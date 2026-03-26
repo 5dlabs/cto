@@ -1,0 +1,17 @@
+{
+  "generated_at": "2026-03-26T22:20:06Z",
+  "project_name": "sigma-1",
+  "linear_session_id": "",
+  "design_mode": "ingest",
+  "stitch_required": false,
+  "bundle_dir": "/Users/jonathon/5dlabs/cto/.tasks/design",
+  "has_frontend": false,
+  "stitch_status": "failed",
+  "files": {
+    "design_context": "/Users/jonathon/5dlabs/cto/.tasks/design/design-context.json",
+    "crawled_urls": "/Users/jonathon/5dlabs/cto/.tasks/design/crawled/urls.json",
+    "stitch_run": "/Users/jonathon/5dlabs/cto/.tasks/design/stitch/stitch-run.json",
+    "stitch_candidates": "/Users/jonathon/5dlabs/cto/.tasks/design/stitch/candidates.json",
+    "auth_discovery": "/Users/jonathon/5dlabs/cto/.tasks/design/auth-discovery.json"
+  }
+}

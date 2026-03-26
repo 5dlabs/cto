@@ -1,0 +1,305 @@
+# Docker image builds for all CTO platform services
+# Each job extends .docker-build and pushes to registry.5dlabs.ai/5dlabs/<name>
+
+# --- Rust service images (cargo-chef pattern) ---
+
+build-controller:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --file infra/images/controller/Dockerfile \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/controller:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/controller:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/controller:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/controller:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - crates/controller/**
+        - templates/**
+        - infra/images/controller/**
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 45m
+
+build-healer:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --file infra/images/healer/Dockerfile \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/healer:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/healer:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/healer:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/healer:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - crates/healer/**
+        - infra/images/healer/**
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 45m
+
+build-pm-server:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --file infra/images/pm-server/Dockerfile \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/pm-server:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/pm-server:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/pm-server:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/pm-server:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - crates/pm/**
+        - infra/images/pm-server/**
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 45m
+
+build-tools:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --file infra/images/tools/Dockerfile \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/tools:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/tools:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/tools:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/tools:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - crates/tools/**
+        - crates/mcp/**
+        - infra/images/tools/**
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 45m
+
+build-research:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --file infra/images/research/Dockerfile \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/research:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/research:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/research:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/research:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - crates/research/**
+        - apps/intake-agent/**
+        - infra/images/research/**
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 45m
+
+build-dex-indexer:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --file skills/trader/docker/Dockerfile.dex-indexer \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/dex-indexer:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/dex-indexer:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/dex-indexer:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/dex-indexer:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - crates/dex-indexer/**
+        - skills/trader/docker/Dockerfile.dex-indexer
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 45m
+
+# --- Node / Next.js images ---
+
+build-web:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --file infra/images/web/Dockerfile \
+        --target production \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/web:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/web:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/web:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/web:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - apps/web/**
+        - infra/images/web/**
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 30m
+
+build-web-migrate:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --file infra/images/web/Dockerfile \
+        --target migrate \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/web-migrate:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/web-migrate:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/web-migrate:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/web-migrate:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - apps/web/**
+        - infra/images/web/**
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 30m
+
+build-discord-bridge:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --file apps/discord-bridge/Dockerfile \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/discord-bridge:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/discord-bridge:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/discord-bridge:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/discord-bridge:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - apps/discord-bridge/**
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 15m
+
+build-linear-bridge:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --file apps/linear-bridge/Dockerfile \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/linear-bridge:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/linear-bridge:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/linear-bridge:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/linear-bridge:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - apps/linear-bridge/**
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 15m
+
+# --- Bun images ---
+
+build-grok:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --file infra/images/grok/Dockerfile \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/grok:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/grok:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/grok:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/grok:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - apps/grok/**
+        - infra/images/grok/**
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 15m
+
+# --- Infrastructure images ---
+
+build-postgresql:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --file infra/images/postgresql/Dockerfile \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/postgresql:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/postgresql:v${CI_COMMIT_SHORT_SHA}" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - infra/images/postgresql/**
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 15m
+
+build-openmemory:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --file infra/images/openmemory/Dockerfile \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/openmemory:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/openmemory:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/openmemory:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/openmemory:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - infra/images/openmemory/**
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 15m
+
+build-tweakcn:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --file infra/images/tweakcn/Dockerfile \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/tweakcn:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/tweakcn:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/tweakcn:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/tweakcn:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - infra/images/tweakcn/**
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 15m

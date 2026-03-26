@@ -5,85 +5,62 @@ description: >
   LLM summarization pass to extract structured context: service boundaries,
   API contracts, data models, patterns, and test infrastructure.
 
-inputs:
-  - name: repository_url
-    type: string
-    description: "GitHub repository URL (e.g. https://github.com/org/repo)"
-  - name: prd_content
-    type: string
-    description: "PRD content — used to focus analysis on areas relevant to the new work"
-  - name: branch
-    type: string
-    default: "main"
-    description: "Branch to analyze"
-  - name: model_primary_provider
-    type: string
-    default: "anthropic"
-  - name: model_primary
-    type: string
-    default: "claude-sonnet-4-6"
-
-outputs:
-  - name: codebase_context
-    type: string
-    description: "Structured codebase context markdown for downstream prompts"
+args:
+  audio_debug:
+    default: "true"
+  repository_url:
+    default: ""
+  prd_content:
+    default: ""
+  branch:
+    default: main
+  model_primary_provider:
+    default: anthropic
+  model_primary:
+    default: claude-sonnet-4-6
 
 steps:
-  # ─────────────────────────────────────────────────────────
-  # Step 1: Pack the repository via Repomix
-  # Produces a context-optimized representation of the entire codebase.
-  # Falls back to OctoCode structure view if Repomix is unavailable.
-  # ─────────────────────────────────────────────────────────
-  - name: pack-repo
-    description: "Pack existing repository into context-optimized format"
-    timeout: "10m"
+  - id: pack-repo
     command: >
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "codebase-analysis" "pack-repo" "${audio_debug}";
       if command -v repomix >/dev/null 2>&1 || openclaw.invoke --tool repomix --action check 2>/dev/null; then
-        openclaw.invoke --tool repomix --action pack_remote_repository --args-json '{
-          "remote": "{{inputs.repository_url}}",
-          "branch": "{{inputs.branch}}"
-        }'
+        openclaw.invoke --tool repomix --action pack_remote_repository --args-json "$(jq -n --arg remote "${repository_url}" --arg branch "${branch}" '{"remote": $remote, "branch": $branch}')"
       else
         echo '{"fallback": "octocode", "message": "Repomix unavailable — using OctoCode structure view"}' >&2 &&
-        REPO_PATH=$(echo "{{inputs.repository_url}}" | sed 's|https://github.com/||' | sed 's|\.git$||') &&
+        REPO_PATH=$(echo "${repository_url}" | sed 's|https://github.com/||' | sed 's|\.git$||') &&
         openclaw.invoke --tool octocode --action githubViewRepoStructure --args-json "{
           \"repository\": \"${REPO_PATH}\",
-          \"branch\": \"{{inputs.branch}}\"
+          \"branch\": \"${branch}\"
         }"
       fi
 
-  # ─────────────────────────────────────────────────────────
-  # Step 2: Search for key patterns relevant to the PRD
-  # Targeted searches for existing implementations that overlap
-  # with what the PRD is asking for.
-  # ─────────────────────────────────────────────────────────
-  - name: search-patterns
-    description: "Search packed codebase for patterns relevant to the PRD"
-    depends_on: [pack-repo]
-    timeout: "5m"
+  - id: search-patterns
     command: >
-      REPO_PATH=$(echo "{{inputs.repository_url}}" | sed 's|https://github.com/||' | sed 's|\.git$||') &&
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "codebase-analysis" "search-patterns" "${audio_debug}";
+      REPO_PATH=$(echo "${repository_url}" | sed 's|https://github.com/||' | sed 's|\.git$||') &&
       openclaw.invoke --tool octocode --action githubSearchCode --args-json "{
         \"repository\": \"${REPO_PATH}\",
         \"query\": \"path:src OR path:lib OR path:app language:rust OR language:go OR language:typescript\",
         \"maxResults\": 50
       }"
 
-  # ─────────────────────────────────────────────────────────
-  # Step 3: Summarize into structured codebase context
-  # LLM pass over the packed output + search results to produce
-  # a structured context document for downstream prompts.
-  # ─────────────────────────────────────────────────────────
-  - name: summarize-codebase
-    description: "Extract structured context from packed codebase + search results"
-    depends_on: [pack-repo, search-patterns]
+  - id: summarize-codebase
+    env:
+      CTO_PACK_REPO_OUT: $pack-repo.stdout
+      CTO_SEARCH_PATTERNS_OUT: $search-patterns.stdout
     command: >
-      jq -n
-        --arg prompt "{{prompts/codebase-analysis-system.md}}"
-        --arg prd_content "{{inputs.prd_content}}"
-        --arg repo_url "{{inputs.repository_url}}"
-        --argjson packed_output '${{ steps.pack-repo.output }}'
-        --argjson search_results '${{ steps.search-patterns.output }}'
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "codebase-analysis" "summarize-codebase" "${audio_debug}";
+      ANALYSIS_ARGS=$(jq -n \
+        --rawfile prompt "$root/intake/prompts/codebase-analysis-system.md" \
+        --rawfile prd_content "$root/.intake/run-prd.txt" \
+        --arg repo_url "${repository_url}" \
+        --argjson packed_output "$(printf '%s' "$CTO_PACK_REPO_OUT")" \
+        --argjson search_results "$(printf '%s' "$CTO_SEARCH_PATTERNS_OUT")" \
+        --arg provider "${model_primary_provider}" \
+        --arg model "${model_primary}" \
         '{
           "prompt": $prompt,
           "input": {
@@ -92,21 +69,18 @@ steps:
             "search_results": $search_results,
             "prd_content": $prd_content
           },
-          "provider": "{{inputs.model_primary_provider}}",
-          "model": "{{inputs.model_primary}}",
+          "provider": $provider,
+          "model": $model,
           "temperature": 0.2
-        }' | openclaw.invoke --tool llm-task --action text --args-json "$(cat)"
+        }')
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action text --args-json "$ANALYSIS_ARGS"
 
-  # ─────────────────────────────────────────────────────────
-  # Step 4: Save codebase context for audit trail
-  # ─────────────────────────────────────────────────────────
-  - name: save-context
-    description: "Persist codebase context for downstream pipeline and audit"
-    depends_on: [summarize-codebase]
+  - id: save-context
+    env:
+      CTO_SUMMARIZE_CODEBASE_OUT: $summarize-codebase.stdout
     command: >
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "codebase-analysis" "save-context" "${audio_debug}";
       mkdir -p .tasks/docs &&
-      echo "${{ steps.summarize-codebase.output }}" > .tasks/docs/codebase-context.md &&
-      echo "Codebase context saved to .tasks/docs/codebase-context.md"
-
-output_mappings:
-  codebase_context: ${{ steps.summarize-codebase.output }}
+      printf '%s' "$CTO_SUMMARIZE_CODEBASE_OUT" > .tasks/docs/codebase-context.md &&
+      printf '%s' "$CTO_SUMMARIZE_CODEBASE_OUT"

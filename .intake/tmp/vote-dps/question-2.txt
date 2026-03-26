@@ -1,0 +1,1 @@
+How will authentication and authorization be handled for service-to-service calls and external API access from the frontend?

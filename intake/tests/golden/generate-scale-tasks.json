@@ -1,0 +1,5 @@
+{"scale_tasks": [
+  {"task_id": 1, "production_tasks": ["Add connection pooling configuration", "Configure rate limiting per tenant"]},
+  {"task_id": 2, "production_tasks": ["Add circuit breaker for external service calls", "Configure gRPC connection keep-alive"]},
+  {"task_id": 3, "production_tasks": ["Add idempotency keys for payment processing", "Configure Stripe webhook retry handling"]}
+]}

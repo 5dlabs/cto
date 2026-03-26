@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # GitLab CE Post-Deploy Setup
-# Run after GitLab is accessible at git.5dlabs.ai
+# Run after GitLab is accessible at gitlab.5dlabs.ai
 #
 # This script automates:
 #   1. Wait for GitLab to be ready
@@ -11,14 +11,14 @@
 #   6. Store secrets in OpenBao
 #
 # Prerequisites:
-#   - GitLab CE running at git.5dlabs.ai
+#   - GitLab CE running at gitlab.5dlabs.ai
 #   - kubectl access to the cluster
 #   - GITLAB_ROOT_PASSWORD set or available from OpenBao
 #   - GITHUB_TOKEN set (for repo import)
 
 set -euo pipefail
 
-GITLAB_URL="${GITLAB_URL:-https://git.5dlabs.ai}"
+GITLAB_URL="${GITLAB_URL:-https://gitlab.5dlabs.ai}"
 GITLAB_API="${GITLAB_URL}/api/v4"
 GITHUB_ORG="5dlabs"
 GITLAB_GROUP="5dlabs"

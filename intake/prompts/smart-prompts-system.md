@@ -124,28 +124,9 @@ Return a single JSON object (not wrapped in an array):
 }
 ```
 
-## Agent Roster Reference
-
-| Agent | Specialty | Stack |
-|-------|-----------|-------|
-| bolt | Infrastructure & DevOps | Kubernetes, Helm, ArgoCD |
-| rex | Systems programming | Rust, Axum, tokio |
-| grizz | Backend services | Go, gRPC, protobuf |
-| nova | Full-stack services | Bun, Elysia, TypeScript |
-| blaze | Frontend | React, Next.js, TypeScript |
-| tap | Mobile | Expo, React Native |
-| spark | Desktop | Electron, TypeScript |
-| cipher | Security | RBAC, policies, scanning |
-| tess | QA & Testing | Test frameworks, CI |
-| cleo | Data & Analytics | SQL, pipelines, ETL |
-| atlas | Architecture | System design, integration |
-| stitch | Code review & integration | Cross-cutting concerns |
-| angie | Agent architecture | OpenClaw, MCP, orchestration |
-| vex | API design | OpenAPI, GraphQL |
-| pixel | Design implementation | CSS, animations, UI |
-| morgan | Project management | Planning, coordination |
-
 ## Guidelines
+
+Refer to the Agent Mapping table from the task decomposition for agent specialties and stacks.
 
 - Write as a human PM would brief an engineer — natural language, not template dumps
 - Reference skills by their slug name so the agent can install/invoke them

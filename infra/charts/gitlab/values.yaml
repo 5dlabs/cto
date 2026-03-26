@@ -1,4 +1,4 @@
-# GitLab CE Helm Chart Values
+# GitLab CE Helm Chart Values (chart 9.10.x / GitLab 18.10)
 # Tuned-down for resource efficiency on existing K8s cluster
 # Chart: https://docs.gitlab.com/charts/
 #
@@ -10,7 +10,7 @@ global:
   hosts:
     domain: 5dlabs.ai
     gitlab:
-      name: git.5dlabs.ai
+      name: gitlab.5dlabs.ai
     registry:
       name: registry.5dlabs.ai
     minio:
@@ -35,9 +35,6 @@ global:
   # GitLab Shell (SSH access)
   shell:
     port: 22
-
-  # Time zone
-  time_zone: UTC
 
   # GitLab Pages (disabled — we use Cloudflare Pages)
   pages:
@@ -168,10 +165,8 @@ registry:
       cpu: 500m
       memory: 512Mi
   storage:
-    # Use filesystem storage (backed by PVC)
-    # For S3-compatible storage, configure s3 block instead
-    filesystem:
-      rootdirectory: /var/lib/registry
+    secret: gitlab-registry-storage
+    key: config
   persistence:
     enabled: true
     size: 100Gi
@@ -189,8 +184,6 @@ registry:
 # -------------------------------------------------------------------
 postgresql:
   install: true
-  image:
-    tag: "16.2"
   primary:
     resources:
       requests:
@@ -242,7 +235,7 @@ minio:
 # Disable components we don't need
 # -------------------------------------------------------------------
 certmanager:
-  install: false
+  installCRDs: false
 
 nginx-ingress:
   enabled: false  # We use our own ingress-nginx + Cloudflare tunnel

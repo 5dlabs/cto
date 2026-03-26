@@ -14,12 +14,12 @@ Python LiveKit agent for the Morgan talking-avatar proof of concept.
 | Component | Options |
 |-----------|---------|
 | STT | `livekit-flux` (default), `livekit-nova`, `deepgram-flux`, `deepgram-nova` |
-| TTS | `livekit-elevenlabs` (default), `elevenlabs`, `cartesia`, `livekit-cartesia` |
+| TTS | `elevenlabs` (default), `livekit-elevenlabs`, `cartesia`, `livekit-cartesia` |
 | LLM | `openclaw` (default), `inference` |
 
 ## Run locally
 
-1. Copy `.env.example` to `.env` and fill in credentials.
+1. Create `agent/.env` and fill in credentials (LiveKit, LemonSlice, OpenClaw, and optional provider keys for any non-default STT/TTS modes).
 2. Create a Python 3.11 virtual environment and install:
    ```bash
    python3.11 -m venv .venv

@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "title": "Equipment Catalog Service",
+    "agent": "rex",
+    "stack": "Rust/Axum",
+    "description": "High-performance API for equipment inventory, availability checking, and self-service quoting.",
+    "status": "pending",
+    "dependencies": [],
+    "priority": "high",
+    "details": "Serve 533+ products across 24 categories with real-time availability checking, barcode/SKU lookup, image serving via S3/R2 CDN, and rate limiting per tenant.",
+    "test_strategy": "Integration tests for CRUD, availability queries, rate limit enforcement."
+  },
+  {
+    "id": 2,
+    "title": "Rental Management System (RMS)",
+    "agent": "grizz",
+    "stack": "Go/gRPC",
+    "description": "Full replacement for Current RMS — bookings, projects, inventory, logistics, crew management.",
+    "status": "pending",
+    "dependencies": [1],
+    "priority": "high",
+    "details": "Quote-to-project workflow, barcode scanning for check-out/check-in, crew scheduling, vehicle tracking, calendar integration.",
+    "test_strategy": "Unit tests for state transitions, integration tests for gRPC services."
+  },
+  {
+    "id": 3,
+    "title": "Finance Service",
+    "agent": "rex",
+    "stack": "Rust/Axum",
+    "description": "Invoicing, payments, AP/AR, payroll, multi-currency support.",
+    "status": "pending",
+    "dependencies": [2],
+    "priority": "high",
+    "details": "Quote-to-invoice conversion, Stripe integration, automated payment reminders, AR aging reports, tax calculation.",
+    "test_strategy": "Unit tests for calculations, integration tests for Stripe webhook handling."
+  }
+]

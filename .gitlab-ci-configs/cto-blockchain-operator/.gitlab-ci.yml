@@ -1,0 +1,171 @@
+# GitLab CI/CD for CTO Blockchain Operator
+# Replaces: .github/workflows/test-kind.yaml from GitHub Actions
+# Full Rust test suite + Docker image build
+
+stages:
+  - test
+  - build
+
+variables:
+  REGISTRY: registry.5dlabs.ai
+  IMAGE_BASE: 5dlabs
+
+# ====================================================================
+# Test Stage
+# ====================================================================
+
+unit-tests:
+  stage: test
+  image: rust:1.88
+  before_script:
+    - apt-get update && apt-get install -y protobuf-compiler
+  script:
+    - cargo test --lib
+  cache:
+    key: rust-${CI_COMMIT_REF_SLUG}
+    paths:
+      - target/
+      - .cargo/
+    policy: pull-push
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  tags:
+    - k8s
+
+provider-tests:
+  stage: test
+  image: rust:1.88
+  needs:
+    - job: unit-tests
+  before_script:
+    - apt-get update && apt-get install -y protobuf-compiler
+  script:
+    - cargo test --test cherry_provider_test
+    - cargo test --test latitude_provider_test
+    - cargo test --test ovh_provider_test
+  cache:
+    key: rust-${CI_COMMIT_REF_SLUG}
+    paths:
+      - target/
+      - .cargo/
+    policy: pull
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  tags:
+    - k8s
+
+integration-tests:
+  stage: test
+  image: rust:1.88
+  needs:
+    - job: provider-tests
+  before_script:
+    - apt-get update && apt-get install -y protobuf-compiler
+  script:
+    - cargo test --test integration_test
+    - cargo test --test polygon_crd_test
+    - cargo test --test polygon_controller_test
+  cache:
+    key: rust-${CI_COMMIT_REF_SLUG}
+    paths:
+      - target/
+      - .cargo/
+    policy: pull
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  tags:
+    - k8s
+
+kind-e2e:
+  stage: test
+  image: docker:24
+  services:
+    - name: docker:24-dind
+      alias: docker
+      variables:
+        DOCKER_TLS_CERTDIR: ""
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  needs:
+    - job: integration-tests
+  before_script:
+    - apk add --no-cache curl bash kubectl
+    - |
+      curl -Lo /usr/local/bin/kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+      chmod +x /usr/local/bin/kind
+  script:
+    - kind create cluster --name cto-test
+    - |
+      kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.5/cert-manager.yaml
+      kubectl wait --for=condition=available --timeout=300s deployment/cert-manager -n cert-manager
+      kubectl wait --for=condition=available --timeout=300s deployment/cert-manager-webhook -n cert-manager
+    - kubectl apply -f config/crd/bases/
+    - kubectl apply -f examples/solana-validator.yaml
+    - sleep 10
+    - kubectl get solananodes
+    - kubectl get crds | grep solananodes
+    - |
+      kubectl apply -f examples/polygon-full-node.yaml
+      kubectl apply -f examples/polygon-archive-node.yaml
+      kubectl apply -f examples/polygon-sentry-node.yaml
+      kubectl apply -f examples/polygon-amoy-smoke-test.yaml
+      sleep 5
+      kubectl get polygonnodes
+      POLYGON_COUNT=$(kubectl get polygonnodes --no-headers | wc -l)
+      if [ "$POLYGON_COUNT" -ne 4 ]; then
+        echo "Expected 4 PolygonNode CRs, got $POLYGON_COUNT"
+        exit 1
+      fi
+      echo "All 4 Polygon node CRs accepted successfully"
+  after_script:
+    - kind delete cluster --name cto-test 2>/dev/null || true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  tags:
+    - k8s
+    - docker
+  timeout: 20m
+
+# ====================================================================
+# Build Stage
+# ====================================================================
+
+build-operator:
+  stage: build
+  image: docker:24
+  services:
+    - name: docker:24-dind
+      alias: docker
+      variables:
+        DOCKER_TLS_CERTDIR: ""
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  needs:
+    - job: kind-e2e
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker buildx create --use --name ci-builder --driver docker-container 2>/dev/null || docker buildx use ci-builder
+    - docker buildx inspect --bootstrap
+  script:
+    - |
+      docker buildx build \
+        --file Dockerfile \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/cto-blockchain-operator:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/cto-blockchain-operator:${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/cto-blockchain-operator:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/cto-blockchain-operator:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  tags:
+    - k8s
+    - docker
+  timeout: 30m

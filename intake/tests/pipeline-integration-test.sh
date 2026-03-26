@@ -1371,8 +1371,18 @@ fi
 echo ""
 echo "=== Test 29: Run Registration ==="
 
-# Check pipeline has register-run and deregister-run steps
+# Check pipeline has preflight, start notify, register-run, deregister-run steps
 pipeline="$INTAKE_DIR/workflows/pipeline.lobster.yaml"
+if grep -q "id: preflight" "$pipeline" 2>/dev/null; then
+  pass "pipeline has preflight step"
+else
+  fail "preflight step" "preflight not found in pipeline"
+fi
+if grep -q "notify-pipeline-start" "$pipeline" 2>/dev/null; then
+  pass "pipeline has notify-pipeline-start step"
+else
+  fail "notify-pipeline-start step" "notify-pipeline-start not found in pipeline"
+fi
 if grep -q "register-run" "$pipeline" 2>/dev/null; then
   pass "pipeline has register-run step"
 else
@@ -1390,6 +1400,160 @@ if grep -q "run_id" "$pipeline" 2>/dev/null; then
   pass "pipeline has run_id input"
 else
   fail "pipeline run_id" "run_id not found in pipeline"
+fi
+
+# =========================================================================
+# Test 30: Design Intake + Stitch wiring
+# =========================================================================
+echo ""
+echo "=== Test 30: Design Intake + Stitch Wiring ==="
+
+pipeline="$INTAKE_DIR/workflows/pipeline.lobster.yaml"
+intake_wf="$INTAKE_DIR/workflows/intake.lobster.yaml"
+delib_wf="$INTAKE_DIR/workflows/deliberation.lobster.yaml"
+agent_index="$INTAKE_DIR/../apps/intake-agent/src/index.ts"
+agent_types="$INTAKE_DIR/../apps/intake-agent/src/types.ts"
+
+for arg_name in design_prompt design_artifacts_path design_urls design_mode; do
+  if grep -q "$arg_name" "$pipeline" 2>/dev/null; then
+    pass "pipeline has $arg_name argument"
+  else
+    fail "pipeline arg: $arg_name" "$arg_name not found in pipeline args"
+  fi
+done
+
+if grep -q "id: materialize-design-inputs" "$pipeline" 2>/dev/null; then
+  pass "pipeline has materialize-design-inputs step"
+else
+  fail "materialize-design-inputs step" "materialize-design-inputs not found in pipeline"
+fi
+
+if grep -q "design_context" "$pipeline" 2>/dev/null; then
+  pass "pipeline threads design_context"
+else
+  fail "pipeline design_context threading" "design_context not found in pipeline"
+fi
+
+if grep -q "design_context" "$intake_wf" 2>/dev/null; then
+  pass "intake workflow accepts design_context"
+else
+  fail "intake design_context" "design_context not found in intake workflow"
+fi
+
+if grep -q "design_context" "$delib_wf" 2>/dev/null; then
+  pass "deliberation workflow accepts design_context"
+else
+  fail "deliberation design_context" "design_context not found in deliberation workflow"
+fi
+
+if grep -q "design_intake" "$agent_index" 2>/dev/null && grep -q "design_intake" "$agent_types" 2>/dev/null; then
+  pass "intake-agent supports design_intake operation"
+else
+  fail "design_intake operation" "design_intake operation missing from intake-agent"
+fi
+
+for fixture in \
+  design-intake-greenfield-frontend.json \
+  design-intake-existing-project.json \
+  design-intake-backend-only.json \
+  design-intake-sketch-mockup.json \
+  design-intake-sigma1-site-improvement.json; do
+  fixture_path="$FIXTURES_DIR/$fixture"
+  if [ ! -f "$fixture_path" ]; then
+    fail "fixture exists: $fixture" "Missing fixture: $fixture_path"
+    continue
+  fi
+  if python3 -c "import json; json.load(open('$fixture_path'))" 2>/dev/null; then
+    pass "fixture valid JSON: $fixture"
+  else
+    fail "fixture JSON: $fixture" "Could not parse JSON fixture: $fixture_path"
+  fi
+done
+
+sigma_fixture="$FIXTURES_DIR/design-intake-sigma1-site-improvement.json"
+if python3 -c "
+import json
+with open('$sigma_fixture') as f:
+    data = json.load(f)
+urls = data.get('design_urls') or []
+assert any('sigma1.led.video' in u for u in urls)
+assert data.get('project_name') == 'sigma-1'
+print('OK')
+" 2>/dev/null | grep -q OK; then
+  pass "sigma-1 fixture includes sigma1 URL and project name"
+else
+  fail "sigma-1 fixture content" "sigma fixture missing expected sigma1 fields"
+fi
+
+if grep -q "id: verify-artifact-gates" "$intake_wf" 2>/dev/null; then
+  pass "intake workflow has verify-artifact-gates step"
+else
+  fail "verify-artifact-gates step" "verify-artifact-gates not found in intake workflow"
+fi
+
+if grep -q ".tasks/tasks/tasks.json" "$intake_wf" 2>/dev/null; then
+  pass "intake workflow writes tasks snapshot artifact"
+else
+  fail "tasks snapshot artifact" ".tasks/tasks/tasks.json write not found in intake workflow"
+fi
+
+if grep -q "id: save-design-bundle" "$pipeline" 2>/dev/null; then
+  pass "pipeline has save-design-bundle step"
+else
+  fail "save-design-bundle step" "save-design-bundle not found in pipeline"
+fi
+
+if grep -q "id: persist-design-metadata" "$pipeline" 2>/dev/null; then
+  pass "pipeline has persist-design-metadata step"
+else
+  fail "persist-design-metadata step" "persist-design-metadata not found in pipeline"
+fi
+
+if grep -q "stitch-credentials" "$pipeline" 2>/dev/null && grep -q "STITCH_API_KEY is required" "$pipeline" 2>/dev/null; then
+  pass "pipeline has hard stitch credential gate"
+else
+  fail "stitch credential gate" "Missing hard stitch credential gate in pipeline"
+fi
+
+linear_http="$INTAKE_DIR/../apps/linear-bridge/src/http-server.ts"
+discord_http="$INTAKE_DIR/../apps/discord-bridge/src/http-server.ts"
+if grep -q "/history/design" "$linear_http" 2>/dev/null && grep -q "/history/design-snapshot" "$linear_http" 2>/dev/null; then
+  pass "linear bridge exposes design history/snapshot endpoints"
+else
+  fail "linear design history endpoints" "Missing /history/design and/or /history/design-snapshot in linear bridge"
+fi
+if grep -q "/history/design" "$discord_http" 2>/dev/null && grep -q "/history/design-snapshot" "$discord_http" 2>/dev/null; then
+  pass "discord bridge exposes design history/snapshot endpoints"
+else
+  fail "discord design history endpoints" "Missing /history/design and/or /history/design-snapshot in discord bridge"
+fi
+
+if command -v bun >/dev/null 2>&1; then
+  tmp_out="/tmp/design-intake-it-$$"
+  mkdir -p "$tmp_out"
+  if bun --eval "
+import { readFileSync, existsSync } from 'node:fs';
+import { designIntake } from '$INTAKE_DIR/../apps/intake-agent/src/operations/design-intake.ts';
+const fixture = JSON.parse(readFileSync('$sigma_fixture', 'utf8'));
+const res = await designIntake({
+  prd_content: fixture.prd_content ?? '',
+  design_prompt: fixture.design_prompt ?? '',
+  design_urls: JSON.stringify(fixture.design_urls ?? []),
+  design_mode: 'ingest_only',
+  output_dir: '$tmp_out',
+  project_name: fixture.project_name ?? 'sigma-1'
+});
+if (!existsSync('$tmp_out/design-context.json')) throw new Error('missing design-context.json');
+if (!existsSync('$tmp_out/crawled/urls.json')) throw new Error('missing crawled/urls.json');
+if (!res.hasFrontend) throw new Error('expected hasFrontend=true');
+if (!Array.isArray(res.frontendTargets) || !res.frontendTargets.includes('web')) throw new Error('expected web frontend target');
+" >/dev/null 2>&1; then
+    pass "designIntake executes and materializes expected outputs"
+  else
+    fail "designIntake execution" "designIntake execution smoke failed for sigma fixture"
+  fi
+else
+  fail "bun availability" "bun is required for designIntake execution smoke test"
 fi
 
 # =========================================================================

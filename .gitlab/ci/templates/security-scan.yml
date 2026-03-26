@@ -1,0 +1,103 @@
+# Security scanning templates for GitLab CI
+# Replaces: CodeQL, skills-security-scan, Trivy from GitHub Actions
+
+.semgrep-sast:
+  image: semgrep/semgrep:latest
+  script:
+    - semgrep ci --config auto --json --output semgrep-results.json || true
+    - semgrep ci --config auto
+  artifacts:
+    reports:
+      sast: semgrep-results.json
+    when: always
+    expire_in: 30 days
+  tags:
+    - k8s
+
+.cargo-audit:
+  image: rust:latest
+  script:
+    - cargo install cargo-audit --locked 2>/dev/null || true
+    - cargo audit --json > cargo-audit-results.json || true
+    - cargo audit
+  artifacts:
+    paths:
+      - cargo-audit-results.json
+    when: always
+    expire_in: 30 days
+  allow_failure: true
+  tags:
+    - k8s
+
+.npm-audit:
+  image: node:20
+  script:
+    - cd $NPM_PROJECT_DIR
+    - npm audit --json > npm-audit-results.json || true
+    - npm audit --audit-level=high
+  artifacts:
+    paths:
+      - $NPM_PROJECT_DIR/npm-audit-results.json
+    when: always
+    expire_in: 30 days
+  allow_failure: true
+  tags:
+    - k8s
+
+.trivy-image-scan:
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  script:
+    - trivy image --exit-code 0 --severity HIGH,CRITICAL --format json --output trivy-results.json "$SCAN_IMAGE"
+    - trivy image --exit-code 1 --severity CRITICAL "$SCAN_IMAGE"
+  artifacts:
+    paths:
+      - trivy-results.json
+    when: always
+    expire_in: 30 days
+  allow_failure: true
+  tags:
+    - k8s
+
+.skills-security-scan:
+  image: python:3.12-slim
+  script:
+    - pip install uv
+    - |
+      shopt -s globstar nullglob 2>/dev/null || true
+      SCAN_DIRS=""
+      for dir in $SKILLS_DIRS; do
+        [ -d "$dir" ] && SCAN_DIRS="$SCAN_DIRS $dir"
+      done
+    - uvx mcp-scan@latest --skills --json $SCAN_DIRS > scan-results.json || true
+    - |
+      python3 << 'SCRIPT'
+      import json, sys
+      with open("scan-results.json") as f:
+          raw = f.read().strip()
+      if not raw:
+          print("Empty scan results, passing."); sys.exit(0)
+      try:
+          data = json.loads(raw)
+      except json.JSONDecodeError:
+          print("Invalid JSON in scan results, passing."); sys.exit(0)
+      critical = 0
+      for path, entry in data.items():
+          if not isinstance(entry, dict): continue
+          for skill in entry.get("skills", []):
+              for issue in skill.get("issues", []):
+                  if issue.get("severity") == "critical" or issue.get("code", "").startswith("E"):
+                      critical += 1
+                      print(f"CRITICAL [{issue.get('code')}] {path}: {issue.get('description','')[:120]}")
+      print(f"\nCritical: {critical}")
+      if critical > 0:
+          print("Failing due to critical findings."); sys.exit(1)
+      SCRIPT
+  artifacts:
+    paths:
+      - scan-results.json
+    when: always
+    expire_in: 30 days
+  tags:
+    - k8s

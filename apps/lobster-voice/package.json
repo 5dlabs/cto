@@ -1,0 +1,14 @@
+{
+  "name": "lobster-voice",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/index.ts --compile --outfile lobster-voice",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/bun": "^1.2.0"
+  }
+}

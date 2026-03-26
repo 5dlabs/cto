@@ -1,0 +1,4 @@
+{"remediation_tasks": [
+  {"finding_id": "sec-1", "task_title": "Implement JWT auth middleware", "priority": "high", "affected_tasks": [1, 2], "description": "Add JWT verification middleware to Axum and gRPC services."},
+  {"finding_id": "sec-2", "task_title": "Add PII encryption layer", "priority": "medium", "affected_tasks": [2, 3], "description": "Implement column-level encryption for customer PII fields."}
+]}

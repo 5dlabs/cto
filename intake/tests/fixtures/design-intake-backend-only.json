@@ -1,0 +1,9 @@
+{
+  "project_name": "backend-services-only",
+  "design_mode": "ingest_plus_stitch",
+  "design_prompt": "API only services. No frontend. Headless backend only.",
+  "design_urls": [],
+  "include_codebase": false,
+  "expected_has_frontend": false,
+  "expected_frontend_targets": []
+}

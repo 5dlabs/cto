@@ -8,7 +8,7 @@ How the intake pipeline transforms a Product Requirements Document into agent-re
 
 ### Required: PRD
 
-A markdown document describing what needs to be built. Mounted at `/intake-files/prd.txt` by the PM server.
+A markdown document describing what needs to be built. The Lobster intake workflow receives it as `prd_content` and also persists it into the generated `.tasks/docs/` output for downstream agents.
 
 **AlertHub example** (`tests/intake/alerthub-e2e-test/prd.md`):
 
@@ -40,6 +40,29 @@ notifications with intelligent routing, rate limiting, and user preferences.
 
 An `architecture.md` file with service topology, data flows, infrastructure CRDs, security model, and observability strategy. AlertHub's is 693 lines covering every service boundary, API contract, Effect pattern, and Kubernetes resource definition.
 
+### Optional: Design Inputs (V1)
+
+Design intake accepts any combination of:
+
+- `design_prompt` - freeform design intent or UX goals
+- `design_artifacts_path` - relative path to sketches/mockups/assets
+- `design_urls` - existing site/app URLs for modernization context
+- `design_mode` - `ingest_only` or `ingest_plus_stitch` (default)
+
+Materialized outputs are written to:
+
+```
+.intake/design/
+├── design-context.json
+├── assets/
+├── crawled/urls.json
+└── stitch/
+    ├── stitch-run.json
+    └── candidates.json
+```
+
+When frontend is not detected (`hasFrontend=false`), intake preserves artifacts/URLs but skips Stitch generation.
+
 ### Pipeline Configuration
 
 ```json
@@ -48,13 +71,16 @@ An `architecture.md` file with service topology, data flows, infrastructure CRDs
   "num_tasks": 30,
   "deliberate": true,
   "include_codebase": false,
-  "generate_ai_prompts": true
+  "generate_ai_prompts": true,
+  "design_mode": "ingest_plus_stitch",
+  "design_prompt": "Modernize UI and improve conversion",
+  "design_urls": ["https://sigma1.led.video/"]
 }
 ```
 
 | Flag | Purpose | AlertHub |
 |------|---------|----------|
-| `deliberate` | Run Optimist/Pessimist debate before task generation | `true` |
+| `deliberate` | Run the deliberation workflow before task generation | `true` |
 | `include_codebase` | Analyze existing repo via Repomix/OctoCode | `false` (greenfield) |
 | `num_tasks` | Target number of top-level tasks | `30` |
 
@@ -84,28 +110,22 @@ This context feeds into both the deliberation debate and the parse-prd step so a
 
 Fires targeted web searches to build evidence memos for each debate position. Produces an optimist memo (best practices, scaling patterns, modern approaches) and a pessimist memo (failure modes, operational risks, technology traps).
 
-#### Step 2: Debate (NATS `deliberation.room`)
+#### Step 2: Debate
 
-Two agents argue over the PRD:
+Two debate turns are generated from the PRD context:
 
 - **Optimist** — advocates for modern, scalable architecture. Uses the `optimist-soul.md` personality prompt.
-- **Pessimist** — advocates for boring technology that works. Uses the `pessimist-soul.md` personality prompt.
+- **Pessimist** — advocates for simpler, operationally conservative architecture. Uses the `pessimist-soul.md` personality prompt.
 
-The **Conductor** (intake-agent) orchestrates turns via NATS, enforces the timebox (default 30 minutes), and watches for `DECISION_POINT:` markers.
+The workflow runs these as Lobster steps with stateless LLM calls, posts progress through `intake-util bridge-notify` / `linear-activity`, and parses `DECISION_POINT:` markers from each turn for committee voting.
 
-**AlertHub debate result** (from `.tasks/deliberation.md`):
+**AlertHub deliberation result** (from `.tasks/deliberation.md`):
 
-> **Arbiter Decision**: ADVERSARY (Pessimist) WINS
->
-> Key takeaway: "Build it right the first time. The original PRD's architecture
-> (Rust/Axum + Bun/Effect + Go/gRPC) should be implemented as-designed. Phasing
-> around tech stack simplification creates rewrite debt."
-
-The pessimist won by identifying contradictions in the optimist's "simplification" proposal — the proposed phased approach would actually require rewriting the Integration Service between phases.
+The recorded outcome concluded that the original polyglot architecture should be implemented as designed, rather than phased through a simplified intermediate stack that would create rewrite debt.
 
 #### Step 3: Committee Votes
 
-When a `DECISION_POINT:` is raised during debate, a **5-member committee** votes (120s deadline per vote). Votes are tallied and ties are escalated.
+When a `DECISION_POINT:` is raised during debate, a 5-member committee votes through `decision-voting.lobster.yaml`. Votes are tallied, published through the bridge layer, and can be either fully automatic or human-reviewed depending on `human_review_mode`.
 
 #### Step 4: Compile Design Brief
 
@@ -118,6 +138,35 @@ Claude Opus synthesizes the debate result + original PRD into a **Design Brief**
 - 6 risk assessments with mitigations
 
 **Output**: `.tasks/docs/design-brief.md`
+
+---
+
+### Phase 0.5: Design Intake *(new, required when Stitch mode is enabled)*
+
+Runs immediately after PRD materialization in `pipeline.lobster.yaml`.
+
+1. Copies local design artifacts into `.intake/design/assets/`
+2. Normalizes URL inputs and crawls basic page metadata into `.intake/design/crawled/urls.json`
+3. Detects frontend scope and targets (`web`, `mobile`, `desktop`)
+4. Enforces a Stitch credential gate when `design_mode=ingest_plus_stitch`:
+   - Requires `STITCH_API_KEY`
+   - Emits credential discovery state (`STITCH_API_KEY`, `STITCH_PROJECT_ID`, `STITCH_ACCESS_TOKEN`, `GOOGLE_CLOUD_PROJECT`) to `.intake/design/auth-discovery.json`
+   - Fails fast with explicit gate output if required auth is missing
+5. If enabled and credentials exist, generates Stitch candidates and saves:
+   - `.intake/design/stitch/stitch-run.json`
+   - `.intake/design/stitch/candidates.json`
+6. Writes canonical `.intake/design/design-context.json` for downstream steps
+7. Saves a committed design bundle under `.tasks/design/`:
+   - `design-context.json`
+   - `crawled/urls.json` (when available)
+   - `stitch/stitch-run.json`, `stitch/candidates.json` (when available)
+   - `auth-discovery.json`
+   - `manifest.json`
+8. Persists a design snapshot to bridge SQLite history for audit/evidence reporting
+
+`design-context.json` is threaded into both deliberation and parse-prd task generation.
+
+If credential discovery in OnePass fails, provision or rotate `STITCH_API_KEY` and re-run preflight before starting the pipeline.
 
 ---
 
@@ -142,15 +191,15 @@ Each parsed task includes:
   "dependencies": [10, 11],
   "priority": "high",
   "details": "1. Create POST /api/v1/notifications endpoint\n2. Add request validation...",
-  "testStrategy": "Can submit valid notifications and receive 202 Accepted...",
-  "decisionPoints": [
+  "test_strategy": "Can submit valid notifications and receive 202 Accepted...",
+  "decision_points": [
     {
       "id": "d12",
       "category": "api-design",
       "description": "Request validation strategy",
       "options": ["serde with custom validators", "tower middleware", "axum extractors"],
-      "requiresApproval": false,
-      "constraintType": "soft"
+      "requires_approval": false,
+      "constraint_type": "soft"
     }
   ]
 }
@@ -239,11 +288,11 @@ If "revise" or "reject": voter suggestions are fed back as additional context fo
 
 #### Step 5: Generate Docs
 
-`intake-util generate-docs` creates per-task markdown documentation from the expanded task data.
+The workflow generates task docs in parallel with `intake-util fan-out`, validates the merged output, then writes files into `.tasks/docs/`.
 
 #### Step 6: Generate Prompts
 
-`intake-util generate-prompts` creates agent-ready prompt files for each task and subtask.
+The workflow generates prompts in parallel with `intake-util fan-out`, validates them, and writes `prompt.md`, `prompt.xml`, and subtask prompts to disk.
 
 #### Step 7: Commit Outputs
 
@@ -410,7 +459,7 @@ Single JSON file with all tasks and metadata, used by the task orchestrator to s
       "priority": "high",
       "status": "pending",
       "subtasks": [],
-      "testStrategy": "Cluster is accessible via kubectl..."
+      "test_strategy": "Cluster is accessible via kubectl..."
     }
   ]
 }
@@ -464,16 +513,18 @@ The core output contract is preserved:
 
 | Agent/Role | Technology | Purpose |
 |---|---|---|
-| **Morgan** | Shell template (Handlebars) | Infrastructure setup: repo creation/clone, auth, webhook, then delegates to Lobster pipeline |
-| **intake-agent** | Bun/TypeScript (Claude Code SDK) | AI operations: PRD parsing, task expansion, complexity analysis, deliberation orchestration |
+| **Morgan** | Shell template (Handlebars) | Sets up the run context and launches the Lobster intake pipeline |
+| **intake-agent** | Bun/TypeScript | Binary entry point for `ping` and `prd_research` only |
 | **intake-util** | Bun/TypeScript CLI | Deterministic operations: generate-docs, generate-prompts, tally votes |
-| **Optimist** | OpenClaw agent (NATS) | Debate: advocates modern/scalable architecture |
-| **Pessimist** | OpenClaw agent (NATS) | Debate: advocates simplicity/operational safety |
-| **Committee (5)** | OpenClaw agents (NATS) | Vote on deliberation decision points |
-| **5-model voting panel** | LLM calls via `openclaw.invoke` | Quality gate: evaluate task decomposition |
+| **Optimist** | Lobster `llm-task` step with soul prompt | Debate: advocates modern/scalable architecture |
+| **Pessimist** | Lobster `llm-task` step with soul prompt | Debate: advocates simplicity/operational safety |
+| **Committee (5)** | Lobster `llm-task` steps | Vote on deliberation decision points |
+| **5-model voting panel** | LLM calls via `openclaw.invoke` | Quality gate: evaluate task decomposition and revisions |
+| **linear-bridge** | HTTP bridge service | Webhooks, run registry, elicitation routing, Linear session updates |
 | **Repomix** | MCP tool | Pack existing codebase for analysis |
 | **OctoCode** | MCP tool | GitHub code search fallback |
 | **Tavily** | Research via intake-agent MCP | Pre-debate evidence gathering |
+| **Stitch SDK** | `@google/stitch-sdk` (TypeScript) | Optional UI candidate generation from design intake |
 
 ---
 
@@ -490,9 +541,8 @@ Phase 0 (Codebase Analysis):
 
 Phase 1 (Deliberation):
   Tavily research ........... 2 evidence memos (optimist + pessimist)
-  Debate .................... Optimist proposes phased simplification;
-                              Pessimist identifies contradictions
-  Arbiter decision .......... PESSIMIST WINS — build as designed
+  Debate .................... Optimist and Pessimist turns generated as Lobster steps
+  Decision resolution ....... Committee voting resolves decision points
   Design brief .............. 434 lines, 8 ADR decisions, 6 risk assessments
 
 Phase 2 (Task Generation):
@@ -511,4 +561,27 @@ Output:
   .tasks/tasks/tasks.json ... 30 tasks, 25KB
   Total files ............... ~250+ (tasks + subtasks + prompts)
   GitHub PR ................. Ready for review → triggers agent implementation
+```
+
+---
+
+## Stitch Authentication and Runtime Notes
+
+For `design_mode=ingest_plus_stitch`, set:
+
+- `STITCH_API_KEY`
+
+The pipeline now enforces a hard gate on this credential in preflight materialization. If missing, the run fails before deliberation/tasking.
+
+### Sigma-1 example invocation
+
+```bash
+lobster run --mode tool intake/workflows/pipeline.lobster.yaml --args-json '{
+  "project_name": "sigma-1",
+  "prd_path": ".intake/run-prd.txt",
+  "include_codebase": true,
+  "design_mode": "ingest_plus_stitch",
+  "design_prompt": "Improve existing site design while preserving brand tone",
+  "design_urls": "https://sigma1.led.video/"
+}'
 ```

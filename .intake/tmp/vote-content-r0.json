@@ -1,0 +1,101 @@
+[
+  {
+    "id": 1,
+    "title": "Create Kubernetes Namespaces",
+    "description": "Establish the 'databases' and 'sigma1' Kubernetes namespaces to logically separate infrastructure components and application services.",
+    "dependencies": [],
+    "details": "Execute `kubectl create namespace databases` and `kubectl create namespace sigma1` commands. Ensure the commands complete successfully.",
+    "status": "pending",
+    "test_strategy": "Verify the existence of 'databases' and 'sigma1' namespaces using `kubectl get namespace databases sigma1`.",
+    "subagentType": "implementer",
+    "parallelizable": false
+  },
+  {
+    "id": 2,
+    "title": "Deploy CloudNative-PG Operator",
+    "description": "Install the CloudNative-PG operator into the Kubernetes cluster, which is responsible for managing PostgreSQL instances.",
+    "dependencies": [1],
+    "details": "Use Helm to deploy the CloudNative-PG operator. For example: `helm repo add cloudnative-pg https://cloudnative-pg.github.io/charts && helm repo update && helm install cnpg-operator cloudnative-pg/cloudnative-pg -n databases --create-namespace`.",
+    "status": "pending",
+    "test_strategy": "Confirm the CloudNative-PG operator pods are running and healthy in the 'databases' namespace using `kubectl get pods -n databases -l app.kubernetes.io/name=cloudnative-pg`.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 3,
+    "title": "Deploy Redis Operator",
+    "description": "Install the Redis operator into the Kubernetes cluster, which will manage Redis/Valkey instances.",
+    "dependencies": [1],
+    "details": "Use Helm to deploy the Redis operator. For example: `helm repo add ot-helm https://ot-container-kit.github.io/helm-charts/ && helm repo update && helm install redis-operator ot-helm/redis-operator -n databases --create-namespace`.",
+    "status": "pending",
+    "test_strategy": "Confirm the Redis operator pods are running and healthy in the 'databases' namespace using `kubectl get pods -n databases -l app=redis-operator`.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 4,
+    "title": "Provision S3/R2 Bucket and Credentials",
+    "description": "Provision an S3/R2 compatible object storage bucket and generate the necessary access credentials (access key ID and secret access key).",
+    "dependencies": [],
+    "details": "Use Cloudflare Terraform or equivalent cloud provider tooling to create an S3/R2 bucket named 'sigma1-assets'. Generate an API token or access key/secret pair with read/write permissions for this bucket.",
+    "status": "pending",
+    "test_strategy": "Verify the 'sigma1-assets' bucket exists and confirm the generated credentials allow successful upload and download of a test file using an S3 client (e.g., `aws s3 cp test.txt s3://sigma1-assets/test.txt`).",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 5,
+    "title": "Set up Cloudflare Tunnel for Morgan Agent",
+    "description": "Configure a basic Cloudflare Tunnel to provide initial external access for the 'morgan' service, pointing to a placeholder internal service or IP.",
+    "dependencies": [],
+    "details": "Install `cloudflared` and configure a new tunnel. Create a tunnel configuration file (e.g., `config.yaml`) that points to a placeholder service (e.g., `http://localhost:8080` or a dummy internal IP) and start the tunnel. Ensure the tunnel is registered with Cloudflare.",
+    "status": "pending",
+    "test_strategy": "Verify the Cloudflare Tunnel is active and reachable from the internet by checking its status via `cloudflared tunnel status` and attempting to access the configured public hostname.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 6,
+    "title": "Deploy PostgreSQL Cluster (sigma1-postgres)",
+    "description": "Deploy a single-instance PostgreSQL cluster named 'sigma1-postgres' using the CloudNative-PG operator, including database and user configuration.",
+    "dependencies": [2],
+    "details": "Create a Kubernetes Custom Resource (CR) for a `Cluster` object in the 'databases' namespace. Configure it for a single replica, 50Gi persistent storage, and specify the creation of a database named 'sigma1' with a user 'sigma1_user'. Apply this CR using `kubectl apply -f postgres-cluster.yaml`.",
+    "status": "pending",
+    "test_strategy": "Verify 'sigma1-postgres' pods are running and healthy in the 'databases' namespace. Connect to the PostgreSQL instance using `psql` with 'sigma1_user' and confirm the 'sigma1' database exists and is accessible.",
+    "subagentType": "implementer",
+    "parallelizable": false
+  },
+  {
+    "id": 7,
+    "title": "Deploy Redis/Valkey Cluster (sigma1-valkey)",
+    "description": "Deploy a single-instance Redis/Valkey cluster named 'sigma1-valkey' using the Redis operator.",
+    "dependencies": [3],
+    "details": "Create a Kubernetes Custom Resource (CR) for a `Redis` object in the 'databases' namespace. Configure it for a single replica using the `valkey/valkey:7.2-alpine` image. Apply this CR using `kubectl apply -f redis-cluster.yaml`.",
+    "status": "pending",
+    "test_strategy": "Verify 'sigma1-valkey' pods are running and healthy in the 'databases' namespace. Connect to the Redis instance using `redis-cli` and perform basic operations (e.g., `SET key value`, `GET key`) to confirm functionality.",
+    "subagentType": "implementer",
+    "parallelizable": false
+  },
+  {
+    "id": 8,
+    "title": "Create sigma1-infra-endpoints ConfigMap",
+    "description": "Create a ConfigMap in the 'sigma1' namespace containing connection strings and credentials for PostgreSQL, Redis, and S3/R2 for consumption by other services.",
+    "dependencies": [6, 7, 4],
+    "details": "Construct a Kubernetes ConfigMap YAML file named 'sigma1-infra-endpoints' in the 'sigma1' namespace. Populate it with `POSTGRES_URL`, `REDIS_URL`, `S3_BUCKET_NAME`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY` using the details from the deployed infrastructure. Apply this ConfigMap using `kubectl apply -f configmap.yaml`.",
+    "status": "pending",
+    "test_strategy": "Verify the 'sigma1-infra-endpoints' ConfigMap exists in the 'sigma1' namespace using `kubectl get configmap sigma1-infra-endpoints -n sigma1 -o yaml`. Confirm all expected keys are present and their values are correct and accessible (e.g., attempt to connect using the URLs/credentials from a test pod).",
+    "subagentType": "implementer",
+    "parallelizable": false
+  },
+  {
+    "id": 9,
+    "title": "Review Core Infrastructure Setup",
+    "description": "Conduct a comprehensive review of all deployed core infrastructure components, including Kubernetes resources, external services, and the `sigma1-infra-endpoints` ConfigMap, to ensure correctness and adherence to requirements.",
+    "dependencies": [6, 7, 4, 5, 8],
+    "details": "Perform a checklist-based review: 1. Verify all Kubernetes namespaces, operators, and database clusters are running and healthy. 2. Confirm PostgreSQL and Redis instances are accessible and functional. 3. Validate S3/R2 bucket existence and credential functionality. 4. Check Cloudflare Tunnel status and reachability. 5. Inspect the `sigma1-infra-endpoints` ConfigMap for accuracy and completeness of connection details. 6. Ensure all resources are configured for single-replica, non-HA as per dev bootstrap requirements.",
+    "status": "pending",
+    "test_strategy": "Generate a review report confirming all verification steps from previous subtasks have passed and that the overall infrastructure setup is robust and ready for dependent services. The report should explicitly state compliance with 'single-replica, no HA' for dev bootstrap.",
+    "subagentType": "reviewer",
+    "parallelizable": false
+  }
+]

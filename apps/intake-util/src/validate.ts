@@ -124,6 +124,7 @@ export function validateGeneric(type: string, input: string, strict: boolean = f
   }
 
   switch (type) {
+    case 'generated-task':
     case 'tasks': {
       let parsed: unknown;
       try { parsed = JSON.parse(input); } catch { return { valid: false, errors: ['Invalid JSON'] }; }
@@ -137,6 +138,7 @@ export function validateGeneric(type: string, input: string, strict: boolean = f
       break;
     }
 
+    case 'complexity-analysis':
     case 'complexity': {
       let parsed: unknown;
       try { parsed = JSON.parse(input); } catch { return { valid: false, errors: ['Invalid JSON'] }; }
@@ -158,6 +160,7 @@ export function validateGeneric(type: string, input: string, strict: boolean = f
       break;
     }
 
+    case 'scaffold':
     case 'scaffolds': {
       let parsed: unknown;
       try { parsed = JSON.parse(input); } catch { return { valid: false, errors: ['Invalid JSON'] }; }
@@ -165,6 +168,18 @@ export function validateGeneric(type: string, input: string, strict: boolean = f
       if (!Array.isArray(arr)) return { valid: false, errors: ['Expected scaffolds array'] };
       for (const s of arr as Array<Record<string, unknown>>) {
         if (!s.task_id) errors.push(`Scaffold missing 'task_id'`);
+      }
+      break;
+    }
+
+    case 'skill-recommendations': {
+      let parsed: unknown;
+      try { parsed = JSON.parse(input); } catch { return { valid: false, errors: ['Invalid JSON'] }; }
+      const obj = parsed as Record<string, unknown>;
+      const recs = Array.isArray(parsed) ? parsed : (obj.recommendations ?? obj.task_skills);
+      if (!Array.isArray(recs)) return { valid: false, errors: ['Expected recommendations array or object with recommendations/task_skills'] };
+      for (const r of recs as Array<Record<string, unknown>>) {
+        if (!r.task_id && r.task_id !== 0) errors.push('Skill recommendation missing task_id');
       }
       break;
     }
@@ -196,6 +211,28 @@ export function validateGeneric(type: string, input: string, strict: boolean = f
       for (const dp of parsed as Array<Record<string, unknown>>) {
         if (!dp.id) errors.push(`Decision point missing 'id'`);
         if (!dp.question) errors.push(`DP ${dp.id ?? '?'} missing 'question'`);
+      }
+      break;
+    }
+
+    case 'project-decision-points': {
+      let parsed: unknown;
+      try { parsed = JSON.parse(input); } catch { return { valid: false, errors: ['Invalid JSON'] }; }
+      if (!Array.isArray(parsed)) return { valid: false, errors: ['Expected JSON array of project decision points'] };
+      const validCategories = new Set(['architecture', 'language-runtime', 'service-topology', 'platform-choice', 'build-vs-buy', 'data-model', 'api-design', 'ux-behavior', 'security', 'visual-identity', 'design-system', 'component-library', 'layout-pattern']);
+      const validConstraints = new Set(['hard', 'soft', 'open', 'escalation']);
+      for (const dp of parsed as Array<Record<string, unknown>>) {
+        const dpId = (dp.id as string) ?? '?';
+        if (!dp.id) errors.push(`Project DP missing 'id'`);
+        if (!dp.category) errors.push(`DP ${dpId} missing 'category'`);
+        else if (!validCategories.has(dp.category as string)) errors.push(`DP ${dpId} invalid category '${dp.category}'`);
+        if (!dp.description) errors.push(`DP ${dpId} missing 'description'`);
+        if (!Array.isArray(dp.options) || (dp.options as unknown[]).length < 2) errors.push(`DP ${dpId} needs at least 2 options`);
+        if (typeof dp.requires_approval !== 'boolean') errors.push(`DP ${dpId} missing 'requires_approval' boolean`);
+        if (!dp.constraint_type) errors.push(`DP ${dpId} missing 'constraint_type'`);
+        else if (!validConstraints.has(dp.constraint_type as string)) errors.push(`DP ${dpId} invalid constraint_type '${dp.constraint_type}'`);
+        if (!Array.isArray(dp.affected_tasks)) errors.push(`DP ${dpId} missing 'affected_tasks' array`);
+        if (!dp.rationale) { if (strict) errors.push(`DP ${dpId} missing 'rationale'`); }
       }
       break;
     }

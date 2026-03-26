@@ -269,6 +269,50 @@ pub fn wait_for_cilium_healthy(kubeconfig: &Path) -> Result<()> {
     }
 }
 
+/// Assert that the cluster has no legacy Flannel/kube-proxy daemonsets.
+///
+/// This is a hard guardrail used to enforce the Cilium-only invariant.
+///
+/// # Errors
+///
+/// Returns an error if `kubectl` fails or if legacy daemonsets are found.
+pub fn assert_cilium_only_network_plane(kubeconfig: &Path) -> Result<()> {
+    let output = Command::new("kubectl")
+        .env("KUBECONFIG", kubeconfig)
+        .args([
+            "get",
+            "daemonset",
+            "-n",
+            "kube-system",
+            "-o",
+            "jsonpath={.items[*].metadata.name}",
+        ])
+        .output()
+        .context("Failed to query kube-system daemonsets")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("kubectl failed while checking network plane: {stderr}");
+    }
+
+    let daemonsets = String::from_utf8_lossy(&output.stdout);
+    let mut found_legacy = Vec::new();
+    for ds in ["kube-flannel", "kube-proxy"] {
+        if daemonsets.split_whitespace().any(|name| name == ds) {
+            found_legacy.push(ds);
+        }
+    }
+
+    if !found_legacy.is_empty() {
+        bail!(
+            "legacy network daemonsets detected: {}. Cilium-only policy forbids Flannel/kube-proxy",
+            found_legacy.join(", ")
+        );
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -306,5 +350,16 @@ mod tests {
 
         assert_eq!(config1.cluster_id, 1);
         assert_eq!(config2.cluster_id, 255);
+    }
+
+    #[test]
+    fn test_legacy_daemonset_detection() {
+        let daemonsets = "cilium cilium-envoy kube-proxy";
+        assert!(daemonsets
+            .split_whitespace()
+            .any(|name| name == "kube-proxy"));
+        assert!(!daemonsets
+            .split_whitespace()
+            .any(|name| name == "kube-flannel"));
     }
 }

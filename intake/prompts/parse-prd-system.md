@@ -34,6 +34,27 @@ This is an **existing project**, not greenfield. The codebase has been analyzed 
 - Assume the codebase is empty -- always reference the codebase context above
 {{/if}}
 
+{{#if design_context}}
+# Context: Design Intake Artifacts
+
+Design intake has already normalized visual references and frontend detection signals.
+Use `design_context` to:
+- Determine whether frontend work exists (`hasFrontend`, `frontendTargets`)
+- Incorporate supplied design inputs (prompts, mockups, sketches, existing site references)
+- Leverage generated Stitch candidates when present (`stitch.candidates`)
+
+## Design Tasking Rules
+
+**When `hasFrontend=true`:**
+- Include explicit frontend modernization tasks for each detected target (`web`, `mobile`, `desktop`) as needed
+- Route tasks to the correct specialist (Blaze/Tap/Spark) based on target
+- Convert design deltas into measurable implementation/test criteria (layout, accessibility, performance, consistency)
+
+**When `hasFrontend=false`:**
+- Do not invent frontend tasks
+- Preserve design context as reference-only material for architecture documentation
+{{/if}}
+
 # Task
 
 Generate exactly **{{num_tasks}}** tasks starting from ID **{{next_id}}**, each representing a single deployable unit of work for one agent.
@@ -43,15 +64,17 @@ Generate exactly **{{num_tasks}}** tasks starting from ID **{{next_id}}**, each 
 Follow these steps in order:
 
 1. **Read the entire PRD** — identify all services, components, and cross-cutting concerns
-{{#if codebase_context}}
-2. **Cross-reference with codebase context** — identify what already exists and where new features integrate
-3. **Identify the agent for each component** using the agent mapping below, consistent with existing service ownership
-{{else}}
-2. **Identify the agent for each component** using the agent mapping below
+{{#if design_context}}
+2. **Review design context** — extract frontend targets, design constraints, and modernization opportunities
 {{/if}}
-3. **Order by dependency** — infrastructure first, then backends, then frontends, then integration
-4. **Define clear boundaries** — each task must be completable by a single agent without touching another agent's domain
-5. **Flag ambiguity** — any requirement that could be implemented multiple ways gets a decision point
+{{#if codebase_context}}
+3. **Cross-reference with codebase context** — identify what already exists and where new features integrate
+4. **Identify the agent for each component** using the agent mapping below, consistent with existing service ownership
+{{else}}
+3. **Identify the agent for each component** using the agent mapping below
+{{/if}}
+4. **Order by dependency** — infrastructure first, then backends, then frontends, then integration
+5. **Define clear boundaries** — each task must be completable by a single agent without touching another agent's domain
 6. **Write acceptance criteria** — every task needs a testStrategy that answers "how do I know this is done?"
 
 # Output Schema
@@ -67,17 +90,8 @@ Follow these steps in order:
   "dependencies": [task_ids],
   "priority": "high" | "medium" | "low",
   "details": "Step-by-step implementation guidance (escaped JSON string)",
-  "testStrategy": "Specific, measurable acceptance criteria",
-  "decisionPoints": [
-    {
-      "id": "d1",
-      "category": "architecture" | "error-handling" | "data-model" | "api-design" | "ux-behavior" | "performance" | "security",
-      "description": "What needs to be decided",
-      "options": ["option1", "option2"],
-      "requiresApproval": boolean,
-      "constraintType": "hard" | "soft" | "open" | "escalation"
-    }
-  ]
+  "test_strategy": "Specific, measurable acceptance criteria",
+  "decision_points": []
 }
 ```
 
@@ -99,22 +113,9 @@ Follow these steps in order:
 | Integration/glue | Stitch | Multi-stack |
 | Agent architecture/orchestration | Angie | OpenClaw/MCP |
 
-# Decision Point Categories
+# Decision Points
 
-- **architecture**: System design, service boundaries, patterns (microservice vs monolith, event-driven vs request-response)
-- **error-handling**: Retry strategies, circuit breakers, fallback behavior
-- **data-model**: Schema design, relationships, migration strategy
-- **api-design**: Endpoint structure, versioning, request/response format
-- **ux-behavior**: User interactions, edge cases, loading/error states
-- **performance**: Caching strategy, optimization targets, scaling approach
-- **security**: Auth mechanism, encryption, access control model
-
-# Constraint Types
-
-- **hard**: PRD mandates this — no agent discretion
-- **soft**: Preferred approach, but agent may override with justification
-- **open**: Agent chooses the best approach
-- **escalation**: Human must decide before implementation begins
+Decision points are extracted by a **separate dedicated step** after task decomposition. Leave `decision_points: []` on every task. Do NOT attempt to identify decision points — focus exclusively on task decomposition.
 
 # Constraints
 
@@ -129,89 +130,20 @@ Follow these steps in order:
 - A task that spans two agents (e.g., "Build API and frontend for feature X")
 - Forward dependency references (task 3 depending on task 5)
 - Vague acceptance criteria ("it works", "tests pass")
-- Decision points without at least two concrete options
+- Non-empty decision_points arrays (decision extraction is done separately)
 
-# Example
+# Anti-Patterns (DO NOT generate)
 
-**Good task:**
-```json
-{
-  "id": 1,
-  "title": "Deploy PostgreSQL and Redis (Bolt - Kubernetes)",
-  "agent": "bolt",
-  "stack": "Kubernetes",
-  "description": "Provision the persistence layer: a PostgreSQL cluster via CloudNative-PG for relational data and a Redis Sentinel deployment for caching and session storage.",
-  "status": "pending",
-  "dependencies": [],
-  "priority": "high",
-  "details": "1. Create namespace 'data-tier'\\n2. Deploy CloudNative-PG operator and PostgresCluster CR (3 replicas, 10Gi PVC)\\n3. Deploy Redis Sentinel (3 replicas) via Helm chart\\n4. Create Kubernetes Secrets for connection strings\\n5. Verify connectivity from a test pod",
-  "testStrategy": "PostgreSQL cluster reports 3/3 ready replicas. Redis Sentinel responds to PING from a test pod. Connection secrets exist in the target namespace.",
-  "decisionPoints": [
-    {
-      "id": "d1",
-      "category": "infrastructure",
-      "description": "Should Redis use Sentinel or Redis Cluster mode?",
-      "options": ["Sentinel (simpler, sufficient for caching)", "Redis Cluster (sharded, higher throughput)"],
-      "requiresApproval": false,
-      "constraintType": "open"
-    }
-  ]
-}
-```
+- Missing `agent`/`stack` fields
+- Vague description ("Create the notification system")
+- Unmeasurable testStrategy ("It works", "tests pass")
+- Multi-agent scope ("Build API and frontend")
+- Missing `dependencies`, `details`, or `decision_points`
 
-**Bad task (DO NOT generate):**
-```json
-{
-  "id": 2,
-  "title": "Build notification system",
-  "description": "Create the notification system",
-  "testStrategy": "It works"
-}
-```
-This is bad because: no agent hint, vague description, no dependencies, no details, unmeasurable acceptance criteria.
+## Infrastructure Pattern
 
-## Infrastructure Task Ordering
-
-When generating tasks, ALWAYS follow this infrastructure pattern:
-
-**Task 1 (mandatory)**: Bolt — Development Infrastructure Bootstrap
-- Agent: bolt (infrastructure specialist)
-- Purpose: Provision single-instance development operators needed by the project
-- Based on the infrastructure_context, provision only what the project needs (e.g., PostgreSQL via CloudNative-PG, Redis, NATS, SeaweedFS)
-- Create a shared ConfigMap `{project_name}-infra-endpoints` with connection strings for all provisioned services
-- All subsequent implementation tasks MUST depend on this task
-- Single-replica, no HA — development-grade only
-- Include: namespace creation, operator CRs, secrets, ConfigMap
-
-**Last 2 tasks (mandatory)**: Bolt — Production Hardening
-- Agent: bolt (infrastructure specialist)
-- Purpose: Scale infrastructure for production after all implementation is complete
-- Task N-1: Scale operators to HA configurations (3-replica PostgreSQL, Redis Sentinel, Kafka multi-broker, etc.), configure CDN, TLS certificates, ingress rules, network policies
-- Task N: Security hardening — pod security standards, RBAC policies, secret rotation, audit logging
-- These tasks depend on ALL implementation tasks completing
-
-## Secrets Distribution Pattern
-
-When Bolt provisions an operator in Task 1:
-1. The operator creates a Secret (e.g., CloudNative-PG creates `{cluster-name}-app` with host, port, dbname, user, password)
-2. Bolt creates a ConfigMap `{project_name}-infra-endpoints` aggregating all service endpoints:
-   - `POSTGRES_MAIN_URL=postgresql://user:pass@host:5432/dbname`
-   - `REDIS_URL=redis://host:6379`
-   - `NATS_URL=nats://host:4222`
-   - etc.
-3. All agent task pods reference this ConfigMap via `envFrom` in their pod spec
-4. Connection string naming convention: `{OPERATOR}_{INSTANCE}_URL`
-
-# Verification
-
-Before outputting, verify:
-- [ ] All dependencies reference only lower IDs
-- [ ] Every task has a `testStrategy` with specific, measurable criteria
-- [ ] No task requires work from two different agents
-- [ ] Every task has an `agent` field matching the agent mapping table
-- [ ] Every task has a `stack` field matching the technology used
-- [ ] Agent hints in titles match the `agent` field
-- [ ] Decision points have at least two concrete options and a valid category
-- [ ] Total task count matches {{num_tasks}}
+- **Task 1** (Bolt): Dev infra bootstrap — namespace, single-replica operator CRs (CloudNative-PG, Redis, NATS, etc.), secrets, `{project}-infra-endpoints` ConfigMap aggregating connection strings (`{OPERATOR}_{INSTANCE}_URL`). All later tasks depend on this.
+- **Tasks N-1, N** (Bolt): Production hardening — HA scaling, CDN/TLS/ingress/network policies, then RBAC/secret rotation/audit logging. Depend on all implementation tasks.
+- **All other tasks**: Reference the ConfigMap via `envFrom`; never re-provision infra.
 
 Output ONLY the JSON array contents. No markdown fences, no explanations.

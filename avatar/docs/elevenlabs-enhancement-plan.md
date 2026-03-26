@@ -1,98 +1,78 @@
-# ElevenLabs Enhancement Plan for Morgan Avatar
+# ElevenLabs Optimization Plan for Morgan Avatar
 
-A plan to adopt newer ElevenLabs features identified from the docs and changelog (March 2026) to improve Morgan’s voice quality, latency, and future integration options.
+This plan is intentionally limited to behavior that is already implemented and configurable in this repo.
 
 Companion note:
 - [ElevenLabs cost savings and scope notes](/Users/jonathon/5dlabs/cto/avatar/docs/elevenlabs-cost-savings-and-scope.md)
 
 ---
 
-## 1. Eleven v3 Conversational TTS (Priority: High)
+## Current implementation (code-verified)
 
-**What**: Switch Morgan’s TTS to the `eleven_v3_conversational` model and optionally add `suggested_audio_tags` for more expressive delivery.
+From `avatar/agent/morgan_avatar_agent/config.py` and `providers.py`:
 
-**Why**: Better voice quality and expressiveness in agent conversations; tags (e.g. “confident”, “warm”) guide how the model delivers lines.
+- Default TTS path is direct ElevenLabs plugin:
+  - `MORGAN_TTS_MODE=elevenlabs`
+  - `MORGAN_ELEVEN_MODEL=eleven_flash_v2_5`
+  - `MORGAN_ELEVEN_STREAMING_LATENCY=3`
+  - `MORGAN_ELEVEN_CHUNK_LENGTH_SCHEDULE=80,120,200,260`
+- Alternate ElevenLabs path is LiveKit Inference:
+  - `MORGAN_TTS_MODE=livekit-elevenlabs`
+- Voice and language are already configurable:
+  - `MORGAN_ELEVEN_VOICE_ID`
+  - `MORGAN_TTS_LANGUAGE`
 
-**Tasks**:
-- [ ] Confirm whether LiveKit Inference / ElevenLabs plugin exposes `eleven_v3_conversational` as a model option.
-- [ ] If yes: update `MORGAN_ELEVEN_MODEL` in `agent/.env` (or equivalent config) to `eleven_v3_conversational`.
-- [ ] If no: check ElevenLabs direct API or LiveKit plugin docs for v3 model availability.
-- [ ] Optional: define 3–5 `suggested_audio_tags` for Morgan’s persona (e.g. “confident”, “calm”, “collaborative”) and wire them into the TTS config if the API supports it.
-- [ ] Run a short latency/quality comparison (greeting + 2–3 turns) vs current model.
+## Goal
 
-**References**: [Changelog – Eleven v3 conversational](https://elevenlabs.io/docs/changelog), [ElevenAgents overview](https://elevenlabs.io/docs/eleven-agents/overview)
+Reduce end-of-turn to first audio while keeping speech quality acceptable and preserving current architecture (`LiveKit + LemonSlice + OpenClaw`).
 
----
+## Phase 1: Tune existing ElevenLabs knobs (highest value, low risk)
 
-## 2. Global Routing and Shorter Audio Chunks (Priority: Medium)
+1. Baseline with current defaults using `scripts/summarize_latency.py`.
+2. Sweep `MORGAN_ELEVEN_STREAMING_LATENCY` with values `1,2,3,4`.
+3. Sweep `MORGAN_ELEVEN_CHUNK_LENGTH_SCHEDULE` presets, for example:
+   - `60,100,160,220`
+   - `80,120,200,260` (current)
+   - `100,140,220,300`
+4. Keep each run to the same prompt set (greeting + 3 turns) and compare:
+   - `p50` and `p95` `end_of_turn_to_first_audio`
+   - subjective speech smoothness
 
-**What**: Use ElevenLabs’ default global routing and, if we ever go direct to Eleven’s streaming API, adopt 100 ms audio chunks instead of 250 ms.
+Exit criteria:
+- Keep a new setting only if `p95` improves without clear speech regressions.
 
-**Why**: Global routing reduces latency by choosing the nearest region; shorter chunks improve perceived responsiveness.
+## Phase 2: Compare ElevenLabs transport modes
 
-**Tasks**:
-- [ ] Confirm we use the default `api.elevenlabs.io` base URL (global routing is now default).
-- [ ] If we add a custom ElevenLabs streaming client: use 100 ms chunk length (per React/client SDK changes).
-- [ ] Document any region or base-URL overrides in `docs/provider-spikes.md` or env example.
+Compare these two configs under identical prompts:
 
-**References**: [Changelog – Global servers out of beta](https://elevenlabs.io/docs/changelog)
+A) Direct ElevenLabs plugin (current default)
+```env
+MORGAN_TTS_MODE=elevenlabs
+```
 
----
+B) LiveKit Inference ElevenLabs
+```env
+MORGAN_TTS_MODE=livekit-elevenlabs
+```
 
-## 3. STT: Scribe v2 and Keyterms (Priority: Low / Spike)
+Exit criteria:
+- Adopt the faster mode only if latency gains are consistent across multiple runs.
 
-**What**: Evaluate ElevenLabs Scribe v2 for STT, with optional `keyterms` for Morgan-specific phrases.
+## Phase 3: Voice/model variants already supported by env
 
-**Why**: Scribe v2 is a newer transcription model; keyterms can improve recognition of names and domain terms.
+1. Keep transport mode fixed from Phase 2.
+2. Evaluate a small matrix of voice/model values via env:
+   - `MORGAN_ELEVEN_VOICE_ID`
+   - `MORGAN_ELEVEN_MODEL`
+3. Reject variants that improve latency but reduce persona fit or intelligibility.
 
-**Tasks**:
-- [ ] Document current STT path (Deepgram Flux via LiveKit Inference) in `docs/provider-spikes.md`.
-- [ ] If we add an ElevenLabs STT option: implement Scribe v2 with `keyterms` (e.g. “Morgan”, “CTO”, “roadmap”) and compare accuracy/latency vs Deepgram Flux.
-- [ ] Gate this on whether we want to consolidate STT+TTS on ElevenLabs for simpler ops.
+## Known constraints
 
-**References**: [Changelog – Scribe v2](https://elevenlabs.io/docs/changelog), [ElevenAPI quickstart](https://elevenlabs.io/docs/eleven-api/quickstart)
+- This document does not assume availability of new upstream ElevenLabs features unless validated in code first.
+- Any new API fields (for example additional expressive controls) should be treated as a separate implementation task in `providers.py`, not a docs-only change.
 
----
+## Deliverables after running the plan
 
-## 4. ElevenAgents Patterns (Priority: Future / Reference)
-
-**What**: Use ElevenAgents as a reference for turn-taking, guardrails, and tool integration—not a full migration.
-
-**Why**: Our stack (LiveKit + OpenClaw + LemonSlice) is working; ElevenAgents offers patterns we can borrow.
-
-**Tasks**:
-- [ ] Review ElevenAgents turn config (speculative turn, spelling patience, TurnModel v2/v3) and compare to our Deepgram endpointing and `MORGAN_FALSE_INTERRUPTION_TIMEOUT`.
-- [ ] If we add output guardrails: consider custom guardrails (LLM-based) or content moderation patterns from ElevenAgents.
-- [ ] If we integrate Morgan with telephony or WhatsApp: evaluate ElevenAgents SIP/WhatsApp flows as an alternative or complement.
-
-**References**: [ElevenAgents overview](https://elevenlabs.io/docs/eleven-agents/overview), [Changelog – Custom guardrails, MCP](https://elevenlabs.io/docs/changelog)
-
----
-
-## 5. Direct Streaming API Spike (Priority: Optional)
-
-**What**: Time-boxed spike to call ElevenLabs streaming TTS directly (bypassing LiveKit Inference) and measure latency.
-
-**Why**: Validate whether a direct path reduces TTS TTFB vs current pipeline.
-
-**Tasks**:
-- [ ] Implement a minimal Python client that streams TTS from ElevenLabs WebSocket/streaming API.
-- [ ] Measure p50/p95 TTFB for a fixed prompt vs current `elevenlabs` mode via LiveKit.
-- [ ] Document findings in `docs/decision-review.md` or a short spike report.
-- [ ] Only pursue integration if the gain is meaningful (e.g. >100 ms improvement).
-
-**References**: [API Introduction](https://elevenlabs.io/docs/api-reference/introduction), [ElevenAPI quickstart](https://elevenlabs.io/docs/eleven-api/quickstart)
-
----
-
-## Summary
-
-| Item                         | Priority | Effort | Dependencies                    |
-|-----------------------------|----------|--------|---------------------------------|
-| Eleven v3 conversational    | High     | Low    | LiveKit/plugin support          |
-| Global routing + 100 ms     | Medium   | Low    | None (or custom client)         |
-| Scribe v2 + keyterms        | Low      | Medium | New STT provider path           |
-| ElevenAgents patterns       | Future   | Low    | Design decisions                |
-| Direct streaming API spike  | Optional | Medium | Python spike, measurements      |
-
-**Recommended order**: Start with (1) Eleven v3; if that’s unavailable or gains are small, run (5) direct streaming spike. Defer (3) and (4) until we have a clear need.
+- Final recommended `.env` values for ElevenLabs mode/model/voice/chunking.
+- Before/after latency summary from `scripts/summarize_latency.py`.
+- Short decision note in `avatar/docs/decision-review.md` describing why the chosen settings won.

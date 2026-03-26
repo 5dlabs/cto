@@ -121,6 +121,7 @@ export interface LinearClient {
   }): Promise<LinearCustomView>;
   createAgentActivity(input: AgentActivityCreateInput): Promise<{ id: string }>;
   updateAgentSession(sessionId: string, input: AgentSessionUpdateInput): Promise<void>;
+  resolveTeamId(teamIdentifier: string): Promise<string>;
 }
 
 export function createLinearClient(
@@ -129,6 +130,11 @@ export function createLinearClient(
 ): LinearClient {
   // Linear API keys (lin_api_*) are sent directly; OAuth tokens use Bearer prefix
   const authHeader = apiKey.startsWith("lin_api_") ? apiKey : `Bearer ${apiKey}`;
+  const teamIdCache = new Map<string, string>();
+
+  function looksLikeUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  }
 
   async function execute<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
     const response = await fetch(LINEAR_API_URL, {
@@ -160,10 +166,49 @@ export function createLinearClient(
   }
 
   return {
+    async resolveTeamId(teamIdentifier) {
+      if (!teamIdentifier) {
+        throw new Error("Team identifier is required");
+      }
+      if (looksLikeUuid(teamIdentifier)) {
+        return teamIdentifier;
+      }
+      const cached = teamIdCache.get(teamIdentifier);
+      if (cached) {
+        return cached;
+      }
+
+      interface TeamsResponse {
+        teams: { nodes: Array<{ id: string; key: string; name: string }> };
+      }
+
+      const data = await execute<TeamsResponse>(
+        `query ResolveTeamIdentifier {
+          teams {
+            nodes { id key name }
+          }
+        }`,
+      );
+
+      const match = data.teams.nodes.find(
+        (team) => team.key === teamIdentifier || team.id === teamIdentifier,
+      );
+      if (!match) {
+        throw new Error(`Unable to resolve team identifier '${teamIdentifier}' to a UUID`);
+      }
+
+      teamIdCache.set(teamIdentifier, match.id);
+      teamIdCache.set(match.id, match.id);
+      logger.info(`Resolved Linear team ${teamIdentifier} -> ${match.id}`);
+      return match.id;
+    },
+
     async createProject(name, teamId, description) {
       interface Response {
         projectCreate: { success: boolean; project?: LinearProject };
       }
+
+      const resolvedTeamId = await this.resolveTeamId(teamId);
 
       const data = await execute<Response>(
         `mutation CreateProject($input: ProjectCreateInput!) {
@@ -175,7 +220,7 @@ export function createLinearClient(
         {
           input: {
             name,
-            teamIds: [teamId],
+            teamIds: [resolvedTeamId],
             ...(description ? { description } : {}),
           },
         },
@@ -192,7 +237,8 @@ export function createLinearClient(
         issueCreate: { success: boolean; issue?: LinearIssue };
       }
 
-      const input: Record<string, unknown> = { title, teamId };
+      const resolvedTeamId = await this.resolveTeamId(teamId);
+      const input: Record<string, unknown> = { title, teamId: resolvedTeamId };
       if (description) input.description = description;
       if (projectId) input.projectId = projectId;
       if (labelIds?.length) input.labelIds = labelIds;
@@ -280,6 +326,7 @@ export function createLinearClient(
     },
 
     async getOrCreateLabel(teamId, name) {
+      const resolvedTeamId = await this.resolveTeamId(teamId);
       // Query existing labels
       interface FindResponse {
         team: { labels: { nodes: LinearLabel[] } };
@@ -291,7 +338,7 @@ export function createLinearClient(
             labels { nodes { id name color } }
           }
         }`,
-        { teamId },
+        { teamId: resolvedTeamId },
       );
 
       const existing = findData.team.labels.nodes.find((l) => l.name === name);
@@ -309,7 +356,7 @@ export function createLinearClient(
             issueLabel { id name color }
           }
         }`,
-        { teamId, name },
+        { teamId: resolvedTeamId, name },
       );
 
       if (!createData.issueLabelCreate.issueLabel) {
@@ -319,6 +366,7 @@ export function createLinearClient(
     },
 
     async getWorkflowStates(teamId) {
+      const resolvedTeamId = await this.resolveTeamId(teamId);
       interface Response {
         team: { states: { nodes: WorkflowState[] } };
       }
@@ -329,7 +377,7 @@ export function createLinearClient(
             states { nodes { id name type position } }
           }
         }`,
-        { teamId },
+        { teamId: resolvedTeamId },
       );
 
       return data.team.states.nodes;
@@ -340,9 +388,11 @@ export function createLinearClient(
         customViewCreate: { success: boolean; customView?: LinearCustomView };
       }
 
+      const resolvedTeamId = await this.resolveTeamId(teamId);
+
       const input: Record<string, unknown> = {
         name,
-        teamId,
+        teamId: resolvedTeamId,
         shared: shared ?? true,
       };
       if (projectId) {

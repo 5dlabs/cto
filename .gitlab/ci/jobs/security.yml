@@ -1,0 +1,64 @@
+# Security scanning jobs
+# Replaces: codeql.yaml, skills-security-scan.yaml from GitHub Actions
+
+semgrep-sast:
+  extends: .semgrep-sast
+  stage: security
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+cargo-audit:
+  extends: .cargo-audit
+  stage: security
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - Cargo.lock
+        - crates/**
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+npm-audit-web:
+  extends: .npm-audit
+  stage: security
+  variables:
+    NPM_PROJECT_DIR: apps/web
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - apps/web/package-lock.json
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+npm-audit-website:
+  extends: .npm-audit
+  stage: security
+  variables:
+    NPM_PROJECT_DIR: apps/website
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - apps/website/package-lock.json
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+skills-security-scan:
+  extends: .skills-security-scan
+  stage: security
+  variables:
+    SKILLS_DIRS: ".claude/skills .factory/skills templates/skills"
+  before_script:
+    - |
+      shopt -s globstar nullglob 2>/dev/null || true
+      mkdir -p /tmp/openclaw-skills-scan
+      for f in infra/charts/openclaw-agent/skills/**/*.md; do
+        name=$(basename "$f" .md)
+        mkdir -p "/tmp/openclaw-skills-scan/$name"
+        if ! head -1 "$f" | grep -q '^---'; then
+          printf -- '---\nname: %s\ndescription: OpenClaw skill\n---\n' "$name" \
+            | cat - "$f" > "/tmp/openclaw-skills-scan/$name/SKILL.md"
+        else
+          cp "$f" "/tmp/openclaw-skills-scan/$name/SKILL.md"
+        fi
+      done
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "schedule"

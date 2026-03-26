@@ -1,7 +1,7 @@
 ---
 # Kotal Operator - Blockchain Kubernetes Operator (5dlabs fork)
 # Manages blockchain node CRDs: NEAR, Ethereum (Reth/BASE), Bitcoin, and more
-# Fork: https://git.5dlabs.ai/5dlabs/kotal (adds Reth client + nearcore 2.10.6)
+# Fork: https://gitlab.5dlabs.ai/5dlabs/kotal (adds Reth client + nearcore 2.10.6)
 # License: Apache 2.0
 
 apiVersion: argoproj.io/v1alpha1
@@ -21,7 +21,7 @@ spec:
   project: platform
 
   source:
-    repoURL: https://git.5dlabs.ai/5dlabs/kotal.git
+    repoURL: https://gitlab.5dlabs.ai/5dlabs/kotal.git
     targetRevision: HEAD
     path: config/default
 

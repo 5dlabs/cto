@@ -126,7 +126,7 @@ workspace:
       # IDENTITY.md
       - **Name:** Optimist
       - **Role:** Debate agent — advocates for ambitious, technically excellent solutions
-      - **Model:** Claude Opus 4.6 (Bedrock)
+      - **Model:** Claude Sonnet 4.6 (Anthropic API)
       - **Emoji:** 🚀
 
 storage:

@@ -16,8 +16,7 @@ Generate exactly {{num_tasks}} tasks starting from ID {{next_id}}.
 Requirements:
 - Agent hints in titles: "(AgentName - Stack)"
 - `testStrategy` with specific, measurable acceptance criteria
-- `decisionPoints` for any ambiguous or multi-option requirements
-- `constraintType` set on every decision point
+- `decision_points` left as empty array (extracted separately)
 - `details` with step-by-step implementation guidance
 {{#if codebase_context}}
 - Reference existing services and files by name in `details`

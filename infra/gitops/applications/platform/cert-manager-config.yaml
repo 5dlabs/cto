@@ -21,7 +21,7 @@ spec:
   project: platform
 
   source:
-    repoURL: https://git.5dlabs.ai/5dlabs/cto.git
+    repoURL: https://gitlab.5dlabs.ai/5dlabs/cto.git
     targetRevision: main
     path: infra/gitops/manifests/cert-manager
 

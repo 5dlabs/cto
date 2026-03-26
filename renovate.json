@@ -1,59 +1,46 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended",
-    ":semanticCommitTypeAll(chore)",
-    ":semanticCommitScopeDisabled"
-  ],
-  "timezone": "America/Los_Angeles",
-  "schedule": ["before 9am on Monday"],
-  "prHourlyLimit": 5,
-  "prConcurrentLimit": 10,
+  "extends": ["config:recommended"],
   "labels": ["dependencies"],
+  "schedule": ["before 9am on Monday"],
+  "timezone": "America/Los_Angeles",
   "packageRules": [
     {
-      "description": "Group Rust minor/patch updates",
       "matchManagers": ["cargo"],
+      "groupName": "Rust dependencies",
       "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "Rust dependencies (minor/patch)",
-      "labels": ["dependencies", "rust"],
-      "schedule": ["before 9am on Monday"]
+      "automerge": false,
+      "labels": ["dependencies", "rust"]
     },
     {
-      "description": "Group npm minor/patch updates for web app",
       "matchManagers": ["npm"],
-      "matchFileNames": ["apps/web/**"],
+      "groupName": "npm dependencies",
       "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "Web app npm dependencies",
+      "automerge": false,
       "labels": ["dependencies", "javascript"]
     },
     {
-      "description": "Group npm minor/patch updates for marketing",
-      "matchManagers": ["npm"],
-      "matchFileNames": ["apps/marketing/**"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "Marketing npm dependencies",
-      "labels": ["dependencies", "javascript", "marketing"],
-      "prConcurrentLimit": 3
-    },
-    {
-      "description": "Docker base image updates",
       "matchManagers": ["dockerfile"],
-      "matchFileNames": ["infra/images/**"],
-      "labels": ["dependencies", "docker"],
-      "schedule": ["before 9am on the first day of the month"]
+      "groupName": "Docker base images",
+      "schedule": ["before 9am on the first day of the month"],
+      "labels": ["dependencies", "docker"]
     },
     {
-      "description": "Helm chart updates",
-      "matchManagers": ["helmv3"],
-      "labels": ["dependencies", "helm"],
-      "schedule": ["before 9am on Monday"]
-    },
-    {
-      "description": "Pin GitLab CI image digests",
       "matchManagers": ["gitlabci"],
+      "groupName": "GitLab CI templates",
       "labels": ["dependencies", "ci"]
     }
   ],
-  "commitMessagePrefix": "chore(deps):"
+  "cargo": {
+    "enabled": true
+  },
+  "npm": {
+    "enabled": true
+  },
+  "dockerfile": {
+    "enabled": true
+  },
+  "gitlabci": {
+    "enabled": true
+  }
 }

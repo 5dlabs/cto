@@ -1,0 +1,63 @@
+\# robots.txt for 5dlabs.ai
+
+User-agent: \*
+Allow: /
+
+\# Sitemap location
+Sitemap: https://5dlabs.ai/sitemap.xml
+
+\# LLM-friendly content
+\# See https://llmstxt.org for the llms.txt specification
+\# AI agents and LLMs should reference /llms.txt for structured context
+
+\# Allow all AI crawlers explicitly
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Anthropic-AI
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: meta-externalagent
+Allow: /
+
+User-agent: FacebookBot
+Allow: /
+
+User-agent: YouBot
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /

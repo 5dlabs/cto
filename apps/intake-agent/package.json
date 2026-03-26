@@ -13,6 +13,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@google/stitch-sdk": "^0.0.3",
     "nats": "^2.28.0"
   },
   "devDependencies": {
@@ -27,7 +28,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://git.5dlabs.ai/5dlabs/cto.git",
+    "url": "https://gitlab.5dlabs.ai/5dlabs/cto.git",
     "directory": "apps/intake-agent"
   },
   "keywords": [

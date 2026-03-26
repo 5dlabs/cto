@@ -1,0 +1,18 @@
+{
+  "projectName": "sigma-1",
+  "mode": "ingest",
+  "prompt": "",
+  "hasFrontend": false,
+  "frontendTargets": [],
+  "confidence": 0,
+  "evidence": [],
+  "urls": [],
+  "stitch": {
+    "status": "failed",
+    "reason": "design_intake_failed",
+    "warnings": [
+      "intake-agent design_intake failed"
+    ],
+    "candidates": []
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "output": [
+    {
+      "expanded_tasks": [
+        {
+          "id": 1,
+          "title": "Equipment Catalog Service",
+          "agent": "rex",
+          "stack": "Rust/Axum",
+          "description": "High-performance API for equipment inventory and availability.",
+          "dependencies": [],
+          "priority": "high",
+          "subtasks": [
+            {"id": 1, "title": "Define product data model and migrations", "description": "PostgreSQL schema for products, categories, availability.", "dependencies": [], "details": "Use sqlx with compile-time checked queries.", "test_strategy": "Migration smoke test, schema validation.", "subagent_type": "implementer", "parallelizable": true},
+            {"id": 2, "title": "Implement CRUD API endpoints", "description": "RESTful endpoints for product listing, detail, and admin operations.", "dependencies": [1], "details": "Axum handlers with proper error types.", "test_strategy": "Integration tests per endpoint.", "subagent_type": "implementer", "parallelizable": false}
+          ],
+          "decision_points": []
+        },
+        {
+          "id": 2,
+          "title": "Rental Management System (RMS)",
+          "agent": "grizz",
+          "stack": "Go/gRPC",
+          "description": "Full replacement for Current RMS.",
+          "dependencies": [1],
+          "priority": "high",
+          "subtasks": [
+            {"id": 1, "title": "Define gRPC service protos", "description": "Protocol buffer definitions for all RMS services.", "dependencies": [], "details": "OpportunityService, ProjectService, InventoryService, CrewService, DeliveryService.", "test_strategy": "Proto compilation, compatibility checks.", "subagent_type": "implementer", "parallelizable": true}
+          ],
+          "decision_points": []
+        },
+        {
+          "id": 3,
+          "title": "Finance Service",
+          "agent": "rex",
+          "stack": "Rust/Axum",
+          "description": "Invoicing, payments, multi-currency.",
+          "dependencies": [2],
+          "priority": "high",
+          "subtasks": [],
+          "decision_points": []
+        }
+      ],
+      "verdict": "approved",
+      "revision_count": 1,
+      "warning": null
+    }
+  ]
+}

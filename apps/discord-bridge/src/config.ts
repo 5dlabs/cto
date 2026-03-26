@@ -11,6 +11,8 @@ export interface BridgeConfig {
   httpPort: number;
   /** Linear bridge URL for cross-cancel callbacks (default: http://linear-bridge.bots.svc:3100) */
   linearBridgeUrl: string;
+  /** Optional fixed channel ID for deliberation traffic (bypasses room allocator) */
+  deliberationChannelId?: string;
 }
 
 export function loadConfig(): BridgeConfig {
@@ -26,5 +28,6 @@ export function loadConfig(): BridgeConfig {
     categoryName: process.env.CATEGORY_NAME ?? "Bot Conversations",
     httpPort: parseInt(process.env.HTTP_PORT ?? "3200", 10),
     linearBridgeUrl: process.env.LINEAR_BRIDGE_URL ?? "http://linear-bridge.bots.svc:3100",
+    deliberationChannelId: process.env.DISCORD_DELIBERATION_CHANNEL_ID?.trim() || undefined,
   };
 }

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "decision-point.schema.json",
   "title": "DecisionPoint",
-  "description": "A decision point capturing a discovered architectural or design choice that needs resolution.",
+  "description": "A strategic decision point capturing an architectural or design choice that needs resolution. Decision points represent choices between fundamentally different approaches — not implementation details that should follow best practices.",
   "type": "object",
   "properties": {
     "id": {
@@ -12,11 +12,13 @@
       "type": "string",
       "enum": [
         "architecture",
-        "error-handling",
+        "language-runtime",
+        "service-topology",
+        "platform-choice",
+        "build-vs-buy",
         "data-model",
         "api-design",
         "ux-behavior",
-        "performance",
         "security"
       ]
     },

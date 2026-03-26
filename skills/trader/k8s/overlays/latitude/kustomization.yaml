@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../namespace.yaml
+  - ../../questdb.yaml
+  - ../../agave-rpc.yaml
+  - ../../agave-rpc-grpc-svc.yaml
+  - ../../solana-exporter-svc.yaml
+  - ../../dex-indexer.yaml
+  - ../../dex-api.yaml

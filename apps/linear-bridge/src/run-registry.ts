@@ -1,9 +1,10 @@
+import type { BridgeStateDb } from "./state/bridge-state-db.js";
+
 /**
  * Run Registry — Linear Bridge
  *
- * In-memory map tracking active pipeline runs.
+ * SQLite-backed run map tracking active pipeline runs.
  * Maps runId → {agentPod, sessionKey, issueId, linearSessionId, resumeToken}.
- * Used to correlate Linear webhook callbacks back to the correct Lobster workflow.
  */
 
 export interface RunEntry {
@@ -37,60 +38,62 @@ export interface RunRegistry {
   getActiveRuns(): ActiveRunView[];
 }
 
-export function createRunRegistry(): RunRegistry {
-  const runs = new Map<string, RunEntry>();
-
+export function createRunRegistry(stateDb: BridgeStateDb): RunRegistry {
   return {
     register(runId, data) {
-      runs.set(runId, {
-        ...data,
-        registeredAt: Date.now(),
-        lastAccessedAt: Date.now(),
+      stateDb.upsertRun({
+        runId,
+        agentPod: data.agentPod,
+        sessionKey: data.sessionKey,
+        issueId: data.issueId,
+        linearSessionId: data.linearSessionId,
+        resumeToken: data.resumeToken,
       });
     },
 
     deregister(runId) {
-      runs.delete(runId);
+      stateDb.deleteRun(runId);
     },
 
     lookup(runId) {
-      const entry = runs.get(runId);
-      if (entry) entry.lastAccessedAt = Date.now();
-      return entry;
+      const row = stateDb.getRun(runId);
+      if (!row) return undefined;
+      stateDb.upsertRun({
+        runId: row.runId,
+        agentPod: row.agentPod,
+        sessionKey: row.sessionKey,
+        issueId: row.issueId,
+        linearSessionId: row.linearSessionId,
+        resumeToken: row.resumeToken,
+      });
+      return {
+        agentPod: row.agentPod,
+        sessionKey: row.sessionKey,
+        issueId: row.issueId,
+        linearSessionId: row.linearSessionId,
+        resumeToken: row.resumeToken,
+        registeredAt: row.registeredAt,
+        lastAccessedAt: row.lastAccessedAt,
+      };
     },
 
     update(runId, data) {
-      const entry = runs.get(runId);
-      if (!entry) return;
-      if (data.linearSessionId !== undefined) entry.linearSessionId = data.linearSessionId;
-      if (data.resumeToken !== undefined) entry.resumeToken = data.resumeToken;
-      entry.lastAccessedAt = Date.now();
+      stateDb.updateRun(runId, {
+        linearSessionId: data.linearSessionId,
+        resumeToken: data.resumeToken,
+      });
     },
 
     gc(maxAgeMs) {
-      const cutoff = Date.now() - maxAgeMs;
-      let removed = 0;
-      for (const [key, entry] of runs) {
-        if (entry.lastAccessedAt < cutoff) {
-          runs.delete(key);
-          removed++;
-        }
-      }
-      return removed;
+      return stateDb.gcRuns(maxAgeMs);
     },
 
     size() {
-      return runs.size;
+      return stateDb.countRuns();
     },
 
     getActiveRuns() {
-      return [...runs.entries()].map(([runId, entry]) => ({
-        runId,
-        agentPod: entry.agentPod,
-        sessionKey: entry.sessionKey,
-        issueId: entry.issueId,
-        linearSessionId: entry.linearSessionId,
-      }));
+      return stateDb.listRuns();
     },
   };
 }

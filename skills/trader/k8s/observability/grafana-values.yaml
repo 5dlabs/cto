@@ -28,13 +28,12 @@ service:
 nodeSelector:
   kubernetes.io/hostname: db-01
 
-# Datasources: Prometheus + Loki + Alertmanager
+# Datasources: Prometheus + Loki (no Alertmanager)
 datasources:
   datasources.yaml:
     apiVersion: 1
     datasources:
       - name: Prometheus
-        uid: prometheus
         type: prometheus
         access: proxy
         url: http://prometheus-server.observability.svc.cluster.local:80
@@ -46,22 +45,12 @@ datasources:
           httpMethod: POST
 
       - name: Loki
-        uid: loki
         type: loki
         access: proxy
         url: http://loki-gateway.observability.svc.cluster.local:80
         editable: false
         jsonData:
           maxLines: 1000
-
-      - name: Alertmanager
-        uid: alertmanager
-        type: alertmanager
-        access: proxy
-        url: http://prometheus-alertmanager.observability.svc.cluster.local:9093
-        editable: false
-        jsonData:
-          implementation: prometheus
 
 plugins:
   - grafana-piechart-panel
@@ -82,9 +71,6 @@ securityContext:
 # Talos restriction — init-chown-data fails
 initChownData:
   enabled: false
-
-# Inject Discord webhook URL for provisioned alerting contact point
-envFromSecret: "alertmanager-discord-secret"
 
 env:
   GF_EXPLORE_ENABLED: "true"
@@ -133,161 +119,3 @@ livenessProbe:
   initialDelaySeconds: 60
   timeoutSeconds: 30
   failureThreshold: 10
-
-# Provisioned alerting: log-based alerts via Grafana Unified Alerting
-alerting:
-  contactpoints.yaml:
-    secret:
-      apiVersion: 1
-      contactPoints:
-        - orgId: 1
-          name: discord-grafana
-          receivers:
-            - uid: discord-grafana
-              type: discord
-              settings:
-                url: $DISCORD_WEBHOOK_URL
-
-  notification-policies.yaml:
-    apiVersion: 1
-    policies:
-      - orgId: 1
-        receiver: discord-grafana
-        group_by: ['grafana_folder', 'alertname']
-        group_wait: 30s
-        group_interval: 5m
-        repeat_interval: 4h
-
-  rules.yaml:
-    apiVersion: 1
-    groups:
-      - orgId: 1
-        name: log-based-alerts
-        folder: Log Alerts
-        interval: 1m
-        rules:
-          - uid: agave-oom-kill
-            title: AgaveOOMKill
-            condition: C
-            data:
-              - refId: A
-                relativeTimeRange:
-                  from: 300
-                  to: 0
-                datasourceUid: loki
-                model:
-                  expr: 'count_over_time({namespace="solana",container="agave"} |~ "OOMKilled|oom-kill" [5m])'
-                  refId: A
-              - refId: B
-                relativeTimeRange:
-                  from: 0
-                  to: 0
-                datasourceUid: __expr__
-                model:
-                  type: reduce
-                  expression: A
-                  reducer: last
-                  refId: B
-              - refId: C
-                relativeTimeRange:
-                  from: 0
-                  to: 0
-                datasourceUid: __expr__
-                model:
-                  type: threshold
-                  expression: B
-                  conditions:
-                    - evaluator:
-                        type: gt
-                        params: [0]
-                  refId: C
-            for: 0s
-            labels:
-              severity: critical
-            annotations:
-              summary: "Agave container OOM killed"
-              description: "Agave container received OOM kill signal. Check memory limits and usage."
-
-          - uid: solana-error-burst
-            title: SolanaErrorBurst
-            condition: C
-            data:
-              - refId: A
-                relativeTimeRange:
-                  from: 300
-                  to: 0
-                datasourceUid: loki
-                model:
-                  expr: 'count_over_time({namespace="solana",container="agave",level="error"} [5m])'
-                  refId: A
-              - refId: B
-                relativeTimeRange:
-                  from: 0
-                  to: 0
-                datasourceUid: __expr__
-                model:
-                  type: reduce
-                  expression: A
-                  reducer: last
-                  refId: B
-              - refId: C
-                relativeTimeRange:
-                  from: 0
-                  to: 0
-                datasourceUid: __expr__
-                model:
-                  type: threshold
-                  expression: B
-                  conditions:
-                    - evaluator:
-                        type: gt
-                        params: [50]
-                  refId: C
-            for: 0s
-            labels:
-              severity: warning
-            annotations:
-              summary: "Solana error log burst"
-              description: "More than 50 error-level log lines from Agave in 5 minutes."
-
-          - uid: trading-bot-errors
-            title: TradingBotErrors
-            condition: C
-            data:
-              - refId: A
-                relativeTimeRange:
-                  from: 300
-                  to: 0
-                datasourceUid: loki
-                model:
-                  expr: 'count_over_time({namespace="trading",level="error"} [5m])'
-                  refId: A
-              - refId: B
-                relativeTimeRange:
-                  from: 0
-                  to: 0
-                datasourceUid: __expr__
-                model:
-                  type: reduce
-                  expression: A
-                  reducer: last
-                  refId: B
-              - refId: C
-                relativeTimeRange:
-                  from: 0
-                  to: 0
-                datasourceUid: __expr__
-                model:
-                  type: threshold
-                  expression: B
-                  conditions:
-                    - evaluator:
-                        type: gt
-                        params: [10]
-                  refId: C
-            for: 0s
-            labels:
-              severity: warning
-            annotations:
-              summary: "Trading bot error burst"
-              description: "More than 10 error-level log lines from trading namespace in 5 minutes."

@@ -1,0 +1,1 @@
+Leverage an Effect-TS native state management solution to align with the existing Effect-based data fetching and validation patterns.

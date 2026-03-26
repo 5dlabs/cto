@@ -1,0 +1,12 @@
+name = "5dlabs-splash"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "out"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cto-waitlist"
+database_id = "76dd1d39-7969-4a05-a296-884641cca26e"
+
+[[kv_namespaces]]
+binding = "RALPH_STATE"
+id = "d9c08f5e48fa4735a6ecab577d7f3cc6"

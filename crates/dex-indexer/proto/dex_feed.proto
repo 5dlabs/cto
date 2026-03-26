@@ -1,0 +1,247 @@
+syntax = "proto3";
+
+package dex_feed;
+
+// ============= Enums =============
+
+enum Interval {
+    INTERVAL_1M = 0;
+    INTERVAL_5M = 1;
+    INTERVAL_15M = 2;
+    INTERVAL_30M = 3;
+    INTERVAL_1H = 4;
+    INTERVAL_4H = 5;
+    INTERVAL_1D = 6;
+    INTERVAL_1W = 7;
+}
+
+// ============= Common Messages =============
+
+message Trade {
+    string signature = 1;
+    string dex = 2;
+    string pool = 3;
+    string token_in = 4;
+    string token_out = 5;
+    double amount_in = 6;
+    double amount_out = 7;
+    double price = 8;
+    string signer = 9;
+    int64 timestamp = 10;
+    uint64 slot = 11;
+}
+
+message OhlcvCandle {
+    int64 timestamp = 1;
+    double open = 2;
+    double high = 3;
+    double low = 4;
+    double close = 5;
+    double volume = 6;
+    uint64 trades = 7;
+}
+
+message TokenPrice {
+    string token = 1;
+    double price_usd = 2;
+    double change_24h = 3;
+    int64 updated_at = 4;
+}
+
+message PricePoint {
+    int64 timestamp = 1;
+    double price_usd = 2;
+}
+
+enum SignalAction {
+    SIGNAL_HOLD = 0;
+    SIGNAL_BUY = 1;
+    SIGNAL_SELL = 2;
+}
+
+message PriceSource {
+    string source = 1;
+    double weight = 2;
+    double price_usd = 3;
+    double confidence = 4;
+    int64 updated_at = 5;
+    bool fallback_used = 6;
+    bool outlier_filtered = 7;
+}
+
+message QuoteSuggestion {
+    double bid_usd = 1;
+    double ask_usd = 2;
+    double mid_usd = 3;
+    double spread_bps = 4;
+    double confidence = 5;
+    double staleness_seconds = 6;
+}
+
+message SignalSuggestion {
+    SignalAction action = 1;
+    double score = 2;
+    double trend_score = 3;
+    double volatility_score = 4;
+    double liquidity_score = 5;
+    double slippage_score = 6;
+    string rationale = 7;
+}
+
+message PriceQualitySuggestion {
+    double blended_price_usd = 1;
+    double outlier_threshold = 2;
+    uint32 sources_total = 3;
+    uint32 sources_used = 4;
+    string primary_source = 5;
+    string fallback_source = 6;
+    bool fallback_active = 7;
+}
+
+message PriceSuggestion {
+    string token = 1;
+    QuoteSuggestion quote = 2;
+    SignalSuggestion signal = 3;
+    PriceQualitySuggestion quality = 4;
+    repeated PriceSource sources = 5;
+    int64 updated_at = 6;
+}
+
+// ============= GetPrice =============
+
+message GetPriceRequest {
+    string token = 1;
+}
+
+message GetPriceResponse {
+    TokenPrice price = 1;
+}
+
+// ============= GetMultiPrice =============
+
+message GetMultiPriceRequest {
+    repeated string tokens = 1;
+}
+
+message GetMultiPriceResponse {
+    map<string, TokenPrice> prices = 1;
+}
+
+// ============= GetOHLCV =============
+
+message GetOhlcvRequest {
+    string token = 1;
+    Interval interval = 2;
+    int64 time_from = 3;
+    int64 time_to = 4;
+}
+
+message GetOhlcvResponse {
+    repeated OhlcvCandle candles = 1;
+}
+
+// ============= GetTrades =============
+
+message GetTradesRequest {
+    string token = 1;
+    int32 limit = 2;
+    int64 before = 3;
+}
+
+message GetTradesResponse {
+    repeated Trade trades = 1;
+}
+
+// ============= GetPairTrades =============
+
+message GetPairTradesRequest {
+    string token_a = 1;
+    string token_b = 2;
+    int32 limit = 3;
+    int64 before = 4;
+}
+
+message GetPairTradesResponse {
+    repeated Trade trades = 1;
+}
+
+// ============= GetTokenOverview =============
+
+message GetTokenOverviewRequest {
+    string token = 1;
+}
+
+message GetTokenOverviewResponse {
+    string token = 1;
+    double price_usd = 2;
+    double change_24h = 3;
+    double volume_24h = 4;
+    uint64 trades_24h = 5;
+    double high_24h = 6;
+    double low_24h = 7;
+    int64 updated_at = 8;
+}
+
+// ============= GetPriceHistory =============
+
+message GetPriceHistoryRequest {
+    string token = 1;
+    Interval interval = 2;
+    int64 time_from = 3;
+    int64 time_to = 4;
+}
+
+message GetPriceHistoryResponse {
+    repeated PricePoint points = 1;
+}
+
+message GetPriceSuggestionRequest {
+    string token = 1;
+}
+
+message GetPriceSuggestionResponse {
+    PriceSuggestion suggestion = 1;
+}
+
+message GetMultiPriceSuggestionRequest {
+    repeated string tokens = 1;
+}
+
+message GetMultiPriceSuggestionResponse {
+    map<string, PriceSuggestion> suggestions = 1;
+}
+
+// ============= Streaming =============
+
+message StreamTradesRequest {
+    string token = 1;
+    string pair_token = 2;
+}
+
+message StreamPriceRequest {
+    string token = 1;
+}
+
+message StreamSuggestionRequest {
+    string token = 1;
+}
+
+// ============= Services =============
+
+service DexQuery {
+    rpc GetPrice(GetPriceRequest) returns (GetPriceResponse);
+    rpc GetMultiPrice(GetMultiPriceRequest) returns (GetMultiPriceResponse);
+    rpc GetOhlcv(GetOhlcvRequest) returns (GetOhlcvResponse);
+    rpc GetTrades(GetTradesRequest) returns (GetTradesResponse);
+    rpc GetPairTrades(GetPairTradesRequest) returns (GetPairTradesResponse);
+    rpc GetTokenOverview(GetTokenOverviewRequest) returns (GetTokenOverviewResponse);
+    rpc GetPriceHistory(GetPriceHistoryRequest) returns (GetPriceHistoryResponse);
+    rpc GetPriceSuggestion(GetPriceSuggestionRequest) returns (GetPriceSuggestionResponse);
+    rpc GetMultiPriceSuggestion(GetMultiPriceSuggestionRequest) returns (GetMultiPriceSuggestionResponse);
+}
+
+service DexStream {
+    rpc StreamTrades(StreamTradesRequest) returns (stream Trade);
+    rpc StreamPrice(StreamPriceRequest) returns (stream TokenPrice);
+    rpc StreamSuggestion(StreamSuggestionRequest) returns (stream PriceSuggestion);
+}

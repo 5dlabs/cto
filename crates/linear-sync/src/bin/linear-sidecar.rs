@@ -26,9 +26,12 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::env;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
@@ -41,6 +44,52 @@ fn safe_truncate(s: &str, max_chars: usize) -> String {
     } else {
         let truncated: String = s.chars().take(max_chars).collect();
         format!("{}...", truncated)
+    }
+}
+
+fn memory_fingerprint(text: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    text.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn parse_bool_env(name: &str, default: bool) -> bool {
+    env::var(name)
+        .map(|value| {
+            matches!(
+                value.as_str(),
+                "1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON"
+            )
+        })
+        .unwrap_or(default)
+}
+
+#[derive(Default)]
+struct MemoryStats {
+    recall_queries: AtomicU64,
+    recall_hits: AtomicU64,
+    writes_attempted: AtomicU64,
+    writes_succeeded: AtomicU64,
+    writes_failed: AtomicU64,
+    reinforces_succeeded: AtomicU64,
+    reinforces_failed: AtomicU64,
+    skipped_low_salience: AtomicU64,
+    conflict_events: AtomicU64,
+}
+
+impl MemoryStats {
+    fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "recall_queries": self.recall_queries.load(Ordering::Relaxed),
+            "recall_hits": self.recall_hits.load(Ordering::Relaxed),
+            "writes_attempted": self.writes_attempted.load(Ordering::Relaxed),
+            "writes_succeeded": self.writes_succeeded.load(Ordering::Relaxed),
+            "writes_failed": self.writes_failed.load(Ordering::Relaxed),
+            "reinforces_succeeded": self.reinforces_succeeded.load(Ordering::Relaxed),
+            "reinforces_failed": self.reinforces_failed.load(Ordering::Relaxed),
+            "skipped_low_salience": self.skipped_low_salience.load(Ordering::Relaxed),
+            "conflict_events": self.conflict_events.load(Ordering::Relaxed),
+        })
     }
 }
 
@@ -718,6 +767,7 @@ struct SessionState {
     files_created: Vec<String>,
     files_modified: Vec<String>,
     subagents_spawned: Vec<String>,
+    memory_fingerprints: Vec<u64>,
     start_time: Option<std::time::Instant>,
     // Narrative state
     narrative: NarrativeState,
@@ -738,6 +788,42 @@ struct AppState {
     model_rotation: Vec<String>,
     // Conductor mode
     is_conductor: bool,
+    // Memory integration
+    memory_enabled: bool,
+    memory_url: String,
+    memory_namespace: String,
+    memory_max_fingerprints: usize,
+    memory_stats: MemoryStats,
+}
+
+#[derive(Debug, Serialize)]
+struct OpenMemoryCreateRequest {
+    content: String,
+    namespace: String,
+    metadata: serde_json::Value,
+}
+
+#[derive(Debug, Serialize)]
+struct OpenMemorySearchRequest {
+    query: String,
+    namespace: String,
+    limit: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenMemorySearchResponse {
+    memories: Vec<OpenMemorySearchMemory>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct OpenMemorySearchMemory {
+    id: String,
+    #[serde(default)]
+    salience: f64,
+    #[serde(default)]
+    score: Option<f64>,
+    #[serde(default)]
+    metadata: serde_json::Value,
 }
 
 // =============================================================================
@@ -1431,6 +1517,314 @@ async fn post_completion_summary(
     Ok(())
 }
 
+fn completion_salience(
+    files_created: usize,
+    files_modified: usize,
+    subagents_spawned: usize,
+    errors: u64,
+) -> f64 {
+    let mut score = 0.35_f64;
+    score += (files_created.min(10) as f64) * 0.04;
+    score += (files_modified.min(20) as f64) * 0.015;
+    score += (subagents_spawned.min(8) as f64) * 0.03;
+    if errors == 0 {
+        score += 0.08;
+    } else {
+        score -= (errors.min(5) as f64) * 0.03;
+    }
+    score.clamp(0.05, 0.99)
+}
+
+fn build_completion_memory_content(
+    state: &AppState,
+    model: &str,
+    files_created: &[String],
+    files_modified: &[String],
+    subagents_spawned: &[String],
+    duration_ms: Option<u64>,
+    num_turns: Option<u64>,
+) -> String {
+    let task = &state.task_context;
+    let title = task
+        .title
+        .clone()
+        .unwrap_or_else(|| "Untitled task".to_string());
+    let goal = task
+        .goal
+        .clone()
+        .unwrap_or_else(|| "No explicit goal captured.".to_string());
+    let constraints = if task.requirements.is_empty() {
+        "No explicit constraints captured.".to_string()
+    } else {
+        task.requirements
+            .iter()
+            .take(5)
+            .map(|value| format!("- {value}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let progress = format!(
+        "- files_created: {}\n- files_modified: {}\n- subagents_spawned: {}\n- acceptance: {}/{}",
+        files_created.len(),
+        files_modified.len(),
+        subagents_spawned.len(),
+        task.completed_criteria,
+        task.total_criteria
+    );
+    let key_decisions = if subagents_spawned.is_empty() {
+        "- No explicit delegation decisions recorded.".to_string()
+    } else {
+        subagents_spawned
+            .iter()
+            .take(5)
+            .map(|value| format!("- delegated: {value}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let next_steps = if task.deliverables.is_empty() {
+        "- Validate output against acceptance criteria and publish summary.".to_string()
+    } else {
+        task.deliverables
+            .iter()
+            .take(5)
+            .map(|value| format!("- {value}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let critical_context = format!(
+        "- issue: {}\n- agent: {}\n- model: {}\n- duration_ms: {}\n- turns: {}",
+        state.issue_identifier,
+        state.agent_name,
+        model,
+        duration_ms.unwrap_or_default(),
+        num_turns.unwrap_or_default()
+    );
+
+    format!(
+        "## Goal\n{goal}\n\n## Constraints\n{constraints}\n\n## Progress\n{progress}\n\n## Key Decisions\n{key_decisions}\n\n## Next Steps\n{next_steps}\n\n## Critical Context\n{critical_context}\n\n## Task\n{title}"
+    )
+}
+
+fn effective_similarity(memory: &OpenMemorySearchMemory) -> f64 {
+    memory.score.unwrap_or(memory.salience).clamp(0.0, 1.0)
+}
+
+async fn search_existing_memories(
+    state: &AppState,
+    query: &str,
+    limit: usize,
+) -> Result<Vec<OpenMemorySearchMemory>> {
+    state
+        .memory_stats
+        .recall_queries
+        .fetch_add(1, Ordering::Relaxed);
+    let url = format!("{}/api/v1/search", state.memory_url.trim_end_matches('/'));
+    let payload = OpenMemorySearchRequest {
+        query: query.to_string(),
+        namespace: state.memory_namespace.clone(),
+        limit,
+    };
+    let client = reqwest::Client::new();
+    let response = client.post(&url).json(&payload).send().await?;
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        warn!("Memory search failed: {} {}", status, body);
+        return Ok(Vec::new());
+    }
+    let result: OpenMemorySearchResponse = response.json().await?;
+    if !result.memories.is_empty() {
+        state
+            .memory_stats
+            .recall_hits
+            .fetch_add(result.memories.len() as u64, Ordering::Relaxed);
+    }
+    Ok(result.memories)
+}
+
+async fn reinforce_memory_best_effort(
+    state: &AppState,
+    memory_id: &str,
+    boost: f64,
+) -> Result<bool> {
+    let client = reqwest::Client::new();
+    let base = state.memory_url.trim_end_matches('/');
+    let payload = serde_json::json!({ "id": memory_id, "boost": boost });
+    let endpoints = [
+        format!("{base}/api/v1/reinforce"),
+        format!("{base}/api/v1/memories/{memory_id}/reinforce"),
+    ];
+
+    for endpoint in endpoints {
+        let response = client.post(&endpoint).json(&payload).send().await?;
+        let status = response.status();
+        if status.is_success() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+async fn persist_completion_memory(
+    state: &AppState,
+    memory_fingerprints: &mut Vec<u64>,
+    session_errors: u64,
+    session_id: &str,
+    model: &str,
+    files_created: &[String],
+    files_modified: &[String],
+    subagents_spawned: &[String],
+    duration_ms: Option<u64>,
+    cost_usd: Option<f64>,
+    num_turns: Option<u64>,
+) -> Result<()> {
+    if !state.memory_enabled {
+        return Ok(());
+    }
+    state
+        .memory_stats
+        .writes_attempted
+        .fetch_add(1, Ordering::Relaxed);
+
+    let content = build_completion_memory_content(
+        state,
+        model,
+        files_created,
+        files_modified,
+        subagents_spawned,
+        duration_ms,
+        num_turns,
+    );
+    let fingerprint = memory_fingerprint(&content);
+    if memory_fingerprints.contains(&fingerprint) {
+        debug!("Skipping duplicate completion memory fingerprint={fingerprint}");
+        return Ok(());
+    }
+    memory_fingerprints.push(fingerprint);
+    if memory_fingerprints.len() > state.memory_max_fingerprints {
+        let drop_n = memory_fingerprints.len() - state.memory_max_fingerprints;
+        memory_fingerprints.drain(0..drop_n);
+    }
+
+    let salience = completion_salience(
+        files_created.len(),
+        files_modified.len(),
+        subagents_spawned.len(),
+        session_errors,
+    );
+    if salience < 0.15 {
+        // ReMe-style decay/down-rank policy: low-value memories are skipped.
+        state
+            .memory_stats
+            .skipped_low_salience
+            .fetch_add(1, Ordering::Relaxed);
+        debug!("Skipping low-salience completion memory score={salience:.3}");
+        return Ok(());
+    }
+
+    let recall_query = format!(
+        "issue {} session {} model {} deliverables {}",
+        state.issue_identifier,
+        session_id,
+        model,
+        files_created
+            .iter()
+            .take(3)
+            .map(|value| value.rsplit('/').next().unwrap_or(value))
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
+    let nearby = search_existing_memories(state, &recall_query, 5).await?;
+    if let Some(best) = nearby.iter().max_by(|a, b| {
+        effective_similarity(a)
+            .partial_cmp(&effective_similarity(b))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    }) {
+        let best_similarity = effective_similarity(best);
+        let best_scope = best
+            .metadata
+            .get("scope_key")
+            .and_then(|value| value.as_str())
+            .unwrap_or_default();
+        let this_scope = format!(
+            "agent:{}:issue:{}:session:{}",
+            state.agent_name, state.issue_identifier, session_id
+        );
+
+        if !best_scope.is_empty() && best_scope != this_scope && best_similarity >= 0.92 {
+            state
+                .memory_stats
+                .conflict_events
+                .fetch_add(1, Ordering::Relaxed);
+            warn!(
+                "High-similarity memory scope conflict detected: existing_scope={} new_scope={} similarity={:.3}",
+                best_scope, this_scope, best_similarity
+            );
+        }
+
+        if best_similarity >= 0.84 {
+            let reinforced = reinforce_memory_best_effort(state, &best.id, 0.15).await?;
+            if reinforced {
+                state
+                    .memory_stats
+                    .reinforces_succeeded
+                    .fetch_add(1, Ordering::Relaxed);
+                info!(
+                    "Reinforced existing memory id={} similarity={:.3}",
+                    best.id, best_similarity
+                );
+                return Ok(());
+            }
+            state
+                .memory_stats
+                .reinforces_failed
+                .fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    let payload = OpenMemoryCreateRequest {
+        content,
+        namespace: state.memory_namespace.clone(),
+        metadata: serde_json::json!({
+            "category": "episodic",
+            "agent": state.agent_name,
+            "issue_identifier": state.issue_identifier,
+            "session_id": session_id,
+            "scope_key": format!("agent:{}:issue:{}:session:{}", state.agent_name, state.issue_identifier, session_id),
+            "salience": salience,
+            "freshness_epoch_ms": std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|value| value.as_millis() as u64)
+                .unwrap_or(0),
+            "consolidation_hint": "phase-boundary-completion",
+            "model": model,
+            "duration_ms": duration_ms,
+            "cost_usd": cost_usd,
+            "num_turns": num_turns
+        }),
+    };
+
+    let url = format!("{}/api/v1/memories", state.memory_url.trim_end_matches('/'));
+    let client = reqwest::Client::new();
+    let response = client.post(&url).json(&payload).send().await?;
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        warn!("Failed to persist completion memory: {} {}", status, body);
+        state
+            .memory_stats
+            .writes_failed
+            .fetch_add(1, Ordering::Relaxed);
+    } else {
+        info!("🧠 Persisted completion memory for session {}", session_id);
+        state
+            .memory_stats
+            .writes_succeeded
+            .fetch_add(1, Ordering::Relaxed);
+    }
+    Ok(())
+}
+
 async fn create_linear_session(
     state: &AppState,
     _model: &str,
@@ -2049,6 +2443,8 @@ async fn ingest(State(state): State<Arc<AppState>>, Json(entry): Json<LogEntry>)
             let files_created = session.files_created.clone();
             let files_modified = session.files_modified.clone();
             let subagents_spawned = session.subagents_spawned.clone();
+            let session_errors = session.errors;
+            let mut memory_fingerprints = session.memory_fingerprints.clone();
 
             // Extract stats from result event
             let duration_ms = entry.extra.get("duration_ms").and_then(|v| v.as_u64());
@@ -2056,6 +2452,28 @@ async fn ingest(State(state): State<Arc<AppState>>, Json(entry): Json<LogEntry>)
             let num_turns = entry.extra.get("num_turns").and_then(|v| v.as_u64());
 
             drop(session); // Release lock before async call
+
+            if let Err(e) = persist_completion_memory(
+                &state,
+                &mut memory_fingerprints,
+                session_errors,
+                &session_id,
+                &model,
+                &files_created,
+                &files_modified,
+                &subagents_spawned,
+                duration_ms,
+                cost_usd,
+                num_turns,
+            )
+            .await
+            {
+                warn!("Failed to persist completion memory: {}", e);
+            }
+            {
+                let mut session = state.session.write().await;
+                session.memory_fingerprints = memory_fingerprints;
+            }
 
             if let Err(e) = post_completion_summary(
                 &state,
@@ -2144,7 +2562,12 @@ async fn status(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
         "tools_used": session.tools_used.len(),
         "skills_count": session.skills.len(),
         "total_entries": session.total_entries,
-        "errors": session.errors
+        "errors": session.errors,
+        "memory": {
+            "enabled": state.memory_enabled,
+            "namespace": state.memory_namespace.clone(),
+            "stats": state.memory_stats.to_json()
+        }
     }))
 }
 
@@ -2290,6 +2713,15 @@ async fn main() -> Result<()> {
         .map(|v| v.split(',').map(|s| s.trim().to_string()).collect())
         .unwrap_or_default();
     let is_conductor = env::var("CTO_CONDUCTOR").is_ok();
+    let memory_enabled = parse_bool_env("CTO_MEMORY_ENABLED", true);
+    let memory_url = env::var("CTO_MEMORY_URL")
+        .unwrap_or_else(|_| "http://openmemory.cto.svc.cluster.local:8080".to_string());
+    let memory_namespace = env::var("CTO_MEMORY_NAMESPACE")
+        .unwrap_or_else(|_| format!("agent/{}", agent_name.to_lowercase()));
+    let memory_max_fingerprints = env::var("CTO_MEMORY_MAX_FINGERPRINTS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(64);
 
     if let Some(attempt) = attempt_number {
         info!(
@@ -2304,6 +2736,10 @@ async fn main() -> Result<()> {
     if is_conductor {
         info!("🎯 Running in CONDUCTOR mode");
     }
+    info!(
+        "🧠 Memory integration: enabled={} namespace={} url={}",
+        memory_enabled, memory_namespace, memory_url
+    );
 
     info!(
         "Issue: {}, Agent: {}, Source: {}",
@@ -2322,6 +2758,11 @@ async fn main() -> Result<()> {
         max_attempts,
         model_rotation,
         is_conductor,
+        memory_enabled,
+        memory_url,
+        memory_namespace,
+        memory_max_fingerprints,
+        memory_stats: MemoryStats::default(),
     });
 
     match log_source.as_str() {

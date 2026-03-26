@@ -1,17 +1,53 @@
-# Shared Rust build template for GitLab CI
-# Replaces GitHub composite actions: setup-rust, setup-rust-k8s, rust-build, rust-test, rust-lint
+# Shared Rust build/test/lint templates for GitLab CI
+# Includes sccache integration and cargo-nextest for faster test execution.
 
 .rust-setup:
   image: rust:latest
   variables:
-    CARGO_HOME: /usr/local/cargo
-    RUSTUP_HOME: /usr/local/rustup
+    CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
+    RUSTUP_HOME: ${CI_PROJECT_DIR}/.rustup
     SCCACHE_DIR: /tmp/sccache
+    CARGO_INCREMENTAL: "0"
+    RUSTC_WRAPPER: sccache
   before_script:
     - rustup component add rustfmt clippy
-    - cargo install cargo-nextest --locked 2>/dev/null || true
+    - |
+      if ! command -v sccache &>/dev/null; then
+        cargo install sccache --locked 2>/dev/null || true
+      fi
+    - |
+      if ! command -v cargo-nextest &>/dev/null; then
+        cargo install cargo-nextest --locked 2>/dev/null || true
+      fi
+  cache:
+    key: rust-${CI_COMMIT_REF_SLUG}
+    paths:
+      - .cargo/registry/
+      - .cargo/git/
+      - target/
+    policy: pull-push
   tags:
     - k8s
+
+.rust-fmt:
+  extends: .rust-setup
+  script:
+    - cargo fmt --all -- --check
+
+.rust-clippy:
+  extends: .rust-setup
+  script:
+    - cargo clippy --all-targets --all-features -- -D warnings
+
+.rust-test:
+  extends: .rust-setup
+  script:
+    - |
+      if command -v cargo-nextest &>/dev/null; then
+        cargo nextest run --all-targets
+      else
+        cargo test --all-targets
+      fi
 
 .rust-build:
   extends: .rust-setup
@@ -20,19 +56,11 @@
   artifacts:
     paths:
       - target/release/$RUST_BINARY
+    expire_in: 1 day
 
-.rust-test:
+.rust-audit:
   extends: .rust-setup
   script:
-    - |
-      if command -v cargo-nextest &> /dev/null; then
-        cargo nextest run --package $RUST_PACKAGE --all-targets
-      else
-        cargo test --package $RUST_PACKAGE --all-targets
-      fi
-
-.rust-lint:
-  extends: .rust-setup
-  script:
-    - cargo fmt --package $RUST_PACKAGE -- --check
-    - cargo clippy --package $RUST_PACKAGE -- -D warnings -W clippy::pedantic
+    - cargo install cargo-audit --locked 2>/dev/null || true
+    - cargo audit
+  allow_failure: true

@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Morgan Avatar Web Client
 
-## Getting Started
+Next.js frontend for the Morgan talking-avatar proof of concept.
 
-First, run the development server:
+## What it does
+
+- Calls `POST /api/token` to create a short-lived LiveKit access token.
+- Ensures the target room exists and dispatches the `morgan-avatar` worker.
+- Connects to LiveKit in-browser for mic capture + audio playback.
+- Shows basic session telemetry (connect timing, media readiness, first speaking state).
+
+## Prerequisites
+
+- Node.js 18+
+- Valid LiveKit Cloud (or self-hosted LiveKit) credentials
+- The Python avatar worker running from `../agent` with agent name `morgan-avatar`
+
+## Environment
+
+Create `.env.local` from `.env.local.example`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.local.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Required variables:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `LIVEKIT_URL` (WebSocket URL, e.g. `wss://<project>.livekit.cloud`)
+- `LIVEKIT_API_KEY`
+- `LIVEKIT_API_SECRET`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+These are read only on the server route (`app/api/token/route.ts`) and are not exposed to the browser.
 
-## Learn More
+## Run locally
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Open `http://localhost:3000` and click **Talk to Morgan**.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Token + dispatch flow
 
-## Deploy on Vercel
+`POST /api/token` (`app/api/token/route.ts`) performs:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Validate LiveKit environment variables.
+2. Create room if missing (`emptyTimeout=60`, `departureTimeout=15`, `maxParticipants=2`).
+3. Ensure a dispatch exists for agent `morgan-avatar`.
+4. Mint a 10-minute user token with room join/publish/subscribe grants.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Response payload:
+
+```json
+{
+  "token": "<jwt>",
+  "serverUrl": "wss://...",
+  "roomName": "morgan-<suffix>",
+  "identity": "user-<suffix>",
+  "participantName": "optional"
+}
+```
+
+## Operational constraints
+
+- Worker identity is currently coupled: token route dispatches `morgan-avatar` and the Python worker registers the same agent name.
+- If room creation/dispatch/token mint fails, the UI surfaces the route error message directly.
+- OpenClaw reply latency can be ~10 seconds; use the in-app transcript/telemetry panel to verify progress.
+
+## Troubleshooting
+
+- `Server misconfigured...` in UI: check `.env.local` has all three LiveKit vars.
+- Connect succeeds but no agent response: confirm the Python worker is running and registered as `morgan-avatar`.
+- Mic text never appears in "Heard you": verify browser microphone permissions and active mic selection.

@@ -72,6 +72,38 @@ Request → Morgan → [Grizz/Nova + Blaze] → Cleo → Cipher → Tess → Bol
 
 Each step creates commits in a feature branch, culminating in a PR.
 
+### Conversation Surfaces (Morgan)
+
+CTO ships three Morgan conversation modes that share one project-scoped session:
+
+- **Chat** (`Text`) - Typed messages through the OpenClaw ACP turn path.
+- **Call** (`Call`) - LiveKit audio room with mic controls and transcript telemetry.
+- **Video** (`Live`) - Same call flow plus avatar video track when available.
+
+Session identity is derived from the selected project and agent (`{agentId}-{projectId}`), so switching between Chat, Call, and Video keeps the same room/session context.
+
+### Shared Context During Call/Video
+
+Call and Video include a **Context** composer for pasting links, PRD snippets, or notes into the active room session.
+
+- Requires an active room/call.
+- Empty context is rejected.
+- Success path returns `CONTEXT_STORED`, shown in UI as "Shared with {agent}".
+
+This uses the Tauri command `openclaw_send_avatar_context` and stores the update in the same Morgan session timeline.
+
+### Optional UI Environment Overrides
+
+The desktop UI defaults to:
+
+- Avatar token endpoint: `/avatar-api/token`
+- Browser avatar URL: `http://localhost:3000`
+
+You can override these in UI env vars:
+
+- `VITE_MORGAN_AVATAR_TOKEN_ENDPOINT`
+- `VITE_MORGAN_AVATAR_BROWSER_URL`
+
 ## Architecture
 
 ```

@@ -29,73 +29,16 @@ Produce a structured Markdown context document that captures what the intake pip
 
 # Output: Required Sections
 
-## 1. Repository Overview
-- Repository URL
-- Primary language(s) and framework(s)
-- Build system and package manager
-- Monorepo or single-service layout
+For each section, use `## N. Title` header. Name specific files and paths.
 
-## 2. Service Architecture
-For each service or major component:
-```markdown
-### <ServiceName>
-- **Path**: `src/services/<name>`
-- **Language/Framework**: Rust/Axum, Go/gRPC, TypeScript/Next.js, etc.
-- **Purpose**: One-sentence description
-- **Exposes**: REST API on port 8080 / gRPC on port 9090 / etc.
-- **Depends on**: PostgreSQL, Redis, ServiceX
-```
-
-## 3. API Contracts
-Existing endpoints that new work may need to integrate with:
-```markdown
-### <ServiceName> API
-- `GET /api/v1/users` -- List users (paginated)
-- `POST /api/v1/users` -- Create user
-- Authentication: Bearer JWT via `Authorization` header
-- Versioning: URI path (`/v1/`, `/v2/`)
-```
-
-## 4. Data Models
-Key database tables/collections and their relationships:
-```markdown
-### <DatabaseName>
-- **Engine**: PostgreSQL 16 / MongoDB / etc.
-- **ORM**: Diesel, SQLx, Prisma, etc.
-- **Key tables**: users, orders, products
-- **Migration tool**: sqlx-migrate, Flyway, Prisma Migrate
-```
-
-## 5. Architectural Patterns
-Patterns in use that new code should follow:
-- Error handling convention (Result types, error middleware, HTTP problem details)
-- Logging/tracing (structured logging, OpenTelemetry, Loki)
-- Configuration (environment variables, config files, Kubernetes ConfigMaps)
-- Dependency injection approach
-- Repository/service/handler layering
-
-## 6. Test Infrastructure
-- Testing framework(s) and runner
-- Test organization (unit in `src/`, integration in `tests/`, e2e separate)
-- CI/CD pipeline (GitHub Actions, ArgoCD, etc.)
-- Code coverage tooling
-
-## 7. Integration Points for PRD
-Based on the PRD, identify where new features should connect:
-```markdown
-### <PRD Feature> -> <Existing Component>
-- **Connect to**: `src/services/auth` for user authentication
-- **Extend**: `src/models/user.rs` with new fields
-- **Reuse**: existing `NotificationService` for email delivery
-- **New service needed**: yes/no -- justify
-```
-
-## 8. Constraints (Do Not Change)
-Things that implementing agents must preserve:
-- Public API endpoints that external clients depend on
-- Database schemas in production (additive migrations only)
-- Shared library interfaces
-- Deployment topology
+1. **Repository Overview** — URL, primary languages/frameworks, build system, mono/single layout
+2. **Service Architecture** — For each service: path, language/framework, purpose, exposed ports, dependencies
+3. **API Contracts** — Endpoints, auth method, versioning strategy for services new work integrates with
+4. **Data Models** — Database engine, ORM, key tables, migration tool for each data store
+5. **Architectural Patterns** — Error handling, logging/tracing, config approach, DI, layering convention
+6. **Test Infrastructure** — Frameworks, test org (unit/integration/e2e), CI/CD, coverage tools
+7. **Integration Points for PRD** — For each PRD feature: what to connect to, extend, reuse (cite specific files)
+8. **Constraints (Do Not Change)** — Public APIs, production schemas, shared library interfaces, deploy topology
 
 # Constraints
 
@@ -112,31 +55,11 @@ Things that implementing agents must preserve:
 - Guess about what code does -- if unclear, note it as "needs manual review"
 - Document areas irrelevant to the PRD (build scripts, CI config, etc., unless the PRD touches them)
 
-# Example
+# Anti-Patterns
 
-**Good integration point:**
-```markdown
-### Notification Feature -> Existing Email Service
-- **Connect to**: `src/services/email/sender.rs` -- existing SMTP sender with template support
-- **Extend**: Add new template `welcome_v2` to `templates/email/`
-- **Reuse**: `EmailQueue` in `src/queue/email.rs` for async delivery
-- **New service needed**: No -- extend existing email service with webhook channel
-```
-
-**Bad (too vague):**
-```markdown
-### Notifications
-- There's some email code somewhere
-- Might need a new service
-```
-
-# Verification
-
-Before outputting, verify:
-- [ ] Every service listed has a concrete path in the repository
-- [ ] Integration points reference specific files, not vague areas
-- [ ] Architectural pattern is identified and named
-- [ ] Constraints list things that must NOT change
-- [ ] Analysis is focused on PRD-relevant areas, not exhaustive
+- Vague references ("there's some email code somewhere") — always cite specific paths
+- Exhaustive documentation of areas irrelevant to the PRD
+- Recommending architecture changes (that's the deliberation phase's job)
+- Including raw source code — summarize, don't copy; note "needs manual review" if unclear
 
 Return ONLY the markdown content. Start with `# Codebase Context` and end when complete.

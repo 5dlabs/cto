@@ -42,7 +42,14 @@ async function main(): Promise<void> {
   });
 
   // 6. Start HTTP notification server
-  const httpServer = createHttpServer(config.httpPort, bridge, elicitHandler, logger);
+  const httpServer = createHttpServer(
+    config.httpPort,
+    bridge,
+    elicitHandler,
+    logger,
+    config.deliberationChannelId,
+    discord,
+  );
   await httpServer.start();
 
   logger.info("Discord bridge is running");

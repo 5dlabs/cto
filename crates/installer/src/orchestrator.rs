@@ -837,7 +837,6 @@ impl Installer {
         .with_install_disk(&self.state.config.install_disk)
         .with_output_dir(&self.state.config.output_dir)
         .with_talos_version(&self.state.config.talos_version)
-        .with_kube_proxy_mode("none") // We use Cilium
         .with_cilium_cni();
 
         if self.state.config.enable_vlan && self.state.config.primary_interface.is_none() {
@@ -1150,6 +1149,8 @@ impl Installer {
             .as_ref()
             .context("Kubeconfig not found in state")?;
 
+        metal::cilium::assert_cilium_only_network_plane(kubeconfig_path)?;
+
         ui::print_info("Deploying Cilium CNI...");
 
         // Use cluster name and a default cluster ID of 1 for single-cluster deployments
@@ -1162,6 +1163,7 @@ impl Installer {
         // Wait for Cilium to be healthy before proceeding
         ui::print_info("Waiting for Cilium to be healthy...");
         metal::cilium::wait_for_cilium_healthy(kubeconfig_path)?;
+        metal::cilium::assert_cilium_only_network_plane(kubeconfig_path)?;
 
         Ok(())
     }

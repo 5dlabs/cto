@@ -1,0 +1,5 @@
+[
+  {"task_id": 1, "prompt_md": "# Implementation Prompt: Equipment Catalog Service\n\nYou are Rex. Build the equipment catalog API using Rust and Axum.", "prompt_xml": "<task id=\"1\"><title>Equipment Catalog Service</title><agent>rex</agent><acceptance><criterion>GET /api/v1/catalog/products returns paginated list</criterion></acceptance></task>"},
+  {"task_id": 2, "prompt_md": "# Implementation Prompt: RMS Service\n\nYou are Grizz. Build the rental management system using Go and gRPC.", "prompt_xml": "<task id=\"2\"><title>RMS Service</title><agent>grizz</agent><acceptance><criterion>Opportunity lifecycle works end-to-end</criterion></acceptance></task>"},
+  {"task_id": 3, "prompt_md": "# Implementation Prompt: Finance Service\n\nYou are Rex. Build the finance service using Rust and Axum.", "prompt_xml": "<task id=\"3\"><title>Finance Service</title><agent>rex</agent><acceptance><criterion>Invoice generation completes under 5s</criterion></acceptance></task>"}
+]

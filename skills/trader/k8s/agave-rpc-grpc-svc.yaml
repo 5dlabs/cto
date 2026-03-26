@@ -1,0 +1,18 @@
+# ClusterIP front door for Yellowstone gRPC (port 10000) on the agave-rpc pod.
+# Use http://agave-rpc-grpc.solana.svc:10000 from dex-indexer (avoids per-cluster node IPs).
+apiVersion: v1
+kind: Service
+metadata:
+  name: agave-rpc-grpc
+  namespace: solana
+  labels:
+    app: agave-rpc
+spec:
+  type: ClusterIP
+  selector:
+    app: agave-rpc
+  ports:
+    - name: grpc
+      port: 10000
+      targetPort: grpc
+      protocol: TCP

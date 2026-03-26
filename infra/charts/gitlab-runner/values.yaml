@@ -1,19 +1,25 @@
-# GitLab Runner Helm Chart Values
+# GitLab Runner Helm Chart Values (chart 0.87.x / Runner 18.10)
 # Deployed as a separate ArgoCD application for independent lifecycle management
 # Chart: https://docs.gitlab.com/runner/install/kubernetes.html
 #
 # This runner uses the Kubernetes executor — each CI job runs as its own K8s pod
+# 5 replicas = 5 independent runner managers for high availability
 
 # GitLab instance URL
-gitlabUrl: https://git.5dlabs.ai
+gitlabUrl: https://gitlab.5dlabs.ai
 
-# Runner registration token — injected via ExternalSecrets from OpenBao
-runnerToken:
-  secret: gitlab-runner-token
-  key: runner-registration-token
+# Runner authentication token (GitLab 16+ format) — injected via ExternalSecrets from OpenBao
+# The token is stored in secret `gitlab-runner-token` with key `runner-registration-token`
+# and referenced via runners.secret below
+
+# 5 runner manager replicas for always-available capacity
+replicas: 5
 
 # Runner configuration
 runners:
+  # Reference the ExternalSecret-synced secret containing the runner token
+  secret: gitlab-runner-token
+
   # Runner name
   name: "k8s-runner"
 

@@ -1,0 +1,1 @@
+Use a single PostgreSQL database with logically separated schemas (e.g., `rms`, `finance`, `catalog`) for each service.

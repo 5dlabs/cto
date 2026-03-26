@@ -1,6 +1,10 @@
 pub mod jupiter;
+pub mod lifinity;
 pub mod meteora;
+pub mod openbook;
 pub mod orca;
+pub mod phoenix;
+pub mod pumpfun;
 pub mod raydium;
 
 use std::collections::HashMap;
@@ -22,16 +26,76 @@ impl DexRegistry {
         let mut programs = HashMap::new();
 
         for (id, label) in raydium::program_ids() {
-            programs.insert(id.to_string(), DexProgram { name: "raydium", label });
+            programs.insert(
+                id.to_string(),
+                DexProgram {
+                    name: "raydium",
+                    label,
+                },
+            );
         }
         for (id, label) in orca::program_ids() {
-            programs.insert(id.to_string(), DexProgram { name: "orca", label });
+            programs.insert(
+                id.to_string(),
+                DexProgram {
+                    name: "orca",
+                    label,
+                },
+            );
         }
         for (id, label) in meteora::program_ids() {
-            programs.insert(id.to_string(), DexProgram { name: "meteora", label });
+            programs.insert(
+                id.to_string(),
+                DexProgram {
+                    name: "meteora",
+                    label,
+                },
+            );
+        }
+        for (id, label) in pumpfun::program_ids() {
+            programs.insert(
+                id.to_string(),
+                DexProgram {
+                    name: "pumpfun",
+                    label,
+                },
+            );
+        }
+        for (id, label) in lifinity::program_ids() {
+            programs.insert(
+                id.to_string(),
+                DexProgram {
+                    name: "lifinity",
+                    label,
+                },
+            );
+        }
+        for (id, label) in phoenix::program_ids() {
+            programs.insert(
+                id.to_string(),
+                DexProgram {
+                    name: "phoenix",
+                    label,
+                },
+            );
+        }
+        for (id, label) in openbook::program_ids() {
+            programs.insert(
+                id.to_string(),
+                DexProgram {
+                    name: "openbook",
+                    label,
+                },
+            );
         }
         for (id, label) in jupiter::program_ids() {
-            programs.insert(id.to_string(), DexProgram { name: "jupiter", label });
+            programs.insert(
+                id.to_string(),
+                DexProgram {
+                    name: "jupiter",
+                    label,
+                },
+            );
         }
 
         tracing::info!(count = programs.len(), "DEX registry initialised");

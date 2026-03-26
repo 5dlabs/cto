@@ -86,7 +86,7 @@ pub struct InstallCommand {
     profile: String,
 
     /// GitOps repository URL.
-    #[arg(long, default_value = "https://git.5dlabs.ai/5dlabs/cto.git")]
+    #[arg(long, default_value = "https://gitlab.5dlabs.ai/5dlabs/cto.git")]
     gitops_repo: String,
 
     /// GitOps branch to deploy from.

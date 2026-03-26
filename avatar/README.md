@@ -18,8 +18,24 @@ cd agent
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
-cp .env.example .env
-# Fill in .env with your credentials
+cat > .env <<'EOF'
+# LiveKit
+LIVEKIT_URL=
+LIVEKIT_API_KEY=
+LIVEKIT_API_SECRET=
+
+# LemonSlice avatar (set either agent id OR image URL)
+MORGAN_LEMONSLICE_AGENT_ID=
+# MORGAN_IMAGE_URL=
+# MORGAN_PLACEHOLDER_IMAGE_URL=
+
+# OpenClaw (default backend)
+MORGAN_LLM_BACKEND=openclaw
+MORGAN_LLM_BASE_URL=https://morgan.5dlabs.ai
+MORGAN_LLM_AGENT_ID=morgan
+OPENCLAW_TOKEN=
+EOF
+# Add any optional STT/TTS provider keys for modes you enable.
 ```
 
 ### 2. Frontend setup (one time)
@@ -94,7 +110,7 @@ Browser -> Next.js /api/token -> LiveKit Cloud
 | `docs/provider-spikes.md` | Zero-code provider swap instructions |
 | `docs/elevenlabs-playbook.md` | Practical guide for using ElevenLabs well in the current stack |
 | `docs/decision-review.md` | Architecture decision record |
-| `docs/morgan-openclaw-setup.md` | Morgan + OpenClaw agent config (openclaw-platform reference, pod logs) |
+| `docs/morgan-openclaw-setup.md` | Morgan OpenClaw deployment runbook (CTO manifests, validation commands, troubleshooting) |
 
 ## Latency instrumentation
 
@@ -140,7 +156,7 @@ These items exist in the OVH Kubernetes cluster and were configured manually:
 |------|-----------------|
 | **This repo** (`avatar/`) | Python agent, Next.js frontend, latency tooling |
 | **CTO** (`5dlabs/cto`) | Morgan Helm values, Cloudflare tunnel manifests, ArgoCD ApplicationSet |
-| **openclaw-platform** (`5dlabs/openclaw-platform`) | Reference for agent deployment patterns (not modified) |
+| **openclaw-platform** (`5dlabs/openclaw-platform`) | Upstream OpenClaw Helm chart source consumed by CTO ArgoCD apps |
 
 ## Follow-up work
 

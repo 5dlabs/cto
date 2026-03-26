@@ -21,14 +21,26 @@ import type { Bridge } from './bridge.js';
 import type { ElicitationHandler } from './elicitation-handler.js';
 import type { RunRegistry } from './run-registry.js';
 import type { AgentMessage } from './types.js';
-import type { ElicitationRequest, ElicitationCancel } from './elicitation-types.js';
+import type { ElicitationRequest, ElicitationCancel, DesignReviewRequest } from './elicitation-types.js';
 
 export interface AgentSessionWebhookEvent {
   action: 'created' | 'prompted' | 'updated';
   type: 'AgentSession';
   data: {
     id: string;
+    // Legacy shortcut used by older webhook payloads for select choices.
     promptedValue?: string;
+    // Per Linear docs, prompted webhook carries user message in agentActivity.body.
+    agentActivity?: {
+      id?: string;
+      body?: string;
+      signal?: string;
+      signalMetadata?: unknown;
+      userId?: string;
+      [key: string]: unknown;
+    };
+    body?: string;
+    userId?: string;
     [key: string]: unknown;
   };
   createdAt: string;
@@ -83,11 +95,95 @@ export function createHttpServer(
 
   async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const method = req.method?.toUpperCase();
-    const url = req.url ?? '';
+    const rawUrl = req.url ?? '/';
+    const parsedUrl = new URL(rawUrl, 'http://localhost');
+    const url = parsedUrl.pathname;
+    const statusMatch = url.match(/^\/elicitation\/status\/([^/]+)$/);
 
     // Health check
     if (method === 'GET' && url === '/health') {
       json(res, 200, { status: 'ok', service: 'linear-bridge', runs: runRegistry.size() });
+      return;
+    }
+
+    if (method === 'GET' && url === '/history/decisions') {
+      if (!elicitHandler) {
+        json(res, 503, { error: 'Elicitation handler not initialized' });
+        return;
+      }
+      const sessionId = parsedUrl.searchParams.get('session_id') ?? undefined;
+      const limitRaw = parsedUrl.searchParams.get('limit');
+      const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 100;
+      const rows = elicitHandler.getDecisionHistory(sessionId, Number.isFinite(limit) ? Math.max(1, Math.min(limit, 1000)) : 100);
+      json(res, 200, { decisions: rows });
+      return;
+    }
+
+    if (method === 'GET' && url === '/history/sessions') {
+      if (!elicitHandler) {
+        json(res, 503, { error: 'Elicitation handler not initialized' });
+        return;
+      }
+      const limitRaw = parsedUrl.searchParams.get('limit');
+      const status = parsedUrl.searchParams.get('status') ?? undefined;
+      const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 200;
+      const rows = elicitHandler.getSessionHistory(Number.isFinite(limit) ? Math.max(1, Math.min(limit, 1000)) : 200, status);
+      json(res, 200, { sessions: rows });
+      return;
+    }
+
+    if (method === 'GET' && url === '/history/waiting') {
+      if (!elicitHandler) {
+        json(res, 503, { error: 'Elicitation handler not initialized' });
+        return;
+      }
+      const limitRaw = parsedUrl.searchParams.get('limit');
+      const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 200;
+      const rows = elicitHandler.getWaitingSessions(Number.isFinite(limit) ? Math.max(1, Math.min(limit, 1000)) : 200);
+      json(res, 200, { waiting: rows });
+      return;
+    }
+
+    if (method === 'GET' && url === '/history/decision-audit') {
+      if (!elicitHandler) {
+        json(res, 503, { error: 'Elicitation handler not initialized' });
+        return;
+      }
+      const elicitationId = parsedUrl.searchParams.get('elicitation_id');
+      if (!elicitationId) {
+        json(res, 400, { error: 'Missing query param: elicitation_id' });
+        return;
+      }
+      const bridge = parsedUrl.searchParams.get('bridge') ?? undefined;
+      const audit = elicitHandler.getDecisionAudit(elicitationId, bridge);
+      json(res, 200, { audit });
+      return;
+    }
+
+    if (method === 'GET' && url === '/history/design') {
+      if (!elicitHandler) {
+        json(res, 503, { error: 'Elicitation handler not initialized' });
+        return;
+      }
+      const sessionId = parsedUrl.searchParams.get('session_id') ?? undefined;
+      const limitRaw = parsedUrl.searchParams.get('limit');
+      const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 50;
+      const rows = elicitHandler.getDesignHistory(sessionId, Number.isFinite(limit) ? Math.max(1, Math.min(limit, 1000)) : 50);
+      json(res, 200, { design: rows });
+      return;
+    }
+
+    if (method === 'GET' && statusMatch) {
+      if (!elicitHandler) {
+        json(res, 503, { error: 'Elicitation handler not initialized' });
+        return;
+      }
+      const elicitationId = decodeURIComponent(statusMatch[1] ?? '');
+      if (!elicitationId) {
+        json(res, 400, { error: 'Missing elicitation id' });
+        return;
+      }
+      json(res, 200, elicitHandler.getStatus(elicitationId));
       return;
     }
 
@@ -237,6 +333,41 @@ export function createHttpServer(
       elicitHandler.handleCancel(cancel).catch((err) => {
         logger.error(`Failed to handle elicitation cancel: ${err}`);
       });
+      return;
+    }
+
+    // POST /design-review — Design variant selection via Linear
+    if (url === '/design-review') {
+      if (!elicitHandler) {
+        json(res, 503, { error: 'Elicitation handler not initialized' });
+        return;
+      }
+      const review = payload as DesignReviewRequest;
+      if (!review.review_id || !review.variants?.length) {
+        json(res, 400, { error: 'Missing required fields: review_id, variants' });
+        return;
+      }
+      json(res, 200, { received: true, review_id: review.review_id });
+      elicitHandler.handleDesignReview(review).catch((err) => {
+        logger.error(`Failed to handle design review: ${err}`);
+      });
+      return;
+    }
+
+    // POST /history/design-snapshot
+    if (url === '/history/design-snapshot') {
+      if (!elicitHandler) {
+        json(res, 503, { error: 'Elicitation handler not initialized' });
+        return;
+      }
+      const bodyObj = payload as Record<string, unknown>;
+      const sessionId = bodyObj['session_id'];
+      if (typeof sessionId !== 'string' || !sessionId) {
+        json(res, 400, { error: 'Missing required field: session_id' });
+        return;
+      }
+      elicitHandler.recordDesignSnapshot(bodyObj);
+      json(res, 200, { received: true, session_id: sessionId });
       return;
     }
 

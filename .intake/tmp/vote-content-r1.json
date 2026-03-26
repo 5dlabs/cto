@@ -1,0 +1,155 @@
+[
+  {
+    "id": 1,
+    "title": "[Bolt] Deploy CloudNative-PG Operator",
+    "description": "Install the CloudNative-PG operator into the Kubernetes cluster, which is responsible for managing PostgreSQL instances. This operator will create the 'databases' namespace if it doesn't exist.",
+    "dependencies": [],
+    "details": "Use Helm to deploy the CloudNative-PG operator. Execute: helm repo add cloudnative-pg https://cloudnative-pg.github.io/charts && helm repo update && helm install cnpg-operator cloudnative-pg/cloudnative-pg -n databases --create-namespace. Ensure the Helm chart is pulled from a trusted source and the version is compatible with the cluster.",
+    "status": "pending",
+    "test_strategy": "Verify the CloudNative-PG operator pods are running and healthy in the 'databases' namespace using kubectl get pods -n databases -l app.kubernetes.io/name=cloudnative-pg. Confirm the 'databases' namespace exists. Test for failure: Attempt to deploy with an invalid Helm chart version or repository to ensure error handling is observed.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 2,
+    "title": "[Bolt] Deploy Redis Operator",
+    "description": "Install the Redis operator into the Kubernetes cluster, which will manage Redis/Valkey instances. This operator will create the 'databases' namespace if it doesn't exist.",
+    "dependencies": [],
+    "details": "Use Helm to deploy the Redis operator. Execute: helm repo add ot-helm https://ot-container-kit.github.io/helm-charts/ && helm repo update && helm install redis-operator ot-helm/redis-operator -n databases --create-namespace. Ensure the Helm chart is pulled from a trusted source and the version is compatible with the cluster.",
+    "status": "pending",
+    "test_strategy": "Confirm the Redis operator pods are running and healthy in the 'databases' namespace using kubectl get pods -n databases -l app=redis-operator. Confirm the 'databases' namespace exists. Test for failure: Attempt to deploy with an invalid Helm chart version or repository to ensure error handling is observed.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 3,
+    "title": "[Bolt] Provision S3/R2 Bucket and Credentials",
+    "description": "Provision an S3/R2 compatible object storage bucket named 'sigma1-assets' and generate the necessary access credentials (access key ID and secret access key) with read/write permissions.",
+    "dependencies": [],
+    "details": "Provision the 'sigma1-assets' S3/R2 bucket. Decision Point: Use Cloudflare Terraform or Cloudflare CLI for provisioning. Generate an API token or access key/secret pair with read/write permissions for this bucket. Store these credentials temporarily in a secure, local environment for the next step.",
+    "status": "pending",
+    "test_strategy": "Verify the 'sigma1-assets' bucket exists. Confirm the generated credentials allow successful upload and download of a test file using an S3 client (e.g., aws s3 cp test.txt s3://sigma1-assets/test.txt). Test for failure: Attempt to use invalid credentials to access the bucket and verify access is correctly rejected (e.g., 403 Forbidden error).",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 4,
+    "title": "[Bolt] Set up Cloudflare Tunnel for Morgan Agent",
+    "description": "Configure a basic Cloudflare Tunnel to provide initial external access for the 'morgan' service, pointing to a placeholder internal service or IP.",
+    "dependencies": [],
+    "details": "Install cloudflared and configure a new tunnel. Create a tunnel configuration file (e.g., config.yaml) that points to a placeholder service (e.g., http://localhost:8080 or a dummy internal IP) and start the tunnel. Ensure the tunnel is registered with Cloudflare and a public hostname is configured.",
+    "status": "pending",
+    "test_strategy": "Verify the Cloudflare Tunnel is active and reachable from the internet by checking its status via cloudflared tunnel status and attempting to access the configured public hostname. Test for failure: Attempt to access the tunnel's public hostname when the cloudflared service is stopped, verifying connection failure.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 5,
+    "title": "[Bolt] Document Core Infrastructure Architectural Decisions",
+    "description": "Document key architectural choices and constraints for the core infrastructure setup, including database configurations, operator versions, and provisioning tools.",
+    "dependencies": [],
+    "details": "Create a markdown document outlining the architectural decisions made for the core infrastructure. Include: 1. Justification for single-replica, non-HA for dev bootstrap. 2. Specific versions of CloudNative-PG and Redis operators used. 3. The chosen tool for S3/R2 provisioning (Terraform or Cloudflare CLI). 4. Cloudflare Tunnel configuration details. This document serves as a reference for future development and auditing.",
+    "status": "pending",
+    "test_strategy": "Verify a markdown document named core-infra-decisions.md exists in the project's documentation directory. Confirm it accurately details the architectural choices and constraints as implemented in the other subtasks, including specific versions and tools.",
+    "subagentType": "documenter",
+    "parallelizable": true
+  },
+  {
+    "id": 6,
+    "title": "[Bolt] Deploy PostgreSQL Cluster (sigma1-postgres)",
+    "description": "Deploy a single-instance PostgreSQL cluster named 'sigma1-postgres' using the CloudNative-PG operator, including database and user configuration.",
+    "dependencies": [
+      1
+    ],
+    "details": "Create a Kubernetes Custom Resource (CR) for a Cluster object in the 'databases' namespace. Configure it for a single replica, 50Gi persistent storage, and specify the creation of a database named 'sigma1' with a user 'sigma1_user'. Apply this CR using kubectl apply -f postgres-cluster.yaml. Ensure the 'sigma1' namespace is created if it doesn't exist.",
+    "status": "pending",
+    "test_strategy": "Verify 'sigma1-postgres' pods are running and healthy in the 'databases' namespace. Connect to the PostgreSQL instance using psql with 'sigma1_user' and confirm the 'sigma1' database exists and is accessible. Test for failure: Attempt to connect with incorrect credentials or to a non-existent database, verifying connection rejection.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 7,
+    "title": "[Bolt] Deploy Redis/Valkey Cluster (sigma1-valkey)",
+    "description": "Deploy a single-instance Redis/Valkey cluster named 'sigma1-valkey' using the Redis operator.",
+    "dependencies": [
+      2
+    ],
+    "details": "Create a Kubernetes Custom Resource (CR) for a Redis object in the 'databases' namespace. Configure it for a single replica using the valkey/valkey:7.2-alpine image. Apply this CR using kubectl apply -f redis-cluster.yaml. Ensure the 'sigma1' namespace is created if it doesn't exist.",
+    "status": "pending",
+    "test_strategy": "Verify 'sigma1-valkey' pods are running and healthy in the 'databases' namespace. Connect to the Redis instance using redis-cli and perform basic operations (e.g., SET key value, GET key) to confirm functionality. Test for failure: Attempt to connect to the Redis instance with an incorrect password (if configured) or to a non-existent port, verifying connection rejection.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 8,
+    "title": "[Bolt] Create sigma1-infra-credentials Secret (Sensitive)",
+    "description": "Create a Kubernetes Secret in the 'sigma1' namespace containing sensitive credentials for S3/R2 and database access.",
+    "dependencies": [
+      3,
+      6,
+      7
+    ],
+    "details": "Construct a Kubernetes Secret YAML file named 'sigma1-infra-credentials' in the 'sigma1' namespace. Populate it with S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY (from subtask 3). Retrieve the generated PostgreSQL user password (e.g., from the secret created by CloudNative-PG for sigma1-postgres-sigma1-user) and include it as POSTGRES_PASSWORD. Retrieve the Redis/Valkey password (if configured, typically from a secret generated by the Redis operator) and include it as REDIS_PASSWORD. Ensure all values are base64 encoded. Apply this Secret using kubectl apply -f secret.yaml.",
+    "status": "pending",
+    "test_strategy": "Verify the 'sigma1-infra-credentials' Secret exists in the 'sigma1' namespace using kubectl get secret sigma1-infra-credentials -n sigma1 -o yaml. Confirm all expected keys are present and their values are base64 encoded. Attempt to decode and use the credentials from a test pod to verify they grant correct access to S3/R2, PostgreSQL, and Redis. Test for failure: Attempt to access the Secret from a pod without appropriate RBAC permissions, verifying access is denied.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 9,
+    "title": "[Bolt] Create sigma1-infra-endpoints ConfigMap (Non-Sensitive)",
+    "description": "Create a ConfigMap in the 'sigma1' namespace containing non-sensitive connection strings for PostgreSQL, Redis, and S3/R2 for consumption by other services.",
+    "dependencies": [
+      6,
+      7,
+      3
+    ],
+    "details": "Construct a Kubernetes ConfigMap YAML file named 'sigma1-infra-endpoints' in the 'sigma1' namespace. Populate it with POSTGRES_URL (e.g., postgres://sigma1_user@sigma1-postgres.databases.svc.cluster.local:5432/sigma1), REDIS_URL (e.g., redis://sigma1-valkey.databases.svc.cluster.local:6379), and S3_BUCKET_NAME (e.g., sigma1-assets). Apply this ConfigMap using kubectl apply -f configmap.yaml.",
+    "status": "pending",
+    "test_strategy": "Verify the 'sigma1-infra-endpoints' ConfigMap exists in the 'sigma1' namespace using kubectl get configmap sigma1-infra-endpoints -n sigma1 -o yaml. Confirm all expected keys are present and their values are correct and accessible (e.g., attempt to resolve DNS for service URLs from a test pod). Test for failure: Attempt to reference a non-existent ConfigMap key from a test pod, verifying the environment variable is not set.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 10,
+    "title": "[Bolt] Review Database Infrastructure Deployment",
+    "description": "Conduct a focused review of the PostgreSQL and Redis/Valkey cluster deployments to ensure they are running correctly, are accessible, and adhere to initial configuration requirements.",
+    "dependencies": [
+      6,
+      7
+    ],
+    "details": "Perform a checklist-based review: 1. Verify 'sigma1-postgres' and 'sigma1-valkey' pods are running and healthy in the 'databases' namespace. 2. Confirm PostgreSQL and Redis instances are accessible and functional from within the cluster. 3. Ensure database and user 'sigma1' exist in PostgreSQL. 4. Verify single-replica, non-HA configuration for both databases. 5. Check logs for any critical errors or warnings.",
+    "status": "pending",
+    "test_strategy": "Generate a review report confirming all database-related verification steps have passed. The report should explicitly state compliance with 'single-replica, no HA' for dev bootstrap and confirm successful connectivity tests.",
+    "subagentType": "reviewer",
+    "parallelizable": true
+  },
+  {
+    "id": 11,
+    "title": "[Bolt] Review Object Storage and Network Infrastructure",
+    "description": "Conduct a focused review of the S3/R2 bucket provisioning and Cloudflare Tunnel setup to ensure external connectivity and storage are correctly configured.",
+    "dependencies": [
+      3,
+      4
+    ],
+    "details": "Perform a checklist-based review: 1. Verify the 'sigma1-assets' S3/R2 bucket exists and is accessible with the generated credentials. 2. Confirm the Cloudflare Tunnel is active, registered, and its public hostname is reachable from the internet. 3. Check for any network policy conflicts or misconfigurations that might impede access.",
+    "status": "pending",
+    "test_strategy": "Generate a review report confirming all object storage and network-related verification steps have passed. The report should include evidence of successful S3/R2 read/write operations and Cloudflare Tunnel reachability.",
+    "subagentType": "reviewer",
+    "parallelizable": true
+  },
+  {
+    "id": 12,
+    "title": "[Bolt] Review Infrastructure Endpoints ConfigMap and Secret",
+    "description": "Conduct a focused review of the sigma1-infra-endpoints ConfigMap and sigma1-infra-credentials Secret to ensure accuracy, completeness, and adherence to security best practices.",
+    "dependencies": [
+      8,
+      9
+    ],
+    "details": "Perform a checklist-based review: 1. Inspect the sigma1-infra-endpoints ConfigMap for accuracy and completeness of non-sensitive connection details. 2. Inspect the sigma1-infra-credentials Secret for accuracy, completeness, and proper base64 encoding of sensitive credentials. 3. Verify that sensitive data is only in the Secret and non-sensitive data is only in the ConfigMap. 4. Confirm that the credentials in the Secret are functional for connecting to the respective services.",
+    "status": "pending",
+    "test_strategy": "Generate a review report confirming the ConfigMap and Secret are correctly populated, securely configured, and their contents are functional. The report should explicitly confirm the separation of sensitive and non-sensitive data and the base64 encoding of Secret values.",
+    "subagentType": "reviewer",
+    "parallelizable": true
+  }
+]

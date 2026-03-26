@@ -1,0 +1,1 @@
+https://5dlabs.ai/2026-03-01weekly1.0https://5dlabs.ai/opportunities/2026-03-01weekly0.9https://5dlabs.ai/investors/2026-03-01monthly0.9https://5dlabs.ai/founder/2026-03-01monthly0.8https://5dlabs.ai/trading/2026-03-01monthly0.8https://5dlabs.ai/llms.txt2026-03-01monthly0.6https://5dlabs.ai/llms-full.txt2026-03-01monthly0.5

@@ -5224,8 +5224,8 @@ fn create_mcp_server_coderun(
         "spec": {
             "taskId": 0,
             "service": "cto",
-            "repositoryUrl": "https://git.5dlabs.ai/5dlabs/cto.git",
-            "docsRepositoryUrl": "https://git.5dlabs.ai/5dlabs/cto.git",
+            "repositoryUrl": "https://gitlab.5dlabs.ai/5dlabs/cto.git",
+            "docsRepositoryUrl": "https://gitlab.5dlabs.ai/5dlabs/cto.git",
             "workingDirectory": ".",
             "model": model,
             "githubApp": github_app,
@@ -5648,8 +5648,8 @@ fn create_add_skills_coderun(
         "spec": {
             "taskId": 0,
             "service": format!("skills-{}", short_name),
-            "repositoryUrl": "https://git.5dlabs.ai/5dlabs/cto.git",
-            "docsRepositoryUrl": "https://git.5dlabs.ai/5dlabs/cto.git",
+            "repositoryUrl": "https://gitlab.5dlabs.ai/5dlabs/cto.git",
+            "docsRepositoryUrl": "https://gitlab.5dlabs.ai/5dlabs/cto.git",
             "workingDirectory": ".",
             "model": model,
             "githubApp": github_app,

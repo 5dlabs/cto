@@ -1049,7 +1049,8 @@ async fn main() -> Result<()> {
             let config = BootstrapConfig::new(&cluster_name, &ip)
                 .with_install_disk(&install_disk)
                 .with_output_dir(&output_dir)
-                .with_talos_version(&talos_version);
+                .with_talos_version(&talos_version)
+                .with_cilium_cni();
 
             // Step 1: Wait for Talos maintenance mode
             println!("\n📡 Step 1/7: Waiting for Talos maintenance mode...");
@@ -1075,13 +1076,20 @@ async fn main() -> Result<()> {
             println!("\n🎯 Step 6/7: Bootstrapping cluster...");
             talos::bootstrap_cluster(&ip, &configs.talosconfig)?;
 
-            // Step 7: Wait for Kubernetes
-            println!("\n☸️  Step 7/7: Waiting for Kubernetes API...");
-            talos::wait_for_kubernetes(&ip, &configs.talosconfig, Duration::from_secs(300))?;
-
-            // Get kubeconfig
+            // Step 7: Get kubeconfig (after API port is reachable)
+            println!("\n☸️  Step 7/7: Waiting for Kubernetes API port...");
+            talos::wait_for_kubernetes_api_port(&ip, Duration::from_secs(300))?;
             let kubeconfig_path = output_dir.join("kubeconfig");
             talos::get_kubeconfig(&ip, &configs.talosconfig, &kubeconfig_path)?;
+
+            println!("\n🔎 Enforcing Cilium-only network plane policy...");
+            metal::cilium::assert_cilium_only_network_plane(&kubeconfig_path)?;
+
+            println!("\n🌐 Deploying Cilium CNI...");
+            stack::deploy_cilium(&kubeconfig_path, &cluster_name, 1)?;
+            metal::cilium::wait_for_cilium_healthy(&kubeconfig_path)?;
+            metal::cilium::assert_cilium_only_network_plane(&kubeconfig_path)?;
+            talos::wait_for_node_ready(&kubeconfig_path, 1, Duration::from_secs(300))?;
 
             println!("\n🎉 Cluster bootstrapped successfully!");
             println!("\n📁 Generated files:");
@@ -1160,7 +1168,8 @@ async fn main() -> Result<()> {
             let config = BootstrapConfig::new(&cluster_name, &server_ip)
                 .with_install_disk(&install_disk)
                 .with_output_dir(&output_dir)
-                .with_talos_version(&talos_version);
+                .with_talos_version(&talos_version)
+                .with_cilium_cni();
             let configs = talos::generate_config(&config)?;
 
             // Step 7: Apply config
@@ -1179,13 +1188,20 @@ async fn main() -> Result<()> {
             println!("\n🎯 Step 9/10: Bootstrapping cluster...");
             talos::bootstrap_cluster(&server_ip, &configs.talosconfig)?;
 
-            // Step 10: Wait for Kubernetes
-            println!("\n☸️  Step 10/10: Waiting for Kubernetes API...");
-            talos::wait_for_kubernetes(&server_ip, &configs.talosconfig, Duration::from_secs(300))?;
-
-            // Get kubeconfig
+            // Step 10: Get kubeconfig (after API port is reachable)
+            println!("\n☸️  Step 10/10: Waiting for Kubernetes API port...");
+            talos::wait_for_kubernetes_api_port(&server_ip, Duration::from_secs(300))?;
             let kubeconfig_path = output_dir.join("kubeconfig");
             talos::get_kubeconfig(&server_ip, &configs.talosconfig, &kubeconfig_path)?;
+
+            println!("\n🔎 Enforcing Cilium-only network plane policy...");
+            metal::cilium::assert_cilium_only_network_plane(&kubeconfig_path)?;
+
+            println!("\n🌐 Deploying Cilium CNI...");
+            stack::deploy_cilium(&kubeconfig_path, &cluster_name, 1)?;
+            metal::cilium::wait_for_cilium_healthy(&kubeconfig_path)?;
+            metal::cilium::assert_cilium_only_network_plane(&kubeconfig_path)?;
+            talos::wait_for_node_ready(&kubeconfig_path, 1, Duration::from_secs(300))?;
 
             println!("\n🎉 Full provisioning complete!");
             println!("\n📊 Summary:");
@@ -1432,7 +1448,8 @@ async fn main() -> Result<()> {
             let config = BootstrapConfig::new(&name, &cp_addr)
                 .with_install_disk(&install_disk)
                 .with_output_dir(&output_dir)
-                .with_talos_version(&talos_version);
+                .with_talos_version(&talos_version)
+                .with_cilium_cni();
             let configs = talos::generate_config(&config)?;
             let kubeconfig_path = output_dir.join("kubeconfig");
 
@@ -1460,15 +1477,13 @@ async fn main() -> Result<()> {
                 talos::bootstrap_cluster(&cp_addr, &configs.talosconfig)?;
 
                 state.set_step(ProvisionStep::WaitingKubernetes)?;
-                println!("\n☸️  Waiting for Kubernetes API...");
-                talos::wait_for_kubernetes(
-                    &cp_addr,
-                    &configs.talosconfig,
-                    Duration::from_secs(300),
-                )?;
-
-                // Get kubeconfig
+                println!("\n☸️  Waiting for Kubernetes API port...");
+                talos::wait_for_kubernetes_api_port(&cp_addr, Duration::from_secs(300))?;
                 talos::get_kubeconfig(&cp_addr, &configs.talosconfig, &kubeconfig_path)?;
+                metal::cilium::assert_cilium_only_network_plane(&kubeconfig_path)?;
+                stack::deploy_cilium(&kubeconfig_path, &name, 1)?;
+                metal::cilium::wait_for_cilium_healthy(&kubeconfig_path)?;
+                metal::cilium::assert_cilium_only_network_plane(&kubeconfig_path)?;
                 println!("   ✅ Control plane bootstrapped!");
             } else {
                 println!("\n⏭️  Step 7/9: Skipping bootstrap (already done)");
@@ -2053,7 +2068,8 @@ async fn main() -> Result<()> {
             let config = BootstrapConfig::new(&name, &cp_addr)
                 .with_install_disk(&install_disk)
                 .with_output_dir(&output_dir)
-                .with_talos_version(&talos_version);
+                .with_talos_version(&talos_version)
+                .with_cilium_cni();
             let configs = talos::generate_config(&config)?;
             let kubeconfig_path = output_dir.join("kubeconfig");
 
@@ -2068,11 +2084,14 @@ async fn main() -> Result<()> {
             println!("\n🎯 Step 8/12: Bootstrapping control plane...");
             talos::bootstrap_cluster(&cp_addr, &configs.talosconfig)?;
 
-            println!("\n☸️  Step 9/12: Waiting for Kubernetes API...");
-            talos::wait_for_kubernetes(&cp_addr, &configs.talosconfig, Duration::from_secs(300))?;
+            println!("\n☸️  Step 9/12: Waiting for Kubernetes API port...");
+            talos::wait_for_kubernetes_api_port(&cp_addr, Duration::from_secs(300))?;
 
-            let kubeconfig_path = output_dir.join("kubeconfig");
             talos::get_kubeconfig(&cp_addr, &configs.talosconfig, &kubeconfig_path)?;
+            metal::cilium::assert_cilium_only_network_plane(&kubeconfig_path)?;
+            stack::deploy_cilium(&kubeconfig_path, &name, 1)?;
+            metal::cilium::wait_for_cilium_healthy(&kubeconfig_path)?;
+            metal::cilium::assert_cilium_only_network_plane(&kubeconfig_path)?;
             println!("   ✅ Control plane bootstrapped!");
 
             // Step 10: Apply worker config to both workers

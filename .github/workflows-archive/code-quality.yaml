@@ -42,7 +42,7 @@ jobs:
         run: |
           echo "🔍 Checking for duplicate code..."
           jscpd apps/web/src --config .jscpd.json --reporters console || true
-          jscpd apps/marketing/src --config .jscpd.json --reporters console || true
+          jscpd apps/website/src --config .jscpd.json --reporters console || true
 
       - name: Upload jscpd report
         uses: actions/upload-artifact@v6

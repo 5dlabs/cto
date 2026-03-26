@@ -1,0 +1,13 @@
+{
+  "project_name": "existing-platform-refresh",
+  "design_mode": "ingest_plus_stitch",
+  "design_prompt": "Refresh UI hierarchy and component consistency without changing core workflows.",
+  "design_urls": [
+    "https://example.com/app"
+  ],
+  "include_codebase": true,
+  "expected_has_frontend": true,
+  "expected_frontend_targets": [
+    "web"
+  ]
+}

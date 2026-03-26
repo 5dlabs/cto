@@ -71,9 +71,10 @@ export function createBridge(
 
     const authorName = coordinator ? `${msg.from} via ${coordinator}` : msg.from;
 
+    const desc = msg.message.length <= 4096 ? msg.message : msg.message.slice(0, 4093) + "...";
     const embed = new EmbedBuilder()
       .setAuthor({ name: authorName })
-      .setDescription(msg.message)
+      .setDescription(desc)
       .setTimestamp(new Date(msg.timestamp));
 
     if (msg.priority === "urgent") {
@@ -95,6 +96,35 @@ export function createBridge(
   return {
     handleMessage(subject: string, msg: AgentMessage): void {
       const recipient = extractRecipient(subject, msg);
+
+      // Optional direct route for intake/deliberation UX: keep workflow traffic in #intake
+      // instead of temporary room-* channels. With session_id, debate content goes to a
+      // per-session thread; markers without session_id stay in the parent channel.
+      if (recipient === "deliberation" && config.deliberationChannelId) {
+        const parentId = config.deliberationChannelId;
+        const sessionId = msg.metadata?.session_id;
+        const step = msg.metadata?.step;
+        void (async () => {
+          try {
+            let body = msg.message;
+            let targetId = parentId;
+            if (sessionId) {
+              const threadId = await discord.getOrCreateSessionThread(parentId, sessionId);
+              if (step === "deliberation-start") {
+                body += `\n\nDiscuss in <#${threadId}>`;
+                targetId = parentId;
+              } else {
+                targetId = threadId;
+              }
+            }
+            const embed = buildEmbed({ ...msg, message: body }, recipient, "intake-channel");
+            await discord.postEmbed(targetId, embed);
+          } catch (err) {
+            logger.warn(`Deliberation post failed: ${err}`);
+          }
+        })();
+        return;
+      }
 
       // Check for end-conversation signal
       if (msg.message.includes(END_CONVERSATION_SIGNAL)) {

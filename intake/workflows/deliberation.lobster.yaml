@@ -1,225 +1,350 @@
 name: deliberation
-description: >
-  PRD deliberation — Lobster-native Optimist vs Pessimist debate with
-  multi-model committee voting on decision points. Each debate turn is a
-  stateless LLM call; messaging flows through HTTP bridge for Discord and
-  Linear observability. Produces a resolved design-brief.md.
 
-inputs:
-  - name: prd_content
-    type: string
-    description: "Full PRD markdown content"
-  - name: timebox_minutes
-    type: number
-    default: 30
-    description: "Maximum deliberation time in minutes"
-  - name: session_id
-    type: string
-    description: "Unique session identifier (UUID)"
-  - name: infrastructure_context
-    type: string
-    default: ""
-    description: "Available operators and services (injected from cluster state)"
-  - name: codebase_context
-    type: string
-    default: ""
-    description: "Structured codebase context from codebase-analysis step (empty for greenfield)"
-  - name: human_review_mode
-    type: string
-    default: "full_auto"
-    description: "full_auto | semi_auto | manual"
-  - name: verify
-    type: string
+args:
+  audio_debug:
     default: "true"
-    description: "When true, validate outputs after each tally"
-  - name: breakpoints
-    type: string
-    default: "false"
-    description: "When true, pause for human approval at key checkpoints"
-  - name: linear_session_id
-    type: string
-    default: ""
-    description: "Linear session ID for activity tracking"
-  - name: model_frontier_provider
-    type: string
-    default: "anthropic"
-  - name: model_frontier
-    type: string
-    default: "claude-opus-4-6"
-  - name: voter_1_provider
-    type: string
-    default: "anthropic"
-  - name: voter_1_model
-    type: string
-    default: "claude-opus-4-6"
-  - name: voter_2_provider
-    type: string
-    default: "openai"
-  - name: voter_2_model
-    type: string
-    default: "gpt-5.2-pro"
-  - name: voter_3_provider
-    type: string
-    default: "anthropic"
-  - name: voter_3_model
-    type: string
-    default: "claude-sonnet-4-6"
-  - name: voter_4_provider
-    type: string
-    default: "openai"
-  - name: voter_4_model
-    type: string
-    default: "o3-pro"
-  - name: voter_5_provider
-    type: string
-    default: "google"
-  - name: voter_5_model
-    type: string
-    default: "gemini-2.5-pro"
-
-outputs:
-  - name: design_brief
-    type: string
-    description: "Resolved design brief markdown — feeds into parse-prd"
-  - name: deliberation_result
-    type: object
-    description: "Full deliberation result JSON for audit logging"
+  prd_content:
+    default: ''
+  timebox_minutes:
+    default: 30
+  session_id:
+    default: ''
+  infrastructure_context_file:
+    default: '.intake/contexts/infrastructure.txt'
+  codebase_context_file:
+    default: '.intake/contexts/codebase.txt'
+  design_context_file:
+    default: '.intake/contexts/design.txt'
+  parsed_tasks:
+    default: ''
+  decision_points_json:
+    default: '[]'
+  human_review_mode:
+    default: human_required
+  verify:
+    default: 'true'
+  breakpoints:
+    default: 'false'
+  linear_session_id:
+    default: ''
+  model_frontier_provider:
+    default: anthropic
+  model_frontier:
+    default: claude-opus-4-6
+  voter_1_provider:
+    default: anthropic
+  voter_1_model:
+    default: claude-opus-4-6
+  voter_2_provider:
+    default: openai
+  voter_2_model:
+    default: gpt-5.2-pro
+  voter_3_provider:
+    default: anthropic
+  voter_3_model:
+    default: claude-sonnet-4-6
 
 steps:
-  # ─────────────────────────────────────────────────────────
-  # Research PRD context (unchanged from original)
-  # ─────────────────────────────────────────────────────────
-  - name: research-prd
-    description: "Research PRD context via Tavily — gives each debate agent evidence"
-    timeout: "5m"
-    command: >
-      jq -n
-        --arg prd_content "{{inputs.prd_content}}"
-        --arg codebase_context "{{inputs.codebase_context}}"
+  - id: research-prd
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "research-prd" "${audio_debug}"
+      PRD_FILE="$root/.intake/run-prd.txt"
+      [ -f "$PRD_FILE" ] || { echo "deliberation: missing $PRD_FILE — run pipeline materialize-prd first" >&2; exit 1; }
+      INTAKE_AGENT_BIN="${INTAKE_AGENT_BIN:-}"
+      if [ -z "$INTAKE_AGENT_BIN" ]; then
+        if command -v intake-agent >/dev/null 2>&1; then
+          INTAKE_AGENT_BIN="intake-agent"
+        elif [ -x "$root/apps/intake-agent/dist/intake-agent" ]; then
+          INTAKE_AGENT_BIN="$root/apps/intake-agent/dist/intake-agent"
+        elif [ -x "$root/apps/intake-agent/intake-agent" ]; then
+          INTAKE_AGENT_BIN="$root/apps/intake-agent/intake-agent"
+        fi
+      fi
+      if [ -z "$INTAKE_AGENT_BIN" ]; then
+        "$root/intake/scripts/workflow-gate-audio.sh" "deliberation" "research-prd" "failed: intake-agent missing" "${audio_debug}" "error" "session ${session_id}"
+        echo "deliberation research-prd: intake-agent binary not found. Set INTAKE_AGENT_BIN or build apps/intake-agent." >&2
+        exit 1
+      fi
+      DP_JSON="$(cat "$root/.intake/decision-points.json" 2>/dev/null || echo '[]')"
+      DP_SUMMARY=""
+      if [ -n "$DP_JSON" ] && [ "$DP_JSON" != "[]" ]; then
+        DP_SUMMARY=$(printf '%s' "$DP_JSON" | jq -r '
+          [.[] | "[" + .id + "] " + .category + ": " + .description +
+           " (affects tasks " + ([.affected_tasks[] | tostring] | join(", ")) + ")"
+          ] | join("\n")' 2>/dev/null || true)
+      fi
+      CB_FILE="$root/.intake/contexts/codebase.txt"
+      DC_FILE="$root/.intake/contexts/design.txt"
+      jq -n \
+        --rawfile prd_content "$PRD_FILE" \
+        --rawfile codebase_context "$CB_FILE" \
+        --rawfile design_context "$DC_FILE" \
+        --arg decision_points "$DP_SUMMARY" \
         '{
           "operation": "prd_research",
           "payload": {
-            "prd_content": (if $codebase_context != "" then ($prd_content + "\n\n## Existing Codebase Context\n" + $codebase_context) else $prd_content end)
+            "prd_content": (
+              (if $codebase_context != "" then ($prd_content + "\n\n## Existing Codebase Context\n" + $codebase_context) else $prd_content end)
+              + (if $design_context != "" then "\n\n## Design Context\n" + $design_context else "" end)
+              + (if $decision_points != "" then "\n\n## Decision Points to Research\nThe following strategic decision points need evidence:\n" + $decision_points else "" end)
+            )
           }
-        }' | intake-agent
+        }' | "$INTAKE_AGENT_BIN"
 
-  # ─────────────────────────────────────────────────────────
-  # Initialize debate session
-  # ─────────────────────────────────────────────────────────
-  - name: init-debate
-    depends_on: [research-prd]
-    description: "Initialize debate session metadata"
-    command: >
-      jq -n --arg session_id "{{inputs.session_id}}" --arg start "$(date +%s)" \
-        '{session_id: $session_id, start_epoch: ($start | tonumber), debate_log: [], resolved_dps: [], pending_dps: {}}'
+  - id: init-debate
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "init-debate" "${audio_debug}"
+      DP_FILE="$root/.intake/decision-points.json"
+      DP_COUNT=$(jq 'if type=="array" then length else 0 end' "$DP_FILE" 2>/dev/null || echo 0)
+      jq -n --arg session_id "${session_id}" --arg start "$(date +%s)" --argjson dp_count "$DP_COUNT" \
+        '{session_id: $session_id, start_epoch: ($start | tonumber), dp_count: $dp_count}'
 
-  - name: notify-start
-    depends_on: [init-debate]
-    description: "Notify bridges that deliberation has started"
-    command: >
-      echo "Deliberation started — session {{inputs.session_id}}" |
-      intake-util bridge-notify --from intake --to deliberation
-        --metadata '{"step":"deliberation-start","session_id":"{{inputs.session_id}}"}'
+  - id: notify-start
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "notify-start" "${audio_debug}"
+      DP_FILE="$root/.intake/decision-points.json"
+      DP_COUNT=$(jq 'if type=="array" then length else 0 end' "$DP_FILE" 2>/dev/null || echo 0)
+      echo "🧠 **Deliberation started** — session ${session_id} — ${DP_COUNT} decision points to resolve" | intake-util bridge-notify --from intake --to deliberation \
+        --metadata '{"step":"deliberation-start","session_id":"'${session_id}'","dp_count":'$DP_COUNT'}' || true
 
-  # ═══════════════════════════════════════════════════════════
-  # ROUND 1
-  # ═══════════════════════════════════════════════════════════
-  - name: optimist-turn-1
-    depends_on: [init-debate]
-    timeout: "5m"
-    description: "Optimist opening position"
-    command: >
-      openclaw.invoke --tool llm-task --action text --args-json '{
-        "prompt": "{{prompts/debate-optimist-soul.md}}",
-        "input": {
-          "prd": "{{inputs.prd_content}}",
-          "research": "${{ steps.research-prd.output | jq -r '.data.optimist // .optimist // empty' }}",
-          "infrastructure_context": "{{inputs.infrastructure_context}}",
-          "codebase_context": "{{inputs.codebase_context}}",
-          "debate_log": [],
-          "resolved_decisions": [],
-          "instruction": "Begin by proposing your architectural approach for this PRD."
-        },
-        "provider": "{{inputs.model_frontier_provider}}",
-        "model": "{{inputs.model_frontier}}"
-      }'
-
-  - name: notify-opt-1
-    depends_on: [optimist-turn-1]
-    command: >
-      echo '${{ steps.optimist-turn-1.output }}' |
-      intake-util bridge-notify --from optimist --to deliberation
-        --metadata '{"turn":"1","speaker":"optimist","session_id":"{{inputs.session_id}}"}'
-
-  - name: linear-activity-opt-1
-    depends_on: [optimist-turn-1]
-    when: "{{inputs.linear_session_id}}"
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "Optimist Turn 1"
-        --body '${{ steps.optimist-turn-1.output }}'
-
-  - name: parse-dp-opt-1
-    depends_on: [optimist-turn-1]
-    command: >
-      jq -n --arg content '${{ steps.optimist-turn-1.output }}' --arg speaker optimist \
-        '{content: $content, speaker: $speaker}' |
-      intake-util parse-decision-points
-
-  - name: pessimist-turn-1
-    depends_on: [optimist-turn-1]
-    timeout: "5m"
-    description: "Pessimist response to optimist opening"
-    command: >
-      openclaw.invoke --tool llm-task --action text --args-json '{
-        "prompt": "{{prompts/debate-pessimist-soul.md}}",
-        "input": {
-          "prd": "{{inputs.prd_content}}",
-          "research": "${{ steps.research-prd.output | jq -r '.data.pessimist // .pessimist // empty' }}",
-          "infrastructure_context": "{{inputs.infrastructure_context}}",
-          "codebase_context": "{{inputs.codebase_context}}",
-          "debate_log": [{"turn": 1, "speaker": "optimist", "content": "${{ steps.optimist-turn-1.output }}"}],
-          "resolved_decisions": [],
-          "instruction": "Respond to the Optimist. Challenge weak points, raise risks, propose simpler alternatives where warranted."
-        },
-        "provider": "{{inputs.model_frontier_provider}}",
-        "model": "{{inputs.model_frontier}}"
-      }'
-
-  - name: notify-pes-1
-    depends_on: [pessimist-turn-1]
-    command: >
-      echo '${{ steps.pessimist-turn-1.output }}' |
-      intake-util bridge-notify --from pessimist --to deliberation
-        --metadata '{"turn":"1","speaker":"pessimist","session_id":"{{inputs.session_id}}"}'
-
-  - name: linear-activity-pes-1
-    depends_on: [pessimist-turn-1]
-    when: "{{inputs.linear_session_id}}"
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "Pessimist Turn 1"
-        --body '${{ steps.pessimist-turn-1.output }}'
-
-  - name: parse-dp-pes-1
-    depends_on: [pessimist-turn-1]
-    command: >
-      jq -n --arg content '${{ steps.pessimist-turn-1.output }}' --arg speaker pessimist \
-        '{content: $content, speaker: $speaker}' |
-      intake-util parse-decision-points
-
-  - name: resolve-dps-1
-    depends_on: [parse-dp-opt-1, parse-dp-pes-1]
-    description: "Find decision points with both positions ready for vote"
-    command: >
-      jq -n \
-        --argjson opt '${{ steps.parse-dp-opt-1.output }}' \
-        --argjson pes '${{ steps.parse-dp-pes-1.output }}' \
+  - id: optimist-turn
+    env:
+      CTO_RESEARCH_PRD: $research-prd.stdout
+    command: |
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "optimist-turn" "${audio_debug}"
+      RESEARCH_OPT=$(printf '%s' "$CTO_RESEARCH_PRD" | jq -r '.data.optimist // .optimist // empty');
+      PARSED_TASKS_JSON="$(cat "$root/.intake/initial-tasks.json" 2>/dev/null || echo '[]')"
+      PARSED_TASKS_CTX=""
+      if [ -n "$PARSED_TASKS_JSON" ] && [ "$PARSED_TASKS_JSON" != "null" ] && [ "$PARSED_TASKS_JSON" != "" ]; then
+        PARSED_TASKS_CTX=$(printf '%s' "$PARSED_TASKS_JSON" | jq -r '
+          "## Initial Task Decomposition (" + (length | tostring) + " tasks)\n\n" +
+          ([.[] |
+            "### Task " + (.id | tostring) + ": " + .title + "\n" +
+            "- Agent: " + .agent + " | Stack: " + .stack + "\n" +
+            "- " + .description
+          ] | join("\n"))' 2>/dev/null || true)
+      fi
+      DP_CTX=""
+      DP_JSON="$(cat "$root/.intake/decision-points.json" 2>/dev/null || echo '[]')"
+      if [ -n "$DP_JSON" ] && [ "$DP_JSON" != "[]" ]; then
+        DP_CTX=$(printf '%s' "$DP_JSON" | jq -r '
+          "## Decision Points (" + (length | tostring) + " to resolve)\n\n" +
+          ([.[] |
+            "### [" + .id + "] " + .category + "\n" +
+            "**Question:** " + .description + "\n" +
+            "**Options:** " + (.options | join(" vs ")) + "\n" +
+            "**Affects tasks:** " + ([.affected_tasks[] | tostring] | join(", ")) + "\n" +
+            "**Constraint:** " + .constraint_type + "\n" +
+            "**Rationale:** " + .rationale
+          ] | join("\n\n"))' 2>/dev/null || true)
+      fi
+      OPT_ARGS=$(jq -n \
+        --rawfile prompt "$root/intake/prompts/debate-optimist-soul.md" \
+        --rawfile prd "$root/.intake/run-prd.txt" \
+        --arg research "$RESEARCH_OPT" \
+        --arg parsed_tasks "$PARSED_TASKS_CTX" \
+        --arg decision_points "$DP_CTX" \
+        --rawfile infrastructure_context "$root/.intake/contexts/infrastructure.txt" \
+        --rawfile codebase_context "$root/.intake/contexts/codebase.txt" \
+        --rawfile design_context "$root/.intake/contexts/design.txt" \
+        --arg instruction "Present your position on ALL decision points. Address each one with specific evidence." \
+        --arg provider "${model_frontier_provider}" \
+        --arg model "${model_frontier}" \
         '{
+          "prompt": $prompt,
+          "input": {
+            "prd": $prd,
+            "parsed_tasks": $parsed_tasks,
+            "decision_points": $decision_points,
+            "research": $research,
+            "infrastructure_context": $infrastructure_context,
+            "codebase_context": $codebase_context,
+            "design_context": $design_context,
+            "debate_log": [],
+            "resolved_decisions": [],
+            "instruction": $instruction
+          },
+          "provider": $provider,
+          "model": $model
+        }')
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action text --args-json "$OPT_ARGS"
+
+  - id: notify-opt
+    env:
+      CTO_OT: $optimist-turn.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "notify-opt" "${audio_debug}"
+      printf '%s' "$CTO_OT" | intake-util bridge-notify --from optimist --to deliberation \
+        --metadata '{"speaker":"optimist","session_id":"'${session_id}'"}' || true
+      LV_BIN=""; command -v lobster-voice >/dev/null 2>&1 && LV_BIN="lobster-voice" || { [ -x "$root/apps/lobster-voice/lobster-voice" ] && LV_BIN="$root/apps/lobster-voice/lobster-voice"; }
+      [ -n "$LV_BIN" ] && WORKSPACE="$root" "$LV_BIN" debate optimist "$(printf '%s' "$CTO_OT")" || true
+
+  - id: linear-activity-opt
+    env:
+      CTO_OT: $optimist-turn.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "linear-activity-opt" "${audio_debug}"
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID=""
+      if [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ]; then
+        LINEAR_SID="$(cat "$FALLBACK_FILE")"
+        echo "linear-activity-opt: session ID from file='$LINEAR_SID'" >&2
+      fi
+      if [ -z "$LINEAR_SID" ] && [ -n "${linear_session_id}" ]; then
+        LINEAR_SID="${linear_session_id}"
+        echo "linear-activity-opt: session ID from arg='$LINEAR_SID'" >&2
+      fi
+      if [ -n "$LINEAR_SID" ]; then
+        intake-util linear-activity \
+          --session-id "$LINEAR_SID" \
+          --type thought \
+          --body "$(printf '**Optimist Position**\n\n%s' "$CTO_OT")" || true
+      else
+        echo "linear-activity-opt: NO session ID — skipping" >&2
+      fi
+
+  - id: parse-dp-opt
+    env:
+      CTO_OT: $optimist-turn.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "parse-dp-opt" "${audio_debug}"
+      jq -n --arg content "$(printf '%s' "$CTO_OT")" --arg speaker optimist \
+        '{content: $content, speaker: $speaker}' |
+      intake-util parse-decision-points
+
+  - id: pessimist-turn
+    env:
+      CTO_RESEARCH_PRD: $research-prd.stdout
+      CTO_OT: $optimist-turn.stdout
+    command: |
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "pessimist-turn" "${audio_debug}"
+      RESEARCH_PES=$(printf '%s' "$CTO_RESEARCH_PRD" | jq -r '.data.pessimist // .pessimist // empty');
+      DEBATE_LOG=$(jq -n --arg c "$(printf '%s' "$CTO_OT")" '[{turn: 1, speaker: "optimist", content: $c}]');
+      PARSED_TASKS_JSON="$(cat "$root/.intake/initial-tasks.json" 2>/dev/null || echo '[]')"
+      PARSED_TASKS_CTX=""
+      if [ -n "$PARSED_TASKS_JSON" ] && [ "$PARSED_TASKS_JSON" != "null" ] && [ "$PARSED_TASKS_JSON" != "" ]; then
+        PARSED_TASKS_CTX=$(printf '%s' "$PARSED_TASKS_JSON" | jq -r '
+          "## Initial Task Decomposition (" + (length | tostring) + " tasks)\n\n" +
+          ([.[] |
+            "### Task " + (.id | tostring) + ": " + .title + "\n" +
+            "- Agent: " + .agent + " | Stack: " + .stack + "\n" +
+            "- " + .description
+          ] | join("\n"))' 2>/dev/null || true)
+      fi
+      DP_CTX=""
+      DP_JSON="$(cat "$root/.intake/decision-points.json" 2>/dev/null || echo '[]')"
+      if [ -n "$DP_JSON" ] && [ "$DP_JSON" != "[]" ]; then
+        DP_CTX=$(printf '%s' "$DP_JSON" | jq -r '
+          "## Decision Points (" + (length | tostring) + " to resolve)\n\n" +
+          ([.[] |
+            "### [" + .id + "] " + .category + "\n" +
+            "**Question:** " + .description + "\n" +
+            "**Options:** " + (.options | join(" vs ")) + "\n" +
+            "**Affects tasks:** " + ([.affected_tasks[] | tostring] | join(", ")) + "\n" +
+            "**Constraint:** " + .constraint_type + "\n" +
+            "**Rationale:** " + .rationale
+          ] | join("\n\n"))' 2>/dev/null || true)
+      fi
+      PES_ARGS=$(jq -n \
+        --rawfile prompt "$root/intake/prompts/debate-pessimist-soul.md" \
+        --rawfile prd "$root/.intake/run-prd.txt" \
+        --arg research "$RESEARCH_PES" \
+        --arg parsed_tasks "$PARSED_TASKS_CTX" \
+        --arg decision_points "$DP_CTX" \
+        --rawfile infrastructure_context "$root/.intake/contexts/infrastructure.txt" \
+        --rawfile codebase_context "$root/.intake/contexts/codebase.txt" \
+        --rawfile design_context "$root/.intake/contexts/design.txt" \
+        --argjson debate_log "$DEBATE_LOG" \
+        --arg instruction "Respond to the Optimist on ALL decision points. Challenge weak points, propose simpler alternatives." \
+        --arg provider "${model_frontier_provider}" \
+        --arg model "${model_frontier}" \
+        '{
+          "prompt": $prompt,
+          "input": {
+            "prd": $prd,
+            "parsed_tasks": $parsed_tasks,
+            "decision_points": $decision_points,
+            "research": $research,
+            "infrastructure_context": $infrastructure_context,
+            "codebase_context": $codebase_context,
+            "design_context": $design_context,
+            "debate_log": $debate_log,
+            "resolved_decisions": [],
+            "instruction": $instruction
+          },
+          "provider": $provider,
+          "model": $model
+        }')
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action text --args-json "$PES_ARGS"
+
+  - id: notify-pes
+    env:
+      CTO_PT: $pessimist-turn.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "notify-pes" "${audio_debug}"
+      printf '%s' "$CTO_PT" | intake-util bridge-notify --from pessimist --to deliberation \
+        --metadata '{"speaker":"pessimist","session_id":"'${session_id}'"}' || true
+      LV_BIN=""; command -v lobster-voice >/dev/null 2>&1 && LV_BIN="lobster-voice" || { [ -x "$root/apps/lobster-voice/lobster-voice" ] && LV_BIN="$root/apps/lobster-voice/lobster-voice"; }
+      [ -n "$LV_BIN" ] && WORKSPACE="$root" "$LV_BIN" debate pessimist "$(printf '%s' "$CTO_PT")" || true
+
+  - id: linear-activity-pes
+    env:
+      CTO_PT: $pessimist-turn.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "linear-activity-pes" "${audio_debug}"
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID=""
+      if [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ]; then
+        LINEAR_SID="$(cat "$FALLBACK_FILE")"
+        echo "linear-activity-pes: session ID from file='$LINEAR_SID'" >&2
+      fi
+      if [ -z "$LINEAR_SID" ] && [ -n "${linear_session_id}" ]; then
+        LINEAR_SID="${linear_session_id}"
+        echo "linear-activity-pes: session ID from arg='$LINEAR_SID'" >&2
+      fi
+      if [ -n "$LINEAR_SID" ]; then
+        intake-util linear-activity \
+          --session-id "$LINEAR_SID" \
+          --type thought \
+          --body "$(printf '**Pessimist Response**\n\n%s' "$CTO_PT")" || true
+      else
+        echo "linear-activity-pes: NO session ID — skipping" >&2
+      fi
+
+  - id: parse-dp-pes
+    env:
+      CTO_PT: $pessimist-turn.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "parse-dp-pes" "${audio_debug}"
+      jq -n --arg content "$(printf '%s' "$CTO_PT")" --arg speaker pessimist \
+        '{content: $content, speaker: $speaker}' |
+      intake-util parse-decision-points
+
+  - id: resolve-dps
+    env:
+      CTO_PARSE_OPT: $parse-dp-opt.stdout
+      CTO_PARSE_PES: $parse-dp-pes.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "resolve-dps" "${audio_debug}"
+      jq -n \
+        --arg opt_raw "$(printf '%s' "$CTO_PARSE_OPT")" \
+        --arg pes_raw "$(printf '%s' "$CTO_PARSE_PES")" \
+        '
+        (try ($opt_raw | fromjson) catch []) as $opt |
+        (try ($pes_raw | fromjson) catch []) as $pes |
+        {
           all_dps: ($opt + $pes),
           votable: [
             $opt[] as $o |
@@ -230,446 +355,230 @@ steps:
           pending: [($opt + $pes) | group_by(.id)[] | select(length == 1) | .[0]]
         }'
 
-  - name: vote-dp-1
-    when: "${{ steps.resolve-dps-1.output | jq '.votable | length > 0' }}"
-    depends_on: [resolve-dps-1]
-    description: "Committee vote on round-1 decision points"
-    workflow: decision-voting.lobster.yaml
-    inputs:
-      question: "${{ steps.resolve-dps-1.output | jq -r '.votable[0].question' }}"
-      optimist_position: "${{ steps.resolve-dps-1.output | jq -r '.votable[0].optimist_position' }}"
-      pessimist_position: "${{ steps.resolve-dps-1.output | jq -r '.votable[0].pessimist_position' }}"
-      context: "{{inputs.prd_content}}"
-      decision_id: "${{ steps.resolve-dps-1.output | jq -r '.votable[0].id' }}"
-      session_id: "{{inputs.session_id}}"
-      human_review_mode: "{{inputs.human_review_mode}}"
-      voter_1_provider: "{{inputs.voter_1_provider}}"
-      voter_1_model: "{{inputs.voter_1_model}}"
-      voter_2_provider: "{{inputs.voter_2_provider}}"
-      voter_2_model: "{{inputs.voter_2_model}}"
-      voter_3_provider: "{{inputs.voter_3_provider}}"
-      voter_3_model: "{{inputs.voter_3_model}}"
-      voter_4_provider: "{{inputs.voter_4_provider}}"
-      voter_4_model: "{{inputs.voter_4_model}}"
-      voter_5_provider: "{{inputs.voter_5_provider}}"
-      voter_5_model: "{{inputs.voter_5_model}}"
-
-  - name: verify-vote-1
-    when: "{{inputs.verify}}"
-    depends_on: [vote-dp-1]
-    command: >
-      echo '${{ steps.vote-dp-1.outputs.decision_result }}' |
-      intake-util validate --type decision-vote
-
-  - name: check-consensus-1
-    depends_on: [pessimist-turn-1, vote-dp-1]
-    description: "Check if consensus reached or timebox expired"
-    command: >
-      jq -n \
-        --argjson elapsed $(( ($(date +%s) - ${{ steps.init-debate.output | jq -r '.start_epoch' }}) / 60 )) \
-        --argjson timebox {{inputs.timebox_minutes}} \
-        --arg pessimist_response '${{ steps.pessimist-turn-1.output }}' \
-        '{
-          continue: ($elapsed < $timebox and ($pessimist_response | test("(I agree|consensus|you.re right)"; "i") | not)),
-          elapsed_minutes: $elapsed,
-          round: 1
-        }'
-
-  # ═══════════════════════════════════════════════════════════
-  # ROUND 2 (conditional on round 1 not reaching consensus)
-  # ═══════════════════════════════════════════════════════════
-  - name: assemble-log-1
-    when: "${{ steps.check-consensus-1.output | jq -r '.continue' }}"
-    depends_on: [check-consensus-1]
-    command: >
-      jq -n '[
-        {turn: 1, speaker: "optimist", content: $opt},
-        {turn: 1, speaker: "pessimist", content: $pes}
-      ]'
-        --arg opt '${{ steps.optimist-turn-1.output }}'
-        --arg pes '${{ steps.pessimist-turn-1.output }}'
-
-  - name: resolved-after-1
-    when: "${{ steps.check-consensus-1.output | jq -r '.continue' }}"
-    depends_on: [vote-dp-1, check-consensus-1]
-    command: >
-      VOTE_RESULT='${{ steps.vote-dp-1.outputs.decision_result }}'
-      if [ -n "$VOTE_RESULT" ] && [ "$VOTE_RESULT" != "null" ]; then
-        echo "[$VOTE_RESULT]"
-      else
-        echo "[]"
+  - id: vote-all-dps
+    env:
+      CTO_RESOLVE_DPS: $resolve-dps.stdout
+    command: |-
+      root="${WORKSPACE:-.}"
+      WS="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "vote-all-dps" "${audio_debug}"
+      VOTABLE_JSON=$(printf '%s' "$CTO_RESOLVE_DPS" | jq -c '.votable // []')
+      DP_COUNT=$(printf '%s' "$VOTABLE_JSON" | jq 'length')
+      if [ "$DP_COUNT" -eq 0 ]; then
+        "$root/intake/scripts/workflow-gate-audio.sh" "deliberation" "vote-all-dps" "no paired decision points to vote on" "${audio_debug}" "wait" "session ${session_id}"
+        echo "vote-all-dps: no votable DPs found — debaters did not produce matching DECISION_POINT blocks" >&2
+        printf '[]'
+        exit 0
       fi
+      "$root/intake/scripts/workflow-gate-audio.sh" "deliberation" "vote-all-dps" "voting on ${DP_COUNT} decision points" "${audio_debug}" "normal" "session ${session_id}"
+      RESULTS="[]"
+      FAILED=0
+      DP_TMPDIR="$WS/.intake/tmp/vote-dps"
+      mkdir -p "$DP_TMPDIR"
+      for i in $(seq 0 $((DP_COUNT - 1))); do
+        DP_ID=$(printf '%s' "$VOTABLE_JSON" | jq -r ".[$i].id")
+        DP_CAT=$(printf '%s' "$VOTABLE_JSON" | jq -r ".[$i].category")
+        IDX=$((i + 1))
+        printf '%s' "$VOTABLE_JSON" | jq -r ".[$i].question" > "$DP_TMPDIR/question-${i}.txt"
+        printf '%s' "$VOTABLE_JSON" | jq -r ".[$i].optimist_position" > "$DP_TMPDIR/optimist-${i}.txt"
+        printf '%s' "$VOTABLE_JSON" | jq -r ".[$i].pessimist_position" > "$DP_TMPDIR/pessimist-${i}.txt"
+        "$root/intake/scripts/workflow-gate-audio.sh" "deliberation" "vote-dp" "voting on decision ${IDX} of ${DP_COUNT}: ${DP_ID}" "${audio_debug}" "normal" "session ${session_id}"
+        ARGS=$(jq -n \
+          --rawfile question "$DP_TMPDIR/question-${i}.txt" \
+          --rawfile optimist_position "$DP_TMPDIR/optimist-${i}.txt" \
+          --rawfile pessimist_position "$DP_TMPDIR/pessimist-${i}.txt" \
+          --arg context_file "$WS/.intake/run-prd.txt" \
+          --arg question_file "$DP_TMPDIR/question-${i}.txt" \
+          --arg optimist_file "$DP_TMPDIR/optimist-${i}.txt" \
+          --arg pessimist_file "$DP_TMPDIR/pessimist-${i}.txt" \
+          --arg decision_id "$DP_ID" \
+          --arg session_id "${session_id}" \
+          --arg human_review_mode "${human_review_mode}" \
+          --arg voter_1_provider "${voter_1_provider}" \
+          --arg voter_1_model "${voter_1_model}" \
+          --arg voter_2_provider "${voter_2_provider}" \
+          --arg voter_2_model "${voter_2_model}" \
+          --arg voter_3_provider "${voter_3_provider}" \
+          --arg voter_3_model "${voter_3_model}" \
+          --arg audio_debug "${audio_debug}" \
+          '{question: $question, optimist_position: $optimist_position, pessimist_position: $pessimist_position, context_file: $context_file, question_file: $question_file, optimist_file: $optimist_file, pessimist_file: $pessimist_file, decision_id: $decision_id, session_id: $session_id, human_review_mode: $human_review_mode, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, audio_debug: $audio_debug}')
+        VOTE_OK=false
+        VOTE_OUT=""
+        for ATTEMPT in 1 2 3 4 5; do
+          VOTE_OUT="$(lobster run --mode tool "$WS/intake/workflows/decision-voting.lobster.yaml" --args-json "$ARGS" 2>&1)" && { VOTE_OK=true; break; }
+          case "$VOTE_OUT" in
+            *"HTTP Error 503"*|*"The read operation timed out"*|*"Service Unavailable"*|*"ECONNREFUSED"*|*"network"*)
+              if [ "$ATTEMPT" -lt 5 ]; then
+                BACKOFF=$((ATTEMPT * ATTEMPT * 5))
+                "$WS/intake/scripts/workflow-gate-audio.sh" "deliberation" "vote-dp retry" "retrying vote for ${DP_ID} (attempt ${ATTEMPT}, waiting ${BACKOFF}s)" "${audio_debug}" "wait" "session ${session_id}"
+                sleep "$BACKOFF"
+                continue
+              fi
+              ;;
+          esac
+          break
+        done
+        if [ "$VOTE_OK" = true ]; then
+          VOTE_RESULT=$(printf '%s' "$VOTE_OUT" | jq -c '.output[0].decision_result // empty' 2>/dev/null || echo '{}')
+          RESULTS=$(printf '%s' "$RESULTS" | jq --argjson r "$VOTE_RESULT" '. + [$r]')
+          WINNER=$(printf '%s' "$VOTE_RESULT" | jq -r '.winning_option // "none"' 2>/dev/null || echo "none")
+          "$root/intake/scripts/workflow-gate-audio.sh" "deliberation" "vote-dp" "decision ${DP_ID} resolved: ${WINNER}" "${audio_debug}" "normal" "session ${session_id}"
+        else
+          FAILED=$((FAILED + 1))
+          echo "vote-all-dps: voting failed for ${DP_ID} after 5 attempts — continuing" >&2
+          FAIL_MSG="$(jq -n --arg did "$DP_ID" '"❌ **Decision voting failed** for `" + $did + "` — skipping."')"
+          FAIL_META="$(jq -nc --arg step "decision-voting-failed" --arg sid "${session_id}" --arg did "$DP_ID" '{step:$step,session_id:$sid,decision_id:$did,severity:"error"}')"
+          echo "$FAIL_MSG" | intake-util bridge-notify --from deliberation --to deliberation --metadata "$FAIL_META" || true
+        fi
+      done
+      RESOLVED=$(printf '%s' "$RESULTS" | jq 'length')
+      "$root/intake/scripts/workflow-gate-audio.sh" "deliberation" "vote-all-dps" "${RESOLVED} of ${DP_COUNT} decisions resolved, ${FAILED} failed" "${audio_debug}" "normal" "session ${session_id}"
+      printf '%s' "$RESULTS"
 
-  - name: optimist-turn-2
-    when: "${{ steps.check-consensus-1.output | jq -r '.continue' }}"
-    depends_on: [assemble-log-1, resolved-after-1]
-    timeout: "5m"
-    command: >
-      openclaw.invoke --tool llm-task --action text --args-json '{
-        "prompt": "{{prompts/debate-optimist-soul.md}}",
-        "input": {
-          "prd": "{{inputs.prd_content}}",
-          "research": "${{ steps.research-prd.output | jq -r '.data.optimist // .optimist // empty' }}",
-          "debate_log": ${{ steps.assemble-log-1.output }},
-          "resolved_decisions": ${{ steps.resolved-after-1.output }},
-          "instruction": "Continue the debate. Address the Pessimist concerns from the previous round."
-        },
-        "provider": "{{inputs.model_frontier_provider}}",
-        "model": "{{inputs.model_frontier}}"
-      }'
-
-  - name: notify-opt-2
-    depends_on: [optimist-turn-2]
-    command: >
-      echo '${{ steps.optimist-turn-2.output }}' |
-      intake-util bridge-notify --from optimist --to deliberation
-        --metadata '{"turn":"2","speaker":"optimist","session_id":"{{inputs.session_id}}"}'
-
-  - name: linear-activity-opt-2
-    depends_on: [optimist-turn-2]
-    when: "{{inputs.linear_session_id}}"
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "Optimist Turn 2"
-        --body '${{ steps.optimist-turn-2.output }}'
-
-  - name: parse-dp-opt-2
-    depends_on: [optimist-turn-2]
-    command: >
-      jq -n --arg content '${{ steps.optimist-turn-2.output }}' --arg speaker optimist \
-        '{content: $content, speaker: $speaker}' |
-      intake-util parse-decision-points
-
-  - name: pessimist-turn-2
-    when: "${{ steps.check-consensus-1.output | jq -r '.continue' }}"
-    depends_on: [optimist-turn-2]
-    timeout: "5m"
-    command: >
-      openclaw.invoke --tool llm-task --action text --args-json '{
-        "prompt": "{{prompts/debate-pessimist-soul.md}}",
-        "input": {
-          "prd": "{{inputs.prd_content}}",
-          "research": "${{ steps.research-prd.output | jq -r '.data.pessimist // .pessimist // empty' }}",
-          "debate_log": ${{ steps.assemble-log-1.output | jq '. + [{turn: 2, speaker: "optimist", content: $opt}]' --arg opt '${{ steps.optimist-turn-2.output }}' }},
-          "resolved_decisions": ${{ steps.resolved-after-1.output }},
-          "instruction": "Respond to the Optimist round 2 arguments. Refine your positions."
-        },
-        "provider": "{{inputs.model_frontier_provider}}",
-        "model": "{{inputs.model_frontier}}"
-      }'
-
-  - name: notify-pes-2
-    depends_on: [pessimist-turn-2]
-    command: >
-      echo '${{ steps.pessimist-turn-2.output }}' |
-      intake-util bridge-notify --from pessimist --to deliberation
-        --metadata '{"turn":"2","speaker":"pessimist","session_id":"{{inputs.session_id}}"}'
-
-  - name: linear-activity-pes-2
-    depends_on: [pessimist-turn-2]
-    when: "{{inputs.linear_session_id}}"
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "Pessimist Turn 2"
-        --body '${{ steps.pessimist-turn-2.output }}'
-
-  - name: parse-dp-pes-2
-    depends_on: [pessimist-turn-2]
-    command: >
-      jq -n --arg content '${{ steps.pessimist-turn-2.output }}' --arg speaker pessimist \
-        '{content: $content, speaker: $speaker}' |
-      intake-util parse-decision-points
-
-  - name: resolve-dps-2
-    depends_on: [parse-dp-opt-1, parse-dp-pes-1, parse-dp-opt-2, parse-dp-pes-2, resolved-after-1]
-    command: >
+  - id: assemble-result
+    env:
+      CTO_INIT_DEBATE: $init-debate.stdout
+      CTO_VOTE_ALL: $vote-all-dps.stdout
+      CTO_RESOLVE_DPS: $resolve-dps.stdout
+      CTO_OT: $optimist-turn.stdout
+      CTO_PT: $pessimist-turn.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "assemble-result" "${audio_debug}"
+      ELAPSED=$(( ( $(date +%s) - $(printf '%s' "$CTO_INIT_DEBATE" | jq -r '.start_epoch') ) / 60 ))
       jq -n \
-        --argjson opt1 '${{ steps.parse-dp-opt-1.output }}' \
-        --argjson pes1 '${{ steps.parse-dp-pes-1.output }}' \
-        --argjson opt2 '${{ steps.parse-dp-opt-2.output }}' \
-        --argjson pes2 '${{ steps.parse-dp-pes-2.output }}' \
-        --argjson resolved '${{ steps.resolved-after-1.output }}' \
-        '($opt1 + $opt2) as $all_opt | ($pes1 + $pes2) as $all_pes |
-        ($resolved | map(.decision_id) // []) as $done |
-        {
-          votable: [
-            $all_opt[] as $o |
-            ($all_pes[] | select(.id == $o.id)) as $p |
-            select(($done | index($o.id)) == null) |
-            {id: $o.id, question: $o.question, category: $o.category,
-             optimist_position: $o.proposing_option, pessimist_position: $p.proposing_option}
-          ]
-        }'
-
-  - name: vote-dp-2
-    when: "${{ steps.resolve-dps-2.output | jq '.votable | length > 0' }}"
-    depends_on: [resolve-dps-2]
-    workflow: decision-voting.lobster.yaml
-    inputs:
-      question: "${{ steps.resolve-dps-2.output | jq -r '.votable[0].question' }}"
-      optimist_position: "${{ steps.resolve-dps-2.output | jq -r '.votable[0].optimist_position' }}"
-      pessimist_position: "${{ steps.resolve-dps-2.output | jq -r '.votable[0].pessimist_position' }}"
-      context: "{{inputs.prd_content}}"
-      decision_id: "${{ steps.resolve-dps-2.output | jq -r '.votable[0].id' }}"
-      session_id: "{{inputs.session_id}}"
-      human_review_mode: "{{inputs.human_review_mode}}"
-      voter_1_provider: "{{inputs.voter_1_provider}}"
-      voter_1_model: "{{inputs.voter_1_model}}"
-      voter_2_provider: "{{inputs.voter_2_provider}}"
-      voter_2_model: "{{inputs.voter_2_model}}"
-      voter_3_provider: "{{inputs.voter_3_provider}}"
-      voter_3_model: "{{inputs.voter_3_model}}"
-      voter_4_provider: "{{inputs.voter_4_provider}}"
-      voter_4_model: "{{inputs.voter_4_model}}"
-      voter_5_provider: "{{inputs.voter_5_provider}}"
-      voter_5_model: "{{inputs.voter_5_model}}"
-
-  - name: verify-vote-2
-    when: "{{inputs.verify}}"
-    depends_on: [vote-dp-2]
-    command: >
-      echo '${{ steps.vote-dp-2.outputs.decision_result }}' |
-      intake-util validate --type decision-vote
-
-  - name: check-consensus-2
-    depends_on: [pessimist-turn-2, vote-dp-2]
-    command: >
-      jq -n \
-        --argjson elapsed $(( ($(date +%s) - ${{ steps.init-debate.output | jq -r '.start_epoch' }}) / 60 )) \
-        --argjson timebox {{inputs.timebox_minutes}} \
-        --arg pessimist_response '${{ steps.pessimist-turn-2.output }}' \
-        '{
-          continue: ($elapsed < $timebox and ($pessimist_response | test("(I agree|consensus|you.re right)"; "i") | not)),
+        --arg session_id "${session_id}" \
+        --argjson timebox "${timebox_minutes}" \
+        --argjson elapsed "$ELAPSED" \
+        --arg all_dps_raw "$(printf '%s' "$CTO_RESOLVE_DPS")" \
+        --arg votes_raw "$(printf '%s' "$CTO_VOTE_ALL")" \
+        --arg o1 "$(printf '%s' "$CTO_OT")" \
+        --arg p1 "$(printf '%s' "$CTO_PT")" \
+        '
+          (try ($all_dps_raw | fromjson) catch {all_dps: [], votable: []}) as $dps |
+          (try ($votes_raw | fromjson) catch []) as $votes |
+          {
+          session_id: $session_id,
+          timebox_minutes: $timebox,
           elapsed_minutes: $elapsed,
-          round: 2
-        }'
-
-  # ═══════════════════════════════════════════════════════════
-  # ROUND 3 (conditional on round 2 continuing)
-  # ═══════════════════════════════════════════════════════════
-  - name: assemble-log-2
-    when: "${{ steps.check-consensus-2.output | jq -r '.continue' }}"
-    depends_on: [check-consensus-2]
-    command: >
-      jq -n '[
-        {turn: 1, speaker: "optimist", content: $o1},
-        {turn: 1, speaker: "pessimist", content: $p1},
-        {turn: 2, speaker: "optimist", content: $o2},
-        {turn: 2, speaker: "pessimist", content: $p2}
-      ]'
-        --arg o1 '${{ steps.optimist-turn-1.output }}'
-        --arg p1 '${{ steps.pessimist-turn-1.output }}'
-        --arg o2 '${{ steps.optimist-turn-2.output }}'
-        --arg p2 '${{ steps.pessimist-turn-2.output }}'
-
-  - name: resolved-after-2
-    when: "${{ steps.check-consensus-2.output | jq -r '.continue' }}"
-    depends_on: [vote-dp-1, vote-dp-2, check-consensus-2]
-    command: >
-      R1='${{ steps.vote-dp-1.outputs.decision_result }}'
-      R2='${{ steps.vote-dp-2.outputs.decision_result }}'
-      jq -n --argjson r1 "${R1:-null}" --argjson r2 "${R2:-null}" \
-        '[[$r1, $r2] | .[] | select(. != null)]'
-
-  - name: optimist-turn-3
-    when: "${{ steps.check-consensus-2.output | jq -r '.continue' }}"
-    depends_on: [assemble-log-2, resolved-after-2]
-    timeout: "5m"
-    command: >
-      openclaw.invoke --tool llm-task --action text --args-json '{
-        "prompt": "{{prompts/debate-optimist-soul.md}}",
-        "input": {
-          "prd": "{{inputs.prd_content}}",
-          "research": "${{ steps.research-prd.output | jq -r '.data.optimist // .optimist // empty' }}",
-          "debate_log": ${{ steps.assemble-log-2.output }},
-          "resolved_decisions": ${{ steps.resolved-after-2.output }},
-          "instruction": "Round 3. Focus on remaining unresolved points. Seek convergence."
-        },
-        "provider": "{{inputs.model_frontier_provider}}",
-        "model": "{{inputs.model_frontier}}"
-      }'
-
-  - name: notify-opt-3
-    depends_on: [optimist-turn-3]
-    command: >
-      echo '${{ steps.optimist-turn-3.output }}' |
-      intake-util bridge-notify --from optimist --to deliberation
-        --metadata '{"turn":"3","speaker":"optimist","session_id":"{{inputs.session_id}}"}'
-
-  - name: linear-activity-opt-3
-    depends_on: [optimist-turn-3]
-    when: "{{inputs.linear_session_id}}"
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "Optimist Turn 3"
-        --body '${{ steps.optimist-turn-3.output }}'
-
-  - name: parse-dp-opt-3
-    depends_on: [optimist-turn-3]
-    command: >
-      jq -n --arg content '${{ steps.optimist-turn-3.output }}' --arg speaker optimist \
-        '{content: $content, speaker: $speaker}' |
-      intake-util parse-decision-points
-
-  - name: pessimist-turn-3
-    when: "${{ steps.check-consensus-2.output | jq -r '.continue' }}"
-    depends_on: [optimist-turn-3]
-    timeout: "5m"
-    command: >
-      openclaw.invoke --tool llm-task --action text --args-json '{
-        "prompt": "{{prompts/debate-pessimist-soul.md}}",
-        "input": {
-          "prd": "{{inputs.prd_content}}",
-          "research": "${{ steps.research-prd.output | jq -r '.data.pessimist // .pessimist // empty' }}",
-          "debate_log": ${{ steps.assemble-log-2.output | jq '. + [{turn: 3, speaker: "optimist", content: $opt}]' --arg opt '${{ steps.optimist-turn-3.output }}' }},
-          "resolved_decisions": ${{ steps.resolved-after-2.output }},
-          "instruction": "Round 3. State your final positions on remaining points."
-        },
-        "provider": "{{inputs.model_frontier_provider}}",
-        "model": "{{inputs.model_frontier}}"
-      }'
-
-  - name: notify-pes-3
-    depends_on: [pessimist-turn-3]
-    command: >
-      echo '${{ steps.pessimist-turn-3.output }}' |
-      intake-util bridge-notify --from pessimist --to deliberation
-        --metadata '{"turn":"3","speaker":"pessimist","session_id":"{{inputs.session_id}}"}'
-
-  - name: parse-dp-pes-3
-    depends_on: [pessimist-turn-3]
-    command: >
-      jq -n --arg content '${{ steps.pessimist-turn-3.output }}' --arg speaker pessimist \
-        '{content: $content, speaker: $speaker}' |
-      intake-util parse-decision-points
-
-  - name: linear-activity-pes-3
-    depends_on: [pessimist-turn-3]
-    when: "{{inputs.linear_session_id}}"
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "Pessimist Turn 3"
-        --body '${{ steps.pessimist-turn-3.output }}'
-
-  # ═══════════════════════════════════════════════════════════
-  # POST-DEBATE: Collect all DPs, assemble result, compile brief
-  # ═══════════════════════════════════════════════════════════
-
-  - name: collect-all-dps
-    depends_on: [parse-dp-opt-1, parse-dp-pes-1, parse-dp-opt-2, parse-dp-pes-2, parse-dp-opt-3, parse-dp-pes-3, vote-dp-1, vote-dp-2]
-    description: "Collect all decision points and their resolution status"
-    command: >
-      jq -n \
-        --argjson opt1 '${steps.parse-dp-opt-1.output:-[]}' \
-        --argjson pes1 '${steps.parse-dp-pes-1.output:-[]}' \
-        --argjson opt2 '${steps.parse-dp-opt-2.output:-[]}' \
-        --argjson pes2 '${steps.parse-dp-pes-2.output:-[]}' \
-        --argjson opt3 '${steps.parse-dp-opt-3.output:-[]}' \
-        --argjson pes3 '${steps.parse-dp-pes-3.output:-[]}' \
-        --argjson vote1 '${steps.vote-dp-1.outputs.decision_result:-null}' \
-        --argjson vote2 '${steps.vote-dp-2.outputs.decision_result:-null}' \
-        '{
-          all_decision_points: ($opt1 + $pes1 + $opt2 + $pes2 + $opt3 + $pes3 | group_by(.id) | map({
+          status: "completed",
+          debate_turns: 2,
+          decision_points: ($dps.all_dps | group_by(.id) | map({
             id: .[0].id,
             question: .[0].question,
             category: .[0].category,
             raised_by: .[0].raised_by,
             positions: map({speaker: .raised_by, option: .proposing_option})
           })),
-          resolved: [[$vote1, $vote2] | .[] | select(. != null)],
-          unresolved_count: 0
+          resolved_decisions: $votes,
+          debate_log: [
+            {turn: 1, speaker: "optimist", content: $o1},
+            {turn: 1, speaker: "pessimist", content: $p1}
+          ]
         }'
 
-  - name: assemble-result
-    depends_on: [collect-all-dps, check-consensus-1, check-consensus-2]
-    description: "Build full DeliberationResult JSON"
-    command: >
-      CONS1='${{ steps.check-consensus-1.output }}'
-      CONS2='${{ steps.check-consensus-2.output }}'
-      jq -n \
-        --arg session_id "{{inputs.session_id}}" \
-        --argjson timebox {{inputs.timebox_minutes}} \
-        --argjson dps '${{ steps.collect-all-dps.output }}' \
-        --argjson cons1 "$CONS1" \
-        --argjson cons2 "${CONS2:-null}" \
-        --arg o1 '${{ steps.optimist-turn-1.output }}' \
-        --arg p1 '${{ steps.pessimist-turn-1.output }}' \
-        --arg o2 '${steps.optimist-turn-2.output:-}' \
-        --arg p2 '${steps.pessimist-turn-2.output:-}' \
-        --arg o3 '${steps.optimist-turn-3.output:-}' \
-        --arg p3 '${steps.pessimist-turn-3.output:-}' \
-        '{
-          session_id: $session_id,
-          timebox_minutes: $timebox,
-          status: (
-            if ($cons1.continue | not) then
-              (if ($cons1 | .elapsed_minutes < $timebox) then "consensus" else "completed" end)
-            elif $cons2 != null and ($cons2.continue | not) then
-              (if ($cons2 | .elapsed_minutes < $timebox) then "consensus" else "completed" end)
-            else "completed"
-            end
-          ),
-          debate_turns: (
-            if $o3 != "" then 6
-            elif $o2 != "" then 4
-            else 2
-            end
-          ),
-          decision_points: $dps.all_decision_points,
-          resolved_decisions: $dps.resolved,
-          debate_log: (
-            [{turn:1, speaker:"optimist", content:$o1}, {turn:1, speaker:"pessimist", content:$p1}]
-            + (if $o2 != "" then [{turn:2, speaker:"optimist", content:$o2}, {turn:2, speaker:"pessimist", content:$p2}] else [] end)
-            + (if $o3 != "" then [{turn:3, speaker:"optimist", content:$o3}, {turn:3, speaker:"pessimist", content:$p3}] else [] end)
-          )
-        }'
+  - id: notify-complete
+    env:
+      CTO_ASSEMBLE_RESULT: $assemble-result.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "notify-complete" "${audio_debug}"
+      MSG=$(printf '%s' "$CTO_ASSEMBLE_RESULT" | jq -r '
+        . as $r
+        | ($r.resolved_decisions // []) as $rd
+        | "🧠 **Deliberation Complete**\n"
+          + "🏁 Status: **\(($r.status | ascii_upcase))**  •  🔁 Turns: **\($r.debate_turns)**  •  ⏱ Duration: **\($r.elapsed_minutes) min**\n"
+          + "📌 Resolved decisions: **\(($rd | length))** of **\(($r.decision_points | length))**\n"
+          + (if ($rd | length) > 0 then
+              "🏆 Decisions:\n" + ([
+                $rd[] |
+                "  - **\(.decision_id // .id // "?")**: " + (.winning_option // "n/a" | tostring | gsub("\\s+"; " ") | .[0:120])
+              ] | join("\n")) + "\n"
+            else "" end)
+      ')
+      META=$(printf '%s' "$CTO_ASSEMBLE_RESULT" | jq -c \
+        --arg sid "${session_id}" \
+        '{step:"deliberation-complete",session_id:$sid,resolved_count:(.resolved_decisions|length),total_dps:(.decision_points|length)}')
+      echo "$MSG" | intake-util bridge-notify --from intake --to deliberation --metadata "$META" || true
 
-  - name: notify-complete
-    depends_on: [assemble-result]
-    command: >
-      echo "Deliberation complete — ${{ steps.assemble-result.output | jq -r '.status' }}, ${{ steps.assemble-result.output | jq -r '.debate_turns' }} turns" |
-      intake-util bridge-notify --from intake --to deliberation
-        --metadata '{"step":"deliberation-complete","session_id":"{{inputs.session_id}}"}'
+  - id: linear-activity-complete
+    env:
+      CTO_ASSEMBLE_RESULT: $assemble-result.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "linear-activity-complete" "${audio_debug}"
+      TITLE=$(printf '%s' "$CTO_ASSEMBLE_RESULT" | jq -r '
+        "Deliberation complete: " + ((.resolved_decisions | length) | tostring) + " decisions resolved"
+      ')
+      BODY=$(printf '%s' "$CTO_ASSEMBLE_RESULT" | jq -r '
+        . as $r |
+        "Status: " + ($r.status | ascii_upcase) + " | Turns: " + ($r.debate_turns | tostring) + " | Duration: " + ($r.elapsed_minutes | tostring) + " min\n"
+        + "Resolved: " + (($r.resolved_decisions | length) | tostring) + " of " + (($r.decision_points | length) | tostring) + "\n"
+        + ([($r.resolved_decisions // [])[] |
+            "- " + (.decision_id // .id // "?") + ": " + (.winning_option // "n/a" | tostring | gsub("\\s+"; " ") | .[0:120])
+          ] | join("\n"))
+      ')
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID=""
+      if [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ]; then
+        LINEAR_SID="$(cat "$FALLBACK_FILE")"
+        echo "linear-activity-complete: session ID from file='$LINEAR_SID'" >&2
+      fi
+      if [ -z "$LINEAR_SID" ] && [ -n "${linear_session_id}" ]; then
+        LINEAR_SID="${linear_session_id}"
+        echo "linear-activity-complete: session ID from arg='$LINEAR_SID'" >&2
+      fi
+      if [ -n "$LINEAR_SID" ]; then
+        intake-util linear-activity \
+          --session-id "$LINEAR_SID" \
+          --type thought \
+          --body "$(printf '**%s**\n\n%s' "$TITLE" "$BODY")" || true
+      else
+        echo "linear-activity-complete: NO session ID — skipping" >&2
+      fi
 
-  # ─────────────────────────────────────────────────────────
-  # Compile design brief (LLM synthesis, unchanged pattern)
-  # ─────────────────────────────────────────────────────────
-  - name: compile-brief
-    description: "Synthesize deliberation result + original PRD into design-brief.md"
-    depends_on: [assemble-result]
-    command: >
-      echo '${{ steps.assemble-result.output }}' > /tmp/delib_result.json &&
-      jq -n
-        --arg prompt "{{prompts/compile-design-brief-system.md}}"
-        --arg prd_content "{{inputs.prd_content}}"
-        --slurpfile delib_result /tmp/delib_result.json
+  - id: compile-brief
+    env:
+      CTO_ASSEMBLE_RESULT: $assemble-result.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "compile-brief" "${audio_debug}"
+      printf '%s' "$CTO_ASSEMBLE_RESULT" > /tmp/delib_result.json
+      PARSED_TASKS_JSON="$(cat "$root/.intake/initial-tasks.json" 2>/dev/null || echo '[]')"
+      PARSED_TASKS_INPUT="[]"
+      if [ -n "$PARSED_TASKS_JSON" ] && [ "$PARSED_TASKS_JSON" != "null" ] && [ "$PARSED_TASKS_JSON" != "" ]; then
+        PARSED_TASKS_INPUT="$PARSED_TASKS_JSON"
+      fi
+      BRIEF_ARGS=$(jq -n \
+        --rawfile prompt "$root/intake/prompts/compile-design-brief-system.md" \
+        --rawfile prd_content "$root/.intake/run-prd.txt" \
+        --rawfile design_context "$root/.intake/contexts/design.txt" \
+        --argjson parsed_tasks "$PARSED_TASKS_INPUT" \
+        --arg provider "${model_frontier_provider}" \
+        --arg model "${model_frontier}" \
+        --slurpfile delib_result /tmp/delib_result.json \
         '{
           "prompt": $prompt,
           "input": {
             "deliberation_result": $delib_result[0],
-            "prd_content": $prd_content
+            "prd_content": $prd_content,
+            "parsed_tasks": $parsed_tasks,
+            "design_context": $design_context
           },
-          "provider": "{{inputs.model_frontier_provider}}",
-          "model": "{{inputs.model_frontier}}",
+          "provider": $provider,
+          "model": $model,
           "temperature": 0.2
-        }' | xargs -I{} openclaw.invoke --tool llm-task --action text --args-json '{}'
+        }')
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action text --args-json "$BRIEF_ARGS"
 
-  - name: save-brief
-    description: "Persist design brief for audit trail and downstream pipeline"
-    depends_on: [compile-brief]
-    command: >
-      mkdir -p .tasks/docs &&
-      echo "${{ steps.compile-brief.output }}" > .tasks/docs/design-brief.md &&
+  - id: save-brief
+    env:
+      CTO_COMPILE_BRIEF: $compile-brief.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "save-brief" "${audio_debug}"
+      mkdir -p .tasks/docs
+      printf '%s\n' "$CTO_COMPILE_BRIEF" > .tasks/docs/design-brief.md
       echo "Design brief saved to .tasks/docs/design-brief.md"
-
-output_mappings:
-  design_brief: ${{ steps.compile-brief.output }}
-  deliberation_result: ${{ steps.assemble-result.output }}
+      LV_BIN=""; command -v lobster-voice >/dev/null 2>&1 && LV_BIN="lobster-voice" || { [ -x "$root/apps/lobster-voice/lobster-voice" ] && LV_BIN="$root/apps/lobster-voice/lobster-voice"; }
+      [ -n "$LV_BIN" ] && WORKSPACE="$root" "$LV_BIN" debate compiler "$(printf '%s' "$CTO_COMPILE_BRIEF")" --summarize || true

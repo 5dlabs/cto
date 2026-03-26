@@ -1,0 +1,5 @@
+{"recommendations": [
+  {"task_id": 1, "agent": "rex", "recommended_skills": [{"skill_slug": "rust-axum-api", "reason": "Axum web framework patterns for building REST APIs", "confidence": 0.9}], "gaps": ["equipment-specific domain knowledge"]},
+  {"task_id": 2, "agent": "grizz", "recommended_skills": [{"skill_slug": "go-grpc-service", "reason": "gRPC service implementation patterns in Go", "confidence": 0.85}], "gaps": ["rental management domain"]},
+  {"task_id": 3, "agent": "rex", "recommended_skills": [{"skill_slug": "rust-axum-api", "reason": "Same Axum patterns for finance endpoints", "confidence": 0.9}, {"skill_slug": "stripe-integration", "reason": "Stripe payment processing integration", "confidence": 0.7}], "gaps": ["multi-currency exchange rate APIs"]}
+]}

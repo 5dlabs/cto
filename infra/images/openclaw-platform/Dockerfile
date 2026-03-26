@@ -5,7 +5,7 @@ FROM ${BASE_IMAGE}
 
 ARG OPENCLAW_VERSION=beta
 
-LABEL org.opencontainers.image.source="https://git.5dlabs.ai/5dlabs/cto"
+LABEL org.opencontainers.image.source="https://gitlab.5dlabs.ai/5dlabs/cto"
 LABEL org.opencontainers.image.description="Local OpenClaw platform image for CTO desktop bootstrap"
 
 USER root
