@@ -54,7 +54,7 @@ npm run dev
 
 Then open `http://localhost:3000` and click **Talk to Morgan**.
 
-**Env**: Copy `agent/.env.example` to `agent/.env` and fill LiveKit, LemonSlice, OpenClaw (or inference fallback), and any STT/TTS keys for the modes you use. See `docs/provider-spikes.md` for swap combinations.
+**Env**: Create `agent/.env` and fill LiveKit, LemonSlice, OpenClaw (or inference fallback), and any STT/TTS keys for the modes you use. See `docs/provider-spikes.md` for swap combinations.
 
 ---
 

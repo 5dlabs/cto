@@ -1,6 +1,29 @@
 # Provider Swap Spikes
 
-These swaps are already wired into the agent via environment variables so latency spikes can happen without code changes.
+These swaps are wired into `avatar/agent/morgan_avatar_agent/providers.py` and `config.py`,
+so latency spikes can happen via environment changes only (no code edits).
+
+## Supported mode values (code-verified)
+
+`MORGAN_STT_MODE`:
+- `livekit-flux` (default)
+- `livekit-nova`
+- `deepgram-flux`
+- `deepgram-nova`
+
+`MORGAN_TTS_MODE`:
+- `elevenlabs` (default)
+- `livekit-elevenlabs`
+- `cartesia`
+- `livekit-cartesia`
+
+`MORGAN_LLM_BACKEND`:
+- `openclaw` (default)
+- `inference`
+
+When `MORGAN_LLM_BACKEND=openclaw`, startup validation requires:
+- `MORGAN_LLM_BASE_URL` (or `OPENCLAW_GATEWAY_URL`)
+- `MORGAN_LLM_API_KEY` (or `OPENCLAW_TOKEN` or `OPENAI_API_KEY`)
 
 ## Baseline
 
@@ -73,3 +96,10 @@ If measured latency still misses target after the above swaps:
   - interruption responsiveness
 
 Do not replace the baseline stack unless the integrated spike wins clearly on measured latency without breaking avatar quality or operational simplicity.
+
+## Common pitfalls
+
+- Typos in mode values are silently coerced to defaults for STT/TTS in `providers.py`.
+  Keep values exactly as listed above to avoid accidental fallback.
+- `MORGAN_STT_MODE=deepgram-*` requires `DEEPGRAM_API_KEY`.
+- `MORGAN_TTS_MODE=cartesia` requires `CARTESIA_API_KEY`.
