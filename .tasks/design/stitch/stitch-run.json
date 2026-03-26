@@ -1,0 +1,9 @@
+{
+  "timestamp": "2026-03-26T12:04:22.785Z",
+  "projectId": "8665361535071652060",
+  "mode": "ingest_plus_stitch",
+  "targets": [
+    "web",
+    "mobile"
+  ]
+}

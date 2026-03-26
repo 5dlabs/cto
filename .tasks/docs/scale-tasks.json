@@ -1,0 +1,99 @@
+{
+  "tasks": [
+    {
+      "task_id": 12,
+      "title": "Scale sigma1-postgres CloudNative-PG cluster to 3 replicas",
+      "agent": "bolt",
+      "subtasks": [
+        "Modify the CloudNative-PG Cluster Custom Resource (CR) for 'sigma1-postgres' to set 'instances: 3'.",
+        "Monitor the cluster for successful scaling and replica synchronization."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    },
+    {
+      "task_id": 13,
+      "title": "Enable PgBouncer connection pooling for sigma1-postgres",
+      "agent": "bolt",
+      "subtasks": [
+        "Integrate PgBouncer with the CloudNative-PG cluster, potentially as a sidecar or a separate deployment.",
+        "Configure PgBouncer to manage connections to the 'sigma1-postgres' cluster.",
+        "Update application connection strings to use PgBouncer."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    },
+    {
+      "task_id": 14,
+      "title": "Configure automated backups for sigma1-postgres",
+      "agent": "bolt",
+      "subtasks": [
+        "Configure a CloudNative-PG Backup Custom Resource (CR) for daily backups of 'sigma1-postgres' to S3.",
+        "Enable Write-Ahead Log (WAL) archiving to S3 for point-in-time recovery.",
+        "Verify backup and restore procedures."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    },
+    {
+      "task_id": 15,
+      "title": "Enable Redis Sentinel with 3 replicas for sigma1-valkey",
+      "agent": "bolt",
+      "subtasks": [
+        "Modify the Redis/Valkey Custom Resource (CR) for 'sigma1-valkey' to enable Sentinel mode.",
+        "Configure the CR to provision 3 Redis/Valkey replicas and 3 Sentinel instances.",
+        "Verify the Sentinel cluster is healthy and monitoring the Redis/Valkey instances."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    },
+    {
+      "task_id": 16,
+      "title": "Configure maxmemory policy for sigma1-valkey",
+      "agent": "bolt",
+      "subtasks": [
+        "Update the Redis/Valkey Custom Resource (CR) for 'sigma1-valkey' to set an appropriate 'maxmemory' limit.",
+        "Configure a 'maxmemory-policy' (e.g., 'allkeys-lru', 'noeviction') based on application requirements.",
+        "Monitor Redis/Valkey memory usage and eviction behavior."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    },
+    {
+      "task_id": 17,
+      "title": "Implement TLS certificates for services via cert-manager",
+      "agent": "bolt",
+      "subtasks": [
+        "Configure ClusterIssuers or Issuers (e.g., Let's Encrypt) within cert-manager.",
+        "Create Certificate resources for all exposed application services requiring TLS.",
+        "Ensure certificates are automatically renewed and correctly mounted by services."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    },
+    {
+      "task_id": 18,
+      "title": "Configure CDN (Cloudflare) for static assets",
+      "agent": "bolt",
+      "subtasks": [
+        "Configure Cloudflare DNS records for static asset domains.",
+        "Set up CNAMEs to point to the origin server for static assets.",
+        "Configure caching rules, edge caching, and Web Application Firewall (WAF) policies in Cloudflare for static asset delivery."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    },
+    {
+      "task_id": 19,
+      "title": "Refine Network Policies to restrict pod-to-pod traffic",
+      "agent": "bolt",
+      "subtasks": [
+        "Analyze application communication patterns and dependencies within the 'sigma1' namespace.",
+        "Create granular Network Policies to enforce least privilege for pod-to-pod and namespace-to-namespace traffic.",
+        "Test network policies to ensure only authorized communication paths are open."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    }
+  ]
+}
