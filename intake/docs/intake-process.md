@@ -8,7 +8,7 @@ How the intake pipeline transforms a Product Requirements Document into agent-re
 
 ### Required: PRD
 
-A markdown document describing what needs to be built. Mounted at `/intake-files/prd.txt` by the PM server.
+A markdown document describing what needs to be built. The Lobster intake workflow receives it as `prd_content` and also persists it into the generated `.tasks/docs/` output for downstream agents.
 
 **AlertHub example** (`tests/intake/alerthub-e2e-test/prd.md`):
 
@@ -54,7 +54,7 @@ An `architecture.md` file with service topology, data flows, infrastructure CRDs
 
 | Flag | Purpose | AlertHub |
 |------|---------|----------|
-| `deliberate` | Run Optimist/Pessimist debate before task generation | `true` |
+| `deliberate` | Run the deliberation workflow before task generation | `true` |
 | `include_codebase` | Analyze existing repo via Repomix/OctoCode | `false` (greenfield) |
 | `num_tasks` | Target number of top-level tasks | `30` |
 
@@ -84,28 +84,22 @@ This context feeds into both the deliberation debate and the parse-prd step so a
 
 Fires targeted web searches to build evidence memos for each debate position. Produces an optimist memo (best practices, scaling patterns, modern approaches) and a pessimist memo (failure modes, operational risks, technology traps).
 
-#### Step 2: Debate (NATS `deliberation.room`)
+#### Step 2: Debate
 
-Two agents argue over the PRD:
+Two debate turns are generated from the PRD context:
 
 - **Optimist** — advocates for modern, scalable architecture. Uses the `optimist-soul.md` personality prompt.
-- **Pessimist** — advocates for boring technology that works. Uses the `pessimist-soul.md` personality prompt.
+- **Pessimist** — advocates for simpler, operationally conservative architecture. Uses the `pessimist-soul.md` personality prompt.
 
-The **Conductor** (intake-agent) orchestrates turns via NATS, enforces the timebox (default 30 minutes), and watches for `DECISION_POINT:` markers.
+The workflow runs these as Lobster steps with stateless LLM calls, posts progress through `intake-util bridge-notify` / `linear-activity`, and parses `DECISION_POINT:` markers from each turn for committee voting.
 
-**AlertHub debate result** (from `.tasks/deliberation.md`):
+**AlertHub deliberation result** (from `.tasks/deliberation.md`):
 
-> **Arbiter Decision**: ADVERSARY (Pessimist) WINS
->
-> Key takeaway: "Build it right the first time. The original PRD's architecture
-> (Rust/Axum + Bun/Effect + Go/gRPC) should be implemented as-designed. Phasing
-> around tech stack simplification creates rewrite debt."
-
-The pessimist won by identifying contradictions in the optimist's "simplification" proposal — the proposed phased approach would actually require rewriting the Integration Service between phases.
+The recorded outcome concluded that the original polyglot architecture should be implemented as designed, rather than phased through a simplified intermediate stack that would create rewrite debt.
 
 #### Step 3: Committee Votes
 
-When a `DECISION_POINT:` is raised during debate, a **5-member committee** votes (120s deadline per vote). Votes are tallied and ties are escalated.
+When a `DECISION_POINT:` is raised during debate, a 5-member committee votes through `decision-voting.lobster.yaml`. Votes are tallied, published through the bridge layer, and can be either fully automatic or human-reviewed depending on `human_review_mode`.
 
 #### Step 4: Compile Design Brief
 
@@ -239,11 +233,11 @@ If "revise" or "reject": voter suggestions are fed back as additional context fo
 
 #### Step 5: Generate Docs
 
-`intake-util generate-docs` creates per-task markdown documentation from the expanded task data.
+The workflow generates task docs in parallel with `intake-util fan-out`, validates the merged output, then writes files into `.tasks/docs/`.
 
 #### Step 6: Generate Prompts
 
-`intake-util generate-prompts` creates agent-ready prompt files for each task and subtask.
+The workflow generates prompts in parallel with `intake-util fan-out`, validates them, and writes `prompt.md`, `prompt.xml`, and subtask prompts to disk.
 
 #### Step 7: Commit Outputs
 
@@ -464,13 +458,14 @@ The core output contract is preserved:
 
 | Agent/Role | Technology | Purpose |
 |---|---|---|
-| **Morgan** | Shell template (Handlebars) | Infrastructure setup: repo creation/clone, auth, webhook, then delegates to Lobster pipeline |
-| **intake-agent** | Bun/TypeScript (Claude Code SDK) | AI operations: PRD parsing, task expansion, complexity analysis, deliberation orchestration |
+| **Morgan** | Shell template (Handlebars) | Sets up the run context and launches the Lobster intake pipeline |
+| **intake-agent** | Bun/TypeScript | Binary entry point for `ping` and `prd_research` only |
 | **intake-util** | Bun/TypeScript CLI | Deterministic operations: generate-docs, generate-prompts, tally votes |
-| **Optimist** | OpenClaw agent (NATS) | Debate: advocates modern/scalable architecture |
-| **Pessimist** | OpenClaw agent (NATS) | Debate: advocates simplicity/operational safety |
-| **Committee (5)** | OpenClaw agents (NATS) | Vote on deliberation decision points |
-| **5-model voting panel** | LLM calls via `openclaw.invoke` | Quality gate: evaluate task decomposition |
+| **Optimist** | Lobster `llm-task` step with soul prompt | Debate: advocates modern/scalable architecture |
+| **Pessimist** | Lobster `llm-task` step with soul prompt | Debate: advocates simplicity/operational safety |
+| **Committee (5)** | Lobster `llm-task` steps | Vote on deliberation decision points |
+| **5-model voting panel** | LLM calls via `openclaw.invoke` | Quality gate: evaluate task decomposition and revisions |
+| **linear-bridge** | HTTP bridge service | Webhooks, run registry, elicitation routing, Linear session updates |
 | **Repomix** | MCP tool | Pack existing codebase for analysis |
 | **OctoCode** | MCP tool | GitHub code search fallback |
 | **Tavily** | Research via intake-agent MCP | Pre-debate evidence gathering |
@@ -490,9 +485,8 @@ Phase 0 (Codebase Analysis):
 
 Phase 1 (Deliberation):
   Tavily research ........... 2 evidence memos (optimist + pessimist)
-  Debate .................... Optimist proposes phased simplification;
-                              Pessimist identifies contradictions
-  Arbiter decision .......... PESSIMIST WINS — build as designed
+  Debate .................... Optimist and Pessimist turns generated as Lobster steps
+  Decision resolution ....... Committee voting resolves decision points
   Design brief .............. 434 lines, 8 ADR decisions, 6 risk assessments
 
 Phase 2 (Task Generation):

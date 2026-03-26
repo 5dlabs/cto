@@ -1,339 +1,167 @@
 # Linear-CTO Integration Workflow
 
-> Complete workflow documentation for Linear integration with the CTO platform, from PRD intake through Play workflow execution.
+> Current-state reference for how Linear, the Lobster intake pipeline, and the bridge services interact.
 
 ## Overview
 
-This document maps the complete integration between Linear (project management) and CTO (Cognitive Task Orchestrator) for AI-driven development workflows. The integration uses Linear's Agent API to provide real-time visibility into agent work, while leveraging the CTO platform for orchestration and execution.
+The current integration has three primary pieces:
 
-## Credential Architecture
+- The Lobster intake workflows in [`/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/pipeline.lobster.yaml`](/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/pipeline.lobster.yaml) and [`/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/intake.lobster.yaml`](/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/intake.lobster.yaml)
+- The HTTP control plane in [`/Users/jonathon/.codex/worktrees/e92e/cto/apps/linear-bridge/src/http-server.ts`](/Users/jonathon/.codex/worktrees/e92e/cto/apps/linear-bridge/src/http-server.ts)
+- The deterministic helper CLI in [`/Users/jonathon/.codex/worktrees/e92e/cto/apps/intake-util/src/index.ts`](/Users/jonathon/.codex/worktrees/e92e/cto/apps/intake-util/src/index.ts)
 
-### Linear API (Simplified)
-- **Single workspace API key** for all Linear operations
-- Used for: Project creation, issue management, agent activities, status updates
-- Stored in: OpenBao at `cto/linear`
-- Environment variable: `LINEAR_API_KEY`
+This is no longer the older PM-server-centric description where intake depended on ad hoc orchestration or NATS-driven debate execution. Intake is Lobster-native, and webhook / human-in-the-loop routing goes through `linear-bridge`.
 
-### GitHub Apps (Per-Agent)
-- **Each agent has its own GitHub App** for git operations
-- Used for: Repository access, PR creation, code commits, branch management
-- Stored in: OpenBao at `github-app-{agent}`
-- Examples: `github-app-5dlabs-rex`, `github-app-5dlabs-blaze`, etc.
+## Credentials
 
-### Key Distinction
-| Credential Type | Scope | Purpose |
-|----------------|-------|---------|
-| Linear API Key | Workspace-wide | All Linear API operations |
-| GitHub Apps | Per-agent | Git operations during Play phases |
+### Linear
 
----
+- `LINEAR_API_KEY` is the workspace-scoped credential used for project creation, issue creation, and agent activity updates.
+- `LINEAR_TEAM_ID` is required for issue and project routing.
+- `LINEAR_WEBHOOK_SECRET` is optional but, when set, is enforced by `linear-bridge` for `/webhooks/linear`.
 
-## Phase 1: Intake via MCP Tool
+### GitHub
 
-### Trigger
-User calls `intake()` MCP tool from their workstation with PRD and architecture documents.
+- GitHub credentials remain per-agent and are used when generated task workflows or play workflows create branches and PRs.
 
-### Actions
+## Intake Flow
 
-1. **Create Linear Project**
-   - Uses workspace API key
-   - Sets up project with appropriate views
-   - Configures project status workflow
+### 1. Intake request starts the pipeline
 
-2. **Create Initial PRD Issue**
-   - Title: Project name from PRD
-   - Description: Full PRD content
-   - Attachments: Architecture docs, supporting materials
-   - Labels: `prd`, `intake`
-   - Delegate: Morgan (awaiting assignment)
+An intake request provides PRD content and pipeline inputs such as:
 
-3. **Set Up Project Views**
-   - Task board (by status)
-   - Agent assignment view
-   - Timeline/milestone view
+- `project_name`
+- `num_tasks`
+- `include_codebase`
+- `deliberate`
+- optional Linear session / issue metadata
 
-### Potential Template Usage
-- **Project Template**: Pre-configure project with standard views, status workflow, and issue templates
-- **Issue Template**: Standard PRD issue format with required sections
+The top-level workflow is [`/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/pipeline.lobster.yaml`](/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/pipeline.lobster.yaml).
 
----
+### 2. Early Linear visibility is created immediately
 
-## Phase 2: Docs/Intake Processing (Linear-Triggered)
+The `create-linear-project` step runs near the start of the pipeline and calls:
 
-### Trigger
-User assigns the PRD issue to Morgan in Linear with the `prd` tag.
-
-### Webhook Flow
-
-```
-Linear (AgentSessionEvent: created)
-    └─→ PM Server (webhook receiver)
-          └─→ Create Argo Workflow (intake-template)
-                └─→ Morgan Agent Pod
-                      ├─→ Parse PRD
-                      ├─→ Generate tasks.json
-                      ├─→ Create task documentation
-                      └─→ Emit activities to Linear
+```bash
+intake-util sync-linear init
 ```
 
-### Agent Activities (Linear UI)
+That creates:
 
-| Activity Type | Usage |
-|--------------|-------|
-| `thought` | Initial acknowledgment, parsing progress |
-| `action` | Task generation, file creation |
-| `response` | Completion with summary |
-| `error` | Failures with details |
+- a Linear project
+- a PRD issue
+- agent mapping metadata for downstream issue sync
 
-### Plan Updates
-Morgan updates the session plan as a checklist:
+### 3. The run is registered with `linear-bridge`
 
-```json
-[
-  { "content": "Parse PRD document", "status": "completed" },
-  { "content": "Extract requirements", "status": "completed" },
-  { "content": "Generate task breakdown", "status": "inProgress" },
-  { "content": "Create task documentation", "status": "pending" },
-  { "content": "Create Linear issues", "status": "pending" }
-]
+The pipeline registers the active run with:
+
+```bash
+intake-util register-run --run-id ... --session-id ... --workflow pipeline
 ```
 
-### Output
-- `tasks.json` with all tasks
-- Task documentation in docs repository
-- Linear issues created for each task
+This enables:
 
----
+- session-to-run correlation
+- elicitation callbacks
+- Lobster resume routing
+- Loki-to-Linear activity correlation when `linearSessionId` is present
 
-## Phase 3: Play Workflow Execution
+### 4. Optional context-building phases run
 
-### Trigger
-MCP `play()` call or automatic progression after intake.
+Before task generation, the pipeline may run:
 
-### Task-Based Agent Routing
+- codebase analysis for non-greenfield repos
+- deliberation for architectural decision-making
+- infrastructure discovery
+- live MCP tool discovery
 
-During **intake**, Morgan analyzes each task and assigns an `agentHint` based on:
-1. **Explicit mention** in task title/description (e.g., "Rex: Create API endpoint")
-2. **Dependency inheritance** - if all dependencies are handled by the same agent
-3. **Keyword inference** - based on technology keywords (rust → Rex, react → Blaze)
+The deliberation workflow is [`/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/deliberation.lobster.yaml`](/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/deliberation.lobster.yaml). Debate turns and decision voting are implemented as Lobster steps and `openclaw.invoke` calls, not as a NATS debate loop inside `intake-agent`.
 
-**Task 1 is always forced to Bolt** (initial infrastructure provisioning), but additional infrastructure tasks can also be assigned to Bolt throughout the project (e.g., adding a new database, configuring a cache layer).
+### 5. Intake generates artifacts and syncs Linear
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           INTAKE (Morgan)                                    │
-│  Creates tasks.json with agentHint, language, framework for each task       │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           PLAY WORKFLOW                                      │
-│                                                                              │
-│   For EACH TASK:                                                            │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │ 1. IMPLEMENTATION AGENT (based on task.agentHint)                   │   │
-│   │    ├─ bolt (infrastructure - Task 1 + any additional infra tasks)  │   │
-│   │    ├─ rex/grizz/nova (backend tasks)                                │   │
-│   │    └─ blaze/tap/spark (frontend tasks)                              │   │
-│   │                                                                      │   │
-│   │ 2. SUPPORT AGENTS (sequential, run for EVERY task)                  │   │
-│   │    ├─ Cleo (quality) ──── receives language/framework context       │   │
-│   │    ├─ Cipher (security) ─ receives language/framework context       │   │
-│   │    ├─ Tess (testing) ──── receives language/framework context       │   │
-│   │    └─ Atlas (integration) final merge gate                          │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+The `intake` workflow:
 
-### Implementation Agents (Task-Routed)
+- parses the PRD into tasks
+- analyzes complexity
+- pauses for task review
+- runs the vote-gated refinement loop
+- generates docs, prompts, workflows, scaffolds, and security outputs
+- creates Linear task issues and subtasks with `intake-util sync-linear issues`
+- commits generated artifacts and opens an intake PR
 
-| Agent | Language/Platform | Stack | Notes |
-|-------|------------------|-------|-------|
-| **Bolt** | Infrastructure | K8s operators, databases, caches | Task 1 forced; can handle additional infra tasks |
-| **Rex** | Rust | axum, tokio, sqlx | |
-| **Grizz** | Go | chi, grpc, pgx | |
-| **Nova** | Node.js/Bun | Elysia, Effect, Drizzle | |
-| **Blaze** | React/Web | Next.js, shadcn/ui, TailwindCSS | |
-| **Tap** | Mobile | Expo, React Native | |
-| **Spark** | Desktop | Electron | |
+The main workflow file is [`/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/intake.lobster.yaml`](/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/intake.lobster.yaml).
 
-### Support Agents (Run for Every Task)
+## Bridge and Webhook Flow
 
-| Agent | Role | Context Received |
-|-------|------|------------------|
-| **Cleo** | Quality Review | `task-language`, `task-framework` for language-specific checks |
-| **Cipher** | Security Scan | `task-language`, `task-framework` for language-specific vulnerabilities |
-| **Tess** | Testing | `task-language`, `task-framework` for language-specific test tools |
-| **Atlas** | Integration | Final merge gate, CI verification |
+### Linear bridge is the authority
 
-### Per-Task Execution Flow
+`linear-bridge` is the HTTP entry point for:
 
-1. **Issue Assignment**
-   - Task issue assigned to appropriate agent (based on `agentHint`)
-   - Agent set as `delegate` (human remains `assignee`)
-   - Status moved to first "started" state
+- `POST /webhooks/linear`
+- `POST /notify`
+- `POST /elicitation`
+- `POST /runs/:runId/register`
+- `POST /runs/:runId/callback`
+- `DELETE /runs/:runId`
 
-2. **Agent Session Created**
-   - Linear creates `AgentSession` automatically
-   - Webhook (`AgentSessionEvent: created`) sent to PM server
+Reference: [`/Users/jonathon/.codex/worktrees/e92e/cto/apps/linear-bridge/src/http-server.ts`](/Users/jonathon/.codex/worktrees/e92e/cto/apps/linear-bridge/src/http-server.ts)
 
-3. **Agent Execution**
-   - CodeRun created with:
-     - Agent's GitHub App credentials (for git)
-     - Linear session ID (for status updates)
-   - Linear sidecar runs alongside agent:
-     - Streams logs to Linear agent dialog (`emit_thought`)
-     - Polls for user input from Linear
-     - Updates plan checklist
-     - Tracks artifacts
+### Workflow-to-Linear notifications
 
-4. **Agent Activities**
-   - `thought`: Reasoning, analysis, decisions
-   - `action`: Tool calls (edit_file, run_command, etc.)
-   - `action` with result: Completed operations
-   - `elicitation`: Requests for user clarification
-   - `response`: Task completion
+Workflow steps emit Linear-visible updates using:
 
-5. **User Interaction**
-   - User can send input via Linear comment
-   - Triggers `AgentSessionEvent: prompted` webhook
-   - Input forwarded to agent via FIFO
+- `intake-util linear-activity`
+- `intake-util bridge-notify`
+- `intake-util bridge-elicitation`
 
-6. **Support Agent Phases**
-   - After implementation completes, support agents run sequentially
-   - Each receives `task-language` and `task-framework` for context
-   - Cleo → Cipher → Tess → Atlas
+These commands are used throughout the intake and deliberation workflows to publish:
 
-7. **Completion**
-   - PR created with implementation agent's GitHub App
-   - Support agents review and approve
-   - Atlas merges after all checks pass
+- thoughts
+- plan/progress updates
+- elicitation prompts
+- PR-created notifications
 
----
+### Human responses
 
-## Linear Agent API Integration
+When human input is required, Lobster approval gates pause execution. The response path is:
 
-### Current Implementation (status-sync.rs)
+1. workflow publishes elicitation through `linear-bridge`
+2. user responds in Linear or Discord
+3. bridge resolves the winning response and resumes the run
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| `emit_thought()` | ✅ Implemented | Thoughts, progress updates |
-| `emit_ephemeral_thought()` | ✅ Implemented | Transient status messages |
-| `emit_action()` | ✅ Implemented | Tool invocations |
-| `emit_action_complete()` | ✅ Implemented | Tool results |
-| `emit_error()` | ✅ Implemented | Error reporting |
-| `emit_response()` | ✅ Implemented | Final completion |
-| `update_plan()` | ✅ Implemented | Checklist updates |
-| `set_external_url()` | ✅ Implemented | Link to Argo workflow |
-| `get_session_activities()` | ✅ Implemented | Poll for user input |
-| User input polling | ✅ Implemented | Forward to agent FIFO |
-| Whip cracking | ✅ Implemented | Progress nudges |
-| Artifact trail | ✅ Implemented | File tracking |
+This is the current replacement for the older "agent waits on NATS / PM server callback" mental model.
 
-### Linear Signals Support
+## Linear Activity Model
 
-| Signal | Direction | Status | Notes |
-|--------|-----------|--------|-------|
-| `stop` | Human→Agent | ⚠️ Partial | Need to handle graceful shutdown |
-| `auth` | Agent→Human | ❌ Not needed | We use workspace API key |
-| `select` | Agent→Human | ❌ Not implemented | Could use for confirmations |
+For intake, the workflow now emits activity explicitly from steps instead of relying on a separate intake-specific sidecar abstraction.
 
----
+Common activity types emitted during intake:
 
-## Open Questions
+- `plan`
+- `thought`
+- `response`
+- `elicitation`
 
-### 1. Stop Signal Handling ✅ IMPLEMENTED
-When a user clicks "Send stop request" in Linear:
-- The `input_poll_task` in `status-sync.rs` detects `signal: "stop"` in polled activities
-- Emits response: "🛑 Stopped as requested. No further changes were made."
-- Sets shutdown flag to trigger graceful termination
-- HTTP endpoint `/stop` also available for direct stop requests
+Examples in source:
 
-### 2. Morgan Assignment Auto-Trigger ✅ IMPLEMENTED
-When a PRD issue is assigned to Morgan with a "PRD" label:
-- `handle_agent_session_created` in `agent_session.rs` detects Morgan + PRD tag
-- Automatically extracts intake request from issue description  
-- Submits intake workflow via Kubernetes API
-- Emits progress thoughts to Linear agent dialog
-- Returns `intake_triggered` status with workflow name
+- [`/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/intake.lobster.yaml`](/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/intake.lobster.yaml)
+- [`/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/deliberation.lobster.yaml`](/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/deliberation.lobster.yaml)
 
-To trigger intake via Linear:
-1. Create an issue with your PRD content in the description
-2. Add the "PRD" label to the issue
-3. Assign Morgan as delegate (or @mention Morgan)
-4. Intake workflow starts automatically
+## Outputs
 
-### 3. Project Templates
-Should we create a Linear Project Template for Play workflows?
-- Pros: Consistent project structure, predefined views, status workflow
-- Cons: Adds manual setup step in Linear
+An intake run can produce:
 
-### 4. Issue Templates
-Should we create Issue Templates for different task types?
-- Implementation task template
-- Bug fix template
-- Documentation template
+- a Linear project
+- a PRD issue
+- task issues and subtasks in Linear
+- `.tasks/` documentation and prompts in the repo
+- an intake PR with generated artifacts
 
-### 5. Resume Capability
-Linear doesn't have explicit "resume" signal. Options:
-- User sends new prompt to resume
-- Agent checks for incomplete work on startup
+The artifact structure is documented in [`/Users/jonathon/.codex/worktrees/e92e/cto/intake/docs/intake-process.md`](/Users/jonathon/.codex/worktrees/e92e/cto/intake/docs/intake-process.md).
 
----
+## Related Docs
 
-## Appendix: Linear API Reference
-
-### Key GraphQL Mutations
-
-```graphql
-# Emit agent activity
-mutation AgentActivityCreate($input: AgentActivityCreateInput!) {
-  agentActivityCreate(input: $input) {
-    success
-  }
-}
-
-# Update session plan
-mutation AgentSessionUpdate($id: String!, $input: AgentSessionUpdateInput!) {
-  agentSessionUpdate(id: $id, input: $input) {
-    success
-  }
-}
-
-# Create issue
-mutation IssueCreate($input: IssueCreateInput!) {
-  issueCreate(input: $input) {
-    success
-    issue { id identifier }
-  }
-}
-
-# Create project
-mutation ProjectCreate($input: ProjectCreateInput!) {
-  projectCreate(input: $input) {
-    success
-    project { id name }
-  }
-}
-```
-
-### Webhook Events
-
-| Event | Action | Description |
-|-------|--------|-------------|
-| AgentSessionEvent | created | Agent mentioned/delegated |
-| AgentSessionEvent | prompted | User sent follow-up message |
-| AppUserNotification | issueAssignedToYou | Issue delegated to agent |
-| AppUserNotification | issueUnassignedFromYou | Agent removed from issue |
-
----
-
-## References
-
-- [Linear Agent Interaction Guidelines (AIG)](https://linear.app/developers/aig)
-- [Linear Getting Started with Agents](https://linear.app/developers/agents)
-- [Linear Developing Agent Interaction](https://linear.app/developers/agent-interaction)
-- [Linear Agent Best Practices](https://linear.app/developers/agent-best-practices)
-- [Linear Agent Signals](https://linear.app/developers/agent-signals)
-- [Linear Project Templates](https://linear.app/docs/project-templates)
-- [Linear Issue Templates](https://linear.app/docs/issue-templates)
+- [`/Users/jonathon/.codex/worktrees/e92e/cto/intake/docs/intake-process.md`](/Users/jonathon/.codex/worktrees/e92e/cto/intake/docs/intake-process.md)
+- [`/Users/jonathon/.codex/worktrees/e92e/cto/docs/cloudflare-tunnel-intake-agent.md`](/Users/jonathon/.codex/worktrees/e92e/cto/docs/cloudflare-tunnel-intake-agent.md)
+- [`/Users/jonathon/.codex/worktrees/e92e/cto/apps/intake-agent/README.md`](/Users/jonathon/.codex/worktrees/e92e/cto/apps/intake-agent/README.md)

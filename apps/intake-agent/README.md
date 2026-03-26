@@ -1,18 +1,31 @@
 # Intake Agent
 
-PRD research and deliberation orchestrator. Reads JSON from stdin, writes JSON to stdout.
+The `intake-agent` binary is now the thin runtime for the parts of intake that still need local code: JSON protocol handling and multi-source PRD research.
 
-All LLM-based operations (parse_prd, expand_task, analyze_complexity, etc.) have been
-migrated to Lobster `llm-task` steps. This binary retains only the operations that
-require stateful orchestration or multi-source API calls.
+The intake pipeline itself has moved to Lobster workflows under `intake/workflows/`. Deliberation, task generation, voting, revision loops, and bridge-driven observability are no longer implemented inside this executable.
 
-## Operations
+## What Changed Recently
+
+- Intake orchestration is now Lobster-native instead of split between shell scripts and agent-local orchestration.
+- Deliberation moved to [`/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/deliberation.lobster.yaml`](/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/deliberation.lobster.yaml).
+- Top-level intake flow lives in [`/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/pipeline.lobster.yaml`](/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/pipeline.lobster.yaml).
+- Task expansion now uses a vote-gated revision loop in [`/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/task-refinement.lobster.yaml`](/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/task-refinement.lobster.yaml).
+- Intake observability and approvals now flow through HTTP/webhook bridges instead of the old NATS-driven execution path inside this binary.
+- Non-greenfield intake can add codebase analysis before PRD parsing.
+
+## Current Responsibility
+
+This executable currently supports only:
 
 | Operation | Description |
 |-----------|-------------|
-| `ping` | Health check |
-| `prd_research` | Multi-source research via Exa, Perplexity, Tavily, Firecrawl |
-| `deliberate` | Stateful NATS debate loop with committee voting |
+| `ping` | Health check for the binary |
+| `prd_research` | Multi-source PRD research via Exa, Perplexity, Tavily, and Firecrawl |
+
+If you are looking for task generation, deliberation, or task refinement behavior, use the workflow docs instead of this binary README:
+
+- [`/Users/jonathon/.codex/worktrees/e92e/cto/intake/docs/intake-process.md`](/Users/jonathon/.codex/worktrees/e92e/cto/intake/docs/intake-process.md)
+- [`/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/pipeline.lobster.yaml`](/Users/jonathon/.codex/worktrees/e92e/cto/intake/workflows/pipeline.lobster.yaml)
 
 ## Usage
 
@@ -20,19 +33,16 @@ require stateful orchestration or multi-source API calls.
 # Health check
 echo '{"operation":"ping"}' | bun run src/index.ts
 
-# PRD research (requires API keys)
+# PRD research
 echo '{"operation":"prd_research","payload":{"prd_content":"..."}}' | bun run src/index.ts
-
-# Deliberation (requires NATS)
-echo '{"operation":"deliberate","payload":{"session_id":"...","prd_content":"..."}}' | bun run src/index.ts
 ```
 
 ## Building
 
 ```bash
 bun install
-bun run build        # outputs dist/intake-agent
-bun run typecheck    # type-check only
+bun run build
+bun run typecheck
 ```
 
 ## JSON Protocol
@@ -41,24 +51,24 @@ bun run typecheck    # type-check only
 
 ```json
 {
-  "operation": "ping" | "deliberate" | "prd_research",
-  "payload": { }
+  "operation": "ping" | "prd_research",
+  "payload": {}
 }
 ```
 
-### Response (Success)
+### Success Response
 
 ```json
 {
   "success": true,
-  "data": { },
+  "data": {},
   "usage": { "input_tokens": 0, "output_tokens": 0, "total_tokens": 0 },
   "model": "...",
   "provider": "..."
 }
 ```
 
-### Response (Error)
+### Error Response
 
 ```json
 {
@@ -72,12 +82,16 @@ bun run typecheck    # type-check only
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `NATS_URL` | For deliberate | NATS server URL |
 | `EXA_API_KEY` | Optional | Exa search API |
 | `PERPLEXITY_API_KEY` | Optional | Perplexity API |
 | `TAVILY_API_KEY` | Optional | Tavily search API |
 | `FIRECRAWL_API_KEY` | Optional | Firecrawl extraction API |
-| `DISCORD_WEBHOOK_URL` | Optional | Discord webhook for deliberation updates |
+
+## Notes
+
+- `prd_research` is the only operation that performs external research from this binary.
+- Deliberation is no longer a valid binary operation.
+- Some TypeScript types still include historical deliberation structures because they are shared with workflow-adjacent code, but the executable only accepts `ping` and `prd_research`.
 
 ## License
 
