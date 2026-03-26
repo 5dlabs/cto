@@ -1,339 +1,132 @@
 # Linear-CTO Integration Workflow
 
-> Complete workflow documentation for Linear integration with the CTO platform, from PRD intake through Play workflow execution.
-
-## Overview
-
-This document maps the complete integration between Linear (project management) and CTO (Cognitive Task Orchestrator) for AI-driven development workflows. The integration uses Linear's Agent API to provide real-time visibility into agent work, while leveraging the CTO platform for orchestration and execution.
-
-## Credential Architecture
+Current-state runbook for PM + Linear integration as implemented in `crates/pm` and ACP runtime foundations (`crates/acp-runtime`).
 
-### Linear API (Simplified)
-- **Single workspace API key** for all Linear operations
-- Used for: Project creation, issue management, agent activities, status updates
-- Stored in: OpenBao at `cto/linear`
-- Environment variable: `LINEAR_API_KEY`
+## Scope
 
-### GitHub Apps (Per-Agent)
-- **Each agent has its own GitHub App** for git operations
-- Used for: Repository access, PR creation, code commits, branch management
-- Stored in: OpenBao at `github-app-{agent}`
-- Examples: `github-app-5dlabs-rex`, `github-app-5dlabs-blaze`, etc.
+This document covers:
+- Linear webhook intake and routing in PM.
+- Session tracking and state transitions.
+- Intake and play workflow triggering paths.
+- ACP runtime selection metadata now tracked for PM sessions.
+
+This document does not define future orchestration design; it reflects shipped behavior.
 
-### Key Distinction
-| Credential Type | Scope | Purpose |
-|----------------|-------|---------|
-| Linear API Key | Workspace-wide | All Linear API operations |
-| GitHub Apps | Per-agent | Git operations during Play phases |
-
----
-
-## Phase 1: Intake via MCP Tool
-
-### Trigger
-User calls `intake()` MCP tool from their workstation with PRD and architecture documents.
-
-### Actions
-
-1. **Create Linear Project**
-   - Uses workspace API key
-   - Sets up project with appropriate views
-   - Configures project status workflow
-
-2. **Create Initial PRD Issue**
-   - Title: Project name from PRD
-   - Description: Full PRD content
-   - Attachments: Architecture docs, supporting materials
-   - Labels: `prd`, `intake`
-   - Delegate: Morgan (awaiting assignment)
-
-3. **Set Up Project Views**
-   - Task board (by status)
-   - Agent assignment view
-   - Timeline/milestone view
-
-### Potential Template Usage
-- **Project Template**: Pre-configure project with standard views, status workflow, and issue templates
-- **Issue Template**: Standard PRD issue format with required sections
-
----
-
-## Phase 2: Docs/Intake Processing (Linear-Triggered)
-
-### Trigger
-User assigns the PRD issue to Morgan in Linear with the `prd` tag.
-
-### Webhook Flow
-
-```
-Linear (AgentSessionEvent: created)
-    └─→ PM Server (webhook receiver)
-          └─→ Create Argo Workflow (intake-template)
-                └─→ Morgan Agent Pod
-                      ├─→ Parse PRD
-                      ├─→ Generate tasks.json
-                      ├─→ Create task documentation
-                      └─→ Emit activities to Linear
-```
-
-### Agent Activities (Linear UI)
-
-| Activity Type | Usage |
-|--------------|-------|
-| `thought` | Initial acknowledgment, parsing progress |
-| `action` | Task generation, file creation |
-| `response` | Completion with summary |
-| `error` | Failures with details |
-
-### Plan Updates
-Morgan updates the session plan as a checklist:
-
-```json
-[
-  { "content": "Parse PRD document", "status": "completed" },
-  { "content": "Extract requirements", "status": "completed" },
-  { "content": "Generate task breakdown", "status": "inProgress" },
-  { "content": "Create task documentation", "status": "pending" },
-  { "content": "Create Linear issues", "status": "pending" }
-]
-```
-
-### Output
-- `tasks.json` with all tasks
-- Task documentation in docs repository
-- Linear issues created for each task
-
----
-
-## Phase 3: Play Workflow Execution
-
-### Trigger
-MCP `play()` call or automatic progression after intake.
-
-### Task-Based Agent Routing
-
-During **intake**, Morgan analyzes each task and assigns an `agentHint` based on:
-1. **Explicit mention** in task title/description (e.g., "Rex: Create API endpoint")
-2. **Dependency inheritance** - if all dependencies are handled by the same agent
-3. **Keyword inference** - based on technology keywords (rust → Rex, react → Blaze)
-
-**Task 1 is always forced to Bolt** (initial infrastructure provisioning), but additional infrastructure tasks can also be assigned to Bolt throughout the project (e.g., adding a new database, configuring a cache layer).
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           INTAKE (Morgan)                                    │
-│  Creates tasks.json with agentHint, language, framework for each task       │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           PLAY WORKFLOW                                      │
-│                                                                              │
-│   For EACH TASK:                                                            │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │ 1. IMPLEMENTATION AGENT (based on task.agentHint)                   │   │
-│   │    ├─ bolt (infrastructure - Task 1 + any additional infra tasks)  │   │
-│   │    ├─ rex/grizz/nova (backend tasks)                                │   │
-│   │    └─ blaze/tap/spark (frontend tasks)                              │   │
-│   │                                                                      │   │
-│   │ 2. SUPPORT AGENTS (sequential, run for EVERY task)                  │   │
-│   │    ├─ Cleo (quality) ──── receives language/framework context       │   │
-│   │    ├─ Cipher (security) ─ receives language/framework context       │   │
-│   │    ├─ Tess (testing) ──── receives language/framework context       │   │
-│   │    └─ Atlas (integration) final merge gate                          │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Implementation Agents (Task-Routed)
-
-| Agent | Language/Platform | Stack | Notes |
-|-------|------------------|-------|-------|
-| **Bolt** | Infrastructure | K8s operators, databases, caches | Task 1 forced; can handle additional infra tasks |
-| **Rex** | Rust | axum, tokio, sqlx | |
-| **Grizz** | Go | chi, grpc, pgx | |
-| **Nova** | Node.js/Bun | Elysia, Effect, Drizzle | |
-| **Blaze** | React/Web | Next.js, shadcn/ui, TailwindCSS | |
-| **Tap** | Mobile | Expo, React Native | |
-| **Spark** | Desktop | Electron | |
-
-### Support Agents (Run for Every Task)
-
-| Agent | Role | Context Received |
-|-------|------|------------------|
-| **Cleo** | Quality Review | `task-language`, `task-framework` for language-specific checks |
-| **Cipher** | Security Scan | `task-language`, `task-framework` for language-specific vulnerabilities |
-| **Tess** | Testing | `task-language`, `task-framework` for language-specific test tools |
-| **Atlas** | Integration | Final merge gate, CI verification |
-
-### Per-Task Execution Flow
-
-1. **Issue Assignment**
-   - Task issue assigned to appropriate agent (based on `agentHint`)
-   - Agent set as `delegate` (human remains `assignee`)
-   - Status moved to first "started" state
-
-2. **Agent Session Created**
-   - Linear creates `AgentSession` automatically
-   - Webhook (`AgentSessionEvent: created`) sent to PM server
-
-3. **Agent Execution**
-   - CodeRun created with:
-     - Agent's GitHub App credentials (for git)
-     - Linear session ID (for status updates)
-   - Linear sidecar runs alongside agent:
-     - Streams logs to Linear agent dialog (`emit_thought`)
-     - Polls for user input from Linear
-     - Updates plan checklist
-     - Tracks artifacts
-
-4. **Agent Activities**
-   - `thought`: Reasoning, analysis, decisions
-   - `action`: Tool calls (edit_file, run_command, etc.)
-   - `action` with result: Completed operations
-   - `elicitation`: Requests for user clarification
-   - `response`: Task completion
-
-5. **User Interaction**
-   - User can send input via Linear comment
-   - Triggers `AgentSessionEvent: prompted` webhook
-   - Input forwarded to agent via FIFO
-
-6. **Support Agent Phases**
-   - After implementation completes, support agents run sequentially
-   - Each receives `task-language` and `task-framework` for context
-   - Cleo → Cipher → Tess → Atlas
-
-7. **Completion**
-   - PR created with implementation agent's GitHub App
-   - Support agents review and approve
-   - Atlas merges after all checks pass
-
----
-
-## Linear Agent API Integration
-
-### Current Implementation (status-sync.rs)
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| `emit_thought()` | ✅ Implemented | Thoughts, progress updates |
-| `emit_ephemeral_thought()` | ✅ Implemented | Transient status messages |
-| `emit_action()` | ✅ Implemented | Tool invocations |
-| `emit_action_complete()` | ✅ Implemented | Tool results |
-| `emit_error()` | ✅ Implemented | Error reporting |
-| `emit_response()` | ✅ Implemented | Final completion |
-| `update_plan()` | ✅ Implemented | Checklist updates |
-| `set_external_url()` | ✅ Implemented | Link to Argo workflow |
-| `get_session_activities()` | ✅ Implemented | Poll for user input |
-| User input polling | ✅ Implemented | Forward to agent FIFO |
-| Whip cracking | ✅ Implemented | Progress nudges |
-| Artifact trail | ✅ Implemented | File tracking |
-
-### Linear Signals Support
-
-| Signal | Direction | Status | Notes |
-|--------|-----------|--------|-------|
-| `stop` | Human→Agent | ⚠️ Partial | Need to handle graceful shutdown |
-| `auth` | Agent→Human | ❌ Not needed | We use workspace API key |
-| `select` | Agent→Human | ❌ Not implemented | Could use for confirmations |
-
----
-
-## Open Questions
-
-### 1. Stop Signal Handling ✅ IMPLEMENTED
-When a user clicks "Send stop request" in Linear:
-- The `input_poll_task` in `status-sync.rs` detects `signal: "stop"` in polled activities
-- Emits response: "🛑 Stopped as requested. No further changes were made."
-- Sets shutdown flag to trigger graceful termination
-- HTTP endpoint `/stop` also available for direct stop requests
-
-### 2. Morgan Assignment Auto-Trigger ✅ IMPLEMENTED
-When a PRD issue is assigned to Morgan with a "PRD" label:
-- `handle_agent_session_created` in `agent_session.rs` detects Morgan + PRD tag
-- Automatically extracts intake request from issue description  
-- Submits intake workflow via Kubernetes API
-- Emits progress thoughts to Linear agent dialog
-- Returns `intake_triggered` status with workflow name
-
-To trigger intake via Linear:
-1. Create an issue with your PRD content in the description
-2. Add the "PRD" label to the issue
-3. Assign Morgan as delegate (or @mention Morgan)
-4. Intake workflow starts automatically
-
-### 3. Project Templates
-Should we create a Linear Project Template for Play workflows?
-- Pros: Consistent project structure, predefined views, status workflow
-- Cons: Adds manual setup step in Linear
-
-### 4. Issue Templates
-Should we create Issue Templates for different task types?
-- Implementation task template
-- Bug fix template
-- Documentation template
-
-### 5. Resume Capability
-Linear doesn't have explicit "resume" signal. Options:
-- User sends new prompt to resume
-- Agent checks for incomplete work on startup
-
----
-
-## Appendix: Linear API Reference
-
-### Key GraphQL Mutations
-
-```graphql
-# Emit agent activity
-mutation AgentActivityCreate($input: AgentActivityCreateInput!) {
-  agentActivityCreate(input: $input) {
-    success
-  }
-}
-
-# Update session plan
-mutation AgentSessionUpdate($id: String!, $input: AgentSessionUpdateInput!) {
-  agentSessionUpdate(id: $id, input: $input) {
-    success
-  }
-}
-
-# Create issue
-mutation IssueCreate($input: IssueCreateInput!) {
-  issueCreate(input: $input) {
-    success
-    issue { id identifier }
-  }
-}
-
-# Create project
-mutation ProjectCreate($input: ProjectCreateInput!) {
-  projectCreate(input: $input) {
-    success
-    project { id name }
-  }
-}
-```
-
-### Webhook Events
-
-| Event | Action | Description |
-|-------|--------|-------------|
-| AgentSessionEvent | created | Agent mentioned/delegated |
-| AgentSessionEvent | prompted | User sent follow-up message |
-| AppUserNotification | issueAssignedToYou | Issue delegated to agent |
-| AppUserNotification | issueUnassignedFromYou | Agent removed from issue |
-
----
-
-## References
-
-- [Linear Agent Interaction Guidelines (AIG)](https://linear.app/developers/aig)
-- [Linear Getting Started with Agents](https://linear.app/developers/agents)
-- [Linear Developing Agent Interaction](https://linear.app/developers/agent-interaction)
-- [Linear Agent Best Practices](https://linear.app/developers/agent-best-practices)
-- [Linear Agent Signals](https://linear.app/developers/agent-signals)
-- [Linear Project Templates](https://linear.app/docs/project-templates)
-- [Linear Issue Templates](https://linear.app/docs/issue-templates)
+## Architecture
+
+| Component | Responsibility | Primary codepaths |
+|---|---|---|
+| PM HTTP server | Receives webhooks and callback traffic | `crates/pm/src/bin/pm-server.rs`, `crates/pm/src/server.rs` |
+| Webhook validation/routing | Signature verification, timestamp checks, event dispatch | `crates/pm/src/webhooks.rs`, `crates/pm/src/server.rs` |
+| Agent session handlers | Handle `created` and `prompted` session events | `crates/pm/src/handlers/agent_session.rs` |
+| Intake/play handlers | Submit intake CodeRuns and play workflows | `crates/pm/src/handlers/intake.rs`, `crates/pm/src/handlers/play.rs` |
+| Session tracker | Tracks session/workflow/pod mappings and ACP metadata | `crates/pm/src/state/session_tracker.rs` |
+| ACP registry + types | Runtime selection and common ACP state model | `crates/acp-runtime/src/registry.rs`, `crates/acp-runtime/src/types.rs` |
+
+## Runtime Flow
+
+### 1. Linear webhook arrives
+
+`POST /webhooks/linear`:
+- Rejects/ignores if `LINEAR_ENABLED` is false.
+- Validates `linear-signature` against multi-app webhook secrets, with optional legacy fallback.
+- Validates freshness via `webhook_timestamp` max age.
+- Routes by event type/action.
+
+### 2. `AgentSessionEvent: created`
+
+`handle_agent_session_created`:
+- Emits an initial thought to satisfy Linear interaction expectations.
+- Moves issue to first workflow state of type `started` (lowest position).
+- Registers session in in-memory `SessionTracker`.
+- If ACP is enabled for PM via config, resolves and stores selected ACP runtime ID in session metadata.
+
+Special-case intake path:
+- If agent is Morgan and issue has label `prd` or `task:intake`, PM triggers intake CodeRun submission and returns `intake_triggered`.
+
+### 3. `AgentSessionEvent: prompted`
+
+`handle_agent_session_prompted`:
+- If stop signal is present, emits stop response and marks ACP run state `cancelled`.
+- Otherwise forwards message to routing layer and marks ACP run state `running`.
+
+Current limitation:
+- Stop handling updates state and emits response, but actual sidecar/process interruption is still TODO in code.
+
+## Session Tracking Contract
+
+`SessionInfo` tracks:
+- `session_id`, `agent_name`, issue IDs.
+- Optional `workflow_name`, `pod_name`, `pod_ip`.
+- Status (`Pending`, `Running`, `Completed`, `Failed`, `TimedOut`).
+- `acp` metadata:
+  - `runtimeId`
+  - `sessionId`
+  - `runState` (`pending`, `initialized`, `running`, `waiting_for_permission`, `completed`, `failed`, `cancelled`)
+  - `lastEventCursor`
+
+Notes:
+- Tracker state is in-memory only.
+- Default timeout is 1 hour unless overridden in `SessionTracker::with_timeout`.
+
+## ACP Runtime Configuration
+
+ACP defaults are defined in config types and template:
+- `defaults.acp.enabled`
+- `defaults.acp.defaultRuntime`
+- `defaults.acp.runtimes`
+- `defaults.acp.services.pm`
+
+Default runtime entry is `stakpak` (`command: "stakpak"`, `args: ["acp"]` in template).
+
+Important implementation detail:
+- PM currently records ACP runtime selection in session metadata.
+- PM does not yet execute runtime prompts through `acp-runtime::run_oneshot_prompt`; that utility exists for runtime clients but is not wired into PM session execution flow.
+
+## PM HTTP Interface (Operational)
+
+Primary endpoints:
+- `POST /webhooks/linear`: Linear webhook ingress.
+- `POST /webhooks/github/events` and `POST /github/webhook`: GitHub event ingress.
+- `POST /api/intake/setup`: Create project + PRD setup artifacts.
+- `POST /trigger/intake`: Manual intake trigger.
+- `POST /api/sessions/{session_id}/input`: Route message to running agent session(s).
+- `GET /health`: Liveness (`{"status":"healthy"}`).
+- `GET /ready`: Readiness (`503` when `LINEAR_ENABLED` is false).
+- `GET /health/tokens`: Per-agent token installation/expiry health.
+
+## Required Environment Inputs
+
+Core:
+- `LINEAR_ENABLED=true`
+- `NAMESPACE` (defaults to `cto` when unset)
+
+Multi-agent OAuth (per agent, examples):
+- `LINEAR_APP_MORGAN_CLIENT_ID`
+- `LINEAR_APP_MORGAN_CLIENT_SECRET`
+- `LINEAR_APP_MORGAN_WEBHOOK_SECRET`
+- `LINEAR_APP_MORGAN_ACCESS_TOKEN` (set after OAuth install)
+- `LINEAR_APP_MORGAN_REFRESH_TOKEN` and `LINEAR_APP_MORGAN_EXPIRES_AT` (optional but recommended)
+
+Optional compatibility:
+- Legacy single-app webhook secret and token env vars are still supported as fallback paths.
+
+## Troubleshooting
+
+1. Webhooks ignored:
+- Check `LINEAR_ENABLED`.
+- Check PM logs for signature/timestamp failures.
+
+2. Session created but no workflow activity:
+- Verify issue transition to a `started` state succeeded.
+- Check `SessionTracker` logs for registration and workflow mapping.
+
+3. Prompted messages not reaching agents:
+- Test `POST /api/sessions/{session_id}/input`.
+- Verify pod/service discovery and routing layer logs.
+
+4. Stop request appears successful but work continues:
+- Expected with current implementation; state is updated to `cancelled`, but hard stop of agent process is not yet wired.
+
+5. Token issues:
+- Use `GET /health/tokens` to identify `not_installed`, `expiring`, or `expired` agent apps.
