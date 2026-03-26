@@ -3,7 +3,7 @@ metadata:
   task_id: 7
   agent: nova
   stack: typescript
-  depends_on_tasks: [2]
+  depends_on_tasks: [4]
 
 inputs:
   - name: task_dir
@@ -27,13 +27,8 @@ steps:
       git clone {{inputs.repo_url}} work && cd work &&
       git checkout -b {{inputs.branch_name}}
 
-  - name: scaffold-files
-    depends_on: [setup]
-    command: >
-      cd work && mkdir -p kubernetes/sigma1/secrets
-
   - name: implement
-    depends_on: [scaffold-files]
+    depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/prompt.md

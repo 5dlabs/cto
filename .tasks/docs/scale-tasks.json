@@ -1,99 +1,105 @@
 {
   "tasks": [
     {
-      "task_id": 12,
-      "title": "Scale sigma1-postgres CloudNative-PG cluster to 3 replicas",
+      "task_id": 11,
+      "title": "Scale PostgreSQL Cluster and Configure Backups",
       "agent": "bolt",
       "subtasks": [
-        "Modify the CloudNative-PG Cluster Custom Resource (CR) for 'sigma1-postgres' to set 'instances: 3'.",
-        "Monitor the cluster for successful scaling and replica synchronization."
+        "Scale CloudNative-PG 'sigma1-postgres' from 1 to 3 replicas.",
+        "Enable PgBouncer connection pooling for 'sigma1-postgres'.",
+        "Configure automated daily backups for 'sigma1-postgres' with WAL archiving to S3."
       ],
       "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    },
+    {
+      "task_id": 12,
+      "title": "Scale Redis/Valkey Cluster and Configure Maxmemory",
+      "agent": "bolt",
+      "subtasks": [
+        "Enable Redis Sentinel for 'sigma1-valkey' with 3 replicas.",
+        "Configure an appropriate maxmemory policy for the 'sigma1-valkey' cluster."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     },
     {
       "task_id": 13,
-      "title": "Enable PgBouncer connection pooling for sigma1-postgres",
+      "title": "Implement TLS Certificates via cert-manager",
       "agent": "bolt",
       "subtasks": [
-        "Integrate PgBouncer with the CloudNative-PG cluster, potentially as a sidecar or a separate deployment.",
-        "Configure PgBouncer to manage connections to the 'sigma1-postgres' cluster.",
-        "Update application connection strings to use PgBouncer."
+        "Deploy cert-manager into the cluster.",
+        "Configure a ClusterIssuer for Let's Encrypt (or internal CA).",
+        "Issue TLS certificates for application ingress points."
       ],
       "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     },
     {
       "task_id": 14,
-      "title": "Configure automated backups for sigma1-postgres",
+      "title": "Configure Ingress Controller",
       "agent": "bolt",
       "subtasks": [
-        "Configure a CloudNative-PG Backup Custom Resource (CR) for daily backups of 'sigma1-postgres' to S3.",
-        "Enable Write-Ahead Log (WAL) archiving to S3 for point-in-time recovery.",
-        "Verify backup and restore procedures."
+        "Deploy an Ingress controller (e.g., NGINX or Envoy) into the cluster.",
+        "Configure Ingress resources for application services in the 'sigma1' namespace."
       ],
       "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     },
     {
       "task_id": 15,
-      "title": "Enable Redis Sentinel with 3 replicas for sigma1-valkey",
+      "title": "Configure CDN for Static Assets",
       "agent": "bolt",
       "subtasks": [
-        "Modify the Redis/Valkey Custom Resource (CR) for 'sigma1-valkey' to enable Sentinel mode.",
-        "Configure the CR to provision 3 Redis/Valkey replicas and 3 Sentinel instances.",
-        "Verify the Sentinel cluster is healthy and monitoring the Redis/Valkey instances."
+        "Integrate Cloudflare CDN with the 'sigma1-assets' S3/R2 bucket.",
+        "Configure caching rules and edge optimizations for static assets served via Cloudflare."
       ],
       "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     },
     {
       "task_id": 16,
-      "title": "Configure maxmemory policy for sigma1-valkey",
+      "title": "Implement Network Policies",
       "agent": "bolt",
       "subtasks": [
-        "Update the Redis/Valkey Custom Resource (CR) for 'sigma1-valkey' to set an appropriate 'maxmemory' limit.",
-        "Configure a 'maxmemory-policy' (e.g., 'allkeys-lru', 'noeviction') based on application requirements.",
-        "Monitor Redis/Valkey memory usage and eviction behavior."
+        "Define and apply Kubernetes Network Policies to restrict pod-to-pod traffic within the 'sigma1' namespace.",
+        "Define and apply Kubernetes Network Policies to restrict traffic between 'sigma1' and 'databases' namespaces to only necessary ports and services."
       ],
       "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     },
     {
       "task_id": 17,
-      "title": "Implement TLS certificates for services via cert-manager",
+      "title": "Deploy OpenTelemetry Collector",
       "agent": "bolt",
       "subtasks": [
-        "Configure ClusterIssuers or Issuers (e.g., Let's Encrypt) within cert-manager.",
-        "Create Certificate resources for all exposed application services requiring TLS.",
-        "Ensure certificates are automatically renewed and correctly mounted by services."
+        "Deploy OpenTelemetry Collector into the cluster.",
+        "Configure OpenTelemetry Collector with appropriate sampling rates for traces and metrics."
       ],
-      "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      "priority": "medium",
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     },
     {
       "task_id": 18,
-      "title": "Configure CDN (Cloudflare) for static assets",
+      "title": "Deploy Jaeger for Trace Storage",
       "agent": "bolt",
       "subtasks": [
-        "Configure Cloudflare DNS records for static asset domains.",
-        "Set up CNAMEs to point to the origin server for static assets.",
-        "Configure caching rules, edge caching, and Web Application Firewall (WAF) policies in Cloudflare for static asset delivery."
+        "Deploy Jaeger with persistent storage for traces.",
+        "Configure Jaeger to receive traces from the OpenTelemetry Collector."
       ],
-      "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      "priority": "medium",
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     },
     {
       "task_id": 19,
-      "title": "Refine Network Policies to restrict pod-to-pod traffic",
+      "title": "Configure Alert Rules for SLO Violations",
       "agent": "bolt",
       "subtasks": [
-        "Analyze application communication patterns and dependencies within the 'sigma1' namespace.",
-        "Create granular Network Policies to enforce least privilege for pod-to-pod and namespace-to-namespace traffic.",
-        "Test network policies to ensure only authorized communication paths are open."
+        "Define alert rules based on application SLOs (e.g., latency, error rate, availability).",
+        "Integrate alert rules with an alerting system (e.g., Prometheus Alertmanager)."
       ],
-      "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      "priority": "medium",
+      "depends_on": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     }
   ]
 }
