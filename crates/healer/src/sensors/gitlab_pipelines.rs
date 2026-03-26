@@ -10,7 +10,7 @@ use tracing::{info, warn};
 /// Configuration for the GitLab pipeline sensor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitLabSensorConfig {
-    /// GitLab host (e.g., "gitlab.5dlabs.ai")
+    /// GitLab host (e.g., "git.5dlabs.ai")
     #[serde(default = "default_host")]
     pub host: String,
     /// GitLab API base URL
@@ -27,10 +27,10 @@ pub struct GitLabSensorConfig {
 }
 
 fn default_host() -> String {
-    "gitlab.5dlabs.ai".to_string()
+    "git.5dlabs.ai".to_string()
 }
 fn default_api_base() -> String {
-    "https://gitlab.5dlabs.ai/api/v4".to_string()
+    "https://git.5dlabs.ai/api/v4".to_string()
 }
 fn default_poll_interval() -> u64 {
     300

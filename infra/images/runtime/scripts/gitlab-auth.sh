@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-GL_HOST="${GITLAB_HOST:-gitlab.5dlabs.ai}"
+GL_HOST="${GITLAB_HOST:-git.5dlabs.ai}"
 
 if [ -z "${GITLAB_TOKEN:-}" ]; then
   echo "ERROR: GITLAB_TOKEN is not set" >&2

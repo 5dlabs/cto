@@ -144,19 +144,11 @@ impl Decoder {
 
         let token_in_delta = sold
             .iter()
-            .min_by(|a, b| {
-                a.amount
-                    .partial_cmp(&b.amount)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
+            .min_by(|a, b| a.amount.partial_cmp(&b.amount).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap();
         let token_out_delta = bought
             .iter()
-            .max_by(|a, b| {
-                a.amount
-                    .partial_cmp(&b.amount)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
+            .max_by(|a, b| a.amount.partial_cmp(&b.amount).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap();
 
         let amount_in = token_in_delta.amount.abs();

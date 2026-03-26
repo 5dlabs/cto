@@ -162,7 +162,11 @@ pub async fn handle_gitlab_events(
             .get("X-Gitlab-Token")
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
-        if !bool::from(provided_token.as_bytes().ct_eq(expected_secret.as_bytes())) {
+        if !bool::from(
+            provided_token
+                .as_bytes()
+                .ct_eq(expected_secret.as_bytes()),
+        ) {
             warn!("GitLab webhook token verification failed");
             return Err(StatusCode::UNAUTHORIZED);
         }
@@ -193,11 +197,7 @@ async fn handle_merge_request_event(
         StatusCode::BAD_REQUEST
     })?;
 
-    let action = event
-        .object_attributes
-        .action
-        .as_deref()
-        .unwrap_or("unknown");
+    let action = event.object_attributes.action.as_deref().unwrap_or("unknown");
     info!(
         action = %action,
         mr_iid = event.object_attributes.iid,
@@ -319,7 +319,10 @@ async fn handle_intake_mr_merged(
 }
 
 /// Handle GitLab pipeline events (parallel to GitHub check_run).
-fn handle_pipeline_event(_state: &CallbackState, body: &[u8]) -> Result<Json<Value>, StatusCode> {
+fn handle_pipeline_event(
+    _state: &CallbackState,
+    body: &[u8],
+) -> Result<Json<Value>, StatusCode> {
     let event: PipelineEvent = serde_json::from_slice(body).map_err(|e| {
         error!(error = %e, "Failed to parse GitLab pipeline event");
         StatusCode::BAD_REQUEST
@@ -357,7 +360,10 @@ fn handle_pipeline_event(_state: &CallbackState, body: &[u8]) -> Result<Json<Val
 }
 
 /// Handle GitLab note (comment) events (parallel to GitHub issue_comment).
-fn handle_note_event(_state: &CallbackState, body: &[u8]) -> Result<Json<Value>, StatusCode> {
+fn handle_note_event(
+    _state: &CallbackState,
+    body: &[u8],
+) -> Result<Json<Value>, StatusCode> {
     let event: NoteEvent = serde_json::from_slice(body).map_err(|e| {
         error!(error = %e, "Failed to parse GitLab note event");
         StatusCode::BAD_REQUEST

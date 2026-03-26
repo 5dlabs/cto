@@ -934,18 +934,15 @@ pub async fn fetch_tasks_json_from_scm(
 ) -> anyhow::Result<TasksJson> {
     use anyhow::Context;
 
-    let (owner, repo) = scm_client
-        .parse_repo_from_url(&scm_client.repo_url(
+    let (owner, repo) = scm_client.parse_repo_from_url(
+        &scm_client.repo_url(
             repo_full_name.split('/').next().unwrap_or(""),
             repo_full_name.split('/').nth(1).unwrap_or(""),
-        ))
-        .unwrap_or_else(|_| {
-            let parts: Vec<&str> = repo_full_name.splitn(2, '/').collect();
-            (
-                parts.first().unwrap_or(&"").to_string(),
-                parts.get(1).unwrap_or(&"").to_string(),
-            )
-        });
+        ),
+    ).unwrap_or_else(|_| {
+        let parts: Vec<&str> = repo_full_name.splitn(2, '/').collect();
+        (parts.first().unwrap_or(&"").to_string(), parts.get(1).unwrap_or(&"").to_string())
+    });
 
     let file_path = format!("{project_dir}/.tasks/tasks/tasks.json");
     let ref_ = commit_sha.unwrap_or("main");
@@ -964,13 +961,10 @@ pub async fn fetch_tasks_json_from_scm(
         .context("Failed to fetch tasks.json via SCM")?;
 
     let json_str = String::from_utf8(content).context("tasks.json is not valid UTF-8")?;
-    let tasks_json: TasksJson =
-        serde_json::from_str(&json_str).context("Failed to parse tasks.json")?;
+    let tasks_json: TasksJson = serde_json::from_str(&json_str)
+        .context("Failed to parse tasks.json")?;
 
-    info!(
-        task_count = tasks_json.tasks.len(),
-        "Fetched tasks.json via SCM"
-    );
+    info!(task_count = tasks_json.tasks.len(), "Fetched tasks.json via SCM");
     Ok(tasks_json)
 }
 

@@ -121,7 +121,7 @@ pub enum ScmProviderType {
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GitLabConfig {
-    /// Self-hosted GitLab hostname (e.g., "gitlab.5dlabs.ai")
+    /// Self-hosted GitLab hostname (e.g., "git.5dlabs.ai")
     #[serde(default = "default_gitlab_host")]
     pub host: String,
     /// GitLab group (namespace) for projects
@@ -135,7 +135,7 @@ pub struct GitLabConfig {
 }
 
 fn default_gitlab_host() -> String {
-    "gitlab.5dlabs.ai".to_string()
+    "git.5dlabs.ai".to_string()
 }
 
 /// GitLab project reference

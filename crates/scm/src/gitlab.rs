@@ -1,9 +1,11 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use async_trait::async_trait;
 use base64::Engine;
 use serde::Deserialize;
 
-use crate::{CodeSearchResult, MergeRequest, RepoInfo, ScmClient, ScmClientConfig, ScmProvider};
+use crate::{
+    CodeSearchResult, MergeRequest, RepoInfo, ScmClient, ScmClientConfig, ScmProvider,
+};
 
 pub struct GitLabClient {
     http: reqwest::Client,
@@ -288,7 +290,10 @@ impl ScmClient for GitLabClient {
 
     async fn search_code(&self, query: &str) -> Result<Vec<CodeSearchResult>> {
         let encoded = urlencoding::encode(query);
-        let url = format!("{}/search?scope=blobs&search={encoded}", self.api_base);
+        let url = format!(
+            "{}/search?scope=blobs&search={encoded}",
+            self.api_base
+        );
         let resp = self
             .http
             .get(&url)
@@ -369,10 +374,10 @@ impl ScmClient for GitLabClient {
     }
 
     fn parse_repo_from_url(&self, url: &str) -> Result<(String, String)> {
-        let cleaned = url.trim_end_matches('/').trim_end_matches(".git").replace(
-            &format!("git@{}:", self.host),
-            &format!("https://{}/", self.host),
-        );
+        let cleaned = url
+            .trim_end_matches('/')
+            .trim_end_matches(".git")
+            .replace(&format!("git@{}:", self.host), &format!("https://{}/", self.host));
         let prefix = format!("https://{}/", self.host);
         let path = cleaned
             .strip_prefix(&prefix)
