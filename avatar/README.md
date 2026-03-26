@@ -94,7 +94,7 @@ Browser -> Next.js /api/token -> LiveKit Cloud
 | `docs/provider-spikes.md` | Zero-code provider swap instructions |
 | `docs/elevenlabs-playbook.md` | Practical guide for using ElevenLabs well in the current stack |
 | `docs/decision-review.md` | Architecture decision record |
-| `docs/morgan-openclaw-setup.md` | Morgan + OpenClaw agent config (openclaw-platform reference, pod logs) |
+| `docs/morgan-openclaw-setup.md` | Morgan OpenClaw deployment runbook (CTO manifests, validation commands, troubleshooting) |
 
 ## Latency instrumentation
 
@@ -140,7 +140,7 @@ These items exist in the OVH Kubernetes cluster and were configured manually:
 |------|-----------------|
 | **This repo** (`avatar/`) | Python agent, Next.js frontend, latency tooling |
 | **CTO** (`5dlabs/cto`) | Morgan Helm values, Cloudflare tunnel manifests, ArgoCD ApplicationSet |
-| **openclaw-platform** (`5dlabs/openclaw-platform`) | Reference for agent deployment patterns (not modified) |
+| **openclaw-platform** (`5dlabs/openclaw-platform`) | Upstream OpenClaw Helm chart source consumed by CTO ArgoCD apps |
 
 ## Follow-up work
 

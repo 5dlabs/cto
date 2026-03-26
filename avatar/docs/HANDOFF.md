@@ -125,7 +125,7 @@ Then open `http://localhost:3000` and click **Talk to Morgan**.
 |------|------------------|
 | **This repo** (`avatar/`) | Python agent, Next.js frontend, latency tooling, this handoff |
 | **CTO** (`5dlabs/cto`) | Morgan Helm values, Cloudflare tunnel manifests, ArgoCD ApplicationSet |
-| **openclaw-platform** | Reference for agent deployment patterns (not modified for this PoC) |
+| **openclaw-platform** | Upstream OpenClaw Helm chart source consumed by CTO ArgoCD applications |
 
 **Manual cluster state (not in git):**
 
@@ -137,9 +137,9 @@ Then open `http://localhost:3000` and click **Talk to Morgan**.
 
 ## 8. OpenClaw pod logs and agent config
 
-- **Which pod serves morgan.5dlabs.ai?** The Cloudflare tunnel for morgan.5dlabs.ai targets a specific service/pod. There is currently **no** `openclaw-morgan-*` pod in the `openclaw` namespace; other agents (intake, metal, keeper, etc.) exist. If the tunnel points at one of them, that pod must have `morgan` in its `agents.list` or requests will not be handled as Morgan.
+- **Which pod serves morgan.5dlabs.ai?** Use live cluster checks, not static assumptions. In git, `infra/manifests/morgan-support/tunnel-binding.yaml` targets service `openclaw-morgan` on port `18789`; verify actual pod/service names with `kubectl get pods,svc -n openclaw | rg morgan`.
 - **Read logs**: `kubectl logs -n openclaw <pod-name> -c agent --tail=200`. Look for gateway startup (`agent model: ...`, `listening on ... 18789`), errors, or timeouts when the avatar sends a request.
-- **Reference setup**: See `docs/morgan-openclaw-setup.md` (pattern from openclaw-platform: agent.id, values, configmap, and how to align Morgan).
+- **Reference setup**: See `docs/morgan-openclaw-setup.md` for the CTO-owned source-of-truth paths (`infra/gitops/agents/morgan-values.yaml`, `infra/manifests/morgan-support/*`) and validation commands.
 
 ---
 
