@@ -220,6 +220,69 @@ kubectl config current-context
    kubectl logs -n cto-lite -l app=cloudflared
    ```
 
+## Morgan Call/Video Issues
+
+### "Start a call first so CTO can target the active room."
+
+**Cause:** Shared context was sent before a room was connected.
+
+**Fix:**
+1. Open **Call** or **Video**
+2. Click **Start call**
+3. Wait until the room is connected, then send context again
+
+### "Morgan could not join the room."
+
+Open **Debug** in Call/Video and check **Local runtime** + **Local blockers**.
+
+Common blockers map directly to local health checks:
+
+- `kind cluster 'cto-lite' does not exist`
+- `kubectl context 'kind-cto-lite' is missing/unreachable`
+- `ingress-nginx controller is not ready in kind`
+- `Morgan deployment is not ready in kind`
+- `Morgan service is missing in kind`
+- `Morgan ingress is missing or not bound to morgan.localhost`
+- `cto-tools deployment is not ready`
+- `cto-openmemory deployment is not ready`
+- `nats deployment is not ready`
+- `morgan.localhost is not reachable`
+
+Useful checks:
+
+```bash
+kubectl config current-context
+kubectl --context kind-cto-lite get deploy -n openclaw openclaw-morgan
+kubectl --context kind-cto-lite get svc -n openclaw openclaw-morgan
+kubectl --context kind-cto-lite get ingress -n openclaw openclaw-morgan
+kubectl --context kind-cto-lite get deploy -n ingress-nginx ingress-nginx-controller
+kubectl --context kind-cto-lite get deploy -n cto cto-tools cto-openmemory
+kubectl --context kind-cto-lite get deploy -n messaging nats
+curl -i http://morgan.localhost/health
+```
+
+### Microphone access denied
+
+**Symptom:** Call setup fails immediately or stays disconnected with media/device error.
+
+**Fix:**
+1. Allow microphone permissions for CTO in OS privacy settings
+2. Retry call start from the Call/Video surface
+3. Use the **Session** debug card to confirm `Mic: enabled`
+
+### No video track (audio works)
+
+**Symptom:** Call is connected but video remains pending.
+
+Expected behavior:
+- Call mode is voice-only.
+- Video mode shows placeholder text until LemonSlice/video track publishes.
+
+Use debug to verify:
+- `Audio track: ready`
+- `Video track: pending/ready`
+- `Recent Morgan errors` for provider/runtime failures
+
 ## Reset Everything
 
 ### Complete reset (start fresh)
