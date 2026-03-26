@@ -1,58 +1,63 @@
-# Twingate Resources
+# Twingate Manifests
 
-This directory contains Twingate custom resources managed by the Twingate Kubernetes Operator.
+This directory contains the `TwingateResource` and `TwingateResourceAccess` objects managed by Argo CD application [`infra/gitops/applications/networking/twingate.yaml`](../../applications/networking/twingate.yaml).
 
-## Prerequisites
+## Ownership model
 
-1. **Twingate Operator** must be installed (see `infra/gitops/applications/operators/twingate-operator.yaml`)
-2. **API Token** must be stored in OpenBao at `secret/tools-twingate` with property `TWINGATE_API_TOKEN`
+Twingate is split across three Argo CD applications:
 
-## Adding the API Token to OpenBao
+1. `twingate-operator`
+   - File: [`infra/gitops/applications/operators/twingate-operator.yaml`](../../applications/operators/twingate-operator.yaml)
+   - Deploys the operator chart and sets `network` + `remoteNetworkId` in Helm values.
+2. `twingate`
+   - File: [`infra/gitops/applications/networking/twingate.yaml`](../../applications/networking/twingate.yaml)
+   - Applies resources from this directory (`TwingateResource` + `TwingateResourceAccess`).
+3. `twingate-connector`
+   - File: [`infra/gitops/applications/networking/twingate-connector.yaml`](../../applications/networking/twingate-connector.yaml)
+   - Deploys connector pods from the official Helm chart in namespace `cto`.
 
-Before the operator can function, you must store the Twingate API token in OpenBao:
+The operator application includes `ignoreDifferences` for normalized CRD fields and stale legacy objects. Keep those entries unless the CRD/controller behavior changes.
 
-```bash
-# Get the OpenBao root token from 1Password
-ROOT_TOKEN=$(op item get "OpenBao Unseal Keys - CTO Platform" --format=json | \
-  jq -r '.fields[] | select(.label == "password" or .label == "Root Token") | .value')
+## Managed resources in this directory
 
-# Store the Twingate API token (replace with your actual token from Twingate Admin Console)
-kubectl exec -n openbao openbao-0 -- env BAO_TOKEN="$ROOT_TOKEN" \
-  bao kv put secret/tools-twingate TWINGATE_API_TOKEN="<YOUR_TWINGATE_API_TOKEN>"
+- `pod-network.yaml`: `TwingateResource` for `10.42.0.0/16`
+- `service-network.yaml`: `TwingateResource` for `10.43.0.0/16`
+- `openclaw-tool-server.yaml`: `TwingateResource` for `openclaw-tool-server.openclaw.svc.cluster.local`
+- `*-access.yaml`: `TwingateResourceAccess` bindings for principal `R3JvdXA6NzQ2MDQy`
 
-# Verify it was stored
-kubectl exec -n openbao openbao-0 -- env BAO_TOKEN="$ROOT_TOKEN" \
-  bao kv get secret/tools-twingate
-```
+## Secret prerequisites
 
-**Security Note:** The API token is only shown here for initial setup. After adding it to OpenBao, it will be automatically synced to the Kubernetes secret via External Secrets Operator. The token is **never stored in Git** - only the ExternalSecret configuration that references OpenBao.
+External Secrets sync from OpenBao key `secret/tools-twingate` into:
 
-## Resources
+- `operators/twingate-api-secret` (`apiToken`)
+- `cto/twingate-connector-tokens` (`TWINGATE_ACCESS_TOKEN`, `TWINGATE_REFRESH_TOKEN`)
 
-- **RemoteNetwork** (`remote-network.yaml`) - Represents the Latitude cluster in Twingate
-- **Connector** (`connector.yaml`) - Deploys connector pods that establish the secure tunnel
-- **Network Resource** (`network-resource.yaml`) - Exposes the pod CIDR (10.4.0.0/16) to Twingate clients
-
-## Network Access
-
-Once configured, Twingate clients can access:
-- **Pod Network**: `10.4.0.0/16` (all pods in the cluster)
-- **Services**: Via pod network access
+Source of truth: [`infra/gitops/manifests/external-secrets/cto-secrets.yaml`](../external-secrets/cto-secrets.yaml).
 
 ## Verification
 
-After deployment, verify the resources:
-
 ```bash
-# Check RemoteNetwork
-kubectl get twingateremotenetwork -n operators
+# Argo status
+kubectl get application twingate-operator -n argocd
+kubectl get application twingate -n argocd
+kubectl get application twingate-connector -n argocd
 
-# Check Connector
-kubectl get twingateconnector -n operators
-
-# Check Network Resource
+# Operator-managed objects (namespace: operators)
 kubectl get twingateresource -n operators
+kubectl get twingateresourceaccess -n operators
 
-# Check operator logs
-kubectl logs -n operators -l app.kubernetes.io/name=twingate-operator
+# Connector deployment (namespace: cto)
+kubectl get pods -n cto -l app.kubernetes.io/name=twingate-connector
+
+# Operator logs
+kubectl logs -n operators -l app.kubernetes.io/name=twingate-operator --tail=100
 ```
+
+## Common drift symptoms
+
+- Argo `OutOfSync` on `twingateresourceaccesses.twingate.com` schema fields:
+  - Expected after CRD normalization; see `ignoreDifferences` in `twingate-operator.yaml`.
+- Resources synced but no client access:
+  - Check `principalId` values in `*-access.yaml` and verify membership in Twingate admin.
+- Connector app healthy but no tunnel traffic:
+  - Verify `twingate-connector-tokens` secret exists in `cto` and tokens are valid.
