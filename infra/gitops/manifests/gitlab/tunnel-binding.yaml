@@ -1,5 +1,5 @@
 ---
-# Cloudflare TunnelBinding — routes git.5dlabs.ai to GitLab webservice
+# Cloudflare TunnelBinding — routes gitlab.5dlabs.ai to GitLab webservice
 # DNS: CNAME auto-managed by Cloudflare tunnel operator
 apiVersion: networking.cfargotunnel.com/v1alpha1
 kind: TunnelBinding
@@ -11,7 +11,7 @@ spec:
     kind: ClusterTunnel
     name: cto-main
   subjects:
-    - hostname: git.5dlabs.ai
+    - hostname: gitlab.5dlabs.ai
       target: http://gitlab-webservice-default.gitlab.svc:8181
 
 ---

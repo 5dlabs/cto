@@ -53,7 +53,7 @@ workspace:
   # Example: clone the CTO repo for each agent
   # repos:
   #   - name: cto
-  #     url: "https://git.5dlabs.ai/5dlabs/cto.git"
+  #     url: "https://gitlab.5dlabs.ai/5dlabs/cto.git"
   #     branch: "main"
   #     path: "repos/cto"   # relative to /workspace
 

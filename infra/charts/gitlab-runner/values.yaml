@@ -5,7 +5,7 @@
 # This runner uses the Kubernetes executor — each CI job runs as its own K8s pod
 
 # GitLab instance URL
-gitlabUrl: https://git.5dlabs.ai
+gitlabUrl: https://gitlab.5dlabs.ai
 
 # Runner registration token — injected via ExternalSecrets from OpenBao
 runnerToken:

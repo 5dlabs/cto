@@ -10,7 +10,7 @@ global:
   hosts:
     domain: 5dlabs.ai
     gitlab:
-      name: git.5dlabs.ai
+      name: gitlab.5dlabs.ai
     registry:
       name: registry.5dlabs.ai
     minio:
