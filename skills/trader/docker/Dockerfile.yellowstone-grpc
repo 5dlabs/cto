@@ -1,8 +1,9 @@
-# Build Yellowstone gRPC geyser plugin (.so) for Agave v2.2.20
-# Must use Rust 1.84.1 to match the dysnix/docker-agave:v2.2.20 binary ABI
+# Build Yellowstone gRPC geyser plugin (.so) for Agave v3.1.x runtime
+# Runtime validator in k8s is ghcr.io/dysnix/docker-agave:v3.1.11.
+# Build against the closest published Yellowstone Solana tag (3.1.10).
 #
 # Build:
-#   docker build -t yellowstone-grpc-builder:v2.2.20 \
+#   docker build -t yellowstone-grpc-builder:v3.1.x \
 #     -f Dockerfile.yellowstone-grpc .
 #
 # Extract .so:
@@ -14,7 +15,7 @@
 #   scp libyellowstone_grpc_geyser.so solana-rpc-01:/var/mnt/yellowstone/lib/
 #   — or use kubectl cp if preferred
 
-FROM rust:1.84.1-slim-bookworm AS build
+FROM rust:1.86-slim-bookworm AS build
 
 RUN apt-get update && apt-get install -y \
     git \
@@ -25,7 +26,7 @@ RUN apt-get update && apt-get install -y \
     protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 
-ARG YELLOWSTONE_VERSION=v7.0.0+solana.2.2.20
+ARG YELLOWSTONE_VERSION=v12.2.0+solana.3.1.10
 
 # Clone at the exact tagged release
 RUN git clone --depth 1 --branch "${YELLOWSTONE_VERSION}" \

@@ -341,7 +341,7 @@ impl InstallConfig {
             storage_disk: None, // Use separate NVMe if available
             storage_replicas: 2,
             output_dir,
-            gitops_repo: "https://git.5dlabs.ai/5dlabs/cto.git".into(),
+            gitops_repo: "https://gitlab.5dlabs.ai/5dlabs/cto.git".into(),
             gitops_branch: "develop".into(),
             sync_timeout_minutes: 30,
             profile: InstallProfile::default(),
@@ -376,7 +376,7 @@ impl InstallConfig {
             storage_disk: None,
             storage_replicas: size.storage_replicas(),
             output_dir,
-            gitops_repo: "https://git.5dlabs.ai/5dlabs/cto.git".into(),
+            gitops_repo: "https://gitlab.5dlabs.ai/5dlabs/cto.git".into(),
             gitops_branch: "develop".into(),
             sync_timeout_minutes: if size.is_ha() { 45 } else { 30 }, // HA takes longer
             profile: if size.is_ha() {

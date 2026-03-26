@@ -7,6 +7,7 @@
  * Remaining operations (everything else is now handled by Lobster workflows):
  *   - ping           — health check
  *   - prd_research    — multi-source research APIs (Exa/Perplexity/Tavily/Firecrawl)
+ *   - design_intake   — design input normalization + frontend detection + optional Stitch generation
  *
  * Deliberation is now a full Lobster workflow (deliberation.lobster.yaml).
  *
@@ -88,6 +89,53 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
       };
     }
 
+    case 'design_intake': {
+      const { designIntake } = await import('./operations/design-intake');
+      const payload = request.payload as {
+        prd_content: string;
+        design_prompt?: string;
+        design_artifacts_path?: string;
+        design_urls?: string;
+        design_mode?: 'ingest_only' | 'ingest_plus_stitch';
+        output_dir?: string;
+        project_name?: string;
+      };
+      if (!payload?.prd_content) {
+        return errorResponse('Missing prd_content in payload', 'validation_error');
+      }
+
+      const designContext = await designIntake(payload);
+      return {
+        success: true,
+        data: designContext,
+        usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+        model: 'detector+stitch',
+        provider: '@google/stitch-sdk',
+      };
+    }
+
+    case 'design_variants': {
+      const { generateDesignVariants } = await import('./operations/design-intake');
+      const payload = request.payload as {
+        candidates_path: string;
+        output_dir?: string;
+        variant_count?: number;
+        creative_range?: 'REFINE' | 'EXPLORE' | 'REIMAGINE';
+      };
+      if (!payload?.candidates_path) {
+        return errorResponse('Missing candidates_path in payload', 'validation_error');
+      }
+
+      const result = await generateDesignVariants(payload);
+      return {
+        success: true,
+        data: result,
+        usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+        model: 'stitch-variants',
+        provider: '@google/stitch-sdk',
+      };
+    }
+
     default:
       return errorResponse(`Unknown operation: ${request.operation}`, 'validation_error');
   }
@@ -140,6 +188,8 @@ Usage:
 Operations:
   ping                   Health check
   prd_research           Research PRD context via Exa/Perplexity/Tavily/Firecrawl
+  design_intake          Normalize design inputs + optional Stitch generation
+  design_variants        Generate design variants from existing Stitch candidates
 
 Options:
   -h, --help             Show this help message
@@ -147,7 +197,9 @@ Options:
 
 Examples:
   echo '{"operation":"ping"}' | intake-agent
-  echo '{"operation":"prd_research","payload":{"prd_content":"..."}}' | intake-agent`);
+  echo '{"operation":"prd_research","payload":{"prd_content":"..."}}' | intake-agent
+  echo '{"operation":"design_intake","payload":{"prd_content":"...","design_urls":"https://example.com"}}' | intake-agent
+  echo '{"operation":"design_variants","payload":{"candidates_path":".intake/design/stitch/candidates.json"}}' | intake-agent`);
 }
 
 /**
@@ -192,7 +244,7 @@ async function main(): Promise<void> {
     if (!validateRequest(request)) {
       writeStdout(
         errorResponse(
-          'Invalid request structure. Expected { operation: "ping" | "prd_research", payload?: {...} }',
+          'Invalid request structure. Expected { operation: "ping" | "prd_research" | "design_intake", payload?: {...} }',
           'validation_error'
         )
       );

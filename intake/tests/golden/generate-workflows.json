@@ -1,0 +1,5 @@
+{"task_workflows": [
+  {"task_id": 1, "workflow_yaml": "name: task-1-equipment-catalog\n\nsteps:\n  - id: setup\n    command: echo setup\n  - id: implement\n    command: echo implement\n  - id: test\n    command: echo test\n  - id: create-pr\n    command: echo pr\n"},
+  {"task_id": 2, "workflow_yaml": "name: task-2-rms\n\nsteps:\n  - id: setup\n    command: echo setup\n  - id: implement\n    command: echo implement\n  - id: test\n    command: echo test\n  - id: create-pr\n    command: echo pr\n"},
+  {"task_id": 3, "workflow_yaml": "name: task-3-finance\n\nsteps:\n  - id: setup\n    command: echo setup\n  - id: implement\n    command: echo implement\n  - id: test\n    command: echo test\n  - id: create-pr\n    command: echo pr\n"}
+]}

@@ -203,3 +203,22 @@ credentials.md
 skills/trader/.env
 skills/trader/**/.env
 skills/trader/**/.secrets/
+
+# Intake coordinator feedback-loop status (local)
+intake/.feedback-loop-state.json
+# Pipeline timing epoch (written at pipeline start)
+.intake/.pipeline-start-epoch
+# Initial task parse output (pre-deliberation)
+.intake/initial-tasks.json
+# 1Password inject file (see intake/local.env.op.example)
+intake/local.env.op
+# Local bridge stdout/stderr (run-local-bridges.sh)
+intake/.bridge-logs/
+# Context files written at pipeline runtime (consumed via jq --rawfile)
+.intake/contexts/
+# lobster-voice audio cache (ElevenLabs TTS)
+.intake/.voice-cache/
+.intake/.voice-locks/
+
+# lobster-voice compiled binary (build artifact)
+apps/lobster-voice/lobster-voice

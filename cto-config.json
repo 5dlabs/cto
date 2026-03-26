@@ -10,16 +10,16 @@
       "sourceBranch": "main",
       "models": {
         "tiers": {
-          "primary": { "provider": "anthropic", "model": "claude-opus-4-6" },
-          "fast": { "provider": "anthropic", "model": "claude-sonnet-4-6" },
-          "frontier": { "provider": "anthropic", "model": "claude-opus-4-6" }
+          "primary": { "provider": "gemini", "model": "gemini-3.1-pro-preview" },
+          "fast": { "provider": "gemini", "model": "gemini-2.5-flash" },
+          "frontier": { "provider": "gemini", "model": "gemini-3.1-pro-preview" }
         },
         "committee": [
-          { "provider": "anthropic", "model": "claude-opus-4-6" },
-          { "provider": "openai-api", "model": "gpt-5.4-pro" },
-          { "provider": "anthropic", "model": "claude-sonnet-4-6" },
-          { "provider": "openai-api", "model": "o3-pro" },
-          { "provider": "google", "model": "gemini-3.1-pro-preview" }
+          { "provider": "gemini", "model": "gemini-3.1-pro-preview" },
+          { "provider": "gemini", "model": "gemini-2.5-flash" },
+          { "provider": "gemini", "model": "gemini-3.1-pro-preview" },
+          { "provider": "gemini", "model": "gemini-2.5-flash" },
+          { "provider": "gemini", "model": "gemini-3.1-pro-preview" }
         ],
         "cliModels": {
           "claude": "claude-opus-4-6-20260205",
@@ -106,8 +106,8 @@
         "appName": "5DLabs-Morgan"
       },
       "gitlab": {
-        "host": "git.5dlabs.ai",
-        "apiBase": "https://git.5dlabs.ai/api/v4",
+        "host": "gitlab.5dlabs.ai",
+        "apiBase": "https://gitlab.5dlabs.ai/api/v4",
         "group": "5dlabs",
         "registry": "registry.5dlabs.ai/5dlabs",
         "tokenEnvVar": "GITLAB_TOKEN"

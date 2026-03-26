@@ -1,10 +1,17 @@
+pub mod api;
+pub mod backfill;
 pub mod config;
+pub mod db;
 pub mod decoder;
 pub mod dex;
 pub mod error;
 pub mod pool_cache;
 pub mod subscriber;
 pub mod writer;
+
+pub mod proto {
+    tonic::include_proto!("dex_feed");
+}
 
 /// A decoded DEX swap event, flowing from subscriber → writer.
 #[derive(Debug, Clone)]

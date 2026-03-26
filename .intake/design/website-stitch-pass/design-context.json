@@ -1,0 +1,42 @@
+{
+  "projectName": "5dlabs-website",
+  "mode": "ingest_plus_stitch",
+  "prompt": "Maximize premium visual impact, improve CTA clarity, preserve brand voice and OpenClaw/CTO narrative, create modern conversion-oriented layout.",
+  "artifactPath": "",
+  "urls": [
+    "https://www.5dlabs.ai/"
+  ],
+  "crawledUrls": [
+    {
+      "url": "https://www.5dlabs.ai/",
+      "status": "ok",
+      "title": "5D Labs | AI-Native Venture Studio",
+      "snippet": "5D Labs | AI-Native Venture Studio 5D CTO Trading Strategy OpenClaw AI-Native Venture Studio We Built the Stack That Helps Us Build Companies. 5D Labs is an AI-native venture studio. CTO is the build engine — an operating system for software delivery, not just a coding tool. Our trading engine helps finance and inform "
+    }
+  ],
+  "hasFrontend": true,
+  "frontendTargets": [
+    "web"
+  ],
+  "confidence": 0.7999999999999999,
+  "evidence": [
+    "[web] Enhance 5D Labs production website visual hierarchy and conversion flow for / and /cto."
+  ],
+  "stitch": {
+    "status": "generated",
+    "projectId": "15178365321096773565",
+    "warnings": [],
+    "candidates": [
+      {
+        "target": "web",
+        "deviceType": "DESKTOP",
+        "screenId": "56de8c487de44a77b14015c5f2892f22",
+        "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sX2FkNzc4YWFmN2QxMzQxMzc5MGQzZWQwNmM3NTg3NDQxEgsSBxD0x7nTwxwYAZIBJAoKcHJvamVjdF9pZBIWQhQxNTE3ODM2NTMyMTA5Njc3MzU2NQ&filename=&opi=96797242",
+        "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0ujwxi-m5maX75CcuCj5D0v2ggjI41L9D_y99IBy3n-1A_cQ11UZaRSzjagrEmNVzxsv0aGLdTaj5jjNbhdlg0vpE16axxoLZm03akcX6LBMkxa6q7ScnQfwOvVSD1iRqrQ4POqlrGMPjxY2beelDJ1pO8Df63OziOrtrnKk8sitUDpcNwpM9uyh9chqEFQ1OYsjbDjGMCoCemypyWwG5U_vx3HGAHtnfq-rrGFV3TDzuNku3bsyEdCzB1E",
+        "rationale": "Generated web modernization candidate from intake design context.",
+        "prompt": "Improve and modernize this web interface for project 5dlabs-website. Design intent: Maximize premium visual impact, improve CTA clarity, preserve brand voice and OpenClaw/CTO narrative, create modern conversion-oriented layout. Reference URLs: https://www.5dlabs.ai/ Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
+        "status": "generated"
+      }
+    ]
+  }
+}

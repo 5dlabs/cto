@@ -23,13 +23,13 @@ spec:
   sources:
     - repoURL: https://charts.gitlab.io/
       chart: gitlab-runner
-      targetRevision: 0.72.0
+      targetRevision: 0.87.0
       helm:
         releaseName: gitlab-runner
         valueFiles:
           - $values/infra/charts/gitlab-runner/values.yaml
 
-    - repoURL: https://git.5dlabs.ai/5dlabs/cto.git
+    - repoURL: https://github.com/5dlabs/cto
       targetRevision: main
       ref: values
 

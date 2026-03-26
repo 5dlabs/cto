@@ -23,8 +23,7 @@ impl Writer {
             .strip_prefix("http://")
             .unwrap_or(&config.questdb_url);
         let conf_str = format!("http::addr={addr};");
-        let sender =
-            Sender::from_conf(&conf_str).map_err(|e| Error::QuestDb(e.to_string()))?;
+        let sender = Sender::from_conf(&conf_str).map_err(|e| Error::QuestDb(e.to_string()))?;
 
         Ok(Self {
             sender,
@@ -110,7 +109,11 @@ impl Writer {
             .map_err(|e| Error::QuestDb(e.to_string()))?;
         self.total_flushed += count as u64;
         self.row_count = 0;
-        tracing::debug!(rows = count, total = self.total_flushed, "flushed to QuestDB");
+        tracing::debug!(
+            rows = count,
+            total = self.total_flushed,
+            "flushed to QuestDB"
+        );
         Ok(())
     }
 }

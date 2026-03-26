@@ -1,0 +1,30 @@
+{
+  "overall_complexity": "high",
+  "complexity": "high",
+  "task_analyses": [
+    {
+      "task_id": 1,
+      "task_title": "Equipment Catalog Service",
+      "complexity_score": 7,
+      "recommended_subtasks": 4,
+      "expansion_prompt": "Break down into data model, API endpoints, availability engine, and CDN integration.",
+      "reasoning": "533+ products with real-time availability requires careful schema design, efficient queries, and CDN integration."
+    },
+    {
+      "task_id": 2,
+      "task_title": "Rental Management System (RMS)",
+      "complexity_score": 9,
+      "recommended_subtasks": 6,
+      "expansion_prompt": "Decompose into opportunity management, project lifecycle, inventory tracking, crew scheduling, delivery routing, and calendar sync.",
+      "reasoning": "Full replacement for existing RMS with multiple interconnected workflows and state machines."
+    },
+    {
+      "task_id": 3,
+      "task_title": "Finance Service",
+      "complexity_score": 8,
+      "recommended_subtasks": 5,
+      "expansion_prompt": "Split into invoicing engine, payment processing (Stripe), AR/AP tracking, payroll, and multi-currency support.",
+      "reasoning": "Financial calculations require precision, Stripe integration has webhook complexity, multi-currency adds exchange rate management."
+    }
+  ]
+}

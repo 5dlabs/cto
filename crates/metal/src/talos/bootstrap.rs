@@ -104,7 +104,7 @@ impl BootstrapConfig {
     #[must_use]
     pub fn with_kube_proxy_mode(self, mode: &str) -> Self {
         let patch = match mode {
-            "disabled" => "cluster:\n  proxy:\n    disabled: true\n".to_string(),
+            "none" | "disabled" => "cluster:\n  proxy:\n    disabled: true\n".to_string(),
             "ipvs" => "cluster:\n  proxy:\n    mode: ipvs\n".to_string(),
             _ => "cluster:\n  proxy:\n    mode: iptables\n".to_string(),
         };
@@ -1383,6 +1383,17 @@ mod tests {
             .with_pod_cidr("10.2.0.0/16");
 
         assert_eq!(config.config_patches.len(), 2);
+    }
+
+    #[test]
+    fn test_generated_patches_enforce_cilium_and_no_kube_proxy() {
+        let config = BootstrapConfig::new("policy-cluster", "10.0.0.1")
+            .with_cilium_cni()
+            .with_pod_cidr("10.6.0.0/16");
+
+        let joined = config.config_patches.join("\n---\n");
+        assert!(joined.contains("cluster:\n  proxy:\n    disabled: true"));
+        assert!(joined.contains("network:\n    cni:\n      name: none"));
     }
 
     #[test]

@@ -26,7 +26,7 @@ Sleek anthropomorphic fox in cyberpunk style, 5DLabs badge on jacket, holographi
 
 **Long prompt** (when the tool allows more characters): fox in dim game dev studio; dark jacket with cyan/magenta neon seams and 5DLabs logo patch on shoulder or chest; paw on holographic level editor with PLAY/BUILD labels; neon signs GAME LAB, WEBGL; server racks; same dramatic lighting and style as Vex and Block avatars.
 
-**Export for marketing:** Save as `glitch-avatar-512.png` and add to `apps/marketing/public/agents/`. Set `avatar: "/agents/glitch-avatar-512.png"` on Glitch in `apps/marketing/src/app/page.tsx` (Specialists squad).
+**Export for marketing:** Save as `glitch-avatar-512.png` and add to `apps/website/public/agents/`. Set `avatar: "/agents/glitch-avatar-512.png"` on Glitch in `apps/website/src/app/cto/page.tsx` (Specialists squad).
 
 ---
 
@@ -42,7 +42,7 @@ Same motif: sleek anthropomorphic animal, cyberpunk style, dark techwear with **
 
 Morgan → Sleek anthropomorphic owl in cyberpunk style, wearing a dark techwear jacket with cyan and pink neon seams and a 5DLabs badge, holding a holographic project dashboard with PRD documents, Linear ticket boards, and task dependency graphs, surrounded by floating research panels, doc snippets, and GitHub/Linear sync status indicators, neon-lit command center with warm cyan and pink glow in the background, realistic digital art with cyan and magenta metallic accents.
 
-**Export:** `morgan-avatar-512.png` → `apps/marketing/public/agents/`. Avatar path on Morgan in Project Management squad.
+**Export:** `morgan-avatar-512.png` → `apps/website/public/agents/`. Avatar path on Morgan in Project Management squad.
 
 ---
 
@@ -54,7 +54,7 @@ Morgan → Sleek anthropomorphic owl in cyberpunk style, wearing a dark techwear
 
 Atlas → Sleek anthropomorphic bear in cyberpunk style, wearing a heavy dark techwear jacket with slate and zinc metallic accents and a 5DLabs badge, holding a holographic merge queue and branch graph with PR status indicators and green checkmarks, surrounded by floating branch diagrams, merge conflict resolvers, and CI pipeline status panels, neon-lit integration hub with cool slate and blue reactor glow in the background, realistic digital art with silver and zinc metallic accents.
 
-**Export:** `atlas-avatar-512.png` → `apps/marketing/public/agents/`. Avatar path on Atlas in Operations squad.
+**Export:** `atlas-avatar-512.png` → `apps/website/public/agents/`. Avatar path on Atlas in Operations squad.
 
 ---
 
@@ -66,7 +66,7 @@ Atlas → Sleek anthropomorphic bear in cyberpunk style, wearing a heavy dark te
 
 Keeper → Sleek anthropomorphic raven in cyberpunk style, wearing a dark techwear jacket with teal and blue neon seams and a 5DLabs badge, holding a holographic cluster topology map with node health indicators and alert dashboards, surrounded by floating metrics panels, log streams, and status lights, neon-lit NOC with cool teal and blue glow in the background, realistic digital art with teal and silver metallic accents.
 
-**Export:** `keeper-avatar-512.png` → `apps/marketing/public/agents/`. Add Keeper to page when ready.
+**Export:** `keeper-avatar-512.png` → `apps/website/public/agents/`. Add Keeper to page when ready.
 
 ---
 
@@ -82,7 +82,7 @@ Same long-format style. These four appear on the home page as coming soon: Lex (
 
 Lex → Sleek anthropomorphic wolf in cyberpunk style, wearing a dark techwear jacket with indigo and blue neon seams and a 5DLabs badge, holding a holographic contract review interface with clause highlights, compliance checklists, and risk indicators, surrounded by floating document panes, jurisdiction tags, and approval status badges, neon-lit legal command center with cool indigo and blue glow in the background, realistic digital art with indigo and silver metallic accents.
 
-**Export:** `lex-avatar-512.png` → `apps/marketing/public/agents/`. Set avatar on Lex when added to page.
+**Export:** `lex-avatar-512.png` → `apps/website/public/agents/`. Set avatar on Lex when added to page.
 
 ---
 
@@ -94,7 +94,7 @@ Lex → Sleek anthropomorphic wolf in cyberpunk style, wearing a dark techwear j
 
 Hype → Sleek anthropomorphic peacock in cyberpunk style, wearing a dark techwear jacket with magenta and gold neon seams and a 5DLabs badge, holding a holographic campaign dashboard with brand voice metrics, conversion funnels, and copy variants, surrounded by floating analytics charts, audience segments, and engagement indicators, neon-lit strategy room with vibrant magenta and gold glow in the background, realistic digital art with magenta and gold metallic accents.
 
-**Export:** `hype-avatar-512.png` → `apps/marketing/public/agents/`. Set avatar on Hype when added to page.
+**Export:** `hype-avatar-512.png` → `apps/website/public/agents/`. Set avatar on Hype when added to page.
 
 ---
 
@@ -106,7 +106,7 @@ Hype → Sleek anthropomorphic peacock in cyberpunk style, wearing a dark techwe
 
 Tally → Sleek anthropomorphic beaver in cyberpunk style, wearing a dark techwear jacket with emerald and gold neon seams and a 5DLabs badge, holding a holographic ledger and reconciliation view with balance sheets, transaction streams, and report summaries, surrounded by floating spreadsheets, audit trails, and compliance badges, neon-lit finance hub with warm emerald and gold glow in the background, realistic digital art with emerald and gold metallic accents.
 
-**Export:** `tally-avatar-512.png` → `apps/marketing/public/agents/`. Set avatar on Tally when added to page.
+**Export:** `tally-avatar-512.png` → `apps/website/public/agents/`. Set avatar on Tally when added to page.
 
 ---
 
@@ -118,4 +118,4 @@ Tally → Sleek anthropomorphic beaver in cyberpunk style, wearing a dark techwe
 
 Chase → Sleek anthropomorphic cheetah in cyberpunk style, wearing a dark techwear jacket with amber and orange neon seams and a 5DLabs badge, holding a holographic pipeline board with deal stages, follow-up reminders, and close probability indicators, surrounded by floating outreach queues, meeting schedules, and win/loss metrics, neon-lit sales war room with warm amber and orange glow in the background, realistic digital art with amber and orange metallic accents.
 
-**Export:** `chase-avatar-512.png` → `apps/marketing/public/agents/`. Set avatar on Chase when added to page.
+**Export:** `chase-avatar-512.png` → `apps/website/public/agents/`. Set avatar on Chase when added to page.

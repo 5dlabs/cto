@@ -1,0 +1,13 @@
+{
+  "project_name": "sigma-1",
+  "design_mode": "ingest_plus_stitch",
+  "design_prompt": "Improve the existing Sigma-1 website design while preserving brand tone and production focus.",
+  "design_urls": [
+    "https://sigma1.led.video/"
+  ],
+  "include_codebase": true,
+  "expected_has_frontend": true,
+  "expected_frontend_targets": [
+    "web"
+  ]
+}

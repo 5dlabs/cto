@@ -1,0 +1,1 @@
+Polling vs SSE vs WebSocket for real-time equipment availability on the website?

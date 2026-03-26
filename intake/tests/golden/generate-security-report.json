@@ -1,0 +1,4 @@
+{"findings": [
+  {"id": "sec-1", "severity": "high", "category": "authentication", "description": "No auth mechanism specified for admin endpoints", "affected_tasks": [1, 2], "recommendation": "Implement JWT-based auth with role-based access control"},
+  {"id": "sec-2", "severity": "medium", "category": "data-protection", "description": "PII in customer records needs encryption at rest", "affected_tasks": [2, 3], "recommendation": "Use column-level encryption for PII fields in PostgreSQL"}
+], "summary": "2 findings: 1 high, 1 medium severity"}

@@ -1,0 +1,51 @@
+# Rust CI: fmt, clippy, test
+# Triggered on crate changes for push/MR
+
+rust-fmt:
+  extends: .rust-fmt
+  stage: test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - crates/**
+        - Cargo.toml
+        - Cargo.lock
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+rust-clippy:
+  extends: .rust-clippy
+  stage: test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - crates/**
+        - Cargo.toml
+        - Cargo.lock
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 30m
+
+rust-test:
+  extends: .rust-test
+  stage: test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - crates/**
+        - Cargo.toml
+        - Cargo.lock
+    - if: $CI_PIPELINE_SOURCE == "web"
+  timeout: 30m
+
+unused-deps:
+  extends: .rust-setup
+  stage: test
+  script:
+    - cargo install cargo-machete --locked 2>/dev/null || true
+    - cargo machete || true
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - crates/**
+        - Cargo.toml
+    - if: $CI_PIPELINE_SOURCE == "schedule"

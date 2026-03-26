@@ -1,0 +1,280 @@
+name: design-deliberation
+
+args:
+  audio_debug:
+    default: "true"
+  session_id:
+    default: ''
+  design_decision_points:
+    default: '[]'
+  design_context_file:
+    default: '.intake/contexts/design.txt'
+  linear_session_id:
+    default: ''
+  linear_issue_id:
+    default: ''
+  linear_issue_url:
+    default: ''
+  model_frontier_provider:
+    default: anthropic
+  model_frontier:
+    default: claude-opus-4-6
+  human_review_mode:
+    default: human_required
+
+steps:
+  - id: classify-design-dps
+    command: |
+      WS="${WORKSPACE:-.}"
+      DP_FILE="$WS/.intake/design-decision-points.json"
+      if [ -f "$DP_FILE" ] && [ -s "$DP_FILE" ]; then
+        jq -c '{design_dp_count: length, decision_points: .}' "$DP_FILE"
+      else
+        jq -nc '{design_dp_count: 0, skipped: true}'
+      fi
+
+  - id: load-design-context
+    command: |
+      trap '' INT TERM
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "design-deliberation" "load-design-context" "${audio_debug}" 2>/dev/null || true
+      DC_FILE="$root/${design_context_file}"
+      STITCH_FILE="$root/.intake/design/website-stitch-pass/stitch/candidates.json"
+      DESIGN_CTX_FILE="$root/.intake/design/design-context.json"
+      DC_ARG="null"
+      [ -f "$DC_FILE" ] && DC_ARG="\"$DC_FILE\"" || DC_ARG="null"
+      STITCH_ARG="[]"
+      [ -f "$STITCH_FILE" ] && STITCH_ARG="$(jq '.' "$STITCH_FILE" 2>/dev/null)" || STITCH_ARG="[]"
+      [ -z "$STITCH_ARG" ] && STITCH_ARG="[]"
+      DESIGN_INTAKE_ARG="{}"
+      [ -f "$DESIGN_CTX_FILE" ] && DESIGN_INTAKE_ARG="$(jq '.' "$DESIGN_CTX_FILE" 2>/dev/null)" || DESIGN_INTAKE_ARG="{}"
+      [ -z "$DESIGN_INTAKE_ARG" ] && DESIGN_INTAKE_ARG="{}"
+      if [ -f "$DC_FILE" ]; then
+        jq -n \
+          --rawfile design_context "$DC_FILE" \
+          --argjson stitch_candidates "$STITCH_ARG" \
+          --argjson design_intake "$DESIGN_INTAKE_ARG" \
+          '{design_context: $design_context, stitch_candidates: $stitch_candidates, design_intake: $design_intake}'
+      else
+        jq -n \
+          --arg design_context "" \
+          --argjson stitch_candidates "$STITCH_ARG" \
+          --argjson design_intake "$DESIGN_INTAKE_ARG" \
+          '{design_context: $design_context, stitch_candidates: $stitch_candidates, design_intake: $design_intake}'
+      fi
+
+  - id: designer-turn
+    env:
+      CTO_CLASSIFY: $classify-design-dps.stdout
+      CTO_DESIGN_CTX: $load-design-context.stdout
+    command: |
+      trap '' INT
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "design-deliberation" "designer-turn" "${audio_debug}"
+      SKIPPED=$(printf '%s' "$CTO_CLASSIFY" | jq -r '.skipped // false')
+      if [ "$SKIPPED" = "true" ]; then
+        jq -nc '{skipped: true, design_decisions: []}'
+        exit 0
+      fi
+      DPS=$(printf '%s' "$CTO_CLASSIFY" | jq -c '.decision_points')
+      DESIGN_CTX=$(printf '%s' "$CTO_DESIGN_CTX" | jq -r '.design_context // ""')
+      STITCH=$(printf '%s' "$CTO_DESIGN_CTX" | jq -c '.stitch_candidates // []')
+      DESIGN_INTAKE=$(printf '%s' "$CTO_DESIGN_CTX" | jq -c '.design_intake // {}')
+      DESIGNER_ARGS=$(jq -n \
+        --rawfile prompt "$root/intake/prompts/debate-designer-soul.md" \
+        --rawfile prd "$root/.intake/run-prd.txt" \
+        --argjson decision_points "$DPS" \
+        --arg design_context "$DESIGN_CTX" \
+        --argjson stitch_candidates "$STITCH" \
+        --argjson design_intake "$DESIGN_INTAKE" \
+        --rawfile infrastructure_context "$root/.intake/contexts/infrastructure.txt" \
+        --rawfile codebase_context "$root/.intake/contexts/codebase.txt" \
+        --arg provider "${model_frontier_provider}" \
+        --arg model "${model_frontier}" \
+        '{
+          "prompt": $prompt,
+          "input": {
+            "prd": $prd,
+            "decision_points": $decision_points,
+            "design_context": $design_context,
+            "stitch_candidates": $stitch_candidates,
+            "design_intake": $design_intake,
+            "infrastructure_context": $infrastructure_context,
+            "codebase_context": $codebase_context
+          },
+          "provider": $provider,
+          "model": $model
+        }')
+      TRACE="${WORKSPACE:-.}/.intake/design-elicitation-trace.log"
+      echo "designer-turn: starting LLM call provider=${model_frontier_provider} model=${model_frontier}" >> "$TRACE"
+      LLM_OUT="$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action text --args-json "$DESIGNER_ARGS" 2>>"$TRACE")" || {
+        echo "designer-turn: LLM FAILED exit=$?" >> "$TRACE"
+        exit 1
+      }
+      echo "designer-turn: LLM OK length=$(printf '%s' "$LLM_OUT" | wc -c | tr -d ' ')" >> "$TRACE"
+      printf '%s' "$LLM_OUT"
+
+  - id: notify-discord-designs
+    env:
+      CTO_DESIGNER: $designer-turn.stdout
+      CTO_CLASSIFY: $classify-design-dps.stdout
+    command: |
+      trap '' INT
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "design-deliberation" "notify-discord-designs" "${audio_debug}"
+      SKIPPED=$(printf '%s' "$CTO_DESIGNER" | jq -r '.skipped // false' 2>/dev/null || echo false)
+      if [ "$SKIPPED" = "true" ]; then
+        jq -nc '{notified: false, skipped: true}'
+        exit 0
+      fi
+      DP_COUNT=$(printf '%s' "$CTO_CLASSIFY" | jq -r '.design_dp_count // 0')
+      LINEAR_URL="${linear_issue_url}"
+      if [ -n "$LINEAR_URL" ]; then
+        MSG=$(printf '🎨 **Design Decisions: Approval Pending**\n\n%d design decision(s) need your review.\nPlease approve in Linear: %s' "$DP_COUNT" "$LINEAR_URL")
+      else
+        MSG=$(printf '🎨 **Design Decisions: Approval Pending**\n\n%d design decision(s) need your review in Linear.' "$DP_COUNT")
+      fi
+      META=$(jq -nc --arg sid "${session_id}" '{step:"design-deliberation",session_id:$sid,speaker:"designer"}')
+      echo "$MSG" | intake-util bridge-notify --from designer --to deliberation --metadata "$META" || true
+      jq -nc --arg url "$LINEAR_URL" --argjson count "$DP_COUNT" '{notified: true, dp_count: $count, linear_url: $url}'
+
+  - id: linear-elicitation
+    env:
+      CTO_DESIGNER: $designer-turn.stdout
+      CTO_CLASSIFY: $classify-design-dps.stdout
+    command: |
+      trap '' INT
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "design-deliberation" "linear-elicitation" "${audio_debug}"
+      SKIPPED=$(printf '%s' "$CTO_DESIGNER" | jq -r '.skipped // false' 2>/dev/null || echo false)
+      if [ "$SKIPPED" = "true" ]; then
+        jq -nc '{elicitations: [], skipped: true}'
+        exit 0
+      fi
+      TRACE="${WORKSPACE:-.}/.intake/design-elicitation-trace.log"
+      echo "--- design-elicitation trace $(date -u +%FT%TZ) ---" >> "$TRACE"
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID=""
+      if [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ]; then
+        LINEAR_SID="$(cat "$FALLBACK_FILE")"
+        echo "design-elicitation: session ID from file='$LINEAR_SID'" >> "$TRACE" 2>&1
+      fi
+      if [ -z "$LINEAR_SID" ] && [ -n "${linear_session_id}" ]; then
+        LINEAR_SID="${linear_session_id}"
+        echo "design-elicitation: session ID from arg='$LINEAR_SID'" >> "$TRACE" 2>&1
+      fi
+      echo "design-elicitation: LINEAR_SID='$LINEAR_SID'" >> "$TRACE" 2>&1
+      if [ -z "$LINEAR_SID" ]; then
+        echo "design-elicitation: NO session ID — cannot post" >> "$TRACE" 2>&1
+        jq -nc '{elicitations: [], no_session: true}'
+        exit 0
+      fi
+      DPS=$(printf '%s' "$CTO_CLASSIFY" | jq -c '.decision_points // []')
+      DP_COUNT=$(printf '%s' "$DPS" | jq 'length')
+      echo "design-elicitation: DP_COUNT=$DP_COUNT" >> "$TRACE" 2>&1
+      DESIGNER_TEXT="$CTO_DESIGNER"
+      ELICITATIONS="[]"
+      for i in $(seq 0 $((DP_COUNT - 1))); do
+        DP_ID=$(printf '%s' "$DPS" | jq -r ".[$i].id")
+        DP_CAT=$(printf '%s' "$DPS" | jq -r ".[$i].category // \"design\"")
+        DP_DESC=$(printf '%s' "$DPS" | jq -r ".[$i].description")
+        OPTIONS_RAW=$(printf '%s' "$DPS" | jq -c ".[$i].options // []")
+        OPT_COUNT=$(printf '%s' "$OPTIONS_RAW" | jq 'length')
+        if [ "$OPT_COUNT" -lt 2 ]; then
+          OPTIONS_RAW='["Option A","Option B"]'
+          OPT_COUNT=2
+        fi
+
+        BODY=$(printf '**Design Decision: %s** (%s)\n\n%s\n\n---\n' "$DP_ID" "$DP_CAT" "$DP_DESC")
+        for j in $(seq 0 $((OPT_COUNT - 1))); do
+          OPT_TEXT=$(printf '%s' "$OPTIONS_RAW" | jq -r ".[$j]")
+          BODY=$(printf '%s\n**Option %d:** %s\n' "$BODY" "$((j + 1))" "$OPT_TEXT")
+        done
+
+        echo "design-elicitation: posting response for $DP_ID" >> "$TRACE"
+        intake-util linear-activity \
+          --session-id "$LINEAR_SID" \
+          --type response \
+          --body "$BODY" > /dev/null 2>>"$TRACE" || {
+            echo "design-elicitation: response activity FAILED for $DP_ID" >> "$TRACE"
+          }
+
+        SHORT_OPTS=$(printf '%s' "$OPTIONS_RAW" | jq -c \
+          '[to_entries[] | {value: ("opt-" + (.key|tostring)), label: ("Option " + ((.key+1)|tostring) + ": " + (.value[:60]))}]')
+        echo "design-elicitation: posting elicitation for $DP_ID" >> "$TRACE"
+        intake-util linear-activity \
+          --session-id "$LINEAR_SID" \
+          --type elicitation \
+          --body "Select your preferred option for $DP_ID" \
+          --signal select \
+          --options "$SHORT_OPTS" > /dev/null 2>>"$TRACE" || {
+            echo "design-elicitation: elicitation FAILED for $DP_ID" >> "$TRACE"
+            continue
+          }
+        ELICITATIONS=$(printf '%s' "$ELICITATIONS" | jq --arg dpid "$DP_ID" '. + [$dpid]')
+      done
+      printf '%s' "$ELICITATIONS" | jq '{elicitations: .}'
+
+  - id: assemble-design-decisions
+    env:
+      CTO_DESIGNER: $designer-turn.stdout
+      CTO_CLASSIFY: $classify-design-dps.stdout
+    command: |
+      trap '' INT
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "design-deliberation" "assemble-design-decisions" "${audio_debug}"
+      SKIPPED=$(printf '%s' "$CTO_DESIGNER" | jq -r '.skipped // false' 2>/dev/null || echo false)
+      if [ "$SKIPPED" = "true" ]; then
+        jq -nc '{status: "skipped", resolved_design_decisions: [], designer_output: ""}'
+        exit 0
+      fi
+      DPS=$(printf '%s' "$CTO_CLASSIFY" | jq -c '.decision_points // []')
+      DP_COUNT=$(printf '%s' "$DPS" | jq 'length')
+      SELECTIONS_FILE="$root/.intake/design/stitch/design-selections.json"
+      SELECTIONS="[]"
+      [ -f "$SELECTIONS_FILE" ] && SELECTIONS="$(cat "$SELECTIONS_FILE")" || true
+      jq -n \
+        --arg status "completed" \
+        --argjson design_dps "$DPS" \
+        --arg designer_output "$(printf '%s' "$CTO_DESIGNER")" \
+        --argjson human_selections "$(printf '%s' "$SELECTIONS" | jq '.' 2>/dev/null || echo '[]')" \
+        --argjson dp_count "$DP_COUNT" \
+        '{
+          status: $status,
+          design_dp_count: $dp_count,
+          resolved_design_decisions: $design_dps,
+          designer_output: $designer_output,
+          human_selections: $human_selections
+        }'
+
+  - id: linear-activity-design-complete
+    env:
+      CTO_ASSEMBLE: $assemble-design-decisions.stdout
+    command: |
+      trap '' INT
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "design-deliberation" "linear-activity-design-complete" "${audio_debug}"
+      TRACE="${WORKSPACE:-.}/.intake/design-elicitation-trace.log"
+      DP_COUNT=$(printf '%s' "$CTO_ASSEMBLE" | jq -r '.design_dp_count // 0')
+      STATUS=$(printf '%s' "$CTO_ASSEMBLE" | jq -r '.status // "unknown"')
+      echo "design-complete: status=$STATUS dp_count=$DP_COUNT" >> "$TRACE"
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID=""
+      if [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ]; then
+        LINEAR_SID="$(cat "$FALLBACK_FILE")"
+        echo "design-complete: session ID from file='$LINEAR_SID'" >> "$TRACE"
+      fi
+      if [ -z "$LINEAR_SID" ] && [ -n "${linear_session_id}" ]; then
+        LINEAR_SID="${linear_session_id}"
+        echo "design-complete: session ID from arg='$LINEAR_SID'" >> "$TRACE"
+      fi
+      if [ -n "$LINEAR_SID" ]; then
+        echo "design-complete: posting completion activity" >> "$TRACE"
+        intake-util linear-activity \
+          --session-id "$LINEAR_SID" \
+          --type thought \
+          --body "**Design Deliberation Complete** — Status: $STATUS — $DP_COUNT design decisions presented" > /dev/null 2>>"$TRACE" || true
+      else
+        echo "design-complete: NO session ID — skipping" >> "$TRACE"
+      fi
+      printf '%s' "$CTO_ASSEMBLE"

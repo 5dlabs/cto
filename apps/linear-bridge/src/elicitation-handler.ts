@@ -11,9 +11,11 @@ import type { LinearClient, AgentActivityCreateInput } from './linear-client.js'
 import type { AgentSessionManager } from './agent-session-manager.js';
 import type { RunRegistry } from './run-registry.js';
 import type { AgentSessionWebhookEvent } from './http-server.js';
+import type { BridgeStateDb } from './state/bridge-state-db.js';
 import type {
   ElicitationRequest,
   ElicitationCancel,
+  DesignReviewRequest,
 } from './elicitation-types.js';
 import {
   createElicitationResponse,
@@ -37,12 +39,28 @@ interface PendingElicitation {
 export interface ElicitationHandler {
   /** Handle an inbound elicitation request (via HTTP POST) */
   handleRequest(request: ElicitationRequest): Promise<void>;
+  /** Handle a design review request (Phase B: variant image selection) */
+  handleDesignReview(request: DesignReviewRequest): Promise<void>;
   /** Handle a Linear webhook event (prompted = human responded to select) */
   handleWebhookEvent(event: AgentSessionWebhookEvent): Promise<void>;
   /** Handle a cancel from the other bridge (Discord answered first) */
   handleCancel(cancel: ElicitationCancel): Promise<void>;
   /** Handle a run callback (Discord or external → Lobster resume) */
   handleRunCallback(runId: string, data: Record<string, unknown>): Promise<void>;
+  /** Query whether an elicitation is still active */
+  getStatus(elicitationId: string): { active: boolean; known: boolean };
+  /** Query decision history for debugging/audit */
+  getDecisionHistory(sessionId?: string, limit?: number): unknown[];
+  /** Query session timeline */
+  getSessionHistory(limit?: number, status?: string): unknown[];
+  /** Query unresolved waiting sessions */
+  getWaitingSessions(limit?: number): unknown[];
+  /** Query full decision audit bundle */
+  getDecisionAudit(elicitationId: string, bridge?: string): unknown;
+  /** Query persisted design snapshots */
+  getDesignHistory(sessionId?: string, limit?: number): unknown[];
+  /** Persist design snapshot metadata */
+  recordDesignSnapshot(snapshot: Record<string, unknown>): void;
   /** Clean up resources */
   destroy(): void;
 }
@@ -51,10 +69,19 @@ export function createElicitationHandler(
   linear: LinearClient,
   sessionManager: AgentSessionManager,
   runRegistry: RunRegistry,
+  stateDb: BridgeStateDb,
   discordBridgeUrl: string,
   logger: { info: Function; warn: Function; error: Function },
 ): ElicitationHandler {
   const pending = new Map<string, PendingElicitation>();
+  const resolved = new Set<string>();
+
+  for (const row of stateDb.getActiveElicitations("linear")) {
+    pending.set(row.elicitationId, {
+      request: row.request,
+      linearSessionId: row.linearSessionId ?? "",
+    });
+  }
 
   // ─── HTTP helpers ─────────────────────────────────────────────────────
 
@@ -97,6 +124,10 @@ export function createElicitationHandler(
     lines.push(
       `**Consensus**: ${Math.round(consensus_strength * 100)}% (${total_voters} voters)${escalated ? ' — **ESCALATED (tie)**' : ''}`,
     );
+    lines.push('');
+    lines.push('### Your input');
+    lines.push('- Select one option from the UI below, or reply in free text.');
+    lines.push('- Free-text replies are interpreted as clarification/re-deliberation context.');
 
     // Voter reasoning
     if (req.vote_summary.voter_notes?.length) {
@@ -110,6 +141,23 @@ export function createElicitationHandler(
     return lines.join('\n');
   }
 
+  function normalizeText(value: string | undefined): string {
+    return (value ?? '')
+      .trim()
+      .replace(/\*\*/g, '')
+      .replace(/\s+/g, ' ');
+  }
+
+  function optionValueFromText(input: string, req: ElicitationRequest): string | undefined {
+    const text = normalizeText(input).toLowerCase();
+    if (!text) return undefined;
+    for (const opt of req.options) {
+      if (normalizeText(opt.value).toLowerCase() === text) return opt.value;
+      if (normalizeText(opt.label).toLowerCase() === text) return opt.value;
+    }
+    return undefined;
+  }
+
   // ─── HTTP → Linear ──────────────────────────────────────────────────────
 
   async function handleRequest(request: ElicitationRequest): Promise<void> {
@@ -117,8 +165,19 @@ export function createElicitationHandler(
 
     if (!linear_issue_id) {
       logger.warn(`Elicitation ${elicitation_id}: no linear_issue_id — skipping Linear rendering`);
+      resolved.add(elicitation_id);
+      stateDb.markElicitationResolved("linear", elicitation_id, undefined, undefined, undefined, "linear", "skipped-no-issue");
       return;
     }
+
+    stateDb.setSessionStatus(session_id, "waiting_user");
+    stateDb.saveElicitationPending({
+      bridge: "linear",
+      elicitationId: elicitation_id,
+      request,
+      status: "active",
+    });
+    stateDb.appendProviderEvent("linear", "elicitation_received", request, session_id, elicitation_id, request.metadata?.run_id);
 
     // Store resume token in run registry if present
     if (request.resume_token && request.metadata?.run_id) {
@@ -181,6 +240,10 @@ export function createElicitationHandler(
         const p = pending.get(elicitation_id);
         if (!p) return;
         pending.delete(elicitation_id);
+        resolved.add(elicitation_id);
+        stateDb.markElicitationResolved("linear", elicitation_id, request.recommended_option, undefined, "system:timeout", "linear", "timeout");
+        stateDb.setSessionStatus(request.session_id, "decision_made");
+        stateDb.appendProviderEvent("linear", "timeout_auto_select", { selectedOption: request.recommended_option }, request.session_id, elicitation_id, request.metadata?.run_id);
 
         logger.info(`Elicitation ${elicitation_id}: timeout — auto-selecting "${request.recommended_option}"`);
 
@@ -206,6 +269,10 @@ export function createElicitationHandler(
       linearSessionId: session?.linearSessionId ?? '',
       timeoutTimer,
     });
+    resolved.delete(elicitation_id);
+    stateDb.upsertProviderMessageRef("linear", elicitation_id, {
+      threadId: session?.linearSessionId ?? undefined,
+    });
   }
 
   // ─── Linear → Lobster resume + Discord cross-cancel ────────────────────
@@ -220,8 +287,11 @@ export function createElicitationHandler(
       if (deliberationSessionId && issueId) {
         sessionManager.register(deliberationSessionId, linearSessionId, issueId);
         logger.info(`Registered agent session ${linearSessionId} for deliberation ${deliberationSessionId}`);
+        stateDb.setSessionStatus(deliberationSessionId, "created");
+        stateDb.appendProviderEvent("linear", "session_created", event, deliberationSessionId);
       } else {
         logger.info(`Agent session created: ${linearSessionId} (no deliberation mapping)`);
+        stateDb.appendProviderEvent("linear", "session_created_unmapped", event);
       }
 
       // 10-second acknowledgment: emit ephemeral thought
@@ -237,6 +307,7 @@ export function createElicitationHandler(
     if (event.action === 'prompted' && event.data.promptedValue === '__stop__') {
       const linearSessionId = event.data.id;
       logger.info(`Stop signal received for session ${linearSessionId}`);
+      stateDb.appendProviderEvent("linear", "stop_signal", event);
       // TODO: Forward stop to coordinator agent via /hooks/wake
       await linear.createAgentActivity({
         agentSessionId: linearSessionId,
@@ -248,12 +319,6 @@ export function createElicitationHandler(
     if (event.action !== 'prompted') return;
 
     const linearSessionId = event.data.id;
-    const selectedValue = event.data.promptedValue;
-
-    if (!selectedValue) {
-      logger.warn(`Webhook prompted event missing promptedValue for session ${linearSessionId}`);
-      return;
-    }
 
     // Find matching pending elicitation
     let matchedId: string | undefined;
@@ -269,21 +334,54 @@ export function createElicitationHandler(
 
     if (!matchedId || !matchedEntry) {
       logger.warn(`No pending elicitation for Linear session ${linearSessionId}`);
+      stateDb.appendProviderEvent("linear", "prompted_without_pending", event);
       return;
     }
 
+    const promptBody = normalizeText(
+      (event.data.agentActivity?.body as string | undefined)
+      ?? (event.data.body as string | undefined),
+    );
+    const promptedValue = normalizeText(event.data.promptedValue);
+    const rawInput = promptedValue || promptBody;
+    if (!rawInput) {
+      logger.warn(`Prompted event missing selection/body for session ${linearSessionId}`);
+      return;
+    }
+
+    const selectedByOption = optionValueFromText(rawInput, matchedEntry.request);
+    const looksRedeliberate = /re[-\s]?deliberat|debate again|reconsider|more context/i.test(rawInput);
+    const isExplicitRedeliberate = rawInput === '__redeliberate__';
+    const isRedeliberate = isExplicitRedeliberate || (!selectedByOption && looksRedeliberate);
+    const selectedValue = !isRedeliberate ? selectedByOption : undefined;
+    const userContext = !selectedValue ? rawInput : undefined;
+
     if (matchedEntry.timeoutTimer) clearTimeout(matchedEntry.timeoutTimer);
     pending.delete(matchedId);
-
-    const isRedeliberate = selectedValue === '__redeliberate__';
+    resolved.add(matchedId);
+    stateDb.markElicitationResolved(
+      "linear",
+      matchedId,
+      selectedValue,
+      matchedEntry.request.options.find((o) => o.value === selectedValue)?.label,
+      (event.data.agentActivity?.userId as string | undefined)
+        ?? (event.data.userId as string | undefined)
+        ?? "linear-user",
+      "linear",
+      isRedeliberate || !selectedValue ? "redeliberate" : "selected",
+    );
+    stateDb.setSessionStatus(matchedEntry.request.session_id, "decision_made");
+    stateDb.appendProviderEvent("linear", "prompted_resolved", { rawInput, selectedValue, isRedeliberate }, matchedEntry.request.session_id, matchedId, matchedEntry.request.metadata?.run_id);
 
     // Build response
     const response = createElicitationResponse(
       matchedId,
       'linear',
-      'linear-user',
-      isRedeliberate
-        ? { userContext: 'Human requested re-deliberation via Linear' }
+      (event.data.agentActivity?.userId as string | undefined)
+        ?? (event.data.userId as string | undefined)
+        ?? 'linear-user',
+      isRedeliberate || !selectedValue
+        ? { userContext: userContext ?? 'Human requested re-deliberation via Linear' }
         : { selectedOption: selectedValue },
     );
 
@@ -291,7 +389,7 @@ export function createElicitationHandler(
     const cancel = createElicitationCancel(
       matchedId,
       'linear',
-      isRedeliberate ? undefined : selectedValue,
+      isRedeliberate || !selectedValue ? undefined : selectedValue,
     );
     await postToDiscordBridge('/elicitation/cancel', cancel);
 
@@ -308,8 +406,8 @@ export function createElicitationHandler(
 
     // Post confirmation activity
     if (matchedEntry.linearSessionId) {
-      const confirmBody = isRedeliberate
-        ? 'Human requested re-deliberation via Linear'
+      const confirmBody = isRedeliberate || !selectedValue
+        ? `Human replied in free text: "${(userContext ?? '').slice(0, 240)}"`
         : `Human selected: **${selectedValue}**`;
 
       await linear.createAgentActivity({
@@ -319,7 +417,7 @@ export function createElicitationHandler(
     }
 
     logger.info(
-      `Elicitation ${matchedId}: resolved via Linear — ${isRedeliberate ? 'redeliberate' : selectedValue}`,
+      `Elicitation ${matchedId}: resolved via Linear — ${isRedeliberate || !selectedValue ? 'free-text/redeliberate' : selectedValue}`,
     );
   }
 
@@ -329,6 +427,7 @@ export function createElicitationHandler(
     const run = runRegistry.lookup(runId);
     if (!run) {
       logger.warn(`Run callback for unknown run ${runId}`);
+      stateDb.appendProviderEvent("linear", "run_callback_unknown", data, undefined, undefined, runId);
       return;
     }
 
@@ -339,6 +438,18 @@ export function createElicitationHandler(
       if (entry) {
         if (entry.timeoutTimer) clearTimeout(entry.timeoutTimer);
         pending.delete(elicitationId);
+        resolved.add(elicitationId);
+        stateDb.markElicitationResolved(
+          "linear",
+          elicitationId,
+          (data.selected_option as string | undefined) ?? undefined,
+          entry.request.options.find((o) => o.value === (data.selected_option as string | undefined))?.label,
+          (data.responded_by as string | undefined) ?? "discord-user",
+          "discord",
+          (data.response_type as string | undefined) ?? "selected",
+        );
+        stateDb.setSessionStatus(entry.request.session_id, "decision_made");
+        stateDb.appendProviderEvent("linear", "run_callback_resolved", data, entry.request.session_id, elicitationId, runId);
 
         // Post resolution to Linear
         if (entry.linearSessionId) {
@@ -367,6 +478,9 @@ export function createElicitationHandler(
 
     if (entry.timeoutTimer) clearTimeout(entry.timeoutTimer);
     pending.delete(cancel.elicitation_id);
+    resolved.add(cancel.elicitation_id);
+    stateDb.markElicitationResolved("linear", cancel.elicitation_id, cancel.selected_option, undefined, "discord-user", "discord", "cancelled");
+    stateDb.appendProviderEvent("linear", "cancelled_by_discord", cancel, entry.request.session_id, cancel.elicitation_id, entry.request.metadata?.run_id);
 
     const resolvedMsg = cancel.selected_option
       ? `Resolved via Discord: **${cancel.selected_option}**`
@@ -394,5 +508,156 @@ export function createElicitationHandler(
     pending.clear();
   }
 
-  return { handleRequest, handleWebhookEvent, handleCancel, handleRunCallback, destroy };
+  function getStatus(elicitationId: string): { active: boolean; known: boolean } {
+    if (pending.has(elicitationId)) return { active: true, known: true };
+    const persisted = stateDb.getElicitationStatus("linear", elicitationId);
+    if (persisted.known) return persisted;
+    if (resolved.has(elicitationId)) return { active: false, known: true };
+    return persisted;
+  }
+
+  function getDecisionHistory(sessionId?: string, limit = 100): unknown[] {
+    return stateDb.listDecisions(sessionId, limit);
+  }
+
+  function getSessionHistory(limit = 200, status?: string): unknown[] {
+    if (status === undefined) return stateDb.listSessions(limit);
+    if (status === "created" || status === "waiting_user" || status === "decision_made" || status === "failed" || status === "completed") {
+      return stateDb.listSessions(limit, status);
+    }
+    return stateDb.listSessions(limit);
+  }
+
+  function getWaitingSessions(limit = 200): unknown[] {
+    return stateDb.listWaitingSessions(limit);
+  }
+
+  function getDecisionAudit(elicitationId: string, bridge?: string): unknown {
+    return stateDb.getDecisionAudit(elicitationId, bridge);
+  }
+
+  function getDesignHistory(sessionId?: string, limit = 50): unknown[] {
+    return stateDb.listDesignSnapshots(sessionId, limit);
+  }
+
+  function recordDesignSnapshot(snapshot: Record<string, unknown>): void {
+    const sessionId = typeof snapshot["session_id"] === "string" && snapshot["session_id"]
+      ? snapshot["session_id"]
+      : "design-unscoped";
+    const runId = typeof snapshot["run_id"] === "string" ? snapshot["run_id"] : undefined;
+    const projectName = typeof snapshot["project_name"] === "string" ? snapshot["project_name"] : undefined;
+    const designMode = typeof snapshot["design_mode"] === "string" ? snapshot["design_mode"] : undefined;
+    const stitchRequired = snapshot["stitch_required"] === true || String(snapshot["stitch_required"] ?? "") === "true";
+    const stitchStatus = typeof snapshot["stitch_status"] === "string" ? snapshot["stitch_status"] : undefined;
+    const hasFrontend = snapshot["has_frontend"] === true || String(snapshot["has_frontend"] ?? "") === "true";
+    const artifactBundlePath = typeof snapshot["artifact_bundle_path"] === "string" ? snapshot["artifact_bundle_path"] : undefined;
+    const context = (snapshot["context"] && typeof snapshot["context"] === "object")
+      ? (snapshot["context"] as Record<string, unknown>)
+      : {};
+    stateDb.saveDesignSnapshot({
+      sessionId,
+      runId,
+      projectName,
+      designMode,
+      stitchRequired,
+      stitchStatus,
+      hasFrontend,
+      artifactBundlePath,
+      context,
+    });
+  }
+
+  async function handleDesignReview(request: DesignReviewRequest): Promise<void> {
+    const issueId = request.linear_issue_id ?? request.metadata?.linear_issue_id;
+    if (!issueId) {
+      logger.warn(`Design review ${request.review_id}: no linear_issue_id — skipping Linear rendering`);
+      return;
+    }
+
+    const variantLines = request.variants.map((v, i) =>
+      `### ${i + 1}. ${v.label}\n![${v.label}](${v.image_url})\n${v.description}\n_Aspects: ${v.aspects_changed.join(', ') || 'mixed'}_`,
+    );
+
+    const body = [
+      `## Design Review: ${request.screen_context}`,
+      '',
+      `Select your preferred design direction for **${request.screen_context}**.`,
+      '',
+      ...variantLines,
+      '',
+      '---',
+      `**Reply with the number** (1–${request.variants.length}) or reply "changes" with notes.`,
+    ].join('\n');
+
+    const session = sessionManager.findByDeliberation(request.session_id);
+
+    if (session) {
+      const selectOptions = request.variants.map((v, i) => ({
+        value: v.variant_id,
+        label: `${i + 1}. ${v.label}`,
+      }));
+      selectOptions.push({ value: 'request_changes', label: 'Request Changes' });
+
+      const input: AgentActivityCreateInput = {
+        agentSessionId: session.linearSessionId,
+        content: { type: 'elicitation', body },
+        signal: 'select',
+        signalMetadata: { options: selectOptions },
+      };
+
+      await linear.createAgentActivity(input);
+      logger.info(`Design review ${request.review_id}: posted select signal to Linear session ${session.linearSessionId}`);
+    } else {
+      await linear.createComment(issueId, body);
+      logger.info(`Design review ${request.review_id}: posted comment to issue ${issueId}`);
+    }
+
+    const elicitRequest: ElicitationRequest = {
+      elicitation_id: request.review_id,
+      session_id: request.session_id,
+      decision_id: `design-${request.screen_context}`,
+      question: `Select design direction for ${request.screen_context}`,
+      category: 'design-review',
+      options: request.variants.map(v => ({
+        value: v.variant_id,
+        label: v.label,
+        description: v.description,
+      })),
+      recommended_option: request.recommended_variant,
+      vote_summary: { total_voters: 0, tally: {}, consensus_strength: 0, escalated: false },
+      allow_redeliberation: false,
+      timeout_seconds: request.timeout_seconds,
+      informational: false,
+      timestamp: request.timestamp,
+      linear_issue_id: issueId,
+      metadata: request.metadata,
+    };
+
+    pending.set(request.review_id, {
+      request: elicitRequest,
+      linearSessionId: session?.linearSessionId ?? '',
+    });
+    stateDb.saveElicitationPending({
+      bridge: 'linear',
+      elicitationId: request.review_id,
+      request: elicitRequest,
+      status: 'active',
+    });
+  }
+
+  return {
+    handleRequest,
+    handleDesignReview,
+    handleWebhookEvent,
+    handleCancel,
+    handleRunCallback,
+    getStatus,
+    getDecisionHistory,
+    getSessionHistory,
+    getWaitingSessions,
+    getDecisionAudit,
+    getDesignHistory,
+    recordDesignSnapshot,
+    destroy,
+  };
 }

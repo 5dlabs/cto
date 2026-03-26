@@ -6,7 +6,7 @@ This directory contains ArgoCD applications for deploying AI/ML models on Kubern
 
 | Feature | KubeAI | Ollama Operator | LlamaStack |
 |---------|--------|-----------------|------------|
-| **Backend** | vLLM (GPU optimized) | Ollama (easy setup) | Multi-backend (vLLM, Ollama, Bedrock, TGI) |
+| **Backend** | vLLM (GPU optimized) | Ollama (easy setup) | Multi-backend (vLLM, Ollama, TGI) |
 | **Best for** | Production GPU inference | CPU/mixed workloads | Full AI stack with safety/tooling |
 | **Scale from zero** | ✅ Yes | ❌ No | ❌ No |
 | **OpenAI API** | ✅ Native | ✅ Compatible | ✅ Compatible |

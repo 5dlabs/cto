@@ -1,0 +1,1 @@
+Floating chat bubble expanding to full-panel overlay; /chat deep-link route; quote builder CTA opens Morgan with pre-populated context

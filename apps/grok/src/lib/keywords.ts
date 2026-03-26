@@ -293,7 +293,6 @@ export const CTO_KEYWORDS: Record<string, string[]> = {
     'service mesh AI',
   ],
   cloudInfra: [
-    'AWS Bedrock',
     'Google Vertex AI',
     'Azure AI',
     'Cloudflare Workers AI',

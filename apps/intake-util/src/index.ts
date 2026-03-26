@@ -39,6 +39,7 @@ import { linearPlan } from './linear-plan';
 import { registerRun, deregisterRun } from './run-registry-client';
 import { invokeAgent } from './invoke-agent';
 import { classifyCliOutput } from './classify-output';
+import { designReview } from './design-review';
 import * as fs from 'fs';
 
 /** Read all of stdin as a string (works in both Bun and Node). */
@@ -140,6 +141,14 @@ Subcommands:
     --cli <type>         CLI type: claude | codex | openclaw (required)
     --intermediate       Mark as intermediate output
     (stdin: CLI output text)
+
+  design-review      Post design variants to bridges and wait for selection
+    --variants <path>    Path to design-variants.json (required)
+    --session-id <id>    Session ID (required)
+    --output <path>      Output path for selections JSON (default: .intake/design/stitch/design-selections.json)
+    --linear-issue-id <id>  Linear issue ID for posting
+    --discord-channel-id <id>  Discord channel ID
+    --run-id <id>        Pipeline run ID
 `);
   process.exit(1);
 }
@@ -365,6 +374,7 @@ async function main(): Promise<void> {
         const prdIssueId = getArg(args, '--prd-issue-id');
         const teamId = getArg(args, '--team-id');
         const baseUrl = getArg(args, '--base-url') || '';
+        const prUrl = getArg(args, '--pr-url') || '';
         const agentMapArg = getArg(args, '--agent-map');
 
         if (!projectId || !prdIssueId || !teamId) {
@@ -393,6 +403,7 @@ async function main(): Promise<void> {
           prdIssueId,
           teamId,
           baseUrl,
+          prUrl,
           agentMap,
           apiKey,
         });
@@ -457,6 +468,8 @@ async function main(): Promise<void> {
       const humanReviewMode = getArg(args, '--human-review-mode');
       const resumeToken = getArg(args, '--resume-token');
       const linearSessionId = getArg(args, '--linear-session-id');
+      const linearIssueId = getArg(args, '--linear-issue-id');
+      const discordChannelId = getArg(args, '--discord-channel-id');
       const runId = getArg(args, '--run-id');
 
       if (!sessionId || !decisionId || !voteResultArg) {
@@ -479,6 +492,8 @@ async function main(): Promise<void> {
         linearSessionId,
         resumeToken,
         humanReviewMode,
+        linearIssueId,
+        discordChannelId,
         runId,
       });
       console.log(JSON.stringify(result));
@@ -546,7 +561,7 @@ async function main(): Promise<void> {
 
     case 'linear-activity': {
       const sessionId = getArg(args, '--session-id');
-      const type = getArg(args, '--type') as 'thought' | 'action' | 'elicitation' | 'response' | 'error' | undefined;
+      const type = getArg(args, '--type') as 'thought' | 'plan' | 'action' | 'elicitation' | 'response' | 'error' | undefined;
       const body = getArg(args, '--body') ?? (await readStdin()).trim();
       const ephemeral = args.includes('--ephemeral');
       const action = getArg(args, '--action');
@@ -555,8 +570,14 @@ async function main(): Promise<void> {
       const signal = getArg(args, '--signal') as 'select' | undefined;
       const optionsArg = getArg(args, '--options');
 
-      if (!sessionId || !type) {
-        console.error('Error: --session-id and --type are required');
+      if (!sessionId) {
+        console.error('Warning: linear-activity skipped (missing --session-id)');
+        console.log(JSON.stringify({ ok: true, skipped: true, reason: 'missing_session_id' }));
+        process.exit(0);
+      }
+
+      if (!type) {
+        console.error('Error: --type is required');
         process.exit(1);
       }
 
@@ -676,6 +697,32 @@ async function main(): Promise<void> {
       const output = await readStdin();
       const result = classifyCliOutput(output, cli, isIntermediate);
       console.log(JSON.stringify(result, null, 2));
+      process.exit(0);
+      break;
+    }
+
+    case 'design-review': {
+      const variantsPath = getArg(args, '--variants');
+      const sessionId = getArg(args, '--session-id');
+      const outputPath = getArg(args, '--output') ?? '.intake/design/stitch/design-selections.json';
+      const linearIssueId = getArg(args, '--linear-issue-id') || undefined;
+      const discordChannelId = getArg(args, '--discord-channel-id') || undefined;
+      const runId = getArg(args, '--run-id') || undefined;
+
+      if (!variantsPath || !sessionId) {
+        console.error('Error: --variants and --session-id are required');
+        process.exit(1);
+      }
+
+      const selections = await designReview({
+        variantsPath,
+        sessionId,
+        outputPath,
+        linearIssueId,
+        discordChannelId,
+        runId,
+      });
+      console.log(JSON.stringify(selections, null, 2));
       process.exit(0);
       break;
     }

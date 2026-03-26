@@ -11,59 +11,11 @@ Generate minimal code scaffolds for each task to give implementation agents a he
 
 For each task, produce a scaffold containing:
 
-### 1. File Structure
-List the files the agent should create/modify with brief descriptions:
-```
-src/services/notification-router.ts  — Main service entry point
-src/services/notification-router.test.ts — Unit tests
-src/types/notification.ts — Type definitions
-```
-
-### 2. Interface/Type Definitions
-Generate the key interfaces and types the task needs:
-```typescript
-export interface NotificationPayload {
-  id: string;
-  channel: 'email' | 'sms' | 'push' | 'webhook';
-  recipient: string;
-  template: string;
-  data: Record<string, unknown>;
-}
-```
-
-### 3. Function Signatures
-Generate function signatures with JSDoc/rustdoc for the main functions:
-```typescript
-/** Route notification to the appropriate channel handler */
-export async function routeNotification(payload: NotificationPayload): Promise<DeliveryResult>
-
-/** Validate notification payload against channel-specific rules */
-export function validatePayload(payload: NotificationPayload): ValidationResult
-```
-
-### 4. Test Stubs
-Generate test file skeletons:
-```typescript
-describe('NotificationRouter', () => {
-  it('should route email notifications to the email handler', async () => { /* TODO */ });
-  it('should reject invalid payloads', async () => { /* TODO */ });
-});
-```
-
-### For Non-Greenfield Projects (codebase_context provided)
-When codebase context exists, also include:
-
-### 5. Existing Pattern Examples
-Extract relevant patterns from the codebase and show them as "follow this pattern":
-```
-// Existing pattern from src/services/user-service.ts:
-// This codebase uses the repository pattern with Effect for error handling.
-// Follow this structure:
-export const makeNotificationRepo = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient;
-  return { ... };
-});
-```
+1. **File Structure** — List files to create/modify with one-line descriptions
+2. **Interface/Type Definitions** — Key interfaces and types the task needs
+3. **Function Signatures** — Main function signatures with JSDoc/rustdoc
+4. **Test Stubs** — Test file skeletons with described test cases
+5. **Existing Pattern Examples** (non-greenfield only) — Extract relevant patterns from `codebase_context` as "follow this pattern" references
 
 ## Stack-Specific Scaffold Rules
 

@@ -8,7 +8,8 @@
   "properties": {
     "chosen_option": {
       "type": "string",
-      "description": "The option chosen by this voter (must match one of the presented options)"
+      "enum": ["optimist_option", "pessimist_option", "abstain"],
+      "description": "Canonical vote key only: optimist_option, pessimist_option, or abstain"
     },
     "confidence": {
       "type": "number",

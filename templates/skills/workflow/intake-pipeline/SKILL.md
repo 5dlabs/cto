@@ -79,7 +79,6 @@ anthropic/claude-opus-4-6, anthropic/claude-sonnet-4-6, anthropic/claude-haiku-4
 openai/gpt-5.2, openai/o3-pro
 google/gemini-3.1-pro-preview, google-vertex/gemini-3.1-pro-preview
 minimax/MiniMax-M2.5
-bedrock/us.anthropic.claude-opus-4-6-v1:0, bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0
 ```
 
 ## Fan-Out Generation

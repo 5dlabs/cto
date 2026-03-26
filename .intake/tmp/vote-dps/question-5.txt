@@ -1,0 +1,1 @@
+What approach will be used for managing complex client-side state in the Next.js application?

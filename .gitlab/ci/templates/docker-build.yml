@@ -1,13 +1,11 @@
 # Shared Docker build template for GitLab CI
-# Replaces GitHub composite action: .github/actions/docker-build-push/action.yaml
-#
 # Usage:
 #   extends: .docker-build
 #   variables:
 #     DOCKERFILE: path/to/Dockerfile
 #     IMAGE_NAME: my-image
-#     BUILD_TARGET: production (optional)
-#     BUILD_PLATFORMS: linux/amd64 (optional, default: linux/amd64)
+#     BUILD_TARGET: production        (optional)
+#     BUILD_PLATFORMS: linux/amd64    (optional, default: linux/amd64)
 
 .docker-build:
   image: docker:24
@@ -23,9 +21,32 @@
     BUILD_PLATFORMS: linux/amd64
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    # Set up buildx for multi-platform builds
     - docker buildx create --use --name ci-builder --driver docker-container 2>/dev/null || docker buildx use ci-builder
     - docker buildx inspect --bootstrap
   tags:
     - k8s
     - docker
+
+# Convenience: standard single-image build+push script
+# Override `script:` in the extending job if you need custom logic.
+.docker-build-push:
+  extends: .docker-build
+  script:
+    - |
+      TAG="${CI_COMMIT_SHORT_SHA}"
+      TARGET_FLAG=""
+      if [ -n "${BUILD_TARGET:-}" ]; then
+        TARGET_FLAG="--target $BUILD_TARGET"
+      fi
+
+      docker buildx build \
+        --file "$DOCKERFILE" \
+        --platform "$BUILD_PLATFORMS" \
+        $TARGET_FLAG \
+        --push \
+        --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/$IMAGE_NAME:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/$IMAGE_NAME:v${TAG}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/$IMAGE_NAME:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/$IMAGE_NAME:buildcache,mode=max" \
+        .

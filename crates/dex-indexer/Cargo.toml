@@ -11,21 +11,38 @@ description = "Solana DEX swap indexer — Yellowstone gRPC → QuestDB"
 name = "dex-indexer"
 path = "src/main.rs"
 
+[[bin]]
+name = "dex-api"
+path = "src/bin/dex-api.rs"
+
+[[bin]]
+name = "dex-backfill"
+path = "src/bin/dex-backfill.rs"
+
 [dependencies]
 # Yellowstone gRPC
 yellowstone-grpc-client = "12.1"
 yellowstone-grpc-proto = "12.1"
 tonic = "0.14"
+tonic-prost = "0.14"
+prost = "0.14"
 
 # Async runtime
 tokio = { workspace = true }
 futures = { workspace = true }
+tokio-stream = { version = "0.1", features = ["net"] }
 
 # QuestDB
 questdb-rs = "6.0"
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }
 
 # Config & CLI
 clap = { workspace = true }
+
+# Serialization (backfill JSON-RPC)
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
 
 # Error handling
 thiserror = { workspace = true }
@@ -39,3 +56,6 @@ tracing-subscriber = { workspace = true }
 bs58 = "0.5"
 dashmap = "6"
 chrono = { workspace = true }
+
+[build-dependencies]
+tonic-prost-build = "0.14"

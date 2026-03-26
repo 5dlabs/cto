@@ -53,7 +53,7 @@ workspace:
   # Example: clone the CTO repo for each agent
   # repos:
   #   - name: cto
-  #     url: "https://git.5dlabs.ai/5dlabs/cto.git"
+  #     url: "https://gitlab.5dlabs.ai/5dlabs/cto.git"
   #     branch: "main"
   #     path: "repos/cto"   # relative to /workspace
 
@@ -555,10 +555,11 @@ telemetry:
 # When a cloud provider is enabled, its models and credentials are injected
 # into both the OpenClaw gateway (openclaw.json) and Claude Code CLI sessions.
 # Only one cloud provider should be enabled at a time.
+# Org policy: Amazon Bedrock stays disabled (cost); use Anthropic/OpenAI/Google APIs instead.
 cloudProviders:
-  # -- Amazon Bedrock (Claude via AWS)
+  # -- Amazon Bedrock (Claude via AWS) — leave disabled unless explicitly approved
   bedrock:
-    enabled: true
+    enabled: false
     region: "us-east-2"
     # OpenClaw gateway provider config (renders into openclaw.json models.providers)
     openclaw:

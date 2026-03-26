@@ -1,52 +1,41 @@
 ---
 name: landing-marketing-app
-description: How to work with the 5dlabs landing page (splash) and CTO marketing app. Use when editing the public sites, agent tiles, investor CTAs, deploy flows, or when handed off to work on landing/marketing.
+description: How to work with the 5dlabs website app. Use when editing public pages, CTO routes, agent tiles, investor CTAs, or deploy flows.
 ---
 
-# Landing Page & Marketing App
+# Website App
 
-Guidance for working with the two public-facing Next.js apps in this repo: **splash** (5dlabs.ai landing) and **marketing** (CTO product site).
+Guidance for the unified public-facing Next.js app in this repo: **website** (`apps/website`).
 
-## The Two Apps
+## App Overview
 
 | App | Path | Purpose | Deploy target |
 |-----|------|---------|----------------|
-| **Splash** | `apps/splash/` | 5dlabs.ai landing: investor CTAs, magnetic filings background, header/nav | Cloudflare Pages `5dlabs-splash` |
-| **Marketing** | `apps/marketing/` | CTO marketing: agent cards, squads, waitlist, pricing, tech stack | Cloudflare Pages `cto-marketing` |
+| **Website** | `apps/website/` | 5dlabs.ai site with landing pages at `/` and CTO marketing under `/cto/*` | Cloudflare Pages `5dlabs-splash` |
 
-Both use **Next.js 16**, **React 19**, **Tailwind 4**, **Framer Motion**, and **Radix UI**. Run from repo root or app dir:
+The website uses **Next.js 16**, **React 19**, **Tailwind 4**, **Framer Motion**, and **Radix UI**.
 
 ```bash
-cd apps/splash && npm ci && npm run dev   # http://localhost:3000
-cd apps/marketing && npm ci && npm run dev
+cd apps/website && npm ci && npm run dev   # http://localhost:3000
 ```
 
 ## Key Paths
 
-### Splash (landing)
-
-- **Layout / global**: `apps/splash/src/app/layout.tsx` (e.g. magnetic filings wrapper)
-- **Pages**: `apps/splash/src/app/investors/page.tsx`, other route folders under `app/`
-- **Components**: `header.tsx`, `investor-cta-buttons.tsx`, `magnetic-filings-background.tsx`
-- **Styling**: `app/globals.css`, Tailwind in components
-
-### Marketing
-
-- **Home page (agents, waitlist, hero)**: `apps/marketing/src/app/page.tsx`
-- **Other routes**: `app/pricing/page.tsx`, `app/ralph/page.tsx`
-- **Components**: `agent-card.tsx` (flip card, squads), `header.tsx`, `waitlist-form.tsx`, `tech-stack.tsx`, `grid-pulse.tsx`, `shift-dimensions-wrapper.tsx`
-- **UI primitives**: `components/ui/` (button, card, avatar, hover-card, input)
-- **Config**: `@/config/feature-flags` if used
+- **Layout / global**: `apps/website/src/app/layout.tsx`
+- **Landing routes**: `apps/website/src/app/*`
+- **CTO routes**: `apps/website/src/app/cto/*`
+- **CTO components**: `apps/website/src/components/cto/*`
+- **Cloudflare functions**: `apps/website/functions/api/*`
+- **UI primitives**: `apps/website/src/components/ui/*`
 
 ## Agent Data and Inventory
 
-- **Marketing agent tiles** (name, role, tools, skills) are defined in `apps/marketing/src/app/page.tsx` in the `squads` array (`AgentSquad[]`). Each agent has `name`, `role`, `avatar`, `color`, `description`, `tools[]`, `skills[]`.
+- **CTO agent tiles** are defined in `apps/website/src/app/cto/page.tsx` in the `squads` array (`AgentSquad[]`).
 - **Source of truth for tools/skills**: `docs/agent-inventory.md` (built from cto-config, controller templates, and skill-mappings). When updating agent tiles, align with the inventory so the site matches the platform.
 
 ## Deploy
 
-- **Splash**: Push to `main` with changes under `apps/splash/**` triggers `.github/workflows/deploy-splash.yaml` (Cloudflare Pages). Or run the "Deploy Splash Site (5dlabs.ai)" workflow manually.
-- **Marketing**: Push to `main` with changes under `apps/marketing/**` triggers `.github/workflows/deploy-marketing.yaml`. Or run "Deploy Marketing Site" manually.
+- Push to `main` with changes under `apps/website/**` to trigger `.github/workflows/deploy-splash.yaml` (Cloudflare Pages).
 - Workflow runs: `npm ci` → `npm run build` in the app dir → `wrangler pages deploy out --project-name=...`.
 
 ## Conventions
@@ -58,7 +47,7 @@ cd apps/marketing && npm ci && npm run dev
 
 ## Quick Checklist for Handoff
 
-- [ ] Confirm which app (splash vs marketing) and which route/component.
-- [ ] Run `npm ci && npm run dev` in that app; verify current behavior.
-- [ ] For agent tile changes, cross-check `docs/agent-inventory.md` and `apps/marketing/src/app/page.tsx`.
+- [ ] Confirm route scope (`/` landing vs `/cto/*` marketing route).
+- [ ] Run `npm ci && npm run dev` in `apps/website`; verify behavior.
+- [ ] For agent tile changes, cross-check `docs/agent-inventory.md` and `apps/website/src/app/cto/page.tsx`.
 - [ ] For deploy: merge to `main` (or trigger workflow) so the right path filter runs.

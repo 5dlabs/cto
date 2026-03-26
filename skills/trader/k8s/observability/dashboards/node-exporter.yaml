@@ -15656,7 +15656,11 @@ data:
       "templating": {
         "list": [
           {
-            "current": {},
+            "current": {
+              "selected": true,
+              "text": "Prometheus",
+              "value": "prometheus"
+            },
             "includeAll": false,
             "label": "Datasource",
             "name": "ds_prometheus",
@@ -15667,7 +15671,11 @@ data:
             "type": "datasource"
           },
           {
-            "current": {},
+            "current": {
+              "selected": true,
+              "text": "node-exporter",
+              "value": "node-exporter"
+            },
             "datasource": {
               "type": "prometheus",
               "uid": "${ds_prometheus}"
@@ -15687,7 +15695,11 @@ data:
             "type": "query"
           },
           {
-            "current": {},
+            "current": {
+              "selected": true,
+              "text": "solana-rpc-01",
+              "value": "solana-rpc-01"
+            },
             "datasource": {
               "type": "prometheus",
               "uid": "${ds_prometheus}"
@@ -15707,7 +15719,11 @@ data:
             "type": "query"
           },
           {
-            "current": {},
+            "current": {
+              "selected": true,
+              "text": "152.236.0.21:9100",
+              "value": "152.236.0.21:9100"
+            },
             "datasource": {
               "type": "prometheus",
               "uid": "${ds_prometheus}"

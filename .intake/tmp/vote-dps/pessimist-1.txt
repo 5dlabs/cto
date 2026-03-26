@@ -1,0 +1,1 @@
+Use a mixed-protocol approach: gRPC for high-throughput services like RMS, and simple HTTP/REST for others like Catalog and Finance.

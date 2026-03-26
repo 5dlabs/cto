@@ -40,6 +40,27 @@ interface WorkflowEntry {
   workflow_yaml: string;
 }
 
+function asText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value == null) return '';
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function asArray<T>(input: unknown, keys: string[]): T[] | null {
+  if (Array.isArray(input)) return input as T[];
+  if (input && typeof input === 'object') {
+    const obj = input as Record<string, unknown>;
+    for (const key of keys) {
+      if (Array.isArray(obj[key])) return obj[key] as T[];
+    }
+  }
+  return null;
+}
+
 export async function writeFiles(
   input: unknown,
   basePath: string,
@@ -48,33 +69,33 @@ export async function writeFiles(
   const paths: string[] = [];
 
   if (type === 'workflows') {
-    const data = input as { task_workflows: WorkflowEntry[] };
-    if (!data.task_workflows || !Array.isArray(data.task_workflows)) {
-      throw new Error('Expected { task_workflows: [...] } for --type workflows');
+    const workflows = asArray<WorkflowEntry>(input, ['task_workflows', 'workflows']);
+    if (!workflows) {
+      throw new Error('Expected workflow array (task_workflows/workflows or raw array) for --type workflows');
     }
 
-    for (const wf of data.task_workflows) {
+    for (const wf of workflows) {
       const taskDir = path.join(basePath, `task-${wf.task_id}`);
       await fs.mkdir(taskDir, { recursive: true });
 
       const filePath = path.join(taskDir, 'implementation.lobster.yaml');
-      await fs.writeFile(filePath, wf.workflow_yaml);
+      await fs.writeFile(filePath, asText(wf.workflow_yaml));
       paths.push(filePath);
     }
   } else if (type === 'docs') {
-    const data = input as { task_docs: DocEntry[] };
-    if (!data.task_docs || !Array.isArray(data.task_docs)) {
-      throw new Error('Expected { task_docs: [...] } for --type docs');
+    const docs = asArray<DocEntry>(input, ['task_docs', 'docs']);
+    if (!docs) {
+      throw new Error('Expected docs array (task_docs/docs or raw array) for --type docs');
     }
 
-    for (const doc of data.task_docs) {
+    for (const doc of docs) {
       const taskDir = path.join(basePath, `task-${doc.task_id}`);
       await fs.mkdir(taskDir, { recursive: true });
 
       const files: [string, string][] = [
-        ['task.md', doc.task_md],
-        ['decisions.md', doc.decisions_md],
-        ['acceptance.md', doc.acceptance_md],
+        ['task.md', asText(doc.task_md)],
+        ['decisions.md', asText(doc.decisions_md)],
+        ['acceptance.md', asText(doc.acceptance_md)],
       ];
 
       for (const [name, content] of files) {
@@ -84,26 +105,26 @@ export async function writeFiles(
       }
     }
   } else {
-    const data = input as { task_prompts: PromptEntry[] };
-    if (!data.task_prompts || !Array.isArray(data.task_prompts)) {
-      throw new Error('Expected { task_prompts: [...] } for --type prompts');
+    const prompts = asArray<PromptEntry>(input, ['task_prompts', 'prompts']);
+    if (!prompts) {
+      throw new Error('Expected prompts array (task_prompts/prompts or raw array) for --type prompts');
     }
 
-    for (const prompt of data.task_prompts) {
+    for (const prompt of prompts) {
       const taskDir = path.join(basePath, `task-${prompt.task_id}`);
       await fs.mkdir(taskDir, { recursive: true });
 
-      await fs.writeFile(path.join(taskDir, 'prompt.md'), prompt.prompt_md);
+      await fs.writeFile(path.join(taskDir, 'prompt.md'), asText(prompt.prompt_md));
       paths.push(path.join(taskDir, 'prompt.md'));
 
-      await fs.writeFile(path.join(taskDir, 'prompt.xml'), prompt.prompt_xml);
+      await fs.writeFile(path.join(taskDir, 'prompt.xml'), asText(prompt.prompt_xml));
       paths.push(path.join(taskDir, 'prompt.xml'));
 
       if (prompt.subtasks && prompt.subtasks.length > 0) {
         for (const st of prompt.subtasks) {
           const stDir = path.join(taskDir, 'subtasks', `task-${prompt.task_id}.${st.subtask_id}`);
           await fs.mkdir(stDir, { recursive: true });
-          await fs.writeFile(path.join(stDir, 'prompt.md'), st.prompt_md);
+          await fs.writeFile(path.join(stDir, 'prompt.md'), asText(st.prompt_md));
           paths.push(path.join(stDir, 'prompt.md'));
         }
       }

@@ -1,0 +1,12 @@
+{
+  "project_name": "mockup-led-redesign",
+  "design_mode": "ingest_plus_stitch",
+  "design_prompt": "Use supplied sketch and mockup to modernize conversion-focused page flow.",
+  "design_artifacts_path": "intake/tests/fixtures/mockups",
+  "design_urls": [],
+  "include_codebase": false,
+  "expected_has_frontend": true,
+  "expected_frontend_targets": [
+    "web"
+  ]
+}

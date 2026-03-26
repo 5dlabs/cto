@@ -40,6 +40,29 @@ notifications with intelligent routing, rate limiting, and user preferences.
 
 An `architecture.md` file with service topology, data flows, infrastructure CRDs, security model, and observability strategy. AlertHub's is 693 lines covering every service boundary, API contract, Effect pattern, and Kubernetes resource definition.
 
+### Optional: Design Inputs (V1)
+
+Design intake accepts any combination of:
+
+- `design_prompt` - freeform design intent or UX goals
+- `design_artifacts_path` - relative path to sketches/mockups/assets
+- `design_urls` - existing site/app URLs for modernization context
+- `design_mode` - `ingest_only` or `ingest_plus_stitch` (default)
+
+Materialized outputs are written to:
+
+```
+.intake/design/
+├── design-context.json
+├── assets/
+├── crawled/urls.json
+└── stitch/
+    ├── stitch-run.json
+    └── candidates.json
+```
+
+When frontend is not detected (`hasFrontend=false`), intake preserves artifacts/URLs but skips Stitch generation.
+
 ### Pipeline Configuration
 
 ```json
@@ -48,7 +71,10 @@ An `architecture.md` file with service topology, data flows, infrastructure CRDs
   "num_tasks": 30,
   "deliberate": true,
   "include_codebase": false,
-  "generate_ai_prompts": true
+  "generate_ai_prompts": true,
+  "design_mode": "ingest_plus_stitch",
+  "design_prompt": "Modernize UI and improve conversion",
+  "design_urls": ["https://sigma1.led.video/"]
 }
 ```
 
@@ -121,6 +147,35 @@ Claude Opus synthesizes the debate result + original PRD into a **Design Brief**
 
 ---
 
+### Phase 0.5: Design Intake *(new, required when Stitch mode is enabled)*
+
+Runs immediately after PRD materialization in `pipeline.lobster.yaml`.
+
+1. Copies local design artifacts into `.intake/design/assets/`
+2. Normalizes URL inputs and crawls basic page metadata into `.intake/design/crawled/urls.json`
+3. Detects frontend scope and targets (`web`, `mobile`, `desktop`)
+4. Enforces a Stitch credential gate when `design_mode=ingest_plus_stitch`:
+   - Requires `STITCH_API_KEY`
+   - Emits credential discovery state (`STITCH_API_KEY`, `STITCH_PROJECT_ID`, `STITCH_ACCESS_TOKEN`, `GOOGLE_CLOUD_PROJECT`) to `.intake/design/auth-discovery.json`
+   - Fails fast with explicit gate output if required auth is missing
+5. If enabled and credentials exist, generates Stitch candidates and saves:
+   - `.intake/design/stitch/stitch-run.json`
+   - `.intake/design/stitch/candidates.json`
+6. Writes canonical `.intake/design/design-context.json` for downstream steps
+7. Saves a committed design bundle under `.tasks/design/`:
+   - `design-context.json`
+   - `crawled/urls.json` (when available)
+   - `stitch/stitch-run.json`, `stitch/candidates.json` (when available)
+   - `auth-discovery.json`
+   - `manifest.json`
+8. Persists a design snapshot to bridge SQLite history for audit/evidence reporting
+
+`design-context.json` is threaded into both deliberation and parse-prd task generation.
+
+If credential discovery in OnePass fails, provision or rotate `STITCH_API_KEY` and re-run preflight before starting the pipeline.
+
+---
+
 ### Phase 2: Task Generation *(always runs)*
 
 **Workflow**: `intake.lobster.yaml`
@@ -142,15 +197,15 @@ Each parsed task includes:
   "dependencies": [10, 11],
   "priority": "high",
   "details": "1. Create POST /api/v1/notifications endpoint\n2. Add request validation...",
-  "testStrategy": "Can submit valid notifications and receive 202 Accepted...",
-  "decisionPoints": [
+  "test_strategy": "Can submit valid notifications and receive 202 Accepted...",
+  "decision_points": [
     {
       "id": "d12",
       "category": "api-design",
       "description": "Request validation strategy",
       "options": ["serde with custom validators", "tower middleware", "axum extractors"],
-      "requiresApproval": false,
-      "constraintType": "soft"
+      "requires_approval": false,
+      "constraint_type": "soft"
     }
   ]
 }
@@ -410,7 +465,7 @@ Single JSON file with all tasks and metadata, used by the task orchestrator to s
       "priority": "high",
       "status": "pending",
       "subtasks": [],
-      "testStrategy": "Cluster is accessible via kubectl..."
+      "test_strategy": "Cluster is accessible via kubectl..."
     }
   ]
 }
@@ -474,6 +529,7 @@ The core output contract is preserved:
 | **Repomix** | MCP tool | Pack existing codebase for analysis |
 | **OctoCode** | MCP tool | GitHub code search fallback |
 | **Tavily** | Research via intake-agent MCP | Pre-debate evidence gathering |
+| **Stitch SDK** | `@google/stitch-sdk` (TypeScript) | Optional UI candidate generation from design intake |
 
 ---
 
@@ -511,4 +567,27 @@ Output:
   .tasks/tasks/tasks.json ... 30 tasks, 25KB
   Total files ............... ~250+ (tasks + subtasks + prompts)
   GitHub PR ................. Ready for review → triggers agent implementation
+```
+
+---
+
+## Stitch Authentication and Runtime Notes
+
+For `design_mode=ingest_plus_stitch`, set:
+
+- `STITCH_API_KEY`
+
+The pipeline now enforces a hard gate on this credential in preflight materialization. If missing, the run fails before deliberation/tasking.
+
+### Sigma-1 example invocation
+
+```bash
+lobster run --mode tool intake/workflows/pipeline.lobster.yaml --args-json '{
+  "project_name": "sigma-1",
+  "prd_path": ".intake/run-prd.txt",
+  "include_codebase": true,
+  "design_mode": "ingest_plus_stitch",
+  "design_prompt": "Improve existing site design while preserving brand tone",
+  "design_urls": "https://sigma1.led.video/"
+}'
 ```

@@ -75,7 +75,10 @@ impl Subscriber {
             .map_err(|e| Error::GrpcTransport(e.to_string()))?;
 
         let program_ids = self.registry.all_program_ids();
-        tracing::info!(program_count = program_ids.len(), "subscribing to DEX programs");
+        tracing::info!(
+            program_count = program_ids.len(),
+            "subscribing to DEX programs"
+        );
 
         let request = SubscribeRequest {
             transactions: HashMap::from([(

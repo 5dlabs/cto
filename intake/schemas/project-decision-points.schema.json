@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "project-decision-points.schema.json",
+  "title": "ProjectDecisionPoints",
+  "description": "Project-level decision points extracted from a PRD and its task decomposition. Each decision point represents a strategic choice between fundamentally different approaches, mapped to the tasks it affects.",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/project_decision_point"
+  },
+  "$defs": {
+    "project_decision_point": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier (dp-1, dp-2, ...)"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "architecture",
+            "language-runtime",
+            "service-topology",
+            "platform-choice",
+            "build-vs-buy",
+            "data-model",
+            "api-design",
+            "ux-behavior",
+            "security"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "description": "Clear description of the decision that needs to be made"
+        },
+        "options": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 2,
+          "description": "At least two concrete alternative approaches"
+        },
+        "requires_approval": {
+          "type": "boolean",
+          "description": "Whether a human must explicitly approve before proceeding"
+        },
+        "constraint_type": {
+          "type": "string",
+          "enum": ["hard", "soft", "open", "escalation"]
+        },
+        "affected_tasks": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "description": "Task IDs from the decomposition that this decision impacts"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Why this is a genuine strategic decision, not an implementation detail"
+        }
+      },
+      "required": [
+        "id",
+        "category",
+        "description",
+        "options",
+        "requires_approval",
+        "constraint_type",
+        "affected_tasks",
+        "rationale"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

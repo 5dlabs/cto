@@ -1,0 +1,48 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: twingate-connector
+  namespace: twingate
+  labels:
+    app: twingate-connector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: twingate-connector
+  template:
+    metadata:
+      labels:
+        app: twingate-connector
+    spec:
+      containers:
+        - name: connector
+          image: twingate/connector:1
+          imagePullPolicy: Always
+          env:
+            - name: TWINGATE_URL
+              value: "https://turquoiseelephant631.twingate.com"
+            - name: TWINGATE_LOG_LEVEL
+              value: "3"
+            - name: TWINGATE_LABEL_DEPLOYED_BY
+              value: kubectl
+            - name: TWINGATE_LABEL_CLUSTER
+              value: trading
+          envFrom:
+            - secretRef:
+                name: twingate-connector-tokens
+          livenessProbe:
+            exec:
+              command:
+                - /connectorctl
+                - health
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

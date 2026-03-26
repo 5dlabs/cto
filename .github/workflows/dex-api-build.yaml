@@ -1,0 +1,64 @@
+---
+name: DEX API Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/dex-indexer/**'
+      - 'skills/trader/docker/Dockerfile.dex-api'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: 5dlabs
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: [k8s-runner]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98 # v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --release -p dex-indexer --bin dex-api
+
+      - name: Prepare build context
+        run: cp target/release/dex-api .
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+        with:
+          driver-opts: network=host
+          buildkitd-config: ./infra/buildkitd.toml
+
+      - name: Build and push image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
+        with:
+          context: .
+          file: skills/trader/docker/Dockerfile.dex-api
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          sbom: false
+          network: host
+          allow: network.host
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/dex-api:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/dex-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

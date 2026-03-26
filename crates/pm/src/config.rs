@@ -49,7 +49,7 @@ impl std::str::FromStr for ScmProvider {
 pub struct ScmConfig {
     /// Active provider (override via `CTO_SCM_PROVIDER` env var).
     pub provider: ScmProvider,
-    /// Hostname of the SCM (e.g. `github.com` or `git.5dlabs.ai`).
+    /// Hostname of the SCM (e.g. `github.com` or `gitlab.5dlabs.ai`).
     pub host: String,
     /// Base URL for REST API calls.
     pub api_base: String,
@@ -95,12 +95,10 @@ impl ScmConfig {
             },
             ScmProvider::GitLab => Self {
                 provider,
-                host: env::var("GITLAB_HOST")
-                    .unwrap_or_else(|_| "git.5dlabs.ai".to_string()),
+                host: env::var("GITLAB_HOST").unwrap_or_else(|_| "gitlab.5dlabs.ai".to_string()),
                 api_base: env::var("GITLAB_API_BASE")
-                    .unwrap_or_else(|_| "https://git.5dlabs.ai/api/v4".to_string()),
-                org_or_group: env::var("GITLAB_GROUP")
-                    .unwrap_or_else(|_| "5dlabs".to_string()),
+                    .unwrap_or_else(|_| "https://gitlab.5dlabs.ai/api/v4".to_string()),
+                org_or_group: env::var("GITLAB_GROUP").unwrap_or_else(|_| "5dlabs".to_string()),
                 registry: env::var("GITLAB_REGISTRY")
                     .unwrap_or_else(|_| "registry.5dlabs.ai/5dlabs".to_string()),
                 token: env::var("GITLAB_TOKEN").ok().filter(|s| !s.is_empty()),

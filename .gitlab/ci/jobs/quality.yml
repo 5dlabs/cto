@@ -1,0 +1,75 @@
+# Code quality jobs
+# Replaces: code-quality.yaml from GitHub Actions
+
+duplicate-detection:
+  stage: quality
+  image: node:20
+  script:
+    - npm install -g jscpd
+    - jscpd apps/web/src --reporters console || true
+    - jscpd apps/website/src --reporters console || true
+  artifacts:
+    paths:
+      - jscpd-report/
+    expire_in: 30 days
+    when: always
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - apps/web/src/**
+        - apps/website/src/**
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  tags:
+    - k8s
+
+tech-debt-tracker:
+  stage: quality
+  image: alpine:latest
+  script:
+    - apk add --no-cache grep coreutils
+    - |
+      echo "# Tech Debt Report" > tech-debt-report.md
+      echo "Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> tech-debt-report.md
+
+      TODO_COUNT=$(grep -r --include="*.ts" --include="*.tsx" --include="*.rs" \
+        -E "(TODO|FIXME|HACK|XXX)" . 2>/dev/null \
+        | grep -v node_modules | grep -v target | grep -v .next | wc -l | tr -d ' ')
+      echo "Total tech debt markers: $TODO_COUNT"
+
+      echo "## Summary" >> tech-debt-report.md
+      echo "- **Total markers:** $TODO_COUNT" >> tech-debt-report.md
+
+      RS_COUNT=$(grep -r --include="*.rs" -E "(TODO|FIXME|HACK|XXX)" . 2>/dev/null | grep -v target | wc -l | tr -d ' ')
+      TS_COUNT=$(grep -r --include="*.ts" --include="*.tsx" -E "(TODO|FIXME|HACK|XXX)" . 2>/dev/null \
+        | grep -v node_modules | grep -v .next | wc -l | tr -d ' ')
+      echo "## By File Type" >> tech-debt-report.md
+      echo "- Rust (.rs): $RS_COUNT" >> tech-debt-report.md
+      echo "- TypeScript (.ts/.tsx): $TS_COUNT" >> tech-debt-report.md
+  artifacts:
+    paths:
+      - tech-debt-report.md
+    expire_in: 90 days
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  tags:
+    - k8s
+
+intake-step-tests:
+  stage: quality
+  image: oven/bun:1
+  script:
+    - cd apps/intake-util && bun install
+    - cd $CI_PROJECT_DIR
+    - bash intake/tests/step-tests.sh
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - intake/**
+        - apps/intake-util/**
+        - apps/intake-agent/**
+    - if: $CI_PIPELINE_SOURCE == "web"
+  tags:
+    - k8s

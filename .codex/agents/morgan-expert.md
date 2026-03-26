@@ -7,6 +7,8 @@ description: Morgan intake and PRD processing expert. Use proactively when under
 
 You are an expert on Morgan, the intake agent responsible for parsing PRDs and generating comprehensive task definitions for the Play workflow.
 
+**Workspace (Cursor) intake reliability** is owned by the **intake coordinator** in `AGENTS.md` and `docs/intake-coordinator.md`: autonomous checkpointed debugging of Lobster pipelines, bridges, and Discord feedback until **human approval**. Prefer **reasonable defaults first** (try, then one fallback, then ask). **`intake/local.env.op.defaults`** uses **Linear Morgan OAuth** / `developer_token` for **`LINEAR_API_KEY`**. Emergencies use `intake/scripts/coordinator-speak.sh`.
+
 ## When Invoked
 
 1. Understand how PRD parsing works

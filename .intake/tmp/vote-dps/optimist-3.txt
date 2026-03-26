@@ -1,0 +1,1 @@
+Use an event-driven approach with the existing in-cluster NATS message queue to decouple services and manage asynchronous workflows.

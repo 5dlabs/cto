@@ -4,8 +4,8 @@
 # Provider selected via CTO_SCM_PROVIDER (default: github).
 
 SCM_PROVIDER="${CTO_SCM_PROVIDER:-github}"
-SCM_GITLAB_HOST="${GITLAB_HOST:-git.5dlabs.ai}"
-SCM_GITLAB_API="${GITLAB_API_BASE:-https://git.5dlabs.ai/api/v4}"
+SCM_GITLAB_HOST="${GITLAB_HOST:-gitlab.5dlabs.ai}"
+SCM_GITLAB_API="${GITLAB_API_BASE:-https://gitlab.5dlabs.ai/api/v4}"
 
 scm_create_repo() {
   local full_name="$1" visibility="$2" description="${3:-}"

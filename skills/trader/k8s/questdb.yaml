@@ -1,0 +1,152 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: questdb
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: questdb
+  namespace: questdb
+  labels:
+    app: questdb
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 9000
+      targetPort: 9000
+      protocol: TCP
+    - name: pg
+      port: 8812
+      targetPort: 8812
+      protocol: TCP
+    - name: ilp
+      port: 9009
+      targetPort: 9009
+      protocol: TCP
+    - name: health
+      port: 9003
+      targetPort: 9003
+      protocol: TCP
+  selector:
+    app: questdb
+---
+# NodePort for direct access from solana-rpc-01 (ILP ingest path)
+apiVersion: v1
+kind: Service
+metadata:
+  name: questdb-nodeport
+  namespace: questdb
+  labels:
+    app: questdb
+spec:
+  type: NodePort
+  ports:
+    - name: ilp
+      port: 9009
+      targetPort: 9009
+      nodePort: 30009
+      protocol: TCP
+    - name: pg
+      port: 8812
+      targetPort: 8812
+      nodePort: 30812
+      protocol: TCP
+    - name: http
+      port: 9000
+      targetPort: 9000
+      nodePort: 30900
+      protocol: TCP
+  selector:
+    app: questdb
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: questdb
+  namespace: questdb
+  labels:
+    app: questdb
+spec:
+  replicas: 1
+  serviceName: questdb
+  selector:
+    matchLabels:
+      app: questdb
+  template:
+    metadata:
+      labels:
+        app: questdb
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: db-01
+      containers:
+        - name: questdb
+          image: questdb/questdb:8.2.3
+          ports:
+            - name: http
+              containerPort: 9000
+            - name: pg
+              containerPort: 8812
+            - name: ilp
+              containerPort: 9009
+            - name: health
+              containerPort: 9003
+          env:
+            - name: QDB_HTTP_ENABLED
+              value: "true"
+            - name: QDB_PG_ENABLED
+              value: "true"
+            - name: QDB_LINE_TCP_ENABLED
+              value: "true"
+            # Performance tuning for time-series ingest
+            - name: QDB_SHARED_WORKER_COUNT
+              value: "4"
+            - name: QDB_LINE_TCP_WRITER_WORKER_COUNT
+              value: "2"
+            - name: QDB_LINE_TCP_IO_WORKER_COUNT
+              value: "2"
+            - name: QDB_PG_WORKER_COUNT
+              value: "2"
+            - name: QDB_CAIRO_SQL_COPY_WORKER_COUNT
+              value: "2"
+            # WAL mode for concurrent writes
+            - name: QDB_CAIRO_WAL_ENABLED_DEFAULT
+              value: "true"
+            # Memory-mapped I/O page size (256MB for NVMe)
+            - name: QDB_CAIRO_SQL_JIT_MODE
+              value: "on"
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 9003
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: 9003
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: "2"
+              memory: 16Gi
+            limits:
+              cpu: "4"
+              memory: 32Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/questdb
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 200Gi

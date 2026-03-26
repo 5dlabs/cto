@@ -1,0 +1,32 @@
+# One-shot: free gossip port 8001 on the Solana host after a stuck hostNetwork pod.
+# Apply, wait for Completed, delete. Not part of normal GitOps — use when "Address already in use" on 8001.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: agave-port-8001-cleanup
+  namespace: solana
+spec:
+  hostNetwork: true
+  hostPID: true
+  nodeName: solana-rpc-01
+  restartPolicy: Never
+  containers:
+    - name: cleanup
+      image: alpine:3.19
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -e
+          apk add --no-cache lsof >/dev/null 2>&1 || true
+          echo "Before:"
+          lsof -i :8001 2>/dev/null || echo "(none or lsof missing)"
+          PIDS=$(lsof -t -i :8001 2>/dev/null || true)
+          for p in $PIDS; do
+            echo "kill -9 $p"
+            kill -9 "$p" 2>/dev/null || true
+          done
+          sleep 2
+          echo "After:"
+          lsof -i :8001 2>/dev/null || echo "port 8001 appears free"
+      securityContext:
+        privileged: true

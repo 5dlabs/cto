@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "quality-gate.schema.json",
+  "title": "QualityGateResult",
+  "type": "object",
+  "properties": {
+    "pass": { "type": "boolean" },
+    "score": { "type": "integer", "minimum": 0, "maximum": 10 },
+    "summary": { "type": "string" },
+    "blocking_issues": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["pass", "score", "summary", "blocking_issues", "warnings"],
+  "additionalProperties": false
+}

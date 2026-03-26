@@ -1,0 +1,5 @@
+[
+  {"task_id": 1, "task_md": "# Task 1: Equipment Catalog Service\n\nBuild a Rust/Axum API serving 533+ products.", "decisions_md": "## Decisions\n\n- Use PostgreSQL for product storage\n- CDN via R2 for images", "acceptance_md": "## Acceptance Criteria\n\n- [ ] GET /api/v1/catalog/products returns paginated list\n- [ ] Availability check responds < 500ms"},
+  {"task_id": 2, "task_md": "# Task 2: Rental Management System\n\nGo/gRPC service replacing Current RMS.", "decisions_md": "## Decisions\n\n- gRPC with grpc-gateway for REST compatibility", "acceptance_md": "## Acceptance Criteria\n\n- [ ] Opportunity lifecycle works end-to-end\n- [ ] Barcode scanning triggers correct inventory transactions"},
+  {"task_id": 3, "task_md": "# Task 3: Finance Service\n\nRust/Axum invoicing and payments.", "decisions_md": "## Decisions\n\n- Stripe for payment processing\n- Multi-currency with daily rate sync", "acceptance_md": "## Acceptance Criteria\n\n- [ ] Invoice generation from project completes < 5s\n- [ ] Stripe webhook handles payment confirmation"}
+]

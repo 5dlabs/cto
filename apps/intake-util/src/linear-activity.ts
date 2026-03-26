@@ -1,11 +1,13 @@
 /**
  * linear-activity — Direct Linear Agent API activity creation.
- * Supports: thought, action, elicitation, response, error
+ * Supports CLI aliases: thought, plan, action, elicitation, response, error
+ * and normalizes to Linear-supported content types.
  */
 
 const LINEAR_API_URL = 'https://api.linear.app/graphql';
 
-type ActivityType = 'thought' | 'action' | 'elicitation' | 'response' | 'error';
+type ActivityType = 'thought' | 'plan' | 'action' | 'elicitation' | 'response' | 'error';
+type LinearContentType = 'action' | 'elicitation' | 'response' | 'error';
 
 interface LinearActivityArgs {
   sessionId: string;
@@ -38,8 +40,13 @@ export async function linearActivity(args: LinearActivityArgs): Promise<{ id: st
   const apiKey = process.env['LINEAR_API_KEY'];
   if (!apiKey) throw new Error('LINEAR_API_KEY not set');
 
+  const normalizedType: LinearContentType = (() => {
+    if (args.type === 'thought' || args.type === 'plan') return 'response';
+    return args.type;
+  })();
+
   let content: Record<string, string>;
-  if (args.type === 'action') {
+  if (normalizedType === 'action') {
     content = {
       type: 'action',
       action: args.action ?? 'Processing',
@@ -47,7 +54,7 @@ export async function linearActivity(args: LinearActivityArgs): Promise<{ id: st
       ...(args.result ? { result: args.result } : {}),
     };
   } else {
-    content = { type: args.type, body: args.body };
+    content = { type: normalizedType, body: args.body };
   }
 
   const input: Record<string, unknown> = {

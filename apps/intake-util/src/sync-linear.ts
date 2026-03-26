@@ -8,6 +8,8 @@
  * Uses direct fetch to Linear GraphQL API (LINEAR_API_KEY env var).
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
 import type { GeneratedTask } from './types';
 
 const LINEAR_API_URL = 'https://api.linear.app/graphql';
@@ -67,6 +69,13 @@ export interface SyncIssueEntry {
 
 export interface SyncIssuesResult {
   issueCount: number;
+  parentIssueId?: string;
+  parentIssueIdentifier?: string;
+  taskIssueCount?: number;
+  subtaskIssueCount?: number;
+  assignedIssueCount?: number;
+  unassignedIssueCount?: number;
+  unresolvedAgents?: string[];
   issues: SyncIssueEntry[];
 }
 
@@ -346,22 +355,67 @@ export interface SyncIssuesOptions {
   prdIssueId: string;
   teamId: string;
   baseUrl: string;
+  prUrl?: string;
   agentMap: Record<string, string>;
   apiKey: string;
 }
 
 function extractAgent(task: GeneratedTask): string {
-  if (task.agent) return task.agent.toLowerCase();
-  const match = task.title.match(/\((\w+)\s*-/);
-  if (match) return match[1].toLowerCase();
-  return 'unknown';
+  const normalize = (value: string): string => {
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/^5d-labs-/, '')
+      .replace(/^5dlabs-/, '')
+      .replace(/[^a-z0-9_-]/g, '');
+  };
+
+  if (task.agent && task.agent.trim().length > 0) {
+    const normalized = normalize(task.agent);
+    if (normalized.length > 0) return normalized;
+  }
+
+  // Common title formats:
+  //   [Bolt] Do thing
+  //   Bolt: Do thing
+  //   (Bolt - ...) Do thing
+  const bracketMatch = task.title.match(/^\[([^\]]+)\]/);
+  if (bracketMatch?.[1]) {
+    const normalized = normalize(bracketMatch[1]);
+    if (normalized.length > 0) return normalized;
+  }
+
+  const colonMatch = task.title.match(/^([A-Za-z0-9_-]+)\s*:/);
+  if (colonMatch?.[1]) {
+    const normalized = normalize(colonMatch[1]);
+    if (normalized.length > 0) return normalized;
+  }
+
+  const parenMatch = task.title.match(/\(([A-Za-z0-9_-]+)\s*-/);
+  if (parenMatch?.[1]) {
+    const normalized = normalize(parenMatch[1]);
+    if (normalized.length > 0) return normalized;
+  }
+
+  return 'morgan';
 }
 
 /**
  * Build the task issue body as acceptance criteria:
  * description, details, test strategy, subtask checklist, dependencies.
  */
-function buildTaskDescription(task: GeneratedTask, baseUrl: string): string {
+function readDocSnippet(filePath: string, maxChars: number): string {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8').trim();
+    if (!content) return '';
+    if (content.length <= maxChars) return content;
+    return `${content.slice(0, maxChars)}\n\n...[truncated]`;
+  } catch {
+    return '';
+  }
+}
+
+function buildTaskDescription(task: GeneratedTask, baseUrl: string, prUrl: string): string {
   const lines: string[] = [];
 
   // Acceptance criteria header
@@ -405,6 +459,27 @@ function buildTaskDescription(task: GeneratedTask, baseUrl: string): string {
     lines.push(`- [task.md](${baseUrl}/.tasks/docs/task-${task.id}/task.md)`);
   }
 
+  if (prUrl) {
+    lines.push('', `**PR:** ${prUrl}`);
+  }
+
+  const taskDocPath = path.join('.tasks', 'docs', `task-${task.id}`, 'task.md');
+  const acceptanceDocPath = path.join('.tasks', 'docs', `task-${task.id}`, 'acceptance.md');
+  const promptDocPath = path.join('.tasks', 'docs', `task-${task.id}`, 'prompt.md');
+
+  const taskDoc = readDocSnippet(taskDocPath, 4000);
+  if (taskDoc) {
+    lines.push('', '## task.md (embedded)', '```markdown', taskDoc, '```');
+  }
+  const acceptanceDoc = readDocSnippet(acceptanceDocPath, 3000);
+  if (acceptanceDoc) {
+    lines.push('', '## acceptance.md (embedded)', '```markdown', acceptanceDoc, '```');
+  }
+  const promptDoc = readDocSnippet(promptDocPath, 2500);
+  if (promptDoc) {
+    lines.push('', '## prompt.md (embedded excerpt)', '```markdown', promptDoc, '```');
+  }
+
   return lines.join('\n');
 }
 
@@ -416,6 +491,7 @@ function buildSubtaskDescription(
   taskId: number,
   baseUrl: string,
   parentTask: GeneratedTask,
+  prUrl: string,
 ): string {
   const lines: string[] = [];
 
@@ -436,6 +512,15 @@ function buildSubtaskDescription(
     lines.push('', '---');
     lines.push(`**Prompt:** [prompt.md](${baseUrl}/.tasks/docs/task-${taskId}/subtasks/task-${subtask.id}/prompt.md)`);
   }
+  if (prUrl) {
+    lines.push(`**PR:** ${prUrl}`);
+  }
+
+  const subtaskPromptPath = path.join('.tasks', 'docs', `task-${taskId}`, 'subtasks', `task-${subtask.id}`, 'prompt.md');
+  const subtaskPrompt = readDocSnippet(subtaskPromptPath, 2500);
+  if (subtaskPrompt) {
+    lines.push('', '## prompt.md (embedded excerpt)', '```markdown', subtaskPrompt, '```');
+  }
 
   return lines.join('\n');
 }
@@ -447,7 +532,7 @@ const PRIORITY_MAP: Record<string, number> = {
 };
 
 export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssuesResult> {
-  const { tasks, projectId, prdIssueId, baseUrl, agentMap, apiKey } = opts;
+  const { tasks, projectId, prdIssueId, baseUrl, prUrl, agentMap, apiKey } = opts;
 
   // Resolve team key (e.g., "CTOPA") → UUID
   const teamId = await resolveTeamId(apiKey, opts.teamId);
@@ -465,29 +550,70 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
     return id;
   }
 
+  // Create one parent issue so Linear always has a visible root task
+  // with child tasks beneath it, even when subtasks are sparse.
+  interface IssueResponse {
+    issueCreate: { success: boolean; issue?: LinearIssue };
+  }
+
+  const parentInput: Record<string, unknown> = {
+    title: 'Main Implementation Task',
+    description: [
+      'Parent issue generated by intake.',
+      '',
+      'Child issues under this task represent the generated implementation task breakdown.',
+      `PRD issue id: ${prdIssueId}`,
+    ].join('\n'),
+    teamId,
+    projectId,
+  };
+  if (intakeLabelId) parentInput.labelIds = [intakeLabelId];
+
+  const parentIssueResp = await execute<IssueResponse>(
+    apiKey,
+    `mutation CreateIssue($input: IssueCreateInput!) {
+      issueCreate(input: $input) {
+        success
+        issue { id identifier title url }
+      }
+    }`,
+    { input: parentInput },
+  );
+  if (!parentIssueResp.issueCreate.success || !parentIssueResp.issueCreate.issue) {
+    throw new Error('Failed to create parent implementation issue');
+  }
+  const parentIssue = parentIssueResp.issueCreate.issue;
+
   const issues: SyncIssueEntry[] = [];
+  const unresolvedAgents = new Set<string>();
+  let subtaskIssueCount = 0;
+  let assignedIssueCount = 0;
+  let unassignedIssueCount = 0;
 
   for (const task of tasks) {
     const agent = extractAgent(task);
     const agentLabelId = await getAgentLabelId(agent);
     const assigneeId = agentMap[agent] || undefined;
+    if (!assigneeId) {
+      unresolvedAgents.add(agent);
+      unassignedIssueCount += 1;
+    } else {
+      assignedIssueCount += 1;
+    }
 
     const labelIds = [intakeLabelId, agentLabelId].filter((id): id is string => id !== null);
 
     const issueInput: Record<string, unknown> = {
       title: `[${agent}] ${task.title}`,
-      description: buildTaskDescription(task, baseUrl),
+      description: buildTaskDescription(task, baseUrl, prUrl ?? ''),
       teamId,
       projectId,
+      parentId: parentIssue.id,
     };
     if (labelIds.length > 0) issueInput.labelIds = labelIds;
     if (assigneeId) issueInput.assigneeId = assigneeId;
     if (task.priority && PRIORITY_MAP[task.priority]) {
       issueInput.priority = PRIORITY_MAP[task.priority];
-    }
-
-    interface IssueResponse {
-      issueCreate: { success: boolean; issue?: LinearIssue };
     }
 
     // Helper: create issue, retrying without assigneeId if assignment fails
@@ -537,15 +663,21 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
       for (const subtask of task.subtasks) {
         const subtaskInput: Record<string, unknown> = {
           title: subtask.title,
-          description: buildSubtaskDescription(subtask, task.id, baseUrl, task),
+          description: buildSubtaskDescription(subtask, task.id, baseUrl, task, prUrl ?? ''),
           teamId,
           projectId,
           parentId: taskIssue.id,
         };
         if (intakeLabelId) subtaskInput.labelIds = [intakeLabelId];
-        if (assigneeId) subtaskInput.assigneeId = assigneeId;
+        if (assigneeId) {
+          subtaskInput.assigneeId = assigneeId;
+          assignedIssueCount += 1;
+        } else {
+          unassignedIssueCount += 1;
+        }
 
         const subtaskIssue = await createIssueWithFallback(subtaskInput);
+        subtaskIssueCount += 1;
 
         subtaskIssues.push({
           subtaskId: subtask.id,
@@ -564,7 +696,14 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
   }
 
   return {
-    issueCount: issues.length,
+    issueCount: issues.length + 1,
+    parentIssueId: parentIssue.id,
+    parentIssueIdentifier: parentIssue.identifier,
+    taskIssueCount: issues.length,
+    subtaskIssueCount,
+    assignedIssueCount,
+    unassignedIssueCount,
+    unresolvedAgents: [...unresolvedAgents].sort(),
     issues,
   };
 }

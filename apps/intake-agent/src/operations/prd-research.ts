@@ -15,6 +15,7 @@ import type { ResearchMemos } from '../types';
 import {
   exaSearch,
   perplexityAsk,
+  dataverseDeveloperSentiment,
   grokXQuery,
   firecrawlExtract,
   selectUrlsForDeepExtract,
@@ -213,7 +214,7 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
   // =========================================================================
   // Phase 1 — parallel searches across Exa, Perplexity, and Tavily
   // =========================================================================
-  console.error('[PRD-RESEARCH] Phase 1: launching parallel searches (Exa, Perplexity, Tavily, Grok/X)');
+  console.error('[PRD-RESEARCH] Phase 1: launching parallel searches (Exa, Perplexity, Tavily, Grok/X, Dataverse)');
 
   const [
     exaArchitecture,
@@ -222,6 +223,7 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
     tavilyBestPractices,
     tavilyFailureModes,
     xSentiment,
+    dataverseSentiment,
   ] = await Promise.all([
     // Exa: architecture patterns for tech stack
     exaSearch(`architecture patterns and best practices for ${techStack}`),
@@ -248,6 +250,9 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
       `Summarize the key opinions, experiences, gotchas, and recommendations. ` +
       `Include both positive experiences and complaints/warnings.`,
     ),
+
+    // Dataverse (macrocosmos): similar intent to Grok/X, but powered by SN13 search
+    dataverseDeveloperSentiment(techStack, domain),
   ]);
 
   console.error(
@@ -257,7 +262,8 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
     `Perplexity: ${perplexityAnalysis.length > 0 ? 'yes' : 'no'}, ` +
     `Tavily best practices: ${tavilyBestPractices.results.length}, ` +
     `Tavily failure modes: ${tavilyFailureModes.results.length}, ` +
-    `Grok/X: ${xSentiment.length > 0 ? 'yes' : 'no'}`,
+    `Grok/X: ${xSentiment.length > 0 ? 'yes' : 'no'}, ` +
+    `Dataverse: ${dataverseSentiment.length > 0 ? 'yes' : 'no'}`,
   );
 
   // =========================================================================
@@ -294,6 +300,10 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
   // Split X sentiment into optimist/pessimist halves
   const { optimistAnalysis: xOptimist, pessimistAnalysis: xPessimist } = splitPerplexityAnalysis(xSentiment);
 
+  // Split Dataverse sentiment into optimist/pessimist halves
+  const { optimistAnalysis: dvOptimist, pessimistAnalysis: dvPessimist } =
+    splitPerplexityAnalysis(dataverseSentiment);
+
   // Split Firecrawl results: those from architecture-ish URLs go to optimist,
   // postmortem-ish URLs go to pessimist, rest split evenly.
   const { optimistExtracts, pessimistExtracts } = splitFirecrawlResults(firecrawlResults);
@@ -329,6 +339,7 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
       `${techStack} best practices ${new Date().getFullYear()}`,
     ),
     formatPerplexitySection('Developer Sentiment on X — Positive', xOptimist),
+    formatPerplexitySection('Developer Sentiment on X — Positive (Dataverse)', dvOptimist),
     formatSection('Deep Extracts — Architecture Docs', 'Firecrawl', optimistExtracts),
   ].filter(Boolean);
 
@@ -345,6 +356,7 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
       `${domain} ${techStack} failure modes operational risks`,
     ),
     formatPerplexitySection('Developer Sentiment on X — Warnings', xPessimist),
+    formatPerplexitySection('Developer Sentiment on X — Warnings (Dataverse)', dvPessimist),
     formatSection('Deep Extracts — Postmortem Details', 'Firecrawl', pessimistExtracts),
   ].filter(Boolean);
 

@@ -825,8 +825,9 @@ pub fn deploy_argocd(kubeconfig: &Path) -> Result<()> {
         ],
     );
 
-    // LESSON LEARNED: Schedule ArgoCD on control plane to avoid cross-region API issues
-    println!("   Configuring ArgoCD for control plane scheduling...");
+    // Keep ArgoCD schedulable on workers. Pinning to control-plane can break
+    // kubelet->pod probes when network routing changes during CNI transitions.
+    println!("   Configuring ArgoCD scheduling defaults...");
     let deployments = [
         "argocd-server",
         "argocd-repo-server",
@@ -845,8 +846,8 @@ pub fn deploy_argocd(kubeconfig: &Path) -> Result<()> {
                 deployment,
                 "-n",
                 "argocd",
-                "--type=json",
-                "-p=[{\"op\": \"add\", \"path\": \"/spec/template/spec/tolerations\", \"value\": [{\"key\": \"node-role.kubernetes.io/control-plane\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]}, {\"op\": \"add\", \"path\": \"/spec/template/spec/nodeSelector\", \"value\": {\"node-role.kubernetes.io/control-plane\": \"\"}}]",
+                "--type=merge",
+                "-p={\"spec\":{\"template\":{\"spec\":{\"nodeSelector\":null,\"tolerations\":null}}}}",
             ],
         );
     }
@@ -860,10 +861,41 @@ pub fn deploy_argocd(kubeconfig: &Path) -> Result<()> {
             "argocd-application-controller",
             "-n",
             "argocd",
-            "--type=json",
-            "-p=[{\"op\": \"add\", \"path\": \"/spec/template/spec/tolerations\", \"value\": [{\"key\": \"node-role.kubernetes.io/control-plane\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]}, {\"op\": \"add\", \"path\": \"/spec/template/spec/nodeSelector\", \"value\": {\"node-role.kubernetes.io/control-plane\": \"\"}}]",
+            "--type=merge",
+            "-p={\"spec\":{\"template\":{\"spec\":{\"nodeSelector\":null,\"tolerations\":null}}}}",
         ],
     );
+
+    // On some Cilium-only clusters the app controller can time out on the
+    // in-cluster service IP (kubernetes.default.svc). Force a direct API
+    // endpoint fallback to keep ArgoCD healthy.
+    if let Ok(control_plane_ip) = kubectl(
+        kubeconfig,
+        &[
+            "get",
+            "nodes",
+            "-l",
+            "node-role.kubernetes.io/control-plane=",
+            "-o",
+            "jsonpath={.items[0].status.addresses[?(@.type==\"InternalIP\")].address}",
+        ],
+    ) {
+        let ip = control_plane_ip.trim();
+        if !ip.is_empty() {
+            let _ = kubectl(
+                kubeconfig,
+                &[
+                    "set",
+                    "env",
+                    "statefulset/argocd-application-controller",
+                    "-n",
+                    "argocd",
+                    &format!("KUBERNETES_SERVICE_HOST={ip}"),
+                    "KUBERNETES_SERVICE_PORT=6443",
+                ],
+            );
+        }
+    }
 
     // LESSON LEARNED: `kubectl wait` can fail with "no matching resources found"
     // immediately after applying manifests. Retry until pods exist or timeout.

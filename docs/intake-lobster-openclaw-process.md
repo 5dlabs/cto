@@ -68,6 +68,22 @@ Exact step names live in the YAML; a diagram lives in [`templates/skills/workflo
 
 **Lobster = orchestration DSL; OpenClaw = host + tools; `intake` = principal that may call `lobster` and `llm-task`.**
 
+### 4a. Pinned runtime (verify locally)
+
+| Piece | Expectation |
+|--------|-------------|
+| **Node** | **≥ 22** (OpenClaw current trees). |
+| **OpenClaw** | Install current stable globally, e.g. `npm install -g openclaw@latest`; optional `openclaw update --channel dev` for prerelease. This repo was smoke-tested with **OpenClaw 2026.3.13**. |
+| **`lobster` CLI** | [`@clawdbot/lobster`](https://www.npmjs.com/package/@clawdbot/lobster) on the **same host** as the gateway (e.g. `npx @clawdbot/lobster` or a global install). **npm `@latest`** was **2026.1.24** — there is no newer standalone CLI on npm today; keep it aligned with whatever OpenClaw bundles or documents. |
+| **Workflow file shape** | The parser in `@clawdbot/lobster` requires every step to have string **`id`** and **`command`**. Top-level **`inputs:`** lists are **not** substituted; use **`args:`** with `{ name: { default: … } }` and **`${arg_name}`** in commands. Sub-workflows are invoked with **`lobster run --mode tool "$WORKSPACE/.../child.lobster.yaml" --args-json "$(jq -n …)"`**. Prefer YAML literal **`command: \|`** (or explicit `\` continuation) for multi-line shell — folded **`command: >`** turns newlines into spaces and can break `python3 multiline -c`, line-broken CLIs, and `if`/`fi` blocks. |
+| **Bulk migration** | [`intake/scripts/lobster_native_convert.py`](../intake/scripts/lobster_native_convert.py) can migrate CTO-style templates (`${{ steps.* }}`, `workflow:` + `inputs:`) toward the native shape; **nested workflows** should pass prior-step JSON via **step `env:`** (e.g. `CTO_*`) so Lobster does not splice raw JSON into `/bin/sh -lc` (see [`pipeline.lobster.yaml`](../intake/workflows/pipeline.lobster.yaml)). LLM steps should build `openclaw.invoke --args-json` with **`jq --rawfile`** from `$WORKSPACE/intake/prompts` (see [`voting.lobster.yaml`](../intake/workflows/voting.lobster.yaml)). |
+| **`intake-util` on PATH** | Prefer a **fresh** build from [`apps/intake-util`](../apps/intake-util) (`bun run build`) and prepend that directory to `PATH` so shell steps do not pick up a stale global binary. See [`intake-local-prereqs.md`](intake-local-prereqs.md). |
+| **Linear secrets** | `LINEAR_API_KEY` may be a **`lin_api_` key** or an **OAuth access token** (injected via 1Password, etc.); see [`sync-linear.ts`](../apps/intake-util/src/sync-linear.ts) for the Authorization header rule. Ensure the gateway child inherits the variable. |
+
+Official references: [Lobster / workflow files](https://docs.openclaw.ai/tools/lobster#workflow-files-lobster), [LLM task](https://docs.openclaw.ai/tools/llm-task).
+
+**Quick verify:** run [`intake/scripts/verify-lobster-openclaw.sh`](../intake/scripts/verify-lobster-openclaw.sh) on the gateway host (Node, OpenClaw, lobster PATH, and `openclaw-llm-task.json` shape).
+
 ---
 
 ## 5. Deliberation vs intake vs committee (conceptual)
@@ -82,14 +98,15 @@ These are **stages inside** `pipeline.lobster.yaml`, not separate one-off script
 
 ## 6. Local run vs sigma-1-shaped repo
 
-**Environment and secrets:** see the focused checklist in [`intake-local-prereqs.md`](intake-local-prereqs.md) (`WORKSPACE`, `LINEAR_API_KEY`, `LINEAR_BRIDGE_URL`, optional skip flags, Argo CD).
+**Environment and secrets:** see [`intake-local-prereqs.md`](intake-local-prereqs.md) (`WORKSPACE`, `LINEAR_API_KEY`, `LINEAR_BRIDGE_URL`, optional skip flags, Argo CD). For **`kubectl`** steps in the pipeline, use the **OVH cluster** context where CTO and OpenClaw agents run—not an arbitrary kube context.
 
 For local testing toward [`5dlabs/sigma-1`](https://github.com/5dlabs/sigma-1):
 
 1. Clone sigma-1 (or use mono-repo paths) so the workflow’s working directory and `repository_url` / PRD paths match what you pass in JSON.
 2. Start **OpenClaw gateway** locally (see [`docs/openclaw-local-setup.md`](openclaw-local-setup.md)).
 3. From the **CTO repo** (or wherever workflow files resolve), run **`openclaw.invoke --workflow pipeline.lobster.yaml`** with stdin JSON analogous to the `jq -n` block in Morgan’s template: at minimum `prd_content`, `project_name`, `num_tasks`, `deliberate`, `include_codebase`, `repository_url`, `pr_base_branch`, and optional `intake_metadata` / Linear fields if steps need them.
-4. Confirm artifacts under `.tasks/` (and any PR/commit steps your local git auth allows).
+4. **Sigma-1 / full surface:** after the graph runs cleanly with `deliberate: false`, re-invoke the intake agent with **`deliberate: true`** (and the same PRD/repo inputs). Watch **#intake** / NATS / Discord if those bridges are enabled; expect longer runtimes and stricter env (see [`intake-local-prereqs.md`](intake-local-prereqs.md)).
+5. Confirm artifacts under `.tasks/` (and any PR/commit steps your local git auth allows).
 
 **Verify:** step completion, model allowlist, fan-out—**not** “did CodeRun schedule.”
 
@@ -109,6 +126,7 @@ For local testing toward [`5dlabs/sigma-1`](https://github.com/5dlabs/sigma-1):
 - [ ] OpenClaw local config includes **`intake`** with **`lobster`** + **`llm-task`** (merge or point at `intake/config/openclaw-llm-task.json` as your source of truth).
 - [ ] `pipeline.lobster.yaml` resolves from your cwd or OpenClaw workflow path.
 - [ ] PRD + flags JSON matches what the workflow expects for sigma-1.
+- [ ] **`kubectl`** context is the **OVH / CTO** cluster (see prereqs doc), if you rely on `build-infra-context` / `discover-tools`.
 - [ ] Optional: deliberation / Discord / NATS only if you are testing those steps locally.
 
 **Production (later)**

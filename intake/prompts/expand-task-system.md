@@ -22,23 +22,10 @@ Break down the provided task into subtasks. Each subtask must do exactly ONE thi
 
 # Single-Concern Rule
 
-Each subtask MUST do exactly ONE thing. Check for violations:
-
-**Bad — MUST SPLIT:**
-- "Deploy PostgreSQL, MongoDB, Redis" → 3 subtasks (one per database)
-- "Deploy Kafka and RabbitMQ" → 2 subtasks (one per broker)
-- "Configure namespaces, policies, and quotas" → 3 subtasks (one per concern)
-
-**Violation patterns to catch:**
-- Multiple operator or technology names (CloudNative-PG AND Percona AND Strimzi)
-- The word "and" connecting different systems
-- Multiple CRD types in one subtask
-- Parenthetical lists of different technologies
-
-**Good — single concern:**
-- "Deploy PostgreSQL Cluster" — one database, one subtask
-- "Configure Network Policies" — one concern, one subtask
-- "Implement user registration endpoint" — one endpoint, one subtask
+Each subtask MUST do exactly ONE thing. Split when you see:
+- Multiple technologies ("Deploy PostgreSQL, Redis" → 2 subtasks)
+- "and" connecting different systems ("Kafka and RabbitMQ" → 2 subtasks)
+- Multiple CRD types or operator names in one subtask
 
 # Output Schema
 
@@ -52,7 +39,7 @@ Each subtask must include ALL fields:
   "dependencies": [subtask_ids],
   "details": "Step-by-step implementation guidance (minimum 20 characters)",
   "status": "pending",
-  "testStrategy": "How to verify this subtask is complete"
+  "test_strategy": "How to verify this subtask is complete"
 }
 ```
 
@@ -80,25 +67,11 @@ Each parent task has an `agent` field indicating the responsible agent (e.g., `"
 - **blaze**: React components, Next.js pages
 - **cipher**: Security audits, RBAC policies, secret management
 
-## Infrastructure Task Ordering (Bolt Tasks)
+## Bolt Infrastructure Expansion
 
-When expanding a Bolt infrastructure task (identified by `"agent": "bolt"`), respect the infra-first / infra-last pattern from the parent plan:
-
-**If expanding the FIRST task (Development Infrastructure Bootstrap):**
-- Subtasks should follow the order: namespace creation → operator CRs (one per service) → secrets aggregation ConfigMap → validation
-- Each operator gets its own subtask (single-concern rule): e.g., "Deploy PostgreSQL Cluster", "Deploy Redis Instance", "Deploy NATS Server"
-- The final subtask MUST create the `{project}-infra-endpoints` ConfigMap aggregating all connection strings
-- All subtasks should be development-grade: single-replica, minimal storage, no HA
-
-**If expanding a FINAL task (Production Hardening):**
-- Subtasks should cover: HA scaling → CDN/TLS/ingress → network policies → RBAC → secret rotation → audit logging
-- Each concern gets its own subtask (single-concern rule)
-- Order: scale stateful services first, then configure networking, then apply security policies
-
-**For all other (implementation) tasks:**
-- Subtask details should reference the `{project}-infra-endpoints` ConfigMap for connection strings
-- Do NOT re-provision infrastructure — assume it exists from Task 1
-- Use `envFrom` to inject the ConfigMap into pod specs
+- **First task** (dev bootstrap): namespace → one subtask per operator CR → `{project}-infra-endpoints` ConfigMap → validation. Single-replica, no HA.
+- **Final tasks** (prod hardening): HA scaling → CDN/TLS/ingress → network policies → RBAC → secret rotation → audit logging. One concern per subtask.
+- **All other tasks**: Reference the ConfigMap via `envFrom`; never re-provision infra.
 
 # Constraints
 
@@ -112,19 +85,9 @@ When expanding a Bolt infrastructure task (identified by `"agent": "bolt"`), res
 - Combine multiple technologies into one subtask
 - Use the parent task's ID in subtask numbering
 - Output subtasks without all required fields
+{{#enable_subagents}}- Output subtasks missing subagentType or parallelizable
+- Omit a reviewer subtask after implementation subtasks{{/enable_subagents}}
 
 # Output Format
 
 The JSON structure `{"subtasks":[` has already been started. Continue by outputting subtask objects directly as array elements. No markdown, no explanations. End with `]}`.
-
-# Verification
-
-Before outputting, verify:
-- [ ] Each subtask does exactly one thing (no "and" connecting different systems)
-- [ ] IDs are sequential starting from {{next_id}}
-- [ ] No subtask requires changes in multiple services
-- [ ] Every subtask has a testStrategy
-{{#enable_subagents}}
-- [ ] Every subtask has subagentType and parallelizable
-- [ ] At least one reviewer subtask exists after implementation subtasks
-{{/enable_subagents}}

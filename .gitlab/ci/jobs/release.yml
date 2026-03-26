@@ -1,0 +1,245 @@
+# Release jobs: binary builds, npm publishing, semantic-release
+# Replaces: binaries-release.yaml, grok-publish.yml, release-please.yaml
+
+# --- Semantic Release (version bump + changelog + GitLab Release) ---
+
+semantic-release:
+  stage: release
+  image: node:20
+  script:
+    - npm install -g semantic-release @semantic-release/gitlab @semantic-release/changelog @semantic-release/git
+    - semantic-release
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  tags:
+    - k8s
+
+# --- Binary Release (triggered on tags) ---
+
+.binary-build-linux:
+  extends: .rust-setup
+  stage: release
+  script:
+    - apt-get update && apt-get install -y musl-tools gcc-aarch64-linux-gnu
+    - |
+      for PACKAGE in cto-mcp tools-server tools-client healer agent-controller cto-utils cto-cli intake play-monitor; do
+        echo "Building $PACKAGE..."
+        cargo build --release --package "$PACKAGE" 2>/dev/null || echo "Skipping $PACKAGE (not found)"
+      done
+    - |
+      mkdir -p release-binaries
+      for BIN in cto-mcp tools-server tools-client healer agent-controller cto-utils cto-cli intake play-monitor; do
+        if [ -f "target/release/$BIN" ]; then
+          cp "target/release/$BIN" "release-binaries/${BIN}-linux-x86_64"
+        fi
+      done
+  artifacts:
+    paths:
+      - release-binaries/
+    expire_in: 1 day
+  timeout: 60m
+
+binary-release-linux-x64:
+  extends: .binary-build-linux
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+
+binary-release-bun:
+  stage: release
+  image: oven/bun:1
+  script:
+    - cd apps/intake-agent && bun install
+    - |
+      mkdir -p $CI_PROJECT_DIR/release-binaries
+      bun build src/index.ts --compile --outfile $CI_PROJECT_DIR/release-binaries/intake-agent-linux-x86_64
+  artifacts:
+    paths:
+      - release-binaries/
+    expire_in: 1 day
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+  tags:
+    - k8s
+
+create-release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - job: binary-release-linux-x64
+      artifacts: true
+    - job: binary-release-bun
+      artifacts: true
+  script:
+    - |
+      cd release-binaries
+      sha256sum * > SHA256SUMS 2>/dev/null || true
+      echo "Release artifacts:"
+      ls -la
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: "Release $CI_COMMIT_TAG"
+    description: "Automated release for $CI_COMMIT_TAG"
+    assets:
+      links:
+        - name: "SHA256SUMS"
+          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/release-binaries/SHA256SUMS"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+  tags:
+    - k8s
+
+# --- npm: grok ---
+
+publish-grok:
+  stage: release
+  image: node:20
+  script:
+    - cd apps/grok
+    - |
+      echo "@5dlabs:registry=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/npm/" > .npmrc
+      echo "//${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=${CI_JOB_TOKEN}" >> .npmrc
+    - npm publish
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^grok-v/
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - apps/grok/**
+  tags:
+    - k8s
+
+# --- CTO Lite Tauri (cross-platform desktop app) ---
+
+tauri-build-linux:
+  stage: release
+  image: rust:latest
+  before_script:
+    - apt-get update && apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev nodejs npm
+    - npm install -g npm@latest
+    - cd crates/cto-lite/ui && npm ci
+  script:
+    - cd crates/cto-lite/tauri
+    - cargo install tauri-cli --locked 2>/dev/null || true
+    - cargo tauri build
+    - |
+      mkdir -p $CI_PROJECT_DIR/tauri-release
+      cp target/release/bundle/deb/*.deb $CI_PROJECT_DIR/tauri-release/ 2>/dev/null || true
+      cp target/release/bundle/rpm/*.rpm $CI_PROJECT_DIR/tauri-release/ 2>/dev/null || true
+      cp target/release/bundle/appimage/*.AppImage $CI_PROJECT_DIR/tauri-release/ 2>/dev/null || true
+  artifacts:
+    paths:
+      - tauri-release/
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^cto-lite-v/
+  tags:
+    - k8s
+  timeout: 45m
+
+tauri-build-macos:
+  stage: release
+  script:
+    - cd crates/cto-lite/ui && npm ci
+    - cd ../tauri
+    - |
+      if [ -n "$APPLE_CERTIFICATE" ]; then
+        CERTIFICATE_PATH=$(mktemp).p12
+        echo -n "$APPLE_CERTIFICATE" | base64 --decode > $CERTIFICATE_PATH
+        security create-keychain -p "$APPLE_KEYCHAIN_PASSWORD" build.keychain
+        security set-keychain-settings -lut 21600 build.keychain
+        security unlock-keychain -p "$APPLE_KEYCHAIN_PASSWORD" build.keychain
+        security import $CERTIFICATE_PATH -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k build.keychain
+        security list-keychain -d user -s build.keychain
+      fi
+    - cargo tauri build --target aarch64-apple-darwin
+    - |
+      mkdir -p $CI_PROJECT_DIR/tauri-release
+      cp target/aarch64-apple-darwin/release/bundle/dmg/*.dmg $CI_PROJECT_DIR/tauri-release/ 2>/dev/null || true
+  artifacts:
+    paths:
+      - tauri-release/
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^cto-lite-v/
+  tags:
+    - macos
+  timeout: 45m
+  allow_failure: true
+
+tauri-build-windows:
+  stage: release
+  script:
+    - cd crates/cto-lite/ui && npm ci
+    - cd ../tauri
+    - |
+      if ($env:WINDOWS_CERTIFICATE) {
+        $certBytes = [System.Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+        $certPath = "$env:TEMP\certificate.pfx"
+        [System.IO.File]::WriteAllBytes($certPath, $certBytes)
+        Import-PfxCertificate -FilePath $certPath -CertStoreLocation Cert:\CurrentUser\My -Password (ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force)
+      }
+    - cargo tauri build
+    - |
+      mkdir -p $CI_PROJECT_DIR/tauri-release
+      Copy-Item target\release\bundle\nsis\*.exe $CI_PROJECT_DIR\tauri-release\ -ErrorAction SilentlyContinue
+  artifacts:
+    paths:
+      - tauri-release/
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^cto-lite-v/
+  tags:
+    - windows
+  timeout: 45m
+  allow_failure: true
+
+tauri-release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - job: tauri-build-linux
+      artifacts: true
+    - job: tauri-build-macos
+      artifacts: true
+      optional: true
+    - job: tauri-build-windows
+      artifacts: true
+      optional: true
+  script:
+    - ls -la tauri-release/ 2>/dev/null || echo "No artifacts"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: "CTO Lite $CI_COMMIT_TAG"
+    description: "CTO Lite desktop app release"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^cto-lite-v/
+  tags:
+    - k8s
+
+tauri-cdn-upload:
+  stage: release
+  image: python:3.12-slim
+  needs:
+    - job: tauri-release
+      artifacts: true
+  script:
+    - pip install boto3
+    - |
+      python3 << 'EOF'
+      import boto3, os
+      from pathlib import Path
+      s3 = boto3.client('s3',
+          endpoint_url=os.environ['R2_ENDPOINT'],
+          aws_access_key_id=os.environ['R2_ACCESS_KEY_ID'],
+          aws_secret_access_key=os.environ['R2_SECRET_ACCESS_KEY'])
+      bucket = os.environ['R2_BUCKET']
+      tag = os.environ.get('CI_COMMIT_TAG', 'latest').replace('cto-lite-v', '')
+      for artifact in Path('tauri-release').rglob('*'):
+          if artifact.is_file():
+              key = f"cto-lite/{tag}/{artifact.name}"
+              print(f"Uploading {artifact} -> {key}")
+              s3.upload_file(str(artifact), bucket, key)
+      EOF
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^cto-lite-v/
+  tags:
+    - k8s

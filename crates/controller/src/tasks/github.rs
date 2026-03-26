@@ -2,7 +2,7 @@
 
 use anyhow::{Context as AnyhowContext, Result};
 use octocrab::{models::pulls::PullRequest, Octocrab};
-use scm::{ScmClient, ScmClientConfig, ScmProvider, create_scm_client};
+use scm::{create_scm_client, ScmClient, ScmClientConfig, ScmProvider};
 use tracing::{info, warn};
 
 use crate::crds::coderun::CodeRun;
@@ -78,13 +78,13 @@ pub async fn check_scm_for_pr_by_branch(
 
     info!(
         "Checking {} for PR/MR matching task-{} in {}/{}",
-        scm_client.provider(), task_id, owner, repo
+        scm_client.provider(),
+        task_id,
+        owner,
+        repo
     );
 
-    let branch_patterns = [
-        format!("task-{task_id}"),
-        format!("feature/task-{task_id}"),
-    ];
+    let branch_patterns = [format!("task-{task_id}"), format!("feature/task-{task_id}")];
 
     let mrs = scm_client
         .list_open_mrs(&owner, &repo, None)
@@ -93,8 +93,7 @@ pub async fn check_scm_for_pr_by_branch(
 
     for mr in &mrs {
         for pattern in &branch_patterns {
-            if mr.source_branch == *pattern
-                || mr.source_branch.starts_with(&format!("{pattern}-"))
+            if mr.source_branch == *pattern || mr.source_branch.starts_with(&format!("{pattern}-"))
             {
                 info!("Found MR via SCM API for task {}: {}", task_id, mr.url);
                 return Ok(Some(mr.url.clone()));
@@ -168,19 +167,19 @@ fn repo_identity_matches(
 ///
 /// Supports formats like:
 /// - `https://github.com/owner/repo`
-/// - `https://git.5dlabs.ai/owner/repo`
+/// - `https://gitlab.5dlabs.ai/owner/repo`
 /// - `git@github.com:owner/repo.git`
-/// - `git@git.5dlabs.ai:owner/repo.git`
+/// - `git@gitlab.5dlabs.ai:owner/repo.git`
 /// - `owner/repo`
 fn parse_repository_url(repo_url: &str) -> Result<(String, String)> {
     let cleaned_url = repo_url
         .trim_end_matches(".git")
         .replace("git@github.com:", "https://github.com/")
-        .replace("git@git.5dlabs.ai:", "https://git.5dlabs.ai/");
+        .replace("git@gitlab.5dlabs.ai:", "https://gitlab.5dlabs.ai/");
 
     let path = cleaned_url
         .replace("https://github.com/", "")
-        .replace("https://git.5dlabs.ai/", "");
+        .replace("https://gitlab.5dlabs.ai/", "");
 
     let parts: Vec<&str> = path.split('/').collect();
     if parts.len() >= 2 {
@@ -262,13 +261,13 @@ mod tests {
 
         // GitLab HTTPS
         assert_eq!(
-            parse_repository_url("https://git.5dlabs.ai/5dlabs/cto").unwrap(),
+            parse_repository_url("https://gitlab.5dlabs.ai/5dlabs/cto").unwrap(),
             ("5dlabs".to_string(), "cto".to_string())
         );
 
         // GitLab SSH
         assert_eq!(
-            parse_repository_url("git@git.5dlabs.ai:5dlabs/cto.git").unwrap(),
+            parse_repository_url("git@gitlab.5dlabs.ai:5dlabs/cto.git").unwrap(),
             ("5dlabs".to_string(), "cto".to_string())
         );
 

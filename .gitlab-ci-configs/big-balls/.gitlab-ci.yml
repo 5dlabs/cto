@@ -1,0 +1,103 @@
+# GitLab CI/CD for Big Balls (price-api)
+# Replaces: .github/workflows/build-price-api.yml from GitHub Actions
+# Rust test suite + parallel Docker image builds for 3 services
+
+stages:
+  - test
+  - build
+
+variables:
+  REGISTRY: registry.5dlabs.ai
+  IMAGE_BASE: 5dlabs
+
+# ====================================================================
+# Test Stage
+# ====================================================================
+
+rust-test:
+  stage: test
+  image: rust:1.85-slim-bookworm
+  before_script:
+    - apt-get update && apt-get install -y protobuf-compiler pkg-config libssl-dev
+  script:
+    - cd price-api
+    - cargo test --all
+  cache:
+    key: rust-${CI_COMMIT_REF_SLUG}
+    paths:
+      - price-api/target/
+    policy: pull-push
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "price-api/**"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  tags:
+    - k8s
+
+rust-clippy:
+  stage: test
+  image: rust:1.85-slim-bookworm
+  before_script:
+    - apt-get update && apt-get install -y protobuf-compiler pkg-config libssl-dev
+    - rustup component add clippy
+  script:
+    - cd price-api
+    - cargo clippy --all-targets -- -D warnings
+  cache:
+    key: rust-${CI_COMMIT_REF_SLUG}
+    paths:
+      - price-api/target/
+    policy: pull
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "price-api/**"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  tags:
+    - k8s
+
+# ====================================================================
+# Build Stage: Price API service images (parallel matrix)
+# ====================================================================
+
+build-price-api:
+  stage: build
+  image: docker:24
+  services:
+    - name: docker:24-dind
+      alias: docker
+      variables:
+        DOCKER_TLS_CERTDIR: ""
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  parallel:
+    matrix:
+      - SERVICE:
+          - tick-pipeline
+          - ohlcv-aggregator
+          - grpc-server
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker buildx create --use --name ci-builder --driver docker-container 2>/dev/null || docker buildx use ci-builder
+    - docker buildx inspect --bootstrap
+  script:
+    - |
+      docker buildx build \
+        --file "price-api/docker/Dockerfile.${SERVICE}" \
+        --push --provenance=false \
+        --tag "$REGISTRY/$IMAGE_BASE/$SERVICE:latest" \
+        --tag "$REGISTRY/$IMAGE_BASE/$SERVICE:${CI_COMMIT_SHA}" \
+        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/$SERVICE:buildcache" \
+        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/$SERVICE:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - "price-api/**"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  tags:
+    - k8s
+    - docker
+  timeout: 30m

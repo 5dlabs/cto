@@ -34,7 +34,7 @@ ARG BASE_IMAGE=registry.5dlabs.ai/5dlabs/runtime:full
 
 FROM ${BASE_IMAGE}
 
-LABEL org.opencontainers.image.source="https://git.5dlabs.ai/5dlabs/cto"
+LABEL org.opencontainers.image.source="https://gitlab.5dlabs.ai/5dlabs/cto"
 LABEL org.opencontainers.image.description="CTO AI Agent - Unified multi-agent platform image"
 LABEL org.opencontainers.image.licenses="MIT"
 

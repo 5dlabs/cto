@@ -1,0 +1,1 @@
+Escalate — agree with Optimist's preference for persistent sidebar with one constraint: must auto-collapse to floating bubble below 768px viewport width

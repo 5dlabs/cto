@@ -1,0 +1,78 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dex-api
+  namespace: solana
+  labels:
+    app: dex-api
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: dex-api
+  template:
+    metadata:
+      labels:
+        app: dex-api
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: db-01
+      containers:
+        - name: dex-api
+          image: ghcr.io/5dlabs/dex-api:latest
+          ports:
+            - name: grpc
+              containerPort: 50051
+              protocol: TCP
+          env:
+            - name: LISTEN_ADDR
+              value: "0.0.0.0:50051"
+            - name: QUESTDB_PG_HOST
+              value: "questdb.questdb.svc"
+            - name: QUESTDB_PG_PORT
+              value: "8812"
+            - name: QUESTDB_PG_USER
+              value: "admin"
+            - name: QUESTDB_PG_PASSWORD
+              value: "quest"
+            - name: RUST_LOG
+              value: "dex_indexer=info"
+          resources:
+            requests:
+              cpu: 500m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 512Mi
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            periodSeconds: 30
+            failureThreshold: 3
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex-api
+  namespace: solana
+  labels:
+    app: dex-api
+spec:
+  type: ClusterIP
+  selector:
+    app: dex-api
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: grpc
+      protocol: TCP

@@ -1,0 +1,1 @@
+Use a service mesh with mTLS for encrypted and authenticated service-to-service communication, and use JWTs for external API clients.

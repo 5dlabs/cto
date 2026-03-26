@@ -4,247 +4,332 @@ description: >
   Supports up to max_revisions rounds (default 2). If the committee rejects after
   all rounds, proceeds with the best attempt and attaches a warning.
 
-inputs:
-  - name: tasks
-    type: string
-    description: "Parsed tasks JSON from parse-prd step"
-  - name: complexity
-    type: string
-    description: "Complexity analysis JSON from analyze-complexity step"
-  - name: evaluation_criteria
-    type: string
+args:
+  audio_debug:
+    default: "true"
+  tasks:
+    default: "[]"
+  complexity:
+    default: "{}"
+  tasks_file:
+    default: ""
+  complexity_file:
+    default: ""
+  evaluation_criteria:
     default: "task decomposition quality, dependency ordering, decision point coverage"
-    description: "Criteria string passed to the voting committee"
-  - name: max_revisions
-    type: number
+  max_revisions:
     default: 2
-    description: "Maximum revision rounds before proceeding regardless"
-  - name: model_primary_provider
-    type: string
-    default: "anthropic"
-  - name: model_primary
-    type: string
-    default: "claude-sonnet-4-6"
-  - name: voter_1_provider
-    type: string
-    default: "anthropic"
-  - name: voter_1_model
-    type: string
-    default: "claude-opus-4-6"
-  - name: voter_2_provider
-    type: string
-    default: "openai"
-  - name: voter_2_model
-    type: string
-    default: "gpt-5.2-pro"
-  - name: voter_3_provider
-    type: string
-    default: "anthropic"
-  - name: voter_3_model
-    type: string
-    default: "claude-sonnet-4-6"
-  - name: voter_4_provider
-    type: string
-    default: "openai"
-  - name: voter_4_model
-    type: string
-    default: "o3-pro"
-  - name: voter_5_provider
-    type: string
-    default: "google"
-  - name: voter_5_model
-    type: string
-    default: "gemini-2.5-pro"
+  model_primary_provider:
+    default: anthropic
+  model_primary:
+    default: claude-sonnet-4-6
+  voter_1_provider:
+    default: anthropic
+  voter_1_model:
+    default: claude-opus-4-6
+  voter_2_provider:
+    default: openai
+  voter_2_model:
+    default: gpt-5.2-pro
+  voter_3_provider:
+    default: anthropic
+  voter_3_model:
+    default: claude-sonnet-4-6
 
 steps:
-  # ─────────────────────────────────────────────────────────
-  # Round 0: Initial expansion + vote
-  # ─────────────────────────────────────────────────────────
-  - name: expand-round-0
+  - id: expand-round-0
     command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/expand-task-system.md}}",
-        "input": {
-          "tasks": {{inputs.tasks}},
-          "complexity": {{inputs.complexity}}
-        },
-        "schema": "{{schemas/generated-task.schema.json}}",
-        "provider": "{{inputs.model_primary_provider}}",
-        "model": "{{inputs.model_primary}}"
-      }'
-
-  - name: vote-round-0
-    depends_on: [expand-round-0]
-    workflow: voting.lobster.yaml
-    inputs:
-      content_to_evaluate: ${{ steps.expand-round-0.output }}
-      evaluation_criteria: "{{inputs.evaluation_criteria}}"
-      voter_1_provider: "{{inputs.voter_1_provider}}"
-      voter_1_model: "{{inputs.voter_1_model}}"
-      voter_2_provider: "{{inputs.voter_2_provider}}"
-      voter_2_model: "{{inputs.voter_2_model}}"
-      voter_3_provider: "{{inputs.voter_3_provider}}"
-      voter_3_model: "{{inputs.voter_3_model}}"
-      voter_4_provider: "{{inputs.voter_4_provider}}"
-      voter_4_model: "{{inputs.voter_4_model}}"
-      voter_5_provider: "{{inputs.voter_5_provider}}"
-      voter_5_model: "{{inputs.voter_5_model}}"
-
-  - name: check-round-0
-    depends_on: [vote-round-0]
-    command: >
-      echo '${{ steps.vote-round-0.outputs.tally_result }}' | jq '{
-        verdict: .verdict,
-        suggestions: (.suggestions // []),
-        round: 0,
-        needs_revision: (.verdict == "revise" or .verdict == "reject")
-      }'
-
-  # ─────────────────────────────────────────────────────────
-  # Round 1: First revision (conditional on round 0 not approving)
-  # ─────────────────────────────────────────────────────────
-  - name: expand-round-1
-    when: "${{ steps.check-round-0.output | jq -r '.needs_revision' }}"
-    depends_on: [check-round-0]
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/expand-task-system.md}}",
-        "input": {
-          "tasks": {{inputs.tasks}},
-          "complexity": {{inputs.complexity}},
-          "previous_expansion": ${{ steps.expand-round-0.output }},
-          "revision_suggestions": ${{ steps.check-round-0.output | jq '.suggestions' }},
-          "revision_round": 1,
-          "additional_context": "This is revision round 1. The 5-model voting committee flagged issues with the previous expansion. Address the suggestions below while preserving what worked well."
-        },
-        "schema": "{{schemas/generated-task.schema.json}}",
-        "provider": "{{inputs.model_primary_provider}}",
-        "model": "{{inputs.model_primary}}"
-      }'
-
-  - name: vote-round-1
-    when: "${{ steps.check-round-0.output | jq -r '.needs_revision' }}"
-    depends_on: [expand-round-1]
-    workflow: voting.lobster.yaml
-    inputs:
-      content_to_evaluate: ${{ steps.expand-round-1.output }}
-      evaluation_criteria: "{{inputs.evaluation_criteria}}"
-      voter_1_provider: "{{inputs.voter_1_provider}}"
-      voter_1_model: "{{inputs.voter_1_model}}"
-      voter_2_provider: "{{inputs.voter_2_provider}}"
-      voter_2_model: "{{inputs.voter_2_model}}"
-      voter_3_provider: "{{inputs.voter_3_provider}}"
-      voter_3_model: "{{inputs.voter_3_model}}"
-      voter_4_provider: "{{inputs.voter_4_provider}}"
-      voter_4_model: "{{inputs.voter_4_model}}"
-      voter_5_provider: "{{inputs.voter_5_provider}}"
-      voter_5_model: "{{inputs.voter_5_model}}"
-
-  - name: check-round-1
-    when: "${{ steps.check-round-0.output | jq -r '.needs_revision' }}"
-    depends_on: [vote-round-1]
-    command: >
-      echo '${{ steps.vote-round-1.outputs.tally_result }}' | jq '{
-        verdict: .verdict,
-        suggestions: (.suggestions // []),
-        round: 1,
-        needs_revision: (.verdict == "revise" or .verdict == "reject")
-      }'
-
-  # ─────────────────────────────────────────────────────────
-  # Round 2: Second revision (conditional on round 1 not approving)
-  # Only runs if max_revisions >= 2
-  # ─────────────────────────────────────────────────────────
-  - name: expand-round-2
-    when: "${{ steps.check-round-1.output | jq -r '.needs_revision' }}"
-    depends_on: [check-round-1]
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/expand-task-system.md}}",
-        "input": {
-          "tasks": {{inputs.tasks}},
-          "complexity": {{inputs.complexity}},
-          "previous_expansion": ${{ steps.expand-round-1.output }},
-          "revision_suggestions": ${{ steps.check-round-1.output | jq '.suggestions' }},
-          "revision_round": 2,
-          "additional_context": "This is revision round 2 (final). The committee still has concerns. Make targeted fixes for the specific issues raised — do not restructure the entire decomposition."
-        },
-        "schema": "{{schemas/generated-task.schema.json}}",
-        "provider": "{{inputs.model_primary_provider}}",
-        "model": "{{inputs.model_primary}}"
-      }'
-
-  - name: vote-round-2
-    when: "${{ steps.check-round-1.output | jq -r '.needs_revision' }}"
-    depends_on: [expand-round-2]
-    workflow: voting.lobster.yaml
-    inputs:
-      content_to_evaluate: ${{ steps.expand-round-2.output }}
-      evaluation_criteria: "{{inputs.evaluation_criteria}}"
-      voter_1_provider: "{{inputs.voter_1_provider}}"
-      voter_1_model: "{{inputs.voter_1_model}}"
-      voter_2_provider: "{{inputs.voter_2_provider}}"
-      voter_2_model: "{{inputs.voter_2_model}}"
-      voter_3_provider: "{{inputs.voter_3_provider}}"
-      voter_3_model: "{{inputs.voter_3_model}}"
-      voter_4_provider: "{{inputs.voter_4_provider}}"
-      voter_4_model: "{{inputs.voter_4_model}}"
-      voter_5_provider: "{{inputs.voter_5_provider}}"
-      voter_5_model: "{{inputs.voter_5_model}}"
-
-  - name: check-round-2
-    when: "${{ steps.check-round-1.output | jq -r '.needs_revision' }}"
-    depends_on: [vote-round-2]
-    command: >
-      echo '${{ steps.vote-round-2.outputs.tally_result }}' | jq '{
-        verdict: .verdict,
-        suggestions: (.suggestions // []),
-        round: 2,
-        needs_revision: (.verdict == "revise" or .verdict == "reject")
-      }'
-
-  # ─────────────────────────────────────────────────────────
-  # Resolve: Pick the best expansion output from whichever
-  # round approved (or the last round if all rejected).
-  # Produces the final expanded tasks + vote metadata.
-  # ─────────────────────────────────────────────────────────
-  - name: resolve-output
-    depends_on: [check-round-0, check-round-1, check-round-2]
-    command: >
-      ROUND_2='${{ steps.check-round-2.output }}' &&
-      ROUND_1='${{ steps.check-round-1.output }}' &&
-      ROUND_0='${{ steps.check-round-0.output }}' &&
-      if [ -n "$ROUND_2" ] && [ "$ROUND_2" != "null" ] && [ "$ROUND_2" != "" ]; then
-        FINAL_TASKS='${{ steps.expand-round-2.output }}'
-        FINAL_VOTE="$ROUND_2"
-        REVISION_COUNT=2
-      elif [ -n "$ROUND_1" ] && [ "$ROUND_1" != "null" ] && [ "$ROUND_1" != "" ]; then
-        FINAL_TASKS='${{ steps.expand-round-1.output }}'
-        FINAL_VOTE="$ROUND_1"
-        REVISION_COUNT=1
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "expand-round-0" "${audio_debug}";
+      TF="${tasks_file}"; CF="${complexity_file}";
+      if [ -n "$TF" ] && [ -f "$TF" ]; then
+        ARGS=$(jq -n \
+          --rawfile prompt "$root/intake/prompts/expand-task-system.md" \
+          --rawfile tasks_raw "$TF" \
+          --rawfile complexity_raw "$CF" \
+          --arg schema "$root/intake/schemas/generated-task.schema.json" \
+          --arg provider "${model_primary_provider}" \
+          --arg model "${model_primary}" \
+          '{"prompt": $prompt,
+            "input": {"tasks": ($tasks_raw | fromjson), "complexity": ($complexity_raw | fromjson)},
+            "schema": $schema, "provider": $provider, "model": $model}');
       else
-        FINAL_TASKS='${{ steps.expand-round-0.output }}'
-        FINAL_VOTE="$ROUND_0"
-        REVISION_COUNT=0
+        ARGS=$(jq -n \
+          --rawfile prompt "$root/intake/prompts/expand-task-system.md" \
+          --argjson tasks "$(printf '%s' "${tasks}")" \
+          --argjson complexity "$(printf '%s' "${complexity}")" \
+          --arg schema "$root/intake/schemas/generated-task.schema.json" \
+          --arg provider "${model_primary_provider}" \
+          --arg model "${model_primary}" \
+          '{"prompt": $prompt,
+            "input": {"tasks": $tasks, "complexity": $complexity},
+            "schema": $schema, "provider": $provider, "model": $model}');
+      fi;
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
+
+  - id: vote-round-0
+    env:
+      CTO_EXPAND_R0: $expand-round-0.stdout
+    command: >
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "vote-round-0" "${audio_debug}";
+      WS="${WORKSPACE:-.}";
+      mkdir -p "$WS/.intake/tmp";
+      printf '%s' "$CTO_EXPAND_R0" > "$WS/.intake/tmp/vote-content-r0.json";
+      "$root/intake/scripts/inline-vote.sh" \
+        "$WS/.intake/tmp/vote-content-r0.json" \
+        "${evaluation_criteria}" \
+        "${voter_1_provider}" "${voter_1_model}" \
+        "${voter_2_provider}" "${voter_2_model}" \
+        "${voter_3_provider}" "${voter_3_model}" || {
+        "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "vote-round-0 failed" "${audio_debug}" "error"; exit 1; }
+
+  - id: check-round-0
+    env:
+      CTO_VOTE_R0: $vote-round-0.stdout
+    command: >
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "check-round-0" "${audio_debug}";
+      printf '%s' "$CTO_VOTE_R0" | jq '
+        .output[0] as $t |
+        { verdict: $t.verdict, suggestions: ($t.suggestions // []), round: 0,
+          needs_revision: ($t.verdict == "revise" or $t.verdict == "reject") }'
+
+  - id: expand-round-1
+    env:
+      CTO_CHECK_R0: $check-round-0.stdout
+      CTO_EXPAND_R0: $expand-round-0.stdout
+    command: >
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "expand-round-1" "${audio_debug}";
+      if [ "$(printf '%s' "$CTO_CHECK_R0" | jq -r '.needs_revision')" != "true" ]; then
+        printf '%s' "$CTO_EXPAND_R0"; exit 0; fi;
+      TF="${tasks_file}"; CF="${complexity_file}";
+      WS="${WORKSPACE:-.}";
+      mkdir -p "$WS/.intake/tmp";
+      printf '%s' "$CTO_EXPAND_R0" > "$WS/.intake/tmp/expand-r0-for-r1.json";
+      if [ -n "$TF" ] && [ -f "$TF" ]; then
+        ARGS=$(jq -n \
+          --rawfile prompt "$root/intake/prompts/expand-task-system.md" \
+          --rawfile tasks_raw "$TF" \
+          --rawfile complexity_raw "$CF" \
+          --rawfile previous "$WS/.intake/tmp/expand-r0-for-r1.json" \
+          --argjson revision_suggestions "$(printf '%s' "$CTO_CHECK_R0" | jq '.suggestions')" \
+          --argjson revision_round "1" \
+          --arg additional_context "This is revision round 1. The 5-model voting committee flagged issues with the previous expansion. Address the suggestions below while preserving what worked well." \
+          --arg schema "$root/intake/schemas/generated-task.schema.json" \
+          --arg provider "${model_primary_provider}" \
+          --arg model "${model_primary}" \
+          '{"prompt": $prompt,
+            "input": {
+              "tasks": ($tasks_raw | fromjson), "complexity": ($complexity_raw | fromjson),
+              "previous_expansion": ($previous | fromjson), "revision_suggestions": $revision_suggestions,
+              "revision_round": $revision_round, "additional_context": $additional_context
+            },
+            "schema": $schema, "provider": $provider, "model": $model}');
+      else
+        ARGS=$(jq -n \
+          --rawfile prompt "$root/intake/prompts/expand-task-system.md" \
+          --argjson tasks "$(printf '%s' "${tasks}")" \
+          --argjson complexity "$(printf '%s' "${complexity}")" \
+          --argjson previous "$(printf '%s' "$CTO_EXPAND_R0")" \
+          --argjson revision_suggestions "$(printf '%s' "$CTO_CHECK_R0" | jq '.suggestions')" \
+          --argjson revision_round "1" \
+          --arg additional_context "This is revision round 1. The 5-model voting committee flagged issues with the previous expansion. Address the suggestions below while preserving what worked well." \
+          --arg schema "$root/intake/schemas/generated-task.schema.json" \
+          --arg provider "${model_primary_provider}" \
+          --arg model "${model_primary}" \
+          '{"prompt": $prompt,
+            "input": {
+              "tasks": $tasks, "complexity": $complexity,
+              "previous_expansion": $previous, "revision_suggestions": $revision_suggestions,
+              "revision_round": $revision_round, "additional_context": $additional_context
+            },
+            "schema": $schema, "provider": $provider, "model": $model}');
+      fi;
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
+
+  - id: vote-round-1
+    env:
+      CTO_CHECK_R0: $check-round-0.stdout
+      CTO_VOTE_R0: $vote-round-0.stdout
+      CTO_EXPAND_R1: $expand-round-1.stdout
+    command: >
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "vote-round-1" "${audio_debug}";
+      if [ "$(printf '%s' "$CTO_CHECK_R0" | jq -r '.needs_revision')" != "true" ]; then
+        printf '%s' "$CTO_VOTE_R0"; exit 0; fi;
+      WS="${WORKSPACE:-.}";
+      mkdir -p "$WS/.intake/tmp";
+      printf '%s' "$CTO_EXPAND_R1" > "$WS/.intake/tmp/vote-content-r1.json";
+      "$root/intake/scripts/inline-vote.sh" \
+        "$WS/.intake/tmp/vote-content-r1.json" \
+        "${evaluation_criteria}" \
+        "${voter_1_provider}" "${voter_1_model}" \
+        "${voter_2_provider}" "${voter_2_model}" \
+        "${voter_3_provider}" "${voter_3_model}" || {
+        "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "vote-round-1 failed" "${audio_debug}" "error"; exit 1; }
+
+  - id: check-round-1
+    env:
+      CTO_CHECK_R0: $check-round-0.stdout
+      CTO_VOTE_R1: $vote-round-1.stdout
+    command: >
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "check-round-1" "${audio_debug}";
+      if [ "$(printf '%s' "$CTO_CHECK_R0" | jq -r '.needs_revision')" != "true" ]; then
+        printf '%s' "$CTO_CHECK_R0"; exit 0; fi;
+      printf '%s' "$CTO_VOTE_R1" | jq '
+        .output[0] as $t |
+        { verdict: $t.verdict, suggestions: ($t.suggestions // []), round: 1,
+          needs_revision: ($t.verdict == "revise" or $t.verdict == "reject") }'
+
+  - id: expand-round-2
+    env:
+      CTO_CHECK_R1: $check-round-1.stdout
+      CTO_EXPAND_R1: $expand-round-1.stdout
+    command: >
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "expand-round-2" "${audio_debug}";
+      if [ "$(printf '%s' "$CTO_CHECK_R1" | jq -r '.needs_revision')" != "true" ]; then
+        printf '%s' "$CTO_EXPAND_R1"; exit 0; fi;
+      if [ "${max_revisions}" -lt 2 ] 2>/dev/null; then
+        printf '%s' "$CTO_EXPAND_R1"; exit 0; fi;
+      TF="${tasks_file}"; CF="${complexity_file}";
+      WS="${WORKSPACE:-.}";
+      mkdir -p "$WS/.intake/tmp";
+      printf '%s' "$CTO_EXPAND_R1" > "$WS/.intake/tmp/expand-r1-for-r2.json";
+      if [ -n "$TF" ] && [ -f "$TF" ]; then
+        ARGS=$(jq -n \
+          --rawfile prompt "$root/intake/prompts/expand-task-system.md" \
+          --rawfile tasks_raw "$TF" \
+          --rawfile complexity_raw "$CF" \
+          --rawfile previous "$WS/.intake/tmp/expand-r1-for-r2.json" \
+          --argjson revision_suggestions "$(printf '%s' "$CTO_CHECK_R1" | jq '.suggestions')" \
+          --argjson revision_round "2" \
+          --arg additional_context "This is revision round 2 (final). The committee still has concerns. Make targeted fixes for the specific issues raised — do not restructure the entire decomposition." \
+          --arg schema "$root/intake/schemas/generated-task.schema.json" \
+          --arg provider "${model_primary_provider}" \
+          --arg model "${model_primary}" \
+          '{"prompt": $prompt,
+            "input": {
+              "tasks": ($tasks_raw | fromjson), "complexity": ($complexity_raw | fromjson),
+              "previous_expansion": ($previous | fromjson), "revision_suggestions": $revision_suggestions,
+              "revision_round": $revision_round, "additional_context": $additional_context
+            },
+            "schema": $schema, "provider": $provider, "model": $model}');
+      else
+        ARGS=$(jq -n \
+          --rawfile prompt "$root/intake/prompts/expand-task-system.md" \
+          --argjson tasks "$(printf '%s' "${tasks}")" \
+          --argjson complexity "$(printf '%s' "${complexity}")" \
+          --argjson previous "$(printf '%s' "$CTO_EXPAND_R1")" \
+          --argjson revision_suggestions "$(printf '%s' "$CTO_CHECK_R1" | jq '.suggestions')" \
+          --argjson revision_round "2" \
+          --arg additional_context "This is revision round 2 (final). The committee still has concerns. Make targeted fixes for the specific issues raised — do not restructure the entire decomposition." \
+          --arg schema "$root/intake/schemas/generated-task.schema.json" \
+          --arg provider "${model_primary_provider}" \
+          --arg model "${model_primary}" \
+          '{"prompt": $prompt,
+            "input": {
+              "tasks": $tasks, "complexity": $complexity,
+              "previous_expansion": $previous, "revision_suggestions": $revision_suggestions,
+              "revision_round": $revision_round, "additional_context": $additional_context
+            },
+            "schema": $schema, "provider": $provider, "model": $model}');
+      fi;
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
+
+  - id: vote-round-2
+    env:
+      CTO_CHECK_R1: $check-round-1.stdout
+      CTO_VOTE_R1: $vote-round-1.stdout
+      CTO_EXPAND_R2: $expand-round-2.stdout
+    command: >
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "vote-round-2" "${audio_debug}";
+      if [ "$(printf '%s' "$CTO_CHECK_R1" | jq -r '.needs_revision')" != "true" ]; then
+        printf '%s' "$CTO_VOTE_R1"; exit 0; fi;
+      if [ "${max_revisions}" -lt 2 ] 2>/dev/null; then
+        printf '%s' "$CTO_VOTE_R1"; exit 0; fi;
+      WS="${WORKSPACE:-.}";
+      mkdir -p "$WS/.intake/tmp";
+      printf '%s' "$CTO_EXPAND_R2" > "$WS/.intake/tmp/vote-content-r2.json";
+      "$root/intake/scripts/inline-vote.sh" \
+        "$WS/.intake/tmp/vote-content-r2.json" \
+        "${evaluation_criteria}" \
+        "${voter_1_provider}" "${voter_1_model}" \
+        "${voter_2_provider}" "${voter_2_model}" \
+        "${voter_3_provider}" "${voter_3_model}" || {
+        "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "vote-round-2 failed" "${audio_debug}" "error"; exit 1; }
+
+  - id: check-round-2
+    env:
+      CTO_CHECK_R1: $check-round-1.stdout
+      CTO_VOTE_R2: $vote-round-2.stdout
+    command: >
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "check-round-2" "${audio_debug}";
+      if [ "$(printf '%s' "$CTO_CHECK_R1" | jq -r '.needs_revision')" != "true" ]; then
+        printf '%s' "$CTO_CHECK_R1"; exit 0; fi;
+      if [ "${max_revisions}" -lt 2 ] 2>/dev/null; then
+        printf '%s' "$CTO_CHECK_R1"; exit 0; fi;
+      printf '%s' "$CTO_VOTE_R2" | jq '
+        .output[0] as $t |
+        { verdict: $t.verdict, suggestions: ($t.suggestions // []), round: 2,
+          needs_revision: ($t.verdict == "revise" or $t.verdict == "reject") }'
+
+  - id: resolve-output
+    env:
+      CTO_CHECK_R2: $check-round-2.stdout
+      CTO_CHECK_R1: $check-round-1.stdout
+      CTO_CHECK_R0: $check-round-0.stdout
+      CTO_EXPAND_R2: $expand-round-2.stdout
+      CTO_EXPAND_R1: $expand-round-1.stdout
+      CTO_EXPAND_R0: $expand-round-0.stdout
+    command: >
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "resolve-output" "${audio_debug}";
+      ROUND_2=$(printf '%s' "$CTO_CHECK_R2") &&
+      ROUND_1=$(printf '%s' "$CTO_CHECK_R1") &&
+      ROUND_0=$(printf '%s' "$CTO_CHECK_R0") &&
+      if [ "${max_revisions}" -ge 2 ] 2>/dev/null && [ -n "$ROUND_2" ] &&
+        printf '%s' "$ROUND_2" | jq -e '(.round == 2)' >/dev/null 2>&1; then
+        FINAL_TASKS=$(printf '%s' "$CTO_EXPAND_R2") &&
+        FINAL_VOTE="$ROUND_2" && REVISION_COUNT=2
+      elif [ -n "$ROUND_1" ] &&
+        printf '%s' "$ROUND_1" | jq -e '(.round == 1)' >/dev/null 2>&1; then
+        FINAL_TASKS=$(printf '%s' "$CTO_EXPAND_R1") &&
+        FINAL_VOTE="$ROUND_1" && REVISION_COUNT=1
+      else
+        FINAL_TASKS=$(printf '%s' "$CTO_EXPAND_R0") &&
+        FINAL_VOTE="$ROUND_0" && REVISION_COUNT=0
       fi &&
-      VERDICT=$(echo "$FINAL_VOTE" | jq -r '.verdict') &&
+      VERDICT=$(printf '%s' "$FINAL_VOTE" | jq -r '.verdict') &&
+      WARN="" &&
+      if [ "$VERDICT" != "approve" ]; then
+        WARN="WARNING: Task decomposition proceeded after ${REVISION_COUNT} revision(s) without full committee approval (verdict: ${VERDICT}). Review carefully."
+      fi &&
+      REQUIRE_SUBTASKS="${INTAKE_REQUIRE_SUBTASKS:-true}" &&
+      TOTAL_SUBTASKS="$(printf '%s' "$FINAL_TASKS" | jq '[.[] | (.subtasks // []) | length] | add // 0' 2>/dev/null || echo 0)" &&
+      if [ "$REQUIRE_SUBTASKS" = "true" ] || [ "$REQUIRE_SUBTASKS" = "1" ]; then
+        if [ "$TOTAL_SUBTASKS" = "0" ]; then
+          echo "resolve-output: FATAL — no subtasks generated in refinement output" >&2
+          exit 1
+        fi
+      fi &&
       jq -n \
         --argjson tasks "$FINAL_TASKS" \
         --argjson vote "$FINAL_VOTE" \
         --argjson revision_count "$REVISION_COUNT" \
         --arg verdict "$VERDICT" \
-        --arg warning "$([ "$VERDICT" != "approve" ] && echo "WARNING: Task decomposition proceeded after $REVISION_COUNT revision(s) without full committee approval (verdict: $VERDICT). Review carefully." || echo "")" \
+        --arg warning "$WARN" \
+        --argjson total_subtasks "$TOTAL_SUBTASKS" \
         '{
           expanded_tasks: $tasks,
           final_vote: $vote,
           revision_count: $revision_count,
           verdict: $verdict,
-          warning: $warning
+          warning: $warning,
+          total_subtasks: $total_subtasks
         }'
-
-output_mappings:
-  expanded_tasks: ${{ steps.resolve-output.output | jq '.expanded_tasks' }}
-  verdict: ${{ steps.resolve-output.output | jq -r '.verdict' }}
-  revision_count: ${{ steps.resolve-output.output | jq '.revision_count' }}
-  warning: ${{ steps.resolve-output.output | jq -r '.warning' }}
-  refinement_result: ${{ steps.resolve-output.output }}

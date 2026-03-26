@@ -13,18 +13,32 @@ import {
 } from "discord.js";
 import { NUM_ROOMS, availableChannelName } from "./types.js";
 
+/** Discord thread name max length */
+const THREAD_NAME_MAX = 100;
+
+function sanitizeThreadName(sessionId: string): string {
+  const base = `intake-${sessionId}`.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  return base.length <= THREAD_NAME_MAX ? base || "intake-session" : base.slice(0, THREAD_NAME_MAX);
+}
+
 export interface DiscordHandle {
   /** Ensure the category and 5 room channels exist; returns channel IDs */
   initializeRooms(guildId: string, categoryName: string): Promise<string[]>;
   /** Rename a channel */
   renameChannel(channelId: string, name: string): Promise<void>;
-  /** Post a message embed to a channel */
+  /**
+   * Get or create a public thread under parentChannelId for this intake session.
+   * Returns the thread channel id (usable with postEmbed / postElicitation / updateMessage).
+   */
+  getOrCreateSessionThread(parentChannelId: string, sessionId: string): Promise<string>;
+  /** Post a message embed to a text channel or thread */
   postEmbed(channelId: string, embed: EmbedBuilder): Promise<void>;
   /** Post an embed with interactive components (buttons/select menus) */
   postElicitation(
     channelId: string,
     embed: EmbedBuilder,
     components: ActionRowBuilder<MessageActionRowComponentBuilder>[],
+    extraEmbeds?: EmbedBuilder[],
   ): Promise<Message>;
   /** Update an existing message's embed and components */
   updateMessage(
@@ -55,13 +69,66 @@ export async function createDiscordClient(
     if (client.isReady()) {
       resolve();
     } else {
-      client.once("ready", () => resolve());
+      client.once("clientReady", () => resolve());
     }
   });
 
   logger.info(`Discord client ready as ${client.user?.tag}`);
 
+  const resolvedSessionThreads = new Map<string, string>();
+  const inFlightSessionThreads = new Map<string, Promise<string>>();
+
+  async function getOrCreateSessionThreadImpl(
+    parentChannelId: string,
+    sessionId: string,
+  ): Promise<string> {
+    const key = `${parentChannelId}:${sessionId}`;
+    const cached = resolvedSessionThreads.get(key);
+    if (cached) {
+      const ch = await client.channels.fetch(cached).catch(() => null);
+      if (ch && ch.isThread()) return cached;
+      resolvedSessionThreads.delete(key);
+    }
+
+    const parent = await client.channels.fetch(parentChannelId);
+    if (!parent || parent.type !== ChannelType.GuildText) {
+      throw new Error(`Parent channel ${parentChannelId} not found or not a text channel`);
+    }
+    const textParent = parent as TextChannel;
+    const threadName = sanitizeThreadName(sessionId);
+
+    const active = await textParent.threads.fetchActive();
+    const existing = active.threads.find((t) => t.name === threadName);
+    if (existing) {
+      resolvedSessionThreads.set(key, existing.id);
+      logger.info(`Session thread reuse: ${threadName} (${existing.id})`);
+      return existing.id;
+    }
+
+    const created = await textParent.threads.create({
+      name: threadName,
+      autoArchiveDuration: 10_080,
+      reason: `Intake deliberation session ${sessionId}`,
+    });
+    resolvedSessionThreads.set(key, created.id);
+    logger.info(`Session thread created: ${threadName} (${created.id})`);
+    return created.id;
+  }
+
   return {
+    async getOrCreateSessionThread(parentChannelId: string, sessionId: string): Promise<string> {
+      const key = `${parentChannelId}:${sessionId}`;
+      let p = inFlightSessionThreads.get(key);
+      if (p) return p;
+      p = getOrCreateSessionThreadImpl(parentChannelId, sessionId);
+      inFlightSessionThreads.set(key, p);
+      try {
+        return await p;
+      } finally {
+        inFlightSessionThreads.delete(key);
+      }
+    },
+
     async initializeRooms(guildId: string, categoryName: string): Promise<string[]> {
       const guild: Guild = await client.guilds.fetch(guildId);
       const channels = await guild.channels.fetch();
@@ -125,34 +192,49 @@ export async function createDiscordClient(
     async postEmbed(channelId: string, embed: EmbedBuilder): Promise<void> {
       try {
         const channel = await client.channels.fetch(channelId);
-        if (channel && channel.type === ChannelType.GuildText) {
+        if (!channel) return;
+        if (channel.type === ChannelType.GuildText) {
           await (channel as TextChannel).send({ embeds: [embed] });
+        } else if (channel.isThread()) {
+          await channel.send({ embeds: [embed] });
         }
       } catch (err) {
         logger.warn(`Failed to post embed to channel ${channelId}: ${err}`);
       }
     },
 
-    async postElicitation(channelId, embed, components): Promise<Message> {
+    async postElicitation(channelId, embed, components, extraEmbeds): Promise<Message> {
+      const embeds = extraEmbeds ?? [embed];
       const channel = await client.channels.fetch(channelId);
-      if (!channel || channel.type !== ChannelType.GuildText) {
-        throw new Error(`Channel ${channelId} not found or not a text channel`);
+      if (!channel) {
+        throw new Error(`Channel ${channelId} not found`);
       }
-      return (channel as TextChannel).send({
-        embeds: [embed],
-        components,
-      });
+      if (channel.type === ChannelType.GuildText) {
+        return (channel as TextChannel).send({ embeds, components });
+      }
+      if (channel.isThread()) {
+        return channel.send({ embeds, components });
+      }
+      throw new Error(`Channel ${channelId} is not a guild text channel or thread`);
     },
 
     async updateMessage(channelId, messageId, embed, components): Promise<void> {
       try {
         const channel = await client.channels.fetch(channelId);
-        if (!channel || channel.type !== ChannelType.GuildText) return;
-        const message = await (channel as TextChannel).messages.fetch(messageId);
-        await message.edit({
-          embeds: [embed],
-          components: components ?? [],
-        });
+        if (!channel) return;
+        if (channel.type === ChannelType.GuildText) {
+          const message = await (channel as TextChannel).messages.fetch(messageId);
+          await message.edit({
+            embeds: [embed],
+            components: components ?? [],
+          });
+        } else if (channel.isThread()) {
+          const message = await channel.messages.fetch(messageId);
+          await message.edit({
+            embeds: [embed],
+            components: components ?? [],
+          });
+        }
       } catch (err) {
         logger.warn(`Failed to update message ${messageId} in ${channelId}: ${err}`);
       }

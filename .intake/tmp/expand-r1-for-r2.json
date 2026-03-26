@@ -1,0 +1,112 @@
+[
+  {
+    "id": 1,
+    "title": "Create Core Kubernetes Namespaces",
+    "description": "Create the 'databases' and 'sigma1' Kubernetes namespaces to logically separate infrastructure components and application services.",
+    "dependencies": [],
+    "details": "As the Bolt agent, use `kubectl create namespace databases` and `kubectl create namespace sigma1` commands or apply a YAML manifest defining both namespaces. Ensure these namespaces are successfully created before proceeding.",
+    "status": "pending",
+    "test_strategy": "Verify both 'databases' and 'sigma1' namespaces exist using `kubectl get ns databases sigma1` and confirm their status is 'Active'.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 2,
+    "title": "Provision S3/R2 Bucket 'sigma1-assets'",
+    "description": "Provision an S3/R2 compatible bucket named 'sigma1-assets' to store application assets.",
+    "dependencies": [],
+    "details": "As the Bolt agent, use Cloudflare Terraform or the Cloudflare dashboard/API to create an R2 bucket named 'sigma1-assets'.",
+    "status": "pending",
+    "test_strategy": "Confirm the 'sigma1-assets' R2 bucket exists via the Cloudflare dashboard or API.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 3,
+    "title": "Set up Cloudflare Tunnel for Morgan Agent",
+    "description": "Establish a basic Cloudflare Tunnel for initial connectivity for the 'morgan' service, pointing to a placeholder service or internal IP for initial setup.",
+    "dependencies": [],
+    "details": "As the Bolt agent, create a new Cloudflare Tunnel. Configure a public hostname (e.g., `morgan.sigma1.example.com`) to point to a placeholder internal service or a dummy IP address within the cluster (e.g., `http://localhost:8080` or a service that will be created later). Ensure the `cloudflared` client is configured to run and connect to the tunnel.",
+    "status": "pending",
+    "test_strategy": "Verify the Cloudflare Tunnel is active and reachable from the internet using `cloudflared tunnel status` or by attempting to access the configured public hostname (expecting a placeholder response or connection).",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 4,
+    "title": "Deploy CloudNative-PG Operator",
+    "description": "Install the CloudNative-PG operator in the 'databases' namespace to enable declarative management of PostgreSQL clusters.",
+    "dependencies": [1],
+    "details": "As the Bolt agent, apply the official CloudNative-PG operator YAML manifests or use Helm to deploy the operator into the 'databases' namespace. Ensure the operator's CustomResourceDefinitions (CRDs) are installed and its pods are running.",
+    "status": "pending",
+    "test_strategy": "Verify the CloudNative-PG operator pod(s) are running and healthy in the 'databases' namespace using `kubectl get pods -n databases -l app.kubernetes.io/name=cloudnative-pg`. Confirm CRDs like `clusters.postgresql.cnpg.io` exist via `kubectl get crd | grep postgresql.cnpg.io`.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 5,
+    "title": "Deploy Redis Operator",
+    "description": "Install a suitable Redis operator (e.g., Redis Community Operator or similar) in the 'databases' namespace to manage Redis/Valkey clusters.",
+    "dependencies": [1],
+    "details": "As the Bolt agent, apply the chosen Redis operator's YAML manifests or use Helm to deploy it into the 'databases' namespace. Ensure the operator's CRDs are installed and its pods are running.",
+    "status": "pending",
+    "test_strategy": "Verify the Redis operator pod(s) are running and healthy in the 'databases' namespace using `kubectl get pods -n databases -l app.kubernetes.io/name=redis-operator` (adjust label based on the specific operator chosen). Confirm relevant Redis CRDs exist.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 6,
+    "title": "Deploy `sigma1-postgres` Cluster and Secret",
+    "description": "Deploy a single-instance PostgreSQL cluster named 'sigma1-postgres' using the CloudNative-PG operator in the 'databases' namespace, with a 'sigma1' database and 'sigma1_user'. Configure 50Gi persistent storage. The operator will create a Kubernetes Secret for the user's password.",
+    "dependencies": [4],
+    "details": "As the Bolt agent, create a `Cluster` Custom Resource (CR) for CloudNative-PG in the 'databases' namespace. Specify `sigma1-postgres` as the name, configure a single replica, define a `storage` class with 50Gi, and create a `database` named 'sigma1' with a `user` 'sigma1_user'. The CloudNative-PG operator will automatically create a Kubernetes Secret containing the password for 'sigma1_user'. Ensure this secret is created and accessible.",
+    "status": "pending",
+    "test_strategy": "Verify the `sigma1-postgres` pod is running and healthy in the 'databases' namespace. Confirm the associated PersistentVolumeClaim (PVC) is bound and the PersistentVolume (PV) is provisioned. Verify the Kubernetes Secret for 'sigma1_user' password exists and contains valid credentials. Connect to the PostgreSQL instance using `psql` with 'sigma1_user' and the retrieved password, then verify the 'sigma1' database exists and is accessible.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 7,
+    "title": "Deploy `sigma1-valkey` Cluster",
+    "description": "Deploy a single-instance Redis/Valkey cluster named 'sigma1-valkey' using the Redis operator in the 'databases' namespace, using the `valkey/valkey:7.2-alpine` image.",
+    "dependencies": [5],
+    "details": "As the Bolt agent, create a `Redis` (or equivalent CR for Valkey) Custom Resource in the 'databases' namespace. Specify `sigma1-valkey` as the name, configure a single replica, and set the image to `valkey/valkey:7.2-alpine`. Ensure the Valkey pod is successfully deployed.",
+    "status": "pending",
+    "test_strategy": "Verify the `sigma1-valkey` pod is running and healthy in the 'databases' namespace. Connect to the Valkey instance using `redis-cli` from within the cluster and perform basic operations (e.g., `SET key value`, `GET key`) to verify functionality.",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 8,
+    "title": "Generate S3/R2 Credentials and Create Kubernetes Secret",
+    "description": "Generate necessary access key ID and secret access key for the 'sigma1-assets' S3/R2 bucket and store them in a Kubernetes Secret.",
+    "dependencies": [2],
+    "details": "As the Bolt agent, generate an API token with R2 read/write permissions for the 'sigma1-assets' bucket (provisioned in subtask 2). Securely extract the access key ID and secret access key. Create a Kubernetes Secret named `sigma1-s3-credentials` in the `sigma1` namespace, storing these credentials as `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`.",
+    "status": "pending",
+    "test_strategy": "Verify the `sigma1-s3-credentials` Secret exists in the `sigma1` namespace using `kubectl get secret sigma1-s3-credentials -n sigma1 -o yaml`. Confirm it contains the expected keys. Use `kubectl get secret ... -o jsonpath='{.data.S3_ACCESS_KEY_ID}' | base64 --decode` to retrieve credentials and verify they allow read/write access to the 'sigma1-assets' R2 bucket (e.g., via `s3cmd` or `aws s3`).",
+    "subagentType": "implementer",
+    "parallelizable": true
+  },
+  {
+    "id": 9,
+    "title": "Create `sigma1-infra-endpoints` ConfigMap",
+    "description": "Create a ConfigMap named 'sigma1-infra-endpoints' in the 'sigma1' namespace, containing non-sensitive connection strings for PostgreSQL, Redis/Valkey, and S3/R2, formatted for easy consumption by other services.",
+    "dependencies": [3, 6, 7, 8],
+    "details": "As the Bolt agent, construct a Kubernetes ConfigMap YAML manifest named `sigma1-infra-endpoints` in the `sigma1` namespace. Populate it with non-sensitive connection details: `POSTGRES_URL` (e.g., `postgres://sigma1_user@sigma1-postgres.databases.svc.cluster.local:5432/sigma1`), `REDIS_URL` (e.g., `redis://sigma1-valkey.databases.svc.cluster.local:6379`), `S3_BUCKET_NAME` ('sigma1-assets'), and `CLOUDFLARE_TUNNEL_URL` (e.g., `https://morgan.sigma1.example.com`). Sensitive credentials (PostgreSQL password, S3 access keys) will be sourced from dedicated Kubernetes Secrets via `envFrom` in consuming pods, not directly referenced in this ConfigMap.",
+    "status": "pending",
+    "test_strategy": "Verify the `sigma1-infra-endpoints` ConfigMap exists in the 'sigma1' namespace using `kubectl get cm sigma1-infra-endpoints -n sigma1 -o yaml`. Confirm all expected keys are present and their values are correctly formatted (e.g., internal DNS names resolve). Ensure no sensitive credentials are directly present in the ConfigMap.",
+    "subagentType": "implementer",
+    "parallelizable": false
+  },
+  {
+    "id": 10,
+    "title": "Review Core Infrastructure Setup",
+    "description": "Conduct a comprehensive review of all deployed core infrastructure components, ensuring they meet requirements, are correctly configured, and are accessible as expected.",
+    "dependencies": [9],
+    "details": "As the Reviewer agent, conduct a comprehensive audit of the deployed core infrastructure. This includes verifying all Kubernetes resources (namespaces, operators, clusters, secrets, configmaps) are in a healthy state, logs are clean, and resource configurations align with best practices. Confirm that all connection endpoints specified in the `sigma1-infra-endpoints` ConfigMap are resolvable and that the associated secrets (PostgreSQL, S3/R2) are correctly provisioned and accessible for a test application.",
+    "status": "pending",
+    "test_strategy": "Perform end-to-end connectivity tests from a temporary test pod deployed in the 'sigma1' namespace. This pod should attempt to connect to PostgreSQL using credentials from its secret, to Redis/Valkey, and perform read/write operations on S3/R2 using credentials from its secret. Verify the Cloudflare Tunnel is fully operational and accessible from outside the cluster. Check Kubernetes events for any warnings or errors across all relevant namespaces and resources.",
+    "subagentType": "reviewer",
+    "parallelizable": false
+  }
+]

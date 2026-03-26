@@ -7,6 +7,7 @@ import { createAgentSessionManager } from "./agent-session-manager.js";
 import { createElicitationHandler } from "./elicitation-handler.js";
 import { createRunRegistry } from "./run-registry.js";
 import { LokiActivityStream } from "./loki-activity-stream.js";
+import { createBridgeStateDb, defaultBridgeStateDbPath } from "./state/bridge-state-db.js";
 
 const logger = {
   info: (...args: unknown[]) => console.log(`[linear-bridge]`, ...args),
@@ -44,8 +45,9 @@ async function main(): Promise<void> {
   );
 
   // 3. Set up agent session manager + run registry
+  const stateDb = createBridgeStateDb(defaultBridgeStateDbPath());
   const sessionManager = createAgentSessionManager();
-  const runRegistry = createRunRegistry();
+  const runRegistry = createRunRegistry(stateDb);
 
   // 4. Create the bridge orchestrator
   const bridge = createBridge(config, linearClient, issueManager, logger);
@@ -57,6 +59,7 @@ async function main(): Promise<void> {
       linearClient,
       sessionManager,
       runRegistry,
+      stateDb,
       config.discordBridgeUrl,
       logger,
     );
@@ -117,6 +120,7 @@ async function main(): Promise<void> {
     lokiStream?.stop();
     bridge.stop();
     elicitHandler?.destroy();
+    stateDb.close();
     await httpServer.stop();
     process.exit(0);
   };

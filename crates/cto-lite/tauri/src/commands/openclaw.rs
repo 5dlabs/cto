@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::State;
 
@@ -406,6 +406,182 @@ fn extract_agent_reply(notifications: &[SessionNotification]) -> String {
         .collect::<String>()
         .trim()
         .to_string()
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MorganMemoryPolicy {
+    recall_required: bool,
+    async_persist: bool,
+}
+
+impl Default for MorganMemoryPolicy {
+    fn default() -> Self {
+        Self {
+            recall_required: true,
+            async_persist: true,
+        }
+    }
+}
+
+impl MorganMemoryPolicy {
+    fn from_env() -> Self {
+        fn bool_env(name: &str, default: bool) -> bool {
+            std::env::var(name)
+                .map(|value| {
+                    matches!(
+                        value.as_str(),
+                        "1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON"
+                    )
+                })
+                .unwrap_or(default)
+        }
+
+        Self {
+            recall_required: bool_env("CTO_MORGAN_MEMORY_RECALL_REQUIRED", true),
+            async_persist: bool_env("CTO_MORGAN_MEMORY_ASYNC_PERSIST", true),
+        }
+    }
+}
+
+fn apply_recall_policy_prompt(
+    message: &str,
+    agent_id: &str,
+    session_id: &str,
+    gateway_session_key: &str,
+) -> String {
+    format!(
+        "You are in memory-policy mode for Morgan.
+
+Before giving the final answer, perform mandatory recall with this order:
+1) scoped episodic recall
+2) scoped factual/relational recall
+3) broader fallback recall only if scoped recall is sparse
+
+Use OpenMemory tools and scope using:
+- agent: {agent_id}
+- ui_session_id: {session_id}
+- gateway_session_key: {gateway_session_key}
+
+Only include relevant recalled context in your final answer.
+
+User message:
+{message}"
+    )
+}
+
+fn build_async_persist_prompt(
+    user_message: &str,
+    assistant_message: &str,
+    agent_id: &str,
+    session_id: &str,
+    gateway_session_key: &str,
+) -> String {
+    format!(
+        "Persist a concise episodic memory snapshot for this completed turn.
+
+Scope:
+- agent: {agent_id}
+- ui_session_id: {session_id}
+- gateway_session_key: {gateway_session_key}
+
+Write memory sectors as appropriate (factual, temporal, relational, behavioral).
+Use this structure:
+- Goal
+- Constraints
+- Progress
+- Key Decisions
+- Next Steps
+- Critical Context
+
+Turn data:
+User: {user_message}
+Assistant: {assistant_message}
+
+After storing memory, reply exactly: MEMORY_PERSISTED"
+    )
+}
+
+fn maybe_spawn_async_memory_persist(
+    policy: MorganMemoryPolicy,
+    gateway_session_key: String,
+    agent_id: String,
+    gateway_base_url: Option<String>,
+    user_message: String,
+    assistant_message: String,
+    session_id: String,
+) {
+    if !policy.async_persist {
+        return;
+    }
+
+    tokio::spawn(async move {
+        let runtime =
+            match agent_acp_runtime(&gateway_session_key, &agent_id, gateway_base_url.as_deref()) {
+                Ok(value) => value,
+                Err(error) => {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        gateway_session_key = %gateway_session_key,
+                        ?error,
+                        "Skipping async memory persist due to runtime init failure"
+                    );
+                    return;
+                }
+            };
+
+        let prompt = build_async_persist_prompt(
+            &user_message,
+            &assistant_message,
+            &agent_id,
+            &session_id,
+            &gateway_session_key,
+        );
+
+        let result = run_morgan_acp_turn(
+            runtime,
+            AcpPromptRequest {
+                runtime_id: agent_id.clone(),
+                cwd: desktop_acp_cwd(),
+                prompt,
+                session_id: None,
+            },
+            AcpClientProfile {
+                name: "cto-morgan-memory-persist".to_string(),
+                title: "CTO Morgan Memory Persist".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                permission_policy: AcpPermissionPolicy::AllowAll,
+            },
+        )
+        .await;
+
+        match result {
+            Ok(persist_result) => {
+                let ack = extract_agent_reply(&persist_result.notifications);
+                if ack.trim() == "MEMORY_PERSISTED" {
+                    tracing::info!(
+                        session_id = %session_id,
+                        gateway_session_key = %gateway_session_key,
+                        "Async memory persistence completed"
+                    );
+                } else {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        gateway_session_key = %gateway_session_key,
+                        ack = %ack,
+                        "Async memory persistence returned unexpected acknowledgement"
+                    );
+                }
+            }
+            Err(error) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    gateway_session_key = %gateway_session_key,
+                    ?error,
+                    "Async memory persistence failed"
+                );
+            }
+        }
+    });
 }
 
 async fn run_morgan_acp_turn(
@@ -1225,6 +1401,7 @@ pub async fn openclaw_send_message(
     conversations: State<'_, ConversationState>,
 ) -> Result<OpenClawResponse, AppError> {
     let started_at = Instant::now();
+    let memory_policy = MorganMemoryPolicy::from_env();
     let agent_id = normalize_agent_id(agent_id);
     let health = collect_local_morgan_health().await;
     ensure_local_morgan_exec_ready(&health)?;
@@ -1239,12 +1416,18 @@ pub async fn openclaw_send_message(
         role: "user".to_string(),
         content: message.clone(),
     };
+    let turn_prompt = if memory_policy.recall_required {
+        apply_recall_policy_prompt(&message, &agent_id, &session_id, &gateway_session_key)
+    } else {
+        message.clone()
+    };
+
     let result = run_morgan_acp_turn(
         runtime,
         AcpPromptRequest {
             runtime_id: agent_id.clone(),
             cwd: desktop_acp_cwd(),
-            prompt: message,
+            prompt: turn_prompt,
             // We intentionally create a fresh ACP session per turn and bind it
             // to a stable OpenClaw session key. That keeps Morgan's context in
             // the Gateway without depending on bridge-local ACP session ids.
@@ -1272,6 +1455,7 @@ pub async fn openclaw_send_message(
         content: assistant_text.clone(),
     };
 
+    let user_content_for_persist = user_message.content.clone();
     update_session_record(
         conversations.inner(),
         &session_id,
@@ -1279,6 +1463,16 @@ pub async fn openclaw_send_message(
         &[user_message, assistant_message],
         Some(result.session_id.clone()),
     )?;
+
+    maybe_spawn_async_memory_persist(
+        memory_policy,
+        gateway_session_key.clone(),
+        agent_id.clone(),
+        gateway_base_url.clone(),
+        user_content_for_persist,
+        assistant_text.clone(),
+        session_id.clone(),
+    );
 
     let latency_ms = started_at.elapsed().as_millis() as u64;
     tracing::info!(
@@ -1625,6 +1819,7 @@ pub async fn openclaw_exec_cli(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::OnceLock;
 
     fn morgan_acp_test_lock() -> &'static tokio::sync::Mutex<()> {
         static LOCK: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
@@ -1800,5 +1995,32 @@ mod tests {
             counts.iter().copied().max().unwrap_or_default() > 0,
             "expected later turn to include prior messages, counts={counts:?}, log={session_text}"
         );
+    }
+
+    #[test]
+    fn recall_policy_prompt_contains_scope_keys() {
+        let prompt = apply_recall_policy_prompt(
+            "Ship this feature.",
+            "morgan",
+            "session-123",
+            "agent:morgan:openai-user:morgan-avatar:session-123",
+        );
+        assert!(prompt.contains("mandatory recall"));
+        assert!(prompt.contains("session-123"));
+        assert!(prompt.contains("gateway_session_key"));
+    }
+
+    #[test]
+    fn persist_prompt_contains_structured_sections() {
+        let prompt = build_async_persist_prompt(
+            "Build pipeline checks",
+            "Done. Added checks.",
+            "morgan",
+            "session-abc",
+            "agent:morgan:openai-user:morgan-avatar:session-abc",
+        );
+        assert!(prompt.contains("Key Decisions"));
+        assert!(prompt.contains("Critical Context"));
+        assert!(prompt.contains("MEMORY_PERSISTED"));
     }
 }

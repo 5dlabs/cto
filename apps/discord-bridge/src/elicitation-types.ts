@@ -92,6 +92,42 @@ export interface ElicitationCancel {
 }
 
 // =============================================================================
+// DesignReviewRequest — Phase B: visual design variant selection
+// =============================================================================
+
+export interface DesignVariantOption {
+  variant_id: string;
+  label: string;
+  image_url: string;
+  html_url?: string;
+  description: string;
+  aspects_changed: string[];
+}
+
+export interface DesignReviewRequest {
+  review_id: string;
+  session_id: string;
+  screen_context: string;
+  variants: DesignVariantOption[];
+  recommended_variant?: string;
+  timeout_seconds: number;
+  timestamp: string;
+  discord_channel_id?: string;
+  linear_issue_id?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface DesignReviewResponse {
+  review_id: string;
+  source: 'linear' | 'discord';
+  response_type: 'selection' | 'request_changes';
+  selected_variant?: string;
+  user_notes?: string;
+  user_id: string;
+  timestamp: string;
+}
+
+// =============================================================================
 // Helpers
 // =============================================================================
 

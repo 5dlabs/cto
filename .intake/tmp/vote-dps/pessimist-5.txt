@@ -1,0 +1,1 @@
+Rely on React's built-in state management (e.g., `useState`, Context API) combined with TanStack Query for server state.

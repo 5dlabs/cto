@@ -1,253 +1,329 @@
 name: decision-voting
 description: >
-  5-member committee vote on a single deliberation decision point.
+  3-member committee vote on a single deliberation decision point.
   Reuses the parallel voting pattern from voting.lobster.yaml but with
   decision-point-specific prompts and elicitation for human-in-the-loop.
 
-inputs:
-  - name: question
-    type: string
-    description: "The decision point question"
-  - name: optimist_position
-    type: string
-    description: "The optimist's advocated approach"
-  - name: pessimist_position
-    type: string
-    description: "The pessimist's advocated approach"
-  - name: context
-    type: string
-    description: "Relevant PRD excerpt for context"
-  - name: decision_id
-    type: string
-    description: "Decision point ID (e.g. dp-auth-strategy)"
-  - name: session_id
-    type: string
-    description: "Deliberation session ID"
-  - name: human_review_mode
-    type: string
-    default: "full_auto"
-    description: "full_auto | semi_auto | manual"
-  - name: verify
-    type: string
+args:
+  question:
+    default: ""
+  optimist_position:
+    default: ""
+  pessimist_position:
+    default: ""
+  context:
+    default: ""
+  question_file:
+    default: ""
+  optimist_file:
+    default: ""
+  pessimist_file:
+    default: ""
+  context_file:
+    default: ""
+  decision_id:
+    default: ""
+  session_id:
+    default: ""
+  human_review_mode:
+    default: human_required
+  verify:
     default: "true"
-    description: "When true, validate tally output"
-  - name: linear_issue_id
-    type: string
+  audio_debug:
+    default: "true"
+  linear_issue_id:
     default: ""
-  - name: discord_channel_id
-    type: string
+  discord_channel_id:
     default: ""
-  - name: voter_1_provider
-    type: string
-    default: "anthropic"
-  - name: voter_1_model
-    type: string
-    default: "claude-opus-4-6"
-  - name: voter_2_provider
-    type: string
-    default: "openai"
-  - name: voter_2_model
-    type: string
-    default: "gpt-5.2-pro"
-  - name: voter_3_provider
-    type: string
-    default: "anthropic"
-  - name: voter_3_model
-    type: string
-    default: "claude-sonnet-4-6"
-  - name: voter_4_provider
-    type: string
-    default: "openai"
-  - name: voter_4_model
-    type: string
-    default: "o3-pro"
-  - name: voter_5_provider
-    type: string
-    default: "google"
-  - name: voter_5_model
-    type: string
-    default: "gemini-2.5-pro"
+  voter_1_provider:
+    default: anthropic
+  voter_1_model:
+    default: claude-opus-4-6
+  voter_2_provider:
+    default: openai-api
+  voter_2_model:
+    default: gpt-5.4-pro
+  voter_3_provider:
+    default: anthropic
+  voter_3_model:
+    default: claude-sonnet-4-6
 
 steps:
-  # ─────────────────────────────────────────────────────────
-  # Parallel committee votes (5 independent voters)
-  # ─────────────────────────────────────────────────────────
-  - name: voter-1
-    description: "Architect voter — structural soundness"
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/voter-architect-soul.md}}\n\n---\n\n{{prompts/decision-vote-system.md}}",
-        "input": {
-          "question": "{{inputs.question}}",
-          "category": "architecture",
-          "optimist_position": "{{inputs.optimist_position}}",
-          "pessimist_position": "{{inputs.pessimist_position}}",
-          "context": "{{inputs.context}}"
-        },
-        "schema": "{{schemas/decision-vote-response.schema.json}}",
-        "provider": "{{inputs.voter_1_provider}}",
-        "model": "{{inputs.voter_1_model}}"
-      }'
-
-  - name: voter-2
-    description: "Pragmatist voter — implementability and timeline"
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/voter-pragmatist-soul.md}}\n\n---\n\n{{prompts/decision-vote-system.md}}",
-        "input": {
-          "question": "{{inputs.question}}",
-          "category": "architecture",
-          "optimist_position": "{{inputs.optimist_position}}",
-          "pessimist_position": "{{inputs.pessimist_position}}",
-          "context": "{{inputs.context}}"
-        },
-        "schema": "{{schemas/decision-vote-response.schema.json}}",
-        "provider": "{{inputs.voter_2_provider}}",
-        "model": "{{inputs.voter_2_model}}"
-      }'
-
-  - name: voter-3
-    description: "Minimalist voter — simplicity and focus"
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/voter-minimalist-soul.md}}\n\n---\n\n{{prompts/decision-vote-system.md}}",
-        "input": {
-          "question": "{{inputs.question}}",
-          "category": "architecture",
-          "optimist_position": "{{inputs.optimist_position}}",
-          "pessimist_position": "{{inputs.pessimist_position}}",
-          "context": "{{inputs.context}}"
-        },
-        "schema": "{{schemas/decision-vote-response.schema.json}}",
-        "provider": "{{inputs.voter_3_provider}}",
-        "model": "{{inputs.voter_3_model}}"
-      }'
-
-  - name: voter-4
-    description: "Operator voter — deployability and observability"
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/voter-operator-soul.md}}\n\n---\n\n{{prompts/decision-vote-system.md}}",
-        "input": {
-          "question": "{{inputs.question}}",
-          "category": "architecture",
-          "optimist_position": "{{inputs.optimist_position}}",
-          "pessimist_position": "{{inputs.pessimist_position}}",
-          "context": "{{inputs.context}}"
-        },
-        "schema": "{{schemas/decision-vote-response.schema.json}}",
-        "provider": "{{inputs.voter_4_provider}}",
-        "model": "{{inputs.voter_4_model}}"
-      }'
-
-  - name: voter-5
-    description: "Strategist voter — maintainability and evolution"
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/voter-strategist-soul.md}}\n\n---\n\n{{prompts/decision-vote-system.md}}",
-        "input": {
-          "question": "{{inputs.question}}",
-          "category": "architecture",
-          "optimist_position": "{{inputs.optimist_position}}",
-          "pessimist_position": "{{inputs.pessimist_position}}",
-          "context": "{{inputs.context}}"
-        },
-        "schema": "{{schemas/decision-vote-response.schema.json}}",
-        "provider": "{{inputs.voter_5_provider}}",
-        "model": "{{inputs.voter_5_model}}"
-      }'
-
-  # ─────────────────────────────────────────────────────────
-  # Tally votes
-  # ─────────────────────────────────────────────────────────
-  - name: tally
-    depends_on: [voter-1, voter-2, voter-3, voter-4, voter-5]
-    description: "Tally committee decision-point votes"
-    command: >
-      jq -n '[
-        ($v1 | . + {"voter_id": "architect"}),
-        ($v2 | . + {"voter_id": "pragmatist"}),
-        ($v3 | . + {"voter_id": "minimalist"}),
-        ($v4 | . + {"voter_id": "operator"}),
-        ($v5 | . + {"voter_id": "strategist"})
-      ]'
-        --argjson v1 '${{ steps.voter-1.output }}'
-        --argjson v2 '${{ steps.voter-2.output }}'
-        --argjson v3 '${{ steps.voter-3.output }}'
-        --argjson v4 '${{ steps.voter-4.output }}'
-        --argjson v5 '${{ steps.voter-5.output }}' |
-      intake-util tally-decision-votes
-
-  # ─────────────────────────────────────────────────────────
-  # Verify tally output
-  # ─────────────────────────────────────────────────────────
-  - name: verify-tally
-    when: "{{inputs.verify}}"
-    depends_on: [tally]
-    command: >
-      echo '${{ steps.tally.output }}' |
-      intake-util validate --type decision-vote
-
-  # ─────────────────────────────────────────────────────────
-  # Publish elicitation to bridges (human-in-the-loop)
-  # ─────────────────────────────────────────────────────────
-  - name: publish-elicitation
-    depends_on: [tally]
-    description: "Publish elicitation request via HTTP bridge"
-    command: >
-      intake-util bridge-elicitation
-        --session-id "{{inputs.session_id}}"
-        --decision-id "{{inputs.decision_id}}"
-        --vote-result '${{ steps.tally.output }}'
-        --resume-token "$LOBSTER_RESUME_TOKEN"
-        --human-review-mode "{{inputs.human_review_mode}}"
-
-  # ─────────────────────────────────────────────────────────
-  # Wait for human response (Lobster approval gate)
-  # ─────────────────────────────────────────────────────────
-  - name: wait-human
-    when: "{{inputs.human_review_mode != 'full_auto'}}"
-    depends_on: [publish-elicitation]
-    approval:
-      message: "Waiting for human decision on {{inputs.decision_id}}"
-
-  # ─────────────────────────────────────────────────────────
-  # Resolve: use human override or committee result
-  # ─────────────────────────────────────────────────────────
-  - name: resolve
-    depends_on: [tally, wait-human]
-    description: "Resolve decision: human override or committee result"
-    command: >
-      TALLY='${{ steps.tally.output }}'
-      HUMAN='${{ steps.wait-human.output }}'
-      jq -n \
-        --argjson tally "$TALLY" \
-        --argjson human "${HUMAN:-null}" \
+  - id: voter-1
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "decision-voting" "voter-1" "${audio_debug}"
+      QF="${question_file}"; OF="${optimist_file}"; PF="${pessimist_file}"; CF="${context_file}"
+      ARGS=$(jq -n \
+        --rawfile p1 "$root/intake/prompts/voter-architect-soul.md" \
+        --rawfile p2 "$root/intake/prompts/decision-vote-system.md" \
+        --rawfile question "$QF" \
+        --rawfile optimist "$OF" \
+        --rawfile pessimist "$PF" \
+        --rawfile context "$CF" \
+        --arg schema "$root/intake/schemas/decision-vote-response.schema.json" \
+        --arg provider "${voter_1_provider}" \
+        --arg model "${voter_1_model}" \
         '{
-          decision_id: "{{inputs.decision_id}}",
-          question: "{{inputs.question}}",
-          winning_option: (
-            if $human != null and $human.response_type == "selection" and $human.selected_option != null
-            then $human.selected_option
-            else $tally.winning_option
-            end
-          ),
-          escalated: (
-            if $human != null and $human.response_type == "redeliberate"
-            then true
-            elif $human != null and $human.response_type == "selection"
-            then false
-            else $tally.escalated
-            end
-          ),
-          consensus_strength: $tally.consensus_strength,
-          tally: $tally.tally,
-          human_override: ($human != null and $human.response_type == "selection"),
-          voter_notes: $tally.voter_notes
-        }'
+          "prompt": ($p1 + "\n\n---\n\n" + $p2),
+          "input": {
+            "question": $question,
+            "category": "architecture",
+            "optimist_position": $optimist,
+            "pessimist_position": $pessimist,
+            "context": $context
+          },
+          "schema": $schema,
+          "provider": $provider,
+          "model": $model
+        }')
+      VOTE_OUT="$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS")"
+      LV_BIN=""; command -v lobster-voice >/dev/null 2>&1 && LV_BIN="lobster-voice" || { [ -x "$root/apps/lobster-voice/lobster-voice" ] && LV_BIN="$root/apps/lobster-voice/lobster-voice"; }
+      VOTE_SAY="$(printf '%s' "$VOTE_OUT" | jq -r '(.output[0] // .) | "I vote for " + (.chosen_option // .chosenOption // "undecided") + ". " + (.reasoning // .rationale // "")' 2>/dev/null || true)"
+      [ -n "$LV_BIN" ] && [ -n "$VOTE_SAY" ] && WORKSPACE="$root" "$LV_BIN" debate voter-1 "$VOTE_SAY" --summarize || true
+      printf '%s' "$VOTE_OUT"
 
-output_mappings:
-  winning_option: ${{ steps.resolve.output | jq -r '.winning_option' }}
-  escalated: ${{ steps.resolve.output | jq -r '.escalated' }}
-  consensus_strength: ${{ steps.resolve.output | jq -r '.consensus_strength' }}
-  decision_result: ${{ steps.resolve.output }}
+  - id: voter-2
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "decision-voting" "voter-2" "${audio_debug}"
+      QF="${question_file}"; OF="${optimist_file}"; PF="${pessimist_file}"; CF="${context_file}"
+      ARGS=$(jq -n \
+        --rawfile p1 "$root/intake/prompts/voter-pragmatist-soul.md" \
+        --rawfile p2 "$root/intake/prompts/decision-vote-system.md" \
+        --rawfile question "$QF" \
+        --rawfile optimist "$OF" \
+        --rawfile pessimist "$PF" \
+        --rawfile context "$CF" \
+        --arg schema "$root/intake/schemas/decision-vote-response.schema.json" \
+        --arg provider "${voter_2_provider}" \
+        --arg model "${voter_2_model}" \
+        '{
+          "prompt": ($p1 + "\n\n---\n\n" + $p2),
+          "input": {
+            "question": $question,
+            "category": "architecture",
+            "optimist_position": $optimist,
+            "pessimist_position": $pessimist,
+            "context": $context
+          },
+          "schema": $schema,
+          "provider": $provider,
+          "model": $model
+        }')
+      VOTE_OUT="$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS")"
+      LV_BIN=""; command -v lobster-voice >/dev/null 2>&1 && LV_BIN="lobster-voice" || { [ -x "$root/apps/lobster-voice/lobster-voice" ] && LV_BIN="$root/apps/lobster-voice/lobster-voice"; }
+      VOTE_SAY="$(printf '%s' "$VOTE_OUT" | jq -r '(.output[0] // .) | "I vote for " + (.chosen_option // .chosenOption // "undecided") + ". " + (.reasoning // .rationale // "")' 2>/dev/null || true)"
+      [ -n "$LV_BIN" ] && [ -n "$VOTE_SAY" ] && WORKSPACE="$root" "$LV_BIN" debate voter-2 "$VOTE_SAY" --summarize || true
+      printf '%s' "$VOTE_OUT"
+
+  - id: voter-3
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "decision-voting" "voter-3" "${audio_debug}"
+      QF="${question_file}"; OF="${optimist_file}"; PF="${pessimist_file}"; CF="${context_file}"
+      ARGS=$(jq -n \
+        --rawfile p1 "$root/intake/prompts/voter-minimalist-soul.md" \
+        --rawfile p2 "$root/intake/prompts/decision-vote-system.md" \
+        --rawfile question "$QF" \
+        --rawfile optimist "$OF" \
+        --rawfile pessimist "$PF" \
+        --rawfile context "$CF" \
+        --arg schema "$root/intake/schemas/decision-vote-response.schema.json" \
+        --arg provider "${voter_3_provider}" \
+        --arg model "${voter_3_model}" \
+        '{
+          "prompt": ($p1 + "\n\n---\n\n" + $p2),
+          "input": {
+            "question": $question,
+            "category": "architecture",
+            "optimist_position": $optimist,
+            "pessimist_position": $pessimist,
+            "context": $context
+          },
+          "schema": $schema,
+          "provider": $provider,
+          "model": $model
+        }')
+      VOTE_OUT="$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS")"
+      LV_BIN=""; command -v lobster-voice >/dev/null 2>&1 && LV_BIN="lobster-voice" || { [ -x "$root/apps/lobster-voice/lobster-voice" ] && LV_BIN="$root/apps/lobster-voice/lobster-voice"; }
+      VOTE_SAY="$(printf '%s' "$VOTE_OUT" | jq -r '(.output[0] // .) | "I vote for " + (.chosen_option // .chosenOption // "undecided") + ". " + (.reasoning // .rationale // "")' 2>/dev/null || true)"
+      [ -n "$LV_BIN" ] && [ -n "$VOTE_SAY" ] && WORKSPACE="$root" "$LV_BIN" debate voter-3 "$VOTE_SAY" --summarize || true
+      printf '%s' "$VOTE_OUT"
+
+  - id: tally
+    env:
+      CTO_VOTER_1: $voter-1.stdout
+      CTO_VOTER_2: $voter-2.stdout
+      CTO_VOTER_3: $voter-3.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "decision-voting" "tally" "${audio_debug}"
+      normalize_vote() {
+        printf '%s' "$1" | jq -c '
+          (.output[0] // .output // .result // .data // .response // .) as $raw
+          | (if ($raw | type) == "string"
+             then (
+               try ($raw | fromjson)
+               catch (
+                 try ($raw | match("(?s)\\{.*\\}") | .string | fromjson)
+                 catch {raw_text: $raw}
+               )
+             )
+             else $raw
+             end) as $v
+          | (if ($v | type) != "object" then {} else $v end)
+          | (if (.chosen_option? == null and .chosenOption? != null) then . + {chosen_option: .chosenOption} else . end)
+          | (if (.chosen_option? == null and .selectedOption? != null) then . + {chosen_option: .selectedOption} else . end)
+          | (if (.chosen_option? == null and .selectedOptionValue? != null) then . + {chosen_option: .selectedOptionValue} else . end)
+          | (if (.chosen_option? == null and .selected_option? != null) then . + {chosen_option: .selected_option} else . end)
+          | (if (.chosen_option? == null and .winning_option? != null) then . + {chosen_option: .winning_option} else . end)
+          | (if (.chosen_option? == null and .vote? != null) then . + {chosen_option: .vote} else . end)
+          | (if (.chosen_option? == null and .choice? != null) then . + {chosen_option: .choice} else . end)
+          | (if (.chosen_option? == null and .option? != null) then . + {chosen_option: .option} else . end)
+          | (if (.chosen_option? == null and .position? != null) then . + {chosen_option: .position} else . end)
+          | ._vote_text = (((.chosen_option // "") + " " + (.reasoning // "") + " " + (.raw_text // "")) | ascii_downcase)
+          | (if (.chosen_option? // "" | type) == "string" and ((.chosen_option | ascii_downcase) | test("optimist")) then . + {chosen_option: "optimist_option"} else . end)
+          | (if (.chosen_option? // "" | type) == "string" and ((.chosen_option | ascii_downcase) | test("pessimist")) then . + {chosen_option: "pessimist_option"} else . end)
+          | (if (.chosen_option? // "" | type) == "string" and ((.chosen_option | ascii_downcase) | test("(hono|bun|cloudflare|worker|workers)")) then . + {chosen_option: "optimist_option"} else . end)
+          | (if (.chosen_option? // "" | type) == "string" and ((.chosen_option | ascii_downcase) | test("(node|express|fastify|container|kubernetes|k8s)")) then . + {chosen_option: "pessimist_option"} else . end)
+          | (if (.chosen_option? == null and (.raw_text? // "" | ascii_downcase | test("(hono|bun|cloudflare|worker|workers)"))) then . + {chosen_option: "optimist_option"} else . end)
+          | (if (.chosen_option? == null and (.raw_text? // "" | ascii_downcase | test("(node|express|fastify|container|kubernetes|k8s)"))) then . + {chosen_option: "pessimist_option"} else . end)
+          | (if ((.chosen_option? // "") == "" and (._vote_text | test("(hono|bun|cloudflare|worker|workers|edge runtime|serverless)"))) then . + {chosen_option: "optimist_option"} else . end)
+          | (if ((.chosen_option? // "") == "" and (._vote_text | test("(node|express|fastify|container|kubernetes|k8s|pod|deployment)"))) then . + {chosen_option: "pessimist_option"} else . end)
+          | .confidence = (.confidence // 0.6)
+          | .reasoning = (.reasoning // .rationale // .why // .explanation // "No reasoning provided.")
+          | .concerns = (.concerns // [])
+          | del(._vote_text)
+        ' 2>/dev/null || printf '{}'
+      }
+      V1="$(normalize_vote "$CTO_VOTER_1")"
+      V2="$(normalize_vote "$CTO_VOTER_2")"
+      V3="$(normalize_vote "$CTO_VOTER_3")"
+      VOTES_JSON="$(jq -nc \
+        --arg v1 "$V1" \
+        --arg v2 "$V2" \
+        --arg v3 "$V3" \
+        '[ (($v1 | fromjson? // {}) + {"voter_id":"architect"}),
+           (($v2 | fromjson? // {}) + {"voter_id":"pragmatist"}),
+           (($v3 | fromjson? // {}) + {"voter_id":"minimalist"}) ]')"
+      printf '%s' "$VOTES_JSON" | intake-util tally-decision-votes
+
+  - id: verify-tally
+    env:
+      CTO_TALLY_OUT: $tally.stdout
+    command: >
+      root="${WORKSPACE:-.}" && "$root/intake/scripts/workflow-step-audio.sh" "decision-voting" "verify-tally" "${audio_debug}" &&
+      if [ "${verify}" = "true" ]; then
+        printf '%s' "$CTO_TALLY_OUT" | intake-util validate --type decision-vote || exit 1
+      fi &&
+      "$root/intake/scripts/workflow-gate-audio.sh" "decision-voting" "verify-tally" "passed" "${audio_debug}" "normal" "session ${session_id}, decision ${decision_id}" &&
+      printf '%s' "$CTO_TALLY_OUT"
+
+  - id: resolve
+    env:
+      CTO_TALLY_OUT: $tally.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "decision-voting" "resolve" "${audio_debug}"
+      QF="${question_file}"
+      TALLY_JSON="$(printf '%s' "$CTO_TALLY_OUT" | jq -c '
+        (.output[0] // .output // .result // .) as $t
+        | (if ($t | type) == "string" then (try ($t | fromjson) catch {}) else $t end)
+      ' 2>/dev/null || printf '{}')"
+      RESOLVED_JSON="$(jq -n \
+        --arg tally "$TALLY_JSON" \
+        --arg decision_id "${decision_id}" \
+        --rawfile question "$QF" \
+        '{
+          decision_id: $decision_id,
+          question: $question,
+          winning_option: (($tally | fromjson?) // {} | .winning_option),
+          escalated: (($tally | fromjson?) // {} | .escalated),
+          consensus_strength: (($tally | fromjson?) // {} | .consensus_strength),
+          tally: (($tally | fromjson?) // {} | .tally),
+          human_override: false,
+          voter_notes: (($tally | fromjson?) // {} | .voter_notes)
+        }')"
+      WINNER="$(printf '%s' "$RESOLVED_JSON" | jq -r '.winning_option // "none"')"
+      "$root/intake/scripts/workflow-gate-audio.sh" "decision-voting" "resolve" "winner ${WINNER}" "${audio_debug}" "normal" "session ${session_id}, decision ${decision_id}"
+      printf '%s' "$RESOLVED_JSON"
+
+  - id: publish-elicitation
+    env:
+      CTO_TALLY_OUT: $tally.stdout
+      CTO_RESOLVE_OUT: $resolve.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "decision-voting" "publish-elicitation" "${audio_debug}"
+      QF="${question_file}"; OF="${optimist_file}"; PF="${pessimist_file}"
+      QUESTION_TEXT="$(cat "$QF")"
+      OPTIMIST_TEXT="$(cat "$OF")"
+      PESSIMIST_TEXT="$(cat "$PF")"
+      TALLY_JSON="$(printf '%s' "$CTO_TALLY_OUT" | jq -c '
+        (.output[0] // .output // .result // .) as $t
+        | (if ($t | type) == "string" then (try ($t | fromjson) catch {}) else $t end)
+      ' 2>/dev/null || printf '{}')"
+      RESOLVE_JSON="$(printf '%s' "$CTO_RESOLVE_OUT" | jq -c '
+        (.output[0] // .output // .result // .) as $r
+        | (if ($r | type) == "string" then (try ($r | fromjson) catch {}) else $r end)
+      ' 2>/dev/null || printf '{}')"
+      PAYLOAD="$(jq -nc \
+        --rawfile question "$QF" \
+        --arg category "architecture" \
+        --rawfile optimist_position "$OF" \
+        --rawfile pessimist_position "$PF" \
+        --argjson tally "$TALLY_JSON" \
+        --argjson resolved "$RESOLVE_JSON" '
+        {
+          question: $question,
+          category: $category,
+          options: (
+            if (($tally.tally // {} | length) > 0) then
+              ($tally.tally | to_entries | map(
+                if .key == "optimist_option" then
+                  {label: ("Optimist: " + ($optimist_position | gsub("\\s+"; " ") | .[0:120])), value: .key, vote_count: .value}
+                elif .key == "pessimist_option" then
+                  {label: ("Pessimist: " + ($pessimist_position | gsub("\\s+"; " ") | .[0:120])), value: .key, vote_count: .value}
+                else
+                  {label: .key, value: .key, vote_count: .value}
+                end
+              ))
+            else
+              [
+                {label: ("Optimist: " + ($optimist_position | gsub("\\s+"; " ") | .[0:120])), value: "optimist_option", vote_count: 0},
+                {label: ("Pessimist: " + ($pessimist_position | gsub("\\s+"; " ") | .[0:120])), value: "pessimist_option", vote_count: 0}
+              ]
+            end
+          ),
+          vote_summary: {
+            total_voters: ($tally.total_voters // 0),
+            tally: ($tally.tally // {}),
+            consensus_strength: ($tally.consensus_strength // 0),
+            escalated: ($tally.escalated // false),
+            voter_notes: ($tally.voter_notes // [])
+          },
+          recommended_option: (
+            $resolved.winning_option
+            // $tally.winning_option
+            // (($tally.tally // {} | to_entries | sort_by(-.value) | .[0].key) // "")
+          ),
+          winning_option: ($resolved.winning_option // $tally.winning_option // null)
+        }')"
+      WAIT_MSG="$(jq -n --rawfile q "$QF" --arg did "${decision_id}" \
+        '"⏳ **Waiting for your decision** in main intake channel.\n\n" +
+        "Decision `" + $did + "`: " + $q + "\n" +
+        "A decision card is being posted in this channel now. Please select an option to continue."')"
+      WAIT_META="$(jq -nc --arg step "decision-waiting-main" --arg did "${decision_id}" \
+        '{step:$step,decision_id:$did,severity:"info"}')"
+      echo "$WAIT_MSG" | intake-util bridge-notify --from deliberation --to deliberation --metadata "$WAIT_META" || true
+      "$root/intake/scripts/workflow-gate-audio.sh" "decision-voting" "human-review" "waiting for user decision" "${audio_debug}" "wait" "session ${session_id}, decision ${decision_id}"
+      intake-util bridge-elicitation \
+        --session-id "${session_id}" \
+        --decision-id "${decision_id}" \
+        --vote-result "$PAYLOAD" \
+        --resume-token "${LOBSTER_RESUME_TOKEN:-}" \
+        --human-review-mode "${human_review_mode}" \
+        --linear-issue-id "${linear_issue_id}" \
+        --discord-channel-id "${discord_channel_id}"
+      "$root/intake/scripts/workflow-gate-audio.sh" "decision-voting" "human-review" "decision captured from user" "${audio_debug}" "normal" "session ${session_id}, decision ${decision_id}"
