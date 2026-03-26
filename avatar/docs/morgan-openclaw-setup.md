@@ -1,80 +1,81 @@
-# Morgan and OpenClaw Agent Config
+# Morgan OpenClaw Setup (CTO Repo)
 
-This doc summarizes how OpenClaw agents are set up in **openclaw-platform** so Morgan’s gateway config can be aligned. The avatar PoC sends requests to `morgan.5dlabs.ai` with `x-openclaw-agent-id: morgan`; the OpenClaw side must have an agent with that id and a gateway that accepts chat-completion traffic.
+This runbook documents the Morgan OpenClaw deployment used by the avatar PoC.
+It is source-verified against the CTO repo manifests, not a one-off cluster snapshot.
 
-## Reference: openclaw-platform
+The avatar pipeline sends chat requests to `morgan.5dlabs.ai` and must include
+`x-openclaw-agent-id: morgan`.
 
-Clone (or use existing):
+## Canonical config paths
 
-```bash
-git clone git@github.com:5dlabs/openclaw-platform.git
-```
+| Path | Purpose |
+|------|---------|
+| `infra/gitops/agents/morgan-values.yaml` | Morgan OpenClaw Helm values (agent identity, model, gateway, tools, skills mount) |
+| `infra/gitops/applications/workloads/deliberation-agents.yaml` | ArgoCD ApplicationSet that deploys the `morgan` OpenClaw workload |
+| `infra/manifests/morgan-support/cluster-tunnel.yaml` | Dedicated Cloudflare tunnel (`morgan-avatar`) |
+| `infra/manifests/morgan-support/tunnel-binding.yaml` | Binds `morgan.5dlabs.ai` to `openclaw-morgan` service on port `18789` |
+| `infra/manifests/morgan-support/skills-configmap.yaml` | External skills ConfigMap mounted into Morgan |
+| `infra/gitops/applications/workloads/morgan-support.yaml` | ArgoCD Application for tunnel + skills support resources |
 
-### How an agent is defined
+## Current declared runtime contract
 
-1. **Helm values** — One values file per agent under `charts/openclaw/agents/<id>/values.yaml` (e.g. `agents/metal/values.yaml`, `agents/intake/values.yaml`).
+From `infra/gitops/agents/morgan-values.yaml`:
 
-2. **Required agent fields** (from `values.yaml` and chart defaults):
-   - `agent.id` — Unique id (e.g. `"metal"`, `"intake"`). This is what the gateway uses (and what we send as `x-openclaw-agent-id: morgan`).
-   - `agent.name` — Display name.
-   - `agent.model` — Model key (e.g. `anthropic/claude-sonnet-4-6`, `openai-api/gpt-5.4-pro`).
-   - Optional: `agent.heartbeat`, `agent.sandbox`, `agent.tools`, `messaging`, `secrets`, etc.
+- `agent.id: morgan`
+- `agent.name: Morgan`
+- `agent.model: openai-api/gpt-5.4-pro`
+- Gateway `chatCompletions` endpoint enabled (`responses` disabled)
+- `tools.profile: minimal`, web search/fetch disabled, ACP disabled
+- External skills ConfigMap: `openclaw-morgan-external-skills`
 
-3. **ConfigMap** — The chart renders `configmap-openclaw.yaml` into an `openclaw.json` that includes:
-   - `agents.list[]` with one entry per agent: `id`, `name`, `model`, `agentDir`, `heartbeat`, `sandbox`, `tools`, `workspace`.
-   - Gateway config (e.g. `gateway.http.endpoints.chatCompletions.enabled: true`, port 18789).
+From `infra/manifests/morgan-support/tunnel-binding.yaml`:
 
-4. **Deployment** — Each agent gets its own StatefulSet/Deployment and Pod (e.g. `openclaw-metal-openclaw-0`, `openclaw-intake-openclaw-0`). The main container is `agent`; it runs the OpenClaw binary and listens on 18789.
+- `morgan.5dlabs.ai` is routed to `http://openclaw-morgan.openclaw.svc:18789`
+- Routing is through ClusterTunnel `morgan-avatar`
 
-### Current cluster (openclaw namespace)
-
-From a recent check there are **no** pods named `openclaw-morgan-*`. Existing agents include conductor, current, forge, healer, holt, infra, intake, keeper, metal (and mem0/openmemory sidecars). So either:
-
-- Morgan is deployed under a different name or in another namespace, or
-- Morgan is not yet deployed as an OpenClaw agent, and `morgan.5dlabs.ai` is pointing at a different service (e.g. a shared gateway that must route by `x-openclaw-agent-id` to a backend that has `morgan` in its `agents.list`).
-
-For the avatar to get a Morgan reply, the **request that hits the gateway for morgan.5dlabs.ai must be served by an OpenClaw process that has an agent with `id: "morgan"`** in its config.
-
-## Reading OpenClaw pod logs
-
-Use the pod that actually serves traffic for `morgan.5dlabs.ai` (e.g. the one the Cloudflare tunnel targets). The main OpenClaw process runs in the `agent` container.
+## Validate deployment state quickly
 
 ```bash
-# List OpenClaw pods
-kubectl get pods -n openclaw -l app.kubernetes.io/part-of=openclaw
+# 1) Confirm Argo apps are synced
+kubectl get applications.argoproj.io -n argocd \
+  cto-deliberation-morgan morgan-support
 
-# Logs from the main agent container (last 150 lines)
-kubectl logs -n openclaw <pod-name> -c agent --tail=150
+# 2) Confirm Morgan pod/service exist
+kubectl get pods,svc -n openclaw | rg 'morgan|openclaw-morgan'
 
-# Example: intake
-kubectl logs -n openclaw openclaw-intake-openclaw-0 -c agent --tail=150
+# 3) Confirm tunnel binding is present
+kubectl get tunnelbinding -n openclaw morgan-gateway -o yaml
+
+# 4) Check gateway logs from the Morgan pod
+kubectl logs -n openclaw <morgan-pod-name> -c agent --tail=200
 ```
 
 Look for:
 
-- Startup: `[gateway] agent model: ...` and `[gateway] listening on ws://0.0.0.0:18789`
-- Errors or timeouts when handling chat-completion requests
-- Any mention of agent id, routing, or missing config
+- Gateway startup on port `18789`
+- Successful chat-completion requests
+- No model/provider errors
 
-## What Morgan needs (summary)
+## Avatar-side routing requirement
 
-1. **An OpenClaw agent with `agent.id: "morgan"`** in the gateway config that serves `morgan.5dlabs.ai` (either a dedicated morgan pod or a shared gateway that routes by `x-openclaw-agent-id` to that agent).
-2. **Tunnel** — `morgan.5dlabs.ai` CNAME and Cloudflare tunnel (e.g. `morgan-avatar-tunnel-credentials`) pointing at that gateway’s port (e.g. 18789).
-3. **Avatar client** — Sends `x-openclaw-agent-id: morgan` on every request (already done in avatar `providers.py` when `MORGAN_LLM_AGENT_ID=morgan`).
+The avatar agent only reaches Morgan persona when the OpenClaw header is set:
 
-If the pod that receives traffic for morgan.5dlabs.ai does **not** have `morgan` in its `agents.list`, you’ll get generic or failing behavior. Fix by deploying Morgan as an OpenClaw agent (e.g. via CTO Helm/ArgoCD, following the same pattern as `agents/metal` or `agents/intake`) and ensuring the tunnel targets that deployment.
+```http
+x-openclaw-agent-id: morgan
+```
 
-### Response in logs but no audio in avatar
+`avatar/agent/morgan_avatar_agent/config.py` defaults `MORGAN_LLM_AGENT_ID` to
+`morgan`, and `avatar/agent/morgan_avatar_agent/providers.py` adds the header
+when calling OpenClaw.
 
-If OpenClaw logs show Morgan’s reply (e.g. “Hey Johnny! …”) but the user never hears it in the browser:
+## Failure modes and fixes
 
-- **400 / model does not exist** — The Morgan agent’s `agent.model` in OpenClaw is set to an invalid model (e.g. `openai/gpt-5.3`). The gateway returns 400, so the avatar agent never gets a stream and has nothing to send to TTS. **Fix**: In the Morgan OpenClaw agent config (Helm values or openclaw.json), set `agent.model` to a valid model (e.g. `openai/gpt-4o`, `openai/gpt-4.1`, or whatever your provider supports). Restart the pod so the new model is used; then the gateway will return 200 and stream the reply to the avatar so TTS can play it.
+- 401/403 from gateway: `OPENCLAW_TOKEN`/`MORGAN_LLM_API_KEY` mismatch between avatar agent and gateway auth.
+- 400 model/provider errors: verify `agent.model` and provider flags in `morgan-values.yaml`, then resync Argo app.
+- Generic/non-Morgan responses: missing `x-openclaw-agent-id` header or stale Morgan config not rolled out.
+- No remote access at `morgan.5dlabs.ai`: check `morgan-support` app sync and TunnelBinding status/events.
 
-## Key paths in openclaw-platform
+## Notes
 
-| Path | Purpose |
-|------|---------|
-| `charts/openclaw/values.yaml` | Defaults, gateway (port 18789, chatCompletions), agentDefaults |
-| `charts/openclaw/agents/<id>/values.yaml` | Per-agent overrides (agent.id, name, model, heartbeat, messaging, etc.) |
-| `charts/openclaw/templates/agent/configmap-openclaw.yaml` | Renders openclaw.json (agents.list, gateway, NATS, etc.) |
-| `charts/openclaw/templates/agent/statefulset.yaml` | Pod spec, volume mounts, agent container |
+Avoid relying on static pod-name examples in docs; validate live names with
+`kubectl get` commands because names can change across rollouts.
