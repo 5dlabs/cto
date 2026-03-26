@@ -1,7 +1,7 @@
 # Solana RPC on Kubernetes — Architecture & Rationale
 
-> **Status:** Research / Planning — 2026-02-25  
-> **Decision:** Solana validator runs **bare metal**, K8s cluster handles services alongside it  
+> **Status:** Planning + active deployment notes (updated 2026-03-21)  
+> **Decision:** Keep architecture guidance here; use the implementation section below for the live trader manifests  
 > **Key insight:** Cilium eBPF gives co-located pods sub-microsecond RPC latency — faster than bare-metal TCP loopback
 
 ---
@@ -21,6 +21,65 @@ cluster (Talos Linux, 3 nodes) runs on the same provider network handling:
 The hot path — trading pod → RPC — stays on the provider's private network.
 With Cilium's socket-level load balancing, same-node pod communication bypasses
 the TCP stack entirely.
+
+---
+
+## Current Implementation (Trader Cluster)
+
+The live trader deployment currently uses:
+
+- `skills/trader/k8s/agave-rpc.yaml` for the Agave RPC `Deployment` plus Yellowstone config `ConfigMap`
+- `skills/trader/k8s/observability/prometheus-values.yaml` for `yellowstone-grpc` scrape target (`solana-rpc-01:8999`)
+- `skills/trader/docker/Dockerfile.yellowstone-grpc` to build `libyellowstone_grpc_geyser.so` from source
+
+### Why source-build Yellowstone
+
+The prebuilt Yellowstone release artifact for `v7.0.0+solana.2.2.20` previously crashed at startup
+(`dlopen` during `GeyserPluginService`) in `ghcr.io/dysnix/docker-agave:v2.2.20`.
+
+The current fix is to compile the plugin with the matching Rust toolchain (`rust:1.84.1`) and
+the matching Yellowstone tag (`v7.0.0+solana.2.2.20`), then mount the resulting `.so` into the
+Agave pod from host path `/var/mnt/yellowstone/lib`.
+
+### Build and deploy flow (verified from repo config)
+
+```bash
+# 1) Build plugin image (from skills/trader/docker/)
+docker build -t yellowstone-grpc-builder:v2.2.20 \
+  -f Dockerfile.yellowstone-grpc .
+
+# 2) Extract the shared object
+docker create --name ys-extract yellowstone-grpc-builder:v2.2.20
+docker cp ys-extract:/output/libyellowstone_grpc_geyser.so .
+docker rm ys-extract
+
+# 3) Copy plugin to Solana host volume expected by agave-rpc.yaml
+scp libyellowstone_grpc_geyser.so solana-rpc-01:/var/mnt/yellowstone/lib/
+
+# 4) Apply/update deployment
+kubectl apply -f skills/trader/k8s/agave-rpc.yaml
+```
+
+### Runtime expectations
+
+- `agave-validator` is configured with `--geyser-plugin-config /etc/yellowstone/config.json`
+- plugin config points to `/opt/yellowstone/lib/libyellowstone_grpc_geyser.so`
+- gRPC endpoint listens on `:10000`
+- Yellowstone Prometheus endpoint listens on `:8999`
+- if the `.so` is missing, the `check-yellowstone` init container logs a warning before startup
+
+### Troubleshooting quick checks
+
+```bash
+# Plugin exists on host path
+ls -lah /var/mnt/yellowstone/lib/libyellowstone_grpc_geyser.so
+
+# Agave pod logs (watch for geyser load errors)
+kubectl -n solana logs deploy/agave-rpc -c agave-validator --tail=200
+
+# Yellowstone metrics reachable from Prometheus target
+curl -fsS http://solana-rpc-01:8999/metrics | head
+```
 
 ---
 
