@@ -30,229 +30,8 @@ server:
   nodeSelector:
     kubernetes.io/hostname: db-01
 
-# AlertManager with Discord integration
-alertmanager:
-  enabled: true
-  persistence:
-    enabled: true
-    storageClass: "local-path"
-    size: 2Gi
-  resources:
-    limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 100m
-      memory: 128Mi
-  securityContext:
-    runAsUser: 65534
-    runAsGroup: 65534
-    runAsNonRoot: true
-  nodeSelector:
-    kubernetes.io/hostname: db-01
-  extraSecretMounts:
-    - name: discord-webhook
-      secretName: alertmanager-discord-secret
-      mountPath: /secrets/discord
-      readOnly: true
-  config:
-    global:
-      resolve_timeout: 5m
-    route:
-      group_by: ['alertname', 'severity', 'namespace']
-      group_wait: 30s
-      group_interval: 5m
-      repeat_interval: 4h
-      receiver: 'discord-default'
-      routes:
-        - matchers: ['severity="critical"']
-          receiver: 'discord-critical'
-          group_wait: 10s
-        - matchers: ['severity="warning"']
-          receiver: 'discord-warning'
-    receivers:
-      - name: 'discord-default'
-        discord_configs:
-          - webhook_url: https://discord.com/api/webhooks/1483785509993054339/PVbVFp27sIT2Zpw2JP5VaL867ngWbl6V6UAw2fBSD6e894DpiV9xSHQ8b63_rAa2vpTm
-            send_resolved: true
-      - name: 'discord-critical'
-        discord_configs:
-          - webhook_url: https://discord.com/api/webhooks/1483785509993054339/PVbVFp27sIT2Zpw2JP5VaL867ngWbl6V6UAw2fBSD6e894DpiV9xSHQ8b63_rAa2vpTm
-            send_resolved: true
-            title: 'CRITICAL: {{ template "discord.default.title" . }}'
-      - name: 'discord-warning'
-        discord_configs:
-          - webhook_url: https://discord.com/api/webhooks/1483785509993054339/PVbVFp27sIT2Zpw2JP5VaL867ngWbl6V6UAw2fBSD6e894DpiV9xSHQ8b63_rAa2vpTm
-            send_resolved: true
-            title: 'Warning: {{ template "discord.default.title" . }}'
-    inhibit_rules:
-      - source_matchers: ['severity="critical"']
-        target_matchers: ['severity="warning"']
-        equal: ['alertname', 'namespace']
-
-# Scrape configurations + alerting
+# Scrape configurations
 serverFiles:
-  alerting_rules.yml:
-    groups:
-      - name: solana
-        rules:
-          - alert: SolanaExporterDown
-            expr: up{job="solana-exporter"} == 0
-            for: 5m
-            labels:
-              severity: critical
-            annotations:
-              summary: "Solana exporter is down"
-              description: "Solana exporter has been unreachable for 5 minutes."
-          - alert: SolanaNodeUnhealthy
-            expr: solana_node_is_healthy == 0 unless solana_node_num_slots_behind > 100
-            for: 5m
-            labels:
-              severity: critical
-            annotations:
-              summary: "Solana node is unhealthy"
-              description: "Solana node reports unhealthy status for 5 minutes."
-          - alert: SolanaSlotStalled
-            expr: increase(solana_node_slot_height[10m]) == 0 and solana_node_num_slots_behind < 100
-            for: 15m
-            labels:
-              severity: critical
-            annotations:
-              summary: "Solana slot height stalled"
-              description: "Solana slot height has not increased in 15 minutes."
-          - alert: SolanaSlotsBehind
-            expr: solana_node_num_slots_behind > 50
-            for: 30m
-            labels:
-              severity: warning
-            annotations:
-              summary: "Solana node falling behind"
-              description: "Solana node is {{ $value }} slots behind the cluster."
-          - alert: SolanaSyncSlow
-            expr: rate(solana_node_slot_height[5m]) > 0 and rate(solana_node_slot_height[5m]) < 1
-            for: 15m
-            labels:
-              severity: warning
-            annotations:
-              summary: "Solana sync is slow"
-              description: "Solana slot height advancing at {{ $value }} slots/sec (expected >1)."
-
-      - name: infrastructure
-        rules:
-          - alert: NodeDown
-            expr: up{job="node-exporter"} == 0
-            for: 3m
-            labels:
-              severity: critical
-            annotations:
-              summary: "Node exporter down on {{ $labels.node }}"
-              description: "Node exporter on {{ $labels.node }} has been unreachable for 3 minutes."
-          - alert: NodeMemoryPressure
-            expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.05
-            for: 5m
-            labels:
-              severity: critical
-            annotations:
-              summary: "Critical memory pressure on {{ $labels.node }}"
-              description: "Available memory is {{ $value | humanizePercentage }} on {{ $labels.node }}."
-          - alert: NodeMemoryHigh
-            expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.10
-            for: 10m
-            labels:
-              severity: warning
-            annotations:
-              summary: "High memory usage on {{ $labels.node }}"
-              description: "Available memory is {{ $value | humanizePercentage }} on {{ $labels.node }}."
-          - alert: NodeDiskFull
-            expr: (node_filesystem_avail_bytes{mountpoint=~"/|/var|/var/mnt/.*",fstype!~"tmpfs|devtmpfs"} / node_filesystem_size_bytes{mountpoint=~"/|/var|/var/mnt/.*",fstype!~"tmpfs|devtmpfs"}) < 0.05
-            for: 5m
-            labels:
-              severity: critical
-            annotations:
-              summary: "Disk nearly full on {{ $labels.node }}:{{ $labels.mountpoint }}"
-              description: "Only {{ $value | humanizePercentage }} available on {{ $labels.mountpoint }}."
-          - alert: NodeDiskHigh
-            expr: (node_filesystem_avail_bytes{mountpoint=~"/|/var|/var/mnt/.*",fstype!~"tmpfs|devtmpfs"} / node_filesystem_size_bytes{mountpoint=~"/|/var|/var/mnt/.*",fstype!~"tmpfs|devtmpfs"}) < 0.20
-            for: 15m
-            labels:
-              severity: warning
-            annotations:
-              summary: "Disk usage high on {{ $labels.node }}:{{ $labels.mountpoint }}"
-              description: "Only {{ $value | humanizePercentage }} available on {{ $labels.mountpoint }}."
-
-      - name: kubernetes
-        rules:
-          - alert: DexApiUnavailable
-            expr: kube_deployment_status_replicas_available{namespace="solana",deployment="dex-api"} < 1
-            for: 3m
-            labels:
-              severity: critical
-            annotations:
-              summary: "dex-api unavailable"
-              description: "No available replicas for solana/dex-api for 3 minutes."
-          - alert: DexIndexerUnavailable
-            expr: kube_deployment_status_replicas_available{namespace="solana",deployment="dex-indexer"} < 1
-            for: 3m
-            labels:
-              severity: critical
-            annotations:
-              summary: "dex-indexer unavailable"
-              description: "No available replicas for solana/dex-indexer for 3 minutes."
-          - alert: DexApiRestartBurst
-            expr: increase(kube_pod_container_status_restarts_total{namespace="solana",container="dex-api"}[15m]) > 3
-            for: 0m
-            labels:
-              severity: warning
-            annotations:
-              summary: "dex-api restart burst"
-              description: "dex-api restarted more than 3 times in the last 15 minutes."
-          - alert: DexIndexerRestartBurst
-            expr: increase(kube_pod_container_status_restarts_total{namespace="solana",container="dex-indexer"}[15m]) > 3
-            for: 0m
-            labels:
-              severity: warning
-            annotations:
-              summary: "dex-indexer restart burst"
-              description: "dex-indexer restarted more than 3 times in the last 15 minutes."
-          - alert: PodCrashLooping
-            expr: increase(kube_pod_container_status_restarts_total[1h]) > 5
-            for: 0m
-            labels:
-              severity: critical
-            annotations:
-              summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} crash looping"
-              description: "Container {{ $labels.container }} restarted {{ $value }} times in the last hour."
-          - alert: PrometheusTargetDown
-            expr: up{job!="yellowstone-grpc"} == 0
-            for: 10m
-            labels:
-              severity: warning
-            annotations:
-              summary: "Prometheus target {{ $labels.job }} down"
-              description: "Target {{ $labels.instance }} in job {{ $labels.job }} has been down for 10 minutes."
-
-      - name: networking
-        rules:
-          - alert: CiliumHighErrorRate
-            expr: sum(rate(cilium_errors_warnings_total{level="error"}[5m])) > 1
-            for: 10m
-            labels:
-              severity: warning
-            annotations:
-              summary: "Cilium error rate elevated"
-              description: "Cilium is generating {{ $value }} errors/sec over the last 5 minutes."
-
-      - name: observability
-        rules:
-          - alert: AlertManagerDown
-            expr: up{job="alertmanager"} == 0
-            for: 5m
-            labels:
-              severity: critical
-            annotations:
-              summary: "AlertManager is down"
-              description: "AlertManager has been unreachable for 5 minutes. Alerts will not be delivered."
-
   prometheus.yml:
     scrape_configs:
       # Self-scrape Prometheus
@@ -268,7 +47,7 @@ serverFiles:
               - prometheus-kube-state-metrics.observability.svc.cluster.local:8080
         metric_relabel_configs:
           - source_labels: [__name__]
-            regex: 'kube_pod_.*|kube_container_.*|kube_job_.*|kube_namespace_.*|kube_node_.*|kube_deployment_.*|kube_statefulset_.*|kube_daemonset_.*|kube_persistentvolume_.*|kube_persistentvolumeclaim_.*|kube_storageclass_.*'
+            regex: 'kube_pod_.*|kube_container_.*|kube_job_.*|kube_namespace_.*|kube_node_.*|kube_deployment_.*|kube_statefulset_.*|kube_daemonset_.*'
             action: keep
 
       # Node exporter (CPU, RAM, disk, network) — per-pod SD for both nodes
@@ -360,22 +139,6 @@ serverFiles:
               namespace: observability
               service: grafana
 
-      # AlertManager metrics
-      - job_name: alertmanager
-        static_configs:
-          - targets:
-              - prometheus-alertmanager.observability.svc.cluster.local:9093
-
-      # Yellowstone gRPC geyser plugin metrics
-      # Removed until Yellowstone gRPC geyser plugin ABI issue is resolved
-      # - job_name: yellowstone-grpc
-      #   static_configs:
-      #     - targets:
-      #         - 10.172.144.41:8999
-      #       labels:
-      #         namespace: solana
-      #         service: yellowstone-grpc
-
 # Enable node-exporter (was disabled on old cluster)
 prometheus-node-exporter:
   enabled: true
@@ -384,6 +147,9 @@ prometheus-node-exporter:
 kube-state-metrics:
   enabled: true
 
-# Disable pushgateway
+# Disable components we don't need
+alertmanager:
+  enabled: false
+
 prometheus-pushgateway:
   enabled: false

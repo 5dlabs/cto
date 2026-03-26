@@ -188,7 +188,7 @@ data:
           "datasource": { "type": "loki", "uid": "${loki_datasource}" },
           "targets": [
             {
-              "expr": "{namespace=\"solana\", container=\"agave-validator\"} |~ \"(?i)(snapshot|index_startup|Purging|catching|replay_stage|Starting|health|ready|rpc.*listen|unpacking|Loading|loaded|ledger)\"",
+              "expr": "{namespace=\"solana\", container=\"agave\"} |~ \"(?i)(snapshot|index_startup|Purging|catching|replay_stage|Starting|health|ready|rpc.*listen|unpacking|Loading|loaded|ledger)\"",
               "refId": "A"
             }
           ],
@@ -363,7 +363,7 @@ data:
           "datasource": { "type": "loki", "uid": "${loki_datasource}" },
           "targets": [
             {
-              "expr": "{namespace=\"solana\", container=\"agave-validator\", level=~\"$log_level\"}",
+              "expr": "{namespace=\"solana\", container=\"agave\", level=~\"$log_level\"}",
               "refId": "A"
             }
           ],
