@@ -7,6 +7,8 @@ This directory contains ArgoCD applications for cluster networking and remote ac
 | Application | Description | Status |
 |-------------|-------------|--------|
 | **kilo** | WireGuard-based VPN mesh (node-to-node + external peers) | Active |
+| **twingate** | Twingate `TwingateResource` + `TwingateResourceAccess` CRs | Active |
+| **twingate-connector** | Twingate connector pods (Helm chart) | Active |
 | **platform-ingress** | Ingress resources for ArgoCD, Workflows, Hubble | Active |
 | **networking-apps** | App-of-apps that deploys all networking components | Active |
 | **headscale** | Self-hosted Tailscale control server | Disabled |
@@ -21,6 +23,37 @@ The following DNS records are automatically created by external-dns:
 | `argocd.5dlabs.ai` | ArgoCD Server | Yes |
 | `workflows.5dlabs.ai` | Argo Workflows | Yes |
 | `hubble.5dlabs.ai` | Hubble UI | Yes |
+
+## Twingate Zero Trust Access (Active)
+
+Twingate deployment is split across three Argo applications:
+
+- `twingate-operator` (operators app directory): installs and runs the operator
+- `twingate` (networking app directory): applies resource/access CRs from `infra/gitops/manifests/twingate`
+- `twingate-connector` (networking app directory): runs connector pods
+
+The current `twingate` app publishes:
+
+- Pod CIDR resource: `10.42.0.0/16`
+- Service CIDR resource: `10.43.0.0/16`
+- `openclaw-tool-server.openclaw.svc.cluster.local`
+
+Quick checks:
+
+```bash
+kubectl get applications.argoproj.io -n argocd \
+  twingate-operator twingate twingate-connector
+kubectl get twingateresource -n operators
+kubectl get twingateresourceaccess -n operators
+kubectl get pods -n cto -l app.kubernetes.io/name=twingate-connector
+```
+
+If Twingate access fails while apps are healthy, inspect both operator and connector logs:
+
+```bash
+kubectl logs -n operators -l app.kubernetes.io/name=twingate-operator
+kubectl logs -n cto -l app.kubernetes.io/name=twingate-connector
+```
 
 ## Kilo VPN Setup (Active)
 
