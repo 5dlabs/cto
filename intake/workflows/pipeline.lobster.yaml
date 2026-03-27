@@ -1148,26 +1148,51 @@ steps:
       fi
       mkdir -p "$root/.intake/tmp"
       GATE_IN="$root/.intake/tmp/quality-gate-intake-output.txt"
+      TASK_COUNT="$(jq 'length' "$root/.tasks/tasks/tasks.json" 2>/dev/null || echo 0)"
+      SUBTASK_COUNT="$(jq '[.[] | (.subtasks // []) | length] | add // 0' "$root/.tasks/tasks/tasks.json" 2>/dev/null || echo 0)"
       {
         echo "project=${project_name}"
         echo
         echo "intake_summary:"
-        cat "$root/.intake/intake-summary.json" 2>/dev/null || true
+        jq -c '{
+          project_name,
+          generated_at,
+          artifact_counts,
+          delivery
+        }' "$root/.intake/intake-summary.json" 2>/dev/null || true
         echo
-        echo "tasks_excerpt:"
-        jq -c '.[0:4]' "$root/.tasks/tasks/tasks.json" 2>/dev/null || true
+        echo "summary:"
+        echo "Pipeline intake output for ${project_name}: ${TASK_COUNT} tasks, ${SUBTASK_COUNT} subtasks. Bundle below includes compact snapshots for every generated task doc/prompt artifact."
         echo
-        for task_id in $(jq -r '.[0:2] | .[].id' "$root/.tasks/tasks/tasks.json" 2>/dev/null); do
+        echo "task_summaries:"
+        jq -c '[.[] | {
+          id,
+          title,
+          agent,
+          stack,
+          priority,
+          dependencies,
+          subtask_count: ((.subtasks // []) | length),
+          decision_point_count: ((.decision_points // []) | length),
+          description: ((.description // "")[0:220]),
+          test_strategy: ((.test_strategy // "")[0:220])
+        }]' "$root/.tasks/tasks/tasks.json" 2>/dev/null || true
+        echo
+        for task_id in $(jq -r '.[].id' "$root/.tasks/tasks/tasks.json" 2>/dev/null); do
+          echo "--- task_id=${task_id} ---"
           for section in task acceptance prompt; do
             f="$root/.tasks/docs/task-${task_id}/${section}.md"
-            echo "=== ${f} ==="
             if [ -s "$f" ]; then
-              sed -n '1,120p' "$f"
+              size="$(wc -c < "$f" | tr -d ' ')"
+              excerpt="$(tr '\n' ' ' < "$f" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
+              echo "${section}_size=${size}"
+              echo "${section}_excerpt=${excerpt}"
             else
-              echo "__MISSING_OR_EMPTY__"
+              echo "${section}_size=0"
+              echo "${section}_excerpt=__MISSING_OR_EMPTY__"
             fi
-            echo
           done
+          echo
         done
       } > "$GATE_IN"
       "$root/intake/scripts/quality-gate.sh" --stage "pipeline-intake-output" --input-file "$GATE_IN" --provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" --model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')"
