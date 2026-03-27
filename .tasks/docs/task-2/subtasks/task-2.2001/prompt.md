@@ -1,0 +1,10 @@
+Implement subtask 2001: Implement Equipment Catalog Service - Database & Core API (Rex - Rust/Axum)
+
+## Objective
+Develop the core Equipment Catalog service, including its PostgreSQL database schema and initial CRUD API endpoints for managing product categories and individual products. This forms the foundation for inventory management.
+
+## Steps
+1. Initialize a new Rust Axum 0.7 project. 2. Define the PostgreSQL schema for `Product` and `Category` data models, including `id`, `name`, `description`, `day_rate`, `image_urls`, `specs` (JSONB), and `created_at` for products, and `id`, `name`, `parent_id`, `icon`, `sort_order` for categories. Use `sqlx` for database interactions. 3. Implement API endpoints: `GET /api/v1/catalog/categories` (list all categories), `GET /api/v1/catalog/products` (list all products with basic filtering), `GET /api/v1/catalog/products/:id` (get product details). 4. Implement admin API endpoints: `POST /api/v1/catalog/products` (add new product), `PATCH /api/v1/catalog/products/:id` (update product details). 5. Configure the service to connect to PostgreSQL using credentials from the 'sigma1-infra-endpoints' ConfigMap. Ensure proper error handling and input validation for all endpoints. Use Rust 1.75+.
+
+## Validation
+1. Deploy the service and verify it starts successfully, connecting to PostgreSQL. 2. Use `curl` or Postman to create a new category via `POST /api/v1/catalog/categories` and verify it appears in `GET /api/v1/catalog/categories`. 3. Create a new product via `POST /api/v1/catalog/products` and verify it appears in `GET /api/v1/catalog/products` and `GET /api/v1/catalog/products/:id`. 4. Update a product via `PATCH /api/v1/catalog/products/:id` and confirm changes are reflected. 5. Verify API responses conform to expected JSON structures and handle invalid inputs gracefully (e.g., 400 Bad Request for malformed data). 6. Run `cargo test` and `cargo clippy` to ensure code quality and correctness.
