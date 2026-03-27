@@ -1,6 +1,11 @@
 ## Acceptance Criteria
 
-- [ ] 1. Verify `GET /api/v1/catalog/products/:id/availability` returns correct availability data for various date ranges and product IDs, considering existing bookings. 2. Confirm `GET /api/v1/equipment-api/catalog` returns a comprehensive, machine-readable catalog. 3. Execute `POST /api/v1/equipment-api/checkout` with valid data and verify that product availability is correctly reduced in the database. 4. Upload a test image to S3/R2 and verify its URL is correctly served via the product details endpoint. 5. Test rate limiting by making multiple rapid requests to a public endpoint and observe expected 429 responses. 6. Monitor Redis cache hits for frequently accessed data. 7. Run `cargo audit` to check for known vulnerabilities in dependencies.
+- [ ] 1. Deploy the service to Kubernetes and verify it starts successfully.
+- [ ] 2. Use `grpcurl` to test gRPC endpoints for `CreateOpportunity`, `GetProject`, `RecordTransaction`, etc.
+- [ ] 3. Use `curl` or Postman to verify REST endpoints exposed via `grpc-gateway` are functional.
+- [ ] 4. Test the full quote-to-project workflow: create opportunity, approve, convert to project.
+- [ ] 5. Verify inventory transactions can be recorded and retrieved.
+- [ ] 6. Confirm data persistence in PostgreSQL for all RMS entities.
 
 ## Verification Notes
 

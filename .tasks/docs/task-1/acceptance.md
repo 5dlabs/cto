@@ -1,6 +1,9 @@
 ## Acceptance Criteria
 
-- [ ] 1. Verify 'databases' and 'sigma1' namespaces exist. 2. Confirm 'sigma1-postgres' and 'sigma1-valkey' pods are running and healthy in the 'databases' namespace. 3. Connect to PostgreSQL and Redis instances to verify accessibility and basic functionality. 4. Confirm S3/R2 bucket exists and credentials allow read/write access. 5. Verify 'sigma1-infra-endpoints' ConfigMap exists in 'sigma1' namespace and contains correct, accessible connection details for all provisioned infrastructure. 6. Confirm Cloudflare Tunnel is active and reachable from the internet (e.g., via `cloudflared tunnel status`).
+- [ ] 1. Verify `databases` and `sigma1` namespaces exist.
+- [ ] 2. Confirm `sigma1-postgres` Cluster and `sigma1-valkey` Redis instances are running and accessible within the cluster.
+- [ ] 3. Validate that the `sigma1-infra-endpoints` ConfigMap exists in the `sigma1` namespace and contains correct, accessible connection URLs for PostgreSQL and Redis/Valkey.
+- [ ] 4. Test S3/R2 access by attempting to create/read a dummy object using configured credentials.
 
 ## Verification Notes
 

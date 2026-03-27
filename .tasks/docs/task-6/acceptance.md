@@ -1,6 +1,11 @@
 ## Acceptance Criteria
 
-- [ ] 1. Deploy the service and verify it starts successfully, connecting to PostgreSQL. 2. Use `curl` or Postman to create a new invoice via `POST /api/v1/invoices` and verify it appears in `GET /api/v1/invoices` and `GET /api/v1/invoices/:id`. 3. Update an invoice status via `POST /api/v1/invoices/:id/send` and `POST /api/v1/invoices/:id/paid`, verifying the status changes in the database and via `GET /api/v1/invoices/:id`. 4. Verify API responses conform to expected JSON structures and handle invalid inputs gracefully. 5. Run `cargo test` and `cargo clippy` to ensure code quality and correctness.
+- [ ] 1. Verify the Morgan agent pod is running and accessible.
+- [ ] 2. Send a test message via Signal to Morgan and confirm a response is received.
+- [ ] 3. Initiate a voice call via Twilio/ElevenLabs and verify Morgan can respond verbally.
+- [ ] 4. Test `sales-qual` skill: Send a natural language query like 'Can you qualify a new lead for me?' and verify Morgan triggers `sigma1_vet_customer` and `sigma1_score_lead` tools, returning a lead score.
+- [ ] 5. Test `quote-gen` skill: Ask Morgan to 'Generate a quote for 5 projectors for next week' and verify it uses `sigma1_catalog_search`, `sigma1_check_availability`, and `sigma1_generate_quote` tools, providing a quote ID.
+- [ ] 6. Confirm Cloudflare Tunnel is correctly routing traffic to the Morgan agent.
 
 ## Verification Notes
 

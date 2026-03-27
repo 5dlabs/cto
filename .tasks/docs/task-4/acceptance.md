@@ -1,6 +1,12 @@
 ## Acceptance Criteria
 
-- [ ] 1. Deploy the service and verify it starts successfully, connecting to PostgreSQL. 2. Use `grpcurl` to test gRPC endpoints for creating, retrieving, updating, and listing opportunities and projects. 3. Use `curl` or Postman to test the REST endpoints exposed by `grpc-gateway` for the same operations. 4. Verify that data persisted via gRPC is correctly retrieved via REST and vice-versa. 5. Confirm `ScoreLead` returns a valid `LeadScore` (even if placeholder logic). 6. Run `go test ./...` and `go vet ./...` to ensure code quality and correctness. 7. Verify database schema matches protobuf definitions.
+- [ ] 1. Deploy the service to Kubernetes and verify it starts successfully.
+- [ ] 2. Create a mock project in RMS (Task 3) and then test invoice creation from that project ID.
+- [ ] 3. Verify invoice status transitions (draft, sent, paid).
+- [ ] 4. Test payment recording and retrieval for an invoice.
+- [ ] 5. Confirm financial reports return data (even if mock data initially).
+- [ ] 6. Verify currency rates are cached and updated by the scheduled job.
+- [ ] 7. Ensure integration with RMS for project data retrieval is functional.
 
 ## Verification Notes
 

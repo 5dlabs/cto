@@ -1,9 +1,9 @@
 name: implement-task-3
 metadata:
   task_id: 3
-  agent: Rex
-  stack: Rust/Axum
-  depends_on_tasks: [1, 2]
+  agent: grizz
+  stack: Go/gRPC
+  depends_on_tasks: [1]
 
 inputs:
   - name: task_dir
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-3/feature-branch"
   - name: agent
-    default: "Rex"
+    default: "grizz"
   - name: cli
     default: "claude"
   - name: model
@@ -37,7 +37,7 @@ steps:
     depends_on: [implement-subtask-3001]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+      cd work && go vet ./... && go test ./... && golangci-lint run
 
   - name: integration-validation
     depends_on: [validate-subtask-3001]

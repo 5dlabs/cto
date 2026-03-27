@@ -1,1 +1,66 @@
-{"overall_risk_level":"high","findings":[{"id":"SEC-001","severity":"critical","category":"Infrastructure Security","title":"Sensitive Credentials Stored in ConfigMap","description":"Task 1 specifies storing PostgreSQL, Redis, and S3 credentials in a Kubernetes ConfigMap ('sigma1-infra-endpoints'). ConfigMaps are stored in plain text and are not suitable for sensitive secrets, exposing the entire infrastructure to privilege escalation if the namespace is compromised.","recommendation":"Modify Task 1 to use Kubernetes Secrets instead of ConfigMaps for all credentials. For the production scale tasks, introduce a secret management solution like External Secrets Operator or HashiCorp Vault.","affected_tasks":[1,2,3,4,5,6]},{"id":"SEC-002","severity":"critical","category":"Authentication & Authorization","title":"Missing API Authentication and RBAC","description":"The plan details creating administrative and financial endpoints (e.g., POST /api/v1/catalog/products, POST /api/v1/invoices, POST /api/v1/equipment-api/checkout) without any mention of authentication mechanisms (e.g., JWT, OAuth) or Role-Based Access Control (RBAC).","recommendation":"Add a dedicated task to implement an Identity Provider (IdP) integration. Update Tasks 2-6 to include authentication middleware and enforce strict RBAC policies on all state-mutating and administrative endpoints.","affected_tasks":[2,3,4,5,6]},{"id":"SEC-003","severity":"medium","category":"Input Validation","title":"Unspecified File Upload Sanitization","description":"Task 3 involves integrating S3/R2 for product images. There are no explicit requirements for validating file types, sizes, or sanitizing uploads, which could lead to malicious file hosting or denial of service via oversized uploads.","recommendation":"Update Task 3 to explicitly require strict MIME-type validation (allowlisting only specific image formats), file size limits, and randomized renaming of uploaded files before storing them in S3/R2.","affected_tasks":[3]},{"id":"SEC-004","severity":"medium","category":"Observability & Incident Response","title":"Lack of Security Audit Logging","description":"While general observability (OTel, Jaeger) is planned in the scale tasks, there is no explicit requirement for immutable audit logging of sensitive business operations such as invoice creation, inventory adjustments, or lead scoring.","recommendation":"Implement structured security audit logging in the Rust and Go services (Tasks 4, 5, 6) to record the actor identity, action, timestamp, and resource ID for all critical state-mutating requests.","affected_tasks":[4,5,6]},{"id":"SEC-005","severity":"low","category":"Supply Chain","title":"Missing Container Image Scanning","description":"The plan specifies base images (e.g., valkey/valkey:7.2-alpine) and custom service deployments but does not include a task for automated container image vulnerability scanning.","recommendation":"Add a subtask to the CI/CD pipeline setup to integrate a container scanning tool (like Trivy or Clair) to block deployments of images containing known critical vulnerabilities.","affected_tasks":[1,2,4,6]}],"summary":"The current task plan establishes a solid functional baseline but contains critical security gaps in its initial phases. The most pressing issues are the storage of infrastructure credentials in plain-text ConfigMaps and the complete absence of authentication and authorization mechanisms for administrative APIs. Addressing these foundational flaws before implementation begins is crucial to prevent immediate compromise.","strengths":["Proactive inclusion of Kubernetes Network Policies (Task 13) for defense-in-depth and lateral movement restriction.","Integration of static analysis and vulnerability auditing tools (cargo audit, go vet, staticcheck) directly into the test strategies.","Comprehensive observability stack planned (OpenTelemetry, Jaeger) which will significantly aid in incident response and anomaly detection.","TLS termination and certificate management via cert-manager is explicitly planned for all external-facing services."]}
+{
+  "overall_risk_level": "high",
+  "findings": [
+    {
+      "id": "SEC-001",
+      "severity": "critical",
+      "category": "Authentication & Authorization",
+      "title": "Missing Centralized Authentication and RBAC",
+      "description": "The task plan defines multiple sensitive services (Finance, RMS, Catalog with admin routes) but completely omits an Identity Provider (IdP), JWT validation, or Role-Based Access Control (RBAC). Without this, endpoints like `POST /api/v1/catalog/products` and `GET /api/v1/payroll` have no defined mechanism to verify user identity or permissions.",
+      "recommendation": "Introduce a dedicated task to deploy or integrate an IdP (e.g., Keycloak, Auth0, or Clerk). Update Tasks 2, 3, 4, and 5 to include JWT middleware validation and define specific RBAC roles (e.g., admin, finance, sales) for endpoint authorization.",
+      "affected_tasks": [2, 3, 4, 5]
+    },
+    {
+      "id": "SEC-002",
+      "severity": "high",
+      "category": "Input Validation",
+      "title": "AI Agent Prompt Injection Vulnerability",
+      "description": "The Morgan AI Agent (Task 6) takes natural language input from external channels (Signal, Web Chat) and maps it directly to backend MCP tools that trigger business logic (e.g., generating quotes, creating invoices). There is no mention of input sanitization, prompt injection safeguards, or human-in-the-loop validation for destructive/sensitive actions.",
+      "recommendation": "Implement an LLM security gateway or system prompt hardening to detect and block prompt injection attacks. Require explicit human confirmation (via Signal/Chat) before the agent is allowed to execute state-changing MCP tools like `sigma1_create_invoice`.",
+      "affected_tasks": [6]
+    },
+    {
+      "id": "SEC-003",
+      "severity": "high",
+      "category": "Data Protection",
+      "title": "Lack of Encryption at Rest for Sensitive PII/Financial Data",
+      "description": "The Finance Service (Task 4) handles payroll and payment data, and the Vetting Service (Task 5) handles credit signals. The plan provisions PostgreSQL but does not specify application-level encryption or database-level encryption at rest (TDE) for these highly sensitive fields.",
+      "recommendation": "Update Task 4 and Task 5 to implement field-level encryption for sensitive data (e.g., payroll details, credit scores) using application-side encryption libraries before writing to PostgreSQL, or ensure the CloudNative-PG deployment explicitly configures encrypted volumes (KMS integration).",
+      "affected_tasks": [1, 4, 5]
+    },
+    {
+      "id": "SEC-004",
+      "severity": "medium",
+      "category": "Observability & Incident Response",
+      "title": "Missing Security Audit Logging",
+      "description": "While Task 11 establishes excellent performance observability (OpenTelemetry, Jaeger), there is no requirement for security audit logging. Actions like viewing payroll, changing invoice statuses, or vetting a customer must be immutably logged for compliance and incident response.",
+      "recommendation": "Add a subtask to Task 11 to implement structured security audit logging. Ensure Tasks 3, 4, and 5 emit audit events containing the actor ID, action, resource ID, and timestamp to a secure, append-only log destination.",
+      "affected_tasks": [3, 4, 5, 11]
+    },
+    {
+      "id": "SEC-005",
+      "severity": "medium",
+      "category": "Infrastructure Security",
+      "title": "Basic Kubernetes Secrets Management",
+      "description": "Task 1 relies on native Kubernetes secrets for S3/R2 credentials and database connection strings. Native K8s secrets are only base64 encoded by default and lack automated rotation, posing a risk if the cluster state is compromised.",
+      "recommendation": "Integrate an external secrets management solution (e.g., External Secrets Operator with AWS Secrets Manager, HashiCorp Vault, or Azure Key Vault) to securely inject credentials into pods and enable automated secret rotation.",
+      "affected_tasks": [1]
+    },
+    {
+      "id": "SEC-006",
+      "severity": "low",
+      "category": "Supply Chain",
+      "title": "Missing Container Image Scanning and Dependency Auditing",
+      "description": "Although language versions are well-pinned, there are no tasks defined for scanning the resulting container images for OS-level vulnerabilities, nor are there steps for running dependency audits (e.g., `cargo audit`, `govulncheck`) during the build process.",
+      "recommendation": "Add a CI/CD pipeline task to run dependency vulnerability scans and container image scans (e.g., using Trivy or Grype) before images are pushed to the registry.",
+      "affected_tasks": [2, 3, 4, 5, 6]
+    }
+  ],
+  "summary": "The proposed architecture establishes a strong baseline by utilizing memory-safe languages (Rust, Go) and proactively planning for network policies, rate limiting, and TLS. However, the overall risk level is currently high due to the complete absence of a centralized Authentication and Authorization strategy, leaving sensitive financial and operational APIs exposed. Addressing the missing identity framework, securing the AI agent against prompt injection, and implementing encryption for PII will be critical before moving to production.",
+  "strengths": [
+    "Explicit pinning of language and framework versions (Rust 1.77.2, Go 1.22.2, Axum 0.7.5) reduces supply chain unpredictability.",
+    "Proactive inclusion of tenant-based rate limiting in the API gateway/services mitigates basic DoS attacks.",
+    "Network policies are considered from the start (Task 1) and explicitly hardened for production (Task 10) to enforce least-privilege network access.",
+    "Production TLS and automated certificate management via cert-manager are explicitly planned (Task 9)."
+  ]
+}

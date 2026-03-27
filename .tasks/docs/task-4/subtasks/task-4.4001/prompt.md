@@ -1,10 +1,30 @@
-Implement subtask 4001: Implement RMS Service - Core gRPC & REST Gateway (Grizz - Go/gRPC)
+Implement subtask 4001: Implement Develop Finance Service (Rex - Rust/Axum)
 
 ## Objective
-Develop the core Rental Management System (RMS) service, focusing on Opportunity and Project management. This includes defining protobuf schemas, implementing gRPC services, and exposing them via a RESTful grpc-gateway.
+Implement the Finance Service for invoicing, payments, and financial reporting. This service replaces traditional accounting software and integrates with the RMS for project-based invoicing.
 
 ## Steps
-1. Initialize a new Go 1.22+ gRPC project. 2. Define protobuf schemas for `OpportunityService` and `ProjectService`, including `CreateOpportunityRequest`, `GetOpportunityRequest`, `UpdateOpportunityRequest`, `ListOpportunitiesRequest`, `ScoreLeadRequest`, `CreateProjectRequest`, `GetProjectRequest`, `UpdateProjectRequest`. 3. Generate Go code from protobuf definitions. 4. Implement the gRPC server for `OpportunityService` and `ProjectService`, including methods for creating, retrieving, updating, and listing opportunities and projects. Implement `ScoreLead` as a placeholder. 5. Define the PostgreSQL schema for `Opportunity` and `Project` data models, including `ID`, `CustomerID`, `Status`, `EventDateStart`, `EventDateEnd`, `Venue`, `TotalEstimate`, `LeadScore`, `Notes` for Opportunity, and `ID`, `OpportunityID`, `CustomerID`, `Status`, `ConfirmedAt`, `EventDates`, `VenueAddress`, `CrewNotes` for Project. Use `gorm` or `sqlc` for database interactions. 6. Set up `grpc-gateway` to expose REST endpoints for opportunities and projects (e.g., `POST /api/v1/opportunities`, `GET /api/v1/opportunities/:id`, `PATCH /api/v1/opportunities/:id`, `POST /api/v1/opportunities/:id/approve`, `POST /api/v1/opportunities/:id/convert`, `GET /api/v1/projects`, `GET /api/v1/projects/:id`). 7. Configure the service to connect to PostgreSQL using credentials from the 'sigma1-infra-endpoints' ConfigMap.
+1. Initialize a new Rust project targeting Rust 1.77.2.
+2. Set up Axum 0.7.5.
+3. Define `Invoice`, `Payment`, and `InvoiceStatus` data models. Implement database migrations for these schemas.
+4. Implement endpoints:
+    - `POST /api/v1/invoices`
+    - `GET /api/v1/invoices`, `GET /api/v1/invoices/:id`
+    - `POST /api/v1/invoices/:id/send`, `POST /api/v1/invoices/:id/paid`
+    - `POST /api/v1/payments`, `GET /api/v1/payments`, `GET /api/v1/payments/invoice/:id`
+    - Finance reports: `GET /api/v1/finance/reports/revenue`, `aging`, `cashflow`, `profitability`
+    - Payroll: `GET /api/v1/payroll`, `POST /api/v1/payroll/entries`
+    - Currency: `GET /api/v1/currency/rates`
+5. Integrate with PostgreSQL using `sqlx` and Redis for currency rate caching, referencing the `sigma1-infra-endpoints` ConfigMap.
+6. Implement basic Stripe integration for recording payments (initial focus on recording, not full payment processing).
+7. Implement logic for quote-to-invoice conversion, requiring integration with the RMS service (Task 3) to fetch project details.
+8. Implement a scheduled job for currency rate synchronization (e.g., using a background worker or cron job within the service).
 
 ## Validation
-1. Deploy the service and verify it starts successfully, connecting to PostgreSQL. 2. Use `grpcurl` to test gRPC endpoints for creating, retrieving, updating, and listing opportunities and projects. 3. Use `curl` or Postman to test the REST endpoints exposed by `grpc-gateway` for the same operations. 4. Verify that data persisted via gRPC is correctly retrieved via REST and vice-versa. 5. Confirm `ScoreLead` returns a valid `LeadScore` (even if placeholder logic). 6. Run `go test ./...` and `go vet ./...` to ensure code quality and correctness. 7. Verify database schema matches protobuf definitions.
+1. Deploy the service to Kubernetes and verify it starts successfully.
+2. Create a mock project in RMS (Task 3) and then test invoice creation from that project ID.
+3. Verify invoice status transitions (draft, sent, paid).
+4. Test payment recording and retrieval for an invoice.
+5. Confirm financial reports return data (even if mock data initially).
+6. Verify currency rates are cached and updated by the scheduled job.
+7. Ensure integration with RMS for project data retrieval is functional.

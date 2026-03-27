@@ -1,10 +1,28 @@
-Implement subtask 5001: Implement RMS Service - Inventory, Crew, Delivery gRPC & REST (Grizz - Go/gRPC)
+Implement subtask 5001: Implement Develop Customer Vetting Service (Rex - Rust/Axum)
 
 ## Objective
-Expand the RMS service to include Inventory, Crew, and Delivery management. This involves defining new protobuf services, implementing their logic, and extending the REST gateway.
+Create the Customer Vetting Service to automate background research on prospects, providing a GREEN/YELLOW/RED lead score. This service supports Morgan's lead qualification workflow.
 
 ## Steps
-1. Define protobuf schemas for `InventoryService`, `CrewService`, and `DeliveryService`, including RPCs like `GetStockLevel`, `RecordTransaction`, `ScanBarcode`, `ListCrew`, `AssignCrew`, `ScheduleCrew`, `ScheduleDelivery`, `UpdateDeliveryStatus`, `OptimizeRoute`. 2. Generate Go code from new protobuf definitions. 3. Implement the gRPC server for these new services. 4. Extend the PostgreSQL schema to support `InventoryTransaction`, `CrewMember`, `Delivery` models. 5. Implement the logic for each RPC, including database interactions for inventory transactions, crew assignments, and delivery scheduling. 6. Extend `grpc-gateway` to expose REST endpoints for these services (e.g., `GET /api/v1/inventory/transactions`, `POST /api/v1/inventory/transactions`, `GET /api/v1/crew`, `POST /api/v1/crew/assign`, `POST /api/v1/deliveries/schedule`). 7. Implement a stub for Google Calendar API integration for crew scheduling, logging calls without actual external interaction for now. Use Go 1.22+.
+1. Initialize a new Rust project targeting Rust 1.77.2.
+2. Set up Axum 0.7.5.
+3. Define `VettingResult` and `LeadScore` data models. Implement database migrations for these schemas.
+4. Implement endpoints:
+    - `POST /api/v1/vetting/run` (triggers the full pipeline)
+    - `GET /api/v1/vetting/:org_id`
+    - `GET /api/v1/vetting/credit/:org_id`
+5. Implement the vetting pipeline logic:
+    - **Business Verification**: Integrate with OpenCorporates API (mock API calls initially).
+    - **Online Presence**: Mock LinkedIn and website checks.
+    - **Reputation**: Mock Google Reviews sentiment analysis.
+    - **Credit Signals**: Mock commercial credit API integration.
+    - **Final Score**: Implement weighted algorithm to compute GREEN/YELLOW/RED score.
+6. Store vetting results in PostgreSQL using `sqlx`, referencing the `sigma1-infra-endpoints` ConfigMap.
+7. Ensure robust error handling and retry mechanisms for external API calls.
 
 ## Validation
-1. Use `grpcurl` and `curl` to test all new gRPC and REST endpoints for Inventory, Crew, and Delivery services. 2. Verify that inventory transactions are correctly recorded and stock levels are updated. 3. Confirm crew members can be listed and assigned to projects. 4. Verify delivery schedules can be created and updated. 5. Check that the Google Calendar API stub logs expected calls. 6. Run `staticcheck ./...` to identify potential issues in the Go codebase. 7. Ensure all new database models are correctly created and data integrity is maintained.
+1. Deploy the service to Kubernetes and verify it starts successfully.
+2. Call `POST /api/v1/vetting/run` with sample organization data and verify a `VettingResult` is stored in PostgreSQL.
+3. Retrieve vetting results using `GET /api/v1/vetting/:org_id` and confirm the `final_score` is correctly computed based on mock inputs.
+4. Verify `GET /api/v1/vetting/credit/:org_id` returns expected credit signals.
+5. Test error handling for failed external API calls (e.g., by simulating an API timeout or error).

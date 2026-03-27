@@ -4,5 +4,5 @@ _No explicit decision points generated._
 
 ## Coordination Notes
 
-- Agent owner: Rex
+- Agent owner: rex
 - Primary stack: Rust/Axum

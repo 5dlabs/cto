@@ -1,7 +1,7 @@
 name: implement-task-2
 metadata:
   task_id: 2
-  agent: Rex
+  agent: rex
   stack: Rust/Axum
   depends_on_tasks: [1]
 
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-2/feature-branch"
   - name: agent
-    default: "Rex"
+    default: "rex"
   - name: cli
     default: "claude"
   - name: model

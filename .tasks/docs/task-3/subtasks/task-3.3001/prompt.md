@@ -1,10 +1,23 @@
-Implement subtask 3001: Implement Equipment Catalog Service - Availability & AI Agent API (Rex - Rust/Axum)
+Implement subtask 3001: Implement Develop Rental Management System (RMS) Service (Grizz - Go/gRPC)
 
 ## Objective
-Extend the Equipment Catalog service to include real-time availability checking, image serving from S3/R2, and machine-readable APIs for AI agents. This enables core functionality for quoting and programmatic booking.
+Build the core Rental Management System (RMS) service, handling opportunities, projects, inventory, crew, and deliveries. This service is central to the quote-to-project workflow and operational logistics.
 
 ## Steps
-1. Extend the PostgreSQL schema to include the `Availability` data model (`product_id`, `date_from`, `date_to`, `quantity_available`, `reserved`, `booked`). 2. Implement the `GET /api/v1/catalog/products/:id/availability?from=&to=` endpoint to check product availability for a given date range. This should query the `Availability` table and consider `reserved` and `booked` quantities. 3. Implement the `GET /api/v1/equipment-api/catalog` endpoint, providing a machine-readable format of the entire catalog for AI agents. 4. Implement the `POST /api/v1/equipment-api/checkout` endpoint for programmatic booking, which should update `Availability` records. 5. Integrate S3/R2 for serving product images. Ensure image URLs stored in `Product` model are correctly resolved and served. 6. Integrate Redis for rate limiting on public endpoints and caching frequently accessed product data. Configure Redis connection using 'sigma1-infra-endpoints' ConfigMap. Use Rust 1.75+.
+1. Initialize a new Go project targeting Go 1.22.2.
+2. Define gRPC services and protobufs for `OpportunityService`, `ProjectService`, `InventoryService`, `CrewService`, and `DeliveryService`.
+3. Generate Go code from protobuf definitions.
+4. Implement gRPC server logic for all services.
+5. Integrate `grpc-gateway` to expose REST endpoints as defined in the PRD.
+6. Define `Opportunity`, `Project`, and `InventoryTransaction` data models and implement `sqlx` (or similar ORM) for PostgreSQL interaction, referencing the `sigma1-infra-endpoints` ConfigMap.
+7. Implement core features: quote-to-project conversion, barcode scanning (mocked initially), crew scheduling, and delivery tracking.
+8. Integrate with Redis for session caching, referencing the `sigma1-infra-endpoints` ConfigMap.
+9. Add basic health checks for gRPC and REST endpoints.
 
 ## Validation
-1. Verify `GET /api/v1/catalog/products/:id/availability` returns correct availability data for various date ranges and product IDs, considering existing bookings. 2. Confirm `GET /api/v1/equipment-api/catalog` returns a comprehensive, machine-readable catalog. 3. Execute `POST /api/v1/equipment-api/checkout` with valid data and verify that product availability is correctly reduced in the database. 4. Upload a test image to S3/R2 and verify its URL is correctly served via the product details endpoint. 5. Test rate limiting by making multiple rapid requests to a public endpoint and observe expected 429 responses. 6. Monitor Redis cache hits for frequently accessed data. 7. Run `cargo audit` to check for known vulnerabilities in dependencies.
+1. Deploy the service to Kubernetes and verify it starts successfully.
+2. Use `grpcurl` to test gRPC endpoints for `CreateOpportunity`, `GetProject`, `RecordTransaction`, etc.
+3. Use `curl` or Postman to verify REST endpoints exposed via `grpc-gateway` are functional.
+4. Test the full quote-to-project workflow: create opportunity, approve, convert to project.
+5. Verify inventory transactions can be recorded and retrieved.
+6. Confirm data persistence in PostgreSQL for all RMS entities.

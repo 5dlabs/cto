@@ -4,5 +4,5 @@ _No explicit decision points generated._
 
 ## Coordination Notes
 
-- Agent owner: Rex
-- Primary stack: Rust/Axum
+- Agent owner: grizz
+- Primary stack: Go/gRPC
