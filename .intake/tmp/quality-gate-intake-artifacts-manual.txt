@@ -1,0 +1,168 @@
+stage=intake-artifacts
+project=sigma-1
+summary:
+Generated 6 tasks with 6 subtasks, per-task docs/prompts/workflows, and security/remediation artifacts for sigma-1 intake.
+
+tasks:
+[{"id":1,"title":"Core Infrastructure Setup (Bolt - Kubernetes/Helm)","agent":"Bolt","stack":"Kubernetes/Helm","description":"Provision the foundational Kubernetes infrastructure components required by all backend services, including PostgreSQL, Redis/Valkey, S3/R2 storage, and initial Cloudflare Tunnel for Morgan agent access. This task establishes the shared environment for subsequent service deployments.","status":"pending","dependencies":[],"priority":"high","details":"1. Create 'databases' and 'sigma1' Kubernetes namespaces. 2. Deploy CloudNative-PG operator and a single-instance 'sigma1-postgres' cluster with 'sigma1' database and 'sigma1_user'. Ensure persistent storage is configured (50Gi). 3. Deploy Redis operator and a single-instance 'sigma1-valkey' cluster using 'valkey/valkey:7.2-alpine'. 4. Provision an S3/R2 bucket (e.g., 'sigma1-assets') via Cloudflare Terraform or equivalent, and generate necessary access credentials. 5. Set up a basic Cloudflare Tunnel for the 'morgan' service, pointing to a placeholder service or internal IP for initial connectivity. 6. Create a 'sigma1-infra-endpoints' ConfigMap in the 'sigma1' namespace, containing connection strings and credentials for PostgreSQL, Redis, and S3/R2, formatted for easy consumption by other services (e.g., `POSTGRES_URL`, `REDIS_URL`, `S3_BUCKET_NAME`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`).","test_strategy":"1. Verify 'databases' and 'sigma1' namespaces exist. 2. Confirm 'sigma1-postgres' and 'sigma1-valkey' pods are running and healthy in the 'databases' namespace. 3. Connect to PostgreSQL and Redis instances to verify accessibility and basic functionality. 4. Confirm S3/R2 bucket exists and credentials allow read/write access. 5. Verify 'sigma1-infra-endpoints' ConfigMap exists in 'sigma1' namespace and contains correct, accessible connection details for all provisioned infrastructure. 6. Confirm Cloudflare Tunnel is active and reachable from the internet (e.g., via `cloudflared tunnel status`).","decision_points":[],"subtasks":[{"id":1001,"title":"Implement Core Infrastructure Setup (Bolt - Kubernetes/Helm)","description":"Provision the foundational Kubernetes infrastructure components required by all backend services, including PostgreSQL, Redis/Valkey, S3/R2 storage, and initial Cloudflare Tunnel for Morgan agent access. This task establishes the shared environment for subsequent service deployments.","dependencies":[],"details":"1. Create 'databases' and 'sigma1' Kubernetes namespaces. 2. Deploy CloudNative-PG operator and a single-instance 'sigma1-postgres' cluster with 'sigma1' database and 'sigma1_user'. Ensure persistent storage is configured (50Gi). 3. Deploy Redis operator and a single-instance 'sigma1-valkey' cluster using 'valkey/valkey:7.2-alpine'. 4. Provision an S3/R2 bucket (e.g., 'sigma1-assets') via Cloudflare Terraform or equivalent, and generate necessary access credentials. 5. Set up a basic Cloudflare Tunnel for the 'morgan' service, pointing to a placeholder service or internal IP for initial connectivity. 6. Create a 'sigma1-infra-endpoints' ConfigMap in the 'sigma1' namespace, containing connection strings and credentials for PostgreSQL, Redis, and S3/R2, formatted for easy consumption by other services (e.g., `POSTGRES_URL`, `REDIS_URL`, `S3_BUCKET_NAME`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`).","status":"pending","test_strategy":"1. Verify 'databases' and 'sigma1' namespaces exist. 2. Confirm 'sigma1-postgres' and 'sigma1-valkey' pods are running and healthy in the 'databases' namespace. 3. Connect to PostgreSQL and Redis instances to verify accessibility and basic functionality. 4. Confirm S3/R2 bucket exists and credentials allow read/write access. 5. Verify 'sigma1-infra-endpoints' ConfigMap exists in 'sigma1' namespace and contains correct, accessible connection details for all provisioned infrastructure. 6. Confirm Cloudflare Tunnel is active and reachable from the internet (e.g., via `cloudflared tunnel status`).","subagentType":"implementer","parallelizable":false}]},{"id":2,"title":"Equipment Catalog Service - Database & Core API (Rex - Rust/Axum)","agent":"Rex","stack":"Rust/Axum","description":"Develop the core Equipment Catalog service, including its PostgreSQL database schema and initial CRUD API endpoints for managing product categories and individual products. This forms the foundation for inventory management.","status":"pending","dependencies":[1],"priority":"high","details":"1. Initialize a new Rust Axum 0.7 project. 2. Define the PostgreSQL schema for `Product` and `Category` data models, including `id`, `name`, `description`, `day_rate`, `image_urls`, `specs` (JSONB), and `created_at` for products, and `id`, `name`, `parent_id`, `icon`, `sort_order` for categories. Use `sqlx` for database interactions. 3. Implement API endpoints: `GET /api/v1/catalog/categories` (list all categories), `GET /api/v1/catalog/products` (list all products with basic filtering), `GET /api/v1/catalog/products/:id` (get product details). 4. Implement admin API endpoints: `POST /api/v1/catalog/products` (add new product), `PATCH /api/v1/catalog/products/:id` (update product details). 5. Configure the service to connect to PostgreSQL using credentials from the 'sigma1-infra-endpoints' ConfigMap. Ensure proper error handling and input validation for all endpoints. Use Rust 1.75+.","test_strategy":"1. Deploy the service and verify it starts successfully, connecting to PostgreSQL. 2. Use `curl` or Postman to create a new category via `POST /api/v1/catalog/categories` and verify it appears in `GET /api/v1/catalog/categories`. 3. Create a new product via `POST /api/v1/catalog/products` and verify it appears in `GET /api/v1/catalog/products` and `GET /api/v1/catalog/products/:id`. 4. Update a product via `PATCH /api/v1/catalog/products/:id` and confirm changes are reflected. 5. Verify API responses conform to expected JSON structures and handle invalid inputs gracefully (e.g., 400 Bad Request for malformed data). 6. Run `cargo test` and `cargo clippy` to ensure code quality and correctness.","decision_points":[],"subtasks":[{"id":2001,"title":"Implement Equipment Catalog Service - Database & Core API (Rex - Rust/Axum)","description":"Develop the core Equipment Catalog service, including its PostgreSQL database schema and initial CRUD API endpoints for managing product categories and individual products. This forms the foundation for inventory management.","dependencies":[],"details":"1. Initialize a new Rust Axum 0.7 project. 2. Define the PostgreSQL schema for `Product` and `Category` data models, including `id`, `name`, `description`, `day_rate`, `image_urls`, `specs` (JSONB), and `created_at` for products, and `id`, `name`, `parent_id`, `icon`, `sort_order` for categories. Use `sqlx` for database interactions. 3. Implement API endpoints: `GET /api/v1/catalog/categories` (list all categories), `GET /api/v1/catalog/products` (list all products with basic filtering), `GET /api/v1/catalog/products/:id` (get product details). 4. Implement admin API endpoints: `POST /api/v1/catalog/products` (add new product), `PATCH /api/v1/catalog/products/:id` (update product details). 5. Configure the service to connect to PostgreSQL using credentials from the 'sigma1-infra-endpoints' ConfigMap. Ensure proper error handling and input validation for all endpoints. Use Rust 1.75+.","status":"pending","test_strategy":"1. Deploy the service and verify it starts successfully, connecting to PostgreSQL. 2. Use `curl` or Postman to create a new category via `POST /api/v1/catalog/categories` and verify it appears in `GET /api/v1/catalog/categories`. 3. Create a new product via `POST /api/v1/catalog/products` and verify it appears in `GET /api/v1/catalog/products` and `GET /api/v1/catalog/products/:id`. 4. Update a product via `PATCH /api/v1/catalog/products/:id` and confirm changes are reflected. 5. Verify API responses conform to expected JSON structures and handle invalid inputs gracefully (e.g., 400 Bad Request for malformed data). 6. Run `cargo test` and `cargo clippy` to ensure code quality and correctness.","subagentType":"implementer","parallelizable":false}]},{"id":3,"title":"Equipment Catalog Service - Availability & AI Agent API (Rex - Rust/Axum)","agent":"Rex","stack":"Rust/Axum","description":"Extend the Equipment Catalog service to include real-time availability checking, image serving from S3/R2, and machine-readable APIs for AI agents. This enables core functionality for quoting and programmatic booking.","status":"pending","dependencies":[1,2],"priority":"high","details":"1. Extend the PostgreSQL schema to include the `Availability` data model (`product_id`, `date_from`, `date_to`, `quantity_available`, `reserved`, `booked`). 2. Implement the `GET /api/v1/catalog/products/:id/availability?from=&to=` endpoint to check product availability for a given date range. This should query the `Availability` table and consider `reserved` and `booked` quantities. 3. Implement the `GET /api/v1/equipment-api/catalog` endpoint, providing a machine-readable format of the entire catalog for AI agents. 4. Implement the `POST /api/v1/equipment-api/checkout` endpoint for programmatic booking, which should update `Availability` records. 5. Integrate S3/R2 for serving product images. Ensure image URLs stored in `Product` model are correctly resolved and served. 6. Integrate Redis for rate limiting on public endpoints and caching frequently accessed product data. Configure Redis connection using 'sigma1-infra-endpoints' ConfigMap. Use Rust 1.75+.","test_strategy":"1. Verify `GET /api/v1/catalog/products/:id/availability` returns correct availability data for various date ranges and product IDs, considering existing bookings. 2. Confirm `GET /api/v1/equipment-api/catalog` returns a comprehensive, machine-readable catalog. 3. Execute `POST /api/v1/equipment-api/checkout` with valid data and verify that product availability is correctly reduced in the database. 4. Upload a test image to S3/R2 and verify its URL is correctly served via the product details endpoint. 5. Test rate limiting by making multiple rapid requests to a public endpoint and observe expected 429 responses. 6. Monitor Redis cache hits for frequently accessed data. 7. Run `cargo audit` to check for known vulnerabilities in dependencies.","decision_points":[],"subtasks":[{"id":3001,"title":"Implement Equipment Catalog Service - Availability & AI Agent API (Rex - Rust/Axum)","description":"Extend the Equipment Catalog service to include real-time availability checking, image serving from S3/R2, and machine-readable APIs for AI agents. This enables core functionality for quoting and programmatic booking.","dependencies":[],"details":"1. Extend the PostgreSQL schema to include the `Availability` data model (`product_id`, `date_from`, `date_to`, `quantity_available`, `reserved`, `booked`). 2. Implement the `GET /api/v1/catalog/products/:id/availability?from=&to=` endpoint to check product availability for a given date range. This should query the `Availability` table and consider `reserved` and `booked` quantities. 3. Implement the `GET /api/v1/equipment-api/catalog` endpoint, providing a machine-readable format of the entire catalog for AI agents. 4. Implement the `POST /api/v1/equipment-api/checkout` endpoint for programmatic booking, which should update `Availability` records. 5. Integrate S3/R2 for serving product images. Ensure image URLs stored in `Product` model are correctly resolved and served. 6. Integrate Redis for rate limiting on public endpoints and caching frequently accessed product data. Configure Redis connection using 'sigma1-infra-endpoints' ConfigMap. Use Rust 1.75+.","status":"pending","test_strategy":"1. Verify `GET /api/v1/catalog/products/:id/availability` returns correct availability data for various date ranges and product IDs, considering existing bookings. 2. Confirm `GET /api/v1/equipment-api/catalog` returns a comprehensive, machine-readable catalog. 3. Execute `POST /api/v1/equipment-api/checkout` with valid data and verify that product availability is correctly reduced in the database. 4. Upload a test image to S3/R2 and verify its URL is correctly served via the product details endpoint. 5. Test rate limiting by making multiple rapid requests to a public endpoint and observe expected 429 responses. 6. Monitor Redis cache hits for frequently accessed data. 7. Run `cargo audit` to check for known vulnerabilities in dependencies.","subagentType":"implementer","parallelizable":false}]}]
+
+=== .tasks/docs/task-1/task.md ===
+## Core Infrastructure Setup (Bolt - Kubernetes/Helm)
+
+### Objective
+Provision the foundational Kubernetes infrastructure components required by all backend services, including PostgreSQL, Redis/Valkey, S3/R2 storage, and initial Cloudflare Tunnel for Morgan agent access. This task establishes the shared environment for subsequent service deployments.
+
+### Ownership
+- Agent: Bolt
+- Stack: Kubernetes/Helm
+- Priority: high
+- Status: pending
+- Dependencies: None
+
+### Implementation Details
+1. Create 'databases' and 'sigma1' Kubernetes namespaces. 2. Deploy CloudNative-PG operator and a single-instance 'sigma1-postgres' cluster with 'sigma1' database and 'sigma1_user'. Ensure persistent storage is configured (50Gi). 3. Deploy Redis operator and a single-instance 'sigma1-valkey' cluster using 'valkey/valkey:7.2-alpine'. 4. Provision an S3/R2 bucket (e.g., 'sigma1-assets') via Cloudflare Terraform or equivalent, and generate necessary access credentials. 5. Set up a basic Cloudflare Tunnel for the 'morgan' service, pointing to a placeholder service or internal IP for initial connectivity. 6. Create a 'sigma1-infra-endpoints' ConfigMap in the 'sigma1' namespace, containing connection strings and credentials for PostgreSQL, Redis, and S3/R2, formatted for easy consumption by other services (e.g., `POSTGRES_URL`, `REDIS_URL`, `S3_BUCKET_NAME`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`).
+
+### Subtasks
+- [ ] Implement Core Infrastructure Setup (Bolt - Kubernetes/Helm): Provision the foundational Kubernetes infrastructure components required by all backend services, including PostgreSQL, Redis/Valkey, S3/R2 storage, and initial Cloudflare Tunnel for Morgan agent access. This task establishes the shared environment for subsequent service deployments.
+=== .tasks/docs/task-1/acceptance.md ===
+## Acceptance Criteria
+
+- [ ] 1. Verify 'databases' and 'sigma1' namespaces exist. 2. Confirm 'sigma1-postgres' and 'sigma1-valkey' pods are running and healthy in the 'databases' namespace. 3. Connect to PostgreSQL and Redis instances to verify accessibility and basic functionality. 4. Confirm S3/R2 bucket exists and credentials allow read/write access. 5. Verify 'sigma1-infra-endpoints' ConfigMap exists in 'sigma1' namespace and contains correct, accessible connection details for all provisioned infrastructure. 6. Confirm Cloudflare Tunnel is active and reachable from the internet (e.g., via `cloudflared tunnel status`).
+
+## Verification Notes
+
+- [ ] Confirm dependencies are satisfied before implementation.
+- [ ] Update tests, docs, and configuration touched by this task.
+- [ ] Validate the final behavior against the task objective.
+=== .tasks/docs/task-1/prompt.md ===
+Implement task 1: Core Infrastructure Setup (Bolt - Kubernetes/Helm)
+
+## Goal
+Provision the foundational Kubernetes infrastructure components required by all backend services, including PostgreSQL, Redis/Valkey, S3/R2 storage, and initial Cloudflare Tunnel for Morgan agent access. This task establishes the shared environment for subsequent service deployments.
+
+## Task Context
+- Agent owner: Bolt
+- Stack: Kubernetes/Helm
+- Priority: high
+- Dependencies: None
+
+## Implementation Plan
+1. Create 'databases' and 'sigma1' Kubernetes namespaces. 2. Deploy CloudNative-PG operator and a single-instance 'sigma1-postgres' cluster with 'sigma1' database and 'sigma1_user'. Ensure persistent storage is configured (50Gi). 3. Deploy Redis operator and a single-instance 'sigma1-valkey' cluster using 'valkey/valkey:7.2-alpine'. 4. Provision an S3/R2 bucket (e.g., 'sigma1-assets') via Cloudflare Terraform or equivalent, and generate necessary access credentials. 5. Set up a basic Cloudflare Tunnel for the 'morgan' service, pointing to a placeholder service or internal IP for initial connectivity. 6. Create a 'sigma1-infra-endpoints' ConfigMap in the 'sigma1' namespace, containing connection strings and credentials for PostgreSQL, Redis, and S3/R2, formatted for easy consumption by other services (e.g., `POSTGRES_URL`, `REDIS_URL`, `S3_BUCKET_NAME`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`).
+
+## Acceptance Criteria
+1. Verify 'databases' and 'sigma1' namespaces exist. 2. Confirm 'sigma1-postgres' and 'sigma1-valkey' pods are running and healthy in the 'databases' namespace. 3. Connect to PostgreSQL and Redis instances to verify accessibility and basic functionality. 4. Confirm S3/R2 bucket exists and credentials allow read/write access. 5. Verify 'sigma1-infra-endpoints' ConfigMap exists in 'sigma1' namespace and contains correct, accessible connection details for all provisioned infrastructure. 6. Confirm Cloudflare Tunnel is active and reachable from the internet (e.g., via `cloudflared tunnel status`).
+
+## Subtasks
+- Implement Core Infrastructure Setup (Bolt - Kubernetes/Helm): Provision the foundational Kubernetes infrastructure components required by all backend services, including PostgreSQL, Redis/Valkey, S3/R2 storage, and initial Cloudflare Tunnel for Morgan agent access. This task establishes the shared environment for subsequent service deployments.
+
+## Deliverables
+- Update the relevant code, configuration, and tests.
+- Keep artifacts aligned with the acceptance criteria.
+- Document blockers or assumptions in your final summary.
+=== .tasks/docs/task-2/task.md ===
+## Equipment Catalog Service - Database & Core API (Rex - Rust/Axum)
+
+### Objective
+Develop the core Equipment Catalog service, including its PostgreSQL database schema and initial CRUD API endpoints for managing product categories and individual products. This forms the foundation for inventory management.
+
+### Ownership
+- Agent: Rex
+- Stack: Rust/Axum
+- Priority: high
+- Status: pending
+- Dependencies: 1
+
+### Implementation Details
+1. Initialize a new Rust Axum 0.7 project. 2. Define the PostgreSQL schema for `Product` and `Category` data models, including `id`, `name`, `description`, `day_rate`, `image_urls`, `specs` (JSONB), and `created_at` for products, and `id`, `name`, `parent_id`, `icon`, `sort_order` for categories. Use `sqlx` for database interactions. 3. Implement API endpoints: `GET /api/v1/catalog/categories` (list all categories), `GET /api/v1/catalog/products` (list all products with basic filtering), `GET /api/v1/catalog/products/:id` (get product details). 4. Implement admin API endpoints: `POST /api/v1/catalog/products` (add new product), `PATCH /api/v1/catalog/products/:id` (update product details). 5. Configure the service to connect to PostgreSQL using credentials from the 'sigma1-infra-endpoints' ConfigMap. Ensure proper error handling and input validation for all endpoints. Use Rust 1.75+.
+
+### Subtasks
+- [ ] Implement Equipment Catalog Service - Database & Core API (Rex - Rust/Axum): Develop the core Equipment Catalog service, including its PostgreSQL database schema and initial CRUD API endpoints for managing product categories and individual products. This forms the foundation for inventory management.
+=== .tasks/docs/task-2/acceptance.md ===
+## Acceptance Criteria
+
+- [ ] 1. Deploy the service and verify it starts successfully, connecting to PostgreSQL. 2. Use `curl` or Postman to create a new category via `POST /api/v1/catalog/categories` and verify it appears in `GET /api/v1/catalog/categories`. 3. Create a new product via `POST /api/v1/catalog/products` and verify it appears in `GET /api/v1/catalog/products` and `GET /api/v1/catalog/products/:id`. 4. Update a product via `PATCH /api/v1/catalog/products/:id` and confirm changes are reflected. 5. Verify API responses conform to expected JSON structures and handle invalid inputs gracefully (e.g., 400 Bad Request for malformed data). 6. Run `cargo test` and `cargo clippy` to ensure code quality and correctness.
+
+## Verification Notes
+
+- [ ] Confirm dependencies are satisfied before implementation.
+- [ ] Update tests, docs, and configuration touched by this task.
+- [ ] Validate the final behavior against the task objective.
+=== .tasks/docs/task-2/prompt.md ===
+Implement task 2: Equipment Catalog Service - Database & Core API (Rex - Rust/Axum)
+
+## Goal
+Develop the core Equipment Catalog service, including its PostgreSQL database schema and initial CRUD API endpoints for managing product categories and individual products. This forms the foundation for inventory management.
+
+## Task Context
+- Agent owner: Rex
+- Stack: Rust/Axum
+- Priority: high
+- Dependencies: 1
+
+## Implementation Plan
+1. Initialize a new Rust Axum 0.7 project. 2. Define the PostgreSQL schema for `Product` and `Category` data models, including `id`, `name`, `description`, `day_rate`, `image_urls`, `specs` (JSONB), and `created_at` for products, and `id`, `name`, `parent_id`, `icon`, `sort_order` for categories. Use `sqlx` for database interactions. 3. Implement API endpoints: `GET /api/v1/catalog/categories` (list all categories), `GET /api/v1/catalog/products` (list all products with basic filtering), `GET /api/v1/catalog/products/:id` (get product details). 4. Implement admin API endpoints: `POST /api/v1/catalog/products` (add new product), `PATCH /api/v1/catalog/products/:id` (update product details). 5. Configure the service to connect to PostgreSQL using credentials from the 'sigma1-infra-endpoints' ConfigMap. Ensure proper error handling and input validation for all endpoints. Use Rust 1.75+.
+
+## Acceptance Criteria
+1. Deploy the service and verify it starts successfully, connecting to PostgreSQL. 2. Use `curl` or Postman to create a new category via `POST /api/v1/catalog/categories` and verify it appears in `GET /api/v1/catalog/categories`. 3. Create a new product via `POST /api/v1/catalog/products` and verify it appears in `GET /api/v1/catalog/products` and `GET /api/v1/catalog/products/:id`. 4. Update a product via `PATCH /api/v1/catalog/products/:id` and confirm changes are reflected. 5. Verify API responses conform to expected JSON structures and handle invalid inputs gracefully (e.g., 400 Bad Request for malformed data). 6. Run `cargo test` and `cargo clippy` to ensure code quality and correctness.
+
+## Subtasks
+- Implement Equipment Catalog Service - Database & Core API (Rex - Rust/Axum): Develop the core Equipment Catalog service, including its PostgreSQL database schema and initial CRUD API endpoints for managing product categories and individual products. This forms the foundation for inventory management.
+
+## Deliverables
+- Update the relevant code, configuration, and tests.
+- Keep artifacts aligned with the acceptance criteria.
+- Document blockers or assumptions in your final summary.
+=== .tasks/docs/task-3/task.md ===
+## Equipment Catalog Service - Availability & AI Agent API (Rex - Rust/Axum)
+
+### Objective
+Extend the Equipment Catalog service to include real-time availability checking, image serving from S3/R2, and machine-readable APIs for AI agents. This enables core functionality for quoting and programmatic booking.
+
+### Ownership
+- Agent: Rex
+- Stack: Rust/Axum
+- Priority: high
+- Status: pending
+- Dependencies: 1, 2
+
+### Implementation Details
+1. Extend the PostgreSQL schema to include the `Availability` data model (`product_id`, `date_from`, `date_to`, `quantity_available`, `reserved`, `booked`). 2. Implement the `GET /api/v1/catalog/products/:id/availability?from=&to=` endpoint to check product availability for a given date range. This should query the `Availability` table and consider `reserved` and `booked` quantities. 3. Implement the `GET /api/v1/equipment-api/catalog` endpoint, providing a machine-readable format of the entire catalog for AI agents. 4. Implement the `POST /api/v1/equipment-api/checkout` endpoint for programmatic booking, which should update `Availability` records. 5. Integrate S3/R2 for serving product images. Ensure image URLs stored in `Product` model are correctly resolved and served. 6. Integrate Redis for rate limiting on public endpoints and caching frequently accessed product data. Configure Redis connection using 'sigma1-infra-endpoints' ConfigMap. Use Rust 1.75+.
+
+### Subtasks
+- [ ] Implement Equipment Catalog Service - Availability & AI Agent API (Rex - Rust/Axum): Extend the Equipment Catalog service to include real-time availability checking, image serving from S3/R2, and machine-readable APIs for AI agents. This enables core functionality for quoting and programmatic booking.
+=== .tasks/docs/task-3/acceptance.md ===
+## Acceptance Criteria
+
+- [ ] 1. Verify `GET /api/v1/catalog/products/:id/availability` returns correct availability data for various date ranges and product IDs, considering existing bookings. 2. Confirm `GET /api/v1/equipment-api/catalog` returns a comprehensive, machine-readable catalog. 3. Execute `POST /api/v1/equipment-api/checkout` with valid data and verify that product availability is correctly reduced in the database. 4. Upload a test image to S3/R2 and verify its URL is correctly served via the product details endpoint. 5. Test rate limiting by making multiple rapid requests to a public endpoint and observe expected 429 responses. 6. Monitor Redis cache hits for frequently accessed data. 7. Run `cargo audit` to check for known vulnerabilities in dependencies.
+
+## Verification Notes
+
+- [ ] Confirm dependencies are satisfied before implementation.
+- [ ] Update tests, docs, and configuration touched by this task.
+- [ ] Validate the final behavior against the task objective.
+=== .tasks/docs/task-3/prompt.md ===
+Implement task 3: Equipment Catalog Service - Availability & AI Agent API (Rex - Rust/Axum)
+
+## Goal
+Extend the Equipment Catalog service to include real-time availability checking, image serving from S3/R2, and machine-readable APIs for AI agents. This enables core functionality for quoting and programmatic booking.
+
+## Task Context
+- Agent owner: Rex
+- Stack: Rust/Axum
+- Priority: high
+- Dependencies: 1, 2
+
+## Implementation Plan
+1. Extend the PostgreSQL schema to include the `Availability` data model (`product_id`, `date_from`, `date_to`, `quantity_available`, `reserved`, `booked`). 2. Implement the `GET /api/v1/catalog/products/:id/availability?from=&to=` endpoint to check product availability for a given date range. This should query the `Availability` table and consider `reserved` and `booked` quantities. 3. Implement the `GET /api/v1/equipment-api/catalog` endpoint, providing a machine-readable format of the entire catalog for AI agents. 4. Implement the `POST /api/v1/equipment-api/checkout` endpoint for programmatic booking, which should update `Availability` records. 5. Integrate S3/R2 for serving product images. Ensure image URLs stored in `Product` model are correctly resolved and served. 6. Integrate Redis for rate limiting on public endpoints and caching frequently accessed product data. Configure Redis connection using 'sigma1-infra-endpoints' ConfigMap. Use Rust 1.75+.
+
+## Acceptance Criteria
+1. Verify `GET /api/v1/catalog/products/:id/availability` returns correct availability data for various date ranges and product IDs, considering existing bookings. 2. Confirm `GET /api/v1/equipment-api/catalog` returns a comprehensive, machine-readable catalog. 3. Execute `POST /api/v1/equipment-api/checkout` with valid data and verify that product availability is correctly reduced in the database. 4. Upload a test image to S3/R2 and verify its URL is correctly served via the product details endpoint. 5. Test rate limiting by making multiple rapid requests to a public endpoint and observe expected 429 responses. 6. Monitor Redis cache hits for frequently accessed data. 7. Run `cargo audit` to check for known vulnerabilities in dependencies.
+
+## Subtasks
+- Implement Equipment Catalog Service - Availability & AI Agent API (Rex - Rust/Axum): Extend the Equipment Catalog service to include real-time availability checking, image serving from S3/R2, and machine-readable APIs for AI agents. This enables core functionality for quoting and programmatic booking.
+
+## Deliverables
+- Update the relevant code, configuration, and tests.
+- Keep artifacts aligned with the acceptance criteria.
+- Document blockers or assumptions in your final summary.
+artifact_doc_count=34

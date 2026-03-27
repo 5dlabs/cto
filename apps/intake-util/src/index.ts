@@ -179,7 +179,14 @@ async function readJsonInput(filePath: string | undefined): Promise<unknown> {
   try {
     return JSON.parse(raw);
   } catch {
-    console.error('Error: Invalid JSON input');
+    const commandLabel = process.argv.slice(2, 4).filter(Boolean).join(' ');
+    const preview = raw.replace(/\s+/g, ' ').slice(0, 240);
+    console.error(`Error: Invalid JSON input${commandLabel ? ` (${commandLabel})` : ''}`);
+    if (filePath) {
+      console.error(`Source file: ${filePath}`);
+    } else {
+      console.error(`Stdin preview: ${preview || '<empty>'}`);
+    }
     process.exit(1);
   }
 }
