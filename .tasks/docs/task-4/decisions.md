@@ -4,5 +4,5 @@ _No explicit decision points generated._
 
 ## Coordination Notes
 
-- Agent owner: Bolt
-- Primary stack: Kubernetes/Helm
+- Agent owner: Grizz
+- Primary stack: Go/gRPC
