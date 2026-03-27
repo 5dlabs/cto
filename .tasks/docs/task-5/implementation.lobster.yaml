@@ -27,8 +27,13 @@ steps:
       git clone {{inputs.repo_url}} work && cd work &&
       git checkout -b {{inputs.branch_name}}
 
-  - name: implement-subtask-5001
+  - name: scaffold-files
     depends_on: [setup]
+    command: >
+      cd work && mkdir -p proto/rms/v1 pkg/api/rms/v1 internal/server internal/db internal/db/migrations internal/google cmd/rms test/integration
+
+  - name: implement-subtask-5001
+    depends_on: [scaffold-files]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5001/prompt.md

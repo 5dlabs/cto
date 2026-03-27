@@ -27,8 +27,13 @@ steps:
       git clone {{inputs.repo_url}} work && cd work &&
       git checkout -b {{inputs.branch_name}}
 
-  - name: implement-subtask-2001
+  - name: scaffold-files
     depends_on: [setup]
+    command: >
+      cd work && mkdir -p src src/handlers tests
+
+  - name: implement-subtask-2001
+    depends_on: [scaffold-files]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2001/prompt.md

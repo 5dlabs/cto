@@ -29,7 +29,7 @@ steps:
   - name: scaffold-files
     depends_on: [setup]
     command: >
-      cd work && mkdir -p kubernetes/namespaces kubernetes/operators kubernetes/databases terraform/cloudflare kubernetes/cloudflare kubernetes/configmaps
+      cd work && mkdir -p kubernetes/namespaces kubernetes/operators kubernetes/sigma1 terraform/cloudflare
 
   - name: implement-subtask-1001
     depends_on: [scaffold-files]
