@@ -810,6 +810,49 @@ steps:
         --arg pn "${project_name}" \
         '{scaffolds: $sc[0], skill_recommendations: $sr[0], tool_manifest: $tm[0], codebase_context: $cb, project_name: $pn}') || {
         echo "fan-out-prompts: FATAL — jq context build failed" >&2; exit 1; }
+      build_prompt_fallback() {
+        jq -nc --argjson tasks "$EXP" '
+          [ $tasks[] as $t | {
+              task_id: $t.id,
+              task_title: $t.title,
+              prompt_md: (
+                "Implement task " + (($t.id // 0)|tostring) + ": " + ($t.title // "Untitled task")
+                + "\n\n## Goal\n" + ($t.description // "No description provided.")
+                + "\n\n## Task Context\n"
+                + "- Agent owner: " + ($t.agent // "Unassigned")
+                + "\n- Stack: " + ($t.stack // "Unspecified")
+                + "\n- Priority: " + ($t.priority // "unspecified")
+                + "\n- Dependencies: "
+                + (if (($t.dependencies // []) | length) > 0
+                    then (($t.dependencies // []) | map(tostring) | join(", "))
+                    else "None"
+                  end)
+                + "\n\n## Implementation Plan\n" + ($t.details // $t.description // "No implementation details provided.")
+                + "\n\n## Acceptance Criteria\n" + ($t.test_strategy // "Run tests and confirm task outcomes.")
+                + "\n\n## Subtasks\n"
+                + (if (($t.subtasks // []) | length) > 0
+                    then (($t.subtasks // [])
+                      | map("- " + (.title // ("Subtask " + ((.id // 0)|tostring))) + ": " + (.description // .details // "No description provided."))
+                      | join("\n"))
+                    else "_No subtasks generated._"
+                  end)
+                + "\n\n## Deliverables\n"
+                + "- Update the relevant code, configuration, and tests.\n"
+                + "- Keep artifacts aligned with the acceptance criteria.\n"
+                + "- Document blockers or assumptions in your final summary."
+              ),
+              prompt_xml: "<acceptance><checklist><item>Implement required behavior.</item><item>Run tests and lint.</item></checklist></acceptance>",
+              subtasks: [($t.subtasks // [])[]? | {
+                subtask_id: .id,
+                prompt_md: (
+                  "Implement subtask " + ((.id // 0)|tostring) + ": " + (.title // "Untitled subtask")
+                  + "\n\n## Objective\n" + (.description // "No description provided.")
+                  + "\n\n## Steps\n" + (.details // .description // "No implementation details provided.")
+                  + "\n\n## Validation\n" + (.test_strategy // "Verify the subtask outcomes.")
+                )
+              }]
+            } ]'
+      }
       OUTPUT=$(printf '%s' "$EXP" | intake-util fan-out \
         --prompt "$root/intake/prompts/smart-prompts-system.md" \
         --schema "$root/intake/schemas/smart-prompt-item.schema.json" \
@@ -817,9 +860,15 @@ steps:
         --provider "${model_fast_provider}" \
         --model "${model_fast}" \
         --concurrency "${INTAKE_FAN_OUT_CONCURRENCY:-4}") || {
-        echo "fan-out-prompts: FATAL — intake-util fan-out failed (exit $?)" >&2; exit 1; }
+        echo "fan-out-prompts: fan-out failed; building deterministic fallback prompts" >&2
+        build_prompt_fallback
+        exit 0
+      }
       if [ -z "$OUTPUT" ]; then
-        echo "fan-out-prompts: FATAL — fan-out returned empty output" >&2; exit 1; fi
+        echo "fan-out-prompts: fan-out returned empty output; building deterministic fallback prompts" >&2
+        build_prompt_fallback
+        exit 0
+      fi
       printf '%s' "$OUTPUT"
 
   - id: validate-prompts
@@ -1131,7 +1180,30 @@ steps:
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "verify-artifact-gates" "${audio_debug}"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
+      EXP=""
+      EXP_SOURCE=""
+      for candidate in \
+        "$root/.intake/tmp/fanout-docs-expanded-tasks.json" \
+        "$root/.intake/tmp/fanout-prompts-expanded-tasks.json" \
+        "$root/.intake/tmp/generate-scale-expanded-tasks.json" \
+        "$root/.tasks/tasks/tasks.json" \
+        "$root/.intake/tmp/refine-tasks-input.json" \
+        "$root/.intake/initial-tasks.json"
+      do
+        if [ -s "$candidate" ] && jq -e 'type=="array" and length>0' "$candidate" >/dev/null 2>&1; then
+          EXP="$(jq -c '.' "$candidate")"
+          EXP_SOURCE="$candidate"
+          break
+        fi
+      done
+      if [ -z "$EXP" ]; then
+        EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
+        if ! printf '%s' "$EXP" | jq -e 'type=="array" and length>0' >/dev/null 2>&1; then
+          EXP="[]"
+        fi
+      else
+        echo "verify-artifact-gates: using expanded tasks from $EXP_SOURCE" >&2
+      fi
       mkdir -p .tasks/tasks
       printf '%s\n' "$EXP" > .tasks/tasks/tasks.json
 
@@ -1368,7 +1440,30 @@ steps:
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "commit-outputs" "${audio_debug}"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
+      EXP=""
+      EXP_SOURCE=""
+      for candidate in \
+        "$root/.intake/tmp/fanout-docs-expanded-tasks.json" \
+        "$root/.intake/tmp/fanout-prompts-expanded-tasks.json" \
+        "$root/.intake/tmp/generate-scale-expanded-tasks.json" \
+        "$root/.tasks/tasks/tasks.json" \
+        "$root/.intake/tmp/refine-tasks-input.json" \
+        "$root/.intake/initial-tasks.json"
+      do
+        if [ -s "$candidate" ] && jq -e 'type=="array" and length>0' "$candidate" >/dev/null 2>&1; then
+          EXP="$(jq -c '.' "$candidate")"
+          EXP_SOURCE="$candidate"
+          break
+        fi
+      done
+      if [ -z "$EXP" ]; then
+        EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
+        if ! printf '%s' "$EXP" | jq -e 'type=="array" and length>0' >/dev/null 2>&1; then
+          EXP="[]"
+        fi
+      else
+        echo "commit-outputs: using expanded tasks from $EXP_SOURCE" >&2
+      fi
       TASK_COUNT=$(printf '%s' "$EXP" | jq 'length')
       printf '%s' "$CTO_GENERATE_SCALE_TASKS_OUT" > .tasks/docs/scale-tasks.json
       printf '%s' "$CTO_GENERATE_SECURITY_REPORT_OUT" > .tasks/docs/security-report.json
@@ -1401,7 +1496,30 @@ steps:
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "create-pr" "${audio_debug}"
       source "$root/scripts/scm-dispatch.sh"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
+      EXP=""
+      EXP_SOURCE=""
+      for candidate in \
+        "$root/.intake/tmp/fanout-docs-expanded-tasks.json" \
+        "$root/.intake/tmp/fanout-prompts-expanded-tasks.json" \
+        "$root/.intake/tmp/generate-scale-expanded-tasks.json" \
+        "$root/.tasks/tasks/tasks.json" \
+        "$root/.intake/tmp/refine-tasks-input.json" \
+        "$root/.intake/initial-tasks.json"
+      do
+        if [ -s "$candidate" ] && jq -e 'type=="array" and length>0' "$candidate" >/dev/null 2>&1; then
+          EXP="$(jq -c '.' "$candidate")"
+          EXP_SOURCE="$candidate"
+          break
+        fi
+      done
+      if [ -z "$EXP" ]; then
+        EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
+        if ! printf '%s' "$EXP" | jq -e 'type=="array" and length>0' >/dev/null 2>&1; then
+          EXP="[]"
+        fi
+      else
+        echo "create-pr: using expanded tasks from $EXP_SOURCE" >&2
+      fi
       TASK_COUNT=$(printf '%s' "$EXP" | jq 'length')
       VERDICT=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].verdict' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
       REVISION_COUNT=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].revision_count' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
@@ -1446,7 +1564,30 @@ steps:
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "sync-linear-issues-post-push" "${audio_debug}"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
+      EXP=""
+      EXP_SOURCE=""
+      for candidate in \
+        "$root/.intake/tmp/fanout-docs-expanded-tasks.json" \
+        "$root/.intake/tmp/fanout-prompts-expanded-tasks.json" \
+        "$root/.intake/tmp/generate-scale-expanded-tasks.json" \
+        "$root/.tasks/tasks/tasks.json" \
+        "$root/.intake/tmp/refine-tasks-input.json" \
+        "$root/.intake/initial-tasks.json"
+      do
+        if [ -s "$candidate" ] && jq -e 'type=="array" and length>0' "$candidate" >/dev/null 2>&1; then
+          EXP="$(jq -c '.' "$candidate")"
+          EXP_SOURCE="$candidate"
+          break
+        fi
+      done
+      if [ -z "$EXP" ]; then
+        EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
+        if ! printf '%s' "$EXP" | jq -e 'type=="array" and length>0' >/dev/null 2>&1; then
+          EXP="[]"
+        fi
+      else
+        echo "sync-linear-issues-post-push: using expanded tasks from $EXP_SOURCE" >&2
+      fi
       BRANCH="$(printf '%s' "$CTO_CREATE_PR_OUT" | jq -r '.branch // empty' 2>/dev/null || true)"
       PR_URL="$(printf '%s' "$CTO_CREATE_PR_OUT" | jq -r '.pr_url // empty' 2>/dev/null || true)"
       REPO_WEB="$(printf '%s' "${repository_url}" | sed -E 's#\.git$##')"
