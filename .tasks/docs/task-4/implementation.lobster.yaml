@@ -1,8 +1,8 @@
 name: implement-task-4
 metadata:
   task_id: 4
-  agent: nova
-  stack: typescript
+  agent: Grizz
+  stack: Go/gRPC
   depends_on_tasks: [1]
 
 inputs:
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-4/feature-branch"
   - name: agent
-    default: "nova"
+    default: "Grizz"
   - name: cli
     default: "claude"
   - name: model
@@ -27,20 +27,20 @@ steps:
       git clone {{inputs.repo_url}} work && cd work &&
       git checkout -b {{inputs.branch_name}}
 
-  - name: implement
+  - name: implement-subtask-4001
     depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/prompt.md
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4001/prompt.md
 
-  - name: validate
-    depends_on: [implement]
+  - name: validate-subtask-4001
+    depends_on: [implement-subtask-4001]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && go vet ./... && go test ./... && golangci-lint run
 
   - name: integration-validation
-    depends_on: [validate]
+    depends_on: [validate-subtask-4001]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

@@ -331,7 +331,7 @@ steps:
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "verify-refine-tasks" "failed: empty refinement output" "${audio_debug}" "error"
         exit 1
       fi
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       if ! printf '%s' "$EXP" | jq -e 'type=="array"' >/dev/null 2>&1; then
         echo "verify-refine-tasks: refinement output was not a valid expanded task array; falling back to parse-prd tasks" >&2
         if [ -s "$root/.intake/initial-tasks.json" ] && jq -e 'type=="array" and length>0' "$root/.intake/initial-tasks.json" >/dev/null 2>&1; then
@@ -374,7 +374,7 @@ steps:
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-activity-refine-tasks" "${audio_debug}"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       TASK_COUNT=$(printf '%s' "$EXP" | jq 'length')
       VERDICT=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].verdict' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
       intake-util linear-activity \
@@ -393,6 +393,18 @@ steps:
         --type plan \
         --title "Phase: Artifact Generation" \
         --body "Generating scaffolds, docs, prompts, workflows, and security analysis" || true
+
+  - id: reset-task-artifacts
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "reset-task-artifacts" "${audio_debug}"
+      mkdir -p .tasks/docs .tasks/tasks
+      find .tasks/docs -mindepth 1 -maxdepth 1 -type d -name 'task-*' -exec rm -rf {} +
+      rm -f \
+        .tasks/tasks/tasks.json \
+        .tasks/docs/security-report.json \
+        .tasks/docs/remediation-tasks.json \
+        .tasks/docs/scale-tasks.json
 
   - id: generate-scaffolds
     env:
@@ -530,7 +542,7 @@ steps:
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-docs" "failed: empty docs output" "${audio_debug}" "error"
         exit 1
       fi
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       TASK_IDS=$(printf '%s' "$EXP" | jq '[.[].id]')
       mkdir -p "$root/.intake/tmp"
       RAW_DOCS="$root/.intake/tmp/validate-docs-raw.json"
@@ -539,19 +551,62 @@ steps:
       DOCS_FINAL="$(jq -nc --argjson tasks "$EXP" --argjson docs "$DOCS_NORM" '
         [ $tasks[] as $t
           | ([$docs[]? | select(.task_id == $t.id)][0]) as $d
-          | if $d then $d else {
+          | if (
+              $d
+              and (($d.task_md // "") | length > 0)
+              and (($d.acceptance_md // "") | length > 0)
+              and (($d.decisions_md // "") | length > 0)
+            ) then $d else {
               task_id: $t.id,
               task_title: $t.title,
-              task_md: ("## " + ($t.title // ("Task " + (($t.id // 0)|tostring))) + "\n\n" + ($t.description // "No description provided.")),
-              acceptance_md: ("## Acceptance Criteria\n\n- [ ] " + ($t.test_strategy // "Validate implementation outcomes.")),
-              decisions_md: (if (($t.decision_points // []) | length) > 0
-                then ("## Decision Points\n\n" + (($t.decision_points // []) | map("- " + (.description // "Decision")) | join("\n")))
-                else "## Decision Points\n\n_No explicit decision points generated._"
-              end)
+              task_md: (
+                "## " + ($t.title // ("Task " + (($t.id // 0)|tostring)))
+                + "\n\n### Objective\n" + ($t.description // "No description provided.")
+                + "\n\n### Ownership\n"
+                + "- Agent: " + ($t.agent // "Unassigned")
+                + "\n- Stack: " + ($t.stack // "Unspecified")
+                + "\n- Priority: " + ($t.priority // "unspecified")
+                + "\n- Status: " + ($t.status // "pending")
+                + "\n- Dependencies: "
+                + (if (($t.dependencies // []) | length) > 0
+                    then (($t.dependencies // []) | map(tostring) | join(", "))
+                    else "None"
+                  end)
+                + "\n\n### Implementation Details\n" + ($t.details // $t.description // "No implementation details provided.")
+                + "\n\n### Subtasks\n"
+                + (if (($t.subtasks // []) | length) > 0
+                    then (($t.subtasks // [])
+                      | map("- [ ] " + (.title // ("Subtask " + ((.id // 0)|tostring))) + ": " + (.description // .details // "No description provided."))
+                      | join("\n"))
+                    else "_No subtasks generated._"
+                  end)
+              ),
+              acceptance_md: (
+                "## Acceptance Criteria\n\n- [ ] "
+                + (($t.test_strategy // "Validate implementation outcomes.") | gsub("\n"; "\n- [ ] "))
+                + "\n\n## Verification Notes\n\n"
+                + "- [ ] Confirm dependencies are satisfied before implementation.\n"
+                + "- [ ] Update tests, docs, and configuration touched by this task.\n"
+                + "- [ ] Validate the final behavior against the task objective."
+              ),
+              decisions_md: (
+                (if (($t.decision_points // []) | length) > 0
+                  then ("## Decision Points\n\n" + (($t.decision_points // []) | map("- " + (.description // "Decision")) | join("\n")))
+                  else "## Decision Points\n\n_No explicit decision points generated._"
+                end)
+                + "\n\n## Coordination Notes\n\n"
+                + "- Agent owner: " + ($t.agent // "Unassigned")
+                + "\n- Primary stack: " + ($t.stack // "Unspecified")
+              )
             } end
         ]')"
       STRICT_CONTENT_GATES="${INTAKE_STRICT_CONTENT_GATES:-true}"
-      if ! printf '%s' "$DOCS_FINAL" | intake-util validate --type docs --task-ids "$TASK_IDS"; then
+      DOC_VALIDATE_STATUS=0
+      DOC_VALIDATE_OUT="$(printf '%s' "$DOCS_FINAL" | intake-util validate --type docs --task-ids "$TASK_IDS" 2>&1)" || DOC_VALIDATE_STATUS=$?
+      if [ -n "$DOC_VALIDATE_OUT" ]; then
+        printf '%s\n' "$DOC_VALIDATE_OUT" >&2
+      fi
+      if [ "$DOC_VALIDATE_STATUS" != "0" ]; then
         if [ "$STRICT_CONTENT_GATES" = "true" ] || [ "$STRICT_CONTENT_GATES" = "1" ]; then
           echo "validate-docs: FATAL — docs validation failed and strict mode is enabled" >&2
           exit 1
@@ -621,7 +676,7 @@ steps:
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "search-skills" "${audio_debug}"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       printf '%s' "$EXP" | jq -r '.[] | "\(.id)|\(.title) \(.stack // "") \(.description | .[0:200])"' | while IFS='|' read -r task_id query; do
         results=$(clawhub search "$query" --limit 5 --json 2>/dev/null || echo '[]')
         echo "{\"task_id\": $task_id, \"search_results\": $results}"
@@ -681,7 +736,7 @@ steps:
     command: |
       root="${WORKSPACE:-.}";
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "generate-tool-manifest" "${audio_debug}"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT");
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]");
       if ! EXP="$(printf '%s' "$EXP" | jq -c '.' 2>/dev/null)"; then
         EXP="[]"
       fi
@@ -710,7 +765,7 @@ steps:
     command: |
       root="${WORKSPACE:-.}";
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "fan-out-prompts" "${audio_debug}"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT");
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]");
       if ! printf '%s' "$EXP" | jq -e . >/dev/null 2>&1; then
         echo "fan-out-prompts: expanded_tasks blob not valid JSON; recovering from refine-tasks-input or initial-tasks" >&2
         if [ -s "$root/.intake/tmp/refine-tasks-input.json" ] && jq -e . "$root/.intake/tmp/refine-tasks-input.json" >/dev/null 2>&1; then
@@ -779,27 +834,65 @@ steps:
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-prompts" "failed: empty prompts output" "${audio_debug}" "error"
         exit 1
       fi
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       TASK_IDS=$(printf '%s' "$EXP" | jq '[.[].id]')
       PROMPTS_NORM="$(printf '%s' "$CTO_FAN_OUT_PROMPTS_OUT" | jq -c 'if type=="array" then map(select(type=="object")) elif .task_prompts? then (.task_prompts | map(select(type=="object"))) else [] end' 2>/dev/null || echo '[]')"
       PROMPTS_FINAL="$(jq -nc --argjson tasks "$EXP" --argjson prompts "$PROMPTS_NORM" '
         [ $tasks[] as $t
           | ([$prompts[]? | select(.task_id == $t.id)][0]) as $p
-          | if $p then
+          | if (
+              $p
+              and (($p.prompt_md // "") | length > 0)
+            ) then
               ($p + { prompt_xml: ($p.prompt_xml // "<acceptance><checklist><item>Implement and verify task outcomes.</item></checklist></acceptance>") })
             else {
               task_id: $t.id,
               task_title: $t.title,
-              prompt_md: ("Implement task " + (($t.id // 0)|tostring) + ": " + ($t.title // "Untitled task") + "\n\nContext:\n" + ($t.description // "")),
+              prompt_md: (
+                "Implement task " + (($t.id // 0)|tostring) + ": " + ($t.title // "Untitled task")
+                + "\n\n## Goal\n" + ($t.description // "No description provided.")
+                + "\n\n## Task Context\n"
+                + "- Agent owner: " + ($t.agent // "Unassigned")
+                + "\n- Stack: " + ($t.stack // "Unspecified")
+                + "\n- Priority: " + ($t.priority // "unspecified")
+                + "\n- Dependencies: "
+                + (if (($t.dependencies // []) | length) > 0
+                    then (($t.dependencies // []) | map(tostring) | join(", "))
+                    else "None"
+                  end)
+                + "\n\n## Implementation Plan\n" + ($t.details // $t.description // "No implementation details provided.")
+                + "\n\n## Acceptance Criteria\n" + ($t.test_strategy // "Run tests and confirm task outcomes.")
+                + "\n\n## Subtasks\n"
+                + (if (($t.subtasks // []) | length) > 0
+                    then (($t.subtasks // [])
+                      | map("- " + (.title // ("Subtask " + ((.id // 0)|tostring))) + ": " + (.description // .details // "No description provided."))
+                      | join("\n"))
+                    else "_No subtasks generated._"
+                  end)
+                + "\n\n## Deliverables\n"
+                + "- Update the relevant code, configuration, and tests.\n"
+                + "- Keep artifacts aligned with the acceptance criteria.\n"
+                + "- Document blockers or assumptions in your final summary."
+              ),
               prompt_xml: "<acceptance><checklist><item>Implement required behavior.</item><item>Run tests and lint.</item></checklist></acceptance>",
               subtasks: [($t.subtasks // [])[]? | {
                 subtask_id: .id,
-                prompt_md: ("Implement subtask " + ((.id // 0)|tostring) + ": " + (.title // "Untitled subtask") + "\n\nDetails:\n" + (.description // ""))
+                prompt_md: (
+                  "Implement subtask " + ((.id // 0)|tostring) + ": " + (.title // "Untitled subtask")
+                  + "\n\n## Objective\n" + (.description // "No description provided.")
+                  + "\n\n## Steps\n" + (.details // .description // "No implementation details provided.")
+                  + "\n\n## Validation\n" + (.test_strategy // "Verify the subtask outcomes.")
+                )
               }]
             } end
         ]')"
       STRICT_CONTENT_GATES="${INTAKE_STRICT_CONTENT_GATES:-true}"
-      if ! printf '%s' "$PROMPTS_FINAL" | intake-util validate --type prompts --task-ids "$TASK_IDS"; then
+      PROMPTS_VALIDATE_STATUS=0
+      PROMPTS_VALIDATE_OUT="$(printf '%s' "$PROMPTS_FINAL" | intake-util validate --type prompts --task-ids "$TASK_IDS" 2>&1)" || PROMPTS_VALIDATE_STATUS=$?
+      if [ -n "$PROMPTS_VALIDATE_OUT" ]; then
+        printf '%s\n' "$PROMPTS_VALIDATE_OUT" >&2
+      fi
+      if [ "$PROMPTS_VALIDATE_STATUS" != "0" ]; then
         if [ "$STRICT_CONTENT_GATES" = "true" ] || [ "$STRICT_CONTENT_GATES" = "1" ]; then
           echo "validate-prompts: FATAL — prompts validation failed and strict mode is enabled" >&2
           exit 1
@@ -871,7 +964,7 @@ steps:
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "generate-workflows" "${audio_debug}"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       if [ -z "$EXP" ] || [ "$EXP" = "null" ] || [ "$EXP" = "[]" ]; then
         echo "generate-workflows: FATAL — no expanded tasks available" >&2; exit 1; fi
       SCF_TMP="$(mktemp "${TMPDIR:-/tmp}/intake-gw-scaffolds.XXXXXX")"
@@ -899,7 +992,7 @@ steps:
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-workflows" "failed: empty workflow output" "${audio_debug}" "error"
         exit 1
       fi
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       TASK_IDS=$(printf '%s' "$EXP" | jq '[.[].id]')
       WF_COUNT=$(printf '%s' "$CTO_GENERATE_WORKFLOWS_OUT" | jq '.task_workflows | length' 2>/dev/null || echo 0)
       if [ "$WF_COUNT" = "0" ]; then
@@ -908,7 +1001,12 @@ steps:
         exit 1
       fi
       STRICT_CONTENT_GATES="${INTAKE_STRICT_CONTENT_GATES:-true}"
-      if ! printf '%s' "$CTO_GENERATE_WORKFLOWS_OUT" | jq '.task_workflows' | intake-util validate --type workflows --task-ids "$TASK_IDS"; then
+      WORKFLOWS_VALIDATE_STATUS=0
+      WORKFLOWS_VALIDATE_OUT="$(printf '%s' "$CTO_GENERATE_WORKFLOWS_OUT" | jq '.task_workflows' | intake-util validate --type workflows --task-ids "$TASK_IDS" 2>&1)" || WORKFLOWS_VALIDATE_STATUS=$?
+      if [ -n "$WORKFLOWS_VALIDATE_OUT" ]; then
+        printf '%s\n' "$WORKFLOWS_VALIDATE_OUT" >&2
+      fi
+      if [ "$WORKFLOWS_VALIDATE_STATUS" != "0" ]; then
         if [ "$STRICT_CONTENT_GATES" = "true" ] || [ "$STRICT_CONTENT_GATES" = "1" ]; then
           echo "validate-workflows: FATAL — workflows validation failed and strict mode is enabled" >&2
           exit 1
@@ -930,7 +1028,7 @@ steps:
     command: |
       root="${WORKSPACE:-.}";
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "generate-scale-tasks" "${audio_debug}"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT");
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]");
       if ! EXP="$(printf '%s' "$EXP" | jq -c '.' 2>/dev/null)"; then
         EXP="[]"
       fi
@@ -956,7 +1054,7 @@ steps:
     command: |
       root="${WORKSPACE:-.}";
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "generate-security-report" "${audio_debug}"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT");
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]");
       if ! EXP="$(printf '%s' "$EXP" | jq -c '.' 2>/dev/null)"; then
         EXP="[]"
       fi
@@ -999,7 +1097,7 @@ steps:
     command: |
       root="${WORKSPACE:-.}";
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "generate-remediation-tasks" "${audio_debug}"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT");
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]");
       if ! EXP="$(printf '%s' "$EXP" | jq -c '.' 2>/dev/null)"; then
         EXP="[]"
       fi
@@ -1033,7 +1131,7 @@ steps:
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "verify-artifact-gates" "${audio_debug}"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       mkdir -p .tasks/tasks
       printf '%s\n' "$EXP" > .tasks/tasks/tasks.json
 
@@ -1202,21 +1300,36 @@ steps:
       fi
       mkdir -p "$root/.intake/tmp"
       BUNDLE="$root/.intake/tmp/quality-gate-intake-artifacts.txt"
+      TASK_COUNT="$(jq 'length' .tasks/tasks/tasks.json 2>/dev/null || echo 0)"
+      SUBTASK_COUNT="$(jq '[.[] | (.subtasks // []) | length] | add // 0' .tasks/tasks/tasks.json 2>/dev/null || echo 0)"
+      DOC_FILE_COUNT="$(find .tasks/docs -name "*.md" -o -name "*.json" 2>/dev/null | wc -l | tr -d ' ')"
+      SAMPLE_TASK_COUNT=2
       {
         echo "stage=intake-artifacts"
         echo "project=${project_name}"
         echo "summary:"
-        cat "$root/.intake/intake-summary.json" 2>/dev/null || true
+        echo "Generated ${TASK_COUNT} tasks with ${SUBTASK_COUNT} subtasks and ${DOC_FILE_COUNT} documentation artifacts for ${project_name}. Bundle below includes sampled summaries and file excerpts for the first ${SAMPLE_TASK_COUNT} tasks."
         echo
-        echo "tasks:"
-        jq -c '.[0:3]' .tasks/tasks/tasks.json 2>/dev/null || true
+        echo "task_summaries:"
+        jq -c --argjson sample_count "$SAMPLE_TASK_COUNT" '[.[0:$sample_count][] | {
+          id,
+          title,
+          agent,
+          stack,
+          priority,
+          dependencies,
+          subtask_count: ((.subtasks // []) | length),
+          decision_point_count: ((.decision_points // []) | length),
+          description: ((.description // "")[0:220]),
+          test_strategy: ((.test_strategy // "")[0:220])
+        }]' .tasks/tasks/tasks.json 2>/dev/null || true
         echo
-        for task_id in $(jq -r '.[0:3] | .[].id' .tasks/tasks/tasks.json 2>/dev/null); do
+        for task_id in $(jq -r --argjson sample_count "$SAMPLE_TASK_COUNT" '.[0:$sample_count] | .[].id' .tasks/tasks/tasks.json 2>/dev/null); do
           for section in task acceptance prompt; do
             f=".tasks/docs/task-${task_id}/${section}.md"
             echo "=== ${f} ==="
             if [ -s "$f" ]; then
-              sed -n '1,120p' "$f"
+              sed -n '1,80p' "$f"
             else
               echo "__MISSING_OR_EMPTY__"
             fi
@@ -1255,7 +1368,7 @@ steps:
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "commit-outputs" "${audio_debug}"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       TASK_COUNT=$(printf '%s' "$EXP" | jq 'length')
       printf '%s' "$CTO_GENERATE_SCALE_TASKS_OUT" > .tasks/docs/scale-tasks.json
       printf '%s' "$CTO_GENERATE_SECURITY_REPORT_OUT" > .tasks/docs/security-report.json
@@ -1288,7 +1401,7 @@ steps:
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "create-pr" "${audio_debug}"
       source "$root/scripts/scm-dispatch.sh"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       TASK_COUNT=$(printf '%s' "$EXP" | jq 'length')
       VERDICT=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].verdict' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
       REVISION_COUNT=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].revision_count' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
@@ -1333,7 +1446,7 @@ steps:
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "sync-linear-issues-post-push" "${audio_debug}"
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       BRANCH="$(printf '%s' "$CTO_CREATE_PR_OUT" | jq -r '.branch // empty' 2>/dev/null || true)"
       PR_URL="$(printf '%s' "$CTO_CREATE_PR_OUT" | jq -r '.pr_url // empty' 2>/dev/null || true)"
       REPO_WEB="$(printf '%s' "${repository_url}" | sed -E 's#\.git$##')"

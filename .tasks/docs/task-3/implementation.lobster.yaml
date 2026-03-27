@@ -1,9 +1,9 @@
 name: implement-task-3
 metadata:
   task_id: 3
-  agent: nova
-  stack: typescript
-  depends_on_tasks: [1]
+  agent: Rex
+  stack: Rust/Axum
+  depends_on_tasks: [1, 2]
 
 inputs:
   - name: task_dir
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-3/feature-branch"
   - name: agent
-    default: "nova"
+    default: "Rex"
   - name: cli
     default: "claude"
   - name: model
@@ -27,20 +27,20 @@ steps:
       git clone {{inputs.repo_url}} work && cd work &&
       git checkout -b {{inputs.branch_name}}
 
-  - name: implement
+  - name: implement-subtask-3001
     depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/prompt.md
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3001/prompt.md
 
-  - name: validate
-    depends_on: [implement]
+  - name: validate-subtask-3001
+    depends_on: [implement-subtask-3001]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: integration-validation
-    depends_on: [validate]
+    depends_on: [validate-subtask-3001]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

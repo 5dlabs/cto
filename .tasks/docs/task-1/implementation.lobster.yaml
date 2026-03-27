@@ -1,8 +1,8 @@
 name: implement-task-1
 metadata:
   task_id: 1
-  agent: nova
-  stack: typescript
+  agent: Bolt
+  stack: Kubernetes/Helm
 
 inputs:
   - name: task_dir
@@ -10,7 +10,7 @@ inputs:
   - name: branch_name
     default: "task-1/feature-branch"
   - name: agent
-    default: "nova"
+    default: "Bolt"
   - name: cli
     default: "claude"
   - name: model
@@ -26,20 +26,25 @@ steps:
       git clone {{inputs.repo_url}} work && cd work &&
       git checkout -b {{inputs.branch_name}}
 
-  - name: implement
+  - name: scaffold-files
     depends_on: [setup]
+    command: >
+      cd work && mkdir -p kubernetes/namespaces kubernetes/operators kubernetes/databases terraform/cloudflare kubernetes/cloudflare kubernetes/configmaps
+
+  - name: implement-subtask-1001
+    depends_on: [scaffold-files]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/prompt.md
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.1001/prompt.md
 
-  - name: validate
-    depends_on: [implement]
+  - name: validate-subtask-1001
+    depends_on: [implement-subtask-1001]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: integration-validation
-    depends_on: [validate]
+    depends_on: [validate-subtask-1001]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 
