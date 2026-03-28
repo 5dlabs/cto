@@ -30,7 +30,7 @@
     "test_strategy": {
       "type": "string"
     },
-    "subagent_type": {
+    "subagentType": {
       "type": "string",
       "enum": ["implementer", "reviewer", "tester", "researcher", "documenter"]
     },
@@ -42,7 +42,9 @@
     "id",
     "title",
     "description",
-    "dependencies"
+    "dependencies",
+    "subagentType",
+    "parallelizable"
   ],
   "additionalProperties": false
 }

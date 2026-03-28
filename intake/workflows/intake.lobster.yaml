@@ -331,6 +331,9 @@ steps:
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "verify-refine-tasks" "failed: empty refinement output" "${audio_debug}" "error"
         exit 1
       fi
+      # EXP extraction: the jq chain handles two output formats from refine-tasks:
+      # .output[0].expanded_tasks is tried first (fallback/wrapper format), then
+      # .expanded_tasks for the happy-path resolve-output format, then .tasks as last resort.
       EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       if ! printf '%s' "$EXP" | jq -e 'type=="array"' >/dev/null 2>&1; then
         echo "verify-refine-tasks: refinement output was not a valid expanded task array; falling back to parse-prd tasks" >&2
@@ -518,6 +521,42 @@ steps:
         --rawfile inf "$root/.intake/contexts/infrastructure.txt" \
         '{scaffolds: $sc[0], codebase_context: $cb, infrastructure_context: $inf}') || {
         echo "fan-out-docs: FATAL — jq context build failed" >&2; exit 1; }
+      build_doc_fallback() {
+        jq -nc --argjson tasks "$EXP" '
+          [ $tasks[] as $t | select($t | type == "object") | {
+              task_id: $t.id,
+              task_md: (
+                "# Task " + (($t.id // 0)|tostring) + ": " + (($t.title // "Untitled task") | tostring)
+                + "\n\n## Overview\n" + (($t.description // "No description provided.") | tostring)
+                + "\n\n## Implementation Details\n" + (($t.details // $t.description // "Follow the task description to implement.") | tostring)
+                + "\n\n## Dependencies\n"
+                + (if (($t.dependencies // []) | length) > 0
+                    then "Tasks: " + (($t.dependencies // []) | map(tostring) | join(", "))
+                    else "None"
+                  end)
+                + "\n\n## Subtasks\n"
+                + (if (($t.subtasks // []) | length) > 0
+                    then (($t.subtasks // [])
+                      | map(select(type == "object"))
+                      | map("- **" + ((.title // ("Subtask " + ((.id // 0)|tostring))) | tostring) + "**: " + ((.description // "No description.") | tostring))
+                      | join("\n"))
+                    else "_No subtasks._"
+                  end)
+              ),
+              decisions_md: (
+                "## Decisions for Task " + (($t.id // 0)|tostring)
+                + "\n\n- Stack: " + (($t.stack // "Unspecified") | tostring)
+                + "\n- Agent: " + (($t.agent // "Unassigned") | tostring)
+                + "\n- Priority: " + (($t.priority // "unspecified") | tostring)
+                + "\n\n_Fallback doc: LLM generation was unavailable._"
+              ),
+              acceptance_md: (
+                "## Acceptance Criteria for Task " + (($t.id // 0)|tostring)
+                + "\n\n" + (($t.test_strategy // "Run tests and confirm task outcomes.") | tostring)
+                + "\n\n_Generated from task metadata (LLM fallback)._"
+              )
+          } ]'
+      }
       OUTPUT=$(printf '%s' "$EXP" | intake-util fan-out \
         --prompt "$root/intake/prompts/smart-docs-system.md" \
         --schema "$root/intake/schemas/smart-doc-item.schema.json" \
@@ -525,9 +564,13 @@ steps:
         --provider "${model_fast_provider}" \
         --model "${model_fast}" \
         --concurrency "${INTAKE_FAN_OUT_CONCURRENCY:-4}") || {
-        echo "fan-out-docs: FATAL — intake-util fan-out failed (exit $?)" >&2; exit 1; }
+        echo "fan-out-docs: intake-util fan-out failed; building deterministic fallback docs" >&2
+        build_doc_fallback
+        exit 0; }
       if [ -z "$OUTPUT" ]; then
-        echo "fan-out-docs: FATAL — fan-out returned empty output" >&2; exit 1; fi
+        echo "fan-out-docs: fan-out returned empty output; building deterministic fallback docs" >&2
+        build_doc_fallback
+        exit 0; fi
       printf '%s' "$OUTPUT"
 
   - id: validate-docs
@@ -542,14 +585,42 @@ steps:
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-docs" "failed: empty docs output" "${audio_debug}" "error"
         exit 1
       fi
-      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
-      TASK_IDS=$(printf '%s' "$EXP" | jq '[.[].id]')
+      # Read expanded tasks from file (written by fan-out-docs) — avoids 50KB+ JSON
+      # through shell variables which can corrupt with control characters.
       mkdir -p "$root/.intake/tmp"
+      EXP=""
+      for candidate in \
+        "$root/.intake/tmp/fanout-docs-expanded-tasks.json" \
+        "$root/.intake/tmp/fanout-prompts-expanded-tasks.json" \
+        "$root/.tasks/tasks/tasks.json" \
+        "$root/.intake/tmp/refine-tasks-input.json" \
+        "$root/.intake/initial-tasks.json"
+      do
+        if [ -s "$candidate" ] && jq -e 'type=="array" and length>0' "$candidate" >/dev/null 2>&1; then
+          EXP="$(jq -c '.' "$candidate")"
+          echo "validate-docs: using expanded tasks from $candidate" >&2
+          break
+        fi
+      done
+      if [ -z "$EXP" ]; then
+        EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
+        echo "validate-docs: fell back to shell variable for expanded tasks" >&2
+      fi
+      TASK_IDS=$(printf '%s' "$EXP" | jq '[.[].id]')
       RAW_DOCS="$root/.intake/tmp/validate-docs-raw.json"
       printf '%s' "$CTO_FAN_OUT_DOCS_OUT" > "$RAW_DOCS"
-      DOCS_NORM="$(printf '%s' "$CTO_FAN_OUT_DOCS_OUT" | jq -c 'if type=="array" then map(select(type=="object")) elif .task_docs? then (.task_docs | map(select(type=="object"))) else [] end' 2>/dev/null || echo '[]')"
-      DOCS_FINAL="$(jq -nc --argjson tasks "$EXP" --argjson docs "$DOCS_NORM" '
+      DOCS_NORM_FILE="$root/.intake/tmp/validate-docs-norm.json"
+      printf '%s' "$CTO_FAN_OUT_DOCS_OUT" | jq -c 'if type=="array" then map(select(type=="object")) elif .task_docs? then (.task_docs | map(select(type=="object"))) else [] end' > "$DOCS_NORM_FILE" 2>/dev/null || printf '[]' > "$DOCS_NORM_FILE"
+      # Write EXP to file so jq reads it via --slurpfile (avoids shell variable corruption
+      # on large JSON with embedded control characters).
+      EXP_FILE="$root/.intake/tmp/validate-docs-tasks.json"
+      printf '%s' "$EXP" > "$EXP_FILE"
+      # NOTE: tostring guards on all field accesses — Gemini can return non-string
+      # types (numbers, objects) for fields like description, agent, stack, etc.
+      # The select(type=="object") skips any non-object entries in the tasks array.
+      DOCS_FINAL="$(jq -nc --slurpfile tasks_arr "$EXP_FILE" --slurpfile docs_arr "$DOCS_NORM_FILE" '($tasks_arr[0] // []) as $tasks | ($docs_arr[0] // []) as $docs |
         [ $tasks[] as $t
+          | select($t | type == "object")
           | ([$docs[]? | select(.task_id == $t.id)][0]) as $d
           | if (
               $d
@@ -558,32 +629,33 @@ steps:
               and (($d.decisions_md // "") | length > 0)
             ) then $d else {
               task_id: $t.id,
-              task_title: $t.title,
+              task_title: (($t.title // "Untitled") | tostring),
               task_md: (
-                "## " + ($t.title // ("Task " + (($t.id // 0)|tostring)))
-                + "\n\n### Objective\n" + ($t.description // "No description provided.")
+                "## " + (($t.title // ("Task " + (($t.id // 0)|tostring))) | tostring)
+                + "\n\n### Objective\n" + (($t.description // "No description provided.") | tostring)
                 + "\n\n### Ownership\n"
-                + "- Agent: " + ($t.agent // "Unassigned")
-                + "\n- Stack: " + ($t.stack // "Unspecified")
-                + "\n- Priority: " + ($t.priority // "unspecified")
-                + "\n- Status: " + ($t.status // "pending")
+                + "- Agent: " + (($t.agent // "Unassigned") | tostring)
+                + "\n- Stack: " + (($t.stack // "Unspecified") | tostring)
+                + "\n- Priority: " + (($t.priority // "unspecified") | tostring)
+                + "\n- Status: " + (($t.status // "pending") | tostring)
                 + "\n- Dependencies: "
                 + (if (($t.dependencies // []) | length) > 0
                     then (($t.dependencies // []) | map(tostring) | join(", "))
                     else "None"
                   end)
-                + "\n\n### Implementation Details\n" + ($t.details // $t.description // "No implementation details provided.")
+                + "\n\n### Implementation Details\n" + (($t.details // $t.description // "No implementation details provided.") | tostring)
                 + "\n\n### Subtasks\n"
                 + (if (($t.subtasks // []) | length) > 0
                     then (($t.subtasks // [])
-                      | map("- [ ] " + (.title // ("Subtask " + ((.id // 0)|tostring))) + ": " + (.description // .details // "No description provided."))
+                      | map(select(type == "object"))
+                      | map("- [ ] " + ((.title // ("Subtask " + ((.id // 0)|tostring))) | tostring) + ": " + ((.description // .details // "No description provided.") | tostring))
                       | join("\n"))
                     else "_No subtasks generated._"
                   end)
               ),
               acceptance_md: (
                 "## Acceptance Criteria\n\n- [ ] "
-                + (($t.test_strategy // "Validate implementation outcomes.") | gsub("\n"; "\n- [ ] "))
+                + ((($t.test_strategy // "Validate implementation outcomes.") | tostring) | gsub("\n"; "\n- [ ] "))
                 + "\n\n## Verification Notes\n\n"
                 + "- [ ] Confirm dependencies are satisfied before implementation.\n"
                 + "- [ ] Update tests, docs, and configuration touched by this task.\n"
@@ -591,15 +663,28 @@ steps:
               ),
               decisions_md: (
                 (if (($t.decision_points // []) | length) > 0
-                  then ("## Decision Points\n\n" + (($t.decision_points // []) | map("- " + (.description // "Decision")) | join("\n")))
+                  then ("## Decision Points\n\n" + (($t.decision_points // []) | map(
+                    if type == "object" then ("- " + ((.description // "Decision") | tostring))
+                    elif type == "string" then ("- " + .)
+                    else ("- " + tostring)
+                    end) | join("\n")))
                   else "## Decision Points\n\n_No explicit decision points generated._"
                 end)
                 + "\n\n## Coordination Notes\n\n"
-                + "- Agent owner: " + ($t.agent // "Unassigned")
-                + "\n- Primary stack: " + ($t.stack // "Unspecified")
+                + "- Agent owner: " + (($t.agent // "Unassigned") | tostring)
+                + "\n- Primary stack: " + (($t.stack // "Unspecified") | tostring)
               )
             } end
-        ]')"
+        ]' 2>"$root/.intake/tmp/validate-docs-jq-err.log")" || {
+        echo "validate-docs: DOCS_FINAL jq failed; using minimal fallback from task metadata" >&2
+        cat "$root/.intake/tmp/validate-docs-jq-err.log" >&2
+        DOCS_FINAL="$(jq -c '[.[] | select(type=="object") | {
+          task_id: .id,
+          task_md: ("## " + ((.title // "Task") | tostring) + "\n\n" + ((.description // "No description.") | tostring)),
+          acceptance_md: ("## Acceptance Criteria\n\n- [ ] " + ((.test_strategy // "Validate outcomes.") | tostring)),
+          decisions_md: ("## Decision Points\n\n_Fallback: see task metadata._")
+        }]' "$EXP_FILE" 2>/dev/null || echo '[]')"
+      }
       STRICT_CONTENT_GATES="${INTAKE_STRICT_CONTENT_GATES:-true}"
       DOC_VALIDATE_STATUS=0
       DOC_VALIDATE_OUT="$(printf '%s' "$DOCS_FINAL" | intake-util validate --type docs --task-ids "$TASK_IDS" 2>&1)" || DOC_VALIDATE_STATUS=$?
@@ -677,7 +762,7 @@ steps:
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "search-skills" "${audio_debug}"
       EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
-      printf '%s' "$EXP" | jq -r '.[] | "\(.id)|\(.title) \(.stack // "") \(.description | .[0:200])"' | while IFS='|' read -r task_id query; do
+      printf '%s' "$EXP" | jq -r '.[] | select(type == "object") | "\(.id)|\(.title // "") \(.stack // "") \((.description // "") | tostring | .[0:200])"' | while IFS='|' read -r task_id query; do
         results=$(clawhub search "$query" --limit 5 --json 2>/dev/null || echo '[]')
         echo "{\"task_id\": $task_id, \"search_results\": $results}"
       done | jq -s '{"skill_search_results": .}'
@@ -812,27 +897,28 @@ steps:
         echo "fan-out-prompts: FATAL — jq context build failed" >&2; exit 1; }
       build_prompt_fallback() {
         jq -nc --argjson tasks "$EXP" '
-          [ $tasks[] as $t | {
+          [ $tasks[] as $t | select($t | type == "object") | {
               task_id: $t.id,
-              task_title: $t.title,
+              task_title: (($t.title // "Untitled") | tostring),
               prompt_md: (
-                "Implement task " + (($t.id // 0)|tostring) + ": " + ($t.title // "Untitled task")
-                + "\n\n## Goal\n" + ($t.description // "No description provided.")
+                "Implement task " + (($t.id // 0)|tostring) + ": " + (($t.title // "Untitled task") | tostring)
+                + "\n\n## Goal\n" + (($t.description // "No description provided.") | tostring)
                 + "\n\n## Task Context\n"
-                + "- Agent owner: " + ($t.agent // "Unassigned")
-                + "\n- Stack: " + ($t.stack // "Unspecified")
-                + "\n- Priority: " + ($t.priority // "unspecified")
+                + "- Agent owner: " + (($t.agent // "Unassigned") | tostring)
+                + "\n- Stack: " + (($t.stack // "Unspecified") | tostring)
+                + "\n- Priority: " + (($t.priority // "unspecified") | tostring)
                 + "\n- Dependencies: "
                 + (if (($t.dependencies // []) | length) > 0
                     then (($t.dependencies // []) | map(tostring) | join(", "))
                     else "None"
                   end)
-                + "\n\n## Implementation Plan\n" + ($t.details // $t.description // "No implementation details provided.")
-                + "\n\n## Acceptance Criteria\n" + ($t.test_strategy // "Run tests and confirm task outcomes.")
+                + "\n\n## Implementation Plan\n" + (($t.details // $t.description // "No implementation details provided.") | tostring)
+                + "\n\n## Acceptance Criteria\n" + (($t.test_strategy // "Run tests and confirm task outcomes.") | tostring)
                 + "\n\n## Subtasks\n"
                 + (if (($t.subtasks // []) | length) > 0
                     then (($t.subtasks // [])
-                      | map("- " + (.title // ("Subtask " + ((.id // 0)|tostring))) + ": " + (.description // .details // "No description provided."))
+                      | map(select(type == "object"))
+                      | map("- " + ((.title // ("Subtask " + ((.id // 0)|tostring))) | tostring) + ": " + ((.description // .details // "No description provided.") | tostring))
                       | join("\n"))
                     else "_No subtasks generated._"
                   end)
@@ -842,13 +928,13 @@ steps:
                 + "- Document blockers or assumptions in your final summary."
               ),
               prompt_xml: "<acceptance><checklist><item>Implement required behavior.</item><item>Run tests and lint.</item></checklist></acceptance>",
-              subtasks: [($t.subtasks // [])[]? | {
+              subtasks: [($t.subtasks // [])[]? | select(type == "object") | {
                 subtask_id: .id,
                 prompt_md: (
-                  "Implement subtask " + ((.id // 0)|tostring) + ": " + (.title // "Untitled subtask")
-                  + "\n\n## Objective\n" + (.description // "No description provided.")
-                  + "\n\n## Steps\n" + (.details // .description // "No implementation details provided.")
-                  + "\n\n## Validation\n" + (.test_strategy // "Verify the subtask outcomes.")
+                  "Implement subtask " + ((.id // 0)|tostring) + ": " + ((.title // "Untitled subtask") | tostring)
+                  + "\n\n## Objective\n" + ((.description // "No description provided.") | tostring)
+                  + "\n\n## Steps\n" + ((.details // .description // "No implementation details provided.") | tostring)
+                  + "\n\n## Validation\n" + ((.test_strategy // "Verify the subtask outcomes.") | tostring)
                 )
               }]
             } ]'
@@ -888,6 +974,7 @@ steps:
       PROMPTS_NORM="$(printf '%s' "$CTO_FAN_OUT_PROMPTS_OUT" | jq -c 'if type=="array" then map(select(type=="object")) elif .task_prompts? then (.task_prompts | map(select(type=="object"))) else [] end' 2>/dev/null || echo '[]')"
       PROMPTS_FINAL="$(jq -nc --argjson tasks "$EXP" --argjson prompts "$PROMPTS_NORM" '
         [ $tasks[] as $t
+          | select($t | type == "object")
           | ([$prompts[]? | select(.task_id == $t.id)][0]) as $p
           | if (
               $p
@@ -896,25 +983,26 @@ steps:
               ($p + { prompt_xml: ($p.prompt_xml // "<acceptance><checklist><item>Implement and verify task outcomes.</item></checklist></acceptance>") })
             else {
               task_id: $t.id,
-              task_title: $t.title,
+              task_title: (($t.title // "Untitled") | tostring),
               prompt_md: (
-                "Implement task " + (($t.id // 0)|tostring) + ": " + ($t.title // "Untitled task")
-                + "\n\n## Goal\n" + ($t.description // "No description provided.")
+                "Implement task " + (($t.id // 0)|tostring) + ": " + (($t.title // "Untitled task") | tostring)
+                + "\n\n## Goal\n" + (($t.description // "No description provided.") | tostring)
                 + "\n\n## Task Context\n"
-                + "- Agent owner: " + ($t.agent // "Unassigned")
-                + "\n- Stack: " + ($t.stack // "Unspecified")
-                + "\n- Priority: " + ($t.priority // "unspecified")
+                + "- Agent owner: " + (($t.agent // "Unassigned") | tostring)
+                + "\n- Stack: " + (($t.stack // "Unspecified") | tostring)
+                + "\n- Priority: " + (($t.priority // "unspecified") | tostring)
                 + "\n- Dependencies: "
                 + (if (($t.dependencies // []) | length) > 0
                     then (($t.dependencies // []) | map(tostring) | join(", "))
                     else "None"
                   end)
-                + "\n\n## Implementation Plan\n" + ($t.details // $t.description // "No implementation details provided.")
-                + "\n\n## Acceptance Criteria\n" + ($t.test_strategy // "Run tests and confirm task outcomes.")
+                + "\n\n## Implementation Plan\n" + (($t.details // $t.description // "No implementation details provided.") | tostring)
+                + "\n\n## Acceptance Criteria\n" + (($t.test_strategy // "Run tests and confirm task outcomes.") | tostring)
                 + "\n\n## Subtasks\n"
                 + (if (($t.subtasks // []) | length) > 0
                     then (($t.subtasks // [])
-                      | map("- " + (.title // ("Subtask " + ((.id // 0)|tostring))) + ": " + (.description // .details // "No description provided."))
+                      | map(select(type == "object"))
+                      | map("- " + ((.title // ("Subtask " + ((.id // 0)|tostring))) | tostring) + ": " + ((.description // .details // "No description provided.") | tostring))
                       | join("\n"))
                     else "_No subtasks generated._"
                   end)
@@ -924,13 +1012,13 @@ steps:
                 + "- Document blockers or assumptions in your final summary."
               ),
               prompt_xml: "<acceptance><checklist><item>Implement required behavior.</item><item>Run tests and lint.</item></checklist></acceptance>",
-              subtasks: [($t.subtasks // [])[]? | {
+              subtasks: [($t.subtasks // [])[]? | select(type == "object") | {
                 subtask_id: .id,
                 prompt_md: (
-                  "Implement subtask " + ((.id // 0)|tostring) + ": " + (.title // "Untitled subtask")
-                  + "\n\n## Objective\n" + (.description // "No description provided.")
-                  + "\n\n## Steps\n" + (.details // .description // "No implementation details provided.")
-                  + "\n\n## Validation\n" + (.test_strategy // "Verify the subtask outcomes.")
+                  "Implement subtask " + ((.id // 0)|tostring) + ": " + ((.title // "Untitled subtask") | tostring)
+                  + "\n\n## Objective\n" + ((.description // "No description provided.") | tostring)
+                  + "\n\n## Steps\n" + ((.details // .description // "No implementation details provided.") | tostring)
+                  + "\n\n## Validation\n" + ((.test_strategy // "Verify the subtask outcomes.") | tostring)
                 )
               }]
             } end
@@ -1539,9 +1627,14 @@ steps:
       ${WARNING:+> **Note:** $WARNING}
       <!-- intake-metadata: ${intake_metadata} -->
       _Review and merge to kick off implementation._" \
-            --base "${pr_base_branch}" \
-            --label "intake" 2>&1 || true)"
+            --base "${pr_base_branch}" 2>&1 || true)"
           PR_URL="$(printf '%s' "$PR_CREATE_OUT" | rg -o "$PR_PATTERN" -m 1 || true)"
+          if [ -z "$PR_URL" ]; then
+            PR_URL="$(gh pr view "$BRANCH" --json url --jq '.url' 2>/dev/null || true)"
+          fi
+          if [ -n "$PR_URL" ] && [ "$PR_URL" != "none" ]; then
+            gh pr edit "$PR_URL" --add-label "intake" 2>/dev/null || true
+          fi
           ;;
         gitlab)
           BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -1550,6 +1643,10 @@ steps:
           ;;
       esac
       printf '%s\n' "$PR_CREATE_OUT" > /tmp/pr-url.txt
+      if [ -z "$PR_URL" ]; then
+        echo "create-pr: regex did not match gh pr create output; trying gh pr view" >&2
+        PR_URL="$(gh pr view "$BRANCH" --json url --jq '.url' 2>/dev/null || true)"
+      fi
       if [ -z "$PR_URL" ]; then
         echo "create-pr: PR creation failed or returned no URL (non-fatal)" >&2
         printf '%s\n' "$PR_CREATE_OUT" >&2

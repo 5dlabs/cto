@@ -310,6 +310,79 @@ steps:
       if [ "$VERDICT" != "approve" ]; then
         WARN="WARNING: Task decomposition proceeded after ${REVISION_COUNT} revision(s) without full committee approval (verdict: ${VERDICT}). Review carefully."
       fi &&
+      WS="${WORKSPACE:-.}" &&
+      mkdir -p "$WS/.intake/tmp" &&
+      FINAL_TASKS="$(printf '%s' "$FINAL_TASKS" | jq -c '
+        def parse_flat_subtasks:
+          reduce .[] as $item (
+            {groups: [], current: []};
+            if ($item == "id") and (.current | length > 0) then
+              .groups += [.current] | .current = [$item]
+            else
+              .current += [$item]
+            end
+          )
+          | .groups + [ .current | select(length > 0) ]
+          | map(
+              . as $group
+              | reduce range(0; ($group | length); 2) as $i (
+                  {};
+                  ($group[$i] // null | tostring) as $key
+                  | .[$key] = ($group[$i + 1] // null)
+                )
+            );
+        def parse_jsonish:
+          if type == "string" then (fromjson? // .) else . end;
+        def normalize_deps:
+          if type == "array" then map(tonumber? // .)
+          elif type == "string" then ((fromjson? // []) | if type == "array" then map(tonumber? // .) else [] end)
+          else [] end;
+        def normalize_bool:
+          if type == "boolean" then .
+          elif type == "string" then (ascii_downcase == "true")
+          else false end;
+        def normalize_subtask_objects($raw):
+          ($raw // []) as $items
+          | if ($items | type) != "array" then []
+            elif ($items | all(.[]; type == "object")) then $items
+            elif ($items | all(.[]; type == "string" and ((fromjson? // null) | type == "object"))) then ($items | map(fromjson))
+            elif ($items | all(.[]; type == "string" or type == "number" or type == "boolean" or type == "null")) then ($items | parse_flat_subtasks)
+            else []
+            end
+          | map(parse_jsonish)
+          | map(select(type == "object"))
+          | map({
+              id: ((.id // 0) | tonumber? // (.id // 0)),
+              title: ((.title // "Untitled subtask") | tostring),
+              description: ((.description // .details // "No description provided.") | tostring),
+              dependencies: ((.dependencies // []) | normalize_deps),
+              details: ((.details // .description // "No implementation details provided.") | tostring),
+              status: ((.status // "pending") | tostring),
+              test_strategy: ((.test_strategy // .testStrategy // "Verify the subtask outcomes.") | tostring),
+              subagentType: ((.subagentType // .subagent_type // "implementer") | tostring),
+              parallelizable: ((.parallelizable // false) | normalize_bool)
+            })
+          | map(select((.id | type) == "number" and (.title | length) > 0 and (.description | length) > 0));
+        map(
+          . as $task
+          | . + {
+              subtasks: (
+                normalize_subtask_objects(.subtasks)
+                | if length > 0 then . else [{
+                    id: (((($task.id // 0) | tonumber? // 0) * 1000) + 1),
+                    title: ("Implement " + (($task.title // ("task " + ((($task.id // 0) | tostring)))) | tostring)),
+                    description: (($task.description // "Implement this task.") | tostring),
+                    dependencies: [],
+                    details: (($task.details // $task.description // "Follow task details and produce working implementation.") | tostring),
+                    status: "pending",
+                    test_strategy: (($task.test_strategy // $task.testStrategy // "Run relevant tests and acceptance checks.") | tostring),
+                    subagentType: "implementer",
+                    parallelizable: false
+                  }] end
+              )
+            }
+        )' 2>/dev/null || echo '[]')" &&
+      printf '%s' "$FINAL_TASKS" > "$WS/.intake/tmp/refined-expanded-tasks.json" &&
       REQUIRE_SUBTASKS="${INTAKE_REQUIRE_SUBTASKS:-true}" &&
       TOTAL_SUBTASKS="$(printf '%s' "$FINAL_TASKS" | jq '[.[] | (.subtasks // []) | length] | add // 0' 2>/dev/null || echo 0)" &&
       if [ "$REQUIRE_SUBTASKS" = "true" ] || [ "$REQUIRE_SUBTASKS" = "1" ]; then

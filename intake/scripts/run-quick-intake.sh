@@ -34,6 +34,8 @@ op run --env-file="$ROOT/intake/local.env.op" -- env \
   INTAKE_FAN_OUT_CONCURRENCY="${INTAKE_FAN_OUT_CONCURRENCY:-2}" \
   INTAKE_AGENT_BIN=cat \
   INLINE_VOTE_TIMEOUT_SEC=90 \
+  INTAKE_STRICT_CONTENT_GATES="${INTAKE_STRICT_CONTENT_GATES:-true}" \
+  INTAKE_ENABLE_LLM_GATES="${INTAKE_ENABLE_LLM_GATES:-true}" \
   WORKSPACE="$PWD" \
   lobster run intake/workflows/pipeline.lobster.yaml --args-json "$ARGS_JSON" 2>&1 | tee "$LOG_FILE"
 
