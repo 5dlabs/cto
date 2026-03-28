@@ -1,9 +1,9 @@
 ## Decision Points
 
-- Level of Stripe integration (e.g., only recording payments vs. full payment processing, webhook handling).
-- Specific algorithms and data sources for financial reports (revenue, aging, cashflow, profitability).
-- Inter-service authentication mechanism for communication with the RMS service (Task 3).
-- Invoice numbering scheme and generation logic.
+- Stripe Integration Depth: Define the exact scope of Stripe integration (e.g., recording payments vs. full payment processing, webhook handling).
+- RMS Integration Protocol: How will the Finance service communicate with the RMS service to fetch project details (e.g., gRPC, REST, message queue)?
+- Financial Report Data Sources: Clarify which data sources are used for each financial report and how data aggregation occurs.
+- Inter-service Authentication: How will Finance authenticate calls to RMS and vice-versa? (e.g., JWT, API keys, mTLS).
 
 ## Coordination Notes
 

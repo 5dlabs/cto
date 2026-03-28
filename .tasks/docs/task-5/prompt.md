@@ -16,7 +16,11 @@ Create the Customer Vetting Service to automate background research on prospects
 1. Deploy the service to Kubernetes and verify it starts successfully.2. Call `POST /api/v1/vetting/run` with sample organization data and verify a `VettingResult` is stored in PostgreSQL.3. Retrieve vetting results using `GET /api/v1/vetting/:org_id` and confirm the `final_score` is correctly computed based on mock inputs.4. Verify `GET /api/v1/vetting/credit/:org_id` returns expected credit signals.5. Test error handling for failed external API calls (e.g., by simulating an API timeout or error).
 
 ## Subtasks
-
+- Initialize Rust project, Axum, and define vetting data models: Set up a new Rust project for the Customer Vetting Service, configure Axum, and define `VettingResult` and `LeadScore` data models with `sqlx` migrations.
+- Implement customer vetting API endpoints: Develop API endpoints for triggering the vetting pipeline and retrieving vetting results and credit signals for an organization.
+- Implement business verification and online presence vetting modules: Develop the Business Verification module (mock OpenCorporates API) and Online Presence module (mock LinkedIn/website checks) as part of the vetting pipeline.
+- Implement reputation analysis and credit signal vetting modules: Develop the Reputation module (mock Google Reviews sentiment) and Credit Signals module (mock commercial credit API) as part of the vetting pipeline.
+- Implement final lead scoring, persistence, and error handling: Implement the weighted algorithm to compute the GREEN/YELLOW/RED lead score, store vetting results in PostgreSQL, and ensure robust error handling and retry mechanisms for external API calls.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

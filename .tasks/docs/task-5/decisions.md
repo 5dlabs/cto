@@ -1,9 +1,9 @@
 ## Decision Points
 
-- Weighted algorithm and thresholds for computing the GREEN/YELLOW/RED lead score.
-- Specific external APIs to mock for Business Verification, Online Presence, Reputation, and Credit Signals.
-- Strategy for mocking external API responses (e.g., static JSON, dynamic based on input).
-- Error handling and retry policies for external API calls (e.g., exponential backoff, circuit breakers).
+- External API Mocking Strategy: Define the specific mocking framework or approach for OpenCorporates, LinkedIn, Google Reviews, and commercial credit APIs.
+- Lead Scoring Algorithm Weights: Determine the exact weighting and thresholds for each vetting signal to compute the GREEN/YELLOW/RED score.
+- Data Retention Policy: Define how long vetting results are stored and any data privacy considerations.
+- Inter-service Authentication: How will the Vetting service authenticate calls from other services (e.g., RMS, AI Agent)? (e.g., JWT, API keys, mTLS).
 
 ## Coordination Notes
 

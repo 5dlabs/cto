@@ -1,9 +1,9 @@
 ## Decision Points
 
-- Specific filtering and sorting capabilities for `/api/v1/catalog/products`.
-- Caching strategy for product data (e.g., TTL, cache invalidation mechanisms).
-- S3/R2 image serving approach (e.g., direct links, signed URLs, or proxying through the service).
-- Algorithm and parameters for tenant-based rate limiting using Redis.
+- Image Storage Strategy: Decide on the specific S3/R2 bucket structure and access patterns for images.
+- Rate Limiting Algorithm: Choose the specific algorithm and parameters for tenant-based rate limiting (e.g., token bucket, leaky bucket).
+- Caching Strategy: Define what data to cache in Redis and for how long (e.g., product lists, availability).
+- API Versioning Strategy: Confirm the API versioning strategy (`/api/v1/`) and future upgrade path.
 
 ## Coordination Notes
 

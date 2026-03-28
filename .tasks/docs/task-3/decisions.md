@@ -1,9 +1,10 @@
 ## Decision Points
 
-- Choice of ORM or database access library for Go (e.g., `sqlx`, GORM, or raw SQL).
-- Initial mocking strategy for barcode scanning, crew scheduling, and delivery tracking external integrations.
-- Specific data structures and relationships for Opportunity, Project, and InventoryTransaction.
-- Error handling and retry mechanisms for gRPC and REST API calls.
+- gRPC-Gateway REST Mapping: Decide on the specific REST endpoint mappings for gRPC services.
+- Barcode Scanning Implementation: Define the initial mocking strategy for barcode scanning and future integration plan.
+- Crew Scheduling Algorithm: Determine the initial complexity and approach for crew scheduling (e.g., simple availability check vs. complex optimization).
+- Session Caching Strategy: Define what data to cache in Redis for sessions and its invalidation strategy.
+- Inter-service Authentication: How will RMS authenticate calls to other services (e.g., Catalog, Finance) and vice-versa? (e.g., JWT, API keys, mTLS).
 
 ## Coordination Notes
 

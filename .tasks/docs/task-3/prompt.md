@@ -16,7 +16,12 @@ Build the core Rental Management System (RMS) service, handling opportunities, p
 1. Deploy the service to Kubernetes and verify it starts successfully.2. Use `grpcurl` to test gRPC endpoints for `CreateOpportunity`, `GetProject`, `RecordTransaction`, etc.3. Use `curl` or Postman to verify REST endpoints exposed via `grpc-gateway` are functional.4. Test the full quote-to-project workflow: create opportunity, approve, convert to project.5. Verify inventory transactions can be recorded and retrieved.6. Confirm data persistence in PostgreSQL for all RMS entities.
 
 ## Subtasks
-
+- Initialize Go project and define gRPC protobuf schemas: Initialize a new Go project and define all necessary gRPC service and message protobufs for Opportunity, Project, Inventory, Crew, and Delivery services.
+- Generate Go code and set up base gRPC server: Generate Go code from the defined protobufs and establish a basic gRPC server structure capable of serving requests.
+- Define data models and integrate with PostgreSQL: Define Go structs for `Opportunity`, `Project`, and `InventoryTransaction` and integrate `sqlx` for PostgreSQL interaction, using the `sigma1-infra-endpoints` ConfigMap.
+- Implement Opportunity and Project gRPC service logic: Implement the server-side logic for `OpportunityService` and `ProjectService`, including quote-to-project conversion.
+- Implement Inventory, Crew, and Delivery gRPC service logic: Implement the server-side logic for `InventoryService`, `CrewService`, and `DeliveryService`, including inventory transactions, crew scheduling, and delivery tracking.
+- Integrate grpc-gateway, Redis caching, and health checks: Integrate `grpc-gateway` to expose REST endpoints, add Redis for session caching, and implement basic health checks for gRPC and REST endpoints.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

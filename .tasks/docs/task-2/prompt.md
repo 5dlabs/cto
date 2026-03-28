@@ -16,7 +16,12 @@ Implement the high-performance Equipment Catalog Service, providing APIs for pro
 1. Deploy the service to Kubernetes and verify it starts successfully.2. Use `curl` or Postman to verify all defined API endpoints are accessible and return expected data structures.3. Test product creation, retrieval, and update operations.4. Verify availability checks return correct quantities for specified date ranges.5. Confirm rate limiting is active and blocks excessive requests.6. Ensure product images are correctly uploaded to and retrieved from S3/R2.7. Validate Prometheus metrics endpoint is exposed and returns data.
 
 ## Subtasks
-
+- Initialize Rust project and configure Axum framework: Set up a new Rust project for the Equipment Catalog Service, configure Axum 0.7.5 with Tokio runtime, and establish a basic server structure.
+- Define data models and implement database migrations: Define `Product`, `Category`, and `Availability` data models using `sqlx` and create initial database migration scripts for PostgreSQL.
+- Integrate PostgreSQL and Redis for data and caching: Connect the service to PostgreSQL using `sqlx` and integrate Redis for caching and rate limiting, utilizing the `sigma1-infra-endpoints` ConfigMap.
+- Implement core read-only catalog API endpoints: Develop the read-only API endpoints for categories, products, product details, and product availability, interacting with the PostgreSQL database.
+- Implement admin and machine-readable catalog API endpoints: Develop API endpoints for administrative product management (create/update) and machine-readable catalog access, including programmatic booking.
+- Implement S3/R2 image serving and service observability: Implement S3/R2 integration for secure and efficient image serving, and add Prometheus metrics, liveness, and readiness probes for service observability.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

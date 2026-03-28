@@ -2,59 +2,113 @@
   "tasks": [
     {
       "task_id": 7,
-      "title": "Scale CloudNative-PG for Production",
+      "title": "PostgreSQL Scaling and Backup",
       "agent": "bolt",
       "subtasks": [
-        "Scale sigma1-postgres CloudNative-PG cluster from 1 to 3 replicas.",
-        "Enable PgBouncer connection pooling for sigma1-postgres.",
-        "Configure automated daily backups for sigma1-postgres.",
-        "Configure WAL archiving for sigma1-postgres to S3/R2."
+        "Scale CloudNative-PG from 1 to 3 replicas for high availability.",
+        "Enable PgBouncer connection pooling for efficient database connections.",
+        "Configure automated daily backups and WAL archiving to S3 for disaster recovery."
       ],
       "priority": "high",
       "depends_on": [1, 2, 3, 4, 5, 6]
     },
     {
       "task_id": 8,
-      "title": "Harden Redis/Valkey for Production",
+      "title": "Redis/Valkey High Availability",
       "agent": "bolt",
       "subtasks": [
-        "Enable Redis Sentinel with 3 replicas for sigma1-valkey.",
-        "Configure appropriate maxmemory policy for sigma1-valkey."
+        "Enable Redis Sentinel with 3 replicas for high availability and automatic failover.",
+        "Configure maxmemory policy to prevent out-of-memory issues and ensure cache efficiency."
       ],
       "priority": "high",
       "depends_on": [1, 2, 3, 4, 5, 6]
     },
     {
       "task_id": 9,
-      "title": "Scale NATS to 3-Node Cluster with JetStream Persistence",
+      "title": "NATS Cluster and Persistence",
       "agent": "bolt",
       "subtasks": [
-        "Scale NATS cluster to 3 nodes.",
-        "Configure JetStream persistence for NATS."
+        "Scale NATS to a 3-node cluster for high availability and increased throughput.",
+        "Configure JetStream persistence for reliable message delivery and event streaming."
       ],
       "priority": "high",
       "depends_on": [1, 2, 3, 4, 5, 6]
     },
     {
       "task_id": 10,
-      "title": "Implement Production-Grade Network Policies",
+      "title": "TLS Certificate Management",
       "agent": "bolt",
       "subtasks": [
-        "Define and apply granular network policies restricting pod-to-pod traffic within and between namespaces (e.g., sigma1 and databases).",
-        "Ensure only necessary ports are open for inter-service communication."
+        "Implement cert-manager to provision and manage TLS certificates (e.g., Let's Encrypt) for all external-facing services.",
+        "Automate certificate renewal processes."
       ],
       "priority": "high",
       "depends_on": [1, 2, 3, 4, 5, 6]
     },
     {
       "task_id": 11,
-      "title": "Configure Cloudflare CDN for Static Assets",
+      "title": "Ingress Controller Configuration",
       "agent": "bolt",
       "subtasks": [
-        "Configure Cloudflare CDN for static assets served by the application.",
-        "Optimize caching rules and edge delivery for improved performance."
+        "Configure a robust Ingress controller (e.g., NGINX or Envoy) for external traffic routing and load balancing.",
+        "Define Ingress rules for all application services."
       ],
-      "priority": "medium",
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "task_id": 12,
+      "title": "CDN Configuration for Static Assets",
+      "agent": "bolt",
+      "subtasks": [
+        "Configure Cloudflare CDN for caching and serving static assets (e.g., images from S3/R2) to improve performance and reduce load on origin servers.",
+        "Integrate Cloudflare Tunnel for secure exposure of internal services."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "task_id": 13,
+      "title": "Advanced Network Policies",
+      "agent": "bolt",
+      "subtasks": [
+        "Implement fine-grained network policies to restrict pod-to-pod traffic based on least privilege principles.",
+        "Ensure only necessary communication paths are allowed between services and namespaces."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "task_id": 14,
+      "title": "OpenTelemetry Collector Configuration",
+      "agent": "bolt",
+      "subtasks": [
+        "Deploy and configure OpenTelemetry collectors across the cluster.",
+        "Define appropriate sampling rates for traces to balance observability and resource usage."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "task_id": 15,
+      "title": "Jaeger Trace Storage",
+      "agent": "bolt",
+      "subtasks": [
+        "Deploy Jaeger with persistent storage configured for long-term retention of traces.",
+        "Ensure Jaeger is integrated with OpenTelemetry collectors for end-to-end tracing."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "task_id": 16,
+      "title": "SLO Alerting Rules",
+      "agent": "bolt",
+      "subtasks": [
+        "Define and implement alert rules for Service Level Objective (SLO) violations across critical services.",
+        "Integrate alerts with a notification system (e.g., PagerDuty, Slack)."
+      ],
+      "priority": "high",
       "depends_on": [1, 2, 3, 4, 5, 6]
     }
   ]

@@ -1,10 +1,11 @@
 ## Decision Points
 
-- Inter-service authentication mechanism for the Morgan agent to call backend services (Tasks 2-5).
-- Deployment strategy for Signal-CLI (e.g., sidecar container, separate deployment).
-- Specific webhook configurations and security for Twilio and ElevenLabs integrations.
-- Cloudflare Tunnel configuration details, including DNS records and access policies.
-- Error handling and fallback strategies for failed MCP tool calls.
+- LLM Model Selection: Confirm the specific LLM model and version to be used (`gpt-5.4-pro` is specified, but could be a decision point for future flexibility).
+- Signal-CLI Deployment Strategy: Decide if Signal-CLI runs as a sidecar, separate pod, or external service.
+- Twilio/ElevenLabs Integration Flow: Define the exact call flow and webhook handling between Twilio, ElevenLabs, and the Morgan agent.
+- MCP Tool Definition Granularity: Determine the level of abstraction for MCP tools (e.g., one tool per API endpoint vs. one tool per service).
+- Inter-service Authentication: How will the AI Agent authenticate calls to backend services (Catalog, RMS, Finance, Vetting)? (e.g., API keys, JWT, mTLS).
+- Cloudflare Tunnel Configuration: Define specific ingress rules, DNS records, and security policies for the tunnel.
 
 ## Coordination Notes
 
