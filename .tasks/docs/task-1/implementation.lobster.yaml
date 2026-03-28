@@ -26,20 +26,1309 @@ steps:
       git clone {{inputs.repo_url}} work && cd work &&
       git checkout -b {{inputs.branch_name}}
 
-  - name: implement-subtask-1001
+  - name: scaffold-files
     depends_on: [setup]
+    command: >
+      cd work && mkdir -p kubernetes/namespaces kubernetes/cnpg kubernetes/valkey kubernetes/secrets kubernetes/configmaps kubernetes/networkpolicies
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.1001/prompt.md
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
 
-  - name: validate-subtask-1001
-    depends_on: [implement-subtask-1001]
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-undefined
+    depends_on: [scaffold-files]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: integration-validation
-    depends_on: [validate-subtask-1001]
+    depends_on: [validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

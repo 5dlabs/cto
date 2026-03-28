@@ -27,20 +27,1088 @@ steps:
       git clone {{inputs.repo_url}} work && cd work &&
       git checkout -b {{inputs.branch_name}}
 
-  - name: implement-subtask-5001
+  - name: implement-subtask-undefined
     depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5001/prompt.md
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
 
-  - name: validate-subtask-5001
-    depends_on: [implement-subtask-5001]
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: integration-validation
-    depends_on: [validate-subtask-5001]
+    depends_on: [validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

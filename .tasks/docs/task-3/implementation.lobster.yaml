@@ -27,20 +27,1304 @@ steps:
       git clone {{inputs.repo_url}} work && cd work &&
       git checkout -b {{inputs.branch_name}}
 
-  - name: implement-subtask-3001
+  - name: implement-subtask-undefined
     depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3001/prompt.md
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
 
-  - name: validate-subtask-3001
-    depends_on: [implement-subtask-3001]
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && go vet ./... && go test ./... && golangci-lint run
+
+  - name: implement-subtask-undefined
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.undefined/prompt.md
+
+  - name: validate-subtask-undefined
+    depends_on: [implement-subtask-undefined]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
       cd work && go vet ./... && go test ./... && golangci-lint run
 
   - name: integration-validation
-    depends_on: [validate-subtask-3001]
+    depends_on: [validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined, validate-subtask-undefined]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

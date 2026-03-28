@@ -1,1 +1,61 @@
-{"tasks": [{"task_id": 7, "title": "Scale PostgreSQL for Production", "agent": "bolt", "subtasks": ["Scale CloudNative-PG 'sigma1-postgres' cluster to 3 replicas.", "Enable PgBouncer connection pooling for 'sigma1-postgres'.", "Configure automated daily backups for 'sigma1-postgres' to S3/R2.", "Configure WAL archiving for 'sigma1-postgres' to S3/R2."], "priority": "high", "depends_on": [1, 2, 3, 4, 5, 6]}, {"task_id": 8, "title": "Scale Redis/Valkey for Production", "agent": "bolt", "subtasks": ["Enable Redis Sentinel for 'sigma1-valkey' with 3 replicas.", "Configure 'maxmemory' policy for 'sigma1-valkey' instances."], "priority": "high", "depends_on": [1, 2, 3, 4, 5, 6]}, {"task_id": 9, "title": "Implement Production Ingress and TLS", "agent": "bolt", "subtasks": ["Deploy cert-manager for automated TLS certificate provisioning.", "Configure cert-manager to issue Let's Encrypt certificates for all external services.", "Deploy and configure an Ingress controller (e.g., NGINX or Envoy) for external traffic.", "Configure Ingress resources for all services requiring external access (e.g., Equipment Catalog, RMS REST, Finance, Vetting, Morgan AI web chat)."], "priority": "high", "depends_on": [1, 2, 3, 4, 5, 6]}, {"task_id": 10, "title": "Harden Network Policies and Configure CDN", "agent": "bolt", "subtasks": ["Configure Cloudflare CDN for static assets served from S3/R2 (e.g., product images).", "Implement granular network policies to restrict pod-to-pod traffic to only necessary communication paths.", "Review and refine existing basic network policies for production-grade security."], "priority": "high", "depends_on": [1, 2, 3, 4, 5, 6]}, {"task_id": 11, "title": "Implement Production-Grade Observability", "agent": "bolt", "subtasks": ["Deploy OpenTelemetry collector with appropriate sampling rates.", "Deploy Jaeger with persistent storage for traces.", "Configure services (Equipment Catalog, RMS, Finance, Vetting, Morgan AI) to send traces to OpenTelemetry collector.", "Define and implement alert rules for key SLO violations (e.g., latency, error rates, availability)."], "priority": "high", "depends_on": [1, 2, 3, 4, 5, 6]}]}
+{
+  "tasks": [
+    {
+      "task_id": 7,
+      "title": "Scale CloudNative-PG for Production",
+      "agent": "bolt",
+      "subtasks": [
+        "Scale sigma1-postgres CloudNative-PG cluster from 1 to 3 replicas.",
+        "Enable PgBouncer connection pooling for sigma1-postgres.",
+        "Configure automated daily backups for sigma1-postgres.",
+        "Configure WAL archiving for sigma1-postgres to S3/R2."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "task_id": 8,
+      "title": "Harden Redis/Valkey for Production",
+      "agent": "bolt",
+      "subtasks": [
+        "Enable Redis Sentinel with 3 replicas for sigma1-valkey.",
+        "Configure appropriate maxmemory policy for sigma1-valkey."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "task_id": 9,
+      "title": "Scale NATS to 3-Node Cluster with JetStream Persistence",
+      "agent": "bolt",
+      "subtasks": [
+        "Scale NATS cluster to 3 nodes.",
+        "Configure JetStream persistence for NATS."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "task_id": 10,
+      "title": "Implement Production-Grade Network Policies",
+      "agent": "bolt",
+      "subtasks": [
+        "Define and apply granular network policies restricting pod-to-pod traffic within and between namespaces (e.g., sigma1 and databases).",
+        "Ensure only necessary ports are open for inter-service communication."
+      ],
+      "priority": "high",
+      "depends_on": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "task_id": 11,
+      "title": "Configure Cloudflare CDN for Static Assets",
+      "agent": "bolt",
+      "subtasks": [
+        "Configure Cloudflare CDN for static assets served by the application.",
+        "Optimize caching rules and edge delivery for improved performance."
+      ],
+      "priority": "medium",
+      "depends_on": [1, 2, 3, 4, 5, 6]
+    }
+  ]
+}
