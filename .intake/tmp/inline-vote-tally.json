@@ -1,12 +1,12 @@
 {
   "verdict": "approve",
   "average_scores": {
-    "task_decomposition": 7.33,
-    "dependency_ordering": 6.67,
+    "task_decomposition": 5.67,
+    "dependency_ordering": 8.67,
     "decision_point_coverage": 7.33,
-    "test_strategy_quality": 8,
-    "agent_assignment": 8.67,
-    "overall": 7.3
+    "test_strategy_quality": 7.33,
+    "agent_assignment": 9.33,
+    "overall": 7.33
   },
   "vote_breakdown": {
     "approve": 2,
@@ -14,15 +14,16 @@
     "reject": 0
   },
   "suggestions": [
-    "Fix truncated subtasks: Task 8 subtask 8013 (Cloudflare Pages deployment) and Task 10 subtask 10015 (quality.yml workflow) have details fields that are cut off mid-sentence — these must be completed before implementation begins, as agents cannot implement from incomplete specifications.",
-    "Split Task 5 subtask 5007 into at least three separate subtasks: (1) JWT middleware, (2) health/metrics endpoints, (3) GDPR endpoints + K8s manifest. Currently it spans four distinct architectural concerns (auth middleware, observability, data privacy, and infrastructure manifests) which violates single-responsibility and makes it difficult for one agent to implement and test atomically.",
-    "Surface the JWT key distribution mechanism (shared secret vs JWKS) as a top-level cross-cutting decision point rather than repeating it per-service (Tasks 4, 5, 6 each mention it independently). This is an architectural decision that affects all services uniformly and should be resolved once in Task 1 or as a global decision point, then referenced by downstream tasks.",
-    "Split each large service build (RMS id=3, Finance id=4, Social Engine id=6) into 2–3 shippable vertical slices with an early deployable milestone: (a) skeleton service + migrations + health/metrics + one core endpoint, (b) core domain CRUD, (c) integrations/background jobs/GDPR. Make each slice independently deployable and testable in-cluster so you can integrate Morgan/Website earlier without waiting for the full feature matrix.",
-    "Fix dependency ordering to create parallel tracks and earlier working software: allow Morgan (id=7) to start after minimal endpoints exist (health + one tool per service) rather than full completion of ids 2–6; allow Website (id=8) to start after Equipment Catalog read endpoints and Morgan widget stub exist; add explicit dependencies from service build tasks (2–6) to their required infra outputs (ConfigMap/secrets naming, CNPG secret names) instead of only depending on infra mega-task id=1.",
-    "Complete and normalize decision points and gating: add explicit decision points (with options) for auth/JWT distribution (shared secret vs JWKS/IdP) used by all services, Signal number management (separate Signal vs Twilio numbers), and R2/S3 credential/endpoint conventions; then create small “decision resolution” tasks that must complete before implementing JWT middleware, Signal integration, and WAL archival. Also fill in any incomplete subtasks (e.g., id=10 subtask 10015 has empty details) or remove them to avoid plan dead-ends.",
-    "Collapse CiliumNetworkPolicy subtasks 10004-10009 into 2 tasks: one for data-plane services (catalog, RMS, finance, vetting, social) and one for Morgan/cloudflared — each policy follows the same template and the current 6-task split inflates the plan without adding clarity or enabling meaningful parallelism that isn't already present.",
-    "Subtask 10003 (scale Valkey to 2 replicas) and 10002 (CNPG scale to 2 + WAL archival) should be merged into a single 'Scale stateful dependencies' task — scaling Valkey is a 5-line manifest change and does not justify independent task overhead; WAL archival config is the only substantive work in 10002 and can carry both.",
-    "Task 8013 (Cloudflare Pages deployment) has truncated content in the details field ending mid-TOML — this subtask is incomplete and will block the website deployment; the wrangler.toml and GitHub Actions workflow body must be filled in before the task is executable."
+    "Split Task 6 into three distinct tasks to respect architectural boundaries: AI Agent Infrastructure (deployment, Cloudflare tunnels), Communication Channels (Signal, Twilio/ElevenLabs), and Tool/Skill Integration (MCP tools for backend services).",
+    "Refactor the 'decision_points' arrays to use structured objects that explicitly assign constraint types (hard, soft, open, escalation) to each decision, as they are currently only plain strings.",
+    "Expand 'test_strategy' fields across all tasks to explicitly mandate negative testing, such as simulating database connection drops, rate limit triggers, or invalid gRPC payloads, rather than relying solely on happy-path verification.",
+    "Split subtasks 6004 and 6005 into more granular units, with each MCP tool definition and integration being its own subtask to reduce scope and improve tracking.",
+    "Decompose subtask 6003 (\"Integrate ElevenLabs and Twilio for voice communication\") into two separate subtasks: one for ElevenLabs integration and another for Twilio integration, as these are distinct external services.",
+    "Split subtask 6006 (\"Develop core AI skills and configure Cloudflare Tunnel\") into separate subtasks for each AI skill (`sales-qual`, `quote-gen`) and a distinct subtask for Cloudflare Tunnel configuration, as these are unrelated concerns.",
+    "Remove Task 5 (Customer Vetting Service) entirely for v1, or collapse it into a single hardcoded mock function within the AI Agent. Building a dedicated microservice to return mock data is unnecessary complexity.",
+    "Defer Task 4004 (Financial reporting: aging, cashflow, profitability) and Task 4005 (Stripe integration). V1 finance only needs basic invoice generation and manual payment status toggling.",
+    "Simplify Task 6 by picking a single communication channel (e.g., Web Chat or Signal) for v1. Defer ElevenLabs/Twilio voice integration (Task 6003) to a future iteration to reduce initial integration surface area.",
+    "Remove Redis rate limiting (Task 2003) and Prometheus metrics (Task 2006) from the Catalog service. These are v2 operational concerns that distract from shipping core functionality."
   ],
   "consensus_score": 0.67
 }
