@@ -447,7 +447,8 @@ function buildTaskDescription(task: GeneratedTask, baseUrl: string, prUrl: strin
     for (const dp of task.decision_points) {
       const approval = dp.requires_approval || dp.requiresApproval ? ' ⚠️ requires approval' : '';
       lines.push(`- **${dp.description}** (${dp.category})${approval}`);
-      lines.push(`  Options: ${dp.options.join(', ')}`);
+      const opts = Array.isArray(dp.options) ? dp.options.join(', ') : (dp.options ?? 'none specified');
+      lines.push(`  Options: ${opts}`);
     }
   }
 
