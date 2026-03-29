@@ -4,6 +4,7 @@ node_modules/
 # Local env (see google-oauth.env.example / google-oauth.env.op.defaults)
 .env.local
 local.env.op
+google-oauth-service-account.env.op
 *.tsbuildinfo
 
 # Generated ElevenLabs walkthrough / samples (large binaries)

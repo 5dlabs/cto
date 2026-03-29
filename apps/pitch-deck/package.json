@@ -11,7 +11,8 @@
     "record:deck": "bash scripts/record-deck-walkthrough.sh",
     "tts:sample": "bash scripts/elevenlabs-tts-sample.sh",
     "tts:walkthrough": "python3 scripts/elevenlabs-walkthrough-full.py",
-    "render:pdf": "npx tsx scripts/render-pdf-samples.ts"
+    "render:pdf": "npx tsx scripts/render-pdf-samples.ts",
+    "1p:import-google-oauth": "bash scripts/google-oauth-json-to-1password.sh"
   },
   "dependencies": {
     "clsx": "^2.1.1",
