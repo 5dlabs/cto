@@ -1,0 +1,11 @@
+# Deploy: `npm run build && npx wrangler pages deploy out --project-name=5dlabs-pitch-deck --branch=main --commit-dirty=true`
+# Or: `just deploy-pitch-deck` (1Password token) / GitHub workflow deploy-pitch-deck.yaml
+#
+# One-time in Cloudflare Dashboard:
+# 1. Workers & Pages → Create project → Connect repo OR upload from CI (project name must match below).
+# 2. Custom domains → add pitch.5dlabs.ai (API: POST .../pages/projects/5dlabs-pitch-deck/domains {"name":"pitch.5dlabs.ai"}).
+# 3. DNS: CNAME pitch → 5dlabs-pitch-deck.pages.dev with **DNS only (grey cloud)**. Orange-cloud proxy to *.pages.dev often returns 522 for Pages; grey cloud still terminates TLS on Pages edge.
+# 4. Same Cloudflare account as 5dlabs-splash is fine; keep a separate Pages project.
+name = "5dlabs-pitch-deck"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "out"
