@@ -1,115 +1,123 @@
-{
-  "tasks": [
-    {
-      "task_id": 7,
-      "title": "PostgreSQL Scaling and Backup",
-      "agent": "bolt",
-      "subtasks": [
-        "Scale CloudNative-PG from 1 to 3 replicas for high availability.",
-        "Enable PgBouncer connection pooling for efficient database connections.",
-        "Configure automated daily backups and WAL archiving to S3 for disaster recovery."
-      ],
-      "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6]
-    },
-    {
-      "task_id": 8,
-      "title": "Redis/Valkey High Availability",
-      "agent": "bolt",
-      "subtasks": [
-        "Enable Redis Sentinel with 3 replicas for high availability and automatic failover.",
-        "Configure maxmemory policy to prevent out-of-memory issues and ensure cache efficiency."
-      ],
-      "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6]
-    },
-    {
-      "task_id": 9,
-      "title": "NATS Cluster and Persistence",
-      "agent": "bolt",
-      "subtasks": [
-        "Scale NATS to a 3-node cluster for high availability and increased throughput.",
-        "Configure JetStream persistence for reliable message delivery and event streaming."
-      ],
-      "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6]
-    },
-    {
-      "task_id": 10,
-      "title": "TLS Certificate Management",
-      "agent": "bolt",
-      "subtasks": [
-        "Implement cert-manager to provision and manage TLS certificates (e.g., Let's Encrypt) for all external-facing services.",
-        "Automate certificate renewal processes."
-      ],
-      "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6]
-    },
-    {
-      "task_id": 11,
-      "title": "Ingress Controller Configuration",
-      "agent": "bolt",
-      "subtasks": [
-        "Configure a robust Ingress controller (e.g., NGINX or Envoy) for external traffic routing and load balancing.",
-        "Define Ingress rules for all application services."
-      ],
-      "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6]
-    },
-    {
-      "task_id": 12,
-      "title": "CDN Configuration for Static Assets",
-      "agent": "bolt",
-      "subtasks": [
-        "Configure Cloudflare CDN for caching and serving static assets (e.g., images from S3/R2) to improve performance and reduce load on origin servers.",
-        "Integrate Cloudflare Tunnel for secure exposure of internal services."
-      ],
-      "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6]
-    },
-    {
-      "task_id": 13,
-      "title": "Advanced Network Policies",
-      "agent": "bolt",
-      "subtasks": [
-        "Implement fine-grained network policies to restrict pod-to-pod traffic based on least privilege principles.",
-        "Ensure only necessary communication paths are allowed between services and namespaces."
-      ],
-      "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6]
-    },
-    {
-      "task_id": 14,
-      "title": "OpenTelemetry Collector Configuration",
-      "agent": "bolt",
-      "subtasks": [
-        "Deploy and configure OpenTelemetry collectors across the cluster.",
-        "Define appropriate sampling rates for traces to balance observability and resource usage."
-      ],
-      "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6]
-    },
-    {
-      "task_id": 15,
-      "title": "Jaeger Trace Storage",
-      "agent": "bolt",
-      "subtasks": [
-        "Deploy Jaeger with persistent storage configured for long-term retention of traces.",
-        "Ensure Jaeger is integrated with OpenTelemetry collectors for end-to-end tracing."
-      ],
-      "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6]
-    },
-    {
-      "task_id": 16,
-      "title": "SLO Alerting Rules",
-      "agent": "bolt",
-      "subtasks": [
-        "Define and implement alert rules for Service Level Objective (SLO) violations across critical services.",
-        "Integrate alerts with a notification system (e.g., PagerDuty, Slack)."
-      ],
-      "priority": "high",
-      "depends_on": [1, 2, 3, 4, 5, 6]
-    }
-  ]
-}
+[
+  {
+    "task_id": 3001,
+    "title": "Scale CloudNativePG to 3-replica HA with backups and PgBouncer",
+    "agent": "bolt",
+    "depends_on": [1001, 1002, 1003, 1004, 1005, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009],
+    "subtasks": [
+      "Update the CloudNativePG Cluster CR in the Helm chart to set spec.instances: 3 for production (parameterized via values-prod.yaml).",
+      "Set spec.minSyncReplicas: 1 and spec.maxSyncReplicas: 1 for synchronous replication.",
+      "Add a PodDisruptionBudget for the PostgreSQL StatefulSet with maxUnavailable: 1.",
+      "Configure automated daily backups: add spec.backup.barmanObjectStore (S3-compatible endpoint, bucket, credentials secret) or PVC-based WAL archiving as appropriate.",
+      "Add a ScheduledBackup CR for daily backups at 2 AM.",
+      "Enable PgBouncer connection pooling: deploy PgBouncer as a sidecar or separate Deployment, configure pool settings, and update DATABASE_URL in the ConfigMap to point to PgBouncer.",
+      "Ensure WAL archiving is enabled and retention policy is set (e.g., 30 days).",
+      "Update values-prod.yaml with all new settings; ensure values-dev.yaml remains single-replica, no backups, no PgBouncer."
+    ],
+    "priority": "high"
+  },
+  {
+    "task_id": 3002,
+    "title": "Scale Redis to 3-node Sentinel cluster with maxmemory policy",
+    "agent": "bolt",
+    "depends_on": [1001, 1002, 1003, 1004, 1005, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009],
+    "subtasks": [
+      "Update Redis Helm subchart values for production: architecture: replication, sentinel.enabled: true, replica.replicaCount: 2 (1 master + 2 replicas), sentinel.quorum: 2.",
+      "Set master.persistence.size and replica.persistence.size to at least 1Gi.",
+      "Configure Redis maxmemory policy (e.g., allkeys-lru) and set a reasonable memory limit.",
+      "Add a PodDisruptionBudget for Redis pods with maxUnavailable: 1.",
+      "Update REDIS_URL in the ConfigMap to use a sentinel-aware connection string (redis+sentinel:// or equivalent).",
+      "Document or template the required changes for the Rust app to support Redis Sentinel.",
+      "Ensure values-dev.yaml remains standalone, no sentinel."
+    ],
+    "priority": "high"
+  },
+  {
+    "task_id": 3003,
+    "title": "Configure Ingress with TLS via cert-manager and CDN for static assets",
+    "agent": "bolt",
+    "depends_on": [1001, 1002, 1003, 1004, 1005, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009],
+    "subtasks": [
+      "Create an Ingress resource for notifycore.{domain} with spec.tls using a cert-manager ClusterIssuer (Let's Encrypt or internal CA).",
+      "Add nginx ingress annotations for rate limiting (nginx.ingress.kubernetes.io/limit-rps: \"100\").",
+      "Parameterize domain and ingressClassName in values-prod.yaml.",
+      "Ensure the TLS secret name matches cert-manager output.",
+      "If static assets are served, configure Cloudflare CDN for the domain and document DNS/CNAME setup.",
+      "Ensure values-dev.yaml does not render an Ingress resource."
+    ],
+    "priority": "high"
+  },
+  {
+    "task_id": 3004,
+    "title": "Implement strict NetworkPolicies for namespace isolation",
+    "agent": "bolt",
+    "depends_on": [1001, 1002, 1003, 1004, 1005, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009],
+    "subtasks": [
+      "Create a default-deny NetworkPolicy for all ingress and egress in the notifycore namespace.",
+      "Allow egress from notifycore app pods to PostgreSQL pods on port 5432.",
+      "Allow egress from notifycore app pods to Redis pods on port 6379.",
+      "Allow ingress from the ingress controller namespace to notifycore app pods on port 8080.",
+      "Allow egress to kube-dns on port 53 (UDP/TCP) for DNS resolution.",
+      "Parameterize ingress controller namespace in values-prod.yaml.",
+      "Ensure values-dev.yaml does not render any NetworkPolicy resources."
+    ],
+    "priority": "high"
+  },
+  {
+    "task_id": 3005,
+    "title": "Add HPA, ServiceAccount, and ResourceQuota for production scaling and security",
+    "agent": "bolt",
+    "depends_on": [1001, 1002, 1003, 1004, 1005, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009],
+    "subtasks": [
+      "Create a HorizontalPodAutoscaler for the notifycore Deployment: minReplicas: 2, maxReplicas: 10, target CPU utilization: 70%.",
+      "Create a ServiceAccount named notifycore-sa with automountServiceAccountToken: false.",
+      "Update the Deployment to use serviceAccountName: notifycore-sa.",
+      "Create a ResourceQuota in the notifycore namespace: requests.cpu: 2, requests.memory: 1Gi, limits.cpu: 4, limits.memory: 2Gi.",
+      "Add a PodDisruptionBudget for the notifycore app Deployment with maxUnavailable: 1.",
+      "Ensure all resources are conditionally rendered via values-prod.yaml; values-dev.yaml disables HPA and ResourceQuota."
+    ],
+    "priority": "medium"
+  },
+  {
+    "task_id": 3006,
+    "title": "Annotate secrets for rotation and document secret rotation procedure",
+    "agent": "bolt",
+    "depends_on": [1001, 1002, 1003, 1004, 1005, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009],
+    "subtasks": [
+      "Add annotations to PostgreSQL and Redis secrets for external-secrets-operator or sealed-secrets compatibility (based on secretManagement.provider in values).",
+      "Add labels and annotations for rotation period and last-rotated date.",
+      "Create docs/secret-rotation.md with procedures for rotating PostgreSQL and Redis credentials, verification steps, and rollback instructions.",
+      "Ensure secret templates render correct annotations based on values-prod.yaml."
+    ],
+    "priority": "medium"
+  },
+  {
+    "task_id": 3007,
+    "title": "Consolidate all production settings in values-prod.yaml",
+    "agent": "bolt",
+    "depends_on": [3001, 3002, 3003, 3004, 3005],
+    "subtasks": [
+      "Create or update infra/notifycore/values-prod.yaml with all production settings: 3-replica PostgreSQL, Redis Sentinel, Ingress with TLS, NetworkPolicies, HPA, ResourceQuota, ServiceAccount, PDBs, and secret management provider.",
+      "Verify that values-dev.yaml remains unchanged and renders only single-replica, no HA, no ingress, no network policies, no HPA, no quota.",
+      "Run helm template with both values files and verify correct resource rendering.",
+      "Run kubectl apply --dry-run=server for both value sets to validate manifests."
+    ],
+    "priority": "high"
+  },
+  {
+    "task_id": 3008,
+    "title": "Define CI/CD pipeline with lint, test, build, and deploy stages",
+    "agent": "bolt",
+    "depends_on": [1001, 1002, 1003, 1004, 1005, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009],
+    "subtasks": [
+      "Create .github/workflows/ci.yaml for PR checks: cargo fmt --check, cargo clippy -- -D warnings, cargo sqlx prepare --check, cargo test.",
+      "Create .github/workflows/cd.yaml for deployment: Docker build and push on merge to main, Helm upgrade to staging, manual approval for production Helm upgrade.",
+      "Parameterize container registry credentials via GitHub secrets.",
+      "Ensure sqlx prepare check is present in the test job.",
+      "Add caching for Cargo registry and target directory.",
+      "Set appropriate timeouts for build and deploy jobs.",
+      "Validate pipeline YAML with actionlint or similar tool."
+    ],
+    "priority": "medium"
+  }
+]

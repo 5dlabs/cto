@@ -1,10 +1,18 @@
-Implement subtask 1002: Deploy CloudNative-PG operator and PostgreSQL cluster
+Implement subtask 1002: Deploy CloudNativePG Cluster CR for PostgreSQL
 
 ## Objective
-Deploy the CloudNative-PG operator and provision a single-instance PostgreSQL cluster named 'sigma1-postgres' with a 'sigma1' database and 'sigma1_user' owner, 50Gi storage, within the 'databases' namespace.
+Create the CloudNativePG `Cluster` CR named `notifycore-pg` with a single replica, database `notifycore`, user `notifycore_app`, and credentials stored in Secret `notifycore-pg-app`.
 
 ## Steps
-1. Install CloudNative-PG operator using Helm or kubectl apply.2. Create a `Cluster` custom resource for 'sigma1-postgres' in the 'databases' namespace, specifying 50Gi storage, single instance, 'sigma1' database, and 'sigma1_user'.3. Ensure the operator creates the necessary PVCs and Pods.
+1. Create `infra/notifycore/templates/postgres-cluster.yaml` with a CloudNativePG `Cluster` CR:
+   - metadata.name: `notifycore-pg`, namespace: `notifycore`
+   - spec.instances: 1
+   - spec.bootstrap.initdb.database: `notifycore`
+   - spec.bootstrap.initdb.owner: `notifycore_app`
+   - spec.storage.size: `1Gi` (dev sizing from values-dev.yaml)
+2. The CloudNativePG operator will auto-generate a Secret `notifycore-pg-app` containing the credentials.
+3. Parameterize replica count and storage size through values-dev.yaml.
+4. Verify the CR schema is correct for the target CloudNativePG operator version.
 
 ## Validation
-1. Verify CloudNative-PG operator pods are running in the 'databases' namespace.2. Confirm 'sigma1-postgres' Cluster resource is in 'Ready' state.3. Connect to the 'sigma1' database using `psql` from within the cluster and verify 'sigma1_user' exists and can create schemas.
+`kubectl get cluster notifycore-pg -n notifycore` shows the cluster in healthy state. `kubectl get secret notifycore-pg-app -n notifycore` exists with `username` and `password` keys. Pod `notifycore-pg-1` is Running/Ready within 120s.

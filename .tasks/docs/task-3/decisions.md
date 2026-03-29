@@ -1,12 +1,13 @@
 ## Decision Points
 
-- gRPC-Gateway REST Mapping: Decide on the specific REST endpoint mappings for gRPC services.
-- Barcode Scanning Implementation: Define the initial mocking strategy for barcode scanning and future integration plan.
-- Crew Scheduling Algorithm: Determine the initial complexity and approach for crew scheduling (e.g., simple availability check vs. complex optimization).
-- Session Caching Strategy: Define what data to cache in Redis for sessions and its invalidation strategy.
-- Inter-service Authentication: How will RMS authenticate calls to other services (e.g., Catalog, Finance) and vice-versa? (e.g., JWT, API keys, mTLS).
+- PostgreSQL backup target: object store (S3/GCS/MinIO) vs PVC-based WAL archiving — depends on available cloud infrastructure and backup retention requirements
+- Redis HA mode: Sentinel vs Redis Cluster — Sentinel is simpler for single-master with failover, Cluster provides sharding but adds complexity; depends on expected cache workload
+- Secret management: external-secrets-operator vs sealed-secrets — depends on existing secret management infrastructure (e.g., Vault, AWS Secrets Manager) vs GitOps-only approach
+- Ingress controller type: nginx-ingress vs other (Traefik, Envoy) — rate limiting annotations are nginx-specific; confirm cluster's ingress controller
+- Container registry: which registry to push Docker images to (GHCR, ECR, GCR, Docker Hub) — affects CI/CD pipeline configuration
+- Production domain: the actual domain for `notifycore.{domain}` needs to be decided for the Ingress and TLS certificate
 
 ## Coordination Notes
 
-- Agent owner: grizz
-- Primary stack: Go/gRPC
+- Agent owner: bolt
+- Primary stack: Kubernetes/Helm

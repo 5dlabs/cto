@@ -1,7 +1,7 @@
-## Provision Core Infrastructure (Bolt - Kubernetes/Helm)
+## Dev Infrastructure Bootstrap (Bolt - Kubernetes/Helm)
 
 ### Objective
-Set up the foundational Kubernetes infrastructure including namespaces, PostgreSQL, Redis/Valkey, and S3/R2 storage. This task establishes the persistent data and caching layers required by all backend services.
+Provision the development infrastructure for NotifyCore: a single-replica PostgreSQL instance via CloudNativePG and a single-replica Redis instance, along with namespace, secrets, and a notifycore-infra-endpoints ConfigMap aggregating DATABASE_URL and REDIS_URL for downstream services.
 
 ### Ownership
 - Agent: bolt
@@ -11,12 +11,20 @@ Set up the foundational Kubernetes infrastructure including namespaces, PostgreS
 - Dependencies: None
 
 ### Implementation Details
-1. Create `databases` and `sigma1` Kubernetes namespaces.2. Deploy CloudNative-PG operator and provision a `sigma1-postgres` Cluster with a `sigma1` database and `sigma1_user` owner, 50Gi storage, and single instance for dev. Ensure multiple schemas (rms, crm, finance, audit, public) can be created within this database.3. Deploy Redis/Valkey operator and provision a `sigma1-valkey` Redis instance (Valkey 7.2-alpine) with single instance for dev.4. Configure S3/R2 bucket access (e.g., via Kubernetes secrets for credentials) for image storage.5. Create a `sigma1-infra-endpoints` ConfigMap in the `sigma1` namespace, containing connection strings for PostgreSQL and Redis/Valkey, following the pattern `{OPERATOR}_{INSTANCE}_URL` (e.g., `POSTGRES_SIGMA1_POSTGRES_URL`, `REDIS_SIGMA1_VALKEY_URL`).6. Ensure basic network policies are in place to allow internal service communication.
+1. Create a dedicated `notifycore` namespace.
+2. Deploy a CloudNativePG `Cluster` CR named `notifycore-pg` with a single replica, a database `notifycore`, and a user `notifycore_app`. Store generated credentials in a Secret `notifycore-pg-app`.
+3. Deploy a single-replica Redis instance (Bitnami Helm chart or Redis Operator CR) named `notifycore-redis` with `requirepass` stored in Secret `notifycore-redis-auth`.
+4. Create ConfigMap `notifycore-infra-endpoints` with keys:
+   - `DATABASE_URL`: `postgres://notifycore_app:<password>@notifycore-pg-rw.notifycore.svc:5432/notifycore`
+   - `REDIS_URL`: `redis://:<password>@notifycore-redis-master.notifycore.svc:6379`
+   - `PORT`: `8080`
+   - `RUST_LOG`: `info`
+5. Validate all pods reach Ready state and connectivity via a Helm test or Job that runs `pg_isready` and `redis-cli PING`.
+6. Output a Helm chart under `infra/notifycore/` with `values-dev.yaml` for single-replica sizing.
 
 ### Subtasks
-- [ ] Create core Kubernetes namespaces: Create the 'databases' and 'sigma1' Kubernetes namespaces to logically separate infrastructure components and application services.
-- [ ] Deploy CloudNative-PG operator and PostgreSQL cluster: Deploy the CloudNative-PG operator and provision a single-instance PostgreSQL cluster named 'sigma1-postgres' with a 'sigma1' database and 'sigma1_user' owner, 50Gi storage, within the 'databases' namespace.
-- [ ] Deploy Redis/Valkey operator and instance: Deploy the Redis/Valkey operator and provision a single-instance Redis/Valkey instance named 'sigma1-valkey' (Valkey 7.2-alpine) within the 'databases' namespace.
-- [ ] Configure S3/R2 bucket access credentials: Create Kubernetes secrets in the 'sigma1' namespace to securely store S3/R2 bucket access credentials for image storage.
-- [ ] Create sigma1-infra-endpoints ConfigMap: Create a ConfigMap named 'sigma1-infra-endpoints' in the 'sigma1' namespace, containing connection strings for the deployed PostgreSQL and Redis/Valkey instances.
-- [ ] Implement basic internal network policies: Apply basic network policies within the 'sigma1' namespace to allow internal service communication, ensuring services can reach PostgreSQL and Redis/Valkey.
+- [ ] Create notifycore namespace and Helm chart scaffold: Create the `notifycore` Kubernetes namespace and initialize the Helm chart directory structure under `infra/notifycore/` with Chart.yaml, values-dev.yaml, and templates directory.
+- [ ] Deploy CloudNativePG Cluster CR for PostgreSQL: Create the CloudNativePG `Cluster` CR named `notifycore-pg` with a single replica, database `notifycore`, user `notifycore_app`, and credentials stored in Secret `notifycore-pg-app`.
+- [ ] Deploy single-replica Redis instance via Bitnami Helm chart: Deploy a single-replica Redis instance named `notifycore-redis` using the Bitnami Helm chart as a subchart dependency, with `requirepass` stored in Secret `notifycore-redis-auth`.
+- [ ] Create notifycore-infra-endpoints ConfigMap: Create the `notifycore-infra-endpoints` ConfigMap aggregating DATABASE_URL, REDIS_URL, PORT, and RUST_LOG, dynamically referencing credentials from the PostgreSQL and Redis secrets.
+- [ ] Create validation Job/Helm test for infrastructure connectivity: Create a Helm test Job that validates PostgreSQL and Redis connectivity using the ConfigMap-provided DATABASE_URL and REDIS_URL, confirming the infrastructure is fully operational.

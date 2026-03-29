@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. Verify `databases` and `sigma1` namespaces exist.2. Confirm `sigma1-postgres` Cluster and `sigma1-valkey` Redis instances are running and accessible within the cluster.3. Validate that the `sigma1-infra-endpoints` ConfigMap exists in the `sigma1` namespace and contains correct, accessible connection URLs for PostgreSQL and Redis/Valkey.4. Test S3/R2 access by attempting to create/read a dummy object using configured credentials.
+- [ ] 1. `kubectl get pods -n notifycore` shows notifycore-pg and notifycore-redis pods in Running/Ready state within 120s. 2. A test Job in the namespace successfully connects to PostgreSQL (`SELECT 1` returns 1) using DATABASE_URL from the ConfigMap. 3. The same Job connects to Redis (`PING` returns `PONG`) using REDIS_URL from the ConfigMap. 4. ConfigMap `notifycore-infra-endpoints` exists and contains all four keys (DATABASE_URL, REDIS_URL, PORT, RUST_LOG) with non-empty values.
 
 ## Verification Notes
 

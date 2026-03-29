@@ -1,10 +1,19 @@
-Implement subtask 1003: Deploy Redis/Valkey operator and instance
+Implement subtask 1003: Deploy single-replica Redis instance via Bitnami Helm chart
 
 ## Objective
-Deploy the Redis/Valkey operator and provision a single-instance Redis/Valkey instance named 'sigma1-valkey' (Valkey 7.2-alpine) within the 'databases' namespace.
+Deploy a single-replica Redis instance named `notifycore-redis` using the Bitnami Helm chart as a subchart dependency, with `requirepass` stored in Secret `notifycore-redis-auth`.
 
 ## Steps
-1. Install Redis/Valkey operator using Helm or kubectl apply.2. Create a `Redis` or `Valkey` custom resource for 'sigma1-valkey' in the 'databases' namespace, specifying Valkey 7.2-alpine and single instance configuration.
+1. Add Bitnami Redis as a Helm subchart dependency in `infra/notifycore/Chart.yaml` (repository: https://charts.bitnami.com/bitnami, name: redis, version: ~18.x).
+2. In `values-dev.yaml`, configure redis subchart values:
+   - architecture: standalone (single replica)
+   - auth.enabled: true
+   - auth.existingSecret: `notifycore-redis-auth` (or let the chart create it)
+   - master.persistence.size: 512Mi
+   - replica.replicaCount: 0
+3. Create `infra/notifycore/templates/redis-auth-secret.yaml` with a generated password stored under key `redis-password` (or use Helm random function).
+4. Run `helm dependency update infra/notifycore/` to fetch the subchart.
+5. Ensure the Redis master service is named `notifycore-redis-master` for DNS consistency.
 
 ## Validation
-1. Verify Redis/Valkey operator pods are running in the 'databases' namespace.2. Confirm 'sigma1-valkey' instance is running and accessible via `redis-cli` from within the cluster.
+Redis pod `notifycore-redis-master-0` is Running/Ready. `kubectl get secret notifycore-redis-auth -n notifycore` exists with `redis-password` key. `redis-cli -h notifycore-redis-master.notifycore.svc -a <password> PING` returns PONG.

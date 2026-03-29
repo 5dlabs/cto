@@ -1,1 +1,229 @@
-{"tasks": [{"task_id": 6007, "title": "Implement Centralized Authentication and RBAC for Microservices", "agent": "cipher", "finding_ids": ["SEC-001"], "description": "Address the missing explicit authentication and Role-Based Access Control (RBAC) across microservices. This involves implementing an API Gateway or service mesh to enforce mTLS for inter-service communication and JWT/RBAC validation for all administrative and sensitive financial endpoints.", "subtasks": ["Research and select an API Gateway or service mesh solution (e.g., Istio, Envoy Gateway).", "Configure mTLS for inter-service communication between Catalog, RMS, Finance, Vetting, and AI Agent services.", "Implement JWT validation middleware for all API endpoints, especially administrative and financial ones.", "Define and implement RBAC policies for sensitive operations in Catalog (admin endpoints), Finance, and RMS services.", "Integrate RBAC checks into the application logic of affected services.", "Conduct penetration testing to verify authentication and authorization controls."], "priority": "high", "acceptance_criteria": ["All inter-service communication is enforced via mTLS.", "Access to `/api/v1/catalog/products` (POST/PATCH), all Finance service endpoints, and sensitive RMS endpoints requires a valid JWT.", "RBAC policies correctly restrict unauthorized users from performing administrative or financial operations.", "Penetration test confirms no unauthorized access to sensitive endpoints."], "depends_on": [2, 3, 4, 5, 6]}, {"task_id": 6008, "title": "Enhance Input Validation and Sanitization for AI Agent Backend APIs", "agent": "cipher", "finding_ids": ["SEC-003"], "description": "Mitigate prompt injection risks by implementing rigorous input validation and sanitization on all backend API endpoints that the AI Agent interacts with. The AI Agent should be treated as an untrusted client, and all incoming parameters must be strictly validated against expected formats and types.", "subtasks": ["Identify all API endpoints in Catalog, RMS, Finance, and Vetting services that are exposed to the AI Agent via MCP tools.", "Implement strict schema validation (e.g., JSON schema, OpenAPI validation) for all incoming request bodies and query parameters on identified endpoints.", "Apply context-aware sanitization for all string inputs to prevent injection attacks (e.g., SQL injection, command injection, XSS if applicable).", "Ensure numerical and boolean parameters are strictly type-checked.", "Add logging for validation failures to detect potential attack attempts.", "Conduct security testing (e.g., fuzzing, negative testing) against these endpoints."], "priority": "high", "acceptance_criteria": ["All API endpoints called by the AI Agent (via MCP tools) have explicit input validation.", "Invalid or malicious inputs are rejected with appropriate error messages (e.g., 400 Bad Request).", "No prompt injection vulnerabilities are discoverable through testing.", "Security scans (e.g., OWASP ZAP) confirm robust input validation."], "depends_on": [2, 3, 4, 5, 6]}, {"task_id": 6009, "title": "Secure Database Credentials and Eliminate Exposure in ConfigMaps", "agent": "cipher", "finding_ids": ["SEC-002"], "description": "Address the potential exposure of database credentials by moving them from ConfigMaps to Kubernetes Secrets. Database connection strings should be constructed within the application code using credentials injected as environment variables from Secrets.", "subtasks": ["Modify `sigma1-infra-endpoints` ConfigMap creation (subtask 1005) to *exclude* sensitive credentials.", "Create new Kubernetes Secrets for PostgreSQL and Redis/Valkey credentials (e.g., `sigma1-postgres-credentials`, `sigma1-valkey-credentials`) in the `databases` namespace.", "Update deployment manifests for Catalog (Task 2), RMS (Task 3), Finance (Task 4), and Vetting (Task 5) services to inject these Secrets as environment variables.", "Modify application code in affected services to construct database connection strings using the injected environment variables.", "Verify that no sensitive credentials remain in any ConfigMaps."], "priority": "medium", "acceptance_criteria": ["`sigma1-infra-endpoints` ConfigMap does not contain any sensitive credentials.", "PostgreSQL and Redis/Valkey credentials are stored exclusively in Kubernetes Secrets.", "All services successfully connect to their respective databases using credentials from Secrets.", "`kubectl get configmap -n sigma1 sigma1-infra-endpoints -o yaml` shows no sensitive data.", "`kubectl get secret -n databases` shows the new credential secrets."], "depends_on": [1]}, {"task_id": 6010, "title": "Implement Encryption at Rest and Field-Level Encryption for Sensitive Data", "agent": "cipher", "finding_ids": ["SEC-004"], "description": "Ensure sensitive business data handled by Finance and Vetting services is protected through encryption. This involves enabling encryption at rest for PostgreSQL databases and implementing field-level encryption for highly sensitive PII/financial data within the application layer.", "subtasks": ["Update the PostgreSQL provisioning (subtask 1002) to ensure encryption at rest is enabled for the `sigma1-postgres` cluster. This might involve cloud provider settings or specific operator configurations.", "Identify highly sensitive fields in Finance (e.g., payment details, specific report data) and Vetting (e.g., credit signals, specific business verification data) services.", "Select an appropriate encryption library/method for field-level encryption in Rust (Finance, Vetting) and Go (RMS, if applicable for future sensitive data).", "Implement field-level encryption for identified sensitive data fields in the Finance and Vetting services before storage and decryption upon retrieval.", "Manage encryption keys securely (e.g., using Kubernetes Secrets or a KMS).", "Conduct data access tests to confirm data is encrypted at rest and field-level encryption/decryption works correctly."], "priority": "medium", "acceptance_criteria": ["PostgreSQL database for `sigma1-postgres` is configured with encryption at rest.", "Sensitive fields in Finance and Vetting services are stored in an encrypted format in the database.", "Applications can correctly encrypt and decrypt field-level data without errors.", "Review of database contents confirms sensitive data is not stored in plain text."], "depends_on": [1, 4, 5]}]}
+[
+  {
+    "task_id": 3010,
+    "title": "Move database and Redis credentials from ConfigMap to Kubernetes Secrets",
+    "agent": "cipher",
+    "finding_ids": ["SEC-001"],
+    "depends_on": [1004, 2009],
+    "description": "Refactor the infrastructure and application configuration so that sensitive credentials (PostgreSQL and Redis passwords) are stored exclusively in Kubernetes Secrets, not ConfigMaps. Update the Deployment manifest to reference both ConfigMap (for non-sensitive info) and Secret (for credentials). Refactor the application to compose the full DATABASE_URL and REDIS_URL at startup from separate environment variables, or mount both resources via envFrom. Ensure no credentials are present in ConfigMap or pod logs.",
+    "subtasks": [
+      "Refactor Helm chart to store only non-sensitive connection info (host, port, db name) in ConfigMap; move passwords to Kubernetes Secrets.",
+      "Update Deployment manifest to mount both ConfigMap and Secret via envFrom.",
+      "Update application startup logic to compose DATABASE_URL and REDIS_URL from separate environment variables.",
+      "Remove any plaintext credentials from ConfigMap and validate via kubectl.",
+      "Test pod environment to ensure credentials are only present via Secret.",
+      "Run a security scan to confirm no credentials are present in ConfigMaps or pod describe output."
+    ],
+    "priority": "critical",
+    "acceptance_criteria": [
+      "No database or Redis passwords are present in any ConfigMap.",
+      "Deployment manifest references both ConfigMap and Secret via envFrom.",
+      "Application successfully composes DATABASE_URL and REDIS_URL at runtime and connects to both services.",
+      "kubectl get configmap and pod describe output do not reveal credentials.",
+      "Helm test/validation job passes with new configuration.",
+      "OWASP ZAP scan and manual review confirm no credential leakage."
+    ]
+  },
+  {
+    "task_id": 3011,
+    "title": "Enforce TLS encryption for PostgreSQL and Redis connections (in transit and at rest)",
+    "agent": "cipher",
+    "finding_ids": ["SEC-002", "SEC-010", "SEC-014"],
+    "depends_on": [1002, 1003, 2001, 2006, 3001, 3002],
+    "description": "Configure PostgreSQL and Redis to require TLS for all client connections. For PostgreSQL, update CloudNativePG Cluster CR to enforce hostssl, enable server certificates, and require sslmode=require (or verify-full) in DATABASE_URL. For Redis, enable TLS in the Bitnami Redis Helm chart and update REDIS_URL to use rediss://. Additionally, enable encryption at rest for PostgreSQL persistent volumes and Redis data if supported. For backups, enable server-side encryption on the object storage bucket. Document all encryption requirements.",
+    "subtasks": [
+      "Update CloudNativePG Cluster CR to enforce hostssl and configure server-side TLS certificates.",
+      "Update application DATABASE_URL to include sslmode=require or verify-full.",
+      "Enable Redis TLS in Helm values (tls.enabled: true) and update REDIS_URL to use rediss://.",
+      "Update application to connect to Redis using TLS.",
+      "Enable encryption at rest for PostgreSQL persistent volumes via StorageClass (e.g., AWS EBS encryption).",
+      "Enable server-side encryption for backup object storage (SSE-S3, SSE-KMS, or equivalent).",
+      "Document encryption requirements and configuration in the infrastructure runbook.",
+      "Test database and Redis connections to ensure TLS is enforced.",
+      "Run network packet capture to confirm all traffic is encrypted."
+    ],
+    "priority": "critical",
+    "acceptance_criteria": [
+      "All PostgreSQL and Redis connections from the application use TLS.",
+      "DATABASE_URL and REDIS_URL are updated to require/enforce TLS.",
+      "Persistent volumes for PostgreSQL are encrypted at rest.",
+      "Backups to object storage are encrypted.",
+      "Application passes connectivity tests with TLS enabled.",
+      "Network packet capture shows no plaintext database or Redis traffic.",
+      "Documentation exists for all encryption settings."
+    ]
+  },
+  {
+    "task_id": 3012,
+    "title": "Implement authentication and authorization for API endpoints",
+    "agent": "cipher",
+    "finding_ids": ["SEC-003"],
+    "depends_on": [2004, 2005, 2006, 2009, 3003],
+    "description": "Add authentication middleware to the Rust Axum service to protect all /api/v1/* endpoints. Require either API key validation via header, JWT bearer token verification, or mTLS. At minimum, require an Authorization or X-API-Key header for all endpoints except /health. Optionally, separate liveness (unauthenticated) and readiness (authenticated) probes. Consider ingress-level authentication as a supplement, not a replacement. Ensure proper error handling and logging for authentication failures.",
+    "subtasks": [
+      "Design and implement authentication middleware (API key, JWT, or mTLS) for Axum.",
+      "Require Authorization or X-API-Key header on all /api/v1/* endpoints.",
+      "Update OpenAPI/spec documentation to reflect authentication requirements.",
+      "Ensure /health endpoint remains unauthenticated; consider splitting readiness probe if needed.",
+      "Add tests for authenticated and unauthenticated requests.",
+      "Update ingress configuration to optionally support OAuth2 proxy or similar.",
+      "Log all authentication failures with request metadata."
+    ],
+    "priority": "critical",
+    "acceptance_criteria": [
+      "All /api/v1/* endpoints require valid authentication credentials.",
+      "Unauthenticated requests to protected endpoints return 401 Unauthorized.",
+      "/health endpoint remains accessible without authentication.",
+      "Authentication failures are logged with request metadata.",
+      "Integration tests cover both successful and failed authentication scenarios.",
+      "OWASP ZAP scan confirms no unauthenticated access to protected endpoints."
+    ]
+  },
+  {
+    "task_id": 3013,
+    "title": "Enforce input validation and application-level rate limiting on API endpoints",
+    "agent": "cipher",
+    "finding_ids": ["SEC-004", "SEC-005"],
+    "depends_on": [2004, 2005, 2006],
+    "description": "Strengthen input validation for the POST /api/v1/notifications endpoint by adding maximum length checks for title and body, validating enum fields, and enforcing a request body size limit. Add application-level rate limiting middleware to protect all API endpoints, with stricter limits for write endpoints. Use tower middleware or Redis-backed rate limiting. Ensure validation errors do not leak internal details.",
+    "subtasks": [
+      "Add maximum length validation for title (max 500 chars) and body (max 10,000 chars) in the request handler.",
+      "Validate that channel and priority fields are valid enum variants; ensure error messages are generic.",
+      "Implement request body size limit (e.g., 1MB) using tower-http's RequestBodyLimitLayer.",
+      "Add VARCHAR length constraints in the database migration for title and body.",
+      "Implement application-level rate limiting middleware (tower::limit::RateLimitLayer or Redis-backed).",
+      "Configure different rate limits for write (POST/DELETE) and read (GET) endpoints.",
+      "Test validation and rate limiting with various payloads and request rates.",
+      "Run fuzz testing and OWASP ZAP scan to verify input validation and rate limiting."
+    ],
+    "priority": "high",
+    "acceptance_criteria": [
+      "POST /api/v1/notifications enforces title and body length limits and returns 422 on violation.",
+      "Invalid enum values for channel/priority return 422 with generic error.",
+      "Request body size is limited to 1MB; larger requests are rejected.",
+      "Database schema enforces VARCHAR length constraints for title and body.",
+      "Application-level rate limiting is enforced and returns 429 on excess requests.",
+      "Write endpoints have stricter rate limits than read endpoints.",
+      "Integration and fuzz tests confirm validation and rate limiting are effective.",
+      "OWASP ZAP scan does not find input validation or rate limiting bypasses."
+    ]
+  },
+  {
+    "task_id": 3014,
+    "title": "Pin all dependency versions and add supply chain security checks",
+    "agent": "cipher",
+    "finding_ids": ["SEC-006"],
+    "depends_on": [2001, 1003, 3008],
+    "description": "Pin all dependencies to exact versions in both Rust (Cargo.toml/Cargo.lock) and Helm charts. Add cargo audit to the CI pipeline to check for known vulnerabilities. Schedule regular dependency update checks (e.g., Dependabot or Renovate) for both Rust and Helm dependencies. Ensure Cargo.lock is committed to the repository.",
+    "subtasks": [
+      "Update Bitnami Redis Helm subchart to use an exact version (e.g., 18.19.4).",
+      "Ensure all Rust dependencies are pinned via Cargo.lock and that file is committed.",
+      "Add cargo audit to the CI pipeline for vulnerability scanning.",
+      "Configure Dependabot or Renovate for both Rust and Helm dependencies.",
+      "Document the dependency update process in the repository.",
+      "Test CI pipeline to ensure it fails on vulnerable dependencies."
+    ],
+    "priority": "medium",
+    "acceptance_criteria": [
+      "All dependencies are pinned to exact versions.",
+      "Cargo.lock is present and up to date in the repository.",
+      "CI pipeline runs cargo audit and fails on high/critical vulnerabilities.",
+      "Dependabot or Renovate is configured and creates PRs for outdated dependencies.",
+      "Documentation exists for updating dependencies.",
+      "CI pipeline passes with all current dependencies."
+    ]
+  },
+  {
+    "task_id": 3015,
+    "title": "Add container image vulnerability scanning and harden runtime base image",
+    "agent": "cipher",
+    "finding_ids": ["SEC-007"],
+    "depends_on": [2009, 3008],
+    "description": "Integrate container image vulnerability scanning (e.g., Trivy, Grype, or Snyk) into the CI/CD pipeline after Docker build. Fail the pipeline on critical/high CVEs. Consider switching to a distroless base image for runtime and pin the base image digest. Document the scanning process and remediation steps.",
+    "subtasks": [
+      "Add a container image scanning step to the CI/CD pipeline using Trivy, Grype, or Snyk.",
+      "Configure the pipeline to fail on critical or high severity CVEs.",
+      "Evaluate and, if feasible, switch the runtime Docker image to gcr.io/distroless/cc-debian12.",
+      "Pin the base image by digest instead of tag in the Dockerfile.",
+      "Document the image scanning and remediation process.",
+      "Test the pipeline by introducing a known vulnerable image and verifying it fails."
+    ],
+    "priority": "medium",
+    "acceptance_criteria": [
+      "CI/CD pipeline scans all built images for vulnerabilities.",
+      "Pipeline fails on critical/high CVEs.",
+      "Runtime image uses a minimal, pinned base image.",
+      "Documentation exists for image scanning and remediation.",
+      "Test run with a vulnerable image fails as expected."
+    ]
+  },
+  {
+    "task_id": 3016,
+    "title": "Enforce Pod Security Standards and container hardening",
+    "agent": "cipher",
+    "finding_ids": ["SEC-008"],
+    "depends_on": [2009, 3005],
+    "description": "Add securityContext to the Deployment template to enforce running as non-root, read-only root filesystem, no privilege escalation, and drop all Linux capabilities. Apply the restricted Pod Security Standard to the namespace via labels. Ensure the Dockerfile creates a non-root user.",
+    "subtasks": [
+      "Update Deployment manifest to set securityContext: runAsNonRoot: true, runAsUser: 65534, readOnlyRootFilesystem: true, allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}.",
+      "Label the namespace with pod-security.kubernetes.io/enforce: restricted.",
+      "Modify Dockerfile to create and use a non-root user.",
+      "Test pod startup and functionality with the new securityContext.",
+      "Run kube-bench or similar tool to verify Pod Security Standard compliance."
+    ],
+    "priority": "medium",
+    "acceptance_criteria": [
+      "Deployment manifest includes all recommended securityContext settings.",
+      "Namespace is labeled to enforce the restricted Pod Security Standard.",
+      "Dockerfile uses a non-root user for the runtime container.",
+      "Pods start and function correctly with the new settings.",
+      "kube-bench or equivalent passes for Pod Security Standard compliance."
+    ]
+  },
+  {
+    "task_id": 3017,
+    "title": "Implement security event logging and audit trail for sensitive operations",
+    "agent": "cipher",
+    "finding_ids": ["SEC-009"],
+    "depends_on": [2004, 2005, 2006, 2001],
+    "description": "Enhance application logging to include security event logging and audit trails for all state-changing operations (POST, DELETE). Log request metadata (client IP, user agent, authenticated identity) and include correlation IDs in all log entries. Forward logs to a centralized system in production and create alerts for anomalous patterns.",
+    "subtasks": [
+      "Update POST and DELETE handlers to log all state-changing operations with request metadata and authenticated identity.",
+      "Add audit-level log entries for sensitive operations.",
+      "Integrate correlation/request IDs into all log entries using tower-http middleware.",
+      "Configure log forwarding to a centralized system (e.g., ELK, Loki, Datadog) in production.",
+      "Set up alerts for anomalous patterns (e.g., spike in 4xx errors, unusual deletion rates).",
+      "Test logging output and alerting with simulated events."
+    ],
+    "priority": "medium",
+    "acceptance_criteria": [
+      "All state-changing operations are logged with request metadata and correlation IDs.",
+      "Audit trail exists for notification creation and deletion.",
+      "Logs are forwarded to a centralized system in production.",
+      "Alerts are triggered for defined anomalous patterns.",
+      "Test logs show correct information for both normal and anomalous events."
+    ]
+  },
+  {
+    "task_id": 3018,
+    "title": "Restrict CORS origins to trusted domains",
+    "agent": "cipher",
+    "finding_ids": ["SEC-013"],
+    "depends_on": [2001],
+    "description": "Configure the Axum CorsLayer to allow only trusted frontend domains as origins. For API-only services, consider disabling CORS entirely if not needed. Parameterize allowed origins via environment variables.",
+    "subtasks": [
+      "Update CorsLayer configuration to use allow_origin with a whitelist of trusted domains.",
+      "Parameterize allowed origins from environment variables.",
+      "Document CORS policy and update OpenAPI/spec documentation.",
+      "Test CORS behavior with allowed and disallowed origins.",
+      "Run browser-based tests to confirm CORS headers are set correctly."
+    ],
+    "priority": "medium",
+    "acceptance_criteria": [
+      "Only trusted domains are allowed by CORS policy.",
+      "Disallowed origins receive appropriate CORS errors.",
+      "CORS configuration is parameterized and documented.",
+      "Browser and integration tests confirm correct CORS behavior."
+    ]
+  }
+]
