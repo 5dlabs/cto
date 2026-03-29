@@ -76,9 +76,9 @@ export const slides: DeckSlide[] = [
       "The bill: egress, storage, margin — not list-price CPU. The org: sprawl + DevOps gap. Scarce: coordination as code commoditizes. CTO: bill + org on bare metal and automation.",
     bullets: [
       "Invoice line items: network + storage + managed tax vs bait-priced compute.",
-      "People + sprawl: same spend explosion without agents, rails, and a single operating model — you can’t hire past the invoice.",
+      "People + sprawl: headcount and tools stack up, but the cloud bill and rework often stay high — adding people doesn’t shrink egress or fix unit economics without agents, rails, and one operating model.",
       "Model mix: frontier for planning; open/local for iteration — cheap loops without giving up quality.",
-      "Loop: decide → ship → learn with real signal.",
+      "Runway pattern: long build cycles and late pivots when cash is low — not early when learning is cheap; costs and stack are often locked in before the turn.",
     ],
   },
   {

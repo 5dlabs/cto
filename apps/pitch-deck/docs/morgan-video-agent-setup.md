@@ -169,7 +169,7 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 
 - Headline: **The real hyperscale bill isn’t headline compute.**
 - Subhead (four beats): **the bill** · **the org** · **what’s scarce** (coordination) · **CTO** on bare metal + automation.
-- Bullets: invoice line items; people + sprawl; model mix; loop (decide → ship → learn).
+- Bullets: invoice line items; people + sprawl (headcount doesn’t shrink the bill); model mix; runway pattern (late pivot / low cash vs cheap learning).
 - No “chat UI” straw man — problem is economics + org + coordination, not wrapping ChatGPT.
 
 **Solution**

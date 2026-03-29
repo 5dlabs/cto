@@ -31,7 +31,7 @@ Hi, I'm Jonathon. This is the 5D Labs pre-seed deck: what we built, why it matte
 
 Cover. We're an AI-native venture studio. The headline is: we built the stack that builds companies — now it's the product. Pre-seed, Delaware C-corp, seven hundred fifty thousand dollars. On the cover: two paying customers, about two hundred forty K annual contract value, multiple revenue streams on one platform, and real infra savings versus a cloud-only AI delivery model. Same stack: CTO implementations, bare-metal rev-share, trading, and advisory.
 
-Problem. The real hyperscale bill is not headline compute. Four beats: the bill — egress, storage, margin; the org — sprawl and DevOps gap; what's scarce — coordination as code commoditizes; CTO goes after bill and org on bare metal with automation. Bullets: invoice line items versus bait pricing; people and sprawl; model mix; loop. No chat-UI straw man — it's economics and delivery.
+Problem. The real hyperscale bill is not headline compute. Four beats: the bill, the org, what's scarce, CTO on bare metal with automation. Bullets: invoice versus bait pricing; people and sprawl — headcount doesn't shrink egress; model mix; runway pattern — late pivots when cash is low, costs already locked in. Decide-ship-learn lives on the next slide, How it works.
 
 One machine. This isn't three random bets — it's one OS: build, fund, ship. CTO is the wedge; trading is internal capital; ventures and OpenClaw share playbooks. One loop — if you drop a piece, the whole thing weakens.
 
