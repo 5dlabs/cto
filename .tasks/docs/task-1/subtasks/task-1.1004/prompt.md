@@ -1,10 +1,17 @@
-Implement subtask 1004: Configure S3/R2 bucket access credentials
+Implement subtask 1004: Create notifycore-infra-endpoints ConfigMap
 
 ## Objective
-Create Kubernetes secrets in the 'sigma1' namespace to securely store S3/R2 bucket access credentials for image storage.
+Create the `notifycore-infra-endpoints` ConfigMap aggregating DATABASE_URL, REDIS_URL, PORT, and RUST_LOG, dynamically referencing credentials from the PostgreSQL and Redis secrets.
 
 ## Steps
-1. Obtain S3/R2 access key ID and secret access key.2. Create a Kubernetes secret (e.g., `sigma1-s3-credentials`) in the 'sigma1' namespace using `kubectl create secret generic` with the credentials.
+1. Create `infra/notifycore/templates/configmap-endpoints.yaml` defining ConfigMap `notifycore-infra-endpoints` in the `notifycore` namespace.
+2. Set keys:
+   - `DATABASE_URL`: `postgres://notifycore_app:<password>@notifycore-pg-rw.notifycore.svc:5432/notifycore` — Note: since ConfigMaps cannot reference secrets natively, either: (a) use a Helm template that reads the password from a known source at deploy time, or (b) document that this ConfigMap must be regenerated after secret creation. Consider using an init container or a Kubernetes Job to populate this.
+   - `REDIS_URL`: `redis://:<redis-password>@notifycore-redis-master.notifycore.svc:6379`
+   - `PORT`: `8080`
+   - `RUST_LOG`: `info`
+3. An alternative approach: create the ConfigMap with static host/port info and mount secrets separately. The downstream Deployment can combine them. Document the chosen approach clearly.
+4. Ensure the ConfigMap is created in the correct namespace and all four keys have non-empty values.
 
 ## Validation
-Verify the secret exists in the 'sigma1' namespace using `kubectl get secret sigma1-s3-credentials -n sigma1` and confirm it contains the expected keys (without exposing values).
+`kubectl get configmap notifycore-infra-endpoints -n notifycore -o json` contains all four keys (DATABASE_URL, REDIS_URL, PORT, RUST_LOG) with non-empty values. DATABASE_URL contains the correct hostname `notifycore-pg-rw.notifycore.svc`. REDIS_URL contains `notifycore-redis-master.notifycore.svc`.

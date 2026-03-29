@@ -1,10 +1,21 @@
-Implement subtask 2002: Define data models and implement database migrations
+Implement subtask 2002: Data models, enum definitions, and database migration
 
 ## Objective
-Define `Product`, `Category`, and `Availability` data models using `sqlx` and create initial database migration scripts for PostgreSQL.
+Define all data models (Notification, Channel, Priority, NotificationStatus, CreateNotificationRequest, ListNotificationsQuery) with serde and sqlx derivations, and create the database migration SQL.
 
 ## Steps
-1. Add `sqlx` and `chrono` dependencies to `Cargo.toml`.2. Define Rust structs for `Product`, `Category`, and `Availability` with `sqlx::FromRow` and `serde` derives.3. Create `sqlx-cli` migrations for `products`, `categories`, and `availability` tables, including necessary indexes.
+1. Create `src/models.rs`:
+   - `Channel` enum: `email`, `sms`, `push`, `in_app` — derive Serialize, Deserialize with `#[serde(rename_all = "snake_case")]`. Map to/from VARCHAR for sqlx (impl sqlx::Type or use string mapping).
+   - `Priority` enum: `low`, `normal`, `high`, `urgent` — same derivations.
+   - `NotificationStatus` enum: `pending`, `sent`, `failed`, `cancelled` — same derivations.
+   - `Notification` struct: `id: Uuid`, `channel: Channel`, `priority: Priority`, `title: String`, `body: String`, `status: NotificationStatus`, `created_at: DateTime<Utc>`, `updated_at: DateTime<Utc>`. Derive Serialize, Deserialize, sqlx::FromRow.
+   - `CreateNotificationRequest` struct: `channel: Channel`, `priority: Priority`, `title: String`, `body: String`. Derive Deserialize.
+   - `ListNotificationsQuery` struct: `page: Option<u32>`, `per_page: Option<u32>`, `status: Option<NotificationStatus>`. Derive Deserialize.
+   - `PaginatedResponse<T>` struct: `data: Vec<T>`, `page: u32`, `per_page: u32`, `total: i64`.
+2. Create `migrations/001_create_notifications.sql`:
+   - CREATE TABLE notifications with all columns as specified.
+   - CREATE INDEX idx_notifications_status_created ON notifications (status, created_at DESC).
+3. Ensure sqlx migration runs on startup (already wired in AppState from 2001).
 
 ## Validation
-1. Run `sqlx migrate run` against a local PostgreSQL instance and verify tables are created correctly.2. Write unit tests for data model serialization/deserialization.
+`cargo build` compiles with all model types. Enum serialization unit tests verify lowercase JSON output (e.g., `Channel::Email` serializes to `"email"`). Migration SQL is syntactically valid (verified via sqlx migrate check or manual review).
