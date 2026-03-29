@@ -741,7 +741,8 @@
   overflow-y: auto;
   height: 100dvh;
   scroll-behavior: smooth;
-  padding-bottom: 5rem;
+  /* Room for chrome + legal row */
+  padding-bottom: 7rem;
 }
 
 .deck-slide {
