@@ -69,13 +69,13 @@ export const slides: DeckSlide[] = [
     id: "problem",
     label: "Problem",
     layout: "impact",
-    eyebrow: "The shift",
-    headline: "When code is cheap, coordination wins.",
+    eyebrow: "Unit economics",
+    headline: "The real hyperscale bill isn’t headline compute.",
     subhead:
-      "“Code is a commodity” means implementation keeps getting automated — more software builds itself, marginal cost of another feature drops. The scarce part is aim, orchestration, and learning fast enough — **and unit economics that don’t break on egress, storage, and headcount.**",
+      "**Egress, storage, and managed-service margin** — that’s where hyperscale dollars concentrate (cheap CPU was never the whole story). **Headcount** burns when tool sprawl and scarce DevOps/design hit at once. **Code is a commodity** — implementation keeps automating; **what’s scarce is coordination**: aim, orchestration, and learning fast enough **on economics that don’t break.**",
     bullets: [
-      "**Infra economics:** egress, storage, and managed-service margin dominate real hyperscale bills — **headline compute is the bait.** CTO’s core wedge is **cost and control** on bare metal plus automation.",
-      "**People + sprawl:** tool sprawl and scarce DevOps/design — spend explodes without a coordinated system.",
+      "**The structural squeeze:** network + storage + managed tax vs. bait-priced compute — **this is the problem CTO fixes** with **bare metal, predictable economics, and automation** (not a prettier chat UI).",
+      "**People + sprawl:** same spend explosion without agents, rails, and a single system — you can’t hire past the invoice.",
       "Model mix: frontier models for planning and architecture; local + competitive open models (incl. Chinese stacks) for iteration loops — front-load thinking, iterate cheaply without giving up quality.",
       "Winners run decide → ship → learn in one loop with real signal.",
     ],

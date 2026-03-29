@@ -56,7 +56,7 @@ Company: five D Labs. Round: pre-seed, Delaware C-Corp, seven hundred fifty K U.
 
 Headline metrics called out on materials: two paying customers; about two hundred forty K annual contract value; four revenue streams; infra savings versus cloud shown as fifty to seventy-five percent on the deck headline — workload-specific; full math is illustrative.
 
-Problem framing: when code is cheap, coordination wins — aim, orchestration, learning; **unit economics** on egress, storage, headcount. Solution framing: one machine — build, fund, ship — CTO, trading, ventures on one operating system, not three disconnected bets.
+Problem framing: **unit economics first** — egress, storage, managed margin vs bait-priced compute; then headcount + sprawl; **code is a commodity** so coordination (aim, orchestration, learning) wins **on economics that don’t break**. Solution framing: one machine — build, fund, ship — CTO, trading, ventures on one operating system, not three disconnected bets.
 
 CTO wedge: SDLC plus ops; Morgan names PM/coordination on the platform; self-healing delivery; multi-CLI; bare metal for sovereignty and predictable cost; license note for serious teams: A G P L three dot zero for self-host story where relevant.
 
@@ -167,9 +167,10 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 
 **Problem**
 
-- When code is cheap, coordination wins — scarce: aim, orchestration, learning; **unit economics** on egress, storage, headcount.
-- Infra economics: egress, storage, managed margin dominate real bills; headline compute is the bait; CTO wedge = cost + control on metal + automation.
-- People + sprawl: tool sprawl, scarce DevOps/design — spend explodes without a coordinated system.
+- Headline: **The real hyperscale bill isn’t headline compute.**
+- Subhead: egress, storage, managed margin where dollars concentrate; headcount + sprawl; code is a commodity — scarce = coordination (aim, orchestration, learning) **on economics that don’t break.**
+- Structural squeeze: network + storage + managed tax vs bait compute — **CTO** = bare metal, predictable economics, automation.
+- People + sprawl: spend explodes without agents, rails, one system.
 - Model mix: frontier for planning/architecture; local + open (incl. Chinese stacks) for iteration.
 - Winners: decide → ship → learn with real signal.
 
