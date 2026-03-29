@@ -5,14 +5,23 @@ import { Header } from "@/components/cto/header";
 import { LemonSliceWidget } from "@/components/cto/lemon-slice-widget";
 
 export const metadata: Metadata = {
-  title: "Morgan — Your AI Business Coordinator | Talk via Chat, Voice, or Video",
+  title:
+    "Morgan — Your AI Business Coordinator | Chat, Voice, Video, or Smart Glasses",
   description:
-    "Morgan is your single point of contact for the CTO platform. Chat, voice, or video—from any device. Your control agent coordinates the whole team.",
+    "Morgan is your single point of contact for the CTO platform. Chat, voice, video, or smart glasses—from any device. Your control agent coordinates the whole team.",
   openGraph: {
-    title: "Morgan — Your AI Business Coordinator | Talk via Chat, Voice, or Video",
+    title:
+      "Morgan — Your AI Business Coordinator | Chat, Voice, Video, or Smart Glasses",
     description:
-      "Morgan is your single point of contact. Chat, voice, or video—from any device. Your control agent coordinates the whole team.",
+      "Morgan is your single point of contact. Chat, voice, video, or smart glasses—from any device. Your control agent coordinates the whole team.",
     url: "https://5dlabs.ai/cto/morgan",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title:
+      "Morgan — Your AI Business Coordinator | Chat, Voice, Video, or Smart Glasses",
+    description:
+      "Morgan is your single point of contact. Chat, voice, video, or smart glasses—from any device. Your control agent coordinates the whole team.",
   },
 };
 
