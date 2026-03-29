@@ -42,6 +42,16 @@ const interactionMethods = [
     description:
       "Talk to Morgan on WhatsApp hands-free — same conversation, your glasses.",
   },
+  {
+    title: "Rokid Glasses",
+    description:
+      "Same Morgan on your channels — voice, chat, or messages from your phone with Rokid on.",
+  },
+  {
+    title: "Vuzix Z100",
+    description:
+      "Enterprise-grade smart glasses — Morgan on Slack, Teams, WhatsApp, or whatever you already use.",
+  },
 ];
 
 export default function MorganPage() {
@@ -198,6 +208,56 @@ export default function MorganPage() {
                 alt="Ray-Ban Meta Display smart glasses and neural band"
                 fill
                 className="object-cover"
+                sizes="(max-width: 768px) 100vw, 672px"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Rokid */}
+        <section className="py-20 px-6 border-t border-border/30">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                Talk to Morgan on{" "}
+                <span className="gradient-text">Rokid Glasses</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Same Morgan. Your channels, your phone, your glasses.
+              </p>
+            </div>
+
+            <div className="relative aspect-[16/9] max-w-2xl mx-auto rounded-xl overflow-hidden border border-border bg-black mb-8">
+              <Image
+                src="/morgan/rokid-glasses.png"
+                alt="Rokid smart glasses in charging case"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 672px"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Vuzix Z100 */}
+        <section className="py-20 px-6 border-t border-border/30">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                Talk to Morgan on{" "}
+                <span className="gradient-text">Vuzix Z100</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Same Morgan. Slack, Teams, WhatsApp — wherever you already work.
+              </p>
+            </div>
+
+            <div className="relative aspect-[16/9] max-w-2xl mx-auto rounded-xl overflow-hidden border border-border bg-white mb-8">
+              <Image
+                src="/morgan/vuzix-z100.png"
+                alt="Vuzix Z100 smart glasses"
+                fill
+                className="object-contain p-4"
                 sizes="(max-width: 768px) 100vw, 672px"
               />
             </div>
