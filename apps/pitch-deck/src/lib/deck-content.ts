@@ -39,6 +39,7 @@ export const DECK_META = {
 /**
  * Single source of truth for web deck + PDF (print).
  * Copy kept short for live read + older investors; pair with verbal detail.
+ * Strings are plain text everywhere (same output in the app, PDF, and PowerPoint).
  */
 export const slides: DeckSlide[] = [
   {
@@ -72,12 +73,12 @@ export const slides: DeckSlide[] = [
     eyebrow: "Unit economics",
     headline: "The real hyperscale bill isn’t headline compute.",
     subhead:
-      "**Egress, storage, and managed-service margin** — that’s where hyperscale dollars concentrate (cheap CPU was never the whole story). **Headcount** burns when tool sprawl and scarce DevOps/design hit at once. **Code is a commodity** — implementation keeps automating; **what’s scarce is coordination**: aim, orchestration, and learning fast enough **on economics that don’t break.**",
+      "The bill: egress, storage, margin — not list-price CPU. The org: sprawl + DevOps gap. Scarce: coordination as code commoditizes. CTO: bill + org on bare metal and automation.",
     bullets: [
-      "**The structural squeeze:** network + storage + managed tax vs. bait-priced compute — **this is the problem CTO fixes** with **bare metal, predictable economics, and automation** (not a prettier chat UI).",
-      "**People + sprawl:** same spend explosion without agents, rails, and a single system — you can’t hire past the invoice.",
-      "Model mix: frontier models for planning and architecture; local + competitive open models (incl. Chinese stacks) for iteration loops — front-load thinking, iterate cheaply without giving up quality.",
-      "Winners run decide → ship → learn in one loop with real signal.",
+      "Invoice line items: network + storage + managed tax vs bait-priced compute.",
+      "People + sprawl: same spend explosion without agents, rails, and a single operating model — you can’t hire past the invoice.",
+      "Model mix: frontier for planning; open/local for iteration — cheap loops without giving up quality.",
+      "Loop: decide → ship → learn with real signal.",
     ],
   },
   {
@@ -116,7 +117,7 @@ export const slides: DeckSlide[] = [
       "Compound — reuse prompts, workflows, infra.",
     ],
     callout:
-      "**Product intake and PRDs** live in **CTO**—agents and automation take it from there through build, review, and **release to production**.",
+      "Product intake and PRDs live in CTO — agents and automation take it from there through build, review, and release to production.",
   },
   {
     id: "cto",
@@ -125,14 +126,14 @@ export const slides: DeckSlide[] = [
     subhead:
       "Kubernetes-native; mostly Rust for latency. Same product on an enterprise cluster or kind on a workstation.",
     bullets: [
-      "Multi-CLI routing — OpenClaw **MCP harness** (eight CLIs); picks provider + model for **token and $ efficiency**—works well when founders spread work across **free credits** on many accounts.",
-      "Tool surface — **MCP aggregator** as the tool server; **preset skills per agent** with add / override anytime—methodology stays yours while tools and providers change.",
-      "Operators & runtime — **Kubernetes operators** for backend services; **runtime image** packs languages and tooling; stack is **mostly Rust** where it matters for performance.",
-      "Self-heal & review — **Healer** reacts to telemetry from the observability stack; **Stitch** does automated PR review **and** remediation; **alerting** to Discord, Slack, and webhooks.",
-      "Coordination — **NATS** for agent-to-agent traffic across pods (fills a gap vs. stock Kubernetes); **CRDs** run headless jobs that report back to **Morgan**; **ACP**-style coordination across the fleet.",
-      "Metal & GPU — **automated bare-metal and GPU** provisioning; we **abstract provider contracts** so customers don’t have to—or they keep a **direct deal** with the vendor.",
-      "Research loop — ingest latest methodologies, patterns, and papers → **PRD → features on the platform**—so the product stays current without asking users to rip up how they work.",
-      "**Board room** (debate, voice, chat with Morgan via **ElevenLabs + LiveKit**) ships in the **main CTO app**—not desktop-only. **CTO Lite** is the **desktop-only** freemium entry (local kind, limited agents). **AR glasses** roadmap: Even G2, Meta Ray-Ban Display, Rokid, Vuzix Z100 — **5dlabs.ai/cto/morgan**.",
+      "Multi-CLI routing — OpenClaw MCP harness (eight CLIs); picks provider + model for token and $ efficiency — works well when founders spread work across free credits on many accounts.",
+      "Tool surface — MCP aggregator as the tool server; preset skills per agent with add / override anytime — methodology stays yours while tools and providers change.",
+      "Operators & runtime — Kubernetes operators for backend services; runtime image packs languages and tooling; stack is mostly Rust where it matters for performance.",
+      "Self-heal & review — Healer reacts to telemetry from the observability stack; Stitch does automated PR review and remediation; alerting to Discord, Slack, and webhooks.",
+      "Coordination — NATS for agent-to-agent traffic across pods (fills a gap vs. stock Kubernetes); CRDs run headless jobs that report back to Morgan; ACP-style coordination across the fleet.",
+      "Metal & GPU — automated bare-metal and GPU provisioning; we abstract provider contracts so customers don’t have to — or they keep a direct deal with the vendor.",
+      "Research loop — ingest latest methodologies, patterns, and papers → PRD → features on the platform — so the product stays current without asking users to rip up how they work.",
+      "Board room (debate, voice, chat with Morgan via ElevenLabs + LiveKit) ships in the main CTO app — not desktop-only. CTO Lite is the desktop-only freemium entry (local kind, limited agents). AR glasses roadmap: Even G2, Meta Ray-Ban Display, Rokid, Vuzix Z100 — 5dlabs.ai/cto/morgan.",
     ],
     footnote:
       "AGPL-3.0 — serious teams self-host. More detail: 5dlabs.ai/cto",
@@ -144,11 +145,11 @@ export const slides: DeckSlide[] = [
     subhead:
       "Preset skills and tools per role—extend or swap without retraining your team on a new methodology.",
     bullets: [
-      "Control — **Morgan** (PM / coordination).",
-      "Build — **Rex**, **Grizz**, **Nova**, **Viper** · **Blaze**, **Tap**, **Spark** (backend, web, mobile, desktop).",
-      "Trust & ship — **Cleo**, **Cipher**, **Tess**, **Stitch**, **Atlas**, **Bolt** (quality, security, testing, review, merge, infra).",
-      "Domain — **Block**, **Vex**, **Angie**, **Glitch** (chains, XR, agent systems, games).",
-      "Business — **Lex**, **Hype**, **Tally**, **Chase** (legal, marketing, accounting, sales).",
+      "Control — Morgan (PM / coordination).",
+      "Build — Rex, Grizz, Nova, Viper · Blaze, Tap, Spark (backend, web, mobile, desktop).",
+      "Trust & ship — Cleo, Cipher, Tess, Stitch, Atlas, Bolt (quality, security, testing, review, merge, infra).",
+      "Domain — Block, Vex, Angie, Glitch (chains, XR, agent systems, games).",
+      "Business — Lex, Hype, Tally, Chase (legal, marketing, accounting, sales).",
     ],
     callout:
       "Avatars and detail on 5dlabs.ai/cto. Internal operators (e.g. Healer, Keeper, Pixel) also run self-heal, desktop, and orchestration under the hood.",
@@ -189,7 +190,7 @@ export const slides: DeckSlide[] = [
     bullets: [
       "Coordinates specialist agents (PM, implementers, infra, security, …) with shared MCP + toolchains.",
       "Intake → tasks → Plays: one loop from PRD to merge with humans in the loop where it matters.",
-      "Open source: **GitOps-based OpenClaw platform** + **Helm** to deploy and scale OpenClaw—the spine CTO runs on—so community and marketing funnel into full CTO + bare metal.",
+      "Open source: GitOps-based OpenClaw platform + Helm to deploy and scale OpenClaw — the spine CTO runs on — so community and marketing funnel into full CTO + bare metal.",
       "Runs beside the 5D private-cloud services: agents operate the stack, stack hosts the workloads.",
     ],
     callout:
@@ -200,9 +201,9 @@ export const slides: DeckSlide[] = [
     label: "Differentiation",
     headline: "Plan before code — keep your mental model",
     bullets: [
-      "Structured **planning workflow** before implementation—explore options, use voice, listen async—so the team aligns before anyone ships the wrong thing.",
-      "**UI and scope** clarified early with review + tracking tied together—less rework, less spend on design-only firefighting.",
-      "Humans stay in the loop through **listening** and async review, not constant ticket-chasing.",
+      "Structured planning workflow before implementation — explore options, use voice, listen async — so the team aligns before anyone ships the wrong thing.",
+      "UI and scope clarified early with review + tracking tied together — less rework, less spend on design-only firefighting.",
+      "Humans stay in the loop through listening and async review, not constant ticket-chasing.",
     ],
     callout: "ROI: fewer hires, lower infra bill, faster cycles.",
   },
@@ -270,7 +271,7 @@ export const slides: DeckSlide[] = [
     subhead:
       "Distribution that points everything back to CTO — desktop is the primary product surface.",
     bullets: [
-      "Ship the **open-source OpenClaw platform** (GitOps + Helm to deploy and scale OpenClaw) so evals and installs funnel into the full CTO stack—not a vague “slice,” the same control plane we run.",
+      "Ship the open-source OpenClaw platform (GitOps + Helm to deploy and scale OpenClaw) so evals and installs funnel into the full CTO stack — not a vague “slice,” the same control plane we run.",
       "Freemium CTO Lite on desktop: local kind cluster, no bare-metal path, limited agent set — enough to get hooked.",
       "Feature flags and upgrade hooks create FOMO; paid tiers (still being defined) unlock full fleet, metal, and agent depth.",
       "Long-term: subscriptions on top of the desktop app as the main commercial surface.",
@@ -298,10 +299,10 @@ export const slides: DeckSlide[] = [
     label: "Morgan",
     headline: "Talk to Morgan before we meet",
     subhead:
-      "Animated avatar + voice — Q&A front door before a live conversation. Ground the host with KB URLs and deck links. **No product intake or PRD path here**—that runs in the **CTO app**, not this widget.",
+      "Animated avatar + voice — Q&A front door before a live conversation. Ground the host with KB URLs and deck links. No product intake or PRD path here — that runs in the CTO app, not this widget.",
     bullets: [
-      "**Morgan** is the PM/coordination **persona on CTO**; this experience is **voice + avatar Q&A only**—not where specs or intake land.",
-      "Investors use this for narrative questions; **product intake and PRDs flow through CTO** (same platform as the agent fleet), not through the browser widget.",
+      "Morgan is the PM/coordination persona on CTO; this experience is voice + avatar Q&A only — not where specs or intake land.",
+      "Investors use this for narrative questions; product intake and PRDs flow through CTO (same platform as the agent fleet), not through the browser widget.",
       "Live stack: OpenClaw + LiveKit + hosted avatar.",
     ],
     cta: {

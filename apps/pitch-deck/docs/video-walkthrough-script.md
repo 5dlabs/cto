@@ -10,7 +10,7 @@ Screen-record [https://pitch.5dlabs.ai](https://pitch.5dlabs.ai) (or `npm run de
 |---|------------------|---------------------------|
 | **Intro** | Your face optional; then browser with deck | You’re Jonathon; this is the 5D Labs pre-seed deck — what you built, why it matters, the raise. Deck: `pitch.5dlabs.ai`. |
 | **01 Cover** | Logo, stats grid, callout | AI-native venture studio; you built the stack that builds companies — now it’s the product. Pre-seed, Delaware, $750K. Point at stats: 2 customers, ~$240K ACV, multiple revenue streams, infra savings vs cloud-only. Same stack: implementations, rev-share, trading, advisory. |
-| **02 Problem** | Impact layout, bullets | **Unit economics** slide: real bill isn’t headline compute — egress, storage, managed margin; then headcount + sprawl. Code **commodity** → coordination wins **after** economics. First bullet = structural squeeze CTO fixes; model mix; one loop. |
+| **02 Problem** | Impact layout, bullets | Four beats in subhead: **bill** (egress/storage/margin), **org** (sprawl + DevOps gap), **scarce** (coordination), **CTO** on metal. Bullets: invoice vs bait compute; people + sprawl; model mix; loop. |
 | **03 One machine** | Thesis | Not three random bets — one OS: **build, fund, ship**. CTO is the wedge; trading is internal capital; ventures + OpenClaw share playbooks. One loop — drop a piece and it weakens the whole thing. |
 | **04 Origin** | Bullets | Built for yourselves first: wanted Solana trading, small team, models weren’t “there” yet — built CTO to ship anyway. Months on CTO; infra is real. Scratch → prod → sell. |
 | **05 Loop** | Four bullets | Decide (thesis + signals) → deploy (CTO + OpenClaw) → learn (runtime + market) → compound (reuse). |

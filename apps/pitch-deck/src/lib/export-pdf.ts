@@ -166,8 +166,8 @@ function writeCalloutBox(
 }
 
 /**
- * Vector PDF (jsPDF) — dark theme + large type to match deck vibe without rasterizing the DOM
- * (html2canvas looks “prettier” but blurs text and balloons file size).
+ * Vector PDF (jsPDF) — dark theme + large type to match deck vibe without rasterizing the page
+ * (DOM-to-image capture looks “prettier” but blurs text and balloons file size).
  */
 export function buildPitchDeckPdfBlob(
   slides: DeckSlide[],
