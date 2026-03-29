@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { Orbitron } from "next/font/google";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -320,41 +321,69 @@ export function PitchDeck() {
 
       <div
         className={cn(
-          "deck-chrome fixed bottom-0 left-0 right-0 z-20 flex items-center gap-2 px-3 py-2.5 backdrop-blur-md sm:gap-3 sm:px-4 sm:py-3",
+          "deck-chrome fixed bottom-0 left-0 right-0 z-20 flex flex-col backdrop-blur-md",
           "border-t border-border/80 bg-background/80",
         )}
       >
-        <div className="flex min-w-0 flex-1 items-center justify-start gap-2">
-          <button
-            type="button"
-            aria-label="Previous slide"
-            className="glass-badge inline-flex size-12 shrink-0 items-center justify-center rounded-lg text-foreground transition hover:bg-white/10"
-            onClick={() =>
-              scrollToIndex(scrollerRef.current, Math.max(active - 1, 0))
-            }
+        <div className="flex items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+          <div className="flex min-w-0 flex-1 items-center justify-start gap-2">
+            <button
+              type="button"
+              aria-label="Previous slide"
+              className="glass-badge inline-flex size-12 shrink-0 items-center justify-center rounded-lg text-foreground transition hover:bg-white/10"
+              onClick={() =>
+                scrollToIndex(scrollerRef.current, Math.max(active - 1, 0))
+              }
+            >
+              <ChevronLeft className="size-6" />
+            </button>
+            <button
+              type="button"
+              aria-label="Next slide"
+              className="glass-badge inline-flex size-12 shrink-0 items-center justify-center rounded-lg text-foreground transition hover:bg-white/10"
+              onClick={() =>
+                scrollToIndex(
+                  scrollerRef.current,
+                  Math.min(active + 1, slides.length - 1),
+                )
+              }
+            >
+              <ChevronRight className="size-6" />
+            </button>
+          </div>
+          <div className="shrink-0 px-1 font-mono text-xs text-muted-foreground sm:px-2 sm:text-sm md:text-base">
+            {active + 1} / {slides.length}
+          </div>
+          <div className="flex min-w-0 flex-1 justify-end">
+            <DeckExportControls />
+          </div>
+        </div>
+        <nav
+          className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-border/50 px-3 py-2 text-center sm:gap-x-3"
+          aria-label="Legal and site identity"
+        >
+          <span className="text-[0.65rem] font-medium uppercase tracking-[0.12em] text-muted-foreground sm:text-xs">
+            5D Labs · Investor deck
+          </span>
+          <span className="text-[0.65rem] text-muted-foreground/50 sm:text-xs" aria-hidden>
+            ·
+          </span>
+          <Link
+            href="/privacy/"
+            className="text-[0.65rem] text-muted-foreground underline underline-offset-2 transition hover:text-foreground sm:text-xs"
           >
-            <ChevronLeft className="size-6" />
-          </button>
-          <button
-            type="button"
-            aria-label="Next slide"
-            className="glass-badge inline-flex size-12 shrink-0 items-center justify-center rounded-lg text-foreground transition hover:bg-white/10"
-            onClick={() =>
-              scrollToIndex(
-                scrollerRef.current,
-                Math.min(active + 1, slides.length - 1),
-              )
-            }
+            Privacy Policy
+          </Link>
+          <span className="text-[0.65rem] text-muted-foreground/50 sm:text-xs" aria-hidden>
+            ·
+          </span>
+          <Link
+            href="/terms/"
+            className="text-[0.65rem] text-muted-foreground underline underline-offset-2 transition hover:text-foreground sm:text-xs"
           >
-            <ChevronRight className="size-6" />
-          </button>
-        </div>
-        <div className="shrink-0 px-1 font-mono text-xs text-muted-foreground sm:px-2 sm:text-sm md:text-base">
-          {active + 1} / {slides.length}
-        </div>
-        <div className="flex min-w-0 flex-1 justify-end">
-          <DeckExportControls />
-        </div>
+            Terms of Service
+          </Link>
+        </nav>
       </div>
     </>
   );
