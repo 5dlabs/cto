@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -23,7 +26,9 @@
       "icon": "external link",
       "includeVars": true,
       "keepTime": true,
-      "tags": ["intake"],
+      "tags": [
+        "intake"
+      ],
       "title": "Intake Dashboards",
       "type": "dashboards"
     }
@@ -34,21 +39,35 @@
       "title": "Run Status",
       "description": "Count of successful runs (exit_code=0) in the last 30 days",
       "type": "stat",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
           "editorMode": "code",
-          "expr": "count_over_time({log_type=\"runs\"} | json | event=\"run_complete\" | exit_code=\"0\" [30d])",
+          "expr": "count_over_time({log_type=\"runs\"} | json | event=\"run_complete\" | exit_code=\"0\" [$__range])",
           "legendFormat": "Successful",
           "queryType": "range",
           "refId": "A"
         },
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
           "editorMode": "code",
-          "expr": "count_over_time({log_type=\"runs\"} | json | event=\"run_complete\" | exit_code!=\"0\" [30d])",
+          "expr": "count_over_time({log_type=\"runs\"} | json | event=\"run_complete\" | exit_code!=\"0\" [$__range])",
           "legendFormat": "Failed",
           "queryType": "range",
           "refId": "B"
@@ -56,20 +75,35 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "green" },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null }
+              {
+                "color": "green",
+                "value": null
+              }
             ]
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Failed" },
+            "matcher": {
+              "id": "byName",
+              "options": "Failed"
+            },
             "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
             ]
           }
         ]
@@ -80,7 +114,9 @@
         "justifyMode": "auto",
         "orientation": "horizontal",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -93,11 +129,22 @@
       "title": "Latest Run Duration",
       "description": "Duration of the selected run",
       "type": "stat",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
           "editorMode": "code",
           "expr": "last_over_time({log_type=\"runs\"} | json | event=\"run_complete\" | run_id=~\"$run_id\" | unwrap duration_sec | __error__=\"\" [$__range])",
           "legendFormat": "",
@@ -107,15 +154,26 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "unit": "s",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1800 },
-              { "color": "red", "value": 3600 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1800
+              },
+              {
+                "color": "red",
+                "value": 3600
+              }
             ]
           }
         },
@@ -127,7 +185,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -140,11 +200,22 @@
       "title": "Active Steps",
       "description": "Steps started but not yet completed for the selected run",
       "type": "stat",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
           "editorMode": "code",
           "expr": "count_over_time({log_type=\"pipeline\"} | json | event=\"step_start\" | run_id=~\"$run_id\" [$__range])",
           "legendFormat": "",
@@ -153,7 +224,10 @@
           "hide": true
         },
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
           "editorMode": "code",
           "expr": "count_over_time({log_type=\"pipeline\"} | json | event=\"step_end\" | run_id=~\"$run_id\" [$__range])",
           "legendFormat": "",
@@ -162,7 +236,10 @@
           "hide": true
         },
         {
-          "datasource": { "type": "__expr__", "uid": "__expr__" },
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
           "expression": "$A - $B",
           "hide": false,
           "refId": "C",
@@ -171,14 +248,25 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 1 },
-              { "color": "red", "value": 5 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
             ]
           },
           "min": 0
@@ -191,7 +279,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -204,11 +294,22 @@
       "title": "Total LLM Calls",
       "description": "Total LLM call events for the selected run",
       "type": "stat",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
           "editorMode": "code",
           "expr": "count_over_time({log_type=\"llm_calls\"} | json | event=\"llm_call\" | run_id=~\"$run_id\" [$__range])",
           "legendFormat": "",
@@ -218,12 +319,17 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "blue", "value": null }
+              {
+                "color": "blue",
+                "value": null
+              }
             ]
           }
         },
@@ -235,7 +341,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -248,11 +356,22 @@
       "title": "Pipeline Phase Timeline",
       "description": "Step details for the selected run: step_id, phase, duration, and exit code",
       "type": "table",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
           "editorMode": "code",
           "expr": "{log_type=\"pipeline\"} | json | event=\"step_end\" | run_id=~\"$run_id\"",
           "legendFormat": "",
@@ -262,10 +381,14 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "custom": {
             "align": "auto",
-            "cellOptions": { "type": "auto" },
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": false,
             "filterable": true
           },
@@ -273,30 +396,79 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
             ]
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "duration_ms" },
+            "matcher": {
+              "id": "byName",
+              "options": "duration_ms"
+            },
             "properties": [
-              { "id": "unit", "value": "ms" },
-              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
-              { "id": "color", "value": { "mode": "continuous-GrYlRd" } },
-              { "id": "min", "value": 0 },
-              { "id": "max", "value": 300000 }
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 300000
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "exit_code" },
+            "matcher": {
+              "id": "byName",
+              "options": "exit_code"
+            },
             "properties": [
               {
                 "id": "mappings",
                 "value": [
-                  { "type": "value", "options": { "0": { "text": "OK", "color": "green" } } },
-                  { "type": "special", "options": { "match": "null+nan", "result": { "text": "-", "color": "text" } } }
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "OK",
+                        "color": "green"
+                      }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "text": "-",
+                        "color": "text"
+                      }
+                    }
+                  }
                 ]
               }
             ]
@@ -305,10 +477,20 @@
       },
       "options": {
         "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
         "showHeader": true,
         "sortBy": [
-          { "desc": false, "displayName": "ts" }
+          {
+            "desc": false,
+            "displayName": "ts"
+          }
         ]
       },
       "transformations": [
@@ -353,11 +535,22 @@
       "title": "Step Durations",
       "description": "Duration of each pipeline step for the selected run",
       "type": "barchart",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 14 },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 14
+      },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
           "editorMode": "code",
           "expr": "max by (step_id) (last_over_time({log_type=\"pipeline\"} | json | event=\"step_end\" | run_id=~\"$run_id\" | unwrap duration_ms | __error__=\"\" [$__range]))",
           "legendFormat": "{{step_id}}",
@@ -367,7 +560,9 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
@@ -376,19 +571,36 @@
             "axisPlacement": "auto",
             "fillOpacity": 80,
             "gradientMode": "scheme",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineWidth": 1,
-            "scaleDistribution": { "type": "linear" },
-            "thresholdsStyle": { "mode": "off" }
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "unit": "ms",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 60000 },
-              { "color": "red", "value": 120000 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60000
+              },
+              {
+                "color": "red",
+                "value": 120000
+              }
             ]
           }
         },
@@ -399,11 +611,18 @@
         "barWidth": 0.8,
         "fullHighlight": false,
         "groupWidth": 0.7,
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
         "orientation": "horizontal",
         "showValue": "auto",
         "stacking": "none",
-        "tooltip": { "mode": "single", "sort": "none" },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
         "xTickLabelRotation": 0
       }
     },
@@ -412,11 +631,22 @@
       "title": "Errors",
       "description": "Pipeline step errors for the selected run",
       "type": "table",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 14 },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 14
+      },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
           "editorMode": "code",
           "expr": "{log_type=\"pipeline\"} | json | event=\"step_error\" | run_id=~\"$run_id\"",
           "legendFormat": "",
@@ -426,10 +656,15 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "red" },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          },
           "custom": {
             "align": "auto",
-            "cellOptions": { "type": "auto" },
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": true,
             "filterable": true
           },
@@ -437,7 +672,10 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null }
+              {
+                "color": "red",
+                "value": null
+              }
             ]
           }
         },
@@ -445,10 +683,20 @@
       },
       "options": {
         "cellHeight": "sm",
-        "footer": { "countRows": true, "fields": "", "reducer": ["count"], "show": true },
+        "footer": {
+          "countRows": true,
+          "fields": "",
+          "reducer": [
+            "count"
+          ],
+          "show": true
+        },
         "showHeader": true,
         "sortBy": [
-          { "desc": true, "displayName": "ts" }
+          {
+            "desc": true,
+            "displayName": "ts"
+          }
         ]
       },
       "transformations": [
@@ -490,11 +738,22 @@
       "title": "Run History",
       "description": "Recent completed runs with project, mode, duration, and exit code",
       "type": "table",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
           "editorMode": "code",
           "expr": "{log_type=\"runs\"} | json | event=\"run_complete\"",
           "legendFormat": "",
@@ -504,10 +763,14 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "custom": {
             "align": "auto",
-            "cellOptions": { "type": "auto" },
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": false,
             "filterable": true
           },
@@ -515,26 +778,58 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
             ]
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "duration_sec" },
+            "matcher": {
+              "id": "byName",
+              "options": "duration_sec"
+            },
             "properties": [
-              { "id": "unit", "value": "s" }
+              {
+                "id": "unit",
+                "value": "s"
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "exit_code" },
+            "matcher": {
+              "id": "byName",
+              "options": "exit_code"
+            },
             "properties": [
               {
                 "id": "mappings",
                 "value": [
-                  { "type": "value", "options": { "0": { "text": "OK", "color": "green" } } },
-                  { "type": "special", "options": { "match": "null+nan", "result": { "text": "-", "color": "text" } } }
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "OK",
+                        "color": "green"
+                      }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "text": "-",
+                        "color": "text"
+                      }
+                    }
+                  }
                 ]
               }
             ]
@@ -543,10 +838,20 @@
       },
       "options": {
         "cellHeight": "sm",
-        "footer": { "countRows": true, "fields": "", "reducer": ["count"], "show": true },
+        "footer": {
+          "countRows": true,
+          "fields": "",
+          "reducer": [
+            "count"
+          ],
+          "show": true
+        },
         "showHeader": true,
         "sortBy": [
-          { "desc": true, "displayName": "ts" }
+          {
+            "desc": true,
+            "displayName": "ts"
+          }
         ]
       },
       "transformations": [
@@ -589,12 +894,23 @@
     }
   ],
   "schemaVersion": 39,
-  "tags": ["intake", "pipeline", "overview"],
+  "tags": [
+    "intake",
+    "pipeline",
+    "overview"
+  ],
   "templating": {
     "list": [
       {
-        "current": { "selected": true, "text": "All", "value": "$__all" },
-        "datasource": { "type": "loki", "uid": "loki" },
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
         "definition": "label_values({log_type=\"runs\"}, run_id)",
         "allValue": ".*",
         "hide": 0,
@@ -612,9 +928,21 @@
       }
     ]
   },
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "timepicker": {
-    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h"]
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h"
+    ]
   },
   "timezone": "browser",
   "title": "Intake Pipeline Overview",
