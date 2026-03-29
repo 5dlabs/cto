@@ -53,7 +53,7 @@ Market. Beachhead is crypto-native teams; we expand to anyone burning cloud and 
 
 Business model. Four revenue streams on one stack: CTO subscriptions, rev-share, trading P and L, advisory.
 
-Go-to-market. Open-source OpenClaw slice funnels to CTO. Freemium desktop with a local kind cluster, limited agents, feature flags into tiers. Long-term, desktop is the main commercial surface.
+Go-to-market. Open-source OpenClaw platform—GitOps and Helm to deploy at scale—funnels to CTO. Freemium desktop with a local kind cluster, limited agents, feature flags into tiers. Long-term, desktop is the main commercial surface.
 
 Use of funds. Seven fifty K goes to engineers, founder runway, edge, lab, models, and buffer — about eighteen months to cash-flow positive.
 

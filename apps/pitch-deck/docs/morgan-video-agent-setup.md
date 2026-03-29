@@ -218,7 +218,7 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 
 - Agent runtime on the same metal—not a separate silo; same fleet/rails as CTO.
 - Coordinates specialist agents with MCP + toolchains; intake → tasks → Plays.
-- Open-core slice with CTO Lite / community; composes with 5D private-cloud services.
+- Open-source OpenClaw platform (GitOps + Helm at scale) with CTO Lite / community; composes with 5D private-cloud services.
 - Callout: “Open Cloud” in conversation = agents + services on your metal; OpenClaw is the control plane.
 
 **Intake / differentiation**
@@ -253,7 +253,7 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 
 **GTM**
 
-- Open core → freemium desktop → paid tiers; desktop as primary surface; funnel via OpenClaw slice; CTO Lite on desktop; feature flags / upgrade path; long-term subscriptions on desktop.
+- Open core → freemium desktop → paid tiers; desktop as primary surface; funnel via **open-source OpenClaw platform** (GitOps + Helm); CTO Lite on desktop; feature flags / upgrade path; long-term subscriptions on desktop.
 
 **Use of funds**
 
@@ -265,6 +265,7 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 
 - Animated avatar + voice — Q&A front door before live meeting.
 - Same Morgan coordinates intake/agents on CTO platform.
+- No PRD field in the video widget—use host **knowledge base** (URLs, text); **PRD → tasks** stays on CTO.
 - Stack: OpenClaw + LiveKit + hosted video avatar; commerce via Lemon Squeezy (pricing in progress).
 - CTA on deck: Talk to Morgan → 5dlabs.ai/cto/morgan#talk
 

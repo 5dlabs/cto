@@ -187,7 +187,7 @@ export const slides: DeckSlide[] = [
     bullets: [
       "Coordinates specialist agents (PM, implementers, infra, security, …) with shared MCP + toolchains.",
       "Intake → tasks → Plays: one loop from PRD to merge with humans in the loop where it matters.",
-      "Open-core slice ships with CTO Lite / community—funnels to full stack and bare metal.",
+      "Open source: **GitOps-based OpenClaw platform** + **Helm** to deploy and scale OpenClaw—the spine CTO runs on—so community and marketing funnel into full CTO + bare metal.",
       "Runs beside the 5D private-cloud services: agents operate the stack, stack hosts the workloads.",
     ],
     callout:
@@ -268,7 +268,7 @@ export const slides: DeckSlide[] = [
     subhead:
       "Distribution that points everything back to CTO — desktop is the primary product surface.",
     bullets: [
-      "Ship an open-source OpenClaw slice (sub-components of CTO) so community and marketing funnel to the full CTO stack.",
+      "Ship the **open-source OpenClaw platform** (GitOps + Helm to deploy and scale OpenClaw) so evals and installs funnel into the full CTO stack—not a vague “slice,” the same control plane we run.",
       "Freemium CTO Lite on desktop: local kind cluster, no bare-metal path, limited agent set — enough to get hooked.",
       "Feature flags and upgrade hooks create FOMO; paid tiers (still being defined) unlock full fleet, metal, and agent depth.",
       "Long-term: subscriptions on top of the desktop app as the main commercial surface.",
@@ -296,18 +296,18 @@ export const slides: DeckSlide[] = [
     label: "Morgan",
     headline: "Talk to Morgan before we meet",
     subhead:
-      "Animated avatar + voice — your Q&A front door. Give Morgan deck and product context; investors can explore on their own before the live conversation.",
+      "Animated avatar + voice — Q&A front door before a live conversation. Ground the host agent with KB URLs and deck links; there’s no separate PRD field here—**PRD → tasks** stays on the CTO platform.",
     bullets: [
       "Same Morgan that runs intake and coordinates agents on the CTO platform.",
-      "Optional: paste context (links, PRD snippets) so answers stay on-narrative.",
-      "Live stack: OpenClaw + LiveKit + LemonSlice (avatar) — pricing via Lemon Squeezy in progress.",
+      "Investors use this for narrative Q&A; product intake and PRDs still flow through CTO (not through the avatar widget).",
+      "Live stack: OpenClaw + LiveKit + hosted avatar — pricing via Lemon Squeezy in progress.",
     ],
     cta: {
       label: "Talk to Morgan",
       href: "https://5dlabs.ai/cto/morgan#talk",
     },
     footnote:
-      "Avatar + voice: LemonSlice · LiveKit · OpenClaw. Commerce: Lemon Squeezy (pricing in progress).",
+      "Avatar + voice: hosted provider · LiveKit · OpenClaw. Commerce: Lemon Squeezy (pricing in progress).",
   },
   {
     id: "founder",

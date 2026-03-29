@@ -21,7 +21,7 @@ Screen-record [https://pitch.5dlabs.ai](https://pitch.5dlabs.ai) (or `npm run de
 | **10 Traction** | Long bullet list | Sigma One; Bloq ~$20K/mo; partners servers.com, ID3.net, Latitude; pipeline Cherry Servers; MiniMax approached; stack stats; founder velocity + Pocket-era 1B+ req/day. |
 | **11 Market** | Three bullets | Beachhead crypto-native → expand to anyone burning cloud + headcount. Moat: bare metal + automation vs cloud-only agents. |
 | **12 Model** | Four bullets | Four revenue streams, one stack: CTO subs, rev-share, trading P&L, advisory. |
-| **13 GTM** | Bullets | Open-source OpenClaw slice → funnel to CTO. Freemium desktop / kind, limited agents, feature flags → tiers. Desktop as main surface long-term. |
+| **13 GTM** | Bullets | Open-source OpenClaw platform (GitOps + Helm) → funnel to CTO. Freemium desktop / kind, limited agents, feature flags → tiers. Desktop as main surface long-term. |
 | **14 Use of funds** | Table + callout | $750K → engineers, founder, edge, lab, models, buffer. ~18 months to cash-flow positive. |
 | **15 Morgan** | CTA button visible | Morgan = avatar + voice; same agent as intake. OpenClaw + LiveKit + LemonSlice; Lemon Squeezy later. **Optional:** hover the “Talk to Morgan” button so viewers see it — no need to click. |
 | **16 Founder** | Three bullets | 20+ yrs ops, Victoria; Pocket Head of Infra at scale; Blocknative; Coinmiles SE→CTO fast. |
