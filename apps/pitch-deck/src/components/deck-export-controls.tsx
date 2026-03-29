@@ -127,7 +127,7 @@ export function DeckExportControls() {
       >
         <summary
           className={cn(
-            "glass-badge inline-flex cursor-pointer list-none items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-foreground transition hover:bg-white/10 sm:gap-1.5 sm:px-3 sm:text-sm",
+            "glass-badge inline-flex cursor-pointer list-none items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-white/10 sm:gap-1.5 sm:px-3 sm:text-sm",
             "[&::-webkit-details-marker]:hidden",
           )}
         >
@@ -173,7 +173,7 @@ export function DeckExportControls() {
         type="button"
         onClick={onPrintLayout}
         className={cn(
-          "glass-badge inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium text-foreground transition hover:bg-white/10 sm:px-3 sm:text-sm",
+          "glass-badge inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-white/10 sm:px-3 sm:text-sm",
         )}
         title="Browser print — Save as PDF to match on-screen colors & layout"
       >
@@ -186,7 +186,7 @@ export function DeckExportControls() {
         onClick={onDownloadPptx}
         disabled={pptxBusy}
         className={cn(
-          "glass-badge inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium text-foreground transition hover:bg-white/10 sm:px-3 sm:text-sm",
+          "glass-badge inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-white/10 sm:px-3 sm:text-sm",
           pptxBusy && "pointer-events-none opacity-60",
         )}
         title="Download .pptx for PowerPoint"
@@ -205,7 +205,7 @@ export function DeckExportControls() {
       >
         <summary
           className={cn(
-            "glass-badge inline-flex cursor-pointer list-none items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-foreground transition hover:bg-white/10 sm:gap-1.5 sm:px-3 sm:text-sm",
+            "glass-badge inline-flex cursor-pointer list-none items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-white/10 sm:gap-1.5 sm:px-3 sm:text-sm",
             "[&::-webkit-details-marker]:hidden",
             (!clientId || driveBusy) && "opacity-60",
           )}

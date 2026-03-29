@@ -325,22 +325,22 @@ export function PitchDeck() {
           "border-t border-border/80 bg-background/80",
         )}
       >
-        <div className="flex items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+        <div className="flex items-center gap-2 px-3 py-1.5 sm:gap-3 sm:px-4 sm:py-2">
           <div className="flex min-w-0 flex-1 items-center justify-start gap-2">
             <button
               type="button"
               aria-label="Previous slide"
-              className="glass-badge inline-flex size-12 shrink-0 items-center justify-center rounded-lg text-foreground transition hover:bg-white/10"
+              className="glass-badge inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-foreground transition hover:bg-white/10 sm:size-11"
               onClick={() =>
                 scrollToIndex(scrollerRef.current, Math.max(active - 1, 0))
               }
             >
-              <ChevronLeft className="size-6" />
+              <ChevronLeft className="size-5 sm:size-[1.35rem]" />
             </button>
             <button
               type="button"
               aria-label="Next slide"
-              className="glass-badge inline-flex size-12 shrink-0 items-center justify-center rounded-lg text-foreground transition hover:bg-white/10"
+              className="glass-badge inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-foreground transition hover:bg-white/10 sm:size-11"
               onClick={() =>
                 scrollToIndex(
                   scrollerRef.current,
@@ -348,10 +348,10 @@ export function PitchDeck() {
                 )
               }
             >
-              <ChevronRight className="size-6" />
+              <ChevronRight className="size-5 sm:size-[1.35rem]" />
             </button>
           </div>
-          <div className="shrink-0 px-1 font-mono text-xs text-muted-foreground sm:px-2 sm:text-sm md:text-base">
+          <div className="shrink-0 px-1 font-mono text-xs text-muted-foreground sm:px-2 sm:text-sm">
             {active + 1} / {slides.length}
           </div>
           <div className="flex min-w-0 flex-1 justify-end">
@@ -359,27 +359,27 @@ export function PitchDeck() {
           </div>
         </div>
         <nav
-          className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-border/50 px-3 py-2 text-center sm:gap-x-3"
+          className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 border-t border-border/50 px-3 py-1 text-center sm:gap-x-3"
           aria-label="Legal and site identity"
         >
-          <span className="text-[0.65rem] font-medium uppercase tracking-[0.12em] text-muted-foreground sm:text-xs">
+          <span className="text-[0.6rem] font-medium uppercase tracking-[0.12em] text-muted-foreground sm:text-[0.65rem]">
             5D Labs · Investor deck
           </span>
-          <span className="text-[0.65rem] text-muted-foreground/50 sm:text-xs" aria-hidden>
+          <span className="text-[0.6rem] text-muted-foreground/50 sm:text-[0.65rem]" aria-hidden>
             ·
           </span>
           <Link
             href="/privacy/"
-            className="text-[0.65rem] text-muted-foreground underline underline-offset-2 transition hover:text-foreground sm:text-xs"
+            className="text-[0.6rem] text-muted-foreground underline underline-offset-2 transition hover:text-foreground sm:text-[0.65rem]"
           >
             Privacy Policy
           </Link>
-          <span className="text-[0.65rem] text-muted-foreground/50 sm:text-xs" aria-hidden>
+          <span className="text-[0.6rem] text-muted-foreground/50 sm:text-[0.65rem]" aria-hidden>
             ·
           </span>
           <Link
             href="/terms/"
-            className="text-[0.65rem] text-muted-foreground underline underline-offset-2 transition hover:text-foreground sm:text-xs"
+            className="text-[0.6rem] text-muted-foreground underline underline-offset-2 transition hover:text-foreground sm:text-[0.65rem]"
           >
             Terms of Service
           </Link>

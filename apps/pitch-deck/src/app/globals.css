@@ -741,8 +741,8 @@
   overflow-y: auto;
   height: 100dvh;
   scroll-behavior: smooth;
-  /* Room for chrome + legal row (+5pt extra clearance) */
-  padding-bottom: calc(7rem + 5pt);
+  /* Room for shorter chrome + legal row (+5pt); footer tightened ~1cm vs prior */
+  padding-bottom: calc(7rem + 5pt - 1cm);
 }
 
 .deck-slide {
