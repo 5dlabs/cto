@@ -2,8 +2,9 @@ services:
   loki:
     image: grafana/loki:3.4.2
     container_name: cto-loki
+    user: "0"
     ports:
-      - "3100:3100"
+      - "${LOKI_PORT:-3100}:3100"
     volumes:
       - ./loki-config.yml:/etc/loki/config.yml:ro
       - loki-data:/loki/data

@@ -2,18 +2,20 @@ auth_enabled: false
 
 server:
   http_listen_port: 3100
+  grpc_listen_port: 9095
 
 common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki/data
+  replication_factor: 1
   ring:
     kvstore:
       store: inmemory
-    replication_factor: 1
-  path_prefix: /loki/data
 
 schema_config:
   configs:
     - from: "2024-01-01"
-      store: boltdb-shipper
+      store: tsdb
       object_store: filesystem
       schema: v13
       index:
@@ -23,13 +25,14 @@ schema_config:
 storage_config:
   filesystem:
     directory: /loki/data/chunks
-  boltdb_shipper:
-    active_index_directory: /loki/data/boltdb-shipper/active
-    cache_location: /loki/data/boltdb-shipper/cache
+  tsdb_shipper:
+    active_index_directory: /loki/data/tsdb-shipper/active
+    cache_location: /loki/data/tsdb-shipper/cache
 
 compactor:
   working_directory: /loki/data/compactor
   retention_enabled: true
+  delete_request_store: filesystem
   retention_delete_delay: 2h
   compaction_interval: 10m
 
@@ -39,3 +42,4 @@ limits_config:
   ingestion_rate_mb: 128
   ingestion_burst_size_mb: 256
   retention_period: 168h
+  allow_structured_metadata: false
