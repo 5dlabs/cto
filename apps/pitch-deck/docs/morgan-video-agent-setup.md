@@ -207,17 +207,23 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 - Table rows include 5D Data / Store / Inference / Observe / Deploy / Vault / Edge with stack notes (CloudNativePG, SeaweedFS, KubeAI, Prom/Grafana/Loki, Argo CD, OpenBao+ESO, Cloudflare+ingress+certs).
 - Catalog reference: cto/services on 5dlabs.ai.
 
+**OpenClaw**
+
+- Agent runtime on the same metal—not a separate silo; same fleet/rails as CTO.
+- Coordinates specialist agents with MCP + toolchains; intake → tasks → Plays.
+- Open-core slice with CTO Lite / community; composes with 5D private-cloud services.
+- Callout: “Open Cloud” in conversation = agents + services on your metal; OpenClaw is the control plane.
+
 **Intake / differentiation**
 
 - Plan before code — Lobster; Stitch + Linear; humans in loop via listening.
 - ROI framing: fewer hires, lower infra bill, faster cycles.
 
-**Trading**
+**Trading engine**
 
-- In-house capital engine (bootstrap only).
-- Chains: Solana, Base, Polygon, Near, Sui — production stack.
-- Low-latency edge without hedge-fund capex.
-- Investor $ is not trading principal.
+- In-house capital & signal; bootstrap only—not a marketed fund; investor $ is not trading principal.
+- Chains: Solana, Base, Polygon, Near, Sui; low-latency RPC/edge (Helius-class); execution discipline aligned with CTO (observe, deploy, heal).
+- Table: chains / edge / capital / positioning (not sold as external fund product).
 
 **Traction**
 

@@ -155,6 +155,21 @@ export const slides: DeckSlide[] = [
       "Hyperscaler-shaped capabilities on hardware you own — run and healed by agents. Full catalog: cto/services on 5dlabs.ai.",
   },
   {
+    id: "openclaw",
+    label: "OpenClaw",
+    headline: "OpenClaw — agent runtime on the same metal",
+    subhead:
+      "Orchestration and playbooks—not a separate product silo. Same fleet, same rails as CTO.",
+    bullets: [
+      "Coordinates specialist agents (PM, implementers, infra, security, …) with shared MCP + toolchains.",
+      "Intake → tasks → Plays: one loop from PRD to merge with humans in the loop where it matters.",
+      "Open-core slice ships with CTO Lite / community—funnels to full stack and bare metal.",
+      "Runs beside the 5D private-cloud services: agents operate the stack, stack hosts the workloads.",
+    ],
+    callout:
+      "If the pitch names “Open Cloud,” read it as this: agents + services on your metal—OpenClaw is the control plane.",
+  },
+  {
     id: "intake",
     label: "Differentiation",
     headline: "Plan before code — keep your mental model",
@@ -168,12 +183,23 @@ export const slides: DeckSlide[] = [
   {
     id: "trading",
     label: "Trading",
-    headline: "In-house capital engine (bootstrap only)",
+    headline: "Trading engine — in-house capital & signal",
+    subhead: "Bootstrap only — not a fund we market; investor capital is not trading principal.",
     bullets: [
-      "Solana, Base, Polygon, Near, Sui — production stack.",
-      "Low-latency edge (Helius-class) without hedge-fund capex.",
-      "Funds experiments + signal — not an external fund product.",
+      "Multi-chain stack in production: Solana, Base, Polygon, Near, Sui.",
+      "Low-latency RPC / edge (Helius-class) without hedge-fund capex.",
+      "Execution + risk workflows on the same infra discipline as CTO—observe, deploy, heal.",
+      "Feeds experiments and on-chain signal; P&L stays inside the studio—not an external product line.",
     ],
+    table: {
+      headers: ["Layer", "What it covers"],
+      rows: [
+        ["Chains", "Solana · Base · Polygon · Near · Sui"],
+        ["Edge", "Low-latency ingress + RPC path"],
+        ["Capital", "Bootstrap only — studio balance sheet"],
+        ["Positioning", "Not sold as a fund or third-party trading product"],
+      ],
+    },
     footnote: "Investor $ is not trading principal.",
   },
   {
