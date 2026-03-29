@@ -57,7 +57,7 @@ Use `design_context` to:
 
 # Task
 
-Generate exactly **{{num_tasks}}** tasks starting from ID **{{next_id}}**, each representing a single deployable unit of work for one agent.
+Generate **{{num_tasks}}** tasks starting from ID **{{next_id}}**, each representing a single deployable unit of work for one agent.
 
 # Process
 

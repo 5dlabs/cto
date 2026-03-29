@@ -122,6 +122,21 @@ export interface LinearClient {
   createAgentActivity(input: AgentActivityCreateInput): Promise<{ id: string }>;
   updateAgentSession(sessionId: string, input: AgentSessionUpdateInput): Promise<void>;
   resolveTeamId(teamIdentifier: string): Promise<string>;
+  /** Poll session activities — returns activities created after `afterCursor` (ISO timestamp) */
+  getSessionActivities(sessionId: string, afterCursor?: string): Promise<SessionActivity[]>;
+  /** Get the authenticated app user ID (cached after first call) */
+  getAppUserId(): Promise<string>;
+  /** Set delegate on an issue if none is currently set */
+  setDelegateIfNone(issueId: string): Promise<boolean>;
+  /** Move issue to first "started" workflow state */
+  moveToStartedStatus(issueId: string): Promise<boolean>;
+}
+
+export interface SessionActivity {
+  id: string;
+  createdAt: string;
+  contentType: string;
+  body?: string;
 }
 
 export function createLinearClient(
@@ -131,6 +146,7 @@ export function createLinearClient(
   // Linear API keys (lin_api_*) are sent directly; OAuth tokens use Bearer prefix
   const authHeader = apiKey.startsWith("lin_api_") ? apiKey : `Bearer ${apiKey}`;
   const teamIdCache = new Map<string, string>();
+  let cachedAppUserId: string | undefined;
 
   function looksLikeUuid(value: string): boolean {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -455,6 +471,165 @@ export function createLinearClient(
 
       if (!data.agentSessionUpdate.success) {
         throw new Error("Failed to update agent session");
+      }
+    },
+
+    async getSessionActivities(sessionId, afterCursor) {
+      interface Response {
+        agentSession: {
+          activities: {
+            nodes: Array<{
+              id: string;
+              createdAt: string;
+              content: { type?: string; body?: string } | { type?: string; action?: string };
+            }>;
+          };
+        };
+      }
+
+      const data = await execute<Response>(
+        `query SessionActivities($id: String!) {
+          agentSession(id: $id) {
+            activities {
+              nodes {
+                id
+                createdAt
+                content {
+                  ... on AgentActivityPromptContent { type body }
+                  ... on AgentActivityResponseContent { type body }
+                  ... on AgentActivityElicitationContent { type body }
+                  ... on AgentActivityThoughtContent { type body }
+                  ... on AgentActivityErrorContent { type body }
+                  ... on AgentActivityActionContent { type action }
+                }
+              }
+            }
+          }
+        }`,
+        { id: sessionId },
+      );
+
+      const nodes = data.agentSession?.activities?.nodes ?? [];
+      const activities: SessionActivity[] = nodes.map(n => ({
+        id: n.id,
+        createdAt: n.createdAt,
+        contentType: (n.content as any)?.type ?? 'unknown',
+        body: (n.content as any)?.body ?? (n.content as any)?.action,
+      }));
+
+      if (afterCursor) {
+        const cutoff = new Date(afterCursor).getTime();
+        return activities.filter(a => new Date(a.createdAt).getTime() > cutoff);
+      }
+      return activities;
+    },
+
+    async getAppUserId() {
+      if (cachedAppUserId) return cachedAppUserId;
+
+      interface Response {
+        viewer: { id: string };
+      }
+
+      const data = await execute<Response>(`query { viewer { id } }`);
+      cachedAppUserId = data.viewer.id;
+      logger.info(`Resolved app user ID: ${cachedAppUserId}`);
+      return cachedAppUserId;
+    },
+
+    async setDelegateIfNone(issueId) {
+      try {
+        interface IssueResponse {
+          issue: { delegate?: { id: string } | null };
+        }
+
+        const issueData = await execute<IssueResponse>(
+          `query GetIssueDelegate($id: String!) {
+            issue(id: $id) { delegate { id } }
+          }`,
+          { id: issueId },
+        );
+
+        if (issueData.issue.delegate) {
+          logger.info(`Issue ${issueId} already has delegate ${issueData.issue.delegate.id}`);
+          return false;
+        }
+
+        const appUserId = await this.getAppUserId();
+
+        interface UpdateResponse {
+          issueUpdate: { success: boolean };
+        }
+
+        const data = await execute<UpdateResponse>(
+          `mutation SetDelegate($id: String!, $input: IssueUpdateInput!) {
+            issueUpdate(id: $id, input: $input) { success }
+          }`,
+          { id: issueId, input: { delegateId: appUserId } },
+        );
+
+        if (data.issueUpdate.success) {
+          logger.info(`Set delegate on issue ${issueId} to app user ${appUserId}`);
+        }
+        return data.issueUpdate.success;
+      } catch (err) {
+        logger.warn(`Failed to set delegate on issue ${issueId}: ${err}`);
+        return false;
+      }
+    },
+
+    async moveToStartedStatus(issueId) {
+      try {
+        interface IssueResponse {
+          issue: {
+            state: { type: string };
+            team: { id: string };
+          };
+        }
+
+        const issueData = await execute<IssueResponse>(
+          `query GetIssueState($id: String!) {
+            issue(id: $id) {
+              state { type }
+              team { id }
+            }
+          }`,
+          { id: issueId },
+        );
+
+        // Only move if currently in a non-started state
+        if (issueData.issue.state.type === 'started') {
+          return false;
+        }
+
+        const states = await this.getWorkflowStates(issueData.issue.team.id);
+        const startedStates = states
+          .filter(s => s.type === 'started')
+          .sort((a, b) => a.position - b.position);
+
+        if (startedStates.length === 0) {
+          logger.warn(`No "started" workflow states found for issue ${issueId}`);
+          return false;
+        }
+
+        interface UpdateResponse {
+          issueUpdate: { success: boolean };
+        }
+
+        const data = await execute<UpdateResponse>(
+          `mutation MoveToStarted($id: String!, $input: IssueUpdateInput!) {
+            issueUpdate(id: $id, input: $input) { success }
+          }`,
+          { id: issueId, input: { stateId: startedStates[0].id } },
+        );
+
+        if (data.issueUpdate.success) {
+          logger.info(`Moved issue ${issueId} to started state "${startedStates[0].name}"`);
+        }
+        return data.issueUpdate.success;
+      } catch (err) {
+        logger.warn(`Failed to move issue ${issueId} to started: ${err}`);
+        return false;
       }
     },
   };

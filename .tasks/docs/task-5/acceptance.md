@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. Use `grpcurl` and `curl` to test all new gRPC and REST endpoints for Inventory, Crew, and Delivery services. 2. Verify that inventory transactions are correctly recorded and stock levels are updated. 3. Confirm crew members can be listed and assigned to projects. 4. Verify delivery schedules can be created and updated. 5. Check that the Google Calendar API stub logs expected calls. 6. Run `staticcheck ./...` to identify potential issues in the Go codebase. 7. Ensure all new database models are correctly created and data integrity is maintained.
+- [ ] 1. Deploy the service to Kubernetes and verify it starts successfully.2. Call `POST /api/v1/vetting/run` with sample organization data and verify a `VettingResult` is stored in PostgreSQL.3. Retrieve vetting results using `GET /api/v1/vetting/:org_id` and confirm the `final_score` is correctly computed based on mock inputs.4. Verify `GET /api/v1/vetting/credit/:org_id` returns expected credit signals.5. Test error handling for failed external API calls (e.g., by simulating an API timeout or error).
 
 ## Verification Notes
 

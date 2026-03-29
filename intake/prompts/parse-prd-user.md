@@ -11,7 +11,7 @@ This is a non-greenfield project. The codebase context above describes existing 
 Research current best practices, stable library versions, and known pitfalls before generating. Apply findings to `details` and `testStrategy` fields.
 {{/research}}
 
-Generate exactly {{num_tasks}} tasks starting from ID {{next_id}}.
+Generate {{num_tasks}} tasks starting from ID {{next_id}}.
 
 Requirements:
 - Agent hints in titles: "(AgentName - Stack)"

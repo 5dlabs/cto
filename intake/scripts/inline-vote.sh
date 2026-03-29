@@ -58,10 +58,31 @@ except subprocess.CalledProcessError as err:
 PY
 }
 
+FALLBACK_SID_FILE="$WS/.intake/linear-session-id.txt"
+LINEAR_SID=""
+if [ -f "$FALLBACK_SID_FILE" ] && [ -s "$FALLBACK_SID_FILE" ]; then
+  LINEAR_SID="$(cat "$FALLBACK_SID_FILE")"
+fi
+
+post_voter_activity() {
+  local EMOJI="$1" NAME="$2" TAGLINE="$3" MODEL="$4" VOTER_OUT="$5"
+  if [ -z "$LINEAR_SID" ] || [ -z "$VOTER_OUT" ]; then return 0; fi
+  local CHOSEN REASONING CONF_PCT CONF_INT SENTIMENT BODY
+  CHOSEN="$(printf '%s' "$VOTER_OUT" | jq -r '.chosen_option // .verdict // "unknown"' 2>/dev/null)"
+  REASONING="$(printf '%s' "$VOTER_OUT" | jq -r '.reasoning // "No reasoning provided."' 2>/dev/null)"
+  CONF_PCT="$(printf '%s' "$VOTER_OUT" | jq -r '(.confidence // 0.6) * 100' 2>/dev/null || echo '60')"
+  CONF_INT="${CONF_PCT%.*}"
+  if [ "$CONF_INT" -ge 80 ] 2>/dev/null; then SENTIMENT="💪"; elif [ "$CONF_INT" -ge 60 ] 2>/dev/null; then SENTIMENT="🤔"; else SENTIMENT="⚠️"; fi
+  BODY="$(printf '## %s %s\n\n> *%s*\n\n**Vote:** %s %s\n**Confidence:** %s%% %s\n**Model:** `%s`\n\n---\n\n%s' \
+    "$EMOJI" "$NAME" "$TAGLINE" "$CHOSEN" "$SENTIMENT" "$CONF_PCT" "$SENTIMENT" "$MODEL" "$REASONING")"
+  intake-util linear-activity --session-id "$LINEAR_SID" --type thought --body "$BODY" 2>/dev/null || true
+}
+
 echo "inline-vote: running voter-1 (architect)" >&2
 V1_OUT=""
 if V1_OUT=$(vote_one "$ROOT/intake/prompts/voter-architect-soul.md" "$V1P" "$V1M" "1"); then
   echo "inline-vote: voter-1 ok" >&2
+  post_voter_activity "🏛️" "Architect" "Evaluating structural integrity and long-term maintainability." "$V1M" "$V1_OUT"
 else
   echo "inline-vote: voter-1 failed (continuing with degraded committee)" >&2
 fi
@@ -70,6 +91,7 @@ echo "inline-vote: running voter-2 (pragmatist)" >&2
 V2_OUT=""
 if V2_OUT=$(vote_one "$ROOT/intake/prompts/voter-pragmatist-soul.md" "$V2P" "$V2M" "2"); then
   echo "inline-vote: voter-2 ok" >&2
+  post_voter_activity "⚖️" "Pragmatist" "Weighing practical trade-offs and real-world constraints." "$V2M" "$V2_OUT"
 else
   echo "inline-vote: voter-2 failed (continuing with degraded committee)" >&2
 fi
@@ -78,6 +100,7 @@ echo "inline-vote: running voter-3 (minimalist)" >&2
 V3_OUT=""
 if V3_OUT=$(vote_one "$ROOT/intake/prompts/voter-minimalist-soul.md" "$V3P" "$V3M" "3"); then
   echo "inline-vote: voter-3 ok" >&2
+  post_voter_activity "✂️" "Minimalist" "Cutting to essential complexity — less is more." "$V3M" "$V3_OUT"
 else
   echo "inline-vote: voter-3 failed (continuing with degraded committee)" >&2
 fi
@@ -126,6 +149,18 @@ else
     jq --arg note "Committee voting degraded: $BALLOT_COUNT/3 ballots available." \
       '.suggestions = ((.suggestions // []) + [$note])' "$TALLY_FILE" > "$TALLY_FILE.tmp" && mv "$TALLY_FILE.tmp" "$TALLY_FILE"
   fi
+fi
+
+# Post tally to Linear
+if [ -n "$LINEAR_SID" ] && [ -f "$TALLY_FILE" ]; then
+  VERDICT="$(jq -r '.verdict // "unknown"' "$TALLY_FILE" 2>/dev/null)"
+  APPROVE_CT="$(jq -r '.vote_breakdown.approve // 0' "$TALLY_FILE" 2>/dev/null)"
+  REVISE_CT="$(jq -r '.vote_breakdown.revise // 0' "$TALLY_FILE" 2>/dev/null)"
+  REJECT_CT="$(jq -r '.vote_breakdown.reject // 0' "$TALLY_FILE" 2>/dev/null)"
+  if [ "$VERDICT" = "approve" ]; then ICON="✅"; elif [ "$VERDICT" = "revise" ]; then ICON="🔄"; else ICON="❌"; fi
+  TALLY_BODY="$(printf '## 🗳️ Committee Verdict: %s %s\n\n| Vote | Count |\n|------|-------|\n| ✅ Approve | %s |\n| 🔄 Revise | %s |\n| ❌ Reject | %s |' \
+    "$VERDICT" "$ICON" "$APPROVE_CT" "$REVISE_CT" "$REJECT_CT")"
+  intake-util linear-activity --session-id "$LINEAR_SID" --type thought --body "$TALLY_BODY" 2>/dev/null || true
 fi
 
 # Keep the historical wrapper shape expected by task-refinement checks.

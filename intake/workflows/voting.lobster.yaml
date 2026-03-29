@@ -7,6 +7,8 @@ description: >
 args:
   audio_debug:
     default: "true"
+  linear_session_id:
+    default: ""
   content_file:
     default: ""
   content_to_evaluate:
@@ -14,17 +16,17 @@ args:
   evaluation_criteria:
     default: ""
   voter_1_provider:
-    default: anthropic
+    default: gemini
   voter_1_model:
-    default: claude-opus-4-6
+    default: gemini-2.5-flash
   voter_2_provider:
-    default: openai
+    default: gemini
   voter_2_model:
-    default: gpt-5.2-pro
+    default: gemini-2.5-flash
   voter_3_provider:
-    default: anthropic
+    default: gemini
   voter_3_model:
-    default: claude-sonnet-4-6
+    default: gemini-2.5-flash
 
 steps:
   - id: voter-1
@@ -123,6 +125,78 @@ steps:
       fi;
       "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
 
+  - id: linear-activity-voter-1
+    env:
+      CTO_VOTER_1: $voter-1.stdout
+    command: |
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID="${linear_session_id}"
+      if [ -z "$LINEAR_SID" ] && [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ]; then
+        LINEAR_SID="$(cat "$FALLBACK_FILE")"
+      fi
+      if [ -z "$LINEAR_SID" ]; then exit 0; fi
+      VOTE_JSON="$(printf '%s' "$CTO_VOTER_1")"
+      CHOSEN="$(printf '%s' "$VOTE_JSON" | jq -r '.chosen_option // .verdict // "unknown"' 2>/dev/null)"
+      REASONING="$(printf '%s' "$VOTE_JSON" | jq -r '.reasoning // "No reasoning provided."' 2>/dev/null)"
+      CONFIDENCE="$(printf '%s' "$VOTE_JSON" | jq -r '.confidence // 0.6' 2>/dev/null)"
+      CONF_PCT="$(echo "$CONFIDENCE * 100" | bc 2>/dev/null || echo '60')"
+      CONF_INT="${CONF_PCT%.*}"
+      if [ "$CONF_INT" -ge 80 ] 2>/dev/null; then SENTIMENT="💪"; elif [ "$CONF_INT" -ge 60 ] 2>/dev/null; then SENTIMENT="🤔"; else SENTIMENT="⚠️"; fi
+      BODY="$(printf '## 🏛️ Architect\n\n> *Evaluating structural integrity and long-term maintainability.*\n\n**Vote:** %s %s\n**Confidence:** %s%% %s\n**Model:** `%s`\n\n---\n\n%s' \
+        "$CHOSEN" "$SENTIMENT" "$CONF_PCT" "$SENTIMENT" "${voter_1_model}" "$REASONING")"
+      intake-util linear-activity \
+        --session-id "$LINEAR_SID" \
+        --type thought \
+        --body "$BODY" || true
+
+  - id: linear-activity-voter-2
+    env:
+      CTO_VOTER_2: $voter-2.stdout
+    command: |
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID="${linear_session_id}"
+      if [ -z "$LINEAR_SID" ] && [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ]; then
+        LINEAR_SID="$(cat "$FALLBACK_FILE")"
+      fi
+      if [ -z "$LINEAR_SID" ]; then exit 0; fi
+      VOTE_JSON="$(printf '%s' "$CTO_VOTER_2")"
+      CHOSEN="$(printf '%s' "$VOTE_JSON" | jq -r '.chosen_option // .verdict // "unknown"' 2>/dev/null)"
+      REASONING="$(printf '%s' "$VOTE_JSON" | jq -r '.reasoning // "No reasoning provided."' 2>/dev/null)"
+      CONFIDENCE="$(printf '%s' "$VOTE_JSON" | jq -r '.confidence // 0.6' 2>/dev/null)"
+      CONF_PCT="$(echo "$CONFIDENCE * 100" | bc 2>/dev/null || echo '60')"
+      CONF_INT="${CONF_PCT%.*}"
+      if [ "$CONF_INT" -ge 80 ] 2>/dev/null; then SENTIMENT="💪"; elif [ "$CONF_INT" -ge 60 ] 2>/dev/null; then SENTIMENT="🤔"; else SENTIMENT="⚠️"; fi
+      BODY="$(printf '## ⚖️ Pragmatist\n\n> *Weighing practical trade-offs and real-world constraints.*\n\n**Vote:** %s %s\n**Confidence:** %s%% %s\n**Model:** `%s`\n\n---\n\n%s' \
+        "$CHOSEN" "$SENTIMENT" "$CONF_PCT" "$SENTIMENT" "${voter_2_model}" "$REASONING")"
+      intake-util linear-activity \
+        --session-id "$LINEAR_SID" \
+        --type thought \
+        --body "$BODY" || true
+
+  - id: linear-activity-voter-3
+    env:
+      CTO_VOTER_3: $voter-3.stdout
+    command: |
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID="${linear_session_id}"
+      if [ -z "$LINEAR_SID" ] && [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ]; then
+        LINEAR_SID="$(cat "$FALLBACK_FILE")"
+      fi
+      if [ -z "$LINEAR_SID" ]; then exit 0; fi
+      VOTE_JSON="$(printf '%s' "$CTO_VOTER_3")"
+      CHOSEN="$(printf '%s' "$VOTE_JSON" | jq -r '.chosen_option // .verdict // "unknown"' 2>/dev/null)"
+      REASONING="$(printf '%s' "$VOTE_JSON" | jq -r '.reasoning // "No reasoning provided."' 2>/dev/null)"
+      CONFIDENCE="$(printf '%s' "$VOTE_JSON" | jq -r '.confidence // 0.6' 2>/dev/null)"
+      CONF_PCT="$(echo "$CONFIDENCE * 100" | bc 2>/dev/null || echo '60')"
+      CONF_INT="${CONF_PCT%.*}"
+      if [ "$CONF_INT" -ge 80 ] 2>/dev/null; then SENTIMENT="💪"; elif [ "$CONF_INT" -ge 60 ] 2>/dev/null; then SENTIMENT="🤔"; else SENTIMENT="⚠️"; fi
+      BODY="$(printf '## ✂️ Minimalist\n\n> *Cutting to essential complexity — less is more.*\n\n**Vote:** %s %s\n**Confidence:** %s%% %s\n**Model:** `%s`\n\n---\n\n%s' \
+        "$CHOSEN" "$SENTIMENT" "$CONF_PCT" "$SENTIMENT" "${voter_3_model}" "$REASONING")"
+      intake-util linear-activity \
+        --session-id "$LINEAR_SID" \
+        --type thought \
+        --body "$BODY" || true
+
   - id: tally
     env:
       CTO_VOTER_1: $voter-1.stdout
@@ -136,3 +210,25 @@ steps:
         --argjson v2 "$(printf '%s' "$CTO_VOTER_2")" \
         --argjson v3 "$(printf '%s' "$CTO_VOTER_3")" \
         '[ $v1, $v2, $v3 ]')"
+
+  - id: linear-activity-tally
+    env:
+      CTO_TALLY: $tally.stdout
+    command: |
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID="${linear_session_id}"
+      if [ -z "$LINEAR_SID" ] && [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ]; then
+        LINEAR_SID="$(cat "$FALLBACK_FILE")"
+      fi
+      if [ -z "$LINEAR_SID" ]; then exit 0; fi
+      VERDICT="$(printf '%s' "$CTO_TALLY" | jq -r '.verdict // "unknown"' 2>/dev/null)"
+      APPROVE_CT="$(printf '%s' "$CTO_TALLY" | jq -r '.approve // 0' 2>/dev/null)"
+      REVISE_CT="$(printf '%s' "$CTO_TALLY" | jq -r '.revise // 0' 2>/dev/null)"
+      REJECT_CT="$(printf '%s' "$CTO_TALLY" | jq -r '.reject // 0' 2>/dev/null)"
+      if [ "$VERDICT" = "approve" ]; then ICON="✅"; elif [ "$VERDICT" = "revise" ]; then ICON="🔄"; else ICON="❌"; fi
+      BODY="$(printf '## 🗳️ Committee Verdict: %s %s\n\n| Vote | Count |\n|------|-------|\n| ✅ Approve | %s |\n| 🔄 Revise | %s |\n| ❌ Reject | %s |' \
+        "$VERDICT" "$ICON" "$APPROVE_CT" "$REVISE_CT" "$REJECT_CT")"
+      intake-util linear-activity \
+        --session-id "$LINEAR_SID" \
+        --type thought \
+        --body "$BODY" || true

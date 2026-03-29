@@ -153,8 +153,23 @@ export function validateGeneric(type: string, input: string, strict: boolean = f
       if (!Array.isArray(parsed)) return { valid: false, errors: ['Expected JSON array'] };
       for (const t of parsed as Array<Record<string, unknown>>) {
         if (!t.id) errors.push(`Task missing 'id'`);
-        if (!Array.isArray(t.subtasks) || (t.subtasks as unknown[]).length === 0) {
+        const subtasks = t.subtasks;
+        if (!Array.isArray(subtasks) || subtasks.length === 0) {
           if (strict) errors.push(`Task ${t.id ?? '?'}: no subtasks`);
+          continue;
+        }
+        for (const [index, raw] of subtasks.entries()) {
+          if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+            errors.push(`Task ${t.id ?? '?'}: subtask ${index + 1} is not an object`);
+            continue;
+          }
+          const st = raw as Record<string, unknown>;
+          if (!st.id && st.id !== 0) errors.push(`Task ${t.id ?? '?'}: subtask ${index + 1} missing 'id'`);
+          if (!st.title) errors.push(`Task ${t.id ?? '?'}: subtask ${st.id ?? index + 1} missing 'title'`);
+          if (!st.description) errors.push(`Task ${t.id ?? '?'}: subtask ${st.id ?? index + 1} missing 'description'`);
+          if (!Array.isArray(st.dependencies)) {
+            errors.push(`Task ${t.id ?? '?'}: subtask ${st.id ?? index + 1} missing 'dependencies' array`);
+          }
         }
       }
       break;

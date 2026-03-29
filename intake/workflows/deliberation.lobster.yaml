@@ -28,11 +28,11 @@ args:
   linear_session_id:
     default: ''
   model_frontier_provider:
-    default: anthropic
+    default: gemini
   model_frontier:
     default: claude-opus-4-6
   voter_1_provider:
-    default: anthropic
+    default: gemini
   voter_1_model:
     default: claude-opus-4-6
   voter_2_provider:
@@ -40,9 +40,9 @@ args:
   voter_2_model:
     default: gpt-5.2-pro
   voter_3_provider:
-    default: anthropic
+    default: gemini
   voter_3_model:
-    default: claude-sonnet-4-6
+    default: gemini-2.5-flash
 
 steps:
   - id: research-prd
@@ -92,6 +92,17 @@ steps:
           }
         }' | "$INTAKE_AGENT_BIN"
 
+  - id: linear-plan-research
+    command: |
+      root="${WORKSPACE:-.}"
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID=""
+      [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ] && LINEAR_SID="$(cat "$FALLBACK_FILE")"
+      [ -z "$LINEAR_SID" ] && [ -n "${linear_session_id}" ] && LINEAR_SID="${linear_session_id}"
+      if [ -n "$LINEAR_SID" ]; then
+        intake-util linear-plan --session-id "$LINEAR_SID" --step delib-research || true
+      fi
+
   - id: init-debate
     command: |
       root="${WORKSPACE:-.}"
@@ -101,6 +112,24 @@ steps:
       jq -n --arg session_id "${session_id}" --arg start "$(date +%s)" --argjson dp_count "$DP_COUNT" \
         '{session_id: $session_id, start_epoch: ($start | tonumber), dp_count: $dp_count}'
 
+  - id: linear-activity-delib-start
+    command: |
+      root="${WORKSPACE:-.}"
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID=""
+      [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ] && LINEAR_SID="$(cat "$FALLBACK_FILE")"
+      [ -z "$LINEAR_SID" ] && [ -n "${linear_session_id}" ] && LINEAR_SID="${linear_session_id}"
+      DP_FILE="$root/.intake/decision-points.json"
+      DP_COUNT=$(jq 'if type=="array" then length else 0 end' "$DP_FILE" 2>/dev/null || echo 0)
+      if [ -n "$LINEAR_SID" ]; then
+        BODY="$(printf '## 🧠 Deliberation Started\n\n**Session:** `%s`\n**Decision points:** %s\n\n**The committee is assembling:**\n⚡ **Optimist** — advocates modern, scalable approaches\n🛡️ **Pessimist** — anchors to proven, operational simplicity\n🏛️ **Architect** — evaluates structural integrity\n⚖️ **Pragmatist** — weighs practical trade-offs\n✂️ **Minimalist** — cuts to essential complexity\n\n---\n\n*Debate is beginning...*' \
+          "${session_id}" "$DP_COUNT")"
+        intake-util linear-activity \
+          --session-id "$LINEAR_SID" \
+          --type thought \
+          --body "$BODY" || true
+      fi
+
   - id: notify-start
     command: |
       root="${WORKSPACE:-.}"
@@ -109,6 +138,17 @@ steps:
       DP_COUNT=$(jq 'if type=="array" then length else 0 end' "$DP_FILE" 2>/dev/null || echo 0)
       echo "🧠 **Deliberation started** — session ${session_id} — ${DP_COUNT} decision points to resolve" | intake-util bridge-notify --from intake --to deliberation \
         --metadata '{"step":"deliberation-start","session_id":"'${session_id}'","dp_count":'$DP_COUNT'}' || true
+
+  - id: linear-plan-optimist
+    command: |
+      root="${WORKSPACE:-.}"
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID=""
+      [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ] && LINEAR_SID="$(cat "$FALLBACK_FILE")"
+      [ -z "$LINEAR_SID" ] && [ -n "${linear_session_id}" ] && LINEAR_SID="${linear_session_id}"
+      if [ -n "$LINEAR_SID" ]; then
+        intake-util linear-plan --session-id "$LINEAR_SID" --step delib-optimist || true
+      fi
 
   - id: optimist-turn
     env:
@@ -204,7 +244,7 @@ steps:
         intake-util linear-activity \
           --session-id "$LINEAR_SID" \
           --type thought \
-          --body "$(printf '**Optimist Position**\n\n%s' "$CTO_OT")" || true
+          --body "$(printf '## ⚡ Optimist\n\n> *Pushing the frontier — modern, scalable, evidence-driven.*\n\n---\n\n%s' "$CTO_OT")" || true
       else
         echo "linear-activity-opt: NO session ID — skipping" >&2
       fi
@@ -218,6 +258,17 @@ steps:
       jq -n --arg content "$(printf '%s' "$CTO_OT")" --arg speaker optimist \
         '{content: $content, speaker: $speaker}' |
       intake-util parse-decision-points
+
+  - id: linear-plan-pessimist
+    command: |
+      root="${WORKSPACE:-.}"
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID=""
+      [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ] && LINEAR_SID="$(cat "$FALLBACK_FILE")"
+      [ -z "$LINEAR_SID" ] && [ -n "${linear_session_id}" ] && LINEAR_SID="${linear_session_id}"
+      if [ -n "$LINEAR_SID" ]; then
+        intake-util linear-plan --session-id "$LINEAR_SID" --step delib-pessimist || true
+      fi
 
   - id: pessimist-turn
     env:
@@ -316,7 +367,7 @@ steps:
         intake-util linear-activity \
           --session-id "$LINEAR_SID" \
           --type thought \
-          --body "$(printf '**Pessimist Response**\n\n%s' "$CTO_PT")" || true
+          --body "$(printf '## 🛡️ Pessimist\n\n> *Anchoring to proven ground — operational simplicity, named failure modes.*\n\n---\n\n%s' "$CTO_PT")" || true
       else
         echo "linear-activity-pes: NO session ID — skipping" >&2
       fi
@@ -354,6 +405,17 @@ steps:
           ],
           pending: [($opt + $pes) | group_by(.id)[] | select(length == 1) | .[0]]
         }'
+
+  - id: linear-plan-vote
+    command: |
+      root="${WORKSPACE:-.}"
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID=""
+      [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ] && LINEAR_SID="$(cat "$FALLBACK_FILE")"
+      [ -z "$LINEAR_SID" ] && [ -n "${linear_session_id}" ] && LINEAR_SID="${linear_session_id}"
+      if [ -n "$LINEAR_SID" ]; then
+        intake-util linear-plan --session-id "$LINEAR_SID" --step delib-vote || true
+      fi
 
   - id: vote-all-dps
     env:
@@ -401,7 +463,8 @@ steps:
           --arg voter_3_provider "${voter_3_provider}" \
           --arg voter_3_model "${voter_3_model}" \
           --arg audio_debug "${audio_debug}" \
-          '{question: $question, optimist_position: $optimist_position, pessimist_position: $pessimist_position, context_file: $context_file, question_file: $question_file, optimist_file: $optimist_file, pessimist_file: $pessimist_file, decision_id: $decision_id, session_id: $session_id, human_review_mode: $human_review_mode, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, audio_debug: $audio_debug}')
+          --arg linear_session_id "${linear_session_id}" \
+          '{question: $question, optimist_position: $optimist_position, pessimist_position: $pessimist_position, context_file: $context_file, question_file: $question_file, optimist_file: $optimist_file, pessimist_file: $pessimist_file, decision_id: $decision_id, session_id: $session_id, human_review_mode: $human_review_mode, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, audio_debug: $audio_debug, linear_session_id: $linear_session_id}')
         VOTE_OK=false
         VOTE_OUT=""
         for ATTEMPT in 1 2 3 4 5; do
@@ -512,11 +575,17 @@ steps:
       ')
       BODY=$(printf '%s' "$CTO_ASSEMBLE_RESULT" | jq -r '
         . as $r |
-        "Status: " + ($r.status | ascii_upcase) + " | Turns: " + ($r.debate_turns | tostring) + " | Duration: " + ($r.elapsed_minutes | tostring) + " min\n"
-        + "Resolved: " + (($r.resolved_decisions | length) | tostring) + " of " + (($r.decision_points | length) | tostring) + "\n"
-        + ([($r.resolved_decisions // [])[] |
-            "- " + (.decision_id // .id // "?") + ": " + (.winning_option // "n/a" | tostring | gsub("\\s+"; " ") | .[0:120])
-          ] | join("\n"))
+        "## 🏁 Deliberation Complete\n\n"
+        + "| Metric | Value |\n|--------|-------|\n"
+        + "| Status | " + ($r.status | ascii_upcase) + " |\n"
+        + "| Turns | " + ($r.debate_turns | tostring) + " |\n"
+        + "| Duration | " + ($r.elapsed_minutes | tostring) + " min |\n"
+        + "| Resolved | " + (($r.resolved_decisions | length) | tostring) + " of " + (($r.decision_points | length) | tostring) + " |\n\n"
+        + (if (($r.resolved_decisions // []) | length) > 0 then
+            "### Decisions\n\n" + ([($r.resolved_decisions // [])[] |
+              "✅ **" + (.decision_id // .id // "?") + "**: " + (.winning_option // "n/a" | tostring | gsub("\\s+"; " ") | .[0:120])
+            ] | join("\n")) + "\n"
+          else "⚠️ No decisions resolved.\n" end)
       ')
       FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
       LINEAR_SID=""
@@ -535,6 +604,17 @@ steps:
           --body "$(printf '**%s**\n\n%s' "$TITLE" "$BODY")" || true
       else
         echo "linear-activity-complete: NO session ID — skipping" >&2
+      fi
+
+  - id: linear-plan-compile
+    command: |
+      root="${WORKSPACE:-.}"
+      FALLBACK_FILE="${WORKSPACE:-.}/.intake/linear-session-id.txt"
+      LINEAR_SID=""
+      [ -f "$FALLBACK_FILE" ] && [ -s "$FALLBACK_FILE" ] && LINEAR_SID="$(cat "$FALLBACK_FILE")"
+      [ -z "$LINEAR_SID" ] && [ -n "${linear_session_id}" ] && LINEAR_SID="${linear_session_id}"
+      if [ -n "$LINEAR_SID" ]; then
+        intake-util linear-plan --session-id "$LINEAR_SID" --step delib-compile || true
       fi
 
   - id: compile-brief

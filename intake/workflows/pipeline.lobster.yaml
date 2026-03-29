@@ -77,11 +77,11 @@ steps:
       r = {}
       for k in ['primary','fast','frontier']:
         d = t.get(k,{})
-        r[k+'_provider'] = d.get('provider','anthropic')
-        r[k+'_model'] = d.get('model','claude-sonnet-4-6')
+        r[k+'_provider'] = d.get('provider','gemini')
+        r[k+'_model'] = d.get('model','gemini-2.5-flash')
       for i,v in enumerate(cm):
-        r['voter_%d_provider'%(i+1)] = v.get('provider','anthropic')
-        r['voter_%d_model'%(i+1)] = v.get('model','claude-sonnet-4-6')
+        r['voter_%d_provider'%(i+1)] = v.get('provider','gemini')
+        r['voter_%d_model'%(i+1)] = v.get('model','gemini-2.5-flash')
       lin = c.get('defaults',{}).get('linear',{})
       r['linear_team_id'] = lin.get('teamId','')
       print(json.dumps(r))
@@ -508,6 +508,21 @@ steps:
         jq -nc '{linear_session_id: ""}'
         exit 0
       fi
+      # Dismiss any existing agent sessions before creating new ones
+      MORGAN_OAUTH="$(op read 'op://Automation/Linear Morgan OAuth/developer_token' 2>/dev/null)" || true
+      if [ -n "$MORGAN_OAUTH" ]; then
+        NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        EXISTING="$(curl -s -X POST https://api.linear.app/graphql \
+          -H "Authorization: Bearer $MORGAN_OAUTH" -H "Content-Type: application/json" \
+          --data-raw '{"query":"{ agentSessions(first: 20) { nodes { id dismissedAt issue { identifier } } } }"}')"
+        printf '%s' "$EXISTING" | jq -r --arg ident "$ISSUE_REF" \
+          '.data.agentSessions.nodes[] | select(.dismissedAt == null) | select(.issue.identifier == $ident) | .id' 2>/dev/null | while read -r OLD_SID; do
+          curl -s -X POST https://api.linear.app/graphql \
+            -H "Authorization: Bearer $MORGAN_OAUTH" -H "Content-Type: application/json" \
+            --data-raw "{\"query\":\"mutation { agentSessionUpdate(id: \\\"$OLD_SID\\\", input: { dismissedAt: \\\"$NOW\\\" }) { success } }\"}" >/dev/null 2>&1
+          echo "ensure-linear-session: dismissed old session $OLD_SID" >&2
+        done
+      fi
       code=$(curl -sS -o /tmp/linear_session_create_$$.json -w '%{http_code}' \
         -H "Authorization: Bearer ${LINEAR_API_KEY:?LINEAR_API_KEY required}" \
         -H "Content-Type: application/json" \
@@ -531,6 +546,21 @@ steps:
       printf '%s' "$sid" > "$SESSION_FILE"
       echo "ensure-linear-session: SUCCESS session=$sid (written to $SESSION_FILE)" >&2
       jq -nc --arg sid "$sid" '{linear_session_id: $sid}'
+
+  - id: session-url-repo
+    env:
+      CTO_ENSURE_LINEAR_SESSION_JSON: $ensure-linear-session.stdout
+      CTO_SETUP_REPO_JSON: $setup-repo.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      SESSION_ID="$(printf '%s' "$CTO_ENSURE_LINEAR_SESSION_JSON" | jq -r '.linear_session_id // empty' 2>/dev/null || true)"
+      REPO_URL="$(printf '%s' "$CTO_SETUP_REPO_JSON" | jq -r '.repository_url // empty' 2>/dev/null || true)"
+      REPO_WEB="$(printf '%s' "$REPO_URL" | sed -E 's#\.git$##')"
+      if [ -n "$SESSION_ID" ] && [ -n "$REPO_WEB" ]; then
+        intake-util linear-session update-urls \
+          --session-id "$SESSION_ID" \
+          --add-url "Repository=${REPO_WEB}" || true
+      fi
 
   - id: build-infra-context
     env:
@@ -623,18 +653,26 @@ steps:
         "stitch_status=" + (.stitch.status // "unknown"),
         "stitch_reason=" + (.stitch.reason // "")
       ] | join("; ")' "$WS/.intake/design/design-context.json" 2>/dev/null || printf '')"
+      EFFECTIVE_NUM_TASKS="${num_tasks}"
+      if [ "$EFFECTIVE_NUM_TASKS" = "0" ] || [ -z "$EFFECTIVE_NUM_TASKS" ]; then
+        EFFECTIVE_NUM_TASKS="0"
+        NUM_TASKS_INSTRUCTION="as many tasks as the project scope requires (aim for thorough granularity — one task per deployable unit of work)"
+      else
+        NUM_TASKS_INSTRUCTION="exactly ${EFFECTIVE_NUM_TASKS}"
+      fi
       ARGS=$(jq -n \
         --rawfile sys "$WS/intake/prompts/parse-prd-system.md" \
         --rawfile usr "$WS/intake/prompts/parse-prd-user.md" \
         --rawfile prd "$PRD_FILE" \
         --arg codebase "$CODEBASE_CTX" \
         --arg design_context "$DESIGN_CONTEXT_BRIEF" \
-        --arg num_tasks "${num_tasks}" \
+        --arg num_tasks "$NUM_TASKS_INSTRUCTION" \
+        --argjson num_tasks_raw "$EFFECTIVE_NUM_TASKS" \
         --arg schema "$WS/intake/schemas/generated-task.schema.json" \
         --arg provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" \
         --arg model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')" \
         '{ "prompt": ($sys + "\n\n" + $usr),
-           "input": { "prd_content": $prd, "codebase_context": $codebase, "design_context": $design_context, "num_tasks": ($num_tasks | tonumber), "next_id": 1 },
+           "input": { "prd_content": $prd, "codebase_context": $codebase, "design_context": $design_context, "num_tasks": (if $num_tasks_raw > 0 then $num_tasks_raw else "auto" end), "num_tasks_instruction": $num_tasks, "next_id": 1 },
            "schema": $schema, "provider": $provider, "model": $model }') || {
         echo "initial-parse-prd: failed to build LLM args — falling back to empty tasks" >&2
         printf '[]'; exit 0
@@ -814,17 +852,80 @@ steps:
       "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "design-deliberation" "${audio_debug}" "project ${project_name}"
       DESIGN_DPS=$(printf '%s' "$CTO_SPLIT_DPS_JSON" | jq -c '.design_decision_points // []')
       DESIGN_COUNT=$(printf '%s' "$CTO_SPLIT_DPS_JSON" | jq -r '.design_count // 0')
-      echo "design-deliberation-pipeline: DESIGN_COUNT=$DESIGN_COUNT, DESIGN_DPS_LEN=$(printf '%s' "$DESIGN_DPS" | wc -c | tr -d ' ')" >&2
-      if [ "$DESIGN_COUNT" -eq 0 ]; then
-        echo "design-deliberation: no design decision points — skipping" >&2
+      STITCH_FILE="$WS/.intake/design/stitch/candidates.json"
+      STITCH_COUNT=0
+      [ -f "$STITCH_FILE" ] && STITCH_COUNT="$(jq 'length' "$STITCH_FILE" 2>/dev/null || echo 0)"
+      echo "design-deliberation-pipeline: DESIGN_COUNT=$DESIGN_COUNT STITCH_COUNT=$STITCH_COUNT" >&2
+
+      if [ "$DESIGN_COUNT" -eq 0 ] && [ "$STITCH_COUNT" -eq 0 ]; then
+        echo "design-deliberation: no design decision points or mockups — skipping" >&2
         jq -nc '{skipped: true, design_decisions: []}'
         exit 0
       fi
+
+      # Create a SEPARATE Linear agent session for design deliberation (parallel to intake)
+      PRD_ISSUE_ID="$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.prdIssueId // empty')"
+      PRD_IDENTIFIER="$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.prdIdentifier // empty')"
+      ISSUE_REF="${PRD_ISSUE_ID:-$PRD_IDENTIFIER}"
+      DESIGN_LINEAR_SID=""
+      DESIGN_SESSION_FILE="$WS/.intake/design-linear-session-id.txt"
+      if [ -n "$ISSUE_REF" ]; then
+        DESIGN_RESP="$(curl -sS \
+          -H "Authorization: Bearer ${LINEAR_API_KEY:?}" \
+          -H "Content-Type: application/json" \
+          -d "$(jq -nc --arg issue "$ISSUE_REF" \
+            '{query:"mutation Create($input: AgentSessionCreateOnIssue!){ agentSessionCreateOnIssue(input:$input){ success agentSession { id } } }", variables:{input:{issueId:$issue}}}')" \
+          https://api.linear.app/graphql 2>/dev/null)"
+        DESIGN_LINEAR_SID="$(printf '%s' "$DESIGN_RESP" | jq -r '.data.agentSessionCreateOnIssue.agentSession.id // empty')"
+        echo "design-deliberation: created PARALLEL session=$DESIGN_LINEAR_SID" >&2
+      fi
+      if [ -n "$DESIGN_LINEAR_SID" ]; then
+        printf '%s' "$DESIGN_LINEAR_SID" > "$DESIGN_SESSION_FILE"
+      fi
+
+      # Post assembly intro to the design session
+      if [ -n "$DESIGN_LINEAR_SID" ]; then
+        INTRO_BODY="$(printf '## 🎨 Design Deliberation\n\n**Mockups:** %s\n**Decision points:** %s\n\n**The design team is assembling:**\n🎨 **Designer** — crafting the visual identity\n🏛️ **Architect** — structural review\n⚖️ **Pragmatist** — practical constraints\n\n---\n\n*Reviewing design mockups and presenting options...*' \
+          "$STITCH_COUNT" "$DESIGN_COUNT")"
+        intake-util linear-activity --session-id "$DESIGN_LINEAR_SID" --type thought --body "$INTRO_BODY" 2>/dev/null || true
+      fi
+
+      # Post Stitch mockups to the DESIGN session (screenshot + upload to Linear)
+      if [ "$STITCH_COUNT" -gt 0 ] && [ -n "$DESIGN_LINEAR_SID" ]; then
+        SCREENSHOT_DIR="$WS/.intake/design/stitch/screenshots"
+        mkdir -p "$SCREENSHOT_DIR"
+        for i in $(seq 0 $((STITCH_COUNT - 1))); do
+          HTML_URL="$(jq -r ".[$i].htmlUrl // empty" "$STITCH_FILE")"
+          DEVICE="$(jq -r ".[$i].deviceType // \"unknown\"" "$STITCH_FILE")"
+          TARGET="$(jq -r ".[$i].target // \"unknown\"" "$STITCH_FILE")"
+          RATIONALE="$(jq -r ".[$i].rationale // \"\"" "$STITCH_FILE")"
+          SCREEN_ID="$(jq -r ".[$i].screenId // \"unknown\"" "$STITCH_FILE")"
+          HTML_LOCAL="$SCREENSHOT_DIR/mockup-$((i+1))-${DEVICE}.html"
+          if [ -n "$HTML_URL" ]; then
+            curl -sL "$HTML_URL" -o "$HTML_LOCAL" 2>/dev/null || true
+          fi
+          # Screenshot and upload to Linear
+          IMG_MARKDOWN=""
+          if [ -f "$HTML_LOCAL" ]; then
+            UPLOAD_JSON="$("$WS/intake/scripts/upload-mockup-to-linear.sh" "$HTML_LOCAL" "$DEVICE" 2>/dev/null)" || true
+            ASSET_URL="$(printf '%s' "$UPLOAD_JSON" | jq -r '.assetUrl // empty' 2>/dev/null)"
+            if [ -n "$ASSET_URL" ]; then
+              IMG_MARKDOWN="$(printf '\n\n![%s mockup — %s](%s)\n' "$TARGET" "$DEVICE" "$ASSET_URL")"
+            fi
+          fi
+          MOCK_BODY="$(printf '## 🎨 Designer\n\n> *Crafting the visual identity — form follows function.*\n\n**Mockup %d:** %s (%s)\n**Screen:** `%s`%s\n\n%s' \
+            "$((i + 1))" "$TARGET" "$DEVICE" "$SCREEN_ID" "$IMG_MARKDOWN" "$RATIONALE")"
+          intake-util linear-activity --session-id "$DESIGN_LINEAR_SID" --type thought --body "$MOCK_BODY" 2>/dev/null || true
+        done
+      fi
+
       RUN_TS=$(date +%s)
       SESSION_ID="${project_name}-design-${RUN_TS}"
-      LINEAR_SID="$(printf '%s' "$CTO_ENSURE_LINEAR_SESSION_JSON" | jq -r '.linear_session_id // empty')"
-      echo "design-deliberation-pipeline: LINEAR_SID='${LINEAR_SID}' from ensure-linear-session" >&2
-      echo "design-deliberation-pipeline: CTO_ENSURE_LINEAR_SESSION_JSON='$(printf '%s' "$CTO_ENSURE_LINEAR_SESSION_JSON" | head -c 200)'" >&2
+      LINEAR_SID="${DESIGN_LINEAR_SID}"
+      if [ -z "$LINEAR_SID" ]; then
+        LINEAR_SID="$(printf '%s' "$CTO_ENSURE_LINEAR_SESSION_JSON" | jq -r '.linear_session_id // empty')"
+      fi
+      echo "design-deliberation-pipeline: LINEAR_SID='${LINEAR_SID}' (design session)" >&2
       PRD_IDENT="$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.prdIdentifier // empty')"
       LINEAR_ISSUE_URL=""
       if [ -n "$PRD_IDENT" ]; then
@@ -955,6 +1056,15 @@ steps:
         "🤖 Agents standing by for assignments."')
       META=$(jq -nc --arg step "task-gen-start" --arg pn "${project_name}" '{step:$step,project_name:$pn}')
       echo "$MSG" | intake-util bridge-notify --from intake --to deliberation --metadata "$META" || true
+      # Rich Linear activity: pipeline context with project overview
+      TASKS_LABEL="${num_tasks}"
+      [ "$TASKS_LABEL" = "0" ] || [ -z "$TASKS_LABEL" ] && TASKS_LABEL="auto (model decides)"
+      BODY=$(printf '## Pipeline: Task Generation\n\n**Project:** %s\n**Tasks requested:** %s\n**Design deliberation:** %s\n\n---\n\nParsing PRD and analyzing task complexity...' \
+        "${project_name}" "$TASKS_LABEL" "$DESIGN_STATUS")
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --type thought \
+        --body "$BODY" || true
 
   - id: quality-gate-deliberation
     env:
@@ -996,11 +1106,11 @@ steps:
     command: |
       WS="${WORKSPACE:-.}"
       "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "gateway-health-check" "${audio_debug}" "project ${project_name}"
-      if ! openclaw.invoke --tool llm-task --action json --args-json '{"prompt":"ping","input":{},"provider":"anthropic","model":"claude-sonnet-4-6"}' >/dev/null 2>&1; then
+      if ! openclaw.invoke --tool llm-task --action json --args-json '{"prompt":"ping","input":{},"provider":"gemini","model":"gemini-2.5-flash"}' >/dev/null 2>&1; then
         echo "gateway-health-check: OpenClaw gateway unhealthy — restarting..." >&2
         pkill -f openclaw-gateway 2>/dev/null || true
         sleep 3
-        if ! openclaw.invoke --tool llm-task --action json --args-json '{"prompt":"ping","input":{},"provider":"anthropic","model":"claude-sonnet-4-6"}' >/dev/null 2>&1; then
+        if ! openclaw.invoke --tool llm-task --action json --args-json '{"prompt":"ping","input":{},"provider":"gemini","model":"gemini-2.5-flash"}' >/dev/null 2>&1; then
           echo "gateway-health-check: gateway still unhealthy after restart — proceeding anyway" >&2
         else
           echo "gateway-health-check: gateway recovered after restart" >&2
@@ -1065,11 +1175,9 @@ steps:
       LOAD_CFG="$(printf '%s' "$CTO_LOAD_CONFIG_JSON")"
       INTAKE_MODEL_PRIMARY_PROVIDER="$(printf '%s' "$LOAD_CFG" | jq -r '.primary_provider')"
       INTAKE_MODEL_PRIMARY="$(printf '%s' "$LOAD_CFG" | jq -r '.primary_model')"
-      # Fast profile: when deliberate=false, prefer fast tier for intake generation reliability.
-      if [ "${deliberate}" != "true" ] && [ "${deliberate}" != "1" ]; then
-        INTAKE_MODEL_PRIMARY_PROVIDER="$(printf '%s' "$LOAD_CFG" | jq -r '.fast_provider')"
-        INTAKE_MODEL_PRIMARY="$(printf '%s' "$LOAD_CFG" | jq -r '.fast_model')"
-      fi
+      # Always use the primary model for task generation/refinement.
+      # Fast models produce corrupted subtask arrays; fast tier is still used
+      # for fan-out docs/prompts which are simpler generation tasks.
       ARGS=$(jq -n \
         --arg prd_path ".tasks/docs/prd.txt" \
         --arg num_tasks_raw "${num_tasks}" \

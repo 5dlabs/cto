@@ -1,9 +1,9 @@
 name: implement-task-5
 metadata:
   task_id: 5
-  agent: Grizz
-  stack: Go/gRPC
-  depends_on_tasks: [1, 4]
+  agent: rex
+  stack: Rust/Axum
+  depends_on_tasks: [1]
 
 inputs:
   - name: task_dir
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-5/feature-branch"
   - name: agent
-    default: "Grizz"
+    default: "rex"
   - name: cli
     default: "claude"
   - name: model
@@ -37,10 +37,58 @@ steps:
     depends_on: [implement-subtask-5001]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && go vet ./... && go test ./... && golangci-lint run
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-5002
+    depends_on: [validate-subtask-5001]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5002/prompt.md
+
+  - name: validate-subtask-5002
+    depends_on: [implement-subtask-5002]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-5003
+    depends_on: [validate-subtask-5002]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5003/prompt.md
+
+  - name: validate-subtask-5003
+    depends_on: [implement-subtask-5003]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-5004
+    depends_on: [validate-subtask-5002]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5004/prompt.md
+
+  - name: validate-subtask-5004
+    depends_on: [implement-subtask-5004]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-5005
+    depends_on: [validate-subtask-5003, validate-subtask-5004]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5005/prompt.md
+
+  - name: validate-subtask-5005
+    depends_on: [implement-subtask-5005]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: integration-validation
-    depends_on: [validate-subtask-5001]
+    depends_on: [validate-subtask-5001, validate-subtask-5002, validate-subtask-5003, validate-subtask-5004, validate-subtask-5005]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

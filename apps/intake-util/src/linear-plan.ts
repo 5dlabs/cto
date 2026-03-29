@@ -1,6 +1,19 @@
 /**
  * linear-plan — Update Linear agent session plan (progress checklist).
+ *
+ * Accepts plan steps via:
+ *   --plan-json <json-string>   Inline JSON array of {content, status} objects
+ *   --plan-json -               Read JSON array from stdin
+ *   --step <step-id>            Use canonical PIPELINE_STEPS and auto-compute statuses
+ *
+ * Requires:
+ *   --session-id <id>           Linear agent session ID
+ *
+ * Error handling is non-fatal by design — callers should append `|| true`
+ * and the function itself catches and logs rather than throwing.
  */
+
+import { buildPlan } from './plan-steps';
 
 const LINEAR_API_URL = 'https://api.linear.app/graphql';
 
@@ -34,4 +47,26 @@ export async function linearPlan(args: LinearPlanArgs): Promise<void> {
   const json = await res.json() as { data?: { agentSessionUpdate: { success: boolean } }; errors?: Array<{ message: string }> };
   if (json.errors?.length) throw new Error(`GraphQL: ${json.errors.map(e => e.message).join(', ')}`);
   if (!json.data?.agentSessionUpdate.success) throw new Error('Failed to update session plan');
+}
+
+/**
+ * Build plan steps from either --plan-json or --step flag.
+ * Returns null if neither is provided.
+ */
+export function resolvePlanSteps(
+  planJson: string | undefined,
+  stepId: string | undefined,
+  stdinContent?: string,
+): PlanStep[] | null {
+  if (stepId) {
+    return buildPlan(stepId) as PlanStep[];
+  }
+
+  if (planJson) {
+    const raw = planJson === '-' ? (stdinContent ?? '') : planJson;
+    if (!raw.trim()) return null;
+    return JSON.parse(raw) as PlanStep[];
+  }
+
+  return null;
 }

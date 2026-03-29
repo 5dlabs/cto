@@ -1,22 +1,27 @@
-Implement task 6: Finance Service - Database & Core Invoicing API (Rex - Rust/Axum)
+Implement task 6: Implement Morgan AI Agent Core (Angie - OpenClaw/MCP)
 
 ## Goal
-Develop the core Finance service, establishing its PostgreSQL database schema and implementing initial API endpoints for invoice creation, listing, retrieval, and status updates. This lays the groundwork for financial operations.
+Develop the core Morgan AI agent, integrating Signal, voice (ElevenLabs/Twilio), and web chat capabilities. This task focuses on the agent's ability to understand natural language and utilize backend services via MCP tools.
 
 ## Task Context
-- Agent owner: Rex
-- Stack: Rust/Axum
+- Agent owner: angie
+- Stack: OpenClaw/MCP
 - Priority: high
-- Dependencies: 1
+- Dependencies: 1, 2, 3, 4, 5
 
 ## Implementation Plan
-1. Initialize a new Rust Axum 0.7 project. 2. Define the PostgreSQL schema for `Invoice` and `Payment` data models, including `id`, `project_id`, `org_id`, `invoice_number`, `status`, `issued_at`, `due_at`, `currency`, `subtotal_cents`, `tax_cents`, `total_cents`, `paid_amount_cents`, `stripe_invoice_id` for invoices, and `id`, `invoice_id`, `amount_cents`, `currency`, `method`, `stripe_payment_id`, `received_at` for payments. Use `sqlx` for database interactions. 3. Implement API endpoints: `POST /api/v1/invoices` (create new invoice), `GET /api/v1/invoices` (list invoices), `GET /api/v1/invoices/:id` (get invoice details). 4. Implement endpoints for invoice status updates: `POST /api/v1/invoices/:id/send` (mark as sent), `POST /api/v1/invoices/:id/paid` (record payment). 5. Configure the service to connect to PostgreSQL using credentials from the 'sigma1-infra-endpoints' ConfigMap. Ensure proper error handling, input validation, and currency handling. Use Rust 1.75+.
+1. Deploy the `morgan` OpenClaw agent to the `openclaw` namespace, configuring it to use `openai-api/gpt-5.4-pro` as the model.2. Set up Signal-CLI (as a sidecar or separate pod) and integrate it with the Morgan agent for receiving and sending messages/photos.3. Integrate ElevenLabs for natural voice synthesis and Twilio for SIP/PSTN voice calls, configuring necessary API keys and webhooks.4. Define and implement the following MCP tools, ensuring they correctly call the respective backend services:    - `sigma1_catalog_search` (calls Equipment Catalog Service, Task 2)    - `sigma1_check_availability` (calls Equipment Catalog Service, Task 2)    - `sigma1_generate_quote` (calls RMS Service, Task 3)    - `sigma1_vet_customer` (calls Customer Vetting Service, Task 5)    - `sigma1_score_lead` (calls Customer Vetting Service, Task 5)    - `sigma1_create_invoice` (calls Finance Service, Task 4)    - `sigma1_finance_report` (calls Finance Service, Task 4)5. Implement initial skills: `sales-qual` (using `sigma1_vet_customer`, `sigma1_score_lead`) and `quote-gen` (using `sigma1_catalog_search`, `sigma1_check_availability`, `sigma1_generate_quote`).6. Configure Cloudflare Tunnel for secure external access to the Morgan agent's web chat interface and webhooks.
 
 ## Acceptance Criteria
-1. Deploy the service and verify it starts successfully, connecting to PostgreSQL. 2. Use `curl` or Postman to create a new invoice via `POST /api/v1/invoices` and verify it appears in `GET /api/v1/invoices` and `GET /api/v1/invoices/:id`. 3. Update an invoice status via `POST /api/v1/invoices/:id/send` and `POST /api/v1/invoices/:id/paid`, verifying the status changes in the database and via `GET /api/v1/invoices/:id`. 4. Verify API responses conform to expected JSON structures and handle invalid inputs gracefully. 5. Run `cargo test` and `cargo clippy` to ensure code quality and correctness.
+1. Verify the Morgan agent pod is running and accessible.2. Send a test message via Signal to Morgan and confirm a response is received.3. Initiate a voice call via Twilio/ElevenLabs and verify Morgan can respond verbally.4. Test `sales-qual` skill: Send a natural language query like 'Can you qualify a new lead for me?' and verify Morgan triggers `sigma1_vet_customer` and `sigma1_score_lead` tools, returning a lead score.5. Test `quote-gen` skill: Ask Morgan to 'Generate a quote for 5 projectors for next week' and verify it uses `sigma1_catalog_search`, `sigma1_check_availability`, and `sigma1_generate_quote` tools, providing a quote ID.6. Confirm Cloudflare Tunnel is correctly routing traffic to the Morgan agent.
 
 ## Subtasks
-- Implement Finance Service - Database & Core Invoicing API (Rex - Rust/Axum): Develop the core Finance service, establishing its PostgreSQL database schema and implementing initial API endpoints for invoice creation, listing, retrieval, and status updates. This lays the groundwork for financial operations.
+- Deploy Morgan OpenClaw agent and configure LLM: Deploy the `morgan` OpenClaw agent to the `openclaw` Kubernetes namespace and configure it to use `openai-api/gpt-5.4-pro` as its underlying language model.
+- Integrate Signal-CLI for messaging: Set up Signal-CLI integration with the Morgan agent for receiving and sending messages and photos.
+- Integrate ElevenLabs and Twilio for voice communication: Integrate ElevenLabs for natural voice synthesis and Twilio for SIP/PSTN voice calls, configuring necessary API keys and webhooks.
+- Implement MCP tools for Catalog and Customer Vetting services: Define and implement OpenClaw MCP tools `sigma1_catalog_search`, `sigma1_check_availability`, `sigma1_vet_customer`, and `sigma1_score_lead` to interact with the Equipment Catalog and Customer Vetting services.
+- Implement MCP tools for RMS and Finance services: Define and implement OpenClaw MCP tools `sigma1_generate_quote`, `sigma1_create_invoice`, and `sigma1_finance_report` to interact with the RMS and Finance services.
+- Develop core AI skills and configure Cloudflare Tunnel: Implement the `sales-qual` and `quote-gen` AI skills, and configure Cloudflare Tunnel for secure external access to the Morgan agent's web chat interface and webhooks.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

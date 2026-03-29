@@ -1,17 +1,22 @@
-## RMS Service - Core gRPC & REST Gateway (Grizz - Go/gRPC)
+## Develop Finance Service (Rex - Rust/Axum)
 
 ### Objective
-Develop the core Rental Management System (RMS) service, focusing on Opportunity and Project management. This includes defining protobuf schemas, implementing gRPC services, and exposing them via a RESTful grpc-gateway.
+Implement the Finance Service for invoicing, payments, and financial reporting. This service replaces traditional accounting software and integrates with the RMS for project-based invoicing.
 
 ### Ownership
-- Agent: Grizz
-- Stack: Go/gRPC
+- Agent: rex
+- Stack: Rust/Axum
 - Priority: high
 - Status: pending
-- Dependencies: 1
+- Dependencies: 1, 3
 
 ### Implementation Details
-1. Initialize a new Go 1.22+ gRPC project. 2. Define protobuf schemas for `OpportunityService` and `ProjectService`, including `CreateOpportunityRequest`, `GetOpportunityRequest`, `UpdateOpportunityRequest`, `ListOpportunitiesRequest`, `ScoreLeadRequest`, `CreateProjectRequest`, `GetProjectRequest`, `UpdateProjectRequest`. 3. Generate Go code from protobuf definitions. 4. Implement the gRPC server for `OpportunityService` and `ProjectService`, including methods for creating, retrieving, updating, and listing opportunities and projects. Implement `ScoreLead` as a placeholder. 5. Define the PostgreSQL schema for `Opportunity` and `Project` data models, including `ID`, `CustomerID`, `Status`, `EventDateStart`, `EventDateEnd`, `Venue`, `TotalEstimate`, `LeadScore`, `Notes` for Opportunity, and `ID`, `OpportunityID`, `CustomerID`, `Status`, `ConfirmedAt`, `EventDates`, `VenueAddress`, `CrewNotes` for Project. Use `gorm` or `sqlc` for database interactions. 6. Set up `grpc-gateway` to expose REST endpoints for opportunities and projects (e.g., `POST /api/v1/opportunities`, `GET /api/v1/opportunities/:id`, `PATCH /api/v1/opportunities/:id`, `POST /api/v1/opportunities/:id/approve`, `POST /api/v1/opportunities/:id/convert`, `GET /api/v1/projects`, `GET /api/v1/projects/:id`). 7. Configure the service to connect to PostgreSQL using credentials from the 'sigma1-infra-endpoints' ConfigMap.
+1. Initialize a new Rust project targeting Rust 1.77.2.2. Set up Axum 0.7.5.3. Define `Invoice`, `Payment`, and `InvoiceStatus` data models. Implement database migrations for these schemas.4. Implement endpoints:    - `POST /api/v1/invoices`    - `GET /api/v1/invoices`, `GET /api/v1/invoices/:id`    - `POST /api/v1/invoices/:id/send`, `POST /api/v1/invoices/:id/paid`    - `POST /api/v1/payments`, `GET /api/v1/payments`, `GET /api/v1/payments/invoice/:id`    - Finance reports: `GET /api/v1/finance/reports/revenue`, `aging`, `cashflow`, `profitability`5. Integrate with PostgreSQL using `sqlx`.6. Implement basic Stripe integration for recording payments (initial focus on recording, not full payment processing).7. Implement logic for quote-to-invoice conversion, requiring integration with the RMS service (Task 3) to fetch project details.
 
 ### Subtasks
-- [ ] Implement RMS Service - Core gRPC & REST Gateway (Grizz - Go/gRPC): Develop the core Rental Management System (RMS) service, focusing on Opportunity and Project management. This includes defining protobuf schemas, implementing gRPC services, and exposing them via a RESTful grpc-gateway.
+- [ ] Initialize Rust project, Axum, and define finance data models: Set up a new Rust project for the Finance Service, configure Axum, and define `Invoice`, `Payment`, `InvoiceStatus` data models with `sqlx` migrations.
+- [ ] Integrate PostgreSQL for data persistence: Connect the service to PostgreSQL using `sqlx` for data persistence, utilizing the `sigma1-infra-endpoints` ConfigMap.
+- [ ] Implement Invoice and Payment API endpoints: Develop API endpoints for creating, retrieving, and managing invoices and payments, including status transitions.
+- [ ] Implement financial reporting API endpoints: Develop API endpoints for various financial reports (revenue, aging, cashflow, profitability).
+- [ ] Implement basic Stripe integration for payment recording: Implement basic Stripe integration for recording payment events, focusing on capturing payment details rather than full processing.
+- [ ] Implement RMS integration for quote-to-invoice conversion: Implement logic for quote-to-invoice conversion, requiring integration with the RMS service (Task 3) to fetch project details.
