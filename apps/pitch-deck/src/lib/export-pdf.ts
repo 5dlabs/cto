@@ -32,6 +32,7 @@ function pdfText(s: string): string {
     .replace(/\u2192/g, " -> ")
     .replace(/\u2014/g, " - ")
     .replace(/\u2013/g, "-") /* en dash */
+    .replace(/\u2248/g, "~") /* approx equal */
     .replace(/\u00a0/g, " ");
 }
 
@@ -76,7 +77,7 @@ function lineHeightMm(
   displayHeadline = false,
 ): number {
   if (displayHeadline) {
-    return fontSizePt * 0.62;
+    return fontSizePt * 0.42;
   }
   const factor = relaxed ? 0.52 : 0.44;
   return fontSizePt * factor;
@@ -192,27 +193,27 @@ export function buildPitchDeckPdfBlob(
           table: 15,
         }
       : {
-          meta: 15,
-          label: 17,
-          eyebrow: 19,
-          headline: 40,
-          sub: 25,
-          body: 24,
-          small: 16,
-          table: 17,
+          meta: 14,
+          label: 16,
+          eyebrow: 18,
+          headline: 34,
+          sub: 21,
+          body: 20,
+          small: 14,
+          table: 16,
         };
 
   /** Extra space (mm) after headline when bullets follow — both densities need clear separation */
-  const headlineToBulletGapMm = density === "compact" ? 14.5 : 16.5;
+  const headlineToBulletGapMm = density === "compact" ? 8 : 10;
 
-  /** Vertical gaps after blocks (mm) — tuned to reduce dead space without crowding */
+  /** Vertical gaps after blocks (mm) — tuned to match web deck spacing */
   const gap = {
-    afterMeta: 1.75,
-    afterLabel: 1.25,
+    afterMeta: 4,
+    afterLabel: 3,
     /** Space after cyan eyebrow before big headline (e.g. "The shift" -> title); +~2pt vs label-only gap */
     afterEyebrow: 3.5,
-    afterHeadline: 1.5,
-    afterSub: 1.5,
+    afterHeadline: 3,
+    afterSub: 3,
     afterStats: 1.75,
     afterBullets: 1,
     afterTable: 4,
@@ -249,10 +250,12 @@ export function buildPitchDeckPdfBlob(
         });
       } else {
         Object.assign(slideSizes, {
-          headline: 36,
-          sub: 23,
-          body: 22,
-          small: 13,
+          label: 14,
+          eyebrow: 16,
+          headline: 30,
+          sub: 19,
+          body: 18,
+          small: 11,
         });
       }
     }
@@ -284,8 +287,8 @@ export function buildPitchDeckPdfBlob(
         color: THEME.muted,
       }) +
       gap.afterLabel +
-      /* Slides with no eyebrow (e.g. "HOW IT WORKS" -> headline only): label was crowding the title */
-      (!slide.eyebrow ? 7 : 0);
+      /* Slides with no eyebrow: small extra gap so label doesn't crowd the title */
+      (!slide.eyebrow ? 2 : 0);
 
     if (slide.eyebrow) {
       y =

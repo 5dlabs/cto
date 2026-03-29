@@ -23,7 +23,7 @@ Screen-record [https://pitch.5dlabs.ai](https://pitch.5dlabs.ai) (or `npm run de
 | **12 Model** | Four bullets | Four revenue streams, one stack: CTO subs, rev-share, trading P&L, advisory. |
 | **13 GTM** | Bullets | Open-source OpenClaw platform (GitOps + Helm) → funnel to CTO. Freemium desktop / kind, limited agents, feature flags → tiers. Desktop as main surface long-term. |
 | **14 Use of funds** | Table + callout | $750K → engineers, founder, edge, lab, models, buffer. ~18 months to cash-flow positive. |
-| **15 Morgan** | CTA button visible | Morgan = avatar + voice; same agent as intake. OpenClaw + LiveKit + LemonSlice; Lemon Squeezy later. **Optional:** hover the “Talk to Morgan” button so viewers see it — no need to click. |
+| **15 Morgan** | CTA button visible | Morgan = avatar + voice; same agent as intake. OpenClaw + LiveKit + hosted avatar. **Optional:** hover the “Talk to Morgan” button so viewers see it — no need to click. |
 | **16 Founder** | Three bullets | 20+ yrs ops, Victoria; Pocket Head of Infra at scale; Blocknative; Coinmiles SE→CTO fast. |
 | **17 Ask** | Callout + footnote | $750K post-money SAFE; use of funds; cap vs comps — terms in conversation; profitability bias; M&A > IPO as default story. **Show:** export controls in bottom chrome (PDF / PPT / Slides). Cal link in footnote. |
 | **Outro** | Deck or your face | Thanks — deck at `pitch.5dlabs.ai`; book a call on the last slide if they want to go deeper. |

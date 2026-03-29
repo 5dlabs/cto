@@ -191,6 +191,7 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 **Loop**
 
 - Decide → deploy → learn → compound (thesis, wedge, signals; agents on shared rails; runtime + market feed roadmap; reuse prompts/workflows/infra).
+- Callout: you focus on the **PRD**—agents and automation take it through build, review, and **release to production**.
 
 **CTO (platform)**
 
@@ -200,7 +201,7 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 - NATS agent-to-agent across pods; CRDs + headless jobs → Morgan; ACP-style coordination.
 - Automated bare metal + GPU; contract abstraction (optional direct vendor deal).
 - Research → PRD → shipped platform features; preset skills per agent, customizable.
-- CTO Lite desktop = board room; Morgan voice/chat (ElevenLabs + LiveKit); AR glasses roadmap (see 5dlabs.ai/cto/morgan).
+- Board room (debate, voice, Morgan; ElevenLabs + LiveKit) in the **main CTO app**; **CTO Lite** = desktop-only freemium (kind, limited agents). AR glasses roadmap: 5dlabs.ai/cto/morgan.
 
 **CTO (agent roster — public site)**
 
@@ -266,7 +267,7 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 - Animated avatar + voice — Q&A front door before live meeting.
 - Same Morgan coordinates intake/agents on CTO platform.
 - No PRD field in the video widget—use host **knowledge base** (URLs, text); **PRD → tasks** stays on CTO.
-- Stack: OpenClaw + LiveKit + hosted video avatar; commerce via Lemon Squeezy (pricing in progress).
+- Stack: OpenClaw + LiveKit + hosted video avatar.
 - CTA on deck: Talk to Morgan → 5dlabs.ai/cto/morgan#talk
 
 **Founder**

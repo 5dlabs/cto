@@ -115,6 +115,8 @@ export const slides: DeckSlide[] = [
       "Learn — runtime + market feed the roadmap.",
       "Compound — reuse prompts, workflows, infra.",
     ],
+    callout:
+      "You focus on the **PRD**—agents and automation take it from there through build, review, and **release to production**.",
   },
   {
     id: "cto",
@@ -130,7 +132,7 @@ export const slides: DeckSlide[] = [
       "Coordination — **NATS** for agent-to-agent traffic across pods (fills a gap vs. stock Kubernetes); **CRDs** run headless jobs that report back to **Morgan**; **ACP**-style coordination across the fleet.",
       "Metal & GPU — **automated bare-metal and GPU** provisioning; we **abstract provider contracts** so customers don’t have to—or they keep a **direct deal** with the vendor.",
       "Research loop — ingest latest methodologies, patterns, and papers → **PRD → features on the platform**—so the product stays current without asking users to rip up how they work.",
-      "CTO Lite desktop — the **board room** (debate, voice, chat with Morgan via **ElevenLabs + LiveKit**). **AR glasses** are on the roadmap (Even G2, Meta Ray-Ban Display, Rokid, Vuzix Z100 — see **5dlabs.ai/cto/morgan**).",
+      "**Board room** (debate, voice, chat with Morgan via **ElevenLabs + LiveKit**) ships in the **main CTO app**—not desktop-only. **CTO Lite** is the **desktop-only** freemium entry (local kind, limited agents). **AR glasses** roadmap: Even G2, Meta Ray-Ban Display, Rokid, Vuzix Z100 — **5dlabs.ai/cto/morgan**.",
     ],
     footnote:
       "AGPL-3.0 — serious teams self-host. More detail: 5dlabs.ai/cto",
@@ -300,14 +302,13 @@ export const slides: DeckSlide[] = [
     bullets: [
       "Same Morgan that runs intake and coordinates agents on the CTO platform.",
       "Investors use this for narrative Q&A; product intake and PRDs still flow through CTO (not through the avatar widget).",
-      "Live stack: OpenClaw + LiveKit + hosted avatar — pricing via Lemon Squeezy in progress.",
+      "Live stack: OpenClaw + LiveKit + hosted avatar.",
     ],
     cta: {
       label: "Talk to Morgan",
       href: "https://5dlabs.ai/cto/morgan#talk",
     },
-    footnote:
-      "Avatar + voice: hosted provider · LiveKit · OpenClaw. Commerce: Lemon Squeezy (pricing in progress).",
+    footnote: "Avatar + voice: hosted provider · LiveKit · OpenClaw.",
   },
   {
     id: "founder",

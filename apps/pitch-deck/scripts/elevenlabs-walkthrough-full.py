@@ -57,7 +57,7 @@ Go-to-market. Open-source OpenClaw platform—GitOps and Helm to deploy at scale
 
 Use of funds. Seven fifty K goes to engineers, founder runway, edge, lab, models, and buffer — about eighteen months to cash-flow positive.
 
-Morgan. Avatar and voice — same agent as intake. OpenClaw, LiveKit, LemonSlice; Lemon Squeezy for commerce when ready. There's a Talk to Morgan button on the site.
+Morgan. Avatar and voice — same agent as intake. OpenClaw, LiveKit, hosted avatar. There's a Talk to Morgan button on the site.
 
 Founder. Twenty plus years in ops, Victoria. At Pocket, Head of Infra at scale. Blocknative; Coinmiles from senior engineer to CTO in three months.
 
