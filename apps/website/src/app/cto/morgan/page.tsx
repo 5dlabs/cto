@@ -37,6 +37,11 @@ const interactionMethods = [
     description:
       "Stay productive without being tethered to your computer. Talk to Morgan hands-free with display smart glasses.",
   },
+  {
+    title: "Meta Ray-Ban Display",
+    description:
+      "Talk to Morgan on WhatsApp hands-free — same conversation, your glasses.",
+  },
 ];
 
 export default function MorganPage() {
@@ -170,6 +175,31 @@ export default function MorganPage() {
               >
                 Learn more about Even G2 →
               </a>
+            </div>
+          </div>
+        </section>
+
+        {/* Meta Ray-Ban Display */}
+        <section className="py-20 px-6 border-t border-border/30">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                Talk to Morgan on{" "}
+                <span className="gradient-text">Meta Ray-Ban Display</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                WhatsApp on your glasses. Same Morgan.
+              </p>
+            </div>
+
+            <div className="relative aspect-[16/9] max-w-2xl mx-auto rounded-xl overflow-hidden border border-border bg-black mb-8">
+              <Image
+                src="/morgan/meta-ray-ban-display.png"
+                alt="Ray-Ban Meta Display smart glasses and neural band"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 672px"
+              />
             </div>
           </div>
         </section>
