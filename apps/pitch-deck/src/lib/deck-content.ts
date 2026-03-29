@@ -62,7 +62,7 @@ export const slides: DeckSlide[] = [
       },
     ],
     callout:
-      "CTO implementations · bare-metal rev-share · trading · advisory — same stack. Customers cut egress + managed-service overhead vs cloud-only AI stacks.",
+      "Same stack across those lines—customers avoid hyperscaler egress bills and extra managed-service tax vs cloud-only AI.",
     footnote: `*Infra: deck shows ${DECK_INFRA_SAVINGS_LABEL} conservative vs hyperscale; internal migration models run ${INTERNAL_FULL_STACK_SAVINGS_RANGE_NOTES}. Example only — ~20TB/mo internet egress ≈ ~$${ILLUSTRATIVE_AWS_EGRESS_20TB_USD_PER_MONTH.toLocaleString("en-US")}/mo at ~$0.085/GB (AWS-style tier) vs $0 inside typical partner bundles (e.g. 20TB/mo included on Latitude Metal; https://www.latitude.sh/network/pricing ). Workload-specific — full math in cloud-vs-baremetal-analysis.ts.`,
   },
   {

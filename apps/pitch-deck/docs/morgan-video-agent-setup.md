@@ -162,7 +162,7 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 - Headline: We built the stack that helps us build companies.
 - Subhead: AI-native venture studio. CTO ships on bare metal today. Capital engine + ventures turn that stack into outcomes.
 - Stats: 2 paying customers; $240K ACV; 4 revenue streams; “50–75%” infra savings vs cloud* (headline label).
-- Callout: CTO implementations · bare-metal rev-share · trading · advisory — same stack. Customers cut egress + managed-service overhead vs cloud-only AI stacks.
+- Callout: Same stack across those lines—customers avoid hyperscaler egress bills and extra managed-service tax vs cloud-only AI.
 - Footnote context: infra line is conservative vs hyperscale; internal migration models cite ~60–80% range; ~20TB/mo internet egress illustrative ~$1,700/mo at ~$0.085/GB (AWS-style tier) vs $0 incremental inside typical partner bundles (e.g. 20TB/mo included on Latitude Metal). Workload-specific.
 
 **Problem**
