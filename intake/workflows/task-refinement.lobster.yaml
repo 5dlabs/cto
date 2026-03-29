@@ -7,6 +7,8 @@ description: >
 args:
   audio_debug:
     default: "true"
+  linear_session_id:
+    default: ""
   tasks:
     default: "[]"
   complexity:
@@ -20,21 +22,21 @@ args:
   max_revisions:
     default: 2
   model_primary_provider:
-    default: anthropic
+    default: gemini
   model_primary:
-    default: claude-sonnet-4-6
+    default: gemini-2.5-flash
   voter_1_provider:
-    default: anthropic
+    default: gemini
   voter_1_model:
-    default: claude-opus-4-6
+    default: gemini-2.5-flash
   voter_2_provider:
-    default: openai
+    default: gemini
   voter_2_model:
-    default: gpt-5.2-pro
+    default: gemini-2.5-flash
   voter_3_provider:
-    default: anthropic
+    default: gemini
   voter_3_model:
-    default: claude-sonnet-4-6
+    default: gemini-2.5-flash
 
 steps:
   - id: expand-round-0
@@ -368,17 +370,6 @@ steps:
           | . + {
               subtasks: (
                 normalize_subtask_objects(.subtasks)
-                | if length > 0 then . else [{
-                    id: (((($task.id // 0) | tonumber? // 0) * 1000) + 1),
-                    title: ("Implement " + (($task.title // ("task " + ((($task.id // 0) | tostring)))) | tostring)),
-                    description: (($task.description // "Implement this task.") | tostring),
-                    dependencies: [],
-                    details: (($task.details // $task.description // "Follow task details and produce working implementation.") | tostring),
-                    status: "pending",
-                    test_strategy: (($task.test_strategy // $task.testStrategy // "Run relevant tests and acceptance checks.") | tostring),
-                    subagentType: "implementer",
-                    parallelizable: false
-                  }] end
               )
             }
         )' 2>/dev/null || echo '[]')" &&

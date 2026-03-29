@@ -46,7 +46,23 @@ export interface AgentSessionWebhookEvent {
   createdAt: string;
 }
 
+export interface AppUserNotificationEvent {
+  action: string;
+  type: 'AppUserNotification';
+  data: {
+    issueId?: string;
+    commentId?: string;
+    userId?: string;
+    reactionEmoji?: string;
+    [key: string]: unknown;
+  };
+  createdAt: string;
+}
+
+export type WebhookEvent = AgentSessionWebhookEvent | AppUserNotificationEvent;
+
 export type WebhookEventHandler = (event: AgentSessionWebhookEvent) => void;
+export type NotificationEventHandler = (event: AppUserNotificationEvent) => void;
 
 export interface HttpServer {
   start(): Promise<void>;
@@ -61,14 +77,16 @@ export function createHttpServer(
   runRegistry: RunRegistry,
   onWebhookEvent: WebhookEventHandler,
   logger: { info: Function; warn: Function; error: Function },
+  onNotificationEvent?: NotificationEventHandler,
 ): HttpServer {
   let server: Server | undefined;
 
   function verifySignature(body: Buffer, signature: string | undefined): boolean {
-    if (!webhookSecret) return true;
-    if (!signature) return false;
+    if (!webhookSecret) { logger.info('No webhook secret configured, skipping verification'); return true; }
+    if (!signature) { logger.warn('No signature header present in webhook request'); return false; }
     const expected = createHmac('sha256', webhookSecret).update(body).digest('hex');
     const sig = signature.replace(/^sha256=/, '');
+    logger.info(`Signature check: header=${signature.substring(0, 20)}... expected_len=${expected.length} sig_len=${sig.length}`);
     if (expected.length !== sig.length) return false;
     return timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(sig, 'hex'));
   }
@@ -213,9 +231,9 @@ export function createHttpServer(
         return;
       }
 
-      let event: AgentSessionWebhookEvent;
+      let rawEvent: WebhookEvent;
       try {
-        event = JSON.parse(body.toString('utf-8'));
+        rawEvent = JSON.parse(body.toString('utf-8'));
       } catch {
         json(res, 400, { error: 'Bad request' });
         return;
@@ -225,7 +243,14 @@ export function createHttpServer(
       json(res, 200, { ok: true });
 
       try {
-        onWebhookEvent(event);
+        if (rawEvent.type === 'AppUserNotification') {
+          logger.info(`Inbox notification: action=${rawEvent.action} issue=${(rawEvent as AppUserNotificationEvent).data.issueId ?? 'n/a'}`);
+          if (onNotificationEvent) {
+            onNotificationEvent(rawEvent as AppUserNotificationEvent);
+          }
+        } else {
+          onWebhookEvent(rawEvent as AgentSessionWebhookEvent);
+        }
       } catch (err) {
         logger.error('Webhook event handler error:', err);
       }

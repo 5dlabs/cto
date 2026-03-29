@@ -93,6 +93,29 @@ async function main(): Promise<void> {
       });
     },
     logger,
+    (event) => {
+      logger.info(`AppUserNotification: action=${event.action} issue=${event.data.issueId ?? 'n/a'}`);
+      // Track relevant notification types for future reactive behavior
+      switch (event.action) {
+        case 'issueAssignedToYou':
+          logger.info(`Agent assigned to issue ${event.data.issueId}`);
+          break;
+        case 'issueUnassignedFromYou':
+          logger.info(`Agent unassigned from issue ${event.data.issueId}`);
+          break;
+        case 'issueEmojiReaction':
+          logger.info(`Emoji reaction on issue ${event.data.issueId}: ${event.data.reactionEmoji ?? '?'}`);
+          break;
+        case 'issueStatusChanged':
+          logger.info(`Issue status changed: ${event.data.issueId}`);
+          break;
+        case 'issueNewComment':
+          logger.info(`New comment on issue ${event.data.issueId}`);
+          break;
+        default:
+          break;
+      }
+    },
   );
   await httpServer.start();
 

@@ -21,6 +21,8 @@ interface LinearActivityArgs {
   // For 'elicitation' with select signal
   signal?: 'select';
   options?: Array<{ label: string; value: string }>;
+  /** Raw signalMetadata JSON — takes precedence over `options` when both are set */
+  signalMetadata?: Record<string, unknown>;
 }
 
 async function graphql(apiKey: string, query: string, variables: Record<string, unknown>): Promise<unknown> {
@@ -40,6 +42,9 @@ export async function linearActivity(args: LinearActivityArgs): Promise<{ id: st
   const apiKey = process.env['LINEAR_API_KEY'];
   if (!apiKey) throw new Error('LINEAR_API_KEY not set');
 
+  // Map CLI aliases to Linear-supported content types.
+  // 'thought' and 'plan' both map to 'response' (Linear has no native thought type).
+  // 'plan' prepends a plan header so the body is visually distinct from thoughts.
   const normalizedType: LinearContentType = (() => {
     if (args.type === 'thought' || args.type === 'plan') return 'response';
     return args.type;
@@ -54,7 +59,11 @@ export async function linearActivity(args: LinearActivityArgs): Promise<{ id: st
       ...(args.result ? { result: args.result } : {}),
     };
   } else {
-    content = { type: normalizedType, body: args.body };
+    // For 'plan' type, wrap the body with a plan header for visual distinction.
+    const body = args.type === 'plan'
+      ? `**Plan:** ${args.body}`
+      : args.body;
+    content = { type: normalizedType, body };
   }
 
   const input: Record<string, unknown> = {
@@ -64,7 +73,10 @@ export async function linearActivity(args: LinearActivityArgs): Promise<{ id: st
   if (args.ephemeral) input.ephemeral = true;
   if (args.signal) {
     input.signal = args.signal;
-    if (args.options) {
+    // --signal-metadata takes precedence over --options
+    if (args.signalMetadata) {
+      input.signalMetadata = args.signalMetadata;
+    } else if (args.options) {
       input.signalMetadata = { options: args.options };
     }
   }

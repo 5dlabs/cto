@@ -192,7 +192,7 @@ fi
 echo ""
 echo "=== validate --type expanded-tasks ==="
 
-if output=$(echo '[{"id":1,"subtasks":[{"id":1,"title":"sub"}]},{"id":2,"subtasks":[{"id":1}]}]' | $INTAKE_UTIL validate --type expanded-tasks 2>&1); then
+if output=$(echo '[{"id":1,"subtasks":[{"id":1,"title":"sub","description":"desc","dependencies":[]}]},{"id":2,"subtasks":[{"id":1,"title":"sub2","description":"desc2","dependencies":[]}]}]' | $INTAKE_UTIL validate --type expanded-tasks 2>&1); then
   echo "$output" | jvalid && pass "valid expanded-tasks → valid:true" || fail "valid expanded-tasks" "$output"
 else
   fail "valid expanded-tasks exit 0" "$output"

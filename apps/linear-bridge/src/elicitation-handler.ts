@@ -30,6 +30,9 @@ interface PendingElicitation {
   request: ElicitationRequest;
   linearSessionId: string;
   timeoutTimer?: ReturnType<typeof setTimeout>;
+  pollTimer?: ReturnType<typeof setInterval>;
+  /** ISO timestamp: only activities after this point are considered user responses */
+  elicitationPostedAt?: string;
 }
 
 // =============================================================================
@@ -239,6 +242,7 @@ export function createElicitationHandler(
       timeoutTimer = setTimeout(async () => {
         const p = pending.get(elicitation_id);
         if (!p) return;
+        if (p.pollTimer) clearInterval(p.pollTimer);
         pending.delete(elicitation_id);
         resolved.add(elicitation_id);
         stateDb.markElicitationResolved("linear", elicitation_id, request.recommended_option, undefined, "system:timeout", "linear", "timeout");
@@ -264,10 +268,52 @@ export function createElicitationHandler(
       }, request.timeout_seconds * 1000);
     }
 
+    const elicitationPostedAt = new Date().toISOString();
+
+    // Start polling for user response (webhook fallback — Linear agent session
+    // webhooks don't fire reliably for API-created sessions)
+    let pollTimer: ReturnType<typeof setInterval> | undefined;
+    if (session) {
+      const POLL_INTERVAL_MS = 3000;
+      pollTimer = setInterval(async () => {
+        if (!pending.has(elicitation_id)) {
+          clearInterval(pollTimer!);
+          return;
+        }
+        try {
+          const activities = await linear.getSessionActivities(
+            session!.linearSessionId,
+            elicitationPostedAt,
+          );
+          const promptActivity = activities.find(a => a.contentType === 'prompt');
+          if (promptActivity) {
+            clearInterval(pollTimer!);
+            logger.info(`Elicitation ${elicitation_id}: detected user response via polling: "${promptActivity.body}"`);
+            // Synthesize a webhook-like event and handle it
+            const syntheticEvent: AgentSessionWebhookEvent = {
+              action: 'prompted',
+              type: 'AgentSession',
+              createdAt: promptActivity.createdAt,
+              data: {
+                id: session!.linearSessionId,
+                promptedValue: promptActivity.body ?? '',
+                agentActivity: { body: promptActivity.body },
+              },
+            };
+            await handleWebhookEvent(syntheticEvent);
+          }
+        } catch (err) {
+          logger.warn(`Poll error for elicitation ${elicitation_id}: ${err}`);
+        }
+      }, POLL_INTERVAL_MS);
+    }
+
     pending.set(elicitation_id, {
       request,
       linearSessionId: session?.linearSessionId ?? '',
       timeoutTimer,
+      pollTimer,
+      elicitationPostedAt,
     });
     resolved.delete(elicitation_id);
     stateDb.upsertProviderMessageRef("linear", elicitation_id, {
@@ -289,6 +335,12 @@ export function createElicitationHandler(
         logger.info(`Registered agent session ${linearSessionId} for deliberation ${deliberationSessionId}`);
         stateDb.setSessionStatus(deliberationSessionId, "created");
         stateDb.appendProviderEvent("linear", "session_created", event, deliberationSessionId);
+
+        // Best practice: set delegate and move to started status
+        linear.setDelegateIfNone(issueId).catch(err =>
+          logger.warn(`Failed to set delegate on ${issueId}: ${err}`));
+        linear.moveToStartedStatus(issueId).catch(err =>
+          logger.warn(`Failed to move ${issueId} to started: ${err}`));
       } else {
         logger.info(`Agent session created: ${linearSessionId} (no deliberation mapping)`);
         stateDb.appendProviderEvent("linear", "session_created_unmapped", event);
@@ -357,6 +409,7 @@ export function createElicitationHandler(
     const userContext = !selectedValue ? rawInput : undefined;
 
     if (matchedEntry.timeoutTimer) clearTimeout(matchedEntry.timeoutTimer);
+    if (matchedEntry.pollTimer) clearInterval(matchedEntry.pollTimer);
     pending.delete(matchedId);
     resolved.add(matchedId);
     stateDb.markElicitationResolved(
@@ -372,6 +425,30 @@ export function createElicitationHandler(
     );
     stateDb.setSessionStatus(matchedEntry.request.session_id, "decision_made");
     stateDb.appendProviderEvent("linear", "prompted_resolved", { rawInput, selectedValue, isRedeliberate }, matchedEntry.request.session_id, matchedId, matchedEntry.request.metadata?.run_id);
+
+    // Write design selections to file for Lobster workflow consumption
+    if (matchedEntry.request.category === 'design-review' || matchedEntry.request.decision_id?.startsWith('design-') || matchedId.startsWith('design-')) {
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const ws = process.env.WORKSPACE || process.cwd();
+        const selectionsFile = path.join(ws, '.intake', 'design', 'stitch', 'design-selections.json');
+        let existing: Array<Record<string, unknown>> = [];
+        try { existing = JSON.parse(fs.readFileSync(selectionsFile, 'utf-8')); } catch { /* first selection */ }
+        existing.push({
+          decision_id: matchedEntry.request.decision_id ?? matchedId,
+          selected_value: selectedValue ?? rawInput,
+          is_redeliberate: isRedeliberate,
+          resolved_at: new Date().toISOString(),
+          source: 'linear',
+        });
+        fs.mkdirSync(path.dirname(selectionsFile), { recursive: true });
+        fs.writeFileSync(selectionsFile, JSON.stringify(existing, null, 2));
+        logger.info(`Design selection written to ${selectionsFile} (${existing.length} total)`);
+      } catch (err) {
+        logger.warn(`Failed to write design selections file: ${err}`);
+      }
+    }
 
     // Build response
     const response = createElicitationResponse(
@@ -437,6 +514,7 @@ export function createElicitationHandler(
       const entry = pending.get(elicitationId);
       if (entry) {
         if (entry.timeoutTimer) clearTimeout(entry.timeoutTimer);
+        if (entry.pollTimer) clearInterval(entry.pollTimer);
         pending.delete(elicitationId);
         resolved.add(elicitationId);
         stateDb.markElicitationResolved(
@@ -477,6 +555,7 @@ export function createElicitationHandler(
     if (!entry) return;
 
     if (entry.timeoutTimer) clearTimeout(entry.timeoutTimer);
+    if (entry.pollTimer) clearInterval(entry.pollTimer);
     pending.delete(cancel.elicitation_id);
     resolved.add(cancel.elicitation_id);
     stateDb.markElicitationResolved("linear", cancel.elicitation_id, cancel.selected_option, undefined, "discord-user", "discord", "cancelled");
@@ -504,6 +583,7 @@ export function createElicitationHandler(
   function destroy(): void {
     for (const entry of pending.values()) {
       if (entry.timeoutTimer) clearTimeout(entry.timeoutTimer);
+      if (entry.pollTimer) clearInterval(entry.pollTimer);
     }
     pending.clear();
   }

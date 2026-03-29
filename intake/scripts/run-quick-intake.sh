@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Conservative fast path: no TTS (audio_debug false + INTAKE_AUDIO_MUTE), stub design agent,
-# single OpenClaw retry, optional lower task count via INTAKE_NUM_TASKS (default 6).
+# single OpenClaw retry. Task count is determined by the LLM based on project scope
+# (override with INTAKE_NUM_TASKS if needed).
 # Visual verification: tee log + summary paths printed on success.
 set -euo pipefail
 
@@ -10,7 +11,7 @@ cd "$ROOT"
 PROJECT_NAME="${1:-sigma-1}"
 REPO_URL="${2:-https://github.com/5dlabs/sigma-1}"
 TARGET_REPO_PATH="${3:-/Users/jonathon/5dlabs/sigma-1}"
-NUM_TASKS="${INTAKE_NUM_TASKS:-6}"
+NUM_TASKS="${INTAKE_NUM_TASKS:-0}"
 LOG_FILE="$ROOT/.intake/quick-intake-run.log"
 
 rm -f "$ROOT/.intake/intake-sub-workflow.log" "$ROOT/.intake/intake-summary.json"
@@ -23,7 +24,7 @@ ARGS_JSON="$(jq -nc \
   --arg deliberate "false" \
   --arg audio_debug "false" \
   --arg design_mode "ingest" \
-  --arg num_tasks "$NUM_TASKS" \
+  --argjson num_tasks "$NUM_TASKS" \
   --arg target_repo_local_path "$TARGET_REPO_PATH" \
   '{prd_path:$prd_path,project_name:$project_name,repository_url:$repository_url,github_org:$github_org,deliberate:$deliberate,audio_debug:$audio_debug,design_mode:$design_mode,num_tasks:$num_tasks,target_repo_local_path:$target_repo_local_path}')"
 

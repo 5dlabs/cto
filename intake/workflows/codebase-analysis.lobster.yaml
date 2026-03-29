@@ -15,9 +15,9 @@ args:
   branch:
     default: main
   model_primary_provider:
-    default: anthropic
+    default: gemini
   model_primary:
-    default: claude-sonnet-4-6
+    default: gemini-2.5-flash
 
 steps:
   - id: pack-repo

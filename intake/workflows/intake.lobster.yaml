@@ -44,19 +44,19 @@ args:
   run_id:
     default: ''
   model_primary_provider:
-    default: anthropic
+    default: gemini
   model_primary:
-    default: claude-sonnet-4-6
+    default: gemini-2.5-flash
   model_fast_provider:
-    default: anthropic
+    default: gemini
   model_fast:
-    default: claude-sonnet-4-6
+    default: gemini-2.5-flash
   model_frontier_provider:
-    default: anthropic
+    default: gemini
   model_frontier:
     default: claude-opus-4-6
   voter_1_provider:
-    default: anthropic
+    default: gemini
   voter_1_model:
     default: claude-opus-4-6
   voter_2_provider:
@@ -64,9 +64,9 @@ args:
   voter_2_model:
     default: gpt-5.2-pro
   voter_3_provider:
-    default: anthropic
+    default: gemini
   voter_3_model:
-    default: claude-sonnet-4-6
+    default: gemini-2.5-flash
 
 steps:
   - id: register-run
@@ -89,6 +89,9 @@ steps:
         --type plan \
         --title "Phase: PRD Parsing & Analysis" \
         --body "Starting PRD parse and complexity analysis" || true
+      intake-util linear-plan \
+        --session-id "${linear_session_id}" \
+        --step parse-prd || true
 
   - id: parse-prd
     command: |
@@ -99,18 +102,27 @@ steps:
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "parse-prd" "failed: PRD file missing" "${audio_debug}" "error"
         exit 1
       fi
+      # num_tasks=0 means "let the model decide based on project scope"
+      EFFECTIVE_NUM_TASKS="${num_tasks}"
+      if [ "$EFFECTIVE_NUM_TASKS" = "0" ] || [ -z "$EFFECTIVE_NUM_TASKS" ]; then
+        EFFECTIVE_NUM_TASKS="0"
+        NUM_TASKS_INSTRUCTION="as many tasks as the project scope requires (aim for thorough granularity — one task per deployable unit of work)"
+      else
+        NUM_TASKS_INSTRUCTION="exactly ${EFFECTIVE_NUM_TASKS}"
+      fi
       ARGS=$(jq -n \
         --rawfile sys "$root/intake/prompts/parse-prd-system.md" \
         --rawfile usr "$root/intake/prompts/parse-prd-user.md" \
         --rawfile prd "$root/.intake/run-prd-for-intake.txt" \
         --rawfile codebase "$root/.intake/contexts/codebase.txt" \
         --rawfile design_context "$root/.intake/contexts/design.txt" \
-        --arg num_tasks "${num_tasks}" \
+        --arg num_tasks "$NUM_TASKS_INSTRUCTION" \
+        --argjson num_tasks_raw "$EFFECTIVE_NUM_TASKS" \
         --arg schema "$root/intake/schemas/generated-task.schema.json" \
         --arg provider "${model_primary_provider}" \
         --arg model "${model_primary}" \
         '{ "prompt": ($sys + "\n\n" + $usr),
-           "input": { "prd_content": $prd, "codebase_context": $codebase, "design_context": $design_context, "num_tasks": ($num_tasks | tonumber), "next_id": 1 },
+           "input": { "prd_content": $prd, "codebase_context": $codebase, "design_context": $design_context, "num_tasks": (if $num_tasks_raw > 0 then $num_tasks_raw else "auto" end), "num_tasks_instruction": $num_tasks, "next_id": 1 },
            "schema": $schema, "provider": $provider, "model": $model }') || {
         echo "parse-prd: FATAL — failed to build LLM args (jq error)" >&2
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "parse-prd" "failed: jq args" "${audio_debug}" "error"
@@ -176,11 +188,14 @@ steps:
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-activity-parse-prd" "${audio_debug}"
       TASK_COUNT=$(printf '%s' "$CTO_PARSE_PRD_OUT" | jq 'length')
+      BODY=$(printf '## PRD Parsed\n\nExtracted **%s** tasks from the PRD.\n\nProceeding to complexity analysis and committee review...' "$TASK_COUNT")
       intake-util linear-activity \
         --session-id "${linear_session_id}" \
         --type thought \
-        --title "PRD Parsed" \
-        --body "Parsed PRD into ${TASK_COUNT} tasks" || true
+        --body "$BODY" || true
+      intake-util linear-plan \
+        --session-id "${linear_session_id}" \
+        --step analyze-complexity || true
 
   - id: analyze-complexity
     env:
@@ -239,20 +254,47 @@ steps:
   - id: linear-activity-analyze-complexity
     env:
       CTO_ANALYZE_COMPLEXITY_OUT: $analyze-complexity.stdout
+      CTO_PARSE_PRD_OUT: $parse-prd.stdout
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-activity-analyze-complexity" "${audio_debug}"
+      # Build a rich markdown table of task complexity scores
+      TABLE_ROWS=$(printf '%s' "$CTO_PARSE_PRD_OUT" | jq -r '
+        . as $tasks | $tasks | to_entries | map(
+          "| " + (.value.id|tostring) + " | " +
+          ((.value.title // "Untitled") | if length > 40 then .[:39] + "..." else . end) + " | " +
+          ((.value.agent // "_unassigned_") | tostring) + " | " +
+          ((.value.priority // "---") | tostring) + " |"
+        ) | join("\n")' 2>/dev/null || echo "| --- | _complexity data unavailable_ | --- | --- |")
+      TASK_COUNT=$(printf '%s' "$CTO_PARSE_PRD_OUT" | jq 'length' 2>/dev/null || echo "0")
+      BODY=$(printf '## Complexity Analysis\n\nAnalyzed **%s** tasks for implementation complexity.\n\n| # | Task | Agent | Priority |\n|---|------|-------|----------|\n%s' \
+        "$TASK_COUNT" "$TABLE_ROWS")
       intake-util linear-activity \
         --session-id "${linear_session_id}" \
         --type thought \
-        --title "Complexity Analyzed" \
-        --body "$(printf '%s' "$CTO_ANALYZE_COMPLEXITY_OUT")" || true
+        --body "$BODY" || true
+      intake-util linear-plan \
+        --session-id "${linear_session_id}" \
+        --step review-tasks || true
 
   - id: review-tasks
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "review-tasks" "${audio_debug}"
       printf '%s\n' '{"breakpoint":"review-tasks","skipped":true}'
+
+  - id: linear-action-refine-tasks
+    command: |
+      root="${WORKSPACE:-.}"
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --type action \
+        --action "Refining tasks" \
+        --parameter "Running committee vote and task expansion" \
+        --ephemeral || true
+      intake-util linear-plan \
+        --session-id "${linear_session_id}" \
+        --step refine-tasks || true
 
   - id: refine-tasks
     env:
@@ -278,45 +320,17 @@ steps:
         --arg voter_2_model "${voter_2_model}" \
         --arg voter_3_provider "${voter_3_provider}" \
         --arg voter_3_model "${voter_3_model}" \
+        --arg linear_session_id "${linear_session_id}" \
         --arg audio_debug "${audio_debug}" \
-        '{tasks_file: $tasks_file, complexity_file: $complexity_file, evaluation_criteria: $evaluation_criteria, max_revisions: $max_revisions, model_primary_provider: $model_primary_provider, model_primary: $model_primary, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, audio_debug: $audio_debug}')
-      if ! lobster run --mode tool "$WS/intake/workflows/task-refinement.lobster.yaml" --args-json "$ARGS"; then
-        echo "refine-tasks: task-refinement workflow failed; using parse-prd tasks as fallback expanded tasks" >&2
-        "$WS/intake/scripts/workflow-step-audio.sh" "intake" "refine-tasks degraded fallback" "${audio_debug}" "error"
-        jq -n \
-          --slurpfile expanded "$WS/.intake/tmp/refine-tasks-input.json" \
-          '{
-            output:[{
-              expanded_tasks: (
-                ($expanded[0] // [])
-                | map(
-                    . as $task
-                    | . + {
-                        subtasks: (
-                          (.subtasks // [])
-                          | if length > 0 then .
-                            else [{
-                              id: (($task.id * 1000) + 1),
-                              title: ("Implement " + ($task.title // ("task " + (($task.id // 0)|tostring)))),
-                              description: ($task.description // "Implement this task."),
-                              dependencies: [],
-                              details: ($task.details // "Follow task details and produce working implementation."),
-                              status: "pending",
-                              test_strategy: ($task.test_strategy // "Run relevant tests and acceptance checks."),
-                              subagentType: "implementer",
-                              parallelizable: false
-                            }]
-                          end
-                        )
-                      }
-                  )
-              ),
-              final_vote:{verdict:"approve",suggestions:["Committee voting unavailable; using parse-prd tasks fallback with deterministic subtasks."]},
-              revision_count:0,
-              verdict:"approve",
-              warning:"Fallback path: refinement unavailable; proceeded with parse-prd output."
-            }]
-          }'
+        '{tasks_file: $tasks_file, complexity_file: $complexity_file, evaluation_criteria: $evaluation_criteria, max_revisions: $max_revisions, model_primary_provider: $model_primary_provider, model_primary: $model_primary, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, linear_session_id: $linear_session_id, audio_debug: $audio_debug}')
+      REFINE_LOG="$WS/.intake/task-refinement.log"
+      if ! lobster run --mode tool "$WS/intake/workflows/task-refinement.lobster.yaml" --args-json "$ARGS" 2>"$REFINE_LOG"; then
+        echo "refine-tasks: FATAL — task-refinement workflow failed. Fix the expansion model or prompt and rerun." >&2
+        echo "--- task-refinement stderr ---" >&2
+        tail -80 "$REFINE_LOG" >&2
+        echo "--- end ---" >&2
+        "$WS/intake/scripts/workflow-gate-audio.sh" "intake" "refine-tasks" "failed: refinement workflow error" "${audio_debug}" "error"
+        exit 1
       fi
 
   - id: verify-refine-tasks
@@ -336,12 +350,9 @@ steps:
       # .expanded_tasks for the happy-path resolve-output format, then .tasks as last resort.
       EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       if ! printf '%s' "$EXP" | jq -e 'type=="array"' >/dev/null 2>&1; then
-        echo "verify-refine-tasks: refinement output was not a valid expanded task array; falling back to parse-prd tasks" >&2
-        if [ -s "$root/.intake/initial-tasks.json" ] && jq -e 'type=="array" and length>0' "$root/.intake/initial-tasks.json" >/dev/null 2>&1; then
-          EXP="$(jq -c 'map(. as $task | . + {subtasks: ((.subtasks // []) | if length > 0 then . else [{id: (($task.id * 1000) + 1), title: ("Implement " + ($task.title // ("task " + (($task.id // 0)|tostring)))), description: ($task.description // "Implement this task."), dependencies: [], details: ($task.details // "Follow task details and produce working implementation."), status: "pending", test_strategy: ($task.test_strategy // "Run relevant tests and acceptance checks."), subagentType: "implementer", parallelizable: false}] end)})' "$root/.intake/initial-tasks.json")"
-        else
-          EXP="$(printf '%s' "$CTO_PARSE_PRD_OUT" | jq -c 'if type=="array" then map(. as $task | . + {subtasks: ((.subtasks // []) | if length > 0 then . else [{id: (($task.id * 1000) + 1), title: ("Implement " + ($task.title // ("task " + (($task.id // 0)|tostring)))), description: ($task.description // "Implement this task."), dependencies: [], details: ($task.details // "Follow task details and produce working implementation."), status: "pending", test_strategy: ($task.test_strategy // "Run relevant tests and acceptance checks."), subagentType: "implementer", parallelizable: false}] end)}) else [] end' 2>/dev/null || echo '[]')"
-        fi
+        echo "verify-refine-tasks: FATAL — refinement output was not a valid expanded task array" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "verify-refine-tasks" "failed: invalid refinement output format" "${audio_debug}" "error"
+        exit 1
       fi
       if [ -z "$EXP" ] || [ "$EXP" = "null" ]; then
         echo "verify-refine-tasks: FATAL — could not extract expanded_tasks from refinement output" >&2
@@ -356,13 +367,9 @@ steps:
         exit 1
       fi
       if ! printf '%s' "$EXP" | intake-util validate --type expanded-tasks; then
-        echo "verify-refine-tasks: expanded-tasks validation failed; retrying with .intake/initial-tasks.json fallback" >&2
-        if [ -s "$root/.intake/initial-tasks.json" ] && jq -e 'type=="array" and length>0' "$root/.intake/initial-tasks.json" >/dev/null 2>&1; then
-          EXP="$(jq -c 'map(. as $task | . + {subtasks: ((.subtasks // []) | if length > 0 then . else [{id: (($task.id * 1000) + 1), title: ("Implement " + ($task.title // ("task " + (($task.id // 0)|tostring)))), description: ($task.description // "Implement this task."), dependencies: [], details: ($task.details // "Follow task details and produce working implementation."), status: "pending", test_strategy: ($task.test_strategy // "Run relevant tests and acceptance checks."), subagentType: "implementer", parallelizable: false}] end)})' "$root/.intake/initial-tasks.json")"
-          printf '%s' "$EXP" | intake-util validate --type expanded-tasks || echo "verify-refine-tasks: expanded-tasks validation failed (continuing in degraded mode)" >&2
-        else
-          echo "verify-refine-tasks: expanded-tasks validation failed (continuing in degraded mode)" >&2
-        fi
+        echo "verify-refine-tasks: FATAL — expanded-tasks validation failed" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "verify-refine-tasks" "failed: expanded-tasks validation error" "${audio_debug}" "error"
+        exit 1
       fi
 
   - id: breakpoint-refine-tasks
@@ -379,12 +386,23 @@ steps:
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-activity-refine-tasks" "${audio_debug}"
       EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       TASK_COUNT=$(printf '%s' "$EXP" | jq 'length')
-      VERDICT=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].verdict' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      VERDICT=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -r '.output[0].verdict // "unknown"' 2>/dev/null || echo "unknown")
+      # Extract vote breakdown and scores if available
+      VOTE_BREAKDOWN=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -r '.output[0].tally.vote_breakdown // empty | "**Votes:** \(.approve) approve / \(.revise) revise / \(.reject) reject"' 2>/dev/null || echo "")
+      SCORE_TABLE=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -r '.output[0].tally.average_scores // empty | to_entries | map("| " + (.key | gsub("_"; " ") | gsub("\\b\\w"; .[:1] | ascii_upcase + .[1:])) + " | " + (.value | tostring) + " |") | join("\n")' 2>/dev/null || echo "")
+      CONSENSUS=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -r '.output[0].tally.consensus_score // empty | . * 100 | floor | tostring + "%"' 2>/dev/null || echo "")
+      BODY="$(printf '## Tasks Refined\n\n')"
+      BODY="${BODY}$(printf 'Expanded tasks: %s\nVerdict: %s\n' "$TASK_COUNT" "$VERDICT")"
+      [ -n "$VOTE_BREAKDOWN" ] && BODY="${BODY}$(printf '\n%s' "$VOTE_BREAKDOWN")"
+      [ -n "$CONSENSUS" ] && BODY="${BODY}$(printf '\nConsensus: %s' "$CONSENSUS")"
+      [ -n "$SCORE_TABLE" ] && BODY="${BODY}$(printf '\n\n| Dimension | Score |\n|-----------|-------|\n%s' "$SCORE_TABLE")"
+      BODY="${BODY}$(printf '\n\nProceeding to artifact generation...')"
       intake-util linear-activity \
         --session-id "${linear_session_id}" \
-        --type thought \
-        --title "Tasks Refined" \
-        --body "Refined ${TASK_COUNT} tasks — verdict: ${VERDICT}" || true
+        --type action \
+        --action "Refined tasks" \
+        --parameter "Committee review complete" \
+        --result "$BODY" || true
 
   - id: linear-plan-generation
     command: |
@@ -396,6 +414,9 @@ steps:
         --type plan \
         --title "Phase: Artifact Generation" \
         --body "Generating scaffolds, docs, prompts, workflows, and security analysis" || true
+      intake-util linear-plan \
+        --session-id "${linear_session_id}" \
+        --step generate-artifacts || true
 
   - id: reset-task-artifacts
     command: |
@@ -478,6 +499,16 @@ steps:
         --type thought \
         --title "Scaffolds Generated" \
         --body "Generated code scaffolds for all tasks" || true
+
+  - id: linear-action-fan-out-docs
+    command: |
+      root="${WORKSPACE:-.}"
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --type action \
+        --action "Generating documentation" \
+        --parameter "Running LLM fan-out for task docs" \
+        --ephemeral || true
 
   - id: fan-out-docs
     env:
@@ -746,14 +777,31 @@ steps:
       printf '%s' "$DOCS_PAYLOAD" | intake-util write-files --base-path .tasks/docs --type docs
 
   - id: linear-activity-write-docs
+    env:
+      CTO_VALIDATED_DOCS_OUT: $validate-docs.stdout
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-activity-write-docs" "${audio_debug}"
+      DOC_COUNT=$(printf '%s' "$CTO_VALIDATED_DOCS_OUT" | jq 'if type=="array" then length else 0 end' 2>/dev/null || echo "0")
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
+      TASK_COUNT=$(printf '%s' "$EXP" | jq 'length' 2>/dev/null || echo "0")
+      MISSING_ACC=$(printf '%s' "$CTO_VALIDATED_DOCS_OUT" | jq '[.[] | select((.acceptance_md // "") | length == 0)] | length' 2>/dev/null || echo "0")
+      MISSING_DEC=$(printf '%s' "$CTO_VALIDATED_DOCS_OUT" | jq '[.[] | select((.decisions_md // "") | length == 0)] | length' 2>/dev/null || echo "0")
+      if [ "$DOC_COUNT" = "$TASK_COUNT" ] && [ "$MISSING_ACC" = "0" ] && [ "$MISSING_DEC" = "0" ]; then
+        STATUS="Passed"
+      else
+        STATUS="Degraded"
+      fi
+      MATCH_STR=$([ "$DOC_COUNT" = "$TASK_COUNT" ] && echo "Yes" || echo "No (${DOC_COUNT}/${TASK_COUNT})")
+      BODY=$(printf '## Documentation Validation: %s\n\n| Metric | Value |\n|--------|-------|\n| Documents generated | %s |\n| Tasks expected | %s |\n| Missing acceptance criteria | %s |\n| Missing decision points | %s |\n| Doc/task match | %s |' \
+        "$STATUS" "$DOC_COUNT" "$TASK_COUNT" "$MISSING_ACC" "$MISSING_DEC" "$MATCH_STR")
       intake-util linear-activity \
         --session-id "${linear_session_id}" \
-        --type thought \
-        --title "Docs Written" \
-        --body "Task documentation written to .tasks/docs" || true
+        --type action \
+        --action "Validated documentation" \
+        --parameter "${DOC_COUNT} docs for ${TASK_COUNT} tasks" \
+        --result "$BODY" || true
 
   - id: search-skills
     env:
@@ -1449,6 +1497,12 @@ steps:
       echo "verify-folder-structure: all expected directories and files present" >&2
       "$root/intake/scripts/workflow-gate-audio.sh" "intake" "folder-structure" "passed" "${audio_debug}" "normal" "project ${project_name}"
 
+  - id: update-plan-quality-gate
+    command: |
+      intake-util linear-plan \
+        --session-id "${linear_session_id}" \
+        --step quality-gate || true
+
   - id: llm-quality-gate-artifacts
     command: |
       root="${WORKSPACE:-.}"
@@ -1518,6 +1572,9 @@ steps:
         --type plan \
         --title "Phase: Commit & PR" \
         --body "Committing generated artifacts and opening PR" || true
+      intake-util linear-plan \
+        --session-id "${linear_session_id}" \
+        --step commit-and-pr || true
 
   - id: commit-outputs
     env:
@@ -1575,6 +1632,17 @@ steps:
         git commit -m "feat(intake): generated ${TASK_COUNT} tasks for ${project_name}
 
       Generated by Morgan intake pipeline (Lobster). - design-brief.md: resolved decisions and architecture overview - tasks/: expanded task breakdown with subtask prompts - docs/: task documentation and per-agent prompts - Vote verdict: ${VERDICT} (after ${REVISION_COUNT} revision(s))" || echo "commit-outputs: git commit failed (non-fatal)" >&2
+      fi
+
+  - id: session-url-branch
+    command: |
+      root="${WORKSPACE:-.}"
+      BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+      REPO_WEB="$(printf '%s' "${repository_url}" | sed -E 's#\.git$##')"
+      if [ -n "${linear_session_id}" ] && [ -n "$REPO_WEB" ] && [ -n "$BRANCH" ]; then
+        intake-util linear-session update-urls \
+          --session-id "${linear_session_id}" \
+          --add-url "Branch=${REPO_WEB}/tree/${BRANCH}" || true
       fi
 
   - id: create-pr
@@ -1759,6 +1827,18 @@ steps:
         --type thought \
         --title "PR Created" \
         --body "Pull request opened: ${PR_URL}" || true
+
+  - id: session-url-pr
+    env:
+      CTO_CREATE_PR_OUT: $create-pr.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      PR_URL="$(printf '%s' "$CTO_CREATE_PR_OUT" | jq -r '.pr_url // empty' 2>/dev/null || true)"
+      if [ -n "${linear_session_id}" ] && [ -n "$PR_URL" ] && [ "$PR_URL" != "none" ]; then
+        intake-util linear-session update-urls \
+          --session-id "${linear_session_id}" \
+          --add-url "Pull Request=${PR_URL}" || true
+      fi
 
   - id: write-handoff-summary
     env:

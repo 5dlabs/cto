@@ -14,8 +14,9 @@
  *   bridge-elicitation       --session-id <id> --decision-id <id> --vote-result <json>
  *   tally-decision-votes     (stdin: DecisionVote[])
  *   generate-workflows       --config <path> [--scaffolds-json <file>] [--repository-url <url>]
- *   linear-activity          --session-id <id> --type <type> --body <text> [--ephemeral]
- *   linear-plan              --session-id <id> --plan <json>
+ *   linear-activity          --session-id <id> --type <type> --body <text> [--ephemeral] [--signal select] [--signal-metadata <json>]
+ *   linear-plan              --session-id <id> [--plan-json <json>|--step <step-id>|--plan <json>]
+ *   linear-session update-urls --session-id <id> [--add-url "label=url"] [--set-urls <json>]
  *   register-run             --run-id <id> --agent <name> [--issue-id <id>] [--session-key <k>] [--linear-session-id <id>]
  *   deregister-run           --run-id <id>
  *   invoke-agent             --mode <subagent|a2a> --agent <name> [--prompt-file <path>]
@@ -35,7 +36,8 @@ import { bridgeElicitation } from './bridge-elicitation';
 import { tallyDecisionVotes } from './tally-decision-votes';
 import { generateWorkflows } from './generate-workflow';
 import { linearActivity } from './linear-activity';
-import { linearPlan } from './linear-plan';
+import { linearPlan, resolvePlanSteps } from './linear-plan';
+import { linearSessionUpdateUrls } from './linear-session';
 import { registerRun, deregisterRun } from './run-registry-client';
 import { invokeAgent } from './invoke-agent';
 import { classifyCliOutput } from './classify-output';
@@ -115,10 +117,20 @@ Subcommands:
     --type <type>        Activity type: thought|action|elicitation|response|error
     --body <text>        Activity body text
     --ephemeral          Mark as ephemeral
+    --signal <signal>    Signal type: "select" (for elicitation with options)
+    --signal-metadata <json>  Raw signal metadata JSON (e.g. '{"options":[...]}')
+    --options <json>     Shorthand for signal-metadata options array
 
   linear-plan        Update Linear session plan
     --session-id <id>    Linear session ID (required)
-    --plan <json>        Plan steps JSON array
+    --plan-json <json>   Plan steps JSON array (or "-" for stdin)
+    --step <step-id>     Auto-build plan from canonical pipeline steps
+    --plan <json>        (legacy) Plan steps JSON array
+
+  linear-session update-urls  Update session external URLs (clickable links)
+    --session-id <id>    Linear session ID (required)
+    --add-url <label=url>  Add a URL (repeatable, label=url format)
+    --set-urls <json>    Full replacement: JSON array of {label, url} objects
 
   register-run       Register pipeline run with linear-bridge
     --run-id <id>        Run ID (required)
@@ -159,6 +171,18 @@ function getArg(args: string[], flag: string): string | undefined {
     return args[idx + 1];
   }
   return undefined;
+}
+
+/** Collect all values for a repeated flag (e.g. --add-url "X" --add-url "Y"). */
+function getAllArgs(args: string[], flag: string): string[] {
+  const results: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === flag && i + 1 < args.length) {
+      results.push(args[i + 1]);
+      i++; // skip value
+    }
+  }
+  return results;
 }
 
 async function readJsonInput(filePath: string | undefined): Promise<unknown> {
@@ -576,6 +600,7 @@ async function main(): Promise<void> {
       const resultStr = getArg(args, '--result');
       const signal = getArg(args, '--signal') as 'select' | undefined;
       const optionsArg = getArg(args, '--options');
+      const signalMetadataArg = getArg(args, '--signal-metadata');
 
       if (!sessionId) {
         console.error('Warning: linear-activity skipped (missing --session-id)');
@@ -598,6 +623,16 @@ async function main(): Promise<void> {
         }
       }
 
+      let signalMetadata: Record<string, unknown> | undefined;
+      if (signalMetadataArg) {
+        try {
+          signalMetadata = JSON.parse(signalMetadataArg);
+        } catch {
+          console.error('Error: --signal-metadata must be valid JSON');
+          process.exit(1);
+        }
+      }
+
       const result = await linearActivity({
         sessionId,
         type,
@@ -608,6 +643,7 @@ async function main(): Promise<void> {
         result: resultStr,
         signal,
         options,
+        signalMetadata,
       });
       console.log(JSON.stringify(result));
       process.exit(0);
@@ -616,23 +652,88 @@ async function main(): Promise<void> {
 
     case 'linear-plan': {
       const sessionId = getArg(args, '--session-id');
-      const planArg = getArg(args, '--plan');
+      const planJsonArg = getArg(args, '--plan-json');
+      const stepArg = getArg(args, '--step');
+      const planArg = getArg(args, '--plan'); // legacy compat
 
-      if (!sessionId || !planArg) {
-        console.error('Error: --session-id and --plan are required');
-        process.exit(1);
+      if (!sessionId) {
+        console.error('Warning: linear-plan skipped (missing --session-id)');
+        console.log(JSON.stringify({ ok: true, skipped: true, reason: 'missing_session_id' }));
+        process.exit(0);
       }
 
-      let plan: Array<{ content: string; status: string }>;
       try {
-        plan = JSON.parse(planArg);
-      } catch {
-        console.error('Error: --plan must be valid JSON');
+        // Resolve plan from --plan-json, --step, or legacy --plan
+        let stdinContent: string | undefined;
+        if (planJsonArg === '-') {
+          stdinContent = await readStdin();
+        }
+        const plan = resolvePlanSteps(planJsonArg ?? planArg, stepArg, stdinContent);
+        if (!plan || plan.length === 0) {
+          console.error('Error: one of --plan-json, --step, or --plan is required');
+          process.exit(1);
+        }
+
+        await linearPlan({ sessionId, plan: plan as any });
+        console.log(JSON.stringify({ updated: true }));
+      } catch (err: any) {
+        // Non-fatal — pipeline should continue if plan update fails
+        console.error(`Warning: linear-plan failed (non-fatal): ${err.message || err}`);
+        console.log(JSON.stringify({ updated: false, error: String(err.message || err) }));
+      }
+      process.exit(0);
+      break;
+    }
+
+    case 'linear-session': {
+      const subMode = args[1];
+      if (subMode !== 'update-urls') {
+        console.error(`Error: Unknown linear-session sub-mode "${subMode}". Use "update-urls".`);
         process.exit(1);
       }
 
-      await linearPlan({ sessionId, plan: plan as any });
-      console.log(JSON.stringify({ updated: true }));
+      const sessionId = getArg(args, '--session-id');
+      if (!sessionId) {
+        console.warn('Warning: linear-session skipped (missing --session-id)');
+        console.log(JSON.stringify({ ok: true, skipped: true, reason: 'missing_session_id' }));
+        process.exit(0);
+      }
+
+      const setUrlsArg = getArg(args, '--set-urls');
+      const addUrlArgs = getAllArgs(args, '--add-url');
+
+      if (!setUrlsArg && addUrlArgs.length === 0) {
+        console.error('Error: --add-url or --set-urls is required');
+        process.exit(1);
+      }
+
+      let setUrls: Array<{ label: string; url: string }> | undefined;
+      if (setUrlsArg) {
+        try {
+          setUrls = JSON.parse(setUrlsArg);
+        } catch {
+          console.error('Error: --set-urls must be valid JSON array of {label, url}');
+          process.exit(1);
+        }
+      }
+
+      // Parse --add-url "label=url" entries
+      const addUrls: Array<{ label: string; url: string }> = [];
+      for (const entry of addUrlArgs) {
+        const eqIdx = entry.indexOf('=');
+        if (eqIdx === -1) {
+          console.error(`Error: --add-url value must be "label=url" format, got: ${entry}`);
+          process.exit(1);
+        }
+        addUrls.push({ label: entry.slice(0, eqIdx), url: entry.slice(eqIdx + 1) });
+      }
+
+      const result = await linearSessionUpdateUrls({
+        sessionId,
+        externalUrls: setUrls,
+        addUrls: addUrls.length > 0 ? addUrls : undefined,
+      });
+      console.log(JSON.stringify(result));
       process.exit(0);
       break;
     }
