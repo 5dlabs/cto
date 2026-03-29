@@ -7,14 +7,16 @@
 #   - jq: brew install jq
 #
 # Authentication (pick one):
-#   A) Service account with "Create and view items" on the target vault:
-#        export OP_SERVICE_ACCOUNT_TOKEN
-#      Store the token in 1Password (e.g. secure note "1Password Service Account — CTO") and:
-#        export OP_SERVICE_ACCOUNT_TOKEN="$(op read 'op://Vault/Item/credential')"
-#      (Run that export in a shell already signed in with your human account.)
 #
-#   B) Interactive user session:
-#        eval "$(op signin)"
+#   A) You + biometrics / password (most common). Do NOT set OP_SERVICE_ACCOUNT_TOKEN.
+#        unset OP_SERVICE_ACCOUNT_TOKEN   # if a bad export is still in the shell
+#        eval "$(op signin)"              # may prompt Touch ID / password
+#      Then run this script. The AI assistant cannot run this for you: `op` must run on your Mac.
+#
+#   B) Service account token (CI / automation only). Needs vault grants in 1Password admin.
+#        export OP_SERVICE_ACCOUNT_TOKEN="..."   # real token, not op://YOUR_VAULT placeholder
+#      Or: export OP_SERVICE_ACCOUNT_TOKEN="$(op read 'op://RealVault/Real Item/credential')"
+#      after (A) once, to copy the token into an item — use real vault and item names from `op vault list` / `op item list`.
 #
 # Usage:
 #   ./scripts/google-oauth-json-to-1password.sh /path/to/client_secret_....json
@@ -47,7 +49,12 @@ project_id: ${PROJECT_ID}
 Source file: $(basename "$JSON_FILE")
 Created: $(date -u +%Y-%m-%dT%H:%MZ)"
 
-op whoami >/dev/null 2>&1 || die "not signed in: set OP_SERVICE_ACCOUNT_TOKEN or run eval \"\$(op signin)\""
+if ! op whoami >/dev/null 2>&1; then
+  echo "error: 1Password CLI is not authenticated." >&2
+  echo "  If you use Touch ID: run  unset OP_SERVICE_ACCOUNT_TOKEN  then  eval \"\$(op signin)\"" >&2
+  echo "  If OP_SERVICE_ACCOUNT_TOKEN is set to a placeholder, unset it and sign in again." >&2
+  exit 1
+fi
 
 op item template get "API Credential" | jq \
   --arg title "$ITEM_TITLE" \
