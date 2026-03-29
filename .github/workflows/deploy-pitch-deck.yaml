@@ -1,0 +1,46 @@
+name: Deploy Pitch Deck (pitch.5dlabs.ai)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/pitch-deck/**"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy pitch deck to Cloudflare Pages
+    permissions:
+      contents: read
+      deployments: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/pitch-deck/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/pitch-deck
+        run: npm ci
+
+      - name: Build
+        working-directory: apps/pitch-deck
+        run: npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/pitch-deck
+          wranglerVersion: "4"
+          command: pages deploy out --project-name=5dlabs-pitch-deck --branch=main --commit-dirty=true
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}

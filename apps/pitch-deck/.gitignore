@@ -1,0 +1,8 @@
+.next/
+out/
+node_modules/
+*.tsbuildinfo
+
+# Generated ElevenLabs walkthrough / samples (large binaries)
+pitch-deck-full-walkthrough.mp3
+*-voice-sample*.mp3
