@@ -1,10 +1,10 @@
-# Morgan (LemonSlice) — field-by-field setup
+# Morgan — hosted video agent (field-by-field setup)
 
-Use this doc when editing the hosted agent **`agent_0b8ca791bd37c632`** in the LemonSlice dashboard. Copy sections into the matching UI fields. Prompt structure follows [LemonSlice Prompt Engineering](https://lemonslice.com/docs/prompt-engineering) (sections, concise, repeat critical rules at end, speech-safe output, video-agent context).
+Use this doc when editing the hosted agent **`agent_0b8ca791bd37c632`** in your video-agent dashboard. Copy sections into the matching UI fields. Prompt structure: short sections with headings, concise rules, repeat critical instructions at the end, speech-safe output, and explicit **video-agent** context (browser, avatar, no physical body).
 
 **Canonical pitch copy** in-repo: `apps/pitch-deck/src/lib/deck-content.ts` — update the deck first, then refresh Knowledge Base text here if numbers change.
 
-**Knowledge base (LemonSlice “Add document”):** see **§5** — includes **investment/deck facts** plus a second block **“what Morgan does”** on the CTO platform. Both are meant to be pasted or uploaded as separate KB documents.
+**Knowledge base (“Add document” in the dashboard):** see **§5** — includes **investment/deck facts** plus a second block **“what Morgan does”** on the CTO platform. Both are meant to be pasted or uploaded as separate KB documents.
 
 ---
 
@@ -15,7 +15,7 @@ Use this doc when editing the hosted agent **`agent_0b8ca791bd37c632`** in the L
 **Suggested copy (paste into “First message”):**
 
 ```text
-<break time="0.3s" /> Hey! I'm Morgan — I help investors get oriented on five D Labs before a live conversation. I'm a video agent powered by Lemon Slice. Ask me about the thesis, traction, the CTO stack, or the round — or say what you're trying to decide and I'll keep it tight.
+<break time="0.3s" /> Hey! I'm Morgan — I help investors get oriented on five D Labs before a live conversation. Ask me about the thesis, traction, the CTO stack, or the round — or say what you're trying to decide and I'll keep it tight.
 ```
 
 **Tuning notes**
@@ -31,13 +31,13 @@ Use this doc when editing the hosted agent **`agent_0b8ca791bd37c632`** in the L
 |--------|-----------|
 | **Voice** | **Sam** (or match brand tests — pick one voice and keep it stable for recognition). |
 | **Voice speed** | **1.00** — raise slightly (e.g. 1.05) only if replay feels sluggish. |
-| **Language** | **English** for a single-language prompt, **or** enable **Multilingual** only if you will maintain system prompts per language. If multilingual is off, write the system prompt in **English** (LemonSlice recommendation). |
+| **Language** | **English** for a single-language prompt, **or** enable **Multilingual** only if you will maintain system prompts per language. If multilingual is off, write the system prompt in **English** (recommended). |
 
 ---
 
 ## 3. Personality — System prompt
 
-*Used for what the agent says and conversation context. “Default personality” appends LemonSlice’s recommended prompt — **try OFF first** so your custom prompt is the single source of truth; turn ON only if you want their extra layer without duplication.*
+*Used for what the agent says and conversation context. “Default personality” may append an extra template from the host — **try OFF first** so your custom prompt is the single source of truth; turn ON only if you want that layer without duplication.*
 
 **Paste the block below into “System Prompt”:**
 
@@ -97,13 +97,13 @@ Stay within the deck and knowledge base. Do not fabricate metrics. Spoken-only p
 
 | Field | Notes |
 |--------|--------|
-| **Model** | **qwen3-30b-a3b** (current) — if answers feel shallow on multi-slide reasoning, try a larger option LemonSlice offers; if latency hurts, keep this tier. |
+| **Model** | **qwen3-30b-a3b** (current) — if answers feel shallow on multi-slide reasoning, try a larger model the host offers; if latency hurts, keep this tier. |
 
 ---
 
 ## 5. Knowledge base — documents to add
 
-**Yes — this was already in this doc** (deck flat facts below). The LemonSlice **Knowledge Base** is separate from the **System Prompt**: the prompt sets *how* Morgan speaks and behaves; uploaded documents give *retrievable* facts so answers stay grounded when investors ask specifics.
+**Yes — this was already in this doc** (deck flat facts below). The dashboard **Knowledge Base** is separate from the **System Prompt**: the prompt sets *how* Morgan speaks and behaves; uploaded documents give *retrievable* facts so answers stay grounded when investors ask specifics.
 
 **Recommended: add at least two documents** in the dashboard (“Add document”):
 
@@ -113,7 +113,7 @@ Stay within the deck and knowledge base. Do not fabricate metrics. Spoken-only p
 | **2** | `Morgan — role on the CTO platform` | Everything under **“Knowledge base — what Morgan does (CTO platform)”** — what “Morgan” means beyond this video widget. |
 | **3** (optional) | `Privacy — pitch site` | Short excerpt or full `docs/legal/privacy-policy.md` only if you want Morgan to answer basic privacy questions without improvising. |
 
-**How to upload:** paste each section into its own “Add document” entry, or export this Markdown file to **PDF** / **.txt** per file if LemonSlice prefers files. You can also attach a **PDF export of the live deck** from [pitch.5dlabs.ai](https://pitch.5dlabs.ai) as a fourth document so the agent can align with slide wording.
+**How to upload:** paste each section into its own “Add document” entry, or export this Markdown file to **PDF** / **.txt** per file if the host accepts those formats. You can also attach a **PDF export of the live deck** from [pitch.5dlabs.ai](https://pitch.5dlabs.ai) as a fourth document so the agent can align with slide wording.
 
 After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “What’s the round?” — answers should pull from doc **2** vs **1** respectively.
 
@@ -128,7 +128,7 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 - **Morgan** is the **program-manager / intake** persona on the **CTO** (Cognitive Task Orchestrator) platform at 5D Labs: the name used for workflows that turn product intent into **structured work** for a fleet of implementation agents.
 - In **intake**, Morgan-style runs parse **PRDs** and produce **task plans** (e.g. `tasks.json`) so engineering agents (Rex, Blaze, Grizz, Bolt, …) can execute without re-deriving scope from scratch.
 - Morgan **coordinates** across the lifecycle: decomposition, agent assignment, and keeping tasks **self-contained** so downstream automation can run (including **OpenClaw**-first agent orchestration on the platform).
-- **This LemonSlice video agent** is the **same “Morgan” character** in spirit: a front door for questions — but the **hosted avatar** does **not** run Kubernetes jobs or edit GitHub; it explains the story and points people to materials and humans. The heavy **CTO** work runs in your stack and agents, not inside LemonSlice.
+- **This hosted video session** uses the **same “Morgan” character** in spirit: a front door for questions — but the **avatar** does **not** run Kubernetes jobs or edit GitHub; it explains the story and points people to materials and humans. The heavy **CTO** work runs in your stack and agents, not in this browser Q&A layer.
 
 **What CTO is (one paragraph)**
 
@@ -252,7 +252,7 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 
 - Animated avatar + voice — Q&A front door before live meeting.
 - Same Morgan coordinates intake/agents on CTO platform.
-- Stack: OpenClaw + LiveKit + LemonSlice; commerce via Lemon Squeezy (pricing in progress).
+- Stack: OpenClaw + LiveKit + hosted video avatar; commerce via Lemon Squeezy (pricing in progress).
 - CTA on deck: Talk to Morgan → 5dlabs.ai/cto/morgan#talk
 
 **Founder**
@@ -272,14 +272,7 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 
 ## 6. Widget (embed)
 
-Already configured on the website component:
-
-```html
-<lemon-slice-widget agent-id="agent_0b8ca791bd37c632"></lemon-slice-widget>
-<script type="module" src="https://unpkg.com/@lemonsliceai/lemon-slice-widget"></script>
-```
-
-**Script URL:** pin the same version as `apps/website/src/components/cto/lemon-slice-widget.tsx` if you need reproducible behavior.
+Do **not** duplicate vendor snippets here — keep **one** source of truth in the website repo. The Morgan widget (same agent id **`agent_0b8ca791bd37c632`**) lives under **`apps/website/src/components/cto/`**. Copy the embed from there so **5dlabs.ai** and the dashboard stay aligned.
 
 ---
 
@@ -345,4 +338,4 @@ Attentive and relaxed — slight smile, ready to listen, no fidgeting, professio
 - [ ] Knowledge base document(s) uploaded and answers spot-check against deck.
 - [ ] Allowlist includes production hostnames.
 - [ ] Idle / max duration match expected investor behavior.
-- [ ] Spot-check: email, URLs, and large numbers sound OK via TTS (per LemonSlice speech-normalization guidance).
+- [ ] Spot-check: email, URLs, and large numbers sound OK via TTS (spell out for speech; avoid symbols that TTS mangles).
