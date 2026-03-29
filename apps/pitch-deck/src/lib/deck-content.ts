@@ -119,13 +119,37 @@ export const slides: DeckSlide[] = [
   {
     id: "cto",
     label: "CTO",
-    headline: "CTO — build engine + first commercial wedge",
+    headline: "CTO — platform, not a chat skin",
+    subhead:
+      "Kubernetes-native; mostly Rust for latency. Same product on an enterprise cluster or kind on a workstation.",
     bullets: [
-      "SDLC + ops (Morgan: sales, marketing, accounting).",
-      "Self-healing delivery · multi-CLI (Cursor, Claude, Codex, Factory, …).",
-      "Bare metal — sovereignty, predictable cost, no lock-in. “And” not “or.”",
+      "Multi-CLI routing — OpenClaw **MCP harness** (eight CLIs); picks provider + model for **token and $ efficiency**—works well when founders spread work across **free credits** on many accounts.",
+      "Tool surface — **MCP aggregator** as the tool server; **preset skills per agent** with add / override anytime—methodology stays yours while tools and providers change.",
+      "Operators & runtime — **Kubernetes operators** for backend services; **runtime image** packs languages and tooling; stack is **mostly Rust** where it matters for performance.",
+      "Self-heal & review — **Healer** reacts to telemetry from the observability stack; **Stitch** does automated PR review **and** remediation; **alerting** to Discord, Slack, and webhooks.",
+      "Coordination — **NATS** for agent-to-agent traffic across pods (fills a gap vs. stock Kubernetes); **CRDs** run headless jobs that report back to **Morgan**; **ACP**-style coordination across the fleet.",
+      "Metal & GPU — **automated bare-metal and GPU** provisioning; we **abstract provider contracts** so customers don’t have to—or they keep a **direct deal** with the vendor.",
+      "Research loop — ingest latest methodologies, patterns, and papers → **PRD → features on the platform**—so the product stays current without asking users to rip up how they work.",
+      "CTO Lite desktop — the **board room** (debate, voice, chat with Morgan via **ElevenLabs + LiveKit**). **AR glasses** are on the roadmap (Even G2, Meta Ray-Ban Display, Rokid, Vuzix Z100 — see **5dlabs.ai/cto/morgan**).",
     ],
-    footnote: "AGPL-3.0 — serious teams self-host.",
+    footnote:
+      "AGPL-3.0 — serious teams self-host. More detail: 5dlabs.ai/cto",
+  },
+  {
+    id: "cto-roster",
+    label: "Agent roster",
+    headline: "22 specialist agents",
+    subhead:
+      "Preset skills and tools per role—extend or swap without retraining your team on a new methodology.",
+    bullets: [
+      "Control — **Morgan** (PM / intake).",
+      "Build — **Rex**, **Grizz**, **Nova**, **Viper** · **Blaze**, **Tap**, **Spark** (backend, web, mobile, desktop).",
+      "Trust & ship — **Cleo**, **Cipher**, **Tess**, **Stitch**, **Atlas**, **Bolt** (quality, security, testing, review, merge, infra).",
+      "Domain — **Block**, **Vex**, **Angie**, **Glitch** (chains, XR, agent systems, games).",
+      "Business — **Lex**, **Hype**, **Tally**, **Chase** (legal, marketing, accounting, sales).",
+    ],
+    callout:
+      "Avatars and detail on 5dlabs.ai/cto. Internal operators (e.g. Healer, Keeper, Pixel) also run self-heal, desktop, and orchestration under the hood.",
   },
   {
     id: "private-cloud",

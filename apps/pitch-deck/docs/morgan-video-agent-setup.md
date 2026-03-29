@@ -192,12 +192,19 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 
 - Decide → deploy → learn → compound (thesis, wedge, signals; agents on shared rails; runtime + market feed roadmap; reuse prompts/workflows/infra).
 
-**CTO**
+**CTO (platform)**
 
-- SDLC + ops (Morgan: sales, marketing, accounting).
-- Self-healing delivery; multi-CLI (Cursor, Claude, Codex, Factory, …).
-- Bare metal — sovereignty, predictable cost, no lock-in.
-- Footnote: AGPL-3.0 — serious teams self-host.
+- K8s-native, mostly Rust; enterprise cluster or kind on a laptop. AGPL-3.0 for serious self-host.
+- OpenClaw MCP harness — eight CLIs; MCP aggregator; cost/token-aware routing across providers (free credits friendly).
+- Operators for backend services; runtime image with languages/tools; Healer (telemetry-driven); Stitch (review + remediate); alerting Discord/Slack/webhooks.
+- NATS agent-to-agent across pods; CRDs + headless jobs → Morgan; ACP-style coordination.
+- Automated bare metal + GPU; contract abstraction (optional direct vendor deal).
+- Research → PRD → shipped platform features; preset skills per agent, customizable.
+- CTO Lite desktop = board room; Morgan voice/chat (ElevenLabs + LiveKit); AR glasses roadmap (see 5dlabs.ai/cto/morgan).
+
+**CTO (agent roster — public site)**
+
+- 22 specialist agents in named groups (Morgan; Rex/Grizz/Nova/Viper/Blaze/Tap/Spark; Cleo/Cipher/Tess/Stitch/Atlas/Bolt; Block/Vex/Angie/Glitch; Lex/Hype/Tally/Chase). Tiles on 5dlabs.ai/cto. Internal operators (Healer, Keeper, Pixel, …) under the hood.
 
 **Private cloud**
 
