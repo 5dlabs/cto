@@ -43,7 +43,7 @@ CTO. SDLC plus ops through Morgan; self-healing delivery; multi-CLI; bare metal 
 
 Private cloud. This isn't a ChatGPT wrapper — it's an AWS-shaped private cloud on your metal. Five D Plan, Code, Git, and Edge — Cloudflare tunnels and edge. The table is a sample map: data, store, inference, observe, deploy, vault, edge. Full catalog lives on five d labs dot ai under CTO services.
 
-Differentiation. Plan before code: Lobster, Stitch and Linear, voice and listen. Humans in the loop without micromanagement. The ROI line on the slide says it: fewer hires, lower infra bill, faster cycles.
+Differentiation. Plan before code: a real planning workflow, UI and scope locked in early, voice and async listening. Humans in the loop without micromanagement. The ROI line on the slide says it: fewer hires, lower infra bill, faster cycles.
 
 Trading. In-house chains and edge; bootstrap only — not an external fund. Investor money is not trading principal.
 

@@ -198,9 +198,9 @@ export const slides: DeckSlide[] = [
     label: "Differentiation",
     headline: "Plan before code — keep your mental model",
     bullets: [
-      "Lobster: optimist vs. pessimist, voice — listen anywhere.",
-      "Stitch + Linear — pick UI before build; less designer headcount.",
-      "Humans stay in the loop via listening, not micromanagement.",
+      "Structured **planning workflow** before implementation—explore options, use voice, listen async—so the team aligns before anyone ships the wrong thing.",
+      "**UI and scope** clarified early with review + tracking tied together—less rework, less spend on design-only firefighting.",
+      "Humans stay in the loop through **listening** and async review, not constant ticket-chasing.",
     ],
     callout: "ROI: fewer hires, lower infra bill, faster cycles.",
   },

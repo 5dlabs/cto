@@ -16,7 +16,7 @@ Screen-record [https://pitch.5dlabs.ai](https://pitch.5dlabs.ai) (or `npm run de
 | **05 Loop** | Four bullets | Decide (thesis + signals) → deploy (CTO + OpenClaw) → learn (runtime + market) → compound (reuse). |
 | **06 CTO** | Bullets | SDLC + ops via Morgan; self-healing delivery; multi-CLI; bare metal for sovereignty and cost — **and** not **or**. AGPL for self-hosters. |
 | **07 Private cloud** | Bullets + table | Not a ChatGPT wrapper — AWS-shaped **private** cloud on your metal. Call out **5D Plan, Code, Git, Edge** (Cloudflare tunnels + edge). Table = sample map (data, store, inference, observe, deploy, vault, edge). Full list: `5dlabs.ai` CTO services. |
-| **08 Differentiation** | Bullets | Plan before code: Lobster, Stitch + Linear, voice/listen. Humans in the loop without micromanagement. ROI line on slide. |
+| **08 Differentiation** | Bullets | Plan before code: planning workflow, UI/scope early, voice + async listening. Humans in the loop without micromanagement. ROI line on slide. |
 | **09 Trading** | Bullets + footnote | In-house chains + edge; bootstrap only; **not** external fund. Investor money ≠ trading principal. |
 | **10 Traction** | Long bullet list | Sigma One; Bloq ~$20K/mo; partners servers.com, ID3.net, Latitude; pipeline Cherry Servers; MiniMax approached; stack stats; founder velocity + Pocket-era 1B+ req/day. |
 | **11 Market** | Three bullets | Beachhead crypto-native → expand to anyone burning cloud + headcount. Moat: bare metal + automation vs cloud-only agents. |

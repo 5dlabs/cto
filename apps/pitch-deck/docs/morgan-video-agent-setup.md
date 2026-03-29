@@ -60,7 +60,7 @@ Problem framing: when code is cheap, coordination wins — aim, orchestration, l
 
 CTO wedge: SDLC plus ops; Morgan names intake and coordination; self-healing delivery; multi-CLI; bare metal for sovereignty and predictable cost; license note for serious teams: A G P L three dot zero for self-host story where relevant.
 
-Differentiation: plan before code — Lobster, Stitch plus Linear, humans in the loop via listening.
+Differentiation: plan before code — structured planning workflow; UI and scope early; humans in the loop via listening and async review.
 
 Traction examples named in materials: Sigma One; Bloq dot com roughly twenty K per month engagement; partnerships servers dot com, I D three dot net, Latitude; Cherry Servers in discussion; MiniMax approached to partner; stack counts as stated on deck — seventeen plus bare-metal sites, four chains, twenty two specialist agents.
 
@@ -223,7 +223,7 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 
 **Intake / differentiation**
 
-- Plan before code — Lobster; Stitch + Linear; humans in loop via listening.
+- Plan before code — planning workflow first; clarify UI and scope before engineering; listening / async review instead of micromanagement.
 - ROI framing: fewer hires, lower infra bill, faster cycles.
 
 **Trading engine**
