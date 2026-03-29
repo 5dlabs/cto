@@ -10,7 +10,7 @@ Screen-record [https://pitch.5dlabs.ai](https://pitch.5dlabs.ai) (or `npm run de
 |---|------------------|---------------------------|
 | **Intro** | Your face optional; then browser with deck | You’re Jonathon; this is the 5D Labs pre-seed deck — what you built, why it matters, the raise. Deck: `pitch.5dlabs.ai`. |
 | **01 Cover** | Logo, stats grid, callout | AI-native venture studio; you built the stack that builds companies — now it’s the product. Pre-seed, Delaware, $750K. Point at stats: 2 customers, ~$240K ACV, multiple revenue streams, infra savings vs cloud-only. Same stack: implementations, rev-share, trading, advisory. |
-| **02 Problem** | Impact layout, bullets | When code is cheap, **coordination** wins — aim, orchestration, learning. Model mix: strong models for planning; cheap open/local (incl. competitive stacks) for iteration. Otherwise: sprawl and cloud tax. One loop: decide → ship → learn. |
+| **02 Problem** | Impact layout, bullets | Coordination wins when code is cheap — **infra economics** (egress, storage, managed margin) dominate bills; **people + sprawl** without a system. Model mix for planning vs iteration. One loop: decide → ship → learn. |
 | **03 One machine** | Thesis | Not three random bets — one OS: **build, fund, ship**. CTO is the wedge; trading is internal capital; ventures + OpenClaw share playbooks. One loop — drop a piece and it weakens the whole thing. |
 | **04 Origin** | Bullets | Built for yourselves first: wanted Solana trading, small team, models weren’t “there” yet — built CTO to ship anyway. Months on CTO; infra is real. Scratch → prod → sell. |
 | **05 Loop** | Four bullets | Decide (thesis + signals) → deploy (CTO + OpenClaw) → learn (runtime + market) → compound (reuse). |
@@ -23,7 +23,7 @@ Screen-record [https://pitch.5dlabs.ai](https://pitch.5dlabs.ai) (or `npm run de
 | **12 Model** | Four bullets | Four revenue streams, one stack: CTO subs, rev-share, trading P&L, advisory. |
 | **13 GTM** | Bullets | Open-source OpenClaw platform (GitOps + Helm) → funnel to CTO. Freemium desktop / kind, limited agents, feature flags → tiers. Desktop as main surface long-term. |
 | **14 Use of funds** | Table + callout | $750K → engineers, founder, edge, lab, models, buffer. ~18 months to cash-flow positive. |
-| **15 Morgan** | CTA button visible | Morgan = avatar + voice; same agent as intake. OpenClaw + LiveKit + hosted avatar. **Optional:** hover the “Talk to Morgan” button so viewers see it — no need to click. |
+| **15 Morgan** | CTA button visible | Morgan = avatar + voice **Q&A**; same **persona** as on CTO, but **no PRD/intake here**—that’s the main app. OpenClaw + LiveKit + hosted avatar. **Optional:** hover “Talk to Morgan” — no need to click. |
 | **16 Founder** | Three bullets | 20+ yrs ops, Victoria; Pocket Head of Infra at scale; Blocknative; Coinmiles SE→CTO fast. |
 | **17 Ask** | Callout + footnote | $750K post-money SAFE; use of funds; cap vs comps — terms in conversation; profitability bias; M&A > IPO as default story. **Show:** export controls in bottom chrome (PDF / PPT / Slides). Cal link in footnote. |
 | **Outro** | Deck or your face | Thanks — deck at `pitch.5dlabs.ai`; book a call on the last slide if they want to go deeper. |

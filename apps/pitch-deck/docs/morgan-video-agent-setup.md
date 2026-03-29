@@ -56,9 +56,9 @@ Company: five D Labs. Round: pre-seed, Delaware C-Corp, seven hundred fifty K U.
 
 Headline metrics called out on materials: two paying customers; about two hundred forty K annual contract value; four revenue streams; infra savings versus cloud shown as fifty to seventy-five percent on the deck headline — workload-specific; full math is illustrative.
 
-Problem framing: when code is cheap, coordination wins — aim, orchestration, learning fast. Solution framing: one machine — build, fund, ship — CTO, trading, ventures on one operating system, not three disconnected bets.
+Problem framing: when code is cheap, coordination wins — aim, orchestration, learning; **unit economics** on egress, storage, headcount. Solution framing: one machine — build, fund, ship — CTO, trading, ventures on one operating system, not three disconnected bets.
 
-CTO wedge: SDLC plus ops; Morgan names intake and coordination; self-healing delivery; multi-CLI; bare metal for sovereignty and predictable cost; license note for serious teams: A G P L three dot zero for self-host story where relevant.
+CTO wedge: SDLC plus ops; Morgan names PM/coordination on the platform; self-healing delivery; multi-CLI; bare metal for sovereignty and predictable cost; license note for serious teams: A G P L three dot zero for self-host story where relevant.
 
 Differentiation: plan before code — structured planning workflow; UI and scope early; humans in the loop via listening and async review.
 
@@ -125,8 +125,8 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 
 **Who Morgan is in the product**
 
-- **Morgan** is the **program-manager / intake** persona on the **CTO** (Cognitive Task Orchestrator) platform at 5D Labs: the name used for workflows that turn product intent into **structured work** for a fleet of implementation agents.
-- In **intake**, Morgan-style runs parse **PRDs** and produce **task plans** (e.g. `tasks.json`) so engineering agents (Rex, Blaze, Grizz, Bolt, …) can execute without re-deriving scope from scratch.
+- **Morgan** is the **program-manager** persona on the **CTO** (Cognitive Task Orchestrator) platform at 5D Labs: the name used for **coordination** workflows that turn product intent into **structured work** for a fleet of implementation agents.
+- **Product intake and PRDs** are handled **in the CTO app and pipelines**—they yield **task plans** (e.g. `tasks.json`) for engineering agents (Rex, Blaze, Grizz, Bolt, …). The **avatar / video** experience does **not** accept PRDs; it is **Q&A only**.
 - Morgan **coordinates** across the lifecycle: decomposition, agent assignment, and keeping tasks **self-contained** so downstream automation can run (including **OpenClaw**-first agent orchestration on the platform).
 - **This hosted video session** uses the **same “Morgan” character** in spirit: a front door for questions — but the **avatar** does **not** run Kubernetes jobs or edit GitHub; it explains the story and points people to materials and humans. The heavy **CTO** work runs in your stack and agents, not in this browser Q&A layer.
 
@@ -136,11 +136,11 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 
 **How to describe it in one sentence (spoken)**
 
-- “Morgan is our program-manager face: on the platform she’s tied to intake and coordination across agents; in this video she’s here to answer investor questions clearly — the actual code and cluster work runs on CTO and OpenClaw.”
+- “Morgan is our program-manager face on CTO for coordination across agents; in this video she’s **Q&A only** — **product intake and PRDs** go through the **CTO app**, not this widget. The heavy code and cluster work runs on CTO and OpenClaw.”
 
 **If asked “which Morgan am I talking to?”**
 
-- Same brand and voice; **this** session is **Q&A + deck** for investors. **Product** Morgan in the platform handles **PRD → tasks → play workflows** with the engineering agent roster.
+- Same brand and voice; **this** session is **Q&A + deck** for investors. **Intake, PRDs, and play workflows** run **in CTO** with the engineering agent roster — not through the avatar browser experience.
 
 **Related public pointers**
 
@@ -167,9 +167,9 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 
 **Problem**
 
-- When code is cheap, coordination wins.
-- Scarcity: aim, orchestration, learning fast enough.
-- Tool sprawl + cloud tax + scarce DevOps/design without a system → cost explodes.
+- When code is cheap, coordination wins — scarce: aim, orchestration, learning; **unit economics** on egress, storage, headcount.
+- Infra economics: egress, storage, managed margin dominate real bills; headline compute is the bait; CTO wedge = cost + control on metal + automation.
+- People + sprawl: tool sprawl, scarce DevOps/design — spend explodes without a coordinated system.
 - Model mix: frontier for planning/architecture; local + open (incl. Chinese stacks) for iteration.
 - Winners: decide → ship → learn with real signal.
 
@@ -191,7 +191,7 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 **Loop**
 
 - Decide → deploy → learn → compound (thesis, wedge, signals; agents on shared rails; runtime + market feed roadmap; reuse prompts/workflows/infra).
-- Callout: you focus on the **PRD**—agents and automation take it through build, review, and **release to production**.
+- Callout: **product intake and PRDs** live in **CTO**—agents and automation take it through build, review, and **release to production**.
 
 **CTO (platform)**
 
@@ -265,8 +265,8 @@ After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “
 **Morgan (this agent)**
 
 - Animated avatar + voice — Q&A front door before live meeting.
-- Same Morgan coordinates intake/agents on CTO platform.
-- No PRD field in the video widget—use host **knowledge base** (URLs, text); **PRD → tasks** stays on CTO.
+- Same **Morgan persona** as PM/coordination on **CTO**; **this widget is Q&A only** — no PRD or product intake path here.
+- No PRD field in the video widget—use host **knowledge base** (URLs, text); **product intake and PRDs** stay in the **CTO app**.
 - Stack: OpenClaw + LiveKit + hosted video avatar.
 - CTA on deck: Talk to Morgan → 5dlabs.ai/cto/morgan#talk
 

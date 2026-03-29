@@ -72,10 +72,10 @@ export const slides: DeckSlide[] = [
     eyebrow: "The shift",
     headline: "When code is cheap, coordination wins.",
     subhead:
-      "“Code is a commodity” means implementation keeps getting automated — more software builds itself, marginal cost of another feature drops. The scarce part is aim, orchestration, and learning fast enough.",
+      "“Code is a commodity” means implementation keeps getting automated — more software builds itself, marginal cost of another feature drops. The scarce part is aim, orchestration, and learning fast enough — **and unit economics that don’t break on egress, storage, and headcount.**",
     bullets: [
-      "Execution still needs direction, discipline, and infra that stays up.",
-      "Tool sprawl + cloud tax + scarce DevOps/design — cost explodes without a system.",
+      "**Infra economics:** egress, storage, and managed-service margin dominate real hyperscale bills — **headline compute is the bait.** CTO’s core wedge is **cost and control** on bare metal plus automation.",
+      "**People + sprawl:** tool sprawl and scarce DevOps/design — spend explodes without a coordinated system.",
       "Model mix: frontier models for planning and architecture; local + competitive open models (incl. Chinese stacks) for iteration loops — front-load thinking, iterate cheaply without giving up quality.",
       "Winners run decide → ship → learn in one loop with real signal.",
     ],
@@ -116,7 +116,7 @@ export const slides: DeckSlide[] = [
       "Compound — reuse prompts, workflows, infra.",
     ],
     callout:
-      "You focus on the **PRD**—agents and automation take it from there through build, review, and **release to production**.",
+      "**Product intake and PRDs** live in **CTO**—agents and automation take it from there through build, review, and **release to production**.",
   },
   {
     id: "cto",
@@ -144,7 +144,7 @@ export const slides: DeckSlide[] = [
     subhead:
       "Preset skills and tools per role—extend or swap without retraining your team on a new methodology.",
     bullets: [
-      "Control — **Morgan** (PM / intake).",
+      "Control — **Morgan** (PM / coordination).",
       "Build — **Rex**, **Grizz**, **Nova**, **Viper** · **Blaze**, **Tap**, **Spark** (backend, web, mobile, desktop).",
       "Trust & ship — **Cleo**, **Cipher**, **Tess**, **Stitch**, **Atlas**, **Bolt** (quality, security, testing, review, merge, infra).",
       "Domain — **Block**, **Vex**, **Angie**, **Glitch** (chains, XR, agent systems, games).",
@@ -298,10 +298,10 @@ export const slides: DeckSlide[] = [
     label: "Morgan",
     headline: "Talk to Morgan before we meet",
     subhead:
-      "Animated avatar + voice — Q&A front door before a live conversation. Ground the host agent with KB URLs and deck links; there’s no separate PRD field here—**PRD → tasks** stays on the CTO platform.",
+      "Animated avatar + voice — Q&A front door before a live conversation. Ground the host with KB URLs and deck links. **No product intake or PRD path here**—that runs in the **CTO app**, not this widget.",
     bullets: [
-      "Same Morgan that runs intake and coordinates agents on the CTO platform.",
-      "Investors use this for narrative Q&A; product intake and PRDs still flow through CTO (not through the avatar widget).",
+      "**Morgan** is the PM/coordination **persona on CTO**; this experience is **voice + avatar Q&A only**—not where specs or intake land.",
+      "Investors use this for narrative questions; **product intake and PRDs flow through CTO** (same platform as the agent fleet), not through the browser widget.",
       "Live stack: OpenClaw + LiveKit + hosted avatar.",
     ],
     cta: {

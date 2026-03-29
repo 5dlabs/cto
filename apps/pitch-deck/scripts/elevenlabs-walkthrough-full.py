@@ -31,7 +31,7 @@ Hi, I'm Jonathon. This is the 5D Labs pre-seed deck: what we built, why it matte
 
 Cover. We're an AI-native venture studio. The headline is: we built the stack that builds companies — now it's the product. Pre-seed, Delaware C-corp, seven hundred fifty thousand dollars. On the cover: two paying customers, about two hundred forty K annual contract value, multiple revenue streams on one platform, and real infra savings versus a cloud-only AI delivery model. Same stack: CTO implementations, bare-metal rev-share, trading, and advisory.
 
-Problem. When code is cheap, coordination wins — aim, orchestration, and learning fast. We use stronger models for planning and cheaper open and local stacks, including very competitive options, for iteration. Without a system you get sprawl and cloud tax. One loop: decide, ship, learn.
+Problem. When code is cheap, coordination wins — aim, orchestration, learning. The real budget hits are hyperscale egress, storage, and managed-service margin — headline compute is the bait — plus headcount when you don't have a system. Strong models for planning, cheaper open and local stacks for iteration. One loop: decide, ship, learn.
 
 One machine. This isn't three random bets — it's one OS: build, fund, ship. CTO is the wedge; trading is internal capital; ventures and OpenClaw share playbooks. One loop — if you drop a piece, the whole thing weakens.
 
@@ -57,7 +57,7 @@ Go-to-market. Open-source OpenClaw platform—GitOps and Helm to deploy at scale
 
 Use of funds. Seven fifty K goes to engineers, founder runway, edge, lab, models, and buffer — about eighteen months to cash-flow positive.
 
-Morgan. Avatar and voice — same agent as intake. OpenClaw, LiveKit, hosted avatar. There's a Talk to Morgan button on the site.
+Morgan. Avatar and voice for Q and A — same Morgan persona as on CTO, but no PRD or product intake in this widget; that stays in the CTO app. OpenClaw, LiveKit, hosted avatar. Talk to Morgan button on the site.
 
 Founder. Twenty plus years in ops, Victoria. At Pocket, Head of Infra at scale. Blocknative; Coinmiles from senior engineer to CTO in three months.
 
