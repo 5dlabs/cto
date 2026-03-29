@@ -197,6 +197,7 @@ tests/cli-invocation/.build-info
 
 # Local credentials (private - never commit)
 local/
+!infra/observability/local/
 CREDENTIALS.md
 credentials.md
 *.credentials.*
@@ -219,6 +220,8 @@ intake/.bridge-logs/
 # lobster-voice audio cache (ElevenLabs TTS)
 .intake/.voice-cache/
 .intake/.voice-locks/
+# Observability JSONL logs (collected by local Grafana/Loki stack)
+.intake/logs/
 
 # lobster-voice compiled binary (build artifact)
 apps/lobster-voice/lobster-voice

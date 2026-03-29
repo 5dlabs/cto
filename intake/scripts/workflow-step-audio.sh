@@ -8,6 +8,41 @@ LEVEL="${4:-normal}"
 EXTRA_CONTEXT="${5:-}"
 ROLE_OVERRIDE="${6:-}"
 
+# --- Observability: always emit step event (even when audio is muted) ---
+_STEP_LOG_DIR="${WORKSPACE:-.}/.intake/logs"
+_TIMING_FILE="$_STEP_LOG_DIR/.step-timing"
+if mkdir -p "$_STEP_LOG_DIR" 2>/dev/null; then
+  _ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  _now=$(date +%s)
+  _run_id="${INTAKE_RUN_ID:-unknown}"
+
+  # Close out previous step (emit step_end with duration)
+  if [[ -f "$_TIMING_FILE" ]]; then
+    _prev_step=$(sed -n '1p' "$_TIMING_FILE")
+    _prev_phase=$(sed -n '2p' "$_TIMING_FILE")
+    _prev_epoch=$(sed -n '3p' "$_TIMING_FILE")
+    if [[ -n "$_prev_epoch" ]]; then
+      _dur_ms=$(( (_now - _prev_epoch) * 1000 ))
+      printf '{"ts":"%s","event":"step_end","run_id":"%s","step_id":"%s","phase":"%s","duration_ms":%d,"exit_code":0}\n' \
+        "$_ts" "$_run_id" "$_prev_step" "$_prev_phase" "$_dur_ms" \
+        >> "$_STEP_LOG_DIR/pipeline.jsonl" 2>/dev/null || true
+    fi
+  fi
+
+  # Emit step_start for current step
+  _event="step_start"
+  case "$LEVEL" in
+    error|fail*) _event="step_error" ;;
+  esac
+  printf '{"ts":"%s","event":"%s","run_id":"%s","step_id":"%s","phase":"%s"}\n' \
+    "$_ts" "$_event" "$_run_id" "$STEP" "$WORKFLOW" \
+    >> "$_STEP_LOG_DIR/pipeline.jsonl" 2>/dev/null || true
+
+  # Save timing for this step
+  printf '%s\n%s\n%s\n' "$STEP" "$WORKFLOW" "$_now" > "$_TIMING_FILE" 2>/dev/null || true
+fi
+# --- End observability ---
+
 if [[ "$ENABLED" != "true" && "$ENABLED" != "1" ]]; then
   exit 0
 fi

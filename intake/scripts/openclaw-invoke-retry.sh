@@ -8,6 +8,20 @@ MAX=${OPENCLAW_MAX_RETRIES:-5}
 ERR_FILE=$(mktemp)
 trap 'rm -f "$ERR_FILE"' EXIT
 
+# Observability: log retry events
+_RETRY_LOG_DIR="${WORKSPACE:-.}/.intake/logs"
+_retry_log() {
+  local attempt="$1" status="$2" backoff="${3:-0}" error="${4:-}"
+  mkdir -p "$_RETRY_LOG_DIR" 2>/dev/null || true
+  local ts run_id
+  ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  run_id="${INTAKE_RUN_ID:-unknown}"
+  error=$(printf '%s' "$error" | head -c 200 | sed 's/"/\\"/g' | tr '\n' ' ')
+  printf '{"ts":"%s","event":"retry","run_id":"%s","attempt":%d,"max_attempts":%d,"status":"%s","backoff_sec":%d,"error":"%s"}\n' \
+    "$ts" "$run_id" "$attempt" "$MAX" "$status" "$backoff" "$error" \
+    >> "$_RETRY_LOG_DIR/llm-calls.jsonl"
+}
+
 for ATTEMPT in $(seq 1 "$MAX"); do
   if OUTPUT=$(openclaw.invoke "$@" 2>"$ERR_FILE"); then
     cat "$ERR_FILE" >&2
@@ -21,6 +35,7 @@ for ATTEMPT in $(seq 1 "$MAX"); do
         BACKOFF=$((ATTEMPT * ATTEMPT * 5))
         echo "openclaw-invoke-retry: transient failure (attempt $ATTEMPT/$MAX), retrying in ${BACKOFF}s..." >&2
         echo "  stderr: ${ERR_TEXT:0:200}" >&2
+        _retry_log "$ATTEMPT" "transient" "$BACKOFF" "${ERR_TEXT:0:200}"
         if [ "$ATTEMPT" -ge 3 ]; then
           echo "openclaw-invoke-retry: killing stale gateway on attempt $ATTEMPT..." >&2
           pkill -f openclaw-gateway 2>/dev/null || true
@@ -30,6 +45,10 @@ for ATTEMPT in $(seq 1 "$MAX"); do
         fi
         continue
       fi
+      _retry_log "$ATTEMPT" "exhausted" "0" "${ERR_TEXT:0:200}"
+      ;;
+    *)
+      _retry_log "$ATTEMPT" "fatal" "0" "${ERR_TEXT:0:200}"
       ;;
   esac
   cat "$ERR_FILE" >&2
