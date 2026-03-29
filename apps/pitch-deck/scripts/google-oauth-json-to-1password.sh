@@ -22,6 +22,11 @@
 #   ./scripts/google-oauth-json-to-1password.sh /path/to/client_secret_....json
 #   VAULT=Private ./scripts/google-oauth-json-to-1password.sh ./client.json
 #
+# If you omit the path, the script tries (in order):
+#   1) $GOOGLE_OAUTH_JSON (if set and the file exists)
+#   2) $HOME/Downloads/client_secret_932249086524-gos1d3eidio1ktdq8q9jp0jjkrt54a67.apps.googleusercontent.com.json
+#      (Pitch Deck OAuth client — update DEFAULT_JSON in this script if Google issues a new download name.)
+#
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,8 +38,22 @@ die() { echo "error: $*" >&2; exit 1; }
 command -v op >/dev/null || die "install 1Password CLI (op)"
 command -v jq >/dev/null || die "install jq"
 
+# Default matches Google Cloud “Download JSON” for the Pitch Deck web client (see header).
+DEFAULT_JSON="$HOME/Downloads/client_secret_932249086524-gos1d3eidio1ktdq8q9jp0jjkrt54a67.apps.googleusercontent.com.json"
+
 JSON_FILE="${1:-}"
-[[ -n "$JSON_FILE" && -f "$JSON_FILE" ]] || die "usage: $0 <client_secret_....apps.googleusercontent.com.json>"
+if [[ -z "$JSON_FILE" && -n "${GOOGLE_OAUTH_JSON:-}" && -f "${GOOGLE_OAUTH_JSON}" ]]; then
+  JSON_FILE="${GOOGLE_OAUTH_JSON}"
+elif [[ -z "$JSON_FILE" && -f "$DEFAULT_JSON" ]]; then
+  JSON_FILE="$DEFAULT_JSON"
+fi
+
+if [[ -z "$JSON_FILE" || ! -f "$JSON_FILE" ]]; then
+  echo "error: pass the path to Google’s client_secret JSON, or put it at:" >&2
+  echo "  $DEFAULT_JSON" >&2
+  echo "  (or set GOOGLE_OAUTH_JSON to the file path)" >&2
+  die "usage: $0 [<client_secret_....apps.googleusercontent.com.json>]"
+fi
 
 VAULT="${VAULT:-Private}"
 ITEM_TITLE="${ITEM_TITLE:-Google OAuth — Pitch Deck (5dlabs)}"
