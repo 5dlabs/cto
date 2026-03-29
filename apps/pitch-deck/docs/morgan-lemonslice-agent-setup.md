@@ -4,6 +4,8 @@ Use this doc when editing the hosted agent **`agent_0b8ca791bd37c632`** in the L
 
 **Canonical pitch copy** in-repo: `apps/pitch-deck/src/lib/deck-content.ts` — update the deck first, then refresh Knowledge Base text here if numbers change.
 
+**Knowledge base (LemonSlice “Add document”):** see **§5** — includes **investment/deck facts** plus a second block **“what Morgan does”** on the CTO platform. Both are meant to be pasted or uploaded as separate KB documents.
+
 ---
 
 ## 1. First message
@@ -101,11 +103,50 @@ Stay within the deck and knowledge base. Do not fabricate metrics. Spoken-only p
 
 ## 5. Knowledge base — documents to add
 
-*Add one or more documents so retrieval grounds answers.*
+**Yes — this was already in this doc** (deck flat facts below). The LemonSlice **Knowledge Base** is separate from the **System Prompt**: the prompt sets *how* Morgan speaks and behaves; uploaded documents give *retrievable* facts so answers stay grounded when investors ask specifics.
 
-**Minimum:** upload **this file** (export as PDF from Markdown if the UI prefers PDF) **or** paste the section **“Knowledge base — flat facts (from deck)”** below into a single “Add document” entry.
+**Recommended: add at least two documents** in the dashboard (“Add document”):
 
-**Optional extras:** PDF export of the live deck from `pitch.5dlabs.ai`; `docs/legal/privacy-policy.md` only if users ask about data practices.
+| # | Document name (suggested) | What to paste |
+|---|---------------------------|---------------|
+| **1** | `5D Labs — investment & deck facts` | Everything under **“Knowledge base — flat facts (from deck)”** — company story, round, traction, product pillars. |
+| **2** | `Morgan — role on the CTO platform` | Everything under **“Knowledge base — what Morgan does (CTO platform)”** — what “Morgan” means beyond this video widget. |
+| **3** (optional) | `Privacy — pitch site` | Short excerpt or full `docs/legal/privacy-policy.md` only if you want Morgan to answer basic privacy questions without improvising. |
+
+**How to upload:** paste each section into its own “Add document” entry, or export this Markdown file to **PDF** / **.txt** per file if LemonSlice prefers files. You can also attach a **PDF export of the live deck** from [pitch.5dlabs.ai](https://pitch.5dlabs.ai) as a fourth document so the agent can align with slide wording.
+
+After uploads, spot-check in preview: ask “What do you do as Morgan?” vs “What’s the round?” — answers should pull from doc **2** vs **1** respectively.
+
+---
+
+### Knowledge base — what Morgan does (CTO platform)
+
+*Use this as **Document 2**. Investor-facing summary — not every internal codename.*
+
+**Who Morgan is in the product**
+
+- **Morgan** is the **program-manager / intake** persona on the **CTO** (Cognitive Task Orchestrator) platform at 5D Labs: the name used for workflows that turn product intent into **structured work** for a fleet of implementation agents.
+- In **intake**, Morgan-style runs parse **PRDs** and produce **task plans** (e.g. `tasks.json`) so engineering agents (Rex, Blaze, Grizz, Bolt, …) can execute without re-deriving scope from scratch.
+- Morgan **coordinates** across the lifecycle: decomposition, agent assignment, and keeping tasks **self-contained** so downstream automation can run (including **OpenClaw**-first agent orchestration on the platform).
+- **This LemonSlice video agent** is the **same “Morgan” character** in spirit: a front door for questions — but the **hosted avatar** does **not** run Kubernetes jobs or edit GitHub; it explains the story and points people to materials and humans. The heavy **CTO** work runs in your stack and agents, not inside LemonSlice.
+
+**What CTO is (one paragraph)**
+
+- **CTO** is the commercial / open-core **build engine**: SDLC plus ops, multi-CLI harness (Cursor, Claude, Codex, Factory, …), bare-metal Kubernetes, self-healing delivery, and a growing catalog of **5D**-named services (plan, code, git, edge, data, deploy, observe, …) — “hyperscaler-shaped” capability on **metal you own**, with agents operating it.
+
+**How to describe it in one sentence (spoken)**
+
+- “Morgan is our program-manager face: on the platform she’s tied to intake and coordination across agents; in this video she’s here to answer investor questions clearly — the actual code and cluster work runs on CTO and OpenClaw.”
+
+**If asked “which Morgan am I talking to?”**
+
+- Same brand and voice; **this** session is **Q&A + deck** for investors. **Product** Morgan in the platform handles **PRD → tasks → play workflows** with the engineering agent roster.
+
+**Related public pointers**
+
+- Company / product: **5dlabs.ai**; investor deck: **pitch.5dlabs.ai**; deeper Morgan / CTO talk path on materials: **5dlabs.ai/cto/morgan** (see deck CTA).
+
+---
 
 ### Knowledge base — flat facts (from deck)
 
