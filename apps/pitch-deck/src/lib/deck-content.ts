@@ -63,7 +63,7 @@ export const slides: DeckSlide[] = [
       },
     ],
     callout:
-      "Same stack across those lines—customers avoid hyperscaler egress bills and extra managed-service tax vs cloud-only AI.",
+      "Same stack across those lines—customers avoid hyperscaler egress bills and managed-service markup vs cloud-only AI.",
     footnote: `*Infra: deck shows ${DECK_INFRA_SAVINGS_LABEL} conservative vs hyperscale; internal migration models run ${INTERNAL_FULL_STACK_SAVINGS_RANGE_NOTES}. Example only — ~20TB/mo internet egress ≈ ~$${ILLUSTRATIVE_AWS_EGRESS_20TB_USD_PER_MONTH.toLocaleString("en-US")}/mo at ~$0.085/GB (AWS-style tier) vs $0 inside typical partner bundles (e.g. 20TB/mo included on Latitude Metal; https://www.latitude.sh/network/pricing ). Workload-specific — full math in cloud-vs-baremetal-analysis.ts.`,
   },
   {
@@ -75,8 +75,8 @@ export const slides: DeckSlide[] = [
     subhead:
       "The bill: egress, storage, margin — not list-price CPU. The org: sprawl + DevOps gap. Scarce: coordination as code commoditizes. CTO: bill + org on bare metal and automation.",
     bullets: [
-      "Invoice line items: network + storage + managed tax vs bait-priced compute.",
-      "People + sprawl: headcount and tools stack up, but the cloud bill and rework often stay high — adding people doesn’t shrink egress or fix unit economics without agents, rails, and one operating model.",
+      "Invoice line items: network + storage + managed-service markup vs bait-priced compute.",
+      "People + sprawl: teams add headcount and tooling to move faster, but without shared rails the rework and coordination overhead grow with the team — more people does not mean more velocity.",
       "Pace and fatigue: models, CLIs, and vendors move at breakneck speed — dizzying for any engineering lead — and still no single operating model; teams re-choose instead of compound.",
       "Runway pattern: long build cycles and late pivots when cash is low — not early when learning is cheap; costs and stack are often locked in before the turn.",
     ],
@@ -164,7 +164,7 @@ export const slides: DeckSlide[] = [
     bullets: [
       "5D Plan — PRD → structured deliberation before build.",
       "5D Code — multi-CLI harness (Cursor, Claude, Codex, …) with intelligent routing.",
-      "5D Git — self-hosted GitLab or Gitea: no per-seat GitHub tax; full pipeline on your metal.",
+      "5D Git — self-hosted GitLab or Gitea: no per-seat GitHub fees; full pipeline on your metal.",
       "5D Edge — Cloudflare tunnels + Cloudflare edge (we use CF end-to-end for secure ingress and connectivity).",
     ],
     table: {
