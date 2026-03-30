@@ -31,7 +31,7 @@ Hi, I'm Jonathon. This is the 5D Labs pre-seed deck: what we built, why it matte
 
 Cover. We're an AI-native venture studio. The headline is: we built the stack that builds companies — now it's the product. Pre-seed, Delaware C-corp, seven hundred fifty thousand dollars. On the cover: two paying customers, about two hundred forty K annual contract value, multiple revenue streams on one platform, and real infra savings versus a cloud-only AI delivery model. Same stack: CTO implementations, bare-metal rev-share, trading, and advisory.
 
-Problem. When code is cheap, coordination wins — aim, orchestration, and learning fast. We use stronger models for planning and cheaper open and local stacks, including very competitive options, for iteration. Without a system you get sprawl and cloud tax. One loop: decide, ship, learn.
+Problem. The real hyperscale bill is not headline compute. Four beats: the bill, the org, what's scarce, CTO on bare metal with automation. Bullets: invoice versus bait pricing; people and sprawl — headcount doesn't shrink egress; model mix; runway pattern — late pivots when cash is low, costs already locked in. Decide-ship-learn lives on the next slide, How it works.
 
 One machine. This isn't three random bets — it's one OS: build, fund, ship. CTO is the wedge; trading is internal capital; ventures and OpenClaw share playbooks. One loop — if you drop a piece, the whole thing weakens.
 
@@ -43,7 +43,7 @@ CTO. SDLC plus ops through Morgan; self-healing delivery; multi-CLI; bare metal 
 
 Private cloud. This isn't a ChatGPT wrapper — it's an AWS-shaped private cloud on your metal. Five D Plan, Code, Git, and Edge — Cloudflare tunnels and edge. The table is a sample map: data, store, inference, observe, deploy, vault, edge. Full catalog lives on five d labs dot ai under CTO services.
 
-Differentiation. Plan before code: Lobster, Stitch and Linear, voice and listen. Humans in the loop without micromanagement. The ROI line on the slide says it: fewer hires, lower infra bill, faster cycles.
+Differentiation. Plan before code: a real planning workflow, UI and scope locked in early, voice and async listening. Humans in the loop without micromanagement. The ROI line on the slide says it: fewer hires, lower infra bill, faster cycles.
 
 Trading. In-house chains and edge; bootstrap only — not an external fund. Investor money is not trading principal.
 
@@ -53,11 +53,11 @@ Market. Beachhead is crypto-native teams; we expand to anyone burning cloud and 
 
 Business model. Four revenue streams on one stack: CTO subscriptions, rev-share, trading P and L, advisory.
 
-Go-to-market. Open-source OpenClaw slice funnels to CTO. Freemium desktop with a local kind cluster, limited agents, feature flags into tiers. Long-term, desktop is the main commercial surface.
+Go-to-market. Open-source OpenClaw platform—GitOps and Helm to deploy at scale—funnels to CTO. Freemium desktop with a local kind cluster, limited agents, feature flags into tiers. Long-term, desktop is the main commercial surface.
 
 Use of funds. Seven fifty K goes to engineers, founder runway, edge, lab, models, and buffer — about eighteen months to cash-flow positive.
 
-Morgan. Avatar and voice — same agent as intake. OpenClaw, LiveKit, LemonSlice; Lemon Squeezy for commerce when ready. There's a Talk to Morgan button on the site.
+Morgan. Avatar and voice for Q and A — same Morgan persona as on CTO, but no PRD or product intake in this widget; that stays in the CTO app. OpenClaw, LiveKit, hosted avatar. Talk to Morgan button on the site.
 
 Founder. Twenty plus years in ops, Victoria. At Pocket, Head of Infra at scale. Blocknative; Coinmiles from senior engineer to CTO in three months.
 

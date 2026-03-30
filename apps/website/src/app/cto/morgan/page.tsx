@@ -143,6 +143,7 @@ export default function MorganPage() {
                   <LemonSliceWidget
                     initialState="active"
                     inline
+                    autoStartConversation={false}
                     customActiveWidth={368}
                     customActiveHeight={560}
                     customMinimizedWidth={120}

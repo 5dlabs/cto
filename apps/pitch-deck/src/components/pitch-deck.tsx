@@ -116,7 +116,7 @@ export function PitchDeck() {
               >
                 {isHero ? (
                   <div className="mb-8 flex w-full flex-col items-center">
-                    {/* Raster is alpha-cropped (no huge transparent pad); HTML lines read as one lockup */}
+                    {/* Logo + wordmark: tight crop so the mark and “5D LABS” read as one lockup */}
                     <div className="flex w-full flex-col items-center">
                       <Image
                         src="/5dlabs-logo-3d.png"

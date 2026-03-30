@@ -1,5 +1,6 @@
-# Deploy: `npm run build && npx wrangler pages deploy out --project-name=5dlabs-pitch-deck --branch=main --commit-dirty=true`
-# Or: `just deploy-pitch-deck` (1Password token) / GitHub workflow deploy-pitch-deck.yaml
+# Deploy: `npm run deploy:pages` (needs CLOUDFLARE_API_TOKEN + gitignored `.env.local` with
+# NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID so the static bundle includes Drive OAuth; same var in
+# Pages → Settings → Environment variables if you build from Git instead of this CLI).
 #
 # One-time in Cloudflare Dashboard:
 # 1. Workers & Pages → Create project → Connect repo OR upload from CI (project name must match below).

@@ -16,6 +16,10 @@ interface LemonSliceWidgetProps {
   customActiveHeight?: number;
   customMinimizedWidth?: number;
   customMinimizedHeight?: number;
+  /**
+   * When true (default), opens the mic shortly after load so the session starts immediately.
+   * When false, skips that — the host’s looping “first message” can play until the user taps or speaks (fewer tokens on idle views).
+   */
   autoStartConversation?: boolean;
   showStartTalkingButton?: boolean;
 }

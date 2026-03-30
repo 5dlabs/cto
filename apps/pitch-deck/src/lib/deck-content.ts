@@ -39,6 +39,7 @@ export const DECK_META = {
 /**
  * Single source of truth for web deck + PDF (print).
  * Copy kept short for live read + older investors; pair with verbal detail.
+ * Strings are plain text everywhere (same output in the app, PDF, and PowerPoint).
  */
 export const slides: DeckSlide[] = [
   {
@@ -62,22 +63,22 @@ export const slides: DeckSlide[] = [
       },
     ],
     callout:
-      "CTO implementations · bare-metal rev-share · trading · advisory — same stack. Customers cut egress + managed-service overhead vs cloud-only AI stacks.",
+      "Same stack across those lines—customers avoid hyperscaler egress bills and extra managed-service tax vs cloud-only AI.",
     footnote: `*Infra: deck shows ${DECK_INFRA_SAVINGS_LABEL} conservative vs hyperscale; internal migration models run ${INTERNAL_FULL_STACK_SAVINGS_RANGE_NOTES}. Example only — ~20TB/mo internet egress ≈ ~$${ILLUSTRATIVE_AWS_EGRESS_20TB_USD_PER_MONTH.toLocaleString("en-US")}/mo at ~$0.085/GB (AWS-style tier) vs $0 inside typical partner bundles (e.g. 20TB/mo included on Latitude Metal; https://www.latitude.sh/network/pricing ). Workload-specific — full math in cloud-vs-baremetal-analysis.ts.`,
   },
   {
     id: "problem",
     label: "Problem",
     layout: "impact",
-    eyebrow: "The shift",
-    headline: "When code is cheap, coordination wins.",
+    eyebrow: "Unit economics",
+    headline: "The real hyperscale bill isn’t headline compute.",
     subhead:
-      "“Code is a commodity” means implementation keeps getting automated — more software builds itself, marginal cost of another feature drops. The scarce part is aim, orchestration, and learning fast enough.",
+      "The bill: egress, storage, margin — not list-price CPU. The org: sprawl + DevOps gap. Scarce: coordination as code commoditizes. CTO: bill + org on bare metal and automation.",
     bullets: [
-      "Execution still needs direction, discipline, and infra that stays up.",
-      "Tool sprawl + cloud tax + scarce DevOps/design — cost explodes without a system.",
-      "Model mix: frontier models for planning and architecture; local + competitive open models (incl. Chinese stacks) for iteration loops — front-load thinking, iterate cheaply without giving up quality.",
-      "Winners run decide → ship → learn in one loop with real signal.",
+      "Invoice line items: network + storage + managed tax vs bait-priced compute.",
+      "People + sprawl: headcount and tools stack up, but the cloud bill and rework often stay high — adding people doesn’t shrink egress or fix unit economics without agents, rails, and one operating model.",
+      "Pace and fatigue: models, CLIs, and vendors move at breakneck speed — dizzying for any engineering lead — and still no single operating model; teams re-choose instead of compound.",
+      "Runway pattern: long build cycles and late pivots when cash is low — not early when learning is cheap; costs and stack are often locked in before the turn.",
     ],
   },
   {
@@ -115,17 +116,44 @@ export const slides: DeckSlide[] = [
       "Learn — runtime + market feed the roadmap.",
       "Compound — reuse prompts, workflows, infra.",
     ],
+    callout:
+      "Product intake and PRDs live in CTO — agents and automation take it from there through build, review, and release to production.",
   },
   {
     id: "cto",
     label: "CTO",
-    headline: "CTO — build engine + first commercial wedge",
+    headline: "CTO — platform, not a chat skin",
+    subhead:
+      "Kubernetes-native; mostly Rust for latency. Same product on an enterprise cluster or kind on a workstation.",
     bullets: [
-      "SDLC + ops (Morgan: sales, marketing, accounting).",
-      "Self-healing delivery · multi-CLI (Cursor, Claude, Codex, Factory, …).",
-      "Bare metal — sovereignty, predictable cost, no lock-in. “And” not “or.”",
+      "One operating model — agents, skills, and routing on shared rails; new models and providers plug in underneath so you are not re-inventing delivery every time the ecosystem shifts — full optionality, one spine.",
+      "Multi-CLI routing — OpenClaw MCP harness (eight CLIs); picks provider + model for token and $ efficiency — works well when founders spread work across free credits on many accounts.",
+      "Tool surface — MCP aggregator as the tool server; preset skills per agent with add / override anytime — methodology stays yours while tools and providers change.",
+      "Operators & runtime — Kubernetes operators for backend services; runtime image packs languages and tooling; stack is mostly Rust where it matters for performance.",
+      "Self-heal & review — Healer reacts to telemetry from the observability stack; Stitch does automated PR review and remediation; alerting to Discord, Slack, and webhooks.",
+      "Coordination — NATS for agent-to-agent traffic across pods (fills a gap vs. stock Kubernetes); CRDs run headless jobs that report back to Morgan; ACP-style coordination across the fleet.",
+      "Metal & GPU — automated bare-metal and GPU provisioning; we abstract provider contracts so customers don’t have to — or they keep a direct deal with the vendor.",
+      "Research loop — ingest latest methodologies, patterns, and papers → PRD → features on the platform — so the product stays current without asking users to rip up how they work.",
+      "Board room (debate, voice, chat with Morgan via ElevenLabs + LiveKit) ships in the main CTO app — not desktop-only. CTO Lite is the desktop-only freemium entry (local kind, limited agents). AR glasses roadmap: Even G2, Meta Ray-Ban Display, Rokid, Vuzix Z100 — 5dlabs.ai/cto/morgan.",
     ],
-    footnote: "AGPL-3.0 — serious teams self-host.",
+    footnote:
+      "AGPL-3.0 — serious teams self-host. More detail: 5dlabs.ai/cto",
+  },
+  {
+    id: "cto-roster",
+    label: "Agent roster",
+    headline: "22 specialist agents",
+    subhead:
+      "Preset skills and tools per role—extend or swap without retraining your team on a new methodology.",
+    bullets: [
+      "Control — Morgan (PM / coordination).",
+      "Build — Rex, Grizz, Nova, Viper · Blaze, Tap, Spark (backend, web, mobile, desktop).",
+      "Trust & ship — Cleo, Cipher, Tess, Stitch, Atlas, Bolt (quality, security, testing, review, merge, infra).",
+      "Domain — Block, Vex, Angie, Glitch (chains, XR, agent systems, games).",
+      "Business — Lex, Hype, Tally, Chase (legal, marketing, accounting, sales).",
+    ],
+    callout:
+      "Avatars and detail on 5dlabs.ai/cto. Internal operators (e.g. Healer, Keeper, Pixel) also run self-heal, desktop, and orchestration under the hood.",
   },
   {
     id: "private-cloud",
@@ -155,25 +183,51 @@ export const slides: DeckSlide[] = [
       "Hyperscaler-shaped capabilities on hardware you own — run and healed by agents. Full catalog: cto/services on 5dlabs.ai.",
   },
   {
+    id: "openclaw",
+    label: "OpenClaw",
+    headline: "OpenClaw — agent runtime on the same metal",
+    subhead:
+      "Orchestration and playbooks—not a separate product silo. Same fleet, same rails as CTO.",
+    bullets: [
+      "Coordinates specialist agents (PM, implementers, infra, security, …) with shared MCP + toolchains.",
+      "Intake → tasks → Plays: one loop from PRD to merge with humans in the loop where it matters.",
+      "Open source: GitOps-based OpenClaw platform + Helm to deploy and scale OpenClaw — the spine CTO runs on — so community and marketing funnel into full CTO + bare metal.",
+      "Runs beside the 5D private-cloud services: agents operate the stack, stack hosts the workloads.",
+    ],
+    callout:
+      "If the pitch names “Open Cloud,” read it as this: agents + services on your metal—OpenClaw is the control plane.",
+  },
+  {
     id: "intake",
     label: "Differentiation",
     headline: "Plan before code — keep your mental model",
     bullets: [
-      "Lobster: optimist vs. pessimist, voice — listen anywhere.",
-      "Stitch + Linear — pick UI before build; less designer headcount.",
-      "Humans stay in the loop via listening, not micromanagement.",
+      "Structured planning workflow before implementation — explore options, use voice, listen async — so the team aligns before anyone ships the wrong thing.",
+      "UI and scope clarified early with review + tracking tied together — less rework, less spend on design-only firefighting.",
+      "Humans stay in the loop through listening and async review, not constant ticket-chasing.",
     ],
     callout: "ROI: fewer hires, lower infra bill, faster cycles.",
   },
   {
     id: "trading",
     label: "Trading",
-    headline: "In-house capital engine (bootstrap only)",
+    headline: "Trading engine — in-house capital & signal",
+    subhead: "Bootstrap only — not a fund we market; investor capital is not trading principal.",
     bullets: [
-      "Solana, Base, Polygon, Near, Sui — production stack.",
-      "Low-latency edge (Helius-class) without hedge-fund capex.",
-      "Funds experiments + signal — not an external fund product.",
+      "Multi-chain stack in production: Solana, Base, Polygon, Near, Sui.",
+      "Low-latency RPC / edge (Helius-class) without hedge-fund capex.",
+      "Execution + risk workflows on the same infra discipline as CTO—observe, deploy, heal.",
+      "Feeds experiments and on-chain signal; P&L stays inside the studio—not an external product line.",
     ],
+    table: {
+      headers: ["Layer", "What it covers"],
+      rows: [
+        ["Chains", "Solana · Base · Polygon · Near · Sui"],
+        ["Edge", "Low-latency ingress + RPC path"],
+        ["Capital", "Bootstrap only — studio balance sheet"],
+        ["Positioning", "Not sold as a fund or third-party trading product"],
+      ],
+    },
     footnote: "Investor $ is not trading principal.",
   },
   {
@@ -218,7 +272,7 @@ export const slides: DeckSlide[] = [
     subhead:
       "Distribution that points everything back to CTO — desktop is the primary product surface.",
     bullets: [
-      "Ship an open-source OpenClaw slice (sub-components of CTO) so community and marketing funnel to the full CTO stack.",
+      "Ship the open-source OpenClaw platform (GitOps + Helm to deploy and scale OpenClaw) so evals and installs funnel into the full CTO stack — not a vague “slice,” the same control plane we run.",
       "Freemium CTO Lite on desktop: local kind cluster, no bare-metal path, limited agent set — enough to get hooked.",
       "Feature flags and upgrade hooks create FOMO; paid tiers (still being defined) unlock full fleet, metal, and agent depth.",
       "Long-term: subscriptions on top of the desktop app as the main commercial surface.",
@@ -246,18 +300,17 @@ export const slides: DeckSlide[] = [
     label: "Morgan",
     headline: "Talk to Morgan before we meet",
     subhead:
-      "Animated avatar + voice — your Q&A front door. Give Morgan deck and product context; investors can explore on their own before the live conversation.",
+      "Animated avatar + voice — Q&A front door before a live conversation. Ground the host with KB URLs and deck links. No product intake or PRD path here — that runs in the CTO app, not this widget.",
     bullets: [
-      "Same Morgan that runs intake and coordinates agents on the CTO platform.",
-      "Optional: paste context (links, PRD snippets) so answers stay on-narrative.",
-      "Live stack: OpenClaw + LiveKit + LemonSlice (avatar) — pricing via Lemon Squeezy in progress.",
+      "Morgan is the PM/coordination persona on CTO; this experience is voice + avatar Q&A only — not where specs or intake land.",
+      "Investors use this for narrative questions; product intake and PRDs flow through CTO (same platform as the agent fleet), not through the browser widget.",
+      "Live stack: OpenClaw + LiveKit + hosted avatar.",
     ],
     cta: {
       label: "Talk to Morgan",
       href: "https://5dlabs.ai/cto/morgan#talk",
     },
-    footnote:
-      "Avatar + voice: LemonSlice · LiveKit · OpenClaw. Commerce: Lemon Squeezy (pricing in progress).",
+    footnote: "Avatar + voice: hosted provider · LiveKit · OpenClaw.",
   },
   {
     id: "founder",
