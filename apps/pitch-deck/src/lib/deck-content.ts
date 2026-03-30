@@ -77,7 +77,7 @@ export const slides: DeckSlide[] = [
     bullets: [
       "Invoice line items: network + storage + managed tax vs bait-priced compute.",
       "People + sprawl: headcount and tools stack up, but the cloud bill and rework often stay high — adding people doesn’t shrink egress or fix unit economics without agents, rails, and one operating model.",
-      "Model mix: frontier for planning; open/local for iteration — cheap loops without giving up quality.",
+      "Pace and fatigue: models, CLIs, and vendors move at breakneck speed — dizzying for any engineering lead — and still no single operating model; teams re-choose instead of compound.",
       "Runway pattern: long build cycles and late pivots when cash is low — not early when learning is cheap; costs and stack are often locked in before the turn.",
     ],
   },
@@ -126,6 +126,7 @@ export const slides: DeckSlide[] = [
     subhead:
       "Kubernetes-native; mostly Rust for latency. Same product on an enterprise cluster or kind on a workstation.",
     bullets: [
+      "One operating model — agents, skills, and routing on shared rails; new models and providers plug in underneath so you are not re-inventing delivery every time the ecosystem shifts — full optionality, one spine.",
       "Multi-CLI routing — OpenClaw MCP harness (eight CLIs); picks provider + model for token and $ efficiency — works well when founders spread work across free credits on many accounts.",
       "Tool surface — MCP aggregator as the tool server; preset skills per agent with add / override anytime — methodology stays yours while tools and providers change.",
       "Operators & runtime — Kubernetes operators for backend services; runtime image packs languages and tooling; stack is mostly Rust where it matters for performance.",
