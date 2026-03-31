@@ -1,21 +1,17 @@
-Implement subtask 1002: Create design tokens file with color palette, type scale, spacing, and breakpoints
+Implement subtask 1002: Create RBAC, ResourceQuota, and LimitRange Templates
 
 ## Objective
-Define the `lib/tokens.ts` file that serves as the single source of truth for all design decisions, replacing absent Stitch candidates. Export typed constants for color palette (with verified AA contrast pairings), 4-level type scale, spacing scale, and responsive breakpoints. Extend Tailwind config to consume these tokens.
+Create namespace-scoped ServiceAccount, Role, RoleBinding, ResourceQuota, and LimitRange templates. These are all small governance YAML resources with identical lifecycle and dependencies, grouped into a single subtask.
 
 ## Steps
-1. Create `lib/tokens.ts`.
-2. Define a `colors` object with at least: `primary`, `primaryForeground`, `secondary`, `secondaryForeground`, `accent`, `accentForeground`, `background`, `surface`, `text`, `textMuted`. All foreground/background pairings must meet 4.5:1 contrast ratio (AA). Document each pairing's contrast ratio in a JSDoc comment.
-3. Define a `typeScale` object with 4 levels:
-   - `display`: { desktop: '48px', mobile: '28px', lineHeight: '1.1', fontWeight: '700' }
-   - `heading`: { desktop: '36px', mobile: '24px', lineHeight: '1.2', fontWeight: '600' }
-   - `subheading`: { desktop: '24px', mobile: '18px', lineHeight: '1.3', fontWeight: '500' }
-   - `body`: { desktop: '16px', mobile: '16px', lineHeight: '1.6', fontWeight: '400' }
-4. Ensure display-to-body ratio is ≥ 1.5× at both desktop and mobile (48/16=3× ✓, 28/16=1.75× ✓).
-5. Define a `spacing` scale: `{ xs: '4px', sm: '8px', md: '16px', lg: '24px', xl: '32px', '2xl': '48px', '3xl': '64px' }`.
-6. Define `breakpoints`: `{ mobile: '375px', tablet: '768px', desktop: '1280px' }`.
-7. Extend `tailwind.config.ts` to consume these tokens: add custom colors, fontSize entries, and spacing to `theme.extend`. Based on the decision point resolution for token strategy (default: Tailwind config extension at build time).
-8. Export all tokens with full TypeScript typing and JSDoc comments.
+Step-by-step:
+1. Create `templates/serviceaccount.yaml`: ServiceAccount `hermes-pipeline-sa` in `{{ .Values.namespace }}` with standard labels.
+2. Create `templates/role.yaml`: namespace-scoped Role with least-privilege verbs. Grant: get/list/watch on pods, services, configmaps, secrets, endpoints; create/delete on jobs. Do NOT use ClusterRole.
+3. Create `templates/rolebinding.yaml`: RoleBinding binding the Role to `hermes-pipeline-sa`. Namespace: `{{ .Values.namespace }}`.
+4. Create `templates/resourcequota.yaml`: ResourceQuota with `spec.hard` containing `requests.cpu: {{ .Values.resourceQuota.cpu }}`, `requests.memory: {{ .Values.resourceQuota.memory }}`, `pods: {{ .Values.resourceQuota.pods }}`. Apply standard labels.
+5. Create `templates/limitrange.yaml`: LimitRange with `spec.limits` type Container: `default.cpu: {{ .Values.limitRange.defaultCpu }}` (500m), `default.memory: {{ .Values.limitRange.defaultMemory }}` (512Mi), `defaultRequest.cpu: 250m`, `defaultRequest.memory: 256Mi`, `max.cpu: {{ .Values.limitRange.maxCpu }}` (2), `max.memory: {{ .Values.limitRange.maxMemory }}` (2Gi).
+6. All resources namespaced to `{{ .Values.namespace }}` with standard labels.
+7. Verify: `helm template --debug` renders all 5 resources for both environments with correct parameterized values.
 
 ## Validation
-`lib/tokens.ts` exports `colors`, `typeScale`, `spacing`, and `breakpoints` objects. `npx tsc --noEmit` passes. Tailwind config references tokens — verify by grep: `tailwind.config.ts` contains keys from `tokens.colors`. Manual or scripted contrast check: primary text on background ≥ 4.5:1 ratio (can use `wcag-contrast` npm package in a test script). Display font-size / body font-size ≥ 1.5 at both desktop and mobile sizes.
+`kubectl auth can-i --as=system:serviceaccount:hermes-staging:hermes-pipeline-sa --namespace=hermes-staging list pods` returns `yes`. Cross-namespace access denied: same SA cannot access hermes-production. `kubectl get clusterrolebinding | grep hermes` returns nothing. `kubectl describe resourcequota -n hermes-staging` shows cpu=8, memory=16Gi, pods=20. `kubectl get limitrange -n hermes-staging -o yaml` confirms default cpu=500m, memory=512Mi, max cpu=2, memory=2Gi. Production namespace shows production-tier quota values.

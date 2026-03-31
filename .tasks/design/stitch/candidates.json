@@ -3,7 +3,7 @@
     "target": "web",
     "deviceType": "DESKTOP",
     "rationale": "Failed to generate web candidate.",
-    "prompt": "Improve and modernize this web interface for project sigma-1-design-snapshot-e2e. Reference URLs: http://127.0.0.1:8765/index.html Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
+    "prompt": "Improve and modernize this web interface for project sigma-1-hermes-e2e. Design intent: Modernize the landing experience while keeping the planning and rollout story visible. Reference URLs: http://127.0.0.1:8765/index.html Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
     "status": "failed",
     "error": "Stitch MCP call \"tools/call\" timed out after 60s"
   }

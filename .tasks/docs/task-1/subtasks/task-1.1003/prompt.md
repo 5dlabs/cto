@@ -1,18 +1,18 @@
-Implement subtask 1003: Implement layout shell with sticky header, main content slot, and footer
+Implement subtask 1003: Create CiliumNetworkPolicies for Namespace Isolation
 
 ## Objective
-Build `app/layout.tsx` with a sticky header containing logo and navigation, a `<main>` content slot, and a semantic `<footer>`. Use semantic HTML landmarks throughout. Configure font loading via next/font.
+Deploy CiliumNetworkPolicy resources implementing default-deny ingress, intra-namespace allow, MinIO egress allow (port 9000 to GitLab or dedicated instance), DNS egress allow, and explicit cross-namespace isolation between hermes-staging and hermes-production.
 
 ## Steps
-1. Implement `app/layout.tsx` as the root layout.
-2. Configure font loading based on decision point resolution (default: `next/font/google` with Inter or similar sans-serif). Apply the font class to `<html>` or `<body>`.
-3. Add a `<header>` element with `className="sticky top-0 z-50"` positioning. Include a text logo placeholder and a horizontal `<nav>` with 3-4 placeholder `<a>` links. Use basic Tailwind spacing/color — if tokens from 1002 are not yet available, use sensible fallback values that will be replaced when tokens are ready.
-4. The header should have a background color and bottom border for visual separation.
-5. Add a `<main>` element wrapping `{children}` with appropriate vertical padding.
-6. Add a `<footer>` element with copyright text, placeholder links, and semantic `<footer>` tag.
-7. All landmark roles are implicit with semantic HTML: `<header>` → banner, `<main>` → main, `<footer>` → contentinfo.
-8. Add `data-testid="header"` and `data-testid="footer"` attributes for testing.
-9. NOTE: This subtask can proceed in parallel with 1002 (tokens). Once 1002 completes, update color/spacing references to use design tokens. The layout structure and semantic HTML do not depend on token values.
+Step-by-step:
+1. Create `templates/cilium-default-deny.yaml`: CiliumNetworkPolicy with `spec.endpointSelector: {}` and empty `ingress: []` to deny all ingress by default in `{{ .Values.namespace }}`.
+2. Create `templates/cilium-allow-intra-namespace.yaml`: Allow ingress from pods within the same namespace using `fromEndpoints` with `matchLabels: {"k8s:io.kubernetes.pod.namespace": "{{ .Values.namespace }}"}`.
+3. Create `templates/cilium-allow-minio-egress.yaml`: Allow egress to MinIO on port 9000. Use conditional logic:
+   - If `{{ .Values.minio.dedicated }}` is false: target `gitlab-minio-svc.gitlab.svc` via `toServices` or `toEndpoints` with namespace selector for `gitlab`.
+   - If `{{ .Values.minio.dedicated }}` is true: target the dedicated MinIO service in `hermes-minio` namespace.
+4. Create `templates/cilium-allow-dns-egress.yaml`: Allow egress to kube-dns on port 53 (TCP and UDP) in the `kube-system` namespace.
+5. All policies namespaced to `{{ .Values.namespace }}` with standard labels.
+6. Verify rendered YAML with `helm template --debug` for both environments and both minio.dedicated=true/false.
 
 ## Validation
-Navigate to `/` and verify `<header>`, `<main>`, and `<footer>` semantic elements are present in the DOM using `document.querySelector`. Header has `position: sticky` computed style. Axe-core reports no landmark-related violations. `data-testid="header"` and `data-testid="footer"` are queryable. Font loads without layout shift (no CLS regression).
+Deploy a test pod (busybox/curl) in hermes-staging: (1) `curl http://<staging-service>:port` within namespace succeeds; (2) `curl http://<production-service>.hermes-production.svc:port` times out or is refused; (3) `curl http://gitlab-minio-svc.gitlab.svc:9000` succeeds (or dedicated endpoint if applicable); (4) `nslookup kubernetes.default` succeeds (DNS works). Remove test pod after validation.
