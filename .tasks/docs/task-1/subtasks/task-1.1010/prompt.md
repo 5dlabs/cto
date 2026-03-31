@@ -1,33 +1,25 @@
-Implement subtask 1010: Write Playwright E2E tests for responsive layout, component presence, and computed styles
+Implement subtask 1010: Create hermes-infra-endpoints ConfigMap Template
 
 ## Objective
-Implement Playwright E2E tests covering component presence assertions, responsive screenshots at 3 viewports, computed style checks for typographic hierarchy, and vertical ordering validation. These are the core functional tests for the marketing page.
+Create the Helm template for ConfigMap named hermes-infra-endpoints in each namespace containing all non-sensitive endpoint keys. All values are deterministic from Helm values (not runtime-derived), so this subtask depends only on the chart scaffold.
 
 ## Steps
-1. Create `playwright.config.ts` with:
-   - `webServer` directive pointing to `npm run dev` (or `npm run start` after build) on port 3000.
-   - Projects for chromium (primary), optionally firefox.
-   - Headless mode for CI.
-2. Create `e2e/marketing-page.spec.ts` with the following test cases:
-3. **Component presence test**:
-   - Navigate to `/`.
-   - Assert `[data-testid="hero"]`, `[data-testid="features"]`, `[data-testid="cta"]` are all visible.
-   - Assert `[data-testid="header"]` and `[data-testid="footer"]` are present.
-4. **Vertical ordering test**:
-   - Get bounding rects for hero, features, CTA.
-   - Assert hero.y < features.y < cta.y.
-5. **Responsive screenshot tests**:
-   - Set viewport to 375px width, capture full-page screenshot → `screenshots/mobile.png`.
-   - Set viewport to 768px width, capture → `screenshots/tablet.png`.
-   - Set viewport to 1280px width, capture → `screenshots/desktop.png`.
-   - Store as test artifacts.
-6. **Computed style checks**:
-   - At 1280px viewport: find H1 inside `[data-testid="hero"]`, extract `getComputedStyle(el).fontSize`, parse to number, assert ≥ 36.
-   - At 375px viewport: same H1, assert computed font-size ≥ 24.
-7. **Features responsive layout test**:
-   - At 1280px: verify feature cards have 3 distinct x-positions (3-column layout).
-   - At 375px: verify all feature cards have approximately the same x-offset (stacked).
-8. Ensure all tests run in headless mode and are CI-compatible.
+Step-by-step:
+1. Create `templates/configmap-endpoints.yaml` defining a ConfigMap resource.
+2. `metadata.name`: `hermes-infra-endpoints`, `metadata.namespace`: `{{ .Values.namespace }}`.
+3. `data` keys (all non-sensitive, derived from Helm values):
+   - `CNPG_HERMES_URL`: `hermes-pg-rw.{{ .Values.namespace }}.svc:5432/hermes`
+   - `REDIS_HERMES_URL`: `hermes-redis-master.{{ .Values.namespace }}.svc:6379`
+   - `NATS_HERMES_URL`: `nats://hermes-nats.{{ .Values.namespace }}.svc:4222`
+   - `MINIO_ENDPOINT`: `{{ .Values.minio.endpoint }}`
+   - `MINIO_BUCKET`: `{{ .Values.minio.bucketName }}`
+   - `MINIO_PRESIGN_EXPIRY`: `{{ .Values.minio.presignExpiry | default "3600" }}`
+   - `ENVIRONMENT`: `{{ .Values.environment }}`
+4. Apply standard labels.
+5. Ensure NO credential/password/secret values are present.
+6. Add comment: downstream workloads consume via `envFrom: [{configMapRef: {name: hermes-infra-endpoints}}]`.
+7. Update NOTES.txt to list all ConfigMap keys and their descriptions.
+8. Verify: `helm template` renders all 7 keys with correct values for both environments.
 
 ## Validation
-Run `npx playwright test e2e/marketing-page.spec.ts` — all tests pass (exit code 0). Screenshots are generated in expected output directory. Font-size assertions pass at both viewport widths. Vertical ordering assertion passes. Features layout assertion passes at both viewports. Tests complete in <30 seconds.
+`kubectl get configmap hermes-infra-endpoints -n hermes-staging -o json | jq '.data | keys'` returns exactly 7 keys: CNPG_HERMES_URL, REDIS_HERMES_URL, NATS_HERMES_URL, MINIO_ENDPOINT, MINIO_BUCKET, MINIO_PRESIGN_EXPIRY, ENVIRONMENT. All values non-empty. ENVIRONMENT=staging for staging, ENVIRONMENT=production for production. No values contain password/secret/key patterns. Same for production.

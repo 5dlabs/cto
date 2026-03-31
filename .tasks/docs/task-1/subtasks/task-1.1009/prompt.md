@@ -1,26 +1,25 @@
-Implement subtask 1009: Generate design snapshot task documentation for downstream agents
+Implement subtask 1009: Create hermes-infra-secrets Secret Template Referencing Operator-Managed and Helm-Managed Credentials
 
 ## Objective
-Create `docs/design-snapshot-tasks.md` capturing each component's intent, props API, accessibility requirements, breakpoint expectations, and implementation prompts for downstream agents. This document replaces Stitch candidates as the source of truth for design intent.
+Create the Helm template for Kubernetes Secret named hermes-infra-secrets in each namespace. For Postgres, reference the CNPG operator-generated Secret (hermes-pg-app) via an init container that extracts the connection URI rather than duplicating credentials in Helm values. For MinIO, Redis, and NATS, source from Helm values.
 
 ## Steps
-1. Create `docs/design-snapshot-tasks.md`.
-2. Include an **Overview** section explaining:
-   - The design snapshot validation flow purpose.
-   - That these docs replace Stitch candidates as the design source of truth.
-   - Reference to `lib/tokens.ts` as the token authority.
-3. For each component (**Hero**, **Features**, **CTA**), create a dedicated `## Component: [Name]` section containing:
-   a. **Intent**: What the component achieves visually and functionally (2-3 sentences).
-   b. **Props API**: Full TypeScript interface copied from the component, with description of each prop's purpose and default values.
-   c. **Accessibility requirements**: Specific contrast ratios required, focus indicator details, semantic HTML elements used, any ARIA attributes.
-   d. **Breakpoint behavior**: Describe expected layout and visual output at each breakpoint:
-      - `375px (mobile)`: layout, font sizes, padding, stacking behavior.
-      - `768px (tablet)`: layout transitions, column changes.
-      - `1280px (desktop)`: full layout, max-width constraints, spacing.
-   e. **Implementation prompts**: 3-5 actionable bullet points that a downstream agent could use to re-implement or modify the component from scratch.
-4. Include a **Design Tokens Reference** section summarizing the token structure (color categories, type scale levels, spacing scale, breakpoints) with a code snippet example.
-5. **Critical**: Each component section MUST contain the words 'props', 'accessibility', and 'breakpoint' to pass CI validation.
-6. Use clear Markdown formatting: H2 for component names, H3 for subsections, fenced code blocks for TypeScript interfaces, tables for breakpoint comparisons.
+Step-by-step:
+1. Create `templates/secrets.yaml` defining a Secret resource.
+2. `metadata.name`: `hermes-infra-secrets`, `metadata.namespace`: `{{ .Values.namespace }}`, `type: Opaque`.
+3. For POSTGRES_URL: Use CNPG's operator-generated Secret. Two approaches (choose based on CNPG version):
+   a. **Preferred**: Reference the `uri` key from the `hermes-pg-app` Secret directly. Create a helper template or document that downstream workloads should mount both `hermes-infra-secrets` and the CNPG Secret, OR:
+   b. **Alternative**: Use a Helm lookup function `{{ (lookup "v1" "Secret" .Values.namespace "hermes-pg-app").data.uri | b64dec }}` to copy the URI at install time. Note: lookup fails on `helm template` (dry-run) — gate with `{{ if .Release.IsInstall }}`.
+   c. Document the chosen approach clearly in the template comments.
+4. For other keys, use `stringData`:
+   - `MINIO_ACCESS_KEY_ID`: `{{ .Values.minio.accessKeyId }}`
+   - `MINIO_SECRET_ACCESS_KEY`: `{{ .Values.minio.secretAccessKey }}`
+   - `REDIS_URL`: `redis://:{{ .Values.redis.auth.password }}@hermes-redis-master.{{ .Values.namespace }}.svc:6379`
+   - `NATS_URL`: `nats://hermes-nats.{{ .Values.namespace }}.svc:4222`
+5. Apply standard labels.
+6. Add template comment: "NOTE: Native Secrets do not auto-rotate. ESO migration is deferred — see decision_points."
+7. Ensure NO credential values appear in the ConfigMap template.
+8. If approach (a) is chosen for Postgres, add `POSTGRES_SECRET_REF: hermes-pg-app` as a non-sensitive key so downstream consumers know which Secret to mount.
 
 ## Validation
-CI script validates: (1) `docs/design-snapshot-tasks.md` exists. (2) File contains at least 3 sections matching `## Component: Hero`, `## Component: Features`, `## Component: CTA` (or similar H2 patterns). (3) Each component section contains the words 'props', 'accessibility', and 'breakpoint'. (4) File is >5000 characters (substantial content). (5) Markdown linting passes (`npx markdownlint docs/design-snapshot-tasks.md` with no errors, or relaxed rules).
+`kubectl get secret hermes-infra-secrets -n hermes-staging -o json | jq '.data | keys'` contains MINIO_ACCESS_KEY_ID, MINIO_SECRET_ACCESS_KEY, REDIS_URL, NATS_URL (and POSTGRES_URL or POSTGRES_SECRET_REF depending on approach). Each key's base64-decoded value is non-empty. No secret values appear in hermes-infra-endpoints ConfigMap. Same for production.

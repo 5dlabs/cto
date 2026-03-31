@@ -1,28 +1,21 @@
-Implement subtask 1004: Build Hero section component with headline, sub-headline, and CTA button
+Implement subtask 1004: MinIO Capacity Gate Check Script
 
 ## Objective
-Implement `components/Hero.tsx` as a full-width hero section with H1 headline, H2 sub-headline, primary CTA button, and optional background gradient. Consume design tokens for all typography and color values. Enforce font-size ratio ≥ 1.5× between H1 and body text.
+Create a standalone script (and optional Kubernetes Job manifest) that checks the existing GitLab MinIO instance capacity, checks for bucket naming conflicts, and outputs a capacity report. This produces the data needed for the pre-execution MinIO decision point — it does NOT make the decision or provision anything.
 
 ## Steps
-1. Create `components/Hero.tsx` as a React component with typed props interface:
-   ```typescript
-   interface HeroProps {
-     headline: string;
-     subheadline: string;
-     ctaText: string;
-     ctaHref: string;
-     backgroundGradient?: string;
-   }
-   ```
-2. Render a full-width `<section>` with `data-testid="hero"`.
-3. Use an `<h1>` for the headline styled with the `display` type scale token (48px desktop / 28px mobile via Tailwind responsive classes).
-4. Use an `<h2>` for the sub-headline styled with `subheading` token (24px desktop / 18px mobile).
-5. Render a primary CTA as an `<a>` element styled as a button using design token `primary` / `primaryForeground` colors with sufficient padding (`px-6 py-3`), rounded corners, and hover state.
-6. The CTA must have a visible focus indicator: `focus-visible:ring-2 focus-visible:ring-offset-2` or equivalent.
-7. Apply a background gradient using design token colors if `backgroundGradient` prop is not provided (default to a subtle gradient from `background` to `surface`).
-8. Responsive: center text on all breakpoints, constrain content width to `max-w-4xl mx-auto`, generous vertical padding (`py-20 md:py-32`).
-9. Verify computed font-size ratio: display (48px) / body (16px) = 3× at desktop, display (28px) / body (16px) = 1.75× at mobile — both ≥ 1.5× ✓.
-10. All colors must meet 4.5:1 contrast against their backgrounds.
+Step-by-step:
+1. Create `scripts/minio-capacity-check.sh` — a standalone bash script using the `mc` CLI.
+2. Script steps:
+   a. Accept MinIO endpoint, root user, and root password as arguments or environment variables.
+   b. `mc alias set gitlab $MINIO_ENDPOINT $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD`
+   c. `mc admin info gitlab --json` — parse and output: total capacity, used capacity, free capacity, utilization percentage, number of drives.
+   d. `mc ls gitlab/` — check if `hermes-staging-artifacts` or `hermes-prod-artifacts` already exist. Report conflicts.
+   e. Output a structured capacity report (JSON or formatted text) with: total_capacity, used_capacity, free_capacity, utilization_pct, bucket_conflicts (list), recommendation ("reuse" if free >= 50Gi AND utilization <= 70%, else "dedicated").
+3. Create `charts/hermes-infra/templates/jobs/minio-capacity-check-job.yaml` — an optional Kubernetes Job using `minio/mc` image that runs the same logic. Use `helm.sh/hook: pre-install` annotation. Mount MinIO root credentials from a pre-existing Secret.
+4. Job should write the capacity report to its logs (retrievable via `kubectl logs`).
+5. Document in chart README: "Run this script/job BEFORE helm install. Feed the result into the minio.dedicated and minio.endpoint values."
+6. This subtask does NOT provision a dedicated MinIO instance or create buckets — it only produces diagnostic data.
 
 ## Validation
-Playwright test: `[data-testid="hero"]` is visible. H1 element exists within hero with non-empty text. At 1280px viewport, H1 computed font-size ≥ 36px (token says 48px). At 375px viewport, H1 computed font-size ≥ 24px (token says 28px). CTA link is visible and has `href` attribute. Axe-core reports no violations within the hero section. Focus the CTA element and verify visible outline/ring via computed styles.
+Script executes successfully against the GitLab MinIO instance and outputs a valid capacity report containing total_capacity, used_capacity, free_capacity, utilization_pct, and bucket_conflicts fields. If run as a Kubernetes Job, `kubectl logs` of the completed Job shows the capacity report. Script returns exit code 0 on success, non-zero on connection failure.

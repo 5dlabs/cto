@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-03-31T12:20:09Z",
-  "project_name": "sigma-1-design-snapshot-e2e",
+  "generated_at": "2026-03-31T15:35:27Z",
+  "project_name": "sigma-1-hermes-e2e",
   "linear_session_id": "",
   "design_mode": "ingest_plus_stitch",
   "stitch_required": true,

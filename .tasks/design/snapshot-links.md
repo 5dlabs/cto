@@ -1,9 +1,9 @@
 ### Design snapshots
 
 #### Current site snapshots
-- `http://127.0.0.1:8765/index.html` — [Image](https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/33a17050-ef8d-4563-8e2c-7768c0ab04d9/ed5c730e-ea44-49e5-a4f7-949c788f7d47)
+- `http://127.0.0.1:8765/index.html` — [Image](https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/ff16e193-f2f3-4893-909a-f35176704c96/60961fee-c583-40d5-8edd-b926e8481571)
 
-![Current site](https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/33a17050-ef8d-4563-8e2c-7768c0ab04d9/ed5c730e-ea44-49e5-a4f7-949c788f7d47)
+![Current site](https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/ff16e193-f2f3-4893-909a-f35176704c96/60961fee-c583-40d5-8edd-b926e8481571)
 
 
 #### Generated variants

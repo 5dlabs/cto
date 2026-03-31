@@ -1,18 +1,18 @@
-Implement subtask 1001: Initialize Next.js 14 App Router project with TypeScript, Tailwind CSS, and linting
+Implement subtask 1001: Scaffold Helm Chart Structure, Namespace Templates, and NOTES.txt Skeleton
 
 ## Objective
-Scaffold the Next.js 14 project using App Router, configure TypeScript strict mode, install and configure Tailwind CSS 3.4+, and set up ESLint and Prettier with consistent rules. This is the foundation that all other subtasks depend on.
+Create the charts/hermes-infra Helm chart directory structure with Chart.yaml, per-environment values files, namespace templates with labels/annotations, and a NOTES.txt skeleton that will be populated as services are added. This is the foundational scaffold all other subtasks build upon.
 
 ## Steps
-1. Run `npx create-next-app@latest --typescript --app --tailwind` to scaffold the project.
-2. Enable `strict: true` in `tsconfig.json`.
-3. Verify Tailwind CSS 3.4+ is installed; update `tailwind.config.ts` with `content` paths covering `app/` and `components/`.
-4. Install and configure ESLint with `eslint-config-next` and Prettier. Add `.prettierrc` with consistent formatting rules (`semi: true`, `singleQuote: true`, `trailingComma: 'all'`).
-5. Add `lint` and `format` scripts to `package.json`.
-6. Install Playwright and `@axe-core/playwright` as dev dependencies now so they're available for later subtasks: `npm i -D @playwright/test @axe-core/playwright`.
-7. Run `npx playwright install --with-deps chromium`.
-8. Run `next build` to confirm zero errors on the clean scaffold.
-9. Commit the initial project structure.
+Step-by-step:
+1. Create directory `charts/hermes-infra/` with standard Helm layout: `Chart.yaml`, `values.yaml` (defaults), `templates/`, `templates/tests/`, `.helmignore`.
+2. In `Chart.yaml`, set name: `hermes-infra`, version: `0.1.0`, appVersion matching project version. Add subchart dependencies placeholder (redis, nats — will be filled in by backing service subtasks).
+3. Create `values.yaml` with all parameterized keys: `namespace`, `environment`, `replicaCount`, `minio.dedicated` (boolean, default false), `minio.endpoint`, `minio.bucketName`, `minio.retentionDays`, `minio.bucketQuota`, `minio.accessKeyId`, `minio.secretAccessKey`, `minio.presignExpiry` (default 3600), `resourceQuota.cpu`, `resourceQuota.memory`, `resourceQuota.pods`, `limitRange.defaultCpu`, `limitRange.defaultMemory`, `limitRange.maxCpu`, `limitRange.maxMemory`, `cnpg.password`, `cnpg.storageSize`, `cnpg.backupEnabled` (default false), `redis.auth.password`.
+4. Create `values-staging.yaml` overriding: namespace=hermes-staging, environment=staging, minio.bucketName=hermes-staging-artifacts, retentionDays=30, bucketQuota=20Gi, resourceQuota cpu=8/memory=16Gi/pods=20.
+5. Create `values-production.yaml` overriding: namespace=hermes-production, environment=production, minio.bucketName=hermes-prod-artifacts, retentionDays=90, bucketQuota=50Gi, resourceQuota cpu=16/memory=32Gi/pods=40.
+6. Create `templates/namespace.yaml`: Namespace resource with `metadata.name: {{ .Values.namespace }}`, labels (`app.kubernetes.io/part-of: hermes`, `hermes.io/environment: {{ .Values.environment }}`, `app.kubernetes.io/managed-by: helm`), annotations (`hermes.io/owner: platform-team`, `hermes.io/project: hermes-e2e-pipeline`).
+7. Create `templates/NOTES.txt` skeleton with sections for Namespace, Environment, Endpoints (placeholders for ConfigMap keys), MinIO, Secrets, and Usage (`envFrom` example). Will be completed as templates are added.
+8. Validate: `helm lint charts/hermes-infra` passes. `helm template hermes-infra charts/hermes-infra -f charts/hermes-infra/values-staging.yaml` renders namespace correctly.
 
 ## Validation
-`next build` completes with zero errors. `npm run lint` passes with no warnings or errors. `npx tsc --noEmit` reports zero type errors. Tailwind utility classes render correctly when adding a test `<div className="bg-blue-500">` to the default page. Playwright is importable: `npx playwright test --list` runs without error.
+`helm lint charts/hermes-infra` passes with no errors. `helm template hermes-infra charts/hermes-infra -f charts/hermes-infra/values-staging.yaml` renders a valid Namespace YAML with name=hermes-staging, all 3 labels, and all 2 annotations. Same for production values. Chart.yaml contains valid metadata. Both values files parse correctly. NOTES.txt skeleton renders without template errors.
