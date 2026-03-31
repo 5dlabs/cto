@@ -1,24 +1,19 @@
-Implement subtask 1007: Create sigma1-infra-endpoints ConfigMap aggregating all connection strings
+Implement subtask 1007: Compose marketing page by assembling Hero, Features, and CTA in app/page.tsx
 
 ## Objective
-Create the central ConfigMap 'sigma1-infra-endpoints' in the sigma1 namespace that aggregates connection strings and endpoint URLs for all provisioned infrastructure (PostgreSQL, Redis, S3, Signal-CLI). All downstream services will reference this ConfigMap via envFrom.
+Assemble Hero → Features → CTA components in `app/page.tsx` to create the canonical marketing validation flow. Provide realistic placeholder content for all component props. Ensure proper section spacing and visual flow.
 
 ## Steps
-1. Create a ConfigMap named `sigma1-infra-endpoints` in the `sigma1` namespace.
-2. Populate with the following keys (values derived from deployed services):
-   - `POSTGRES_HOST`: `sigma1-pg-rw.databases.svc.cluster.local`
-   - `POSTGRES_PORT`: `5432`
-   - `POSTGRES_DB`: `app` (or the default DB name from CNPG)
-   - `POSTGRES_URL`: Full connection string (without password — password comes from the CNPG secret)
-   - `REDIS_HOST`: `sigma1-redis.databases.svc.cluster.local`
-   - `REDIS_PORT`: `6379`
-   - `REDIS_URL`: `redis://:$(REDIS_PASSWORD)@sigma1-redis.databases.svc.cluster.local:6379`
-   - `S3_ENDPOINT`: From the S3/R2 provisioning step
-   - `S3_BUCKET`: `sigma1-assets`
-   - `SIGNALCLI_URL`: `http://sigma1-signal-cli.sigma1.svc.cluster.local:8080`
-3. Also copy or reference this ConfigMap into other namespaces (openclaw, social, web) that need it, or document that services should reference it cross-namespace.
-4. Apply the ConfigMap manifest.
-5. Verify all values resolve to reachable endpoints from within the cluster.
+1. In `app/page.tsx`, import Hero, Features, and CTA components.
+2. Render them in sequence: Hero at top, Features in middle, CTA at bottom.
+3. Provide concrete, realistic marketing copy:
+   - Hero: headline (e.g., 'Ship Products That Delight'), subheadline, CTA text + href.
+   - Features: 3 features with descriptive titles, body copy, and icon ReactNodes (use the placeholder SVG icons from Features component).
+   - CTA: headline (e.g., 'Ready to Get Started?'), button text + href.
+4. Ensure consistent vertical spacing between sections using design token spacing values (e.g., `space-y-0` with each section managing its own padding, or explicit gap).
+5. The page should create a clear top-to-bottom reading path: hook (Hero) → educate (Features) → convert (CTA).
+6. Verify the full page renders without hydration errors or console warnings.
+7. Test at all three breakpoints (375px, 768px, 1280px) that the flow is coherent.
 
 ## Validation
-Verify the ConfigMap exists with `kubectl get configmap sigma1-infra-endpoints -n sigma1 -o yaml`. Confirm all expected keys are present (POSTGRES_HOST, POSTGRES_PORT, POSTGRES_URL, REDIS_HOST, REDIS_PORT, REDIS_URL, S3_ENDPOINT, S3_BUCKET, SIGNALCLI_URL). Deploy a test pod with `envFrom` referencing the ConfigMap and verify all environment variables are set. From the test pod, attempt a TCP connection to each host:port to confirm reachability.
+Playwright E2E: Navigate to `/`, verify Hero, Features, and CTA appear in correct vertical order by comparing `getBoundingClientRect().y` values: Hero.y < Features.y < CTA.y. All three `data-testid` elements are visible. No console errors or React hydration warnings. `next build` succeeds with this page composition. Page renders correctly at 375px, 768px, and 1280px viewports (visual spot check via screenshots).

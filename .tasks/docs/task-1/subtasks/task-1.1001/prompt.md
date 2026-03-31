@@ -1,14 +1,18 @@
-Implement subtask 1001: Create Kubernetes namespaces for Sigma-1 platform
+Implement subtask 1001: Initialize Next.js 14 App Router project with TypeScript, Tailwind CSS, and linting
 
 ## Objective
-Create all required Kubernetes namespaces that will host the various infrastructure components and application services: databases, sigma1, openclaw, social, web. Apply standard labels and annotations for organizational tracking.
+Scaffold the Next.js 14 project using App Router, configure TypeScript strict mode, install and configure Tailwind CSS 3.4+, and set up ESLint and Prettier with consistent rules. This is the foundation that all other subtasks depend on.
 
 ## Steps
-1. Create a YAML manifest file `namespaces.yaml` defining all namespaces: `databases`, `sigma1`, `openclaw`, `social`, `web`.
-2. Add standard labels to each namespace: `app.kubernetes.io/part-of: sigma1`, `app.kubernetes.io/managed-by: bolt`.
-3. Apply the manifest using `kubectl apply -f namespaces.yaml`.
-4. Verify all namespaces are Active with `kubectl get namespaces`.
-5. Ensure no conflicting resource quotas or limit ranges exist that would block subsequent deployments.
+1. Run `npx create-next-app@latest --typescript --app --tailwind` to scaffold the project.
+2. Enable `strict: true` in `tsconfig.json`.
+3. Verify Tailwind CSS 3.4+ is installed; update `tailwind.config.ts` with `content` paths covering `app/` and `components/`.
+4. Install and configure ESLint with `eslint-config-next` and Prettier. Add `.prettierrc` with consistent formatting rules (`semi: true`, `singleQuote: true`, `trailingComma: 'all'`).
+5. Add `lint` and `format` scripts to `package.json`.
+6. Install Playwright and `@axe-core/playwright` as dev dependencies now so they're available for later subtasks: `npm i -D @playwright/test @axe-core/playwright`.
+7. Run `npx playwright install --with-deps chromium`.
+8. Run `next build` to confirm zero errors on the clean scaffold.
+9. Commit the initial project structure.
 
 ## Validation
-Run `kubectl get namespaces` and confirm all five namespaces (databases, sigma1, openclaw, social, web) exist with status Active. Verify labels are correctly applied using `kubectl get ns -l app.kubernetes.io/part-of=sigma1`.
+`next build` completes with zero errors. `npm run lint` passes with no warnings or errors. `npx tsc --noEmit` reports zero type errors. Tailwind utility classes render correctly when adding a test `<div className="bg-blue-500">` to the default page. Playwright is importable: `npx playwright test --list` runs without error.
