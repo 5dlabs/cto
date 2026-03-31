@@ -46,13 +46,13 @@ export const DECK_META = {
  * 4. One system: spec in, deployed software out.
  * 5. Write a spec. 22 agents build it. You approve what matters.
  * 6. Everything a startup needs to ship, except the idea.
- * 7. $240K annual revenue. Zero outside capital.
+ * 7. Pilot customer live. $240K in pipeline. Zero outside capital.
  * 8. $420B+ in cloud spend. We start where the pain is worst.
  * 9. Subscriptions, infrastructure margin, and trading revenue.
  * 10. Free desktop app > paid deployments > infrastructure rev-share.
  * 11. $750K for two engineers and 18 months of runway.
  * 12. Jonathon Fritz. 20 years of infra. Built this solo.
- * 13. $750K. Customers in hand. Product in production.
+ * 13. $750K. Pipeline in hand. Product in pilot.
  */
 export const slides: DeckSlide[] = [
   /* ------------------------------------------------------------------ */
@@ -65,10 +65,10 @@ export const slides: DeckSlide[] = [
     eyebrow: "Pre-seed \u00B7 Delaware C-Corp \u00B7 $750K",
     headline:
       "We replace your cloud stack and most of your DevOps team.",
-    subhead: `5D Labs sells software that turns a product spec into deployed code on infrastructure that costs ${DECK_INFRA_SAVINGS_LABEL} less than AWS.`,
+    subhead: `5D Labs is building software that turns a product spec into deployed code on infrastructure that costs ${DECK_INFRA_SAVINGS_LABEL} less than AWS. Currently in pilot.`,
     stats: [
-      { value: "2", label: "paying customers" },
-      { value: "$240K", label: "annual revenue" },
+      { value: "1", label: "pilot customer" },
+      { value: "$240K", label: "pipeline ACV" },
       {
         value: String(DECK_REVENUE_STREAMS_COUNT),
         label: "revenue streams",
@@ -190,19 +190,19 @@ export const slides: DeckSlide[] = [
   {
     id: "traction",
     label: "Traction",
-    headline: "$240K annual revenue. Zero outside capital.",
+    headline: "Pilot customer live. $240K in pipeline. Zero outside capital.",
     stats: [
-      { value: "$240K", label: "ARR" },
-      { value: "2", label: "paying customers" },
+      { value: "$240K", label: "pipeline ACV" },
+      { value: "1", label: "pilot customer" },
       { value: "17+", label: "bare-metal deployments" },
-      { value: "22", label: "agents in production" },
+      { value: "22", label: "agents built" },
     ],
     bullets: [
-      "Bloq (bloq.com) \u2014 $20K/mo for web3 infrastructure and application delivery. ~$240K ACV.",
-      "Sigma One \u2014 full CTO deployment. Self-hosted reference customer.",
+      "Sigma One \u2014 live pilot/partnership. CTO deployment running.",
+      "Bloq (bloq.com) \u2014 in discussion for web3 infrastructure and application delivery. ~$240K ACV in pipeline.",
       "Infrastructure partners: servers.com, ID3.net, Latitude.",
       "In discussion: Cherry Servers, MiniMax (inbound \u2014 they approached us).",
-      "One person built the platform, landed paying customers, and deployed 17+ bare-metal sites before raising a dollar.",
+      "One person built the platform, landed a pilot customer and $240K in pipeline, and deployed 17+ bare-metal sites before raising a dollar.",
     ],
   },
 
@@ -295,7 +295,7 @@ export const slides: DeckSlide[] = [
       "Pocket \u2014 Head of Infrastructure. Managed 13 engineers. Systems handled 1B+ requests/day across 50+ network integrations.",
       "Coinmiles \u2014 hired as a senior engineer, promoted to CTO in 3 months.",
       "Blocknative \u2014 web3 infrastructure and real-time transaction monitoring.",
-      "Built 5D Labs solo: working platform, paying customers, 17+ bare-metal deployments \u2014 before raising a dollar.",
+      "Built 5D Labs solo: working platform, live pilot customer, $240K pipeline, 17+ bare-metal deployments \u2014 before raising a dollar.",
       "Has worked ~18-hour days on this since May 2025. Nearly a year straight.",
       "Nontraditional path. High adversity tolerance. Takes the punches. Keeps shipping.",
     ],
@@ -307,10 +307,10 @@ export const slides: DeckSlide[] = [
   {
     id: "ask",
     label: "The ask",
-    headline: "$750K. Customers in hand. Product in production.",
+    headline: "$750K. Pipeline in hand. Product in pilot.",
     bullets: [
       "Post-money SAFE. Cap aligned to AI infrastructure comps.",
-      "Capital goes to speed, not discovery. We already have paying customers and a working product.",
+      "Capital goes to speed, not discovery. We have a live pilot, $240K in pipeline, and a working product.",
       "18-month path to cash-flow positive. Two senior engineering hires are the bottleneck.",
     ],
     callout:
