@@ -1,18 +1,26 @@
-Implement subtask 1006: Provision Kubernetes Secrets for external API keys
+Implement subtask 1006: Build CTA section component with contrasting background and centered layout
 
 ## Objective
-Create Kubernetes Secrets for all third-party API keys required by Sigma-1 services: Stripe, OpenCorporates, LinkedIn, Google APIs, and any other external integrations. Use a consistent naming convention and namespace placement.
+Implement `components/CTA.tsx` as a centered call-to-action block with a visually distinct contrasting background color, headline, optional description, and action button. Consume design tokens for all styling.
 
 ## Steps
-1. Define a naming convention for secrets: `sigma1-<provider>-credentials` (e.g., `sigma1-stripe-credentials`, `sigma1-opencorporates-credentials`, `sigma1-linkedin-credentials`, `sigma1-google-credentials`).
-2. Create each secret in the `sigma1` namespace as Opaque type.
-3. For Stripe: keys `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`.
-4. For OpenCorporates: key `OPENCORPORATES_API_KEY`.
-5. For LinkedIn: keys `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`.
-6. For Google: keys `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_API_KEY`.
-7. Create placeholder values (clearly marked as `REPLACE_ME_<key>`) so that the manifests can be applied without real keys during dev bootstrap. Document which keys need to be replaced before production.
-8. If using External Secrets Operator (dp-14), instead create ExternalSecret CRs pointing to a secrets backend (e.g., AWS Secrets Manager, Vault). Otherwise, create static Kubernetes Secrets.
-9. Apply all secret manifests.
+1. Create `components/CTA.tsx` with typed props interface:
+   ```typescript
+   interface CTAProps {
+     headline: string;
+     buttonText: string;
+     buttonHref: string;
+     description?: string;
+   }
+   ```
+2. Render a `<section>` with `data-testid="cta"` and a visually distinct background using design token `accent` or `secondary` color.
+3. Center all content horizontally using `text-center max-w-3xl mx-auto` with generous vertical padding (`py-16 md:py-24`).
+4. Render an `<h2>` headline with `heading` type scale token, colored with `accentForeground` or appropriate contrasting color.
+5. Optional `<p>` description below headline using `body` token.
+6. Render a prominent CTA `<a>` styled as a button with contrasting colors. If section background is dark/accent, button should be light. Ensure button text ≥ 4.5:1 contrast against button background, and button background ≥ 3:1 contrast against section background.
+7. Button must have visible focus indicator: `focus-visible:ring-2 focus-visible:ring-offset-2`.
+8. Responsive: padding and text sizes scale down gracefully via Tailwind responsive utilities.
+9. The section background must be visually distinct from the Features section above it to create clear visual separation in the page flow.
 
 ## Validation
-Verify each secret exists in the sigma1 namespace using `kubectl get secrets -n sigma1`. For each secret, confirm the expected keys are present (without inspecting values) using `kubectl get secret <name> -n sigma1 -o jsonpath='{.data}' | jq 'keys'`. Verify secrets are accessible by the default service account in the sigma1 namespace.
+Playwright test: `[data-testid="cta"]` is visible. Section has a distinct background-color (extract via `getComputedStyle`, verify it's not the same as body/page background). H2 and a link/button element are present within the section. Tab to the button and verify focus ring is visible (check computed `outline` or `box-shadow` properties on `:focus-visible`). Axe-core reports no contrast violations within the CTA section.

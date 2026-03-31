@@ -1,17 +1,18 @@
-Implement subtask 1003: Deploy Redis/Valkey instance via Opstree operator
+Implement subtask 1003: Implement layout shell with sticky header, main content slot, and footer
 
 ## Objective
-Deploy a single-instance Redis/Valkey cache using the Opstree Redis operator in the databases namespace. Configure it for session storage, caching, and rate limiting use cases across Sigma-1 services.
+Build `app/layout.tsx` with a sticky header containing logo and navigation, a `<main>` content slot, and a semantic `<footer>`. Use semantic HTML landmarks throughout. Configure font loading via next/font.
 
 ## Steps
-1. Verify the Opstree Redis operator is installed: `kubectl get crd redis.redis.opstreelabs.in`.
-2. Create a `Redis` CR YAML in the `databases` namespace: name `sigma1-redis`, single replica (no cluster mode for v1), resource requests of 256Mi memory / 100m CPU.
-3. Configure persistence with a 10Gi PVC for data durability across restarts.
-4. Set `maxmemory-policy` to `allkeys-lru` for cache eviction.
-5. Enable password authentication via a Kubernetes Secret referenced in the CR.
-6. Apply the CR: `kubectl apply -f sigma1-redis.yaml`.
-7. Verify the Redis pod is Running and the service endpoint is reachable.
-8. Record the service DNS name (e.g., `sigma1-redis.databases.svc.cluster.local:6379`) for the ConfigMap.
+1. Implement `app/layout.tsx` as the root layout.
+2. Configure font loading based on decision point resolution (default: `next/font/google` with Inter or similar sans-serif). Apply the font class to `<html>` or `<body>`.
+3. Add a `<header>` element with `className="sticky top-0 z-50"` positioning. Include a text logo placeholder and a horizontal `<nav>` with 3-4 placeholder `<a>` links. Use basic Tailwind spacing/color — if tokens from 1002 are not yet available, use sensible fallback values that will be replaced when tokens are ready.
+4. The header should have a background color and bottom border for visual separation.
+5. Add a `<main>` element wrapping `{children}` with appropriate vertical padding.
+6. Add a `<footer>` element with copyright text, placeholder links, and semantic `<footer>` tag.
+7. All landmark roles are implicit with semantic HTML: `<header>` → banner, `<main>` → main, `<footer>` → contentinfo.
+8. Add `data-testid="header"` and `data-testid="footer"` attributes for testing.
+9. NOTE: This subtask can proceed in parallel with 1002 (tokens). Once 1002 completes, update color/spacing references to use design tokens. The layout structure and semantic HTML do not depend on token values.
 
 ## Validation
-Verify the Redis pod is Running in the databases namespace. Port-forward to the Redis service and run `redis-cli ping` expecting `PONG`. Authenticate with the password from the secret. Run `SET testkey testvalue` and `GET testkey` to confirm read/write. Check `INFO server` to verify single-instance mode.
+Navigate to `/` and verify `<header>`, `<main>`, and `<footer>` semantic elements are present in the DOM using `document.querySelector`. Header has `position: sticky` computed style. Axe-core reports no landmark-related violations. `data-testid="header"` and `data-testid="footer"` are queryable. Font loads without layout shift (no CLS regression).

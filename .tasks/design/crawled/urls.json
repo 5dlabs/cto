@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "url": "http://127.0.0.1:8765/index.html",
+    "status": "ok",
+    "title": "Design Snapshot E2E",
+    "snippet": "Design Snapshot E2E Design Snapshot E2E Current-site capture target for intake pipeline verification. Features Hero copy Feature list Simple card layout"
+  }
+]
