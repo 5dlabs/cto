@@ -1,8 +1,6 @@
 import {
   DECK_INFRA_SAVINGS_LABEL,
   DECK_REVENUE_STREAMS_COUNT,
-  ILLUSTRATIVE_AWS_EGRESS_20TB_USD_PER_MONTH,
-  INTERNAL_FULL_STACK_SAVINGS_RANGE_NOTES,
 } from "./cloud-vs-baremetal-analysis";
 
 export type SlideTable = { headers: string[]; rows: string[][] };
@@ -12,7 +10,7 @@ export type DeckSlideStat = { value: string; label: string };
 /** hero = full-bleed cover; impact = larger type for opening slides */
 export type DeckSlideLayout = "default" | "hero" | "impact";
 
-/** Optional primary action (e.g. Talk to Morgan) — shown in web deck + noted in PDF/PPTX. */
+/** Optional primary action (e.g. schedule a call) \u2014 shown in web deck + noted in PDF/PPTX. */
 export type DeckSlideCta = { label: string; href: string };
 
 export type DeckSlide = {
@@ -33,306 +31,294 @@ export type DeckSlide = {
 export const DECK_META = {
   company: "5D Labs",
   round: "Pre-seed",
-  confidential: "Confidential — discussion only",
+  confidential: "Confidential \u2014 discussion only",
 } as const;
 
 /**
  * Single source of truth for web deck + PDF (print).
  * Copy kept short for live read + older investors; pair with verbal detail.
  * Strings are plain text everywhere (same output in the app, PDF, and PowerPoint).
+ *
+ * Headline track (read ONLY H1s and the whole pitch should land):
+ * 1. We replace your cloud stack and most of your DevOps team.
+ * 2. AI changes faster than your team can ship.
+ * 3. The window is closing.
+ * 4. One system: spec in, deployed software out.
+ * 5. Write a spec. 22 agents build it. You approve what matters.
+ * 6. Everything a startup needs to ship, except the idea.
+ * 7. $240K annual revenue. Zero outside capital.
+ * 8. $420B+ in cloud spend. We start where the pain is worst.
+ * 9. Subscriptions, infrastructure margin, and trading revenue.
+ * 10. Free desktop app > paid deployments > infrastructure rev-share.
+ * 11. $750K for two engineers and 18 months of runway.
+ * 12. Jonathon Fritz. 20 years of infra. Built this solo.
+ * 13. $750K. Customers in hand. Product in production.
  */
 export const slides: DeckSlide[] = [
+  /* ------------------------------------------------------------------ */
+  /* 1. COVER                                                           */
+  /* ------------------------------------------------------------------ */
   {
     id: "cover",
     label: "Cover",
     layout: "hero",
-    eyebrow: "Pre-seed · Delaware C-Corp · $750K",
-    headline: "We built the stack that helps us build companies.",
-    subhead:
-      "AI-native venture studio. CTO ships on bare metal today. Capital engine + ventures turn that stack into outcomes.",
+    eyebrow: "Pre-seed \u00B7 Delaware C-Corp \u00B7 $750K",
+    headline:
+      "We replace your cloud stack and most of your DevOps team.",
+    subhead: `5D Labs sells software that turns a product spec into deployed code on infrastructure that costs ${DECK_INFRA_SAVINGS_LABEL} less than AWS.`,
     stats: [
       { value: "2", label: "paying customers" },
-      { value: "$240K", label: "ACV" },
+      { value: "$240K", label: "annual revenue" },
       {
         value: String(DECK_REVENUE_STREAMS_COUNT),
         label: "revenue streams",
       },
       {
         value: DECK_INFRA_SAVINGS_LABEL,
-        label: "infra savings vs cloud*",
+        label: "cheaper than cloud",
       },
     ],
-    callout:
-      "Same stack across those lines—customers avoid hyperscaler egress bills and managed-service markup vs cloud-only AI.",
-    footnote: `*Infra: deck shows ${DECK_INFRA_SAVINGS_LABEL} conservative vs hyperscale; internal migration models run ${INTERNAL_FULL_STACK_SAVINGS_RANGE_NOTES}. Example only — ~20TB/mo internet egress ≈ ~$${ILLUSTRATIVE_AWS_EGRESS_20TB_USD_PER_MONTH.toLocaleString("en-US")}/mo at ~$0.085/GB (AWS-style tier) vs $0 inside typical partner bundles (e.g. 20TB/mo included on Latitude Metal; https://www.latitude.sh/network/pricing ). Workload-specific — full math in cloud-vs-baremetal-analysis.ts.`,
+    footnote:
+      "*Savings range from current workloads vs public cloud list pricing.",
   },
+
+  /* ------------------------------------------------------------------ */
+  /* 2. PROBLEM  (P in PAS)                                             */
+  /* ------------------------------------------------------------------ */
   {
     id: "problem",
     label: "Problem",
     layout: "impact",
-    eyebrow: "Unit economics",
-    headline: "The real hyperscale bill isn’t headline compute.",
+    eyebrow: "The pain",
+    headline:
+      "AI changes faster than your team can ship.",
     subhead:
-      "The bill: egress, storage, margin — not list-price CPU. The org: sprawl + DevOps gap. Scarce: coordination as code commoditizes. CTO: bill + org on bare metal and automation.",
+      "Your CTO evaluated 15 tools last year. Adopted 3. Wasted a quarter. The cloud bill went up anyway.",
     bullets: [
-      "Invoice line items: network + storage + managed-service markup vs bait-priced compute.",
-      "People + sprawl: teams add headcount and tooling to move faster, but without shared rails the rework and coordination overhead grow with the team — more people does not mean more velocity.",
-      "Pace and fatigue: models, CLIs, and vendors move at breakneck speed — dizzying for any engineering lead — and still no single operating model; teams re-choose instead of compound.",
-      "Runway pattern: long build cycles and late pivots when cash is low — not early when learning is cheap; costs and stack are often locked in before the turn.",
+      "A new AI coding tool launches every week. Your engineering lead is choosing tools instead of shipping product.",
+      "AWS advertises cheap compute, then charges 10x for storage, egress, and managed services. Most teams don\u2019t notice until the bill arrives.",
+      "You hire more engineers to go faster. The coordination overhead eats the speed gain. Net output barely moves.",
     ],
   },
+
+  /* ------------------------------------------------------------------ */
+  /* 3. WHY NOW / AGITATE  (A in PAS)                                   */
+  /* ------------------------------------------------------------------ */
+  {
+    id: "why-now",
+    label: "Why now",
+    layout: "impact",
+    eyebrow: "Urgency",
+    headline: "The window is closing.",
+    bullets: [
+      "Model releases have gone from quarterly to weekly. The tool landscape doubles every six months.",
+      "Teams that don\u2019t lock in one delivery system now will keep re-architecting until the money runs out.",
+      "Bare-metal providers just hit the price point where you can match AWS capabilities at 60\u201380% less. That crossover happened in the last 18 months.",
+      "First platform to own the full loop \u2014 plan, build, deploy, heal \u2014 on cheaper hardware wins the category.",
+    ],
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* 4. SOLUTION  (S in PAS)                                            */
+  /* ------------------------------------------------------------------ */
   {
     id: "solution",
-    label: "One machine",
+    label: "Solution",
     layout: "impact",
-    eyebrow: "Thesis",
-    headline: "One machine: build, fund, ship.",
-    subhead: "CTO, trading, ventures — one OS, not three random bets.",
+    eyebrow: "What we do",
+    headline:
+      "One system: spec in, deployed software out.",
+    subhead:
+      "CTO is the product. You write a spec. 22 AI agents plan, build, review, test, and deploy it on hardware you own.",
     bullets: [
-      "CTO — agents, multi-CLI, bare metal K8s, self-healing delivery.",
-      "Trading — in-house capital + on-chain signal (not a product we sell).",
-      "Ventures + OpenClaw — same playbooks; one fleet.",
+      "Your code runs on dedicated servers, not AWS. Same capabilities. Fraction of the cost.",
+      "When the AI ecosystem changes next week, we absorb the update. Your workflow stays the same.",
+      "We also run an internal trading operation for bootstrap revenue. It is not a product. Investor capital is never at risk.",
     ],
-    callout: "“Too wide?” One loop. Cut a leg and it breaks.",
   },
-  {
-    id: "origin",
-    label: "Origin",
-    headline: "Built it for ourselves — then it became the product",
-    bullets: [
-      "Wanted a Solana trading stack; one person, pre-reliable models.",
-      "Built CTO to ship anyway — didn’t wait for “good enough” AI.",
-      "8 months on CTO; back to trading now that infra is real.",
-    ],
-    callout: "Scratch-the-itch infra → prove in prod → sell the wedge.",
-  },
+
+  /* ------------------------------------------------------------------ */
+  /* 5. HOW IT WORKS                                                    */
+  /* ------------------------------------------------------------------ */
   {
     id: "loop",
     label: "How it works",
-    headline: "Decide → deploy → learn → compound",
+    headline:
+      "Write a spec. 22 agents build it. You approve what matters.",
     bullets: [
-      "Decide — one thesis, wedge, success signals.",
-      "Deploy — agents on shared rails (CTO + OpenClaw).",
-      "Learn — runtime + market feed the roadmap.",
-      "Compound — reuse prompts, workflows, infra.",
+      "Step 1: You write a product spec or describe what you need in plain language.",
+      "Step 2: A PM agent breaks it into tasks and assigns specialist agents \u2014 backend, frontend, infrastructure, tests.",
+      "Step 3: Every pull request gets automated code review. Humans approve critical decisions.",
+      "Step 4: Deployment, monitoring, and incident response run through the same system. Issues get fixed before your team wakes up.",
     ],
-    callout:
-      "Product intake and PRDs live in CTO — agents and automation take it from there through build, review, and release to production.",
   },
+
+  /* ------------------------------------------------------------------ */
+  /* 6. PRODUCT                                                         */
+  /* ------------------------------------------------------------------ */
   {
     id: "cto",
-    label: "CTO",
-    headline: "CTO — platform, not a chat skin",
+    label: "Product",
+    headline:
+      "Everything a startup needs to ship, except the idea.",
     subhead:
-      "Kubernetes-native; mostly Rust for latency. Same product on an enterprise cluster or kind on a workstation.",
+      "Planning, coding, review, security, testing, deployment, and monitoring. One subscription.",
     bullets: [
-      "One operating model — agents, skills, and routing on shared rails; new models and providers plug in underneath so you are not re-inventing delivery every time the ecosystem shifts — full optionality, one spine.",
-      "Multi-CLI routing — OpenClaw MCP harness (eight CLIs); picks provider + model for token and $ efficiency — works well when founders spread work across free credits on many accounts.",
-      "Tool surface — MCP aggregator as the tool server; preset skills per agent with add / override anytime — methodology stays yours while tools and providers change.",
-      "Operators & runtime — Kubernetes operators for backend services; runtime image packs languages and tooling; stack is mostly Rust where it matters for performance.",
-      "Self-heal & review — Healer reacts to telemetry from the observability stack; Stitch does automated PR review and remediation; alerting to Discord, Slack, and webhooks.",
-      "Coordination — NATS for agent-to-agent traffic across pods (fills a gap vs. stock Kubernetes); CRDs run headless jobs that report back to Morgan; ACP-style coordination across the fleet.",
-      "Metal & GPU — automated bare-metal and GPU provisioning; we abstract provider contracts so customers don’t have to — or they keep a direct deal with the vendor.",
-      "Research loop — ingest latest methodologies, patterns, and papers → PRD → features on the platform — so the product stays current without asking users to rip up how they work.",
-      "Board room (debate, voice, chat with Morgan via ElevenLabs + LiveKit) ships in the main CTO app — not desktop-only. CTO Lite is the desktop-only freemium entry (local kind, limited agents). AR glasses roadmap: Even G2, Meta Ray-Ban Display, Rokid, Vuzix Z100 — 5dlabs.ai/cto/morgan.",
-    ],
-    footnote:
-      "AGPL-3.0 — serious teams self-host. More detail: 5dlabs.ai/cto",
-  },
-  {
-    id: "cto-roster",
-    label: "Agent roster",
-    headline: "22 specialist agents",
-    subhead:
-      "Preset skills and tools per role—extend or swap without retraining your team on a new methodology.",
-    bullets: [
-      "Control — Morgan (PM / coordination).",
-      "Build — Rex, Grizz, Nova, Viper · Blaze, Tap, Spark (backend, web, mobile, desktop).",
-      "Trust & ship — Cleo, Cipher, Tess, Stitch, Atlas, Bolt (quality, security, testing, review, merge, infra).",
-      "Domain — Block, Vex, Angie, Glitch (chains, XR, agent systems, games).",
-      "Business — Lex, Hype, Tally, Chase (legal, marketing, accounting, sales).",
-    ],
-    callout:
-      "Avatars and detail on 5dlabs.ai/cto. Internal operators (e.g. Healer, Keeper, Pixel) also run self-heal, desktop, and orchestration under the hood.",
-  },
-  {
-    id: "private-cloud",
-    label: "Private cloud",
-    headline: "Agentic private cloud — AWS parity, your metal",
-    subhead:
-      "20+ productized services — Plan, Code, Git, Edge, Data, Deploy, Observe, … — not wrappers around ChatGPT.",
-    bullets: [
-      "5D Plan — PRD → structured deliberation before build.",
-      "5D Code — multi-CLI harness (Cursor, Claude, Codex, …) with intelligent routing.",
-      "5D Git — self-hosted GitLab or Gitea: no per-seat GitHub fees; full pipeline on your metal.",
-      "5D Edge — Cloudflare tunnels + Cloudflare edge (we use CF end-to-end for secure ingress and connectivity).",
+      "Multi-model routing: each task goes to the cheapest AI model that can handle it. Customers use credits across 8+ providers instead of locking into one.",
+      "Self-healing production: automated monitoring detects issues and triggers fixes before anyone pages your oncall.",
+      "20+ infrastructure services replace AWS equivalents on dedicated servers \u2014 database, storage, inference, CI/CD, secrets, edge.",
+      "Open-source core (AGPL-3.0). Serious teams self-host. We sell the managed version and support.",
     ],
     table: {
-      headers: ["5D", "≈ Replaces", "Stack"],
+      headers: ["5D Service", "Replaces", "Built on"],
       rows: [
-        ["5D Data", "RDS", "CloudNativePG"],
-        ["5D Store", "Object", "SeaweedFS"],
+        ["5D Data", "AWS RDS", "CloudNativePG"],
+        ["5D Store", "S3", "SeaweedFS"],
         ["5D Inference", "SageMaker", "KubeAI"],
-        ["5D Observe", "CW / DD", "Prom / Grafana / Loki"],
+        ["5D Observe", "CloudWatch / Datadog", "Prometheus + Grafana"],
         ["5D Deploy", "CI/CD SaaS", "Argo CD"],
-        ["5D Vault", "Secrets", "OpenBao + ESO"],
-        ["5D Edge", "Edge / DNS / ZT", "Cloudflare + ingress + certs"],
+        ["5D Vault", "Secrets Manager", "OpenBao"],
+        ["5D Edge", "CloudFront / Route53", "Cloudflare"],
       ],
     },
-    callout:
-      "Hyperscaler-shaped capabilities on hardware you own — run and healed by agents. Full catalog: cto/services on 5dlabs.ai.",
+    footnote: "Full service catalog: 5dlabs.ai/cto",
   },
-  {
-    id: "openclaw",
-    label: "OpenClaw",
-    headline: "OpenClaw — agent runtime on the same metal",
-    subhead:
-      "Orchestration and playbooks—not a separate product silo. Same fleet, same rails as CTO.",
-    bullets: [
-      "Coordinates specialist agents (PM, implementers, infra, security, …) with shared MCP + toolchains.",
-      "Intake → tasks → Plays: one loop from PRD to merge with humans in the loop where it matters.",
-      "Open source: GitOps-based OpenClaw platform + Helm to deploy and scale OpenClaw — the spine CTO runs on — so community and marketing funnel into full CTO + bare metal.",
-      "Runs beside the 5D private-cloud services: agents operate the stack, stack hosts the workloads.",
-    ],
-    callout:
-      "If the pitch names “Open Cloud,” read it as this: agents + services on your metal—OpenClaw is the control plane.",
-  },
-  {
-    id: "intake",
-    label: "Differentiation",
-    headline: "Plan before code — keep your mental model",
-    bullets: [
-      "Structured planning workflow before implementation — explore options, use voice, listen async — so the team aligns before anyone ships the wrong thing.",
-      "UI and scope clarified early with review + tracking tied together — less rework, less spend on design-only firefighting.",
-      "Humans stay in the loop through listening and async review, not constant ticket-chasing.",
-    ],
-    callout: "ROI: fewer hires, lower infra bill, faster cycles.",
-  },
-  {
-    id: "trading",
-    label: "Trading",
-    headline: "Trading engine — in-house capital & signal",
-    subhead: "Bootstrap only — not a fund we market; investor capital is not trading principal.",
-    bullets: [
-      "Multi-chain stack in production: Solana, Base, Polygon, Near, Sui.",
-      "Low-latency RPC / edge (Helius-class) without hedge-fund capex.",
-      "Execution + risk workflows on the same infra discipline as CTO—observe, deploy, heal.",
-      "Feeds experiments and on-chain signal; P&L stays inside the studio—not an external product line.",
-    ],
-    table: {
-      headers: ["Layer", "What it covers"],
-      rows: [
-        ["Chains", "Solana · Base · Polygon · Near · Sui"],
-        ["Edge", "Low-latency ingress + RPC path"],
-        ["Capital", "Bootstrap only — studio balance sheet"],
-        ["Positioning", "Not sold as a fund or third-party trading product"],
-      ],
-    },
-    footnote: "Investor $ is not trading principal.",
-  },
+
+  /* ------------------------------------------------------------------ */
+  /* 7. TRACTION                                                        */
+  /* ------------------------------------------------------------------ */
   {
     id: "traction",
     label: "Traction",
-    headline: "Traction & partnerships",
+    headline: "$240K annual revenue. Zero outside capital.",
+    stats: [
+      { value: "$240K", label: "ARR" },
+      { value: "2", label: "paying customers" },
+      { value: "17+", label: "bare-metal deployments" },
+      { value: "22", label: "agents in production" },
+    ],
     bullets: [
-      "Sigma One — full CTO + ops; self-hosted reference.",
-      "Bloq (bloq.com) — ~$20K/mo engagement (~$240K ACV). Web3 infra & applications partner.",
-      "Partnerships — servers.com · ID3.net · Latitude (metal / network).",
-      "In discussion — Cherry Servers (not closed yet). MiniMax — approached us to partner.",
-      "Stack: 17+ bare-metal sites · 4 chains · 22 specialist agents.",
-      "Founder velocity: 10.6k GH/yr · Pocket-era infra: 1B+ req/day peak, 50+ networks.",
+      "Bloq (bloq.com) \u2014 $20K/mo for web3 infrastructure and application delivery. ~$240K ACV.",
+      "Sigma One \u2014 full CTO deployment. Self-hosted reference customer.",
+      "Infrastructure partners: servers.com, ID3.net, Latitude.",
+      "In discussion: Cherry Servers, MiniMax (inbound \u2014 they approached us).",
+      "One person built the platform, landed paying customers, and deployed 17+ bare-metal sites before raising a dollar.",
     ],
   },
+
+  /* ------------------------------------------------------------------ */
+  /* 8. MARKET                                                          */
+  /* ------------------------------------------------------------------ */
   {
     id: "market",
     label: "Market",
-    headline: "Beachhead → TAM",
-    bullets: [
-      "Start: crypto-native teams + founder credibility.",
-      "Expand: any startup burning cloud + delivery headcount.",
-      "Moat: bare metal + full automation vs. cloud-only agents.",
+    headline:
+      "$420B+ in cloud spend. We start where the pain is worst.",
+    stats: [
+      { value: "$3\u20135B", label: "beachhead" },
+      { value: "$40\u201380B", label: "SAM" },
+      { value: "$420B+", label: "TAM" },
     ],
-    footnote: "Cover footnote + cloud-vs-baremetal-analysis.ts — per-customer appendix TBD.",
+    bullets: [
+      "Beachhead ($3\u20135B): crypto and AI teams already running dedicated servers. We have credibility and network here.",
+      "SAM ($40\u201380B): any startup spending too much on cloud and hiring too many engineers to compensate.",
+      "TAM ($420B+): 2025 global public-cloud IaaS + PaaS spend. Every dollar overspent on AWS is a dollar we can save.",
+    ],
+    footnote:
+      "Source: Gartner public-cloud forecast, Nov 2024. PaaS $208.6B + IaaS $211.9B.",
   },
+
+  /* ------------------------------------------------------------------ */
+  /* 9. BUSINESS MODEL                                                  */
+  /* ------------------------------------------------------------------ */
   {
     id: "business-model",
     label: "Model",
-    headline: "Four revenue streams · one stack",
+    headline:
+      "Subscriptions, infrastructure margin, and trading revenue.",
     bullets: [
-      "CTO subscriptions + implementations (near-term $).",
-      "Bare-metal rev-share (partners we route customers to).",
-      "In-house trading P&L (bootstrap capital only).",
-      "Advisory / consulting engagements.",
+      "CTO subscriptions: the core product. Tiered by agents, users, and infrastructure scale.",
+      "Infrastructure rev-share: we route customers to bare-metal partners and take a margin on hardware.",
+      "In-house trading: bootstrap capital only. Funds experiments. Investor money is never at risk.",
+      "Implementation work: bridge revenue while subscription base builds. De-prioritized as ARR scales.",
     ],
   },
+
+  /* ------------------------------------------------------------------ */
+  /* 10. GO-TO-MARKET                                                   */
+  /* ------------------------------------------------------------------ */
   {
     id: "gtm",
     label: "Go-to-market",
-    headline: "Open core → freemium desktop → paid tiers",
-    subhead:
-      "Distribution that points everything back to CTO — desktop is the primary product surface.",
+    headline:
+      "Free desktop app \u2192 paid deployments \u2192 infrastructure rev-share.",
     bullets: [
-      "Ship the open-source OpenClaw platform (GitOps + Helm to deploy and scale OpenClaw) so evals and installs funnel into the full CTO stack — not a vague “slice,” the same control plane we run.",
-      "Freemium CTO Lite on desktop: local kind cluster, no bare-metal path, limited agent set — enough to get hooked.",
-      "Feature flags and upgrade hooks create FOMO; paid tiers (still being defined) unlock full fleet, metal, and agent depth.",
-      "Long-term: subscriptions on top of the desktop app as the main commercial surface.",
+      "CTO Lite on desktop: free, runs locally, limited agents. Low friction to try.",
+      "Paid tiers: full agent fleet, multi-user, bare-metal deployment, production ops.",
+      "Implementation-led sales land reference customers and shorten time to value.",
+      "Infrastructure rev-share compounds behind every deployment as customers grow.",
     ],
   },
+
+  /* ------------------------------------------------------------------ */
+  /* 11. USE OF FUNDS                                                   */
+  /* ------------------------------------------------------------------ */
   {
     id: "use-of-funds",
     label: "Use of funds",
-    headline: "$750K — team, infra, runway",
+    headline:
+      "$750K for two engineers and 18 months of runway.",
     table: {
       headers: ["Line", "USD", "Note"],
       rows: [
-        ["2 engineers", "$300–400K", "~$150–200K each"],
-        ["Founder", "$100–120K", "Runway salary"],
-        ["Trading edge", "$20–40K", "Low-latency"],
-        ["Lab server", "$16–20K", "Hardware"],
-        ["Models", "$30–50K", "R&D; credits help"],
+        ["2 engineers", "$300\u2013400K", "~$150\u2013200K each"],
+        ["Founder salary", "$100\u2013120K", "Runway"],
+        ["Market infra", "$20\u201340K", "Low-latency + data"],
+        ["Lab server", "$16\u201320K", "Hardware"],
+        ["AI model costs", "$30\u201350K", "R&D usage"],
         ["Buffer", "Rest", "Legal, ops"],
       ],
     },
-    callout: "18 months: path to cash-flow positive.",
+    callout: "18 months to cash-flow positive.",
   },
-  {
-    id: "morgan",
-    label: "Morgan",
-    headline: "Talk to Morgan before we meet",
-    subhead:
-      "Animated avatar + voice — Q&A front door before a live conversation. Ground the host with KB URLs and deck links. No product intake or PRD path here — that runs in the CTO app, not this widget.",
-    bullets: [
-      "Morgan is the PM/coordination persona on CTO; this experience is voice + avatar Q&A only — not where specs or intake land.",
-      "Investors use this for narrative questions; product intake and PRDs flow through CTO (same platform as the agent fleet), not through the browser widget.",
-      "Live stack: OpenClaw + LiveKit + hosted avatar.",
-    ],
-    cta: {
-      label: "Talk to Morgan",
-      href: "https://5dlabs.ai/cto/morgan#talk",
-    },
-    footnote: "Avatar + voice: hosted provider · LiveKit · OpenClaw.",
-  },
+
+  /* ------------------------------------------------------------------ */
+  /* 12. FOUNDER                                                        */
+  /* ------------------------------------------------------------------ */
   {
     id: "founder",
     label: "Founder",
-    headline: "Jonathon Fritz",
+    headline:
+      "Jonathon Fritz. 20 years of infra. Built this solo.",
+    subhead: "Victoria, BC.",
     bullets: [
-      "20+ yrs ops · Victoria, BC.",
-      "Pocket — Head of Infra, 1B+ req/day, 50+ networks (management scope at scale).",
-      "Blocknative · Coinmiles SE→CTO in 3 mo.",
+      "Pocket \u2014 Head of Infrastructure. Managed 13 engineers. Systems handled 1B+ requests/day across 50+ network integrations.",
+      "Coinmiles \u2014 hired as a senior engineer, promoted to CTO in 3 months.",
+      "Blocknative \u2014 web3 infrastructure and real-time transaction monitoring.",
+      "Built 5D Labs solo: working platform, paying customers, 17+ bare-metal deployments \u2014 before raising a dollar.",
+      "Has worked ~18-hour days on this since May 2025. Nearly a year straight.",
+      "Nontraditional path. High adversity tolerance. Takes the punches. Keeps shipping.",
     ],
   },
+
+  /* ------------------------------------------------------------------ */
+  /* 13. ASK                                                            */
+  /* ------------------------------------------------------------------ */
   {
     id: "ask",
     label: "The ask",
-    headline: "$750K post-money SAFE",
+    headline: "$750K. Customers in hand. Product in production.",
     bullets: [
-      "Hires, founder salary, edge, lab, models.",
-      "Cap aligned to AI infra comps — terms in conversation.",
-      "Bias: profitability optionality; M&A > IPO as default.",
+      "Post-money SAFE. Cap aligned to AI infrastructure comps.",
+      "Capital goes to speed, not discovery. We already have paying customers and a working product.",
+      "18-month path to cash-flow positive. Two senior engineering hires are the bottleneck.",
     ],
     callout:
-      "Live demo in meeting · Export PDF, PowerPoint, or Google Slides from the deck chrome.",
+      "Live demo available in any meeting.",
+    cta: {
+      label: "Schedule a call",
+      href: "https://cal.com/jonathon-fritz-2uhdqe/discovery",
+    },
     footnote: "https://cal.com/jonathon-fritz-2uhdqe/discovery",
   },
 ];
