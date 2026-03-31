@@ -1,27 +1,10 @@
-Implement subtask 2005: Implement GET /api/v1/notifications (list) and DELETE /api/v1/notifications/:id (cancel) endpoints
+Implement subtask 2005: Implement repository layer for catalog queries
 
 ## Objective
-Implement the paginated list endpoint with optional status filtering and the cancel endpoint with conflict detection for non-pending notifications.
+Create repository modules with database query functions for categories, products (list, detail, search), and availability lookups using sqlx.
 
 ## Steps
-1. **GET /api/v1/notifications** (list):
-   - Extract `Query<ListNotificationsQuery>` from URL params.
-   - Compute: `page = query.page.unwrap_or(1).max(1)`, `per_page = query.per_page.unwrap_or(20).min(100)`, `offset = (page - 1) * per_page`.
-   - Build dynamic query: if `status` filter is provided, add `WHERE status = $1`. Use sqlx query builder or conditional query.
-   - Count total: `SELECT COUNT(*) FROM notifications [WHERE status = $1]`.
-   - Fetch page: `SELECT * FROM notifications [WHERE status = $1] ORDER BY created_at DESC LIMIT $2 OFFSET $3`.
-   - Return `Json(PaginatedResponse { data, page, per_page, total })`.
-2. **DELETE /api/v1/notifications/:id** (cancel):
-   - Extract `Path(id): Path<Uuid>`.
-   - Query current notification: `SELECT * FROM notifications WHERE id = $1`.
-   - If not found, return `AppError::NotFound`.
-   - If status != Pending, return `AppError::Conflict("only pending notifications can be cancelled")`.
-   - Update: `UPDATE notifications SET status = 'cancelled', updated_at = NOW() WHERE id = $1 RETURNING *`.
-   - Return `(StatusCode::OK, Json(updated_notification))`.
-3. Register routes:
-   - `.route("/api/v1/notifications", get(list_notifications))` (alongside existing post)
-   - `.route("/api/v1/notifications/:id", delete(cancel_notification))` (alongside existing get)
-4. Consider using `.route("/api/v1/notifications", get(list).post(create))` and `.route("/api/v1/notifications/:id", get(get_one).delete(cancel))` for cleanliness.
+1. Create src/repositories/category_repo.rs with functions: list_categories(pool, active_only) -> Vec<Category>, get_category_by_id(pool, id) -> Option<Category>, get_category_by_slug(pool, slug) -> Option<Category>. 2. Create src/repositories/product_repo.rs with functions: list_products(pool, filters: ProductFilter) -> (Vec<ProductListItem>, i64) supporting pagination (limit/offset), category_id filter, search by name/sku, and is_active filter. get_product_by_id(pool, id) -> Option<ProductDetail>. get_products_by_category(pool, category_id, pagination) -> (Vec<ProductListItem>, i64). 3. Create src/repositories/availability_repo.rs with: get_availability(pool, product_id) -> Option<AvailabilityResponse>, get_bulk_availability(pool, product_ids) -> Vec<AvailabilityResponse>. 4. Define a ProductFilter struct with optional fields: category_id, search_query, min_daily_rate, max_daily_rate, is_active, page, per_page. 5. Use sqlx::query_as! or query_as with named fields. Ensure all queries use parameterized inputs. 6. Add unit tests using sqlx::test with a test database for each repository function.
 
 ## Validation
-Integration tests: List with default pagination returns `{data, page: 1, per_page: 20, total}` structure. List with status filter returns only matching notifications. List with per_page=200 clamps to 100. Cancel a pending notification returns 200 with status=cancelled. Cancel a non-pending (e.g., already cancelled) notification returns 409. Cancel with unknown ID returns 404.
+Repository functions return correct results against a seeded test database. list_products with pagination returns expected page sizes and total counts. Search by name/SKU returns matching products. Availability query returns correct quantities.

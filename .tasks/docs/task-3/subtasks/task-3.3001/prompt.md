@@ -1,22 +1,17 @@
-Implement subtask 3001: Upgrade CloudNativePG to 3-replica HA with synchronous replication and backups
+Implement subtask 3001: Scaffold Go project with gRPC server and grpc-gateway
 
 ## Objective
-Update the CloudNativePG Cluster CR for production: 3 replicas with synchronous replication (minSyncReplicas: 1), PodDisruptionBudget (maxUnavailable: 1), and automated backup configuration.
+Initialize the Go module, set up the gRPC server entrypoint, configure grpc-gateway for REST proxy, and establish the project directory structure following idiomatic Go layout for a multi-service gRPC application.
 
 ## Steps
-1. In `infra/notifycore/templates/postgres-cluster.yaml`, add conditional logic based on values:
-   - `spec.instances`: parameterize from values (3 for prod).
-   - `spec.minSyncReplicas: 1` (ensures at least one synchronous standby).
-   - `spec.maxSyncReplicas: 1`.
-2. Create `infra/notifycore/templates/postgres-pdb.yaml`:
-   - PodDisruptionBudget targeting the CloudNativePG pods (label selector matching `cnpg.io/cluster: notifycore-pg`).
-   - `spec.maxUnavailable: 1`.
-3. Add backup configuration to the Cluster CR:
-   - `spec.backup.barmanObjectStore` section (parameterized: object store endpoint, bucket, credentials secret) OR `spec.backup.volumeSnapshot` for PVC-based.
-   - Configure `spec.backup.retentionPolicy: "30d"`.
-   - Create a `ScheduledBackup` CR for daily backups at 2 AM.
-4. Update `values-prod.yaml` with postgres.instances: 3, postgres.backup settings.
-5. Ensure `values-dev.yaml` remains unchanged (instances: 1, no backups).
+1. Run `go mod init` for the RMS service module.
+2. Create directory structure: `/cmd/rms-server/`, `/internal/`, `/proto/`, `/pkg/`, `/migrations/`.
+3. Set up a `main.go` in `/cmd/rms-server/` that initializes a gRPC server on a configurable port (default 50051).
+4. Add grpc-gateway runtime mux and register it on an HTTP port (default 8080).
+5. Configure graceful shutdown with signal handling (SIGTERM, SIGINT).
+6. Add a `buf.yaml` and `buf.gen.yaml` for protobuf tooling with Go and grpc-gateway plugins.
+7. Include a `Makefile` with targets: `proto-gen`, `build`, `run`, `test`.
+8. Add a Dockerfile with multi-stage build (builder + distroless runtime).
 
 ## Validation
-`helm template infra/notifycore -f infra/notifycore/values-prod.yaml` renders a CloudNativePG Cluster with instances=3, minSyncReplicas=1. A PodDisruptionBudget resource is rendered with maxUnavailable=1. Backup configuration section is present in the Cluster CR. `values-dev.yaml` still renders with instances=1 and no backup section.
+The gRPC server starts and listens on port 50051. The HTTP gateway starts and listens on port 8080. `make build` produces a binary without errors. `make proto-gen` completes successfully (even with empty proto files). Dockerfile builds successfully.

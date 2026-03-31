@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-03-29T09:21:24Z",
-  "project_name": "notifycore-e2e",
+  "generated_at": "2026-03-30T23:16:53Z",
+  "project_name": "sigma-1",
   "linear_session_id": "",
-  "design_mode": "ingest",
-  "stitch_required": false,
+  "design_mode": "ingest_plus_stitch",
+  "stitch_required": true,
   "bundle_dir": "/Users/jonathon/5dlabs/cto/.tasks/design",
-  "has_frontend": false,
+  "has_frontend": true,
   "stitch_status": "failed",
   "files": {
     "design_context": "/Users/jonathon/5dlabs/cto/.tasks/design/design-context.json",

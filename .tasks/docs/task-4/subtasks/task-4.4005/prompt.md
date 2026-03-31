@@ -1,0 +1,10 @@
+Implement subtask 4005: Implement Stripe payment creation and webhook handling
+
+## Objective
+Integrate with the Stripe API for creating PaymentIntents, handling checkout flows, and processing Stripe webhooks with idempotent event handling.
+
+## Steps
+1. Create `src/services/stripe_service.rs`. 2. Implement `create_payment_intent(amount, currency, invoice_id)` — calls Stripe API to create a PaymentIntent with metadata containing invoice_id. Store the payment_intent_id in the payments table with status 'processing'. Return the client_secret for frontend. 3. POST /api/v1/payments/stripe/create-intent — handler that accepts invoice_id, validates the invoice exists and is unpaid, creates PaymentIntent via stripe_service, records payment record. 4. POST /api/v1/payments/stripe/webhook — Stripe webhook endpoint. Verify webhook signature using STRIPE_WEBHOOK_SECRET. Parse event type. Handle: `payment_intent.succeeded` (mark payment completed, update invoice if applicable), `payment_intent.payment_failed` (mark payment failed), `charge.refunded` (mark payment refunded, revert invoice status). 5. Implement idempotency: store processed Stripe event IDs in a `finance.stripe_events` table (event_id VARCHAR PK, processed_at TIMESTAMP). Before processing, check if event_id exists; skip if already processed. Add migration for this table. 6. Use raw body extraction for webhook signature verification (Axum extractor that captures raw bytes before JSON parsing). 7. Add error handling: return 200 to Stripe even if internal processing fails (log error, add to retry queue or dead letter). 8. Register webhook route outside of normal auth middleware (Stripe calls it directly).
+
+## Validation
+Create a PaymentIntent via the endpoint and verify a Stripe PaymentIntent is created in test mode. Send a mock webhook with valid signature for payment_intent.succeeded and verify payment and invoice status update. Send duplicate webhook event and verify idempotent handling (no duplicate processing). Send webhook with invalid signature and verify 400 rejection.

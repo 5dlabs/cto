@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. `kubectl get pods -n notifycore` shows notifycore-pg and notifycore-redis pods in Running/Ready state within 120s. 2. A test Job in the namespace successfully connects to PostgreSQL (`SELECT 1` returns 1) using DATABASE_URL from the ConfigMap. 3. The same Job connects to Redis (`PING` returns `PONG`) using REDIS_URL from the ConfigMap. 4. ConfigMap `notifycore-infra-endpoints` exists and contains all four keys (DATABASE_URL, REDIS_URL, PORT, RUST_LOG) with non-empty values.
+- [ ] Verify all pods (PostgreSQL, Redis, S3/R2, Signal-CLI) are running and healthy. Confirm ConfigMap 'sigma1-infra-endpoints' is present and contains valid connection strings. All secrets are accessible by service accounts.
 
 ## Verification Notes
 

@@ -1,0 +1,10 @@
+Implement subtask 4007: Implement financial reporting endpoints
+
+## Objective
+Build the /api/v1/finance/reports/* endpoints for revenue reports, AR aging, profit/loss summaries, and expense breakdowns.
+
+## Steps
+1. Create `src/handlers/reports.rs`. 2. GET /api/v1/finance/reports/revenue — accepts date range (from, to), optional currency, grouping (daily, weekly, monthly). Query completed payments within range, aggregate by period. Return array of {period, total_revenue, payment_count, currency}. 3. GET /api/v1/finance/reports/ar-aging — accounts receivable aging report. Query all unpaid invoices (status = sent or overdue). Bucket by age: current (0-30 days), 30-60 days, 60-90 days, 90+ days. Return buckets with invoice count and total amount per bucket. Auto-update overdue status for invoices past due_date. 4. GET /api/v1/finance/reports/profit-loss — accepts date range. Revenue = sum of completed payments. Expenses = sum of processed payroll. Return {revenue, expenses, net_profit, currency, period}. 5. GET /api/v1/finance/reports/payroll-summary — aggregate payroll costs by period, department/employee. 6. Create `src/services/report_service.rs` with optimized SQL queries using aggregation functions (SUM, GROUP BY, date_trunc). 7. Ensure all report queries complete within 5 seconds. Add appropriate database indexes in a new migration if needed (on invoice.status, invoice.due_date, payment.paid_at, payroll.period_start). 8. Register routes under `/api/v1/finance/reports`.
+
+## Validation
+Seed database with known invoices, payments, and payroll records. Verify revenue report returns correct aggregates for specified date range. Verify AR aging correctly buckets overdue invoices. Verify profit/loss calculation is accurate. Confirm all report endpoints respond within 5 seconds with 1000+ records.

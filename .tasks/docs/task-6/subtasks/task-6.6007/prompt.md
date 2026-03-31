@@ -1,0 +1,10 @@
+Implement subtask 6007: Implement approval workflow with Signal notification
+
+## Objective
+Build the approval/rejection endpoints and integrate with Signal messaging to notify Morgan when drafts are ready for review, allowing approve/reject actions.
+
+## Steps
+1. Create `src/routes/approval.ts` with: POST /api/v1/social/drafts/:id/approve (move draft to approved status), POST /api/v1/social/drafts/:id/reject (move draft to rejected with optional rejection_reason). 2. Create `src/services/NotificationService.ts` as an Effect.Service tag with method: sendApprovalRequest(draft: Draft) → Effect<void, NotificationError>. 3. Create `src/layers/NotificationLayer.ts` reading SIGNAL_API_URL and SIGNAL_RECIPIENT from env (assumes signal-cli-rest-api or similar bridge is running as a sidecar/separate service). 4. When a draft is created (or explicitly submitted), transition status to 'pending_approval' and call NotificationService.sendApprovalRequest which sends a Signal message with: photo thumbnail URL, generated caption, platform, and approve/reject deep links or instructions. 5. Approve endpoint: validate draft is in 'pending_approval' status → set status to 'approved' → record approved_at timestamp and approver. 6. Reject endpoint: validate draft is in 'pending_approval' status → set status to 'rejected' → record rejection_reason. 7. Add guard: only pending_approval drafts can be approved/rejected (return 409 Conflict otherwise). 8. Add Prometheus counters: social_drafts_approved_total, social_drafts_rejected_total.
+
+## Validation
+Submit a draft for approval and verify status transitions to 'pending_approval'. Verify Signal notification service is called (mock in tests). Approve a draft and verify status is 'approved'. Reject a draft and verify rejection_reason is stored. Attempt to approve an already-approved draft and verify 409 response.

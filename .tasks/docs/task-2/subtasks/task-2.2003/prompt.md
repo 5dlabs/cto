@@ -1,20 +1,10 @@
-Implement subtask 2003: Custom AppError enum and error handling middleware
+Implement subtask 2003: Define data models and database migrations for Product, Category, and Availability
 
 ## Objective
-Implement the custom `AppError` enum with variants NotFound, Validation, Conflict, and Internal, implementing `IntoResponse` to return appropriate HTTP status codes and JSON error bodies.
+Create SQLx migrations for the catalog schema including categories, products, and availability tables. Define corresponding Rust structs with serde Serialize/Deserialize derives.
 
 ## Steps
-1. Create `src/errors.rs`:
-   - Define `AppError` enum with variants:
-     - `NotFound(String)` → 404 `{"error": "..."}`
-     - `Validation(String)` → 422 `{"error": "..."}`
-     - `Conflict(String)` → 409 `{"error": "..."}`
-     - `Internal(String)` → 500 `{"error": "internal server error"}`
-   - Implement `IntoResponse` for `AppError` that returns `(StatusCode, Json<serde_json::Value>)`.
-   - Implement `From<sqlx::Error>` for `AppError` — map `RowNotFound` to `NotFound`, others to `Internal` (logging the actual error via tracing::error!).
-   - Optionally implement `From<redis::RedisError>` for `AppError` mapping to `Internal`.
-2. All endpoint handlers will return `Result<impl IntoResponse, AppError>`.
-3. Ensure error responses always have a consistent `{"error": "message"}` JSON shape.
+1. Create sqlx migrations directory. 2. Migration 001: CREATE SCHEMA IF NOT EXISTS rms; CREATE TABLE rms.categories (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name VARCHAR(255) NOT NULL, slug VARCHAR(255) UNIQUE NOT NULL, description TEXT, image_url TEXT, parent_category_id UUID REFERENCES rms.categories(id), sort_order INT DEFAULT 0, is_active BOOLEAN DEFAULT TRUE, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()); 3. Migration 002: CREATE TABLE rms.products (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), sku VARCHAR(100) UNIQUE NOT NULL, name VARCHAR(500) NOT NULL, slug VARCHAR(500) UNIQUE NOT NULL, description TEXT, short_description TEXT, category_id UUID NOT NULL REFERENCES rms.categories(id), daily_rate DECIMAL(10,2), weekly_rate DECIMAL(10,2), monthly_rate DECIMAL(10,2), image_url TEXT, thumbnail_url TEXT, specifications JSONB DEFAULT '{}', weight_lbs DECIMAL(10,2), is_active BOOLEAN DEFAULT TRUE, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()); 4. Migration 003: CREATE TABLE rms.product_availability (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), product_id UUID NOT NULL REFERENCES rms.products(id), total_quantity INT NOT NULL DEFAULT 0, available_quantity INT NOT NULL DEFAULT 0, reserved_quantity INT NOT NULL DEFAULT 0, location VARCHAR(255), last_checked_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(product_id, location)); 5. Add indexes on category_id, sku, slug, and is_active columns. 6. In Rust, define structs: Category, Product, ProductAvailability, and DTO variants (CategoryResponse, ProductListItem, ProductDetail, AvailabilityResponse) with serde derives. 7. Run `sqlx migrate run` to verify migrations apply cleanly.
 
 ## Validation
-Unit tests verify: `AppError::NotFound` produces 404 with correct JSON body, `AppError::Validation` produces 422, `AppError::Conflict` produces 409, `AppError::Internal` produces 500 with generic message (not leaking internal details). `From<sqlx::Error>` maps RowNotFound correctly.
+Migrations apply to a clean PostgreSQL database without errors. Rust structs compile. sqlx compile-time query checks pass (if using query! macros).

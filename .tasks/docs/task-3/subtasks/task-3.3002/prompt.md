@@ -1,21 +1,22 @@
-Implement subtask 3002: Configure Redis HA with Sentinel mode
+Implement subtask 3002: Configure PostgreSQL database connectivity and migration framework
 
 ## Objective
-Switch the Redis deployment from standalone to Sentinel mode for production, with 3 nodes and automatic failover, and update the REDIS_URL in the ConfigMap to a sentinel-aware connection string.
+Establish PostgreSQL connection pooling using ConfigMap endpoints, set up a migration framework (golang-migrate or goose), and create the initial RMS schema migrations for all domain tables.
 
 ## Steps
-1. In `values-prod.yaml`, update the Bitnami Redis subchart values:
-   - `architecture: replication` (enables master + replicas + sentinel).
-   - `sentinel.enabled: true`
-   - `replica.replicaCount: 2` (1 master + 2 replicas = 3 nodes total).
-   - `sentinel.quorum: 2`
-   - `master.persistence.size: 1Gi`
-   - `replica.persistence.size: 1Gi`
-2. Update `infra/notifycore/templates/configmap-endpoints.yaml` with conditional REDIS_URL:
-   - Dev: `redis://:<password>@notifycore-redis-master.notifycore.svc:6379`
-   - Prod: sentinel-aware URL. Note: the Rust `redis` crate supports sentinel via `redis+sentinel://` scheme or by configuring sentinel nodes directly. Set REDIS_URL to sentinel format or add separate `REDIS_SENTINEL_NODES` and `REDIS_MASTER_NAME` env vars.
-3. Add a PodDisruptionBudget for Redis pods (maxUnavailable: 1).
-4. Ensure `values-dev.yaml` retains standalone architecture.
+1. Read PostgreSQL connection details from environment variables sourced via `envFrom` referencing the infra-endpoints ConfigMap.
+2. Use `pgxpool` for connection pooling with configurable pool size, timeouts, and health checks.
+3. Set up `golang-migrate` with a `/migrations` directory.
+4. Create initial migration files for the RMS schema:
+   - `opportunities` table (id, customer_id, title, description, status enum [lead/quoted/won/lost], estimated_value, created_at, updated_at)
+   - `projects` table (id, opportunity_id FK, name, status enum [pending/active/completed/cancelled], start_date, end_date, site_address, created_at, updated_at)
+   - `inventory_items` table (id, barcode, name, category, status enum [available/rented/maintenance/retired], daily_rate, location, created_at, updated_at)
+   - `bookings` table (id, project_id FK, inventory_item_id FK, start_date, end_date, status, created_at) with unique constraint to prevent overlapping bookings per item
+   - `crew_members` table (id, name, email, phone, role, calendar_id, created_at)
+   - `crew_assignments` table (id, project_id FK, crew_member_id FK, start_date, end_date, status)
+   - `deliveries` table (id, project_id FK, type enum [delivery/pickup], scheduled_date, status enum [scheduled/in_transit/completed], driver_id, notes, created_at)
+5. Add a migration CLI command or Makefile target: `make migrate-up`, `make migrate-down`.
+6. Write a `db.go` package in `/internal/db/` that exposes the pool and a health check function.
 
 ## Validation
-`helm template` with values-prod.yaml renders Redis with sentinel enabled, 3 total Redis pods. ConfigMap REDIS_URL for prod uses sentinel-aware connection string. `values-dev.yaml` rendering still shows standalone Redis. PDB resource for Redis is present in prod rendering.
+Migrations run successfully against a local PostgreSQL instance. All tables are created with correct columns, types, and constraints. Pool connects and responds to a ping. `make migrate-down` cleanly reverses all migrations.

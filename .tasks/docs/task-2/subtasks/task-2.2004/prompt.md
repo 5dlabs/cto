@@ -1,25 +1,10 @@
-Implement subtask 2004: Implement POST and GET /api/v1/notifications/:id endpoints
+Implement subtask 2004: Seed database with 533+ products and 24 categories
 
 ## Objective
-Implement the POST /api/v1/notifications endpoint for creating notifications with validation, and the GET /api/v1/notifications/:id endpoint for retrieving a single notification by UUID.
+Create a seed script or migration that populates the catalog database with all 24 equipment categories and 533+ products with realistic rental equipment data.
 
 ## Steps
-1. Create `src/handlers.rs` (or `src/handlers/notifications.rs`):
-2. **POST /api/v1/notifications**:
-   - Extract `Json<CreateNotificationRequest>` from request body.
-   - Validate: title must be non-empty, body must be non-empty. Return `AppError::Validation` if invalid.
-   - Generate `Uuid::new_v4()` for the notification ID.
-   - Insert into database: `INSERT INTO notifications (id, channel, priority, title, body, status) VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING *`.
-   - Return `(StatusCode::CREATED, Json(notification))`.
-3. **GET /api/v1/notifications/:id**:
-   - Extract `Path(id): Path<Uuid>` from URL.
-   - Query: `SELECT * FROM notifications WHERE id = $1`.
-   - If found, return `(StatusCode::OK, Json(notification))`.
-   - If not found, return `AppError::NotFound("not found".to_string())`.
-4. Register both routes on the Axum Router in main.rs:
-   - `.route("/api/v1/notifications", post(create_notification))`
-   - `.route("/api/v1/notifications/:id", get(get_notification))`
-5. Ensure AppState is available via Axum's `State` extractor.
+1. Create a seed migration or a standalone Rust binary (cargo workspace member) that inserts data. 2. Define 24 categories representing equipment rental segments (e.g., Aerial Lifts, Air Compressors, Compaction, Concrete & Masonry, Earth Moving, Generators, Heaters, HVAC, Ladders & Scaffolding, Lighting, Material Handling, Painting, Plumbing, Power Tools, Pressure Washers, Pumps, Safety Equipment, Saws, Surveying, Trailers, Trenchers, Trucks & Vehicles, Welding, Miscellaneous). 3. For each category, generate products with realistic SKUs (e.g., AL-001 through AL-030 for Aerial Lifts), names, descriptions, daily/weekly/monthly rates based on typical rental pricing. 4. Include image_url fields pointing to a placeholder path on the configured object storage (e.g., /catalog/images/{sku}.jpg). 5. Populate availability records with reasonable quantities (total_quantity between 1-20 per product, available_quantity <= total_quantity). 6. Use a transaction to ensure atomicity of the seed operation. 7. Add an idempotency check (skip if categories already exist) to allow re-running safely.
 
 ## Validation
-Integration tests: POST with valid payload returns 201 with UUID and status=pending. POST with empty title returns 422. POST with empty body returns 422. GET with valid ID returns 200 with matching notification. GET with random UUID returns 404 with `{"error": "not found"}`.
+After seeding, SELECT COUNT(*) FROM rms.categories returns 24. SELECT COUNT(*) FROM rms.products returns >= 533. SELECT COUNT(*) FROM rms.product_availability returns >= 533. All foreign key relationships are valid.

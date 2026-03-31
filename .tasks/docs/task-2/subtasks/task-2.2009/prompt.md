@@ -1,23 +1,10 @@
-Implement subtask 2009: Multi-stage Dockerfile and Kubernetes Deployment manifest
+Implement subtask 2009: Implement rate limiting middleware using Redis
 
 ## Objective
-Create a multi-stage Dockerfile producing an image under 100MB and a Kubernetes Deployment manifest referencing the notifycore-infra-endpoints ConfigMap with health probes and resource limits.
+Add an Axum middleware layer that enforces per-tenant or per-IP rate limiting using Redis as the backing store with a sliding window or token bucket algorithm.
 
 ## Steps
-1. **Dockerfile** (at project root):
-   - Stage 1 (builder): `FROM rust:1.75-slim AS builder`. Install required system deps (libssl-dev, pkg-config if needed). `WORKDIR /app`. Copy `Cargo.toml`, `Cargo.lock`, create dummy `src/main.rs` for dependency caching. `RUN cargo build --release`. Copy actual source. `RUN cargo build --release`.
-   - Stage 2 (runtime): `FROM debian:bookworm-slim`. Install minimal runtime deps (`ca-certificates`, `libssl3` if needed). Copy binary from builder: `COPY --from=builder /app/target/release/notifycore /usr/local/bin/`. `EXPOSE 8080`. `ENTRYPOINT ["notifycore"]`.
-   - Add `.dockerignore` excluding `target/`, `.git/`, `tests/`.
-   - Verify image size < 100MB.
-2. **Kubernetes Deployment** (`k8s/deployment.yaml` or within the Helm chart):
-   - Deployment with 1 replica (dev), image reference placeholder.
-   - `envFrom: [{configMapRef: {name: notifycore-infra-endpoints}}]`.
-   - Also mount secrets for DATABASE_URL password and REDIS_URL password if using separate secret approach.
-   - Liveness probe: `httpGet: {path: /health, port: 8080}`, initialDelaySeconds: 5, periodSeconds: 10.
-   - Readiness probe: same path, initialDelaySeconds: 3, periodSeconds: 5.
-   - Resources: requests: {memory: 64Mi, cpu: 100m}, limits: {memory: 256Mi, cpu: 500m}.
-   - Container port: 8080.
-3. Create a Service manifest exposing port 8080 (ClusterIP).
+1. Create src/middleware/rate_limit.rs. 2. Implement a sliding window rate limiter using Redis MULTI/EXEC or Lua script: key pattern `ratelimit:{identifier}:{window}`, INCR + EXPIRE approach or sorted set approach. 3. Identifier extraction: check X-Tenant-ID header first, fall back to X-Forwarded-For or peer IP. 4. Configure rate limits via environment: RATE_LIMIT_REQUESTS_PER_MINUTE (default 60 for public, 300 for agent API). 5. Add the middleware to the Axum router. Apply different limits to public /api/v1/catalog/ routes vs agent /api/v1/equipment-api/ routes. 6. Return HTTP 429 Too Many Requests with Retry-After header when limit is exceeded. Include rate limit headers on all responses: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset. 7. Ensure the middleware is non-blocking and handles Redis connection failures gracefully (fail open with a warning log).
 
 ## Validation
-`docker build -t notifycore:test .` completes successfully. `docker image inspect notifycore:test --format '{{.Size}}'` shows size < 100MB (104857600 bytes). `kubectl apply --dry-run=client -f k8s/deployment.yaml` succeeds. Deployment manifest contains envFrom referencing notifycore-infra-endpoints, both liveness and readiness probes on /health, and resource requests/limits matching spec.
+Sending requests above the configured rate limit returns HTTP 429 with Retry-After header. Responses include X-RateLimit-* headers with correct values. Rate limits reset after the window expires. If Redis is unavailable, requests still succeed (fail-open behavior verified by stopping Redis temporarily).

@@ -1,18 +1,21 @@
-Implement subtask 3004: Implement namespace NetworkPolicies for default-deny and allowed traffic
+Implement subtask 3004: Define protobuf schemas for OpportunityService and ProjectService
 
 ## Objective
-Create five NetworkPolicy resources: default deny all, allow app→PostgreSQL, allow app→Redis, allow ingress controller→app, and allow DNS egress.
+Write .proto files for OpportunityService and ProjectService including all message types, enums, RPC methods, and grpc-gateway HTTP annotations for the quote-to-project workflow.
 
 ## Steps
-1. Create `infra/notifycore/templates/network-policies/` directory with separate files for clarity.
-2. `default-deny.yaml`: NetworkPolicy with podSelector: {} (all pods), policyTypes: [Ingress, Egress], no ingress/egress rules (denies all by default).
-3. `allow-app-to-pg.yaml`: NetworkPolicy selecting notifycore app pods (label: app=notifycore), allowing egress to pods matching cnpg.io/cluster=notifycore-pg on port 5432/TCP.
-4. `allow-app-to-redis.yaml`: NetworkPolicy selecting notifycore app pods, allowing egress to pods matching app.kubernetes.io/name=redis on port 6379/TCP.
-5. `allow-ingress-to-app.yaml`: NetworkPolicy selecting notifycore app pods, allowing ingress from namespaceSelector matching the ingress controller namespace (e.g., label: kubernetes.io/metadata.name=ingress-nginx) on port 8080/TCP.
-6. `allow-dns-egress.yaml`: NetworkPolicy selecting all pods in namespace, allowing egress to kube-dns namespace on port 53 UDP and TCP.
-7. Conditionally render network policies when `networkPolicies.enabled: true` in values.
-8. `values-prod.yaml`: networkPolicies.enabled: true, ingressNamespace: ingress-nginx.
-9. `values-dev.yaml`: networkPolicies.enabled: false.
+1. Create `proto/rms/v1/opportunity.proto`:
+   - Messages: Opportunity, CreateOpportunityRequest/Response, GetOpportunityRequest/Response, ListOpportunitiesRequest/Response, UpdateOpportunityRequest/Response, ConvertToProjectRequest/Response
+   - Enums: OpportunityStatus (LEAD, QUOTED, WON, LOST)
+   - RPCs: CreateOpportunity, GetOpportunity, ListOpportunities, UpdateOpportunity, ConvertOpportunityToProject
+   - Add `google.api.http` annotations for REST mapping (POST /api/v1/opportunities, GET /api/v1/opportunities/{id}, etc.)
+2. Create `proto/rms/v1/project.proto`:
+   - Messages: Project, CreateProjectRequest/Response, GetProjectRequest/Response, ListProjectsRequest/Response, UpdateProjectRequest/Response
+   - Enums: ProjectStatus (PENDING, ACTIVE, COMPLETED, CANCELLED)
+   - RPCs: CreateProject, GetProject, ListProjects, UpdateProject
+   - Add grpc-gateway HTTP annotations.
+3. Create shared `proto/rms/v1/common.proto` for pagination, timestamps, and shared field types.
+4. Run `make proto-gen` and verify generated Go code compiles.
 
 ## Validation
-`helm template` with values-prod.yaml renders exactly 5 NetworkPolicy resources. Default deny policy has empty ingress and egress rules with both policyTypes. App-to-PG policy allows egress on port 5432. App-to-Redis allows egress on port 6379. Ingress-to-app allows ingress on 8080 from specific namespace. DNS policy allows egress on port 53. `values-dev.yaml` renders no NetworkPolicy resources.
+Proto files compile without errors via `buf lint` and `buf generate`. Generated Go code compiles. HTTP annotations are present and correctly map to REST paths. All message fields match the database schema.
