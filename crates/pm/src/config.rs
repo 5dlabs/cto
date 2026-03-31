@@ -95,12 +95,10 @@ impl ScmConfig {
             },
             ScmProvider::GitLab => Self {
                 provider,
-                host: env::var("GITLAB_HOST")
-                    .unwrap_or_else(|_| "git.5dlabs.ai".to_string()),
+                host: env::var("GITLAB_HOST").unwrap_or_else(|_| "git.5dlabs.ai".to_string()),
                 api_base: env::var("GITLAB_API_BASE")
                     .unwrap_or_else(|_| "https://git.5dlabs.ai/api/v4".to_string()),
-                org_or_group: env::var("GITLAB_GROUP")
-                    .unwrap_or_else(|_| "5dlabs".to_string()),
+                org_or_group: env::var("GITLAB_GROUP").unwrap_or_else(|_| "5dlabs".to_string()),
                 registry: env::var("GITLAB_REGISTRY")
                     .unwrap_or_else(|_| "registry.5dlabs.ai/5dlabs".to_string()),
                 token: env::var("GITLAB_TOKEN").ok().filter(|s| !s.is_empty()),
@@ -158,6 +156,108 @@ pub struct Config {
     pub gitlab_webhook_secret: Option<String>,
     /// Unified SCM provider configuration.
     pub scm: ScmConfig,
+    /// Morgan/OpenClaw dispatch configuration for reversible webhook cutover.
+    pub morgan_dispatch: MorganDispatchConfig,
+}
+
+/// How PM should route verified webhook deliveries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WebhookDispatchMode {
+    /// Keep using PM's existing direct-processing logic.
+    Legacy,
+    /// Forward to Morgan as a best-effort shadow copy, then continue legacy handling.
+    Shadow,
+    /// Forward to Morgan and skip PM's legacy direct-processing logic.
+    Morgan,
+}
+
+impl Default for WebhookDispatchMode {
+    fn default() -> Self {
+        Self::Legacy
+    }
+}
+
+impl std::str::FromStr for WebhookDispatchMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "legacy" => Ok(Self::Legacy),
+            "shadow" | "morgan-shadow" => Ok(Self::Shadow),
+            "morgan" | "morgan-only" => Ok(Self::Morgan),
+            other => Err(format!("unknown webhook dispatch mode: {other}")),
+        }
+    }
+}
+
+impl WebhookDispatchMode {
+    /// Whether this mode should forward deliveries to Morgan.
+    #[must_use]
+    pub const fn dispatches_to_morgan(self) -> bool {
+        matches!(self, Self::Shadow | Self::Morgan)
+    }
+
+    /// Whether this mode keeps the legacy PM logic active after dispatch.
+    #[must_use]
+    pub const fn keeps_legacy_processing(self) -> bool {
+        matches!(self, Self::Legacy | Self::Shadow)
+    }
+}
+
+/// Morgan/OpenClaw hook settings used for webhook forwarding.
+#[derive(Debug, Clone)]
+pub struct MorganDispatchConfig {
+    /// Dispatch mode for verified webhooks.
+    pub mode: WebhookDispatchMode,
+    /// Base URL for the Morgan/OpenClaw gateway (without the `/hooks/agent` suffix).
+    pub base_url: Option<String>,
+    /// Bearer token used to authenticate to OpenClaw hooks.
+    pub token: Option<String>,
+    /// Target agent ID for OpenClaw hook routing.
+    pub agent_id: String,
+    /// Prefix for generated session keys.
+    pub session_key_prefix: String,
+    /// Timeout for hook-triggered runs.
+    pub timeout_seconds: u64,
+}
+
+impl Default for MorganDispatchConfig {
+    fn default() -> Self {
+        Self {
+            mode: env::var("PM_WEBHOOK_DISPATCH_MODE")
+                .ok()
+                .and_then(|value| value.parse().ok())
+                .unwrap_or_default(),
+            base_url: env::var("MORGAN_HOOKS_BASE_URL")
+                .ok()
+                .map(|s| s.trim().trim_end_matches('/').to_string())
+                .filter(|s| !s.is_empty()),
+            token: env::var("MORGAN_HOOKS_TOKEN")
+                .ok()
+                .filter(|s| !s.is_empty()),
+            agent_id: env::var("MORGAN_HOOKS_AGENT_ID")
+                .ok()
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "morgan".to_string()),
+            session_key_prefix: env::var("MORGAN_HOOKS_SESSION_KEY_PREFIX")
+                .ok()
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "hook:pm".to_string()),
+            timeout_seconds: env::var("MORGAN_HOOKS_TIMEOUT_SECONDS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(120),
+        }
+    }
+}
+
+impl MorganDispatchConfig {
+    /// Whether Morgan dispatch is active for any verified webhook deliveries.
+    #[must_use]
+    pub const fn enabled(&self) -> bool {
+        self.mode.dispatches_to_morgan()
+    }
 }
 
 // =============================================================================
@@ -167,7 +267,7 @@ pub struct Config {
 /// All known agent names for the CTO platform.
 pub const AGENT_NAMES: &[&str] = &[
     "morgan", "rex", "blaze", "grizz", "nova", "tap", "spark", "cleo", "cipher", "tess", "atlas",
-    "bolt", "stitch", "vex", "angie",
+    "bolt", "stitch", "vex", "angie", "pixel",
 ];
 
 /// Configuration for a single Linear OAuth application.
@@ -181,10 +281,10 @@ pub struct LinearAppConfig {
     /// Webhook signing secret for this app.
     #[serde(skip_serializing)]
     pub webhook_secret: String,
-    /// OAuth access token (obtained after installation).
+    /// Runtime access token minted or refreshed by PM.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub access_token: Option<String>,
-    /// OAuth refresh token (for obtaining new access tokens).
+    /// Refresh token for legacy authorization_code apps.
     #[serde(skip_serializing)]
     pub refresh_token: Option<String>,
     /// Unix timestamp when the access token expires.
@@ -243,7 +343,7 @@ impl LinearAppConfig {
                 // Consider expired if less than 1 hour remaining
                 expires_at - now < 3600
             }
-            None => true, // No expiration info, assume expired to be safe
+            None => false, // No expiration info — token may be long-lived (e.g. loaded from K8s secret without expires_at)
         }
     }
 
@@ -251,6 +351,36 @@ impl LinearAppConfig {
     #[must_use]
     pub fn can_refresh(&self) -> bool {
         self.refresh_token.is_some() && !self.client_id.is_empty() && !self.client_secret.is_empty()
+    }
+
+    /// Check if the app has enough credentials to mint a token via client_credentials.
+    #[must_use]
+    pub fn can_mint_client_credentials(&self) -> bool {
+        !self.client_id.is_empty() && !self.client_secret.is_empty()
+    }
+
+    /// Whether PM should proactively mint a client_credentials token.
+    ///
+    /// We only do this when:
+    /// - the app has client credentials
+    /// - the app is not already using refresh-token flow
+    /// - there is no access token yet, or
+    /// - the token has a known expiration and is within the 1 hour renewal buffer
+    ///
+    /// If an access token exists but `expires_at` is missing, we avoid blind
+    /// replacement to preserve legacy long-lived tokens until they actually fail.
+    #[must_use]
+    pub fn should_proactively_mint_client_credentials(&self) -> bool {
+        if !self.can_mint_client_credentials() || self.can_refresh() {
+            return false;
+        }
+
+        if self.access_token.is_none() {
+            return true;
+        }
+
+        self.expires_at
+            .is_some_and(|expires_at| expires_at - Utc::now().timestamp() < 3600)
     }
 }
 
@@ -486,6 +616,7 @@ impl Default for Config {
                 .ok()
                 .filter(|s| !s.is_empty()),
             scm: ScmConfig::from_env(),
+            morgan_dispatch: MorganDispatchConfig::default(),
         }
     }
 }
@@ -735,12 +866,22 @@ mod tests {
         env::remove_var("LINEAR_ENABLED");
         env::remove_var("LINEAR_PORT");
         env::remove_var("LINEAR_MAX_TIMESTAMP_AGE_MS");
+        env::remove_var("PM_WEBHOOK_DISPATCH_MODE");
+        env::remove_var("MORGAN_HOOKS_BASE_URL");
+        env::remove_var("MORGAN_HOOKS_TOKEN");
+        env::remove_var("MORGAN_HOOKS_AGENT_ID");
+        env::remove_var("MORGAN_HOOKS_SESSION_KEY_PREFIX");
+        env::remove_var("MORGAN_HOOKS_TIMEOUT_SECONDS");
 
         let config = Config::default();
         assert!(!config.enabled);
         assert!(config.webhook_secret.is_none());
         assert_eq!(config.max_timestamp_age_ms, 60_000);
         assert_eq!(config.port, 8081);
+        assert_eq!(config.morgan_dispatch.mode, WebhookDispatchMode::Legacy);
+        assert_eq!(config.morgan_dispatch.agent_id, "morgan");
+        assert_eq!(config.morgan_dispatch.session_key_prefix, "hook:pm");
+        assert_eq!(config.morgan_dispatch.timeout_seconds, 120);
     }
 
     #[test]
@@ -751,20 +892,64 @@ mod tests {
         env::remove_var("LINEAR_ENABLED");
         env::remove_var("LINEAR_WEBHOOK_SECRET");
         env::remove_var("LINEAR_PORT");
+        env::remove_var("PM_WEBHOOK_DISPATCH_MODE");
+        env::remove_var("MORGAN_HOOKS_BASE_URL");
+        env::remove_var("MORGAN_HOOKS_TOKEN");
+        env::remove_var("MORGAN_HOOKS_AGENT_ID");
+        env::remove_var("MORGAN_HOOKS_SESSION_KEY_PREFIX");
+        env::remove_var("MORGAN_HOOKS_TIMEOUT_SECONDS");
 
         env::set_var("LINEAR_ENABLED", "true");
         env::set_var("LINEAR_WEBHOOK_SECRET", "test-secret");
         env::set_var("LINEAR_PORT", "9000");
+        env::set_var("PM_WEBHOOK_DISPATCH_MODE", "morgan");
+        env::set_var("MORGAN_HOOKS_BASE_URL", "https://morgan.example.com/");
+        env::set_var("MORGAN_HOOKS_TOKEN", "hook-token");
+        env::set_var("MORGAN_HOOKS_AGENT_ID", "atlas");
+        env::set_var("MORGAN_HOOKS_SESSION_KEY_PREFIX", "hook:pm:test");
+        env::set_var("MORGAN_HOOKS_TIMEOUT_SECONDS", "45");
 
         let config = Config::default();
         assert!(config.enabled);
         assert_eq!(config.webhook_secret, Some("test-secret".to_string()));
         assert_eq!(config.port, 9000);
+        assert_eq!(config.morgan_dispatch.mode, WebhookDispatchMode::Morgan);
+        assert_eq!(
+            config.morgan_dispatch.base_url,
+            Some("https://morgan.example.com".to_string())
+        );
+        assert_eq!(config.morgan_dispatch.token, Some("hook-token".to_string()));
+        assert_eq!(config.morgan_dispatch.agent_id, "atlas");
+        assert_eq!(config.morgan_dispatch.session_key_prefix, "hook:pm:test");
+        assert_eq!(config.morgan_dispatch.timeout_seconds, 45);
 
         // Clean up
         env::remove_var("LINEAR_ENABLED");
         env::remove_var("LINEAR_WEBHOOK_SECRET");
         env::remove_var("LINEAR_PORT");
+        env::remove_var("PM_WEBHOOK_DISPATCH_MODE");
+        env::remove_var("MORGAN_HOOKS_BASE_URL");
+        env::remove_var("MORGAN_HOOKS_TOKEN");
+        env::remove_var("MORGAN_HOOKS_AGENT_ID");
+        env::remove_var("MORGAN_HOOKS_SESSION_KEY_PREFIX");
+        env::remove_var("MORGAN_HOOKS_TIMEOUT_SECONDS");
+    }
+
+    #[test]
+    fn test_webhook_dispatch_mode_parsing() {
+        assert_eq!(
+            "legacy".parse::<WebhookDispatchMode>().unwrap(),
+            WebhookDispatchMode::Legacy
+        );
+        assert_eq!(
+            "shadow".parse::<WebhookDispatchMode>().unwrap(),
+            WebhookDispatchMode::Shadow
+        );
+        assert_eq!(
+            "morgan".parse::<WebhookDispatchMode>().unwrap(),
+            WebhookDispatchMode::Morgan
+        );
+        assert!("unknown".parse::<WebhookDispatchMode>().is_err());
     }
 
     // =========================================================================
@@ -1077,5 +1262,51 @@ mod tests {
         assert_ne!(expires_at, 12345);
         let now = Utc::now().timestamp();
         assert!(expires_at > now && expires_at <= now + 7200);
+    }
+
+    #[test]
+    fn test_linear_app_can_mint_client_credentials() {
+        let app = LinearAppConfig::new(
+            "id".to_string(),
+            "secret".to_string(),
+            "webhook".to_string(),
+        );
+        assert!(app.can_mint_client_credentials());
+        assert!(!LinearAppConfig::default().can_mint_client_credentials());
+    }
+
+    #[test]
+    fn test_should_proactively_mint_client_credentials_when_token_missing() {
+        let app = LinearAppConfig::new(
+            "id".to_string(),
+            "secret".to_string(),
+            "webhook".to_string(),
+        );
+        assert!(app.should_proactively_mint_client_credentials());
+    }
+
+    #[test]
+    fn test_should_proactively_mint_client_credentials_when_token_expiring() {
+        let mut app = LinearAppConfig::new(
+            "id".to_string(),
+            "secret".to_string(),
+            "webhook".to_string(),
+        );
+        app.access_token = Some("token".to_string());
+        app.expires_at = Some(Utc::now().timestamp() + 1800);
+
+        assert!(app.should_proactively_mint_client_credentials());
+    }
+
+    #[test]
+    fn test_should_not_proactively_mint_client_credentials_without_expiry() {
+        let mut app = LinearAppConfig::new(
+            "id".to_string(),
+            "secret".to_string(),
+            "webhook".to_string(),
+        );
+        app.access_token = Some("legacy_token".to_string());
+
+        assert!(!app.should_proactively_mint_client_credentials());
     }
 }
