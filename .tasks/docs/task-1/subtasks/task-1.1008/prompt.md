@@ -1,22 +1,17 @@
-Implement subtask 1008: Deploy NATS with JetStream via Helm Subchart per Namespace
+Implement subtask 1008: Package Helm chart with values overlays for dev and staging
 
 ## Objective
-Deploy a single-replica NATS server using nats/nats as a Helm subchart dependency in each namespace with JetStream enabled for durable message delivery.
+Structure and finalize the charts/hermes-infra Helm chart with values-dev.yaml and values-staging.yaml overlays, ensuring a single helm upgrade --install per environment deploys everything.
 
 ## Steps
-Step-by-step:
-1. Add `nats/nats` as a dependency in `Chart.yaml` with condition `nats.enabled` (default true) and alias `nats`.
-2. Configure in `values.yaml` defaults:
-   - `nats.config.jetstream.enabled: true`
-   - `nats.config.jetstream.memStorage.enabled: true`, `size: 256Mi`
-   - `nats.config.jetstream.fileStorage.enabled: true`, `size: 1Gi`
-   - `nats.config.cluster.enabled: false`
-   - `nats.natsBox.enabled: true` (for testing)
-   - `nats.nameOverride: hermes-nats`
-3. Run `helm dependency update charts/hermes-infra` to fetch the subchart.
-4. Connection string pattern: `nats://hermes-nats.{{ .Values.namespace }}.svc:4222` — document for downstream wiring.
-5. Apply standard labels via subchart configuration.
-6. Verify: `helm template --debug` renders NATS resources correctly.
+1. Ensure `charts/hermes-infra/Chart.yaml` has correct metadata (name, version, appVersion, description).
+2. Create `values.yaml` with sensible defaults shared across environments.
+3. Create `values-dev.yaml` override: single replicas, smaller resource requests, 90-day MinIO retention, `ENVIRONMENT: dev`, automated ArgoCD sync.
+4. Create `values-staging.yaml` override: single replicas (for now), larger resource requests, 365-day MinIO retention, `ENVIRONMENT: staging`, manual ArgoCD sync.
+5. Add `templates/NOTES.txt` with post-install instructions.
+6. Validate with `helm template charts/hermes-infra -f charts/hermes-infra/values-dev.yaml` and verify all templates render correctly.
+7. Test with `helm upgrade --install hermes-infra charts/hermes-infra -n hermes-dev -f charts/hermes-infra/values-dev.yaml` to confirm a single command provisions everything.
+8. Add a `README.md` in `charts/hermes-infra/` documenting the chart, values, and usage.
 
 ## Validation
-`kubectl get pods -n hermes-staging -l app.kubernetes.io/name=hermes-nats` shows 1 running pod. Using nats-box: `nats server info` shows JetStream enabled. A test publish/subscribe cycle succeeds: create a stream, publish a message, consume it. Same for production namespace.
+`helm lint charts/hermes-infra` passes. `helm template` with both values files renders all expected resources without errors. `helm upgrade --install` on a clean namespace provisions all infrastructure components and the test pod connectivity check passes.

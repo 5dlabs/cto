@@ -1,24 +1,20 @@
-Implement subtask 1006: Deploy CloudNative-PG Postgres Cluster CR per Namespace
+Implement subtask 1006: Create hermes-infra-endpoints ConfigMap aggregating all service connection strings
 
 ## Objective
-Deploy a CloudNative-PG Cluster custom resource in each namespace with 1 replica, database name 'hermes', and document the operator-generated Secret naming convention for downstream Secret wiring.
+Create the hermes-infra-endpoints ConfigMap in each namespace that aggregates all infrastructure connection strings for downstream service consumption via envFrom.
 
 ## Steps
-Step-by-step:
-1. Research the CNPG operator version installed in the cluster: `kubectl get deployment -n cnpg-system` and `kubectl get crd clusters.postgresql.cnpg.io -o jsonpath='{.spec.versions[*].name}'`. Use the matching API version.
-2. Create `templates/cnpg-cluster.yaml` with a `Cluster` CR:
-   - `apiVersion`: match installed CNPG version (e.g., `postgresql.cnpg.io/v1`)
-   - `metadata.name`: `hermes-pg`
-   - `metadata.namespace`: `{{ .Values.namespace }}`
-   - `spec.instances`: 1
-   - `spec.storage.size`: `{{ .Values.cnpg.storageSize | default "5Gi" }}`
-   - `spec.bootstrap.initdb.database`: `hermes`
-   - `spec.bootstrap.initdb.owner`: `hermes`
-   - Apply standard labels.
-3. Optionally gate backup config: `{{ if .Values.cnpg.backupEnabled }}` — configure `spec.backup` to write to MinIO. Default to disabled per decision point.
-4. Document in README: CNPG operator auto-creates a Secret named `hermes-pg-app` containing keys `uri`, `username`, `password`, `host`, `port`, `dbname`. The downstream Secret subtask (1009) will reference this operator-managed Secret rather than duplicating credentials in Helm values.
-5. Add a comment in the template noting the expected operator-generated Secret name.
-6. Verify: `helm template --debug` renders valid Cluster CR for both environments.
+1. Create Helm template `charts/hermes-infra/templates/configmap-endpoints.yaml`.
+2. Populate the ConfigMap with the following keys, referencing values from the deployed services:
+   - `CNPG_HERMES_URL` — PostgreSQL connection string (composed from `hermes-pg-credentials` secret values or operator-generated service DNS)
+   - `REDIS_HERMES_URL` — Redis connection string (from `hermes-redis-credentials`)
+   - `NATS_HERMES_URL` — NATS connection string (from `hermes-nats-credentials`)
+   - `MINIO_HERMES_ENDPOINT` — MinIO S3 endpoint URL
+   - `MINIO_HERMES_BUCKET` — Bucket name (`hermes-artifacts-dev` or `hermes-artifacts-staging`)
+   - `ENVIRONMENT` — `dev` or `staging` (from values)
+3. Note: Sensitive values (passwords, keys) remain in secrets. The ConfigMap contains only hostnames/URLs/bucket names. Downstream pods mount BOTH the ConfigMap (via `envFrom: configMapRef`) and secrets (via `envFrom: secretRef`).
+4. Document the expected env var contract in a comment block within the template.
+5. Deploy a validation test pod that mounts the ConfigMap and all four secrets, then connects to PostgreSQL, Redis, NATS, and MinIO to verify all four connections succeed.
 
 ## Validation
-`kubectl get cluster hermes-pg -n hermes-staging -o jsonpath='{.status.phase}'` returns healthy status. `kubectl get secret hermes-pg-app -n hermes-staging` exists and contains keys: uri, username, password, host, port, dbname. A test pod can connect using the uri from the operator-generated Secret and execute `SELECT 1`. Same for production namespace.
+`kubectl get configmap hermes-infra-endpoints -n hermes-dev -o jsonpath='{.data.CNPG_HERMES_URL}'` returns a valid PostgreSQL connection string. A test pod using only `envFrom` from the ConfigMap and secrets successfully connects to all four services.

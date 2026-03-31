@@ -1,18 +1,14 @@
-Implement subtask 1003: Create CiliumNetworkPolicies for Namespace Isolation
+Implement subtask 1003: Deploy Redis operator CRs and credential secrets
 
 ## Objective
-Deploy CiliumNetworkPolicy resources implementing default-deny ingress, intra-namespace allow, MinIO egress allow (port 9000 to GitLab or dedicated instance), DNS egress allow, and explicit cross-namespace isolation between hermes-staging and hermes-production.
+Deploy single-replica Redis custom resources in both namespaces with connection string stored in namespace-scoped secrets.
 
 ## Steps
-Step-by-step:
-1. Create `templates/cilium-default-deny.yaml`: CiliumNetworkPolicy with `spec.endpointSelector: {}` and empty `ingress: []` to deny all ingress by default in `{{ .Values.namespace }}`.
-2. Create `templates/cilium-allow-intra-namespace.yaml`: Allow ingress from pods within the same namespace using `fromEndpoints` with `matchLabels: {"k8s:io.kubernetes.pod.namespace": "{{ .Values.namespace }}"}`.
-3. Create `templates/cilium-allow-minio-egress.yaml`: Allow egress to MinIO on port 9000. Use conditional logic:
-   - If `{{ .Values.minio.dedicated }}` is false: target `gitlab-minio-svc.gitlab.svc` via `toServices` or `toEndpoints` with namespace selector for `gitlab`.
-   - If `{{ .Values.minio.dedicated }}` is true: target the dedicated MinIO service in `hermes-minio` namespace.
-4. Create `templates/cilium-allow-dns-egress.yaml`: Allow egress to kube-dns on port 53 (TCP and UDP) in the `kube-system` namespace.
-5. All policies namespaced to `{{ .Values.namespace }}` with standard labels.
-6. Verify rendered YAML with `helm template --debug` for both environments and both minio.dedicated=true/false.
+1. Create a Helm template for the Redis operator CR in `charts/hermes-infra/templates/redis.yaml`.
+2. Configure single-replica for both dev and staging environments.
+3. Ensure the operator creates or you manually template a secret named `hermes-redis-credentials` containing the Redis connection string (host, port, and password if auth is enabled).
+4. Add values for memory limits in `values-dev.yaml` (256Mi) and `values-staging.yaml` (512Mi).
+5. Verify the Redis instance is accessible from within the namespace.
 
 ## Validation
-Deploy a test pod (busybox/curl) in hermes-staging: (1) `curl http://<staging-service>:port` within namespace succeeds; (2) `curl http://<production-service>.hermes-production.svc:port` times out or is refused; (3) `curl http://gitlab-minio-svc.gitlab.svc:9000` succeeds (or dedicated endpoint if applicable); (4) `nslookup kubernetes.default` succeeds (DNS works). Remove test pod after validation.
+`kubectl get redis -n hermes-dev` shows a Ready Redis instance. `kubectl get secret hermes-redis-credentials -n hermes-dev` exists with valid connection string. A test pod can `redis-cli PING` and receive `PONG`.

@@ -1,0 +1,119 @@
+name: implement-task-6
+metadata:
+  task_id: 6
+  agent: nova
+  stack: Bun/Elysia
+  depends_on_tasks: [1, 2, 3]
+
+inputs:
+  - name: task_dir
+  - name: repo_url
+  - name: branch_name
+    default: "task-6/feature-branch"
+  - name: agent
+    default: "nova"
+  - name: cli
+    default: "claude"
+  - name: model
+    default: "claude-opus-4-6"
+  - name: max_implementation_retries
+    default: 10
+  - name: max_quality_retries
+    default: 5
+
+steps:
+  - name: setup
+    command: >
+      git clone {{inputs.repo_url}} work && cd work &&
+      git checkout -b {{inputs.branch_name}}
+
+  - name: implement-subtask-6001
+    depends_on: [setup]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6001/prompt.md
+
+  - name: validate-subtask-6001
+    depends_on: [implement-subtask-6001]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
+  - name: implement-subtask-6002
+    depends_on: [validate-subtask-6001]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6002/prompt.md
+
+  - name: validate-subtask-6002
+    depends_on: [implement-subtask-6002]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
+  - name: implement-subtask-6003
+    depends_on: [validate-subtask-6001]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6003/prompt.md
+
+  - name: validate-subtask-6003
+    depends_on: [implement-subtask-6003]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
+  - name: implement-subtask-6004
+    depends_on: [validate-subtask-6001]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6004/prompt.md
+
+  - name: validate-subtask-6004
+    depends_on: [implement-subtask-6004]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
+  - name: implement-subtask-6005
+    depends_on: [validate-subtask-6001]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6005/prompt.md
+
+  - name: validate-subtask-6005
+    depends_on: [implement-subtask-6005]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
+  - name: implement-subtask-6006
+    depends_on: [validate-subtask-6001, validate-subtask-6002]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6006/prompt.md
+
+  - name: validate-subtask-6006
+    depends_on: [implement-subtask-6006]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
+  - name: integration-validation
+    depends_on: [validate-subtask-6001, validate-subtask-6002, validate-subtask-6003, validate-subtask-6004, validate-subtask-6005, validate-subtask-6006]
+    command: >
+      cd work && bun tsc --noEmit && bun test --run && bun lint
+
+  - name: acceptance-check
+    depends_on: [integration-validation]
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt "Review changes against {{inputs.task_dir}}/acceptance.md. Output PASS or FAIL."
+
+  - name: create-pr
+    depends_on: [acceptance-check]
+    command: >
+      cd work && git add -A &&
+      git commit -m "feat: task-6" &&
+      git push origin {{inputs.branch_name}} &&
+      source "${WORKSPACE:-.}/scripts/scm-dispatch.sh" &&
+      scm_create_pr "feat: task-6" "$(cat {{inputs.task_dir}}/task.md)" "main"

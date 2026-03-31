@@ -1,17 +1,15 @@
-Implement subtask 1002: Create RBAC, ResourceQuota, and LimitRange Templates
+Implement subtask 1002: Deploy CloudNative-PG PostgreSQL Cluster CRs and credential secrets
 
 ## Objective
-Create namespace-scoped ServiceAccount, Role, RoleBinding, ResourceQuota, and LimitRange templates. These are all small governance YAML resources with identical lifecycle and dependencies, grouped into a single subtask.
+Deploy single-replica CNPG Cluster custom resources in both hermes-dev and hermes-staging namespaces with initdb configuration and credential secrets.
 
 ## Steps
-Step-by-step:
-1. Create `templates/serviceaccount.yaml`: ServiceAccount `hermes-pipeline-sa` in `{{ .Values.namespace }}` with standard labels.
-2. Create `templates/role.yaml`: namespace-scoped Role with least-privilege verbs. Grant: get/list/watch on pods, services, configmaps, secrets, endpoints; create/delete on jobs. Do NOT use ClusterRole.
-3. Create `templates/rolebinding.yaml`: RoleBinding binding the Role to `hermes-pipeline-sa`. Namespace: `{{ .Values.namespace }}`.
-4. Create `templates/resourcequota.yaml`: ResourceQuota with `spec.hard` containing `requests.cpu: {{ .Values.resourceQuota.cpu }}`, `requests.memory: {{ .Values.resourceQuota.memory }}`, `pods: {{ .Values.resourceQuota.pods }}`. Apply standard labels.
-5. Create `templates/limitrange.yaml`: LimitRange with `spec.limits` type Container: `default.cpu: {{ .Values.limitRange.defaultCpu }}` (500m), `default.memory: {{ .Values.limitRange.defaultMemory }}` (512Mi), `defaultRequest.cpu: 250m`, `defaultRequest.memory: 256Mi`, `max.cpu: {{ .Values.limitRange.maxCpu }}` (2), `max.memory: {{ .Values.limitRange.maxMemory }}` (2Gi).
-6. All resources namespaced to `{{ .Values.namespace }}` with standard labels.
-7. Verify: `helm template --debug` renders all 5 resources for both environments with correct parameterized values.
+1. Create a Helm template for the CNPG `Cluster` CR in `charts/hermes-infra/templates/cnpg-cluster.yaml`.
+2. Configure single-replica (1 instance) for both dev and staging.
+3. Set `initdb` to create a `hermes` database with appropriate encoding (UTF-8).
+4. The CNPG operator auto-generates secrets; ensure the generated secret is named or aliased to `hermes-pg-credentials` in each namespace.
+5. Verify the secret contains keys: `host`, `port`, `dbname`, `username`, `password`, or a composite `uri` key.
+6. Add values for storage class and size in `values-dev.yaml` (1Gi) and `values-staging.yaml` (5Gi).
 
 ## Validation
-`kubectl auth can-i --as=system:serviceaccount:hermes-staging:hermes-pipeline-sa --namespace=hermes-staging list pods` returns `yes`. Cross-namespace access denied: same SA cannot access hermes-production. `kubectl get clusterrolebinding | grep hermes` returns nothing. `kubectl describe resourcequota -n hermes-staging` shows cpu=8, memory=16Gi, pods=20. `kubectl get limitrange -n hermes-staging -o yaml` confirms default cpu=500m, memory=512Mi, max cpu=2, memory=2Gi. Production namespace shows production-tier quota values.
+`kubectl get clusters.postgresql.cnpg.io -n hermes-dev` shows a Ready cluster with 1 replica. `kubectl get secret hermes-pg-credentials -n hermes-dev` exists and contains valid PostgreSQL connection parameters.
