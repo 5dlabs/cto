@@ -1,7 +1,5 @@
 # Enhanced PRD
 
-This document synthesizes the original project requirements with the outcomes of a structured design deliberation session. It serves as the single source of truth for all subsequent implementation tasks, detailing both the original vision and the resolved architectural decisions.
-
 ## 1. Original Requirements
 
 > # Project: Sigma-1 — Unified AI Business Platform
@@ -62,8 +60,8 @@ This document synthesizes the original project requirements with the outcomes of
 >
 > ### 1. Morgan AI Agent (OpenClaw)
 >
-> **Agent**: Morgan (OpenClaw agent)  
-> **Priority**: Critical  
+> **Agent**: Morgan (OpenClaw agent)
+> **Priority**: Critical
 > **Runtime**: OpenClaw with MCP tools
 >
 > The central AI agent that handles all customer interactions via Signal, voice, and web chat.
@@ -111,9 +109,9 @@ This document synthesizes the original project requirements with the outcomes of
 >
 > ### 2. Equipment Catalog Service (Rust/Axum)
 >
-> **Agent**: Rex  
-> **Priority**: High  
-> **Language**: Rust 1.75+  
+> **Agent**: Rex
+> **Priority**: High
+> **Language**: Rust 1.75+
 > **Framework**: Axum 0.7
 >
 > High-performance API for equipment inventory, availability checking, and self-service quoting.
@@ -183,9 +181,9 @@ This document synthesizes the original project requirements with the outcomes of
 >
 > ### 3. Rental Management System — RMS (Go/gRPC)
 >
-> **Agent**: Grizz  
-> **Priority**: High  
-> **Language**: Go 1.22+  
+> **Agent**: Grizz
+> **Priority**: High
+> **Language**: Go 1.22+
 > **Framework**: gRPC with grpc-gateway for REST
 >
 > Full replacement for Current RMS — bookings, projects, inventory, logistics, crew management.
@@ -309,9 +307,9 @@ This document synthesizes the original project requirements with the outcomes of
 >
 > ### 4. Finance Service (Rust/Axum)
 >
-> **Agent**: Rex  
-> **Priority**: High  
-> **Language**: Rust 1.75+  
+> **Agent**: Rex
+> **Priority**: High
+> **Language**: Rust 1.75+
 > **Framework**: Axum 0.7
 >
 > Invoicing, payments, AP/AR, payroll, multi-currency support. Replaces QuickBooks/Xero.
@@ -401,9 +399,9 @@ This document synthesizes the original project requirements with the outcomes of
 >
 > ### 5. Customer Vetting Service (Rust/Axum)
 >
-> **Agent**: Rex  
-> **Priority**: High  
-> **Language**: Rust 1.75+  
+> **Agent**: Rex
+> **Priority**: High
+> **Language**: Rust 1.75+
 > **Framework**: Axum 0.7
 >
 > Automated background research on prospects: business registration, online presence, reputation, credit signals.
@@ -465,9 +463,9 @@ This document synthesizes the original project requirements with the outcomes of
 >
 > ### 7. Social Media Engine (Node.js/Elysia + Effect)
 >
-> **Agent**: Nova  
-> **Priority**: Medium  
-> **Runtime**: Node.js 20+  
+> **Agent**: Nova
+> **Priority**: Medium
+> **Runtime**: Node.js 20+
 > **Framework**: Elysia 1.x with Effect TypeScript
 >
 > Automated content curation, caption generation, and multi-platform publishing.
@@ -515,17 +513,17 @@ This document synthesizes the original project requirements with the outcomes of
 >
 > ### 8. Website — Next.js 15 (React/Next.js + Effect)
 >
-> **Agent**: Blaze  
-> **Priority**: High  
-> **Framework**: Next.js 15 (App Router)  
-> **UI**: React 19, shadcn/ui, TailwindCSS 4  
+> **Agent**: Blaze
+> **Priority**: High
+> **Framework**: Next.js 15 (App Router)
+> **UI**: React 19, shadcn/ui, TailwindCSS 4
 > **Type System**: Effect 3.x + TypeScript 5.x
 >
 > AI-optimized website with equipment catalog, self-service quotes, and Morgan web chat.
 >
 > **Pages**:
 > | Route | Purpose | Effect Usage |
-> |-------|---------|--------------|
+> |-------|---------|--------------
 > | `/` | Hero, value prop, CTA | Static content |
 > | `/equipment` | Browse 533+ products | Effect data fetching |
 > | `/equipment/:id` | Product detail + availability | Effect Schema validation |
@@ -562,7 +560,7 @@ This document synthesizes the original project requirements with the outcomes of
 >
 > ### 9. Infrastructure & Deployment (Kubernetes)
 >
-> **Agent**: Infra + Metal  
+> **Agent**: Infra + Metal
 > **Priority**: Critical
 >
 > **Kubernetes Resources**:
@@ -743,7 +741,7 @@ This document synthesizes the original project requirements with the outcomes of
 > - **Tools**: GitHub PR integration via GitHub App
 > - **MCP Tools**: `github_get_pull_request`, `github_get_pull_request_files`
 >
-> ### 2. Code Quality Enforcement (Cleo) 
+> ### 2. Code Quality Enforcement (Cleo)
 > - **Agent**: Cleo — Quality Guardian
 > - **Trigger**: CI/CD pipeline
 > - **Focus**: Maintainability, refactor opportunities, code smells
@@ -751,7 +749,7 @@ This document synthesizes the original project requirements with the outcomes of
 > - **Output**: PR comments with improvement suggestions
 >
 > ### 3. Comprehensive Testing (Tess)
-> - **Agent**: Tess — Testing Genius  
+> - **Agent**: Tess — Testing Genius
 > - **Trigger**: CI/CD pipeline after review approval
 > - **Coverage**: Unit tests, integration tests, end-to-end tests
 > - **Tools**: Jest/Vitest, PyTest, Cargo Test
@@ -801,207 +799,519 @@ This document synthesizes the original project requirements with the outcomes of
 > 5. All services build, test, and deploy successfully
 > 6. End-to-end flow works: Signal message → Morgan → action → confirmation
 
+---
+
 ## 2. Project Scope
 
-The initial task decomposition identified 10 tasks to bootstrap the Sigma-1 platform. The scope covers infrastructure provisioning, backend service creation, frontend website setup, and foundational CI/CD and testing pipelines.
+The initial task decomposition identified **10 tasks** spanning infrastructure, backend services, an AI agent, a web frontend, and production hardening.
 
--   **Total Tasks Identified**: 10
-    -   `Task 1`: Provision Core Infrastructure (PostgreSQL, Redis, S3/R2).
-    -   `Task 2`: Bootstrap Equipment Catalog Service (Rust/Axum).
-    -   `Task 3`: Bootstrap RMS Service & gRPC Definitions (Go/gRPC).
-    -   `Task 4`: Bootstrap Finance Service (Rust/Axum).
-    -   `Task 5`: Bootstrap Customer Vetting Service (Rust/Axum).
-    -   `Task 6`: Bootstrap Social Media Engine (Bun/Elysia).
-    -   `Task 7`: Setup Website & Equipment Catalog Pages (React/Next.js).
-    -   `Task 8`: Bootstrap Morgan AI Agent & Catalog Tool (OpenClaw).
-    -   `Task 9`: Establish CI/CD Pipeline Foundations (GitHub Actions).
-    -   `Task 10`: Create Integration Test for Lead Qualification.
+### Task Inventory
 
--   **Key Services & Components**:
-    -   **Backend**: Equipment Catalog, RMS, Finance, Customer Vetting, Social Media Engine.
-    -   **Frontend**: Next.js Website.
-    -   **AI**: Morgan Agent (OpenClaw).
-    -   **Infrastructure**: PostgreSQL, Redis/Valkey, Cloudflare R2, Kubernetes.
+| ID | Title | Agent | Stack | Priority | Dependencies |
+|----|-------|-------|-------|----------|--------------|
+| 1 | Provision Core Infrastructure | Bolt | Kubernetes/Helm | High | None |
+| 2 | Equipment Catalog Service API | Rex | Rust 1.75+, Axum 0.7 | High | Task 1 |
+| 3 | RMS Service | Grizz | Go 1.22+, gRPC | High | Task 1 |
+| 4 | Finance Service | Rex | Rust 1.75+, Axum 0.7 | High | Task 1 |
+| 5 | Customer Vetting Service | Rex | Rust 1.75+, Axum 0.7 | High | Task 1 |
+| 6 | Social Media Engine | Nova | Node.js 20+, Elysia 1.x, Effect TS | Medium | Task 1 |
+| 7 | Morgan AI Agent | Angie | OpenClaw/MCP | High | Tasks 2, 3, 4, 5, 6 |
+| 8 | Web Frontend | Blaze | React 19, Next.js 15, Effect, shadcn/ui, TailwindCSS 4 | High | Tasks 2, 7 |
+| 9 | Production Hardening: HA, CDN, TLS, Ingress | Bolt | Kubernetes/Helm | High | Tasks 2–8 |
+| 10 | Production Hardening: RBAC, Secret Rotation, Audit Logging | Bolt | Kubernetes/Helm | High | Task 9 |
 
--   **Agent Assignments & Technology Stacks**:
-    -   **Bolt**: Kubernetes/Helm for infrastructure.
-    -   **Rex**: Rust/Axum for Catalog, Finance, and Vetting services.
-    -   **Grizz**: Go/gRPC for the RMS service.
-    -   **Nova**: Bun/Elysia/Effect for the Social Media Engine.
-    -   **Blaze**: React/Next.js for the website.
-    -   **Angie**: OpenClaw/MCP for the Morgan agent.
-    -   **Atlas**: CI/CD platforms for pipelines.
-    -   **Tess**: Test frameworks for integration tests.
+### Key Services and Components
 
--   **Cross-cutting Concerns**:
-    -   CI/CD pipelines will be established for all services (Task 9).
-    -   End-to-end integration testing will validate core data flows (Task 10).
+- **5 backend microservices**: Equipment Catalog (Rust), RMS (Go), Finance (Rust), Customer Vetting (Rust), Social Media Engine (Node.js)
+- **1 AI agent**: Morgan (OpenClaw/MCP) — the central orchestrator for all customer and admin interactions
+- **1 web frontend**: Next.js 15 website with equipment catalog, quote builder, chat widget, and portfolio
+- **2 infrastructure/hardening tasks**: Core provisioning and production-grade security/HA
+
+### Agent Assignments
+
+- **Bolt**: Infrastructure provisioning and production hardening (Tasks 1, 9, 10)
+- **Rex**: Three Rust/Axum services — Equipment Catalog, Finance, Customer Vetting (Tasks 2, 4, 5)
+- **Grizz**: Go/gRPC Rental Management System (Task 3)
+- **Nova**: Node.js/Elysia Social Media Engine (Task 6)
+- **Angie**: Morgan AI Agent integration and MCP tool configuration (Task 7)
+- **Blaze**: Next.js 15 web frontend (Task 8)
+
+### Cross-Cutting Concerns
+
+- **15 decision points** were identified across tasks, covering architecture, platform choices, API design, data models, security, UX, design systems, and build-vs-buy trade-offs
+- All backend services share a single PostgreSQL cluster (CloudNative-PG) with schema-level isolation
+- All services share a Valkey (Redis-compatible) cache for rate limiting, sessions, and caching
+- Service-to-service authentication and secret management span all tasks
+- API versioning strategy (`/api/v1/...`) applies uniformly to all public endpoints
+- The QA pipeline (Stitch, Cleo, Tess, Cipher, Atlas, Bolt) applies to all code changes
+
+---
 
 ## 3. Resolved Decisions
 
-The following decisions were resolved by unanimous agreement during the deliberation session.
+### [D2] Which Redis-compatible cache should be used?
 
-### [D2] Which object storage provider should be used for storing product images and social media content?
+**Status**: Accepted
 
--   **Status**: Accepted
--   **Task Context**: 1 (Provision Core Infrastructure), 2 (Bootstrap Equipment Catalog Service), 6 (Bootstrap Social Media Engine)
--   **Context**: Both Optimist and Pessimist agreed that Cloudflare R2 is the pragmatic choice. The S3-compatible API minimizes technical risk, and its integration with the Cloudflare-hosted frontend eliminates data egress costs.
--   **Decision**: Use Cloudflare R2 for all object storage needs.
--   **Consensus**: 2/2 (100%)
--   **Consequences**:
-    -   **Positive**: Significant and compounding cost savings on data egress for image-heavy services. Aligns with existing Cloudflare infrastructure (Pages, CDN).
-    -   **Negative**: None identified. The S3-compatible API makes it a low-risk choice.
+**Task Context**: Tasks 1, 2, 3, 4 (core infrastructure and all services needing caching)
 
-### [D6] How will the Customer Vetting service source Google Reviews data?
+**Context**: Both debaters agreed immediately. The Valkey operator (redis.redis.opstreelabs.in) is already available in-cluster with CRDs deployed. Valkey 7.2 is Redis wire-compatible and BSD-licensed.
 
--   **Status**: Accepted
--   **Task Context**: 5 (Bootstrap Customer Vetting Service)
--   **Context**: Both Optimist and Pessimist agreed that building and maintaining a custom web scraper against a target like Google is a fragile, low-value engineering task that creates significant maintenance debt.
--   **Decision**: Use a paid, third-party data provider API for reliable access to Google Reviews data.
--   **Consensus**: 2/2 (100%)
--   **Consequences**:
-    -   **Positive**: Offloads maintenance burden, provides a stable API contract, and allows engineers to focus on core business logic. Trades a predictable operational expense for a massive reduction in engineering toil and incident risk.
-    -   **Negative**: Introduces a new operational expense for the third-party API.
+**Decision**: Use the existing Valkey operator with Valkey 7.2 as specified in the PRD YAML (`valkey/valkey:7.2-alpine`).
 
-### [D7] How should the Signal-CLI dependency for the Morgan agent be deployed?
+**Consensus**: 2/2 (100%)
 
--   **Status**: Accepted
--   **Task Context**: 8 (Bootstrap Morgan AI Agent & Catalog Tool)
--   **Context**: Both Optimist and Pessimist agreed that the relationship between the Morgan agent and Signal-CLI is 1:1 and tightly coupled. The sidecar pattern is the textbook correct implementation for this use case.
--   **Decision**: Deploy Signal-CLI as a sidecar container within the same Kubernetes pod as the Morgan agent.
--   **Consensus**: 2/2 (100%)
--   **Consequences**:
-    -   **Positive**: Co-locates the containers, simplifies networking to `localhost`, and ensures their lifecycles are managed together. Avoids unnecessary network and service discovery complexity.
-    -   **Negative**: None identified.
+**Consequences**:
+- **Positive**: Single operator handles lifecycle management; no additional Helm charts; wire-compatible with all Redis client libraries across Rust, Go, and Node.js stacks
+- **Negative**: None identified
+- **Caveats**: None
+
+---
+
+### [D3] Which object storage provider should be used?
+
+**Status**: Accepted
+
+**Task Context**: Tasks 1, 2, 6 (infrastructure, product images, social media photos)
+
+**Context**: Both debaters agreed. R2 has zero egress fees, S3-compatible API, and native Cloudflare CDN integration. The Cloudflare tunnel operator is already deployed in-cluster.
+
+**Decision**: Use Cloudflare R2 for all object storage (product images, social media photos, portfolio assets).
+
+**Consensus**: 2/2 (100%)
+
+**Consequences**:
+- **Positive**: Zero egress fees (vs S3's $0.09/GB); native Cloudflare CDN integration for Tasks 2, 6, 8; S3-compatible SDK means no code changes if migrating later
+- **Negative**: None identified
+- **Caveats**: None
+
+---
+
+### [D4] Which PostgreSQL operator?
+
+**Status**: Accepted (Hard Constraint)
+
+**Task Context**: Tasks 1, 2, 3, 4, 5, 6 (all services using PostgreSQL)
+
+**Context**: Hard constraint per PRD. Both debaters agreed without discussion.
+
+**Decision**: CloudNative-PG as specified in the PRD.
+
+**Consensus**: 2/2 (100%)
+
+**Consequences**:
+- **Positive**: CNCF-adopted, production-proven, handles backup/recovery natively
+- **Negative**: None
+- **Caveats**: None
+
+---
+
+### [D6] Single database with multiple schemas vs separate databases per service?
+
+**Status**: Accepted
+
+**Task Context**: Tasks 1, 2, 3, 4, 5, 6 (all services sharing the PostgreSQL cluster)
+
+**Context**: Both debaters agreed on single PostgreSQL cluster with schemas per domain (rms, crm, finance, audit, public) as specified in the PRD. The Pessimist raised a valid caveat about cross-schema coupling.
+
+**Decision**: Single PostgreSQL cluster with schemas per domain.
+
+**Consensus**: 2/2 (100%)
+
+**Consequences**:
+- **Positive**: One backup strategy, one failover; cross-schema access available for reporting; simpler operations than distributed databases
+- **Negative**: Cross-schema joins create implicit coupling between services
+- **Caveats (Pessimist)**: **Mitigate cross-schema coupling by using views at schema boundaries. Never join raw tables cross-schema.** Schema migrations in one service (e.g., RMS) can break queries in another (e.g., Finance) if raw tables are joined directly.
+
+---
+
+### [D8] RBAC or ABAC for web frontend and Morgan agent?
+
+**Status**: Accepted
+
+**Task Context**: Tasks 7, 8, 10 (Morgan agent, web frontend, production hardening)
+
+**Context**: Both debaters agreed. The PRD describes exactly two human personas (Mike as admin, customers) plus Morgan as agent. Four roles cover all access patterns.
+
+**Decision**: RBAC with a small, well-defined role set: `admin`, `operator`, `customer`, `agent`.
+
+**Consensus**: 2/2 (100%)
+
+**Consequences**:
+- **Positive**: Simple role checks across all services; no policy engine overhead (OPA/Cedar); well-matched to the actual user base
+- **Negative**: May need to extend to ABAC later if role requirements grow
+- **Caveats**: Only extend to ABAC if requirements demand it — YAGNI applies
+
+---
+
+### [D9] Self-hosted Signal-CLI or third-party relay?
+
+**Status**: Accepted (Hard Constraint)
+
+**Task Context**: Tasks 1, 7 (infrastructure provisioning, Morgan agent)
+
+**Context**: Hard constraint per PRD. No reliable third-party Signal SaaS exists. The Pessimist agreed but raised an operational risk.
+
+**Decision**: Self-host Signal-CLI as a sidecar pod alongside Morgan.
+
+**Consensus**: 2/2 (100%)
+
+**Consequences**:
+- **Positive**: Open-source, well-maintained; sidecar pattern keeps latency low for Morgan's 10-second response requirement
+- **Negative**: Signal-CLI is a Java process that holds registration state
+- **Caveats (Pessimist)**: **Task 1 MUST provision a PVC for Signal-CLI state.** If the pod crashes and restarts without persistent storage for the Signal identity, the registered phone number is lost. An operational runbook is needed for Signal-CLI deregistration events after updates.
+
+---
+
+### [D10] API versioning strategy?
+
+**Status**: Accepted (Hard Constraint)
+
+**Task Context**: Tasks 2, 3, 4, 5, 6 (all public-facing API services)
+
+**Context**: Hard constraint per PRD. Both debaters agreed without discussion.
+
+**Decision**: URI-based versioning (`/api/v1/...`) for all public endpoints.
+
+**Consensus**: 2/2 (100%)
+
+**Consequences**:
+- **Positive**: Explicit, discoverable, and matches the endpoint patterns already defined in the PRD
+- **Negative**: None
+- **Caveats**: None
+
+---
+
+### [D11] Sidebar or top navigation for the web frontend?
+
+**Status**: Accepted
+
+**Task Context**: Task 8 (web frontend)
+
+**Context**: Only the Optimist raised this point; no counter-position was offered. The Optimist argued top navigation is standard for customer-facing catalog/marketing sites, with contextual sidebar filters on the equipment browse page.
+
+**Decision**: Top navigation bar with responsive hamburger menu for mobile. Equipment catalog uses sidebar filters contextually (page-specific, not global navigation).
+
+**Consensus**: Uncontested (Optimist position, no objection from Pessimist)
+
+**Consequences**:
+- **Positive**: Matches customer-facing site conventions; avoids admin-panel UX feel; sidebar filters enhance equipment browse UX
+- **Negative**: None identified
+- **Caveats**: None
+
+---
+
+### [D12] shadcn/ui as-is, extended, or custom?
+
+**Status**: Accepted
+
+**Task Context**: Task 8 (web frontend)
+
+**Context**: Both debaters agreed. A lighting/production company needs brand differentiation beyond defaults. 80% shadcn/ui primitives, 20% custom branded components.
+
+**Decision**: Extend shadcn/ui with custom branded components (theme tokens, hero sections, quote builder).
+
+**Consensus**: 2/2 (100%)
+
+**Consequences**:
+- **Positive**: Accessible, composable primitives from shadcn/ui; brand differentiation via custom color palette, typography, and hero layouts; fast development for Task 8
+- **Negative**: Custom components require additional design and maintenance effort
+- **Caveats**: None
+
+---
+
+### [D13] Which data table component for equipment catalog and admin views?
+
+**Status**: Accepted
+
+**Task Context**: Task 8 (web frontend — equipment catalog with 533+ products)
+
+**Context**: Both debaters agreed. TanStack Table is headless and provides filtering, sorting, pagination, and virtual scrolling. shadcn/ui provides the visual layer.
+
+**Decision**: TanStack Table with shadcn/ui Table styling.
+
+**Consensus**: 2/2 (100%)
+
+**Consequences**:
+- **Positive**: Full control over rendering; handles 533+ products with virtual scrolling; de facto standard (24k+ GitHub stars)
+- **Negative**: None identified
+- **Caveats**: None
+
+---
+
+### [D14] External Secrets Operator with automated rotation or static secrets?
+
+**Status**: Accepted
+
+**Task Context**: Tasks 1, 10 (infrastructure provisioning, production hardening)
+
+**Context**: Both debaters agreed. ESO CRDs are already present and operational in-cluster. Static secrets are a compliance liability.
+
+**Decision**: Use the already-deployed External Secrets Operator with automated rotation.
+
+**Consensus**: 2/2 (100%)
+
+**Consequences**:
+- **Positive**: Transparent rotation for Stripe keys, API tokens, DB credentials; compliance-friendly; already operational
+- **Negative**: None identified
+- **Caveats (Pessimist)**: **Verify that a SecretStore backend is actually configured (e.g., Vault, AWS SSM), not just the CRDs installed.** Task 1 should validate this during provisioning.
+
+---
+
+### [D15] Direct Stripe API integration or payment gateway abstraction?
+
+**Status**: Accepted
+
+**Task Context**: Task 4 (Finance Service)
+
+**Context**: Both debaters agreed. The PRD names Stripe exclusively with no mention of alternative providers. YAGNI on the abstraction layer.
+
+**Decision**: Direct Stripe API integration using the official `stripe-rust` crate.
+
+**Consensus**: 2/2 (100%)
+
+**Consequences**:
+- **Positive**: Direct access to Stripe's invoicing, subscription, and webhook APIs; no unnecessary abstraction layer; well-maintained official crate
+- **Negative**: If a second payment provider is needed, an interface will need to be extracted
+- **Caveats**: Extract an interface later only if requirements change — not preemptively
+
+---
 
 ## 4. Escalated Decisions
 
-The following decision points resulted in a split opinion and require human review to resolve. Implementing agents **must not** proceed with tasks affected by these decisions until a final resolution is provided.
+### [D1] Should inter-service communication be purely synchronous REST/gRPC or include asynchronous event-driven messaging via NATS? — ESCALATED
 
-### [D1] How should data be isolated for the various backend services (RMS, Finance, Catalog, etc.) within the single PostgreSQL cluster? — ESCALATED
+**Status**: Pending human decision
 
--   **Status**: Pending human decision
--   **Task Context**: 1, 2, 3, 4, 5, 6
--   **Options**:
-    -   A: Use a single PostgreSQL database with logically separated schemas for each service.
-    -   B: Provision separate, physically isolated PostgreSQL databases for each service.
--   **Optimist argued (A)**: A single database with schemas simplifies infrastructure provisioning and connection management, aligning with the PRD's hint. It reduces operational overhead.
--   **Pessimist argued (B)**: A single database is a single point of failure. Separate databases provide true service isolation, contain the blast radius of a bad migration or runaway query, and enforce strong boundaries. The CloudNative-PG operator makes provisioning new databases trivial.
--   **Recommendation**: **Option B (Separate Databases)**. For a V1 system, prioritizing reliability and blast radius containment is paramount. The operational cost of managing a few separate databases with the specified operator is low compared to the risk of a platform-wide outage caused by a single service's database error.
+**Task Context**: Tasks 2, 3, 4, 5, 6, 7 (all backend services and Morgan agent)
 
-### [D3] What should be the primary communication protocol for internal service-to-service calls? — ESCALATED
+**Options**:
+- **Option A (Optimist)**: Hybrid — synchronous gRPC/REST for queries (availability checks, catalog lookups) and NATS JetStream for event-driven workflows (lead→vet→score→opportunity, invoice→payment, social publish pipeline). NATS is already deployed in-cluster at `openclaw-nats.openclaw.svc.cluster.local`.
+- **Option B (Pessimist)**: Synchronous REST/gRPC for all service-to-service calls in financial and rental workflows (Tasks 2–5, 7). NATS only for the social media pipeline (Task 6) where eventual consistency is acceptable.
 
--   **Status**: Pending human decision
--   **Task Context**: 2, 3, 4, 5, 6, 8, 10
--   **Options**:
-    -   A: Standardize on gRPC for all internal communication.
-    -   B: Use a mixed-protocol approach: gRPC for high-throughput services (RMS) and HTTP/REST for others.
--   **Optimist argued (A)**: A unified gRPC protocol provides performance, type safety, and a superior developer experience through a central repository of Protobuf definitions, preventing integration bugs.
--   **Pessimist argued (B)**: Forcing gRPC on simple CRUD services adds unnecessary complexity (Protobuf management, code generation, gateways). Simple REST/JSON is easier to implement, secure, and debug with standard tools like `curl` during an incident.
--   **Recommendation**: **Option B (Mixed Protocol)**. The PRD already implies this pattern. The operational benefit of simple, debuggable REST APIs for services like the Equipment Catalog outweighs the benefits of universal gRPC standardization at this stage. Use gRPC where its performance is critical (RMS) and REST where simplicity and debuggability are more valuable.
+**Optimist argued**: The quote-to-invoice flow (DF-2) crosses 3 services; coupling them synchronously means a Finance Service outage blocks quoting. NATS JetStream provides at-least-once delivery, replay, and decoupling. NATS is already deployed and running. Tasks 3, 4, 5, 6, 7 all participate in multi-step workflows that benefit from event decoupling.
 
-### [D4] How will authentication and authorization be handled for service-to-service calls and external API access from the frontend? — ESCALATED
+**Pessimist argued**: This is a small business platform (~5 services, single cluster, one primary user) not a distributed systems showcase. NATS JetStream at-least-once delivery requires every consumer to be idempotent. The quote→invoice flow is financial and must have clear success/failure semantics. Without dead-letter queue strategies, consumer lag alerting, and idempotency keys (none of which appear in any task description), the risk of silent data loss or duplicate invoices is real. With 2 replicas and circuit breakers, synchronous calls are simpler to operate and debug. Critical question: how does Morgan respond to users within 10 seconds if the answer depends on an async event that hasn't been consumed yet?
 
--   **Status**: Pending human decision
--   **Task Context**: 2, 3, 4, 5, 6, 7, 8
--   **Options**:
-    -   A: Use a service mesh with mTLS for service-to-service communication and JWTs for external clients.
-    -   B: Implement service-to-service authentication using short-lived JWTs issued by a central identity service.
--   **Optimist argued (A)**: A service mesh pushes security to the infrastructure layer, freeing developers from implementing token validation. It's a modern, secure approach for a zero-trust network.
--   **Pessimist argued (B)**: A service mesh is a complex distributed system that adds an enormous layer of opaque complexity, increasing mean-time-to-resolution (MTTR) during incidents. JWTs are a well-understood, debuggable, and stateless technology that is sufficient for V1.
--   **Recommendation**: **Option B (JWTs)**. The operational burden and learning curve of a service mesh are too high for a V1 project. A simple, robust JWT-based system is easier to debug and operate, which is critical for a new platform. A service mesh can be introduced later if the need is proven.
+**Recommendation**: The Pessimist's position is more operationally conservative and better matched to the platform's scale. However, the Optimist correctly identifies that NATS is already deployed and that multi-step workflows benefit from decoupling. A pragmatic middle ground:
 
-### [D5] What architectural pattern should be used for orchestrating long-running, multi-step business workflows? — ESCALATED
+1. **V1**: Synchronous REST/gRPC for all financial and rental workflows (quote, invoice, payment, vetting). NATS for the social media pipeline (Task 6) only.
+2. **V1.1**: After operational maturity, add NATS for non-financial event workflows (lead score notifications, portfolio sync triggers) with explicit dead-letter queues and idempotency keys.
+3. **Prerequisite for any NATS expansion**: Dead-letter queue strategy, consumer lag monitoring, and idempotency keys must be designed as a sub-task before NATS is used for financial flows.
 
--   **Status**: Pending human decision
--   **Task Context**: 5, 6, 8, 10
--   **Options**:
-    -   A: Use an event-driven approach with the existing NATS message queue.
-    -   B: Use direct orchestration from the Morgan agent, offloading long-running steps to a simple background job queue.
--   **Optimist argued (A)**: An event-driven architecture using NATS decouples services, creating a resilient, scalable, and observable system. This is a proven pattern for robust microservices.
--   **Pessimist argued (B)**: A fully event-driven system is difficult to trace and debug without extensive, perfectly configured distributed tracing. Direct orchestration with a simple Redis-backed job queue provides the necessary asynchronicity and resilience without the debugging nightmare.
--   **Recommendation**: **Option B (Direct Orchestration + Job Queue)**. Traceability is king in a new system. Understanding a full business process flow is critical for debugging. The direct orchestration model provides a clear, traceable path for core business logic, which is more valuable than the loose coupling of an event-driven system at this early stage.
+**The human should decide**: full hybrid from day one (Option A) or conservative synchronous-first (Option B, recommended).
 
-### [D8] How will database schema migrations be managed across the multiple services using the PostgreSQL cluster? — ESCALATED
+---
 
--   **Status**: Pending human decision
--   **Task Context**: 2, 3, 4, 5, 6
--   **Options**:
-    -   A: Each service manages its own schema migrations independently using a language-specific tool.
-    -   B: Use a single, language-agnostic migration tool managed from a central repository.
--   **Optimist argued (A)**: A core principle of microservices is autonomy. Empowering each service to manage its own migrations within its own CI/CD pipeline improves developer experience and velocity.
--   **Pessimist argued (B)**: Autonomy is not anarchy. A central tool creates a single, auditable source of truth and prevents uncoordinated, conflicting schema changes from taking down the database. This "bottleneck" is a feature that forces communication.
--   **Recommendation**: **Option A (Per-service Migrations)**. This recommendation is contingent on the acceptance of the recommendation for **[D1]** to use separate databases. If each service has its own database, the risk of collision is eliminated, and the principle of service autonomy can be safely applied. This aligns best with a microservices philosophy.
+### [D5] What API paradigm for Morgan's tool-server to backend services? — ESCALATED
 
-### [D9] Which Redis-compatible engine should be used for caching and rate-limiting? — ESCALATED
+**Status**: Pending human decision
 
--   **Status**: Pending human decision
--   **Task Context**: 1, 2, 3, 4
--   **Options**:
-    -   A: Use Valkey, as specified in the example Kubernetes manifest.
-    -   B: Use a standard Redis deployment.
--   **Optimist argued (A)**: Valkey is the community-driven, open-source future of Redis. Adopting it aligns with the open-source community and insulates the project from future licensing changes by Redis Inc.
--   **Pessimist argued (B)**: Redis is battle-tested for a decade; Valkey is months old. The risk of running critical production caching on an unproven engine is an unforced error. We should use "boring technology" for core infrastructure.
--   **Recommendation**: **Option B (Standard Redis)**. For critical infrastructure like caching and rate-limiting, stability and operational history are more important than aligning with a new fork. The risk of unknown bugs or behavioral differences in Valkey is too high for a V1 launch.
+**Task Context**: Tasks 2, 3, 4, 5, 6, 7 (tool-server communicating with all backends)
 
-### [D10] How will the Morgan web chat widget be implemented and integrated into the Next.js site? — ESCALATED
+**Options**:
+- **Option A (Optimist)**: gRPC for tool-server→backend communication, with REST via grpc-gateway for external/web consumers. Protobuf gives compile-time safety across Rust/Go/Node boundaries.
+- **Option B (Pessimist)**: REST (HTTP/JSON) for tool-server→backend calls. Use gRPC only for the RMS service (Task 3) which already has it.
 
--   **Status**: Pending human decision
--   **Task Context**: 7, 8
--   **Options**:
-    -   A: Build a custom React component for the chat widget from scratch.
-    -   B: Source a third-party, embeddable chat widget library and connect it to the Morgan agent's backend.
--   **Optimist argued (A)**: Morgan is the centerpiece of the product. A custom component gives complete control over UX, branding, and unique features, which is a direct investment in product quality.
--   **Pessimist argued (B)**: Building a chat widget is a notorious time sink that involves many solved problems (history, typing indicators, accessibility). Using a library allows the team to ship faster and focus on the backend logic that makes Morgan smart.
--   **Recommendation**: **Option B (Third-party Library)**. The primary goal for V1 is to ship a functional end-to-end product. The engineering effort required to build a production-ready chat widget from scratch is significant and will delay the project. A well-maintained open-source library can be styled to match the brand and replaced with a custom version in a future phase if it becomes a competitive differentiator.
+**Optimist argued**: MCP tools are typed function calls — a perfect fit for gRPC's Protobuf contracts. gRPC provides compile-time safety across the polyglot stack (Rust/Go/Node). The RMS (Task 3) already uses gRPC. Protobuf is 5–10x faster than JSON serialization.
+
+**Pessimist argued**: Three of five backend services are Rust/Axum REST (Tasks 2, 4, 5) and one is Node/Elysia REST (Task 6). Adding gRPC to all of them doubles the API surface for no operational gain. MCP tools are JSON-based. The tool-server is already a translation layer that serializes/deserializes JSON. The "5–10x faster" Protobuf claim is irrelevant when the bottleneck is LLM inference at seconds, not microseconds of serialization.
+
+**Recommendation**: The Pessimist's position is more pragmatic. The tool-server is a translation layer between JSON-based MCP tool schemas and backend services. Adding gRPC to services that are natively REST (Tasks 2, 4, 5, 6) increases implementation scope for each of those tasks with minimal benefit — the LLM inference time dwarfs serialization overhead. The recommended approach:
+
+- Tool-server calls RMS (Task 3) via **gRPC** (native to that service)
+- Tool-server calls all other services via **REST/JSON** (native to those services)
+- Web consumers use the REST endpoints directly
+- If a unified Protobuf contract is desired later, it can be added incrementally
+
+**The human should decide**: universal gRPC (Option A) or native-protocol-per-service (Option B, recommended).
+
+---
+
+### [D7] mTLS or JWT for service-to-service auth? — ESCALATED
+
+**Status**: Pending human decision
+
+**Task Context**: Tasks 1, 2, 3, 4, 5, 6, 7 (all service-to-service communication)
+
+**Options**:
+- **Option A (Optimist)**: mTLS via Cilium's built-in mutual authentication, supplemented by service identity headers for authorization context.
+- **Option B (Pessimist)**: Start with Kubernetes NetworkPolicies (Cilium-backed) for service isolation + shared pre-shared keys (PSK) in headers for v1. Upgrade to Cilium mTLS when the mesh is operationally validated.
+
+**Optimist argued**: Cilium is already deployed in-cluster (CRDs present). Cilium's mTLS is transparent to application code — no JWT validation middleware needed in each Rust/Go/Node service. This reduces per-service auth complexity.
+
+**Pessimist argued**: Having Cilium CRDs installed is not the same as having mTLS enabled. Cilium mTLS requires enabling mutual authentication mode, managing SPIFFE identities, and understanding the certificate lifecycle. Misconfigured mTLS fails closed — services can't talk to each other. For v1 with 5 internal services in a single namespace, NetworkPolicies + PSK provides defense-in-depth without the operational surface area.
+
+**Recommendation**: The Pessimist's phased approach reduces risk for initial delivery. Cilium NetworkPolicies are well-understood and immediately deployable. PSK headers provide a lightweight authentication mechanism. The recommended approach:
+
+1. **V1**: Cilium-backed NetworkPolicies for service isolation + PSK headers for service identity
+2. **V1.1**: Enable Cilium mTLS mutual authentication after operational validation of the Cilium mesh configuration
+3. Task 1 should include a sub-task to verify Cilium's mutual authentication readiness (SPIFFE identity issuance, certificate lifecycle)
+
+**The human should decide**: Cilium mTLS from day one (Option A) or phased NetworkPolicies+PSK first (Option B, recommended).
+
+---
 
 ## 5. Architecture Overview
 
-Based on the resolved decisions, the architecture will adhere to the following principles. Note that this overview is partial, pending the resolution of the escalated decisions above.
+### Agreed Technology Stack
 
--   **Technology Stacks**: The project will use a polyglot microservice architecture as defined in the PRD:
-    -   **Rust/Axum**: For high-performance REST services (Equipment Catalog, Finance, Customer Vetting).
-    -   **Go/gRPC**: For the core RMS service.
-    -   **Node.js/Elysia/Effect**: For the Social Media Engine.
-    -   **Next.js/React**: For the frontend website.
-    -   **OpenClaw**: For the Morgan AI agent.
--   **Service Architecture**: Services will be deployed as containers in a single Kubernetes cluster.
--   **Object Storage**: All services requiring object storage for images, photos, or other assets will use **Cloudflare R2** via its S3-compatible API.
--   **Third-Party Data**: The Customer Vetting service will integrate with a **paid, third-party API** for sourcing Google Reviews data.
--   **Key Patterns**:
-    -   The **sidecar pattern** is mandated for deploying the Signal-CLI dependency alongside the Morgan agent.
--   **Explicitly Ruled Out**:
-    -   Building and maintaining an in-house web scraper for Google Reviews data is not permitted.
+| Layer | Technology | Version | Decision Source |
+|-------|-----------|---------|-----------------|
+| Database | PostgreSQL via CloudNative-PG | 16 | D4 (hard constraint) |
+| Cache | Valkey via Opstree operator | 7.2 | D2 (unanimous) |
+| Object Storage | Cloudflare R2 | — | D3 (unanimous) |
+| Web Framework (Rust services) | Axum | 0.7 | PRD constraint |
+| Web Framework (Go service) | gRPC + grpc-gateway | — | PRD constraint |
+| Web Framework (Node service) | Elysia + Effect | 1.x / 3.x | PRD constraint |
+| Frontend Framework | Next.js 15, React 19 | 15 / 19 | PRD constraint |
+| UI Components | shadcn/ui (extended) + TanStack Table | — | D12, D13 (unanimous) |
+| Styling | TailwindCSS | 4 | PRD constraint |
+| Type System (frontend/Node) | Effect + TypeScript | 3.x / 5.x | PRD constraint |
+| AI Agent | OpenClaw (Morgan) | — | PRD constraint |
+| Payment Processing | Stripe (direct, `stripe-rust` crate) | — | D15 (unanimous) |
+| Signal Integration | Signal-CLI (self-hosted sidecar) | — | D9 (hard constraint) |
+| Secret Management | External Secrets Operator | — | D14 (unanimous) |
+| CDN / Hosting | Cloudflare Pages + Cloudflare Tunnel | — | PRD constraint |
+| Observability | Grafana + Loki + Prometheus | — | PRD constraint (existing stack) |
+| Access Control | RBAC (admin, operator, customer, agent) | — | D8 (unanimous) |
+| API Versioning | URI-based (`/api/v1/...`) | — | D10 (hard constraint) |
+
+### Service Architecture
+
+**Single PostgreSQL cluster** with domain-specific schemas (`rms`, `crm`, `finance`, `audit`, `public`). Cross-schema access uses **views at schema boundaries** — never raw table joins (per D6 caveat).
+
+**5 backend microservices** communicate synchronously for v1 (pending D1 human decision):
+- Equipment Catalog (Rust/Axum) — REST
+- RMS (Go/gRPC) — gRPC natively, REST via grpc-gateway
+- Finance (Rust/Axum) — REST
+- Customer Vetting (Rust/Axum) — REST
+- Social Media Engine (Node/Elysia) — REST (NATS for publish pipeline per both debaters)
+
+**Morgan AI Agent** (OpenClaw) orchestrates all workflows through a tool-server that translates MCP tool calls into backend API calls. The tool-server's protocol per backend is pending D5 human decision (recommended: native protocol per service).
+
+**Web Frontend** (Next.js 15) deployed to Cloudflare Pages with top navigation, extended shadcn/ui components, and TanStack Table for the equipment catalog.
+
+### Key Patterns
+
+- **Schema-per-domain** in a single PostgreSQL cluster with view-based boundaries
+- **URI-based API versioning** across all services
+- **RBAC with 4 roles** for all access control
+- **ESO-managed secrets** with automated rotation
+- **Sidecar pattern** for Signal-CLI alongside Morgan
+- **GitOps deployment** via ArgoCD with automatic rollbacks
+
+### Explicitly Ruled Out
+
+- **ABAC/policy engines** (OPA, Cedar) — unnecessary for <5 roles (D8)
+- **Payment gateway abstraction** — YAGNI; Stripe is the only provider (D15)
+- **Separate PostgreSQL databases per service** — single cluster with schemas is sufficient (D6)
+- **Bitnami Redis Helm chart** — Valkey operator is already deployed (D2)
+- **AWS S3** — R2 is S3-compatible with zero egress and native Cloudflare integration (D3)
+- **Trading Desk (Python)** — explicitly Phase 2 per PRD
+- **Multi-region deployment** — single cluster per PRD non-goals
+- **Custom component library from scratch** — extend shadcn/ui instead (D12)
+
+---
 
 ## 6. Implementation Constraints
 
-All implementing agents must adhere to the following hard constraints:
+### Security Requirements
 
--   **Performance Targets**:
-    -   Morgan must respond within 10 seconds for simple queries.
-    -   Equipment availability check must be < 500ms.
-    -   Invoice generation must be < 5 seconds.
--   **Operational Requirements**:
-    -   The platform must support 500+ concurrent Signal connections.
-    -   All production services must maintain 99.9% uptime.
--   **Security & Compliance**:
-    -   The platform must be GDPR compliant, supporting data export and customer deletion requests.
--   **Service Dependencies & Integration Points**:
-    -   All object storage must target the provisioned Cloudflare R2 bucket.
-    -   The Customer Vetting service must use a commercial API for Google Reviews data, not a custom scraper.
-    -   The Morgan agent's Kubernetes deployment must include Signal-CLI as a sidecar container.
+- **RBAC enforcement**: All services must implement role checks for `admin`, `operator`, `customer`, `agent` roles
+- **Service-to-service auth**: Pending D7 decision — implement whichever approach is selected (mTLS or NetworkPolicies+PSK); do not ship services without inter-service authentication
+- **Secret management**: All API keys, DB credentials, and tokens must be managed via External Secrets Operator — no static secrets in manifests. **Verify SecretStore backend is configured, not just CRDs installed** (D14 caveat)
+- **Signal-CLI state persistence**: A PVC must be provisioned for Signal-CLI registration state. Loss of persistent state means loss of the registered phone number (D9 caveat)
+- **Security scanning**: Critical/high severity issues block merge (Cipher agent in CI pipeline)
+- **GDPR compliance**: Data export and customer deletion capabilities required across all services
+
+### Performance Targets
+
+- Morgan response time: **< 10 seconds** for simple queries
+- Equipment availability check: **< 500ms** (95th percentile)
+- Invoice generation: **< 5 seconds**
+- Quote-to-invoice workflow: **< 2 minutes** end-to-end
+- Signal concurrent connections: **500+**
+
+### Operational Requirements
+
+- **99.9% uptime** for production services
+- **Minimum 80% code coverage** enforced by Tess agent in CI
+- **HA for databases and services** in production (Task 9)
+- **GitOps with ArgoCD** for deployment; automatic rollbacks on failure
+- **Observability**: All services must expose Prometheus metrics at `/metrics` and health probes at `/health/live` and `/health/ready`
+- **Cloudflare CDN**: Static assets served with < 100ms latency
+
+### Service Dependencies and Integration Points
+
+| Service | Depends On | External APIs |
+|---------|-----------|---------------|
+| Equipment Catalog | PostgreSQL, Valkey, R2 | — |
+| RMS | PostgreSQL, Valkey | Google Calendar API |
+| Finance | PostgreSQL, Valkey, Stripe | Stripe API |
+| Customer Vetting | PostgreSQL | OpenCorporates, LinkedIn, Google Reviews, Credit APIs |
+| Social Media Engine | PostgreSQL, R2 | Instagram Graph, LinkedIn, Facebook Graph, OpenAI/Claude |
+| Morgan Agent | All backend services, Signal-CLI | ElevenLabs, Twilio |
+| Website | Equipment Catalog API, Morgan (chat) | Cloudflare Pages |
+
+### Organizational Preferences
+
+- Prefer **self-hosted / in-cluster services** when available (Signal-CLI, Valkey operator, ESO, CloudNative-PG)
+- Prefer **Cloudflare ecosystem** for CDN, hosting, tunnels, and object storage
+- Prefer **existing OpenClaw observability stack** (Grafana, Loki, Prometheus)
+- Cross-schema database access through **views only** — no raw cross-schema joins
+
+---
 
 ## 7. Design Intake Summary
 
-The project includes a significant frontend component with opportunities for UI modernization.
+### Frontend Detection
 
--   **Frontend Presence**: `hasFrontend` is **true**.
--   **Frontend Targets**: The project must support both **web** (`Next.js`) and **mobile** (`Expo`) clients as specified in the PRD.
--   **Supplied Artifacts**: No design artifacts (e.g., Figma files, wireframes) were supplied.
--   **Reference URLs**: No reference URLs were supplied.
--   **Stitch Analysis**: The `stitch_status` is **generated**, indicating that the codebase was analyzed and concrete UI modernization opportunities were identified.
--   **Implications**: Frontend implementation tasks for the web (Task 7) and the future mobile app must account for both targets. The absence of design artifacts means implementing agents will rely on the specified component library (`shadcn/ui`) and their own judgment to create a clean, functional UI, pending further design deliberation.
+- **`hasFrontend`**: `true`
+- **`frontendTargets`**: `web` and `mobile`
+- The PRD specifies a Next.js 15 website (Task 8) and lists an Expo mobile client in the architecture diagram, though mobile is not detailed as a Phase 1 task
+
+### Supplied Design Artifacts
+
+- No design artifacts (mockups, Figma files, brand guidelines) were supplied in the design context
+- No reference URLs were provided for crawling
+
+### Stitch Generation Status
+
+- **Status**: `failed`
+- **Reason**: Not specified (empty reason field)
+- No Stitch-generated design candidates are available
+
+### Implications for Implementation
+
+1. **Web (Task 8)**: The frontend must be built using the resolved design system decisions:
+   - Extended shadcn/ui with custom branded components (D12)
+   - TanStack Table for equipment catalog data display (D13)
+   - Top navigation with responsive hamburger menu; contextual sidebar filters on equipment page (D11)
+   - TailwindCSS 4 for styling
+   - No visual references are available — Blaze agent should establish brand identity (color palette, typography, hero layouts) as the first sub-task of Task 8, with Mike's approval before proceeding
+
+2. **Mobile (Expo)**: Listed in architecture but not decomposed into a Phase 1 task. Implementing agents should not build mobile unless explicitly instructed. The REST API design should remain mobile-friendly (JSON, versioned endpoints).
+
+3. **Brand Identity Gap**: With no supplied design artifacts and failed Stitch generation, the web frontend lacks visual direction. **Task 8 should include an explicit design spike** to establish:
+   - Color palette appropriate for a lighting/visual production company
+   - Typography system
+   - Hero section layouts
+   - Component theme tokens for shadcn/ui customization
+
+### 7a. Selected Design Direction
+
+No design selections were provided (`design_selections` not present).
+
+### 7b. Design Deliberation Decisions
+
+No design deliberation results were provided (`design_deliberation_result` not present).
+
+---
 
 ## 8. Open Questions
 
-All initial open questions identified during task parsing were elevated to formal decision points during the deliberation session. There are no remaining non-blocking items for which implementing agents should use their own judgment. The unresolved items are now classified as **Escalated Decisions** in Section 4 and require a formal resolution before work can proceed.
+The following items were not resolved in deliberation and are not escalated — implementing agents should use their best judgment:
+
+1. **Signal-
+

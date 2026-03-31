@@ -1,15 +1,10 @@
-Implement subtask 2001: Project scaffold with Cargo.toml, app state, and configuration
+Implement subtask 2001: Initialize Rust Axum project scaffold with PostgreSQL client
 
 ## Objective
-Initialize the Rust project with all dependencies, create the application state struct, configuration loading from environment variables, and the main entrypoint with Axum server setup, structured logging, and graceful shutdown.
+Create the Rust workspace and Axum 0.7 application skeleton with PostgreSQL connection pool (sqlx or deadpool-postgres) configured from the infra ConfigMap environment variables. Set up the project structure with layered architecture (handlers, services, repositories, models).
 
 ## Steps
-1. Run `cargo init notifycore` and configure Cargo.toml with all dependencies: axum 0.7, tokio 1 (full features), sqlx 0.7 (postgres, runtime-tokio, tls-rustls, migrate), serde 1 + serde_json, uuid (v4, serde), chrono (serde), tracing 0.1, tracing-subscriber (json, env-filter), redis 0.25 (as optional feature behind `cache` flag), tower-http (trace, cors).
-2. Create `src/config.rs` — read `DATABASE_URL` (required), `REDIS_URL` (optional), `PORT` (default 8080), `RUST_LOG` (default info) from env vars.
-3. Create `src/state.rs` — `AppState` struct holding `PgPool` and `Option<redis::Client>`. Implement constructor that creates the PgPool, optionally connects to Redis (failing silently), and runs sqlx migrations.
-4. Create `src/main.rs` — initialize tracing_subscriber with JSON formatter and env filter from RUST_LOG. Build `AppState`, construct Axum Router (placeholder routes), bind to `0.0.0.0:{PORT}`, add `with_graceful_shutdown` using `tokio::signal::ctrl_c()`.
-5. Add tower-http TraceLayer and CorsLayer to the router.
-6. Ensure `cargo build` compiles successfully.
+1. Run `cargo init equipment-catalog` and add dependencies: axum 0.7, tokio, serde, serde_json, sqlx (with postgres and runtime-tokio features), dotenvy, tracing, tracing-subscriber. 2. Create module structure: src/{main.rs, config.rs, routes/, handlers/, services/, repositories/, models/, errors.rs}. 3. In config.rs, read DATABASE_URL from environment (injected via `envFrom` referencing the infra ConfigMap). 4. Initialize sqlx::PgPool in main.rs and pass it via Axum state (Arc or Extension). 5. Configure tracing subscriber for structured JSON logging. 6. Set up a basic Axum router with a placeholder root route returning 200. 7. Add a Dockerfile with multi-stage build (rust:1.75-slim for build, debian:bookworm-slim for runtime). 8. Verify the app starts, connects to PostgreSQL, and responds on the root route.
 
 ## Validation
-`cargo build` compiles without errors. `cargo clippy -- -D warnings` passes. The binary starts and binds to the configured port when DATABASE_URL is provided (will fail healthily if no DB is available).
+Application compiles without errors. `cargo run` starts the server and successfully creates a PgPool connection. A GET to / returns HTTP 200. Docker image builds successfully.

@@ -1,25 +1,10 @@
-Implement subtask 2007: Unit tests for validation logic, enum serialization, and pagination math
+Implement subtask 2007: Implement machine-readable agent API endpoints (equipment-api/catalog and checkout)
 
 ## Objective
-Write unit tests within src/ modules covering validation logic, enum serialization/deserialization to lowercase JSON, and pagination offset calculation.
+Build the agent-facing API endpoints at /api/v1/equipment-api/catalog and /api/v1/equipment-api/checkout designed for Morgan and other AI agents to consume programmatically.
 
 ## Steps
-1. In `src/models.rs` (or a `#[cfg(test)]` module):
-   - Test `Channel` enum serializes to lowercase: `serde_json::to_string(&Channel::Email)` == `"email"`.
-   - Test `Priority` enum: all variants serialize correctly.
-   - Test `NotificationStatus` enum: all variants serialize correctly.
-   - Test deserialization of `CreateNotificationRequest` from valid JSON.
-   - Test deserialization rejects unknown channel values.
-2. In `src/handlers.rs` (or separate test module):
-   - Test pagination offset calculation: page=1, per_page=20 → offset=0. page=3, per_page=10 → offset=20.
-   - Test per_page clamping: per_page=200 → clamped to 100. per_page=0 → default to 20 (or minimum 1).
-   - Test page minimum: page=0 → clamped to 1.
-3. In `src/errors.rs`:
-   - Test `AppError::NotFound` produces StatusCode 404.
-   - Test `AppError::Validation` produces StatusCode 422.
-   - Test `AppError::Conflict` produces StatusCode 409.
-   - Test error JSON body shape is `{"error": "message"}`.
-4. Aim for at least 6 unit test cases across these modules.
+1. Create src/handlers/agent_api_handlers.rs. 2. GET /api/v1/equipment-api/catalog: Return a structured, machine-optimized catalog response. Include all products grouped by category with flattened fields optimized for LLM consumption: { categories: [{ id, name, products: [{ id, sku, name, daily_rate, weekly_rate, monthly_rate, available_quantity, image_url }] }] }. Support query params: category (filter by category slug), available_only (boolean, default true), format (compact|full, default compact). 3. POST /api/v1/equipment-api/checkout: Accept a checkout intent payload: { items: [{ product_id, quantity, rental_start, rental_end }], customer_id?: string }. Validate: all product_ids exist, quantities are available, rental dates are valid (start < end, start >= today). Return a checkout summary with line items, subtotals, estimated total, and a reservation_token (UUID stored in Redis with 15min TTL). Do NOT actually process payment—this is a reservation/quote endpoint. 4. Add appropriate error responses for validation failures with field-level error details. 5. Register routes under /api/v1/equipment-api prefix.
 
 ## Validation
-`cargo test --lib` passes all unit tests. Tests cover: enum serialization (3 enum types × at least 1 variant each), pagination math (offset calculation, per_page clamping, page minimum), error response codes and body shapes. Minimum 6 passing unit test functions.
+GET /api/v1/equipment-api/catalog returns all products grouped by category in the expected machine-readable format. POST /api/v1/equipment-api/checkout with valid items returns 200 with reservation summary and token. POST with invalid product_id returns 400 with specific error. POST with quantity exceeding availability returns 409 conflict. Reservation token is stored in Redis with correct TTL.

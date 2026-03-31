@@ -1,21 +1,23 @@
-Implement subtask 3007: Create values-prod.yaml consolidating all production settings
+Implement subtask 3007: Implement OpportunityService gRPC handlers with quote-to-project conversion
 
 ## Objective
-Create the consolidated values-prod.yaml file integrating all HA, security, and scaling settings while ensuring values-dev.yaml remains unchanged.
+Implement the OpportunityService gRPC server including CRUD operations and the ConvertOpportunityToProject RPC that transitions an opportunity into a project (the core quote-to-project workflow).
 
 ## Steps
-1. Create/finalize `infra/notifycore/values-prod.yaml` with all production settings:
-   - postgres.instances: 3, postgres.minSyncReplicas: 1, postgres.backup: (configured)
-   - redis.architecture: replication, redis.sentinel.enabled: true, redis.replica.replicaCount: 2
-   - ingress.enabled: true, domain: example.com (placeholder)
-   - networkPolicies.enabled: true, networkPolicies.ingressNamespace: ingress-nginx
-   - hpa.enabled: true, hpa.minReplicas: 2, hpa.maxReplicas: 10, hpa.targetCPU: 70
-   - resourceQuota.enabled: true
-   - secretManagement.provider: none (placeholder)
-2. Verify `values-dev.yaml` is unchanged from task 1 output (single-replica, no HA, no ingress, no network policies, no HPA, no resource quota).
-3. Run `helm template infra/notifycore -f infra/notifycore/values-prod.yaml` and verify all expected resources are rendered.
-4. Run `helm template infra/notifycore -f infra/notifycore/values-dev.yaml` and verify only dev resources are rendered.
-5. Run `kubectl apply --dry-run=server` against a test cluster API for both value sets.
+1. Create `/internal/service/opportunity_service.go` implementing the generated OpportunityServiceServer interface.
+2. Implement CreateOpportunity: validate input, insert into `opportunities` table, return created record.
+3. Implement GetOpportunity: query by ID, return 404 if not found.
+4. Implement ListOpportunities: support pagination (page_size, page_token), optional status filtering.
+5. Implement UpdateOpportunity: field-mask-based updates, validate status transitions.
+6. Implement ConvertOpportunityToProject:
+   - Validate opportunity exists and is in WON status.
+   - Begin database transaction.
+   - Create a new project record linked to the opportunity.
+   - Update opportunity status to indicate conversion.
+   - Commit transaction.
+   - Return the newly created project.
+7. Create `/internal/repository/opportunity_repo.go` with data access methods using pgxpool.
+8. Register the service with the gRPC server in main.go.
 
 ## Validation
-`helm template` with values-prod.yaml renders all expected resources: 3-replica PG cluster, Redis sentinel, Ingress with TLS, 5 NetworkPolicies, HPA, ResourceQuota, ServiceAccount, PDBs. `helm template` with values-dev.yaml renders only basic resources (1-replica PG, standalone Redis, ConfigMap, no ingress/netpol/HPA/quota). `kubectl apply --dry-run=server` succeeds for both value sets.
+Unit tests for each RPC method using a mock repository. Integration test: create an opportunity, update it to WON status, convert to project — verify project is created and opportunity is updated. ConvertOpportunityToProject on a non-WON opportunity returns an appropriate error.

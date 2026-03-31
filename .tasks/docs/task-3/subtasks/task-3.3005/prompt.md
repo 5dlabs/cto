@@ -1,27 +1,15 @@
-Implement subtask 3005: Configure HPA, RBAC ServiceAccount, and ResourceQuota
+Implement subtask 3005: Define protobuf schemas for InventoryService
 
 ## Objective
-Create the HorizontalPodAutoscaler (min 2, max 10, 70% CPU), a minimal ServiceAccount with no cluster-wide roles, and a namespace-level ResourceQuota.
+Write .proto file for InventoryService including barcode lookup, availability checking, and inventory CRUD operations with grpc-gateway annotations.
 
 ## Steps
-1. Create `infra/notifycore/templates/hpa.yaml`:
-   - HorizontalPodAutoscaler targeting notifycore Deployment.
-   - spec.minReplicas: 2, spec.maxReplicas: 10.
-   - spec.metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}].
-   - Conditionally render when `hpa.enabled: true`.
-2. Create `infra/notifycore/templates/serviceaccount.yaml`:
-   - ServiceAccount `notifycore-sa` in notifycore namespace.
-   - `automountServiceAccountToken: false` (no need for K8s API access).
-3. Update the Deployment template to use `serviceAccountName: notifycore-sa`.
-4. Create `infra/notifycore/templates/resource-quota.yaml`:
-   - ResourceQuota in notifycore namespace.
-   - spec.hard: requests.cpu: "2", requests.memory: "1Gi", limits.cpu: "4", limits.memory: "2Gi".
-   - Conditionally render when `resourceQuota.enabled: true`.
-5. Create `infra/notifycore/templates/app-pdb.yaml`:
-   - PodDisruptionBudget for the notifycore app Deployment.
-   - maxUnavailable: 1.
-6. In `values-prod.yaml`: hpa.enabled: true, resourceQuota.enabled: true.
-7. In `values-dev.yaml`: hpa.enabled: false, resourceQuota.enabled: false.
+1. Create `proto/rms/v1/inventory.proto`:
+   - Messages: InventoryItem, CreateInventoryItemRequest/Response, GetInventoryItemRequest/Response, ListInventoryItemsRequest/Response, UpdateInventoryItemRequest/Response, LookupByBarcodeRequest/Response, CheckAvailabilityRequest/Response, BookItemRequest/Response, ReturnItemRequest/Response
+   - Enums: InventoryStatus (AVAILABLE, RENTED, MAINTENANCE, RETIRED), ItemCategory
+   - RPCs: CreateInventoryItem, GetInventoryItem, ListInventoryItems, UpdateInventoryItem, LookupByBarcode, CheckAvailability, BookItem, ReturnItem
+   - HTTP annotations: POST /api/v1/inventory, GET /api/v1/inventory/{id}, GET /api/v1/inventory/barcode/{barcode}, POST /api/v1/inventory/{id}/book, POST /api/v1/inventory/{id}/return
+2. Run `make proto-gen` and verify generated Go code compiles.
 
 ## Validation
-`helm template` with values-prod.yaml renders: HPA with min=2/max=10/cpu=70%, ServiceAccount named notifycore-sa, ResourceQuota with specified limits, and app PDB with maxUnavailable=1. Deployment references serviceAccountName: notifycore-sa. `values-dev.yaml` does not render HPA or ResourceQuota but does render the ServiceAccount.
+Proto file compiles without errors. Generated Go code compiles. All RPCs have correct HTTP annotations. Barcode lookup and availability check messages include all necessary fields.

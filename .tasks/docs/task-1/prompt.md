@@ -1,7 +1,7 @@
-Implement task 1: Dev Infrastructure Bootstrap (Bolt - Kubernetes/Helm)
+Implement task 1: Provision Core Infrastructure (Bolt - Kubernetes/Helm)
 
 ## Goal
-Provision the development infrastructure for NotifyCore: a single-replica PostgreSQL instance via CloudNativePG and a single-replica Redis instance, along with namespace, secrets, and a notifycore-infra-endpoints ConfigMap aggregating DATABASE_URL and REDIS_URL for downstream services.
+Set up all foundational infrastructure for Sigma-1, including PostgreSQL, Redis/Valkey, S3/R2, Signal-CLI, and required ConfigMaps for service connection strings. This enables all backend and frontend services to connect to their dependencies.
 
 ## Task Context
 - Agent owner: bolt
@@ -10,26 +10,20 @@ Provision the development infrastructure for NotifyCore: a single-replica Postgr
 - Dependencies: None
 
 ## Implementation Plan
-1. Create a dedicated `notifycore` namespace.
-2. Deploy a CloudNativePG `Cluster` CR named `notifycore-pg` with a single replica, a database `notifycore`, and a user `notifycore_app`. Store generated credentials in a Secret `notifycore-pg-app`.
-3. Deploy a single-replica Redis instance (Bitnami Helm chart or Redis Operator CR) named `notifycore-redis` with `requirepass` stored in Secret `notifycore-redis-auth`.
-4. Create ConfigMap `notifycore-infra-endpoints` with keys:
-   - `DATABASE_URL`: `postgres://notifycore_app:<password>@notifycore-pg-rw.notifycore.svc:5432/notifycore`
-   - `REDIS_URL`: `redis://:<password>@notifycore-redis-master.notifycore.svc:6379`
-   - `PORT`: `8080`
-   - `RUST_LOG`: `info`
-5. Validate all pods reach Ready state and connectivity via a Helm test or Job that runs `pg_isready` and `redis-cli PING`.
-6. Output a Helm chart under `infra/notifycore/` with `values-dev.yaml` for single-replica sizing.
+{"steps": ["Create Kubernetes namespaces: databases, sigma1, openclaw, social, web, etc.", "Deploy CloudNative-PG PostgreSQL cluster (single instance, 50Gi, schemas: rms, crm, finance, audit, public)", "Deploy Redis/Valkey using Opstree operator (single instance)", "Provision S3/R2 bucket for object storage (product images, event photos)", "Deploy Signal-CLI as a sidecar or separate pod for Morgan agent integration", "Create ConfigMap 'sigma1-infra-endpoints' aggregating connection strings for all services (POSTGRES_URL, REDIS_URL, S3_URL, SIGNALCLI_URL, etc.)", "Provision secrets for API keys (Stripe, OpenCorporates, LinkedIn, Google, etc.)", "Document all endpoints and secret references for downstream services"]}
 
 ## Acceptance Criteria
-1. `kubectl get pods -n notifycore` shows notifycore-pg and notifycore-redis pods in Running/Ready state within 120s. 2. A test Job in the namespace successfully connects to PostgreSQL (`SELECT 1` returns 1) using DATABASE_URL from the ConfigMap. 3. The same Job connects to Redis (`PING` returns `PONG`) using REDIS_URL from the ConfigMap. 4. ConfigMap `notifycore-infra-endpoints` exists and contains all four keys (DATABASE_URL, REDIS_URL, PORT, RUST_LOG) with non-empty values.
+Verify all pods (PostgreSQL, Redis, S3/R2, Signal-CLI) are running and healthy. Confirm ConfigMap 'sigma1-infra-endpoints' is present and contains valid connection strings. All secrets are accessible by service accounts.
 
 ## Subtasks
-- Create notifycore namespace and Helm chart scaffold: Create the `notifycore` Kubernetes namespace and initialize the Helm chart directory structure under `infra/notifycore/` with Chart.yaml, values-dev.yaml, and templates directory.
-- Deploy CloudNativePG Cluster CR for PostgreSQL: Create the CloudNativePG `Cluster` CR named `notifycore-pg` with a single replica, database `notifycore`, user `notifycore_app`, and credentials stored in Secret `notifycore-pg-app`.
-- Deploy single-replica Redis instance via Bitnami Helm chart: Deploy a single-replica Redis instance named `notifycore-redis` using the Bitnami Helm chart as a subchart dependency, with `requirepass` stored in Secret `notifycore-redis-auth`.
-- Create notifycore-infra-endpoints ConfigMap: Create the `notifycore-infra-endpoints` ConfigMap aggregating DATABASE_URL, REDIS_URL, PORT, and RUST_LOG, dynamically referencing credentials from the PostgreSQL and Redis secrets.
-- Create validation Job/Helm test for infrastructure connectivity: Create a Helm test Job that validates PostgreSQL and Redis connectivity using the ConfigMap-provided DATABASE_URL and REDIS_URL, confirming the infrastructure is fully operational.
+- Create Kubernetes namespaces for Sigma-1 platform: Create all required Kubernetes namespaces that will host the various infrastructure components and application services: databases, sigma1, openclaw, social, web. Apply standard labels and annotations for organizational tracking.
+- Deploy CloudNative-PG PostgreSQL cluster with multi-schema setup: Deploy a single-instance CloudNative-PG PostgreSQL cluster in the databases namespace with 50Gi storage. Configure the database with five schemas: rms, crm, finance, audit, and public. Create appropriate roles and grant schema-level permissions.
+- Deploy Redis/Valkey instance via Opstree operator: Deploy a single-instance Redis/Valkey cache using the Opstree Redis operator in the databases namespace. Configure it for session storage, caching, and rate limiting use cases across Sigma-1 services.
+- Provision S3/R2 object storage bucket and access credentials: Create an S3-compatible object storage bucket (Cloudflare R2 or AWS S3 based on decision point dp-3) for product images, event photos, and other binary assets. Generate access keys and store them as Kubernetes secrets.
+- Deploy Signal-CLI as a standalone pod for Morgan agent integration: Deploy Signal-CLI as a standalone Deployment in the sigma1 namespace to enable the Morgan AI agent to send and receive Signal messages. Expose it via an internal ClusterIP service with a REST/JSON-RPC interface.
+- Provision Kubernetes Secrets for external API keys: Create Kubernetes Secrets for all third-party API keys required by Sigma-1 services: Stripe, OpenCorporates, LinkedIn, Google APIs, and any other external integrations. Use a consistent naming convention and namespace placement.
+- Create sigma1-infra-endpoints ConfigMap aggregating all connection strings: Create the central ConfigMap 'sigma1-infra-endpoints' in the sigma1 namespace that aggregates connection strings and endpoint URLs for all provisioned infrastructure (PostgreSQL, Redis, S3, Signal-CLI). All downstream services will reference this ConfigMap via envFrom.
+- Validate full infrastructure stack end-to-end: Run a comprehensive validation of all provisioned infrastructure components to ensure they are healthy, interconnected, and ready for downstream service deployment. Verify cross-namespace access patterns and document the final state.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

@@ -1,24 +1,16 @@
-Implement subtask 3008: Define CI/CD pipeline with lint, test, build, and deploy stages
+Implement subtask 3008: Implement ProjectService gRPC handlers
 
 ## Objective
-Create a GitHub Actions (or equivalent) CI/CD pipeline definition with PR checks (fmt, clippy, test, sqlx prepare check), Docker build+push on merge, Helm deploy to staging, and manual approval for production.
+Implement the ProjectService gRPC server with CRUD operations for projects, including status management and querying by opportunity linkage.
 
 ## Steps
-1. Create `.github/workflows/ci.yaml` for PR checks:
-   - Trigger: on pull_request to main.
-   - Jobs:
-     a. **lint**: `cargo fmt --check`, `cargo clippy -- -D warnings`.
-     b. **test**: Start Postgres service container, set DATABASE_URL, `cargo sqlx prepare --check`, `cargo test`.
-     c. **docker-lint**: `hadolint Dockerfile` (optional but recommended).
-2. Create `.github/workflows/cd.yaml` for deployment:
-   - Trigger: on push to main (after PR merge).
-   - Jobs:
-     a. **build**: Docker build with multi-stage Dockerfile, tag with git SHA and `latest`, push to container registry (parameterized via secrets: REGISTRY_URL, REGISTRY_USER, REGISTRY_PASSWORD).
-     b. **deploy-staging**: Depends on build. Run `helm upgrade --install notifycore infra/notifycore -f values-dev.yaml --set image.tag=$SHA -n notifycore-staging`. Wait for rollout.
-     c. **deploy-production**: Depends on deploy-staging. Uses `environment: production` for manual approval gate. Run `helm upgrade --install notifycore infra/notifycore -f values-prod.yaml --set image.tag=$SHA -n notifycore`.
-3. Include sqlx offline mode: ensure `cargo sqlx prepare --check` step validates that `.sqlx/` query cache is up to date.
-4. Add caching for Cargo registry and target directory to speed up CI.
-5. Set appropriate timeouts (build: 15min, deploy: 10min).
+1. Create `/internal/service/project_service.go` implementing the generated ProjectServiceServer interface.
+2. Implement CreateProject: validate input, insert into `projects` table.
+3. Implement GetProject: query by ID with related opportunity info, return 404 if not found.
+4. Implement ListProjects: support pagination, status filtering, date range filtering.
+5. Implement UpdateProject: field-mask-based updates, validate status transitions (PENDING→ACTIVE→COMPLETED, PENDING→CANCELLED, ACTIVE→CANCELLED).
+6. Create `/internal/repository/project_repo.go` with data access methods.
+7. Register the service with the gRPC server in main.go.
 
 ## Validation
-CI pipeline file `.github/workflows/ci.yaml` exists and contains jobs for fmt check, clippy, sqlx prepare check, and cargo test. CD pipeline file `.github/workflows/cd.yaml` exists and contains build, deploy-staging, and deploy-production jobs. Production deploy job uses `environment: production` for manual approval. Pipeline YAML is valid (can be validated with actionlint or similar tool). sqlx prepare check step is present in the test job.
+Unit tests for each RPC method. Integration test: create project, update status through valid transitions, verify invalid transitions are rejected. List with filters returns correct subsets.

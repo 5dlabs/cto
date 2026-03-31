@@ -1,22 +1,10 @@
-Implement subtask 2006: Implement health check endpoint and optional Redis caching layer
+Implement subtask 2006: Implement core catalog REST endpoints (categories, products, availability)
 
 ## Objective
-Implement the GET /health endpoint with database connectivity check, and the optional Redis caching layer for GET by ID with silent fallthrough on Redis failure.
+Build Axum route handlers for the public-facing catalog API: category listing, product listing with pagination/filtering, product detail, and product availability check.
 
 ## Steps
-1. **GET /health**:
-   - Query `sqlx::query("SELECT 1").fetch_one(&pool).await`.
-   - If successful, return `(StatusCode::OK, Json({"status": "healthy", "database": "connected"}))`.
-   - If failed, return `(StatusCode::SERVICE_UNAVAILABLE, Json({"status": "degraded", "database": "disconnected"}))`.
-   - Register route: `.route("/health", get(health_check))`.
-2. **Redis caching** (behind `cache` feature flag or always compiled with optional runtime behavior):
-   - Create `src/cache.rs` module.
-   - On GET /api/v1/notifications/:id: before DB query, attempt `redis.get("notification:{id}")`. If hit, deserialize and return. If miss or error, proceed to DB. On DB hit, attempt `redis.set_ex("notification:{id}", serialized, 300)` (5 min TTL). Catch and log any Redis errors, never propagate.
-   - On POST (create): no cache action needed (new ID).
-   - On DELETE (cancel): invalidate `redis.del("notification:{id}")`. Catch errors silently.
-   - If `AppState.redis` is `None`, skip all cache operations.
-3. Update the GET by ID handler in 2004 to call through the cache layer.
-4. Ensure all Redis failures are logged at `warn` level but never affect HTTP responses.
+1. Create src/handlers/catalog_handlers.rs. 2. GET /api/v1/catalog/categories: Return all active categories with id, name, slug, description, image_url, product_count. Support ?include_inactive=true query param. 3. GET /api/v1/catalog/products: Return paginated product list. Query params: page (default 1), per_page (default 20, max 100), category_id, search, min_rate, max_rate, sort_by (name, daily_rate, created_at), sort_order (asc, desc). Response includes items array and pagination metadata (total, page, per_page, total_pages). 4. GET /api/v1/catalog/products/:id: Return full product detail including specifications JSONB, all rate tiers, category info, and current availability. Return 404 with structured error if not found. 5. GET /api/v1/catalog/products/:id/availability: Return availability for a specific product with total_quantity, available_quantity, reserved_quantity, last_checked_at. 6. Define consistent JSON response envelope: { data: T, meta?: PaginationMeta }. 7. Define consistent error response: { error: { code: string, message: string, details?: any } }. 8. Register all routes under a Router::new() with /api/v1/catalog prefix. 9. Wire up the service layer between handlers and repositories for any business logic (e.g., enriching product responses with image URLs).
 
 ## Validation
-Health check returns 200 with `{"status": "healthy", "database": "connected"}` when DB is reachable. Health check returns 503 when DB is unreachable (test by using invalid DATABASE_URL). Redis cache: with Redis available, second GET by ID is served from cache (verify via Redis GET command). With Redis unavailable, GET by ID still returns correct data from Postgres (no error in HTTP response, warning in logs).
+Integration tests: GET /api/v1/catalog/categories returns 200 with 24 categories. GET /api/v1/catalog/products returns 200 with paginated results (default 20 per page). GET /api/v1/catalog/products/:id returns 200 with full product detail or 404 for unknown ID. GET /api/v1/catalog/products/:id/availability returns correct availability data. All responses match the defined JSON envelope structure.
