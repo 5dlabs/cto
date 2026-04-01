@@ -326,7 +326,7 @@ async fn test_intake_issue_creation_flow() {
 
     info!("📋 Creating task issues...");
     let result =
-        create_task_issues_with_project(&client, &request, &tasks, project_id.as_deref()).await;
+        create_task_issues_with_project(&client, &request, &tasks, project_id.as_deref(), None).await;
 
     match result {
         Ok(task_map) => {

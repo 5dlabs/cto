@@ -1441,6 +1441,72 @@ pub async fn submit_intake_workflow(
     })
 }
 
+/// Resolve agent hints to Linear user IDs for delegate assignment.
+///
+/// For each unique agent hint in the task list, search Linear's workspace users
+/// for a matching agent app (e.g., "rex" → "5DLabs-Rex"). Returns a map of
+/// lowercase agent name → Linear user ID.
+///
+/// This follows the same pattern used for Morgan auto-assignment in `handle_intake_setup`.
+pub async fn resolve_agent_delegates(
+    client: &LinearClient,
+    tasks: &[IntakeTask],
+) -> HashMap<String, String> {
+    let mut delegate_map: HashMap<String, String> = HashMap::new();
+
+    // Collect unique agent hints
+    let unique_agents: std::collections::HashSet<String> = tasks
+        .iter()
+        .filter(|t| !t.agent_hint.is_empty())
+        .map(|t| t.agent_hint.to_lowercase())
+        .collect();
+
+    for agent_name in &unique_agents {
+        match client.search_users_by_name(agent_name).await {
+            Ok(users) => {
+                // Match by name pattern: "5DLabs-{Agent}" or "{Agent}" (case-insensitive)
+                let expected_full = format!("5dlabs-{agent_name}");
+                let found = users.iter().find(|u| {
+                    let lower = u.name.to_lowercase();
+                    lower == expected_full
+                        || lower == *agent_name
+                        || lower.contains(agent_name)
+                });
+                if let Some(user) = found {
+                    info!(
+                        agent = %agent_name,
+                        linear_user_id = %user.id,
+                        linear_user_name = %user.name,
+                        "Resolved agent delegate"
+                    );
+                    delegate_map.insert(agent_name.clone(), user.id.clone());
+                } else {
+                    warn!(
+                        agent = %agent_name,
+                        candidates = ?users.iter().map(|u| &u.name).collect::<Vec<_>>(),
+                        "Agent not found in Linear workspace users"
+                    );
+                }
+            }
+            Err(e) => {
+                warn!(
+                    agent = %agent_name,
+                    error = %e,
+                    "Failed to search Linear users for agent delegate"
+                );
+            }
+        }
+    }
+
+    info!(
+        resolved = delegate_map.len(),
+        total = unique_agents.len(),
+        "Agent delegate resolution complete"
+    );
+
+    delegate_map
+}
+
 /// Create Linear issues from intake tasks.
 ///
 /// This function creates sub-issues under the PRD issue for each generated task.
@@ -1449,16 +1515,20 @@ pub async fn create_task_issues(
     request: &IntakeRequest,
     tasks: &[IntakeTask],
 ) -> Result<HashMap<String, String>> {
-    create_task_issues_with_project(client, request, tasks, None).await
+    create_task_issues_with_project(client, request, tasks, None, None).await
 }
 
 /// Create Linear issues for generated tasks, optionally linked to a project.
+///
+/// If `agent_delegates` is provided, agents are auto-assigned as delegates on their issues.
+/// If not provided, issues are created without delegates (legacy behavior).
 #[allow(clippy::too_many_lines)] // Complex function not easily split
 pub async fn create_task_issues_with_project(
     client: &LinearClient,
     request: &IntakeRequest,
     tasks: &[IntakeTask],
     project_id: Option<&str>,
+    agent_delegates: Option<&HashMap<String, String>>,
 ) -> Result<HashMap<String, String>> {
     let mut task_issue_map: HashMap<String, String> = HashMap::new();
 
@@ -1520,21 +1590,26 @@ pub async fn create_task_issues_with_project(
         // Format task description with details.
         let description = format_task_description(task);
 
-        let mut label_ids = vec![play_task_label.id.clone()];
+        // Resolve delegate_id from agent hint if agent_delegates map is available.
+        let delegate_id = agent_delegates
+            .and_then(|m| m.get(&task.agent_hint.to_lowercase()))
+            .cloned();
 
-        // All new tasks start as pending - delegate assignment happens when Play workflow starts
-        label_ids.push(agent_pending_label.id.clone());
+        // Determine appropriate labels based on whether agent is assigned
+        let mut label_ids = vec![play_task_label.id.clone()];
+        if delegate_id.is_none() {
+            // Only mark as pending if no agent was resolved
+            label_ids.push(agent_pending_label.id.clone());
+        }
 
         if let Some(label) = priority_label {
             label_ids.push(label.id);
         }
 
+        let has_delegate = delegate_id.is_some();
+
         // Create as standalone issue linked to project (not as sub-issue of PRD).
         // This enables proper board view in Linear with workflow state columns.
-        //
-        // Note: Delegate assignment happens when the Play workflow starts each task.
-        // The PM service looks up the agent's Linear user ID and updates the issue.
-        // The agent_hint is stored in the task description for reference.
         let input = IssueCreateInput {
             team_id: request.team_id.clone(),
             title: format!("Task {}: {}", task.id, task.title),
@@ -1544,7 +1619,7 @@ pub async fn create_task_issues_with_project(
             label_ids: Some(label_ids),
             project_id: project_id.map(String::from),
             state_id: Some(initial_state.id.clone()),
-            delegate_id: None, // Set by PM service when task starts
+            delegate_id,
         };
 
         match client.create_issue(input).await {
@@ -1552,6 +1627,8 @@ pub async fn create_task_issues_with_project(
                 info!(
                     task_id = %task.id,
                     issue_identifier = %issue.identifier,
+                    agent_hint = %task.agent_hint,
+                    delegated = has_delegate,
                     "Created task issue"
                 );
                 task_issue_map.insert(task.id.clone(), issue.id);

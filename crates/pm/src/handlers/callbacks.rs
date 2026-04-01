@@ -11,10 +11,11 @@ use tracing::{debug, error, info, warn};
 
 use super::intake::{
     create_intake_project, create_project_cto_config_document, create_task_issues_with_project,
-    generate_completion_summary, IntakeRequest, IntakeTask, TasksJson, TechStack,
+    generate_completion_summary, resolve_agent_delegates, IntakeRequest, IntakeTask, TasksJson,
+    TechStack,
 };
 use crate::activities::PlanStep;
-use crate::config::CtoConfig;
+use crate::config::{CtoConfig, MorganDispatchConfig};
 use crate::models::AgentStatus;
 use crate::LinearClient;
 
@@ -75,6 +76,8 @@ pub struct CallbackState {
     pub github_webhook_secret: Option<String>,
     /// GitLab webhook secret for `X-Gitlab-Token` verification.
     pub gitlab_webhook_secret: Option<String>,
+    /// Morgan/OpenClaw webhook dispatch settings.
+    pub morgan_dispatch: MorganDispatchConfig,
 }
 
 /// Handle intake workflow completion callback.
@@ -292,9 +295,17 @@ pub async fn handle_intake_complete(
         warn!(error = %e, "Failed to emit thought activity");
     }
 
+    // Resolve agent delegates before creating issues
+    let agent_delegates = resolve_agent_delegates(client, &payload.tasks).await;
+    let delegates_ref = if agent_delegates.is_empty() {
+        None
+    } else {
+        Some(&agent_delegates)
+    };
+
     // Create task issues (with project if created)
     let project_id = project.as_ref().map(|p| p.id.as_str());
-    match create_task_issues_with_project(client, &request, &payload.tasks, project_id).await {
+    match create_task_issues_with_project(client, &request, &payload.tasks, project_id, delegates_ref).await {
         Ok(task_issue_map) => {
             let created_count = task_issue_map.len();
             info!(
