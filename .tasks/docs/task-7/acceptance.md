@@ -1,13 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. API lifecycle test passes: A deliberation created via POST transitions to `completed` status within 60 seconds and has at least 2 artifacts (1 current_site_screenshot + 1 variant_snapshot).
-- [ ] 2. Auth tests pass: All 3 auth scenarios (no session, wrong claim, correct claim) return expected HTTP status codes.
-- [ ] 3. Browser dashboard test passes: `/hermes` page renders deliberation cards matching the count returned by the API.
-- [ ] 4. Browser comparison test passes: Artifact comparison view renders two non-zero-dimension images side by side for a completed deliberation.
-- [ ] 5. Accessibility audit passes: axe-core reports zero critical and zero serious violations on all Hermes pages.
-- [ ] 6. CI pipeline: GitHub Actions workflow completes with exit code 0 on a staging deployment with all test suites passing; HTML report artifact is downloadable from the workflow run.
-- [ ] 7. Cross-browser: All browser tests pass in Chromium, Firefox, and WebKit without modification.
-- [ ] 8. Flakiness: Test suite achieves 100% pass rate over 3 consecutive CI runs (no flaky tests).
+- [ ] 1. Unit test: mock GitHub API; verify branch creation, blob/tree/commit sequence, and PR creation calls are made in correct order. 2. Unit test: verify scaffold file content for a sample task contains all required sections (title, agent, stack, description, details, test strategy). 3. Unit test: verify SUMMARY.md contains a markdown table with correct task count and agent assignments. 4. Unit test: mock 404 on repo access; verify error is logged and pipeline continues. 5. Integration test: run pipeline against 5dlabs/sigma-1; verify PR exists with correct branch name, file count matches task count + 1 (summary), and PR body contains run ID.
 
 ## Verification Notes
 

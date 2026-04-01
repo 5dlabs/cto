@@ -1,22 +1,19 @@
-Implement subtask 8004: Create operational runbook with LogQL queries
+Implement subtask 8004: Implement Test Case 1: Full Pipeline Completion
 
 ## Objective
-Write runbook.md covering common Hermes operational issues, resolution steps, validated LogQL queries for troubleshooting, and an escalation matrix.
+Write the E2E test that submits a sample PRD to the PM server intake endpoint, polls for pipeline completion, and asserts the pipeline reaches 'completed' status without fatal errors.
 
 ## Steps
-1. Create `docs/hermes/runbook.md` with these sections:
-   - **Common Issues and Resolutions** (table format with columns: Symptom, Cause, Resolution, Severity):
-     a. Deliberation stuck in `processing` → headless browser pod OOM or crash → check pod logs (`kubectl logs -l app=hermes-worker -n <ns> --tail=100`), restart pod, check memory limits
-     b. Artifact upload failures → MinIO unhealthy or credentials expired → check MinIO health (`mc admin info minio`), verify secret rotation status
-     c. High latency on artifact retrieval → presigned URL TTL issues or MinIO performance → check TTL config, MinIO metrics dashboard
-     d. 403 errors after deployment → RBAC claims not propagated → verify session claims, check auth service logs
-     e. E2E tests failing in CI → staging environment drift → compare deployed image tags, check ConfigMap values
-   - **LogQL Queries** (at least 3, validated):
-     a. Hermes API error logs: `{namespace="hermes", app="hermes-backend"} |= "error" | json | level="error"` — filter for errors in the last 1h
-     b. Deliberation processing duration: `{namespace="hermes", app="hermes-worker"} |= "deliberation_completed" | json | unwrap duration_ms` — histogram of processing times
-     c. Artifact upload failures: `{namespace="hermes", app="hermes-backend"} |= "upload_failed" | json | line_format "{{.deliberation_id}} {{.error}}"` — identify failing deliberations
-   - **Useful kubectl Commands**: pod status, log tailing, exec into pod, port-forward to MinIO
-   - **Escalation Matrix**: table with severity levels (P1-P4), response time, team/person, communication channel
+1. In `sigma1-e2e.test.ts`, create a `describe('Full Pipeline E2E')` block.
+2. In a `beforeAll` hook: start the Discord collector, clear its messages, then POST the sample PRD from `fixtures/sample-prd.json` to `POST ${PM_SERVER_URL}/api/pipeline/intake`. Capture the returned `runId`.
+3. Test Case 1 (`it('completes pipeline within 5 minutes')`):
+   a. Use the `poll` helper to call `GET /api/pipeline/${runId}/status` every 5 seconds.
+   b. Predicate: `response.status === 'completed'` or `response.status === 'failed'`.
+   c. Timeout: 5 minutes.
+   d. Assert `response.status === 'completed'`.
+   e. Assert `response.errors` is either absent or an empty array (no fatal errors).
+4. Store the `runId` in a module-level variable so subsequent test cases (in other subtasks) can reference it.
+5. Handle timeout gracefully: if poll times out, fail with a message including the last observed status and any partial error logs.
 
 ## Validation
-Verify runbook.md exists with all specified sections. Run at least 3 LogQL queries against Loki in the staging environment and confirm they are syntactically valid (return results or empty result set without parse errors). Verify kubectl commands use correct label selectors matching the deployed Hermes resources.
+Test passes when pipeline status reaches 'completed' within 5 minutes. On failure, the error message includes the last status and any error payload. Manually verify the test correctly times out by temporarily shortening the timeout to 10 seconds against a slow/non-existent server.

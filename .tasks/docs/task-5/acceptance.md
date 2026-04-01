@@ -1,11 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. Idempotency: Running the migration twice on the same dataset results in the same number of artifact records — no duplicates (verified by COUNT query before and after second run).
-- [ ] 2. Artifact integrity: For a sample of 10 migrated artifacts, the MD5 hash of the source file matches the MD5 hash of the object in the Hermes MinIO bucket.
-- [ ] 3. Progress logging: During migration of 100+ artifacts, Loki query `{app="hermes"} | json | migration_step="copy"` returns log entries with incrementing `migration_progress.completed` values.
-- [ ] 4. Failure handling: When MinIO is temporarily unavailable during migration, the migrator retries with backoff and resumes from the last successful artifact (verified by killing MinIO during migration, restarting it, and confirming migration completes).
-- [ ] 5. Backward compatibility: After migration completes, existing legacy artifact access paths (original URLs/API endpoints) still return the correct artifacts.
-- [ ] 6. Admin endpoint: `POST /api/hermes/admin/migrate-artifacts` without `hermes:admin` claim returns 403; with the claim, returns 202 with a migration job ID.
+- [ ] 1. Unit test: mock fetch; call notifyPipelineStart and verify POST body matches expected embed structure with correct color, title, and fields. 2. Unit test: call notifyPipelineComplete with status='success' and verify green embed; call with status='failure' and verify red embed. 3. Unit test: unset DISCORD_WEBHOOK_URL; verify no fetch call made and warning logged. 4. Unit test: mock a 429 response then 200; verify retry fires and succeeds on second attempt. 5. Integration test: trigger a real pipeline run; verify two Discord messages appear in the test channel (start and complete) with correct run ID.
 
 ## Verification Notes
 

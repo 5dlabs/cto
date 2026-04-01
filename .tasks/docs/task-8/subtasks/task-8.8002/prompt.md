@@ -1,28 +1,16 @@
-Implement subtask 8002: Create rollback procedures document
+Implement subtask 8002: Configure CI credential injection from sigma1-dev namespace secrets
 
 ## Objective
-Write rollback-procedures.md covering immediate feature flag rollback, database rollback, MinIO cleanup, trigger conditions linked to Grafana alerts, and post-rollback verification checklist.
+Set up the CI pipeline job to inject real credentials (LINEAR_API_KEY, GITHUB_TOKEN, NOUS_API_KEY, PM_SERVER_URL, DISCORD_COLLECTOR_URL) from sigma1-dev Kubernetes secrets into the E2E test runner environment.
 
 ## Steps
-1. Create `docs/hermes/rollback-procedures.md` with these sections:
-   - **Immediate Rollback (Feature Flag)**:
-     - Exact commands: `kubectl edit configmap hermes-config -n <namespace>` to set `HERMES_ENABLED=false`, or patch command
-     - ArgoCD sync command to propagate: `argocd app sync hermes-backend-staging`
-     - Expected behavior: Hermes routes return 404 within 60 seconds, no data loss
-     - Verification: `curl -s -o /dev/null -w '%{http_code}' $BASE_URL/api/hermes/deliberations` returns 404
-   - **Database Rollback**:
-     - Note: tables are additive only (per D6), so rollback = drop tables
-     - SQL commands: `DROP TABLE IF EXISTS hermes_artifacts CASCADE; DROP TABLE IF EXISTS deliberations CASCADE;`
-     - Warning about data loss implications
-     - When to use: only for full feature removal, not routine rollback
-   - **MinIO Cleanup**:
-     - `mc rb --force minio/hermes-artifacts` command
-     - Only needed for complete rollback; bucket can safely remain for feature re-enable
-   - **Rollback Trigger Conditions**:
-     - Link to Grafana dashboard from Task 6
-     - Specific alert thresholds: error rate > 5% for 5 minutes, artifact generation failure > 10%, API p99 latency > 5s
-   - **Post-Rollback Verification Checklist**:
-     - 8-10 items: API returns 404, nav item hidden, no orphaned processes, monitoring shows zero Hermes traffic, etc.
+1. In the CI config (GitHub Actions workflow or equivalent), add a new job `e2e-integration` that runs after all build/deploy jobs.
+2. Configure the job to authenticate to the sigma1-dev Kubernetes cluster.
+3. Use `kubectl get secret sigma1-dev-credentials -o jsonpath` (or a CI-native secret injection) to extract: LINEAR_API_KEY, GITHUB_TOKEN, NOUS_API_KEY, PM_SERVER_URL.
+4. Export each as an environment variable available to the test runner step.
+5. Add a step that runs `bun install` in `tests/e2e/` and then `bun test tests/e2e/` with a 10-minute job timeout.
+6. Ensure secrets are masked in CI logs.
+7. Add a manual trigger option (`workflow_dispatch`) so E2E can be run on-demand outside normal CI.
 
 ## Validation
-Verify rollback-procedures.md exists and contains all 5 sections. Execute the immediate rollback procedure in staging: patch ConfigMap to set HERMES_ENABLED=false, run ArgoCD sync, then verify `/api/hermes/deliberations` returns 404 within 120 seconds. Restore HERMES_ENABLED=true afterward.
+Trigger the CI job manually. Verify it reaches the test execution step without secret injection errors. Confirm secrets are masked in logs. Confirm the placeholder test from 8001 passes in CI.

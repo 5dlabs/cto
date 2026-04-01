@@ -1,12 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. `kubectl get namespace hermes-dev hermes-staging` returns both namespaces in Active state.
-- [ ] 2. `kubectl get clusters.postgresql.cnpg.io -n hermes-dev` shows a Ready cluster with 1 replica.
-- [ ] 3. `kubectl get configmap hermes-infra-endpoints -n hermes-dev -o jsonpath='{.data.CNPG_HERMES_URL}'` returns a valid PostgreSQL connection string.
-- [ ] 4. `kubectl exec` a test pod in `hermes-dev` that connects to PostgreSQL, Redis, NATS, and MinIO using only env vars from `hermes-infra-endpoints` ConfigMap and mounted secrets — all four connections succeed.
-- [ ] 5. MinIO bucket `hermes-artifacts-dev` exists and is writable with dedicated credentials, AND those credentials do NOT have access to any GitLab-owned buckets.
-- [ ] 6. ArgoCD UI shows `hermes-backend-dev` and `hermes-frontend-staging` Application CRs in Synced/Healthy state (initially empty).
-- [ ] 7. A structured JSON log emitted from a test pod in `hermes-dev` is queryable in Loki via LogQL within 30 seconds.
+- [ ] 1. `kubectl get namespace sigma1-dev` returns Active. 2. `kubectl get secret -n sigma1-dev` lists all four secrets. 3. `kubectl get configmap sigma1-infra-endpoints -n sigma1-dev -o json` contains all five expected keys. 4. A curl pod in the namespace can resolve PM_SERVER_URL and reach LINEAR_API_BASE with a 200/401 (auth expected). 5. Network policy audit confirms egress only to allowed CIDRs.
 
 ## Verification Notes
 

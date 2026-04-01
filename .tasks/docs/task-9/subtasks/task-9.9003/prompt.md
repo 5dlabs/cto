@@ -1,15 +1,16 @@
-Implement subtask 9003: Configure Redis HA with Sentinel mode and 3 replicas
+Implement subtask 9003: Configure HorizontalPodAutoscaler for PM server
 
 ## Objective
-Configure the Redis operator CR for production with Sentinel mode, 3 replicas, resource requests/limits, and a PodDisruptionBudget.
+Create an HPA manifest for the PM server with min 3, max 10 replicas targeting 70% average CPU utilization.
 
 ## Steps
-1. Create the production Redis CR in `hermes-production` namespace with Sentinel mode enabled and 3 replicas.
-2. Set resource requests/limits: `requests: {cpu: 250m, memory: 256Mi}`, `limits: {cpu: 500m, memory: 512Mi}` per replica.
-3. Configure Sentinel with 3 sentinel instances for quorum-based failover.
-4. Create a PodDisruptionBudget: `maxUnavailable: 1` for Redis pods.
-5. Enable persistence (AOF or RDB) for data durability.
-6. Update `hermes-infra-endpoints` ConfigMap if the Redis service name differs in production.
+1. Create `templates/pm-server-hpa.yaml` with `apiVersion: autoscaling/v2`.
+2. Set `spec.scaleTargetRef` to the PM server Deployment name.
+3. Set `spec.minReplicas: 3`, `spec.maxReplicas: 10`.
+4. Add a metric of type Resource targeting CPU with `averageUtilization: 70`.
+5. Wrap the template in a Helm conditional: `{{- if .Values.pmServer.autoscaling.enabled }}`.
+6. In `values-sigma1-prod.yaml`, set `pmServer.autoscaling.enabled: true`, `pmServer.autoscaling.minReplicas: 3`, `pmServer.autoscaling.maxReplicas: 10`, `pmServer.autoscaling.targetCPUUtilizationPercentage: 70`.
+7. Validate the rendered YAML with `helm template`.
 
 ## Validation
-Verify `kubectl get pods -n hermes-production -l app=hermes-redis` (or equivalent label) returns 3 Running Redis pods plus 3 Sentinel pods. Verify Sentinel is tracking the master: `kubectl exec` into a sentinel pod and run `redis-cli -p 26379 SENTINEL masters`. Verify PDB exists: `kubectl get pdb -n hermes-production` shows Redis PDB.
+Run `helm template . -f values-sigma1-prod.yaml` and verify the HPA manifest is rendered with minReplicas=3, maxReplicas=10, and targetCPU=70. After deploy: `kubectl get hpa -n sigma1-prod` confirms correct values.

@@ -1,21 +1,16 @@
-Implement subtask 8001: Create migration plan and rollout strategy documents
+Implement subtask 8001: Set up E2E test framework and project scaffolding
 
 ## Objective
-Write the migration-plan.md with pre-migration checklist, execution steps, duration estimates, success criteria, and failure recovery. Write rollout-strategy.md with all 4 phases, go/no-go criteria, and identified risks.
+Initialize the sigma1-e2e test project with the chosen test framework (vitest or bun:test), configure TypeScript, create the `sigma1-e2e.test.ts` entry file, and establish shared utility modules for HTTP requests, polling, and assertions.
 
 ## Steps
-1. Create `docs/hermes/migration-plan.md` with the following sections:
-   - **Pre-migration Checklist**: bullet list including infrastructure verification (MinIO bucket, database, network policies), dependency task completion status, monitoring dashboards live
-   - **Migration Execution Steps**: numbered steps for triggering artifact migration via admin API (`POST /api/hermes/admin/migrate-artifacts`), alternative CLI command, monitoring via Grafana dashboard link
-   - **Duration Estimates**: provide formula based on artifact count × avg size / throughput, with example calculations for 100, 1000, 10000 artifacts
-   - **Success Criteria**: all artifacts migrated (count match), zero SHA integrity failures, legacy access paths still functional during transition
-   - **Failure Recovery**: idempotent re-run procedure, partial failure handling, escalation contacts table
-
-2. Create `docs/hermes/rollout-strategy.md` with:
-   - Phase 1-4 table with environment, flag state, audience, and duration columns
-   - Go/no-go criteria for each phase transition (E2E pass rate ≥ 100%, error rate < 0.1%, artifact generation success rate ≥ 99%)
-   - Risk register table with 4 identified risks, impact, likelihood, and mitigation columns
-   - Sign-off section template for phase transitions
+1. Create directory `tests/e2e/` in the sigma-1 repo.
+2. Add `vitest.config.ts` (or equivalent bun:test config) with a 10-minute global timeout.
+3. Create `tests/e2e/helpers/http-client.ts` — a lightweight fetch wrapper that reads `PM_SERVER_URL` from env and provides typed `get`/`post` helpers.
+4. Create `tests/e2e/helpers/poll.ts` — a generic async poller: takes a URL, predicate function, interval (default 5s), and max timeout (default 5min); throws on timeout with last response.
+5. Create `tests/e2e/fixtures/sample-prd.json` — a minimal but realistic PRD payload that exercises all pipeline stages.
+6. Create `tests/e2e/helpers/env.ts` — reads and validates required env vars (PM_SERVER_URL, LINEAR_API_KEY, GITHUB_TOKEN, DISCORD_COLLECTOR_URL, NOUS_API_KEY optional) and exports them typed.
+7. Verify `bun test` or `vitest` can discover and run a trivial placeholder test in the new directory.
 
 ## Validation
-Verify both files exist at the specified paths. Check that migration-plan.md contains headings: 'Pre-migration Checklist', 'Migration Execution Steps', 'Duration Estimates', 'Success Criteria', 'Failure Recovery'. Check that rollout-strategy.md contains headings for all 4 phases plus 'Go/No-Go Criteria' and 'Risks'.
+Run `bun test tests/e2e/` (or vitest equivalent) and confirm the placeholder test passes. Verify all helper modules export correctly with no TypeScript errors. Confirm env.ts throws a descriptive error when required vars are missing.

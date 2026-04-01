@@ -1,17 +1,26 @@
-Implement subtask 3003: Implement variant snapshot generation pipeline
+Implement subtask 3003: Write comprehensive unit and integration tests for Hermes research integration
 
 ## Objective
-Create `src/modules/hermes/artifacts/variant-snapshot-generator.ts` — a pipeline that takes completed deliberation variants and captures each as a PNG screenshot, producing variant snapshot buffers and metadata ready for storage.
+Create test files covering all branches: API available with valid results, API key missing, timeout handling, low-relevance filtering, empty results, and artifact persistence.
 
 ## Steps
-1. Create `variant-snapshot-generator.ts` with interface: `generateVariantSnapshots(deliberationId: string, variants: Variant[]): Promise<VariantSnapshotResult[]>`.
-2. For each variant, determine how to render it for capture. Variants will need to be served or rendered as HTML — implement a temporary local HTTP server (using Bun's built-in `Bun.serve`) that serves variant HTML on a random port, then capture via the screenshot service.
-3. Call `captureScreenshot(`http://localhost:${port}/variant/${variantId}`)` from subtask 3002 for each variant.
-4. `VariantSnapshotResult`: `{ variantId: string; buffer: Buffer; metadata: CaptureMetadata; storageKey: string }` where `storageKey` follows pattern `{deliberation_id}/variants/{variant_id}.png`.
-5. Generate comparison metadata linking the current-site capture to each variant: `{ deliberationId, currentSiteKey, variantKey, variantId }`.
-6. Process variants sequentially to avoid overwhelming the browser instance (or in controlled parallel batches of 2-3 if the browser pool supports it).
-7. Clean up the temporary HTTP server after all variants are captured.
-8. Handle partial failures: if one variant capture fails, continue with remaining variants, collect errors, and report which variants succeeded/failed.
+1. Create `src/deliberation/__tests__/hermes-client.test.ts`:
+   a. Test: NOUS_API_KEY set, mock fetch returns 5 results (3 with score >= 0.5, 2 below). Assert returned array has exactly 3 items.
+   b. Test: NOUS_API_KEY not set. Assert function returns null. Assert console/logger output includes info-level skip message.
+   c. Test: Mock fetch to throw AbortError after 30s timeout. Assert function returns null and logs warning.
+   d. Test: Mock fetch to return 500 error. Assert function returns null (graceful degradation).
+   e. Test: Mock fetch returns empty array. Assert function returns empty array (not null).
+   f. Test: Mock fetch returns malformed JSON. Assert function returns null and logs error.
+2. Create `src/deliberation/__tests__/research-memo.test.ts`:
+   a. Test: Format 2 results, verify Markdown output matches expected structure with header and bullet points.
+   b. Test: Empty array input returns empty string.
+   c. Test: Verify special characters in title/summary are not corrupted in output.
+3. Create `src/deliberation/__tests__/deliberation-hermes-integration.test.ts`:
+   a. Test: Full pipeline with mocked Hermes returning results — deliberation output contains '## Hermes Research Findings'.
+   b. Test: Full pipeline with NOUS_API_KEY unset — deliberation output does NOT contain '## Hermes Research Findings' and no errors thrown.
+   c. Test: Verify `hermes-raw-response.json` is written to a temp artifacts directory.
+   d. Test: Verify artifacts directory is created if it doesn't exist.
+4. Use Bun's built-in test runner (`bun:test`). Mock `fetch` using `mock()` from `bun:test` or a helper that replaces `globalThis.fetch`.
 
 ## Validation
-Unit test with mocked screenshot service: provide 3 mock variants, verify `captureScreenshot` is called 3 times with correct localhost URLs, and 3 `VariantSnapshotResult` objects are returned with correct storage key patterns. Integration test: create a simple HTML variant, serve it via the temp server, capture it, verify the resulting buffer is a valid PNG. Partial failure test: mock one variant capture to throw, verify the other variants still produce results and the error is collected.
+Run `bun test` on all three test files. All tests must pass. Verify coverage of: happy path, missing API key, timeout, HTTP error, malformed response, empty results, relevance filtering threshold, memo formatting, artifact file creation, and directory creation.

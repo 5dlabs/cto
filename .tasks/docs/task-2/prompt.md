@@ -1,7 +1,7 @@
-Implement task 2: Implement Hermes Deliberation Path API (Nova - Bun/Elysia)
+Implement task 2: Extend PM Server for Agent Delegation in Linear Issues (Nova - Bun/Elysia)
 
 ## Goal
-Build the Hermes deliberation path as an internal module within the existing Bun/Elysia service, exposing RESTful endpoints for triggering deliberation, querying deliberation status, and retrieving results. This module forms the core of the intake pipeline validation.
+Update the PM server's issue creation flow so that agent hints from task decomposition are resolved to Linear user IDs via resolve_agent_delegates(), and the resulting delegate_id is set as the assignee on each Linear issue at creation time. Previously all issues were created unassigned.
 
 ## Task Context
 - Agent owner: nova
@@ -10,63 +10,27 @@ Build the Hermes deliberation path as an internal module within the existing Bun
 - Dependencies: 1
 
 ## Implementation Plan
-Step-by-step implementation:
-
-1. **Module structure:** Create `src/modules/hermes/` directory with clear boundary:
-   - `src/modules/hermes/index.ts` — module entry point exporting Elysia plugin
-   - `src/modules/hermes/routes.ts` — route definitions
-   - `src/modules/hermes/service.ts` — business logic (HermesService class/interface)
-   - `src/modules/hermes/types.ts` — TypeScript interfaces for deliberation request/response, artifact metadata
-   - `src/modules/hermes/repository.ts` — database access abstraction
-
-2. **Interface contracts (per D1):** Define clear TypeScript interfaces:
-   - `IHermesService` — deliberation trigger, status query, result retrieval
-   - `IHermesRepository` — CRUD for deliberation records and artifact references
-   - `IHermesArtifactWriter` — abstraction for artifact storage (per open question #7 on D6, this must accommodate either schema extension or parallel table)
-
-3. **REST endpoints (per D3):** Implement via Elysia route handlers with `@elysiajs/swagger` for OpenAPI generation:
-   - `POST /api/hermes/deliberations` — trigger a new deliberation (requires `hermes:trigger` RBAC claim)
-   - `GET /api/hermes/deliberations/:id` — get deliberation status and result (requires `hermes:read`)
-   - `GET /api/hermes/deliberations` — list deliberations with pagination (requires `hermes:read`)
-   - `GET /api/hermes/deliberations/:id/artifacts` — list artifacts for a deliberation (requires `hermes:read`)
-
-4. **Auth integration (per D5):** Extend existing session middleware to check RBAC claims:
-   - Create `src/modules/hermes/middleware.ts` with `requireHermesClaim(claim: string)` guard
-   - Claims: `hermes:read`, `hermes:trigger` at minimum. Document additional claims as needed.
-   - Coordinate claim names with Task 10 (RBAC hardening) via shared types file or ADR.
-
-5. **Database schema:** Create migration for deliberation records:
-   - `deliberations` table: `id` (UUID), `status` (enum: pending/processing/completed/failed), `input_payload` (JSONB), `result_payload` (JSONB), `triggered_by` (FK to users), `created_at`, `updated_at`
-   - For artifact references: implement behind `IHermesArtifactWriter` abstraction to accommodate pending D6 decision. Default to parallel table approach (`hermes_artifacts` with FK to deliberation) but ensure the interface can swap to schema extension.
-
-6. **Elysia plugin registration:** Register the Hermes module as an Elysia plugin in the main app entry point:
-   ```typescript
-   app.use(hermesPlugin)
-   ```
-   Ensure it does not interfere with existing legacy pipeline routes.
-
-7. **OpenAPI documentation:** Ensure all endpoints generate OpenAPI specs via `@elysiajs/swagger`. Tag all Hermes endpoints with `hermes` group.
-
-8. **Environment configuration:** Read all infra connection strings from `hermes-infra-endpoints` ConfigMap (env vars). Feature flag: `HERMES_ENABLED=true|false` env var controls whether the module registers routes.
-
-9. **Error handling:** Return structured JSON error responses with `error_code` field for downstream logging (Task 6 dependency).
+1. In the PM server task-to-issue mapping module, locate the Linear issue creation call (GraphQL mutation `issueCreate`).
+2. Before calling `issueCreate`, invoke `resolve_agent_delegates(agentHints)` which takes an array of agent hint strings (e.g., 'bolt', 'nova', 'blaze') and returns a map of `{ agentHint: linearUserId }`.
+3. Implement `resolve_agent_delegates()` if not already present:
+   a. Query Linear API `users` endpoint filtered by display name or custom metadata matching agent hints.
+   b. Cache results for the duration of the pipeline run to avoid repeated API calls.
+   c. If a hint cannot be resolved, log a warning and fall back to unassigned (do NOT set `agent:pending` label).
+4. Pass the resolved `linearUserId` as the `assigneeId` field in the `issueCreate` mutation payload.
+5. Remove any legacy code that sets `agent:pending` labels as a fallback for assignment.
+6. Add structured logging: log each issue ID, title, agent hint, and resolved delegate_id.
+7. Ensure the endpoint reads secrets from `sigma1-infra-endpoints` ConfigMap via `envFrom`.
 
 ## Acceptance Criteria
-1. Unit tests: `HermesService.triggerDeliberation()` creates a deliberation record in PostgreSQL with status `pending` — verified by direct DB query returning the UUID.
-2. Integration test: `POST /api/hermes/deliberations` with valid session and `hermes:trigger` claim returns 201 with a deliberation ID; same request without `hermes:trigger` claim returns 403.
-3. Integration test: `GET /api/hermes/deliberations/:id` returns the correct deliberation record with status field matching the DB state.
-4. OpenAPI spec: `GET /api/swagger/json` includes all four Hermes endpoints with correct request/response schemas.
-5. Feature flag: When `HERMES_ENABLED=false`, `GET /api/hermes/deliberations` returns 404 (routes not registered).
-6. Database migration: Running migrations on a clean database creates `deliberations` and `hermes_artifacts` tables without errors; running on an existing database with legacy data does not alter existing tables.
+1. Unit test: mock Linear users API returning 3 known agents; verify resolve_agent_delegates returns correct mapping for all 3 and logs warning for unknown hint. 2. Integration test: create a test issue via the PM server with agent hint 'nova'; verify the Linear API response includes the correct assigneeId. 3. Verify at least 5 issues created in a pipeline run have non-null assigneeId fields by querying Linear API. 4. Confirm no issues carry the legacy 'agent:pending' label.
 
 ## Subtasks
-- Scaffold Hermes module structure and define TypeScript interface contracts: Create the src/modules/hermes/ directory structure with all file stubs and define the IHermesService, IHermesRepository, and IHermesArtifactWriter TypeScript interfaces.
-- Create database migrations for deliberations and hermes_artifacts tables: Write and validate database migration scripts that create the deliberations and hermes_artifacts tables in PostgreSQL without affecting existing tables.
-- Implement HermesRepository with PostgreSQL data access layer: Implement the IHermesRepository interface with PostgreSQL queries for CRUD operations on deliberations and hermes_artifacts tables.
-- Implement HermesService business logic layer: Implement the IHermesService interface with business logic for triggering deliberations, querying status, and retrieving results, using the repository abstraction.
-- Implement RBAC middleware with hermes:read and hermes:trigger claim guards: Create Hermes-specific RBAC middleware that extends the existing session middleware to check for hermes:read and hermes:trigger claims.
-- Implement REST endpoints and register Elysia plugin with feature flag: Implement all four Hermes REST endpoints as Elysia route handlers, wire them to the service layer with RBAC guards, register as a plugin, and implement the HERMES_ENABLED feature flag.
-- Configure OpenAPI/Swagger documentation for all Hermes endpoints: Ensure all Hermes endpoints are properly documented in the OpenAPI spec via @elysiajs/swagger with correct schemas, tags, and descriptions.
+- Implement resolve_agent_delegates() function with Linear Users API query: Create a new TypeScript module exporting resolve_agent_delegates(agentHints: string[]) that queries the Linear GraphQL users endpoint, matches agent hint strings to Linear user profiles, and returns a Map<string, string> of agentHint → linearUserId.
+- Add per-pipeline-run caching layer to resolve_agent_delegates(): Wrap the Linear Users API call inside resolve_agent_delegates with an in-memory cache scoped to a single pipeline run so repeated calls within the same run reuse the first result.
+- Integrate resolve_agent_delegates into issueCreate mutation flow: Modify the existing task-to-issue mapping module to call resolve_agent_delegates() before each issueCreate GraphQL mutation and pass the resolved linearUserId as the assigneeId field in the mutation payload.
+- Remove legacy agent:pending label code: Find and remove all code paths that set or reference the 'agent:pending' label on Linear issues as a fallback assignment mechanism.
+- Add structured logging for agent delegation in issue creation: Add structured log entries at each issue creation that include the issue ID, issue title, agent hint, and resolved delegate_id (or 'unassigned').
+- Write unit and integration tests for agent delegation flow: Create comprehensive test coverage for resolve_agent_delegates, the updated issueCreate integration, cache behavior, and end-to-end pipeline delegation.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

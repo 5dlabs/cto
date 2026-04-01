@@ -1,15 +1,18 @@
-Implement subtask 1005: Provision dedicated MinIO bucket with IAM credentials and lifecycle policies
+Implement subtask 1005: Apply network policies for egress to Linear, Discord, GitHub, and Nous APIs
 
 ## Objective
-Create a dedicated MinIO bucket for Hermes artifacts in each namespace with independent IAM credentials and configurable retention lifecycle policies. Must NOT reuse GitLab-owned buckets.
+Create and apply Kubernetes NetworkPolicy resources in sigma1-dev allowing egress traffic to Linear API, Discord webhooks, GitHub API, and Nous/Hermes API endpoints while denying all other egress by default.
 
 ## Steps
-1. Based on the chosen MinIO strategy (dedicated tenant or shared cluster with isolated bucket), create the appropriate Helm template in `charts/hermes-infra/templates/minio.yaml`.
-2. For dedicated tenant approach: deploy a MinIO Tenant CR with single-replica in each namespace.
-3. For shared cluster approach: use a Job or init-container that calls the MinIO admin API to create buckets `hermes-artifacts-dev` and `hermes-artifacts-staging` with dedicated IAM users.
-4. Create lifecycle policy: 90-day object expiration for dev (configurable via `values-dev.yaml`), 365-day for staging (configurable via `values-staging.yaml`).
-5. Store S3 endpoint, access key, secret key, and bucket name in secret `hermes-minio-credentials` in each namespace.
-6. CRITICAL: Verify the generated IAM credentials do NOT have access to any bucket outside `hermes-artifacts-*`. Test by attempting to list/read a known GitLab bucket — must return Access Denied.
+1. Create a default-deny egress NetworkPolicy `netpol-default-deny-egress.yaml` targeting all pods in sigma1-dev.
+2. Create an allow-egress NetworkPolicy `netpol-allow-external-apis.yaml` that permits egress to:
+   - Linear API: resolve `api.linear.app` IPs or use CIDR blocks; port 443.
+   - Discord webhooks: resolve `discord.com` IPs or use CIDR blocks; port 443.
+   - GitHub API: resolve `api.github.com` IPs or use CIDR blocks; port 443.
+   - Nous/Hermes API: resolve the Hermes endpoint IPs; port 443.
+3. Also allow egress to kube-dns (UDP/TCP 53) on the cluster DNS CIDR so pods can resolve hostnames.
+4. Also allow intra-namespace traffic for pod-to-pod communication (PM server ↔ auxiliary services).
+5. Apply all NetworkPolicy manifests: `kubectl apply -f netpol-*.yaml -n sigma1-dev`.
 
 ## Validation
-MinIO bucket `hermes-artifacts-dev` exists and is writable with dedicated credentials from `hermes-minio-credentials`. A `mc ls` against any GitLab-owned bucket using the Hermes credentials returns Access Denied. Lifecycle policy is confirmed via `mc ilm ls` showing the configured retention.
+`kubectl get networkpolicy -n sigma1-dev` lists the default-deny and allow policies. `kubectl describe networkpolicy -n sigma1-dev` shows correct egress rules for ports 443 and 53. Policy audit confirms no unexpected egress CIDRs are allowed.

@@ -1,14 +1,17 @@
-Implement subtask 1003: Deploy Redis operator CRs and credential secrets
+Implement subtask 1003: Create sigma1-infra-endpoints ConfigMap
 
 ## Objective
-Deploy single-replica Redis custom resources in both namespaces with connection string stored in namespace-scoped secrets.
+Deploy the `sigma1-infra-endpoints` ConfigMap in sigma1-dev containing all five service connection strings (PM_SERVER_URL, LINEAR_API_BASE, DISCORD_WEBHOOK_URL, GITHUB_API_BASE, NOUS_API_BASE) that downstream tasks consume via envFrom.
 
 ## Steps
-1. Create a Helm template for the Redis operator CR in `charts/hermes-infra/templates/redis.yaml`.
-2. Configure single-replica for both dev and staging environments.
-3. Ensure the operator creates or you manually template a secret named `hermes-redis-credentials` containing the Redis connection string (host, port, and password if auth is enabled).
-4. Add values for memory limits in `values-dev.yaml` (256Mi) and `values-staging.yaml` (512Mi).
-5. Verify the Redis instance is accessible from within the namespace.
+1. Author `configmap-sigma1-infra-endpoints.yaml` with:
+   - `PM_SERVER_URL`: internal K8s service URL for the PM server (e.g., `http://pm-server.sigma1-dev.svc.cluster.local:8080`).
+   - `LINEAR_API_BASE`: `https://api.linear.app/graphql`.
+   - `DISCORD_WEBHOOK_URL`: value referencing the convention that pods mount the `discord-webhook-url` secret separately; set to a placeholder note or the secret-reference pattern your stack uses.
+   - `GITHUB_API_BASE`: `https://api.github.com`.
+   - `NOUS_API_BASE`: Hermes research endpoint URL.
+2. Apply: `kubectl apply -f configmap-sigma1-infra-endpoints.yaml -n sigma1-dev`.
+3. Ensure the ConfigMap is consumable via `envFrom` by downstream Deployments.
 
 ## Validation
-`kubectl get redis -n hermes-dev` shows a Ready Redis instance. `kubectl get secret hermes-redis-credentials -n hermes-dev` exists with valid connection string. A test pod can `redis-cli PING` and receive `PONG`.
+`kubectl get configmap sigma1-infra-endpoints -n sigma1-dev -o json | jq '.data'` contains exactly the five keys: PM_SERVER_URL, LINEAR_API_BASE, DISCORD_WEBHOOK_URL, GITHUB_API_BASE, NOUS_API_BASE, each with non-empty values.

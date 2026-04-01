@@ -1,11 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. Unit tests: `HermesService.triggerDeliberation()` creates a deliberation record in PostgreSQL with status `pending` — verified by direct DB query returning the UUID.
-- [ ] 2. Integration test: `POST /api/hermes/deliberations` with valid session and `hermes:trigger` claim returns 201 with a deliberation ID; same request without `hermes:trigger` claim returns 403.
-- [ ] 3. Integration test: `GET /api/hermes/deliberations/:id` returns the correct deliberation record with status field matching the DB state.
-- [ ] 4. OpenAPI spec: `GET /api/swagger/json` includes all four Hermes endpoints with correct request/response schemas.
-- [ ] 5. Feature flag: When `HERMES_ENABLED=false`, `GET /api/hermes/deliberations` returns 404 (routes not registered).
-- [ ] 6. Database migration: Running migrations on a clean database creates `deliberations` and `hermes_artifacts` tables without errors; running on an existing database with legacy data does not alter existing tables.
+- [ ] 1. Unit test: mock Linear users API returning 3 known agents; verify resolve_agent_delegates returns correct mapping for all 3 and logs warning for unknown hint. 2. Integration test: create a test issue via the PM server with agent hint 'nova'; verify the Linear API response includes the correct assigneeId. 3. Verify at least 5 issues created in a pipeline run have non-null assigneeId fields by querying Linear API. 4. Confirm no issues carry the legacy 'agent:pending' label.
 
 ## Verification Notes
 

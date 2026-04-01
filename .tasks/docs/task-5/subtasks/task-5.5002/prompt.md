@@ -1,20 +1,16 @@
-Implement subtask 5002: Implement migration tracker with idempotency guarantees
+Implement subtask 5002: Hook DiscordNotifier into the intake pipeline handler
 
 ## Objective
-Create `src/modules/hermes/migration/migration-tracker.ts` that tracks per-artifact migration status, supports idempotent re-runs by recording which artifacts have been successfully migrated, and allows resuming from the last successful batch on restart.
+Wire the DiscordNotifier into the existing intake pipeline handler so that notifyPipelineStart fires at the very beginning of the pipeline and notifyPipelineComplete fires in a finally block upon success or failure.
 
 ## Steps
-Step-by-step:
-1. Define a `MigrationStatus` type: `{ artifactId: string, status: 'pending' | 'migrated' | 'failed', migratedAt?: Date, errorMessage?: string }`.
-2. Implement `MigrationTracker` class with methods:
-   - `isAlreadyMigrated(artifactId: string): Promise<boolean>` — checks if artifact was already migrated
-   - `markMigrated(artifactId: string): Promise<void>` — records successful migration
-   - `markFailed(artifactId: string, error: string): Promise<void>` — records failure
-   - `getProgress(): Promise<{ total: number, completed: number, failed: number, skipped: number }>` — returns current progress
-   - `resetFailed(): Promise<void>` — resets failed artifacts to pending for retry
-3. Use a persistence backend (database table or JSON file — keep it behind an interface `IMigrationTrackerStore` so it can be swapped).
-4. Ensure all state mutations are atomic — if the process crashes mid-write, the artifact is NOT marked as migrated.
-5. On initialization, load existing state to support resume-from-where-we-left-off semantics.
+1. In the intake pipeline handler file (e.g. `src/routes/pipeline.ts` or equivalent Elysia route), import the DiscordNotifier service.
+2. At the very beginning of the pipeline handler (after extracting runId, prdTitle, and generating a timestamp), call `await discordNotifier.notifyPipelineStart(runId, prdTitle, new Date().toISOString())`.
+3. Wrap the main pipeline logic in a try/finally block.
+4. In the finally block, determine the status ('success' or 'failure') based on whether an error was caught.
+5. Call `await discordNotifier.notifyPipelineComplete(runId, prdTitle, status, taskCount, issueCount, prUrl, new Date().toISOString())`.
+6. Ensure the notifyPipelineComplete call has access to all required data: taskCount and issueCount should default to 0 if the pipeline failed before generating them; prUrl should default to empty string.
+7. Ensure that any error from the notifier itself does not mask the original pipeline error (the notifier already swallows its own errors, but verify this at the call site).
 
 ## Validation
-Unit test: Create tracker, mark 5 artifacts as migrated, verify `isAlreadyMigrated` returns true for those 5 and false for an unknown ID. Test idempotency: call `markMigrated` twice for the same artifact — no error, no duplicate records. Test resume: create tracker with 3 migrated and 2 failed, call `getProgress()`, assert counts are correct. Test `resetFailed`: after reset, previously failed artifacts return false from `isAlreadyMigrated`.
+Integration test: trigger a full pipeline run with a mock/test PRD. Verify that DiscordNotifier.notifyPipelineStart was called once before any task generation begins and DiscordNotifier.notifyPipelineComplete was called once after the pipeline finishes. Test failure path: inject a deliberate error mid-pipeline and verify notifyPipelineComplete is still called with status='failure' and the pipeline error propagates correctly to the caller. End-to-end: with a real DISCORD_WEBHOOK_URL pointed at a test channel, trigger a pipeline run and confirm two embeds appear (start and complete) with the correct run ID.

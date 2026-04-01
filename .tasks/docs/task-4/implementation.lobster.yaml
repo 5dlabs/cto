@@ -3,7 +3,7 @@ metadata:
   task_id: 4
   agent: blaze
   stack: React/Next.js
-  depends_on_tasks: [1, 2, 3]
+  depends_on_tasks: [1, 7]
 
 inputs:
   - name: task_dir
@@ -40,7 +40,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-4002
-    depends_on: [setup]
+    depends_on: [validate-subtask-4001]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4002/prompt.md
@@ -52,7 +52,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-4003
-    depends_on: [validate-subtask-4002]
+    depends_on: [validate-subtask-4001]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4003/prompt.md
@@ -88,7 +88,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-4006
-    depends_on: [validate-subtask-4002, validate-subtask-4003]
+    depends_on: [validate-subtask-4004, validate-subtask-4005]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4006/prompt.md
@@ -99,44 +99,8 @@ steps:
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
-  - name: implement-subtask-4007
-    depends_on: [validate-subtask-4002, validate-subtask-4003]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4007/prompt.md
-
-  - name: validate-subtask-4007
-    depends_on: [implement-subtask-4007]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
-
-  - name: implement-subtask-4008
-    depends_on: [validate-subtask-4004, validate-subtask-4005]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4008/prompt.md
-
-  - name: validate-subtask-4008
-    depends_on: [implement-subtask-4008]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
-
-  - name: implement-subtask-4009
-    depends_on: [validate-subtask-4001, validate-subtask-4004, validate-subtask-4005, validate-subtask-4006, validate-subtask-4007, validate-subtask-4008]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4009/prompt.md
-
-  - name: validate-subtask-4009
-    depends_on: [implement-subtask-4009]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
-
   - name: integration-validation
-    depends_on: [validate-subtask-4001, validate-subtask-4002, validate-subtask-4003, validate-subtask-4004, validate-subtask-4005, validate-subtask-4006, validate-subtask-4007, validate-subtask-4008, validate-subtask-4009]
+    depends_on: [validate-subtask-4001, validate-subtask-4002, validate-subtask-4003, validate-subtask-4004, validate-subtask-4005, validate-subtask-4006]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

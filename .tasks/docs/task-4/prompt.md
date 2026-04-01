@@ -1,89 +1,38 @@
-Implement task 4: Update Web Experience for Hermes Path Surfacing (Blaze - React/Next.js)
+Implement task 4: Implement Design Snapshot PR Surfacing (Blaze - React/Next.js)
 
 ## Goal
-Build the frontend web experience that surfaces Hermes deliberation results, displays snapshot artifacts (current-site screenshots and variant snapshots) in a comparison view, and implements the environment distinction pattern (banner + accent color) for staging vs production.
+Build a web frontend component that surfaces design snapshot PRs generated during the pipeline, allowing users to view PR details, design deltas, and navigate to the GitHub PR. This addresses the hasFrontend=true, targets=web requirement from the design intake.
 
 ## Task Context
 - Agent owner: blaze
 - Stack: React/Next.js
-- Priority: high
-- Dependencies: 1, 2, 3
+- Priority: medium
+- Dependencies: 1, 7
 
 ## Implementation Plan
-Step-by-step implementation:
-
-1. **Environment distinction (per D4):**
-   - Create `components/EnvironmentBanner.tsx` — persistent top bar component:
-     - Reads `NEXT_PUBLIC_ENVIRONMENT` env var (injected at build time)
-     - Renders `⚠ STAGING` banner with amber background when env !== 'production'
-     - Hidden in production (or shows subtle production indicator)
-   - CSS custom property theming: define `--accent-color` in `globals.css` or Tailwind config
-     - Staging: `--accent-color: theme(colors.amber.500)`
-     - Production: `--accent-color: theme(colors.brand.500)` (or primary brand color)
-   - Add `<EnvironmentBanner />` to root layout (`app/layout.tsx`)
-
-2. **shadcn/ui integration (per D9):**
-   - Initialize shadcn/ui: `npx shadcn-ui@latest init` — select Tailwind CSS, configure `components.json`
-   - Install needed components into `components/ui/`: Card, Badge, Tabs, Dialog, Skeleton, Button, Table
-   - All components are copied into the codebase — no runtime dependency
-
-3. **Hermes deliberation dashboard:** Create `app/hermes/page.tsx`:
-   - List view of deliberations using shadcn Card components
-   - Each card shows: deliberation ID, status (Badge with color coding), triggered by, timestamp, artifact count
-   - Pagination via query params
-   - Loading states via Skeleton components
-
-4. **Deliberation detail page:** Create `app/hermes/[id]/page.tsx`:
-   - Header: deliberation metadata (status, trigger time, duration)
-   - Status indicator: real-time or polling-based status updates during processing
-   - Artifact section: tabbed view (Tabs component) — "Current Site" and "Variants"
-
-5. **Snapshot comparison view:** Create `components/hermes/ArtifactComparison.tsx`:
-   - Side-by-side comparison: current-site screenshot on left, selected variant on right
-   - Image loading from presigned URLs (`GET /api/hermes/artifacts/:id/url`)
-   - Variant selector: thumbnail strip below the comparison area
-   - Zoom/pan capability for detail inspection (use CSS transform or a lightweight image viewer)
-
-6. **Artifact viewer:** Create `components/hermes/ArtifactViewer.tsx`:
-   - Full-screen dialog (Dialog component) for individual artifact viewing
-   - Download button for artifact PNG
-   - Metadata display: viewport, URL captured, timestamp
-
-7. **Feature flag:** Gate all Hermes UI behind `NEXT_PUBLIC_HERMES_ENABLED` env var:
-   - When false: Hermes nav item hidden, `/hermes` routes return 404 or redirect
-   - Feature flag respects environment awareness (can be enabled in staging but disabled in production)
-
-8. **API client:** Create `lib/hermes-api.ts`:
-   - Typed API client for all Hermes endpoints using fetch or SWR
-   - Types imported from or mirroring the backend's `types.ts` definitions
-   - Error handling with user-friendly toast notifications
-
-9. **Navigation:** Add "Hermes" item to the main navigation (conditionally rendered based on feature flag and RBAC claims from session).
-
-10. **Accessibility:** Ensure all new components meet WCAG 2.1 AA:
-    - Environment banner: text label (not color alone) per D4
-    - Image alt text on all screenshots
-    - Keyboard navigation for comparison view and artifact viewer
-    - Focus management in Dialog components (handled by Radix)
+1. Create a new page route `/pipeline/[runId]/design-snapshots` in the Next.js app.
+2. Implement a `DesignSnapshotList` component that fetches PR data from the PM server endpoint `GET /api/pipeline/:runId/prs` which returns `{ prs: [{ number, title, url, status, files_changed, created_at }] }`.
+3. For each PR, render a card showing:
+   - PR title and number as a link to GitHub.
+   - Status badge (open/merged/closed).
+   - Number of files changed.
+   - Created timestamp in relative format.
+4. Implement a `DesignDeltaViewer` component that, when a PR card is clicked, fetches diff data from `GET /api/pipeline/:runId/prs/:number/diff` and renders a side-by-side or inline diff view using a lightweight diff library (e.g., `react-diff-viewer-continued` v3.x).
+5. Add accessibility: all interactive elements must have ARIA labels, cards are keyboard-navigable, diff viewer supports screen readers.
+6. Add loading skeletons and error states for all async fetches.
+7. Ensure the page is responsive for viewport widths from 320px to 1920px.
+8. Since stitch_status=failed, do not rely on any Stitch-generated candidates; build components from scratch following the existing project's design system if one exists, or use Tailwind CSS utility classes.
 
 ## Acceptance Criteria
-1. Environment banner: In a staging build (`NEXT_PUBLIC_ENVIRONMENT=staging`), the `EnvironmentBanner` component renders with text containing 'STAGING' and has an amber-colored background (CSS computed style check). In production build, the banner is not rendered or shows production indicator.
-2. Deliberation list: When API returns 3 deliberations, the `/hermes` page renders exactly 3 Card components each containing a deliberation ID and status Badge.
-3. Artifact comparison: On `/hermes/[id]`, when a deliberation has 1 current-site screenshot and 2 variants, the comparison view displays the current-site image on the left and a variant selector with 2 thumbnails.
-4. Presigned URL loading: Artifact images load successfully from presigned URLs — no CORS errors, images render with correct dimensions.
-5. Feature flag: When `NEXT_PUBLIC_HERMES_ENABLED=false`, navigating to `/hermes` does not render the deliberation dashboard and the nav item is absent from the DOM.
-6. Accessibility: axe-core audit of `/hermes` and `/hermes/[id]` pages returns zero critical or serious violations. Tab key navigates through all interactive elements in logical order.
+1. Component test: render DesignSnapshotList with mocked API returning 3 PRs; verify 3 cards appear with correct titles and status badges. 2. Component test: render with empty PR array; verify 'No design snapshots' message displays. 3. Component test: click a PR card; verify DesignDeltaViewer renders with diff content. 4. Accessibility audit: run axe-core on the page; zero critical or serious violations. 5. Responsive test: capture screenshots at 320px, 768px, and 1920px widths; verify no horizontal overflow and cards stack/grid appropriately. 6. Error state test: mock a 500 response; verify error message displays and no uncaught exceptions.
 
 ## Subtasks
-- Implement EnvironmentBanner component with CSS custom property theming: Create `components/EnvironmentBanner.tsx` that reads `NEXT_PUBLIC_ENVIRONMENT` and renders a staging/production-aware banner, plus wire up CSS custom property theming for `--accent-color` across environments.
-- Initialize shadcn/ui and install required components: Run `shadcn-ui init` to set up the component system with Tailwind CSS, then install all needed components (Card, Badge, Tabs, Dialog, Skeleton, Button, Table) into `components/ui/`.
-- Create typed Hermes API client: Create `lib/hermes-api.ts` — a typed API client for all Hermes backend endpoints, with SWR hooks for data fetching, error handling, and types mirroring the backend definitions.
-- Build Hermes deliberation dashboard page: Create `app/hermes/page.tsx` — the deliberation list view with Card components showing deliberation details, status badges, pagination, and loading skeleton states.
-- Build deliberation detail page with status updates and tabbed artifacts: Create `app/hermes/[id]/page.tsx` — the deliberation detail view showing metadata, polling-based status updates, and a tabbed artifact section for current-site screenshots and variant snapshots.
-- Build snapshot comparison view component: Create `components/hermes/ArtifactComparison.tsx` — a side-by-side image comparison component showing the current-site screenshot alongside a selected variant, with a thumbnail variant selector strip.
-- Build full-screen artifact viewer dialog component: Create `components/hermes/ArtifactViewer.tsx` — a full-screen Dialog component for viewing individual artifact images with download capability and metadata display.
-- Implement feature flag gating and navigation integration: Gate all Hermes UI behind the `NEXT_PUBLIC_HERMES_ENABLED` feature flag, add conditional Hermes navigation item, and implement route-level protection for `/hermes` paths.
-- Accessibility audit and remediation for all Hermes components: Run axe-core accessibility audits on all new Hermes pages and components, then fix any critical or serious violations to meet WCAG 2.1 AA compliance.
+- Create page route and data-fetching hook for design snapshot PRs: Set up the Next.js dynamic page route at `/pipeline/[runId]/design-snapshots` and implement a custom hook `useDesignSnapshotPRs(runId)` that fetches PR data from `GET /api/pipeline/:runId/prs`, returning loading, error, and data states.
+- Build DesignSnapshotList component with PR cards, loading skeletons, and error state: Implement the `DesignSnapshotList` component that receives PR data (or loading/error states) and renders a list of PR cards with title, number, GitHub link, status badge, files changed count, and relative timestamp. Include loading skeleton placeholders and an error message UI.
+- Implement DesignDeltaViewer component with diff library integration: Build the `DesignDeltaViewer` component that fetches diff data for a selected PR from `GET /api/pipeline/:runId/prs/:number/diff` and renders it using `react-diff-viewer-continued` v3.x with side-by-side and inline toggle modes, plus its own loading and error states.
+- Accessibility pass: ARIA labels, keyboard navigation, and screen reader support: Audit and enhance all components built in prior subtasks for accessibility compliance: add ARIA attributes, ensure full keyboard navigation, and verify screen reader compatibility for the PR card list and diff viewer.
+- Responsive layout implementation for 320px to 1920px viewports: Ensure the entire design-snapshots page, including the PR card grid and the diff viewer, is fully responsive across viewports from 320px to 1920px with no horizontal overflow or layout breakage.
+- Component and integration tests for all UI states and accessibility audit: Write comprehensive component tests covering all states of DesignSnapshotList and DesignDeltaViewer (populated, empty, loading, error, interaction), plus an automated axe-core accessibility audit and responsive snapshot tests.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

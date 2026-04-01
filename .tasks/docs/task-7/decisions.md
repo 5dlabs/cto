@@ -1,9 +1,8 @@
 ## Decision Points
 
-- Decision
-- Decision
+_No explicit decision points generated._
 
 ## Coordination Notes
 
-- Agent owner: tess
-- Primary stack: Playwright
+- Agent owner: nova
+- Primary stack: Bun/Elysia

@@ -1,9 +1,9 @@
 name: implement-task-8
 metadata:
   task_id: 8
-  agent: atlas
-  stack: CI/CD platforms
-  depends_on_tasks: [1, 2, 3, 4, 5, 6, 7]
+  agent: tess
+  stack: Test frameworks
+  depends_on_tasks: [2, 3, 4, 5, 6, 7]
 
 inputs:
   - name: task_dir
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-8/feature-branch"
   - name: agent
-    default: "atlas"
+    default: "tess"
   - name: cli
     default: "claude"
   - name: model
@@ -64,7 +64,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-8004
-    depends_on: [setup]
+    depends_on: [validate-subtask-8001, validate-subtask-8003]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-8.8004/prompt.md
@@ -76,7 +76,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-8005
-    depends_on: [setup]
+    depends_on: [validate-subtask-8004]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-8.8005/prompt.md
@@ -87,8 +87,68 @@ steps:
     command: >
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
+  - name: implement-subtask-8006
+    depends_on: [validate-subtask-8004]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-8.8006/prompt.md
+
+  - name: validate-subtask-8006
+    depends_on: [implement-subtask-8006]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - name: implement-subtask-8007
+    depends_on: [validate-subtask-8004]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-8.8007/prompt.md
+
+  - name: validate-subtask-8007
+    depends_on: [implement-subtask-8007]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - name: implement-subtask-8008
+    depends_on: [validate-subtask-8004]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-8.8008/prompt.md
+
+  - name: validate-subtask-8008
+    depends_on: [implement-subtask-8008]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - name: implement-subtask-8009
+    depends_on: [validate-subtask-8004, validate-subtask-8003]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-8.8009/prompt.md
+
+  - name: validate-subtask-8009
+    depends_on: [implement-subtask-8009]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - name: implement-subtask-8010
+    depends_on: [validate-subtask-8005, validate-subtask-8006, validate-subtask-8007, validate-subtask-8008, validate-subtask-8009]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-8.8010/prompt.md
+
+  - name: validate-subtask-8010
+    depends_on: [implement-subtask-8010]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
   - name: integration-validation
-    depends_on: [validate-subtask-8001, validate-subtask-8002, validate-subtask-8003, validate-subtask-8004, validate-subtask-8005]
+    depends_on: [validate-subtask-8001, validate-subtask-8002, validate-subtask-8003, validate-subtask-8004, validate-subtask-8005, validate-subtask-8006, validate-subtask-8007, validate-subtask-8008, validate-subtask-8009, validate-subtask-8010]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

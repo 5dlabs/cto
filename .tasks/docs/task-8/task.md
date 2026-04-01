@@ -1,69 +1,54 @@
-## Document Migration and Rollout Plan (Atlas - CI/CD platforms)
+## End-to-End Pipeline Integration Test (Tess - Test frameworks)
 
 ### Objective
-Create comprehensive documentation covering the migration plan, rollout strategy, rollback procedures, infrastructure sequencing, and operational runbooks for the Hermes pipeline — including ArgoCD promotion workflow configuration for staging-to-production deployment.
+Develop and execute a comprehensive E2E integration test that validates the full Sigma-1 pipeline from PRD intake through deliberation, task generation, issue creation with agent delegation, research memo inclusion, PR surfacing, and Discord/Linear notifications.
 
 ### Ownership
-- Agent: atlas
-- Stack: CI/CD platforms
-- Priority: medium
+- Agent: tess
+- Stack: Test frameworks
+- Priority: high
 - Status: pending
-- Dependencies: 1, 2, 3, 4, 5, 6, 7
+- Dependencies: 2, 3, 4, 5, 6, 7
 
 ### Implementation Details
-Step-by-step implementation:
-
-1. **Migration plan document** (`docs/hermes/migration-plan.md`):
-   - Pre-migration checklist: infrastructure verified, MinIO bucket provisioned, database migrations applied
-   - Migration execution steps: trigger artifact migration (CLI or admin API), monitor progress via Grafana dashboard
-   - Expected duration estimates based on artifact count and average size
-   - Success criteria: all artifacts migrated, zero integrity failures, legacy access paths preserved
-   - Failure recovery: re-run migration (idempotent), escalation contacts
-
-2. **Rollout strategy document** (`docs/hermes/rollout-strategy.md`):
-   - Phase 1: Dev environment — full feature enabled, used for development validation
-   - Phase 2: Staging environment — feature-flagged Hermes path enabled, E2E tests must pass
-   - Phase 3: Production canary — HERMES_ENABLED=true for <10% traffic (if applicable) or internal users only
-   - Phase 4: Production GA — full rollout after 72-hour canary observation window
-   - Go/no-go criteria for each phase transition: E2E pass rate, error rate thresholds, artifact generation success rate
-   - Rollout risks identified:
-     a. MinIO bucket isolation failure (risk: artifact cross-contamination with GitLab)
-     b. Database migration lock contention during peak hours
-     c. Headless browser OOM in artifact generation under load
-     d. Session auth incompatibility with new RBAC claims for existing users
-
-3. **Rollback procedures** (`docs/hermes/rollback-procedures.md`):
-   - Immediate rollback: Set `HERMES_ENABLED=false` via ConfigMap update → ArgoCD sync → Hermes routes deregistered within 60 seconds
-   - Database rollback: Reverse migration script (drop `hermes_artifacts` table, drop `deliberations` table — additive tables only, no ALTER TABLE rollback needed per D6 recommendation)
-   - MinIO cleanup: Document bucket deletion procedure (only if full rollback needed)
-   - Rollback trigger conditions: link to Grafana dashboard alert thresholds from Task 6
-   - Post-rollback verification checklist
-
-4. **Infrastructure sequencing** (`docs/hermes/infrastructure-sequence.md`):
-   - Visual dependency diagram (Mermaid format) showing task execution order
-   - Critical path: Task 1 → Task 2 → Task 3 → Task 7 → Task 9 → Task 10
-   - Parallel execution windows: Tasks 4, 5, 6 can run in parallel after Task 3
-   - Estimated timeline per task
-
-5. **ArgoCD promotion workflow:**
-   - Document the ArgoCD Application CR configuration from Task 1
-   - Promotion flow: staging sync (automatic) → E2E tests pass (Task 7 GitHub Actions) → production sync (manual approval via ArgoCD UI or CLI)
-   - Create ArgoCD sync wave annotations for the Hermes services
-   - Document `argocd app sync hermes-backend-production` command and prerequisites
-
-6. **Operational runbook** (`docs/hermes/runbook.md`):
-   - Common issues and resolutions:
-     a. Deliberation stuck in `processing` state → check headless browser pod logs, restart if OOM
-     b. Artifact upload failures → check MinIO health dashboard, verify credentials
-     c. High latency on artifact retrieval → check presigned URL TTL, MinIO performance
-   - Monitoring commands: useful LogQL queries for Hermes troubleshooting
-   - Escalation matrix
-
-7. **ADR (Architecture Decision Record):** Create `docs/hermes/adr/` directory with ADRs for each resolved decision (D1-D5, D7-D9) documenting context, decision, and consequences.
+1. Create a test suite `sigma1-e2e.test.ts` using a test framework compatible with Bun (e.g., bun:test or vitest).
+2. Test Case 1 — Full Pipeline Completion:
+   a. Submit a sample PRD to the PM server intake endpoint.
+   b. Poll the pipeline status endpoint until status is 'completed' or timeout after 5 minutes.
+   c. Assert: pipeline status is 'completed', no fatal errors in logs.
+3. Test Case 2 — Task Generation with Agent Assignments:
+   a. Fetch tasks from `GET /api/pipeline/:runId/tasks`.
+   b. Assert: at least 5 tasks returned.
+   c. Assert: each task has a non-empty `agent` field.
+   d. Assert: at least 3 distinct agent types are present.
+4. Test Case 3 — Linear Issues with Delegate IDs:
+   a. Fetch issues from `GET /api/pipeline/:runId/issues`.
+   b. Assert: issue count >= 5.
+   c. Assert: each issue has a non-null `assigneeId` (delegate_id).
+   d. Cross-verify with Linear API: query each issue by ID and confirm assignee matches.
+5. Test Case 4 — Hermes Research Integration:
+   a. Fetch deliberation artifacts from `GET /api/pipeline/:runId/deliberation`.
+   b. If NOUS_API_KEY is set: assert research memo contains 'Hermes Research Findings' section with at least one entry.
+   c. If NOUS_API_KEY is not set: assert research memo does not contain Hermes section and no errors.
+6. Test Case 5 — PR Creation:
+   a. Fetch PR metadata from `GET /api/pipeline/:runId/pr`.
+   b. Assert: PR URL is non-null and points to 5dlabs/sigma-1.
+   c. Assert: PR status is 'open'.
+   d. Verify PR contains at least 5 task scaffold files via GitHub API.
+7. Test Case 6 — Discord Notifications:
+   a. Query a Discord audit log or use a test webhook collector.
+   b. Assert: at least 2 messages received (pipeline start + complete).
+   c. Assert: start message contains run ID; complete message contains task count.
+8. Configure CI to run this suite with real credentials from the sigma1-dev namespace secrets.
 
 ### Subtasks
-- [ ] Create migration plan and rollout strategy documents: Write the migration-plan.md with pre-migration checklist, execution steps, duration estimates, success criteria, and failure recovery. Write rollout-strategy.md with all 4 phases, go/no-go criteria, and identified risks.
-- [ ] Create rollback procedures document: Write rollback-procedures.md covering immediate feature flag rollback, database rollback, MinIO cleanup, trigger conditions linked to Grafana alerts, and post-rollback verification checklist.
-- [ ] Create infrastructure sequencing diagram and ArgoCD promotion workflow documentation: Write infrastructure-sequence.md with a Mermaid dependency diagram, critical path analysis, parallel execution windows, and timeline estimates. Document the ArgoCD promotion workflow including Application CR references, sync wave annotations, and promotion commands.
-- [ ] Create operational runbook with LogQL queries: Write runbook.md covering common Hermes operational issues, resolution steps, validated LogQL queries for troubleshooting, and an escalation matrix.
-- [ ] Create Architecture Decision Records (ADRs) for decisions D1-D5 and D7-D9: Create the ADR directory and write 8 individual ADR documents covering each resolved architectural decision, following the standard ADR format with Status, Context, Decision, and Consequences sections.
+- [ ] Set up E2E test framework and project scaffolding: Initialize the sigma1-e2e test project with the chosen test framework (vitest or bun:test), configure TypeScript, create the `sigma1-e2e.test.ts` entry file, and establish shared utility modules for HTTP requests, polling, and assertions.
+- [ ] Configure CI credential injection from sigma1-dev namespace secrets: Set up the CI pipeline job to inject real credentials (LINEAR_API_KEY, GITHUB_TOKEN, NOUS_API_KEY, PM_SERVER_URL, DISCORD_COLLECTOR_URL) from sigma1-dev Kubernetes secrets into the E2E test runner environment.
+- [ ] Implement Discord webhook collector service for notification verification: Build a lightweight HTTP server that acts as a Discord webhook collector — receives POST payloads, stores them in memory, and exposes a GET endpoint for the test suite to query received messages.
+- [ ] Implement Test Case 1: Full Pipeline Completion: Write the E2E test that submits a sample PRD to the PM server intake endpoint, polls for pipeline completion, and asserts the pipeline reaches 'completed' status without fatal errors.
+- [ ] Implement Test Case 2: Task Generation with Agent Assignments: Write the E2E test that fetches generated tasks for the pipeline run and asserts correct task count, agent assignment, and agent diversity.
+- [ ] Implement Test Case 3: Linear Issue Delegation Verification with Cross-API Validation: Write the E2E test that fetches Linear issues created by the pipeline, asserts correct count and delegate assignment, and cross-verifies each issue's assignee against the Linear API.
+- [ ] Implement Test Case 4: Hermes Research Integration with Conditional Assertions: Write the E2E test that fetches deliberation artifacts and conditionally asserts the presence or absence of Hermes research findings based on NOUS_API_KEY availability.
+- [ ] Implement Test Case 5: PR Creation Verification via GitHub API: Write the E2E test that fetches PR metadata from the pipeline and verifies the PR exists on GitHub with the correct repo, status, and scaffold file count.
+- [ ] Implement Test Case 6: Discord Notification Assertions: Write the E2E test that queries the Discord webhook collector and asserts the correct number of messages with expected content (pipeline start and complete notifications).
+- [ ] Implement test suite orchestration: lifecycle hooks, timeout handling, cleanup, and reporting: Wire up the full test suite with proper lifecycle management — ordered execution, shared state between test cases, global timeout, post-run cleanup of created resources, and CI-friendly reporting.

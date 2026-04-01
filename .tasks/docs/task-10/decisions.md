@@ -1,8 +1,7 @@
 ## Decision Points
 
-- Secret rotation mechanism: CloudNative-PG built-in rotation vs external-secrets-operator — determines whether a unified rotation approach is used across all services or CNPG-specific tooling for PostgreSQL
-- Secret encryption at rest strategy: rely on cluster-level etcd encryption (if available) vs implement SealedSecrets vs external-secrets-operator — depends on cluster capabilities and team operational preferences
-- Container image scanning integration: Trivy vs Snyk vs Grype — choose based on existing CI tooling and license requirements
+- Secret rotation mechanism: use External Secrets Operator (requires operator installation and an external secret store like Vault/AWS Secrets Manager) vs. a lightweight CronJob approach (simpler but less secure, secrets generated/stored within cluster). This affects infrastructure dependencies and security posture.
+- Audit log destination: route audit logs to a PersistentVolume on-cluster vs. an external log aggregator (e.g., Elasticsearch, Loki, CloudWatch). Affects storage costs, retention policy, and observability tooling requirements.
 
 ## Coordination Notes
 

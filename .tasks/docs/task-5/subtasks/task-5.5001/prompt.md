@@ -1,17 +1,19 @@
-Implement subtask 5001: Implement legacy artifact scanner and manifest builder
+Implement subtask 5001: Implement DiscordNotifier service class with embed builders and retry logic
 
 ## Objective
-Create `src/modules/hermes/migration/legacy-scanner.ts` that discovers existing snapshot artifacts from the legacy storage location, builds an in-memory manifest of all artifacts needing migration, and logs total count and total size. Exports a function that returns a structured manifest array with artifact identifiers, paths, and sizes.
+Create the core DiscordNotifier service class that reads DISCORD_WEBHOOK_URL from the environment, constructs Discord embed payloads for pipeline start and complete events, sends them via fetch POST, and handles retry logic for 429/5xx responses. Gracefully degrades when the webhook URL is not configured.
 
 ## Steps
-Step-by-step:
-1. Create the `src/modules/hermes/migration/` directory structure.
-2. Define a `LegacyArtifactManifestEntry` type with fields: `id`, `originalPath`, `sizeBytes`, `lastModified`, `md5Hash` (if available from source).
-3. Implement `scanLegacyArtifacts()` in `legacy-scanner.ts` that connects to the legacy storage location (filesystem/MinIO/DB — use an environment variable `LEGACY_ARTIFACT_SOURCE_TYPE` to switch between adapters).
-4. For filesystem: recursively walk the configured directory. For MinIO: list objects in the legacy bucket. For DB: query the artifact table.
-5. Return a `LegacyArtifactManifest` with the full list and summary stats (`totalCount`, `totalSizeBytes`).
-6. Emit structured log with `migration_step: 'scan'` and `migration_progress: { total: N, completed: 0, failed: 0, skipped: 0 }`.
-7. Export the manifest type and scanner function for use by the migration orchestrator.
+1. Create `src/services/discord-notifier.ts`.
+2. In the constructor, read `DISCORD_WEBHOOK_URL` from `process.env` (populated via sigma1-infra-endpoints ConfigMap envFrom). Store it as a private field. If not set, store `null`.
+3. Implement a private `sendWebhook(payload: object)` method that:
+   a. If `this.webhookUrl` is null, log a warning (`console.warn('DISCORD_WEBHOOK_URL not set, skipping notification')`) and return immediately.
+   b. POST to the webhook URL with `Content-Type: application/json` and the serialized payload.
+   c. On 429 or 5xx response, retry up to 2 times with a 1-second delay (`await Bun.sleep(1000)`).
+   d. On final failure after retries, log the error but do NOT throw (fire-and-forget semantics).
+4. Implement `notifyPipelineStart(runId: string, prdTitle: string, timestamp: string)` that calls `sendWebhook` with a Discord embed: color `0x3498db` (blue), title `🚀 Pipeline Started`, fields for Run ID, PRD Title, Started At.
+5. Implement `notifyPipelineComplete(runId: string, prdTitle: string, status: 'success' | 'failure', taskCount: number, issueCount: number, prUrl: string, timestamp: string)` that calls `sendWebhook` with: color `0x2ecc71` for success / `0xe74c3c` for failure, title `✅ Pipeline Complete` or `❌ Pipeline Failed`, fields for Run ID, PRD Title, Status, Tasks Generated, Issues Created, PR URL, Completed At.
+6. Export the class as a singleton or as a constructable service for DI.
 
 ## Validation
-Seed a test legacy storage location (e.g., temp directory with 20 sample files of known sizes). Call `scanLegacyArtifacts()` and assert: returned manifest has exactly 20 entries, total size matches sum of file sizes, each entry has a valid `originalPath` and `sizeBytes`. Verify structured log output contains `migration_step: 'scan'` with correct total count.
+Unit test: mock global fetch. Call notifyPipelineStart and assert the POST body contains the correct embed structure with blue color, correct title, and all three fields. Call notifyPipelineComplete with status='success' and verify green color and success title; call with status='failure' and verify red color and failure title with all seven fields present. Test missing DISCORD_WEBHOOK_URL: instantiate with env unset, call both methods, verify zero fetch calls and a warning was logged. Test retry: mock fetch to return 429 on first call then 200 on second; verify two fetch calls were made with ~1s delay.

@@ -1,15 +1,17 @@
-Implement subtask 9005: Harden MinIO for production with versioning and lifecycle policies
+Implement subtask 9005: Create Ingress resource for web frontend with TLS and CDN cache headers
 
 ## Objective
-Configure MinIO for production use — either scale a dedicated tenant to 4+ nodes with erasure coding or configure the shared MinIO instance with appropriate replication. Enable bucket versioning and set a 365-day lifecycle retention policy.
+Define an Ingress manifest for `sigma1.5dlabs.io` with cert-manager TLS and CDN-friendly cache-control headers for static assets.
 
 ## Steps
-1. Determine the MinIO deployment model (dedicated tenant vs shared — see decision point).
-2. For dedicated tenant: update MinIO Tenant CR to 4+ servers with erasure coding enabled. For shared: verify the production Hermes bucket exists with appropriate access policies.
-3. Enable bucket versioning on the `hermes-production` bucket via MinIO client (`mc versioning enable`).
-4. Create a lifecycle policy: 365-day retention for all objects, transition older objects to infrequent access tier if available.
-5. Set resource requests/limits for MinIO pods if using dedicated tenant.
-6. Verify the MinIO endpoint in `hermes-infra-endpoints` ConfigMap points to the production MinIO service.
+1. Create `templates/frontend-ingress.yaml`.
+2. Set `apiVersion: networking.k8s.io/v1`, kind `Ingress`.
+3. Add annotation `cert-manager.io/cluster-issuer: letsencrypt-prod`.
+4. Add cache-header annotations (e.g., for nginx: `nginx.ingress.kubernetes.io/configuration-snippet` with `add_header Cache-Control "public, max-age=3600";` scoped to static asset paths like `/_next/static`, `/static`).
+5. Define `spec.tls` with host `sigma1.5dlabs.io` and secretName `sigma1-frontend-tls`.
+6. Define `spec.rules` with host `sigma1.5dlabs.io`, path `/` routing to the frontend Service on port 3000.
+7. Parameterize the host and ClusterIssuer via Helm values.
+8. Validate with `helm template`.
 
 ## Validation
-Verify bucket versioning is enabled: `mc versioning info hermes-production/hermes`. Upload an object, delete it, and verify the previous version is recoverable via `mc ls --versions`. Verify lifecycle policy is applied: `mc ilm ls hermes-production/hermes` shows the 365-day retention rule.
+Rendered template contains correct host, TLS config, and cache-control annotation snippet. After deploy: `curl -I https://sigma1.5dlabs.io/_next/static/somefile.js` returns `Cache-Control: public, max-age=3600` header.

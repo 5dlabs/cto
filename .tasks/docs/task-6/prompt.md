@@ -1,68 +1,32 @@
-Implement task 6: Implement Rollout and Migration Risk Logging (Nova - Bun/Elysia)
+Implement task 6: Implement Linear-Discord Bridge for Issue Notifications (Nova - Bun/Elysia)
 
 ## Goal
-Implement structured logging, rollout phase tracking, and alerting for the Hermes pipeline — including Grafana dashboards for migration health, deliberation error rates, and rollback trigger conditions using the existing Loki stack.
+Bridge Linear issue creation events to Discord, so that each new issue created during the pipeline run is announced in real time to the configured Discord channel with its title, assignee, and link.
 
 ## Task Context
 - Agent owner: nova
 - Stack: Bun/Elysia
 - Priority: medium
-- Dependencies: 1, 2, 3
+- Dependencies: 1, 2, 5
 
 ## Implementation Plan
-Step-by-step implementation:
-
-1. **Structured logging library:** Create `src/modules/hermes/logging/` subdirectory:
-   - `hermes-logger.ts` — wrapper around the application's logger that enforces structured fields
-   - Required fields on ALL Hermes log entries: `module: 'hermes'`, `rollout_phase` (enum: `dev` | `staging` | `canary` | `production`), `operation`, `duration_ms`
-   - Error entries additionally require: `error_code`, `error_message`, `stack_trace`
-   - Migration entries additionally require: `migration_step`, `migration_progress`
-
-2. **Rollout phase tracking:** Read `ENVIRONMENT` from `hermes-infra-endpoints` ConfigMap. Map to rollout phase:
-   - `dev` → `dev`
-   - `staging` → `staging`
-   - Production with <10% traffic → `canary`
-   - Production at full traffic → `production`
-   Track phase transitions as explicit log events.
-
-3. **Rollback trigger conditions:** Define and implement alerting thresholds:
-   - Deliberation failure rate > 20% over 5-minute window → emit `rollback_trigger` log
-   - Artifact write failure rate > 10% over 5-minute window → emit `rollback_trigger` log
-   - Migration failure count > 5 consecutive → emit `rollback_trigger` log
-   - P99 deliberation latency > 30s → emit `rollback_trigger` log
-   Implement as a lightweight in-process monitor using sliding window counters (Redis-backed for persistence across restarts).
-
-4. **MinIO availability monitoring (per D2 caveat):** Implement periodic MinIO health check:
-   - Every 60 seconds, perform a HEAD request against the Hermes bucket
-   - Log `minio_health: 'ok' | 'degraded' | 'unreachable'` as structured field
-   - If unreachable for 3 consecutive checks, emit `rollback_trigger` log
-
-5. **Grafana dashboard provisioning:** Create dashboard JSON files in `dashboards/hermes/`:
-   - **Rollout Health Dashboard:** panels for rollout phase, deployment count, error rate by phase
-   - **Deliberation Pipeline Dashboard:** panels for deliberation throughput, latency P50/P95/P99, failure rate, active deliberations
-   - **Migration Progress Dashboard:** panels for migration progress (total/completed/failed), artifact copy throughput, MinIO health
-   - **Rollback Triggers Dashboard:** panel showing `rollback_trigger` events over time
-   All dashboards query Loki via LogQL. Provision via Grafana's sidecar ConfigMap pattern or dashboard API.
-
-6. **Alert rules (optional but recommended):** Create Grafana alert rules for rollback trigger conditions, routing to a Slack/webhook channel if configured.
-
-7. **Retrofit existing code:** Ensure Tasks 2, 3, and 5 code paths use the `hermes-logger` wrapper. Add logging middleware to all Hermes routes that captures request/response metadata.
+1. Extend the PM server's issue creation flow (from Task 2) to emit an internal event `issue.created` after each successful Linear issue creation, with payload `{ issueId, issueUrl, title, agentHint, assigneeName }`.
+2. Create a `LinearDiscordBridge` service that listens for `issue.created` events.
+3. On each event, use the existing `DiscordNotifier` (from Task 5) to post an embed:
+   - Color: purple (#9b59b6).
+   - Title: '📋 New Issue Created'.
+   - Fields: Issue Title (linked to issueUrl), Assigned To (assigneeName or 'Unassigned'), Agent Hint.
+4. Batch notifications: if multiple issues are created within a 2-second window, batch them into a single embed with multiple field rows to avoid Discord rate limiting.
+5. Ensure the bridge does not block the main issue creation flow — use fire-and-forget with error logging.
+6. Add a configuration toggle `ENABLE_ISSUE_DISCORD_BRIDGE` (default: true) to allow disabling without code changes.
 
 ## Acceptance Criteria
-1. Structured log validation: All Hermes API requests generate logs queryable in Loki via `{app="hermes"} | json | module="hermes"` — each entry contains `rollout_phase`, `operation`, and `duration_ms` fields.
-2. Rollback trigger: Simulate 25 consecutive deliberation failures; verify that a log entry with `rollback_trigger=true` and `error_code=FAILURE_RATE_EXCEEDED` appears in Loki within 1 minute.
-3. MinIO health monitoring: Stop the MinIO service for 4 minutes; verify that logs with `minio_health="unreachable"` appear and a `rollback_trigger` log is emitted after 3 consecutive failures.
-4. Grafana dashboards: The Rollout Health Dashboard loads in Grafana without errors and displays at least one data point when the Hermes service has been running for >5 minutes.
-5. LogQL queryability: The query `{app="hermes"} | json | migration_step="complete"` returns results after a migration run (cross-validates with Task 5).
-6. Error code taxonomy: Deliberation errors, artifact write errors, and migration errors each use distinct `error_code` values — verified by querying `{app="hermes"} | json | error_code!="" | line_format "{{.error_code}}"` and confirming at least 3 distinct codes in test runs.
+1. Unit test: emit issue.created event; verify DiscordNotifier receives a POST with purple embed containing correct issue title and assignee. 2. Unit test: emit 5 events within 1 second; verify only 1 batched Discord message is sent containing all 5 issues. 3. Unit test: set ENABLE_ISSUE_DISCORD_BRIDGE=false; verify no Discord call made. 4. Unit test: simulate Discord API failure; verify issue creation flow is not blocked and error is logged. 5. Integration test: run pipeline creating 5+ issues; verify Discord channel receives batched issue notification(s) with correct assignee names.
 
 ## Subtasks
-- Implement structured logging library (hermes-logger wrapper): Create `src/modules/hermes/logging/hermes-logger.ts` — a wrapper around the application's existing logger that enforces required structured fields on all Hermes log entries, with specialized methods for error and migration log entries.
-- Implement rollout phase tracking with environment mapping: Add rollout phase detection logic that reads `ENVIRONMENT` from the `hermes-infra-endpoints` ConfigMap, maps it to the rollout phase enum, and logs phase transitions as explicit events.
-- Implement rollback trigger monitoring with sliding window counters: Build a lightweight in-process monitor that tracks failure rates and latencies using sliding window counters (Redis-backed), evaluates rollback trigger conditions, and emits `rollback_trigger` log entries when thresholds are exceeded.
-- Implement MinIO availability health check monitor: Create a periodic MinIO health check that runs every 60 seconds, logs health status as structured fields, and emits a rollback trigger after 3 consecutive unreachable checks.
-- Provision Grafana dashboard JSON files for Hermes observability: Create four Grafana dashboard JSON files in `dashboards/hermes/` with LogQL queries against Loki for rollout health, deliberation pipeline metrics, migration progress, and rollback triggers. Configure for sidecar ConfigMap provisioning.
-- Add Hermes logging middleware to Elysia routes and retrofit existing code paths: Create Elysia middleware that wraps all Hermes route handlers with structured logging (request/response metadata, timing), and retrofit existing Task 2, 3, and 5 code paths to use the hermes-logger wrapper instead of direct console/logger calls.
+- Emit issue.created event from the issue creation flow: Extend the PM server's Linear issue creation logic (from Task 2) to emit an internal `issue.created` event after each successful issue creation, carrying the full notification payload.
+- Implement LinearDiscordBridge service with 2-second batching and fire-and-forget execution: Create the `LinearDiscordBridge` service that listens for `issue.created` events, batches events within a 2-second window, formats a purple Discord embed, and sends via the existing DiscordNotifier in a fire-and-forget manner with error logging. Include the ENABLE_ISSUE_DISCORD_BRIDGE configuration toggle.
+- Write comprehensive unit and integration tests for the Linear-Discord bridge: Create a full test suite covering single event notification, batched notifications, disabled toggle, Discord failure resilience, and end-to-end integration with the pipeline.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

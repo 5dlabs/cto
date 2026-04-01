@@ -1,20 +1,15 @@
-Implement subtask 4001: Implement EnvironmentBanner component with CSS custom property theming
+Implement subtask 4001: Create page route and data-fetching hook for design snapshot PRs
 
 ## Objective
-Create `components/EnvironmentBanner.tsx` that reads `NEXT_PUBLIC_ENVIRONMENT` and renders a staging/production-aware banner, plus wire up CSS custom property theming for `--accent-color` across environments.
+Set up the Next.js dynamic page route at `/pipeline/[runId]/design-snapshots` and implement a custom hook `useDesignSnapshotPRs(runId)` that fetches PR data from `GET /api/pipeline/:runId/prs`, returning loading, error, and data states.
 
 ## Steps
-1. Create `components/EnvironmentBanner.tsx`:
-   - Read `process.env.NEXT_PUBLIC_ENVIRONMENT` at render time
-   - When value is not `'production'`: render a fixed/sticky top bar with `⚠ STAGING` text, amber background (`bg-amber-500`), white text, and an accessible text label (not color-only per WCAG)
-   - When `'production'`: render nothing (return null) or a subtle, minimal production indicator
-   - Component should be a client component (`'use client'`) if using any client-side logic, otherwise server component is fine
-2. CSS custom property theming in `app/globals.css` or `tailwind.config.ts`:
-   - Define `:root { --accent-color: <brand-color>; }` for production
-   - Define `[data-environment='staging'] { --accent-color: theme(colors.amber.500); }` or use a body class approach
-   - Set `data-environment` attribute on `<html>` or `<body>` in root layout based on `NEXT_PUBLIC_ENVIRONMENT`
-3. Add `<EnvironmentBanner />` to `app/layout.tsx` as the first child in the body, before any other content.
-4. Ensure the banner accounts for layout shift — use a fixed height so content below doesn't jump.
+1. Create the file `app/pipeline/[runId]/design-snapshots/page.tsx` (or `pages/pipeline/[runId]/design-snapshots.tsx` depending on the project's Next.js routing convention).
+2. Extract `runId` from the route params.
+3. Implement `useDesignSnapshotPRs(runId)` in a `hooks/` directory. Use `fetch` or the project's existing HTTP client to call `GET /api/pipeline/${runId}/prs`. Return `{ data, isLoading, error }` shape.
+4. Handle non-200 responses by throwing or returning an error object.
+5. The page component should call this hook and pass state down to child components (built in subsequent subtasks). For now, render a placeholder wrapper `<div>` that conditionally renders based on `isLoading`, `error`, and `data`.
+6. Use Tailwind CSS for the page layout container.
 
 ## Validation
-Unit test: render `EnvironmentBanner` with `NEXT_PUBLIC_ENVIRONMENT=staging`, assert text 'STAGING' is present and the container has amber background class. Render with `NEXT_PUBLIC_ENVIRONMENT=production`, assert the banner is not in the DOM (or shows production indicator). Verify `--accent-color` CSS variable resolves to the correct value in each environment. Accessibility: verify the banner has a text label, not just color.
+Unit test the hook with msw or a fetch mock: verify it returns loading=true initially, resolves to data on 200, and returns an error object on 500. Verify the page route renders without crashing when given a valid runId.

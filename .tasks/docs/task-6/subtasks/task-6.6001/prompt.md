@@ -1,21 +1,15 @@
-Implement subtask 6001: Implement structured logging library (hermes-logger wrapper)
+Implement subtask 6001: Emit issue.created event from the issue creation flow
 
 ## Objective
-Create `src/modules/hermes/logging/hermes-logger.ts` — a wrapper around the application's existing logger that enforces required structured fields on all Hermes log entries, with specialized methods for error and migration log entries.
+Extend the PM server's Linear issue creation logic (from Task 2) to emit an internal `issue.created` event after each successful issue creation, carrying the full notification payload.
 
 ## Steps
-Step-by-step:
-1. Create `src/modules/hermes/logging/` directory.
-2. Define TypeScript types for log entry categories:
-   - `HermesBaseLogFields`: `{ module: 'hermes', rollout_phase: 'dev' | 'staging' | 'canary' | 'production', operation: string, duration_ms: number }`
-   - `HermesErrorLogFields`: extends base with `{ error_code: string, error_message: string, stack_trace?: string }`
-   - `HermesMigrationLogFields`: extends base with `{ migration_step: string, migration_progress: { total: number, completed: number, failed: number, skipped: number } }`
-3. Implement `HermesLogger` class that wraps the app's logger (accept logger instance via constructor injection).
-4. Methods: `info(operation: string, fields?: Record<string, unknown>)`, `error(operation: string, errorFields: HermesErrorLogFields)`, `migration(step: string, progress: MigrationProgress, fields?: Record<string, unknown>)`.
-5. Each method auto-injects `module: 'hermes'` and `rollout_phase` (read once on init from environment/ConfigMap).
-6. Define an error code enum/const: `DELIBERATION_FAILURE`, `ARTIFACT_WRITE_FAILURE`, `MIGRATION_FAILURE`, `INTEGRITY_MISMATCH`, `FAILURE_RATE_EXCEEDED`, `LATENCY_EXCEEDED`, `MINIO_UNREACHABLE`.
-7. Implement `startTimer()` helper that returns a function to compute `duration_ms`.
-8. Export the logger class and all types.
+1. In the existing issue creation module (from Task 2), locate the success path after the Linear API call returns.
+2. Define a typed event payload interface: `{ issueId: string, issueUrl: string, title: string, agentHint: string, assigneeName: string | null }`.
+3. Use a lightweight in-process event emitter (e.g., Node/Bun `EventEmitter` or a typed wrapper). Export a singleton `issueEvents` emitter from a shared module like `src/events/issue-events.ts`.
+4. After successful Linear issue creation, call `issueEvents.emit('issue.created', payload)`. Ensure the emit is non-blocking — do not await any listeners.
+5. If `assigneeName` is not available from the Linear response, pass `null` so downstream consumers can display 'Unassigned'.
+6. Export the payload type and the emitter for consumers to import.
 
 ## Validation
-Unit test: Create HermesLogger with a mock logger, call `info('test-op')` — verify the mock received a log entry with `module: 'hermes'`, `rollout_phase`, `operation: 'test-op'`, and `duration_ms`. Call `error()` — verify `error_code`, `error_message` fields are present. Call `migration()` — verify `migration_step` and `migration_progress` fields. Verify that omitting required fields causes TypeScript compilation errors (type safety).
+Unit test: mock the Linear API response, call the issue creation function, and verify that the `issue.created` event is emitted with the correct payload shape and values. Verify the event is emitted after (not before) the successful API call.

@@ -1,47 +1,18 @@
-Implement subtask 8005: Create Architecture Decision Records (ADRs) for decisions D1-D5 and D7-D9
+Implement subtask 8005: Implement Test Case 2: Task Generation with Agent Assignments
 
 ## Objective
-Create the ADR directory and write 8 individual ADR documents covering each resolved architectural decision, following the standard ADR format with Status, Context, Decision, and Consequences sections.
+Write the E2E test that fetches generated tasks for the pipeline run and asserts correct task count, agent assignment, and agent diversity.
 
 ## Steps
-1. Create `docs/hermes/adr/` directory.
-2. Create 8 ADR files following the naming convention `NNN-title.md`:
-   - `001-d1-<decision-topic>.md` through `008-d9-<decision-topic>.md` (skipping D6 if it was not a resolved decision, or including it — adjust based on the actual D1-D5, D7-D9 mapping)
-3. Each ADR must follow this template:
-   ```markdown
-   # ADR-NNN: <Title>
-   
-   ## Status
-   Accepted
-   
-   ## Date
-   <YYYY-MM-DD>
-   
-   ## Context
-   <What is the issue that we're seeing that is motivating this decision or change?>
-   
-   ## Decision
-   <What is the change that we're proposing and/or doing?>
-   
-   ## Consequences
-   ### Positive
-   - <benefit 1>
-   ### Negative
-   - <trade-off 1>
-   ### Neutral
-   - <observation 1>
-   ```
-4. Specific ADRs to create (map to actual decisions from project context):
-   - D1: Storage backend choice (MinIO for artifacts)
-   - D2: Headless browser technology for screenshot capture
-   - D3: API authentication strategy (session-based with RBAC claims)
-   - D4: Database schema approach (additive tables, no ALTER TABLE)
-   - D5: Feature flag implementation (HERMES_ENABLED ConfigMap)
-   - D7: Artifact presigned URL strategy
-   - D8: CI/CD promotion workflow (ArgoCD with E2E gating)
-   - D9: Monitoring and observability stack choice
-5. Each ADR should be 150-400 words, concise but complete.
-6. Create an `index.md` in the ADR directory listing all ADRs with links.
+1. Test Case 2 (`it('generates >= 5 tasks with diverse agent assignments')`):
+   a. Call `GET ${PM_SERVER_URL}/api/pipeline/${runId}/tasks`.
+   b. Parse response as JSON array of task objects.
+   c. Assert: `tasks.length >= 5`.
+   d. Assert: every task has a non-empty string `agent` field (`task.agent` is truthy and `typeof task.agent === 'string'`).
+   e. Collect unique agent values: `new Set(tasks.map(t => t.agent))`.
+   f. Assert: `uniqueAgents.size >= 3`.
+   g. Log the task count and agent distribution for debugging (e.g., `{ bolt: 2, rex: 1, nova: 3, ... }`).
+2. If the endpoint returns an error, fail with the full response body for debugging.
 
 ## Validation
-Verify at least 8 ADR files exist in `docs/hermes/adr/`. For each file, verify it contains the headings 'Status' (with value 'Accepted'), 'Context', 'Decision', and 'Consequences'. Verify index.md exists and links to all 8 ADRs. Check that no ADR is a stub (minimum 150 words per ADR).
+Test passes when at least 5 tasks are returned, each has a non-empty agent field, and at least 3 distinct agent types are represented. Console output shows agent distribution for manual verification.

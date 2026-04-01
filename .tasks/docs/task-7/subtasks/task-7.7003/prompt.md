@@ -1,25 +1,18 @@
-Implement subtask 7003: Implement API test suite for deliberation lifecycle, pagination, and migration
+Implement subtask 7003: Implement scaffold file content generators for per-task README and SUMMARY.md
 
 ## Objective
-Create API-level spec files covering the full deliberation lifecycle (create → status transitions → artifacts → presigned URLs), pagination behavior, and artifact migration endpoint.
+Create pure functions that generate markdown content for each task's scaffold README.md and the root SUMMARY.md table. These are pure content generators with no API dependencies.
 
 ## Steps
-1. Create `tests/e2e/hermes/api/deliberation-lifecycle.spec.ts`:
-   - Use the `api` project (request context, no browser)
-   - Load `fullAccessUser` storageState
-   - Test: POST `/api/hermes/deliberations` → assert 201, body has `id` (UUID format), `status: 'pending'`
-   - Test: Poll GET `/api/hermes/deliberations/{id}` with 5s intervals, max 60s → assert status transitions from `pending` to `processing` to `completed`
-   - Test: GET `/api/hermes/deliberations/{id}/artifacts` → assert array length >= 2, includes type `current_site_screenshot` and `variant_snapshot`
-   - Test: GET artifact presigned URL from artifact object → assert 200, `Content-Type: image/png`
-2. Create `tests/e2e/hermes/api/deliberation-pagination.spec.ts`:
-   - Use the seeded 15+ deliberations from global setup
-   - Test: GET `/api/hermes/deliberations?page=1&limit=10` → assert 10 results, response has `total`, `page`, `limit`, `totalPages` metadata
-   - Test: GET page 2 → assert 5 results (for exactly 15 seeded)
-   - Test: GET with limit > total → assert all results returned
-3. Create `tests/e2e/hermes/api/artifact-migration.spec.ts`:
-   - Test: POST `/api/hermes/admin/migrate-artifacts` → assert 202
-   - Test: Poll migration status endpoint until complete → verify artifact counts match expected
-4. Implement polling helper utility in `tests/e2e/hermes/utils/poll.ts` with configurable interval and timeout.
+1. Create `src/services/scaffold-generator.ts`.
+2. Define a `TaskMeta` type: `{ id: number, title: string, agent: string, stack: string, description: string, details: string, testStrategy: string, priority: string, dependencies: number[] }`.
+3. Implement `generateTaskReadme(task: TaskMeta): string` that produces markdown with sections: `# {title}`, `**Agent:** {agent}`, `**Stack:** {stack}`, `## Description`, `## Implementation Details`, `## Test Strategy`.
+4. Implement `generateSlug(task: TaskMeta): string` that produces a kebab-case slug from the title (max 50 chars, alphanumeric and hyphens only).
+5. Implement `generateSummaryMd(tasks: TaskMeta[], runId: string): string` that produces a markdown document with:
+   - Header: `# Pipeline {runId} — Task Scaffolds`
+   - A markdown table with columns: ID, Title, Agent, Stack, Priority, Dependencies.
+   - A dependency graph section showing which tasks depend on which (simple textual representation like `Task 3 → Task 1, Task 2`).
+6. All functions are pure — no side effects, no API calls.
 
 ## Validation
-Run `npx playwright test tests/e2e/hermes/api/deliberation-lifecycle.spec.ts tests/e2e/hermes/api/deliberation-pagination.spec.ts tests/e2e/hermes/api/artifact-migration.spec.ts` against staging. All tests pass. Lifecycle test completes within 90s. Pagination returns correct counts. Presigned URL resolves to a valid PNG.
+Unit test: call generateTaskReadme with sample TaskMeta; verify output contains all required sections and field values. Unit test: call generateSlug with various titles including special characters; verify output is valid kebab-case. Unit test: call generateSummaryMd with 3 sample tasks; verify markdown table has 3 rows, correct headers, and dependency graph lists all edges. Unit test: verify SUMMARY.md with 0 tasks produces a valid document with empty table.

@@ -1,12 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. RBAC enforcement: The backend ServiceAccount can read `hermes-infra-endpoints` ConfigMap but CANNOT list Secrets in other namespaces — verified by `kubectl auth can-i` with the SA token.
-- [ ] 2. Application RBAC: A user with only `hermes:read` claim receives 403 when calling `POST /api/hermes/deliberations` and 200 when calling `GET /api/hermes/deliberations`.
-- [ ] 3. Secret rotation: After rotating PostgreSQL credentials via the rotation mechanism, the Hermes backend service continues to serve requests within 60 seconds (rolling restart completes, no 500 errors during rotation window).
-- [ ] 4. Audit logging: Create a deliberation via the API; within 30 seconds, query Loki with `{app="hermes", audit="true"} | json | audit_action="create_deliberation"` and verify the log entry contains the correct `audit_actor` (user ID) and `audit_resource` (deliberation ID).
-- [ ] 5. Pod security: `kubectl get pod -n hermes-production -o jsonpath='{.items[0].spec.containers[0].securityContext}'` shows `runAsNonRoot: true` and `allowPrivilegeEscalation: false` for all Hermes pods.
-- [ ] 6. Production readiness: All items in `docs/hermes/production-readiness-checklist.md` are marked complete with evidence links (Loki queries, kubectl outputs, or CI run URLs).
-- [ ] 7. Claim taxonomy: The `hermes:admin` claim gates access to `POST /api/hermes/admin/migrate-artifacts` — verified by 403 without claim and 202 with claim.
+- [ ] 1. RBAC verification: exec into a PM server pod and attempt to list pods — should receive 403 Forbidden. 2. RBAC verification: exec into a PM server pod and read `sigma1-infra-endpoints` ConfigMap — should succeed. 3. ServiceAccount audit: `kubectl get pods -n sigma1-prod -o jsonpath='{.items[*].spec.serviceAccountName}'` returns only `sa-pm-server` and `sa-frontend`, never `default`. 4. Secret rotation: manually trigger rotation CronJob; verify new secret value is mounted in pods after rolling restart (check pod restart timestamp). 5. Audit logging: perform a kubectl create in sigma1-prod; verify the action appears in audit log within 60 seconds. 6. NetworkPolicy: from a frontend pod, attempt to curl an external API directly — should be blocked; curl PM server on port 3000 — should succeed. 7. `docs/security.md` exists and contains RBAC role descriptions and rotation schedule table.
 
 ## Verification Notes
 

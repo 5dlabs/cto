@@ -1,15 +1,6 @@
 {
-  "current_urls": [
-    "http://127.0.0.1:8765/index.html"
-  ],
-  "current_site_snapshots": [
-    {
-      "source_url": "http://127.0.0.1:8765/index.html",
-      "asset_url": "https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/3f2c8bcc-f804-4eac-91bd-a115a1fb9606/76dda29e-d4c4-4ed4-becd-b866ecce3581",
-      "success": true,
-      "error": ""
-    }
-  ],
+  "current_urls": [],
+  "current_site_snapshots": [],
   "generated_variants": [
     {
       "screen_id": "40b8b541e631423db20aa5f99d06e4d4",
@@ -42,8 +33,8 @@
     }
   ],
   "counts": {
-    "current_urls": 1,
-    "current_site_snapshots": 1,
+    "current_urls": 0,
+    "current_site_snapshots": 0,
     "generated_variants": 2,
     "selected_variants": 1
   }

@@ -1,28 +1,26 @@
-Implement subtask 4006: Build snapshot comparison view component
+Implement subtask 4006: Component and integration tests for all UI states and accessibility audit
 
 ## Objective
-Create `components/hermes/ArtifactComparison.tsx` — a side-by-side image comparison component showing the current-site screenshot alongside a selected variant, with a thumbnail variant selector strip.
+Write comprehensive component tests covering all states of DesignSnapshotList and DesignDeltaViewer (populated, empty, loading, error, interaction), plus an automated axe-core accessibility audit and responsive snapshot tests.
 
 ## Steps
-1. Create `components/hermes/ArtifactComparison.tsx`:
-   - Props: `currentSiteArtifact: Artifact`, `variantArtifacts: Artifact[]`
-   - Layout: two-column side-by-side view — left column for current site, right column for selected variant
-2. Image loading:
-   - For each artifact, call `fetchArtifactUrl(artifact.id)` to get the presigned URL
-   - Use `<Image>` from Next.js or a plain `<img>` with the presigned URL as `src`
-   - Show Skeleton loader while presigned URL is being fetched and while image is loading
-   - Handle expired presigned URLs gracefully — re-fetch if image load fails
-3. Variant selector:
-   - Thumbnail strip below the comparison area showing all variant artifacts as small thumbnails
-   - Clicking a thumbnail selects that variant and displays it in the right column
-   - Visual indicator on the currently selected thumbnail (border highlight)
-4. Zoom/pan capability:
-   - Implement CSS transform-based zoom on mouse wheel / pinch gesture
-   - Click-and-drag to pan when zoomed in
-   - Sync zoom level between left and right panels for easier comparison
-   - Reset zoom button
-5. Labels: display "Current Site" and "Variant {n}" labels above each image.
-6. Responsive: stack vertically on mobile screens (`md:` breakpoint for side-by-side).
+1. Use the project's testing framework (likely Vitest + React Testing Library or Jest + RTL).
+2. **DesignSnapshotList tests**:
+   - Render with 3 mocked PRs; assert 3 cards with correct title text, correct `href` on GitHub links, correct status badge text.
+   - Render with empty `prs` array; assert 'No design snapshots' message.
+   - Render with `isLoading=true`; assert skeleton elements with `aria-busy`.
+   - Render with error; assert error message text and retry button. Click retry; assert callback called.
+   - Click a card; assert `onSelectPR` called with correct PR number.
+   - Keyboard: press Enter on focused card; assert `onSelectPR` called.
+3. **DesignDeltaViewer tests**:
+   - Mock diff API to return 2 files. Render; assert both file sections with filenames. Assert diff content visible.
+   - Toggle inline/split view; assert the mode changes.
+   - Click close; assert `onClose` called.
+   - Mock diff API to return 500; assert error message.
+4. **Accessibility audit tests**:
+   - For each major state (list loaded, list empty, list error, diff viewer open), render and run `axe(container)`. Assert `results.violations` has length 0 for critical and serious.
+5. **Integration test**: Render the full page with both API calls mocked. Click a card, verify diff viewer opens. Close it, verify list reappears and focus returns.
+6. All async assertions should use `waitFor` or `findBy` queries.
 
 ## Validation
-Component test: render with a mock current-site artifact and 2 variant artifacts (mock presigned URL fetches). Verify both image panels render, thumbnail strip shows 2 thumbnails. Click the second thumbnail, verify the right panel image src changes. Verify 'Current Site' and variant labels are present. Responsive test: render at mobile width, verify vertical stacking. Zoom test: simulate wheel event on an image panel, verify CSS transform scale changes.
+All tests must pass in CI. Verify coverage: DesignSnapshotList (loading, populated, empty, error, click, keyboard), DesignDeltaViewer (loaded, error, toggle, close), axe-core audit per state. Integration test covers the full user flow from list to diff and back.

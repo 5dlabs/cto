@@ -1,29 +1,17 @@
-Implement subtask 7005: Implement browser test suite for environment banner, dashboard, and feature flag
+Implement subtask 7005: Implement PR creation via GitHub Pulls API and store PR metadata
 
 ## Objective
-Create Playwright browser specs covering the staging environment banner display, deliberation dashboard rendering and navigation, and feature flag gating behavior.
+Implement the function that creates a pull request from the pipeline branch to main, formats the PR body with run context and task summary, and stores the resulting PR URL and number in the pipeline run metadata.
 
 ## Steps
-1. Create `tests/e2e/hermes/browser/environment-banner.spec.ts`:
-   - Navigate to `E2E_BASE_URL`
-   - Assert an element containing 'STAGING' text is visible
-   - Assert the banner element's background color is in the amber family (e.g., rgb values in amber/yellow range)
-   - Use `page.waitForSelector` for reliability
-
-2. Create `tests/e2e/hermes/browser/deliberation-dashboard.spec.ts`:
-   - Load `fullAccessUser` storageState for browser context
-   - Navigate to `/hermes`
-   - Assert loading skeleton is visible initially (use `{ timeout: 2000 }` for the assertion, accept if skeleton is briefly shown)
-   - Assert deliberation cards render; count matches API response from GET `/api/hermes/deliberations`
-   - Click the first deliberation card → assert URL changes to `/hermes/{id}` pattern
-   - Assert detail page loads with deliberation data (title, status, created date visible)
-
-3. Create `tests/e2e/hermes/browser/feature-flag.spec.ts`:
-   - Test: With feature disabled (requires environment configuration per decision point), navigate to `/hermes` → assert either redirect to home/404 page
-   - Test: Assert the Hermes navigation item is NOT present in the sidebar/nav DOM
-   - Note: If dynamic flag toggling is not feasible, these tests should be skipped with `test.skip` and a clear annotation explaining the dependency on a separate deployment.
-
-4. All browser tests should use `expect(locator).toBeVisible()` pattern, never `page.waitForTimeout()`.
+1. Create `src/services/pr-creator.ts`.
+2. Implement `createPullRequest(client: GitHubClient, opts: { runId: string, taskCount: number, linearSessionUrl?: string }): Promise<{ prUrl: string, prNumber: number }>`.
+3. Format the PR title as `[Pipeline {runId}] Task Scaffolds`.
+4. Format the PR body with: task count, agents involved, link to Linear session (if provided), and a note that these are auto-generated scaffolds.
+5. `POST /repos/5dlabs/sigma-1/pulls` with `{ title, body, head: 'pipeline/{runId}', base: 'main' }`.
+6. Extract `html_url` and `number` from the response.
+7. Store the PR metadata in the pipeline run context — call the existing pipeline metadata store (or accept a callback/store interface) to persist `{ prUrl, prNumber }` keyed by runId.
+8. Return the PR URL and number.
 
 ## Validation
-Run browser specs across all 3 browser projects (chromium, firefox, webkit). Banner test confirms STAGING text and amber background. Dashboard test renders correct card count matching API. Feature flag test confirms Hermes is inaccessible when disabled. All pass in all 3 browsers.
+Unit test: mock POST pulls; verify request body has correct title format, body contains runId and task count, and head/base are correct. Unit test: verify returned prUrl and prNumber match the mock response. Unit test: verify metadata store is called with correct prUrl and prNumber. Unit test: verify PR body includes Linear session URL when provided, and omits it gracefully when not provided.
