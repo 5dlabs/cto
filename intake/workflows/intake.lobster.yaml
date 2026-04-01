@@ -88,7 +88,7 @@ steps:
         --issue-id "${linear_issue_id}" \
         --type plan \
         --title "Phase: PRD Parsing & Analysis" \
-        --body "Starting PRD parse and complexity analysis" || true
+        --body "Starting PRD parse and complexity analysis" >/dev/null || true
       intake-util linear-plan \
         --session-id "${linear_session_id}" \
         --step parse-prd || true
@@ -192,7 +192,7 @@ steps:
       intake-util linear-activity \
         --session-id "${linear_session_id}" \
         --type thought \
-        --body "$BODY" || true
+        --body "$BODY" >/dev/null || true
       intake-util linear-plan \
         --session-id "${linear_session_id}" \
         --step analyze-complexity || true
@@ -272,7 +272,7 @@ steps:
       intake-util linear-activity \
         --session-id "${linear_session_id}" \
         --type thought \
-        --body "$BODY" || true
+        --body "$BODY" >/dev/null || true
       intake-util linear-plan \
         --session-id "${linear_session_id}" \
         --step review-tasks || true
@@ -291,7 +291,7 @@ steps:
         --type action \
         --action "Refining tasks" \
         --parameter "Running committee vote and task expansion" \
-        --ephemeral || true
+        --ephemeral >/dev/null || true
       intake-util linear-plan \
         --session-id "${linear_session_id}" \
         --step refine-tasks || true
@@ -306,7 +306,17 @@ steps:
       WS="${WORKSPACE:-.}"
       mkdir -p "$WS/.intake/tmp"
       printf '%s' "$CTO_PARSE_PRD_OUT" > "$WS/.intake/tmp/refine-tasks-input.json"
-      printf '%s' "$CTO_ANALYZE_COMPLEXITY_OUT" > "$WS/.intake/tmp/refine-complexity-input.json"
+      if ! printf '%s' "$CTO_ANALYZE_COMPLEXITY_OUT" | jq -c '
+        if type == "array" then .
+        elif type == "object" and (.complexityAnalysis | type == "array") then .complexityAnalysis
+        elif type == "object" then [.]
+        else error("refine-tasks expected complexity array or .complexityAnalysis array")
+        end
+      ' > "$WS/.intake/tmp/refine-complexity-input.json"; then
+        echo "refine-tasks: FATAL — analyze-complexity output could not be normalized into a complexity array" >&2
+        printf 'refine-tasks complexity preview: %.500s\n' "$CTO_ANALYZE_COMPLEXITY_OUT" >&2
+        exit 1
+      fi
       ARGS=$(jq -n \
         --arg tasks_file "$WS/.intake/tmp/refine-tasks-input.json" \
         --arg complexity_file "$WS/.intake/tmp/refine-complexity-input.json" \
@@ -324,14 +334,18 @@ steps:
         --arg audio_debug "${audio_debug}" \
         '{tasks_file: $tasks_file, complexity_file: $complexity_file, evaluation_criteria: $evaluation_criteria, max_revisions: $max_revisions, model_primary_provider: $model_primary_provider, model_primary: $model_primary, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, linear_session_id: $linear_session_id, audio_debug: $audio_debug}')
       REFINE_LOG="$WS/.intake/task-refinement.log"
-      if ! lobster run --mode tool "$WS/intake/workflows/task-refinement.lobster.yaml" --args-json "$ARGS" 2>"$REFINE_LOG"; then
+      REFINE_STDOUT_LOG="$WS/.intake/task-refinement.stdout.log"
+      if ! lobster run --mode tool "$WS/intake/workflows/task-refinement.lobster.yaml" --args-json "$ARGS" >"$REFINE_STDOUT_LOG" 2>"$REFINE_LOG"; then
         echo "refine-tasks: FATAL — task-refinement workflow failed. Fix the expansion model or prompt and rerun." >&2
         echo "--- task-refinement stderr ---" >&2
         tail -80 "$REFINE_LOG" >&2
+        echo "--- task-refinement stdout ---" >&2
+        tail -80 "$REFINE_STDOUT_LOG" >&2
         echo "--- end ---" >&2
         "$WS/intake/scripts/workflow-gate-audio.sh" "intake" "refine-tasks" "failed: refinement workflow error" "${audio_debug}" "error"
         exit 1
       fi
+      cat "$REFINE_STDOUT_LOG"
 
   - id: verify-refine-tasks
     env:
@@ -402,7 +416,7 @@ steps:
         --type action \
         --action "Refined tasks" \
         --parameter "Committee review complete" \
-        --result "$BODY" || true
+        --result "$BODY" >/dev/null || true
 
   - id: linear-plan-generation
     command: |
@@ -413,7 +427,7 @@ steps:
         --issue-id "${linear_issue_id}" \
         --type plan \
         --title "Phase: Artifact Generation" \
-        --body "Generating scaffolds, docs, prompts, workflows, and security analysis" || true
+        --body "Generating scaffolds, docs, prompts, workflows, and security analysis" >/dev/null || true
       intake-util linear-plan \
         --session-id "${linear_session_id}" \
         --step generate-artifacts || true
@@ -498,7 +512,7 @@ steps:
         --session-id "${linear_session_id}" \
         --type thought \
         --title "Scaffolds Generated" \
-        --body "Generated code scaffolds for all tasks" || true
+        --body "Generated code scaffolds for all tasks" >/dev/null || true
 
   - id: linear-action-fan-out-docs
     command: |
@@ -508,7 +522,7 @@ steps:
         --type action \
         --action "Generating documentation" \
         --parameter "Running LLM fan-out for task docs" \
-        --ephemeral || true
+        --ephemeral >/dev/null || true
 
   - id: fan-out-docs
     env:
@@ -801,7 +815,7 @@ steps:
         --type action \
         --action "Validated documentation" \
         --parameter "${DOC_COUNT} docs for ${TASK_COUNT} tasks" \
-        --result "$BODY" || true
+        --result "$BODY" >/dev/null || true
 
   - id: search-skills
     env:
@@ -861,7 +875,7 @@ steps:
         --session-id "${linear_session_id}" \
         --type thought \
         --title "Skills Discovered" \
-        --body "Skill recommendations generated for all tasks" || true
+        --body "Skill recommendations generated for all tasks" >/dev/null || true
 
   - id: generate-tool-manifest
     env:
@@ -1020,8 +1034,16 @@ steps:
       EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       TASK_IDS=$(printf '%s' "$EXP" | jq '[.[].id]')
       PROMPTS_NORM="$(printf '%s' "$CTO_FAN_OUT_PROMPTS_OUT" | jq -c 'if type=="array" then map(select(type=="object")) elif .task_prompts? then (.task_prompts | map(select(type=="object"))) else [] end' 2>/dev/null || echo '[]')"
-      PROMPTS_FINAL="$(jq -nc --argjson tasks "$EXP" --argjson prompts "$PROMPTS_NORM" '
-        [ $tasks[] as $t
+      TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/validate-prompts.XXXXXX")"
+      trap 'rm -rf "$TMP_DIR"' EXIT
+      TASKS_FILE="$TMP_DIR/tasks.json"
+      PROMPTS_FILE="$TMP_DIR/prompts.json"
+      printf '%s' "$EXP" > "$TASKS_FILE"
+      printf '%s' "$PROMPTS_NORM" > "$PROMPTS_FILE"
+      PROMPTS_FINAL="$(jq -nc --slurpfile tasks "$TASKS_FILE" --slurpfile prompts "$PROMPTS_FILE" '
+        ($tasks[0] // []) as $tasks
+        | ($prompts[0] // []) as $prompts
+        | [ $tasks[] as $t
           | select($t | type == "object")
           | ([$prompts[]? | select(.task_id == $t.id)][0]) as $p
           | if (
@@ -1121,6 +1143,8 @@ steps:
         echo "validate-prompts: WARNING — prompt count ($PROMPT_COUNT) does not match task count ($TASK_COUNT)" >&2
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-prompts" "warning: prompt/task count mismatch ($PROMPT_COUNT vs $TASK_COUNT)" "${audio_debug}" "warning"
       fi
+      rm -rf "$TMP_DIR"
+      trap - EXIT
       printf '%s\n' "$PROMPTS_FINAL"
 
   - id: write-prompts
@@ -1140,7 +1164,7 @@ steps:
         --session-id "${linear_session_id}" \
         --type thought \
         --title "Prompts Written" \
-        --body "Per-agent implementation prompts written to .tasks/docs" || true
+        --body "Per-agent implementation prompts written to .tasks/docs" >/dev/null || true
 
   - id: generate-workflows
     env:
@@ -1273,7 +1297,7 @@ steps:
         --session-id "${linear_session_id}" \
         --type thought \
         --title "Security Report" \
-        --body "Security analysis found ${FINDING_COUNT} findings" || true
+        --body "Security analysis found ${FINDING_COUNT} findings" >/dev/null || true
 
   - id: generate-remediation-tasks
     env:
@@ -1571,7 +1595,7 @@ steps:
         --issue-id "${linear_issue_id}" \
         --type plan \
         --title "Phase: Commit & PR" \
-        --body "Committing generated artifacts and opening PR" || true
+        --body "Committing generated artifacts and opening PR" >/dev/null || true
       intake-util linear-plan \
         --session-id "${linear_session_id}" \
         --step commit-and-pr || true
@@ -1802,9 +1826,25 @@ steps:
       if ! printf '%s' "$ISSUE_COUNT" | jq -e 'type=="number" and . > 0' >/dev/null 2>&1; then
         echo "verify-delivery-gates: Linear issues gate skipped (issueCount=$ISSUE_COUNT)" >&2
       fi
+
+      # Agent assignment gate — fail if issues went unassigned
       if [ "$UNASSIGNED_ISSUE_COUNT" != "0" ]; then
-        echo "verify-delivery-gates: WARNING — $UNASSIGNED_ISSUE_COUNT Linear issues were left unassigned (agents=$UNRESOLVED_AGENTS)" >&2
+        echo "verify-delivery-gates: GATE FAILED — $UNASSIGNED_ISSUE_COUNT of $ISSUE_COUNT Linear issues were left unassigned" >&2
+        echo "verify-delivery-gates: unresolved agents: $UNRESOLVED_AGENTS" >&2
+
+        if [ "${INTAKE_ASSIGNMENT_GATE_SKIP:-false}" = "true" ] || [ "${INTAKE_ASSIGNMENT_GATE_SKIP:-false}" = "1" ]; then
+          echo "verify-delivery-gates: bypassed via INTAKE_ASSIGNMENT_GATE_SKIP — continuing with unassigned issues" >&2
+        else
+          ASSIGNED_COUNT=$((ISSUE_COUNT - UNASSIGNED_ISSUE_COUNT))
+          echo "verify-delivery-gates: $ASSIGNED_COUNT/$ISSUE_COUNT issues assigned, $UNASSIGNED_ISSUE_COUNT unassigned" >&2
+          echo "verify-delivery-gates: set INTAKE_ASSIGNMENT_GATE_SKIP=true to bypass this gate" >&2
+          "$root/intake/scripts/workflow-gate-audio.sh" "intake" "agent-assignment" "failed — ${UNASSIGNED_ISSUE_COUNT} issues unassigned" "${audio_debug}" "alert" "project ${project_name}" || true
+          exit 1
+        fi
+      else
+        echo "verify-delivery-gates: agent assignment gate PASSED — all $ISSUE_COUNT issues assigned" >&2
       fi
+
       if [ -z "$PR_URL" ]; then
         echo "verify-delivery-gates: PR gate skipped (no PR URL — may need manual creation)" >&2
         PR_URL="none"
@@ -1826,7 +1866,7 @@ steps:
         --session-id "${linear_session_id}" \
         --type thought \
         --title "PR Created" \
-        --body "Pull request opened: ${PR_URL}" || true
+        --body "Pull request opened: ${PR_URL}" >/dev/null || true
 
   - id: session-url-pr
     env:
