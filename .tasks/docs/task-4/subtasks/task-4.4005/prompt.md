@@ -1,25 +1,20 @@
-Implement subtask 4005: Build deliberation detail page with status updates and tabbed artifacts
+Implement subtask 4005: Responsive layout implementation for 320px to 1920px viewports
 
 ## Objective
-Create `app/hermes/[id]/page.tsx` — the deliberation detail view showing metadata, polling-based status updates, and a tabbed artifact section for current-site screenshots and variant snapshots.
+Ensure the entire design-snapshots page, including the PR card grid and the diff viewer, is fully responsive across viewports from 320px to 1920px with no horizontal overflow or layout breakage.
 
 ## Steps
-1. Create `app/hermes/[id]/page.tsx` as a client component.
-2. Use `useDeliberation(id)` hook — configure SWR to poll every 3 seconds when status is `pending` or `processing`, stop polling when `completed` or `failed`.
-3. Header section:
-   - Deliberation ID with copy button
-   - Status Badge (same color coding as dashboard)
-   - Processing time indicator (elapsed time if in progress, total duration if completed)
-   - Target URL (linked)
-   - Triggered by and timestamp
-4. Artifact section using shadcn Tabs:
-   - Tab 1: "Current Site" — shows the current-site screenshot artifact
-   - Tab 2: "Variants" — shows all variant snapshot artifacts
-   - Use `useDeliberationArtifacts(id)` to fetch artifacts, then filter by `artifactType`
-5. Each tab renders artifact cards with thumbnail previews loaded from presigned URLs.
-6. Loading state: Skeleton components for the entire page while initial data loads.
-7. Error/failed state: if deliberation status is `failed`, show a prominent error message with any available error details from metadata.
-8. Back navigation: breadcrumb or back link to `/hermes`.
+1. **Card grid breakpoints** (verify/refine from subtask 4002):
+   - 320px–639px: single column, cards full width with appropriate padding (min 16px side padding).
+   - 640px–1023px: 2-column grid.
+   - 1024px–1920px: 3-column grid.
+   - Ensure card content (especially long PR titles) wraps or truncates with ellipsis and a title tooltip.
+2. **Diff viewer responsiveness**:
+   - On viewports <768px, force inline view mode (side-by-side is unusable) and hide the split-view toggle or disable it with a tooltip explaining why.
+   - Wrap the diff viewer in `overflow-x-auto` so wide lines scroll horizontally within the container.
+   - File section headers should be sticky on scroll.
+3. **Page-level layout**: Ensure the page header, breadcrumbs (if any), and content area have appropriate max-width (e.g., `max-w-7xl mx-auto`) and side padding.
+4. Test that at 320px, no element causes horizontal page scroll (use `overflow-x: hidden` on body as a safeguard is NOT acceptable — fix the actual overflow).
 
 ## Validation
-Component test: mock a completed deliberation with 1 current-site and 2 variant artifacts. Verify header shows correct metadata, Tabs component has 2 tabs, 'Current Site' tab shows 1 artifact, 'Variants' tab shows 2 artifacts. Polling test: mock a 'processing' deliberation, verify SWR refetch interval is set (check `useSWR` config). Status transition test: start with 'processing' mock, update to 'completed', verify status badge updates and polling stops.
+Visual regression: capture screenshots at 320px, 480px, 768px, 1024px, 1440px, and 1920px widths for both the list view and the diff viewer. Verify no horizontal overflow at any width. Verify card grid column count matches spec at each breakpoint. Verify diff viewer forces inline mode below 768px.

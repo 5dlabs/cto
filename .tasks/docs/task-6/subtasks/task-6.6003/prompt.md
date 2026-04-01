@@ -1,28 +1,20 @@
-Implement subtask 6003: Implement rollback trigger monitoring with sliding window counters
+Implement subtask 6003: Write comprehensive unit and integration tests for the Linear-Discord bridge
 
 ## Objective
-Build a lightweight in-process monitor that tracks failure rates and latencies using sliding window counters (Redis-backed), evaluates rollback trigger conditions, and emits `rollback_trigger` log entries when thresholds are exceeded.
+Create a full test suite covering single event notification, batched notifications, disabled toggle, Discord failure resilience, and end-to-end integration with the pipeline.
 
 ## Steps
-Step-by-step:
-1. Create `src/modules/hermes/logging/rollback-monitor.ts`.
-2. Implement `SlidingWindowCounter` class:
-   - Backed by Redis sorted sets (ZADD with timestamp scores, ZRANGEBYSCORE for window queries, ZREMRANGEBYSCORE for cleanup).
-   - Methods: `increment(key: string)`, `getCount(key: string, windowMs: number): Promise<number>`, `getRate(successKey: string, failureKey: string, windowMs: number): Promise<number>`.
-   - Use configurable Redis connection from environment/ConfigMap.
-3. Implement `RollbackMonitor` class that uses `SlidingWindowCounter`:
-   - `recordDeliberationResult(success: boolean, latencyMs: number)` — increments counters.
-   - `recordArtifactWriteResult(success: boolean)` — increments counters.
-   - `recordMigrationFailure()` — increments consecutive failure counter.
-   - `recordMigrationSuccess()` — resets consecutive failure counter.
-4. Implement `evaluateThresholds()` method (called after each `record*` call):
-   - Deliberation failure rate > 20% over 5-minute window → emit rollback trigger.
-   - Artifact write failure rate > 10% over 5-minute window → emit rollback trigger.
-   - Migration consecutive failures > 5 → emit rollback trigger.
-   - P99 deliberation latency > 30s → emit rollback trigger (maintain a sorted list of recent latencies for percentile calculation).
-5. When a threshold is breached, call `hermesLogger.error()` with `rollback_trigger: true`, appropriate `error_code` (e.g., `FAILURE_RATE_EXCEEDED`, `LATENCY_EXCEEDED`), and the current metric values.
-6. Add debouncing: don't emit the same rollback trigger more than once per 5-minute window.
-7. Export `RollbackMonitor` singleton factory.
+1. Create `src/services/__tests__/linear-discord-bridge.test.ts` using Bun's test runner.
+2. Mock `DiscordNotifier.sendEmbed` and the `issueEvents` emitter.
+3. Test cases:
+   a. **Single event**: emit one `issue.created`, advance fake timers by 2s, assert `sendEmbed` called once with embed color `0x9b59b6`, title `'📋 New Issue Created'`, and fields containing the issue title as a link, assignee name, and agent hint.
+   b. **Batched events**: emit 5 events within 500ms, advance timers by 2s, assert `sendEmbed` called once with 5 sets of fields.
+   c. **Batch splitting**: emit 30 events, verify multiple `sendEmbed` calls each with ≤25 fields.
+   d. **Toggle disabled**: set env `ENABLE_ISSUE_DISCORD_BRIDGE=false`, reinitialize bridge, emit events, assert zero `sendEmbed` calls.
+   e. **Unassigned handling**: emit event with `assigneeName: null`, verify embed field shows 'Unassigned'.
+   f. **Discord failure**: mock `sendEmbed` to reject, emit event, advance timers, verify error is logged (spy on logger) and no exception propagates.
+   g. **Non-blocking**: verify that the issue creation function returns before `sendEmbed` is called (using timing assertions or call order tracking).
+4. Integration test (can be marked as e2e): trigger a pipeline run that creates 5+ issues via the PM server, capture Discord webhook requests (via a mock server or intercepted fetch), and verify batched embed(s) arrive with correct content.
 
 ## Validation
-Unit test with mock Redis: Record 25 deliberation failures and 0 successes — verify `evaluateThresholds()` emits a rollback trigger log with `error_code: 'FAILURE_RATE_EXCEEDED'`. Record 80 successes and 20 failures (20% rate) — verify trigger fires. Record 79 successes and 21 failures — verify no trigger at exactly 20% boundary. Test debounce: trigger twice within 5 minutes — verify only one log emitted. Test P99 latency: record 99 deliberations at 1s and 1 at 35s — P99 is 35s > 30s threshold — verify trigger. Test consecutive migration failures: record 6 failures — verify trigger; record 4 failures then 1 success then 4 failures — verify NO trigger (reset on success).
+All tests pass with `bun test`. Coverage report shows ≥90% line coverage for `linear-discord-bridge.ts`. Each test case listed above has a corresponding passing test. Integration test verifies end-to-end flow with mock Discord endpoint.

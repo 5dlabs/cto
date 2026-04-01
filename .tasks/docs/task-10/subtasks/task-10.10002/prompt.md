@@ -1,13 +1,14 @@
-Implement subtask 10002: Create ClusterRole for Hermes operator (human admin) access
+Implement subtask 10002: Update all Deployment specs to use dedicated ServiceAccounts
 
 ## Objective
-Create a ClusterRole and ClusterRoleBinding for human Hermes operators granting full access to the hermes-production namespace resources.
+Modify every Deployment in sigma1-prod to reference its dedicated ServiceAccount, removing any reliance on the default ServiceAccount.
 
 ## Steps
-1. Create `ClusterRole` `hermes-operator` with rules granting full access (`*` verbs) to all resources in the `hermes-production` namespace, scoped via a `ClusterRoleBinding` with namespace restriction or via a namespaced `Role` + `RoleBinding` if full cluster-level access is not needed.
-2. Alternatively, create a namespaced `Role` `hermes-operator` in `hermes-production` with `*` verbs on `*` resources, and bind it to the operator group/users.
-3. Document which users/groups should be bound to this role.
-4. Do NOT grant cluster-admin or access to other namespaces.
+1. Edit the PM server Deployment spec: set `spec.template.spec.serviceAccountName: sa-pm-server` and `automountServiceAccountToken: true`.
+2. Edit the frontend Deployment spec: set `spec.template.spec.serviceAccountName: sa-frontend` and `automountServiceAccountToken: true`.
+3. Ensure no Deployment omits `serviceAccountName` (which would default to `default`).
+4. Apply updated Deployments and wait for rollout to complete.
+5. Verify with: `kubectl get pods -n sigma1-prod -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.serviceAccountName}{"\n"}{end}'` — no pod should show `default`.
 
 ## Validation
-Verify an operator-bound user can `kubectl get all -n hermes-production` and `kubectl delete pod -n hermes-production <pod>` but cannot access resources in `kube-system` or other namespaces via the Hermes operator role.
+Run `kubectl get pods -n sigma1-prod -o jsonpath='{.items[*].spec.serviceAccountName}'` and confirm output contains only `sa-pm-server` and `sa-frontend`, never `default`.

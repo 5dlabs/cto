@@ -1,7 +1,7 @@
-Implement task 1: Provision Dev and Staging Infrastructure (Bolt - Kubernetes/Helm)
+Implement task 1: Provision Dev Infrastructure for Sigma-1 E2E Pipeline (Bolt - Kubernetes/Helm)
 
 ## Goal
-Bootstrap dev and staging namespaces with all operator-managed data services, dedicated MinIO bucket, secrets, ConfigMap, and ArgoCD Application CRs for the Hermes pipeline. This is the foundational task — every subsequent task depends on it.
+Set up the development infrastructure required for the Sigma-1 agent delegation E2E pipeline. This includes creating a dedicated namespace, provisioning secrets for Linear API, Discord webhook, GitHub PAT, and NOUS_API_KEY, and publishing a sigma1-infra-endpoints ConfigMap aggregating all service connection strings so downstream tasks never re-provision infra.
 
 ## Task Context
 - Agent owner: bolt
@@ -10,60 +10,32 @@ Bootstrap dev and staging namespaces with all operator-managed data services, de
 - Dependencies: None
 
 ## Implementation Plan
-Step-by-step implementation:
-
-1. **Namespace creation:** Create `hermes-dev` and `hermes-staging` namespaces with appropriate labels (`app.kubernetes.io/part-of: hermes`, `environment: dev|staging`).
-
-2. **CloudNative-PG PostgreSQL:** Deploy single-replica `Cluster` CRs in each namespace. Configure `initdb` with a `hermes` database. Store connection credentials in namespace-scoped secrets (`hermes-pg-credentials`).
-
-3. **Redis operator:** Deploy single-replica Redis CRs in each namespace. Store connection string in namespace-scoped secret (`hermes-redis-credentials`).
-
-4. **NATS operator:** Deploy single-replica NATS CRs in each namespace. Not actively wired but must be available for future decoupling per D1. Store connection string in secret (`hermes-nats-credentials`).
-
-5. **MinIO — dedicated bucket (CRITICAL per D2):** Do NOT reuse `gitlab/gitlab-minio-svc`. Either:
-   a. Deploy a dedicated MinIO tenant via the MinIO Operator in each namespace, OR
-   b. If using the existing MinIO cluster, create a dedicated bucket (`hermes-artifacts-dev`, `hermes-artifacts-staging`) with independent IAM credentials and lifecycle policy.
-   Store S3 endpoint, access key, secret key, and bucket name in secret (`hermes-minio-credentials`).
-   Configure lifecycle policy: 90-day retention for dev, 365-day for staging (configurable via values).
-
-6. **ConfigMap aggregation:** Create `hermes-infra-endpoints` ConfigMap in each namespace aggregating all connection strings:
-   - `CNPG_HERMES_URL` — PostgreSQL connection string
-   - `REDIS_HERMES_URL` — Redis connection string
-   - `NATS_HERMES_URL` — NATS connection string
-   - `MINIO_HERMES_ENDPOINT` — MinIO S3 endpoint
-   - `MINIO_HERMES_BUCKET` — Bucket name
-   - `ENVIRONMENT` — `dev` or `staging`
-   All later tasks reference this ConfigMap via `envFrom`.
-
-7. **Secrets management:** Each namespace gets independent secrets for all services. No cross-namespace secret references. Use `SealedSecrets` or existing secret management pattern in the cluster.
-
-8. **ArgoCD Application CRs (gap resolution):** Create ArgoCD `Application` CRs for:
-   - `hermes-backend-dev` and `hermes-backend-staging` (Bun/Elysia service)
-   - `hermes-frontend-dev` and `hermes-frontend-staging` (Next.js app)
-   Configure automated sync for dev, manual sync with auto-prune for staging. Staging promotion should be gated by successful E2E test runs (annotation hook for Task 7 integration).
-
-9. **Loki verification:** Confirm `openclaw/loki-*` services are accessible from the new namespaces. No provisioning needed, but verify log shipping works by deploying a test pod that emits structured JSON.
-
-10. **Helm chart structure:** Package all of the above into a Helm chart (`charts/hermes-infra`) with `values-dev.yaml` and `values-staging.yaml` overlays. Single `helm upgrade --install` per environment.
+1. Create Kubernetes namespace `sigma1-dev`.
+2. Create sealed secrets:
+   - `linear-api-token` — Linear API key for issue creation and delegate resolution.
+   - `discord-webhook-url` — Discord channel webhook for notifications.
+   - `github-pat` — GitHub personal access token with repo scope for 5dlabs/sigma-1.
+   - `nous-api-key` — Hermes/Nous research API key.
+3. Deploy a ConfigMap `sigma1-infra-endpoints` with keys:
+   - `PM_SERVER_URL` — internal service URL for the PM server.
+   - `LINEAR_API_BASE` — https://api.linear.app/graphql.
+   - `DISCORD_WEBHOOK_URL` — referenced from secret.
+   - `GITHUB_API_BASE` — https://api.github.com.
+   - `NOUS_API_BASE` — Hermes research endpoint.
+4. Create a Helm values file `values-sigma1-dev.yaml` with single-replica deployments for the PM server and any auxiliary services.
+5. Apply network policies allowing egress to Linear, Discord, GitHub, and Nous APIs.
+6. Validate all secrets are mounted and ConfigMap is readable from a test pod.
 
 ## Acceptance Criteria
-1. `kubectl get namespace hermes-dev hermes-staging` returns both namespaces in Active state.
-2. `kubectl get clusters.postgresql.cnpg.io -n hermes-dev` shows a Ready cluster with 1 replica.
-3. `kubectl get configmap hermes-infra-endpoints -n hermes-dev -o jsonpath='{.data.CNPG_HERMES_URL}'` returns a valid PostgreSQL connection string.
-4. `kubectl exec` a test pod in `hermes-dev` that connects to PostgreSQL, Redis, NATS, and MinIO using only env vars from `hermes-infra-endpoints` ConfigMap and mounted secrets — all four connections succeed.
-5. MinIO bucket `hermes-artifacts-dev` exists and is writable with dedicated credentials, AND those credentials do NOT have access to any GitLab-owned buckets.
-6. ArgoCD UI shows `hermes-backend-dev` and `hermes-frontend-staging` Application CRs in Synced/Healthy state (initially empty).
-7. A structured JSON log emitted from a test pod in `hermes-dev` is queryable in Loki via LogQL within 30 seconds.
+1. `kubectl get namespace sigma1-dev` returns Active. 2. `kubectl get secret -n sigma1-dev` lists all four secrets. 3. `kubectl get configmap sigma1-infra-endpoints -n sigma1-dev -o json` contains all five expected keys. 4. A curl pod in the namespace can resolve PM_SERVER_URL and reach LINEAR_API_BASE with a 200/401 (auth expected). 5. Network policy audit confirms egress only to allowed CIDRs.
 
 ## Subtasks
-- Create hermes-dev and hermes-staging namespaces with labels and Loki verification: Create both Kubernetes namespaces with standard labels and verify Loki log shipping is accessible from the new namespaces.
-- Deploy CloudNative-PG PostgreSQL Cluster CRs and credential secrets: Deploy single-replica CNPG Cluster custom resources in both hermes-dev and hermes-staging namespaces with initdb configuration and credential secrets.
-- Deploy Redis operator CRs and credential secrets: Deploy single-replica Redis custom resources in both namespaces with connection string stored in namespace-scoped secrets.
-- Deploy NATS operator CRs and credential secrets: Deploy single-replica NATS custom resources in both namespaces for future decoupling, with connection strings stored in secrets.
-- Provision dedicated MinIO bucket with IAM credentials and lifecycle policies: Create a dedicated MinIO bucket for Hermes artifacts in each namespace with independent IAM credentials and configurable retention lifecycle policies. Must NOT reuse GitLab-owned buckets.
-- Create hermes-infra-endpoints ConfigMap aggregating all service connection strings: Create the hermes-infra-endpoints ConfigMap in each namespace that aggregates all infrastructure connection strings for downstream service consumption via envFrom.
-- Create ArgoCD Application CRs for backend and frontend in both environments: Create ArgoCD Application custom resources for hermes-backend and hermes-frontend in both dev and staging namespaces with appropriate sync policies.
-- Package Helm chart with values overlays for dev and staging: Structure and finalize the charts/hermes-infra Helm chart with values-dev.yaml and values-staging.yaml overlays, ensuring a single helm upgrade --install per environment deploys everything.
+- Create sigma1-dev Kubernetes namespace: Create the dedicated `sigma1-dev` namespace that will host all Sigma-1 pipeline resources including secrets, ConfigMaps, and workloads.
+- Provision sealed secrets for Linear API, Discord webhook, GitHub PAT, and NOUS_API_KEY: Create four SealedSecret resources in the sigma1-dev namespace for `linear-api-token`, `discord-webhook-url`, `github-pat`, and `nous-api-key`, ensuring each secret holds its respective API credential.
+- Create sigma1-infra-endpoints ConfigMap: Deploy the `sigma1-infra-endpoints` ConfigMap in sigma1-dev containing all five service connection strings (PM_SERVER_URL, LINEAR_API_BASE, DISCORD_WEBHOOK_URL, GITHUB_API_BASE, NOUS_API_BASE) that downstream tasks consume via envFrom.
+- Author Helm values file for single-replica dev deployments: Create `values-sigma1-dev.yaml` Helm values file configuring single-replica deployments for the PM server and any auxiliary services, referencing the sigma1-infra-endpoints ConfigMap and provisioned secrets.
+- Apply network policies for egress to Linear, Discord, GitHub, and Nous APIs: Create and apply Kubernetes NetworkPolicy resources in sigma1-dev allowing egress traffic to Linear API, Discord webhooks, GitHub API, and Nous/Hermes API endpoints while denying all other egress by default.
+- Validate infrastructure with a test pod: Deploy a temporary curl/test pod in sigma1-dev to validate that all secrets are mountable, the ConfigMap is readable, DNS resolution works, and network policies allow expected egress while blocking unexpected traffic.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

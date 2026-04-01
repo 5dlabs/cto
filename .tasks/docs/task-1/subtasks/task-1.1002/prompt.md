@@ -1,15 +1,18 @@
-Implement subtask 1002: Deploy CloudNative-PG PostgreSQL Cluster CRs and credential secrets
+Implement subtask 1002: Provision sealed secrets for Linear API, Discord webhook, GitHub PAT, and NOUS_API_KEY
 
 ## Objective
-Deploy single-replica CNPG Cluster custom resources in both hermes-dev and hermes-staging namespaces with initdb configuration and credential secrets.
+Create four SealedSecret resources in the sigma1-dev namespace for `linear-api-token`, `discord-webhook-url`, `github-pat`, and `nous-api-key`, ensuring each secret holds its respective API credential.
 
 ## Steps
-1. Create a Helm template for the CNPG `Cluster` CR in `charts/hermes-infra/templates/cnpg-cluster.yaml`.
-2. Configure single-replica (1 instance) for both dev and staging.
-3. Set `initdb` to create a `hermes` database with appropriate encoding (UTF-8).
-4. The CNPG operator auto-generates secrets; ensure the generated secret is named or aliased to `hermes-pg-credentials` in each namespace.
-5. Verify the secret contains keys: `host`, `port`, `dbname`, `username`, `password`, or a composite `uri` key.
-6. Add values for storage class and size in `values-dev.yaml` (1Gi) and `values-staging.yaml` (5Gi).
+1. For each of the four secrets (`linear-api-token`, `discord-webhook-url`, `github-pat`, `nous-api-key`), create a standard Kubernetes Secret manifest with the appropriate data key (e.g., `token`, `url`, `pat`, `api-key`).
+2. Use `kubeseal` to encrypt each Secret manifest into a SealedSecret YAML file:
+   - `sealed-secret-linear-api-token.yaml`
+   - `sealed-secret-discord-webhook-url.yaml`
+   - `sealed-secret-github-pat.yaml`
+   - `sealed-secret-nous-api-key.yaml`
+3. All SealedSecrets target namespace `sigma1-dev`.
+4. Apply all four SealedSecret manifests: `kubectl apply -f sealed-secret-*.yaml -n sigma1-dev`.
+5. Verify the sealed-secrets controller decrypts them into usable Secret objects.
 
 ## Validation
-`kubectl get clusters.postgresql.cnpg.io -n hermes-dev` shows a Ready cluster with 1 replica. `kubectl get secret hermes-pg-credentials -n hermes-dev` exists and contains valid PostgreSQL connection parameters.
+`kubectl get secret -n sigma1-dev` lists `linear-api-token`, `discord-webhook-url`, `github-pat`, and `nous-api-key`. Each secret has the expected data key present (non-empty) when described with `kubectl get secret <name> -n sigma1-dev -o jsonpath='{.data}'`.

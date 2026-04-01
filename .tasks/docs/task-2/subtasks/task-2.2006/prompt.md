@@ -1,22 +1,23 @@
-Implement subtask 2006: Implement REST endpoints and register Elysia plugin with feature flag
+Implement subtask 2006: Write unit and integration tests for agent delegation flow
 
 ## Objective
-Implement all four Hermes REST endpoints as Elysia route handlers, wire them to the service layer with RBAC guards, register as a plugin, and implement the HERMES_ENABLED feature flag.
+Create comprehensive test coverage for resolve_agent_delegates, the updated issueCreate integration, cache behavior, and end-to-end pipeline delegation.
 
 ## Steps
-1. In `src/modules/hermes/routes.ts`, implement four route handlers using Elysia:
-   - `POST /api/hermes/deliberations` — guard: `hermes:trigger`. Parse body, call `service.triggerDeliberation()`, return 201 with deliberation object.
-   - `GET /api/hermes/deliberations/:id` — guard: `hermes:read`. Parse UUID param, call `service.getDeliberation()`, return 200 or 404.
-   - `GET /api/hermes/deliberations` — guard: `hermes:read`. Parse pagination query params, call `service.listDeliberations()`, return 200 with paginated response.
-   - `GET /api/hermes/deliberations/:id/artifacts` — guard: `hermes:read`. Call `service.getDeliberationArtifacts()`, return 200 with artifacts array.
-2. Apply Elysia validation schemas (using `t.Object()` from Elysia's typebox) for request bodies and query params.
-3. In `src/modules/hermes/index.ts`, create `hermesPlugin` as an Elysia instance/plugin:
-   - Check `process.env.HERMES_ENABLED` — if not `'true'`, return an empty plugin (no routes registered).
-   - Instantiate `HermesRepository`, `HermesArtifactWriter`, and `HermesService` with dependency injection.
-   - Mount all routes.
-4. In the main app entry point, register: `app.use(hermesPlugin)`.
-5. Ensure Hermes routes do NOT conflict with any existing legacy pipeline routes.
-6. All endpoints return structured JSON error responses with `error_code` on failure.
+1. **Unit tests for resolve_agent_delegates:**
+   a. Mock Linear users API returning 3 agents (bolt, nova, blaze). Assert correct map returned.
+   b. Include an unknown hint. Assert it's excluded from map and a warning is logged.
+   c. Simulate Linear API failure. Assert graceful degradation (empty map, error logged).
+2. **Unit tests for cache:**
+   a. Verify second call doesn't hit API. Verify clearDelegateCache resets.
+3. **Integration test for issueCreate with assigneeId:**
+   a. Mock Linear issueCreate mutation. Submit a task with hint 'nova'. Assert assigneeId is present in mutation variables.
+   b. Submit a task with unresolvable hint. Assert assigneeId is absent.
+4. **Regression test for legacy label removal:**
+   a. Run issue creation flow. Assert no 'agent:pending' label is attached to any created issue.
+5. **End-to-end test:**
+   a. Run a full pipeline with 5+ tasks. Query created issues and verify non-null assigneeId on all resolvable hints.
+6. Use Bun's built-in test runner (`bun test`).
 
 ## Validation
-Integration test: `POST /api/hermes/deliberations` with valid session and `hermes:trigger` claim returns 201 with deliberation ID. Same without claim returns 403. `GET /api/hermes/deliberations/:id` returns correct record. `GET /api/hermes/deliberations` returns paginated list. When `HERMES_ENABLED=false`, all Hermes routes return 404.
+All tests pass with `bun test`. Coverage report shows >90% line coverage for resolve-agent-delegates.ts and the modified issue creation module. CI pipeline gate on test pass.

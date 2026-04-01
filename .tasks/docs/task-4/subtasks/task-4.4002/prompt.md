@@ -1,24 +1,21 @@
-Implement subtask 4002: Initialize shadcn/ui and install required components
+Implement subtask 4002: Build DesignSnapshotList component with PR cards, loading skeletons, and error state
 
 ## Objective
-Run `shadcn-ui init` to set up the component system with Tailwind CSS, then install all needed components (Card, Badge, Tabs, Dialog, Skeleton, Button, Table) into `components/ui/`.
+Implement the `DesignSnapshotList` component that receives PR data (or loading/error states) and renders a list of PR cards with title, number, GitHub link, status badge, files changed count, and relative timestamp. Include loading skeleton placeholders and an error message UI.
 
 ## Steps
-1. Run `npx shadcn-ui@latest init` in the project root:
-   - Select Tailwind CSS as the styling approach
-   - Configure `components.json` with the correct paths: `components` alias pointing to `@/components`, `utils` to `@/lib/utils`
-   - Confirm `tailwind.config.ts` is updated with shadcn's required config (CSS variables, animation plugin)
-2. Install each component individually:
-   - `npx shadcn-ui@latest add card` → `components/ui/card.tsx`
-   - `npx shadcn-ui@latest add badge` → `components/ui/badge.tsx`
-   - `npx shadcn-ui@latest add tabs` → `components/ui/tabs.tsx`
-   - `npx shadcn-ui@latest add dialog` → `components/ui/dialog.tsx`
-   - `npx shadcn-ui@latest add skeleton` → `components/ui/skeleton.tsx`
-   - `npx shadcn-ui@latest add button` → `components/ui/button.tsx`
-   - `npx shadcn-ui@latest add table` → `components/ui/table.tsx`
-3. Verify `lib/utils.ts` exists with the `cn()` utility function (class merging via clsx + tailwind-merge).
-4. Confirm all components are copied into the codebase (no runtime external dependency).
-5. Run a quick build (`next build`) to ensure no import errors or Tailwind config issues.
+1. Create `components/DesignSnapshotList.tsx`. Accept props: `{ prs, isLoading, error, onSelectPR }`.
+2. **Loading state**: When `isLoading` is true, render 3 skeleton cards using Tailwind's `animate-pulse` on placeholder divs matching card dimensions.
+3. **Error state**: When `error` is truthy, render an error banner with the message and a 'Retry' button (calls a retry callback prop).
+4. **Empty state**: When `prs` is an empty array, render a centered message: 'No design snapshots found for this run.'
+5. **Populated state**: Map over `prs` and render a card for each:
+   - PR title as an `<a>` linking to `pr.url` (opens in new tab with `rel='noopener noreferrer'`).
+   - PR number displayed as `#${pr.number}`.
+   - Status badge: green for 'open', purple for 'merged', red for 'closed'. Use a `<span>` with appropriate Tailwind bg/text classes.
+   - Files changed: e.g., '5 files changed'.
+   - Relative timestamp using a lightweight formatter (e.g., `Intl.RelativeTimeFormat` or a small utility function — no heavy dependency).
+   - The entire card is clickable (calls `onSelectPR(pr.number)`) to trigger the diff viewer.
+6. Cards should use a CSS grid layout: single column on mobile (<640px), 2 columns on tablet, 3 columns on desktop.
 
 ## Validation
-Verify each component file exists at its expected path under `components/ui/`. Import each component in a test file and confirm it renders without errors. Run `next build` — zero errors related to shadcn components or missing utilities. Confirm `cn()` function works correctly by passing test class strings.
+Component test: render with 3 mocked PRs, assert 3 cards exist with correct titles, status badge colors, and GitHub links. Render with empty array, assert 'No design snapshots' message. Render with isLoading=true, assert skeleton elements. Render with error, assert error message and retry button.

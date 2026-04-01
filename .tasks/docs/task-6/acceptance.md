@@ -1,11 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. Structured log validation: All Hermes API requests generate logs queryable in Loki via `{app="hermes"} | json | module="hermes"` — each entry contains `rollout_phase`, `operation`, and `duration_ms` fields.
-- [ ] 2. Rollback trigger: Simulate 25 consecutive deliberation failures; verify that a log entry with `rollback_trigger=true` and `error_code=FAILURE_RATE_EXCEEDED` appears in Loki within 1 minute.
-- [ ] 3. MinIO health monitoring: Stop the MinIO service for 4 minutes; verify that logs with `minio_health="unreachable"` appear and a `rollback_trigger` log is emitted after 3 consecutive failures.
-- [ ] 4. Grafana dashboards: The Rollout Health Dashboard loads in Grafana without errors and displays at least one data point when the Hermes service has been running for >5 minutes.
-- [ ] 5. LogQL queryability: The query `{app="hermes"} | json | migration_step="complete"` returns results after a migration run (cross-validates with Task 5).
-- [ ] 6. Error code taxonomy: Deliberation errors, artifact write errors, and migration errors each use distinct `error_code` values — verified by querying `{app="hermes"} | json | error_code!="" | line_format "{{.error_code}}"` and confirming at least 3 distinct codes in test runs.
+- [ ] 1. Unit test: emit issue.created event; verify DiscordNotifier receives a POST with purple embed containing correct issue title and assignee. 2. Unit test: emit 5 events within 1 second; verify only 1 batched Discord message is sent containing all 5 issues. 3. Unit test: set ENABLE_ISSUE_DISCORD_BRIDGE=false; verify no Discord call made. 4. Unit test: simulate Discord API failure; verify issue creation flow is not blocked and error is logged. 5. Integration test: run pipeline creating 5+ issues; verify Discord channel receives batched issue notification(s) with correct assignee names.
 
 ## Verification Notes
 

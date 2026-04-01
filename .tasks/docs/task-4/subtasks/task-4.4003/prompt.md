@@ -1,24 +1,19 @@
-Implement subtask 4003: Create typed Hermes API client
+Implement subtask 4003: Implement DesignDeltaViewer component with diff library integration
 
 ## Objective
-Create `lib/hermes-api.ts` — a typed API client for all Hermes backend endpoints, with SWR hooks for data fetching, error handling, and types mirroring the backend definitions.
+Build the `DesignDeltaViewer` component that fetches diff data for a selected PR from `GET /api/pipeline/:runId/prs/:number/diff` and renders it using `react-diff-viewer-continued` v3.x with side-by-side and inline toggle modes, plus its own loading and error states.
 
 ## Steps
-1. Create `lib/hermes-api.ts` with the following types (mirroring backend):
-   - `Deliberation`: `{ id: string; status: 'pending' | 'processing' | 'completed' | 'failed'; targetUrl: string; triggeredBy: string; createdAt: string; completedAt?: string; artifactCount: number }`
-   - `Artifact`: `{ id: string; deliberationId: string; artifactType: 'current_site_screenshot' | 'variant_snapshot'; storageKey: string; contentType: string; sizeBytes: number; metadata: Record<string, unknown>; createdAt: string }`
-   - `PresignedUrlResponse`: `{ url: string; expiresAt: string; contentType: string; sizeBytes: number }`
-2. Implement fetch-based API functions:
-   - `fetchDeliberations(page: number, limit: number): Promise<{ data: Deliberation[]; total: number }>`
-   - `fetchDeliberation(id: string): Promise<Deliberation>`
-   - `fetchDeliberationArtifacts(deliberationId: string): Promise<Artifact[]>`
-   - `fetchArtifactUrl(artifactId: string): Promise<PresignedUrlResponse>`
-3. Create SWR hooks:
-   - `useDeliberations(page, limit)` — returns `{ data, error, isLoading }`
-   - `useDeliberation(id)` — with refresh interval when status is `pending` or `processing`
-   - `useDeliberationArtifacts(deliberationId)`
-4. Error handling: parse API error responses, throw typed errors, and surface user-friendly messages via toast notifications (use a toast library already in the project or a simple custom toast).
-5. Base URL: use `NEXT_PUBLIC_API_BASE_URL` env var, or default to relative path `/api`.
+1. Install `react-diff-viewer-continued` v3.x: `npm install react-diff-viewer-continued`.
+2. Create `components/DesignDeltaViewer.tsx`. Accept props: `{ runId, prNumber, onClose }`.
+3. Implement a hook `useDesignDiff(runId, prNumber)` that fetches `GET /api/pipeline/${runId}/prs/${prNumber}/diff`. Expect the response to contain `{ files: [{ filename, old_content, new_content }] }` (or adapt to the actual API shape).
+4. **Loading state**: Show a skeleton or spinner while the diff is loading.
+5. **Error state**: Show an error message with a 'Retry' button.
+6. **Diff rendering**: For each file in the diff response, render a collapsible section with the filename as header. Inside, render `<ReactDiffViewer oldValue={old_content} newValue={new_content} splitView={splitView} />` where `splitView` is toggled by a button.
+7. Add a toggle control at the top: 'Side-by-side' vs 'Inline' view mode.
+8. Add a 'Close' button or back-navigation that calls `onClose`.
+9. Style the viewer container to be full-width with horizontal scroll for wide diffs on narrow viewports.
+10. Integrate into the page: when `onSelectPR` is called from DesignSnapshotList, show the DesignDeltaViewer (e.g., as a slide-in panel or replacing the list with a back button).
 
 ## Validation
-Unit test: mock fetch responses and verify `fetchDeliberations` returns correctly typed data. Test error handling: mock a 500 response and verify a typed error is thrown. Test SWR hooks using `@testing-library/react`: mock API, render a component using `useDeliberations`, verify loading state then data state. Verify refresh interval is set when deliberation status is 'processing'.
+Component test: render with mocked diff API returning 2 files, verify both file sections appear with diff content. Test the side-by-side/inline toggle changes the `splitView` prop. Test loading state renders spinner/skeleton. Test error state shows error message. Test close button calls onClose.

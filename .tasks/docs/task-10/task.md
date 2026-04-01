@@ -1,89 +1,45 @@
 ## Production Hardening: RBAC, Secret Rotation, Audit Logging (Bolt - Kubernetes/Helm)
 
 ### Objective
-Implement production security hardening — Kubernetes RBAC policies, automated secret rotation for all data service credentials, comprehensive audit logging for critical resource access, and security scanning integration for the Hermes pipeline.
+Finalize production hardening by implementing least-privilege RBAC for all service accounts, automated secret rotation policies, and audit logging for security and compliance of the Sigma-1 pipeline infrastructure.
 
 ### Ownership
 - Agent: bolt
 - Stack: Kubernetes/Helm
-- Priority: high
+- Priority: medium
 - Status: pending
-- Dependencies: 1, 2, 3, 4, 5, 6, 7, 8, 9
+- Dependencies: 9
 
 ### Implementation Details
-Step-by-step implementation:
-
-1. **Kubernetes RBAC:**
-   - Create `ServiceAccount` for each Hermes service (backend, frontend) in production namespace
-   - Create `Role` and `RoleBinding` restricting each ServiceAccount to only the resources it needs:
-     - Backend SA: get/list ConfigMaps, get Secrets (hermes-* only), no cluster-level access
-     - Frontend SA: get/list ConfigMaps only
-   - Create `ClusterRole` for Hermes operators (human admins): full access to hermes-production namespace
-   - Verify no default ServiceAccount token automount (`automountServiceAccountToken: false` on pods)
-
-2. **Application-level RBAC claims (coordination with Task 2):**
-   - Finalize RBAC claim taxonomy:
-     - `hermes:read` — view deliberations and artifacts
-     - `hermes:trigger` — create new deliberations
-     - `hermes:admin` — trigger migrations, access admin endpoints
-     - `hermes:delete` — delete deliberations and artifacts (optional, for future use)
-   - Ensure claims are stored in the session model and checked by the Hermes middleware (Task 2)
-   - Create a database migration to add claims to existing admin users
-
-3. **Automated secret rotation:**
-   - Implement secret rotation for PostgreSQL credentials:
-     - Use CloudNative-PG's built-in rotation mechanism or external-secrets-operator
-     - Rotation frequency: every 90 days for production
-     - Zero-downtime rotation: new credentials provisioned, services restarted via rolling update, old credentials revoked
-   - Implement secret rotation for MinIO credentials:
-     - Create rotation CronJob or use external-secrets-operator
-     - Test that artifact read/write continues working after rotation
-   - Implement secret rotation for Redis credentials:
-     - Similar pattern to PostgreSQL
-   - Store rotation schedule and last rotation timestamp as annotations on Secret objects
-
-4. **Audit logging:**
-   - Enable Kubernetes audit logging for the `hermes-production` namespace (if not already enabled at cluster level)
-   - Application-level audit logging: log all critical resource access with structured fields:
-     - `audit_action`: `create_deliberation`, `read_artifact`, `trigger_migration`, `access_admin_endpoint`
-     - `audit_actor`: user ID from session
-     - `audit_resource`: resource type and ID
-     - `audit_result`: `success` | `denied` | `error`
-     - `audit_ip`: client IP address
-   - Implement audit logging middleware in `src/modules/hermes/middleware.ts` (extends Task 2's auth middleware)
-   - Audit logs must be shipped to Loki with a dedicated label (`audit=true`) for separate retention policy
-
-5. **Pod security:**
-   - Apply `PodSecurityStandard: restricted` or equivalent SecurityContext on all Hermes pods:
-     - `runAsNonRoot: true`
-     - `readOnlyRootFilesystem: true` (with writable tmpdir mount for headless browser)
-     - `allowPrivilegeEscalation: false`
-     - Drop all capabilities
-   - Scan container images for vulnerabilities (integrate Trivy or similar into CI)
-
-6. **Secret encryption at rest:**
-   - Verify Kubernetes secrets are encrypted at rest (etcd encryption) — document current state
-   - If not encrypted, implement etcd encryption configuration or use SealedSecrets/external-secrets-operator
-
-7. **Production readiness checklist:** Create `docs/hermes/production-readiness-checklist.md`:
-   - All RBAC policies applied
-   - All secrets rotated at least once
-   - Audit logging verified in Loki
-   - Pod security contexts applied
-   - Network policies verified (from Task 9)
-   - TLS verified (from Task 9)
-   - E2E tests passing (from Task 7)
-   - Rollback procedures documented (from Task 8)
+1. Create dedicated ServiceAccounts for each deployment:
+   - `sa-pm-server` — for PM server pods.
+   - `sa-frontend` — for frontend pods.
+2. Create RBAC Roles scoped to `sigma1-prod` namespace:
+   - `pm-server-role`: get/list ConfigMaps (`sigma1-infra-endpoints`), get Secrets (only the 4 pipeline secrets).
+   - `frontend-role`: get/list ConfigMaps only.
+3. Create RoleBindings binding each ServiceAccount to its Role.
+4. Ensure no pod uses the `default` ServiceAccount — update all Deployment specs.
+5. Implement secret rotation using External Secrets Operator or a CronJob:
+   a. `linear-api-token`: rotate every 90 days.
+   b. `github-pat`: rotate every 90 days.
+   c. `discord-webhook-url`: rotate every 180 days.
+   d. `nous-api-key`: rotate every 90 days.
+   e. On rotation, trigger a rolling restart of affected deployments.
+6. Enable Kubernetes audit logging:
+   a. Create an audit policy that logs all create/update/delete operations in `sigma1-prod`.
+   b. Log authentication failures at the RequestResponse level.
+   c. Route audit logs to a persistent volume or external log aggregator.
+7. Add NetworkPolicy restricting inter-pod communication:
+   - Frontend pods can only reach PM server on port 3000.
+   - PM server can reach external APIs (Linear, GitHub, Discord, Nous) but not other namespaces.
+8. Document all RBAC roles and rotation schedules in a `docs/security.md` file committed to the repo.
 
 ### Subtasks
-- [ ] Create Kubernetes RBAC: ServiceAccounts, Roles, and RoleBindings for Hermes services: Create dedicated ServiceAccounts for backend and frontend services, create Roles with least-privilege access, bind them with RoleBindings, and disable default ServiceAccount token automount on all pods.
-- [ ] Create ClusterRole for Hermes operator (human admin) access: Create a ClusterRole and ClusterRoleBinding for human Hermes operators granting full access to the hermes-production namespace resources.
-- [ ] Finalize application-level RBAC claim taxonomy and create database migration: Define the RBAC claim taxonomy (hermes:read, hermes:trigger, hermes:admin, hermes:delete), coordinate with Task 2's session model, and create a database migration to add claims to existing admin users.
-- [ ] Implement automated secret rotation for PostgreSQL credentials: Configure automated 90-day secret rotation for PostgreSQL credentials using CloudNative-PG's built-in mechanism or external-secrets-operator, with zero-downtime rolling restart of dependent services.
-- [ ] Implement automated secret rotation for Redis credentials: Configure automated 90-day secret rotation for Redis credentials with zero-downtime rolling restart of dependent services.
-- [ ] Implement automated secret rotation for MinIO credentials: Configure automated 90-day secret rotation for MinIO access keys with zero-downtime rolling restart and verification that artifact read/write continues working.
-- [ ] Implement application-level audit logging middleware with Loki integration: Create audit logging middleware in the Hermes backend that logs all critical resource access with structured fields (audit_action, audit_actor, audit_resource, audit_result, audit_ip) and ships logs to Loki with a dedicated 'audit=true' label.
-- [ ] Apply Pod Security contexts to all Hermes pods: Configure SecurityContext on all Hermes pod specs with runAsNonRoot, readOnlyRootFilesystem (with writable tmpdir for headless browser), allowPrivilegeEscalation=false, and drop all capabilities.
-- [ ] Integrate container image vulnerability scanning with Trivy in CI: Add Trivy (or chosen scanner) to the CI pipeline to scan all Hermes container images for vulnerabilities before deployment, failing the build on critical/high severity findings.
-- [ ] Verify and document secret encryption at rest (etcd encryption): Verify whether Kubernetes secrets are encrypted at rest in etcd, document the current state, and implement encryption if not already configured (or document the path to SealedSecrets/external-secrets-operator).
-- [ ] Create production readiness checklist document: Create docs/hermes/production-readiness-checklist.md covering all security, reliability, and operational readiness items with evidence links and verification commands.
+- [ ] Create dedicated ServiceAccounts for PM server and frontend: Define and apply dedicated ServiceAccount resources for each workload in the sigma1-prod namespace, ensuring no pod uses the default ServiceAccount.
+- [ ] Update all Deployment specs to use dedicated ServiceAccounts: Modify every Deployment in sigma1-prod to reference its dedicated ServiceAccount, removing any reliance on the default ServiceAccount.
+- [ ] Define least-privilege RBAC Roles for PM server and frontend: Create namespace-scoped Role resources implementing least-privilege access: PM server can read specific ConfigMaps and Secrets; frontend can only read ConfigMaps.
+- [ ] Create RoleBindings linking ServiceAccounts to their Roles: Bind each dedicated ServiceAccount to its corresponding least-privilege Role via RoleBinding resources.
+- [ ] Implement automated secret rotation via CronJob with rolling restart triggers: Create CronJob resources that rotate each pipeline secret on its defined schedule and trigger rolling restarts of affected Deployments.
+- [ ] Configure Kubernetes audit policy for sigma1-prod namespace: Create and apply a Kubernetes audit policy that logs all mutating operations in sigma1-prod and authentication failures at RequestResponse level, routing logs to persistent storage.
+- [ ] Create NetworkPolicy restricting inter-pod and egress communication: Define and apply NetworkPolicy resources that restrict frontend pods to only reach PM server on port 3000, and restrict PM server egress to external APIs while blocking cross-namespace traffic.
+- [ ] Create security documentation in docs/security.md: Document all RBAC roles, ServiceAccount assignments, secret rotation schedules, NetworkPolicy rules, and audit logging configuration for operational reference and compliance.

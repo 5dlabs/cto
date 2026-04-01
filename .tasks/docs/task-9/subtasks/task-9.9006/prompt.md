@@ -1,15 +1,19 @@
-Implement subtask 9006: Configure TLS termination with cert-manager and HTTPS enforcement
+Implement subtask 9006: Configure PodDisruptionBudgets for PM server and frontend
 
 ## Objective
-Set up TLS for all public Hermes endpoints using cert-manager with Let's Encrypt (or pre-provisioned TLS secrets), and enforce HTTPS redirect on all HTTP endpoints.
+Create PDB manifests ensuring PM server has minAvailable=2 and frontend has minAvailable=1 during voluntary disruptions.
 
 ## Steps
-1. If cert-manager is available: create a `ClusterIssuer` or `Issuer` resource for Let's Encrypt (staging first, then production).
-2. Create a `Certificate` CR for the Hermes domain(s): `hermes.{domain}` and `hermes-api.{domain}` (or a wildcard if using subdomain routing).
-3. If cert-manager is not available: create a TLS Secret manually from pre-provisioned certificate and key files.
-4. Configure the ingress controller to enforce HTTPS redirect: `nginx.ingress.kubernetes.io/ssl-redirect: "true"` (for nginx-ingress) or equivalent annotation for the cluster's ingress controller.
-5. Set minimum TLS version to 1.2: `nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"`.
-6. Store TLS configuration references (secret name, issuer name) for use by the Ingress subtask.
+1. Create `templates/pm-server-pdb.yaml`:
+   - `apiVersion: policy/v1`, kind `PodDisruptionBudget`.
+   - `spec.minAvailable: 2`.
+   - `spec.selector.matchLabels` matching the PM server Deployment labels.
+2. Create `templates/frontend-pdb.yaml`:
+   - `apiVersion: policy/v1`, kind `PodDisruptionBudget`.
+   - `spec.minAvailable: 1`.
+   - `spec.selector.matchLabels` matching the frontend Deployment labels.
+3. Parameterize minAvailable values via Helm values for flexibility.
+4. Validate both rendered manifests with `helm template`.
 
 ## Validation
-Verify the Certificate CR status shows `Ready=True`: `kubectl get certificate -n hermes-production`. Verify TLS secret is created: `kubectl get secret hermes-tls -n hermes-production`. Verify `curl -v https://hermes.{domain}` shows TLS 1.2+ handshake. Verify `curl http://hermes.{domain}` returns 301 redirect to HTTPS.
+Run `helm template` and verify both PDB manifests are rendered with correct minAvailable values and label selectors. After deploy: `kubectl get pdb -n sigma1-prod` shows both PDBs with expected minAvailable.

@@ -1,23 +1,16 @@
-Implement subtask 7002: Implement global setup with authentication and test data seeding
+Implement subtask 7002: Implement branch creation from latest main SHA via GitHub Refs API
 
 ## Objective
-Create the global setup script that authenticates test sessions with the required RBAC claims (hermes:read, hermes:trigger) and seeds the test data (deliberations and artifacts) needed by all test suites.
+Implement a function that fetches the latest commit SHA from the default branch of 5dlabs/sigma-1 and creates a new branch `pipeline/{runId}` pointing to that SHA using the GitHub Git Refs API.
 
 ## Steps
-1. Create `tests/e2e/hermes/global-setup.ts`:
-   - Authenticate against the staging auth endpoint to obtain session tokens for 3 personas:
-     a. `fullAccessUser` — has both `hermes:read` and `hermes:trigger` claims
-     b. `readOnlyUser` — has only `hermes:read` claim
-     c. `unauthenticatedContext` — no session (for 401 tests)
-   - Store auth state (cookies/tokens) in `tests/e2e/hermes/.auth/` directory using `storageState`
-   - Seed test data via API:
-     a. Create 15+ deliberations (needed for pagination tests)
-     b. Ensure at least 1 deliberation reaches `completed` status with artifacts (poll with 60s timeout)
-   - Store created resource IDs in a shared JSON file (`tests/e2e/hermes/.testdata/ids.json`) for consumption by test specs.
-2. Create `tests/e2e/hermes/global-teardown.ts`:
-   - Read `ids.json` and delete all test-created deliberations via API
-   - Log cleanup results
-3. Update `playwright.config.ts` projects to use the appropriate `storageState` files for each auth persona.
+1. Create `src/services/branch-creator.ts`.
+2. Implement `createPipelineBranch(client: GitHubClient, runId: string): Promise<{ branchRef: string, baseSha: string }>`.
+3. Step 1: `GET /repos/5dlabs/sigma-1/git/ref/heads/main` — extract `object.sha` as `baseSha`.
+4. Step 2: `POST /repos/5dlabs/sigma-1/git/refs` with body `{ ref: 'refs/heads/pipeline/{runId}', sha: baseSha }`.
+5. Return both the branch ref string and the baseSha (needed later for tree creation).
+6. If the branch already exists (422 response), handle gracefully — either delete and recreate, or skip creation and fetch existing ref SHA.
+7. Propagate GitHubApiError for 404 (repo not found) so the caller can handle it.
 
 ## Validation
-Run the global setup in isolation (`npx playwright test --global-setup-only` or invoke directly). Verify `.auth/` contains valid storageState JSON files for each persona, `.testdata/ids.json` contains at least 15 deliberation UUIDs, and at least 1 deliberation has status 'completed' when queried via API.
+Unit test: mock GET ref returning a SHA, mock POST refs returning success; verify both calls are made with correct paths and payloads. Unit test: mock 422 on branch creation (already exists); verify graceful handling. Unit test: mock 404 on GET ref; verify GitHubApiError propagates.

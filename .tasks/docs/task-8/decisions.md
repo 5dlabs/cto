@@ -1,8 +1,9 @@
 ## Decision Points
 
 - Decision
+- Decision
 
 ## Coordination Notes
 
-- Agent owner: atlas
-- Primary stack: CI/CD platforms
+- Agent owner: tess
+- Primary stack: Test frameworks

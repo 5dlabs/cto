@@ -1,18 +1,14 @@
-Implement subtask 2005: Implement RBAC middleware with hermes:read and hermes:trigger claim guards
+Implement subtask 2005: Add structured logging for agent delegation in issue creation
 
 ## Objective
-Create Hermes-specific RBAC middleware that extends the existing session middleware to check for hermes:read and hermes:trigger claims.
+Add structured log entries at each issue creation that include the issue ID, issue title, agent hint, and resolved delegate_id (or 'unassigned').
 
 ## Steps
-1. In `src/modules/hermes/middleware.ts`, create `requireHermesClaim(claim: string)` function that returns an Elysia `beforeHandle` hook.
-2. The middleware should:
-   - Extract the current user session from the existing auth middleware (check project's auth pattern — likely `context.store.session` or `context.user`)
-   - Check that the user's claims/roles include the required Hermes claim
-   - Return 401 if no session, 403 if session exists but claim is missing
-   - Return structured JSON error response: `{ error_code: 'HERMES_UNAUTHORIZED' | 'HERMES_FORBIDDEN', message: string }`
-3. Define claim constants: `HERMES_CLAIMS = { READ: 'hermes:read', TRIGGER: 'hermes:trigger' }` in a shared location (can be in types.ts).
-4. Export these claim constants for coordination with Task 10 (RBAC hardening).
-5. Write the middleware to be composable — it should work as an Elysia guard/derive pattern.
+1. After each successful `issueCreate` call, emit a structured log object: `{ event: 'issue_created', issueId, title, agentHint, delegateId: resolvedId ?? 'unassigned' }`.
+2. Use the project's existing structured logger (e.g., pino, consola, or Bun's console with JSON formatting).
+3. At the start of agent resolution, log the full list of agent hints being resolved.
+4. At the end of the pipeline run's issue creation phase, log a summary: total issues created, count assigned, count unassigned.
+5. Ensure log level is 'info' for normal operations and 'warn' for unresolvable hints.
 
 ## Validation
-Unit test: `requireHermesClaim('hermes:trigger')` with a mock context containing the claim passes (calls next). Same middleware with a context missing the claim returns 403 with `HERMES_FORBIDDEN` error_code. No session returns 401 with `HERMES_UNAUTHORIZED`.
+Capture log output during a test pipeline run. Verify each created issue produces a structured log entry with all required fields. Verify the summary log shows correct counts.

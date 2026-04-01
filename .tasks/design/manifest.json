@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-03-31T16:34:15Z",
-  "project_name": "sigma-1-hardening-e2e",
+  "generated_at": "2026-03-31T23:41:14Z",
+  "project_name": "sigma-1",
   "linear_session_id": "",
   "design_mode": "ingest_plus_stitch",
   "stitch_required": true,

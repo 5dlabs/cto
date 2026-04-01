@@ -1,19 +1,18 @@
-Implement subtask 10004: Implement automated secret rotation for PostgreSQL credentials
+Implement subtask 10004: Create RoleBindings linking ServiceAccounts to their Roles
 
 ## Objective
-Configure automated 90-day secret rotation for PostgreSQL credentials using CloudNative-PG's built-in mechanism or external-secrets-operator, with zero-downtime rolling restart of dependent services.
+Bind each dedicated ServiceAccount to its corresponding least-privilege Role via RoleBinding resources.
 
 ## Steps
-1. Choose rotation mechanism (see decision point): CNPG built-in or external-secrets-operator.
-2. For CNPG built-in: configure the `Cluster` CR's `managed.roles` section to define application user credentials, or use the auto-generated `<cluster>-app` secret with periodic rotation.
-3. Create a CronJob or use external-secrets-operator `ExternalSecret` with `refreshInterval: 2160h` (90 days) to trigger credential rotation.
-4. Implement zero-downtime rotation workflow:
-   a. New secret is generated/updated.
-   b. Trigger rolling restart of the backend Deployment: use `kubectl rollout restart` or a Reloader controller that watches Secret changes.
-   c. Old credentials remain valid during the rolling update window.
-   d. After all pods are updated, optionally revoke old credentials.
-5. Add annotations to the Secret: `rotation-schedule: 90d`, `last-rotated: <timestamp>`.
-6. Test the full rotation cycle in staging before production.
+1. Create `infra/rbac/rolebindings.yaml`.
+2. Define RoleBinding `pm-server-rolebinding`:
+   - roleRef: Role `pm-server-role`
+   - subjects: ServiceAccount `sa-pm-server` in namespace `sigma1-prod`.
+3. Define RoleBinding `frontend-rolebinding`:
+   - roleRef: Role `frontend-role`
+   - subjects: ServiceAccount `sa-frontend` in namespace `sigma1-prod`.
+4. Apply: `kubectl apply -f infra/rbac/rolebindings.yaml`.
+5. Verify: `kubectl describe rolebinding pm-server-rolebinding -n sigma1-prod`.
 
 ## Validation
-Trigger a manual rotation of PostgreSQL credentials. Verify: (1) New secret is created/updated in Kubernetes. (2) Backend pods are rolling-restarted within 60 seconds. (3) No 500 errors during the rotation window (continuous health check during rotation). (4) After rotation, backend can query the database successfully. (5) Secret annotations show updated `last-rotated` timestamp.
+Exec into a PM server pod and run `kubectl auth can-i list pods --as=system:serviceaccount:sigma1-prod:sa-pm-server -n sigma1-prod` — should return 'no'. Run `kubectl auth can-i get configmaps --as=system:serviceaccount:sigma1-prod:sa-pm-server -n sigma1-prod` — should return 'yes'. Exec into a frontend pod and verify it cannot access secrets.

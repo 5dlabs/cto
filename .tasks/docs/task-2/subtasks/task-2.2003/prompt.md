@@ -1,20 +1,15 @@
-Implement subtask 2003: Implement HermesRepository with PostgreSQL data access layer
+Implement subtask 2003: Integrate resolve_agent_delegates into issueCreate mutation flow
 
 ## Objective
-Implement the IHermesRepository interface with PostgreSQL queries for CRUD operations on deliberations and hermes_artifacts tables.
+Modify the existing task-to-issue mapping module to call resolve_agent_delegates() before each issueCreate GraphQL mutation and pass the resolved linearUserId as the assigneeId field in the mutation payload.
 
 ## Steps
-1. In `src/modules/hermes/repository.ts`, implement `HermesRepository` class that satisfies `IHermesRepository`.
-2. Use the project's existing database client/ORM pattern (check if Drizzle, Prisma, or raw pg is used) to implement:
-   - `createDeliberation(input)` — INSERT into deliberations, return full record
-   - `getDeliberationById(id)` — SELECT by UUID
-   - `listDeliberations(params)` — SELECT with pagination (ORDER BY created_at DESC, LIMIT/OFFSET or cursor)
-   - `updateDeliberationStatus(id, status, resultPayload?)` — UPDATE status and optionally result_payload, set updated_at
-   - `createArtifact(artifact)` — INSERT into hermes_artifacts
-   - `getArtifactsByDeliberationId(deliberationId)` — SELECT artifacts for a deliberation
-3. Read `CNPG_HERMES_URL` from environment variables (provided by `hermes-infra-endpoints` ConfigMap).
-4. Implement proper error handling: wrap database errors in domain-specific error types.
-5. All methods must be async and return typed results matching the interfaces from types.ts.
+1. Locate the existing issue creation call site (the `issueCreate` GraphQL mutation in the PM server).
+2. Before the loop/call that creates issues, invoke `resolve_agent_delegates()` with the collected array of agent hint strings from the decomposed tasks.
+3. For each task/issue being created, look up the task's agent hint in the returned map.
+4. If a userId is found, include `assigneeId: userId` in the `issueCreate` mutation variables.
+5. If no userId is found (hint was unresolvable), omit `assigneeId` so the issue is created unassigned.
+6. Ensure the mutation payload type/interface is updated to accept the optional `assigneeId` field.
 
 ## Validation
-Unit tests with a test database: `createDeliberation` returns a valid UUID and the record is retrievable via `getDeliberationById`. `listDeliberations` returns paginated results in correct order. `updateDeliberationStatus` changes status and updated_at timestamp. `getArtifactsByDeliberationId` returns only artifacts belonging to the specified deliberation.
+Integration test: with a mocked Linear API, submit a pipeline run with 3 tasks having hints 'nova', 'bolt', 'unknown'. Verify the issueCreate calls for 'nova' and 'bolt' include correct assigneeId values, and the 'unknown' task's call omits assigneeId.

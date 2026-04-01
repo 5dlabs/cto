@@ -1,89 +1,47 @@
-Implement task 9: Production Hardening: HA, CDN, TLS, Ingress (Bolt - Kubernetes/Helm)
+Implement task 9: Production Hardening: HA Scaling, CDN, TLS, Ingress (Bolt - Kubernetes/Helm)
 
 ## Goal
-Harden the Hermes pipeline for production deployment — scale all data services to HA configurations, configure TLS termination, set up ingress routing, apply network policies, and establish resource limits and autoscaling for the application services.
+Harden the Sigma-1 pipeline production deployment by enabling high-availability scaling for all services, configuring TLS termination, ingress routing, and CDN for the web frontend.
 
 ## Task Context
 - Agent owner: bolt
 - Stack: Kubernetes/Helm
-- Priority: high
-- Dependencies: 1, 2, 3, 4, 5, 6, 7, 8
+- Priority: medium
+- Dependencies: 2, 3, 4, 5, 6, 7, 8
 
 ## Implementation Plan
-Step-by-step implementation:
-
-1. **Production namespace:** Create `hermes-production` namespace with appropriate labels and annotations. Apply all ConfigMap and secret patterns from Task 1 with production-specific values.
-
-2. **CloudNative-PG HA scaling:** Update PostgreSQL `Cluster` CR for production:
-   - 3 replicas (1 primary + 2 read replicas)
-   - Synchronous replication with `minSyncReplicas: 1`
-   - Automated failover enabled
-   - Backup configuration: scheduled base backups to MinIO (or separate backup bucket), continuous WAL archiving
-   - Resource requests/limits: allocate based on expected load (start with 1 CPU / 2Gi memory per replica)
-   - PodDisruptionBudget: `maxUnavailable: 1`
-
-3. **Redis HA:** Configure Redis operator CR for production:
-   - Sentinel mode with 3 replicas
-   - Resource requests/limits
-   - PodDisruptionBudget
-
-4. **NATS HA:** Configure NATS operator CR for production:
-   - 3-node cluster with JetStream enabled
-   - Resource requests/limits
-
-5. **MinIO production hardening:**
-   - If using dedicated MinIO tenant: scale to 4+ nodes with erasure coding
-   - If using shared MinIO: verify production bucket with appropriate replication policy
-   - Lifecycle policy: 365-day retention for production artifacts
-   - Enable bucket versioning for accidental deletion protection
-
-6. **TLS termination:** Configure TLS for all public endpoints:
-   - Use cert-manager (if available in cluster) for automatic Let's Encrypt certificates
-   - Or configure TLS secrets for the Hermes domain
-   - Enforce HTTPS redirect on all HTTP endpoints
-
-7. **Ingress configuration:** Create Ingress resources for production:
-   - `hermes.{domain}` → Next.js frontend service
-   - `hermes-api.{domain}` → Bun/Elysia backend service (or path-based routing: `hermes.{domain}/api/*`)
-   - Rate limiting annotations (if using nginx-ingress: `nginx.ingress.kubernetes.io/rate-limit-connections`)
-   - CORS headers for frontend-to-API communication
-
-8. **Network policies:** Apply Kubernetes NetworkPolicy resources:
-   - Frontend pods can only talk to backend service
-   - Backend pods can only talk to PostgreSQL, Redis, NATS, MinIO, and Loki
-   - No direct external egress from backend (except for screenshot capture — need egress policy for target URLs)
-   - Deny all other inter-namespace traffic
-
-9. **Application autoscaling:**
-   - HorizontalPodAutoscaler for Bun/Elysia service: min 2, max 10 replicas, target 70% CPU
-   - HorizontalPodAutoscaler for Next.js service: min 2, max 5 replicas, target 70% CPU
-   - Resource requests/limits for both services (start with 500m CPU / 512Mi memory)
-
-10. **PodDisruptionBudgets:** For all application services: `minAvailable: 1`
-
-11. **Helm chart updates:** Extend `charts/hermes-infra` with `values-production.yaml` overlay. All production-specific configurations (replica counts, resource limits, TLS, ingress) are driven by values.
+1. Update Helm values for production (`values-sigma1-prod.yaml`):
+   a. PM server: replicas 3, resource requests (256Mi RAM, 250m CPU), resource limits (512Mi RAM, 500m CPU).
+   b. Frontend: replicas 2, resource requests (128Mi RAM, 100m CPU).
+2. Configure HorizontalPodAutoscaler for PM server: min 3, max 10, target CPU 70%.
+3. Create Ingress resource for the PM server API:
+   a. Host: `api.sigma1.5dlabs.io`.
+   b. TLS via cert-manager with Let's Encrypt ClusterIssuer.
+   c. Annotations for rate limiting (100 req/s per IP).
+4. Create Ingress resource for the web frontend:
+   a. Host: `sigma1.5dlabs.io`.
+   b. TLS via cert-manager.
+   c. CDN cache headers: `Cache-Control: public, max-age=3600` for static assets.
+5. Configure PodDisruptionBudgets: PM server minAvailable 2, frontend minAvailable 1.
+6. Add readiness and liveness probes for all deployments:
+   - PM server: HTTP GET `/health` on port 3000, initialDelay 10s, period 15s.
+   - Frontend: HTTP GET `/` on port 3000, initialDelay 5s, period 10s.
+7. Configure anti-affinity rules to spread PM server pods across availability zones.
 
 ## Acceptance Criteria
-1. HA PostgreSQL: `kubectl get pods -n hermes-production -l cnpg.io/cluster=hermes-pg` returns 3 Running pods. Killing the primary pod results in automatic failover to a replica within 30 seconds (verified by continuous query during failover).
-2. TLS: `curl -v https://hermes.{domain}/api/hermes/deliberations` shows TLS 1.2+ handshake and valid certificate. `curl http://hermes.{domain}` returns 301 redirect to HTTPS.
-3. Network policy: A test pod in `hermes-production` namespace can reach PostgreSQL on port 5432 but cannot reach the Kubernetes API server or pods in other namespaces (verified by `kubectl exec` with `curl` and `nc`).
-4. Autoscaling: Under load (50 concurrent deliberation requests), HPA scales the backend service beyond 2 replicas within 3 minutes. After load subsides, replicas scale back to 2 within 10 minutes.
-5. PodDisruptionBudget: `kubectl get pdb -n hermes-production` shows PDBs for all services with `ALLOWED DISRUPTIONS >= 1`.
-6. Ingress routing: `curl https://hermes.{domain}/` returns the Next.js application HTML. `curl https://hermes.{domain}/api/hermes/deliberations` (or `hermes-api.{domain}`) returns JSON from the Elysia service.
-7. MinIO versioning: Deleting an object from the production Hermes bucket and then listing versions shows the deleted object as a delete marker with the previous version recoverable.
+1. `kubectl get hpa -n sigma1-prod` shows PM server HPA with correct min/max/target. 2. `kubectl get ingress -n sigma1-prod` shows both ingresses with TLS configured. 3. `curl -I https://api.sigma1.5dlabs.io/health` returns 200 with valid TLS certificate. 4. `curl -I https://sigma1.5dlabs.io` returns 200 with Cache-Control header on static assets. 5. PDB validation: `kubectl get pdb -n sigma1-prod` shows correct minAvailable values. 6. Kill one PM server pod; verify traffic continues to be served (zero downtime confirmed by continuous health check). 7. Pod anti-affinity: verify pods are distributed across at least 2 nodes/zones via `kubectl get pods -o wide`.
 
 ## Subtasks
-- Create hermes-production namespace with ConfigMap and Secret patterns: Create the hermes-production namespace with appropriate labels and annotations, and replicate all ConfigMap and Secret patterns from the dev namespace (Task 1) with production-specific values including the hermes-infra-endpoints ConfigMap.
-- Configure CloudNative-PG HA cluster with 3 replicas and synchronous replication: Update the PostgreSQL Cluster CR for production with 3 replicas (1 primary + 2 read replicas), synchronous replication, automated failover, scheduled backups with WAL archiving, resource limits, and a PodDisruptionBudget.
-- Configure Redis HA with Sentinel mode and 3 replicas: Configure the Redis operator CR for production with Sentinel mode, 3 replicas, resource requests/limits, and a PodDisruptionBudget.
-- Configure NATS HA with 3-node JetStream cluster: Configure the NATS operator CR for production with a 3-node cluster, JetStream enabled, and resource requests/limits.
-- Harden MinIO for production with versioning and lifecycle policies: Configure MinIO for production use — either scale a dedicated tenant to 4+ nodes with erasure coding or configure the shared MinIO instance with appropriate replication. Enable bucket versioning and set a 365-day lifecycle retention policy.
-- Configure TLS termination with cert-manager and HTTPS enforcement: Set up TLS for all public Hermes endpoints using cert-manager with Let's Encrypt (or pre-provisioned TLS secrets), and enforce HTTPS redirect on all HTTP endpoints.
-- Create Ingress resources with routing rules, rate limiting, and CORS: Create Kubernetes Ingress resources for production routing: frontend and API endpoints with rate limiting annotations and CORS headers for frontend-to-API communication.
-- Apply Kubernetes NetworkPolicy resources for pod-to-pod isolation: Create NetworkPolicy resources restricting pod-to-pod communication: frontend can only reach backend, backend can only reach data services and Loki, with a special egress exception for headless browser screenshot capture.
-- Configure HorizontalPodAutoscalers for backend and frontend services: Create HPA resources for the Bun/Elysia backend (min 2, max 10, target 70% CPU) and Next.js frontend (min 2, max 5, target 70% CPU), with appropriate resource requests and limits on the Deployment specs.
-- Create PodDisruptionBudgets for all application services: Create PodDisruptionBudget resources for both the backend and frontend application services with minAvailable: 1 to ensure availability during voluntary disruptions.
-- Create Helm values-production.yaml overlay for all production configurations: Extend the hermes-infra Helm chart with a values-production.yaml overlay that drives all production-specific configurations: replica counts, resource limits, TLS, ingress, network policies, HPA, and PDBs.
+- Update Helm production values for PM server replicas and resource limits: Create or update `values-sigma1-prod.yaml` to set PM server deployment to 3 replicas with production-grade resource requests and limits.
+- Update Helm production values for frontend replicas and resource limits: Update `values-sigma1-prod.yaml` to set the frontend deployment to 2 replicas with appropriate resource requests.
+- Configure HorizontalPodAutoscaler for PM server: Create an HPA manifest for the PM server with min 3, max 10 replicas targeting 70% average CPU utilization.
+- Create Ingress resource for PM server API with TLS and rate limiting: Define an Ingress manifest for `api.sigma1.5dlabs.io` with cert-manager TLS and rate-limiting annotations.
+- Create Ingress resource for web frontend with TLS and CDN cache headers: Define an Ingress manifest for `sigma1.5dlabs.io` with cert-manager TLS and CDN-friendly cache-control headers for static assets.
+- Configure PodDisruptionBudgets for PM server and frontend: Create PDB manifests ensuring PM server has minAvailable=2 and frontend has minAvailable=1 during voluntary disruptions.
+- Add readiness and liveness probes to PM server deployment: Configure HTTP health probes for the PM server: readiness and liveness via GET /health on port 3000.
+- Add readiness and liveness probes to frontend deployment: Configure HTTP health probes for the frontend: readiness and liveness via GET / on port 3000.
+- Configure pod anti-affinity rules for PM server cross-zone distribution: Add pod anti-affinity rules to the PM server Deployment to spread pods across availability zones and nodes.
+- Validate full production hardening deployment end-to-end: Deploy all production hardening manifests to the sigma1-prod namespace and run comprehensive validation tests.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

@@ -1,32 +1,20 @@
-Implement subtask 7006: Implement browser test suite for artifact comparison, artifact viewer, and accessibility
+Implement subtask 7006: Implement PRGenerator orchestrator service with error handling
 
 ## Objective
-Create Playwright browser specs for the artifact comparison view, artifact viewer dialog interaction, and axe-core accessibility audits on Hermes pages.
+Create the top-level PRGenerator service that orchestrates the full flow: collect tasks → create branch → generate scaffolds → commit files → create PR, with error handling that logs failures and marks the PR step as failed without crashing the pipeline.
 
 ## Steps
-1. Create `tests/e2e/hermes/browser/artifact-comparison.spec.ts`:
-   - Load `fullAccessUser` storageState
-   - Navigate to a completed deliberation detail page (use ID from `.testdata/ids.json`)
-   - Assert comparison view is visible with a current-site screenshot image
-   - Assert image element has `naturalWidth > 0` and `naturalHeight > 0` (via `evaluate`)
-   - Click a variant thumbnail → assert the variant image loads in the comparison view
-   - Assert both current-site and variant images have non-zero dimensions
-
-2. Create `tests/e2e/hermes/browser/artifact-viewer.spec.ts`:
-   - Navigate to completed deliberation detail page
-   - Click an artifact thumbnail/image → assert a dialog/modal opens
-   - Assert the dialog contains a full-size image with `naturalWidth > 0`
-   - Assert a download button is present and has a valid `href` or `onclick` handler
-   - Click download button → assert no network error (intercept download request, verify 200)
-   - Press Escape key → assert dialog is no longer visible
-
-3. Create `tests/e2e/hermes/browser/accessibility.spec.ts`:
-   - Import `AxeBuilder` from `@axe-core/playwright`
-   - Test: Navigate to `/hermes`, run `new AxeBuilder({ page }).analyze()` → assert `violations.filter(v => v.impact === 'critical' || v.impact === 'serious').length === 0`
-   - Test: Navigate to `/hermes/{completedDeliberationId}`, run axe → same assertion
-   - Log all violations (including minor) for informational purposes
-
-4. Use `page.waitForLoadState('networkidle')` before running axe to ensure all content is rendered.
+1. Create `src/services/pr-generator.ts`.
+2. Implement `PRGenerator` class with method `generatePR(runId: string, tasks: TaskMeta[]): Promise<{ success: boolean, prUrl?: string, prNumber?: number, error?: string }>`.
+3. Orchestration flow:
+   a. Instantiate GitHubClient.
+   b. Call `createPipelineBranch(client, runId)` to get baseSha and branchRef.
+   c. Generate file entries: for each task, call `generateTaskReadme` and map to `{ path: 'tasks/{taskId}-{slug}/README.md', content }`. Also generate SUMMARY.md at `tasks/SUMMARY.md`.
+   d. Call `commitFiles(client, { baseSha, branchRef, files, message })` with commit message `chore: scaffold tasks for pipeline {runId}`.
+   e. Call `createPullRequest(client, { runId, taskCount, linearSessionUrl })`.
+   f. Return success with PR metadata.
+4. Wrap entire flow in try/catch. On GitHubApiError (especially 404), log structured error with runId and endpoint, return `{ success: false, error: message }`. Pipeline must NOT crash.
+5. Export this service for use by the pipeline orchestrator after task generation completes.
 
 ## Validation
-Run specs across chromium, firefox, webkit. Comparison view loads two images with non-zero dimensions. Viewer dialog opens/closes correctly with Escape. Download button triggers a successful request. Axe-core reports zero critical/serious violations on both `/hermes` and `/hermes/[id]`. All pass in all 3 browsers.
+Unit test: mock all sub-services; verify orchestration calls them in correct order with correct arguments. Unit test: mock branch creation throwing 404 GitHubApiError; verify function returns { success: false } with error message and does not throw. Unit test: mock commit step failing; verify PR creation is not attempted and error is returned. Unit test: with 3 tasks, verify file entries array has 4 items (3 READMEs + 1 SUMMARY). Integration test: run full PRGenerator with mocked GitHub API; verify all calls are sequenced correctly and PR metadata is stored.

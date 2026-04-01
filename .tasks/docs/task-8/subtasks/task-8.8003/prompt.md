@@ -1,25 +1,17 @@
-Implement subtask 8003: Create infrastructure sequencing diagram and ArgoCD promotion workflow documentation
+Implement subtask 8003: Implement Discord webhook collector service for notification verification
 
 ## Objective
-Write infrastructure-sequence.md with a Mermaid dependency diagram, critical path analysis, parallel execution windows, and timeline estimates. Document the ArgoCD promotion workflow including Application CR references, sync wave annotations, and promotion commands.
+Build a lightweight HTTP server that acts as a Discord webhook collector — receives POST payloads, stores them in memory, and exposes a GET endpoint for the test suite to query received messages.
 
 ## Steps
-1. Create `docs/hermes/infrastructure-sequence.md`:
-   - **Mermaid Dependency Diagram**: Use `graph TD` or `flowchart TD` syntax showing all tasks (1-8+) with directed edges for dependencies. Color-code: green for completed, blue for in-progress, gray for pending.
-   - **Critical Path**: Identify and bold the longest dependency chain (Task 1 → 2 → 3 → 7 → promotion)
-   - **Parallel Execution Windows**: Table showing which tasks can run concurrently (e.g., Tasks 4, 5, 6 after Task 3)
-   - **Estimated Timeline**: Gantt-style table with task durations and start/end dates relative to kickoff
-
-2. Add **ArgoCD Promotion Workflow** section (can be in the same doc or a separate `docs/hermes/argocd-promotion.md`):
-   - Reference the ArgoCD Application CR name and namespace from Task 1
-   - Promotion flow diagram (Mermaid sequence diagram):
-     a. Developer pushes to staging branch
-     b. ArgoCD auto-syncs staging Application
-     c. GitHub Actions triggers E2E tests (Task 7 workflow)
-     d. On E2E pass → manual approval in ArgoCD UI or CLI
-     e. `argocd app sync hermes-backend-production --prune` command with prerequisites
-   - Sync wave annotations: document the order in which Hermes resources should sync (ConfigMap → Deployment → Service → Ingress)
-   - Rollback via ArgoCD: `argocd app rollback hermes-backend-production` command
+1. Create `tests/e2e/discord-collector/server.ts` — a Bun HTTP server (port from `COLLECTOR_PORT` env, default 9876).
+2. `POST /webhook` — accepts Discord webhook-format JSON payloads, stores them in an in-memory array with timestamps.
+3. `GET /messages` — returns all collected messages as a JSON array.
+4. `DELETE /messages` — clears collected messages (used between test runs for isolation).
+5. `GET /health` — returns 200 with `{status: 'ok', messageCount: N}`.
+6. The collector should be started as a background process before tests and stopped after. Add a helper `tests/e2e/helpers/collector.ts` that spawns/kills the process.
+7. The PM server's Discord webhook URL must be configured to point to this collector during E2E runs (via PM_DISCORD_WEBHOOK_URL env var pointing to `http://localhost:9876/webhook` or the CI-accessible URL).
+8. Document that in production the real Discord webhook is used; this collector is test-only.
 
 ## Validation
-Verify Mermaid diagram renders without syntax errors by pasting into GitHub's Mermaid live editor or a `.md` file preview. Verify the `argocd app sync hermes-backend-production` command references the correct Application CR name from Task 1's output. Verify sync wave annotation examples are valid Kubernetes annotation format.
+Start the collector, POST a sample Discord webhook payload to /webhook, GET /messages and verify the payload is returned. DELETE /messages and confirm GET /messages returns empty array. Verify /health returns correct messageCount.

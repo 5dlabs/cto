@@ -1,16 +1,14 @@
-Implement subtask 9002: Configure CloudNative-PG HA cluster with 3 replicas and synchronous replication
+Implement subtask 9002: Update Helm production values for frontend replicas and resource limits
 
 ## Objective
-Update the PostgreSQL Cluster CR for production with 3 replicas (1 primary + 2 read replicas), synchronous replication, automated failover, scheduled backups with WAL archiving, resource limits, and a PodDisruptionBudget.
+Update `values-sigma1-prod.yaml` to set the frontend deployment to 2 replicas with appropriate resource requests.
 
 ## Steps
-1. Create a production CNPG `Cluster` CR (`hermes-pg`) in `hermes-production` namespace with `instances: 3`.
-2. Set `postgresql.synchronous.method: any`, `postgresql.synchronous.number: 1` for synchronous replication with `minSyncReplicas: 1`.
-3. Configure automated failover (default in CNPG).
-4. Add backup configuration: `spec.backup.barmanObjectStore` pointing to MinIO production bucket with a scheduled base backup (e.g., daily at 2am) and continuous WAL archiving.
-5. Set resource requests/limits: `requests: {cpu: 1, memory: 2Gi}`, `limits: {cpu: 2, memory: 4Gi}` per replica.
-6. Create a PodDisruptionBudget: `maxUnavailable: 1` targeting CNPG pods.
-7. Configure storage: production-appropriate PVC size (e.g., 50Gi) with the cluster's default StorageClass.
+1. In `values-sigma1-prod.yaml`, set `frontend.replicaCount: 2`.
+2. Set `frontend.resources.requests.memory: 128Mi`, `frontend.resources.requests.cpu: 100m`.
+3. Optionally set `frontend.resources.limits.memory: 256Mi`, `frontend.resources.limits.cpu: 200m` for safety.
+4. Ensure the Helm template in `templates/frontend-deployment.yaml` references `.Values.frontend.resources`.
+5. Verify with `helm template . -f values-sigma1-prod.yaml` that the rendered frontend Deployment has replicas=2 and correct resources.
 
 ## Validation
-Verify `kubectl get pods -n hermes-production -l cnpg.io/cluster=hermes-pg` returns 3 Running pods. Kill the primary pod and verify automatic failover completes within 30 seconds by running continuous `SELECT 1` queries. Verify backup schedule is registered: `kubectl get scheduledbackup -n hermes-production`.
+Run `helm template . -f values-sigma1-prod.yaml` and confirm the frontend Deployment renders with replicas=2 and the expected resource requests.

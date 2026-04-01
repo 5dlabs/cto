@@ -1,15 +1,30 @@
-Implement subtask 9009: Configure HorizontalPodAutoscalers for backend and frontend services
+Implement subtask 9009: Configure pod anti-affinity rules for PM server cross-zone distribution
 
 ## Objective
-Create HPA resources for the Bun/Elysia backend (min 2, max 10, target 70% CPU) and Next.js frontend (min 2, max 5, target 70% CPU), with appropriate resource requests and limits on the Deployment specs.
+Add pod anti-affinity rules to the PM server Deployment to spread pods across availability zones and nodes.
 
 ## Steps
-1. Update the backend Deployment spec with resource requests/limits: `requests: {cpu: 500m, memory: 512Mi}`, `limits: {cpu: 1, memory: 1Gi}`.
-2. Create HPA for backend: `minReplicas: 2`, `maxReplicas: 10`, `targetCPUUtilizationPercentage: 70`.
-3. Update the frontend Deployment spec with resource requests/limits: `requests: {cpu: 250m, memory: 256Mi}`, `limits: {cpu: 500m, memory: 512Mi}`.
-4. Create HPA for frontend: `minReplicas: 2`, `maxReplicas: 5`, `targetCPUUtilizationPercentage: 70`.
-5. Verify metrics-server is available in the cluster (HPA depends on it).
-6. Set appropriate scale-down stabilization window (default 300s is fine for production).
+1. In `templates/pm-server-deployment.yaml`, add to `spec.template.spec`:
+   ```yaml
+   affinity:
+     podAntiAffinity:
+       preferredDuringSchedulingIgnoredDuringExecution:
+         - weight: 100
+           podAffinityTerm:
+             labelSelector:
+               matchLabels:
+                 app: pm-server
+             topologyKey: topology.kubernetes.io/zone
+         - weight: 50
+           podAffinityTerm:
+             labelSelector:
+               matchLabels:
+                 app: pm-server
+             topologyKey: kubernetes.io/hostname
+   ```
+2. Use `preferredDuringSchedulingIgnoredDuringExecution` (soft) to avoid scheduling failures in clusters with fewer zones.
+3. Parameterize the topology keys and weights via Helm values.
+4. Verify with `helm template`.
 
 ## Validation
-Verify `kubectl get hpa -n hermes-production` shows both HPAs with current metrics. Under load (50 concurrent requests), verify backend HPA scales beyond 2 replicas within 3 minutes. After load subsides, verify replicas scale back to 2 within 10 minutes. Verify resource requests are set: `kubectl get deploy -n hermes-production -o jsonpath='{.items[*].spec.template.spec.containers[*].resources}'`.
+Rendered Deployment YAML includes the affinity block with both zone and hostname anti-affinity rules. After deploy with 3+ replicas: `kubectl get pods -o wide -n sigma1-prod -l app=pm-server` shows pods distributed across at least 2 different nodes/zones.
