@@ -3,6 +3,69 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.52](https://github.com/5dlabs/cto/compare/v0.2.51...v0.2.52) (2026-04-01)
+
+
+### ✨ Features
+
+* **intake:** notifycore-e2e task breakdown ([#4552](https://github.com/5dlabs/cto/issues/4552)) ([d43b686](https://github.com/5dlabs/cto/commit/d43b686d0c2207f843849d12f6cdc76a3fb51679))
+* **marketing:** add 5D Git as platform service under Source Control ([0099151](https://github.com/5dlabs/cto/commit/00991510e31ebc6060dfa815f1195f5547618718))
+* **marketing:** add ACP harness and multi-provider model routing ([81d5d11](https://github.com/5dlabs/cto/commit/81d5d1157417979cc33b38a2a98dd5959c3965c5))
+* **marketing:** add GitLab/Gitea support, align header behavior ([41f13d0](https://github.com/5dlabs/cto/commit/41f13d02bc81659ee3ebf50bb38229b81b624c04))
+* **marketing:** Morgan hero effects, card flip fix, LemonSlice inline, golden retriever avatar ([a40d988](https://github.com/5dlabs/cto/commit/a40d98871ebfc1e46004c5f0452dc7b07398ad72))
+* **marketing:** Morgan prominence across CTO site ([d706194](https://github.com/5dlabs/cto/commit/d7061947968bc26b16cae4411bfe742a088b5d37))
+* **morgan:** marketing page, avatar, LemonSlice embed, and desktop wiring ([917e2cf](https://github.com/5dlabs/cto/commit/917e2cf73f68afbc9cacf75646933bc51368194d))
+* **observability:** add local Grafana/Loki stack for intake pipeline ([c446e72](https://github.com/5dlabs/cto/commit/c446e7266c2ad00d9523d7128f8b3d8ffd83ad7d))
+* **observability:** add log level label to Loki + Cluster Logs dashboard ([8189d2a](https://github.com/5dlabs/cto/commit/8189d2a33b330070383f45b5e4dcc33a958a691d))
+* **observability:** add prominent status tiles to Solana Validator dashboard ([6c6c399](https://github.com/5dlabs/cto/commit/6c6c3993de4989188a73d690d51aaecd92620a93))
+* **pitch-deck:** rewrite deck with PAS framework, plain language, 13 slides ([a0980c0](https://github.com/5dlabs/cto/commit/a0980c0685b6fb826c67a7e43b4a63c853005a99))
+* **pm:** agent delegation, token endpoint, and config hardening ([#4568](https://github.com/5dlabs/cto/issues/4568)) ([e56df9f](https://github.com/5dlabs/cto/commit/e56df9f66753623f6a68f4a3a0b61a2491aa0432))
+* **scm:** dual GitHub + GitLab SCM provider support ([#4536](https://github.com/5dlabs/cto/issues/4536)) ([a43c572](https://github.com/5dlabs/cto/commit/a43c572e7ba95fe52fd10c8cc020fa931e43c204))
+* **splash:** add Polygon to trading chain coverage ([3e5755c](https://github.com/5dlabs/cto/commit/3e5755cf1e53fcea037b6c7f848e09d1e1f529bd))
+* **trading:** add Yellowstone gRPC geyser plugin to Agave RPC node ([7647831](https://github.com/5dlabs/cto/commit/7647831d51814145c48213dd2e1484fed3cbf369))
+* **trading:** build Yellowstone gRPC from source, fix ABI crash ([9b6bfeb](https://github.com/5dlabs/cto/commit/9b6bfeb4852889bca9b9b4ebbd48c45d738d8f98))
+* **trading:** deploy 8 trading agents to K8s via ArgoCD ([#4530](https://github.com/5dlabs/cto/issues/4530)) ([1105794](https://github.com/5dlabs/cto/commit/1105794e49a0aaf2a1e79cdd028df91cd341b9f6))
+* **trading:** deploy solana exporter, production dashboards, and ArgoCD integration for Cherry cluster ([16dee06](https://github.com/5dlabs/cto/commit/16dee0685f892358a5f09617850204d604c1373f))
+* **trading:** Solana DEX indexer + Agave flag fix ([#4535](https://github.com/5dlabs/cto/issues/4535)) ([d51edb9](https://github.com/5dlabs/cto/commit/d51edb9696b7843959a01aa6f20966f7bfbd9db9))
+* **website:** Morgan page — Meta Ray-Ban Display + WhatsApp ([5bcb6f9](https://github.com/5dlabs/cto/commit/5bcb6f9cec58e77b9dcbb9420f15de6521fbd00c))
+* **website:** Morgan page — Rokid Glasses + Vuzix Z100 sections ([a229dde](https://github.com/5dlabs/cto/commit/a229ddec9a069b7f9566917403f0758e89cb2e1e))
+
+
+### 🐛 Bug Fixes
+
+* **intake:** harden e2e quick-run workflow ([#4548](https://github.com/5dlabs/cto/issues/4548)) ([39b27ef](https://github.com/5dlabs/cto/commit/39b27ef565f1563832abc512844d79dc0e9f4924))
+* **marketing,splash:** mobile view regressions + Business Team tools/skills ([5ec9eb4](https://github.com/5dlabs/cto/commit/5ec9eb469780647a03f64a191c2ccac557b41b8d))
+* **marketing,splash:** normalize pathname for nav link highlighting ([573ebd7](https://github.com/5dlabs/cto/commit/573ebd7960f5bef640ff944313f20f3e85c57417))
+* **marketing:** center Meet Morgan section, remove empty right space ([7d6e25a](https://github.com/5dlabs/cto/commit/7d6e25a03072f25e24ce6bdcd1c0aaa5998a9df6))
+* **marketing:** grid-pulse z-index so it stays behind hero content ([2b6e7ff](https://github.com/5dlabs/cto/commit/2b6e7ffee547b10992fe61e2d17ee64f32ac3d1f))
+* **marketing:** LemonSlice widget 9:14 aspect ratio, responsive sizing, no head crop ([06d4c73](https://github.com/5dlabs/cto/commit/06d4c73be44b98ad632a1aefa631897d03040764))
+* **observability:** add cilium-operator Prometheus scrape target ([1c781dc](https://github.com/5dlabs/cto/commit/1c781dc20c81c113c1d4482b700534c56d3741ce))
+* **observability:** fix Solana dashboard logs panel and sync ETA ([9c9baa1](https://github.com/5dlabs/cto/commit/9c9baa1458577f4444f6ec091ff1aa757f5a0283))
+* **observability:** raise Agave memory limit and fix Cilium dashboards ([6d4de40](https://github.com/5dlabs/cto/commit/6d4de400ccd91a68ff4164108ff30082fd79e278))
+* **observability:** remove Label_Keys from Fluent Bit Loki output ([0d080f3](https://github.com/5dlabs/cto/commit/0d080f35378151398e4276bea807891855a0b96e))
+* **observability:** split Solana logs into Agave and Exporter panels ([6f94a7b](https://github.com/5dlabs/cto/commit/6f94a7b926e83ef254ca3943bb03388419a6c6ca))
+* **pitch-deck:** accurate traction — pilot phase, pipeline not closed revenue ([4cc7e10](https://github.com/5dlabs/cto/commit/4cc7e10f7c3f5b6a5c8c50821c8f3a5c09dc3007))
+* **pitch-deck:** move Model mix from Problem to CTO slide ([#4558](https://github.com/5dlabs/cto/issues/4558)) ([61e780f](https://github.com/5dlabs/cto/commit/61e780fa18c5ad233daae5518d77f0b1ac4266d0))
+* **pitch-deck:** replace "tax" metaphor with markup/overhead/fees ([#4560](https://github.com/5dlabs/cto/issues/4560)) ([b984429](https://github.com/5dlabs/cto/commit/b98442953a34ea98e301eb49d6bb0bafadd98ef2))
+* **trading:** align secrets structure with remote openclaw chart ([0225cd4](https://github.com/5dlabs/cto/commit/0225cd4a44aeb47e0b4c1b9adca98ce5aa4b11ff))
+* **trading:** bump memory limits to 1Gi and fix Mode A heartbeat instructions ([7aaee97](https://github.com/5dlabs/cto/commit/7aaee97555bbcbfad37131a4f19773623a70f8c9))
+* **trading:** bump memory limits to 2Gi — 1Gi still OOMKilling Mode A agents ([a5bf166](https://github.com/5dlabs/cto/commit/a5bf1664e0c6d3899febf282549ade3888c61ba3))
+* **trading:** correct repo URLs, OpenBao paths, disable hooks ([eb77c03](https://github.com/5dlabs/cto/commit/eb77c03169fdce5898c391bfc6d56bdbf68ad97f))
+* **trading:** disable Yellowstone gRPC geyser plugin pending crash fix ([2f438a3](https://github.com/5dlabs/cto/commit/2f438a3f54f1011f6d0c6f26dbbeaaa0677aa1d7))
+* **trading:** fix secrets structure blocking ArgoCD sync ([d2c5af3](https://github.com/5dlabs/cto/commit/d2c5af301cbe90da3f2358827d7d9b19a59210af))
+* **trading:** mirror openclaw-api-keys pattern, add 1Password token ([c1a7250](https://github.com/5dlabs/cto/commit/c1a7250075252a7641ffe301f8f8138a3c6ea015))
+* **trading:** override heartbeat model to Haiku (chart defaults to minimax) ([9bdaf61](https://github.com/5dlabs/cto/commit/9bdaf619572d26ab56cfdd6d54e7723b42dda320))
+* **trading:** register Haiku 4.5 model in anthropic provider + fix fallback IDs ([fdda146](https://github.com/5dlabs/cto/commit/fdda146dbf8d4a5b3630cdc7affbaa1d56892391))
+* **trading:** resolve PR [#4531](https://github.com/5dlabs/cto/issues/4531) conflicts — add simmer/helius/polymarket secrets and env vars ([#4532](https://github.com/5dlabs/cto/issues/4532)) ([57052a9](https://github.com/5dlabs/cto/commit/57052a93364abaa1205741ab38621b0f68b4add1))
+* **trading:** set Helm releaseNames in ArgoCD apps to match existing releases ([78bca01](https://github.com/5dlabs/cto/commit/78bca010a9ae31fad3375e9d5fec07f8f32fba0c))
+* **trading:** use pre-built asymmetric-research solana-exporter image ([a46fb8c](https://github.com/5dlabs/cto/commit/a46fb8c9a07608ffd49edfb97edae254ec0e7102))
+
+
+### 🔧 Maintenance
+
+* consolidate worktrees and merge trading-agents infra ([#4541](https://github.com/5dlabs/cto/issues/4541)) ([6e5c20a](https://github.com/5dlabs/cto/commit/6e5c20a187152672bb45e9a32ac578b6383e940c))
+* **marketing:** remove Even G2 HUD images, keep product shot only ([dc8cb43](https://github.com/5dlabs/cto/commit/dc8cb4333b24f39fb35a83a14e3c25d598897a97))
+
 ## [0.2.51](https://github.com/5dlabs/cto/compare/v0.2.50...v0.2.51) (2026-03-08)
 
 
