@@ -407,6 +407,7 @@ async function main(): Promise<void> {
         const baseUrl = getArg(args, '--base-url') || '';
         const prUrl = getArg(args, '--pr-url') || '';
         const agentMapArg = getArg(args, '--agent-map');
+        const pmUrl = getArg(args, '--pm-url') || process.env.PM_URL || '';
 
         if (!projectId || !prdIssueId || !teamId) {
           console.error('Error: --project-id, --prd-issue-id, and --team-id are required');
@@ -423,9 +424,21 @@ async function main(): Promise<void> {
         if (agentMapArg) {
           try {
             agentMap = JSON.parse(agentMapArg);
+            console.error(`sync-linear issues: parsed agentMap with ${Object.keys(agentMap).length} entries`);
           } catch {
-            console.error('Warning: Could not parse --agent-map JSON, using empty map');
+            console.error(`Warning: Could not parse --agent-map JSON (${agentMapArg.length} chars, preview: ${agentMapArg.slice(0, 80)}), using empty map`);
           }
+        } else {
+          console.error('sync-linear issues: no --agent-map provided, using empty map');
+        }
+
+        if (pmUrl) {
+          console.error(`sync-linear issues: PM server at ${pmUrl} — will use per-agent tokens for self-assignment`);
+        }
+
+        const personalApiKey = process.env.LINEAR_PERSONAL_API_KEY || undefined;
+        if (personalApiKey) {
+          console.error(`sync-linear issues: personal API key available for issue assignment`);
         }
 
         const result = await syncTaskIssues({
@@ -437,6 +450,8 @@ async function main(): Promise<void> {
           prUrl,
           agentMap,
           apiKey,
+          personalApiKey,
+          pmUrl: pmUrl || undefined,
         });
 
         console.log(JSON.stringify(result, null, 2));

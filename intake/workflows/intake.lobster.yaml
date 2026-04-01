@@ -29,6 +29,8 @@ args:
     default: ''
   linear_agent_map:
     default: '{}'
+  pm_url:
+    default: ''
   repository_url:
     default: ''
   tool_context_file:
@@ -1784,17 +1786,36 @@ steps:
       if [ -n "$BRANCH" ]; then
         BASE_URL="${REPO_WEB}/blob/${BRANCH}"
       fi
+      AGENT_MAP_VAL='${linear_agent_map}'
+      AGENT_MAP_LEN="$(printf '%s' "$AGENT_MAP_VAL" | wc -c | tr -d ' ')"
+      echo "sync-linear-issues-post-push: agent-map length=${AGENT_MAP_LEN} preview=$(printf '%s' "$AGENT_MAP_VAL" | head -c 120)" >&2
+      TASK_COUNT="$(printf '%s' "$EXP" | jq 'length' 2>/dev/null || echo '?')"
+      echo "sync-linear-issues-post-push: syncing ${TASK_COUNT} tasks to project=${linear_project_id}" >&2
+      SYNC_ERR_LOG="$(mktemp)"
+      PM_URL_ARG=""
+      if [ -n "${pm_url}" ]; then
+        PM_URL_ARG="--pm-url ${pm_url}"
+        echo "sync-linear-issues-post-push: using PM server at ${pm_url} for per-agent tokens" >&2
+      fi
       SYNC_OUT="$(printf '%s' "$EXP" | intake-util sync-linear issues \
         --project-id "${linear_project_id}" \
         --prd-issue-id "${linear_prd_issue_id}" \
         --team-id "${linear_team_id}" \
         --base-url "$BASE_URL" \
         --pr-url "$PR_URL" \
-        --agent-map '${linear_agent_map}' 2>&1)" || {
-        echo "sync-linear-issues-post-push: Linear sync failed (non-fatal) — $SYNC_OUT" >&2
+        --agent-map "$AGENT_MAP_VAL" \
+        $PM_URL_ARG 2>"$SYNC_ERR_LOG")" || {
+        echo "sync-linear-issues-post-push: Linear sync failed (non-fatal)" >&2
+        cat "$SYNC_ERR_LOG" >&2
+        rm -f "$SYNC_ERR_LOG"
         printf '{"issueCount":0,"skipped":true}\n'
         exit 0
       }
+      if [ -s "$SYNC_ERR_LOG" ]; then
+        echo "sync-linear-issues-post-push: stderr from intake-util:" >&2
+        cat "$SYNC_ERR_LOG" >&2
+      fi
+      rm -f "$SYNC_ERR_LOG"
       ISSUE_COUNT="$(printf '%s' "$SYNC_OUT" | jq -r '.issueCount // 0' 2>/dev/null || echo 0)"
       if ! printf '%s' "$ISSUE_COUNT" | jq -e 'type=="number" and . > 0' >/dev/null 2>&1; then
         echo "sync-linear-issues-post-push: issueCount=$ISSUE_COUNT (non-fatal warning)" >&2

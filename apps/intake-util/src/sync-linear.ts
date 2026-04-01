@@ -358,6 +358,33 @@ export interface SyncIssuesOptions {
   prUrl?: string;
   agentMap: Record<string, string>;
   apiKey: string;
+  /** Personal API key that can assign to app users (lin_api_* prefix). */
+  personalApiKey?: string;
+  /** PM server URL for per-agent OAuth tokens (enables self-assignment). */
+  pmUrl?: string;
+}
+
+/**
+ * Fetch an agent's Linear OAuth token from the PM server.
+ * Returns the token string or null if unavailable.
+ */
+async function fetchAgentToken(pmUrl: string, agent: string): Promise<string | null> {
+  try {
+    const resp = await fetch(`${pmUrl}/oauth/token/${agent}`, { signal: AbortSignal.timeout(10_000) });
+    if (!resp.ok) {
+      console.error(`fetchAgentToken: ${agent} → HTTP ${resp.status}`);
+      return null;
+    }
+    const data = await resp.json() as { status: string; access_token?: string };
+    if (data.status === 'ok' && data.access_token) {
+      return data.access_token;
+    }
+    console.error(`fetchAgentToken: ${agent} → status=${data.status}, no token`);
+    return null;
+  } catch (err) {
+    console.error(`fetchAgentToken: ${agent} → ${err}`);
+    return null;
+  }
 }
 
 function extractAgent(task: GeneratedTask): string {
@@ -533,7 +560,49 @@ const PRIORITY_MAP: Record<string, number> = {
 };
 
 export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssuesResult> {
-  const { tasks, projectId, prdIssueId, baseUrl, prUrl, agentMap, apiKey } = opts;
+  const { tasks, projectId, prdIssueId, baseUrl, prUrl, agentMap, apiKey, personalApiKey, pmUrl } = opts;
+
+  // ── Agent Delegation Model ──
+  // Linear's agent model uses "delegate" (not "assignee") for app users:
+  //   - issueCreate(input: { assigneeId: <app-user-id> }) sets the DELEGATE field
+  //   - The assignee field is set to the token owner (human)
+  //   - This is the intended behavior: humans maintain ownership, agents act on their behalf
+  // Requirements:
+  //   - Each agent app must have app:assignable scope (enabled via client_credentials token grant)
+  //   - A personal API key (lin_api_*) is the simplest way to create issues with delegation
+  //   - Agent self-assignment via OAuth tokens also works but is more complex
+  //
+  // Priority: personalApiKey > PM per-agent tokens > default apiKey
+  const assignApiKey = personalApiKey || apiKey;
+  if (personalApiKey) {
+    console.error(`syncTaskIssues: using personal API key for agent delegation`);
+  }
+
+  const mapKeys = Object.keys(agentMap);
+  console.error(`syncTaskIssues: agentMap has ${mapKeys.length} entries, tasks: ${tasks.length}`);
+  if (mapKeys.length > 0) {
+    console.error(`syncTaskIssues: agentMap sample keys: ${mapKeys.slice(0, 8).join(', ')}`);
+  }
+  const taskAgents = tasks.map(t => extractAgent(t));
+  const uniqueAgents = [...new Set(taskAgents)];
+  console.error(`syncTaskIssues: unique agents in tasks: ${uniqueAgents.join(', ')}`);
+  for (const a of uniqueAgents) {
+    console.error(`syncTaskIssues:   ${a} → ${agentMap[a] ? 'delegate:' + agentMap[a].slice(0, 8) + '...' : 'UNRESOLVED (no delegation)'}`);
+  }
+
+  // Pre-fetch per-agent tokens from PM server for self-assignment (fallback if no personal key).
+  const agentTokens = new Map<string, string>();
+  if (pmUrl && !personalApiKey) {
+    console.error(`syncTaskIssues: fetching per-agent tokens from ${pmUrl}`);
+    const tokenPromises = uniqueAgents.map(async (agent) => {
+      const token = await fetchAgentToken(pmUrl, agent);
+      if (token) {
+        agentTokens.set(agent, token);
+      }
+    });
+    await Promise.all(tokenPromises);
+    console.error(`syncTaskIssues: got tokens for ${agentTokens.size}/${uniqueAgents.length} agents`);
+  }
 
   // Resolve team key (e.g., "CTOPA") → UUID
   const teamId = await resolveTeamId(apiKey, opts.teamId);
@@ -588,18 +657,23 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
   const issues: SyncIssueEntry[] = [];
   const unresolvedAgents = new Set<string>();
   let subtaskIssueCount = 0;
-  let assignedIssueCount = 0;
-  let unassignedIssueCount = 0;
+  let delegatedIssueCount = 0;
+  let undelegatedIssueCount = 0;
 
   for (const task of tasks) {
     const agent = extractAgent(task);
     const agentLabelId = await getAgentLabelId(agent);
     const assigneeId = agentMap[agent] || undefined;
+    // Use personal API key for assignment (can assign to app users),
+    // or fall back to agent's own token, or default key.
+    const agentToken = agentTokens.get(agent);
+    const issueApiKey = personalApiKey || agentToken || apiKey;
+
     if (!assigneeId) {
       unresolvedAgents.add(agent);
-      unassignedIssueCount += 1;
+      undelegatedIssueCount += 1;
     } else {
-      assignedIssueCount += 1;
+      delegatedIssueCount += 1;
     }
 
     const labelIds = [intakeLabelId, agentLabelId].filter((id): id is string => id !== null);
@@ -617,11 +691,12 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
       issueInput.priority = PRIORITY_MAP[task.priority];
     }
 
-    // Helper: create issue, retrying without assigneeId if assignment fails
+    // Helper: create issue using the agent's token for self-assignment,
+    // falling back to default apiKey without assignee if assignment fails.
     async function createIssueWithFallback(input: Record<string, unknown>): Promise<LinearIssue> {
       try {
         const data = await execute<IssueResponse>(
-          apiKey,
+          issueApiKey,
           `mutation CreateIssue($input: IssueCreateInput!) {
             issueCreate(input: $input) {
               success
@@ -634,8 +709,9 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
           return data.issueCreate.issue;
         }
       } catch (err) {
-        // If assignment failed ("App user not valid"), retry without assignee
+        // If assignment failed ("App user not valid"), retry without assignee using default key
         if (input.assigneeId && String(err).includes('not valid')) {
+          console.error(`syncTaskIssues: assignment failed for ${agent}, retrying without assignee`);
           const { assigneeId: _, ...withoutAssignee } = input;
           const retry = await execute<IssueResponse>(
             apiKey,
@@ -672,9 +748,9 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
         if (intakeLabelId) subtaskInput.labelIds = [intakeLabelId];
         if (assigneeId) {
           subtaskInput.assigneeId = assigneeId;
-          assignedIssueCount += 1;
+          delegatedIssueCount += 1;
         } else {
-          unassignedIssueCount += 1;
+          undelegatedIssueCount += 1;
         }
 
         const subtaskIssue = await createIssueWithFallback(subtaskInput);
@@ -702,8 +778,8 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
     parentIssueIdentifier: parentIssue.identifier,
     taskIssueCount: issues.length,
     subtaskIssueCount,
-    assignedIssueCount,
-    unassignedIssueCount,
+    assignedIssueCount: delegatedIssueCount,
+    unassignedIssueCount: undelegatedIssueCount,
     unresolvedAgents: [...unresolvedAgents].sort(),
     issues,
   };
