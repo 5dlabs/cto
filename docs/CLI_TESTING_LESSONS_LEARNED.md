@@ -116,7 +116,7 @@ async fn post_init_activity(
 
 ### Required Environment Variables
 ```bash
-LINEAR_OAUTH_TOKEN=lin_oauth_...  # From 1Password: op://Automation/Linear Morgan OAuth/developer_token
+LINEAR_OAUTH_TOKEN=lin_oauth_...  # Prefer: POST /oauth/mint/morgan, then read linear-app-morgan from Kubernetes
 LINEAR_ISSUE_IDENTIFIER=CTOPA-XXX  # Issue to post to
 CTO_AGENT_NAME=rex  # Agent name for config lookup
 ```

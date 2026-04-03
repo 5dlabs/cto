@@ -1,232 +1,130 @@
-# Linear OAuth Setup for CTO Agents
+# Linear Tokens for CTO Agents
 
-## Current Status
+## Preferred Operating Model
 
-| Agent | OAuth App | Token | Refresh |
-|-------|-----------|-------|---------|
-| morgan | ✅ | ✅ Valid | ⚠️ No refresh_token |
-| bolt | ✅ | ❌ Expired | ⚠️ No refresh_token |
-| rex | ❌ | ❌ | ❌ |
-| blaze | ❌ | ❌ | ❌ |
-| grizz | ❌ | ❌ | ❌ |
-| nova | ❌ | ❌ | ❌ |
-| tap | ❌ | ❌ | ❌ |
-| spark | ❌ | ❌ | ❌ |
-| cleo | ❌ | ❌ | ❌ |
-| cipher | ❌ | ❌ | ❌ |
-| tess | ❌ | ❌ | ❌ |
-| atlas | ❌ | ❌ | ❌ |
-| stitch | ❌ | ❌ | ❌ |
-| vex | ❌ | ❌ | ❌ |
+The canonical flow is now:
 
-## Architecture
+1. Store `client_id` and `client_secret` in 1Password as `Linear {Agent} OAuth`.
+2. Let PM mint runtime access tokens with `grant_type=client_credentials`.
+3. Let PM store the minted runtime token in Kubernetes secret `linear-app-{agent}`.
+4. Let PM re-mint when the token is missing, expiring, or explicitly requested.
 
-### Token Flow
+Do **not** treat 1Password as the source of truth for runtime access tokens.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        LINEAR OAUTH FLOW                         │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  1. Create OAuth App in Linear                                  │
-│     ┌─────────────────────────────────────────────────────┐     │
-│     │ Linear Settings → API → OAuth Applications          │     │
-│     │ • Name: 5DLabs-{Agent}                              │     │
-│     │ • Redirect URI: https://pm.5dlabs.ai/oauth/{agent}  │     │
-│     │ • Scopes: read, write, issues:create               │     │
-│     └─────────────────────────────────────────────────────┘     │
-│                            │                                     │
-│                            ▼                                     │
-│  2. Store credentials in K8s / 1Password                        │
-│     ┌─────────────────────────────────────────────────────┐     │
-│     │ linear-app-{agent} secret:                          │     │
-│     │ • client_id                                         │     │
-│     │ • client_secret                                     │     │
-│     │ • webhook_secret                                    │     │
-│     └─────────────────────────────────────────────────────┘     │
-│                            │                                     │
-│                            ▼                                     │
-│  3. User authorizes app                                         │
-│     ┌─────────────────────────────────────────────────────┐     │
-│     │ GET https://pm.5dlabs.ai/oauth/{agent}/authorize    │     │
-│     │     → Redirects to Linear OAuth consent             │     │
-│     │     → User approves                                 │     │
-│     │     → Linear redirects to callback with code        │     │
-│     └─────────────────────────────────────────────────────┘     │
-│                            │                                     │
-│                            ▼                                     │
-│  4. PM Server exchanges code for tokens                         │
-│     ┌─────────────────────────────────────────────────────┐     │
-│     │ POST https://api.linear.app/oauth/token             │     │
-│     │     grant_type=authorization_code                   │     │
-│     │     code={authorization_code}                       │     │
-│     │     → Returns: access_token + refresh_token         │     │
-│     └─────────────────────────────────────────────────────┘     │
-│                            │                                     │
-│                            ▼                                     │
-│  5. Tokens stored in K8s secret                                 │
-│     ┌─────────────────────────────────────────────────────┐     │
-│     │ linear-app-{agent} secret updated:                  │     │
-│     │ • access_token                                      │     │
-│     │ • refresh_token                                     │     │
-│     │ • expires_at                                        │     │
-│     └─────────────────────────────────────────────────────┘     │
-│                            │                                     │
-│                            ▼                                     │
-│  6. TokenHealthManager auto-refreshes                           │
-│     ┌─────────────────────────────────────────────────────┐     │
-│     │ Every 5 minutes, checks all agents:                 │     │
-│     │ • If expires_at < now + 1 hour: refresh             │     │
-│     │ • POST https://api.linear.app/oauth/token           │     │
-│     │     grant_type=refresh_token                        │     │
-│     │ • Update K8s secret with new tokens                 │     │
-│     └─────────────────────────────────────────────────────┘     │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+## Source Of Truth
+
+Use per-agent 1Password items for long-lived credentials only:
+
+```text
+Linear {Agent} OAuth
+  - client_id
+  - client_secret
+  - webhook_secret   (if you keep it there)
 ```
 
-## Setup Instructions
+If `developer_token` or `refresh_token` still exist on older items, treat them as legacy data. PM should not depend on them for the standard path.
 
-### Step 1: Create OAuth Apps in Linear
+Runtime access tokens belong in Kubernetes only:
 
-For each agent, create an OAuth application in Linear:
+```text
+Secret: linear-app-{agent}
+  - client_id
+  - client_secret
+  - webhook_secret
+  - access_token
+  - expires_at
+```
 
-1. Go to **Linear Settings → API → OAuth Applications**
-2. Click **Create OAuth Application**
-3. Fill in:
-   - **Name**: `5DLabs-{Agent}` (e.g., `5DLabs-Rex`)
-   - **Redirect URIs**: `https://pm.5dlabs.ai/oauth/{agent}/callback`
-   - **Scopes**: `read`, `write`, `issues:create`
-4. Save the **Client ID** and **Client Secret**
+## PM Endpoints
 
-### Step 2: Store Credentials
+PM is the token broker.
 
-#### Option A: Kubernetes (Production)
+Single agent:
 
 ```bash
-kubectl create secret generic linear-app-{agent} \
-  --namespace cto \
-  --from-literal=client_id={CLIENT_ID} \
-  --from-literal=client_secret={CLIENT_SECRET} \
-  --from-literal=webhook_secret={WEBHOOK_SECRET}
+curl -X POST https://pm.5dlabs.ai/oauth/mint/bolt
 ```
 
-#### Option B: 1Password (Local Testing)
+All configured agents:
 
 ```bash
-op item create \
-  --category="Login" \
-  --title="Linear {Agent} OAuth" \
-  --vault="Automation" \
-  "client_id[concealed]={CLIENT_ID}" \
-  "client_secret[concealed]={CLIENT_SECRET}"
+curl -X POST https://pm.5dlabs.ai/oauth/mint-all
 ```
 
-### Step 3: Authorize the App
+These endpoints mint via `client_credentials`, persist the runtime token to `linear-app-{agent}`, and update PM's in-memory config.
 
-1. Open the authorization URL:
-   ```
-   https://pm.5dlabs.ai/oauth/{agent}/authorize
-   ```
+## Standard Setup For A New Agent
 
-2. Log in to Linear with the workspace admin account
+### 1. Create the Linear OAuth app
 
-3. Approve the OAuth request
+In Linear:
 
-4. PM Server will:
-   - Exchange the code for tokens
-   - Store `access_token` + `refresh_token` in K8s secret
-   - Start automatic refresh cycle
+1. Go to `Settings -> API -> OAuth applications`
+2. Create `5DLabs-{Agent}`
+3. Add redirect URI:
 
-### Step 4: Verify
+```text
+https://pm.5dlabs.ai/oauth/{agent}/callback
+```
+
+The redirect URI is still useful for exception flows, but it is not the default operational path.
+
+### 2. Create the 1Password item
+
+Create:
+
+```text
+Linear {Agent} OAuth
+```
+
+with:
+
+```text
+client_id
+client_secret
+webhook_secret   (optional if stored elsewhere)
+```
+
+### 3. Create or update the Kubernetes secret
+
+PM expects `linear-app-{agent}` to exist or be provisioned by the cluster secret pipeline. It may contain blank runtime token fields initially, but it must carry the agent credentials PM needs to mint from scratch.
+
+### 4. Ask PM to mint a runtime token
 
 ```bash
-# Check token health
-./setup-linear-oauth.sh
-
-# Test specific agent
-./setup-linear-oauth.sh bolt
+./tests/cli-invocation/scripts/refresh-linear-tokens.sh bolt
 ```
 
-## Automated Refresh
+or:
 
-The PM Server's `TokenHealthManager` automatically refreshes tokens:
-
-- **Interval**: Every 5 minutes
-- **Buffer**: Refresh 1 hour before expiration
-- **Concurrency**: 3 parallel refreshes max
-
-### How It Works
-
-```rust
-// crates/pm/src/state/token_health.rs
-
-pub async fn refresh_expiring_tokens(&self) {
-    for (agent, app) in agents {
-        if app.needs_refresh() {
-            let new_tokens = refresh_access_token(
-                &app.refresh_token,
-                &app.client_id,
-                &app.client_secret,
-            ).await;
-            
-            store_to_k8s_secret(agent, new_tokens);
-        }
-    }
-}
-```
-
-## Troubleshooting
-
-### Token Expired, No Refresh Token
-
-**Symptom**: `developer_token` returns 401, but no `refresh_token` stored.
-
-**Solution**: Re-authorize the app:
 ```bash
-open "https://pm.5dlabs.ai/oauth/{agent}/authorize"
+curl -X POST https://pm.5dlabs.ai/oauth/mint/bolt
 ```
 
-### OAuth App Not Found
+### 5. Verify the runtime token
 
-**Symptom**: `no OAuth app configured`
-
-**Solution**: Create OAuth app in Linear (Step 1)
-
-### Refresh Fails
-
-**Symptom**: `refresh failed: invalid_grant`
-
-**Possible causes**:
-- Refresh token revoked (user uninstalled app)
-- Token rotated and old refresh token used
-
-**Solution**: Re-authorize the app
-
-## 1Password Items
-
-### Existing Items
-
-| Item | Contents |
-|------|----------|
-| `Linear Agent Client Secrets (Rotated 2026-01-02)` | client_secret for 12 agents (by section) |
-| `Linear Bolt OAuth` | client_id, client_secret, developer_token |
-| `Linear Morgan OAuth` | client_id, client_secret, developer_token |
-
-### Required Fields Per Agent
-
-```
-Linear {Agent} OAuth:
-  - client_id (concealed)
-  - client_secret (concealed)
-  - developer_token (concealed) - the access token
-  - refresh_token (concealed) - for auto-refresh
+```bash
+./tests/cli-invocation/verify-linear-tokens.sh bolt
 ```
 
-## Scripts
+This validates the current runtime token from Kubernetes, not a cached token from 1Password.
+
+## Browser Auth
+
+Browser auth is now an exception path only.
+
+Use it only when:
+
+- the app truly requires `authorization_code`
+- `client_credentials` is not enabled for that app
+- you are repairing a legacy refresh-token app that cannot mint non-interactively
+
+For normal service-style agent apps, browser auth should not be the first repair step.
+
+## Related Scripts
 
 | Script | Purpose |
 |--------|---------|
-| `setup-linear-oauth.sh` | Audit all agents, test tokens |
-| `setup-linear-oauth.sh --refresh` | Attempt token refresh |
-| `verify-linear-tokens.sh` | Quick token validation |
+| `tests/cli-invocation/verify-linear-tokens.sh` | Validate runtime tokens from Kubernetes |
+| `tests/cli-invocation/scripts/refresh-linear-tokens.sh` | Ask PM to mint runtime tokens |
+| `tests/cli-invocation/setup-linear-oauth.sh` | Audit per-agent client credentials and runtime token state |

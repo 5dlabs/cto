@@ -9,6 +9,12 @@
 # tracking annotation pointing to its owning app.
 #
 # Apply with: kubectl patch configmap argocd-cm -n argocd --patch-file argocd-cm-patch.yaml
+#
+# TLS terminates at Cloudflare: argocd-server must also run with HTTP on the pod or every
+# request 307-redirects to https://argocd.5dlabs.ai/ (infinite loop). Merge patch once:
+#   kubectl patch configmap argocd-cmd-params-cm -n argocd --type merge -p '{"data":{"server.insecure":"true"}}'
+#   kubectl rollout restart deployment argocd-server -n argocd
+# If Argo CD is installed via Helm, set configs.params.server.insecure: true instead.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -19,6 +25,9 @@ data:
   # when multiple apps deploy resources to the same namespace
   # Resources must have: argocd.argoproj.io/tracking-id: <app-name>:<group/kind:namespace/name>
   application.resourceTrackingMethod: annotation
+
+  # External URL (TLS terminates at Cloudflare; pair with server.insecure in argocd-cmd-params-cm)
+  url: https://argocd.5dlabs.ai
 
   # Custom health checks for CRDs that don't have built-in ArgoCD health logic
 

@@ -1,11 +1,9 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use base64::Engine;
 use serde::Deserialize;
 
-use crate::{
-    CodeSearchResult, MergeRequest, RepoInfo, ScmClient, ScmClientConfig, ScmProvider,
-};
+use crate::{CodeSearchResult, MergeRequest, RepoInfo, ScmClient, ScmClientConfig, ScmProvider};
 
 pub struct GitHubClient {
     http: reqwest::Client,
@@ -29,10 +27,7 @@ impl GitHubClient {
         headers.insert("Accept", "application/vnd.github.v3+json".parse().unwrap());
         headers.insert("User-Agent", "cto-scm/1.0".parse().unwrap());
         if let Some(ref token) = self.token {
-            headers.insert(
-                "Authorization",
-                format!("Bearer {token}").parse().unwrap(),
-            );
+            headers.insert("Authorization", format!("Bearer {token}").parse().unwrap());
         }
         headers
     }
@@ -360,16 +355,19 @@ impl ScmClient for GitHubClient {
 
     fn clone_url(&self, owner: &str, repo: &str, token: Option<&str>) -> String {
         match token {
-            Some(t) => format!("https://x-access-token:{t}@{}/{owner}/{repo}.git", self.host),
+            Some(t) => format!(
+                "https://x-access-token:{t}@{}/{owner}/{repo}.git",
+                self.host
+            ),
             None => format!("https://{}/{owner}/{repo}.git", self.host),
         }
     }
 
     fn parse_repo_from_url(&self, url: &str) -> Result<(String, String)> {
-        let cleaned = url
-            .trim_end_matches('/')
-            .trim_end_matches(".git")
-            .replace(&format!("git@{}:", self.host), &format!("https://{}/", self.host));
+        let cleaned = url.trim_end_matches('/').trim_end_matches(".git").replace(
+            &format!("git@{}:", self.host),
+            &format!("https://{}/", self.host),
+        );
         let prefix = format!("https://{}/", self.host);
         let path = cleaned
             .strip_prefix(&prefix)

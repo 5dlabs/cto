@@ -3,8 +3,10 @@
 # Credential Setup Script for CLI Integration Tests
 # =============================================================================
 #
-# Auto-discovers credentials from 1Password and writes to .env file.
-# Supports multiple agents: Morgan (rex), Bolt, Blaze, etc.
+# Auto-discovers credentials from 1Password and Kubernetes and writes to .env.
+# Linear runtime tokens come from PM/Kubernetes; 1Password is only used for
+# client credentials and other long-lived secrets.
+# Supports multiple agents: Morgan, Bolt, Blaze, etc.
 #
 # Usage:
 #   ./scripts/setup-credentials.sh [agent]
@@ -40,19 +42,30 @@ fi
 echo "✓ 1Password CLI ready" >&2
 
 # -----------------------------------------------------------------------------
-# Linear Credentials (same for all agents)
+# Linear runtime token (minted by PM, stored in Kubernetes)
 # -----------------------------------------------------------------------------
 echo "" >&2
-echo "--- Fetching Linear credentials ---" >&2
+echo "--- Fetching Linear runtime token from PM/Kubernetes ---" >&2
 
-LINEAR_OAUTH_TOKEN=$(op read "op://Automation/Linear Morgan OAuth/developer_token" 2>/dev/null) || {
-  echo "⚠ Could not fetch Linear OAuth token, trying alternate path..." >&2
-  LINEAR_OAUTH_TOKEN=$(op read "op://Automation/Linear API Key/credential" 2>/dev/null) || {
-    echo "❌ Failed to fetch Linear credentials" >&2
-    exit 1
-  }
-}
-echo "✓ Linear OAuth token retrieved" >&2
+PM_BASE_URL="${PM_BASE_URL:-https://pm.5dlabs.ai}"
+NAMESPACE="${NAMESPACE:-cto}"
+
+case "$AGENT" in
+  rex|morgan) LINEAR_AGENT_NAME="morgan" ;;
+  *)          LINEAR_AGENT_NAME="$AGENT" ;;
+esac
+
+curl -fsS -X POST "${PM_BASE_URL}/oauth/mint/${LINEAR_AGENT_NAME}" >/dev/null 2>&1 || true
+
+LINEAR_OAUTH_TOKEN=$(kubectl get secret "linear-app-${LINEAR_AGENT_NAME}" -n "${NAMESPACE}" \
+  -o jsonpath='{.data.access_token}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+
+if [ -z "$LINEAR_OAUTH_TOKEN" ]; then
+  echo "❌ Failed to fetch Linear runtime token for ${LINEAR_AGENT_NAME}" >&2
+  exit 1
+fi
+
+echo "✓ Linear runtime token retrieved for ${LINEAR_AGENT_NAME}" >&2
 
 # -----------------------------------------------------------------------------
 # Anthropic API Key

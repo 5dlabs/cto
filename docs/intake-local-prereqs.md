@@ -22,7 +22,7 @@ Short checklist before running [`pipeline.lobster.yaml`](../intake/workflows/pip
 
 **Default for the team (no per-developer `cp`):**
 
-1. Maintain **[`intake/local.env.op.defaults`](../intake/local.env.op.defaults)** with the real `LINEAR_API_KEY=op://…` line (one PR when the canonical item changes). **Default in repo:** **Linear Morgan OAuth** → `developer_token` (intake / Morgan).
+1. Maintain **[`intake/local.env.op.defaults`](../intake/local.env.op.defaults)** only as a temporary local fallback while intake bootstrap migrates. The preferred path is now: mint a runtime token via PM from the per-agent item (for example **Linear Morgan OAuth** `client_id` / `client_secret`) and read the runtime token from Kubernetes.
 2. On first preflight/checkpoints run, **[`intake/scripts/ensure-local-env-op.sh`](../intake/scripts/ensure-local-env-op.sh)** copies defaults → gitignored **`intake/local.env.op`** if the latter is missing.
 3. **[`intake/scripts/intake-op-auto.sh`](../intake/scripts/intake-op-auto.sh)** then **`op run`** as before.
 
@@ -55,7 +55,7 @@ The pipeline runs **`intake/scripts/pipeline-preflight.sh`** immediately after `
 
 | Check | Why |
 |--------|-----|
-| **`LINEAR_API_KEY`** | Non-empty (OAuth access token or `lin_api_…`). |
+| **`LINEAR_API_KEY`** | Non-empty runtime token (prefer PM-minted Kubernetes token; `lin_api_…` still works as a fallback). |
 | **`DISCORD_BRIDGE_URL/health`** | HTTP 200 (default base `http://discord-bridge.bots.svc:3200` — override when not on-cluster). |
 | **`LINEAR_BRIDGE_URL/health`** | HTTP 200 (default `http://linear-bridge.bots.svc:3100`). |
 | **`kubectl cluster-info`** | Reaches the **CTO** API server (`INTAKE_PREFLIGHT_KUBECTL_SKIP=true` only if you accept missing cluster context). |
@@ -89,7 +89,7 @@ kubectl cluster-info --request-timeout=15s
 **Local both bridges (OAuth + team id + OpenClaw Discord token):**
 
 1. Ensure **`intake/local.env.op`** exists (from **`local.env.op.defaults`**) with:
-   - **`LINEAR_API_KEY`** → OAuth access token (**Linear Morgan OAuth** / `developer_token`), not **`lin_api_*`** personal keys.
+   - **`LINEAR_API_KEY`** → runtime Linear token. Prefer a PM-minted token sourced from Kubernetes; the `developer_token` pointer is only a temporary local fallback while intake bootstrap is migrated.
    - **`DISCORD_BRIDGE_TOKEN`** → **`op://Automation/OpenClaw Discord Tokens/DISCORD_TOKEN_INTAKE`** (intake bot).
 2. **`LINEAR_TEAM_ID`** is **not** required in the file for local runs: **`intake/scripts/linear-resolve-team-id.sh`** resolves **`defaults.linear.teamId`** in **`cto-config.json`** (e.g. `CTOPA`) to a UUID via GraphQL (same as finding the team in the Linear UI).
 3. Run **`./intake/scripts/run-local-bridges.sh`** — starts both bridges ( **`ACP_ACTIVITY_ENABLED=false`** by default). **One terminal:** logs go to **`intake/.bridge-logs/`** and the script runs **`tail -f`** on both files so you monitor Discord + Linear together. Use **`--detach`** to spawn in the background and print the `tail -f` command; **`--no-tail`** if you only want the processes and will read logs elsewhere. Then export **`DISCORD_BRIDGE_URL`** / **`LINEAR_BRIDGE_URL`** to **`http://127.0.0.1:3200`** / **`:3100`** and run **`go-green.sh`** without **`--bridges-skip`**.
