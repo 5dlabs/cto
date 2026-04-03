@@ -15,11 +15,7 @@ use dex_indexer::writer::Writer;
 )]
 struct Config {
     /// Solana JSON-RPC URL.
-    #[arg(
-        long,
-        env = "SOLANA_RPC_URL",
-        default_value = "http://127.0.0.1:8899"
-    )]
+    #[arg(long, env = "SOLANA_RPC_URL", default_value = "http://127.0.0.1:8899")]
     solana_rpc_url: String,
 
     /// QuestDB HTTP endpoint (for writing via ILP).

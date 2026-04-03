@@ -2,7 +2,7 @@
 
 use anyhow::{Context as AnyhowContext, Result};
 use octocrab::{models::pulls::PullRequest, Octocrab};
-use scm::{ScmClient, ScmClientConfig, ScmProvider, create_scm_client};
+use scm::{create_scm_client, ScmClient, ScmClientConfig, ScmProvider};
 use tracing::{info, warn};
 
 use crate::crds::coderun::CodeRun;
@@ -78,13 +78,13 @@ pub async fn check_scm_for_pr_by_branch(
 
     info!(
         "Checking {} for PR/MR matching task-{} in {}/{}",
-        scm_client.provider(), task_id, owner, repo
+        scm_client.provider(),
+        task_id,
+        owner,
+        repo
     );
 
-    let branch_patterns = [
-        format!("task-{task_id}"),
-        format!("feature/task-{task_id}"),
-    ];
+    let branch_patterns = [format!("task-{task_id}"), format!("feature/task-{task_id}")];
 
     let mrs = scm_client
         .list_open_mrs(&owner, &repo, None)
@@ -93,8 +93,7 @@ pub async fn check_scm_for_pr_by_branch(
 
     for mr in &mrs {
         for pattern in &branch_patterns {
-            if mr.source_branch == *pattern
-                || mr.source_branch.starts_with(&format!("{pattern}-"))
+            if mr.source_branch == *pattern || mr.source_branch.starts_with(&format!("{pattern}-"))
             {
                 info!("Found MR via SCM API for task {}: {}", task_id, mr.url);
                 return Ok(Some(mr.url.clone()));

@@ -1,5 +1,7 @@
 # Linear OAuth Permanent Solution - Problem Statement
 
+> Historical problem statement. The active direction is now PM-managed `client_credentials` minting with runtime tokens stored in Kubernetes, not cached access tokens in 1Password.
+
 ## The Pain Point
 
 Morgan (and other agents) need to authenticate with Linear to create projects, issues, and manage tasks. Currently, we keep running into OAuth token expiration/refresh issues that require manual intervention.
