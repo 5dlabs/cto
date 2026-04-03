@@ -1,1 +1,19 @@
-[]
+[
+  {
+    "id": "dp-9",
+    "category": "ux-behavior",
+    "description": "How should design snapshot PR surfacing be presented in the frontend?",
+    "options": [
+      "Show design snapshot PRs as a dedicated section in the pipeline UI with interactive previews",
+      "Display design snapshot PRs as notifications or activity feed items only"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      4,
+      7,
+      8
+    ],
+    "rationale": "The PRD requires surfacing design snapshot PRs. The UX pattern chosen affects user discoverability, engagement, and workflow integration."
+  }
+]

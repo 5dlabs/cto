@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sigma-1 | Project Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-dim": "#d9d9e7",
+                        "inverse-surface": "#2e303a",
+                        "surface-container-high": "#e7e7f5",
+                        "on-secondary-fixed-variant": "#2b418f",
+                        "surface-container": "#ededfb",
+                        "surface-tint": "#004ced",
+                        "tertiary-fixed-dim": "#ffb4a1",
+                        "secondary-fixed": "#dde1ff",
+                        "surface-container-low": "#f3f2ff",
+                        "secondary-container": "#95aafe",
+                        "secondary": "#4459a8",
+                        "surface-bright": "#fbf8ff",
+                        "on-primary": "#ffffff",
+                        "primary-fixed-dim": "#b7c4ff",
+                        "primary": "#003ec7",
+                        "on-tertiary-fixed": "#3c0800",
+                        "on-error": "#ffffff",
+                        "inverse-primary": "#b7c4ff",
+                        "surface-container-highest": "#e1e1ef",
+                        "inverse-on-surface": "#f0effe",
+                        "outline-variant": "#c3c5d9",
+                        "on-tertiary": "#ffffff",
+                        "on-surface": "#191b25",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed": "#001452",
+                        "on-surface-variant": "#434656",
+                        "surface-variant": "#e1e1ef",
+                        "primary-fixed": "#dde1ff",
+                        "on-primary-container": "#dfe3ff",
+                        "tertiary-fixed": "#ffdbd2",
+                        "primary-container": "#0052ff",
+                        "outline": "#737688",
+                        "tertiary-container": "#bf3003",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#952200",
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed": "#001452",
+                        "on-secondary-container": "#253b89",
+                        "on-tertiary-container": "#ffddd5",
+                        "on-primary-fixed-variant": "#0038b6",
+                        "background": "#fbf8ff",
+                        "surface": "#fbf8ff",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed-dim": "#b7c4ff",
+                        "on-tertiary-fixed-variant": "#891e00",
+                        "on-background": "#191b25",
+                        "error-container": "#ffdad6"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Manrope"],
+                        "label": ["Manrope"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Manrope', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface antialiased pb-32">
+<!-- TopAppBar -->
+<header class="w-full sticky top-0 z-50 bg-[#fbf8ff] dark:bg-slate-950 flex justify-between items-center px-6 py-4 w-full">
+<div class="flex items-center gap-4">
+<button class="text-[#0052FF] active:scale-95 duration-200">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="text-2xl font-black tracking-tighter text-[#191b25] dark:text-white font-['Manrope']">Sigma-1</h1>
+</div>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-fixed-dim active:scale-95 duration-200">
+<img alt="User profile avatar" data-alt="Close-up professional headshot of a smiling creative director in a bright modern studio with soft bokeh background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDv0SM0-i32BTkJwYvG3X561O2gi2SgjDZiFP0EmipYPMLobi_u_q5PknXb7yr9Q3wNy2tF7qdgUtQ3Vui5OC4GlTt0rByqDjBROI5HMZzKpo5PsAOWqwLSfnv9AhGjAlkrRRMRfP0E7bEiNfS8ftCkRrlvz8633Ej0xqGufsGARhe1CRveJ3gWbrb_wiw7Ni_f1c4F9WcEKI7q8OSSQ4CcivI0oKy2hZV-TH4HNvomwpiFUfhItIxMOGJFkVtEjI01LM3mTasVwoIR"/>
+</div>
+</header>
+<main class="px-6 space-y-12 mt-6">
+<!-- User Greeting & Hero Stats -->
+<section class="space-y-8">
+<div class="space-y-1">
+<span class="font-label text-sm uppercase tracking-[0.05em] font-semibold text-on-surface-variant">Welcome Back, Alex</span>
+<h2 class="font-headline text-4xl font-extrabold tracking-tight text-on-surface leading-tight">Your architectural vision is taking shape.</h2>
+</div>
+<!-- Bento Stats Grid -->
+<div class="grid grid-cols-2 gap-4">
+<div class="col-span-1 p-6 bg-primary-container rounded-[2rem] text-on-primary flex flex-col justify-between aspect-square relative overflow-hidden">
+<div class="z-10">
+<span class="material-symbols-outlined text-3xl mb-4" data-icon="dashboard">dashboard</span>
+<p class="font-label text-xs uppercase tracking-widest opacity-80">Active Projects</p>
+</div>
+<p class="text-5xl font-black z-10">12</p>
+<div class="absolute -bottom-4 -right-4 w-24 h-24 bg-primary opacity-20 rounded-full blur-2xl"></div>
+</div>
+<div class="col-span-1 p-6 bg-surface-container-highest rounded-[2rem] flex flex-col justify-between aspect-square">
+<div>
+<span class="material-symbols-outlined text-3xl text-primary mb-4" data-icon="bolt">bolt</span>
+<p class="font-label text-xs uppercase tracking-widest text-on-surface-variant">Completion</p>
+</div>
+<div>
+<p class="text-5xl font-black text-on-surface tracking-tighter">84<span class="text-2xl font-bold text-primary">%</span></p>
+<div class="w-full h-1.5 bg-surface-dim rounded-full mt-2 overflow-hidden">
+<div class="w-[84%] h-full bg-primary rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Critical Projects -->
+<section class="space-y-6">
+<div class="flex justify-between items-end">
+<h3 class="font-headline text-2xl font-bold tracking-tight">Critical Projects</h3>
+<span class="font-label text-xs font-bold text-primary uppercase tracking-widest">View All</span>
+</div>
+<div class="space-y-3">
+<!-- Project Card 1 -->
+<div class="p-5 bg-surface-container-lowest rounded-[1.5rem] flex items-center justify-between shadow-[0_8px_24px_rgba(25,27,37,0.04)]">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-2xl bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="apartment">apartment</span>
+</div>
+<div>
+<h4 class="font-bold text-on-surface">Neo-Brutalist Hub</h4>
+<p class="text-sm text-on-surface-variant">Phase: Foundation</p>
+</div>
+</div>
+<div class="flex -space-x-3">
+<img alt="Team member" class="w-8 h-8 rounded-full border-2 border-white" data-alt="Portrait of a young male designer wearing glasses in a clean professional environment" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCo9dB50s-ndht5EtUsrd3tnCi3Eg39KH_OOW6y6ym4zikhFnNkIEdnNptKY4QX0T5lQR-2yhTDZpqihVN7Y248teXrdFi5gxtYt0JSayQnVq6zdtOCno2qHYNSNrMcgcz-rTGzuH4DY13XpP2qJJ-VGzu77-8zS2as8QS2QuCfyDF-0O_hTU1nG4039__TvvUP9GYGV8rEpb9Defgkimc459rQsa5JIpkXJG5qluJkoyO3zumvItvjGrqYzPPCrh0_TUlomImCSXAC"/>
+<img alt="Team member" class="w-8 h-8 rounded-full border-2 border-white" data-alt="Smiling young woman with professional attire in front of a white background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbL5oGhpJxHEEttZPTh6fFkM13Qbw2XSGidRYoBXh8sVxtKMVFBk9MEYff42Bxh8rrhlnxTH5cLDoNJvrYIQ_F6XrdNxS9XXTlLeMaK0gYclZTBWb6f9OPc6E6lS1qacxX4BkHnGzVEHnbdedzKlow-mBBLiOXT1zm7JbOejJOMDWxRjtKSA80g97dWxqGN5nvozKaAWdbwUh-sGjWvwWZhUdi6hty8vyL_-TLF38nIJMIDrymabH6PV9ALwpdIYf1TKc2z5pSAZxT"/>
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center border-2 border-white text-[10px] font-bold text-on-primary-fixed">+3</div>
+</div>
+</div>
+<!-- Project Card 2 -->
+<div class="p-5 bg-surface-container-low rounded-[1.5rem] flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-2xl bg-surface-container-high flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="landscape">landscape</span>
+</div>
+<div>
+<h4 class="font-bold text-on-surface">Echo Valley Resort</h4>
+<p class="text-sm text-on-surface-variant">Phase: Blueprint</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="font-label text-[10px] uppercase font-bold text-error">Delayed</span>
+</div>
+</div>
+<!-- Project Card 3 -->
+<div class="p-5 bg-surface-container-low rounded-[1.5rem] flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-2xl bg-surface-container-high flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="precision_manufacturing">precision_manufacturing</span>
+</div>
+<div>
+<h4 class="font-bold text-on-surface">Sigma Factory 01</h4>
+<p class="text-sm text-on-surface-variant">Phase: Assembly</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="font-label text-[10px] uppercase font-bold text-primary">On Track</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Quick Tasks -->
+<section class="space-y-6">
+<h3 class="font-headline text-2xl font-bold tracking-tight">Quick Tasks</h3>
+<div class="space-y-2">
+<!-- Task Item 1 -->
+<label class="flex items-center gap-4 p-5 bg-surface-container-lowest rounded-[1.5rem] cursor-pointer group active:scale-[0.98] transition-all">
+<input checked="" class="w-6 h-6 rounded-full border-outline-variant text-primary focus:ring-primary focus:ring-offset-0 transition-all" type="checkbox"/>
+<div class="flex-1">
+<span class="block font-bold text-on-surface line-through opacity-40">Review architectural renders</span>
+<span class="text-xs text-on-surface-variant">Due Today, 4:00 PM</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant opacity-40" data-icon="drag_indicator">drag_indicator</span>
+</label>
+<!-- Task Item 2 -->
+<label class="flex items-center gap-4 p-5 bg-surface-container-lowest rounded-[1.5rem] cursor-pointer group active:scale-[0.98] transition-all">
+<input class="w-6 h-6 rounded-full border-outline text-primary focus:ring-primary focus:ring-offset-0 transition-all" type="checkbox"/>
+<div class="flex-1">
+<span class="block font-bold text-on-surface">Client meeting: Sigma Alpha</span>
+<span class="text-xs text-primary font-bold">In 2 hours</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="chevron_right">chevron_right</span>
+</label>
+<!-- Task Item 3 -->
+<label class="flex items-center gap-4 p-5 bg-surface-container-lowest rounded-[1.5rem] cursor-pointer group active:scale-[0.98] transition-all">
+<input class="w-6 h-6 rounded-full border-outline text-primary focus:ring-primary focus:ring-offset-0 transition-all" type="checkbox"/>
+<div class="flex-1">
+<span class="block font-bold text-on-surface">Budget approval: Q3 Logistics</span>
+<span class="text-xs text-on-surface-variant">Due Tomorrow</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="chevron_right">chevron_right</span>
+</label>
+</div>
+</section>
+<!-- High-Conversion CTA Section -->
+<section class="relative h-48 rounded-[2.5rem] overflow-hidden flex items-center p-8 text-on-primary">
+<div class="absolute inset-0 bg-gradient-to-br from-primary-container to-primary z-0"></div>
+<div class="absolute inset-0 z-0 opacity-40 bg-[url('https://images.unsplash.com/photo-1541888946425-d81bb19480c5?auto=format&amp;fit=crop&amp;q=80&amp;w=800')] mix-blend-overlay" data-alt="High-detail architectural construction site with steel beams and golden hour sunlight filtering through"></div>
+<div class="relative z-10 space-y-3">
+<h4 class="text-2xl font-black tracking-tight leading-tight">Scale Your Impact.</h4>
+<p class="text-sm opacity-90 max-w-[200px]">Upgrade to Sigma Pro for advanced analytics and global team sync.</p>
+<button class="bg-surface-container-lowest text-primary font-bold px-6 py-2 rounded-full text-sm active:scale-95 transition-transform">Get Started</button>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-[#ffffff]/70 dark:bg-slate-900/80 backdrop-blur-xl z-50 rounded-t-[2rem] border-t border-[#c3c5d9]/15 shadow-[0_-8px_24px_rgba(25,27,37,0.04)]">
+<a class="flex flex-col items-center justify-center bg-[#0052ff] text-white rounded-full px-5 py-2 scale-110 shadow-lg shadow-blue-500/20 active:scale-90 transition-transform duration-300 ease-out" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-['Manrope'] text-[10px] uppercase tracking-[0.05em] font-semibold mt-0.5">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#434656] dark:text-slate-400 px-4 py-2 hover:text-[#003ec7] dark:hover:text-blue-300 active:scale-90 transition-transform duration-300 ease-out" href="#">
+<span class="material-symbols-outlined" data-icon="folder_copy">folder_copy</span>
+<span class="font-['Manrope'] text-[10px] uppercase tracking-[0.05em] font-semibold mt-0.5">Projects</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#434656] dark:text-slate-400 px-4 py-2 hover:text-[#003ec7] dark:hover:text-blue-300 active:scale-90 transition-transform duration-300 ease-out" href="#">
+<span class="material-symbols-outlined" data-icon="assignment_turned_in">assignment_turned_in</span>
+<span class="font-['Manrope'] text-[10px] uppercase tracking-[0.05em] font-semibold mt-0.5">Tasks</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#434656] dark:text-slate-400 px-4 py-2 hover:text-[#003ec7] dark:hover:text-blue-300 active:scale-90 transition-transform duration-300 ease-out" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-['Manrope'] text-[10px] uppercase tracking-[0.05em] font-semibold mt-0.5">Settings</span>
+</a>
+</nav>
+<!-- FAB (Suppressed on details, shown on Home/Dashboard) -->
+<button class="fixed bottom-32 right-6 w-14 h-14 bg-primary text-on-primary rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-all z-40 border-t border-white/20">
+<span class="material-symbols-outlined text-3xl" data-icon="add">add</span>
+</button>
+</body></html>

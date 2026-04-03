@@ -1,16 +1,16 @@
 stage=intake-artifacts
-project=sigma-1
+project=sigma-1-hardening-e2e
 summary:
-Generated 6 tasks with 35 subtasks and 63 documentation artifacts for sigma-1. Bundle below includes sampled summaries and file excerpts for the first 2 tasks.
+Generated 10 tasks with 77 subtasks and 122 documentation artifacts for sigma-1-hardening-e2e. Bundle below includes sampled summaries and file excerpts for the first 2 tasks.
 
 task_summaries:
-[{"id":1,"title":"Provision Core Infrastructure (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[],"subtask_count":6,"decision_point_count":4,"description":"Set up the foundational Kubernetes infrastructure including namespaces, PostgreSQL, Redis/Valkey, and S3/R2 storage. This task establishes the persistent data and caching layers required by all backend services.","test_strategy":"1. Verify `databases` and `sigma1` namespaces exist.2. Confirm `sigma1-postgres` Cluster and `sigma1-valkey` Redis instances are running and accessible within the cluster.3. Validate that the `sigma1-infra-endpoints` Con"},{"id":2,"title":"Develop Equipment Catalog Service (Rex - Rust/Axum)","agent":"rex","stack":"Rust/Axum","priority":"high","dependencies":[1],"subtask_count":6,"decision_point_count":4,"description":"Implement the high-performance Equipment Catalog Service, providing APIs for product inventory, availability, and image serving. This service is critical for Morgan's quoting capabilities and the website's product displa","test_strategy":"1. Deploy the service to Kubernetes and verify it starts successfully.2. Use `curl` or Postman to verify all defined API endpoints are accessible and return expected data structures.3. Test product creation, retrieval, a"}]
+[{"id":1,"title":"Provision Dev and Staging Infrastructure (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[],"subtask_count":8,"decision_point_count":3,"description":"Bootstrap dev and staging namespaces with all operator-managed data services, dedicated MinIO bucket, secrets, ConfigMap, and ArgoCD Application CRs for the Hermes pipeline. This is the foundational task — every subseque","test_strategy":"1. `kubectl get namespace hermes-dev hermes-staging` returns both namespaces in Active state.\n2. `kubectl get clusters.postgresql.cnpg.io -n hermes-dev` shows a Ready cluster with 1 replica.\n3. `kubectl get configmap her"},{"id":2,"title":"Implement Hermes Deliberation Path API (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"high","dependencies":[1],"subtask_count":7,"decision_point_count":2,"description":"Build the Hermes deliberation path as an internal module within the existing Bun/Elysia service, exposing RESTful endpoints for triggering deliberation, querying deliberation status, and retrieving results. This module f","test_strategy":"1. Unit tests: `HermesService.triggerDeliberation()` creates a deliberation record in PostgreSQL with status `pending` — verified by direct DB query returning the UUID.\n2. Integration test: `POST /api/hermes/deliberation"}]
 
 === .tasks/docs/task-1/task.md ===
-## Provision Core Infrastructure (Bolt - Kubernetes/Helm)
+## Provision Dev and Staging Infrastructure (Bolt - Kubernetes/Helm)
 
 ### Objective
-Set up the foundational Kubernetes infrastructure including namespaces, PostgreSQL, Redis/Valkey, and S3/R2 storage. This task establishes the persistent data and caching layers required by all backend services.
+Bootstrap dev and staging namespaces with all operator-managed data services, dedicated MinIO bucket, secrets, ConfigMap, and ArgoCD Application CRs for the Hermes pipeline. This is the foundational task — every subsequent task depends on it.
 
 ### Ownership
 - Agent: bolt
@@ -20,19 +20,61 @@ Set up the foundational Kubernetes infrastructure including namespaces, PostgreS
 - Dependencies: None
 
 ### Implementation Details
-1. Create `databases` and `sigma1` Kubernetes namespaces.2. Deploy CloudNative-PG operator and provision a `sigma1-postgres` Cluster with a `sigma1` database and `sigma1_user` owner, 50Gi storage, and single instance for dev. Ensure multiple schemas (rms, crm, finance, audit, public) can be created within this database.3. Deploy Redis/Valkey operator and provision a `sigma1-valkey` Redis instance (Valkey 7.2-alpine) with single instance for dev.4. Configure S3/R2 bucket access (e.g., via Kubernetes secrets for credentials) for image storage.5. Create a `sigma1-infra-endpoints` ConfigMap in the `sigma1` namespace, containing connection strings for PostgreSQL and Redis/Valkey, following the pattern `{OPERATOR}_{INSTANCE}_URL` (e.g., `POSTGRES_SIGMA1_POSTGRES_URL`, `REDIS_SIGMA1_VALKEY_URL`).6. Ensure basic network policies are in place to allow internal service communication.
+Step-by-step implementation:
+
+1. **Namespace creation:** Create `hermes-dev` and `hermes-staging` namespaces with appropriate labels (`app.kubernetes.io/part-of: hermes`, `environment: dev|staging`).
+
+2. **CloudNative-PG PostgreSQL:** Deploy single-replica `Cluster` CRs in each namespace. Configure `initdb` with a `hermes` database. Store connection credentials in namespace-scoped secrets (`hermes-pg-credentials`).
+
+3. **Redis operator:** Deploy single-replica Redis CRs in each namespace. Store connection string in namespace-scoped secret (`hermes-redis-credentials`).
+
+4. **NATS operator:** Deploy single-replica NATS CRs in each namespace. Not actively wired but must be available for future decoupling per D1. Store connection string in secret (`hermes-nats-credentials`).
+
+5. **MinIO — dedicated bucket (CRITICAL per D2):** Do NOT reuse `gitlab/gitlab-minio-svc`. Either:
+   a. Deploy a dedicated MinIO tenant via the MinIO Operator in each namespace, OR
+   b. If using the existing MinIO cluster, create a dedicated bucket (`hermes-artifacts-dev`, `hermes-artifacts-staging`) with independent IAM credentials and lifecycle policy.
+   Store S3 endpoint, access key, secret key, and bucket name in secret (`hermes-minio-credentials`).
+   Configure lifecycle policy: 90-day retention for dev, 365-day for staging (configurable via values).
+
+6. **ConfigMap aggregation:** Create `hermes-infra-endpoints` ConfigMap in each namespace aggregating all connection strings:
+   - `CNPG_HERMES_URL` — PostgreSQL connection string
+   - `REDIS_HERMES_URL` — Redis connection string
+   - `NATS_HERMES_URL` — NATS connection string
+   - `MINIO_HERMES_ENDPOINT` — MinIO S3 endpoint
+   - `MINIO_HERMES_BUCKET` — Bucket name
+   - `ENVIRONMENT` — `dev` or `staging`
+   All later tasks reference this ConfigMap via `envFrom`.
+
+7. **Secrets management:** Each namespace gets independent secrets for all services. No cross-namespace secret references. Use `SealedSecrets` or existing secret management pattern in the cluster.
+
+8. **ArgoCD Application CRs (gap resolution):** Create ArgoCD `Application` CRs for:
+   - `hermes-backend-dev` and `hermes-backend-staging` (Bun/Elysia service)
+   - `hermes-frontend-dev` and `hermes-frontend-staging` (Next.js app)
+   Configure automated sync for dev, manual sync with auto-prune for staging. Staging promotion should be gated by successful E2E test runs (annotation hook for Task 7 integration).
+
+9. **Loki verification:** Confirm `openclaw/loki-*` services are accessible from the new namespaces. No provisioning needed, but verify log shipping works by deploying a test pod that emits structured JSON.
+
+10. **Helm chart structure:** Package all of the above into a Helm chart (`charts/hermes-infra`) with `values-dev.yaml` and `values-staging.yaml` overlays. Single `helm upgrade --install` per environment.
 
 ### Subtasks
-- [ ] Create core Kubernetes namespaces: Create the 'databases' and 'sigma1' Kubernetes namespaces to logically separate infrastructure components and application services.
-- [ ] Deploy CloudNative-PG operator and PostgreSQL cluster: Deploy the CloudNative-PG operator and provision a single-instance PostgreSQL cluster named 'sigma1-postgres' with a 'sigma1' database and 'sigma1_user' owner, 50Gi storage, within the 'databases' namespace.
-- [ ] Deploy Redis/Valkey operator and instance: Deploy the Redis/Valkey operator and provision a single-instance Redis/Valkey instance named 'sigma1-valkey' (Valkey 7.2-alpine) within the 'databases' namespace.
-- [ ] Configure S3/R2 bucket access credentials: Create Kubernetes secrets in the 'sigma1' namespace to securely store S3/R2 bucket access credentials for image storage.
-- [ ] Create sigma1-infra-endpoints ConfigMap: Create a ConfigMap named 'sigma1-infra-endpoints' in the 'sigma1' namespace, containing connection strings for the deployed PostgreSQL and Redis/Valkey instances.
-- [ ] Implement basic internal network policies: Apply basic network policies within the 'sigma1' namespace to allow internal service communication, ensuring services can reach PostgreSQL and Redis/Valkey.
+- [ ] Create hermes-dev and hermes-staging namespaces with labels and Loki verification: Create both Kubernetes namespaces with standard labels and verify Loki log shipping is accessible from the new namespaces.
+- [ ] Deploy CloudNative-PG PostgreSQL Cluster CRs and credential secrets: Deploy single-replica CNPG Cluster custom resources in both hermes-dev and hermes-staging namespaces with initdb configuration and credential secrets.
+- [ ] Deploy Redis operator CRs and credential secrets: Deploy single-replica Redis custom resources in both namespaces with connection string stored in namespace-scoped secrets.
+- [ ] Deploy NATS operator CRs and credential secrets: Deploy single-replica NATS custom resources in both namespaces for future decoupling, with connection strings stored in secrets.
+- [ ] Provision dedicated MinIO bucket with IAM credentials and lifecycle policies: Create a dedicated MinIO bucket for Hermes artifacts in each namespace with independent IAM credentials and configurable retention lifecycle policies. Must NOT reuse GitLab-owned buckets.
+- [ ] Create hermes-infra-endpoints ConfigMap aggregating all service connection strings: Create the hermes-infra-endpoints ConfigMap in each namespace that aggregates all infrastructure connection strings for downstream service consumption via envFrom.
+- [ ] Create ArgoCD Application CRs for backend and frontend in both environments: Create ArgoCD Application custom resources for hermes-backend and hermes-frontend in both dev and staging namespaces with appropriate sync policies.
+- [ ] Package Helm chart with values overlays for dev and staging: Structure and finalize the charts/hermes-infra Helm chart with values-dev.yaml and values-staging.yaml overlays, ensuring a single helm upgrade --install per environment deploys everything.
 === .tasks/docs/task-1/acceptance.md ===
 ## Acceptance Criteria
 
-- [ ] 1. Verify `databases` and `sigma1` namespaces exist.2. Confirm `sigma1-postgres` Cluster and `sigma1-valkey` Redis instances are running and accessible within the cluster.3. Validate that the `sigma1-infra-endpoints` ConfigMap exists in the `sigma1` namespace and contains correct, accessible connection URLs for PostgreSQL and Redis/Valkey.4. Test S3/R2 access by attempting to create/read a dummy object using configured credentials.
+- [ ] 1. `kubectl get namespace hermes-dev hermes-staging` returns both namespaces in Active state.
+- [ ] 2. `kubectl get clusters.postgresql.cnpg.io -n hermes-dev` shows a Ready cluster with 1 replica.
+- [ ] 3. `kubectl get configmap hermes-infra-endpoints -n hermes-dev -o jsonpath='{.data.CNPG_HERMES_URL}'` returns a valid PostgreSQL connection string.
+- [ ] 4. `kubectl exec` a test pod in `hermes-dev` that connects to PostgreSQL, Redis, NATS, and MinIO using only env vars from `hermes-infra-endpoints` ConfigMap and mounted secrets — all four connections succeed.
+- [ ] 5. MinIO bucket `hermes-artifacts-dev` exists and is writable with dedicated credentials, AND those credentials do NOT have access to any GitLab-owned buckets.
+- [ ] 6. ArgoCD UI shows `hermes-backend-dev` and `hermes-frontend-staging` Application CRs in Synced/Healthy state (initially empty).
+- [ ] 7. A structured JSON log emitted from a test pod in `hermes-dev` is queryable in Loki via LogQL within 30 seconds.
 
 ## Verification Notes
 
@@ -40,10 +82,10 @@ Set up the foundational Kubernetes infrastructure including namespaces, PostgreS
 - [ ] Update tests, docs, and configuration touched by this task.
 - [ ] Validate the final behavior against the task objective.
 === .tasks/docs/task-1/prompt.md ===
-Implement task 1: Provision Core Infrastructure (Bolt - Kubernetes/Helm)
+Implement task 1: Provision Dev and Staging Infrastructure (Bolt - Kubernetes/Helm)
 
 ## Goal
-Set up the foundational Kubernetes infrastructure including namespaces, PostgreSQL, Redis/Valkey, and S3/R2 storage. This task establishes the persistent data and caching layers required by all backend services.
+Bootstrap dev and staging namespaces with all operator-managed data services, dedicated MinIO bucket, secrets, ConfigMap, and ArgoCD Application CRs for the Hermes pipeline. This is the foundational task — every subsequent task depends on it.
 
 ## Task Context
 - Agent owner: bolt
@@ -52,50 +94,137 @@ Set up the foundational Kubernetes infrastructure including namespaces, PostgreS
 - Dependencies: None
 
 ## Implementation Plan
-1. Create `databases` and `sigma1` Kubernetes namespaces.2. Deploy CloudNative-PG operator and provision a `sigma1-postgres` Cluster with a `sigma1` database and `sigma1_user` owner, 50Gi storage, and single instance for dev. Ensure multiple schemas (rms, crm, finance, audit, public) can be created within this database.3. Deploy Redis/Valkey operator and provision a `sigma1-valkey` Redis instance (Valkey 7.2-alpine) with single instance for dev.4. Configure S3/R2 bucket access (e.g., via Kubernetes secrets for credentials) for image storage.5. Create a `sigma1-infra-endpoints` ConfigMap in the `sigma1` namespace, containing connection strings for PostgreSQL and Redis/Valkey, following the pattern `{OPERATOR}_{INSTANCE}_URL` (e.g., `POSTGRES_SIGMA1_POSTGRES_URL`, `REDIS_SIGMA1_VALKEY_URL`).6. Ensure basic network policies are in place to allow internal service communication.
+Step-by-step implementation:
+
+1. **Namespace creation:** Create `hermes-dev` and `hermes-staging` namespaces with appropriate labels (`app.kubernetes.io/part-of: hermes`, `environment: dev|staging`).
+
+2. **CloudNative-PG PostgreSQL:** Deploy single-replica `Cluster` CRs in each namespace. Configure `initdb` with a `hermes` database. Store connection credentials in namespace-scoped secrets (`hermes-pg-credentials`).
+
+3. **Redis operator:** Deploy single-replica Redis CRs in each namespace. Store connection string in namespace-scoped secret (`hermes-redis-credentials`).
+
+4. **NATS operator:** Deploy single-replica NATS CRs in each namespace. Not actively wired but must be available for future decoupling per D1. Store connection string in secret (`hermes-nats-credentials`).
+
+5. **MinIO — dedicated bucket (CRITICAL per D2):** Do NOT reuse `gitlab/gitlab-minio-svc`. Either:
+   a. Deploy a dedicated MinIO tenant via the MinIO Operator in each namespace, OR
+   b. If using the existing MinIO cluster, create a dedicated bucket (`hermes-artifacts-dev`, `hermes-artifacts-staging`) with independent IAM credentials and lifecycle policy.
+   Store S3 endpoint, access key, secret key, and bucket name in secret (`hermes-minio-credentials`).
+   Configure lifecycle policy: 90-day retention for dev, 365-day for staging (configurable via values).
+
+6. **ConfigMap aggregation:** Create `hermes-infra-endpoints` ConfigMap in each namespace aggregating all connection strings:
+   - `CNPG_HERMES_URL` — PostgreSQL connection string
+   - `REDIS_HERMES_URL` — Redis connection string
+   - `NATS_HERMES_URL` — NATS connection string
+   - `MINIO_HERMES_ENDPOINT` — MinIO S3 endpoint
+   - `MINIO_HERMES_BUCKET` — Bucket name
+   - `ENVIRONMENT` — `dev` or `staging`
+   All later tasks reference this ConfigMap via `envFrom`.
+
+7. **Secrets management:** Each namespace gets independent secrets for all services. No cross-namespace secret references. Use `SealedSecrets` or existing secret management pattern in the cluster.
+
+8. **ArgoCD Application CRs (gap resolution):** Create ArgoCD `Application` CRs for:
+   - `hermes-backend-dev` and `hermes-backend-staging` (Bun/Elysia service)
+   - `hermes-frontend-dev` and `hermes-frontend-staging` (Next.js app)
+   Configure automated sync for dev, manual sync with auto-prune for staging. Staging promotion should be gated by successful E2E test runs (annotation hook for Task 7 integration).
+
+9. **Loki verification:** Confirm `openclaw/loki-*` services are accessible from the new namespaces. No provisioning needed, but verify log shipping works by deploying a test pod that emits structured JSON.
+
+10. **Helm chart structure:** Package all of the above into a Helm chart (`charts/hermes-infra`) with `values-dev.yaml` and `values-staging.yaml` overlays. Single `helm upgrade --install` per environment.
 
 ## Acceptance Criteria
-1. Verify `databases` and `sigma1` namespaces exist.2. Confirm `sigma1-postgres` Cluster and `sigma1-valkey` Redis instances are running and accessible within the cluster.3. Validate that the `sigma1-infra-endpoints` ConfigMap exists in the `sigma1` namespace and contains correct, accessible connection URLs for PostgreSQL and Redis/Valkey.4. Test S3/R2 access by attempting to create/read a dummy object using configured credentials.
+1. `kubectl get namespace hermes-dev hermes-staging` returns both namespaces in Active state.
+2. `kubectl get clusters.postgresql.cnpg.io -n hermes-dev` shows a Ready cluster with 1 replica.
+3. `kubectl get configmap hermes-infra-endpoints -n hermes-dev -o jsonpath='{.data.CNPG_HERMES_URL}'` returns a valid PostgreSQL connection string.
+4. `kubectl exec` a test pod in `hermes-dev` that connects to PostgreSQL, Redis, NATS, and MinIO using only env vars from `hermes-infra-endpoints` ConfigMap and mounted secrets — all four connections succeed.
+5. MinIO bucket `hermes-artifacts-dev` exists and is writable with dedicated credentials, AND those credentials do NOT have access to any GitLab-owned buckets.
+6. ArgoCD UI shows `hermes-backend-dev` and `hermes-frontend-staging` Application CRs in Synced/Healthy state (initially empty).
+7. A structured JSON log emitted from a test pod in `hermes-dev` is queryable in Loki via LogQL within 30 seconds.
 
 ## Subtasks
-- Create core Kubernetes namespaces: Create the 'databases' and 'sigma1' Kubernetes namespaces to logically separate infrastructure components and application services.
-- Deploy CloudNative-PG operator and PostgreSQL cluster: Deploy the CloudNative-PG operator and provision a single-instance PostgreSQL cluster named 'sigma1-postgres' with a 'sigma1' database and 'sigma1_user' owner, 50Gi storage, within the 'databases' namespace.
-- Deploy Redis/Valkey operator and instance: Deploy the Redis/Valkey operator and provision a single-instance Redis/Valkey instance named 'sigma1-valkey' (Valkey 7.2-alpine) within the 'databases' namespace.
-- Configure S3/R2 bucket access credentials: Create Kubernetes secrets in the 'sigma1' namespace to securely store S3/R2 bucket access credentials for image storage.
-- Create sigma1-infra-endpoints ConfigMap: Create a ConfigMap named 'sigma1-infra-endpoints' in the 'sigma1' namespace, containing connection strings for the deployed PostgreSQL and Redis/Valkey instances.
-- Implement basic internal network policies: Apply basic network policies within the 'sigma1' namespace to allow internal service communication, ensuring services can reach PostgreSQL and Redis/Valkey.
+- Create hermes-dev and hermes-staging namespaces with labels and Loki verification: Create both Kubernetes namespaces with standard labels and verify Loki log shipping is accessible from the new namespaces.
+- Deploy CloudNative-PG PostgreSQL Cluster CRs and credential secrets: Deploy single-replica CNPG Cluster custom resources in both hermes-dev and hermes-staging namespaces with initdb configuration and credential secrets.
+- Deploy Redis operator CRs and credential secrets: Deploy single-replica Redis custom resources in both namespaces with connection string stored in namespace-scoped secrets.
+- Deploy NATS operator CRs and credential secrets: Deploy single-replica NATS custom resources in both namespaces for future decoupling, with connection strings stored in secrets.
+- Provision dedicated MinIO bucket with IAM credentials and lifecycle policies: Create a dedicated MinIO bucket for Hermes artifacts in each namespace with independent IAM credentials and configurable retention lifecycle policies. Must NOT reuse GitLab-owned buckets.
+- Create hermes-infra-endpoints ConfigMap aggregating all service connection strings: Create the hermes-infra-endpoints ConfigMap in each namespace that aggregates all infrastructure connection strings for downstream service consumption via envFrom.
+- Create ArgoCD Application CRs for backend and frontend in both environments: Create ArgoCD Application custom resources for hermes-backend and hermes-frontend in both dev and staging namespaces with appropriate sync policies.
+- Package Helm chart with values overlays for dev and staging: Structure and finalize the charts/hermes-infra Helm chart with values-dev.yaml and values-staging.yaml overlays, ensuring a single helm upgrade --install per environment deploys everything.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.
 - Keep artifacts aligned with the acceptance criteria.
 - Document blockers or assumptions in your final summary.
 === .tasks/docs/task-2/task.md ===
-## Develop Equipment Catalog Service (Rex - Rust/Axum)
+## Implement Hermes Deliberation Path API (Nova - Bun/Elysia)
 
 ### Objective
-Implement the high-performance Equipment Catalog Service, providing APIs for product inventory, availability, and image serving. This service is critical for Morgan's quoting capabilities and the website's product display.
+Build the Hermes deliberation path as an internal module within the existing Bun/Elysia service, exposing RESTful endpoints for triggering deliberation, querying deliberation status, and retrieving results. This module forms the core of the intake pipeline validation.
 
 ### Ownership
-- Agent: rex
-- Stack: Rust/Axum
+- Agent: nova
+- Stack: Bun/Elysia
 - Priority: high
 - Status: pending
 - Dependencies: 1
 
 ### Implementation Details
-1. Initialize a new Rust project using `cargo new --bin equipment-catalog` targeting Rust 1.77.2.2. Set up Axum 0.7.5 with `tokio` runtime.3. Define `Product`, `Category`, and `Availability` data models using `sqlx` for PostgreSQL interaction. Implement database migrations for these schemas.4. Implement endpoints:    - `GET /api/v1/catalog/categories`    - `GET /api/v1/catalog/products` (filterable)    - `GET /api/v1/catalog/products/:id`    - `GET /api/v1/catalog/products/:id/availability?from=&to=`    - `POST /api/v1/catalog/products` (admin)    - `PATCH /api/v1/catalog/products/:id` (admin)    - `GET /api/v1/equipment-api/catalog` (machine-readable)    - `POST /api/v1/equipment-api/checkout` (programmatic booking)5. Integrate with PostgreSQL using `sqlx` and Redis for rate limiting and caching, referencing the `sigma1-infra-endpoints` ConfigMap.6. Implement S3/R2 integration for image serving, ensuring secure access and efficient retrieval.7. Add Prometheus metrics (`/metrics`), liveness (`/health/live`), and readiness (`/health/ready`) probes.8. Implement basic tenant-based rate limiting using Redis.
+Step-by-step implementation:
+
+1. **Module structure:** Create `src/modules/hermes/` directory with clear boundary:
+   - `src/modules/hermes/index.ts` — module entry point exporting Elysia plugin
+   - `src/modules/hermes/routes.ts` — route definitions
+   - `src/modules/hermes/service.ts` — business logic (HermesService class/interface)
+   - `src/modules/hermes/types.ts` — TypeScript interfaces for deliberation request/response, artifact metadata
+   - `src/modules/hermes/repository.ts` — database access abstraction
+
+2. **Interface contracts (per D1):** Define clear TypeScript interfaces:
+   - `IHermesService` — deliberation trigger, status query, result retrieval
+   - `IHermesRepository` — CRUD for deliberation records and artifact references
+   - `IHermesArtifactWriter` — abstraction for artifact storage (per open question #7 on D6, this must accommodate either schema extension or parallel table)
+
+3. **REST endpoints (per D3):** Implement via Elysia route handlers with `@elysiajs/swagger` for OpenAPI generation:
+   - `POST /api/hermes/deliberations` — trigger a new deliberation (requires `hermes:trigger` RBAC claim)
+   - `GET /api/hermes/deliberations/:id` — get deliberation status and result (requires `hermes:read`)
+   - `GET /api/hermes/deliberations` — list deliberations with pagination (requires `hermes:read`)
+   - `GET /api/hermes/deliberations/:id/artifacts` — list artifacts for a deliberation (requires `hermes:read`)
+
+4. **Auth integration (per D5):** Extend existing session middleware to check RBAC claims:
+   - Create `src/modules/hermes/middleware.ts` with `requireHermesClaim(claim: string)` guard
+   - Claims: `hermes:read`, `hermes:trigger` at minimum. Document additional claims as needed.
+   - Coordinate claim names with Task 10 (RBAC hardening) via shared types file or ADR.
+
+5. **Database schema:** Create migration for deliberation records:
+   - `deliberations` table: `id` (UUID), `status` (enum: pending/processing/completed/failed), `input_payload` (JSONB), `result_payload` (JSONB), `triggered_by` (FK to users), `created_at`, `updated_at`
+   - For artifact references: implement behind `IHermesArtifactWriter` abstraction to accommodate pending D6 decision. Default to parallel table approach (`hermes_artifacts` with FK to deliberation) but ensure the interface can swap to schema extension.
+
+6. **Elysia plugin registration:** Register the Hermes module as an Elysia plugin in the main app entry point:
+   ```typescript
+   app.use(hermesPlugin)
+   ```
+   Ensure it does not interfere with existing legacy pipeline routes.
+
+7. **OpenAPI documentation:** Ensure all endpoints generate OpenAPI specs via `@elysiajs/swagger`. Tag all Hermes endpoints with `hermes` group.
+
+8. **Environment configuration:** Read all infra connection strings from `hermes-infra-endpoints` ConfigMap (env vars). Feature flag: `HERMES_ENABLED=true|false` env var controls whether the module registers routes.
+
+9. **Error handling:** Return structured JSON error responses with `error_code` field for downstream logging (Task 6 dependency).
 
 ### Subtasks
-- [ ] Initialize Rust project and configure Axum framework: Set up a new Rust project for the Equipment Catalog Service, configure Axum 0.7.5 with Tokio runtime, and establish a basic server structure.
-- [ ] Define data models and implement database migrations: Define `Product`, `Category`, and `Availability` data models using `sqlx` and create initial database migration scripts for PostgreSQL.
-- [ ] Integrate PostgreSQL and Redis for data and caching: Connect the service to PostgreSQL using `sqlx` and integrate Redis for caching and rate limiting, utilizing the `sigma1-infra-endpoints` ConfigMap.
-- [ ] Implement core read-only catalog API endpoints: Develop the read-only API endpoints for categories, products, product details, and product availability, interacting with the PostgreSQL database.
-- [ ] Implement admin and machine-readable catalog API endpoints: Develop API endpoints for administrative product management (create/update) and machine-readable catalog access, including programmatic booking.
-- [ ] Implement S3/R2 image serving and service observability: Implement S3/R2 integration for secure and efficient image serving, and add Prometheus metrics, liveness, and readiness probes for service observability.
+- [ ] Scaffold Hermes module structure and define TypeScript interface contracts: Create the src/modules/hermes/ directory structure with all file stubs and define the IHermesService, IHermesRepository, and IHermesArtifactWriter TypeScript interfaces.
+- [ ] Create database migrations for deliberations and hermes_artifacts tables: Write and validate database migration scripts that create the deliberations and hermes_artifacts tables in PostgreSQL without affecting existing tables.
+- [ ] Implement HermesRepository with PostgreSQL data access layer: Implement the IHermesRepository interface with PostgreSQL queries for CRUD operations on deliberations and hermes_artifacts tables.
+- [ ] Implement HermesService business logic layer: Implement the IHermesService interface with business logic for triggering deliberations, querying status, and retrieving results, using the repository abstraction.
+- [ ] Implement RBAC middleware with hermes:read and hermes:trigger claim guards: Create Hermes-specific RBAC middleware that extends the existing session middleware to check for hermes:read and hermes:trigger claims.
+- [ ] Implement REST endpoints and register Elysia plugin with feature flag: Implement all four Hermes REST endpoints as Elysia route handlers, wire them to the service layer with RBAC guards, register as a plugin, and implement the HERMES_ENABLED feature flag.
+- [ ] Configure OpenAPI/Swagger documentation for all Hermes endpoints: Ensure all Hermes endpoints are properly documented in the OpenAPI spec via @elysiajs/swagger with correct schemas, tags, and descriptions.
 === .tasks/docs/task-2/acceptance.md ===
 ## Acceptance Criteria
 
-- [ ] 1. Deploy the service to Kubernetes and verify it starts successfully.2. Use `curl` or Postman to verify all defined API endpoints are accessible and return expected data structures.3. Test product creation, retrieval, and update operations.4. Verify availability checks return correct quantities for specified date ranges.5. Confirm rate limiting is active and blocks excessive requests.6. Ensure product images are correctly uploaded to and retrieved from S3/R2.7. Validate Prometheus metrics endpoint is exposed and returns data.
+- [ ] 1. Unit tests: `HermesService.triggerDeliberation()` creates a deliberation record in PostgreSQL with status `pending` — verified by direct DB query returning the UUID.
+- [ ] 2. Integration test: `POST /api/hermes/deliberations` with valid session and `hermes:trigger` claim returns 201 with a deliberation ID; same request without `hermes:trigger` claim returns 403.
+- [ ] 3. Integration test: `GET /api/hermes/deliberations/:id` returns the correct deliberation record with status field matching the DB state.
+- [ ] 4. OpenAPI spec: `GET /api/swagger/json` includes all four Hermes endpoints with correct request/response schemas.
+- [ ] 5. Feature flag: When `HERMES_ENABLED=false`, `GET /api/hermes/deliberations` returns 404 (routes not registered).
+- [ ] 6. Database migration: Running migrations on a clean database creates `deliberations` and `hermes_artifacts` tables without errors; running on an existing database with legacy data does not alter existing tables.
 
 ## Verification Notes
 
@@ -103,30 +232,75 @@ Implement the high-performance Equipment Catalog Service, providing APIs for pro
 - [ ] Update tests, docs, and configuration touched by this task.
 - [ ] Validate the final behavior against the task objective.
 === .tasks/docs/task-2/prompt.md ===
-Implement task 2: Develop Equipment Catalog Service (Rex - Rust/Axum)
+Implement task 2: Implement Hermes Deliberation Path API (Nova - Bun/Elysia)
 
 ## Goal
-Implement the high-performance Equipment Catalog Service, providing APIs for product inventory, availability, and image serving. This service is critical for Morgan's quoting capabilities and the website's product display.
+Build the Hermes deliberation path as an internal module within the existing Bun/Elysia service, exposing RESTful endpoints for triggering deliberation, querying deliberation status, and retrieving results. This module forms the core of the intake pipeline validation.
 
 ## Task Context
-- Agent owner: rex
-- Stack: Rust/Axum
+- Agent owner: nova
+- Stack: Bun/Elysia
 - Priority: high
 - Dependencies: 1
 
 ## Implementation Plan
-1. Initialize a new Rust project using `cargo new --bin equipment-catalog` targeting Rust 1.77.2.2. Set up Axum 0.7.5 with `tokio` runtime.3. Define `Product`, `Category`, and `Availability` data models using `sqlx` for PostgreSQL interaction. Implement database migrations for these schemas.4. Implement endpoints:    - `GET /api/v1/catalog/categories`    - `GET /api/v1/catalog/products` (filterable)    - `GET /api/v1/catalog/products/:id`    - `GET /api/v1/catalog/products/:id/availability?from=&to=`    - `POST /api/v1/catalog/products` (admin)    - `PATCH /api/v1/catalog/products/:id` (admin)    - `GET /api/v1/equipment-api/catalog` (machine-readable)    - `POST /api/v1/equipment-api/checkout` (programmatic booking)5. Integrate with PostgreSQL using `sqlx` and Redis for rate limiting and caching, referencing the `sigma1-infra-endpoints` ConfigMap.6. Implement S3/R2 integration for image serving, ensuring secure access and efficient retrieval.7. Add Prometheus metrics (`/metrics`), liveness (`/health/live`), and readiness (`/health/ready`) probes.8. Implement basic tenant-based rate limiting using Redis.
+Step-by-step implementation:
+
+1. **Module structure:** Create `src/modules/hermes/` directory with clear boundary:
+   - `src/modules/hermes/index.ts` — module entry point exporting Elysia plugin
+   - `src/modules/hermes/routes.ts` — route definitions
+   - `src/modules/hermes/service.ts` — business logic (HermesService class/interface)
+   - `src/modules/hermes/types.ts` — TypeScript interfaces for deliberation request/response, artifact metadata
+   - `src/modules/hermes/repository.ts` — database access abstraction
+
+2. **Interface contracts (per D1):** Define clear TypeScript interfaces:
+   - `IHermesService` — deliberation trigger, status query, result retrieval
+   - `IHermesRepository` — CRUD for deliberation records and artifact references
+   - `IHermesArtifactWriter` — abstraction for artifact storage (per open question #7 on D6, this must accommodate either schema extension or parallel table)
+
+3. **REST endpoints (per D3):** Implement via Elysia route handlers with `@elysiajs/swagger` for OpenAPI generation:
+   - `POST /api/hermes/deliberations` — trigger a new deliberation (requires `hermes:trigger` RBAC claim)
+   - `GET /api/hermes/deliberations/:id` — get deliberation status and result (requires `hermes:read`)
+   - `GET /api/hermes/deliberations` — list deliberations with pagination (requires `hermes:read`)
+   - `GET /api/hermes/deliberations/:id/artifacts` — list artifacts for a deliberation (requires `hermes:read`)
+
+4. **Auth integration (per D5):** Extend existing session middleware to check RBAC claims:
+   - Create `src/modules/hermes/middleware.ts` with `requireHermesClaim(claim: string)` guard
+   - Claims: `hermes:read`, `hermes:trigger` at minimum. Document additional claims as needed.
+   - Coordinate claim names with Task 10 (RBAC hardening) via shared types file or ADR.
+
+5. **Database schema:** Create migration for deliberation records:
+   - `deliberations` table: `id` (UUID), `status` (enum: pending/processing/completed/failed), `input_payload` (JSONB), `result_payload` (JSONB), `triggered_by` (FK to users), `created_at`, `updated_at`
+   - For artifact references: implement behind `IHermesArtifactWriter` abstraction to accommodate pending D6 decision. Default to parallel table approach (`hermes_artifacts` with FK to deliberation) but ensure the interface can swap to schema extension.
+
+6. **Elysia plugin registration:** Register the Hermes module as an Elysia plugin in the main app entry point:
+   ```typescript
+   app.use(hermesPlugin)
+   ```
+   Ensure it does not interfere with existing legacy pipeline routes.
+
+7. **OpenAPI documentation:** Ensure all endpoints generate OpenAPI specs via `@elysiajs/swagger`. Tag all Hermes endpoints with `hermes` group.
+
+8. **Environment configuration:** Read all infra connection strings from `hermes-infra-endpoints` ConfigMap (env vars). Feature flag: `HERMES_ENABLED=true|false` env var controls whether the module registers routes.
+
+9. **Error handling:** Return structured JSON error responses with `error_code` field for downstream logging (Task 6 dependency).
 
 ## Acceptance Criteria
-1. Deploy the service to Kubernetes and verify it starts successfully.2. Use `curl` or Postman to verify all defined API endpoints are accessible and return expected data structures.3. Test product creation, retrieval, and update operations.4. Verify availability checks return correct quantities for specified date ranges.5. Confirm rate limiting is active and blocks excessive requests.6. Ensure product images are correctly uploaded to and retrieved from S3/R2.7. Validate Prometheus metrics endpoint is exposed and returns data.
+1. Unit tests: `HermesService.triggerDeliberation()` creates a deliberation record in PostgreSQL with status `pending` — verified by direct DB query returning the UUID.
+2. Integration test: `POST /api/hermes/deliberations` with valid session and `hermes:trigger` claim returns 201 with a deliberation ID; same request without `hermes:trigger` claim returns 403.
+3. Integration test: `GET /api/hermes/deliberations/:id` returns the correct deliberation record with status field matching the DB state.
+4. OpenAPI spec: `GET /api/swagger/json` includes all four Hermes endpoints with correct request/response schemas.
+5. Feature flag: When `HERMES_ENABLED=false`, `GET /api/hermes/deliberations` returns 404 (routes not registered).
+6. Database migration: Running migrations on a clean database creates `deliberations` and `hermes_artifacts` tables without errors; running on an existing database with legacy data does not alter existing tables.
 
 ## Subtasks
-- Initialize Rust project and configure Axum framework: Set up a new Rust project for the Equipment Catalog Service, configure Axum 0.7.5 with Tokio runtime, and establish a basic server structure.
-- Define data models and implement database migrations: Define `Product`, `Category`, and `Availability` data models using `sqlx` and create initial database migration scripts for PostgreSQL.
-- Integrate PostgreSQL and Redis for data and caching: Connect the service to PostgreSQL using `sqlx` and integrate Redis for caching and rate limiting, utilizing the `sigma1-infra-endpoints` ConfigMap.
-- Implement core read-only catalog API endpoints: Develop the read-only API endpoints for categories, products, product details, and product availability, interacting with the PostgreSQL database.
-- Implement admin and machine-readable catalog API endpoints: Develop API endpoints for administrative product management (create/update) and machine-readable catalog access, including programmatic booking.
-- Implement S3/R2 image serving and service observability: Implement S3/R2 integration for secure and efficient image serving, and add Prometheus metrics, liveness, and readiness probes for service observability.
+- Scaffold Hermes module structure and define TypeScript interface contracts: Create the src/modules/hermes/ directory structure with all file stubs and define the IHermesService, IHermesRepository, and IHermesArtifactWriter TypeScript interfaces.
+- Create database migrations for deliberations and hermes_artifacts tables: Write and validate database migration scripts that create the deliberations and hermes_artifacts tables in PostgreSQL without affecting existing tables.
+- Implement HermesRepository with PostgreSQL data access layer: Implement the IHermesRepository interface with PostgreSQL queries for CRUD operations on deliberations and hermes_artifacts tables.
+- Implement HermesService business logic layer: Implement the IHermesService interface with business logic for triggering deliberations, querying status, and retrieving results, using the repository abstraction.
+- Implement RBAC middleware with hermes:read and hermes:trigger claim guards: Create Hermes-specific RBAC middleware that extends the existing session middleware to check for hermes:read and hermes:trigger claims.
+- Implement REST endpoints and register Elysia plugin with feature flag: Implement all four Hermes REST endpoints as Elysia route handlers, wire them to the service layer with RBAC guards, register as a plugin, and implement the HERMES_ENABLED feature flag.
+- Configure OpenAPI/Swagger documentation for all Hermes endpoints: Ensure all Hermes endpoints are properly documented in the OpenAPI spec via @elysiajs/swagger with correct schemas, tags, and descriptions.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

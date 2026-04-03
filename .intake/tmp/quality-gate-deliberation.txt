@@ -1,0 +1,88 @@
+project=sigma-1
+deliberate=true
+
+deliberation_stdout:
+{
+  "protocolVersion": 1,
+  "ok": true,
+  "status": "ok",
+  "output": [
+    "Design brief saved to .tasks/docs/design-brief.md\n"
+  ],
+  "requiresApproval": null
+}
+
+
+design_brief_excerpt:
+# Enhanced PRD
+
+## 1. Original Requirements
+
+> # Project: Sigma-1 Agent Delegation E2E
+> 
+> ## Goal
+> Validate the full intake pipeline end-to-end with agent delegation enabled, confirming:
+> 1. Linear issues are created with the correct agent assignee (delegate_id)
+> 2. Hermes research integration produces content in the deliberation path
+> 3. Design snapshot PR surfacing works
+> 4. Discord and Linear bridge notifications fire correctly
+> 
+> ## Context
+> The PM server now resolves agent hints to Linear user IDs at issue creation time via `resolve_agent_delegates()`. Previously all issues were created unassigned. This run validates the full delegation flow from PRD → deliberation → task generation → issue creation with assigned agents.
+> 
+> ## Requirements
+> - Pipeline completes through all stages (deliberation, task generation, issue creation)
+> - At least 5 tasks generated with agent assignments
+> - Linear issues show assigned agents (not just "agent:pending" labels)
+> - Research memos include Hermes-sourced content where NOUS_API_KEY is available
+> - PR created in target repo with task scaffolds
+> 
+> ## Target Repository
+> - Organization: 5dlabs
+> - Repository: sigma-1
+> - Visibility: private
+> 
+> ## Acceptance Criteria
+> - [ ] Pipeline completes without fatal errors
+> - [ ] Linear session created with issues
+> - [ ] Issues have delegate_id set (visible as assignee in Linear)
+> - [ ] PR created in sigma-1 with generated artifacts
+> - [ ] Discord notification posted for pipeline start/complete
+> 
+
+## 2. Project Scope
+
+- Total tasks identified: 10
+- Task 1: Provision Dev Infrastructure for Sigma-1 E2E Pipeline (Bolt - Kubernetes/Helm) — Set up the development infrastructure required for the Sigma-1 agent delegation E2E pipeline, including namespaces, secrets, and a ConfigMap for service endpoints.
+- Task 2: Implement Agent Delegate Resolution in PM Server (Nova - Bun/Elysia) — Extend the PM server to resolve agent hints to Linear user IDs at issue creation time using the resolve_agent_delegates() function, ensuring issues are assigned to the correct agent.
+- Task 3: Integrate Hermes Research in Deliberation Path (Nova - Bun/Elysia) — Enable Hermes research integration in the deliberation path, ensuring research memos are included when NOUS_API_KEY is available.
+- Task 4: Surface Design Snapshot PRs in Pipeline (Nova - Bun/Elysia) — Ensure that design snapshot pull requests are surfaced and linked in the pipeline output, supporting design review and traceability.
+- Task 5: Implement Discord Notification Bridge (Nova - Bun/Elysia) — Send Discord notifications at pipeline start and completion, ensuring visibility for E2E runs.
+- Task 6: Validate Linear Issue Creation with Agent Assignment (Tess - Test frameworks) — Test that Linear issues are created with the correct delegate_id set, confirming agent assignment works as expected.
+- Task 7: End-to-End Pipeline Execution Test (Tess - Test frameworks) — Run the full Sigma-1 E2E pipeline and verify that all stages (deliberation, task generation, issue creation, notifications, PR creation) complete without fatal errors.
+- Task 8: Verify Hermes Research Memo Inclusion (Tess - Test frameworks) — Test that research memos in the deliberation path include Hermes-sourced content when NOUS_API_KEY is available.
+- Task 9: Confirm Design Snapshot PR Surfacing (Tess - Test frameworks) — Test that design snapshot PRs are created and surfaced in the pipeline output for design review.
+- Task 10: Production Hardening: HA, Ingress, and Security (Bolt - Kubernetes/Helm) — Harden the production deployment with high-availability scaling, ingress/CDN, network policies, RBAC, secret rotation, and audit logging.
+
+## 3. Resolved Decisions
+
+_No resolved decisions were recorded._
+
+
+## 4. Architecture Overview
+
+- Deliberation status: completed
+- Debate turns: 2
+- Elapsed minutes: 1
+- Decision points considered: 2
+- Decisions resolved: 0
+
+## 5. Design Intake Summary
+
+mode=ingest_plus_stitch; has_frontend=true; targets=web; stitch_status=failed; stitch_reason=
+
+## 6. Open Questions
+
+- Use the deliberation record and task decomposition to resolve any remaining implementation details not captured above.
+
+

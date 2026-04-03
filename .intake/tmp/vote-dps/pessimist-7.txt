@@ -1,1 +1,1 @@
-Escalate — agree with Optimist's preference for persistent sidebar with one constraint: must auto-collapse to floating bubble below 768px viewport width
+Centralized GDPR orchestrator — but implemented as a simple cron-based script that calls each service's deletion endpoint sequentially, not a NATS-based event system

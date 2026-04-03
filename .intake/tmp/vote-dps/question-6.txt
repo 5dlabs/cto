@@ -1,1 +1,1 @@
-Polling vs SSE vs WebSocket for real-time equipment availability on the website?
+How should the web chat widget communicate with the backend?

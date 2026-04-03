@@ -1,59 +1,91 @@
-project=sigma-1
+project=sigma-1-hardening-e2e
 
 intake_summary:
-{"project_name":"sigma-1","generated_at":"2026-03-28T05:29:47Z","artifact_counts":{"task_count":6,"subtask_count":35,"decision_point_count":27,"doc_count":6,"prompt_count":6,"workflow_count":6},"delivery":{"issue_count":0,"pr_url":"https://github.com/5dlabs/cto/pull/4550"}}
+{"project_name":"sigma-1-hardening-e2e","generated_at":"2026-03-31T17:40:05Z","artifact_counts":{"task_count":10,"subtask_count":77,"decision_point_count":24,"doc_count":10,"prompt_count":10,"workflow_count":10},"delivery":{"issue_count":11,"pr_url":"https://github.com/5dlabs/cto/pull/4567"}}
 
 summary:
-Pipeline intake output for sigma-1: 6 tasks, 35 subtasks. Bundle below includes compact snapshots for every generated task doc/prompt artifact.
+Pipeline intake output for sigma-1-hardening-e2e: 10 tasks, 77 subtasks. Bundle below includes compact snapshots for every generated task doc/prompt artifact.
 
 task_summaries:
-[{"id":1,"title":"Provision Core Infrastructure (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[],"subtask_count":6,"decision_point_count":4,"description":"Set up the foundational Kubernetes infrastructure including namespaces, PostgreSQL, Redis/Valkey, and S3/R2 storage. This task establishes the persistent data and caching layers required by all backend services.","test_strategy":"1. Verify `databases` and `sigma1` namespaces exist.2. Confirm `sigma1-postgres` Cluster and `sigma1-valkey` Redis instances are running and accessible within the cluster.3. Validate that the `sigma1-infra-endpoints` Con"},{"id":2,"title":"Develop Equipment Catalog Service (Rex - Rust/Axum)","agent":"rex","stack":"Rust/Axum","priority":"high","dependencies":[1],"subtask_count":6,"decision_point_count":4,"description":"Implement the high-performance Equipment Catalog Service, providing APIs for product inventory, availability, and image serving. This service is critical for Morgan's quoting capabilities and the website's product displa","test_strategy":"1. Deploy the service to Kubernetes and verify it starts successfully.2. Use `curl` or Postman to verify all defined API endpoints are accessible and return expected data structures.3. Test product creation, retrieval, a"},{"id":3,"title":"Develop Rental Management System (RMS) Service (Grizz - Go/gRPC)","agent":"grizz","stack":"Go/gRPC","priority":"high","dependencies":[1],"subtask_count":6,"decision_point_count":5,"description":"Build the core Rental Management System (RMS) service, handling opportunities, projects, inventory, crew, and deliveries. This service is central to the quote-to-project workflow and operational logistics.","test_strategy":"1. Deploy the service to Kubernetes and verify it starts successfully.2. Use `grpcurl` to test gRPC endpoints for `CreateOpportunity`, `GetProject`, `RecordTransaction`, etc.3. Use `curl` or Postman to verify REST endpoi"},{"id":4,"title":"Develop Finance Service (Rex - Rust/Axum)","agent":"rex","stack":"Rust/Axum","priority":"high","dependencies":[1,3],"subtask_count":6,"decision_point_count":4,"description":"Implement the Finance Service for invoicing, payments, and financial reporting. This service replaces traditional accounting software and integrates with the RMS for project-based invoicing.","test_strategy":"1. Deploy the service to Kubernetes and verify it starts successfully.2. Create a mock project in RMS (Task 3) and then test invoice creation from that project ID.3. Verify invoice status transitions (draft, sent, paid)."},{"id":5,"title":"Develop Customer Vetting Service (Rex - Rust/Axum)","agent":"rex","stack":"Rust/Axum","priority":"high","dependencies":[1],"subtask_count":5,"decision_point_count":4,"description":"Create the Customer Vetting Service to automate background research on prospects, providing a GREEN/YELLOW/RED lead score. This service supports Morgan's lead qualification workflow.","test_strategy":"1. Deploy the service to Kubernetes and verify it starts successfully.2. Call `POST /api/v1/vetting/run` with sample organization data and verify a `VettingResult` is stored in PostgreSQL.3. Retrieve vetting results usin"},{"id":6,"title":"Implement Morgan AI Agent Core (Angie - OpenClaw/MCP)","agent":"angie","stack":"OpenClaw/MCP","priority":"high","dependencies":[1,2,3,4,5],"subtask_count":6,"decision_point_count":6,"description":"Develop the core Morgan AI agent, integrating Signal, voice (ElevenLabs/Twilio), and web chat capabilities. This task focuses on the agent's ability to understand natural language and utilize backend services via MCP too","test_strategy":"1. Verify the Morgan agent pod is running and accessible.2. Send a test message via Signal to Morgan and confirm a response is received.3. Initiate a voice call via Twilio/ElevenLabs and verify Morgan can respond verball"}]
+[{"id":1,"title":"Provision Dev and Staging Infrastructure (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[],"subtask_count":8,"decision_point_count":3,"description":"Bootstrap dev and staging namespaces with all operator-managed data services, dedicated MinIO bucket, secrets, ConfigMap, and ArgoCD Application CRs for the Hermes pipeline. This is the foundational task — every subseque","test_strategy":"1. `kubectl get namespace hermes-dev hermes-staging` returns both namespaces in Active state.\n2. `kubectl get clusters.postgresql.cnpg.io -n hermes-dev` shows a Ready cluster with 1 replica.\n3. `kubectl get configmap her"},{"id":2,"title":"Implement Hermes Deliberation Path API (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"high","dependencies":[1],"subtask_count":7,"decision_point_count":2,"description":"Build the Hermes deliberation path as an internal module within the existing Bun/Elysia service, exposing RESTful endpoints for triggering deliberation, querying deliberation status, and retrieving results. This module f","test_strategy":"1. Unit tests: `HermesService.triggerDeliberation()` creates a deliberation record in PostgreSQL with status `pending` — verified by direct DB query returning the UUID.\n2. Integration test: `POST /api/hermes/deliberation"},{"id":3,"title":"Integrate Hermes Path with Snapshot Artifact Generation (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"high","dependencies":[1,2],"subtask_count":7,"decision_point_count":3,"description":"Implement snapshot artifact generation within the Hermes deliberation flow — capturing current-site screenshots and generated variant snapshots, writing them to the dedicated MinIO bucket, and linking artifact metadata t","test_strategy":"1. Integration test: Triggering a deliberation via `POST /api/hermes/deliberations` with a valid target URL results in at least one `current_site_screenshot` artifact record in the database within 30 seconds.\n2. MinIO ve"},{"id":4,"title":"Update Web Experience for Hermes Path Surfacing (Blaze - React/Next.js)","agent":"blaze","stack":"React/Next.js","priority":"high","dependencies":[1,2,3],"subtask_count":9,"decision_point_count":2,"description":"Build the frontend web experience that surfaces Hermes deliberation results, displays snapshot artifacts (current-site screenshots and variant snapshots) in a comparison view, and implements the environment distinction p","test_strategy":"1. Environment banner: In a staging build (`NEXT_PUBLIC_ENVIRONMENT=staging`), the `EnvironmentBanner` component renders with text containing 'STAGING' and has an amber-colored background (CSS computed style check). In p"},{"id":5,"title":"Preserve and Migrate Existing Snapshot Artifacts (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"medium","dependencies":[1,2,3],"subtask_count":6,"decision_point_count":2,"description":"Build a migration pipeline that preserves existing legacy snapshot artifacts by copying them to the dedicated MinIO bucket and creating corresponding artifact metadata records, ensuring backward compatibility while enabl","test_strategy":"1. Idempotency: Running the migration twice on the same dataset results in the same number of artifact records — no duplicates (verified by COUNT query before and after second run).\n2. Artifact integrity: For a sample of"},{"id":6,"title":"Implement Rollout and Migration Risk Logging (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"medium","dependencies":[1,2,3],"subtask_count":6,"decision_point_count":2,"description":"Implement structured logging, rollout phase tracking, and alerting for the Hermes pipeline — including Grafana dashboards for migration health, deliberation error rates, and rollback trigger conditions using the existing","test_strategy":"1. Structured log validation: All Hermes API requests generate logs queryable in Loki via `{app=\"hermes\"} | json | module=\"hermes\"` — each entry contains `rollout_phase`, `operation`, and `duration_ms` fields.\n2. Rollbac"},{"id":7,"title":"Automate E2E Testing for Hermes Intake Pipeline (Tess - Test frameworks)","agent":"tess","stack":"Playwright","priority":"high","dependencies":[1,2,3,4,5,6],"subtask_count":7,"decision_point_count":2,"description":"Create a comprehensive E2E test suite using Playwright that validates the entire Hermes intake pipeline — from API deliberation triggering through artifact generation to frontend surfacing — covering both API-level and b","test_strategy":"1. API lifecycle test passes: A deliberation created via POST transitions to `completed` status within 60 seconds and has at least 2 artifacts (1 current_site_screenshot + 1 variant_snapshot).\n2. Auth tests pass: All 3 a"},{"id":8,"title":"Document Migration and Rollout Plan (Atlas - CI/CD platforms)","agent":"atlas","stack":"CI/CD platforms","priority":"medium","dependencies":[1,2,3,4,5,6,7],"subtask_count":5,"decision_point_count":1,"description":"Create comprehensive documentation covering the migration plan, rollout strategy, rollback procedures, infrastructure sequencing, and operational runbooks for the Hermes pipeline — including ArgoCD promotion workflow con","test_strategy":"1. Documentation completeness: All six documents listed above exist in `docs/hermes/` directory and each contains all specified sections (verified by section heading check).\n2. Mermaid diagram: The infrastructure sequenc"},{"id":9,"title":"Production Hardening: HA, CDN, TLS, Ingress (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[1,2,3,4,5,6,7,8],"subtask_count":11,"decision_point_count":4,"description":"Harden the Hermes pipeline for production deployment — scale all data services to HA configurations, configure TLS termination, set up ingress routing, apply network policies, and establish resource limits and autoscalin","test_strategy":"1. HA PostgreSQL: `kubectl get pods -n hermes-production -l cnpg.io/cluster=hermes-pg` returns 3 Running pods. Killing the primary pod results in automatic failover to a replica within 30 seconds (verified by continuous "},{"id":10,"title":"Production Hardening: RBAC, Secret Rotation, Audit Logging (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[1,2,3,4,5,6,7,8,9],"subtask_count":11,"decision_point_count":3,"description":"Implement production security hardening — Kubernetes RBAC policies, automated secret rotation for all data service credentials, comprehensive audit logging for critical resource access, and security scanning integration ","test_strategy":"1. RBAC enforcement: The backend ServiceAccount can read `hermes-infra-endpoints` ConfigMap but CANNOT list Secrets in other namespaces — verified by `kubectl auth can-i` with the SA token.\n2. Application RBAC: A user wi"}]
 
 --- task_id=1 ---
-task_size=2563
-task_excerpt=## Provision Core Infrastructure (Bolt - Kubernetes/Helm)  ### Objective Set up the foundational Kubernetes infrastructure including namespaces, PostgreSQL, Redis/Valkey, and S3/R2 storage. This task establishes the pers
-acceptance_size=681
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Verify `databases` and `sigma1` namespaces exist.2. Confirm `sigma1-postgres` Cluster and `sigma1-valkey` Redis instances are running and accessible within the cluster.3. Validate that th
-prompt_size=3177
-prompt_excerpt=Implement task 1: Provision Core Infrastructure (Bolt - Kubernetes/Helm)  ## Goal Set up the foundational Kubernetes infrastructure including namespaces, PostgreSQL, Redis/Valkey, and S3/R2 storage. This task establishes
+task_size=5153
+task_excerpt=## Provision Dev and Staging Infrastructure (Bolt - Kubernetes/Helm)  ### Objective Bootstrap dev and staging namespaces with all operator-managed data services, dedicated MinIO bucket, secrets, ConfigMap, and ArgoCD App
+acceptance_size=1235
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. `kubectl get namespace hermes-dev hermes-staging` returns both namespaces in Active state. - [ ] 2. `kubectl get clusters.postgresql.cnpg.io -n hermes-dev` shows a Ready cluster with 1 re
+prompt_size=6277
+prompt_excerpt=Implement task 1: Provision Dev and Staging Infrastructure (Bolt - Kubernetes/Helm)  ## Goal Bootstrap dev and staging namespaces with all operator-managed data services, dedicated MinIO bucket, secrets, ConfigMap, and A
 
 --- task_id=2 ---
-task_size=2790
-task_excerpt=## Develop Equipment Catalog Service (Rex - Rust/Axum)  ### Objective Implement the high-performance Equipment Catalog Service, providing APIs for product inventory, availability, and image serving. This service is criti
-acceptance_size=778
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Deploy the service to Kubernetes and verify it starts successfully.2. Use `curl` or Postman to verify all defined API endpoints are accessible and return expected data structures.3. Test 
-prompt_size=3501
-prompt_excerpt=Implement task 2: Develop Equipment Catalog Service (Rex - Rust/Axum)  ## Goal Implement the high-performance Equipment Catalog Service, providing APIs for product inventory, availability, and image serving. This service
+task_size=5172
+task_excerpt=## Implement Hermes Deliberation Path API (Nova - Bun/Elysia)  ### Objective Build the Hermes deliberation path as an internal module within the existing Bun/Elysia service, exposing RESTful endpoints for triggering deli
+acceptance_size=1220
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Unit tests: `HermesService.triggerDeliberation()` creates a deliberation record in PostgreSQL with status `pending` — verified by direct DB query returning the UUID. - [ ] 2. Integration 
+prompt_size=6291
+prompt_excerpt=Implement task 2: Implement Hermes Deliberation Path API (Nova - Bun/Elysia)  ## Goal Build the Hermes deliberation path as an internal module within the existing Bun/Elysia service, exposing RESTful endpoints for trigge
 
 --- task_id=3 ---
-task_size=2498
-task_excerpt=## Develop Rental Management System (RMS) Service (Grizz - Go/gRPC)  ### Objective Build the core Rental Management System (RMS) service, handling opportunities, projects, inventory, crew, and deliveries. This service is
-acceptance_size=730
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Deploy the service to Kubernetes and verify it starts successfully.2. Use `grpcurl` to test gRPC endpoints for `CreateOpportunity`, `GetProject`, `RecordTransaction`, etc.3. Use `curl` or
-prompt_size=3161
-prompt_excerpt=Implement task 3: Develop Rental Management System (RMS) Service (Grizz - Go/gRPC)  ## Goal Build the core Rental Management System (RMS) service, handling opportunities, projects, inventory, crew, and deliveries. This s
+task_size=5489
+task_excerpt=## Integrate Hermes Path with Snapshot Artifact Generation (Nova - Bun/Elysia)  ### Objective Implement snapshot artifact generation within the Hermes deliberation flow — capturing current-site screenshots and generated 
+acceptance_size=1342
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Integration test: Triggering a deliberation via `POST /api/hermes/deliberations` with a valid target URL results in at least one `current_site_screenshot` artifact record in the database 
+prompt_size=6730
+prompt_excerpt=Implement task 3: Integrate Hermes Path with Snapshot Artifact Generation (Nova - Bun/Elysia)  ## Goal Implement snapshot artifact generation within the Hermes deliberation flow — capturing current-site screenshots and g
 
 --- task_id=4 ---
-task_size=2330
-task_excerpt=## Develop Finance Service (Rex - Rust/Axum)  ### Objective Implement the Finance Service for invoicing, payments, and financial reporting. This service replaces traditional accounting software and integrates with the RM
-acceptance_size=664
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Deploy the service to Kubernetes and verify it starts successfully.2. Create a mock project in RMS (Task 3) and then test invoice creation from that project ID.3. Verify invoice status tr
-prompt_size=2927
-prompt_excerpt=Implement task 4: Develop Finance Service (Rex - Rust/Axum)  ## Goal Implement the Finance Service for invoicing, payments, and financial reporting. This service replaces traditional accounting software and integrates wi
+task_size=5933
+task_excerpt=## Update Web Experience for Hermes Path Surfacing (Blaze - React/Next.js)  ### Objective Build the frontend web experience that surfaces Hermes deliberation results, displays snapshot artifacts (current-site screenshots
+acceptance_size=1436
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Environment banner: In a staging build (`NEXT_PUBLIC_ENVIRONMENT=staging`), the `EnvironmentBanner` component renders with text containing 'STAGING' and has an amber-colored background (C
+prompt_size=7260
+prompt_excerpt=Implement task 4: Update Web Experience for Hermes Path Surfacing (Blaze - React/Next.js)  ## Goal Build the frontend web experience that surfaces Hermes deliberation results, displays snapshot artifacts (current-site sc
 
 --- task_id=5 ---
-task_size=2436
-task_excerpt=## Develop Customer Vetting Service (Rex - Rust/Axum)  ### Objective Create the Customer Vetting Service to automate background research on prospects, providing a GREEN/YELLOW/RED lead score. This service supports Morgan
-acceptance_size=749
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Deploy the service to Kubernetes and verify it starts successfully.2. Call `POST /api/v1/vetting/run` with sample organization data and verify a `VettingResult` is stored in PostgreSQL.3.
-prompt_size=3122
-prompt_excerpt=Implement task 5: Develop Customer Vetting Service (Rex - Rust/Axum)  ## Goal Create the Customer Vetting Service to automate background research on prospects, providing a GREEN/YELLOW/RED lead score. This service suppor
+task_size=5026
+task_excerpt=## Preserve and Migrate Existing Snapshot Artifacts (Nova - Bun/Elysia)  ### Objective Build a migration pipeline that preserves existing legacy snapshot artifacts by copying them to the dedicated MinIO bucket and creati
+acceptance_size=1378
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Idempotency: Running the migration twice on the same dataset results in the same number of artifact records — no duplicates (verified by COUNT query before and after second run). - [ ] 2.
+prompt_size=6307
+prompt_excerpt=Implement task 5: Preserve and Migrate Existing Snapshot Artifacts (Nova - Bun/Elysia)  ## Goal Build a migration pipeline that preserves existing legacy snapshot artifacts by copying them to the dedicated MinIO bucket a
 
 --- task_id=6 ---
-task_size=3001
-task_excerpt=## Implement Morgan AI Agent Core (Angie - OpenClaw/MCP)  ### Objective Develop the core Morgan AI agent, integrating Signal, voice (ElevenLabs/Twilio), and web chat capabilities. This task focuses on the agent's ability
-acceptance_size=969
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Verify the Morgan agent pod is running and accessible.2. Send a test message via Signal to Morgan and confirm a response is received.3. Initiate a voice call via Twilio/ElevenLabs and ver
-prompt_size=3903
-prompt_excerpt=Implement task 6: Implement Morgan AI Agent Core (Angie - OpenClaw/MCP)  ## Goal Develop the core Morgan AI agent, integrating Signal, voice (ElevenLabs/Twilio), and web chat capabilities. This task focuses on the agent'
+task_size=4921
+task_excerpt=## Implement Rollout and Migration Risk Logging (Nova - Bun/Elysia)  ### Objective Implement structured logging, rollout phase tracking, and alerting for the Hermes pipeline — including Grafana dashboards for migration h
+acceptance_size=1486
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Structured log validation: All Hermes API requests generate logs queryable in Loki via `{app="hermes"} | json | module="hermes"` — each entry contains `rollout_phase`, `operation`, and `d
+prompt_size=6310
+prompt_excerpt=Implement task 6: Implement Rollout and Migration Risk Logging (Nova - Bun/Elysia)  ## Goal Implement structured logging, rollout phase tracking, and alerting for the Hermes pipeline — including Grafana dashboards for mi
+
+--- task_id=7 ---
+task_size=6018
+task_excerpt=## Automate E2E Testing for Hermes Intake Pipeline (Tess - Test frameworks)  ### Objective Create a comprehensive E2E test suite using Playwright that validates the entire Hermes intake pipeline — from API deliberation t
+acceptance_size=1336
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. API lifecycle test passes: A deliberation created via POST transitions to `completed` status within 60 seconds and has at least 2 artifacts (1 current_site_screenshot  1 variant_snapshot)
+prompt_size=7241
+prompt_excerpt=Implement task 7: Automate E2E Testing for Hermes Intake Pipeline (Tess - Test frameworks)  ## Goal Create a comprehensive E2E test suite using Playwright that validates the entire Hermes intake pipeline — from API delib
+
+--- task_id=8 ---
+task_size=5352
+task_excerpt=## Document Migration and Rollout Plan (Atlas - CI/CD platforms)  ### Objective Create comprehensive documentation covering the migration plan, rollout strategy, rollback procedures, infrastructure sequencing, and operat
+acceptance_size=1334
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Documentation completeness: All six documents listed above exist in `docs/hermes/` directory and each contains all specified sections (verified by section heading check). - [ ] 2. Mermaid
+prompt_size=6593
+prompt_excerpt=Implement task 8: Document Migration and Rollout Plan (Atlas - CI/CD platforms)  ## Goal Create comprehensive documentation covering the migration plan, rollout strategy, rollback procedures, infrastructure sequencing, a
+
+--- task_id=9 ---
+task_size=6303
+task_excerpt=## Production Hardening: HA, CDN, TLS, Ingress (Bolt - Kubernetes/Helm)  ### Objective Harden the Hermes pipeline for production deployment — scale all data services to HA configurations, configure TLS termination, set u
+acceptance_size=1636
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. HA PostgreSQL: `kubectl get pods -n hermes-production -l cnpg.io/cluster=hermes-pg` returns 3 Running pods. Killing the primary pod results in automatic failover to a replica within 30 se
+prompt_size=7816
+prompt_excerpt=Implement task 9: Production Hardening: HA, CDN, TLS, Ingress (Bolt - Kubernetes/Helm)  ## Goal Harden the Hermes pipeline for production deployment — scale all data services to HA configurations, configure TLS terminati
+
+--- task_id=10 ---
+task_size=6960
+task_excerpt=## Production Hardening: RBAC, Secret Rotation, Audit Logging (Bolt - Kubernetes/Helm)  ### Objective Implement production security hardening — Kubernetes RBAC policies, automated secret rotation for all data service cre
+acceptance_size=1678
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. RBAC enforcement: The backend ServiceAccount can read `hermes-infra-endpoints` ConfigMap but CANNOT list Secrets in other namespaces — verified by `kubectl auth can-i` with the SA token. 
+prompt_size=8516
+prompt_excerpt=Implement task 10: Production Hardening: RBAC, Secret Rotation, Audit Logging (Bolt - Kubernetes/Helm)  ## Goal Implement production security hardening — Kubernetes RBAC policies, automated secret rotation for all data s
 

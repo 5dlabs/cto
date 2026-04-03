@@ -1,1 +1,1 @@
-Use direct orchestration from the Morgan agent, offloading long-running, unreliable steps to a simple background job queue.
+Inline within task views with summary badge — but note the stitch_status=failed risk

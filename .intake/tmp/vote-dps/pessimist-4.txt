@@ -1,1 +1,1 @@
-Use a single, language-agnostic migration tool like Flyway or Liquibase, managed from a central repository.
+PM server as monolithic orchestrator with HTTP calls to bridge services — no NATS event emission at stage boundaries

@@ -1,1 +1,1 @@
-What architectural pattern should be used for orchestrating long-running, multi-step business workflows like customer vetting and social media publishing?
+Dedicated dashboard section or inline notifications within task views for design snapshot PRs?

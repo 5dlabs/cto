@@ -1,1 +1,1 @@
-Use a mixed-protocol approach: gRPC for high-throughput services like RMS, and simple HTTP/REST for others like Catalog and Finance.
+Display design snapshot PRs as linked items in the pipeline activity view — a PR link with status badge, not an interactive preview panel

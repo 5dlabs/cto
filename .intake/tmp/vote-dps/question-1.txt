@@ -1,1 +1,1 @@
-What should be the primary communication protocol for internal service-to-service calls?
+How should design snapshot PR surfacing be presented in the frontend?

@@ -1,1 +1,1 @@
-How should data be isolated for the various backend services (RMS, Finance, Catalog, etc.) within the single PostgreSQL cluster?
+Should the E2E pipeline be orchestrated as a single monolithic workflow or as decoupled microservices communicating via events?

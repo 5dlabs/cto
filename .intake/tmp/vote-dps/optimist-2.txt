@@ -1,1 +1,1 @@
-Use a service mesh with mTLS for encrypted and authenticated service-to-service communication, and use JWTs for external API clients.
+Store delegate_id as the native Linear assignee (assigneeId) field on the issue
