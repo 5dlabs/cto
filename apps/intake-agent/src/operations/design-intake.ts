@@ -314,6 +314,7 @@ async function generateStitchCandidates(
     const prompt = promptParts.join(' ');
 
     try {
+      console.error(`[design-intake] generating Stitch candidate for ${target} (${deviceType})`);
       const generateResult = await client.callTool('generate_screen_from_text', {
         projectId,
         prompt,
@@ -359,14 +360,17 @@ async function generateStitchCandidates(
         prompt,
         status: 'generated',
       });
+      console.error(`[design-intake] Stitch candidate ready for ${target} (${deviceType})`);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[design-intake] Stitch candidate failed for ${target} (${deviceType}): ${message}`);
       candidates.push({
         target,
         deviceType,
         rationale: `Failed to generate ${target} candidate.`,
         prompt,
         status: 'failed',
-        error: error instanceof Error ? error.message : String(error),
+        error: message,
       });
     }
   }

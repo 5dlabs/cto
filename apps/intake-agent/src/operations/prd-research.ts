@@ -7,13 +7,14 @@
  *   - Pessimist memo: failure modes, operational risks, postmortems
  *
  * Research providers (graceful degradation — missing keys are skipped):
- *   Phase 1 (parallel): Exa, Perplexity, Tavily
+ *   Phase 1 (parallel): Exa, Perplexity, Hermes, Tavily
  *   Phase 2 (conditional, sequential): Firecrawl deep-extraction
  */
 
 import type { ResearchMemos } from '../types';
 import {
   exaSearch,
+  hermesAnalyze,
   perplexityAsk,
   dataverseDeveloperSentiment,
   grokXQuery,
@@ -156,13 +157,13 @@ function formatSection(
 }
 
 /**
- * Format a Perplexity synthesized analysis into a memo block.
+ * Format a synthesized analysis into a memo block.
  */
-function formatPerplexitySection(heading: string, analysis: string): string {
+function formatAnalysisSection(heading: string, source: string, analysis: string): string {
   if (!analysis) {
     return '';
   }
-  return `## ${heading}\n_[Source: Perplexity]_\n\n${analysis}`;
+  return `## ${heading}\n_[Source: ${source}]_\n\n${analysis}`;
 }
 
 /**
@@ -197,7 +198,7 @@ function formatTavilySection(heading: string, response: TavilyResponse, query: s
 /**
  * Run multi-source PRD research.
  *
- * Phase 1 (parallel): Exa, Perplexity, Tavily
+ * Phase 1 (parallel): Exa, Perplexity, Hermes, Tavily
  * Phase 2 (conditional): Firecrawl deep-extraction of top URLs
  *
  * Returns two focused research memos:
@@ -212,14 +213,15 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
   console.error(`[PRD-RESEARCH] Domain detected: ${domain}`);
 
   // =========================================================================
-  // Phase 1 — parallel searches across Exa, Perplexity, and Tavily
+  // Phase 1 — parallel searches across Exa, Perplexity, Hermes, and Tavily
   // =========================================================================
-  console.error('[PRD-RESEARCH] Phase 1: launching parallel searches (Exa, Perplexity, Tavily, Grok/X, Dataverse)');
+  console.error('[PRD-RESEARCH] Phase 1: launching parallel searches (Exa, Perplexity, Hermes, Tavily, Grok/X, Dataverse)');
 
   const [
     exaArchitecture,
     exaSimilarSystems,
     perplexityAnalysis,
+    hermesAnalysis,
     tavilyBestPractices,
     tavilyFailureModes,
     xSentiment,
@@ -236,6 +238,14 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
       `Analyze tradeoffs for building ${domain} with ${techStack}. ` +
       `Cover best practices, common pitfalls, and recommended architecture patterns. ` +
       `Include both optimistic success patterns and pessimistic failure scenarios.`,
+    ),
+
+    // Hermes: alternate synthesized planning/research analysis
+    hermesAnalyze(
+      `You are supporting a software planning and architecture debate for ${domain} built with ${techStack}. ` +
+      'Respond in Markdown with exactly two top-level sections titled "## Proven patterns and best practices" ' +
+      'and "## Risks, failure modes, and cautions". ' +
+      'Focus on architecture choices, delivery sequencing, data and integration concerns, infrastructure implications, and anti-patterns to avoid.',
     ),
 
     // Tavily: best practices (existing pattern)
@@ -257,12 +267,13 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
 
   console.error(
     `[PRD-RESEARCH] Phase 1 results — ` +
-    `Exa architecture: ${exaArchitecture.length}, ` +
-    `Exa similar: ${exaSimilarSystems.length}, ` +
-    `Perplexity: ${perplexityAnalysis.length > 0 ? 'yes' : 'no'}, ` +
-    `Tavily best practices: ${tavilyBestPractices.results.length}, ` +
-    `Tavily failure modes: ${tavilyFailureModes.results.length}, ` +
-    `Grok/X: ${xSentiment.length > 0 ? 'yes' : 'no'}, ` +
+      `Exa architecture: ${exaArchitecture.length}, ` +
+      `Exa similar: ${exaSimilarSystems.length}, ` +
+      `Perplexity: ${perplexityAnalysis.length > 0 ? 'yes' : 'no'}, ` +
+      `Hermes: ${hermesAnalysis.length > 0 ? 'yes' : 'no'}, ` +
+      `Tavily best practices: ${tavilyBestPractices.results.length}, ` +
+      `Tavily failure modes: ${tavilyFailureModes.results.length}, ` +
+      `Grok/X: ${xSentiment.length > 0 ? 'yes' : 'no'}, ` +
     `Dataverse: ${dataverseSentiment.length > 0 ? 'yes' : 'no'}`,
   );
 
@@ -296,6 +307,10 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
   // Split Perplexity analysis roughly in half for optimist/pessimist.
   // If the analysis contains a clear break around risks/pitfalls, split there.
   const { optimistAnalysis, pessimistAnalysis } = splitPerplexityAnalysis(perplexityAnalysis);
+
+  // Split Hermes analysis into optimist/pessimist halves
+  const { optimistAnalysis: hermesOptimist, pessimistAnalysis: hermesPessimist } =
+    splitPerplexityAnalysis(hermesAnalysis);
 
   // Split X sentiment into optimist/pessimist halves
   const { optimistAnalysis: xOptimist, pessimistAnalysis: xPessimist } = splitPerplexityAnalysis(xSentiment);
@@ -332,14 +347,15 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
   const optimistSections = [
     '# Research Memo: What\'s Proven and Working\n',
     formatSection('Architecture Patterns', 'Exa', exaOptimistResults),
-    formatPerplexitySection('Synthesized Analysis — Best Practices', optimistAnalysis),
+    formatAnalysisSection('Synthesized Analysis — Best Practices', 'Perplexity', optimistAnalysis),
+    formatAnalysisSection('Synthesized Analysis — Best Practices', 'Hermes', hermesOptimist),
     formatTavilySection(
       'Industry Best Practices',
       tavilyBestPractices,
       `${techStack} best practices ${new Date().getFullYear()}`,
     ),
-    formatPerplexitySection('Developer Sentiment on X — Positive', xOptimist),
-    formatPerplexitySection('Developer Sentiment on X — Positive (Dataverse)', dvOptimist),
+    formatAnalysisSection('Developer Sentiment on X — Positive', 'Grok/X', xOptimist),
+    formatAnalysisSection('Developer Sentiment on X — Positive (Dataverse)', 'Dataverse', dvOptimist),
     formatSection('Deep Extracts — Architecture Docs', 'Firecrawl', optimistExtracts),
   ].filter(Boolean);
 
@@ -349,14 +365,15 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
   const pessimistSections = [
     '# Research Memo: Known Failure Modes and Risks\n',
     formatSection('Failure Case Studies', 'Exa', exaPessimistResults),
-    formatPerplexitySection('Synthesized Analysis — Risks & Pitfalls', pessimistAnalysis),
+    formatAnalysisSection('Synthesized Analysis — Risks & Pitfalls', 'Perplexity', pessimistAnalysis),
+    formatAnalysisSection('Synthesized Analysis — Risks & Pitfalls', 'Hermes', hermesPessimist),
     formatTavilySection(
       'Failure Modes & Operational Risks',
       tavilyFailureModes,
       `${domain} ${techStack} failure modes operational risks`,
     ),
-    formatPerplexitySection('Developer Sentiment on X — Warnings', xPessimist),
-    formatPerplexitySection('Developer Sentiment on X — Warnings (Dataverse)', dvPessimist),
+    formatAnalysisSection('Developer Sentiment on X — Warnings', 'Grok/X', xPessimist),
+    formatAnalysisSection('Developer Sentiment on X — Warnings (Dataverse)', 'Dataverse', dvPessimist),
     formatSection('Deep Extracts — Postmortem Details', 'Firecrawl', pessimistExtracts),
   ].filter(Boolean);
 
