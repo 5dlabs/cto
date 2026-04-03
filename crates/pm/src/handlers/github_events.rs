@@ -24,6 +24,8 @@ use subtle::ConstantTimeEq;
 use tracing::{debug, error, info, warn};
 
 use super::callbacks::CallbackState;
+use crate::config::WebhookDispatchMode;
+use crate::morgan_hooks::{dispatch_to_morgan, MorganWebhookDispatch};
 
 // =============================================================================
 // Types
@@ -124,6 +126,74 @@ fn verify_github_signature(secret: &str, signature_header: &str, body: &[u8]) ->
 // Unified Webhook Handler
 // =============================================================================
 
+async fn maybe_dispatch_github_webhook_to_morgan(
+    state: &CallbackState,
+    route: &'static str,
+    event_type: &str,
+    delivery_id: &str,
+    payload: &Value,
+) -> Result<Option<Json<Value>>, StatusCode> {
+    let dispatch_mode = state.morgan_dispatch.mode;
+    if !dispatch_mode.dispatches_to_morgan() {
+        return Ok(None);
+    }
+
+    let mut labels = vec![("github_event", event_type.to_string())];
+    if let Some(action) = payload.get("action").and_then(Value::as_str) {
+        labels.push(("github_action", action.to_string()));
+    }
+    if let Some(repo) = payload
+        .pointer("/repository/full_name")
+        .and_then(Value::as_str)
+    {
+        labels.push(("repository", repo.to_string()));
+    }
+
+    let dispatch = MorganWebhookDispatch {
+        source: "github",
+        route,
+        event_type: event_type.to_string(),
+        delivery_id: Some(delivery_id.to_string()),
+        verified: state.github_webhook_secret.is_some(),
+        labels,
+        payload: payload.clone(),
+    };
+
+    match dispatch_to_morgan(&state.http_client, &state.morgan_dispatch, &dispatch).await {
+        Ok(accepted) => {
+            info!(
+                session_key = %accepted.session_key,
+                agent_id = %accepted.agent_id,
+                route,
+                "Forwarded GitHub webhook to Morgan"
+            );
+
+            if dispatch_mode == WebhookDispatchMode::Morgan {
+                return Ok(Some(Json(json!({
+                    "status": "accepted",
+                    "dispatch": "morgan",
+                    "source": "github",
+                    "event_type": event_type,
+                    "delivery_id": delivery_id,
+                    "session_key": accepted.session_key,
+                    "agent_id": accepted.agent_id
+                }))));
+            }
+
+            Ok(None)
+        }
+        Err(e) => {
+            if dispatch_mode == WebhookDispatchMode::Shadow {
+                warn!(error = %e, route, "Failed to shadow-dispatch GitHub webhook to Morgan");
+                Ok(None)
+            } else {
+                error!(error = %e, route, "Failed to dispatch GitHub webhook to Morgan");
+                Err(StatusCode::BAD_GATEWAY)
+            }
+        }
+    }
+}
+
 /// Unified GitHub webhook endpoint.
 ///
 /// Receives all GitHub webhook events, verifies the signature, and routes
@@ -167,6 +237,23 @@ pub async fn handle_github_events(
         debug!("GitHub webhook signature verified");
     } else {
         debug!("No GITHUB_WEBHOOK_SECRET configured, skipping signature verification");
+    }
+
+    let payload: Value = serde_json::from_slice(&body).map_err(|e| {
+        error!(error = %e, "Failed to parse GitHub webhook payload");
+        StatusCode::BAD_REQUEST
+    })?;
+
+    if let Some(response) = maybe_dispatch_github_webhook_to_morgan(
+        &state,
+        "/webhooks/github/events",
+        event_type,
+        delivery_id,
+        &payload,
+    )
+    .await?
+    {
+        return Ok(response);
     }
 
     // Route based on event type

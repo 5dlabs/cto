@@ -37,6 +37,7 @@ pub mod detection;
 pub mod emitter;
 pub mod handlers;
 pub mod models;
+pub mod morgan_hooks;
 pub mod onboarding;
 pub mod server;
 pub mod state;

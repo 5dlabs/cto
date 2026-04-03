@@ -17,6 +17,8 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 use super::callbacks::CallbackState;
+use crate::config::WebhookDispatchMode;
+use crate::morgan_hooks::{dispatch_to_morgan, MorganWebhookDispatch};
 
 // =============================================================================
 // Types
@@ -411,6 +413,65 @@ pub fn parse_button_identifier(identifier: &str) -> Option<(Agent, u64, u64)> {
     None
 }
 
+async fn maybe_dispatch_legacy_agent_webhook_to_morgan(
+    state: &CallbackState,
+    route: &'static str,
+    event_type: &'static str,
+    payload: &Value,
+) -> Result<Option<Json<Value>>, StatusCode> {
+    let dispatch_mode = state.morgan_dispatch.mode;
+    if !dispatch_mode.dispatches_to_morgan() {
+        return Ok(None);
+    }
+
+    let dispatch = MorganWebhookDispatch {
+        source: "github",
+        route,
+        event_type: event_type.to_string(),
+        delivery_id: payload
+            .pointer("/check_run/id")
+            .and_then(Value::as_u64)
+            .map(|id| id.to_string()),
+        verified: false,
+        labels: vec![("legacy_route", route.to_string())],
+        payload: payload.clone(),
+    };
+
+    match dispatch_to_morgan(&state.http_client, &state.morgan_dispatch, &dispatch).await {
+        Ok(accepted) => {
+            info!(
+                session_key = %accepted.session_key,
+                agent_id = %accepted.agent_id,
+                route,
+                "Forwarded legacy agent webhook to Morgan"
+            );
+
+            if dispatch_mode == WebhookDispatchMode::Morgan {
+                return Ok(Some(Json(json!({
+                    "status": "accepted",
+                    "dispatch": "morgan",
+                    "source": "github",
+                    "event_type": event_type,
+                    "route": route,
+                    "session_key": accepted.session_key,
+                    "agent_id": accepted.agent_id
+                }))));
+            }
+
+            Ok(None)
+        }
+        Err(e) => {
+            if dispatch_mode == WebhookDispatchMode::Shadow {
+                warn!(error = %e, route, "Failed to shadow-dispatch legacy agent webhook to Morgan");
+                Ok(None)
+            } else {
+                error!(error = %e, route, "Failed to dispatch legacy agent webhook to Morgan");
+                Err(StatusCode::BAD_GATEWAY)
+            }
+        }
+    }
+}
+
 // =============================================================================
 // Handlers
 // =============================================================================
@@ -432,6 +493,17 @@ pub async fn handle_mention_webhook(
 
     // Extract nested payload (from Argo Events sensor)
     let inner_payload = payload.get("payload").unwrap_or(&payload);
+
+    if let Some(response) = maybe_dispatch_legacy_agent_webhook_to_morgan(
+        &state,
+        "/webhooks/github/mention",
+        "mention",
+        inner_payload,
+    )
+    .await?
+    {
+        return Ok(response);
+    }
 
     handle_mention_webhook_impl(&state, inner_payload).await
 }
@@ -612,6 +684,17 @@ pub async fn handle_remediation_webhook(
 
     // Extract nested payload (from Argo Events sensor)
     let inner_payload = payload.get("payload").unwrap_or(&payload);
+
+    if let Some(response) = maybe_dispatch_legacy_agent_webhook_to_morgan(
+        &state,
+        "/webhooks/github/remediation",
+        "remediation",
+        inner_payload,
+    )
+    .await?
+    {
+        return Ok(response);
+    }
 
     handle_remediation_webhook_impl(&state, inner_payload).await
 }
@@ -938,6 +1021,17 @@ pub async fn handle_ci_failure_webhook(
 
     // Extract nested payload (from Argo Events sensor)
     let inner_payload = payload.get("payload").unwrap_or(&payload);
+
+    if let Some(response) = maybe_dispatch_legacy_agent_webhook_to_morgan(
+        &state,
+        "/webhooks/github/ci-failure",
+        "ci-failure",
+        inner_payload,
+    )
+    .await?
+    {
+        return Ok(response);
+    }
 
     handle_ci_failure_webhook_impl(&state, inner_payload).await
 }

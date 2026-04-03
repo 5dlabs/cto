@@ -17,7 +17,9 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 use super::callbacks::CallbackState;
+use crate::config::WebhookDispatchMode;
 use crate::models::{IssueCreateInput, ProjectCreateInput};
+use crate::morgan_hooks::{dispatch_to_morgan, MorganWebhookDispatch};
 use crate::LinearClient;
 
 /// GitHub PR event payload (simplified)
@@ -164,7 +166,79 @@ pub async fn handle_github_webhook(
         })));
     }
 
+    let payload: Value = serde_json::from_slice(&body).map_err(|e| {
+        error!(error = %e, "Failed to parse legacy GitHub webhook payload");
+        StatusCode::BAD_REQUEST
+    })?;
+
+    if let Some(response) =
+        maybe_dispatch_legacy_github_webhook_to_morgan(&state, event_type, delivery_id, &payload)
+            .await?
+    {
+        return Ok(response);
+    }
+
     handle_github_webhook_inner(&state, &body).await
+}
+
+async fn maybe_dispatch_legacy_github_webhook_to_morgan(
+    state: &CallbackState,
+    event_type: &str,
+    delivery_id: &str,
+    payload: &Value,
+) -> Result<Option<Json<Value>>, StatusCode> {
+    let dispatch_mode = state.morgan_dispatch.mode;
+    if !dispatch_mode.dispatches_to_morgan() {
+        return Ok(None);
+    }
+
+    let mut labels = vec![("github_event", event_type.to_string())];
+    if let Some(action) = payload.get("action").and_then(Value::as_str) {
+        labels.push(("github_action", action.to_string()));
+    }
+
+    let dispatch = MorganWebhookDispatch {
+        source: "github",
+        route: "/webhooks/github",
+        event_type: event_type.to_string(),
+        delivery_id: Some(delivery_id.to_string()),
+        verified: false,
+        labels,
+        payload: payload.clone(),
+    };
+
+    match dispatch_to_morgan(&state.http_client, &state.morgan_dispatch, &dispatch).await {
+        Ok(accepted) => {
+            info!(
+                session_key = %accepted.session_key,
+                agent_id = %accepted.agent_id,
+                "Forwarded legacy GitHub webhook to Morgan"
+            );
+
+            if dispatch_mode == WebhookDispatchMode::Morgan {
+                return Ok(Some(Json(json!({
+                    "status": "accepted",
+                    "dispatch": "morgan",
+                    "source": "github",
+                    "event_type": event_type,
+                    "delivery_id": delivery_id,
+                    "session_key": accepted.session_key,
+                    "agent_id": accepted.agent_id
+                }))));
+            }
+
+            Ok(None)
+        }
+        Err(e) => {
+            if dispatch_mode == WebhookDispatchMode::Shadow {
+                warn!(error = %e, "Failed to shadow-dispatch legacy GitHub webhook to Morgan");
+                Ok(None)
+            } else {
+                error!(error = %e, "Failed to dispatch legacy GitHub webhook to Morgan");
+                Err(StatusCode::BAD_GATEWAY)
+            }
+        }
+    }
 }
 
 /// Inner handler for intake PR merges, callable from both the legacy Axum
@@ -934,15 +1008,18 @@ pub async fn fetch_tasks_json_from_scm(
 ) -> anyhow::Result<TasksJson> {
     use anyhow::Context;
 
-    let (owner, repo) = scm_client.parse_repo_from_url(
-        &scm_client.repo_url(
+    let (owner, repo) = scm_client
+        .parse_repo_from_url(&scm_client.repo_url(
             repo_full_name.split('/').next().unwrap_or(""),
             repo_full_name.split('/').nth(1).unwrap_or(""),
-        ),
-    ).unwrap_or_else(|_| {
-        let parts: Vec<&str> = repo_full_name.splitn(2, '/').collect();
-        (parts.first().unwrap_or(&"").to_string(), parts.get(1).unwrap_or(&"").to_string())
-    });
+        ))
+        .unwrap_or_else(|_| {
+            let parts: Vec<&str> = repo_full_name.splitn(2, '/').collect();
+            (
+                parts.first().unwrap_or(&"").to_string(),
+                parts.get(1).unwrap_or(&"").to_string(),
+            )
+        });
 
     let file_path = format!("{project_dir}/.tasks/tasks/tasks.json");
     let ref_ = commit_sha.unwrap_or("main");
@@ -961,10 +1038,13 @@ pub async fn fetch_tasks_json_from_scm(
         .context("Failed to fetch tasks.json via SCM")?;
 
     let json_str = String::from_utf8(content).context("tasks.json is not valid UTF-8")?;
-    let tasks_json: TasksJson = serde_json::from_str(&json_str)
-        .context("Failed to parse tasks.json")?;
+    let tasks_json: TasksJson =
+        serde_json::from_str(&json_str).context("Failed to parse tasks.json")?;
 
-    info!(task_count = tasks_json.tasks.len(), "Fetched tasks.json via SCM");
+    info!(
+        task_count = tasks_json.tasks.len(),
+        "Fetched tasks.json via SCM"
+    );
     Ok(tasks_json)
 }
 
