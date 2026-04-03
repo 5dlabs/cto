@@ -1,1 +1,1 @@
-Use a single PostgreSQL database with logically separated schemas (e.g., `rms`, `finance`, `catalog`) for each service.
+Event-driven pipeline stages communicating via NATS, orchestrated by the PM server as coordinator

@@ -1,1 +1,1 @@
-Each service will manage its own schema migrations independently using a language-specific tool (e.g., `sqlx-cli` for Rust, `golang-migrate` for Go).
+PM server as the orchestrator with NATS-based event emission at stage boundaries — not a full microservices decomposition

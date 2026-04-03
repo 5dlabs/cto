@@ -1,1 +1,1 @@
-Implement service-to-service authentication using short-lived JWTs issued by a central identity service.
+Store delegate_id as the native Linear assigneeId field

@@ -1,1 +1,1 @@
-Standardize on gRPC for all internal communication, using grpc-gateway for external REST exposure where needed.
+Dedicated section in the pipeline UI with interactive previews (image diffs, before/after)

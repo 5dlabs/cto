@@ -1,57 +1,52 @@
 [
   {
-    "voter_id": "the_architect",
+    "scores": {
+      "task_decomposition": 9,
+      "dependency_ordering": 8,
+      "decision_point_coverage": 7,
+      "test_strategy_quality": 9,
+      "agent_assignment": 9
+    },
+    "overall_score": 8.57,
+    "verdict": "approve",
+    "reasoning": "The plan demonstrates exemplary structural decomposition: each top-level task owns a single architectural boundary (infra in Task 1, data/API layer in Tasks 2/3/5/6/7, presentation layer in Task 4, cross-cutting E2E validation in Task 8, and ops hardening in Tasks 9/10). Subtasks are well-scoped to single concerns — e.g., Task 7 cleanly separates the GitHub client (7001), branch creation (7002), content generation (7003), Git tree commit (7004), PR creation (7005), and orchestration (7006), which is textbook dependency inversion and single-responsibility. Dependencies follow gravity correctly: infrastructure (Task 1) precedes all services, backend services (Tasks 2, 3, 7) precede the frontend (Task 4), and E2E testing (Task 8) correctly depends on all feature tasks. Decision points are present for key ambiguities (agent hint matching strategy in Task 2, diff library and design system in Task 4, ingress controller and cert-manager in Task 9, secret rotation mechanism in Task 10) but Task 3 (Hermes integration) lacks a decision point for the research endpoint API contract/versioning, and Task 6's batching window size (2 seconds) is hardcoded without a decision point for tuning. Test strategies are consistently specific and measurable with acceptance criteria covering happy paths, error paths, and edge cases across nearly all tasks.",
+    "suggestions": [
+      "Task 4 depends on Task 7 (PR generation) but the frontend's data-fetching hook (subtask 4001) has no dependencies and can't actually integrate without the PM server endpoints from Task 7 being available — make the dependency explicit at the subtask level or add a decision point about whether to mock the API contract or wait for Task 7 completion.",
+      "Task 3 (Hermes integration) should include a decision point about the Hermes API contract stability — whether to code against a versioned schema, what happens if the response shape changes, and whether a client SDK or raw fetch is appropriate, since the entire integration is built on an assumed response shape ({ title, summary, url, relevance_score }).",
+      "Tasks 9 and 10 could enable more parallelism: Task 10 depends entirely on Task 9, but several subtasks (10001 ServiceAccounts, 10003 RBAC Roles, 10006 Audit Policy, 10007 NetworkPolicies) have no actual structural dependency on Task 9's HPA/Ingress/probe work — they could be split into a parallel track or Task 10's dependency on 9 could be narrowed to only the deployment subtasks that need the prod namespace and deployments to exist."
+    ]
+  },
+  {
     "scores": {
       "task_decomposition": 7,
-      "dependency_ordering": 10,
+      "dependency_ordering": 4,
       "decision_point_coverage": 6,
-      "test_strategy_quality": 7,
-      "agent_assignment": 9
+      "test_strategy_quality": 8,
+      "agent_assignment": 8
     },
-    "overall_score": 8,
-    "verdict": "approve",
-    "reasoning": "The architectural foundation is structurally sound, with dependencies strictly following gravity (infrastructure -> core services -> dependent services -> AI consumer). Service boundaries are well-defined per bounded context, though Task 6 violates separation of concerns by bundling infrastructure routing with application logic and external communication channels.",
+    "overall_score": 5.8,
+    "verdict": "revise",
+    "reasoning": "Most tasks are implementable and sized reasonably with strong subtask structure and concrete test strategies (e.g., Tasks 2, 3, 7, 8). However, dependency ordering has a clear forward reference (Task 4 depends on Task 7 while Task 7 also depends on Task 2 and 1), creating a cycle/invalid ordering; additionally, some tasks depend on infra (Task 1) unnecessarily at code-level, reducing parallelism. Decision points exist for some major choices (Task 2 matching strategy, Task 8 framework/Discord verification, Task 9 ingress/cert-manager), but several infrastructure/security assumptions (e.g., NetworkPolicy CIDR realism, secret rotation mechanism feasibility) are left as vague bullets rather than executable decisions.",
     "suggestions": [
-      "Split Task 6 into three distinct tasks to respect architectural boundaries: AI Agent Infrastructure (deployment, Cloudflare tunnels), Communication Channels (Signal, Twilio/ElevenLabs), and Tool/Skill Integration (MCP tools for backend services).",
-      "Refactor the 'decision_points' arrays to use structured objects that explicitly assign constraint types (hard, soft, open, escalation) to each decision, as they are currently only plain strings.",
-      "Expand 'test_strategy' fields across all tasks to explicitly mandate negative testing, such as simulating database connection drops, rate limit triggers, or invalid gRPC payloads, rather than relying solely on happy-path verification."
+      "Fix the invalid dependency graph: remove Task 4’s dependency on Task 7 (frontend UI can ship against stubbed/mock PR endpoints), or split Task 7 into (7a) “persist PR metadata + expose /api/pipeline/:runId/pr(s) endpoints” (depends on 2, can unblock 4) and (7b) “actual GitHub PR creation + commit flow”; then make Task 4 depend on 7a instead of 7.",
+      "Reduce unnecessary serial chains by separating “cluster infra prerequisites” from “code changes”: allow Tasks 2/3/5/7 to start without Task 1 as a hard dependency by adding explicit config interfaces + local env fallback (e.g., accept env vars directly in dev), and keep Task 1 as a deployment/environments task needed only for in-cluster validation/E2E (Task 8).",
+      "Add explicit decision points (with options) where feasibility is currently hand-wavy: (a) NetworkPolicy egress strategy in dev/prod (DNS + FQDN policies vs. CIDRs vs. allow-all with audit) since “resolve IPs” is brittle, and (b) secret rotation source-of-truth (External Secrets + cloud store vs. manual rotation runbook) because the proposed CronJob cannot actually mint new Linear/GitHub/Discord credentials without an external system."
     ]
   },
   {
-    "voter_id": "ThePragmatist",
     "scores": {
       "task_decomposition": 6,
-      "dependency_ordering": 9,
-      "decision_point_coverage": 9,
-      "test_strategy_quality": 9,
-      "agent_assignment": 10
-    },
-    "overall_score": 8,
-    "verdict": "approve",
-    "reasoning": "The plan exhibits strong dependency ordering, agent assignment, and comprehensive test strategies, with well-covered decision points. However, the task decomposition for the AI Agent (Task 6) is too broad, combining multiple distinct integrations and skill developments into single subtasks, which could lead to delays.",
-    "suggestions": [
-      "Split subtasks 6004 and 6005 into more granular units, with each MCP tool definition and integration being its own subtask to reduce scope and improve tracking.",
-      "Decompose subtask 6003 (\"Integrate ElevenLabs and Twilio for voice communication\") into two separate subtasks: one for ElevenLabs integration and another for Twilio integration, as these are distinct external services.",
-      "Split subtask 6006 (\"Develop core AI skills and configure Cloudflare Tunnel\") into separate subtasks for each AI skill (`sales-qual`, `quote-gen`) and a distinct subtask for Cloudflare Tunnel configuration, as these are unrelated concerns."
-    ]
-  },
-  {
-    "voter_id": "the_minimalist",
-    "scores": {
-      "task_decomposition": 4,
       "dependency_ordering": 7,
       "decision_point_coverage": 7,
-      "test_strategy_quality": 6,
-      "agent_assignment": 9
+      "test_strategy_quality": 9,
+      "agent_assignment": 8
     },
-    "overall_score": 6,
-    "verdict": "revise",
-    "reasoning": "The plan is drowning in premature optimization and scope creep. Building an entire microservice (Task 5) just to mock four external APIs is a massive waste of effort for v1, and including full financial reporting or Redis rate-limiting before the core system is proven is textbook over-engineering.",
+    "overall_score": 7.2,
+    "verdict": "approve",
+    "reasoning": "Test strategies are genuinely excellent — specific, measurable, covering happy paths, error cases, and edge conditions consistently across all tasks. However, task decomposition suffers from significant inflation: tasks 9 and 10 are premature v2 scope (production HA, RBAC, CDN, secret rotation) gated behind all v1 tasks including the E2E test suite, meaning they'll never run in v1 — they should be deferred. Within tasks, subtask inflation is evident: 2002 (caching layer as a standalone subtask), 2004 (removing a label as a standalone subtask), 10008 (docs as a standalone subtask), and 9001/9002 (splitting frontend vs backend replica values into separate subtasks) are all unnecessary decompositions that could be collapsed. Dependency ordering is mostly correct with infrastructure-first sequencing, but task 4 depends on task 7 (frontend depends on PR generation) which is a plausible but arguable forward dependency that forces sequential execution where parallelism was possible.",
     "suggestions": [
-      "Remove Task 5 (Customer Vetting Service) entirely for v1, or collapse it into a single hardcoded mock function within the AI Agent. Building a dedicated microservice to return mock data is unnecessary complexity.",
-      "Defer Task 4004 (Financial reporting: aging, cashflow, profitability) and Task 4005 (Stripe integration). V1 finance only needs basic invoice generation and manual payment status toggling.",
-      "Simplify Task 6 by picking a single communication channel (e.g., Web Chat or Signal) for v1. Defer ElevenLabs/Twilio voice integration (Task 6003) to a future iteration to reduce initial integration surface area.",
-      "Remove Redis rate limiting (Task 2003) and Prometheus metrics (Task 2006) from the Catalog service. These are v2 operational concerns that distract from shipping core functionality."
+      "Defer tasks 9 and 10 entirely from this plan — production hardening (HA scaling, CDN, TLS, RBAC, secret rotation, audit logging) is v2 scope; the E2E pipeline can be validated without production infra, and these 19 subtasks represent ~40% of the plan's bulk with zero v1 value. Remove the dependency chain requiring E2E completion (task 8) before hardening can begin — this sequencing alone proves they're post-launch concerns.",
+      "Collapse subtask 2002 (caching) into 2001 (resolve_agent_delegates implementation) — a module-level cache variable is 3 lines of code, not a standalone subtask. Similarly collapse 2004 (remove legacy label) into 2003 (integrate delegates into issueCreate), and collapse 10008 (security.md) into task 10's acceptance criteria rather than a separate subtask. These inflations obscure real work."
     ]
   }
 ]
