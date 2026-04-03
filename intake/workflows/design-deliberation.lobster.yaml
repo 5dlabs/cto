@@ -261,7 +261,7 @@ steps:
       if [ -n "$LINEAR_SID" ]; then
         WAIT_BODY="$(printf '## 🎨 Designer\n\n> *Awaiting your selections...*\n\n**%d design decision(s)** need your review.\nPlease select your preferred options above.\n\n*Timeout: %d minutes*' \
           "$ELICIT_COUNT" "$((TIMEOUT_SEC / 60))")"
-        intake-util linear-activity --session-id "$LINEAR_SID" --type thought --body "$WAIT_BODY" 2>/dev/null || true
+        intake-util linear-activity --session-id "$LINEAR_SID" --type thought --body "$WAIT_BODY" >/dev/null 2>/dev/null || true
       fi
       while [ "$ELAPSED" -lt "$TIMEOUT_SEC" ]; do
         if [ -f "$SELECTIONS_FILE" ]; then

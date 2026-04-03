@@ -43,31 +43,28 @@ steps:
     command: >
       root="${WORKSPACE:-.}";
       "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "expand-round-0" "${audio_debug}";
+      WS="${WORKSPACE:-.}";
+      mkdir -p "$WS/.intake/tmp";
+      OUT_FILE="$WS/.intake/tmp/expand-round-0.json";
       TF="${tasks_file}"; CF="${complexity_file}";
-      if [ -n "$TF" ] && [ -f "$TF" ]; then
-        ARGS=$(jq -n \
-          --rawfile prompt "$root/intake/prompts/expand-task-system.md" \
-          --rawfile tasks_raw "$TF" \
-          --rawfile complexity_raw "$CF" \
-          --arg schema "$root/intake/schemas/generated-task.schema.json" \
-          --arg provider "${model_primary_provider}" \
-          --arg model "${model_primary}" \
-          '{"prompt": $prompt,
-            "input": {"tasks": ($tasks_raw | fromjson), "complexity": ($complexity_raw | fromjson)},
-            "schema": $schema, "provider": $provider, "model": $model}');
+      if [ -n "$TF" ] && [ -f "$TF" ] && [ -n "$CF" ] && [ -f "$CF" ]; then
+        "$root/intake/scripts/expand-tasks-batched.sh" \
+          --tasks-file "$TF" \
+          --complexity-file "$CF" \
+          --provider "${model_primary_provider}" \
+          --model "${model_primary}" > "$OUT_FILE";
       else
-        ARGS=$(jq -n \
-          --rawfile prompt "$root/intake/prompts/expand-task-system.md" \
-          --argjson tasks "$(printf '%s' "${tasks}")" \
-          --argjson complexity "$(printf '%s' "${complexity}")" \
-          --arg schema "$root/intake/schemas/generated-task.schema.json" \
-          --arg provider "${model_primary_provider}" \
-          --arg model "${model_primary}" \
-          '{"prompt": $prompt,
-            "input": {"tasks": $tasks, "complexity": $complexity},
-            "schema": $schema, "provider": $provider, "model": $model}');
+        TMPF=$(mktemp); TMPC=$(mktemp);
+        printf '%s' "${tasks}" > "$TMPF";
+        printf '%s' "${complexity}" > "$TMPC";
+        "$root/intake/scripts/expand-tasks-batched.sh" \
+          --tasks-file "$TMPF" \
+          --complexity-file "$TMPC" \
+          --provider "${model_primary_provider}" \
+          --model "${model_primary}" > "$OUT_FILE";
+        rm -f "$TMPF" "$TMPC";
       fi;
-      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
+      printf '%s' "$OUT_FILE"
 
   - id: vote-round-0
     env:
@@ -77,9 +74,11 @@ steps:
       "$root/intake/scripts/workflow-step-audio.sh" "task-refinement" "vote-round-0" "${audio_debug}";
       WS="${WORKSPACE:-.}";
       mkdir -p "$WS/.intake/tmp";
-      printf '%s' "$CTO_EXPAND_R0" > "$WS/.intake/tmp/vote-content-r0.json";
+      CONTENT_FILE="$(printf '%s' "$CTO_EXPAND_R0")";
+      if [ ! -f "$CONTENT_FILE" ]; then
+        echo "vote-round-0: expansion output file not found: $CONTENT_FILE" >&2; exit 1; fi;
       "$root/intake/scripts/inline-vote.sh" \
-        "$WS/.intake/tmp/vote-content-r0.json" \
+        "$CONTENT_FILE" \
         "${evaluation_criteria}" \
         "${voter_1_provider}" "${voter_1_model}" \
         "${voter_2_provider}" "${voter_2_model}" \
@@ -109,13 +108,16 @@ steps:
       TF="${tasks_file}"; CF="${complexity_file}";
       WS="${WORKSPACE:-.}";
       mkdir -p "$WS/.intake/tmp";
-      printf '%s' "$CTO_EXPAND_R0" > "$WS/.intake/tmp/expand-r0-for-r1.json";
-      if [ -n "$TF" ] && [ -f "$TF" ]; then
+      PREVIOUS_FILE="$(printf '%s' "$CTO_EXPAND_R0")";
+      if [ ! -f "$PREVIOUS_FILE" ]; then
+        echo "expand-round-1: previous expansion output file not found: $PREVIOUS_FILE" >&2; exit 1; fi;
+      OUT_FILE="$WS/.intake/tmp/expand-round-1.json";
+      if [ -n "$TF" ] && [ -f "$TF" ] && [ -n "$CF" ] && [ -f "$CF" ]; then
         ARGS=$(jq -n \
           --rawfile prompt "$root/intake/prompts/expand-task-system.md" \
           --rawfile tasks_raw "$TF" \
           --rawfile complexity_raw "$CF" \
-          --rawfile previous "$WS/.intake/tmp/expand-r0-for-r1.json" \
+          --rawfile previous "$PREVIOUS_FILE" \
           --argjson revision_suggestions "$(printf '%s' "$CTO_CHECK_R0" | jq '.suggestions')" \
           --argjson revision_round "1" \
           --arg additional_context "This is revision round 1. The 5-model voting committee flagged issues with the previous expansion. Address the suggestions below while preserving what worked well." \
@@ -134,7 +136,7 @@ steps:
           --rawfile prompt "$root/intake/prompts/expand-task-system.md" \
           --argjson tasks "$(printf '%s' "${tasks}")" \
           --argjson complexity "$(printf '%s' "${complexity}")" \
-          --argjson previous "$(printf '%s' "$CTO_EXPAND_R0")" \
+          --rawfile previous "$PREVIOUS_FILE" \
           --argjson revision_suggestions "$(printf '%s' "$CTO_CHECK_R0" | jq '.suggestions')" \
           --argjson revision_round "1" \
           --arg additional_context "This is revision round 1. The 5-model voting committee flagged issues with the previous expansion. Address the suggestions below while preserving what worked well." \
@@ -144,12 +146,13 @@ steps:
           '{"prompt": $prompt,
             "input": {
               "tasks": $tasks, "complexity": $complexity,
-              "previous_expansion": $previous, "revision_suggestions": $revision_suggestions,
+              "previous_expansion": ($previous | fromjson), "revision_suggestions": $revision_suggestions,
               "revision_round": $revision_round, "additional_context": $additional_context
             },
             "schema": $schema, "provider": $provider, "model": $model}');
       fi;
-      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS" > "$OUT_FILE";
+      printf '%s' "$OUT_FILE"
 
   - id: vote-round-1
     env:
@@ -163,9 +166,11 @@ steps:
         printf '%s' "$CTO_VOTE_R0"; exit 0; fi;
       WS="${WORKSPACE:-.}";
       mkdir -p "$WS/.intake/tmp";
-      printf '%s' "$CTO_EXPAND_R1" > "$WS/.intake/tmp/vote-content-r1.json";
+      CONTENT_FILE="$(printf '%s' "$CTO_EXPAND_R1")";
+      if [ ! -f "$CONTENT_FILE" ]; then
+        echo "vote-round-1: expansion output file not found: $CONTENT_FILE" >&2; exit 1; fi;
       "$root/intake/scripts/inline-vote.sh" \
-        "$WS/.intake/tmp/vote-content-r1.json" \
+        "$CONTENT_FILE" \
         "${evaluation_criteria}" \
         "${voter_1_provider}" "${voter_1_model}" \
         "${voter_2_provider}" "${voter_2_model}" \
@@ -200,13 +205,16 @@ steps:
       TF="${tasks_file}"; CF="${complexity_file}";
       WS="${WORKSPACE:-.}";
       mkdir -p "$WS/.intake/tmp";
-      printf '%s' "$CTO_EXPAND_R1" > "$WS/.intake/tmp/expand-r1-for-r2.json";
-      if [ -n "$TF" ] && [ -f "$TF" ]; then
+      PREVIOUS_FILE="$(printf '%s' "$CTO_EXPAND_R1")";
+      if [ ! -f "$PREVIOUS_FILE" ]; then
+        echo "expand-round-2: previous expansion output file not found: $PREVIOUS_FILE" >&2; exit 1; fi;
+      OUT_FILE="$WS/.intake/tmp/expand-round-2.json";
+      if [ -n "$TF" ] && [ -f "$TF" ] && [ -n "$CF" ] && [ -f "$CF" ]; then
         ARGS=$(jq -n \
           --rawfile prompt "$root/intake/prompts/expand-task-system.md" \
           --rawfile tasks_raw "$TF" \
           --rawfile complexity_raw "$CF" \
-          --rawfile previous "$WS/.intake/tmp/expand-r1-for-r2.json" \
+          --rawfile previous "$PREVIOUS_FILE" \
           --argjson revision_suggestions "$(printf '%s' "$CTO_CHECK_R1" | jq '.suggestions')" \
           --argjson revision_round "2" \
           --arg additional_context "This is revision round 2 (final). The committee still has concerns. Make targeted fixes for the specific issues raised — do not restructure the entire decomposition." \
@@ -225,7 +233,7 @@ steps:
           --rawfile prompt "$root/intake/prompts/expand-task-system.md" \
           --argjson tasks "$(printf '%s' "${tasks}")" \
           --argjson complexity "$(printf '%s' "${complexity}")" \
-          --argjson previous "$(printf '%s' "$CTO_EXPAND_R1")" \
+          --rawfile previous "$PREVIOUS_FILE" \
           --argjson revision_suggestions "$(printf '%s' "$CTO_CHECK_R1" | jq '.suggestions')" \
           --argjson revision_round "2" \
           --arg additional_context "This is revision round 2 (final). The committee still has concerns. Make targeted fixes for the specific issues raised — do not restructure the entire decomposition." \
@@ -235,12 +243,13 @@ steps:
           '{"prompt": $prompt,
             "input": {
               "tasks": $tasks, "complexity": $complexity,
-              "previous_expansion": $previous, "revision_suggestions": $revision_suggestions,
+              "previous_expansion": ($previous | fromjson), "revision_suggestions": $revision_suggestions,
               "revision_round": $revision_round, "additional_context": $additional_context
             },
             "schema": $schema, "provider": $provider, "model": $model}');
       fi;
-      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS" > "$OUT_FILE";
+      printf '%s' "$OUT_FILE"
 
   - id: vote-round-2
     env:
@@ -256,9 +265,11 @@ steps:
         printf '%s' "$CTO_VOTE_R1"; exit 0; fi;
       WS="${WORKSPACE:-.}";
       mkdir -p "$WS/.intake/tmp";
-      printf '%s' "$CTO_EXPAND_R2" > "$WS/.intake/tmp/vote-content-r2.json";
+      CONTENT_FILE="$(printf '%s' "$CTO_EXPAND_R2")";
+      if [ ! -f "$CONTENT_FILE" ]; then
+        echo "vote-round-2: expansion output file not found: $CONTENT_FILE" >&2; exit 1; fi;
       "$root/intake/scripts/inline-vote.sh" \
-        "$WS/.intake/tmp/vote-content-r2.json" \
+        "$CONTENT_FILE" \
         "${evaluation_criteria}" \
         "${voter_1_provider}" "${voter_1_model}" \
         "${voter_2_provider}" "${voter_2_model}" \
@@ -297,23 +308,46 @@ steps:
       ROUND_0=$(printf '%s' "$CTO_CHECK_R0") &&
       if [ "${max_revisions}" -ge 2 ] 2>/dev/null && [ -n "$ROUND_2" ] &&
         printf '%s' "$ROUND_2" | jq -e '(.round == 2)' >/dev/null 2>&1; then
-        FINAL_TASKS=$(printf '%s' "$CTO_EXPAND_R2") &&
-        FINAL_VOTE="$ROUND_2" && REVISION_COUNT=2
+        FINAL_TASKS_FILE=$(printf '%s' "$CTO_EXPAND_R2") &&
+        FINAL_VOTE="$ROUND_2" && REVISION_COUNT=2;
       elif [ -n "$ROUND_1" ] &&
         printf '%s' "$ROUND_1" | jq -e '(.round == 1)' >/dev/null 2>&1; then
-        FINAL_TASKS=$(printf '%s' "$CTO_EXPAND_R1") &&
-        FINAL_VOTE="$ROUND_1" && REVISION_COUNT=1
+        FINAL_TASKS_FILE=$(printf '%s' "$CTO_EXPAND_R1") &&
+        FINAL_VOTE="$ROUND_1" && REVISION_COUNT=1;
       else
-        FINAL_TASKS=$(printf '%s' "$CTO_EXPAND_R0") &&
-        FINAL_VOTE="$ROUND_0" && REVISION_COUNT=0
+        FINAL_TASKS_FILE=$(printf '%s' "$CTO_EXPAND_R0") &&
+        FINAL_VOTE="$ROUND_0" && REVISION_COUNT=0;
       fi &&
       VERDICT=$(printf '%s' "$FINAL_VOTE" | jq -r '.verdict') &&
       WARN="" &&
       if [ "$VERDICT" != "approve" ]; then
-        WARN="WARNING: Task decomposition proceeded after ${REVISION_COUNT} revision(s) without full committee approval (verdict: ${VERDICT}). Review carefully."
+        WARN="WARNING: Task decomposition proceeded after ${REVISION_COUNT} revision(s) without full committee approval (verdict: ${VERDICT}). Review carefully.";
       fi &&
       WS="${WORKSPACE:-.}" &&
       mkdir -p "$WS/.intake/tmp" &&
+      DEBUG_DIR="$WS/.intake/tmp/task-refinement-debug" &&
+      mkdir -p "$DEBUG_DIR" &&
+      cp "$(printf '%s' "$CTO_EXPAND_R0")" "$DEBUG_DIR/expand-round-0.json" &&
+      cp "$(printf '%s' "$CTO_EXPAND_R1")" "$DEBUG_DIR/expand-round-1.json" &&
+      cp "$(printf '%s' "$CTO_EXPAND_R2")" "$DEBUG_DIR/expand-round-2.json" &&
+      printf '%s' "$ROUND_0" > "$DEBUG_DIR/check-round-0.json" &&
+      printf '%s' "$ROUND_1" > "$DEBUG_DIR/check-round-1.json" &&
+      printf '%s' "$ROUND_2" > "$DEBUG_DIR/check-round-2.json" &&
+      if [ ! -f "$FINAL_TASKS_FILE" ]; then
+        echo "resolve-output: FATAL — final expansion output file not found: $FINAL_TASKS_FILE" >&2 &&
+        exit 1;
+      fi &&
+      if [ -n "${tasks_file}" ] && [ -f "${tasks_file}" ]; then
+        EXPECTED_TASKS="$(jq 'length' "${tasks_file}" 2>/dev/null)";
+      else
+        EXPECTED_TASKS="$(printf '%s' "${tasks}" | jq 'length' 2>/dev/null)";
+      fi &&
+      FINAL_TASKS="$(cat "$FINAL_TASKS_FILE")" &&
+      if ! printf '%s' "$FINAL_TASKS" | jq -e 'type=="array"' >/dev/null 2>&1; then
+        echo "resolve-output: FATAL — expansion output was not a valid task array" >&2 &&
+        printf 'resolve-output preview: %.500s\n' "$FINAL_TASKS" >&2 &&
+        exit 1;
+      fi &&
       FINAL_TASKS="$(printf '%s' "$FINAL_TASKS" | jq -c '
         def parse_flat_subtasks:
           reduce .[] as $item (
@@ -372,10 +406,22 @@ steps:
                 normalize_subtask_objects(.subtasks)
               )
             }
-        )' 2>/dev/null || echo '[]')" &&
+        )')" || {
+          echo "resolve-output: FATAL — malformed expansion JSON could not be normalized" >&2
+          printf 'resolve-output preview: %.500s\n' "$FINAL_TASKS" >&2
+          exit 1
+        } &&
       printf '%s' "$FINAL_TASKS" > "$WS/.intake/tmp/refined-expanded-tasks.json" &&
+      FINAL_TASK_COUNT="$(printf '%s' "$FINAL_TASKS" | jq 'length' 2>/dev/null)" &&
+      if [ "$FINAL_TASK_COUNT" != "$EXPECTED_TASKS" ]; then
+        echo "resolve-output: FATAL — expected $EXPECTED_TASKS expanded tasks but got $FINAL_TASK_COUNT" >&2 &&
+        exit 1
+      fi &&
       REQUIRE_SUBTASKS="${INTAKE_REQUIRE_SUBTASKS:-true}" &&
-      TOTAL_SUBTASKS="$(printf '%s' "$FINAL_TASKS" | jq '[.[] | (.subtasks // []) | length] | add // 0' 2>/dev/null || echo 0)" &&
+      TOTAL_SUBTASKS="$(printf '%s' "$FINAL_TASKS" | jq '[.[] | (.subtasks // []) | length] | add // 0' 2>/dev/null)" || {
+        echo "resolve-output: FATAL — could not count subtasks from normalized expansion output" >&2
+        exit 1
+      } &&
       if [ "$REQUIRE_SUBTASKS" = "true" ] || [ "$REQUIRE_SUBTASKS" = "1" ]; then
         if [ "$TOTAL_SUBTASKS" = "0" ]; then
           echo "resolve-output: FATAL — no subtasks generated in refinement output" >&2

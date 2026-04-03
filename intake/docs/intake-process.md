@@ -106,9 +106,11 @@ This context feeds into both the deliberation debate and the parse-prd step so a
 
 **Workflow**: `deliberation.lobster.yaml`
 
-#### Step 1: Research (Tavily)
+#### Step 1: Research (multi-source)
 
-Fires targeted web searches to build evidence memos for each debate position. Produces an optimist memo (best practices, scaling patterns, modern approaches) and a pessimist memo (failure modes, operational risks, technology traps).
+Fires targeted research across multiple providers to build evidence memos for each debate position. Produces an optimist memo (best practices, scaling patterns, modern approaches) and a pessimist memo (failure modes, operational risks, technology traps).
+
+Current sources include Tavily, Exa, Perplexity, Grok/X, Dataverse, Firecrawl deep extracts, and an optional Hermes pass via the Nous inference API when `NOUS_API_KEY` is set.
 
 #### Step 2: Debate
 

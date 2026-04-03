@@ -7,6 +7,7 @@ INPUT_FILE=""
 MIN_SCORE="${INTAKE_QUALITY_GATE_MIN_SCORE:-7}"
 PROVIDER="${INTAKE_QUALITY_GATE_PROVIDER:-}"
 MODEL="${INTAKE_QUALITY_GATE_MODEL:-}"
+PROMPT_FILE=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -15,9 +16,12 @@ while [ $# -gt 0 ]; do
     --min-score) MIN_SCORE="${2:-7}"; shift 2 ;;
     --provider) PROVIDER="${2:-}"; shift 2 ;;
     --model) MODEL="${2:-}"; shift 2 ;;
+    --prompt) PROMPT_FILE="${2:-}"; shift 2 ;;
     *) echo "quality-gate: unknown arg: $1" >&2; exit 2 ;;
   esac
 done
+
+PROMPT_FILE="${PROMPT_FILE:-$ROOT/intake/prompts/quality-gate-system.md}"
 
 if [ -z "$STAGE" ] || [ -z "$INPUT_FILE" ]; then
   echo "quality-gate: usage: --stage <stage> --input-file <file> [--min-score N] [--provider p --model m]" >&2
@@ -57,7 +61,7 @@ print(json.dumps(payload))
 PY
 
 ARGS="$(jq -n \
-  --rawfile prompt "$ROOT/intake/prompts/quality-gate-system.md" \
+  --rawfile prompt "$PROMPT_FILE" \
   --rawfile gate_input "$TMP_INPUT" \
   --arg schema "$ROOT/intake/schemas/quality-gate.schema.json" \
   --arg provider "$PROVIDER" \
