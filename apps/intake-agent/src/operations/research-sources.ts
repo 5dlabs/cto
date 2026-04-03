@@ -8,6 +8,7 @@
  *   - Exa: Neural semantic search (requires EXA_API_KEY)
  *   - Perplexity: Synthesized analysis via sonar-pro (requires PERPLEXITY_API_KEY)
  *   - Firecrawl: Deep page extraction to markdown (requires FIRECRAWL_API_KEY)
+ *   - Nous/Hermes: synthesized research analysis (requires NOUS_API_KEY)
  *   - Tavily: Already implemented in prd-research.ts
  *   - Grok/X: Real-time social signal intelligence (requires GROK_API_KEY or XAI_API_KEY)
  *   - Dataverse/SN13: Real-time social signal intelligence (requires MC_API or MACROCOSMOS_API_KEY)
@@ -94,7 +95,7 @@ export async function exaSearch(query: string): Promise<ResearchResult[]> {
 // Prefers OpenRouter (OPENROUTER_API_KEY), falls back to direct Perplexity API.
 // ---------------------------------------------------------------------------
 
-interface PerplexityResponse {
+interface ChatCompletionResponse {
   choices?: Array<{
     message?: {
       content?: string;
@@ -144,10 +145,60 @@ export async function perplexityAsk(question: string): Promise<string> {
       return '';
     }
 
-    const data = (await resp.json()) as PerplexityResponse;
+    const data = (await resp.json()) as ChatCompletionResponse;
     return data.choices?.[0]?.message?.content ?? '';
   } catch (err) {
     console.error('[RESEARCH-SOURCES] Perplexity query error:', err);
+    return '';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Nous/Hermes — synthesized research analysis
+// OpenAI-compatible chat completions API.
+// ---------------------------------------------------------------------------
+
+/**
+ * Ask Hermes for a synthesized research analysis.
+ * Returns empty string if neither NOUS_API_KEY nor HERMES_API_KEY is set.
+ */
+export async function hermesAnalyze(question: string): Promise<string> {
+  const apiKey = process.env['NOUS_API_KEY'] ?? process.env['HERMES_API_KEY'];
+  if (!apiKey) {
+    console.error('[RESEARCH-SOURCES] NOUS_API_KEY/HERMES_API_KEY not set — skipping Hermes query');
+    return '';
+  }
+
+  const baseUrl = (process.env['NOUS_BASE_URL'] ?? 'https://inference-api.nousresearch.com/v1').replace(/\/$/, '');
+  const model = process.env['NOUS_MODEL'] ?? process.env['HERMES_MODEL'] ?? 'nousresearch/hermes-4-70b';
+
+  console.error(`[RESEARCH-SOURCES] Hermes query via ${baseUrl} using model ${model}`);
+
+  try {
+    const resp = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: question }],
+        temperature: 0.2,
+        max_tokens: 1600,
+      }),
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error(`[RESEARCH-SOURCES] Hermes query failed (${resp.status}): ${text}`);
+      return '';
+    }
+
+    const data = (await resp.json()) as ChatCompletionResponse;
+    return data.choices?.[0]?.message?.content ?? '';
+  } catch (err) {
+    console.error('[RESEARCH-SOURCES] Hermes query error:', err);
     return '';
   }
 }

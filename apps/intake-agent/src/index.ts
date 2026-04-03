@@ -6,7 +6,7 @@
  *
  * Remaining operations (everything else is now handled by Lobster workflows):
  *   - ping           — health check
- *   - prd_research    — multi-source research APIs (Exa/Perplexity/Tavily/Firecrawl)
+ *   - prd_research    — multi-source research APIs (Exa/Perplexity/Hermes/Tavily/Firecrawl)
  *   - design_intake   — design input normalization + frontend detection + optional Stitch generation
  *
  * Deliberation is now a full Lobster workflow (deliberation.lobster.yaml).
@@ -85,7 +85,7 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
         data: memos,
         usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
         model: 'multi-source',
-        provider: 'exa+perplexity+tavily+firecrawl',
+        provider: 'exa+perplexity+hermes+tavily+firecrawl',
       };
     }
 
