@@ -19,6 +19,8 @@ use subtle::ConstantTimeEq;
 use tracing::{debug, error, info, warn};
 
 use super::callbacks::CallbackState;
+use crate::config::WebhookDispatchMode;
+use crate::morgan_hooks::{dispatch_to_morgan, MorganWebhookDispatch};
 
 // =============================================================================
 // Types
@@ -143,6 +145,73 @@ struct NoteIssueRef {
 // Handler
 // =============================================================================
 
+async fn maybe_dispatch_gitlab_webhook_to_morgan(
+    state: &CallbackState,
+    event_type: &str,
+    payload: &Value,
+) -> Result<Option<Json<Value>>, StatusCode> {
+    let dispatch_mode = state.morgan_dispatch.mode;
+    if !dispatch_mode.dispatches_to_morgan() {
+        return Ok(None);
+    }
+
+    let mut labels = vec![("gitlab_event", event_type.to_string())];
+    if let Some(kind) = payload.get("object_kind").and_then(Value::as_str) {
+        labels.push(("object_kind", kind.to_string()));
+    }
+    if let Some(project) = payload
+        .pointer("/project/path_with_namespace")
+        .and_then(Value::as_str)
+    {
+        labels.push(("project", project.to_string()));
+    }
+
+    let dispatch = MorganWebhookDispatch {
+        source: "gitlab",
+        route: "/webhooks/gitlab/events",
+        event_type: event_type.to_string(),
+        delivery_id: payload
+            .pointer("/object_attributes/id")
+            .and_then(Value::as_u64)
+            .map(|id| id.to_string()),
+        verified: state.gitlab_webhook_secret.is_some(),
+        labels,
+        payload: payload.clone(),
+    };
+
+    match dispatch_to_morgan(&state.http_client, &state.morgan_dispatch, &dispatch).await {
+        Ok(accepted) => {
+            info!(
+                session_key = %accepted.session_key,
+                agent_id = %accepted.agent_id,
+                "Forwarded GitLab webhook to Morgan"
+            );
+
+            if dispatch_mode == WebhookDispatchMode::Morgan {
+                return Ok(Some(Json(json!({
+                    "status": "accepted",
+                    "dispatch": "morgan",
+                    "source": "gitlab",
+                    "event_type": event_type,
+                    "session_key": accepted.session_key,
+                    "agent_id": accepted.agent_id
+                }))));
+            }
+
+            Ok(None)
+        }
+        Err(e) => {
+            if dispatch_mode == WebhookDispatchMode::Shadow {
+                warn!(error = %e, "Failed to shadow-dispatch GitLab webhook to Morgan");
+                Ok(None)
+            } else {
+                error!(error = %e, "Failed to dispatch GitLab webhook to Morgan");
+                Err(StatusCode::BAD_GATEWAY)
+            }
+        }
+    }
+}
+
 /// Handle incoming GitLab webhook events.
 pub async fn handle_gitlab_events(
     State(state): State<Arc<CallbackState>>,
@@ -162,14 +231,21 @@ pub async fn handle_gitlab_events(
             .get("X-Gitlab-Token")
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
-        if !bool::from(
-            provided_token
-                .as_bytes()
-                .ct_eq(expected_secret.as_bytes()),
-        ) {
+        if !bool::from(provided_token.as_bytes().ct_eq(expected_secret.as_bytes())) {
             warn!("GitLab webhook token verification failed");
             return Err(StatusCode::UNAUTHORIZED);
         }
+    }
+
+    let payload: Value = serde_json::from_slice(&body).map_err(|e| {
+        error!(error = %e, "Failed to parse GitLab webhook payload");
+        StatusCode::BAD_REQUEST
+    })?;
+
+    if let Some(response) =
+        maybe_dispatch_gitlab_webhook_to_morgan(&state, event_type, &payload).await?
+    {
+        return Ok(response);
     }
 
     // Route by event type
@@ -197,7 +273,11 @@ async fn handle_merge_request_event(
         StatusCode::BAD_REQUEST
     })?;
 
-    let action = event.object_attributes.action.as_deref().unwrap_or("unknown");
+    let action = event
+        .object_attributes
+        .action
+        .as_deref()
+        .unwrap_or("unknown");
     info!(
         action = %action,
         mr_iid = event.object_attributes.iid,
@@ -319,10 +399,7 @@ async fn handle_intake_mr_merged(
 }
 
 /// Handle GitLab pipeline events (parallel to GitHub check_run).
-fn handle_pipeline_event(
-    _state: &CallbackState,
-    body: &[u8],
-) -> Result<Json<Value>, StatusCode> {
+fn handle_pipeline_event(_state: &CallbackState, body: &[u8]) -> Result<Json<Value>, StatusCode> {
     let event: PipelineEvent = serde_json::from_slice(body).map_err(|e| {
         error!(error = %e, "Failed to parse GitLab pipeline event");
         StatusCode::BAD_REQUEST
@@ -360,10 +437,7 @@ fn handle_pipeline_event(
 }
 
 /// Handle GitLab note (comment) events (parallel to GitHub issue_comment).
-fn handle_note_event(
-    _state: &CallbackState,
-    body: &[u8],
-) -> Result<Json<Value>, StatusCode> {
+fn handle_note_event(_state: &CallbackState, body: &[u8]) -> Result<Json<Value>, StatusCode> {
     let event: NoteEvent = serde_json::from_slice(body).map_err(|e| {
         error!(error = %e, "Failed to parse GitLab note event");
         StatusCode::BAD_REQUEST

@@ -3,9 +3,10 @@
 //! This module handles the OAuth authorization callback from Linear,
 //! exchanging authorization codes for access tokens and refreshing them.
 
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
+use axum::Json;
 use base64::Engine;
 use chrono::Utc;
 use k8s_openapi::api::core::v1::Secret;
@@ -15,6 +16,15 @@ use serde_json::json;
 use tracing::{debug, error, info, warn};
 
 use crate::server::AppState;
+
+const DEFAULT_CLIENT_CREDENTIALS_SCOPE: &str = "read,write,issues:create,comments:create";
+
+fn client_credentials_scope() -> String {
+    std::env::var("LINEAR_CLIENT_CREDENTIALS_SCOPE")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| DEFAULT_CLIENT_CREDENTIALS_SCOPE.to_string())
+}
 
 /// Query parameters from OAuth callback.
 #[derive(Debug, Deserialize)]
@@ -437,6 +447,429 @@ pub async fn refresh_access_token(
                 "Token refresh failed with status {status}: {error_body}"
             ))
         }
+    }
+}
+
+/// Mint an access token using the OAuth client_credentials flow.
+///
+/// This is the preferred non-interactive flow for service-style agent apps that
+/// do not rely on per-user browser authorization.
+pub async fn mint_client_credentials_token(
+    client_id: &str,
+    client_secret: &str,
+) -> Result<TokenResponse, String> {
+    let client = reqwest::Client::new();
+    let scope = client_credentials_scope();
+
+    let params = [
+        ("grant_type", "client_credentials"),
+        ("scope", scope.as_str()),
+        ("client_id", client_id),
+        ("client_secret", client_secret),
+    ];
+
+    debug!(
+        client_id = %client_id,
+        scope = %scope,
+        "Minting access token via client_credentials"
+    );
+
+    let response = client
+        .post("https://api.linear.app/oauth/token")
+        .form(&params)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {e}"))?;
+
+    let status = response.status();
+
+    if status.is_success() {
+        let token_response: TokenResponse = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse token response: {e}"))?;
+
+        debug!(
+            expires_in = ?token_response.expires_in,
+            "client_credentials token mint successful"
+        );
+
+        Ok(token_response)
+    } else {
+        let error_body = response.text().await.unwrap_or_default();
+
+        if let Ok(error_response) = serde_json::from_str::<TokenErrorResponse>(&error_body) {
+            Err(format!(
+                "client_credentials token mint failed: {} ({})",
+                error_response.error,
+                error_response.error_description.unwrap_or_default()
+            ))
+        } else {
+            Err(format!(
+                "client_credentials token mint failed with status {status}: {error_body}"
+            ))
+        }
+    }
+}
+
+/// Manually mint and persist a client_credentials token for a single agent.
+///
+/// This is the preferred operational path for service-style agent apps:
+/// read the per-agent client credentials from config, mint a fresh access
+/// token, store it in Kubernetes, and update PM's in-memory config.
+pub async fn handle_oauth_mint(
+    State(state): State<AppState>,
+    Path(agent): Path<String>,
+) -> impl IntoResponse {
+    info!(agent = %agent, "Manual client_credentials mint requested");
+
+    let (client_id, client_secret, can_mint) = {
+        let linear_config = match state.config.linear.read() {
+            Ok(config) => config,
+            Err(e) => {
+                error!(error = %e, "Failed to acquire read lock on linear config");
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({
+                        "status": "error",
+                        "agent": agent,
+                        "error": format!("Failed to read configuration: {e}"),
+                    })),
+                )
+                    .into_response();
+            }
+        };
+
+        let Some(app_config) = linear_config.get_app(&agent) else {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({
+                    "status": "error",
+                    "agent": agent,
+                    "error": format!("Agent '{agent}' is not configured"),
+                })),
+            )
+                .into_response();
+        };
+
+        (
+            app_config.client_id.clone(),
+            app_config.client_secret.clone(),
+            app_config.can_mint_client_credentials(),
+        )
+    };
+
+    if !can_mint {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "status": "error",
+                "agent": agent,
+                "mode": "client_credentials",
+                "error": format!(
+                    "Agent '{agent}' does not have client_credentials configured"
+                ),
+            })),
+        )
+            .into_response();
+    }
+
+    match mint_client_credentials_token(&client_id, &client_secret).await {
+        Ok(token_response) => {
+            let expires_at = token_response
+                .expires_in
+                .map(|secs| Utc::now().timestamp() + secs);
+
+            match store_access_token(
+                &state.kube_client,
+                &state.config.namespace,
+                &agent,
+                &token_response.access_token,
+                None,
+                token_response.expires_in,
+            )
+            .await
+            {
+                Ok(()) => {
+                    if let Ok(mut linear_config) = state.config.linear.write() {
+                        linear_config.update_tokens(
+                            &agent,
+                            &token_response.access_token,
+                            None,
+                            token_response.expires_in,
+                        );
+                    } else {
+                        warn!(
+                            agent = %agent,
+                            "Minted token was stored in Kubernetes but in-memory config update failed"
+                        );
+                    }
+
+                    (
+                        StatusCode::OK,
+                        Json(json!({
+                            "status": "ok",
+                            "agent": agent,
+                            "mode": "client_credentials",
+                            "stored_in": format!("linear-app-{}", agent.to_lowercase()),
+                            "expires_in": token_response.expires_in,
+                            "expires_at": expires_at,
+                        })),
+                    )
+                        .into_response()
+                }
+                Err(e) => {
+                    error!(agent = %agent, error = %e, "Failed to store minted token");
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({
+                            "status": "error",
+                            "agent": agent,
+                            "mode": "client_credentials",
+                            "error": format!("Token minted but storage failed: {e}"),
+                        })),
+                    )
+                        .into_response()
+                }
+            }
+        }
+        Err(e) => {
+            error!(agent = %agent, error = %e, "client_credentials mint failed");
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "status": "error",
+                    "agent": agent,
+                    "mode": "client_credentials",
+                    "error": e,
+                })),
+            )
+                .into_response()
+        }
+    }
+}
+
+/// Manually mint and persist client_credentials tokens for every configured agent.
+pub async fn handle_oauth_mint_all(State(state): State<AppState>) -> impl IntoResponse {
+    info!("Bulk client_credentials mint requested");
+
+    let apps = {
+        let linear_config = match state.config.linear.read() {
+            Ok(config) => config,
+            Err(e) => {
+                error!(error = %e, "Failed to acquire read lock on linear config");
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({
+                        "status": "error",
+                        "error": format!("Failed to read configuration: {e}"),
+                    })),
+                )
+                    .into_response();
+            }
+        };
+
+        linear_config
+            .apps
+            .iter()
+            .map(|(agent, app)| {
+                (
+                    agent.clone(),
+                    app.client_id.clone(),
+                    app.client_secret.clone(),
+                    app.can_mint_client_credentials(),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+
+    let mut minted = 0;
+    let mut skipped = 0;
+    let mut failed = 0;
+    let mut results = Vec::with_capacity(apps.len());
+
+    for (agent, client_id, client_secret, can_mint) in apps {
+        if !can_mint {
+            skipped += 1;
+            results.push(json!({
+                "agent": agent,
+                "status": "skipped",
+                "mode": "client_credentials",
+                "reason": "missing client_id/client_secret",
+            }));
+            continue;
+        }
+
+        match mint_client_credentials_token(&client_id, &client_secret).await {
+            Ok(token_response) => {
+                let expires_at = token_response
+                    .expires_in
+                    .map(|secs| Utc::now().timestamp() + secs);
+
+                match store_access_token(
+                    &state.kube_client,
+                    &state.config.namespace,
+                    &agent,
+                    &token_response.access_token,
+                    None,
+                    token_response.expires_in,
+                )
+                .await
+                {
+                    Ok(()) => {
+                        if let Ok(mut linear_config) = state.config.linear.write() {
+                            linear_config.update_tokens(
+                                &agent,
+                                &token_response.access_token,
+                                None,
+                                token_response.expires_in,
+                            );
+                        } else {
+                            warn!(
+                                agent = %agent,
+                                "Bulk mint stored token in Kubernetes but in-memory config update failed"
+                            );
+                        }
+
+                        minted += 1;
+                        results.push(json!({
+                            "agent": agent,
+                            "status": "minted",
+                            "mode": "client_credentials",
+                            "stored_in": format!("linear-app-{}", agent.to_lowercase()),
+                            "expires_in": token_response.expires_in,
+                            "expires_at": expires_at,
+                        }));
+                    }
+                    Err(e) => {
+                        failed += 1;
+                        results.push(json!({
+                            "agent": agent,
+                            "status": "error",
+                            "mode": "client_credentials",
+                            "error": format!("Token minted but storage failed: {e}"),
+                        }));
+                    }
+                }
+            }
+            Err(e) => {
+                failed += 1;
+                results.push(json!({
+                    "agent": agent,
+                    "status": "error",
+                    "mode": "client_credentials",
+                    "error": e,
+                }));
+            }
+        }
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "status": "ok",
+            "mode": "client_credentials",
+            "counts": {
+                "minted": minted,
+                "skipped": skipped,
+                "failed": failed,
+            },
+            "results": results,
+        })),
+    )
+        .into_response()
+}
+
+/// Retrieve the current valid access token for an agent.
+///
+/// Uses the same auto-refresh/mint logic as internal agent client resolution.
+/// Returns the token if available, or an error if the agent isn't configured
+/// or has no valid token.
+pub async fn handle_oauth_token(
+    State(state): State<AppState>,
+    Path(agent): Path<String>,
+) -> impl IntoResponse {
+    info!(agent = %agent, "Token retrieval requested");
+
+    // Use the same resolution path as internal agent operations
+    match crate::server::get_agent_client_with_refresh(
+        &state.config,
+        &state.kube_client,
+        &agent,
+    )
+    .await
+    {
+        Some(client) => {
+            // Read the token from the in-memory config (now refreshed if needed)
+            let token_info = {
+                let linear_config = match state.config.linear.read() {
+                    Ok(config) => config,
+                    Err(e) => {
+                        error!(error = %e, "Failed to read config after refresh");
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({
+                                "status": "error",
+                                "agent": agent,
+                                "error": "Failed to read configuration",
+                            })),
+                        )
+                            .into_response();
+                    }
+                };
+                let app = linear_config.get_app(&agent);
+                app.map(|a| {
+                    (
+                        a.access_token.clone(),
+                        a.expires_at,
+                        a.is_token_expired(),
+                    )
+                })
+            };
+
+            match token_info {
+                Some((Some(token), expires_at, expired)) if !expired => {
+                    // Also resolve the agent's Linear user ID via viewer query
+                    let viewer_id = match client.get_viewer().await {
+                        Ok(viewer) => Some(viewer.id),
+                        Err(e) => {
+                            warn!(agent = %agent, error = %e, "Failed to resolve viewer ID");
+                            None
+                        }
+                    };
+
+                    (
+                        StatusCode::OK,
+                        Json(json!({
+                            "status": "ok",
+                            "agent": agent,
+                            "access_token": token,
+                            "expires_at": expires_at,
+                            "linear_user_id": viewer_id,
+                        })),
+                    )
+                        .into_response()
+                }
+                _ => (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(json!({
+                        "status": "error",
+                        "agent": agent,
+                        "error": "Token not available or expired after refresh attempt",
+                    })),
+                )
+                    .into_response(),
+            }
+        }
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(json!({
+                "status": "error",
+                "agent": agent,
+                "error": format!("Agent '{}' is not configured or has no usable credentials", agent),
+            })),
+        )
+            .into_response(),
     }
 }
 

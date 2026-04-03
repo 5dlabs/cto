@@ -93,7 +93,7 @@ spec:
                   key: secret  # pragma: allowlist secret
                   optional: true
             # Linear OAuth App credentials for each agent
-            {{- $agents := list "morgan" "rex" "blaze" "grizz" "nova" "tap" "spark" "cleo" "cipher" "tess" "atlas" "bolt" "stitch" "vex" "angie" }}
+            {{- $agents := list "morgan" "rex" "blaze" "grizz" "nova" "tap" "spark" "cleo" "cipher" "tess" "atlas" "bolt" "stitch" "vex" "angie" "pixel" }}
             {{- range $agents }}
             {{- $upper := . | upper }}
             - name: LINEAR_APP_{{ $upper }}_CLIENT_ID
@@ -119,6 +119,12 @@ spec:
                 secretKeyRef:
                   name: linear-app-{{ . }}
                   key: access_token
+                  optional: true
+            - name: LINEAR_APP_{{ $upper }}_EXPIRES_AT
+              valueFrom:
+                secretKeyRef:
+                  name: linear-app-{{ . }}
+                  key: expires_at
                   optional: true
             {{- end }}
           envFrom:

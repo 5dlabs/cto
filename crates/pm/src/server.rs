@@ -17,7 +17,7 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 use crate::activities::{PlanStep, PlanStepStatus};
-use crate::config::Config;
+use crate::config::{Config, WebhookDispatchMode};
 use crate::emitter::{AgentActivityEmitter, LinearAgentEmitter};
 use crate::handlers::callbacks::{
     handle_agent_work_started, handle_intake_complete, handle_play_complete, handle_pr_created,
@@ -26,6 +26,7 @@ use crate::handlers::callbacks::{
 use crate::handlers::github::handle_github_webhook;
 use crate::handlers::intake::{extract_intake_request, submit_intake_coderun};
 use crate::handlers::play::{cancel_play_workflow, extract_play_request, submit_play_workflow};
+use crate::morgan_hooks::{dispatch_to_morgan, MorganWebhookDispatch};
 use crate::state::SessionTracker;
 use crate::webhooks::{
     identify_agent_or_legacy, validate_webhook_timestamp, WebhookAction, WebhookPayload,
@@ -33,10 +34,11 @@ use crate::webhooks::{
 };
 use crate::LinearClient;
 
-/// Get an agent-specific Linear client, refreshing the token if expired.
+/// Get an agent-specific Linear client, rotating or minting a token as needed.
 ///
-/// This async version attempts to refresh expired tokens before returning a client.
-/// Use this when you need a client and want automatic token refresh.
+/// This async version attempts to refresh expired tokens or mint a fresh
+/// client_credentials token before returning a client. Use this when you need
+/// a client and want automatic token lifecycle management.
 ///
 /// **Important:** After a successful token refresh, this function updates both:
 /// 1. The Kubernetes secret (persistent storage)
@@ -44,18 +46,29 @@ use crate::LinearClient;
 ///
 /// This ensures subsequent calls see the fresh token data and don't attempt
 /// to refresh again using stale (potentially rotated) refresh tokens.
-async fn get_agent_client_with_refresh(
+pub async fn get_agent_client_with_refresh(
     config: &Config,
     kube_client: &kube::Client,
     agent_name: &str,
 ) -> Option<LinearClient> {
     // First, read the current token state
-    let (is_expired, can_refresh, refresh_token, client_id, client_secret, existing_token) = {
+    let (
+        is_expired,
+        can_refresh,
+        can_mint_client_credentials,
+        should_proactively_mint_client_credentials,
+        refresh_token,
+        client_id,
+        client_secret,
+        existing_token,
+    ) = {
         let linear_config = config.linear.read().ok()?;
         let app = linear_config.get_app(agent_name)?;
         (
             app.is_token_expired(),
             app.can_refresh(),
+            app.can_mint_client_credentials(),
+            app.should_proactively_mint_client_credentials(),
             app.refresh_token.clone(),
             app.client_id.clone(),
             app.client_secret.clone(),
@@ -146,6 +159,77 @@ async fn get_agent_client_with_refresh(
         }
     }
 
+    if can_mint_client_credentials && should_proactively_mint_client_credentials {
+        info!(
+            agent = %agent_name,
+            "Token missing or expiring, attempting client_credentials mint"
+        );
+
+        match crate::handlers::oauth::mint_client_credentials_token(&client_id, &client_secret)
+            .await
+        {
+            Ok(token_response) => {
+                if let Err(e) = crate::handlers::oauth::store_access_token_public(
+                    kube_client,
+                    &config.namespace,
+                    agent_name,
+                    &token_response.access_token,
+                    None,
+                    token_response.expires_in,
+                )
+                .await
+                {
+                    warn!(
+                        agent = %agent_name,
+                        error = %e,
+                        "Failed to store minted token in K8s"
+                    );
+                } else {
+                    info!(
+                        agent = %agent_name,
+                        "Successfully stored client_credentials token in K8s"
+                    );
+                }
+
+                if let Ok(mut linear_config) = config.linear.write() {
+                    linear_config.update_tokens(
+                        agent_name,
+                        &token_response.access_token,
+                        None,
+                        token_response.expires_in,
+                    );
+                    info!(
+                        agent = %agent_name,
+                        "Updated in-memory token config from client_credentials"
+                    );
+                } else {
+                    warn!(
+                        agent = %agent_name,
+                        "Failed to acquire write lock for in-memory config update"
+                    );
+                }
+
+                return LinearClient::new(&token_response.access_token)
+                    .map_err(|e| {
+                        warn!(
+                            agent = %agent_name,
+                            error = %e,
+                            "Failed to create client with minted token"
+                        );
+                        e
+                    })
+                    .ok();
+            }
+            Err(e) => {
+                warn!(
+                    agent = %agent_name,
+                    error = %e,
+                    "Failed to mint token via client_credentials"
+                );
+            }
+        }
+    }
+
     // Fall back to using existing token
     let token = existing_token?;
     LinearClient::new(&token)
@@ -165,6 +249,8 @@ async fn get_agent_client_with_refresh(
 pub struct AppState {
     /// Configuration.
     pub config: Config,
+    /// Shared HTTP client for external calls.
+    pub http_client: reqwest::Client,
     /// Kubernetes client.
     pub kube_client: kube::Client,
     /// Linear API client.
@@ -177,11 +263,7 @@ pub struct AppState {
 
 /// Build the HTTP router for the Linear service.
 pub fn build_router(state: AppState) -> Router {
-    // Create HTTP client for external API calls
-    let http_client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .unwrap_or_else(|_| reqwest::Client::new());
+    let http_client = state.http_client.clone();
 
     // Get GitHub token from environment (optional)
     let github_token = std::env::var("GITHUB_TOKEN").ok();
@@ -195,6 +277,7 @@ pub fn build_router(state: AppState) -> Router {
         kube_client: state.kube_client.clone(),
         github_webhook_secret: state.config.github_webhook_secret.clone(),
         gitlab_webhook_secret: state.config.gitlab_webhook_secret.clone(),
+        morgan_dispatch: state.config.morgan_dispatch.clone(),
     });
 
     Router::new()
@@ -274,7 +357,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/intake/setup", post(handle_intake_setup))
         // Input routing endpoint - send messages to running agents
         .route("/api/sessions/{session_id}/input", post(send_session_input))
-        // OAuth endpoints for Linear agent apps
+        // OAuth / token-broker endpoints for Linear agent apps
         .route(
             "/oauth/callback",
             axum::routing::get(crate::handlers::oauth::handle_oauth_callback),
@@ -286,6 +369,18 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/oauth/refresh/{agent}",
             axum::routing::post(crate::handlers::oauth::handle_oauth_refresh),
+        )
+        .route(
+            "/oauth/mint/{agent}",
+            axum::routing::post(crate::handlers::oauth::handle_oauth_mint),
+        )
+        .route(
+            "/oauth/mint-all",
+            axum::routing::post(crate::handlers::oauth::handle_oauth_mint_all),
+        )
+        .route(
+            "/oauth/token/{agent}",
+            axum::routing::get(crate::handlers::oauth::handle_oauth_token),
         )
         // Health check
         .route("/health", axum::routing::get(health_check))
@@ -545,16 +640,17 @@ async fn handle_intake_setup(
         "Intake setup requested"
     );
 
-    // Use Morgan's OAuth token for intake operations (not the static workspace client)
+    // Use Morgan's runtime Linear token for intake operations instead of the
+    // shared workspace client, which does not support agent-session activity.
     let Some(client) =
         get_agent_client_with_refresh(&state.config, &state.kube_client, "morgan").await
     else {
-        error!("Morgan's Linear client not available - ensure OAuth is configured");
+        error!("Morgan's Linear client not available - ensure client credentials are configured");
         return Err((
             StatusCode::SERVICE_UNAVAILABLE,
             Json(json!({
                 "status": "error",
-                "error": "Morgan's Linear OAuth token not configured. Complete OAuth at /oauth/start?agent=morgan"
+                "error": "Morgan's Linear credentials are not configured or PM could not mint a runtime token. Ensure linear-app-morgan has client_id/client_secret and try POST /oauth/mint/morgan."
             })),
         ));
     };
@@ -987,6 +1083,8 @@ async fn token_health(State(state): State<AppState>) -> Result<Json<Value>, Stat
             "configured": app.is_configured(),
             "installed": app.is_installed(),
             "can_refresh": app.can_refresh(),
+            "can_mint_client_credentials": app.can_mint_client_credentials(),
+            "should_proactively_mint_client_credentials": app.should_proactively_mint_client_credentials(),
             "expires_at": app.expires_at,
             "expires_in_seconds": expires_in,
             "status": status
@@ -1011,6 +1109,81 @@ async fn readiness_check(State(state): State<AppState>) -> Result<Json<Value>, S
         return Err(StatusCode::SERVICE_UNAVAILABLE);
     }
     Ok(Json(json!({ "status": "ready" })))
+}
+
+async fn maybe_dispatch_linear_webhook_to_morgan(
+    state: &AppState,
+    payload: &WebhookPayload,
+    delivery_id: &str,
+    event_type: &str,
+    agent_name: &str,
+) -> Result<Option<Json<Value>>, StatusCode> {
+    let dispatch_mode = state.config.morgan_dispatch.mode;
+    if !dispatch_mode.dispatches_to_morgan() {
+        return Ok(None);
+    }
+
+    let mut labels = vec![("linear_event", event_type.to_string())];
+    labels.push((
+        "webhook_action",
+        format!("{:?}", payload.action).to_lowercase(),
+    ));
+    labels.push(("webhook_type", format!("{:?}", payload.event_type)));
+    if let Some(session_id) = payload.get_session_id() {
+        labels.push(("session_id", session_id.to_string()));
+    }
+    if let Some(issue) = payload.get_issue() {
+        labels.push(("issue_identifier", issue.identifier.clone()));
+    }
+    if agent_name != "unknown" {
+        labels.push(("agent", agent_name.to_string()));
+    }
+
+    let dispatch = MorganWebhookDispatch {
+        source: "linear",
+        route: "/webhooks/linear",
+        event_type: event_type.to_string(),
+        delivery_id: Some(delivery_id.to_string()),
+        verified: agent_name != "unknown",
+        labels,
+        payload: serde_json::to_value(payload).map_err(|e| {
+            error!(error = %e, "Failed to serialize Linear payload for Morgan dispatch");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?,
+    };
+
+    match dispatch_to_morgan(&state.http_client, &state.config.morgan_dispatch, &dispatch).await {
+        Ok(accepted) => {
+            info!(
+                session_key = %accepted.session_key,
+                agent_id = %accepted.agent_id,
+                "Forwarded Linear webhook to Morgan"
+            );
+
+            if dispatch_mode == WebhookDispatchMode::Morgan {
+                return Ok(Some(Json(json!({
+                    "status": "accepted",
+                    "dispatch": "morgan",
+                    "source": "linear",
+                    "event_type": event_type,
+                    "delivery_id": delivery_id,
+                    "session_key": accepted.session_key,
+                    "agent_id": accepted.agent_id
+                }))));
+            }
+
+            Ok(None)
+        }
+        Err(e) => {
+            if dispatch_mode == WebhookDispatchMode::Shadow {
+                warn!(error = %e, "Failed to shadow-dispatch Linear webhook to Morgan");
+                Ok(None)
+            } else {
+                error!(error = %e, "Failed to dispatch Linear webhook to Morgan");
+                Err(StatusCode::BAD_GATEWAY)
+            }
+        }
+    }
 }
 
 /// Handle incoming Linear webhooks.
@@ -1121,6 +1294,18 @@ pub async fn linear_webhook_handler(
 
     // Extract agent name for logging
     let agent_name = agent_id.as_ref().map_or("unknown", |id| id.agent.as_str());
+
+    if let Some(response) = maybe_dispatch_linear_webhook_to_morgan(
+        &state,
+        &payload,
+        delivery_id,
+        event_type,
+        agent_name,
+    )
+    .await?
+    {
+        return Ok(response);
+    }
 
     // Route based on event type
     match (&payload.event_type, &payload.action) {
@@ -1235,8 +1420,8 @@ async fn handle_session_created(
             "Detected PRD issue - triggering intake workflow"
         );
 
-        // Create emitter for activity emission using agent's OAuth token
-        // (not the workspace API key, which Linear rejects for agent activities)
+        // Create emitter for activity emission using the agent's runtime token
+        // (not the shared workspace API key, which Linear rejects for agent activities)
         let agent_client =
             get_agent_client_with_refresh(&state.config, &state.kube_client, agent_name).await;
         let emitter = agent_client
@@ -1246,8 +1431,8 @@ async fn handle_session_created(
         if emitter.is_none() {
             warn!(
                 agent = %agent_name,
-                "Agent OAuth token not available - activities will not be emitted. \
-                 Complete OAuth authorization at /oauth/start?agent={agent_name}"
+                "Agent Linear token not available - activities will not be emitted. \
+                 Ensure client credentials are configured and mint via /oauth/mint/{agent_name}"
             );
         }
 
@@ -1397,7 +1582,7 @@ async fn handle_session_created(
             "Detected task issue - triggering play workflow"
         );
 
-        // Create emitter for activity emission using agent's OAuth token
+        // Create emitter for activity emission using the agent's runtime token
         let agent_client =
             get_agent_client_with_refresh(&state.config, &state.kube_client, agent_name).await;
         let emitter = agent_client
@@ -1407,7 +1592,7 @@ async fn handle_session_created(
         if emitter.is_none() {
             warn!(
                 agent = %agent_name,
-                "Agent OAuth token not available - activities will not be emitted"
+                "Agent Linear token not available - activities will not be emitted"
             );
         }
 
