@@ -75,7 +75,7 @@ post_voter_activity() {
   if [ "$CONF_INT" -ge 80 ] 2>/dev/null; then SENTIMENT="💪"; elif [ "$CONF_INT" -ge 60 ] 2>/dev/null; then SENTIMENT="🤔"; else SENTIMENT="⚠️"; fi
   BODY="$(printf '## %s %s\n\n> *%s*\n\n**Vote:** %s %s\n**Confidence:** %s%% %s\n**Model:** `%s`\n\n---\n\n%s' \
     "$EMOJI" "$NAME" "$TAGLINE" "$CHOSEN" "$SENTIMENT" "$CONF_PCT" "$SENTIMENT" "$MODEL" "$REASONING")"
-  intake-util linear-activity --session-id "$LINEAR_SID" --type thought --body "$BODY" 2>/dev/null || true
+  intake-util linear-activity --session-id "$LINEAR_SID" --type thought --body "$BODY" >/dev/null 2>/dev/null || true
 }
 
 echo "inline-vote: running voter-1 (architect)" >&2
@@ -160,7 +160,7 @@ if [ -n "$LINEAR_SID" ] && [ -f "$TALLY_FILE" ]; then
   if [ "$VERDICT" = "approve" ]; then ICON="✅"; elif [ "$VERDICT" = "revise" ]; then ICON="🔄"; else ICON="❌"; fi
   TALLY_BODY="$(printf '## 🗳️ Committee Verdict: %s %s\n\n| Vote | Count |\n|------|-------|\n| ✅ Approve | %s |\n| 🔄 Revise | %s |\n| ❌ Reject | %s |' \
     "$VERDICT" "$ICON" "$APPROVE_CT" "$REVISE_CT" "$REJECT_CT")"
-  intake-util linear-activity --session-id "$LINEAR_SID" --type thought --body "$TALLY_BODY" 2>/dev/null || true
+  intake-util linear-activity --session-id "$LINEAR_SID" --type thought --body "$TALLY_BODY" >/dev/null 2>/dev/null || true
 fi
 
 # Keep the historical wrapper shape expected by task-refinement checks.

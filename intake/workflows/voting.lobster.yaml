@@ -147,7 +147,7 @@ steps:
       intake-util linear-activity \
         --session-id "$LINEAR_SID" \
         --type thought \
-        --body "$BODY" || true
+        --body "$BODY" >/dev/null || true
 
   - id: linear-activity-voter-2
     env:
@@ -171,7 +171,7 @@ steps:
       intake-util linear-activity \
         --session-id "$LINEAR_SID" \
         --type thought \
-        --body "$BODY" || true
+        --body "$BODY" >/dev/null || true
 
   - id: linear-activity-voter-3
     env:
@@ -195,7 +195,7 @@ steps:
       intake-util linear-activity \
         --session-id "$LINEAR_SID" \
         --type thought \
-        --body "$BODY" || true
+        --body "$BODY" >/dev/null || true
 
   - id: tally
     env:
@@ -231,4 +231,4 @@ steps:
       intake-util linear-activity \
         --session-id "$LINEAR_SID" \
         --type thought \
-        --body "$BODY" || true
+        --body "$BODY" >/dev/null || true

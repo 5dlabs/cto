@@ -175,7 +175,7 @@ steps:
         intake-util linear-activity \
           --session-id "$LINEAR_SID" \
           --type thought \
-          --body "$BODY" || true
+          --body "$BODY" >/dev/null || true
       fi
 
   - id: linear-activity-voter-2
@@ -200,7 +200,7 @@ steps:
         intake-util linear-activity \
           --session-id "$LINEAR_SID" \
           --type thought \
-          --body "$BODY" || true
+          --body "$BODY" >/dev/null || true
       fi
 
   - id: linear-activity-voter-3
@@ -225,7 +225,7 @@ steps:
         intake-util linear-activity \
           --session-id "$LINEAR_SID" \
           --type thought \
-          --body "$BODY" || true
+          --body "$BODY" >/dev/null || true
       fi
 
   - id: tally
