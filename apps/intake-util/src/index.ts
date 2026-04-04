@@ -9,6 +9,7 @@
  *   validate                 --type <type> [--task-ids <json>] [--strict]
  *   sync-linear init         --project-name <name> --team-id <id> --prd-content <file>
  *   sync-linear issues       --project-id <id> --prd-issue-id <id> --team-id <id>
+ *   sync-linear rewrite-urls --project-id <id> --old-base-url <url> --new-base-url <url>
  *   parse-decision-points    (stdin: {content, speaker})
  *   bridge-notify            --from <agent> --to <agent> [--metadata <json>]
  *   bridge-elicitation       --session-id <id> --decision-id <id> --vote-result <json>
@@ -27,7 +28,7 @@
 
 import { writeFiles } from './write-files';
 import { tallyVotes } from './tally';
-import { createProjectAndPrdIssue, syncTaskIssues } from './sync-linear';
+import { createProjectAndPrdIssue, syncTaskIssues, rewriteProjectUrls } from './sync-linear';
 import { fanOut } from './fan-out';
 import { validateDocs, validatePrompts, validateWorkflows, validateGeneric } from './validate';
 import { parseDecisionPoints } from './parse-decision-points';
@@ -84,8 +85,9 @@ Subcommands:
     --task-ids <json>    Expected task IDs as JSON array (for docs/prompts/workflows)
     --strict             Fail on warnings too
 
-  sync-linear init    Create Linear project and PRD issue
-  sync-linear issues  Create Linear issues for tasks and subtasks
+  sync-linear init           Create Linear project and PRD issue
+  sync-linear issues         Create Linear issues for tasks and subtasks
+  sync-linear rewrite-urls   Bulk-replace base URL in project issue descriptions
 
   parse-decision-points  Extract DECISION_POINT blocks from debate text
     (stdin: {content: string, speaker: "optimist"|"pessimist"})
@@ -456,8 +458,27 @@ async function main(): Promise<void> {
 
         console.log(JSON.stringify(result, null, 2));
         process.exit(0);
+      } else if (subMode === 'rewrite-urls') {
+        const projectId = getArg(args, '--project-id');
+        const oldBaseUrl = getArg(args, '--old-base-url');
+        const newBaseUrl = getArg(args, '--new-base-url');
+
+        if (!projectId || !oldBaseUrl || !newBaseUrl) {
+          console.error('Error: --project-id, --old-base-url, and --new-base-url are required');
+          process.exit(1);
+        }
+
+        const result = await rewriteProjectUrls({
+          projectId,
+          oldBaseUrl,
+          newBaseUrl,
+          apiKey,
+        });
+
+        console.log(JSON.stringify(result, null, 2));
+        process.exit(0);
       } else {
-        console.error(`Error: Unknown sync-linear sub-mode "${subMode}". Use "init" or "issues".`);
+        console.error(`Error: Unknown sync-linear sub-mode "${subMode}". Use "init", "issues", or "rewrite-urls".`);
         process.exit(1);
       }
       break;
