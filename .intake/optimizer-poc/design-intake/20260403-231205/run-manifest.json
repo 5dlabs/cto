@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-04-04T06:12:05Z",
+  "workspace": "/Users/jonathon/5dlabs/cto",
+  "output_root": "/Users/jonathon/5dlabs/cto/.intake/optimizer-poc/design-intake/20260403-231205",
+  "intake_agent_bin": "/Users/jonathon/5dlabs/cto/apps/intake-agent/dist/intake-agent",
+  "baseline_provider": "stitch",
+  "candidate_provider": "framer",
+  "runs_per_variant": 1,
+  "keep_threshold": 5
+}

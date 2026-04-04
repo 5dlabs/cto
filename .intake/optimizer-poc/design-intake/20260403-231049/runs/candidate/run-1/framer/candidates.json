@@ -1,0 +1,17 @@
+[
+  {
+    "provider": "framer",
+    "target": "web",
+    "deviceType": "DESKTOP",
+    "screenId": "framer-web-1775283049591",
+    "rationale": "Prepared web Framer candidate with component-library oriented guidance.",
+    "prompt": "Create a web Framer implementation direction for optimizer-poc-candidate-1. Intent: Modernize UI while preserving product tone and implementation realism. Favor reusable components with clear property controls for Framer code components.",
+    "status": "generated",
+    "meta": {
+      "sdk_available": false,
+      "project_url": "https://framer.com/projects/fr_4j04q95j7s8n48kakevderq43c",
+      "project_ref": "fr_4j04q95j7s8n48kakevderq43c"
+    },
+    "candidate_id": "framer-web-1"
+  }
+]
