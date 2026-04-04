@@ -1,0 +1,6 @@
+---
+# Optional local overlay for validating Datadog instrumentation on intake flows.
+datadog:
+  enabled: true
+  tags:
+    env: local

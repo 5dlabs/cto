@@ -28,6 +28,11 @@ spec:
     metadata:
       labels:
         app: linear-bridge
+        tags.datadoghq.com/env: production
+        tags.datadoghq.com/service: linear-bridge
+        tags.datadoghq.com/version: latest
+      annotations:
+        ad.datadoghq.com/bridge.logs: '[{"source":"nodejs","service":"linear-bridge"}]'
     spec:
       serviceAccountName: linear-bridge
       imagePullSecrets:
@@ -37,6 +42,12 @@ spec:
           image: ghcr.io/5dlabs/linear-bridge:latest
           imagePullPolicy: Always
           env:
+            - name: DD_ENV
+              value: "production"
+            - name: DD_SERVICE
+              value: "linear-bridge"
+            - name: DD_VERSION
+              value: "latest"
             # Linear API key from OpenBao secret
             - name: LINEAR_API_KEY
               valueFrom:

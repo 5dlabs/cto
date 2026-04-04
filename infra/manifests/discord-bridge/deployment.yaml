@@ -28,6 +28,11 @@ spec:
     metadata:
       labels:
         app: discord-bridge
+        tags.datadoghq.com/env: production
+        tags.datadoghq.com/service: discord-bridge
+        tags.datadoghq.com/version: latest
+      annotations:
+        ad.datadoghq.com/bridge.logs: '[{"source":"nodejs","service":"discord-bridge"}]'
     spec:
       serviceAccountName: discord-bridge
       imagePullSecrets:
@@ -37,6 +42,12 @@ spec:
           image: ghcr.io/5dlabs/discord-bridge:latest
           imagePullPolicy: Always
           env:
+            - name: DD_ENV
+              value: "production"
+            - name: DD_SERVICE
+              value: "discord-bridge"
+            - name: DD_VERSION
+              value: "latest"
             # Discord bot token from OpenBao secret
             - name: DISCORD_BRIDGE_TOKEN
               valueFrom:

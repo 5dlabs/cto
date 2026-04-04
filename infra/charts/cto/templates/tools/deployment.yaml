@@ -24,10 +24,18 @@ spec:
       annotations:
         logs.platform.5dlabs.io/collect: "true"
         logs.platform.5dlabs.io/service: "tools-mcp"
+        {{- if .Values.datadog.enabled }}
+        ad.datadoghq.com/tools.logs: '[{"source":"rust","service":"tools-mcp"}]'
+        {{- end }}
       labels:
         {{- include "cto.tools.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: tools
         platform.5dlabs.io/log-collection: enabled
+        {{- if .Values.datadog.enabled }}
+        tags.datadoghq.com/env: {{ .Values.datadog.tags.env | quote }}
+        tags.datadoghq.com/service: "tools-mcp"
+        tags.datadoghq.com/version: {{ .Values.tools.image.tag | quote }}
+        {{- end }}
     spec:
       {{- include "cto.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "cto.tools.fullname" . }}
@@ -84,6 +92,14 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.tools.service.port | quote }}
+            {{- if .Values.datadog.enabled }}
+            - name: DD_ENV
+              value: {{ .Values.datadog.tags.env | quote }}
+            - name: DD_SERVICE
+              value: "tools-mcp"
+            - name: DD_VERSION
+              value: {{ .Values.tools.image.tag | quote }}
+            {{- end }}
             - name: RUST_LOG
               value: "info,kube=debug,tools=trace"
             - name: SYSTEM_CONFIG_PATH

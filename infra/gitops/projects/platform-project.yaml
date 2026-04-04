@@ -32,6 +32,7 @@ spec:
     - 'https://prometheus-community.github.io/helm-charts'
     - 'https://grafana.github.io/helm-charts'
     - 'https://open-telemetry.github.io/opentelemetry-helm-charts'
+    - 'https://helm.datadoghq.com'
     - 'https://actions-runner-controller.github.io/actions-runner-controller'
     - 'https://twingate.github.io/helm-charts'
     - 'https://github.com/Twingate/kubernetes-operator'
@@ -121,6 +122,9 @@ spec:
       server: https://kubernetes.default.svc
     # Observability - metrics, logs, traces
     - namespace: observability
+      server: https://kubernetes.default.svc
+    # Datadog operator and DatadogAgent resources
+    - namespace: datadog-agent
       server: https://kubernetes.default.svc
     # CI/CD runners
     - namespace: arc-runners
@@ -254,6 +258,9 @@ spec:
     # OpenTelemetry CRDs
     - group: 'opentelemetry.io'
       kind: '*'
+    # Datadog Operator / DatadogAgent CRDs
+    - group: 'datadoghq.com'
+      kind: '*'
     # OpenSearch CRDs
     - group: 'opensearch.opster.io'
       kind: '*'
@@ -373,6 +380,9 @@ spec:
       kind: '*'
     # OpenTelemetry CRDs
     - group: 'opentelemetry.io'
+      kind: '*'
+    # Datadog Operator / DatadogAgent resources
+    - group: 'datadoghq.com'
       kind: '*'
     # OpenSearch CRDs
     - group: 'opensearch.opster.io'

@@ -15,6 +15,15 @@ spec:
     metadata:
       labels:
         {{- include "cto.pm.selectorLabels" . | nindent 8 }}
+        {{- if .Values.datadog.enabled }}
+        tags.datadoghq.com/env: {{ .Values.datadog.tags.env | quote }}
+        tags.datadoghq.com/service: "pm-server"
+        tags.datadoghq.com/version: {{ .Values.pm.image.tag | quote }}
+        {{- end }}
+      {{- if .Values.datadog.enabled }}
+      annotations:
+        ad.datadoghq.com/pm.logs: '[{"source":"nodejs","service":"pm-server"}]'
+      {{- end }}
     spec:
       {{- include "cto.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "cto.pm.fullname" . }}
@@ -29,6 +38,14 @@ spec:
           env:
             - name: PM_PROVIDER
               value: {{ .Values.pm.provider | quote }}
+            {{- if .Values.datadog.enabled }}
+            - name: DD_ENV
+              value: {{ .Values.datadog.tags.env | quote }}
+            - name: DD_SERVICE
+              value: "pm-server"
+            - name: DD_VERSION
+              value: {{ .Values.pm.image.tag | quote }}
+            {{- end }}
             - name: KUBERNETES_NAMESPACE
               value: {{ include "cto.namespace" . }}
             - name: NAMESPACE
