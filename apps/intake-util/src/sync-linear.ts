@@ -291,6 +291,61 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
 
   const project = projectData.projectCreate.project;
 
+  // 1b. Create a board (Kanban) view scoped to this project
+  try {
+    interface CustomViewResponse {
+      customViewCreate: { success: boolean; customView?: { id: string; name: string } };
+    }
+    const viewData = await execute<CustomViewResponse>(
+      apiKey,
+      `mutation CreateView($input: CustomViewCreateInput!) {
+        customViewCreate(input: $input) {
+          success
+          customView { id name }
+        }
+      }`,
+      {
+        input: {
+          name: `${projectName} — Board`,
+          teamId,
+          projectId: project.id,
+          filterData: { project: { id: { eq: project.id } } },
+          shared: true,
+          modelName: 'customView',
+        },
+      },
+    );
+    if (viewData.customViewCreate.success && viewData.customViewCreate.customView) {
+      const viewId = viewData.customViewCreate.customView.id;
+      console.error(`Created board view: ${viewData.customViewCreate.customView.name} (${viewId})`);
+
+      // Set layout to "board" (Kanban) with useful field visibility
+      await execute(
+        apiKey,
+        `mutation SetViewPrefs($input: ViewPreferencesCreateInput!) {
+          viewPreferencesCreate(input: $input) { success }
+        }`,
+        {
+          input: {
+            customViewId: viewId,
+            type: 'organization',
+            preferences: {
+              layout: 'board',
+              issueGrouping: 'status',
+              showSubIssues: true,
+              fieldAssignee: true,
+              fieldPriority: true,
+              fieldLabels: true,
+              fieldEstimate: true,
+            },
+          },
+        },
+      );
+    }
+  } catch (err) {
+    console.error(`Warning: failed to create project board view: ${err}`);
+  }
+
   // 2. Get/create labels
   const [intakeLabelId, prdLabelId] = await Promise.all([
     getOrCreateLabel(apiKey, teamId, 'intake'),
