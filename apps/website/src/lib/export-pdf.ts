@@ -535,10 +535,11 @@ export async function createPitchDeckPdfBlob(
     /* Vertical offset — push lighter slides toward center */
     const vOffset = (() => {
       switch (slide.id) {
-        case "cover": return PG.h * 0.33;
-        case "ask": return PG.h * 0.28;
-        case "problem": case "traction": return PG.h * 0.18;
-        case "founder": case "market": case "competition": return PG.h * 0.08;
+        case "cover": return PG.h * 0.35;
+        case "ask": return PG.h * 0.30;
+        case "problem": case "traction": return PG.h * 0.25;
+        case "founder": case "market": case "competition": return PG.h * 0.10;
+        case "solution": case "funds": return PG.h * 0.05;
         default: return margin + 1.5;
       }
     })();
@@ -556,7 +557,7 @@ export async function createPitchDeckPdfBlob(
     /* ── label ── */
     y = writeLines(doc, safe(slide.label.toUpperCase()), margin, y, maxW, sizes.label, {
       color: T.muted,
-    }) + 3;
+    }) + 6;
 
     /* ── headline ── */
     const headlineFs = slide.id === "cover" ? 44 : slide.id === "ask" ? 48 : sizes.headline;
