@@ -44,7 +44,7 @@
           "question": { "type": "string" },
           "category": {
             "type": "string",
-            "enum": ["architecture", "error-handling", "data-model", "api-design", "ux-behavior", "performance", "security", "technology-choice", "infrastructure"]
+            "enum": ["architecture", "error-handling", "data-model", "api-design", "ux-behavior", "visual-identity", "design-system", "component-library", "layout-pattern", "performance", "security", "technology-choice", "infrastructure"]
           },
           "options": {
             "type": "array",
