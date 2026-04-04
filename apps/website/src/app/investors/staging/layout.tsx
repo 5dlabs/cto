@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Investor Deck Staging | 5D Labs",
+  title: "Pitch Deck (staging) | 5D Labs — AI-Native Venture Studio",
   description:
-    "Staging variant of the 5D Labs investor deck with visual-first framing.",
+    "5D Labs pitch deck (staging). CTO turns a product spec into production-ready software with 22 AI agents on owned infrastructure.",
   alternates: {
     canonical: "/investors/staging/",
+  },
+  openGraph: {
+    title: "5D Labs — Pitch Deck (staging)",
+    description:
+      "Spec in, software out. 22 AI agents. Research-backed infra economics. Pre-seed $750K.",
   },
   robots: {
     index: false,

@@ -498,7 +498,7 @@ export default function OpportunitiesPage() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-foreground transition-colors"
-                  data-umami-event="opportunities-twitter"
+                  data-umami-event="opportunities-x"
                 >
                   @5dlabs on X
                 </a>
