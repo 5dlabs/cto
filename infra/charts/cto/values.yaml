@@ -45,6 +45,14 @@ global:
     componentTags: {}
 
 # =============================================================================
+# Datadog - Service tags and log annotations for intake-critical workloads
+# =============================================================================
+datadog:
+  enabled: false
+  tags:
+    env: production
+
+# =============================================================================
 # Secrets - External Secrets Operator Configuration
 # =============================================================================
 # NOTE: ExternalSecrets are managed by the external-secrets-config ArgoCD application

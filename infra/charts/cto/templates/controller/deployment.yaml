@@ -15,9 +15,17 @@ spec:
     metadata:
       labels:
         {{- include "cto.controller.selectorLabels" . | nindent 8 }}
+        {{- if .Values.datadog.enabled }}
+        tags.datadoghq.com/env: {{ .Values.datadog.tags.env | quote }}
+        tags.datadoghq.com/service: "cto-controller"
+        tags.datadoghq.com/version: {{ .Values.controller.image.tag | quote }}
+        {{- end }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/controller/configmap.yaml") . | sha256sum }}
         checksum/task-config: {{ include (print $.Template.BasePath "/controller/task-controller-config.yaml") . | sha256sum }}
+        {{- if .Values.datadog.enabled }}
+        ad.datadoghq.com/controller.logs: '[{"source":"rust","service":"cto-controller"}]'
+        {{- end }}
     spec:
       {{- include "cto.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "cto.controller.fullname" . }}
@@ -42,6 +50,14 @@ spec:
               value: {{ .Values.controller.templatesVersion | quote }}
             - name: AGENT_TEMPLATES_PATH
               value: "/app/templates"
+            {{- if .Values.datadog.enabled }}
+            - name: DD_ENV
+              value: {{ .Values.datadog.tags.env | quote }}
+            - name: DD_SERVICE
+              value: "cto-controller"
+            - name: DD_VERSION
+              value: {{ .Values.controller.image.tag | quote }}
+            {{- end }}
           envFrom:
             - secretRef:
                 name: cto-secrets
