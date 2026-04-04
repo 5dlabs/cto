@@ -109,7 +109,10 @@ steps:
       OUT="$WS/.intake/run-prd.txt"
       if [ -n "${prd_path}" ]; then
         REL=$(printf '%s' "${prd_path}" | sed 's|^\./||')
-        SRC="$WS/$REL"
+        case "$REL" in
+          /*) SRC="$REL" ;;          # absolute path (e.g. target repo PRD)
+          *)  SRC="$WS/$REL" ;;      # relative to workspace
+        esac
         if [ ! -f "$SRC" ]; then
           echo "materialize-prd: missing PRD file: $SRC (prd_path=${prd_path})" >&2
           exit 1
