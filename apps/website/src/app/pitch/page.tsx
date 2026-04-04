@@ -195,7 +195,7 @@ const funnelStages = [
 
 const revenueStreams = [
   { name: "CTO subscriptions", type: "Recurring", desc: "Monthly plans from Free to Enterprise. CodeRun-based usage." },
-  { name: "Bare-metal rev-share", type: "Recurring", desc: "Infrastructure margin on dedicated hardware we provision." },
+  { name: "Bare-metal rev-share", type: "Recurring", desc: "Infrastructure margin on bare-metal servers we provision." },
   { name: "Proprietary trading", type: "Bootstrap", desc: "In-house capital engine. Funds experiments + provides market signal." },
   { name: "Advisory + implementation", type: "Services", desc: "Hands-on setup for early adopters and enterprise pilots." },
 ];
@@ -234,10 +234,10 @@ function SlideSection({
 function SlideLabel({ number, title }: { number: string; title: string }) {
   return (
     <div className="flex items-center gap-3 mb-6">
-      <span className="text-xs font-mono text-muted-foreground tabular-nums">
+      <span className="text-xs font-mono text-foreground/60 tabular-nums">
         {number}
       </span>
-      <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+      <span className="text-xs uppercase tracking-[0.2em] text-foreground/60">
         {title}
       </span>
     </div>
@@ -287,7 +287,7 @@ export default function PitchPage() {
                 <span className="text-foreground">Software out.</span>
               </h1>
 
-              <p className="text-xl text-foreground/70 max-w-2xl mx-auto mb-10">
+              <p className="text-xl text-foreground/80 max-w-2xl mx-auto mb-10">
                 You describe what you want built. Our AI builds, tests, and ships it
                 &mdash; hyperscale performance, bare-metal economics. Targeting a $420B+ cloud
                 market where ~29% of spend is wasted.
@@ -311,7 +311,7 @@ export default function PitchPage() {
                       <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 flex items-center justify-center text-xs sm:text-sm font-semibold ${
                         i === 0 ? "border-cyan/60 bg-cyan/15 text-cyan" :
                         i === 4 ? "border-cyan/60 bg-cyan/15 text-cyan" :
-                        "border-border/50 bg-card/30 text-muted-foreground"
+                        "border-border/50 bg-card/30 text-foreground/60"
                       }`}>
                         {step}
                       </div>
@@ -357,7 +357,7 @@ export default function PitchPage() {
                 <h2 className="text-3xl sm:text-4xl font-bold mb-3">
                   Jonathon Fritz
                 </h2>
-                <p className="text-lg text-foreground/70">
+                <p className="text-lg text-foreground/80">
                   20 years building infrastructure at scale. Built this solo.
                 </p>
               </div>
@@ -374,7 +374,7 @@ export default function PitchPage() {
             <h2 className="text-3xl sm:text-4xl font-bold mb-6">
               The old startup model is structurally disadvantaged.
             </h2>
-            <p className="text-base text-foreground/70 mb-6 max-w-3xl">
+            <p className="text-base text-foreground/80 mb-6 max-w-3xl">
               One bet, 18 months of runway, pivot when you learn too late. Agentic coding + owned infrastructure
               changes the math — run multiple ventures in parallel, fail fast, compound what works.
             </p>
@@ -390,9 +390,9 @@ export default function PitchPage() {
                   transition={{ duration: 0.5, delay: i * 0.1, ease: [0.25, 0.4, 0, 1] }}
                 >
                   <p className="text-2xl font-bold gradient-text mb-1">{f.stat}</p>
-                  <p className="text-sm font-semibold">{f.label}</p>
-                  <p className="text-sm text-foreground/60 mt-1">{f.detail}</p>
-                  <p className="text-xs text-muted-foreground/70 mt-2 font-mono">{f.source}</p>
+                  <p className="text-base font-semibold">{f.label}</p>
+                  <p className="text-base text-foreground/80 mt-1">{f.detail}</p>
+                  <p className="text-sm text-foreground/50 mt-2 font-mono">{f.source}</p>
                 </motion.div>
               ))}
             </div>
@@ -466,7 +466,7 @@ export default function PitchPage() {
             <h2 className="text-3xl sm:text-4xl font-bold mb-6">
               Agentic private cloud — 20+ services on your hardware.
             </h2>
-            <p className="text-base text-foreground/70 mb-6 max-w-3xl">
+            <p className="text-base text-foreground/80 mb-6 max-w-3xl">
               Everything a team needs to build, ship, and run software — without renting it from AWS.
               Same capabilities. Your economics.
             </p>
@@ -482,14 +482,14 @@ export default function PitchPage() {
                   transition={{ duration: 0.4, delay: i * 0.03, ease: [0.25, 0.4, 0, 1] }}
                 >
                   <p className="text-sm font-bold gradient-text">{svc.name}</p>
-                  <p className="text-sm text-foreground/60 mt-1">{svc.desc}</p>
-                  <p className="text-xs text-muted-foreground mt-1.5 font-mono">
+                  <p className="text-sm text-foreground/80 mt-1">{svc.desc}</p>
+                  <p className="text-xs text-foreground/60 mt-1.5 font-mono">
                     Replaces {svc.replaces}
                   </p>
                 </motion.div>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground/70 mt-4 font-mono">
+            <p className="text-xs text-foreground/50 mt-4 font-mono">
               20 managed services across compute, data, security, networking, AI, and blockchain.
             </p>
           </SlideSection>
@@ -523,8 +523,8 @@ export default function PitchPage() {
                     value={m.value}
                     className="text-3xl font-bold gradient-text block"
                   />
-                  <p className="text-sm font-semibold mt-2">{m.label}</p>
-                  <p className="text-sm text-foreground/60 mt-1">{m.note}</p>
+                  <p className="text-base font-semibold mt-2">{m.label}</p>
+                  <p className="text-base text-foreground/80 mt-1">{m.note}</p>
                 </motion.article>
               ))}
             </div>
@@ -538,7 +538,7 @@ export default function PitchPage() {
                 <h2 className="text-3xl sm:text-4xl font-bold mb-3">
                   $420B+ spent on cloud every year.
                 </h2>
-                <p className="text-base text-foreground/70">
+                <p className="text-base text-foreground/80">
                   We start where teams already feel the pain.
                 </p>
               </div>
@@ -558,33 +558,33 @@ export default function PitchPage() {
             <h2 className="text-3xl sm:text-4xl font-bold mb-3">
               No one else combines both.
             </h2>
-            <p className="text-base text-foreground/70 mb-6 max-w-3xl">
+            <p className="text-base text-foreground/80 mb-6 max-w-3xl">
               AI code tools assume cloud. Infrastructure tools assume human engineers. We’re the only player combining AI-native development with bare-metal economics.
             </p>
 
             <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm">
               <div className="grid grid-cols-2 gap-px bg-border/20 rounded-lg overflow-hidden">
                 <div className="bg-card/40 p-5">
-                  <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-3">Cloud-managed + Human-built</p>
+                  <p className="text-xs font-mono text-foreground/60 uppercase tracking-wider mb-3">Cloud-managed + Human-built</p>
                   <div className="space-y-1.5">
                     {["AWS / GCP / Azure", "Heroku / Render", "Vercel / Netlify"].map((name) => (
-                      <p key={name} className="text-sm text-foreground/60">{name}</p>
+                      <p key={name} className="text-sm text-foreground/80">{name}</p>
                     ))}
                   </div>
                 </div>
                 <div className="bg-card/40 p-5">
-                  <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-3">Cloud-managed + AI-built</p>
+                  <p className="text-xs font-mono text-foreground/60 uppercase tracking-wider mb-3">Cloud-managed + AI-built</p>
                   <div className="space-y-1.5">
                     {["Replit / Bolt", "GitHub Copilot Workspace", "Vercel v0"].map((name) => (
-                      <p key={name} className="text-sm text-foreground/60">{name}</p>
+                      <p key={name} className="text-sm text-foreground/80">{name}</p>
                     ))}
                   </div>
                 </div>
                 <div className="bg-card/40 p-5">
-                  <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-3">Bare metal + Human-built</p>
+                  <p className="text-xs font-mono text-foreground/60 uppercase tracking-wider mb-3">Bare metal + Human-built</p>
                   <div className="space-y-1.5">
                     {["Coolify / CapRover", "Hetzner + Terraform", "Oxide Computer"].map((name) => (
-                      <p key={name} className="text-sm text-foreground/60">{name}</p>
+                      <p key={name} className="text-sm text-foreground/80">{name}</p>
                     ))}
                   </div>
                 </div>
@@ -597,7 +597,7 @@ export default function PitchPage() {
                 >
                   <p className="text-[10px] font-mono text-cyan uppercase tracking-wider mb-3">Bare metal + AI-built</p>
                   <p className="text-lg font-bold gradient-text">5D Labs</p>
-                  <p className="text-sm text-foreground/60 mt-1">Spec in, software out — on your hardware.</p>
+                  <p className="text-sm text-foreground/80 mt-1">Spec in, software out — on your hardware.</p>
                 </motion.div>
               </div>
             </div>
@@ -612,14 +612,14 @@ export default function PitchPage() {
 
             <div className="grid lg:grid-cols-2 gap-8">
               <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm">
-                <p className="text-sm font-semibold mb-4 text-foreground/60 uppercase tracking-wider">
+                <p className="text-sm font-semibold mb-4 text-foreground/80 uppercase tracking-wider">
                   How customers find us
                 </p>
                 <FunnelDiagram stages={funnelStages} />
               </div>
 
               <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm">
-                <p className="text-sm font-semibold mb-4 text-foreground/60 uppercase tracking-wider">
+                <p className="text-sm font-semibold mb-4 text-foreground/80 uppercase tracking-wider">
                   Revenue streams
                 </p>
                 <div className="grid sm:grid-cols-2 gap-3">
@@ -638,7 +638,7 @@ export default function PitchPage() {
                           {s.type}
                         </span>
                       </div>
-                      <p className="text-sm text-foreground/60">{s.desc}</p>
+                      <p className="text-sm text-foreground/80">{s.desc}</p>
                     </motion.div>
                   ))}
                 </div>
@@ -679,16 +679,16 @@ export default function PitchPage() {
               <p className="text-2xl font-semibold mb-2">
                 Product live. Customer paying. Pipeline in hand.
               </p>
-              <p className="text-lg text-foreground/70 mb-4">
+              <p className="text-lg text-foreground/80 mb-4">
                 Post-money SAFE. Cap aligned to AI infrastructure comps.
               </p>
-              <p className="text-base text-foreground/60 mb-8 font-mono">
+              <p className="text-base text-foreground/80 mb-8 font-mono">
                 3–5 customers at $5–8K/mo MRR = breakeven at month 15–18.
               </p>
 
               <InvestorCtaButtons />
 
-              <p className="text-base text-foreground/60 mt-8">
+              <p className="text-base text-foreground/80 mt-8">
                 Live demo available in any meeting.
               </p>
             </motion.div>
@@ -696,7 +696,7 @@ export default function PitchPage() {
 
           {/* Minimal footer — no site links */}
           <div className="py-8 px-6 text-center print:hidden">
-            <p className="text-xs text-muted-foreground/60">
+            <p className="text-xs text-foreground/50">
               &copy; {new Date().getFullYear()} 5D Labs Inc. &middot; Confidential
             </p>
           </div>
