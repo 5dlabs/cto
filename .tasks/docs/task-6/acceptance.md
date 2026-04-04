@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. Unit test: emit issue.created event; verify DiscordNotifier receives a POST with purple embed containing correct issue title and assignee. 2. Unit test: emit 5 events within 1 second; verify only 1 batched Discord message is sent containing all 5 issues. 3. Unit test: set ENABLE_ISSUE_DISCORD_BRIDGE=false; verify no Discord call made. 4. Unit test: simulate Discord API failure; verify issue creation flow is not blocked and error is logged. 5. Integration test: run pipeline creating 5+ issues; verify Discord channel receives batched issue notification(s) with correct assignee names.
+- [ ] 1. Component test: TaskCard rendered with `delegate_id='user_123'` and `agent='nova'` displays 'Nova' badge in green and shows the avatar. 2. Component test: TaskCard rendered with `delegate_id=null` displays 'Unresolved' badge in amber. 3. Component test: TaskList with 5 tasks renders them in dependency order (no task appears before its dependencies). 4. Component test: Summary header shows correct counts — given 5 tasks with 4 assigned and 1 unresolved, displays '5 tasks, 4 assigned, 1 unresolved'. 5. Accessibility test: All interactive elements in TaskCard and TaskList are keyboard-navigable and have appropriate ARIA labels (tested via @testing-library/jest-dom axe integration).
 
 ## Verification Notes
 

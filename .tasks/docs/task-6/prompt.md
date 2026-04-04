@@ -1,32 +1,35 @@
-Implement task 6: Implement Linear-Discord Bridge for Issue Notifications (Nova - Bun/Elysia)
+Implement task 6: Scaffold Web Frontend with Agent Assignment Visualization (Blaze - React/Next.js)
 
 ## Goal
-Bridge Linear issue creation events to Discord, so that each new issue created during the pipeline run is announced in real time to the configured Discord channel with its title, assignee, and link.
+Create or extend the web frontend application to display pipeline task lists with agent assignment visualization. Each task card shows the delegate_id as an agent avatar/badge, assignment status, and task metadata. Uses shadcn/ui (per D6) with Radix UI primitives for accessibility. Note: This task is contingent on D5 resolution — if D5 resolves to defer frontend tasks, this task should be skipped.
 
 ## Task Context
-- Agent owner: nova
-- Stack: Bun/Elysia
+- Agent owner: blaze
+- Stack: React/Next.js
 - Priority: medium
-- Dependencies: 1, 2, 5
+- Dependencies: 2
 
 ## Implementation Plan
-1. Extend the PM server's issue creation flow (from Task 2) to emit an internal event `issue.created` after each successful Linear issue creation, with payload `{ issueId, issueUrl, title, agentHint, assigneeName }`.
-2. Create a `LinearDiscordBridge` service that listens for `issue.created` events.
-3. On each event, use the existing `DiscordNotifier` (from Task 5) to post an embed:
-   - Color: purple (#9b59b6).
-   - Title: '📋 New Issue Created'.
-   - Fields: Issue Title (linked to issueUrl), Assigned To (assigneeName or 'Unassigned'), Agent Hint.
-4. Batch notifications: if multiple issues are created within a 2-second window, batch them into a single embed with multiple field rows to avoid Discord rate limiting.
-5. Ensure the bridge does not block the main issue creation flow — use fire-and-forget with error logging.
-6. Add a configuration toggle `ENABLE_ISSUE_DISCORD_BRIDGE` (default: true) to allow disabling without code changes.
+1. Initialize or extend the Next.js application in the project with shadcn/ui components (per D6, using the team's tweakcn configuration if accessible, otherwise shadcn/ui defaults).
+2. Create a pipeline dashboard page at `/pipeline/[sessionId]` that fetches task data from the PM server API.
+3. Implement a `TaskCard` component using shadcn/ui Card, Badge, and Avatar components: display task title, agent name, stack, priority, status, and dependencies. Show `delegate_id` as an agent avatar with the agent name (e.g., 'Bolt', 'Nova') as a badge. Use color-coded badges: green for assigned, amber for unresolved (`agent:unresolved`), gray for pending.
+4. Implement a `TaskList` component that renders all tasks in dependency order with a visual dependency graph (simple indentation or connecting lines).
+5. Add a summary header showing: total tasks, assigned count, unresolved count, pipeline status.
+6. Use `envFrom` to read the PM server API URL from `sigma-1-infra-endpoints` ConfigMap.
+7. Ensure all components meet WCAG 2.1 AA accessibility standards (Radix primitives handle focus management, keyboard navigation, and ARIA attributes).
+8. No authentication implementation — this is deferred per D7 recommendation (Cloudflare Access handles auth at ingress layer).
+9. Write component tests for: TaskCard rendering with assigned agent, TaskCard rendering with unresolved agent, TaskList ordering by dependencies, summary header counts.
 
 ## Acceptance Criteria
-1. Unit test: emit issue.created event; verify DiscordNotifier receives a POST with purple embed containing correct issue title and assignee. 2. Unit test: emit 5 events within 1 second; verify only 1 batched Discord message is sent containing all 5 issues. 3. Unit test: set ENABLE_ISSUE_DISCORD_BRIDGE=false; verify no Discord call made. 4. Unit test: simulate Discord API failure; verify issue creation flow is not blocked and error is logged. 5. Integration test: run pipeline creating 5+ issues; verify Discord channel receives batched issue notification(s) with correct assignee names.
+1. Component test: TaskCard rendered with `delegate_id='user_123'` and `agent='nova'` displays 'Nova' badge in green and shows the avatar. 2. Component test: TaskCard rendered with `delegate_id=null` displays 'Unresolved' badge in amber. 3. Component test: TaskList with 5 tasks renders them in dependency order (no task appears before its dependencies). 4. Component test: Summary header shows correct counts — given 5 tasks with 4 assigned and 1 unresolved, displays '5 tasks, 4 assigned, 1 unresolved'. 5. Accessibility test: All interactive elements in TaskCard and TaskList are keyboard-navigable and have appropriate ARIA labels (tested via @testing-library/jest-dom axe integration).
 
 ## Subtasks
-- Emit issue.created event from the issue creation flow: Extend the PM server's Linear issue creation logic (from Task 2) to emit an internal `issue.created` event after each successful issue creation, carrying the full notification payload.
-- Implement LinearDiscordBridge service with 2-second batching and fire-and-forget execution: Create the `LinearDiscordBridge` service that listens for `issue.created` events, batches events within a 2-second window, formats a purple Discord embed, and sends via the existing DiscordNotifier in a fire-and-forget manner with error logging. Include the ENABLE_ISSUE_DISCORD_BRIDGE configuration toggle.
-- Write comprehensive unit and integration tests for the Linear-Discord bridge: Create a full test suite covering single event notification, batched notifications, disabled toggle, Discord failure resilience, and end-to-end integration with the pipeline.
+- Initialize Next.js application with shadcn/ui setup: Set up or extend the Next.js project with shadcn/ui component library, Tailwind CSS configuration, and project structure for the pipeline dashboard feature.
+- Create pipeline dashboard page with data fetching: Implement the `/pipeline/[sessionId]` page route that fetches task data from the PM server API and passes it to child components.
+- Implement TaskCard component with agent avatar and color-coded badges: Build the TaskCard component using shadcn/ui Card, Badge, and Avatar primitives to display task metadata with agent assignment visualization and color-coded status indicators.
+- Implement TaskList component with dependency-ordered rendering: Build the TaskList component that topologically sorts tasks by their dependencies and renders TaskCards in correct order with visual dependency indicators.
+- Implement pipeline summary header component: Build a summary header component that displays aggregate pipeline statistics: total tasks, assigned count, unresolved count, and pipeline status.
+- Write component tests and accessibility tests: Write comprehensive component tests for TaskCard, TaskList, and PipelineSummary, plus accessibility tests verifying WCAG 2.1 AA compliance using axe-core.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

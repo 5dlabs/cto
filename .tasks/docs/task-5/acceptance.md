@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. Unit test: mock fetch; call notifyPipelineStart and verify POST body matches expected embed structure with correct color, title, and fields. 2. Unit test: call notifyPipelineComplete with status='success' and verify green embed; call with status='failure' and verify red embed. 3. Unit test: unset DISCORD_WEBHOOK_URL; verify no fetch call made and warning logged. 4. Unit test: mock a 429 response then 200; verify retry fires and succeeds on second attempt. 5. Integration test: trigger a real pipeline run; verify two Discord messages appear in the test channel (start and complete) with correct run ID.
+- [ ] 1. Unit test: `notify('pipeline.start')` sends an HTTP POST to DISCORD_BRIDGE_URL with a JSON body containing event='pipeline.start', pipeline_id, and timestamp. 2. Unit test: `notify('pipeline.complete')` payload includes task_count >= 5, assigned_count, pr_url, and linear_session_url. 3. Unit test: When DISCORD_BRIDGE_URL is unreachable (connection refused), `notify()` logs a warning and resolves without throwing. 4. Unit test: When LINEAR_BRIDGE_URL returns 500, `notify()` logs a warning and resolves without throwing. 5. Integration test: With mocked bridge HTTP endpoints, run the full pipeline and verify exactly 2 notification calls per bridge (start + complete), with correct payloads.
 
 ## Verification Notes
 

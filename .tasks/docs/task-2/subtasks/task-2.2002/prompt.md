@@ -1,14 +1,18 @@
-Implement subtask 2002: Add per-pipeline-run caching layer to resolve_agent_delegates()
+Implement subtask 2002: Implement and verify resolve_agent_delegates() function
 
 ## Objective
-Wrap the Linear Users API call inside resolve_agent_delegates with an in-memory cache scoped to a single pipeline run so repeated calls within the same run reuse the first result.
+Locate or implement the resolve_agent_delegates() function that accepts an array of agent hint strings and returns a mapping of agent hints to Linear user IDs, with null for unresolvable agents.
 
 ## Steps
-1. Inside `resolve-agent-delegates.ts`, introduce a module-level cache variable (e.g., `let cachedDelegates: Map<string, string> | null = null`).
-2. On first invocation, perform the API call and store the result. On subsequent invocations within the same process/run, return the cached result immediately.
-3. Export a `clearDelegateCache()` function to allow explicit cache invalidation between pipeline runs or in tests.
-4. Add a debug-level log line when serving from cache vs. fetching fresh.
-5. Keep the cache simple — no TTL needed since pipeline runs are short-lived.
+1. Locate the existing `resolve_agent_delegates()` function in the PM server codebase.
+2. Verify it accepts an array of agent hint strings (e.g., `['bolt', 'nova', 'blaze']`) and returns a `Record<string, string | null>` mapping each hint to a Linear user ID or null.
+3. If the function does not exist, implement it:
+   a. Define the agent-to-Linear-user-ID mapping (source TBD per decision point — hardcoded map, ConfigMap, or Linear API query).
+   b. Accept `string[]` of agent hints.
+   c. Return `Record<string, string | null>` with resolved IDs or null for unknown agents.
+4. Ensure the function handles edge cases: empty array input, duplicate agent hints, case-insensitive matching.
+5. The function should be a pure batch operation — resolve all hints in a single call.
+6. Export the function for import by the pipeline integration code.
 
 ## Validation
-Unit test: call resolve_agent_delegates twice with the same hints; assert the Linear API mock is called exactly once. Call clearDelegateCache(), then call again; assert the mock is called a second time.
+Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object with 3 keys, each mapping to a non-empty string (Linear user ID). Unit test: `resolve_agent_delegates([])` returns an empty object. Unit test: `resolve_agent_delegates(['unknown_agent'])` returns `{ unknown_agent: null }`.

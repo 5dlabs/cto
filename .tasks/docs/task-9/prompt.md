@@ -1,47 +1,30 @@
-Implement task 9: Production Hardening: HA Scaling, CDN, TLS, Ingress (Bolt - Kubernetes/Helm)
+Implement task 9: Show Pipeline Status Notifications in Web Frontend (Blaze - React/Next.js)
 
 ## Goal
-Harden the Sigma-1 pipeline production deployment by enabling high-availability scaling for all services, configuring TLS termination, ingress routing, and CDN for the web frontend.
+Add a real-time or polling-based pipeline status indicator and notification timeline to the dashboard, showing pipeline lifecycle events (start, complete, error) and their timestamps. Displays the same events that are dispatched to Discord/Linear bridges. Contingent on D5 resolution.
 
 ## Task Context
-- Agent owner: bolt
-- Stack: Kubernetes/Helm
-- Priority: medium
-- Dependencies: 2, 3, 4, 5, 6, 7, 8
+- Agent owner: blaze
+- Stack: React/Next.js
+- Priority: low
+- Dependencies: 5, 6
 
 ## Implementation Plan
-1. Update Helm values for production (`values-sigma1-prod.yaml`):
-   a. PM server: replicas 3, resource requests (256Mi RAM, 250m CPU), resource limits (512Mi RAM, 500m CPU).
-   b. Frontend: replicas 2, resource requests (128Mi RAM, 100m CPU).
-2. Configure HorizontalPodAutoscaler for PM server: min 3, max 10, target CPU 70%.
-3. Create Ingress resource for the PM server API:
-   a. Host: `api.sigma1.5dlabs.io`.
-   b. TLS via cert-manager with Let's Encrypt ClusterIssuer.
-   c. Annotations for rate limiting (100 req/s per IP).
-4. Create Ingress resource for the web frontend:
-   a. Host: `sigma1.5dlabs.io`.
-   b. TLS via cert-manager.
-   c. CDN cache headers: `Cache-Control: public, max-age=3600` for static assets.
-5. Configure PodDisruptionBudgets: PM server minAvailable 2, frontend minAvailable 1.
-6. Add readiness and liveness probes for all deployments:
-   - PM server: HTTP GET `/health` on port 3000, initialDelay 10s, period 15s.
-   - Frontend: HTTP GET `/` on port 3000, initialDelay 5s, period 10s.
-7. Configure anti-affinity rules to spread PM server pods across availability zones.
+1. Create a `PipelineStatus` component using shadcn/ui Badge for the current status (running, complete, error) with color coding: blue=running, green=complete, red=error.
+2. Create a `NotificationTimeline` component that displays a chronological list of pipeline events: each event shows type (start/complete/error), timestamp, and brief description.
+3. Implement polling (every 5 seconds) against the PM server API to fetch current pipeline status and event history. Use SWR or React Query for data fetching with automatic revalidation.
+4. Place PipelineStatus in the dashboard header (next to the summary counts from Task 6). Place NotificationTimeline in a sidebar or below the task list.
+5. When pipeline status is 'complete', show links to: Linear session, GitHub PR (from Task 4), and indicate that Discord/Linear notifications were sent.
+6. When pipeline status is 'error', display the error message prominently with a red background alert using shadcn/ui Alert component.
+7. Write component tests for: each status state rendering, timeline event ordering, polling behavior, error alert display.
 
 ## Acceptance Criteria
-1. `kubectl get hpa -n sigma1-prod` shows PM server HPA with correct min/max/target. 2. `kubectl get ingress -n sigma1-prod` shows both ingresses with TLS configured. 3. `curl -I https://api.sigma1.5dlabs.io/health` returns 200 with valid TLS certificate. 4. `curl -I https://sigma1.5dlabs.io` returns 200 with Cache-Control header on static assets. 5. PDB validation: `kubectl get pdb -n sigma1-prod` shows correct minAvailable values. 6. Kill one PM server pod; verify traffic continues to be served (zero downtime confirmed by continuous health check). 7. Pod anti-affinity: verify pods are distributed across at least 2 nodes/zones via `kubectl get pods -o wide`.
+1. Component test: PipelineStatus with status='running' renders a blue 'Running' badge. 2. Component test: PipelineStatus with status='complete' renders a green 'Complete' badge and displays Linear session and PR links. 3. Component test: PipelineStatus with status='error' renders a red Alert component with the error message text visible. 4. Component test: NotificationTimeline with 3 events renders them in chronological order with correct timestamps and event type labels. 5. Integration test: Mock the PM server API with SWR/React Query; verify that the component re-fetches status after the 5-second polling interval and updates the display. 6. Accessibility test: Error alert has role='alert' for screen reader announcement.
 
 ## Subtasks
-- Update Helm production values for PM server replicas and resource limits: Create or update `values-sigma1-prod.yaml` to set PM server deployment to 3 replicas with production-grade resource requests and limits.
-- Update Helm production values for frontend replicas and resource limits: Update `values-sigma1-prod.yaml` to set the frontend deployment to 2 replicas with appropriate resource requests.
-- Configure HorizontalPodAutoscaler for PM server: Create an HPA manifest for the PM server with min 3, max 10 replicas targeting 70% average CPU utilization.
-- Create Ingress resource for PM server API with TLS and rate limiting: Define an Ingress manifest for `api.sigma1.5dlabs.io` with cert-manager TLS and rate-limiting annotations.
-- Create Ingress resource for web frontend with TLS and CDN cache headers: Define an Ingress manifest for `sigma1.5dlabs.io` with cert-manager TLS and CDN-friendly cache-control headers for static assets.
-- Configure PodDisruptionBudgets for PM server and frontend: Create PDB manifests ensuring PM server has minAvailable=2 and frontend has minAvailable=1 during voluntary disruptions.
-- Add readiness and liveness probes to PM server deployment: Configure HTTP health probes for the PM server: readiness and liveness via GET /health on port 3000.
-- Add readiness and liveness probes to frontend deployment: Configure HTTP health probes for the frontend: readiness and liveness via GET / on port 3000.
-- Configure pod anti-affinity rules for PM server cross-zone distribution: Add pod anti-affinity rules to the PM server Deployment to spread pods across availability zones and nodes.
-- Validate full production hardening deployment end-to-end: Deploy all production hardening manifests to the sigma1-prod namespace and run comprehensive validation tests.
+- Implement PipelineStatus badge component with three states and error Alert: Create the PipelineStatus component using shadcn/ui Badge that renders color-coded status indicators (blue=running, green=complete, red=error). When status is 'complete', render links to Linear session and GitHub PR. When status is 'error', render a shadcn/ui Alert component with role='alert' and the error message on a red background.
+- Implement NotificationTimeline component with polling data fetching: Create the NotificationTimeline component that displays a chronological list of pipeline events (start/complete/error with timestamps and descriptions). Implement SWR or React Query polling hook with 5-second revalidation interval against the PM server API to fetch pipeline status and event history. Wire both PipelineStatus and NotificationTimeline into the dashboard layout.
+- Write comprehensive component and accessibility tests for pipeline status UI: Write full test suite covering all PipelineStatus states, NotificationTimeline rendering and ordering, polling behavior verification, error alert display, and accessibility compliance for the error alert.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

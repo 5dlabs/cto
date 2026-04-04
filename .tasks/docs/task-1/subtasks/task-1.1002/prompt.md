@@ -1,18 +1,15 @@
-Implement subtask 1002: Provision sealed secrets for Linear API, Discord webhook, GitHub PAT, and NOUS_API_KEY
+Implement subtask 1002: Create sigma-1-secrets Kubernetes Secret with 4 keys
 
 ## Objective
-Create four SealedSecret resources in the sigma1-dev namespace for `linear-api-token`, `discord-webhook-url`, `github-pat`, and `nous-api-key`, ensuring each secret holds its respective API credential.
+Create the Kubernetes Secret `sigma-1-secrets` in the sigma-1-dev namespace containing LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, and GITHUB_TOKEN. Use external-secrets CRs if available, otherwise sealed-secrets placeholders for dev.
 
 ## Steps
-1. For each of the four secrets (`linear-api-token`, `discord-webhook-url`, `github-pat`, `nous-api-key`), create a standard Kubernetes Secret manifest with the appropriate data key (e.g., `token`, `url`, `pat`, `api-key`).
-2. Use `kubeseal` to encrypt each Secret manifest into a SealedSecret YAML file:
-   - `sealed-secret-linear-api-token.yaml`
-   - `sealed-secret-discord-webhook-url.yaml`
-   - `sealed-secret-github-pat.yaml`
-   - `sealed-secret-nous-api-key.yaml`
-3. All SealedSecrets target namespace `sigma1-dev`.
-4. Apply all four SealedSecret manifests: `kubectl apply -f sealed-secret-*.yaml -n sigma1-dev`.
-5. Verify the sealed-secrets controller decrypts them into usable Secret objects.
+1. Create a Secret manifest `secret.yaml` of type Opaque in namespace `sigma-1-dev`.
+2. Define exactly 4 keys: `LINEAR_API_KEY`, `DISCORD_WEBHOOK_URL`, `NOUS_API_KEY`, `GITHUB_TOKEN`.
+3. If external-secrets operator is available in the cluster, create an ExternalSecret CR that syncs these keys from the external secret store into `sigma-1-secrets`.
+4. If external-secrets is not available, create a SealedSecret manifest with dev placeholder values that can be replaced before production.
+5. Apply the manifest and verify the secret exists with all 4 keys.
+6. Do NOT commit plaintext secret values to the repository — use sealed-secrets or external-secrets patterns only.
 
 ## Validation
-`kubectl get secret -n sigma1-dev` lists `linear-api-token`, `discord-webhook-url`, `github-pat`, and `nous-api-key`. Each secret has the expected data key present (non-empty) when described with `kubectl get secret <name> -n sigma1-dev -o jsonpath='{.data}'`.
+`kubectl get secret sigma-1-secrets -n sigma-1-dev` exists. `kubectl get secret sigma-1-secrets -n sigma-1-dev -o jsonpath='{.data}'` contains exactly 4 keys: LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, GITHUB_TOKEN. Each key has a non-empty base64-encoded value.

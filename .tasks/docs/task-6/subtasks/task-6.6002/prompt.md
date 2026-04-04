@@ -1,21 +1,15 @@
-Implement subtask 6002: Implement LinearDiscordBridge service with 2-second batching and fire-and-forget execution
+Implement subtask 6002: Create pipeline dashboard page with data fetching
 
 ## Objective
-Create the `LinearDiscordBridge` service that listens for `issue.created` events, batches events within a 2-second window, formats a purple Discord embed, and sends via the existing DiscordNotifier in a fire-and-forget manner with error logging. Include the ENABLE_ISSUE_DISCORD_BRIDGE configuration toggle.
+Implement the `/pipeline/[sessionId]` page route that fetches task data from the PM server API and passes it to child components.
 
 ## Steps
-1. Create `src/services/linear-discord-bridge.ts`.
-2. Read `ENABLE_ISSUE_DISCORD_BRIDGE` from env (default `'true'`). If disabled, register the listener as a no-op or skip registration entirely.
-3. Subscribe to `issueEvents.on('issue.created', handler)`.
-4. Implement a batching buffer: on the first event in an idle state, start a 2-second timer. Accumulate all incoming events into an array. When the timer fires, flush the batch.
-5. On flush, build a Discord embed object:
-   - Color: `0x9b59b6` (purple).
-   - Title: `'📋 New Issue Created'` (or `'📋 New Issues Created'` if batch size > 1).
-   - For each issue in the batch, add embed fields: `Issue Title` (value is a markdown link `[title](issueUrl)`), `Assigned To` (`assigneeName || 'Unassigned'`), `Agent Hint`.
-6. Call `DiscordNotifier.sendEmbed(embed)` (from Task 5). Wrap the call in a try/catch — on error, log the error with issue IDs but do NOT re-throw or propagate.
-7. Ensure the entire listener is fire-and-forget: the `issue.created` handler should not return a promise that the emitter awaits. Use `void` or `queueMicrotask`/`setTimeout` to detach.
-8. Export an `initLinearDiscordBridge()` function called at server startup to wire the listener.
-9. Handle edge case: if the batch grows very large (e.g., 25+ issues), split into multiple embeds to stay within Discord's 25-field limit per embed.
+1. Create `app/pipeline/[sessionId]/page.tsx` as a server component (or client component with useEffect, depending on data freshness needs).
+2. Implement a data fetching function in `lib/api/pipeline.ts`: `async function fetchPipelineTasks(sessionId: string): Promise<PipelineData>` that calls `${NEXT_PUBLIC_PM_SERVER_URL}/api/pipeline/${sessionId}/tasks`.
+3. Define TypeScript types for the API response: `PipelineData { session_id: string; status: string; tasks: Task[] }` and `Task { id: number; title: string; agent: string; stack: string; priority: string; status: string; delegate_id: string | null; dependencies: number[] }`.
+4. Handle loading state with a skeleton/loading UI.
+5. Handle error state (API unreachable, 404 session) with a user-friendly error message.
+6. Pass fetched data to TaskList and summary header components.
 
 ## Validation
-1. Unit test: emit a single `issue.created` event, advance timers by 2 seconds, verify `DiscordNotifier.sendEmbed` is called once with a purple embed containing the correct issue title as a markdown link and correct assignee. 2. Unit test: emit 5 events within 1 second, advance timers, verify only 1 call to `sendEmbed` with all 5 issues in the fields. 3. Unit test: set `ENABLE_ISSUE_DISCORD_BRIDGE=false`, emit events, verify zero calls to `sendEmbed`. 4. Unit test: mock `sendEmbed` to throw, emit event, advance timers, verify the error is logged and no unhandled promise rejection occurs.
+Verify: (1) the page fetches from the correct API URL with the sessionId from the route, (2) loading state renders a skeleton UI, (3) error state renders an error message when fetch fails, (4) successful fetch passes task data to child components.

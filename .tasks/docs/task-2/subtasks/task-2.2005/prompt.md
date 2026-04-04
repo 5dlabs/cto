@@ -1,14 +1,21 @@
-Implement subtask 2005: Add structured logging for agent delegation in issue creation
+Implement subtask 2005: Write unit tests for resolve_agent_delegates and delegate_id propagation
 
 ## Objective
-Add structured log entries at each issue creation that include the issue ID, issue title, agent hint, and resolved delegate_id (or 'unassigned').
+Create comprehensive unit tests covering resolve_agent_delegates mapping, fallback on unknown agents, and delegate_id propagation to the Linear API call layer.
 
 ## Steps
-1. After each successful `issueCreate` call, emit a structured log object: `{ event: 'issue_created', issueId, title, agentHint, delegateId: resolvedId ?? 'unassigned' }`.
-2. Use the project's existing structured logger (e.g., pino, consola, or Bun's console with JSON formatting).
-3. At the start of agent resolution, log the full list of agent hints being resolved.
-4. At the end of the pipeline run's issue creation phase, log a summary: total issues created, count assigned, count unassigned.
-5. Ensure log level is 'info' for normal operations and 'warn' for unresolvable hints.
+1. Create a test file (e.g., `resolve-agent-delegates.test.ts`) using Bun's test runner.
+2. Unit tests for resolve_agent_delegates():
+   a. Known agents ('bolt', 'nova', 'blaze', 'rex', 'grizz', 'cipher') all resolve to non-empty string Linear user IDs.
+   b. Unknown agent returns null in the mapping.
+   c. Empty array input returns empty object.
+   d. Duplicate agent hints return same ID for each occurrence.
+3. Unit tests for delegate_id propagation:
+   a. Mock the task generation output with agent hints.
+   b. Verify after resolution, each task has the correct delegate_id.
+   c. Mock the Linear API client and verify `createIssue` is called with `assigneeId` matching delegate_id for resolved agents.
+   d. Verify `createIssue` is called without `assigneeId` for unresolved agents.
+4. Use Bun's built-in test and mock utilities. Avoid external test dependencies.
 
 ## Validation
-Capture log output during a test pipeline run. Verify each created issue produces a structured log entry with all required fields. Verify the summary log shows correct counts.
+All unit tests pass via `bun test`. Test coverage includes: resolve_agent_delegates with known agents, unknown agents, empty input, and duplicates. Delegate_id propagation tests verify the Linear API client receives correct assigneeId values. At least 8 distinct test cases pass.

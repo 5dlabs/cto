@@ -1,16 +1,23 @@
-Implement subtask 9003: Configure HorizontalPodAutoscaler for PM server
+Implement subtask 9003: Write comprehensive component and accessibility tests for pipeline status UI
 
 ## Objective
-Create an HPA manifest for the PM server with min 3, max 10 replicas targeting 70% average CPU utilization.
+Write full test suite covering all PipelineStatus states, NotificationTimeline rendering and ordering, polling behavior verification, error alert display, and accessibility compliance for the error alert.
 
 ## Steps
-1. Create `templates/pm-server-hpa.yaml` with `apiVersion: autoscaling/v2`.
-2. Set `spec.scaleTargetRef` to the PM server Deployment name.
-3. Set `spec.minReplicas: 3`, `spec.maxReplicas: 10`.
-4. Add a metric of type Resource targeting CPU with `averageUtilization: 70`.
-5. Wrap the template in a Helm conditional: `{{- if .Values.pmServer.autoscaling.enabled }}`.
-6. In `values-sigma1-prod.yaml`, set `pmServer.autoscaling.enabled: true`, `pmServer.autoscaling.minReplicas: 3`, `pmServer.autoscaling.maxReplicas: 10`, `pmServer.autoscaling.targetCPUUtilizationPercentage: 70`.
-7. Validate the rendered YAML with `helm template`.
+1. Create `src/components/__tests__/PipelineStatus.test.tsx`:
+   - Test: status='running' renders blue 'Running' badge (check className or data attribute for blue variant).
+   - Test: status='complete' renders green 'Complete' badge and renders Linear session link and PR link with correct href values.
+   - Test: status='error' renders red Alert with the exact error message text visible in the DOM.
+   - Test: status='error' Alert element has `role='alert'` attribute.
+2. Create `src/components/__tests__/NotificationTimeline.test.tsx`:
+   - Test: 3 events passed as props render 3 timeline items.
+   - Test: Events appear in correct chronological order (verify DOM order matches timestamp sort).
+   - Test: Each event displays its type label, formatted timestamp, and description.
+   - Test: Empty events array renders an empty state or no items.
+3. Create `src/hooks/__tests__/usePipelineStatus.test.ts` or integration test:
+   - Test: Mock API with MSW or jest mock. Render component using the hook. Assert initial data loads.
+   - Test: Use fake timers, advance 5 seconds, assert re-fetch occurs and updated data renders.
+4. Run all tests with `npm test` or `vitest` and verify 100% of the above cases pass.
 
 ## Validation
-Run `helm template . -f values-sigma1-prod.yaml` and verify the HPA manifest is rendered with minReplicas=3, maxReplicas=10, and targetCPU=70. After deploy: `kubectl get hpa -n sigma1-prod` confirms correct values.
+All specified tests pass: 3 PipelineStatus state tests, 1 accessibility test (role='alert'), 4 NotificationTimeline tests (rendering, ordering, labels, empty state), and 2 polling integration tests (initial load, 5-second revalidation). Run via test runner with coverage report showing PipelineStatus.tsx, NotificationTimeline.tsx, and usePipelineStatus.ts covered.

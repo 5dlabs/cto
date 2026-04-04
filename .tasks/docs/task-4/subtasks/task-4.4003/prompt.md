@@ -1,19 +1,14 @@
-Implement subtask 4003: Implement DesignDeltaViewer component with diff library integration
+Implement subtask 4003: Implement GitHub branch creation and file commit logic
 
 ## Objective
-Build the `DesignDeltaViewer` component that fetches diff data for a selected PR from `GET /api/pipeline/:runId/prs/:number/diff` and renders it using `react-diff-viewer-continued` v3.x with side-by-side and inline toggle modes, plus its own loading and error states.
+Implement the GitHub API calls to create a new branch pipeline/<session-id> from main and commit the generated scaffold and deliberation files to it.
 
 ## Steps
-1. Install `react-diff-viewer-continued` v3.x: `npm install react-diff-viewer-continued`.
-2. Create `components/DesignDeltaViewer.tsx`. Accept props: `{ runId, prNumber, onClose }`.
-3. Implement a hook `useDesignDiff(runId, prNumber)` that fetches `GET /api/pipeline/${runId}/prs/${prNumber}/diff`. Expect the response to contain `{ files: [{ filename, old_content, new_content }] }` (or adapt to the actual API shape).
-4. **Loading state**: Show a skeleton or spinner while the diff is loading.
-5. **Error state**: Show an error message with a 'Retry' button.
-6. **Diff rendering**: For each file in the diff response, render a collapsible section with the filename as header. Inside, render `<ReactDiffViewer oldValue={old_content} newValue={new_content} splitView={splitView} />` where `splitView` is toggled by a button.
-7. Add a toggle control at the top: 'Side-by-side' vs 'Inline' view mode.
-8. Add a 'Close' button or back-navigation that calls `onClose`.
-9. Style the viewer container to be full-width with horizontal scroll for wide diffs on narrow viewports.
-10. Integrate into the page: when `onSelectPR` is called from DesignSnapshotList, show the DesignDeltaViewer (e.g., as a slide-in panel or replacing the list with a back button).
+1. Create `src/design-snapshot/github-ops.ts` with functions for Git operations.
+2. Implement `createPipelineBranch(sessionId: string)`: call `GET /repos/{owner}/{repo}/git/ref/heads/main` to get the latest commit SHA, then `POST /repos/{owner}/{repo}/git/refs` to create `refs/heads/pipeline/<session-id>` pointing to that SHA.
+3. Implement `commitFiles(branchRef: string, files: Array<{ path: string, content: string }>)`: use the Git Trees API to create a tree with all files as blobs, create a commit pointing to that tree with parent as the branch tip, and update the branch ref to the new commit. This creates a single atomic commit.
+4. Encode file content as base64 for the blob creation API.
+5. Handle the case where the branch already exists (e.g., pipeline re-run) by deleting and recreating or force-updating the ref.
 
 ## Validation
-Component test: render with mocked diff API returning 2 files, verify both file sections appear with diff content. Test the side-by-side/inline toggle changes the `splitView` prop. Test loading state renders spinner/skeleton. Test error state shows error message. Test close button calls onClose.
+Unit test with mocked GitHub API: verify createPipelineBranch makes the correct API calls (GET ref, POST ref) with proper owner/repo/branch naming. Verify commitFiles creates blobs, a tree, a commit, and updates the ref in the correct sequence. Verify file content is base64 encoded in blob creation calls.

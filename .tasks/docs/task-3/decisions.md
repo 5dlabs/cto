@@ -1,6 +1,7 @@
 ## Decision Points
 
-_No explicit decision points generated._
+- Decision
+- Decision
 
 ## Coordination Notes
 

@@ -1,16 +1,15 @@
-Implement subtask 1004: Author Helm values file for single-replica dev deployments
+Implement subtask 1004: Create ServiceAccount sigma-1-pm-server with RBAC Role and RoleBinding
 
 ## Objective
-Create `values-sigma1-dev.yaml` Helm values file configuring single-replica deployments for the PM server and any auxiliary services, referencing the sigma1-infra-endpoints ConfigMap and provisioned secrets.
+Create a ServiceAccount, Role, and RoleBinding in sigma-1-dev namespace granting minimal get/list permissions on configmaps and secrets.
 
 ## Steps
-1. Create `values-sigma1-dev.yaml` in the Helm chart directory.
-2. Set `replicaCount: 1` for PM server and any auxiliary services.
-3. Configure `envFrom` to include `configMapRef: sigma1-infra-endpoints`.
-4. Configure secret volume mounts or `envFrom` secretRefs for `linear-api-token`, `discord-webhook-url`, `github-pat`, `nous-api-key`.
-5. Set resource requests/limits appropriate for dev (e.g., 128Mi–256Mi memory, 100m–250m CPU).
-6. Ensure image tags reference a valid dev image or placeholder.
-7. Validate the values file renders correctly: `helm template sigma1 ./chart -f values-sigma1-dev.yaml --namespace sigma1-dev` produces valid manifests without errors.
+1. Create a ServiceAccount manifest for `sigma-1-pm-server` in `sigma-1-dev` namespace.
+2. Create a Role `sigma-1-pm-server-role` in `sigma-1-dev` with rules:
+   - apiGroups: [""], resources: ["configmaps", "secrets"], verbs: ["get", "list"]
+3. Create a RoleBinding `sigma-1-pm-server-binding` binding the role to the service account.
+4. Apply all three manifests.
+5. Verify the service account exists and the RBAC permissions are correct via `kubectl auth can-i` checks.
 
 ## Validation
-`helm template sigma1 ./chart -f values-sigma1-dev.yaml --namespace sigma1-dev` renders without errors. Rendered Deployment manifests show `replicaCount: 1`, correct envFrom referencing `sigma1-infra-endpoints`, and secretRef entries for all four secrets.
+`kubectl get serviceaccount sigma-1-pm-server -n sigma-1-dev` exists. `kubectl auth can-i get configmaps -n sigma-1-dev --as=system:serviceaccount:sigma-1-dev:sigma-1-pm-server` returns 'yes'. `kubectl auth can-i get secrets -n sigma-1-dev --as=system:serviceaccount:sigma-1-dev:sigma-1-pm-server` returns 'yes'. `kubectl auth can-i create pods -n sigma-1-dev --as=system:serviceaccount:sigma-1-dev:sigma-1-pm-server` returns 'no'.

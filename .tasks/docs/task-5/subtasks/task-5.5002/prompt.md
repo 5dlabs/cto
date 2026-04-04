@@ -1,16 +1,14 @@
-Implement subtask 5002: Hook DiscordNotifier into the intake pipeline handler
+Implement subtask 5002: Implement HTTP POST transport for discord-bridge-http
 
 ## Objective
-Wire the DiscordNotifier into the existing intake pipeline handler so that notifyPipelineStart fires at the very beginning of the pipeline and notifyPipelineComplete fires in a finally block upon success or failure.
+Implement the NotificationTransport interface for HTTP POST dispatch to the discord-bridge-http service. Format the payload per the Discord bridge's expected schema and POST to the URL from the ConfigMap.
 
 ## Steps
-1. In the intake pipeline handler file (e.g. `src/routes/pipeline.ts` or equivalent Elysia route), import the DiscordNotifier service.
-2. At the very beginning of the pipeline handler (after extracting runId, prdTitle, and generating a timestamp), call `await discordNotifier.notifyPipelineStart(runId, prdTitle, new Date().toISOString())`.
-3. Wrap the main pipeline logic in a try/finally block.
-4. In the finally block, determine the status ('success' or 'failure') based on whether an error was caught.
-5. Call `await discordNotifier.notifyPipelineComplete(runId, prdTitle, status, taskCount, issueCount, prUrl, new Date().toISOString())`.
-6. Ensure the notifyPipelineComplete call has access to all required data: taskCount and issueCount should default to 0 if the pipeline failed before generating them; prUrl should default to empty string.
-7. Ensure that any error from the notifier itself does not mask the original pipeline error (the notifier already swallows its own errors, but verify this at the call site).
+1. Create `src/notification-dispatch/transports/http-discord.ts` implementing the `send()` method for the 'discord' target.
+2. Use Bun's native `fetch()` to POST to `DISCORD_BRIDGE_URL` with `Content-Type: application/json`.
+3. Format the JSON body as `{ event, pipeline_id, status, task_count, assigned_count, pr_url, linear_session_url, timestamp }`.
+4. Set a reasonable timeout (5 seconds) on the fetch to avoid hanging on unresponsive bridges.
+5. Return the response status for the error handling layer to inspect.
 
 ## Validation
-Integration test: trigger a full pipeline run with a mock/test PRD. Verify that DiscordNotifier.notifyPipelineStart was called once before any task generation begins and DiscordNotifier.notifyPipelineComplete was called once after the pipeline finishes. Test failure path: inject a deliberate error mid-pipeline and verify notifyPipelineComplete is still called with status='failure' and the pipeline error propagates correctly to the caller. End-to-end: with a real DISCORD_WEBHOOK_URL pointed at a test channel, trigger a pipeline run and confirm two embeds appear (start and complete) with the correct run ID.
+Unit test: Call the Discord HTTP transport's send() with a pipeline.start event. Verify the outgoing HTTP POST targets the correct URL with the correct JSON body shape including all required fields (event, pipeline_id, timestamp).

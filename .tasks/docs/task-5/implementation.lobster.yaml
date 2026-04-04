@@ -51,8 +51,56 @@ steps:
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
+  - name: implement-subtask-5003
+    depends_on: [validate-subtask-5001]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5003/prompt.md
+
+  - name: validate-subtask-5003
+    depends_on: [implement-subtask-5003]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
+  - name: implement-subtask-5004
+    depends_on: [validate-subtask-5002, validate-subtask-5003]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5004/prompt.md
+
+  - name: validate-subtask-5004
+    depends_on: [implement-subtask-5004]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
+  - name: implement-subtask-5005
+    depends_on: [validate-subtask-5004]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5005/prompt.md
+
+  - name: validate-subtask-5005
+    depends_on: [implement-subtask-5005]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
+  - name: implement-subtask-5006
+    depends_on: [validate-subtask-5004]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5006/prompt.md
+
+  - name: validate-subtask-5006
+    depends_on: [implement-subtask-5006]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
   - name: integration-validation
-    depends_on: [validate-subtask-5001, validate-subtask-5002]
+    depends_on: [validate-subtask-5001, validate-subtask-5002, validate-subtask-5003, validate-subtask-5004, validate-subtask-5005, validate-subtask-5006]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

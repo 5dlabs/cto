@@ -1,16 +1,10 @@
-Implement subtask 8002: Configure CI credential injection from sigma1-dev namespace secrets
+Implement subtask 8002: Integrate SnapshotPR into pipeline dashboard page with data fetching
 
 ## Objective
-Set up the CI pipeline job to inject real credentials (LINEAR_API_KEY, GITHUB_TOKEN, NOUS_API_KEY, PM_SERVER_URL, DISCORD_COLLECTOR_URL) from sigma1-dev Kubernetes secrets into the E2E test runner environment.
+Place the SnapshotPR component in the pipeline dashboard page below the summary header and above the task list, fetching PR data from the PM server API endpoint.
 
 ## Steps
-1. In the CI config (GitHub Actions workflow or equivalent), add a new job `e2e-integration` that runs after all build/deploy jobs.
-2. Configure the job to authenticate to the sigma1-dev Kubernetes cluster.
-3. Use `kubectl get secret sigma1-dev-credentials -o jsonpath` (or a CI-native secret injection) to extract: LINEAR_API_KEY, GITHUB_TOKEN, NOUS_API_KEY, PM_SERVER_URL.
-4. Export each as an environment variable available to the test runner step.
-5. Add a step that runs `bun install` in `tests/e2e/` and then `bun test tests/e2e/` with a 10-minute job timeout.
-6. Ensure secrets are masked in CI logs.
-7. Add a manual trigger option (`workflow_dispatch`) so E2E can be run on-demand outside normal CI.
+1. In the pipeline dashboard page component, identify the location between the summary header and the task list. 2. Fetch PR data from the PM server API endpoint (e.g., `/api/pipeline/snapshot-pr` or wherever the Task 4 PR result is exposed). Use the existing data fetching pattern from the dashboard (SWR, fetch, or server component data loading). 3. Pass the fetched prResult (or null if the endpoint returns no PR) to `<SnapshotPR prResult={data} />`. 4. Handle loading state with a subtle skeleton or nothing (component is small). 5. Handle fetch error gracefully: treat as null prResult with reason 'Failed to load PR data'.
 
 ## Validation
-Trigger the CI job manually. Verify it reaches the test execution step without secret injection errors. Confirm secrets are masked in logs. Confirm the placeholder test from 8001 passes in CI.
+Integration test: mock the API endpoint to return a valid PR result; verify SnapshotPR component renders on the page between summary header and task list. Mock API returning null; verify 'No snapshot PR created' message appears. Mock API error; verify graceful fallback.

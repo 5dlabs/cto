@@ -1,21 +1,14 @@
-Implement subtask 4002: Build DesignSnapshotList component with PR cards, loading skeletons, and error state
+Implement subtask 4002: Implement task scaffold file generation
 
 ## Objective
-Implement the `DesignSnapshotList` component that receives PR data (or loading/error states) and renders a list of PR cards with title, number, GitHub link, status badge, files changed count, and relative timestamp. Include loading skeleton placeholders and an error message UI.
+Create the logic that transforms PipelineOutput tasks into markdown scaffold files with the correct naming convention and content structure.
 
 ## Steps
-1. Create `components/DesignSnapshotList.tsx`. Accept props: `{ prs, isLoading, error, onSelectPR }`.
-2. **Loading state**: When `isLoading` is true, render 3 skeleton cards using Tailwind's `animate-pulse` on placeholder divs matching card dimensions.
-3. **Error state**: When `error` is truthy, render an error banner with the message and a 'Retry' button (calls a retry callback prop).
-4. **Empty state**: When `prs` is an empty array, render a centered message: 'No design snapshots found for this run.'
-5. **Populated state**: Map over `prs` and render a card for each:
-   - PR title as an `<a>` linking to `pr.url` (opens in new tab with `rel='noopener noreferrer'`).
-   - PR number displayed as `#${pr.number}`.
-   - Status badge: green for 'open', purple for 'merged', red for 'closed'. Use a `<span>` with appropriate Tailwind bg/text classes.
-   - Files changed: e.g., '5 files changed'.
-   - Relative timestamp using a lightweight formatter (e.g., `Intl.RelativeTimeFormat` or a small utility function — no heavy dependency).
-   - The entire card is clickable (calls `onSelectPR(pr.number)`) to trigger the diff viewer.
-6. Cards should use a CSS grid layout: single column on mobile (<640px), 2 columns on tablet, 3 columns on desktop.
+1. Create `src/design-snapshot/scaffold-generator.ts` with function `generateTaskScaffolds(pipelineOutput: PipelineOutput): Array<{ path: string, content: string }>`.
+2. For each task, generate a file with path `tasks/task-<id>-<slug>.md` where slug is derived from the task title (lowercased, spaces replaced with hyphens, special chars stripped).
+3. File content should be structured markdown containing: task title as H1, description, agent assignment, dependencies list, acceptance criteria, and research_memo content (if non-null).
+4. Also generate deliberation artifact files: for each task with a non-null research_memo, create `deliberation/research-memo-task-<id>.md` containing the raw research memo content, source, and timestamp.
+5. Export a slug generation helper for testability.
 
 ## Validation
-Component test: render with 3 mocked PRs, assert 3 cards exist with correct titles, status badge colors, and GitHub links. Render with empty array, assert 'No design snapshots' message. Render with isLoading=true, assert skeleton elements. Render with error, assert error message and retry button.
+Unit test: Given a PipelineOutput with 5 tasks, generateTaskScaffolds returns exactly 5 task files plus the correct number of deliberation files. Verify naming convention matches `tasks/task-<id>-<slug>.md`. Verify each file's markdown content includes title, description, agent, dependencies, and acceptance criteria.

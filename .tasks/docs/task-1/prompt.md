@@ -1,7 +1,7 @@
 Implement task 1: Provision Dev Infrastructure for Sigma-1 E2E Pipeline (Bolt - Kubernetes/Helm)
 
 ## Goal
-Set up the development infrastructure required for the Sigma-1 agent delegation E2E pipeline. This includes creating a dedicated namespace, provisioning secrets for Linear API, Discord webhook, GitHub PAT, and NOUS_API_KEY, and publishing a sigma1-infra-endpoints ConfigMap aggregating all service connection strings so downstream tasks never re-provision infra.
+Bootstrap the sigma-1-dev namespace with all required infrastructure resources: namespace creation, Kubernetes secrets for Linear API key, Discord webhook URL, NOUS_API_KEY, and GitHub tokens, plus a sigma-1-infra-endpoints ConfigMap aggregating connection strings for all in-cluster services (discord-bridge-http, linear-bridge, openclaw-nats, cloudflare-operator). This task provides the foundational infrastructure that all subsequent tasks depend on.
 
 ## Task Context
 - Agent owner: bolt
@@ -10,32 +10,28 @@ Set up the development infrastructure required for the Sigma-1 agent delegation 
 - Dependencies: None
 
 ## Implementation Plan
-1. Create Kubernetes namespace `sigma1-dev`.
-2. Create sealed secrets:
-   - `linear-api-token` — Linear API key for issue creation and delegate resolution.
-   - `discord-webhook-url` — Discord channel webhook for notifications.
-   - `github-pat` — GitHub personal access token with repo scope for 5dlabs/sigma-1.
-   - `nous-api-key` — Hermes/Nous research API key.
-3. Deploy a ConfigMap `sigma1-infra-endpoints` with keys:
-   - `PM_SERVER_URL` — internal service URL for the PM server.
-   - `LINEAR_API_BASE` — https://api.linear.app/graphql.
-   - `DISCORD_WEBHOOK_URL` — referenced from secret.
-   - `GITHUB_API_BASE` — https://api.github.com.
-   - `NOUS_API_BASE` — Hermes research endpoint.
-4. Create a Helm values file `values-sigma1-dev.yaml` with single-replica deployments for the PM server and any auxiliary services.
-5. Apply network policies allowing egress to Linear, Discord, GitHub, and Nous APIs.
-6. Validate all secrets are mounted and ConfigMap is readable from a test pod.
+1. Create the `sigma-1-dev` namespace with appropriate labels (`project: sigma-1`, `env: dev`).
+2. Create Kubernetes Secret `sigma-1-secrets` containing keys: `LINEAR_API_KEY`, `DISCORD_WEBHOOK_URL`, `NOUS_API_KEY`, `GITHUB_TOKEN`. Values should reference external-secrets operator CRs if available, otherwise placeholder sealed-secrets for dev.
+3. Create ConfigMap `sigma-1-infra-endpoints` with the following keys:
+   - `DISCORD_BRIDGE_URL`: internal cluster URL for `bots/discord-bridge-http` service
+   - `LINEAR_BRIDGE_URL`: internal cluster URL for `bots/linear-bridge` service
+   - `NATS_URL`: `openclaw-nats.openclaw.svc.cluster.local` (reference only; may not be used per D2 resolution)
+   - `CLOUDFLARE_OPERATOR_NS`: `cloudflare-operator-system`
+4. Create a ServiceAccount `sigma-1-pm-server` with minimal RBAC (get/list on configmaps and secrets in `sigma-1-dev` namespace only).
+5. Validate that existing in-cluster services are reachable from the namespace: `bots/discord-bridge-http`, `bots/linear-bridge`, `cloudflare-operator-system` webhook service.
+6. Create a Helm values file `values-dev.yaml` capturing all namespace-scoped resource names for downstream consumption.
+7. Do NOT provision new NATS instances — NATS is already deployed at `openclaw-nats.openclaw.svc.cluster.local`. Do NOT deploy any ingress controller — Cloudflare operator handles ingress per D8.
 
 ## Acceptance Criteria
-1. `kubectl get namespace sigma1-dev` returns Active. 2. `kubectl get secret -n sigma1-dev` lists all four secrets. 3. `kubectl get configmap sigma1-infra-endpoints -n sigma1-dev -o json` contains all five expected keys. 4. A curl pod in the namespace can resolve PM_SERVER_URL and reach LINEAR_API_BASE with a 200/401 (auth expected). 5. Network policy audit confirms egress only to allowed CIDRs.
+1. `kubectl get namespace sigma-1-dev` returns Active status. 2. `kubectl get secret sigma-1-secrets -n sigma-1-dev` exists and contains exactly 4 keys (LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, GITHUB_TOKEN). 3. `kubectl get configmap sigma-1-infra-endpoints -n sigma-1-dev -o json` contains all 4 endpoint keys with non-empty values. 4. `kubectl get serviceaccount sigma-1-pm-server -n sigma-1-dev` exists. 5. A connectivity test pod in `sigma-1-dev` can resolve DNS for `discord-bridge-http`, `linear-bridge`, and `openclaw-nats.openclaw.svc.cluster.local`.
 
 ## Subtasks
-- Create sigma1-dev Kubernetes namespace: Create the dedicated `sigma1-dev` namespace that will host all Sigma-1 pipeline resources including secrets, ConfigMaps, and workloads.
-- Provision sealed secrets for Linear API, Discord webhook, GitHub PAT, and NOUS_API_KEY: Create four SealedSecret resources in the sigma1-dev namespace for `linear-api-token`, `discord-webhook-url`, `github-pat`, and `nous-api-key`, ensuring each secret holds its respective API credential.
-- Create sigma1-infra-endpoints ConfigMap: Deploy the `sigma1-infra-endpoints` ConfigMap in sigma1-dev containing all five service connection strings (PM_SERVER_URL, LINEAR_API_BASE, DISCORD_WEBHOOK_URL, GITHUB_API_BASE, NOUS_API_BASE) that downstream tasks consume via envFrom.
-- Author Helm values file for single-replica dev deployments: Create `values-sigma1-dev.yaml` Helm values file configuring single-replica deployments for the PM server and any auxiliary services, referencing the sigma1-infra-endpoints ConfigMap and provisioned secrets.
-- Apply network policies for egress to Linear, Discord, GitHub, and Nous APIs: Create and apply Kubernetes NetworkPolicy resources in sigma1-dev allowing egress traffic to Linear API, Discord webhooks, GitHub API, and Nous/Hermes API endpoints while denying all other egress by default.
-- Validate infrastructure with a test pod: Deploy a temporary curl/test pod in sigma1-dev to validate that all secrets are mountable, the ConfigMap is readable, DNS resolution works, and network policies allow expected egress while blocking unexpected traffic.
+- Create sigma-1-dev namespace with labels: Create the sigma-1-dev Kubernetes namespace with project and environment labels that all subsequent resources will be deployed into.
+- Create sigma-1-secrets Kubernetes Secret with 4 keys: Create the Kubernetes Secret `sigma-1-secrets` in the sigma-1-dev namespace containing LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, and GITHUB_TOKEN. Use external-secrets CRs if available, otherwise sealed-secrets placeholders for dev.
+- Create sigma-1-infra-endpoints ConfigMap: Create the ConfigMap `sigma-1-infra-endpoints` in sigma-1-dev namespace with all 4 endpoint keys pointing to existing in-cluster services.
+- Create ServiceAccount sigma-1-pm-server with RBAC Role and RoleBinding: Create a ServiceAccount, Role, and RoleBinding in sigma-1-dev namespace granting minimal get/list permissions on configmaps and secrets.
+- Generate Helm values-dev.yaml capturing all resource names: Create a Helm values file that aggregates all namespace-scoped resource names (namespace, secret, configmap, service account) for downstream chart consumption.
+- Validate cross-namespace connectivity from sigma-1-dev to existing services: Deploy a temporary test pod in sigma-1-dev namespace to verify DNS resolution and HTTP connectivity to discord-bridge-http, linear-bridge, and openclaw-nats services.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

@@ -1,18 +1,16 @@
-Implement subtask 10004: Create RoleBindings linking ServiceAccounts to their Roles
+Implement subtask 10004: Create frontend ServiceAccount with read-only API access
 
 ## Objective
-Bind each dedicated ServiceAccount to its corresponding least-privilege Role via RoleBinding resources.
+Create a separate ServiceAccount for the frontend deployment with minimal read-only permissions. Only applicable if D5 includes Tasks 6-9.
 
 ## Steps
-1. Create `infra/rbac/rolebindings.yaml`.
-2. Define RoleBinding `pm-server-rolebinding`:
-   - roleRef: Role `pm-server-role`
-   - subjects: ServiceAccount `sa-pm-server` in namespace `sigma1-prod`.
-3. Define RoleBinding `frontend-rolebinding`:
-   - roleRef: Role `frontend-role`
-   - subjects: ServiceAccount `sa-frontend` in namespace `sigma1-prod`.
-4. Apply: `kubectl apply -f infra/rbac/rolebindings.yaml`.
-5. Verify: `kubectl describe rolebinding pm-server-rolebinding -n sigma1-prod`.
+1. Create `manifests/production/rbac-frontend.yaml`.
+2. Define a `ServiceAccount` named `sigma-1-frontend` in namespace `sigma-1-dev`.
+3. Define a `Role` named `sigma-1-frontend-role` with minimal rules — read-only access to configmaps only (the frontend should call the PM server API, not directly access secrets):
+   - apiGroups: [""], resources: ["configmaps"], verbs: ["get", "list"]
+4. Define a `RoleBinding` named `sigma-1-frontend-binding` binding the Role to the frontend ServiceAccount.
+5. Update the frontend Deployment manifest to use `serviceAccountName: sigma-1-frontend`.
+6. Apply: `kubectl apply -f manifests/production/rbac-frontend.yaml`.
 
 ## Validation
-Exec into a PM server pod and run `kubectl auth can-i list pods --as=system:serviceaccount:sigma1-prod:sa-pm-server -n sigma1-prod` — should return 'no'. Run `kubectl auth can-i get configmaps --as=system:serviceaccount:sigma1-prod:sa-pm-server -n sigma1-prod` — should return 'yes'. Exec into a frontend pod and verify it cannot access secrets.
+`kubectl auth can-i get configmaps --as=system:serviceaccount:sigma-1-dev:sigma-1-frontend -n sigma-1-dev` returns 'yes'. `kubectl auth can-i get secrets --as=system:serviceaccount:sigma-1-dev:sigma-1-frontend -n sigma-1-dev` returns 'no'. `kubectl auth can-i list pods --as=system:serviceaccount:sigma-1-dev:sigma-1-frontend -n sigma-1-dev` returns 'no'.

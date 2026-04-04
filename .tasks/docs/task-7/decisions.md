@@ -4,5 +4,5 @@ _No explicit decision points generated._
 
 ## Coordination Notes
 
-- Agent owner: nova
-- Primary stack: Bun/Elysia
+- Agent owner: blaze
+- Primary stack: React/Next.js

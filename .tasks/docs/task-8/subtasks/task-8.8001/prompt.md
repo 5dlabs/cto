@@ -1,16 +1,10 @@
-Implement subtask 8001: Set up E2E test framework and project scaffolding
+Implement subtask 8001: Create SnapshotPR component with shadcn/ui Card and status badges
 
 ## Objective
-Initialize the sigma1-e2e test project with the chosen test framework (vitest or bun:test), configure TypeScript, create the `sigma1-e2e.test.ts` entry file, and establish shared utility modules for HTTP requests, polling, and assertions.
+Build a SnapshotPR component using shadcn/ui Card that displays PR title, clickable URL with external link icon, color-coded status badge (open=green, merged=purple, closed=red), file count, and branch name.
 
 ## Steps
-1. Create directory `tests/e2e/` in the sigma-1 repo.
-2. Add `vitest.config.ts` (or equivalent bun:test config) with a 10-minute global timeout.
-3. Create `tests/e2e/helpers/http-client.ts` — a lightweight fetch wrapper that reads `PM_SERVER_URL` from env and provides typed `get`/`post` helpers.
-4. Create `tests/e2e/helpers/poll.ts` — a generic async poller: takes a URL, predicate function, interval (default 5s), and max timeout (default 5min); throws on timeout with last response.
-5. Create `tests/e2e/fixtures/sample-prd.json` — a minimal but realistic PRD payload that exercises all pipeline stages.
-6. Create `tests/e2e/helpers/env.ts` — reads and validates required env vars (PM_SERVER_URL, LINEAR_API_KEY, GITHUB_TOKEN, DISCORD_COLLECTOR_URL, NOUS_API_KEY optional) and exports them typed.
-7. Verify `bun test` or `vitest` can discover and run a trivial placeholder test in the new directory.
+1. Create `components/snapshot-pr.tsx`. 2. Accept props: `prResult: { title: string; url: string; status: 'open' | 'merged' | 'closed'; files_changed: number; branch: string } | null`. 3. When prResult is non-null, render a shadcn/ui Card with: CardHeader containing PR title, CardContent with branch name, file count, and status Badge. 4. Status badge color mapping: 'open' → green variant, 'merged' → purple/violet variant, 'closed' → red/destructive variant. Use shadcn/ui Badge with className overrides for colors. 5. PR URL rendered as an anchor tag with `target='_blank'` and `rel='noopener noreferrer'`. 6. Add an ExternalLink icon (from lucide-react) next to the URL text. 7. When prResult is null, render a muted message: 'No snapshot PR created' with optional reason text if a `reason` prop is provided. 8. Add `aria-label` on the link indicating it opens externally for screen reader accessibility.
 
 ## Validation
-Run `bun test tests/e2e/` (or vitest equivalent) and confirm the placeholder test passes. Verify all helper modules export correctly with no TypeScript errors. Confirm env.ts throws a descriptive error when required vars are missing.
+Render SnapshotPR with valid prResult having status='open'; verify Card renders with PR title, green badge with text 'Open', clickable URL, file count, and branch name. Render with status='merged'; verify purple badge. Render with null; verify 'No snapshot PR created' message.

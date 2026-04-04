@@ -1,18 +1,19 @@
-Implement subtask 10008: Create security documentation in docs/security.md
+Implement subtask 10008: Enable Kubernetes audit logging for sigma-1-dev namespace
 
 ## Objective
-Document all RBAC roles, ServiceAccount assignments, secret rotation schedules, NetworkPolicy rules, and audit logging configuration for operational reference and compliance.
+Configure Kubernetes audit logging to capture all create, update, and delete operations on secrets, configmaps, and deployments within the sigma-1-dev namespace.
 
 ## Steps
-1. Create `docs/security.md` with the following sections:
-   a. **Overview**: Summary of the production hardening measures applied to sigma1-prod.
-   b. **ServiceAccounts**: Table listing each SA, its purpose, and which Deployment uses it.
-   c. **RBAC Roles**: Table for each Role with columns: Role Name, Resources, Verbs, ResourceNames, Bound ServiceAccount.
-   d. **Secret Rotation**: Table with columns: Secret Name, Rotation Frequency, CronJob Name, Affected Deployments, Last Rotated (placeholder).
-   e. **Network Policies**: Description of each NetworkPolicy with a diagram or table showing allowed ingress/egress flows.
-   f. **Audit Logging**: Description of audit policy rules, log storage location, retention policy, and how to query audit logs.
-   g. **Incident Response**: Brief runbook for common scenarios (e.g., compromised secret, unauthorized access attempt detected in audit logs).
-2. Commit the file to the repository root under `docs/`.
+1. Create or update the Kubernetes audit policy file (typically at `/etc/kubernetes/audit-policy.yaml` on the control plane, or via the cluster provider's audit configuration).
+2. Add an audit rule:
+   - level: RequestResponse
+   - resources: [{group: "", resources: ["secrets", "configmaps"]}, {group: "apps", resources: ["deployments"]}]
+   - namespaces: ["sigma-1-dev"]
+   - verbs: ["create", "update", "patch", "delete"]
+3. If the cluster is managed (EKS, GKE, AKS), use the provider's audit log configuration (CloudWatch, Cloud Logging, Azure Monitor) and document the configuration steps.
+4. If using a self-managed cluster, ensure the API server is configured with `--audit-policy-file` and `--audit-log-path` flags.
+5. Document the audit log location and how to query it in `docs/production/audit-logging.md`.
+6. Verify that a test operation (e.g., `kubectl annotate configmap sigma-1-infra-endpoints test=true -n sigma-1-dev && kubectl annotate configmap sigma-1-infra-endpoints test- -n sigma-1-dev`) appears in the audit log.
 
 ## Validation
-Verify `docs/security.md` exists in the repo. Confirm it contains all required sections: ServiceAccounts table, RBAC Roles table, Secret Rotation schedule table, Network Policies description, Audit Logging configuration, and Incident Response runbook. Ensure no placeholder values remain (except 'Last Rotated' date).
+Perform a test annotation on a configmap in sigma-1-dev, then query the audit log (via kubectl logs, CloudWatch, or the configured sink) and confirm the create/update event is recorded with the correct namespace, resource, and verb.

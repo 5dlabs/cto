@@ -40,7 +40,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-2002
-    depends_on: [validate-subtask-2001]
+    depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2002/prompt.md
@@ -52,7 +52,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-2003
-    depends_on: [validate-subtask-2001]
+    depends_on: [validate-subtask-2001, validate-subtask-2002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2003/prompt.md
@@ -64,7 +64,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-2004
-    depends_on: [setup]
+    depends_on: [validate-subtask-2003]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2004/prompt.md
@@ -76,7 +76,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-2005
-    depends_on: [validate-subtask-2003]
+    depends_on: [validate-subtask-2002, validate-subtask-2003]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2005/prompt.md
@@ -88,7 +88,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-2006
-    depends_on: [validate-subtask-2002, validate-subtask-2003, validate-subtask-2004, validate-subtask-2005]
+    depends_on: [validate-subtask-2004, validate-subtask-2005]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2006/prompt.md

@@ -1,7 +1,7 @@
 ## Decision Points
 
-- Secret rotation mechanism: use External Secrets Operator (requires operator installation and an external secret store like Vault/AWS Secrets Manager) vs. a lightweight CronJob approach (simpler but less secure, secrets generated/stored within cluster). This affects infrastructure dependencies and security posture.
-- Audit log destination: route audit logs to a PersistentVolume on-cluster vs. an external log aggregator (e.g., Elasticsearch, Loki, CloudWatch). Affects storage costs, retention policy, and observability tooling requirements.
+- D7 resolution dependency: If D7 resolves to JWT/RBAC instead of Cloudflare Access, subtask 10002 (Cloudflare Access configuration) must be replaced with application-level auth middleware. This fundamentally changes the auth architecture for the production deployment.
+- D5 resolution dependency: If D5 defers Tasks 6-9 (frontend), all frontend-related resources (ingress routes to /, frontend ServiceAccount, frontend resource limits, frontend NetworkPolicy) must be removed from scope. This affects subtasks 10001, 10003, 10004, and 10005.
 
 ## Coordination Notes
 

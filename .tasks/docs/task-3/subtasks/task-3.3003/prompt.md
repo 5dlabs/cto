@@ -1,26 +1,14 @@
-Implement subtask 3003: Write comprehensive unit and integration tests for Hermes research integration
+Implement subtask 3003: Implement graceful degradation for missing API key, timeouts, and API errors
 
 ## Objective
-Create test files covering all branches: API available with valid results, API key missing, timeout handling, low-relevance filtering, empty results, and artifact persistence.
+Add all error handling paths to fetchResearchMemo: missing NOUS_API_KEY skip with info log, 30s timeout handling with warning log, and HTTP error handling with warning log. None of these should throw.
 
 ## Steps
-1. Create `src/deliberation/__tests__/hermes-client.test.ts`:
-   a. Test: NOUS_API_KEY set, mock fetch returns 5 results (3 with score >= 0.5, 2 below). Assert returned array has exactly 3 items.
-   b. Test: NOUS_API_KEY not set. Assert function returns null. Assert console/logger output includes info-level skip message.
-   c. Test: Mock fetch to throw AbortError after 30s timeout. Assert function returns null and logs warning.
-   d. Test: Mock fetch to return 500 error. Assert function returns null (graceful degradation).
-   e. Test: Mock fetch returns empty array. Assert function returns empty array (not null).
-   f. Test: Mock fetch returns malformed JSON. Assert function returns null and logs error.
-2. Create `src/deliberation/__tests__/research-memo.test.ts`:
-   a. Test: Format 2 results, verify Markdown output matches expected structure with header and bullet points.
-   b. Test: Empty array input returns empty string.
-   c. Test: Verify special characters in title/summary are not corrupted in output.
-3. Create `src/deliberation/__tests__/deliberation-hermes-integration.test.ts`:
-   a. Test: Full pipeline with mocked Hermes returning results — deliberation output contains '## Hermes Research Findings'.
-   b. Test: Full pipeline with NOUS_API_KEY unset — deliberation output does NOT contain '## Hermes Research Findings' and no errors thrown.
-   c. Test: Verify `hermes-raw-response.json` is written to a temp artifacts directory.
-   d. Test: Verify artifacts directory is created if it doesn't exist.
-4. Use Bun's built-in test runner (`bun:test`). Mock `fetch` using `mock()` from `bun:test` or a helper that replaces `globalThis.fetch`.
+1. At the top of `fetchResearchMemo`, check if `NOUS_API_KEY` is falsy. If so, log an info message exactly: 'Hermes integration skipped: NOUS_API_KEY not configured' and return null immediately.
+2. Wrap the fetch call in a try/catch. If the AbortController fires (timeout after 30s), catch the AbortError, log a warning with the task context identifier (e.g., 'Hermes API timeout for task <id>'), and return null.
+3. After the fetch, check `response.ok`. If the status is not 2xx, log a warning including the HTTP status code (e.g., 'Hermes API error: status 500 for task <id>'), and return null.
+4. Catch any other unexpected errors (network errors, JSON parse errors), log them as warnings, and return null.
+5. Ensure no code path in fetchResearchMemo can throw an unhandled exception — the pipeline must never fail due to Hermes unavailability.
 
 ## Validation
-Run `bun test` on all three test files. All tests must pass. Verify coverage of: happy path, missing API key, timeout, HTTP error, malformed response, empty results, relevance filtering threshold, memo formatting, artifact file creation, and directory creation.
+Unit test 1: With NOUS_API_KEY unset, fetchResearchMemo returns null and the info log 'Hermes integration skipped' is emitted. Unit test 2: With a mocked API that never responds (simulating 30s+ delay), fetchResearchMemo returns null and a timeout warning is logged. Unit test 3: With a mocked API returning HTTP 500, fetchResearchMemo returns null and the error status is logged. Unit test 4: With a mocked API returning malformed JSON, fetchResearchMemo returns null without throwing.

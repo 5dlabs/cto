@@ -1,40 +1,28 @@
-## Generate PR in Sigma-1 Repo with Task Scaffolds (Nova - Bun/Elysia)
+## Add Research Memo Display to Web Frontend (Blaze - React/Next.js)
 
 ### Objective
-Automate the creation of a pull request in the 5dlabs/sigma-1 private repository containing generated task scaffold files for the E2E pipeline run. This includes directory structure, task metadata files, and a summary README.
+Extend the pipeline dashboard to display Hermes research memos associated with each task. Memos are shown as collapsible sections within task cards, displaying the content, source, and timestamp. Contingent on D5 resolution.
 
 ### Ownership
-- Agent: nova
-- Stack: Bun/Elysia
-- Priority: high
+- Agent: blaze
+- Stack: React/Next.js
+- Priority: medium
 - Status: pending
-- Dependencies: 1, 2
+- Dependencies: 3, 6
 
 ### Implementation Details
-1. Create a `PRGenerator` service in the PM server.
-2. Read `GITHUB_PAT` from secret and `GITHUB_API_BASE` from ConfigMap.
-3. After task generation completes, collect all generated tasks with their metadata (id, title, agent, stack, description, details).
-4. Create a new branch `pipeline/{runId}` from the default branch of `5dlabs/sigma-1` using the GitHub API:
-   a. GET `/repos/5dlabs/sigma-1/git/ref/heads/main` to get the latest SHA.
-   b. POST `/repos/5dlabs/sigma-1/git/refs` to create the branch.
-5. For each task, create a scaffold file at `tasks/{taskId}-{slug}/README.md` containing:
-   - Task title, agent, stack.
-   - Description and implementation details.
-   - Test strategy.
-6. Create a root `tasks/SUMMARY.md` with a table of all tasks, their agents, priorities, and dependency graph.
-7. Commit all files in a single commit using the Git tree API (create blobs → create tree → create commit → update ref).
-8. Create a PR via POST `/repos/5dlabs/sigma-1/pulls` with:
-   - Title: `[Pipeline {runId}] Task Scaffolds`.
-   - Body: Summary of tasks generated, link to Linear session.
-   - Base: main, Head: pipeline/{runId}.
-9. Store the PR URL and number in the pipeline run metadata for use by notifications and frontend.
-10. Handle errors: if repo is inaccessible, log error and mark PR step as failed without crashing the pipeline.
+1. Extend the `TaskCard` component to include a collapsible `ResearchMemo` section using shadcn/ui Collapsible (or Accordion) component.
+2. When `research_memo` is non-null on a task, display a 'Research' indicator badge on the task card. Clicking it expands the collapsible section.
+3. The expanded section shows: `content` rendered as markdown (use a lightweight markdown renderer like react-markdown), `source` displayed as a subtle metadata line, `timestamp` formatted as relative time (e.g., '2 hours ago').
+4. When `research_memo` is null, display a muted 'No research data' text or hide the section entirely.
+5. Update the summary header to include a research memo count: 'N of M tasks have research memos'.
+6. Ensure the collapsible interaction is keyboard-accessible (Enter/Space to toggle) via Radix primitives.
+7. Write component tests for: memo present (expanded and collapsed states), memo absent, markdown rendering, summary count.
 
 ### Subtasks
-- [ ] Create GitHubClient wrapper with authenticated fetch and error handling: Implement a reusable GitHubClient class/module that wraps fetch calls to the GitHub API with authentication headers, base URL resolution, JSON parsing, and structured error handling. This client will be used by all subsequent GitHub API operations.
-- [ ] Implement branch creation from latest main SHA via GitHub Refs API: Implement a function that fetches the latest commit SHA from the default branch of 5dlabs/sigma-1 and creates a new branch `pipeline/{runId}` pointing to that SHA using the GitHub Git Refs API.
-- [ ] Implement scaffold file content generators for per-task README and SUMMARY.md: Create pure functions that generate markdown content for each task's scaffold README.md and the root SUMMARY.md table. These are pure content generators with no API dependencies.
-- [ ] Implement Git tree API commit flow (blobs → tree → commit → update ref): Implement the function that takes generated file contents and commits them to the pipeline branch in a single commit using GitHub's low-level Git Data API: creating blobs, assembling a tree, creating a commit object, and updating the branch ref.
-- [ ] Implement PR creation via GitHub Pulls API and store PR metadata: Implement the function that creates a pull request from the pipeline branch to main, formats the PR body with run context and task summary, and stores the resulting PR URL and number in the pipeline run metadata.
-- [ ] Implement PRGenerator orchestrator service with error handling: Create the top-level PRGenerator service that orchestrates the full flow: collect tasks → create branch → generate scaffolds → commit files → create PR, with error handling that logs failures and marks the PR step as failed without crashing the pipeline.
-- [ ] Write comprehensive unit and integration tests for the PR generation pipeline: Create a dedicated test suite covering all GitHub API interaction sequences, scaffold content validation, error scenarios, and an end-to-end integration test verifying PR creation against the real 5dlabs/sigma-1 repo.
+- [ ] Create ResearchMemo collapsible component with shadcn/ui: Build a self-contained ResearchMemo component using shadcn/ui Collapsible (Radix-based) that accepts research_memo data as props and renders a collapsible section with proper aria-expanded state management.
+- [ ] Integrate react-markdown for memo content rendering: Install react-markdown and integrate it into the ResearchMemo component to render the `content` field as formatted markdown, including headers, links, and code blocks.
+- [ ] Add relative timestamp formatting for memo timestamp: Format the research memo timestamp as a human-readable relative time string (e.g., '2 hours ago') using a lightweight date utility.
+- [ ] Integrate ResearchMemo into TaskCard component: Extend the existing TaskCard component to conditionally render the ResearchMemo collapsible section when research_memo data is present on a task, and show a muted 'No research data' text when absent.
+- [ ] Add research memo count to summary header: Update the pipeline dashboard summary header to display a count of how many tasks have research memos out of the total, e.g., '3 of 5 tasks have research memos'.
+- [ ] Write comprehensive component and accessibility tests: Write component tests covering all memo display states (present/absent, expanded/collapsed), markdown rendering, timestamp formatting, summary count, and keyboard accessibility of the collapsible section.

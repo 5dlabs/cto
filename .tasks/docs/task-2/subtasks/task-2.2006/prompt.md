@@ -1,23 +1,23 @@
-Implement subtask 2006: Write unit and integration tests for agent delegation flow
+Implement subtask 2006: Write integration test with mock Linear API validating full delegation pipeline
 
 ## Objective
-Create comprehensive test coverage for resolve_agent_delegates, the updated issueCreate integration, cache behavior, and end-to-end pipeline delegation.
+Create an integration test that runs the full task generation and issue creation pipeline against a mock Linear API, verifying at least 5 issues are created with non-null assigneeId and the summary log is correct.
 
 ## Steps
-1. **Unit tests for resolve_agent_delegates:**
-   a. Mock Linear users API returning 3 agents (bolt, nova, blaze). Assert correct map returned.
-   b. Include an unknown hint. Assert it's excluded from map and a warning is logged.
-   c. Simulate Linear API failure. Assert graceful degradation (empty map, error logged).
-2. **Unit tests for cache:**
-   a. Verify second call doesn't hit API. Verify clearDelegateCache resets.
-3. **Integration test for issueCreate with assigneeId:**
-   a. Mock Linear issueCreate mutation. Submit a task with hint 'nova'. Assert assigneeId is present in mutation variables.
-   b. Submit a task with unresolvable hint. Assert assigneeId is absent.
-4. **Regression test for legacy label removal:**
-   a. Run issue creation flow. Assert no 'agent:pending' label is attached to any created issue.
-5. **End-to-end test:**
-   a. Run a full pipeline with 5+ tasks. Query created issues and verify non-null assigneeId on all resolvable hints.
-6. Use Bun's built-in test runner (`bun test`).
+1. Create an integration test file (e.g., `delegation-pipeline.integration.test.ts`).
+2. Set up a mock Linear API server (using Bun's built-in HTTP server or a mock library) that:
+   a. Accepts `createIssue` mutation calls.
+   b. Records all received payloads.
+   c. Returns valid mock issue responses.
+3. Configure the PM server to use the mock Linear API URL.
+4. Provide a sample PRD input that generates at least 6 tasks with a mix of known and unknown agent hints.
+5. Run the full pipeline: PRD → task generation → agent resolution → Linear issue creation.
+6. Assertions:
+   a. At least 5 issues were created with non-null `assigneeId`.
+   b. Each `assigneeId` matches the expected Linear user ID for the agent hint.
+   c. Any unresolved agents resulted in issues without `assigneeId` and with `agent:unresolved` label.
+   d. The summary log line is present and shows correct N/M/K counts.
+7. Clean up mock server after test completion.
 
 ## Validation
-All tests pass with `bun test`. Coverage report shows >90% line coverage for resolve-agent-delegates.ts and the modified issue creation module. CI pipeline gate on test pass.
+Integration test passes via `bun test`. Mock Linear API received at least 6 createIssue calls. At least 5 calls include a non-null `assigneeId`. Unresolved agent issues have the `agent:unresolved` label. Summary log output matches expected assigned/unresolved counts. Test completes in under 10 seconds.

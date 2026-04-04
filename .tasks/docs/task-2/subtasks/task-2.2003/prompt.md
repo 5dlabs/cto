@@ -1,15 +1,17 @@
-Implement subtask 2003: Integrate resolve_agent_delegates into issueCreate mutation flow
+Implement subtask 2003: Integrate delegation into the task generation pipeline
 
 ## Objective
-Modify the existing task-to-issue mapping module to call resolve_agent_delegates() before each issueCreate GraphQL mutation and pass the resolved linearUserId as the assigneeId field in the mutation payload.
+Wire resolve_agent_delegates() into the task generation pipeline: after tasks are generated with agent hints, batch-resolve them and populate delegate_id on each task, then pass assigneeId to the Linear API issue creation calls.
 
 ## Steps
-1. Locate the existing issue creation call site (the `issueCreate` GraphQL mutation in the PM server).
-2. Before the loop/call that creates issues, invoke `resolve_agent_delegates()` with the collected array of agent hint strings from the decomposed tasks.
-3. For each task/issue being created, look up the task's agent hint in the returned map.
-4. If a userId is found, include `assigneeId: userId` in the `issueCreate` mutation variables.
-5. If no userId is found (hint was unresolvable), omit `assigneeId` so the issue is created unassigned.
-6. Ensure the mutation payload type/interface is updated to accept the optional `assigneeId` field.
+1. Locate the task generation pipeline code where tasks are created with agent hints.
+2. After the task generation step completes, collect all unique agent hints from the generated tasks.
+3. Call `resolve_agent_delegates(uniqueAgentHints)` to get the mapping.
+4. Iterate over all generated tasks and set `task.delegate_id = mapping[task.agent] ?? null` for each.
+5. Locate the Linear issue creation step in the pipeline.
+6. When creating each Linear issue, pass `assigneeId: task.delegate_id` if `delegate_id` is non-null. If `delegate_id` is null, omit `assigneeId` from the Linear API call (or pass undefined).
+7. Ensure the pipeline awaits the resolution before proceeding to issue creation.
+8. Ensure the PM server reads `LINEAR_API_KEY` from `sigma-1-secrets` and endpoints from `sigma-1-infra-endpoints` ConfigMap via `envFrom` environment variables.
 
 ## Validation
-Integration test: with a mocked Linear API, submit a pipeline run with 3 tasks having hints 'nova', 'bolt', 'unknown'. Verify the issueCreate calls for 'nova' and 'bolt' include correct assigneeId values, and the 'unknown' task's call omits assigneeId.
+Run the pipeline with a sample PRD containing at least 5 tasks with known agent hints. Verify each task object has a non-null `delegate_id` after resolution. Verify the Linear API create-issue calls include `assigneeId` matching the task's `delegate_id`. Trace logs show resolve_agent_delegates was called once with the batch of agent hints.

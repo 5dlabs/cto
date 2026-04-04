@@ -1,18 +1,18 @@
-Implement subtask 10006: Configure Kubernetes audit policy for sigma1-prod namespace
+Implement subtask 10006: Configure liveness and readiness probes on all deployments
 
 ## Objective
-Create and apply a Kubernetes audit policy that logs all mutating operations in sigma1-prod and authentication failures at RequestResponse level, routing logs to persistent storage.
+Add HTTP liveness probes (GET /health, 10s interval) and readiness probes (GET /ready, 5s interval) to all service deployments in sigma-1-dev.
 
 ## Steps
-1. Create `infra/audit/audit-policy.yaml` with the following rules:
-   - Rule 1: level `RequestResponse` for all create/update/patch/delete verbs in namespace `sigma1-prod`.
-   - Rule 2: level `RequestResponse` for authentication failures (group `authentication.k8s.io`).
-   - Rule 3: level `Metadata` as catch-all for remaining requests in `sigma1-prod`.
-   - Rule 4: level `None` for read-only requests to health endpoints to reduce noise.
-2. Configure the API server to use this policy (if managed cluster, document required cluster-level config; if self-managed, add `--audit-policy-file` and `--audit-log-path` flags).
-3. Create a PersistentVolumeClaim `audit-log-pvc` (5Gi) for storing audit logs if no external aggregator is configured.
-4. Alternatively, configure a log forwarding sidecar or DaemonSet to ship audit logs to the chosen aggregator.
-5. Apply all manifests and verify audit logging is active.
+1. Edit the PM server Deployment manifest to add probes under `spec.template.spec.containers[0]`:
+   - livenessProbe: httpGet path=/health port=8080, periodSeconds=10, initialDelaySeconds=5, failureThreshold=3
+   - readinessProbe: httpGet path=/ready port=8080, periodSeconds=5, initialDelaySeconds=3, failureThreshold=3
+2. Edit the frontend Deployment manifest similarly:
+   - livenessProbe: httpGet path=/health port=3000, periodSeconds=10, initialDelaySeconds=5
+   - readinessProbe: httpGet path=/ready port=3000, periodSeconds=5, initialDelaySeconds=3
+3. Ensure the PM server and frontend applications actually implement /health and /ready endpoints. If not, document that those endpoints need to be added (or use TCP socket probes as a fallback).
+4. Apply manifests and verify pods transition to Ready state.
+5. Verify probe configuration via `kubectl get deployment -o json`.
 
 ## Validation
-Perform a mutating action in sigma1-prod (e.g., `kubectl create configmap test-audit --from-literal=key=value -n sigma1-prod`). Within 60 seconds, check the audit log output (file or aggregator) for a corresponding entry containing the create verb, the configmap resource, and the sigma1-prod namespace. Clean up the test configmap.
+`kubectl get deployment sigma-1-pm-server -n sigma-1-dev -o jsonpath='{.spec.template.spec.containers[0].livenessProbe}'` returns a non-empty JSON object with httpGet path=/health. `kubectl get deployment sigma-1-pm-server -n sigma-1-dev -o jsonpath='{.spec.template.spec.containers[0].readinessProbe}'` returns httpGet path=/ready. Pods are in Ready state (READY 1/1).
