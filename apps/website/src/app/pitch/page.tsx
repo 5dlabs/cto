@@ -5,7 +5,6 @@ import { InvestorCtaButtons } from "@/components/investor-cta-buttons";
 import { AnimatedCounter } from "@/components/animated-counter";
 import {
   StatCard,
-  AccelerationTimeline,
   PipelineFlow,
   ComparisonMap,
   ConcentricRings,
@@ -75,22 +74,31 @@ const founderTimeline = [
   },
 ];
 
-/* ─── Slide 4: Why Now ─── */
-const accelerationPoints = [
+/* ─── Slide 4: Why Now — four convergence factors ─── */
+const convergenceFactors = [
   {
-    year: "2023",
-    label: "149 foundation models",
-    detail: "More than double vs. 2022 — Stanford AI Index 2025.",
+    stat: "280×",
+    label: "Inference cost collapse",
+    detail: "Inference API pricing fell >280× in 18 months. The same collapse makes self-hosted AI viable on dedicated hardware.",
+    source: "Stanford AI Index 2025",
   },
   {
-    year: "2024–25",
-    label: "Compute compounding",
-    detail: "Training compute for notable models doubles ~every 5 months — Stanford AI Index 2025.",
+    stat: "Open",
+    label: "Open-weight models",
+    detail: "Llama 3, Mistral, DeepSeek — production-grade models you can run on dedicated infrastructure, no vendor lock-in.",
+    source: "Meta, Mistral, DeepSeek — 2024–25",
   },
   {
-    year: "2026+",
-    label: "~29% cloud waste",
-    detail: "Survey respondents’ wasted spend — Flexera State of the Cloud 2026.",
+    stat: "59%",
+    label: "Bare-metal validation",
+    detail: "37signals publicly cut cloud from $3.2M to ~$1.3M/yr on bare metal. Hyperscale performance at a fraction of the cost.",
+    source: "The Register, 2024",
+  },
+  {
+    stat: "Prod",
+    label: "Agentic tooling maturity",
+    detail: "Coding agents went from demos to production-grade in 2025. Multi-agent systems now ship real software autonomously.",
+    source: "Industry consensus, 2025–26",
   },
 ];
 
@@ -145,14 +153,14 @@ const pipelineNodes = [
 
 /* ─── Slide 6: Product replacement map ─── */
 const replacements = [
-  { from: "Managed DB (RDS, Cloud SQL, Aurora, Cosmos…)", to: "5D Data" },
-  { from: "Object storage (S3, GCS, Blob…)", to: "5D Store" },
-  { from: "Managed inference (Vertex, SageMaker, Bedrock…)", to: "5D Inference" },
-  { from: "APM + observability (native + SaaS)", to: "5D Observe" },
-  { from: "CI/CD SaaS (any cloud)", to: "5D Deploy" },
-  { from: "Secrets + KMS", to: "5D Vault" },
-  { from: "CDN + edge DNS (CloudFront, Front Door…)", to: "5D Edge" },
-  { from: "Managed workflows (Step Functions, Logic Apps…)", to: "5D Deploy" },
+  { from: "CI/CD SaaS (any cloud)", to: "5D Deploy", status: "live" as const },
+  { from: "APM + observability (native + SaaS)", to: "5D Observe", status: "live" as const },
+  { from: "Secrets + KMS", to: "5D Vault", status: "live" as const },
+  { from: "Managed DB (RDS, Cloud SQL, Aurora, Cosmos…)", to: "5D Data", status: "next" as const },
+  { from: "Managed inference (Vertex, SageMaker, Bedrock…)", to: "5D Inference", status: "next" as const },
+  { from: "Managed workflows (Step Functions, Logic Apps…)", to: "5D Deploy", status: "next" as const },
+  { from: "Object storage (S3, GCS, Blob…)", to: "5D Store", status: "planned" as const },
+  { from: "CDN + edge DNS (CloudFront, Front Door…)", to: "5D Edge", status: "planned" as const },
 ];
 
 /* ─── Slide 8: Market rings ─── */
@@ -177,16 +185,18 @@ const revenueStreams = [
   { name: "Subscriptions", type: "Recurring", desc: "Monthly plans tiered by team size and usage." },
   { name: "Margin expansion", type: "Structural", desc: "Infrastructure costs fall; customer pricing stays." },
   { name: "Implementation", type: "Services", desc: "Hands-on setup for early enterprise adopters." },
-  { name: "Trading engine", type: "Internal", desc: "Funds operations internally. Investor capital never at risk." },
+  { name: "Partner channel", type: "Distribution", desc: "MSPs and DevOps consultancies resell to their clients." },
 ];
 
 /* ─── Slide 10: Use of funds ─── */
 const fundBars = [
-  { label: "Engineering (2 hires)", value: "$300-400K", percent: 100, colorVar: "--chart-1" },
-  { label: "Founder salary", value: "$100-120K", percent: 30, colorVar: "--chart-1" },
-  { label: "AI model costs", value: "$30-50K", percent: 11, colorVar: "--chart-4" },
-  { label: "Market infra", value: "$20-40K", percent: 8, colorVar: "--chart-4" },
-  { label: "Lab server", value: "$16-20K", percent: 5, colorVar: "--chart-4" },
+  { label: "Engineering (2 hires, loaded)", value: "$360–420K", percent: 100, colorVar: "--chart-1" },
+  { label: "Founder salary (loaded)", value: "$120–140K", percent: 34, colorVar: "--chart-1" },
+  { label: "Legal / accounting / 409A", value: "$30–40K", percent: 9, colorVar: "--chart-4" },
+  { label: "AI model + inference", value: "$30–50K", percent: 9, colorVar: "--chart-4" },
+  { label: "GTM + sales", value: "$20–30K", percent: 6, colorVar: "--chart-4" },
+  { label: "Infrastructure (servers)", value: "$30–50K", percent: 9, colorVar: "--chart-4" },
+  { label: "Buffer / contingency", value: "$20–30K", percent: 6, colorVar: "--chart-4" },
 ];
 
 /* ─── Slide divider helper ─── */
@@ -267,8 +277,8 @@ export default function PitchPage() {
 
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
                 You describe what you want built. Our AI builds, tests, and ships it
-                &mdash; on owned hardware. Economics on slide 04 cite Stanford AI Index, Flexera, and
-                a public bare-metal exit (37signals).
+                &mdash; hyperscale performance, bare-metal economics. Targeting a $420B+ cloud
+                market where ~29% of spend is wasted.
               </p>
 
               {/* Mini pipeline visual */}
@@ -350,52 +360,29 @@ export default function PitchPage() {
           <SlideSection id="why-now">
             <SlideLabel number="04" title="Why now" />
             <h2 className="text-3xl sm:text-4xl font-bold mb-6">
-              The window is closing.
+              Four forces just converged.
             </h2>
-
-            <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm mb-5">
-              <AccelerationTimeline
-                points={accelerationPoints}
-                callout="Bare metal economics: 37signals cut annual cloud spend from $3.2M → ~$1.3M (The Register, 2024 — public exit case)."
-              />
-            </div>
+            <p className="text-sm text-muted-foreground mb-6 max-w-3xl">
+              Each existed before. Together they make AI-native infrastructure on owned hardware viable for the first time.
+            </p>
 
             <div className="grid sm:grid-cols-2 gap-4">
-              <motion.div
-                className="rounded-xl premium-shell p-5 backdrop-blur-sm"
-                initial={{ opacity: 0, y: 14 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-40px" }}
-                transition={{ duration: 0.5, ease: [0.25, 0.4, 0, 1] }}
-              >
-                <p className="text-2xl font-bold gradient-text mb-1">
-                  <AnimatedCounter value="59" className="text-2xl font-bold gradient-text" />%
-                </p>
-                <p className="text-sm font-semibold">lower annual infra (public case)</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  37signals cloud exit — workload-dependent; not a guarantee for every architecture.
-                </p>
-              </motion.div>
-              <motion.div
-                className="rounded-xl premium-shell p-5 backdrop-blur-sm"
-                initial={{ opacity: 0, y: 14 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-40px" }}
-                transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.4, 0, 1] }}
-              >
-                <p className="text-2xl font-bold gradient-text mb-1">
-                  <AnimatedCounter value="280" className="text-2xl font-bold gradient-text" />×
-                </p>
-                <p className="text-sm font-semibold">cheaper GPT-3.5-class inference</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  $/M tokens Nov 2022 → Oct 2024 — Stanford AI Index 2025.
-                </p>
-              </motion.div>
+              {convergenceFactors.map((f, i) => (
+                <motion.div
+                  key={f.label}
+                  className="rounded-xl premium-shell p-5 backdrop-blur-sm"
+                  initial={{ opacity: 0, y: 14 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-40px" }}
+                  transition={{ duration: 0.5, delay: i * 0.1, ease: [0.25, 0.4, 0, 1] }}
+                >
+                  <p className="text-2xl font-bold gradient-text mb-1">{f.stat}</p>
+                  <p className="text-sm font-semibold">{f.label}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{f.detail}</p>
+                  <p className="text-[10px] text-muted-foreground/40 mt-2 font-mono">{f.source}</p>
+                </motion.div>
+              ))}
             </div>
-            <p className="text-[10px] text-muted-foreground/60 mt-4 text-center max-w-2xl mx-auto leading-relaxed">
-              Sources: Stanford HAI AI Index Report 2025 (hai.stanford.edu); Flexera State of the Cloud
-              2026; The Register (37signals).
-            </p>
           </SlideSection>
 
           {/* ── SLIDE 5: SOLUTION + HOW IT WORKS ── */}
@@ -488,8 +475,8 @@ export default function PitchPage() {
                 { value: "1", label: "Paying customer", note: "Sigma One — live in production" },
                 { value: "$240K", label: "Pipeline", note: "Annual contract value in discussions" },
                 { value: "17+", label: "Server deployments", note: "Across multiple regions" },
-                { value: "22", label: "AI workers", note: "Specialized, coordinated roles" },
-                { value: "$0", label: "Outside capital to date", note: "Entirely self-funded" },
+                { value: "22", label: "AI workers", note: "Intake, code gen, testing, deploy, security, self-healing — shipping 24/7" },
+                { value: "$0", label: "Outside capital", note: "Self-funded via proprietary trading — zero dilution" },
               ].map((m, i) => (
                 <motion.article
                   key={m.label}
@@ -534,9 +521,60 @@ export default function PitchPage() {
             </div>
           </SlideSection>
 
-          {/* ── SLIDE 9: BUSINESS MODEL + GTM ── */}
+          {/* ── SLIDE 9: COMPETITIVE LANDSCAPE ── */}
+          <SlideSection id="competition">
+            <SlideLabel number="09" title="Competition" />
+            <h2 className="text-3xl sm:text-4xl font-bold mb-3">
+              No one else combines both.
+            </h2>
+            <p className="text-sm text-muted-foreground mb-6 max-w-3xl">
+              AI code tools assume cloud. Infrastructure tools assume human engineers. We’re the only player combining AI-native development with owned infrastructure economics.
+            </p>
+
+            <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm">
+              <div className="grid grid-cols-2 gap-px bg-border/20 rounded-lg overflow-hidden">
+                <div className="bg-card/40 p-5">
+                  <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-wider mb-3">Cloud-managed + Human-built</p>
+                  <div className="space-y-1.5">
+                    {["AWS / GCP / Azure", "Heroku / Render", "Vercel / Netlify"].map((name) => (
+                      <p key={name} className="text-sm text-muted-foreground">{name}</p>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-card/40 p-5">
+                  <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-wider mb-3">Cloud-managed + AI-built</p>
+                  <div className="space-y-1.5">
+                    {["Replit / Bolt", "GitHub Copilot Workspace", "Vercel v0"].map((name) => (
+                      <p key={name} className="text-sm text-muted-foreground">{name}</p>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-card/40 p-5">
+                  <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-wider mb-3">Self-hosted + Human-built</p>
+                  <div className="space-y-1.5">
+                    {["Coolify / CapRover", "Hetzner + Terraform", "Oxide Computer"].map((name) => (
+                      <p key={name} className="text-sm text-muted-foreground">{name}</p>
+                    ))}
+                  </div>
+                </div>
+                <motion.div
+                  className="relative p-5 border-2 border-cyan/40 bg-cyan/5"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true, margin: "-40px" }}
+                  transition={{ duration: 0.6, ease: [0.25, 0.4, 0, 1] }}
+                >
+                  <p className="text-[10px] font-mono text-cyan uppercase tracking-wider mb-3">Self-hosted + AI-built</p>
+                  <p className="text-lg font-bold gradient-text">5D Labs</p>
+                  <p className="text-xs text-muted-foreground mt-1">Spec in, software out — on your hardware.</p>
+                </motion.div>
+              </div>
+            </div>
+          </SlideSection>
+
+          {/* ── SLIDE 10: BUSINESS MODEL + GTM ── */}
           <SlideSection id="business-gtm">
-            <SlideLabel number="09" title="Business + GTM" />
+            <SlideLabel number="10" title="Business + GTM" />
             <h2 className="text-3xl sm:text-4xl font-bold mb-6">
               Recurring revenue. Expanding margins.
             </h2>
@@ -577,9 +615,9 @@ export default function PitchPage() {
             </div>
           </SlideSection>
 
-          {/* ── SLIDE 10: USE OF FUNDS ── */}
+          {/* ── SLIDE 11: USE OF FUNDS ── */}
           <SlideSection id="funds">
-            <SlideLabel number="10" title="Use of funds" />
+            <SlideLabel number="11" title="Use of funds" />
             <h2 className="text-3xl sm:text-4xl font-bold mb-6">
               $750K. Two engineers. 18 months.
             </h2>
@@ -588,7 +626,7 @@ export default function PitchPage() {
               <AnimatedBarChart
                 items={fundBars}
                 heading="Scaling, not discovery."
-                subheading="Product works. Customer live. 18-month path to cash-flow positive."
+                subheading="1 senior backend/infra + 1 full-stack with AI systems experience. All costs loaded (benefits, payroll tax)."
               />
             </div>
           </SlideSection>
@@ -602,7 +640,7 @@ export default function PitchPage() {
               viewport={{ once: true }}
               transition={{ duration: 0.8 }}
             >
-              <SlideLabel number="11" title="The ask" />
+              <SlideLabel number="12" title="The ask" />
 
               <p className="text-6xl sm:text-7xl font-bold gradient-text mb-6">
                 $750K
@@ -610,8 +648,11 @@ export default function PitchPage() {
               <p className="text-2xl font-semibold mb-2">
                 Product live. Customer paying. Pipeline in hand.
               </p>
-              <p className="text-lg text-muted-foreground mb-8">
+              <p className="text-lg text-muted-foreground mb-4">
                 Post-money SAFE. Cap aligned to AI infrastructure comps.
+              </p>
+              <p className="text-sm text-muted-foreground/80 mb-8 font-mono">
+                3–5 customers at $5–8K/mo MRR = breakeven at month 15–18.
               </p>
 
               <InvestorCtaButtons />

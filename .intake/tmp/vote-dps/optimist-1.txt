@@ -1,1 +1,1 @@
-Extend the existing task schema with delegate_id and status fields (CRUD model)
+Event-driven architecture using the in-cluster NATS service

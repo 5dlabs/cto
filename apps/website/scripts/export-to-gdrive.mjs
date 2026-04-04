@@ -15,7 +15,8 @@ const PDF_PATH = path.resolve(
   import.meta.dirname,
   "../exports/5D-Labs-Pitch-Deck.pdf"
 );
-const PITCH_URL = "https://pitch.5dlabs.ai/";
+// Override with PITCH_URL env var for local dev: PITCH_URL=http://localhost:3000/pitch/ npm run export:gdrive
+const PITCH_URL = process.env.PITCH_URL ?? "https://pitch.5dlabs.ai/";
 
 async function generatePdf() {
   console.log("📄 Generating PDF from", PITCH_URL, "...");

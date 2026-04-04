@@ -2,31 +2,17 @@
   {
     "id": "dp-7",
     "category": "ux-behavior",
-    "description": "How should the frontend dashboard handle pipeline progress and error states?",
+    "description": "How should design snapshot PRs be surfaced in the frontend for user interaction?",
     "options": [
-      "Show real-time progress updates with optimistic UI and inline error banners",
-      "Use polling with periodic refresh and modal dialogs for errors"
+      "Display design snapshot PRs as a dedicated section in the dashboard with metadata and links",
+      "Integrate design snapshot PRs into the existing activity feed or notifications panel"
     ],
     "requires_approval": false,
     "constraint_type": "open",
     "affected_tasks": [
-      7
+      4,
+      9
     ],
-    "rationale": "The dashboard must communicate pipeline status clearly. Real-time updates improve UX but are more complex; polling is simpler but less responsive."
-  },
-  {
-    "id": "dp-9",
-    "category": "design-system",
-    "description": "What component library or design system should be used for the frontend dashboard?",
-    "options": [
-      "Use an existing design system (e.g., shadcn, Radix) for rapid development",
-      "Develop custom components tailored to the Sigma-1 dashboard"
-    ],
-    "requires_approval": false,
-    "constraint_type": "open",
-    "affected_tasks": [
-      7
-    ],
-    "rationale": "The dashboard is a new UI surface. Using a design system accelerates development and ensures consistency, but custom components may better fit unique requirements."
+    "rationale": "The frontend can surface design PRs in multiple ways, affecting discoverability and user workflow. The PRD requires surfacing but not the specific UX pattern."
   }
 ]

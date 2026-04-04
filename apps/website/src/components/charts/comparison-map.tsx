@@ -6,7 +6,14 @@ interface ComparisonRow {
   from: string;
   to: string;
   via?: string;
+  status?: "live" | "next" | "planned";
 }
+
+const statusBadge: Record<string, { label: string; cls: string }> = {
+  live: { label: "Live", cls: "text-emerald-400 bg-emerald-400/10 border-emerald-400/30" },
+  next: { label: "Next", cls: "text-amber-400 bg-amber-400/10 border-amber-400/30" },
+  planned: { label: "Planned", cls: "text-muted-foreground bg-muted-foreground/10 border-muted-foreground/30" },
+};
 
 interface ComparisonMapProps {
   rows: ComparisonRow[];
@@ -75,6 +82,11 @@ export function ComparisonMap({ rows, callout }: ComparisonMapProps) {
 
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-cyan">{row.to}</span>
+              {row.status && statusBadge[row.status] && (
+                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${statusBadge[row.status].cls}`}>
+                  {statusBadge[row.status].label}
+                </span>
+              )}
               {row.via && (
                 <span className="text-[10px] text-muted-foreground/70 font-mono">
                   {row.via}

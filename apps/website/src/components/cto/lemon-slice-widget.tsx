@@ -3,7 +3,7 @@
 import Script from "next/script";
 import { useEffect, useRef } from "react";
 
-const MORGAN_AGENT_ID = "agent_0b8ca791bd37c632";
+import { PRODUCT_MORGAN_AGENT_ID } from "@/lib/morgan-agents";
 const LEMON_SLICE_SCRIPT =
   "https://unpkg.com/@lemonsliceai/lemon-slice-widget@1.0.27/dist/index.js";
 
@@ -33,7 +33,7 @@ interface LemonSliceWidgetElement extends HTMLElement {
 }
 
 export function LemonSliceWidget({
-  agentId = MORGAN_AGENT_ID,
+  agentId = PRODUCT_MORGAN_AGENT_ID,
   initialState = "active",
   inline = true,
   className,
