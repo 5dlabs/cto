@@ -1,1 +1,1 @@
-Dedicated section in the pipeline UI with interactive previews (image diffs, before/after)
+Extend the existing task schema with delegate_id and status fields (CRUD model)

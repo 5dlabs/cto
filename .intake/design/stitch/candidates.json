@@ -3,7 +3,7 @@
     "target": "web",
     "deviceType": "DESKTOP",
     "rationale": "Failed to generate web candidate.",
-    "prompt": "Improve and modernize this web interface for project sigma-1. Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
+    "prompt": "Improve and modernize this web interface for project sigma-1-remediation. Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
     "status": "failed",
     "error": "Stitch MCP call \"tools/call\" timed out after 60s"
   }

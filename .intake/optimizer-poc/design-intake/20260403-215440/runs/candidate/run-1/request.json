@@ -1,0 +1,12 @@
+{
+  "operation": "design_intake",
+  "payload": {
+    "prd_content": "# Project: Sigma-1 Agent Delegation E2E\n\n## Goal\nValidate the full intake pipeline end-to-end with agent delegation enabled, confirming:\n1. Linear issues are created with the correct agent assignee (delegate_id)\n2. Hermes research integration produces content in the deliberation path\n3. Design snapshot PR surfacing works\n4. Discord and Linear bridge notifications fire correctly\n\n## Context\nThe PM server now resolves agent hints to Linear user IDs at issue creation time via `resolve_agent_delegates()`. Previously all issues were created unassigned. This run validates the full delegation flow from PRD → deliberation → task generation → issue creation with assigned agents.\n\n## Requirements\n- Pipeline completes through all stages (deliberation, task generation, issue creation)\n- At least 5 tasks generated with agent assignments\n- Linear issues show assigned agents (not just \"agent:pending\" labels)\n- Research memos include Hermes-sourced content where NOUS_API_KEY is available\n- PR created in target repo with task scaffolds\n\n## Target Repository\n- Organization: 5dlabs\n- Repository: sigma-1\n- Visibility: private\n\n## Acceptance Criteria\n- [ ] Pipeline completes without fatal errors\n- [ ] Linear session created with issues\n- [ ] Issues have delegate_id set (visible as assignee in Linear)\n- [ ] PR created in sigma-1 with generated artifacts\n- [ ] Discord notification posted for pipeline start/complete",
+    "project_name": "optimizer-poc-candidate-1",
+    "design_prompt": "Modernize UI while preserving product tone and implementation realism.",
+    "design_provider": "both",
+    "design_framer_project": "fr_4j04q95j7s8n48kakevderq43c",
+    "design_urls": "",
+    "output_dir": "/Users/jonathon/5dlabs/cto/.intake/optimizer-poc/design-intake/20260403-215440/runs/candidate/run-1"
+  }
+}

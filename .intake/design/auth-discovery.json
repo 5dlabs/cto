@@ -1,6 +1,9 @@
 {
   "mode": "ingest_plus_stitch",
+  "provider_mode": "stitch",
   "stitch_api_key": "present",
+  "framer_api_key": "missing",
+  "framer_project_url": "missing",
   "stitch_project_id": "missing",
   "stitch_access_token": "missing",
   "google_cloud_project": "missing"

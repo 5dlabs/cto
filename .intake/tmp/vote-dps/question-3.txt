@@ -1,1 +1,1 @@
-Dedicated dashboard section or inline notifications within task views for design snapshot PRs?
+How should the frontend handle pipeline progress and error states?

@@ -1,0 +1,157 @@
+{
+  "version": "1.0.0",
+  "projectName": "optimizer-poc-candidate-1",
+  "provider_mode": "both",
+  "providers": [
+    "stitch"
+  ],
+  "tokens": {
+    "color": [
+      {
+        "name": "color.background.base",
+        "value": "#0B0C0F",
+        "description": "Primary app background"
+      },
+      {
+        "name": "color.text.primary",
+        "value": "#F4F6F8",
+        "description": "Primary text color"
+      },
+      {
+        "name": "color.accent.brand",
+        "value": "#7C5CFF",
+        "description": "Primary call-to-action accent"
+      }
+    ],
+    "typography": [
+      {
+        "name": "font.family.base",
+        "value": "Inter, system-ui, sans-serif"
+      },
+      {
+        "name": "font.size.body",
+        "value": "16px"
+      },
+      {
+        "name": "font.size.h1",
+        "value": "40px"
+      }
+    ],
+    "spacing": [
+      {
+        "name": "space.2",
+        "value": "8px"
+      },
+      {
+        "name": "space.4",
+        "value": "16px"
+      },
+      {
+        "name": "space.6",
+        "value": "24px"
+      }
+    ],
+    "radius": [
+      {
+        "name": "radius.sm",
+        "value": "8px"
+      },
+      {
+        "name": "radius.md",
+        "value": "12px"
+      },
+      {
+        "name": "radius.lg",
+        "value": "16px"
+      }
+    ]
+  },
+  "primitives": [
+    {
+      "name": "Button",
+      "description": "Primary action with variant and size controls.",
+      "states": [
+        "default",
+        "hover",
+        "disabled",
+        "loading"
+      ],
+      "provider_refs": [
+        "stitch"
+      ]
+    },
+    {
+      "name": "Input",
+      "description": "Text input with hint, error, and success states.",
+      "states": [
+        "default",
+        "focus",
+        "error",
+        "success"
+      ],
+      "provider_refs": [
+        "stitch"
+      ]
+    },
+    {
+      "name": "Card",
+      "description": "Surface container used for content grouping.",
+      "states": [
+        "default",
+        "interactive",
+        "selected"
+      ],
+      "provider_refs": [
+        "stitch"
+      ]
+    }
+  ],
+  "patterns": [
+    {
+      "name": "HeroSection",
+      "description": "Top-level value proposition area with CTA and social proof.",
+      "states": [
+        "default",
+        "with-secondary-cta"
+      ],
+      "provider_refs": [
+        "stitch"
+      ]
+    },
+    {
+      "name": "FeatureGrid",
+      "description": "Responsive feature list with icon, title, and supporting copy.",
+      "states": [
+        "2-column",
+        "3-column",
+        "mobile-stack"
+      ],
+      "provider_refs": [
+        "stitch"
+      ]
+    },
+    {
+      "name": "PricingStack",
+      "description": "Tiered pricing cards with highlighted recommended plan.",
+      "states": [
+        "monthly",
+        "annual",
+        "enterprise"
+      ],
+      "provider_refs": [
+        "stitch"
+      ]
+    }
+  ],
+  "component_map": [
+    {
+      "target": "web",
+      "provider": "stitch",
+      "candidate_id": "stitch-web-1",
+      "screen_id": "0bd7f5e0146b4ecc8237e8d80af32d71",
+      "notes": "Generated web modernization candidate from intake design context."
+    }
+  ],
+  "framer_code_components": [],
+  "generated_at": "2026-04-04T04:58:41.434Z"
+}

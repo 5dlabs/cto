@@ -1,16 +1,16 @@
 stage=intake-artifacts
-project=sigma-1-hardening-e2e
+project=sigma-1-e2e-delegation
 summary:
-Generated 10 tasks with 77 subtasks and 122 documentation artifacts for sigma-1-hardening-e2e. Bundle below includes sampled summaries and file excerpts for the first 2 tasks.
+Generated 10 tasks with 58 subtasks and 103 documentation artifacts for sigma-1-e2e-delegation. Bundle below includes sampled summaries and file excerpts for the first 2 tasks.
 
 task_summaries:
-[{"id":1,"title":"Provision Dev and Staging Infrastructure (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[],"subtask_count":8,"decision_point_count":3,"description":"Bootstrap dev and staging namespaces with all operator-managed data services, dedicated MinIO bucket, secrets, ConfigMap, and ArgoCD Application CRs for the Hermes pipeline. This is the foundational task — every subseque","test_strategy":"1. `kubectl get namespace hermes-dev hermes-staging` returns both namespaces in Active state.\n2. `kubectl get clusters.postgresql.cnpg.io -n hermes-dev` shows a Ready cluster with 1 replica.\n3. `kubectl get configmap her"},{"id":2,"title":"Implement Hermes Deliberation Path API (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"high","dependencies":[1],"subtask_count":7,"decision_point_count":2,"description":"Build the Hermes deliberation path as an internal module within the existing Bun/Elysia service, exposing RESTful endpoints for triggering deliberation, querying deliberation status, and retrieving results. This module f","test_strategy":"1. Unit tests: `HermesService.triggerDeliberation()` creates a deliberation record in PostgreSQL with status `pending` — verified by direct DB query returning the UUID.\n2. Integration test: `POST /api/hermes/deliberation"}]
+[{"id":1,"title":"Provision Dev Infrastructure for Sigma-1 E2E Pipeline (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[],"subtask_count":6,"decision_point_count":1,"description":"Bootstrap the sigma-1-dev namespace with all required infrastructure resources: namespace creation, Kubernetes secrets for Linear API key, Discord webhook URL, NOUS_API_KEY, and GitHub tokens, plus a sigma-1-infra-endpoi","test_strategy":"1. `kubectl get namespace sigma-1-dev` returns Active status. 2. `kubectl get secret sigma-1-secrets -n sigma-1-dev` exists and contains exactly 4 keys (LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, GITHUB_TOKEN). 3"},{"id":2,"title":"Extend PM Server for Agent Delegation in Linear Issues (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"high","dependencies":[1],"subtask_count":6,"decision_point_count":2,"description":"Extend the existing PM server's task generation and Linear issue creation pipeline to resolve agent hints to Linear user IDs via resolve_agent_delegates() and set delegate_id on every created issue. This is the core dele","test_strategy":"1. Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object mapping each to a valid Linear user ID string. 2. Unit test: `resolve_agent_delegates(['unknown_agent'])` returns null for the unknown "}]
 
 === .tasks/docs/task-1/task.md ===
-## Provision Dev and Staging Infrastructure (Bolt - Kubernetes/Helm)
+## Provision Dev Infrastructure for Sigma-1 E2E Pipeline (Bolt - Kubernetes/Helm)
 
 ### Objective
-Bootstrap dev and staging namespaces with all operator-managed data services, dedicated MinIO bucket, secrets, ConfigMap, and ArgoCD Application CRs for the Hermes pipeline. This is the foundational task — every subsequent task depends on it.
+Bootstrap the sigma-1-dev namespace with all required infrastructure resources: namespace creation, Kubernetes secrets for Linear API key, Discord webhook URL, NOUS_API_KEY, and GitHub tokens, plus a sigma-1-infra-endpoints ConfigMap aggregating connection strings for all in-cluster services (discord-bridge-http, linear-bridge, openclaw-nats, cloudflare-operator). This task provides the foundational infrastructure that all subsequent tasks depend on.
 
 ### Ownership
 - Agent: bolt
@@ -20,61 +20,29 @@ Bootstrap dev and staging namespaces with all operator-managed data services, de
 - Dependencies: None
 
 ### Implementation Details
-Step-by-step implementation:
-
-1. **Namespace creation:** Create `hermes-dev` and `hermes-staging` namespaces with appropriate labels (`app.kubernetes.io/part-of: hermes`, `environment: dev|staging`).
-
-2. **CloudNative-PG PostgreSQL:** Deploy single-replica `Cluster` CRs in each namespace. Configure `initdb` with a `hermes` database. Store connection credentials in namespace-scoped secrets (`hermes-pg-credentials`).
-
-3. **Redis operator:** Deploy single-replica Redis CRs in each namespace. Store connection string in namespace-scoped secret (`hermes-redis-credentials`).
-
-4. **NATS operator:** Deploy single-replica NATS CRs in each namespace. Not actively wired but must be available for future decoupling per D1. Store connection string in secret (`hermes-nats-credentials`).
-
-5. **MinIO — dedicated bucket (CRITICAL per D2):** Do NOT reuse `gitlab/gitlab-minio-svc`. Either:
-   a. Deploy a dedicated MinIO tenant via the MinIO Operator in each namespace, OR
-   b. If using the existing MinIO cluster, create a dedicated bucket (`hermes-artifacts-dev`, `hermes-artifacts-staging`) with independent IAM credentials and lifecycle policy.
-   Store S3 endpoint, access key, secret key, and bucket name in secret (`hermes-minio-credentials`).
-   Configure lifecycle policy: 90-day retention for dev, 365-day for staging (configurable via values).
-
-6. **ConfigMap aggregation:** Create `hermes-infra-endpoints` ConfigMap in each namespace aggregating all connection strings:
-   - `CNPG_HERMES_URL` — PostgreSQL connection string
-   - `REDIS_HERMES_URL` — Redis connection string
-   - `NATS_HERMES_URL` — NATS connection string
-   - `MINIO_HERMES_ENDPOINT` — MinIO S3 endpoint
-   - `MINIO_HERMES_BUCKET` — Bucket name
-   - `ENVIRONMENT` — `dev` or `staging`
-   All later tasks reference this ConfigMap via `envFrom`.
-
-7. **Secrets management:** Each namespace gets independent secrets for all services. No cross-namespace secret references. Use `SealedSecrets` or existing secret management pattern in the cluster.
-
-8. **ArgoCD Application CRs (gap resolution):** Create ArgoCD `Application` CRs for:
-   - `hermes-backend-dev` and `hermes-backend-staging` (Bun/Elysia service)
-   - `hermes-frontend-dev` and `hermes-frontend-staging` (Next.js app)
-   Configure automated sync for dev, manual sync with auto-prune for staging. Staging promotion should be gated by successful E2E test runs (annotation hook for Task 7 integration).
-
-9. **Loki verification:** Confirm `openclaw/loki-*` services are accessible from the new namespaces. No provisioning needed, but verify log shipping works by deploying a test pod that emits structured JSON.
-
-10. **Helm chart structure:** Package all of the above into a Helm chart (`charts/hermes-infra`) with `values-dev.yaml` and `values-staging.yaml` overlays. Single `helm upgrade --install` per environment.
+1. Create the `sigma-1-dev` namespace with appropriate labels (`project: sigma-1`, `env: dev`).
+2. Create Kubernetes Secret `sigma-1-secrets` containing keys: `LINEAR_API_KEY`, `DISCORD_WEBHOOK_URL`, `NOUS_API_KEY`, `GITHUB_TOKEN`. Values should reference external-secrets operator CRs if available, otherwise placeholder sealed-secrets for dev.
+3. Create ConfigMap `sigma-1-infra-endpoints` with the following keys:
+   - `DISCORD_BRIDGE_URL`: internal cluster URL for `bots/discord-bridge-http` service
+   - `LINEAR_BRIDGE_URL`: internal cluster URL for `bots/linear-bridge` service
+   - `NATS_URL`: `openclaw-nats.openclaw.svc.cluster.local` (reference only; may not be used per D2 resolution)
+   - `CLOUDFLARE_OPERATOR_NS`: `cloudflare-operator-system`
+4. Create a ServiceAccount `sigma-1-pm-server` with minimal RBAC (get/list on configmaps and secrets in `sigma-1-dev` namespace only).
+5. Validate that existing in-cluster services are reachable from the namespace: `bots/discord-bridge-http`, `bots/linear-bridge`, `cloudflare-operator-system` webhook service.
+6. Create a Helm values file `values-dev.yaml` capturing all namespace-scoped resource names for downstream consumption.
+7. Do NOT provision new NATS instances — NATS is already deployed at `openclaw-nats.openclaw.svc.cluster.local`. Do NOT deploy any ingress controller — Cloudflare operator handles ingress per D8.
 
 ### Subtasks
-- [ ] Create hermes-dev and hermes-staging namespaces with labels and Loki verification: Create both Kubernetes namespaces with standard labels and verify Loki log shipping is accessible from the new namespaces.
-- [ ] Deploy CloudNative-PG PostgreSQL Cluster CRs and credential secrets: Deploy single-replica CNPG Cluster custom resources in both hermes-dev and hermes-staging namespaces with initdb configuration and credential secrets.
-- [ ] Deploy Redis operator CRs and credential secrets: Deploy single-replica Redis custom resources in both namespaces with connection string stored in namespace-scoped secrets.
-- [ ] Deploy NATS operator CRs and credential secrets: Deploy single-replica NATS custom resources in both namespaces for future decoupling, with connection strings stored in secrets.
-- [ ] Provision dedicated MinIO bucket with IAM credentials and lifecycle policies: Create a dedicated MinIO bucket for Hermes artifacts in each namespace with independent IAM credentials and configurable retention lifecycle policies. Must NOT reuse GitLab-owned buckets.
-- [ ] Create hermes-infra-endpoints ConfigMap aggregating all service connection strings: Create the hermes-infra-endpoints ConfigMap in each namespace that aggregates all infrastructure connection strings for downstream service consumption via envFrom.
-- [ ] Create ArgoCD Application CRs for backend and frontend in both environments: Create ArgoCD Application custom resources for hermes-backend and hermes-frontend in both dev and staging namespaces with appropriate sync policies.
-- [ ] Package Helm chart with values overlays for dev and staging: Structure and finalize the charts/hermes-infra Helm chart with values-dev.yaml and values-staging.yaml overlays, ensuring a single helm upgrade --install per environment deploys everything.
+- [ ] Create sigma-1-dev namespace with labels: Create the sigma-1-dev Kubernetes namespace with project and environment labels that all subsequent resources will be deployed into.
+- [ ] Create sigma-1-secrets Kubernetes Secret with 4 keys: Create the Kubernetes Secret `sigma-1-secrets` in the sigma-1-dev namespace containing LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, and GITHUB_TOKEN. Use external-secrets CRs if available, otherwise sealed-secrets placeholders for dev.
+- [ ] Create sigma-1-infra-endpoints ConfigMap: Create the ConfigMap `sigma-1-infra-endpoints` in sigma-1-dev namespace with all 4 endpoint keys pointing to existing in-cluster services.
+- [ ] Create ServiceAccount sigma-1-pm-server with RBAC Role and RoleBinding: Create a ServiceAccount, Role, and RoleBinding in sigma-1-dev namespace granting minimal get/list permissions on configmaps and secrets.
+- [ ] Generate Helm values-dev.yaml capturing all resource names: Create a Helm values file that aggregates all namespace-scoped resource names (namespace, secret, configmap, service account) for downstream chart consumption.
+- [ ] Validate cross-namespace connectivity from sigma-1-dev to existing services: Deploy a temporary test pod in sigma-1-dev namespace to verify DNS resolution and HTTP connectivity to discord-bridge-http, linear-bridge, and openclaw-nats services.
 === .tasks/docs/task-1/acceptance.md ===
 ## Acceptance Criteria
 
-- [ ] 1. `kubectl get namespace hermes-dev hermes-staging` returns both namespaces in Active state.
-- [ ] 2. `kubectl get clusters.postgresql.cnpg.io -n hermes-dev` shows a Ready cluster with 1 replica.
-- [ ] 3. `kubectl get configmap hermes-infra-endpoints -n hermes-dev -o jsonpath='{.data.CNPG_HERMES_URL}'` returns a valid PostgreSQL connection string.
-- [ ] 4. `kubectl exec` a test pod in `hermes-dev` that connects to PostgreSQL, Redis, NATS, and MinIO using only env vars from `hermes-infra-endpoints` ConfigMap and mounted secrets — all four connections succeed.
-- [ ] 5. MinIO bucket `hermes-artifacts-dev` exists and is writable with dedicated credentials, AND those credentials do NOT have access to any GitLab-owned buckets.
-- [ ] 6. ArgoCD UI shows `hermes-backend-dev` and `hermes-frontend-staging` Application CRs in Synced/Healthy state (initially empty).
-- [ ] 7. A structured JSON log emitted from a test pod in `hermes-dev` is queryable in Loki via LogQL within 30 seconds.
+- [ ] 1. `kubectl get namespace sigma-1-dev` returns Active status. 2. `kubectl get secret sigma-1-secrets -n sigma-1-dev` exists and contains exactly 4 keys (LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, GITHUB_TOKEN). 3. `kubectl get configmap sigma-1-infra-endpoints -n sigma-1-dev -o json` contains all 4 endpoint keys with non-empty values. 4. `kubectl get serviceaccount sigma-1-pm-server -n sigma-1-dev` exists. 5. A connectivity test pod in `sigma-1-dev` can resolve DNS for `discord-bridge-http`, `linear-bridge`, and `openclaw-nats.openclaw.svc.cluster.local`.
 
 ## Verification Notes
 
@@ -82,10 +50,10 @@ Step-by-step implementation:
 - [ ] Update tests, docs, and configuration touched by this task.
 - [ ] Validate the final behavior against the task objective.
 === .tasks/docs/task-1/prompt.md ===
-Implement task 1: Provision Dev and Staging Infrastructure (Bolt - Kubernetes/Helm)
+Implement task 1: Provision Dev Infrastructure for Sigma-1 E2E Pipeline (Bolt - Kubernetes/Helm)
 
 ## Goal
-Bootstrap dev and staging namespaces with all operator-managed data services, dedicated MinIO bucket, secrets, ConfigMap, and ArgoCD Application CRs for the Hermes pipeline. This is the foundational task — every subsequent task depends on it.
+Bootstrap the sigma-1-dev namespace with all required infrastructure resources: namespace creation, Kubernetes secrets for Linear API key, Discord webhook URL, NOUS_API_KEY, and GitHub tokens, plus a sigma-1-infra-endpoints ConfigMap aggregating connection strings for all in-cluster services (discord-bridge-http, linear-bridge, openclaw-nats, cloudflare-operator). This task provides the foundational infrastructure that all subsequent tasks depend on.
 
 ## Task Context
 - Agent owner: bolt
@@ -94,70 +62,38 @@ Bootstrap dev and staging namespaces with all operator-managed data services, de
 - Dependencies: None
 
 ## Implementation Plan
-Step-by-step implementation:
-
-1. **Namespace creation:** Create `hermes-dev` and `hermes-staging` namespaces with appropriate labels (`app.kubernetes.io/part-of: hermes`, `environment: dev|staging`).
-
-2. **CloudNative-PG PostgreSQL:** Deploy single-replica `Cluster` CRs in each namespace. Configure `initdb` with a `hermes` database. Store connection credentials in namespace-scoped secrets (`hermes-pg-credentials`).
-
-3. **Redis operator:** Deploy single-replica Redis CRs in each namespace. Store connection string in namespace-scoped secret (`hermes-redis-credentials`).
-
-4. **NATS operator:** Deploy single-replica NATS CRs in each namespace. Not actively wired but must be available for future decoupling per D1. Store connection string in secret (`hermes-nats-credentials`).
-
-5. **MinIO — dedicated bucket (CRITICAL per D2):** Do NOT reuse `gitlab/gitlab-minio-svc`. Either:
-   a. Deploy a dedicated MinIO tenant via the MinIO Operator in each namespace, OR
-   b. If using the existing MinIO cluster, create a dedicated bucket (`hermes-artifacts-dev`, `hermes-artifacts-staging`) with independent IAM credentials and lifecycle policy.
-   Store S3 endpoint, access key, secret key, and bucket name in secret (`hermes-minio-credentials`).
-   Configure lifecycle policy: 90-day retention for dev, 365-day for staging (configurable via values).
-
-6. **ConfigMap aggregation:** Create `hermes-infra-endpoints` ConfigMap in each namespace aggregating all connection strings:
-   - `CNPG_HERMES_URL` — PostgreSQL connection string
-   - `REDIS_HERMES_URL` — Redis connection string
-   - `NATS_HERMES_URL` — NATS connection string
-   - `MINIO_HERMES_ENDPOINT` — MinIO S3 endpoint
-   - `MINIO_HERMES_BUCKET` — Bucket name
-   - `ENVIRONMENT` — `dev` or `staging`
-   All later tasks reference this ConfigMap via `envFrom`.
-
-7. **Secrets management:** Each namespace gets independent secrets for all services. No cross-namespace secret references. Use `SealedSecrets` or existing secret management pattern in the cluster.
-
-8. **ArgoCD Application CRs (gap resolution):** Create ArgoCD `Application` CRs for:
-   - `hermes-backend-dev` and `hermes-backend-staging` (Bun/Elysia service)
-   - `hermes-frontend-dev` and `hermes-frontend-staging` (Next.js app)
-   Configure automated sync for dev, manual sync with auto-prune for staging. Staging promotion should be gated by successful E2E test runs (annotation hook for Task 7 integration).
-
-9. **Loki verification:** Confirm `openclaw/loki-*` services are accessible from the new namespaces. No provisioning needed, but verify log shipping works by deploying a test pod that emits structured JSON.
-
-10. **Helm chart structure:** Package all of the above into a Helm chart (`charts/hermes-infra`) with `values-dev.yaml` and `values-staging.yaml` overlays. Single `helm upgrade --install` per environment.
+1. Create the `sigma-1-dev` namespace with appropriate labels (`project: sigma-1`, `env: dev`).
+2. Create Kubernetes Secret `sigma-1-secrets` containing keys: `LINEAR_API_KEY`, `DISCORD_WEBHOOK_URL`, `NOUS_API_KEY`, `GITHUB_TOKEN`. Values should reference external-secrets operator CRs if available, otherwise placeholder sealed-secrets for dev.
+3. Create ConfigMap `sigma-1-infra-endpoints` with the following keys:
+   - `DISCORD_BRIDGE_URL`: internal cluster URL for `bots/discord-bridge-http` service
+   - `LINEAR_BRIDGE_URL`: internal cluster URL for `bots/linear-bridge` service
+   - `NATS_URL`: `openclaw-nats.openclaw.svc.cluster.local` (reference only; may not be used per D2 resolution)
+   - `CLOUDFLARE_OPERATOR_NS`: `cloudflare-operator-system`
+4. Create a ServiceAccount `sigma-1-pm-server` with minimal RBAC (get/list on configmaps and secrets in `sigma-1-dev` namespace only).
+5. Validate that existing in-cluster services are reachable from the namespace: `bots/discord-bridge-http`, `bots/linear-bridge`, `cloudflare-operator-system` webhook service.
+6. Create a Helm values file `values-dev.yaml` capturing all namespace-scoped resource names for downstream consumption.
+7. Do NOT provision new NATS instances — NATS is already deployed at `openclaw-nats.openclaw.svc.cluster.local`. Do NOT deploy any ingress controller — Cloudflare operator handles ingress per D8.
 
 ## Acceptance Criteria
-1. `kubectl get namespace hermes-dev hermes-staging` returns both namespaces in Active state.
-2. `kubectl get clusters.postgresql.cnpg.io -n hermes-dev` shows a Ready cluster with 1 replica.
-3. `kubectl get configmap hermes-infra-endpoints -n hermes-dev -o jsonpath='{.data.CNPG_HERMES_URL}'` returns a valid PostgreSQL connection string.
-4. `kubectl exec` a test pod in `hermes-dev` that connects to PostgreSQL, Redis, NATS, and MinIO using only env vars from `hermes-infra-endpoints` ConfigMap and mounted secrets — all four connections succeed.
-5. MinIO bucket `hermes-artifacts-dev` exists and is writable with dedicated credentials, AND those credentials do NOT have access to any GitLab-owned buckets.
-6. ArgoCD UI shows `hermes-backend-dev` and `hermes-frontend-staging` Application CRs in Synced/Healthy state (initially empty).
-7. A structured JSON log emitted from a test pod in `hermes-dev` is queryable in Loki via LogQL within 30 seconds.
+1. `kubectl get namespace sigma-1-dev` returns Active status. 2. `kubectl get secret sigma-1-secrets -n sigma-1-dev` exists and contains exactly 4 keys (LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, GITHUB_TOKEN). 3. `kubectl get configmap sigma-1-infra-endpoints -n sigma-1-dev -o json` contains all 4 endpoint keys with non-empty values. 4. `kubectl get serviceaccount sigma-1-pm-server -n sigma-1-dev` exists. 5. A connectivity test pod in `sigma-1-dev` can resolve DNS for `discord-bridge-http`, `linear-bridge`, and `openclaw-nats.openclaw.svc.cluster.local`.
 
 ## Subtasks
-- Create hermes-dev and hermes-staging namespaces with labels and Loki verification: Create both Kubernetes namespaces with standard labels and verify Loki log shipping is accessible from the new namespaces.
-- Deploy CloudNative-PG PostgreSQL Cluster CRs and credential secrets: Deploy single-replica CNPG Cluster custom resources in both hermes-dev and hermes-staging namespaces with initdb configuration and credential secrets.
-- Deploy Redis operator CRs and credential secrets: Deploy single-replica Redis custom resources in both namespaces with connection string stored in namespace-scoped secrets.
-- Deploy NATS operator CRs and credential secrets: Deploy single-replica NATS custom resources in both namespaces for future decoupling, with connection strings stored in secrets.
-- Provision dedicated MinIO bucket with IAM credentials and lifecycle policies: Create a dedicated MinIO bucket for Hermes artifacts in each namespace with independent IAM credentials and configurable retention lifecycle policies. Must NOT reuse GitLab-owned buckets.
-- Create hermes-infra-endpoints ConfigMap aggregating all service connection strings: Create the hermes-infra-endpoints ConfigMap in each namespace that aggregates all infrastructure connection strings for downstream service consumption via envFrom.
-- Create ArgoCD Application CRs for backend and frontend in both environments: Create ArgoCD Application custom resources for hermes-backend and hermes-frontend in both dev and staging namespaces with appropriate sync policies.
-- Package Helm chart with values overlays for dev and staging: Structure and finalize the charts/hermes-infra Helm chart with values-dev.yaml and values-staging.yaml overlays, ensuring a single helm upgrade --install per environment deploys everything.
+- Create sigma-1-dev namespace with labels: Create the sigma-1-dev Kubernetes namespace with project and environment labels that all subsequent resources will be deployed into.
+- Create sigma-1-secrets Kubernetes Secret with 4 keys: Create the Kubernetes Secret `sigma-1-secrets` in the sigma-1-dev namespace containing LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, and GITHUB_TOKEN. Use external-secrets CRs if available, otherwise sealed-secrets placeholders for dev.
+- Create sigma-1-infra-endpoints ConfigMap: Create the ConfigMap `sigma-1-infra-endpoints` in sigma-1-dev namespace with all 4 endpoint keys pointing to existing in-cluster services.
+- Create ServiceAccount sigma-1-pm-server with RBAC Role and RoleBinding: Create a ServiceAccount, Role, and RoleBinding in sigma-1-dev namespace granting minimal get/list permissions on configmaps and secrets.
+- Generate Helm values-dev.yaml capturing all resource names: Create a Helm values file that aggregates all namespace-scoped resource names (namespace, secret, configmap, service account) for downstream chart consumption.
+- Validate cross-namespace connectivity from sigma-1-dev to existing services: Deploy a temporary test pod in sigma-1-dev namespace to verify DNS resolution and HTTP connectivity to discord-bridge-http, linear-bridge, and openclaw-nats services.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.
 - Keep artifacts aligned with the acceptance criteria.
 - Document blockers or assumptions in your final summary.
 === .tasks/docs/task-2/task.md ===
-## Implement Hermes Deliberation Path API (Nova - Bun/Elysia)
+## Extend PM Server for Agent Delegation in Linear Issues (Nova - Bun/Elysia)
 
 ### Objective
-Build the Hermes deliberation path as an internal module within the existing Bun/Elysia service, exposing RESTful endpoints for triggering deliberation, querying deliberation status, and retrieving results. This module forms the core of the intake pipeline validation.
+Extend the existing PM server's task generation and Linear issue creation pipeline to resolve agent hints to Linear user IDs via resolve_agent_delegates() and set delegate_id on every created issue. This is the core delegation flow that the E2E validation is designed to prove. The task entity schema is extended with a delegate_id field, and fallback behavior is implemented for unmappable agents.
 
 ### Ownership
 - Agent: nova
@@ -167,64 +103,28 @@ Build the Hermes deliberation path as an internal module within the existing Bun
 - Dependencies: 1
 
 ### Implementation Details
-Step-by-step implementation:
-
-1. **Module structure:** Create `src/modules/hermes/` directory with clear boundary:
-   - `src/modules/hermes/index.ts` — module entry point exporting Elysia plugin
-   - `src/modules/hermes/routes.ts` — route definitions
-   - `src/modules/hermes/service.ts` — business logic (HermesService class/interface)
-   - `src/modules/hermes/types.ts` — TypeScript interfaces for deliberation request/response, artifact metadata
-   - `src/modules/hermes/repository.ts` — database access abstraction
-
-2. **Interface contracts (per D1):** Define clear TypeScript interfaces:
-   - `IHermesService` — deliberation trigger, status query, result retrieval
-   - `IHermesRepository` — CRUD for deliberation records and artifact references
-   - `IHermesArtifactWriter` — abstraction for artifact storage (per open question #7 on D6, this must accommodate either schema extension or parallel table)
-
-3. **REST endpoints (per D3):** Implement via Elysia route handlers with `@elysiajs/swagger` for OpenAPI generation:
-   - `POST /api/hermes/deliberations` — trigger a new deliberation (requires `hermes:trigger` RBAC claim)
-   - `GET /api/hermes/deliberations/:id` — get deliberation status and result (requires `hermes:read`)
-   - `GET /api/hermes/deliberations` — list deliberations with pagination (requires `hermes:read`)
-   - `GET /api/hermes/deliberations/:id/artifacts` — list artifacts for a deliberation (requires `hermes:read`)
-
-4. **Auth integration (per D5):** Extend existing session middleware to check RBAC claims:
-   - Create `src/modules/hermes/middleware.ts` with `requireHermesClaim(claim: string)` guard
-   - Claims: `hermes:read`, `hermes:trigger` at minimum. Document additional claims as needed.
-   - Coordinate claim names with Task 10 (RBAC hardening) via shared types file or ADR.
-
-5. **Database schema:** Create migration for deliberation records:
-   - `deliberations` table: `id` (UUID), `status` (enum: pending/processing/completed/failed), `input_payload` (JSONB), `result_payload` (JSONB), `triggered_by` (FK to users), `created_at`, `updated_at`
-   - For artifact references: implement behind `IHermesArtifactWriter` abstraction to accommodate pending D6 decision. Default to parallel table approach (`hermes_artifacts` with FK to deliberation) but ensure the interface can swap to schema extension.
-
-6. **Elysia plugin registration:** Register the Hermes module as an Elysia plugin in the main app entry point:
-   ```typescript
-   app.use(hermesPlugin)
-   ```
-   Ensure it does not interfere with existing legacy pipeline routes.
-
-7. **OpenAPI documentation:** Ensure all endpoints generate OpenAPI specs via `@elysiajs/swagger`. Tag all Hermes endpoints with `hermes` group.
-
-8. **Environment configuration:** Read all infra connection strings from `hermes-infra-endpoints` ConfigMap (env vars). Feature flag: `HERMES_ENABLED=true|false` env var controls whether the module registers routes.
-
-9. **Error handling:** Return structured JSON error responses with `error_code` field for downstream logging (Task 6 dependency).
+1. Locate the existing `resolve_agent_delegates()` function in the PM server codebase. Verify it accepts agent hints (e.g., 'bolt', 'nova', 'blaze') and returns Linear user IDs.
+2. Extend the task entity/type definition to include `delegate_id: string | null` field.
+3. In the task generation pipeline, after tasks are generated with agent hints, call `resolve_agent_delegates()` to batch-resolve all agent hints to Linear user IDs.
+4. Populate `delegate_id` on each task object with the resolved Linear user ID.
+5. In the Linear issue creation step, pass `assigneeId: task.delegate_id` when creating each issue via the Linear API.
+6. Implement fallback behavior: if `resolve_agent_delegates()` cannot resolve an agent hint, log a warning with the agent hint and task ID, create the issue unassigned (delegate_id = null), and add an `agent:unresolved` label to the issue.
+7. Add a summary log at the end of issue creation: `Created N issues, M assigned, K unresolved`.
+8. Ensure the PM server reads secrets from the `sigma-1-secrets` Kubernetes secret and endpoints from `sigma-1-infra-endpoints` ConfigMap via `envFrom`.
+9. Write unit tests for: resolve_agent_delegates mapping, fallback on unknown agent, delegate_id propagation to Linear API call.
+10. Write an integration test that runs the full pipeline with a mock Linear API and verifies at least 5 issues are created with non-null assigneeId.
 
 ### Subtasks
-- [ ] Scaffold Hermes module structure and define TypeScript interface contracts: Create the src/modules/hermes/ directory structure with all file stubs and define the IHermesService, IHermesRepository, and IHermesArtifactWriter TypeScript interfaces.
-- [ ] Create database migrations for deliberations and hermes_artifacts tables: Write and validate database migration scripts that create the deliberations and hermes_artifacts tables in PostgreSQL without affecting existing tables.
-- [ ] Implement HermesRepository with PostgreSQL data access layer: Implement the IHermesRepository interface with PostgreSQL queries for CRUD operations on deliberations and hermes_artifacts tables.
-- [ ] Implement HermesService business logic layer: Implement the IHermesService interface with business logic for triggering deliberations, querying status, and retrieving results, using the repository abstraction.
-- [ ] Implement RBAC middleware with hermes:read and hermes:trigger claim guards: Create Hermes-specific RBAC middleware that extends the existing session middleware to check for hermes:read and hermes:trigger claims.
-- [ ] Implement REST endpoints and register Elysia plugin with feature flag: Implement all four Hermes REST endpoints as Elysia route handlers, wire them to the service layer with RBAC guards, register as a plugin, and implement the HERMES_ENABLED feature flag.
-- [ ] Configure OpenAPI/Swagger documentation for all Hermes endpoints: Ensure all Hermes endpoints are properly documented in the OpenAPI spec via @elysiajs/swagger with correct schemas, tags, and descriptions.
+- [ ] Extend task entity type definition with delegate_id field: Add the `delegate_id: string | null` field to the task entity/type definition used throughout the PM server's task generation and issue creation pipeline.
+- [ ] Implement and verify resolve_agent_delegates() function: Locate or implement the resolve_agent_delegates() function that accepts an array of agent hint strings and returns a mapping of agent hints to Linear user IDs, with null for unresolvable agents.
+- [ ] Integrate delegation into the task generation pipeline: Wire resolve_agent_delegates() into the task generation pipeline: after tasks are generated with agent hints, batch-resolve them and populate delegate_id on each task, then pass assigneeId to the Linear API issue creation calls.
+- [ ] Implement fallback behavior for unresolvable agents and summary logging: Add fallback logic for when resolve_agent_delegates() returns null for an agent hint: log a warning, create the issue unassigned, add an agent:unresolved label, and emit a summary log line after all issues are created.
+- [ ] Write unit tests for resolve_agent_delegates and delegate_id propagation: Create comprehensive unit tests covering resolve_agent_delegates mapping, fallback on unknown agents, and delegate_id propagation to the Linear API call layer.
+- [ ] Write integration test with mock Linear API validating full delegation pipeline: Create an integration test that runs the full task generation and issue creation pipeline against a mock Linear API, verifying at least 5 issues are created with non-null assigneeId and the summary log is correct.
 === .tasks/docs/task-2/acceptance.md ===
 ## Acceptance Criteria
 
-- [ ] 1. Unit tests: `HermesService.triggerDeliberation()` creates a deliberation record in PostgreSQL with status `pending` — verified by direct DB query returning the UUID.
-- [ ] 2. Integration test: `POST /api/hermes/deliberations` with valid session and `hermes:trigger` claim returns 201 with a deliberation ID; same request without `hermes:trigger` claim returns 403.
-- [ ] 3. Integration test: `GET /api/hermes/deliberations/:id` returns the correct deliberation record with status field matching the DB state.
-- [ ] 4. OpenAPI spec: `GET /api/swagger/json` includes all four Hermes endpoints with correct request/response schemas.
-- [ ] 5. Feature flag: When `HERMES_ENABLED=false`, `GET /api/hermes/deliberations` returns 404 (routes not registered).
-- [ ] 6. Database migration: Running migrations on a clean database creates `deliberations` and `hermes_artifacts` tables without errors; running on an existing database with legacy data does not alter existing tables.
+- [ ] 1. Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object mapping each to a valid Linear user ID string. 2. Unit test: `resolve_agent_delegates(['unknown_agent'])` returns null for the unknown agent and logs a warning. 3. Integration test: Run the task generation pipeline with a sample PRD; verify at least 5 task objects have non-null `delegate_id` values. 4. Integration test: Mock the Linear API create-issue endpoint; verify each call includes `assigneeId` matching the task's `delegate_id`. 5. Integration test: Verify the summary log line shows correct counts for assigned vs unresolved.
 
 ## Verification Notes
 
@@ -232,10 +132,10 @@ Step-by-step implementation:
 - [ ] Update tests, docs, and configuration touched by this task.
 - [ ] Validate the final behavior against the task objective.
 === .tasks/docs/task-2/prompt.md ===
-Implement task 2: Implement Hermes Deliberation Path API (Nova - Bun/Elysia)
+Implement task 2: Extend PM Server for Agent Delegation in Linear Issues (Nova - Bun/Elysia)
 
 ## Goal
-Build the Hermes deliberation path as an internal module within the existing Bun/Elysia service, exposing RESTful endpoints for triggering deliberation, querying deliberation status, and retrieving results. This module forms the core of the intake pipeline validation.
+Extend the existing PM server's task generation and Linear issue creation pipeline to resolve agent hints to Linear user IDs via resolve_agent_delegates() and set delegate_id on every created issue. This is the core delegation flow that the E2E validation is designed to prove. The task entity schema is extended with a delegate_id field, and fallback behavior is implemented for unmappable agents.
 
 ## Task Context
 - Agent owner: nova
@@ -244,63 +144,27 @@ Build the Hermes deliberation path as an internal module within the existing Bun
 - Dependencies: 1
 
 ## Implementation Plan
-Step-by-step implementation:
-
-1. **Module structure:** Create `src/modules/hermes/` directory with clear boundary:
-   - `src/modules/hermes/index.ts` — module entry point exporting Elysia plugin
-   - `src/modules/hermes/routes.ts` — route definitions
-   - `src/modules/hermes/service.ts` — business logic (HermesService class/interface)
-   - `src/modules/hermes/types.ts` — TypeScript interfaces for deliberation request/response, artifact metadata
-   - `src/modules/hermes/repository.ts` — database access abstraction
-
-2. **Interface contracts (per D1):** Define clear TypeScript interfaces:
-   - `IHermesService` — deliberation trigger, status query, result retrieval
-   - `IHermesRepository` — CRUD for deliberation records and artifact references
-   - `IHermesArtifactWriter` — abstraction for artifact storage (per open question #7 on D6, this must accommodate either schema extension or parallel table)
-
-3. **REST endpoints (per D3):** Implement via Elysia route handlers with `@elysiajs/swagger` for OpenAPI generation:
-   - `POST /api/hermes/deliberations` — trigger a new deliberation (requires `hermes:trigger` RBAC claim)
-   - `GET /api/hermes/deliberations/:id` — get deliberation status and result (requires `hermes:read`)
-   - `GET /api/hermes/deliberations` — list deliberations with pagination (requires `hermes:read`)
-   - `GET /api/hermes/deliberations/:id/artifacts` — list artifacts for a deliberation (requires `hermes:read`)
-
-4. **Auth integration (per D5):** Extend existing session middleware to check RBAC claims:
-   - Create `src/modules/hermes/middleware.ts` with `requireHermesClaim(claim: string)` guard
-   - Claims: `hermes:read`, `hermes:trigger` at minimum. Document additional claims as needed.
-   - Coordinate claim names with Task 10 (RBAC hardening) via shared types file or ADR.
-
-5. **Database schema:** Create migration for deliberation records:
-   - `deliberations` table: `id` (UUID), `status` (enum: pending/processing/completed/failed), `input_payload` (JSONB), `result_payload` (JSONB), `triggered_by` (FK to users), `created_at`, `updated_at`
-   - For artifact references: implement behind `IHermesArtifactWriter` abstraction to accommodate pending D6 decision. Default to parallel table approach (`hermes_artifacts` with FK to deliberation) but ensure the interface can swap to schema extension.
-
-6. **Elysia plugin registration:** Register the Hermes module as an Elysia plugin in the main app entry point:
-   ```typescript
-   app.use(hermesPlugin)
-   ```
-   Ensure it does not interfere with existing legacy pipeline routes.
-
-7. **OpenAPI documentation:** Ensure all endpoints generate OpenAPI specs via `@elysiajs/swagger`. Tag all Hermes endpoints with `hermes` group.
-
-8. **Environment configuration:** Read all infra connection strings from `hermes-infra-endpoints` ConfigMap (env vars). Feature flag: `HERMES_ENABLED=true|false` env var controls whether the module registers routes.
-
-9. **Error handling:** Return structured JSON error responses with `error_code` field for downstream logging (Task 6 dependency).
+1. Locate the existing `resolve_agent_delegates()` function in the PM server codebase. Verify it accepts agent hints (e.g., 'bolt', 'nova', 'blaze') and returns Linear user IDs.
+2. Extend the task entity/type definition to include `delegate_id: string | null` field.
+3. In the task generation pipeline, after tasks are generated with agent hints, call `resolve_agent_delegates()` to batch-resolve all agent hints to Linear user IDs.
+4. Populate `delegate_id` on each task object with the resolved Linear user ID.
+5. In the Linear issue creation step, pass `assigneeId: task.delegate_id` when creating each issue via the Linear API.
+6. Implement fallback behavior: if `resolve_agent_delegates()` cannot resolve an agent hint, log a warning with the agent hint and task ID, create the issue unassigned (delegate_id = null), and add an `agent:unresolved` label to the issue.
+7. Add a summary log at the end of issue creation: `Created N issues, M assigned, K unresolved`.
+8. Ensure the PM server reads secrets from the `sigma-1-secrets` Kubernetes secret and endpoints from `sigma-1-infra-endpoints` ConfigMap via `envFrom`.
+9. Write unit tests for: resolve_agent_delegates mapping, fallback on unknown agent, delegate_id propagation to Linear API call.
+10. Write an integration test that runs the full pipeline with a mock Linear API and verifies at least 5 issues are created with non-null assigneeId.
 
 ## Acceptance Criteria
-1. Unit tests: `HermesService.triggerDeliberation()` creates a deliberation record in PostgreSQL with status `pending` — verified by direct DB query returning the UUID.
-2. Integration test: `POST /api/hermes/deliberations` with valid session and `hermes:trigger` claim returns 201 with a deliberation ID; same request without `hermes:trigger` claim returns 403.
-3. Integration test: `GET /api/hermes/deliberations/:id` returns the correct deliberation record with status field matching the DB state.
-4. OpenAPI spec: `GET /api/swagger/json` includes all four Hermes endpoints with correct request/response schemas.
-5. Feature flag: When `HERMES_ENABLED=false`, `GET /api/hermes/deliberations` returns 404 (routes not registered).
-6. Database migration: Running migrations on a clean database creates `deliberations` and `hermes_artifacts` tables without errors; running on an existing database with legacy data does not alter existing tables.
+1. Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object mapping each to a valid Linear user ID string. 2. Unit test: `resolve_agent_delegates(['unknown_agent'])` returns null for the unknown agent and logs a warning. 3. Integration test: Run the task generation pipeline with a sample PRD; verify at least 5 task objects have non-null `delegate_id` values. 4. Integration test: Mock the Linear API create-issue endpoint; verify each call includes `assigneeId` matching the task's `delegate_id`. 5. Integration test: Verify the summary log line shows correct counts for assigned vs unresolved.
 
 ## Subtasks
-- Scaffold Hermes module structure and define TypeScript interface contracts: Create the src/modules/hermes/ directory structure with all file stubs and define the IHermesService, IHermesRepository, and IHermesArtifactWriter TypeScript interfaces.
-- Create database migrations for deliberations and hermes_artifacts tables: Write and validate database migration scripts that create the deliberations and hermes_artifacts tables in PostgreSQL without affecting existing tables.
-- Implement HermesRepository with PostgreSQL data access layer: Implement the IHermesRepository interface with PostgreSQL queries for CRUD operations on deliberations and hermes_artifacts tables.
-- Implement HermesService business logic layer: Implement the IHermesService interface with business logic for triggering deliberations, querying status, and retrieving results, using the repository abstraction.
-- Implement RBAC middleware with hermes:read and hermes:trigger claim guards: Create Hermes-specific RBAC middleware that extends the existing session middleware to check for hermes:read and hermes:trigger claims.
-- Implement REST endpoints and register Elysia plugin with feature flag: Implement all four Hermes REST endpoints as Elysia route handlers, wire them to the service layer with RBAC guards, register as a plugin, and implement the HERMES_ENABLED feature flag.
-- Configure OpenAPI/Swagger documentation for all Hermes endpoints: Ensure all Hermes endpoints are properly documented in the OpenAPI spec via @elysiajs/swagger with correct schemas, tags, and descriptions.
+- Extend task entity type definition with delegate_id field: Add the `delegate_id: string | null` field to the task entity/type definition used throughout the PM server's task generation and issue creation pipeline.
+- Implement and verify resolve_agent_delegates() function: Locate or implement the resolve_agent_delegates() function that accepts an array of agent hint strings and returns a mapping of agent hints to Linear user IDs, with null for unresolvable agents.
+- Integrate delegation into the task generation pipeline: Wire resolve_agent_delegates() into the task generation pipeline: after tasks are generated with agent hints, batch-resolve them and populate delegate_id on each task, then pass assigneeId to the Linear API issue creation calls.
+- Implement fallback behavior for unresolvable agents and summary logging: Add fallback logic for when resolve_agent_delegates() returns null for an agent hint: log a warning, create the issue unassigned, add an agent:unresolved label, and emit a summary log line after all issues are created.
+- Write unit tests for resolve_agent_delegates and delegate_id propagation: Create comprehensive unit tests covering resolve_agent_delegates mapping, fallback on unknown agents, and delegate_id propagation to the Linear API call layer.
+- Write integration test with mock Linear API validating full delegation pipeline: Create an integration test that runs the full task generation and issue creation pipeline against a mock Linear API, verifying at least 5 issues are created with non-null assigneeId and the summary log is correct.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

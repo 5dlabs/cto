@@ -1,1 +1,1 @@
-Store delegate_id as Linear's native assignee field or as custom metadata/label?
+What authentication mechanism for the web frontend dashboard?

@@ -1,91 +1,91 @@
-project=sigma-1-hardening-e2e
+project=sigma-1-e2e-delegation
 
 intake_summary:
-{"project_name":"sigma-1-hardening-e2e","generated_at":"2026-03-31T17:40:05Z","artifact_counts":{"task_count":10,"subtask_count":77,"decision_point_count":24,"doc_count":10,"prompt_count":10,"workflow_count":10},"delivery":{"issue_count":11,"pr_url":"https://github.com/5dlabs/cto/pull/4567"}}
+{"project_name":"sigma-1-e2e-delegation","generated_at":"2026-04-04T02:14:35Z","artifact_counts":{"task_count":10,"subtask_count":58,"decision_point_count":12,"doc_count":10,"prompt_count":10,"workflow_count":10},"delivery":{"issue_count":11,"pr_url":"https://github.com/5dlabs/cto/pull/4571"}}
 
 summary:
-Pipeline intake output for sigma-1-hardening-e2e: 10 tasks, 77 subtasks. Bundle below includes compact snapshots for every generated task doc/prompt artifact.
+Pipeline intake output for sigma-1-e2e-delegation: 10 tasks, 58 subtasks. Bundle below includes compact snapshots for every generated task doc/prompt artifact.
 
 task_summaries:
-[{"id":1,"title":"Provision Dev and Staging Infrastructure (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[],"subtask_count":8,"decision_point_count":3,"description":"Bootstrap dev and staging namespaces with all operator-managed data services, dedicated MinIO bucket, secrets, ConfigMap, and ArgoCD Application CRs for the Hermes pipeline. This is the foundational task — every subseque","test_strategy":"1. `kubectl get namespace hermes-dev hermes-staging` returns both namespaces in Active state.\n2. `kubectl get clusters.postgresql.cnpg.io -n hermes-dev` shows a Ready cluster with 1 replica.\n3. `kubectl get configmap her"},{"id":2,"title":"Implement Hermes Deliberation Path API (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"high","dependencies":[1],"subtask_count":7,"decision_point_count":2,"description":"Build the Hermes deliberation path as an internal module within the existing Bun/Elysia service, exposing RESTful endpoints for triggering deliberation, querying deliberation status, and retrieving results. This module f","test_strategy":"1. Unit tests: `HermesService.triggerDeliberation()` creates a deliberation record in PostgreSQL with status `pending` — verified by direct DB query returning the UUID.\n2. Integration test: `POST /api/hermes/deliberation"},{"id":3,"title":"Integrate Hermes Path with Snapshot Artifact Generation (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"high","dependencies":[1,2],"subtask_count":7,"decision_point_count":3,"description":"Implement snapshot artifact generation within the Hermes deliberation flow — capturing current-site screenshots and generated variant snapshots, writing them to the dedicated MinIO bucket, and linking artifact metadata t","test_strategy":"1. Integration test: Triggering a deliberation via `POST /api/hermes/deliberations` with a valid target URL results in at least one `current_site_screenshot` artifact record in the database within 30 seconds.\n2. MinIO ve"},{"id":4,"title":"Update Web Experience for Hermes Path Surfacing (Blaze - React/Next.js)","agent":"blaze","stack":"React/Next.js","priority":"high","dependencies":[1,2,3],"subtask_count":9,"decision_point_count":2,"description":"Build the frontend web experience that surfaces Hermes deliberation results, displays snapshot artifacts (current-site screenshots and variant snapshots) in a comparison view, and implements the environment distinction p","test_strategy":"1. Environment banner: In a staging build (`NEXT_PUBLIC_ENVIRONMENT=staging`), the `EnvironmentBanner` component renders with text containing 'STAGING' and has an amber-colored background (CSS computed style check). In p"},{"id":5,"title":"Preserve and Migrate Existing Snapshot Artifacts (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"medium","dependencies":[1,2,3],"subtask_count":6,"decision_point_count":2,"description":"Build a migration pipeline that preserves existing legacy snapshot artifacts by copying them to the dedicated MinIO bucket and creating corresponding artifact metadata records, ensuring backward compatibility while enabl","test_strategy":"1. Idempotency: Running the migration twice on the same dataset results in the same number of artifact records — no duplicates (verified by COUNT query before and after second run).\n2. Artifact integrity: For a sample of"},{"id":6,"title":"Implement Rollout and Migration Risk Logging (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"medium","dependencies":[1,2,3],"subtask_count":6,"decision_point_count":2,"description":"Implement structured logging, rollout phase tracking, and alerting for the Hermes pipeline — including Grafana dashboards for migration health, deliberation error rates, and rollback trigger conditions using the existing","test_strategy":"1. Structured log validation: All Hermes API requests generate logs queryable in Loki via `{app=\"hermes\"} | json | module=\"hermes\"` — each entry contains `rollout_phase`, `operation`, and `duration_ms` fields.\n2. Rollbac"},{"id":7,"title":"Automate E2E Testing for Hermes Intake Pipeline (Tess - Test frameworks)","agent":"tess","stack":"Playwright","priority":"high","dependencies":[1,2,3,4,5,6],"subtask_count":7,"decision_point_count":2,"description":"Create a comprehensive E2E test suite using Playwright that validates the entire Hermes intake pipeline — from API deliberation triggering through artifact generation to frontend surfacing — covering both API-level and b","test_strategy":"1. API lifecycle test passes: A deliberation created via POST transitions to `completed` status within 60 seconds and has at least 2 artifacts (1 current_site_screenshot + 1 variant_snapshot).\n2. Auth tests pass: All 3 a"},{"id":8,"title":"Document Migration and Rollout Plan (Atlas - CI/CD platforms)","agent":"atlas","stack":"CI/CD platforms","priority":"medium","dependencies":[1,2,3,4,5,6,7],"subtask_count":5,"decision_point_count":1,"description":"Create comprehensive documentation covering the migration plan, rollout strategy, rollback procedures, infrastructure sequencing, and operational runbooks for the Hermes pipeline — including ArgoCD promotion workflow con","test_strategy":"1. Documentation completeness: All six documents listed above exist in `docs/hermes/` directory and each contains all specified sections (verified by section heading check).\n2. Mermaid diagram: The infrastructure sequenc"},{"id":9,"title":"Production Hardening: HA, CDN, TLS, Ingress (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[1,2,3,4,5,6,7,8],"subtask_count":11,"decision_point_count":4,"description":"Harden the Hermes pipeline for production deployment — scale all data services to HA configurations, configure TLS termination, set up ingress routing, apply network policies, and establish resource limits and autoscalin","test_strategy":"1. HA PostgreSQL: `kubectl get pods -n hermes-production -l cnpg.io/cluster=hermes-pg` returns 3 Running pods. Killing the primary pod results in automatic failover to a replica within 30 seconds (verified by continuous "},{"id":10,"title":"Production Hardening: RBAC, Secret Rotation, Audit Logging (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[1,2,3,4,5,6,7,8,9],"subtask_count":11,"decision_point_count":3,"description":"Implement production security hardening — Kubernetes RBAC policies, automated secret rotation for all data service credentials, comprehensive audit logging for critical resource access, and security scanning integration ","test_strategy":"1. RBAC enforcement: The backend ServiceAccount can read `hermes-infra-endpoints` ConfigMap but CANNOT list Secrets in other namespaces — verified by `kubectl auth can-i` with the SA token.\n2. Application RBAC: A user wi"}]
+[{"id":1,"title":"Provision Dev Infrastructure for Sigma-1 E2E Pipeline (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[],"subtask_count":6,"decision_point_count":1,"description":"Bootstrap the sigma-1-dev namespace with all required infrastructure resources: namespace creation, Kubernetes secrets for Linear API key, Discord webhook URL, NOUS_API_KEY, and GitHub tokens, plus a sigma-1-infra-endpoi","test_strategy":"1. `kubectl get namespace sigma-1-dev` returns Active status. 2. `kubectl get secret sigma-1-secrets -n sigma-1-dev` exists and contains exactly 4 keys (LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, GITHUB_TOKEN). 3"},{"id":2,"title":"Extend PM Server for Agent Delegation in Linear Issues (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"high","dependencies":[1],"subtask_count":6,"decision_point_count":2,"description":"Extend the existing PM server's task generation and Linear issue creation pipeline to resolve agent hints to Linear user IDs via resolve_agent_delegates() and set delegate_id on every created issue. This is the core dele","test_strategy":"1. Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object mapping each to a valid Linear user ID string. 2. Unit test: `resolve_agent_delegates(['unknown_agent'])` returns null for the unknown "},{"id":3,"title":"Integrate Hermes Research Content in Deliberation Path (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"high","dependencies":[1],"subtask_count":5,"decision_point_count":2,"description":"Add a Hermes research integration module to the PM server's deliberation stage. When NOUS_API_KEY is available, the module calls the Hermes/NOUS API to generate research memos that are embedded directly on each task's re","test_strategy":"1. Unit test: With a mocked Hermes API returning valid content, `fetchResearchMemo()` returns a ResearchMemo with non-empty content, source, and valid timestamp. 2. Unit test: With NOUS_API_KEY unset, `fetchResearchMemo("},{"id":4,"title":"Implement Design Snapshot PR Surfacing (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"medium","dependencies":[1],"subtask_count":6,"decision_point_count":2,"description":"Implement the PR creation module in the PM server that creates a pull request in the 5dlabs/sigma-1 repository containing generated task scaffolds and any pipeline artifacts. Since stitch_status=failed and no design arti","test_strategy":"1. Unit test: Given a PipelineOutput with 5 tasks, the module generates exactly 5 task scaffold files with correct naming convention `tasks/task-<id>-<slug>.md`. 2. Unit test: PR body contains task count, list of agent a"},{"id":5,"title":"Enable Discord and Linear Bridge Notifications (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"medium","dependencies":[1],"subtask_count":6,"decision_point_count":1,"description":"Implement the notification dispatch layer in the PM server that sends pipeline lifecycle events (start, complete, error) to the existing in-cluster discord-bridge-http and linear-bridge services. Per D3, notifications ar","test_strategy":"1. Unit test: `notify('pipeline.start')` sends an HTTP POST to DISCORD_BRIDGE_URL with a JSON body containing event='pipeline.start', pipeline_id, and timestamp. 2. Unit test: `notify('pipeline.complete')` payload includ"},{"id":6,"title":"Scaffold Web Frontend with Agent Assignment Visualization (Blaze - React/Next.js)","agent":"blaze","stack":"React/Next.js","priority":"medium","dependencies":[2],"subtask_count":6,"decision_point_count":2,"description":"Create or extend the web frontend application to display pipeline task lists with agent assignment visualization. Each task card shows the delegate_id as an agent avatar/badge, assignment status, and task metadata. Uses ","test_strategy":"1. Component test: TaskCard rendered with `delegate_id='user_123'` and `agent='nova'` displays 'Nova' badge in green and shows the avatar. 2. Component test: TaskCard rendered with `delegate_id=null` displays 'Unresolved"},{"id":7,"title":"Add Research Memo Display to Web Frontend (Blaze - React/Next.js)","agent":"blaze","stack":"React/Next.js","priority":"medium","dependencies":[3,6],"subtask_count":6,"decision_point_count":0,"description":"Extend the pipeline dashboard to display Hermes research memos associated with each task. Memos are shown as collapsible sections within task cards, displaying the content, source, and timestamp. Contingent on D5 resolut","test_strategy":"1. Component test: TaskCard with a non-null `research_memo` shows a 'Research' badge; clicking it reveals content, source, and timestamp. 2. Component test: TaskCard with `research_memo=null` does not render the Research"},{"id":8,"title":"Display Design Snapshot PRs in Web Frontend (Blaze - React/Next.js)","agent":"blaze","stack":"React/Next.js","priority":"low","dependencies":[4,6],"subtask_count":3,"decision_point_count":0,"description":"Add a PR status section to the pipeline dashboard that displays the design snapshot PR created by the pipeline, including PR URL, status, file count, and a link to the GitHub PR. Contingent on D5 resolution.","test_strategy":"1. Component test: SnapshotPR rendered with a valid PR result displays the PR title, a clickable URL linking to `github.com/5dlabs/sigma-1/pull/N`, and an 'Open' badge in green. 2. Component test: SnapshotPR rendered wit"},{"id":9,"title":"Show Pipeline Status Notifications in Web Frontend (Blaze - React/Next.js)","agent":"blaze","stack":"React/Next.js","priority":"low","dependencies":[5,6],"subtask_count":3,"decision_point_count":0,"description":"Add a real-time or polling-based pipeline status indicator and notification timeline to the dashboard, showing pipeline lifecycle events (start, complete, error) and their timestamps. Displays the same events that are di","test_strategy":"1. Component test: PipelineStatus with status='running' renders a blue 'Running' badge. 2. Component test: PipelineStatus with status='complete' renders a green 'Complete' badge and displays Linear session and PR links. "},{"id":10,"title":"Production Hardening: HA, Ingress, RBAC, and Security (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[2,3,4,5,6,7,8,9],"subtask_count":11,"decision_point_count":2,"description":"Harden the sigma-1-dev deployment for production readiness: configure Cloudflare Tunnel ingress via accesstunnel/clustertunnel CRDs, enforce RBAC on all service accounts, enable audit logging, configure resource limits a","test_strategy":"1. `kubectl get accesstunnel -n sigma-1-dev` (or `clustertunnel`) returns a CR in 'Active' or 'Ready' state. 2. External HTTPS request to the tunnel URL returns a valid response (200 from PM server /health endpoint) with"}]
 
 --- task_id=1 ---
-task_size=5153
-task_excerpt=## Provision Dev and Staging Infrastructure (Bolt - Kubernetes/Helm)  ### Objective Bootstrap dev and staging namespaces with all operator-managed data services, dedicated MinIO bucket, secrets, ConfigMap, and ArgoCD App
-acceptance_size=1235
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. `kubectl get namespace hermes-dev hermes-staging` returns both namespaces in Active state. - [ ] 2. `kubectl get clusters.postgresql.cnpg.io -n hermes-dev` shows a Ready cluster with 1 re
-prompt_size=6277
-prompt_excerpt=Implement task 1: Provision Dev and Staging Infrastructure (Bolt - Kubernetes/Helm)  ## Goal Bootstrap dev and staging namespaces with all operator-managed data services, dedicated MinIO bucket, secrets, ConfigMap, and A
+task_size=3452
+task_excerpt=## Provision Dev Infrastructure for Sigma-1 E2E Pipeline (Bolt - Kubernetes/Helm)  ### Objective Bootstrap the sigma-1-dev namespace with all required infrastructure resources: namespace creation, Kubernetes secrets for 
+acceptance_size=815
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. `kubectl get namespace sigma-1-dev` returns Active status. 2. `kubectl get secret sigma-1-secrets -n sigma-1-dev` exists and contains exactly 4 keys (LINEAR_API_KEY, DISCORD_WEBHOOK_URL, 
+prompt_size=4200
+prompt_excerpt=Implement task 1: Provision Dev Infrastructure for Sigma-1 E2E Pipeline (Bolt - Kubernetes/Helm)  ## Goal Bootstrap the sigma-1-dev namespace with all required infrastructure resources: namespace creation, Kubernetes sec
 
 --- task_id=2 ---
-task_size=5172
-task_excerpt=## Implement Hermes Deliberation Path API (Nova - Bun/Elysia)  ### Objective Build the Hermes deliberation path as an internal module within the existing Bun/Elysia service, exposing RESTful endpoints for triggering deli
-acceptance_size=1220
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Unit tests: `HermesService.triggerDeliberation()` creates a deliberation record in PostgreSQL with status `pending` — verified by direct DB query returning the UUID. - [ ] 2. Integration 
-prompt_size=6291
-prompt_excerpt=Implement task 2: Implement Hermes Deliberation Path API (Nova - Bun/Elysia)  ## Goal Build the Hermes deliberation path as an internal module within the existing Bun/Elysia service, exposing RESTful endpoints for trigge
+task_size=3644
+task_excerpt=## Extend PM Server for Agent Delegation in Linear Issues (Nova - Bun/Elysia)  ### Objective Extend the existing PM server's task generation and Linear issue creation pipeline to resolve agent hints to Linear user IDs vi
+acceptance_size=867
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object mapping each to a valid Linear user ID string. 2. Unit test: `resolve_agent_delegates(['unknown_agent'])`
+prompt_size=4444
+prompt_excerpt=Implement task 2: Extend PM Server for Agent Delegation in Linear Issues (Nova - Bun/Elysia)  ## Goal Extend the existing PM server's task generation and Linear issue creation pipeline to resolve agent hints to Linear us
 
 --- task_id=3 ---
-task_size=5489
-task_excerpt=## Integrate Hermes Path with Snapshot Artifact Generation (Nova - Bun/Elysia)  ### Objective Implement snapshot artifact generation within the Hermes deliberation flow — capturing current-site screenshots and generated 
-acceptance_size=1342
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Integration test: Triggering a deliberation via `POST /api/hermes/deliberations` with a valid target URL results in at least one `current_site_screenshot` artifact record in the database 
-prompt_size=6730
-prompt_excerpt=Implement task 3: Integrate Hermes Path with Snapshot Artifact Generation (Nova - Bun/Elysia)  ## Goal Implement snapshot artifact generation within the Hermes deliberation flow — capturing current-site screenshots and g
+task_size=3338
+task_excerpt=## Integrate Hermes Research Content in Deliberation Path (Nova - Bun/Elysia)  ### Objective Add a Hermes research integration module to the PM server's deliberation stage. When NOUS_API_KEY is available, the module call
+acceptance_size=974
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Unit test: With a mocked Hermes API returning valid content, `fetchResearchMemo()` returns a ResearchMemo with non-empty content, source, and valid timestamp. 2. Unit test: With NOUS_API_
+prompt_size=4249
+prompt_excerpt=Implement task 3: Integrate Hermes Research Content in Deliberation Path (Nova - Bun/Elysia)  ## Goal Add a Hermes research integration module to the PM server's deliberation stage. When NOUS_API_KEY is available, the mo
 
 --- task_id=4 ---
-task_size=5933
-task_excerpt=## Update Web Experience for Hermes Path Surfacing (Blaze - React/Next.js)  ### Objective Build the frontend web experience that surfaces Hermes deliberation results, displays snapshot artifacts (current-site screenshots
-acceptance_size=1436
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Environment banner: In a staging build (`NEXT_PUBLIC_ENVIRONMENT=staging`), the `EnvironmentBanner` component renders with text containing 'STAGING' and has an amber-colored background (C
-prompt_size=7260
-prompt_excerpt=Implement task 4: Update Web Experience for Hermes Path Surfacing (Blaze - React/Next.js)  ## Goal Build the frontend web experience that surfaces Hermes deliberation results, displays snapshot artifacts (current-site sc
+task_size=3129
+task_excerpt=## Implement Design Snapshot PR Surfacing (Nova - Bun/Elysia)  ### Objective Implement the PR creation module in the PM server that creates a pull request in the 5dlabs/sigma-1 repository containing generated task scaffo
+acceptance_size=949
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Unit test: Given a PipelineOutput with 5 tasks, the module generates exactly 5 task scaffold files with correct naming convention `tasks/task-<id>-<slug>.md`. 2. Unit test: PR body contai
+prompt_size=4011
+prompt_excerpt=Implement task 4: Implement Design Snapshot PR Surfacing (Nova - Bun/Elysia)  ## Goal Implement the PR creation module in the PM server that creates a pull request in the 5dlabs/sigma-1 repository containing generated ta
 
 --- task_id=5 ---
-task_size=5026
-task_excerpt=## Preserve and Migrate Existing Snapshot Artifacts (Nova - Bun/Elysia)  ### Objective Build a migration pipeline that preserves existing legacy snapshot artifacts by copying them to the dedicated MinIO bucket and creati
-acceptance_size=1378
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Idempotency: Running the migration twice on the same dataset results in the same number of artifact records — no duplicates (verified by COUNT query before and after second run). - [ ] 2.
-prompt_size=6307
-prompt_excerpt=Implement task 5: Preserve and Migrate Existing Snapshot Artifacts (Nova - Bun/Elysia)  ## Goal Build a migration pipeline that preserves existing legacy snapshot artifacts by copying them to the dedicated MinIO bucket a
+task_size=3997
+task_excerpt=## Enable Discord and Linear Bridge Notifications (Nova - Bun/Elysia)  ### Objective Implement the notification dispatch layer in the PM server that sends pipeline lifecycle events (start, complete, error) to the existin
+acceptance_size=944
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Unit test: `notify('pipeline.start')` sends an HTTP POST to DISCORD_BRIDGE_URL with a JSON body containing event='pipeline.start', pipeline_id, and timestamp. 2. Unit test: `notify('pipel
+prompt_size=4874
+prompt_excerpt=Implement task 5: Enable Discord and Linear Bridge Notifications (Nova - Bun/Elysia)  ## Goal Implement the notification dispatch layer in the PM server that sends pipeline lifecycle events (start, complete, error) to th
 
 --- task_id=6 ---
-task_size=4921
-task_excerpt=## Implement Rollout and Migration Risk Logging (Nova - Bun/Elysia)  ### Objective Implement structured logging, rollout phase tracking, and alerting for the Hermes pipeline — including Grafana dashboards for migration h
-acceptance_size=1486
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Structured log validation: All Hermes API requests generate logs queryable in Loki via `{app="hermes"} | json | module="hermes"` — each entry contains `rollout_phase`, `operation`, and `d
-prompt_size=6310
-prompt_excerpt=Implement task 6: Implement Rollout and Migration Risk Logging (Nova - Bun/Elysia)  ## Goal Implement structured logging, rollout phase tracking, and alerting for the Hermes pipeline — including Grafana dashboards for mi
+task_size=3383
+task_excerpt=## Scaffold Web Frontend with Agent Assignment Visualization (Blaze - React/Next.js)  ### Objective Create or extend the web frontend application to display pipeline task lists with agent assignment visualization. Each t
+acceptance_size=938
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Component test: TaskCard rendered with `delegate_id='user_123'` and `agent='nova'` displays 'Nova' badge in green and shows the avatar. 2. Component test: TaskCard rendered with `delegate
+prompt_size=4254
+prompt_excerpt=Implement task 6: Scaffold Web Frontend with Agent Assignment Visualization (Blaze - React/Next.js)  ## Goal Create or extend the web frontend application to display pipeline task lists with agent assignment visualizatio
 
 --- task_id=7 ---
-task_size=6018
-task_excerpt=## Automate E2E Testing for Hermes Intake Pipeline (Tess - Test frameworks)  ### Objective Create a comprehensive E2E test suite using Playwright that validates the entire Hermes intake pipeline — from API deliberation t
-acceptance_size=1336
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. API lifecycle test passes: A deliberation created via POST transitions to `completed` status within 60 seconds and has at least 2 artifacts (1 current_site_screenshot  1 variant_snapshot)
-prompt_size=7241
-prompt_excerpt=Implement task 7: Automate E2E Testing for Hermes Intake Pipeline (Tess - Test frameworks)  ## Goal Create a comprehensive E2E test suite using Playwright that validates the entire Hermes intake pipeline — from API delib
+task_size=2828
+task_excerpt=## Add Research Memo Display to Web Frontend (Blaze - React/Next.js)  ### Objective Extend the pipeline dashboard to display Hermes research memos associated with each task. Memos are shown as collapsible sections within
+acceptance_size=960
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Component test: TaskCard with a non-null `research_memo` shows a 'Research' badge; clicking it reveals content, source, and timestamp. 2. Component test: TaskCard with `research_memo=null
+prompt_size=3721
+prompt_excerpt=Implement task 7: Add Research Memo Display to Web Frontend (Blaze - React/Next.js)  ## Goal Extend the pipeline dashboard to display Hermes research memos associated with each task. Memos are shown as collapsible sectio
 
 --- task_id=8 ---
-task_size=5352
-task_excerpt=## Document Migration and Rollout Plan (Atlas - CI/CD platforms)  ### Objective Create comprehensive documentation covering the migration plan, rollout strategy, rollback procedures, infrastructure sequencing, and operat
-acceptance_size=1334
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Documentation completeness: All six documents listed above exist in `docs/hermes/` directory and each contains all specified sections (verified by section heading check). - [ ] 2. Mermaid
-prompt_size=6593
-prompt_excerpt=Implement task 8: Document Migration and Rollout Plan (Atlas - CI/CD platforms)  ## Goal Create comprehensive documentation covering the migration plan, rollout strategy, rollback procedures, infrastructure sequencing, a
+task_size=1951
+task_excerpt=## Display Design Snapshot PRs in Web Frontend (Blaze - React/Next.js)  ### Objective Add a PR status section to the pipeline dashboard that displays the design snapshot PR created by the pipeline, including PR URL, stat
+acceptance_size=796
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Component test: SnapshotPR rendered with a valid PR result displays the PR title, a clickable URL linking to `github.com/5dlabs/sigma-1/pull/N`, and an 'Open' badge in green. 2. Component
+prompt_size=2692
+prompt_excerpt=Implement task 8: Display Design Snapshot PRs in Web Frontend (Blaze - React/Next.js)  ## Goal Add a PR status section to the pipeline dashboard that displays the design snapshot PR created by the pipeline, including PR 
 
 --- task_id=9 ---
-task_size=6303
-task_excerpt=## Production Hardening: HA, CDN, TLS, Ingress (Bolt - Kubernetes/Helm)  ### Objective Harden the Hermes pipeline for production deployment — scale all data services to HA configurations, configure TLS termination, set u
-acceptance_size=1636
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. HA PostgreSQL: `kubectl get pods -n hermes-production -l cnpg.io/cluster=hermes-pg` returns 3 Running pods. Killing the primary pod results in automatic failover to a replica within 30 se
-prompt_size=7816
-prompt_excerpt=Implement task 9: Production Hardening: HA, CDN, TLS, Ingress (Bolt - Kubernetes/Helm)  ## Goal Harden the Hermes pipeline for production deployment — scale all data services to HA configurations, configure TLS terminati
+task_size=2791
+task_excerpt=## Show Pipeline Status Notifications in Web Frontend (Blaze - React/Next.js)  ### Objective Add a real-time or polling-based pipeline status indicator and notification timeline to the dashboard, showing pipeline lifecyc
+acceptance_size=978
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. Component test: PipelineStatus with status='running' renders a blue 'Running' badge. 2. Component test: PipelineStatus with status='complete' renders a green 'Complete' badge and displays
+prompt_size=3714
+prompt_excerpt=Implement task 9: Show Pipeline Status Notifications in Web Frontend (Blaze - React/Next.js)  ## Goal Add a real-time or polling-based pipeline status indicator and notification timeline to the dashboard, showing pipelin
 
 --- task_id=10 ---
-task_size=6960
-task_excerpt=## Production Hardening: RBAC, Secret Rotation, Audit Logging (Bolt - Kubernetes/Helm)  ### Objective Implement production security hardening — Kubernetes RBAC policies, automated secret rotation for all data service cre
-acceptance_size=1678
-acceptance_excerpt=## Acceptance Criteria  - [ ] 1. RBAC enforcement: The backend ServiceAccount can read `hermes-infra-endpoints` ConfigMap but CANNOT list Secrets in other namespaces — verified by `kubectl auth can-i` with the SA token. 
-prompt_size=8516
-prompt_excerpt=Implement task 10: Production Hardening: RBAC, Secret Rotation, Audit Logging (Bolt - Kubernetes/Helm)  ## Goal Implement production security hardening — Kubernetes RBAC policies, automated secret rotation for all data s
+task_size=5850
+task_excerpt=## Production Hardening: HA, Ingress, RBAC, and Security (Bolt - Kubernetes/Helm)  ### Objective Harden the sigma-1-dev deployment for production readiness: configure Cloudflare Tunnel ingress via accesstunnel/clustertun
+acceptance_size=1316
+acceptance_excerpt=## Acceptance Criteria  - [ ] 1. `kubectl get accesstunnel -n sigma-1-dev` (or `clustertunnel`) returns a CR in 'Active' or 'Ready' state. 2. External HTTPS request to the tunnel URL returns a valid response (200 from PM
+prompt_size=7080
+prompt_excerpt=Implement task 10: Production Hardening: HA, Ingress, RBAC, and Security (Bolt - Kubernetes/Helm)  ## Goal Harden the sigma-1-dev deployment for production readiness: configure Cloudflare Tunnel ingress via accesstunnel/
 

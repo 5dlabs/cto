@@ -3,50 +3,50 @@
     "scores": {
       "task_decomposition": 9,
       "dependency_ordering": 8,
-      "decision_point_coverage": 7,
-      "test_strategy_quality": 9,
+      "decision_point_coverage": 8,
+      "test_strategy_quality": 8,
       "agent_assignment": 9
     },
-    "overall_score": 8.57,
+    "overall_score": 8.5,
     "verdict": "approve",
-    "reasoning": "The plan demonstrates exemplary structural decomposition: each top-level task owns a single architectural boundary (infra in Task 1, data/API layer in Tasks 2/3/5/6/7, presentation layer in Task 4, cross-cutting E2E validation in Task 8, and ops hardening in Tasks 9/10). Subtasks are well-scoped to single concerns — e.g., Task 7 cleanly separates the GitHub client (7001), branch creation (7002), content generation (7003), Git tree commit (7004), PR creation (7005), and orchestration (7006), which is textbook dependency inversion and single-responsibility. Dependencies follow gravity correctly: infrastructure (Task 1) precedes all services, backend services (Tasks 2, 3, 7) precede the frontend (Task 4), and E2E testing (Task 8) correctly depends on all feature tasks. Decision points are present for key ambiguities (agent hint matching strategy in Task 2, diff library and design system in Task 4, ingress controller and cert-manager in Task 9, secret rotation mechanism in Task 10) but Task 3 (Hermes integration) lacks a decision point for the research endpoint API contract/versioning, and Task 6's batching window size (2 seconds) is hardcoded without a decision point for tuning. Test strategies are consistently specific and measurable with acceptance criteria covering happy paths, error paths, and edge cases across nearly all tasks.",
+    "reasoning": "The plan demonstrates excellent structural decomposition with clean architectural boundaries: Task 1 (infra) is correctly isolated as the foundation, Tasks 2-5 (service layer) properly depend on infra and own distinct bounded contexts (delegation, research, PR surfacing, notifications), Task 6 (validation) correctly depends on service-layer tasks, Task 7 (frontend) depends on APIs it consumes, and Task 8 (E2E) sits at the top of the DAG. Each task owns a single architectural concern and subtasks further decompose along clean module boundaries (e.g., Task 3 separates provider interface, concrete implementations, selector, and integration — textbook Strategy pattern). Tasks 9-10 (production hardening) are correctly sequenced after E2E validation. Minor structural issues: Tasks 2-5 all depend only on Task 1 but could potentially have inter-dependencies made explicit (e.g., Task 5 notifications reference Task 4 PR URL output); the dependency graph permits parallelism between 2/3/4/5 which is architecturally sound since they share infra but own separate concerns. Decision points correctly flag external API contracts (Hermes, NOUS, Discord bridge, Linear bridge) and infrastructure ambiguities (SecretStore, backing paths) as unresolved.",
     "suggestions": [
-      "Task 4 depends on Task 7 (PR generation) but the frontend's data-fetching hook (subtask 4001) has no dependencies and can't actually integrate without the PM server endpoints from Task 7 being available — make the dependency explicit at the subtask level or add a decision point about whether to mock the API contract or wait for Task 7 completion.",
-      "Task 3 (Hermes integration) should include a decision point about the Hermes API contract stability — whether to code against a versioned schema, what happens if the response shape changes, and whether a client SDK or raw fetch is appropriate, since the entire integration is built on an assumed response shape ({ title, summary, url, relevance_score }).",
-      "Tasks 9 and 10 could enable more parallelism: Task 10 depends entirely on Task 9, but several subtasks (10001 ServiceAccounts, 10003 RBAC Roles, 10006 Audit Policy, 10007 NetworkPolicies) have no actual structural dependency on Task 9's HPA/Ingress/probe work — they could be split into a parallel track or Task 10's dependency on 9 could be narrowed to only the deployment subtasks that need the prod namespace and deployments to exist."
+      "Task 5 (notifications) references PR URL from Task 4 output in its completion notification payload, but does not declare Task 4 as a dependency — either add Task 4 as a soft dependency or document that the PR URL field is nullable when Task 4 has not completed, to make the data flow contract explicit at the architectural level.",
+      "Task 7 subtasks 7003-7004 (auth/JWT) introduce a new backend API surface (`POST /api/auth/login`, `/api/auth/refresh`) that does not exist in Task 2's scope — split this into a dedicated subtask under Task 2 for the auth endpoint implementation on cto-pm, and have Task 7's auth subtasks depend on it, to avoid a cross-layer responsibility gap where the frontend task implicitly requires backend changes.",
+      "Tasks 9 and 10 contain subtasks that could be parallelized more aggressively — specifically, 9004 (default-deny NetworkPolicy) has no real dependency on 9001 (HA scaling) but 9005/9006 correctly depend on 9004; similarly 10001 (RBAC), 10003 (secret rotation config), 10005 (audit policy), and 10006 (app-level audit) are all independent foundations that could run in parallel, which the plan already captures via empty dependencies on some but could make more explicit."
     ]
   },
   {
     "scores": {
       "task_decomposition": 7,
-      "dependency_ordering": 4,
-      "decision_point_coverage": 6,
-      "test_strategy_quality": 8,
+      "dependency_ordering": 6,
+      "decision_point_coverage": 7,
+      "test_strategy_quality": 7,
       "agent_assignment": 8
     },
-    "overall_score": 5.8,
+    "overall_score": 6.6,
     "verdict": "revise",
-    "reasoning": "Most tasks are implementable and sized reasonably with strong subtask structure and concrete test strategies (e.g., Tasks 2, 3, 7, 8). However, dependency ordering has a clear forward reference (Task 4 depends on Task 7 while Task 7 also depends on Task 2 and 1), creating a cycle/invalid ordering; additionally, some tasks depend on infra (Task 1) unnecessarily at code-level, reducing parallelism. Decision points exist for some major choices (Task 2 matching strategy, Task 8 framework/Discord verification, Task 9 ingress/cert-manager), but several infrastructure/security assumptions (e.g., NetworkPolicy CIDR realism, secret rotation mechanism feasibility) are left as vague bullets rather than executable decisions.",
+    "reasoning": "The breakdown is generally actionable with 1–3 day subtasks (e.g., 2001–2006, 3001–3007, 4002–4006) and strong agent-fit, but several tasks hide major unknowns that will stall execution (payload contracts for Hermes/NOUS/bridges, and dashboard auth endpoints). Dependency ordering is mostly infrastructure-first, yet introduces avoidable serial chains and missing hard dependencies (e.g., Task 6/8 depend on API endpoints and pipeline triggers that aren’t defined as tasks; Task 7 depends on 6 even though it only needs 2 + 6 endpoints).",
     "suggestions": [
-      "Fix the invalid dependency graph: remove Task 4’s dependency on Task 7 (frontend UI can ship against stubbed/mock PR endpoints), or split Task 7 into (7a) “persist PR metadata + expose /api/pipeline/:runId/pr(s) endpoints” (depends on 2, can unblock 4) and (7b) “actual GitHub PR creation + commit flow”; then make Task 4 depend on 7a instead of 7.",
-      "Reduce unnecessary serial chains by separating “cluster infra prerequisites” from “code changes”: allow Tasks 2/3/5/7 to start without Task 1 as a hard dependency by adding explicit config interfaces + local env fallback (e.g., accept env vars directly in dev), and keep Task 1 as a deployment/environments task needed only for in-cluster validation/E2E (Task 8).",
-      "Add explicit decision points (with options) where feasibility is currently hand-wavy: (a) NetworkPolicy egress strategy in dev/prod (DNS + FQDN policies vs. CIDRs vs. allow-all with audit) since “resolve IPs” is brittle, and (b) secret rotation source-of-truth (External Secrets + cloud store vs. manual rotation runbook) because the proposed CronJob cannot actually mint new Linear/GitHub/Discord credentials without an external system."
+      "Add explicit tasks to define/confirm external service contracts and required endpoints before implementation: (a) discover and document discord-bridge-http payload schema + endpoint paths, (b) linear-bridge payload schema, (c) Hermes API contract (/health + /research path + request/response), (d) NOUS auth/header + endpoint; make these tasks dependencies for Tasks 3 and 5 (and partially 8).",
+      "Unblock E2E by adding missing backend/API surface tasks that current tests assume: implement pipeline intake/status endpoints used by 8005 (`POST /api/pipeline/intake`, `GET /api/pipeline/:runId/status`) and a notifications record endpoint assumed by 8004 (`GET /api/pipeline/:runId/notifications`) or revise 8004/8008 to use only already-planned interfaces.",
+      "Reduce unnecessary sequential dependencies to enable parallel work: let Task 7 depend on Task 2 (delegation/pipeline status endpoints) and Task 6 (validation report) rather than only Task 6; split Task 6 into (i) pipeline runner + report storage/API (6002/6004/6005) and (ii) Linear live verification (6003) so the core pipeline can ship and be demoed even if live Linear verification isn’t available in an environment."
     ]
   },
   {
     "scores": {
       "task_decomposition": 6,
       "dependency_ordering": 7,
-      "decision_point_coverage": 7,
-      "test_strategy_quality": 9,
-      "agent_assignment": 8
+      "decision_point_coverage": 8,
+      "test_strategy_quality": 8,
+      "agent_assignment": 9
     },
-    "overall_score": 7.2,
+    "overall_score": 7.1,
     "verdict": "approve",
-    "reasoning": "Test strategies are genuinely excellent — specific, measurable, covering happy paths, error cases, and edge conditions consistently across all tasks. However, task decomposition suffers from significant inflation: tasks 9 and 10 are premature v2 scope (production HA, RBAC, CDN, secret rotation) gated behind all v1 tasks including the E2E test suite, meaning they'll never run in v1 — they should be deferred. Within tasks, subtask inflation is evident: 2002 (caching layer as a standalone subtask), 2004 (removing a label as a standalone subtask), 10008 (docs as a standalone subtask), and 9001/9002 (splitting frontend vs backend replica values into separate subtasks) are all unnecessary decompositions that could be collapsed. Dependency ordering is mostly correct with infrastructure-first sequencing, but task 4 depends on task 7 (frontend depends on PR generation) which is a plausible but arguable forward dependency that forces sequential execution where parallelism was possible.",
+    "reasoning": "The plan delivers solid coverage of a complex E2E pipeline with well-scoped subtasks, strong test strategies, and correct agent assignments throughout. However, the total task count (10 top-level tasks, 70+ subtasks) is severely bloated for the PRD scope — Tasks 7 (dashboard), 9 (production hardening), and 10 (RBAC/audit) are explicitly labeled 'stretch/deferred' yet consume roughly 30 subtasks, inflating the plan weight and obscuring the critical path. Task 3 subtask 3007 (structured logging audit) and Task 2 subtask 2006 (delegation logging) are redundant — both audit and consolidate logging that should have been built inline during implementation subtasks, not as separate cleanup passes. Task 9 subtask 9010 (CDN caching) explicitly gates on Task 7 being deployed, making it a conditional stretch-within-a-stretch that adds noise.",
     "suggestions": [
-      "Defer tasks 9 and 10 entirely from this plan — production hardening (HA scaling, CDN, TLS, RBAC, secret rotation, audit logging) is v2 scope; the E2E pipeline can be validated without production infra, and these 19 subtasks represent ~40% of the plan's bulk with zero v1 value. Remove the dependency chain requiring E2E completion (task 8) before hardening can begin — this sequencing alone proves they're post-launch concerns.",
-      "Collapse subtask 2002 (caching) into 2001 (resolve_agent_delegates implementation) — a module-level cache variable is 3 lines of code, not a standalone subtask. Similarly collapse 2004 (remove legacy label) into 2003 (integrate delegates into issueCreate), and collapse 10008 (security.md) into task 10's acceptance criteria rather than a separate subtask. These inflations obscure real work."
+      "Remove Tasks 7, 9, and 10 entirely from this plan or move them to a separate v2 task list — they are self-declared deferred and together account for ~35 subtasks that do not advance the PRD's stated acceptance criteria (AC-1 through AC-5). Their presence makes the critical path (Tasks 1-6, 8) harder to track and inflates the perceived scope.",
+      "Collapse subtasks 2006 and 3007 (standalone structured logging passes) into their respective implementation subtasks — logging should be an acceptance criterion on subtasks 2003/3005/3006, not a separate deliverable. A subtask that only 'audits and replaces ad-hoc console.log calls' after the fact is rework, not forward progress."
     ]
   }
 ]
