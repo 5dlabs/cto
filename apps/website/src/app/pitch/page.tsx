@@ -412,7 +412,7 @@ export default function PitchPage() {
             <div className="grid sm:grid-cols-3 gap-4">
               {[
                 {
-                  title: "Your servers",
+                  title: "Your bare metal",
                   desc: "Bare-metal servers we provision through hardware partners (Cherry, Hetzner, Latitude). You control the economics.",
                   icon: (
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
