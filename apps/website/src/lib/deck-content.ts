@@ -176,7 +176,7 @@ export interface QuadrantCell {
 
 export const COMPETITION_QUADRANT: QuadrantCell[] = [
   { label: "Cloud-managed + Human-built", players: ["AWS / GCP / Azure", "Heroku / Render", "Vercel / Netlify"] },
-  { label: "Cloud-managed + AI-built", players: ["Replit / Bolt", "GitHub Copilot Workspace", "Vercel v0"] },
+  { label: "Cloud-managed + AI-built", players: ["Devin (Cognition)", "Replit / Bolt", "GitHub Copilot Workspace", "Vercel v0"] },
   { label: "Bare metal + Human-built", players: ["Coolify / CapRover", "Hetzner + Terraform", "Oxide Computer"] },
   { label: "Bare metal + AI-built", players: ["5D Labs"], highlight: true },
 ];
