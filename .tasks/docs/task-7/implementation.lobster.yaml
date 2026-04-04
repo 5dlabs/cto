@@ -3,7 +3,7 @@ metadata:
   task_id: 7
   agent: blaze
   stack: React/Next.js
-  depends_on_tasks: [3, 6]
+  depends_on_tasks: [6]
 
 inputs:
   - name: task_dir
@@ -52,7 +52,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-7003
-    depends_on: [validate-subtask-7001]
+    depends_on: [validate-subtask-7002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7003/prompt.md
@@ -64,7 +64,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-7004
-    depends_on: [validate-subtask-7002, validate-subtask-7003]
+    depends_on: [validate-subtask-7003]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7004/prompt.md
@@ -76,7 +76,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-7005
-    depends_on: [setup]
+    depends_on: [validate-subtask-7001]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7005/prompt.md
@@ -88,7 +88,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-7006
-    depends_on: [validate-subtask-7004, validate-subtask-7005]
+    depends_on: [validate-subtask-7002, validate-subtask-7005]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7006/prompt.md
@@ -99,8 +99,44 @@ steps:
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
+  - name: implement-subtask-7007
+    depends_on: [validate-subtask-7006]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7007/prompt.md
+
+  - name: validate-subtask-7007
+    depends_on: [implement-subtask-7007]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
+  - name: implement-subtask-7008
+    depends_on: [validate-subtask-7005, validate-subtask-7002]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7008/prompt.md
+
+  - name: validate-subtask-7008
+    depends_on: [implement-subtask-7008]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
+  - name: implement-subtask-7009
+    depends_on: [validate-subtask-7001]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7009/prompt.md
+
+  - name: validate-subtask-7009
+    depends_on: [implement-subtask-7009]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
   - name: integration-validation
-    depends_on: [validate-subtask-7001, validate-subtask-7002, validate-subtask-7003, validate-subtask-7004, validate-subtask-7005, validate-subtask-7006]
+    depends_on: [validate-subtask-7001, validate-subtask-7002, validate-subtask-7003, validate-subtask-7004, validate-subtask-7005, validate-subtask-7006, validate-subtask-7007, validate-subtask-7008, validate-subtask-7009]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

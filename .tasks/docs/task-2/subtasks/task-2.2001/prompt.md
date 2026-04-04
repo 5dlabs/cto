@@ -1,15 +1,16 @@
-Implement subtask 2001: Extend task entity type definition with delegate_id field
+Implement subtask 2001: Audit and extend resolve_agent_delegates() mapping to cover 5+ agents
 
 ## Objective
-Add the `delegate_id: string | null` field to the task entity/type definition used throughout the PM server's task generation and issue creation pipeline.
+Audit the existing resolve_agent_delegates() function in cto/cto-pm to determine the current mapping source and coverage. Extend it to map at least 5 distinct agent hints (bolt, nova, blaze, tess, and at least one more) to their corresponding Linear user IDs.
 
 ## Steps
-1. Locate the task entity type definition in the PM server codebase (likely a TypeScript interface or type).
-2. Add `delegate_id: string | null` to the type definition.
-3. Set the default value to `null` for backward compatibility.
-4. Update any task factory/builder functions to initialize `delegate_id` as `null`.
-5. If there are Zod schemas or other validation schemas for the task entity, update those as well to include the new field.
-6. Ensure existing code that creates task objects still compiles without modification (the new field should be optional or default to null).
+1. Locate the resolve_agent_delegates() function in the cto-pm codebase.
+2. Identify how agent → Linear user ID mappings are currently stored (hardcoded map, config, or API).
+3. Document the current set of mappings and identify gaps.
+4. Add missing agent entries so at least 5 agents are covered: bolt, nova, blaze, tess, and one additional (e.g., rex, grizz, or cipher).
+5. Ensure the function signature accepts an agent hint string and returns `string | null` (Linear user ID or null for unknown agents).
+6. Ensure the function reads Linear API token from the environment (injected via sigma-1-infra-endpoints ConfigMap envFrom from ExternalSecret sigma-1-linear-token).
+7. Add structured logging: log the agent hint received and the resolved user ID or null.
 
 ## Validation
-TypeScript compilation passes with no errors. Existing task creation code continues to work without modification. A new task object created with the factory has `delegate_id: null` by default. Type-checking confirms that `delegate_id` accepts both `string` and `null`.
+Unit test: call resolve_agent_delegates() with each of the 5 known agent hints and assert a non-null, valid-format Linear user ID is returned for each. Call with 'unknown-agent' and assert null is returned. Verify structured log output includes agent hint and resolution result.

@@ -1,21 +1,21 @@
-Implement subtask 2005: Write unit tests for resolve_agent_delegates and delegate_id propagation
+Implement subtask 2005: Implement GET /api/pipeline/status endpoint
 
 ## Objective
-Create comprehensive unit tests covering resolve_agent_delegates mapping, fallback on unknown agents, and delegate_id propagation to the Linear API call layer.
+Add a REST endpoint GET /api/pipeline/status to the Elysia server that returns pipeline stage, task counts (total, assigned, pending), and stage transition timestamps.
 
 ## Steps
-1. Create a test file (e.g., `resolve-agent-delegates.test.ts`) using Bun's test runner.
-2. Unit tests for resolve_agent_delegates():
-   a. Known agents ('bolt', 'nova', 'blaze', 'rex', 'grizz', 'cipher') all resolve to non-empty string Linear user IDs.
-   b. Unknown agent returns null in the mapping.
-   c. Empty array input returns empty object.
-   d. Duplicate agent hints return same ID for each occurrence.
-3. Unit tests for delegate_id propagation:
-   a. Mock the task generation output with agent hints.
-   b. Verify after resolution, each task has the correct delegate_id.
-   c. Mock the Linear API client and verify `createIssue` is called with `assigneeId` matching delegate_id for resolved agents.
-   d. Verify `createIssue` is called without `assigneeId` for unresolved agents.
-4. Use Bun's built-in test and mock utilities. Avoid external test dependencies.
+1. Add a new Elysia route: `GET /api/pipeline/status`.
+2. Query the task store and pipeline state to compute:
+   - `stage` — the current pipeline stage (string)
+   - `task_count` — total number of tasks
+   - `assigned_count` — number of tasks with delegation_status = 'assigned'
+   - `pending_count` — number of tasks with delegation_status = 'pending'
+   - `failed_count` — number of tasks with delegation_status = 'failed'
+   - `stage_transitions` — array of objects with `stage` and `timestamp` for each transition
+3. Return as a JSON object with the above fields.
+4. Set appropriate Content-Type header (application/json).
+5. Handle empty state: return zero counts and current stage even if no tasks exist.
+6. Add structured logging for requests to this endpoint.
 
 ## Validation
-All unit tests pass via `bun test`. Test coverage includes: resolve_agent_delegates with known agents, unknown agents, empty input, and duplicates. Delegate_id propagation tests verify the Linear API client receives correct assigneeId values. At least 8 distinct test cases pass.
+Integration test: call GET /api/pipeline/status and verify the response is valid JSON containing 'stage' (string), 'task_count' (number), 'assigned_count' (number), and 'pending_count' (number) fields. Verify counts are consistent with the actual state. Test that stage_transitions is an array. Test empty pipeline state returns zeros with 200 status.

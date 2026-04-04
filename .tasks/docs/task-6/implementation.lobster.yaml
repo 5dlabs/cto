@@ -1,9 +1,9 @@
 name: implement-task-6
 metadata:
   task_id: 6
-  agent: blaze
-  stack: React/Next.js
-  depends_on_tasks: [2]
+  agent: nova
+  stack: Bun/Elysia
+  depends_on_tasks: [2, 3]
 
 inputs:
   - name: task_dir
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-6/feature-branch"
   - name: agent
-    default: "blaze"
+    default: "nova"
   - name: cli
     default: "claude"
   - name: model
@@ -52,7 +52,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-6003
-    depends_on: [validate-subtask-6001]
+    depends_on: [validate-subtask-6002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6003/prompt.md
@@ -64,7 +64,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-6004
-    depends_on: [validate-subtask-6003]
+    depends_on: [validate-subtask-6002, validate-subtask-6003]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6004/prompt.md
@@ -76,7 +76,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-6005
-    depends_on: [validate-subtask-6001]
+    depends_on: [validate-subtask-6004]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6005/prompt.md
@@ -88,7 +88,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-6006
-    depends_on: [validate-subtask-6003, validate-subtask-6004, validate-subtask-6005]
+    depends_on: [validate-subtask-6001, validate-subtask-6002, validate-subtask-6003, validate-subtask-6004, validate-subtask-6005]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6006/prompt.md

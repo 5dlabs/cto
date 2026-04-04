@@ -1,17 +1,19 @@
-Implement subtask 1003: Create sigma-1-infra-endpoints ConfigMap
+Implement subtask 1003: Create ExternalSecret CRD for sigma-1-discord-webhook
 
 ## Objective
-Create the ConfigMap `sigma-1-infra-endpoints` in sigma-1-dev namespace with all 4 endpoint keys pointing to existing in-cluster services.
+Define and apply the ExternalSecret resource for the Discord webhook URL, referencing the cluster's existing SecretStore.
 
 ## Steps
-1. Create a ConfigMap manifest `configmap-endpoints.yaml` in namespace `sigma-1-dev`.
-2. Populate the following keys:
-   - `DISCORD_BRIDGE_URL`: `http://discord-bridge-http.bots.svc.cluster.local` (verify actual service name/port from the bots namespace)
-   - `LINEAR_BRIDGE_URL`: `http://linear-bridge.bots.svc.cluster.local` (verify actual service name/port from the bots namespace)
-   - `NATS_URL`: `nats://openclaw-nats.openclaw.svc.cluster.local:4222`
-   - `CLOUDFLARE_OPERATOR_NS`: `cloudflare-operator-system`
-3. Apply with `kubectl apply -f configmap-endpoints.yaml`.
-4. Verify all 4 keys are present and non-empty.
+1. Create `externalsecret-discord-webhook.yaml` in the sigma-1 namespace:
+   - `metadata.name`: `sigma-1-discord-webhook`
+   - `metadata.labels`: include `sigma-1-pipeline: infra`
+   - `spec.secretStoreRef`: reference the cluster's existing ClusterSecretStore
+   - `spec.target.name`: `sigma-1-discord-webhook`
+   - `spec.data[0].secretKey`: `DISCORD_WEBHOOK_URL`
+   - `spec.data[0].remoteRef.key`: the backing store path for the Discord webhook
+   - `spec.refreshInterval`: `1h`
+2. Apply with `kubectl apply -f externalsecret-discord-webhook.yaml -n sigma-1`.
+3. Wait for the ExternalSecret status to show `SecretSynced`.
 
 ## Validation
-`kubectl get configmap sigma-1-infra-endpoints -n sigma-1-dev -o json | jq '.data'` contains exactly 4 keys (DISCORD_BRIDGE_URL, LINEAR_BRIDGE_URL, NATS_URL, CLOUDFLARE_OPERATOR_NS), each with a non-empty string value.
+`kubectl get externalsecret sigma-1-discord-webhook -n sigma-1 -o jsonpath='{.status.conditions[0].reason}'` returns 'SecretSynced'. The resulting Secret `sigma-1-discord-webhook` exists and has a non-empty `DISCORD_WEBHOOK_URL` data key.

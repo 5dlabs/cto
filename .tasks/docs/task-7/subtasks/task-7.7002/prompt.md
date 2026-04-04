@@ -1,10 +1,15 @@
-Implement subtask 7002: Integrate react-markdown for memo content rendering
+Implement subtask 7002: Install and configure shadcn/ui component library
 
 ## Objective
-Install react-markdown and integrate it into the ResearchMemo component to render the `content` field as formatted markdown, including headers, links, and code blocks.
+Set up shadcn/ui via its CLI, initializing the component system with the default theme. Pre-install the specific shadcn/ui components needed across the dashboard: Table, Button, Input, Alert, Badge, Card, and Skeleton (for loading states).
 
 ## Steps
-1. Install `react-markdown` via npm/bun. 2. In the ResearchMemo CollapsibleContent area, render `<ReactMarkdown>{researchMemo.content}</ReactMarkdown>`. 3. Apply appropriate Tailwind prose classes (e.g., `prose prose-sm dark:prose-invert`) for consistent styling within the card context. 4. Verify that headers (h1-h3), inline code, code blocks, links, and lists render correctly. 5. Do NOT add remark/rehype plugins unless explicitly needed — keep it lightweight for v1.
+1. Run `npx shadcn-ui@latest init` and select default theme, CSS variables mode, and the `src/components/ui` output directory.
+2. Verify `components.json` is created with correct paths and aliases.
+3. Install required components: `npx shadcn-ui@latest add table button input alert badge card skeleton`.
+4. Verify each component file exists under `src/components/ui/`.
+5. Confirm Radix UI peer dependencies are resolved (check `package.json`).
+6. Create a smoke-test page at `src/app/test/page.tsx` that renders one of each installed component to verify they work with Tailwind. Remove the test page after verification.
 
 ## Validation
-Component test: pass markdown string with h2 header, a link, and a code block as content. Verify rendered HTML contains <h2>, <a>, and <code>/<pre> elements respectively.
+All shadcn/ui components render without console errors. `next build` still exits 0 after component installation. Each component file exists under `src/components/ui/`.

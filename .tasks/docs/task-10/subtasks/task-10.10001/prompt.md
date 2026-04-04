@@ -1,17 +1,17 @@
-Implement subtask 10001: Create Cloudflare Tunnel CR with route mapping for PM server and frontend
+Implement subtask 10001: Create RBAC ServiceAccount and Role with least-privilege permissions
 
 ## Objective
-Create an accesstunnel or clustertunnel Custom Resource in the sigma-1-dev namespace to expose services via Cloudflare Tunnel. Configure route mappings for /api/* to the PM server service and / to the frontend service (if in scope per D5). TLS terminates at Cloudflare edge. No NGINX or other ingress controller.
+Create the ServiceAccount `sigma-1-pipeline-sa`, a Role `sigma-1-pipeline-role` with read-only access to ConfigMaps and Secrets in the sigma-1 namespace (no write access to Secrets), and a RoleBinding linking them together. All manifests go in the sigma-1 Helm chart or kustomize overlay.
 
 ## Steps
-1. Create `manifests/production/cloudflare-tunnel.yaml` with an `accesstunnel` or `clustertunnel` CR (use whichever CRD is installed on the cluster — check with `kubectl api-resources | grep tunnel`).
-2. Set the CR namespace to `sigma-1-dev`. Configure the tunnel name (e.g., `sigma-1-tunnel`).
-3. Add ingress rules in the CR spec:
-   - Rule 1: path `/api/*` → service `sigma-1-pm-server` on port 8080 (or whatever the PM server service port is).
-   - Rule 2: path `/` → service `sigma-1-frontend` on port 3000 (only if D5 includes Tasks 6-9; otherwise omit).
-4. Configure TLS settings: `originRequest.noTLSVerify: true` if services use HTTP internally, since TLS terminates at Cloudflare edge.
-5. Apply the manifest: `kubectl apply -f manifests/production/cloudflare-tunnel.yaml`.
-6. Verify the tunnel CR reaches 'Active' or 'Ready' status.
+Step-by-step:
+1. Create `rbac/serviceaccount.yaml` defining ServiceAccount `sigma-1-pipeline-sa` in namespace `sigma-1`.
+2. Create `rbac/role.yaml` defining Role `sigma-1-pipeline-role` with rules:
+   - apiGroups: [""], resources: ["configmaps", "secrets"], verbs: ["get", "list", "watch"]
+   - Explicitly exclude create, update, patch, delete on secrets.
+3. Create `rbac/rolebinding.yaml` binding the Role to the ServiceAccount.
+4. Ensure all resources have labels `app.kubernetes.io/part-of: sigma-1` and `app.kubernetes.io/component: rbac`.
+5. If cross-namespace bridge access is needed, create a separate ClusterRole manifest (gated by a Helm values flag `rbac.crossNamespace.enabled`).
 
 ## Validation
-`kubectl get accesstunnel -n sigma-1-dev` (or `clustertunnel`) returns the CR in 'Active' or 'Ready' state. External HTTPS request to the tunnel URL's `/api/health` endpoint returns HTTP 200 with valid TLS certificate.
+Run `kubectl auth can-i get secrets -n sigma-1 --as=system:serviceaccount:sigma-1:sigma-1-pipeline-sa` → 'yes'. Run `kubectl auth can-i create secrets -n sigma-1 --as=system:serviceaccount:sigma-1:sigma-1-pipeline-sa` → 'no'. Run `kubectl auth can-i get secrets -n default --as=system:serviceaccount:sigma-1:sigma-1-pipeline-sa` → 'no'. Verify all three RBAC resources exist via `kubectl get sa,role,rolebinding -n sigma-1`.

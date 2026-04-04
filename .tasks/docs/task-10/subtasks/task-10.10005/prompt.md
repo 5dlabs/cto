@@ -1,18 +1,18 @@
-Implement subtask 10005: Configure resource limits and requests on all deployments
+Implement subtask 10005: Configure Kubernetes audit policy for sigma-1 namespace
 
 ## Objective
-Set CPU and memory requests and limits on the PM server and frontend deployments per the specified values: PM server 256m/512Mi request, 1000m/1Gi limit; frontend 128m/256Mi request, 500m/512Mi limit.
+Create or update the Kubernetes API server audit policy to capture security-relevant events in the sigma-1 namespace: Secret access, RBAC events, and mutating operations on critical resources.
 
 ## Steps
-1. Edit the PM server Deployment manifest (or Helm values) to add under `spec.template.spec.containers[0].resources`:
-   - requests: cpu=256m, memory=512Mi
-   - limits: cpu=1000m, memory=1Gi
-2. Edit the frontend Deployment manifest (or Helm values) to add:
-   - requests: cpu=128m, memory=256Mi
-   - limits: cpu=500m, memory=512Mi
-3. If there are any other deployments in sigma-1-dev (bridge services), apply reasonable resource limits (128m/256Mi request, 500m/512Mi limit as a default).
-4. Apply updated manifests.
-5. Verify with `kubectl describe pod` that all pods show non-zero resource requests and limits.
+Step-by-step:
+1. Create an audit policy file `audit-policy.yaml` with rules scoped to the sigma-1 namespace:
+   a. Level `Metadata` for all Secret get/list/watch operations in sigma-1.
+   b. Level `RequestResponse` for all create/update/delete/patch operations on any resource in sigma-1.
+   c. Level `Metadata` for all authentication and authorization events involving `system:serviceaccount:sigma-1:*`.
+2. If the cluster uses a managed Kubernetes service (GKE, EKS, AKS), configure audit logging via the cloud provider's mechanism and document the approach.
+3. If self-managed, update the kube-apiserver flags: `--audit-policy-file` and `--audit-log-path`.
+4. Document that this step may require cluster-admin privileges and coordination with the platform team.
+5. Verify audit log entries appear for test operations (e.g., `kubectl get secret -n sigma-1`).
 
 ## Validation
-`kubectl describe pod -l app=sigma-1-pm-server -n sigma-1-dev` shows Requests: cpu=256m, memory=512Mi and Limits: cpu=1000m, memory=1Gi. Same verification for frontend pod with its specified values. No pod in the namespace has empty resource requests.
+Perform a `kubectl get secret -n sigma-1` and verify a corresponding audit log entry appears in the configured audit log sink. Perform a `kubectl create configmap test-audit -n sigma-1 --from-literal=key=val` then `kubectl delete configmap test-audit -n sigma-1` — verify both create and delete events are logged at RequestResponse level. Audit policy YAML passes `kubeval` or `kubectl apply --dry-run=server` validation.

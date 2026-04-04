@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. `kubectl get namespace sigma-1-dev` returns Active status. 2. `kubectl get secret sigma-1-secrets -n sigma-1-dev` exists and contains exactly 4 keys (LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, GITHUB_TOKEN). 3. `kubectl get configmap sigma-1-infra-endpoints -n sigma-1-dev -o json` contains all 4 endpoint keys with non-empty values. 4. `kubectl get serviceaccount sigma-1-pm-server -n sigma-1-dev` exists. 5. A connectivity test pod in `sigma-1-dev` can resolve DNS for `discord-bridge-http`, `linear-bridge`, and `openclaw-nats.openclaw.svc.cluster.local`.
+- [ ] 1. `kubectl get ns sigma-1` returns Active status with expected labels. 2. `kubectl get externalsecrets -n sigma-1` shows all 4 ExternalSecret resources with status 'SecretSynced'. 3. Secret validation job completes with exit code 0, and logs confirm non-empty values for linear-token, discord-webhook, and github-token. 4. `kubectl get configmap sigma-1-infra-endpoints -n sigma-1 -o json` contains all 5 expected keys with non-empty values for DISCORD_BRIDGE_URL, LINEAR_BRIDGE_URL, and PM_SERVER_URL. 5. Health check probes to discord-bridge-http, linear-bridge, and cto-pm return 200 from within the sigma-1 namespace.
 
 ## Verification Notes
 

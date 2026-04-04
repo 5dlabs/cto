@@ -1,10 +1,15 @@
-Implement subtask 8003: Write component and accessibility tests for SnapshotPR
+Implement subtask 8003: Implement mock/live adapters for GitHub API
 
 ## Objective
-Write comprehensive component tests covering all PR display states (open, merged, closed, null) and accessibility requirements for external links.
+Create an adapter layer for GitHub API interactions supporting both live PR verification and mock responses. The adapter must support: fetching PR details by URL, verifying PR contains expected files, and cleanup (close PR, delete branch).
 
 ## Steps
-1. Create test file `__tests__/snapshot-pr.test.tsx`. 2. Test cases: (a) Valid PR with status='open' displays title, URL, green 'Open' badge, file count, branch. (b) Status='merged' displays purple 'Merged' badge. (c) Status='closed' displays red 'Closed' badge. (d) prResult=null displays 'No snapshot PR created'. (e) PR URL link element has `target='_blank'` and `rel='noopener noreferrer'` attributes. (f) Accessibility: PR link has appropriate aria-label or visually hidden text indicating external link for screen readers; verify ExternalLink icon is present. 3. Use React Testing Library. 4. Use getByRole, getByText for semantic queries.
+Step-by-step:
+1. Create `tests/e2e/adapters/github.ts` with interface `GitHubTestAdapter` containing methods: `verifyPR(prUrl: string): Promise<PRVerification>`, `listPRFiles(prUrl: string): Promise<string[]>`, `cleanup(prUrl: string): Promise<void>`.
+2. Define `PRVerification` type: `{ state: string, url: string, files: string[], hasPipelineMeta: boolean, taskFileCount: number }`.
+3. Implement `LiveGitHubAdapter`: uses `GITHUB_TOKEN`, calls GitHub REST API (`GET /repos/5dlabs/sigma-1/pulls/:number`, `GET /repos/5dlabs/sigma-1/pulls/:number/files`). Cleanup closes PR and deletes the source branch.
+4. Implement `MockGitHubAdapter`: returns recorded payloads from `tests/e2e/fixtures/github/`. Include fixture with PR state 'open', >= 5 files in `tasks/` directory, and a `pipeline-meta.json`.
+5. Factory function `createGitHubAdapter()` selects based on `E2E_GITHUB_MODE` env var (default: 'mock').
 
 ## Validation
-All 6 test cases pass. Link attributes verified via `expect(link).toHaveAttribute('target', '_blank')` and `expect(link).toHaveAttribute('rel', 'noopener noreferrer')`. Screen reader test verifies aria-label or sr-only text on external link.
+MockGitHubAdapter returns a PR verification with state 'open', taskFileCount >= 5, and hasPipelineMeta true. LiveGitHubAdapter (if token available) can fetch a known existing PR without errors. Factory correctly switches on env var.

@@ -1,14 +1,15 @@
-Implement subtask 3003: Implement graceful degradation for missing API key, timeouts, and API errors
+Implement subtask 3003: Implement NousProvider concrete implementation
 
 ## Objective
-Add all error handling paths to fetchResearchMemo: missing NOUS_API_KEY skip with info log, 30s timeout handling with warning log, and HTTP error handling with warning log. None of these should throw.
+Implement NousProvider that calls the external NOUS API using NOUS_API_KEY with a 30-second timeout and returns structured research results following the ResearchProvider interface.
 
 ## Steps
-1. At the top of `fetchResearchMemo`, check if `NOUS_API_KEY` is falsy. If so, log an info message exactly: 'Hermes integration skipped: NOUS_API_KEY not configured' and return null immediately.
-2. Wrap the fetch call in a try/catch. If the AbortController fires (timeout after 30s), catch the AbortError, log a warning with the task context identifier (e.g., 'Hermes API timeout for task <id>'), and return null.
-3. After the fetch, check `response.ok`. If the status is not 2xx, log a warning including the HTTP status code (e.g., 'Hermes API error: status 500 for task <id>'), and return null.
-4. Catch any other unexpected errors (network errors, JSON parse errors), log them as warnings, and return null.
-5. Ensure no code path in fetchResearchMemo can throw an unhandled exception — the pipeline must never fail due to Hermes unavailability.
+1. Create `src/research/providers/nous-provider.ts`.
+2. Constructor takes `{ apiKey: string; baseUrl?: string }`. Default base URL should be read from `process.env.NOUS_API_BASE_URL` or a sensible default.
+3. `execute()` method: POST to `${baseUrl}/research` (or appropriate NOUS endpoint) with JSON body and `Authorization: Bearer ${apiKey}` header. Use `AbortSignal.timeout(30_000)`.
+4. On success (2xx), parse response and return `ResearchResult` with `provider: 'nous'`, `skipped: false`.
+5. On non-2xx or timeout, throw `ResearchProviderError` with provider name 'nous'.
+6. Ensure the API key is never logged — use `[REDACTED]` in any log statements that reference the key.
 
 ## Validation
-Unit test 1: With NOUS_API_KEY unset, fetchResearchMemo returns null and the info log 'Hermes integration skipped' is emitted. Unit test 2: With a mocked API that never responds (simulating 30s+ delay), fetchResearchMemo returns null and a timeout warning is logged. Unit test 3: With a mocked API returning HTTP 500, fetchResearchMemo returns null and the error status is logged. Unit test 4: With a mocked API returning malformed JSON, fetchResearchMemo returns null without throwing.
+Unit test with mocked fetch: (1) Successful 200 response returns ResearchResult with provider='nous'. (2) 401 response throws ResearchProviderError. (3) Timeout throws ResearchProviderError. (4) Verify Authorization header is sent with correct Bearer token. (5) Verify no log output contains the raw API key value.

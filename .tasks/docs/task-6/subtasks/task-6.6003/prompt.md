@@ -1,16 +1,20 @@
-Implement subtask 6003: Implement TaskCard component with agent avatar and color-coded badges
+Implement subtask 6003: Implement Linear API verification for issue assignees
 
 ## Objective
-Build the TaskCard component using shadcn/ui Card, Badge, and Avatar primitives to display task metadata with agent assignment visualization and color-coded status indicators.
+After Linear issues are created in Stage 5, query the Linear API for each created issue to independently confirm that the `assignee.id` matches the expected `delegate_id` from the delegation resolution stage.
 
 ## Steps
-1. Create `components/pipeline/TaskCard.tsx` accepting a `Task` prop.
-2. Use shadcn/ui `Card` as the outer container with `CardHeader` and `CardContent`.
-3. Display task title in `CardHeader`, and in `CardContent` show: agent name, stack, priority, status, and dependency IDs.
-4. Agent visualization: use shadcn/ui `Avatar` with a colored background based on agent name (e.g., bolt=blue, nova=purple, rex=orange, grizz=green, blaze=red, cipher=gray). Display agent name initial in the avatar.
-5. Assignment status badge using shadcn/ui `Badge`: if `delegate_id` is non-null, render a green badge with the agent name (e.g., 'Nova'). If `delegate_id` is null, render an amber badge with 'Unresolved'. If status is 'pending', render a gray badge with 'Pending'.
-6. Show priority as a small secondary badge (high=red, medium=amber, low=gray).
-7. Ensure all text has sufficient contrast (WCAG AA 4.5:1 ratio).
+1. Create `src/validation/linear-verifier.ts`.
+2. Define `LinearVerificationResult` type: `{ issueId: string, title: string, expectedDelegateId: string, actualAssigneeId: string | null, matched: boolean, linearUrl: string }`.
+3. Implement `verifyLinearAssignees(issues: CreatedIssue[]): Promise<LinearVerificationResult[]>`:
+   - For each created issue, call Linear API `GET /issues/{id}` (or use the Linear SDK `linearClient.issue(id)`).
+   - Extract `assignee.id` from the response.
+   - Compare against the `delegate_id` that was set during creation.
+   - Build the result object with `matched: actualAssigneeId === expectedDelegateId`.
+   - Apply 100ms delay between API calls to respect rate limits.
+4. Implement `summarizeVerification(results: LinearVerificationResult[]): { total: number, matched: number, unmatched: number, pendingOnly: number }`.
+5. Detect issues that have ONLY the `agent:pending` label but whose agent hint has a known mapping — flag these as errors, not just warnings.
+6. Export both functions for use by the report generator.
 
 ## Validation
-1. Component test: TaskCard with delegate_id='user_123' and agent='nova' displays 'Nova' badge in green variant. 2. Component test: TaskCard with delegate_id=null displays 'Unresolved' badge in amber variant. 3. Component test: TaskCard with status='pending' and no delegate_id displays gray 'Pending' badge. 4. Snapshot test: TaskCard renders all metadata fields (title, agent, stack, priority, status).
+Mock the Linear SDK client. Verify that for 5 mock issues with known assignees, `verifyLinearAssignees` returns 5 results with `matched: true`. Verify that an issue with a null assignee returns `matched: false`. Verify that `summarizeVerification` produces correct counts. Verify rate-limit delay is applied between calls.

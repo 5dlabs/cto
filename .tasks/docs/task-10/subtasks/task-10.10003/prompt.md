@@ -1,16 +1,16 @@
-Implement subtask 10003: Harden RBAC for PM server ServiceAccount
+Implement subtask 10003: Configure ExternalSecret resources with refreshInterval for automated secret rotation
 
 ## Objective
-Tighten the sigma-1-pm-server ServiceAccount RBAC to read-only access for configmaps and secrets in the sigma-1-dev namespace only. Ensure no cluster-wide permissions exist.
+Update all ExternalSecret CRs in the sigma-1 namespace to include a `refreshInterval` (e.g., 1h) so that secrets are periodically re-synced from the external secret store, enabling automated rotation.
 
 ## Steps
-1. Edit or create `manifests/production/rbac-pm-server.yaml`.
-2. Define a `Role` (not ClusterRole) in namespace `sigma-1-dev` named `sigma-1-pm-server-role` with rules:
-   - apiGroups: [""], resources: ["configmaps", "secrets"], verbs: ["get", "list", "watch"]
-3. Define a `RoleBinding` named `sigma-1-pm-server-binding` binding the Role to `ServiceAccount:sigma-1-pm-server` in namespace `sigma-1-dev`.
-4. Remove any existing ClusterRoleBinding or ClusterRole that grants the sigma-1-pm-server ServiceAccount broader permissions.
-5. Apply the manifest: `kubectl apply -f manifests/production/rbac-pm-server.yaml`.
-6. Verify with `kubectl auth can-i` commands.
+Step-by-step:
+1. Identify all ExternalSecret resources in the sigma-1 namespace (Linear token, NOUS_API_KEY, GitHub token, Discord webhook URL, etc.).
+2. For each ExternalSecret CR, set `spec.refreshInterval: 1h` (or whatever the organization standard is).
+3. Verify that the external-secrets operator is running and healthy in the cluster.
+4. Apply the updated ExternalSecret manifests.
+5. After applying, check that each ExternalSecret's status shows `lastSyncedTime` updating at the configured interval.
+6. Ensure the corresponding Kubernetes Secret objects are updated when the source values change.
 
 ## Validation
-`kubectl auth can-i create secrets --as=system:serviceaccount:sigma-1-dev:sigma-1-pm-server -n sigma-1-dev` returns 'no'. `kubectl auth can-i get configmaps --as=system:serviceaccount:sigma-1-dev:sigma-1-pm-server -n sigma-1-dev` returns 'yes'. `kubectl auth can-i get pods --as=system:serviceaccount:sigma-1-dev:sigma-1-pm-server -n default` returns 'no' (no cross-namespace access).
+Run `kubectl get externalsecret -n sigma-1 -o jsonpath='{range .items[*]}{.metadata.name}: {.spec.refreshInterval}{"\n"}{end}'` — all show `1h` (or configured interval). Check `kubectl get externalsecret -n sigma-1 -o jsonpath='{range .items[*]}{.metadata.name}: {.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}'` — all show `True`. Verify `lastSyncedTime` is within the last refresh interval.

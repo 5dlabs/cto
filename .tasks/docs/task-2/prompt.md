@@ -1,7 +1,7 @@
 Implement task 2: Extend PM Server for Agent Delegation in Linear Issues (Nova - Bun/Elysia)
 
 ## Goal
-Extend the existing PM server's task generation and Linear issue creation pipeline to resolve agent hints to Linear user IDs via resolve_agent_delegates() and set delegate_id on every created issue. This is the core delegation flow that the E2E validation is designed to prove. The task entity schema is extended with a delegate_id field, and fallback behavior is implemented for unmappable agents.
+Extend the existing cto/cto-pm Bun/Elysia service to resolve agent hints to Linear user IDs via resolve_agent_delegates() and set delegate_id on Linear issues at creation time. Ensure backward compatibility: if agent mapping is unavailable for a task, fall back to agent:pending label rather than failing.
 
 ## Task Context
 - Agent owner: nova
@@ -10,27 +10,44 @@ Extend the existing PM server's task generation and Linear issue creation pipeli
 - Dependencies: 1
 
 ## Implementation Plan
-1. Locate the existing `resolve_agent_delegates()` function in the PM server codebase. Verify it accepts agent hints (e.g., 'bolt', 'nova', 'blaze') and returns Linear user IDs.
-2. Extend the task entity/type definition to include `delegate_id: string | null` field.
-3. In the task generation pipeline, after tasks are generated with agent hints, call `resolve_agent_delegates()` to batch-resolve all agent hints to Linear user IDs.
-4. Populate `delegate_id` on each task object with the resolved Linear user ID.
-5. In the Linear issue creation step, pass `assigneeId: task.delegate_id` when creating each issue via the Linear API.
-6. Implement fallback behavior: if `resolve_agent_delegates()` cannot resolve an agent hint, log a warning with the agent hint and task ID, create the issue unassigned (delegate_id = null), and add an `agent:unresolved` label to the issue.
-7. Add a summary log at the end of issue creation: `Created N issues, M assigned, K unresolved`.
-8. Ensure the PM server reads secrets from the `sigma-1-secrets` Kubernetes secret and endpoints from `sigma-1-infra-endpoints` ConfigMap via `envFrom`.
-9. Write unit tests for: resolve_agent_delegates mapping, fallback on unknown agent, delegate_id propagation to Linear API call.
-10. Write an integration test that runs the full pipeline with a mock Linear API and verifies at least 5 issues are created with non-null assigneeId.
+Step-by-step implementation:
+
+1. Audit the existing `resolve_agent_delegates()` function in cto/cto-pm:
+   - Identify the current mapping source (hardcoded map, config file, or API lookup — Open Question #3)
+   - Verify it covers at least 5 distinct agent → Linear user ID mappings (Bolt, Nova, Blaze, Tess, plus at least one more)
+   - If fewer than 5 mappings exist, extend the mapping source with additional agent entries
+
+2. Modify the Linear issue creation flow in cto-pm:
+   - Before creating each issue, call `resolve_agent_delegates()` with the task's agent hint
+   - If a valid Linear user ID is returned, set `assigneeId` (delegate_id) on the Linear API createIssue mutation
+   - If resolution fails or returns null, apply the label `agent:pending` to the issue instead of assigning — do NOT throw
+
+3. Extend the task schema with:
+   - `delegate_id: string | null` — the resolved Linear user ID
+   - `delegation_status: 'assigned' | 'pending' | 'failed'` — tracks resolution outcome
+
+4. Add a REST endpoint `GET /api/delegation/status` that returns:
+   - List of tasks with their `delegate_id`, `delegation_status`, agent hint, and Linear issue URL
+   - This endpoint will be consumed by Task 7 (dashboard) if implemented, and by Task 8 (E2E test)
+
+5. Add a REST endpoint `GET /api/pipeline/status` that returns:
+   - Current pipeline stage, task count, assigned count, pending count
+   - Timestamps for stage transitions
+
+6. Ensure all Linear API calls use the token from ExternalSecret `sigma-1-linear-token` injected via `sigma-1-infra-endpoints` ConfigMap envFrom.
+
+7. Add structured logging for delegation resolution: log agent hint, resolved user ID (or null), and fallback action taken.
 
 ## Acceptance Criteria
-1. Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object mapping each to a valid Linear user ID string. 2. Unit test: `resolve_agent_delegates(['unknown_agent'])` returns null for the unknown agent and logs a warning. 3. Integration test: Run the task generation pipeline with a sample PRD; verify at least 5 task objects have non-null `delegate_id` values. 4. Integration test: Mock the Linear API create-issue endpoint; verify each call includes `assigneeId` matching the task's `delegate_id`. 5. Integration test: Verify the summary log line shows correct counts for assigned vs unresolved.
+1. Unit test: `resolve_agent_delegates()` returns valid Linear user IDs for at least 5 known agent hints (bolt, nova, blaze, tess, and one additional). 2. Unit test: when `resolve_agent_delegates()` returns null, the issue creation applies `agent:pending` label instead of assigneeId. 3. Integration test: create a test Linear issue with a known agent hint and verify the response includes a non-null `assigneeId` matching the expected Linear user ID. 4. `GET /api/delegation/status` returns JSON array with at least one entry containing `delegate_id`, `delegation_status`, and `linear_issue_url` fields. 5. `GET /api/pipeline/status` returns valid JSON with `stage`, `task_count`, `assigned_count` fields. 6. Backward compatibility: pipeline does not throw when an unknown agent hint is provided — confirmed by test with hint 'unknown-agent' returning `delegation_status: 'pending'`.
 
 ## Subtasks
-- Extend task entity type definition with delegate_id field: Add the `delegate_id: string | null` field to the task entity/type definition used throughout the PM server's task generation and issue creation pipeline.
-- Implement and verify resolve_agent_delegates() function: Locate or implement the resolve_agent_delegates() function that accepts an array of agent hint strings and returns a mapping of agent hints to Linear user IDs, with null for unresolvable agents.
-- Integrate delegation into the task generation pipeline: Wire resolve_agent_delegates() into the task generation pipeline: after tasks are generated with agent hints, batch-resolve them and populate delegate_id on each task, then pass assigneeId to the Linear API issue creation calls.
-- Implement fallback behavior for unresolvable agents and summary logging: Add fallback logic for when resolve_agent_delegates() returns null for an agent hint: log a warning, create the issue unassigned, add an agent:unresolved label, and emit a summary log line after all issues are created.
-- Write unit tests for resolve_agent_delegates and delegate_id propagation: Create comprehensive unit tests covering resolve_agent_delegates mapping, fallback on unknown agents, and delegate_id propagation to the Linear API call layer.
-- Write integration test with mock Linear API validating full delegation pipeline: Create an integration test that runs the full task generation and issue creation pipeline against a mock Linear API, verifying at least 5 issues are created with non-null assigneeId and the summary log is correct.
+- Audit and extend resolve_agent_delegates() mapping to cover 5+ agents: Audit the existing resolve_agent_delegates() function in cto/cto-pm to determine the current mapping source and coverage. Extend it to map at least 5 distinct agent hints (bolt, nova, blaze, tess, and at least one more) to their corresponding Linear user IDs.
+- Extend task schema with delegate_id and delegation_status fields: Add delegate_id (string | null) and delegation_status ('assigned' | 'pending' | 'failed') fields to the task schema/type definitions used in cto-pm.
+- Modify Linear issue creation flow to use delegate_id with agent:pending fallback: Modify the existing Linear issue creation flow in cto-pm to call resolve_agent_delegates() before creating each issue. If a valid user ID is returned, set assigneeId on the createIssue mutation. If resolution fails or returns null, apply the 'agent:pending' label and do NOT throw.
+- Implement GET /api/delegation/status endpoint: Add a REST endpoint GET /api/delegation/status to the Elysia server that returns a JSON array of tasks with their delegate_id, delegation_status, agent hint, and Linear issue URL.
+- Implement GET /api/pipeline/status endpoint: Add a REST endpoint GET /api/pipeline/status to the Elysia server that returns pipeline stage, task counts (total, assigned, pending), and stage transition timestamps.
+- Add structured logging for delegation resolution across the flow: Ensure all delegation-related operations (resolution, issue creation, fallback) produce structured log entries with agent hint, resolved user ID, and action taken.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

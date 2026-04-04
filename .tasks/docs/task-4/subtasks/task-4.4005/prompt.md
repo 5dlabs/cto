@@ -1,15 +1,18 @@
-Implement subtask 4005: Implement error handling with retry logic for GitHub API failures
+Implement subtask 4005: Implement error handling and graceful degradation for GitHub API failures
 
 ## Objective
-Add retry logic with exponential backoff for GitHub API calls and ensure the pipeline never fails due to GitHub API unavailability.
+Wrap all GitHub API interactions with error handling that logs failures clearly, marks the PR step as failed in pipeline state, and ensures the pipeline continues without crashing.
 
 ## Steps
-1. Create a reusable `retryWithBackoff(fn, maxRetries=1, baseDelay=1000)` utility in `src/design-snapshot/retry.ts`.
-2. Wrap the key GitHub API operations (branch creation, file commit, PR creation) with the retry utility.
-3. On first failure (non-2xx response or network error), wait `baseDelay` ms then retry once.
-4. If the retry also fails, log the error with details (HTTP status, error message, operation name) and return a PRResult with `{ prUrl: null, skipped: false, error: '<descriptive error>' }`.
-5. Ensure no unhandled exceptions escape createSnapshotPR — all errors must be caught and converted to PRResult responses.
-6. Integrate the retry logic into the main createSnapshotPR orchestration flow.
+1. Create `src/pr/error-handler.ts`.
+2. Define a `PRStepResult` type: `{ success: boolean; prUrl?: string; error?: string; errorCode?: number }`.
+3. Implement `withGracefulDegradation<T>(fn: () => Promise<T>, stepName: string): Promise<{ ok: true; value: T } | { ok: false; error: string }>` wrapper that catches errors, logs them with context (step name, HTTP status if available, message about token permissions for 403/404), and returns a failure result.
+4. In `github-client.ts`, wrap `createBranch` and `commitFileTree` calls with this handler.
+5. In `pr-creator.ts`, wrap `createPullRequest` and `addLabels` with this handler.
+6. For 403 errors, log: `GitHub API 403: Check that sigma-1-github-token has repo scope and access to 5dlabs/sigma-1`.
+7. For 404 errors, log: `GitHub API 404: Repository 5dlabs/sigma-1 not found — verify token has access to this private repository`.
+8. For branch-already-exists (422 on ref creation), implement retry with counter suffix (coordinate with logic in 4003).
+9. Ensure that if any step fails, the overall pipeline does not throw — return `PRStepResult` with `success: false`.
 
 ## Validation
-Unit test: With a mocked GitHub API returning 500 on first call and 201 on retry, createSnapshotPR succeeds and returns a valid PR URL. Unit test: With a mocked GitHub API returning 500 on both attempts, createSnapshotPR returns PRResult with prUrl=null and a descriptive error, without throwing. Verify the backoff delay is applied between attempts.
+Unit test: `withGracefulDegradation` catches a thrown error and returns `{ ok: false, error: '...' }` without re-throwing. Unit test: when a mock fetch returns 403, the logged message contains 'token permissions'. Unit test: when a mock fetch returns 404, the logged message contains 'not found'. Integration test: simulate full PR flow where `createPullRequest` returns 500 — verify pipeline state shows `success: false` and no unhandled exception is thrown.

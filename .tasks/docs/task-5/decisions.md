@@ -1,6 +1,7 @@
 ## Decision Points
 
-- The API paradigm (HTTP POST vs NATS publish) for bridge communication is pending D2 resolution. This task implements HTTP as the default, but the facade must accommodate a swap to NATS. If D2 resolves to NATS, the HTTP implementation subtask would need rework.
+- What is the expected payload format for discord-bridge-http? Does it support Discord rich embeds natively, or does it expect a simplified schema that the bridge transforms internally? This must be discovered from the bridge's source or docs before implementing.
+- What is the expected payload format for linear-bridge? Does it accept free-form notification text, or does it require structured fields (e.g., project ID, issue references)? This must be discovered from the bridge's source or docs before implementing.
 
 ## Coordination Notes
 

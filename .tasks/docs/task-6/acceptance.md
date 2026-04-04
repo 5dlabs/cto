@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. Component test: TaskCard rendered with `delegate_id='user_123'` and `agent='nova'` displays 'Nova' badge in green and shows the avatar. 2. Component test: TaskCard rendered with `delegate_id=null` displays 'Unresolved' badge in amber. 3. Component test: TaskList with 5 tasks renders them in dependency order (no task appears before its dependencies). 4. Component test: Summary header shows correct counts — given 5 tasks with 4 assigned and 1 unresolved, displays '5 tasks, 4 assigned, 1 unresolved'. 5. Accessibility test: All interactive elements in TaskCard and TaskList are keyboard-navigable and have appropriate ARIA labels (tested via @testing-library/jest-dom axe integration).
+- [ ] 1. Pipeline completes all 5 stages without throwing a fatal error — exit status is success. 2. Validation report shows `total_tasks >= 5`. 3. Validation report shows `assigned_tasks >= 5` (delegate_id is non-null for at least 5 tasks). 4. For each assigned task, query Linear API GET issue and confirm `assignee.id` matches the expected delegate_id — at least 5 issues pass this check. 5. No issues have ONLY the `agent:pending` label when their agent hint has a known mapping — verify by cross-referencing the agent mapping. 6. `GET /api/validation/report/{run_id}` returns 200 with valid JSON containing all required fields. 7. If research was available (Hermes or NOUS), `research_included` is true and deliberation output contains non-empty research memos.
 
 ## Verification Notes
 

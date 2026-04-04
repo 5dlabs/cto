@@ -1,16 +1,19 @@
-Implement subtask 3002: Implement Hermes API client with NOUS_API_KEY reading and 30s timeout
+Implement subtask 3002: Implement ResearchProvider interface and HermesProvider concrete implementation
 
 ## Objective
-Create the core hermes-research module with the fetchResearchMemo function that reads NOUS_API_KEY from environment, calls the Hermes/NOUS API with the task context, and parses the response into a ResearchMemo.
+Define the ResearchProvider abstraction (TypeScript interface) and implement HermesProvider that calls the in-cluster Hermes agent with a 30-second timeout and returns structured research results.
 
 ## Steps
-1. Create `src/hermes-research/index.ts` exporting `async function fetchResearchMemo(taskContext: TaskContext): Promise<ResearchMemo | null>`.
-2. Read `NOUS_API_KEY` from `process.env.NOUS_API_KEY` (or `Bun.env`).
-3. Construct the HTTP request to the Hermes API: use `fetch()` (native in Bun) with the API key in the Authorization header (Bearer token or whatever the API expects).
-4. Send the task description and context as the research query in the request body.
-5. Set `AbortController` with a 30-second timeout on the fetch call.
-6. On successful response, parse the JSON body and map it to `ResearchMemo`: store the raw response content verbatim in `content`, set `source` to the API endpoint or identifier, and `timestamp` to the current Date.
-7. Ensure the module interface is clean with a single exported function and no side effects on import, suitable for future extraction into a separate service.
+1. Create `src/research/types.ts` with:
+   - `ResearchResult = { content: string; provider: 'hermes' | 'nous' | 'skip'; skipped: boolean; reason?: string; responseTimeMs: number; contentLength: number }`
+   - `ResearchProvider = { name: string; execute(query: ResearchQuery): Promise<ResearchResult> }`
+   - `ResearchQuery = { prdContent: string; projectContext?: string }`
+2. Create `src/research/providers/hermes-provider.ts`.
+3. HermesProvider constructor takes `{ baseUrl: string }`.
+4. `execute()` method: POST to `${baseUrl}/research` with JSON body `{ query: researchQuery.prdContent, context: researchQuery.projectContext }`. Use `AbortSignal.timeout(30_000)` for the 30-second timeout.
+5. On success (2xx), parse JSON response body and return `ResearchResult` with `provider: 'hermes'`, `skipped: false`, measured response time, and content length.
+6. On non-2xx or timeout, throw a typed error `ResearchProviderError` with the status code and provider name — the caller (selector) will handle fallback.
+7. Export `ResearchProviderError` class extending Error with `providerName` and `statusCode` fields.
 
 ## Validation
-Unit test with a mocked Hermes API (using Bun's test utilities or a mock server) returning valid JSON content: verify fetchResearchMemo returns a ResearchMemo with non-empty content, correct source string, and a valid Date timestamp.
+Unit test with mocked fetch: (1) Successful 200 response returns ResearchResult with provider='hermes', skipped=false, and correct content. (2) 500 response throws ResearchProviderError with statusCode=500. (3) Timeout (simulated via AbortSignal) throws ResearchProviderError. (4) Verify responseTimeMs is a positive number and contentLength matches actual content length.

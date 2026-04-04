@@ -1,19 +1,21 @@
-Implement subtask 2004: Implement fallback behavior for unresolvable agents and summary logging
+Implement subtask 2004: Implement GET /api/delegation/status endpoint
 
 ## Objective
-Add fallback logic for when resolve_agent_delegates() returns null for an agent hint: log a warning, create the issue unassigned, add an agent:unresolved label, and emit a summary log line after all issues are created.
+Add a REST endpoint GET /api/delegation/status to the Elysia server that returns a JSON array of tasks with their delegate_id, delegation_status, agent hint, and Linear issue URL.
 
 ## Steps
-1. In the pipeline integration code (from subtask 2003), after populating delegate_id, check for tasks where `delegate_id === null`.
-2. For each such task, log a structured warning: `{ level: 'warn', message: 'Unresolved agent delegate', agentHint: task.agent, taskId: task.id }`.
-3. When creating the Linear issue for an unresolved task:
-   a. Omit `assigneeId` (or pass undefined).
-   b. Add a label `agent:unresolved` to the issue. Use the Linear API to find or create this label, then attach it.
-4. After all issues are created, compute and log a summary line:
-   - `Created N issues, M assigned, K unresolved`
-   - Where N = total issues, M = issues with non-null delegate_id, K = issues with null delegate_id.
-5. Use structured logging (JSON) consistent with the PM server's existing log format.
-6. Ensure the `agent:unresolved` label creation is idempotent (check if it exists before creating).
+1. Add a new Elysia route: `GET /api/delegation/status`.
+2. Query the task store for all tasks that have been processed through the delegation flow.
+3. Return a JSON array where each entry contains:
+   - `task_id` — the task identifier
+   - `agent_hint` — the original agent hint string
+   - `delegate_id` — the resolved Linear user ID (string | null)
+   - `delegation_status` — 'assigned' | 'pending' | 'failed'
+   - `linear_issue_url` — the URL of the created Linear issue (string | null)
+4. Set appropriate Content-Type header (application/json).
+5. Handle empty state gracefully: return an empty array `[]` if no tasks exist.
+6. Add input validation: this is a simple GET with no parameters, but ensure proper error handling for internal failures (return 500 with error message).
+7. Add structured logging for requests to this endpoint.
 
 ## Validation
-Unit test: Given a task with an unknown agent hint, the warning log is emitted with the correct agent hint and task ID. Integration test: Run pipeline with one known and one unknown agent; verify the unknown agent's issue is created without assigneeId and has the `agent:unresolved` label. Verify the summary log line shows correct counts (e.g., 'Created 2 issues, 1 assigned, 1 unresolved').
+Integration test: after creating at least one issue through the delegation flow, call GET /api/delegation/status and verify the response is a JSON array with at least one entry containing delegate_id, delegation_status, agent_hint, and linear_issue_url fields. Test empty state: call the endpoint before any issues are created and verify an empty array is returned with 200 status. Test response Content-Type is application/json.

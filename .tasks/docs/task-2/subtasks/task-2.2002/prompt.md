@@ -1,18 +1,16 @@
-Implement subtask 2002: Implement and verify resolve_agent_delegates() function
+Implement subtask 2002: Extend task schema with delegate_id and delegation_status fields
 
 ## Objective
-Locate or implement the resolve_agent_delegates() function that accepts an array of agent hint strings and returns a mapping of agent hints to Linear user IDs, with null for unresolvable agents.
+Add delegate_id (string | null) and delegation_status ('assigned' | 'pending' | 'failed') fields to the task schema/type definitions used in cto-pm.
 
 ## Steps
-1. Locate the existing `resolve_agent_delegates()` function in the PM server codebase.
-2. Verify it accepts an array of agent hint strings (e.g., `['bolt', 'nova', 'blaze']`) and returns a `Record<string, string | null>` mapping each hint to a Linear user ID or null.
-3. If the function does not exist, implement it:
-   a. Define the agent-to-Linear-user-ID mapping (source TBD per decision point — hardcoded map, ConfigMap, or Linear API query).
-   b. Accept `string[]` of agent hints.
-   c. Return `Record<string, string | null>` with resolved IDs or null for unknown agents.
-4. Ensure the function handles edge cases: empty array input, duplicate agent hints, case-insensitive matching.
-5. The function should be a pure batch operation — resolve all hints in a single call.
-6. Export the function for import by the pipeline integration code.
+1. Locate the task type/interface definition in the cto-pm codebase (likely a TypeScript interface or Zod schema).
+2. Add field `delegate_id: string | null` — the resolved Linear user ID.
+3. Add field `delegation_status: 'assigned' | 'pending' | 'failed'` — tracks the outcome of delegation resolution.
+4. Set default values: delegate_id = null, delegation_status = 'pending'.
+5. If tasks are persisted to a store or database, update the persistence layer to include these new fields.
+6. Update any existing serialization/deserialization logic to handle the new fields.
+7. Ensure backward compatibility: existing tasks without these fields should default to delegate_id = null, delegation_status = 'pending' when read.
 
 ## Validation
-Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object with 3 keys, each mapping to a non-empty string (Linear user ID). Unit test: `resolve_agent_delegates([])` returns an empty object. Unit test: `resolve_agent_delegates(['unknown_agent'])` returns `{ unknown_agent: null }`.
+Unit test: create a task object with the extended schema and verify delegate_id and delegation_status are present with correct types. Test deserialization of a legacy task object (without new fields) and confirm defaults are applied (null and 'pending').

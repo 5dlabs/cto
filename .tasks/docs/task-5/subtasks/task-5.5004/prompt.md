@@ -1,14 +1,20 @@
-Implement subtask 5004: Implement best-effort error handling for notification dispatch
+Implement subtask 5004: Wire notification methods into pipeline lifecycle hooks
 
 ## Objective
-Wrap the transport send() calls with error handling that catches connection refused, timeouts, and HTTP error responses (4xx/5xx), logging warnings without throwing or failing the pipeline.
+Integrate the Discord and Linear notification methods into the pipeline execution flow so that notifications fire at pipeline start, completion, and error events. Ensure notification failures never block or abort the pipeline.
 
 ## Steps
-1. In the notify() facade, wrap each transport.send() call in a try/catch block.
-2. On catch (connection refused, timeout, network error): log a structured warning with `{ service: 'discord' | 'linear', error: message, pipeline_id }` and resolve the promise normally.
-3. On non-2xx HTTP response: log a structured warning with `{ service, statusCode, pipeline_id }` and resolve normally.
-4. Use `Promise.allSettled()` to dispatch to both bridges concurrently and handle each independently — a failure in one bridge must not prevent notification to the other.
-5. Ensure the notify() function always resolves (never rejects) regardless of transport errors.
+1. Identify the pipeline orchestration entry points in cto-pm (e.g., the main pipeline runner function/class).
+2. At pipeline initialization (after runId is assigned and tasks are parsed):
+   - Call `notifyDiscordPipelineStart(runId, prdTitle, taskCount)` and `notifyLinearPipelineStart(runId, prdTitle, taskCount, linearSessionId)` concurrently using `Promise.allSettled`.
+3. At pipeline completion (after all stages — issue creation, PR creation — are done):
+   - Gather summary: tasksCreated, agentsAssigned, prUrl (from Task 4 output), any accumulated warnings.
+   - Call `notifyDiscordPipelineComplete(runId, summary)` and `notifyLinearPipelineComplete(runId, summary)` concurrently via `Promise.allSettled`.
+4. At pipeline error (on any stage failure or non-fatal warning):
+   - Call `notifyDiscordPipelineError(runId, stage, error)` and `notifyLinearPipelineError(runId, stage, error, linearSessionId)` concurrently via `Promise.allSettled`.
+   - Ensure the pipeline continues with graceful degradation after the error notification.
+5. Wrap all notification dispatches in `Promise.allSettled` (not `Promise.all`) so a rejected notification promise never propagates.
+6. Add structured log entries at each hook point: 'notifications_dispatched', event type, number of bridges notified, any settled rejections.
 
 ## Validation
-1. Unit test: When DISCORD_BRIDGE_URL is unreachable (mock fetch to throw connection refused), notify() logs a warning containing 'discord' and resolves without throwing. 2. Unit test: When LINEAR_BRIDGE_URL returns HTTP 500, notify() logs a warning containing 'linear' and status 500, and resolves without throwing. 3. Unit test: When both bridges fail, notify() still resolves and both warnings are logged.
+Unit test: mock NotificationService methods; trigger pipeline start and verify both notifyDiscordPipelineStart and notifyLinearPipelineStart are called with correct args. Unit test: trigger pipeline complete and verify both complete notifications fire with summary including prUrl. Unit test: trigger pipeline error and verify both error notifications fire; confirm the pipeline function does not throw. Integration test: run a full pipeline flow (mocked stages) and verify at least 2 Discord and 2 Linear notification calls occur (start + complete). Integration test: make one bridge mock return a rejection — verify the other bridge still receives its notification and the pipeline completes successfully.

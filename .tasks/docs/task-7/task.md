@@ -1,28 +1,66 @@
-## Add Research Memo Display to Web Frontend (Blaze - React/Next.js)
+## Implement Web Frontend for Delegation Status Dashboard (Blaze - React/Next.js)
 
 ### Objective
-Extend the pipeline dashboard to display Hermes research memos associated with each task. Memos are shown as collapsible sections within task cards, displaying the content, source, and timestamp. Contingent on D5 resolution.
+Build a minimal read-only web dashboard using Next.js and shadcn/ui that displays pipeline delegation status: task list with agent assignments, delegate_id, pipeline status, and Linear issue links. This is a stretch/deferred task — lower priority than core pipeline validation (Tasks 1–6, 8).
 
 ### Ownership
 - Agent: blaze
 - Stack: React/Next.js
-- Priority: medium
+- Priority: low
 - Status: pending
-- Dependencies: 3, 6
+- Dependencies: 6
 
 ### Implementation Details
-1. Extend the `TaskCard` component to include a collapsible `ResearchMemo` section using shadcn/ui Collapsible (or Accordion) component.
-2. When `research_memo` is non-null on a task, display a 'Research' indicator badge on the task card. Clicking it expands the collapsible section.
-3. The expanded section shows: `content` rendered as markdown (use a lightweight markdown renderer like react-markdown), `source` displayed as a subtle metadata line, `timestamp` formatted as relative time (e.g., '2 hours ago').
-4. When `research_memo` is null, display a muted 'No research data' text or hide the section entirely.
-5. Update the summary header to include a research memo count: 'N of M tasks have research memos'.
-6. Ensure the collapsible interaction is keyboard-accessible (Enter/Space to toggle) via Radix primitives.
-7. Write component tests for: memo present (expanded and collapsed states), memo absent, markdown rendering, summary count.
+Step-by-step implementation:
+
+1. Scaffold a Next.js app (App Router) with:
+   - Tailwind CSS configured
+   - shadcn/ui components installed via CLI (consistent with organizational tweakcn patterns)
+   - TypeScript enabled
+
+2. Implement JWT-based authentication:
+   - Login page with credentials form (shadcn/ui Input + Button)
+   - JWT token stored in httpOnly cookie (NOT localStorage)
+   - Next.js middleware to check auth on protected routes
+   - Short-lived tokens (15-minute expiry) with refresh mechanism
+   - Auth endpoint: `POST /api/auth/login` on the PM server (may need to be added to cto-pm)
+
+3. Dashboard page (`/dashboard`):
+   - Fetch from `GET /api/pipeline/status` and `GET /api/delegation/status` (from Task 2)
+   - Display pipeline status banner at top: stage, progress, timestamps
+   - Task table using shadcn/ui Table component:
+     - Columns: Task ID, Title, Agent, Delegate ID, Status, Linear Issue Link
+     - Color-coded status badges: assigned (green), pending (yellow), failed (red)
+   - Inline error banner (shadcn/ui Alert) for API errors — not modal dialogs (per D7)
+
+4. Polling implementation:
+   - 5-second periodic refresh using `setInterval` or SWR with `refreshInterval: 5000`
+   - Show last-updated timestamp
+   - Disable polling when pipeline status is 'complete' or 'failed'
+
+5. Pipeline run detail view (`/dashboard/runs/{run_id}`):
+   - Fetch from `GET /api/validation/report/{run_id}` (from Task 6)
+   - Display full validation report: total tasks, assigned vs pending, warnings
+   - Link to Linear session URL
+   - Link to PR URL
+
+6. Styling:
+   - Use shadcn/ui default theme (no custom design artifacts available — Stitch failed)
+   - Responsive layout for desktop viewing (internal tool, no mobile requirement)
+   - Prioritize functional correctness over visual polish
+
+7. Containerize with Dockerfile for potential in-cluster deployment:
+   - Multi-stage build: build Next.js → serve with Node.js
+   - Expose on port 3000
+   - Read API base URL from environment variable `PM_SERVER_URL`
 
 ### Subtasks
-- [ ] Create ResearchMemo collapsible component with shadcn/ui: Build a self-contained ResearchMemo component using shadcn/ui Collapsible (Radix-based) that accepts research_memo data as props and renders a collapsible section with proper aria-expanded state management.
-- [ ] Integrate react-markdown for memo content rendering: Install react-markdown and integrate it into the ResearchMemo component to render the `content` field as formatted markdown, including headers, links, and code blocks.
-- [ ] Add relative timestamp formatting for memo timestamp: Format the research memo timestamp as a human-readable relative time string (e.g., '2 hours ago') using a lightweight date utility.
-- [ ] Integrate ResearchMemo into TaskCard component: Extend the existing TaskCard component to conditionally render the ResearchMemo collapsible section when research_memo data is present on a task, and show a muted 'No research data' text when absent.
-- [ ] Add research memo count to summary header: Update the pipeline dashboard summary header to display a count of how many tasks have research memos out of the total, e.g., '3 of 5 tasks have research memos'.
-- [ ] Write comprehensive component and accessibility tests: Write component tests covering all memo display states (present/absent, expanded/collapsed), markdown rendering, timestamp formatting, summary count, and keyboard accessibility of the collapsible section.
+- [ ] Scaffold Next.js App Router project with TypeScript and Tailwind CSS: Initialize a new Next.js application using the App Router with TypeScript enabled and Tailwind CSS configured. Set up the project structure with `src/app` directory layout, configure `tsconfig.json`, `tailwind.config.ts`, and `postcss.config.js`. Ensure `next build` passes cleanly with no errors.
+- [ ] Install and configure shadcn/ui component library: Set up shadcn/ui via its CLI, initializing the component system with the default theme. Pre-install the specific shadcn/ui components needed across the dashboard: Table, Button, Input, Alert, Badge, Card, and Skeleton (for loading states).
+- [ ] Implement login page with credentials form: Build the `/login` page with a username/password form using shadcn/ui Input and Button components. The form submits credentials to `POST /api/auth/login` (proxied through a Next.js API route to avoid CORS). On success, the API route sets an httpOnly cookie containing the JWT. On failure, display an inline error message.
+- [ ] Implement Next.js auth middleware and token refresh: Create Next.js middleware that intercepts requests to protected routes (`/dashboard/*`) and verifies the JWT from the httpOnly cookie. If the token is expired or missing, redirect to `/login`. Implement a refresh mechanism via a Next.js API route that requests a new token before the current one expires.
+- [ ] Build API client module with typed fetch helpers: Create a shared API client module that handles fetching from the PM server endpoints, including typed responses, error handling, and base URL configuration from the `PM_SERVER_URL` environment variable. This module is used by both the dashboard and detail pages.
+- [ ] Build dashboard page with pipeline status banner and task table: Implement the main `/dashboard` page displaying a pipeline status banner at the top and a task table below. The banner shows pipeline stage, progress, and timestamps. The table renders delegation tasks with columns for Task ID, Title, Agent, Delegate ID, Status (color-coded badge), and Linear Issue Link.
+- [ ] Implement SWR-based polling with 5-second refresh interval: Add automatic 5-second polling to the dashboard page using SWR's `refreshInterval` option. Display a 'Last updated' timestamp, and automatically disable polling when the pipeline status reaches 'complete' or 'failed'.
+- [ ] Build pipeline run detail view page: Implement the `/dashboard/runs/[run_id]` page that displays a full validation report for a specific pipeline run, including total tasks, assigned vs pending counts, warnings list, and links to the Linear session and PR.
+- [ ] Containerize Next.js app with multi-stage Dockerfile: Create a multi-stage Dockerfile that builds the Next.js application and serves it with a minimal Node.js runtime. Configure the container to read `PM_SERVER_URL` from an environment variable and expose port 3000.

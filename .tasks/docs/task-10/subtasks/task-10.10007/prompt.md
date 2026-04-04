@@ -1,25 +1,16 @@
-Implement subtask 10007: Create NetworkPolicy resources restricting egress traffic
+Implement subtask 10007: Configure log shipping to cluster logging infrastructure
 
 ## Objective
-Create Kubernetes NetworkPolicy resources to restrict traffic flow: PM server can reach bridge services, GitHub API, Hermes API, and Linear API. Frontend can only reach PM server. Block all other egress from sigma-1-dev except DNS.
+Ensure audit logs (both Kubernetes-level and application-level) from the sigma-1 namespace are shipped to the cluster's central logging infrastructure (EFK, Loki, or equivalent) with appropriate labels and retention.
 
 ## Steps
-1. Create `manifests/production/network-policies.yaml`.
-2. Define a default-deny egress NetworkPolicy for the sigma-1-dev namespace:
-   - podSelector: {} (all pods)
-   - policyTypes: [Egress]
-   - egress: allow DNS (UDP port 53 to kube-dns).
-3. Define a PM server egress NetworkPolicy:
-   - podSelector: matchLabels app=sigma-1-pm-server
-   - egress rules allowing:
-     - To pods matching labels for bridge services (discord-bridge, linear-bridge) within the namespace.
-     - To external IPs/CIDRs for GitHub API (140.82.112.0/20, 192.30.252.0/22), Linear API, and Hermes API. Alternatively, if external egress can't be IP-restricted, allow all egress on port 443 from PM server only.
-     - DNS (UDP 53).
-4. Define a frontend egress NetworkPolicy:
-   - podSelector: matchLabels app=sigma-1-frontend
-   - egress: allow to PM server pods only (podSelector matchLabels app=sigma-1-pm-server) on the service port, plus DNS.
-5. Apply: `kubectl apply -f manifests/production/network-policies.yaml`.
-6. Test connectivity from pods.
+Step-by-step:
+1. Identify the cluster's logging stack (EFK, Loki+Promtail, CloudWatch, Stackdriver, etc.).
+2. If using Promtail/Loki: verify the Promtail DaemonSet is scraping pods in the sigma-1 namespace. Add pipeline stages to parse JSON audit logs and add labels (`namespace=sigma-1`, `log_type=audit`).
+3. If using Fluentd/EFK: verify Fluentd config includes the sigma-1 namespace. Add a filter to parse structured JSON logs and route audit events to a dedicated index.
+4. For Kubernetes audit logs: ensure the audit log backend (webhook or log file) feeds into the same logging stack.
+5. Verify log retention meets organizational requirements (minimum 90 days for audit logs recommended).
+6. Create a basic dashboard or saved search for sigma-1 audit events (optional but recommended).
 
 ## Validation
-`kubectl get networkpolicy -n sigma-1-dev` returns at least 3 NetworkPolicy resources. `kubectl exec` into PM server pod: `curl -s discord-bridge-http:port/health` succeeds. `kubectl exec` into PM server pod: `curl -s --connect-timeout 3 http://example.com` times out or is refused (blocked by default deny). `kubectl exec` into frontend pod: `curl -s sigma-1-pm-server:8080/health` succeeds.
+Query the logging backend (Kibana, Grafana/Loki, CloudWatch Logs Insights) for logs from namespace=sigma-1 with event_type=issue_created within the last hour. Verify results appear. Confirm Kubernetes audit events for sigma-1 Secret access also appear in the logging backend. Check that log retention policy is configured (not relying on defaults).

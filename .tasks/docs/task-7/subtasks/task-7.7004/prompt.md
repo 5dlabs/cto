@@ -1,10 +1,23 @@
-Implement subtask 7004: Integrate ResearchMemo into TaskCard component
+Implement subtask 7004: Implement Next.js auth middleware and token refresh
 
 ## Objective
-Extend the existing TaskCard component to conditionally render the ResearchMemo collapsible section when research_memo data is present on a task, and show a muted 'No research data' text when absent.
+Create Next.js middleware that intercepts requests to protected routes (`/dashboard/*`) and verifies the JWT from the httpOnly cookie. If the token is expired or missing, redirect to `/login`. Implement a refresh mechanism via a Next.js API route that requests a new token before the current one expires.
 
 ## Steps
-1. In `TaskCard` component, import ResearchMemo. 2. Check if `task.research_memo` is non-null: if yes, render `<ResearchMemo researchMemo={task.research_memo} />` within the card body. 3. If `task.research_memo` is null, optionally render `<p className='text-xs text-muted-foreground'>No research data</p>` or hide the section entirely based on the design preference (start with hiding entirely for a cleaner look). 4. Ensure the ResearchMemo section is positioned after the existing task details but before any action buttons.
+1. Create `src/middleware.ts` using Next.js Middleware API.
+2. Configure the matcher to protect `/dashboard/:path*` routes.
+3. In the middleware:
+   a. Read the `auth_token` cookie from the request.
+   b. Decode the JWT (without full verification — that's the server's job) to check the `exp` claim.
+   c. If no token or token is expired, redirect to `/login` with a `?redirect=` query param preserving the original URL.
+   d. If token is valid, allow the request through.
+4. Create `src/app/api/auth/refresh/route.ts`:
+   a. Read the current `auth_token` cookie.
+   b. Forward it to `${PM_SERVER_URL}/api/auth/refresh` (or re-use login endpoint if refresh isn't supported).
+   c. On success, set a new httpOnly cookie with the refreshed JWT.
+   d. On failure, clear the cookie and return 401.
+5. Create a client-side hook `src/hooks/useTokenRefresh.ts` that calls the refresh API route 1 minute before the 15-minute expiry, using the decoded `exp` claim to schedule the refresh.
+6. Create `src/app/api/auth/logout/route.ts` that clears the cookie and add a logout button to the dashboard layout.
 
 ## Validation
-Component test: render TaskCard with a task that has research_memo set; verify 'Research' badge appears and collapsible section is present. Render TaskCard with research_memo=null; verify no Research badge or collapsible is rendered.
+Accessing `/dashboard` without a valid cookie redirects to `/login`. After login, `/dashboard` is accessible. After 15 minutes (or by manually expiring the cookie), the user is redirected to `/login`. The refresh mechanism extends the session when the hook fires before expiry. Logout clears the cookie and redirects to `/login`.

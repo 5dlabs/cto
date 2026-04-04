@@ -1,15 +1,33 @@
-Implement subtask 6004: Implement TaskList component with dependency-ordered rendering
+Implement subtask 6004: Build validation report generator with edge case tracking
 
 ## Objective
-Build the TaskList component that topologically sorts tasks by their dependencies and renders TaskCards in correct order with visual dependency indicators.
+Consume the PipelineRun output and LinearVerificationResults to produce the structured validation report JSON with all required fields, including warnings for edge cases like agent mapping failures and fallback to agent:pending.
 
 ## Steps
-1. Create `components/pipeline/TaskList.tsx` accepting a `tasks: Task[]` prop.
-2. Implement a topological sort utility in `lib/utils/topological-sort.ts` that orders tasks so no task appears before its dependencies. Handle circular dependency edge cases gracefully (log warning, render in original order).
-3. Render sorted tasks as a vertical list of TaskCard components.
-4. Add visual dependency indicators: indent tasks that have dependencies, or show a subtle left-border connector line using Tailwind CSS utilities.
-5. Show dependency labels on each TaskCard: 'Depends on: Task 1, Task 3' as a small text below the card.
-6. Use `key={task.id}` for React reconciliation.
+1. Create `src/validation/report-generator.ts`.
+2. Define the `ValidationReport` type matching the schema from the task details:
+   ```typescript
+   interface ValidationReport {
+     run_id: string;
+     total_tasks: number;
+     assigned_tasks: number;
+     pending_tasks: number;
+     linear_session_url: string;
+     issues: Array<{ id: string; title: string; agent: string; delegate_id: string; linear_url: string }>;
+     research_included: boolean;
+     warnings: string[];
+     stages: Array<{ name: string; status: string; durationMs: number }>;
+   }
+   ```
+3. Implement `generateReport(pipelineRun: PipelineRun, verificationResults: LinearVerificationResult[]): ValidationReport`:
+   - Extract `run_id` from `pipelineRun.runId`.
+   - Count `total_tasks` from Stage 3 output, `assigned_tasks` from tasks with non-null `delegate_id`, `pending_tasks` as the remainder.
+   - Map verification results into the `issues` array.
+   - Set `research_included` based on Stage 2 deliberation output.
+   - Populate `warnings` array: include any agents that failed resolution, any issues that fell back to `agent:pending`, any verification mismatches.
+   - Include stage timing summaries.
+4. Implement `storeReport(report: ValidationReport): Promise<void>` that persists the report to pipeline state (in-memory store or file-based, depending on existing patterns in cto-pm).
+5. Implement `getReport(runId: string): Promise<ValidationReport | null>` for retrieval by the API endpoint and downstream tasks (Task 5, Task 4, Task 8).
 
 ## Validation
-1. Component test: TaskList with 5 tasks renders them in dependency order — no task appears before its dependencies in the DOM. 2. Unit test: topological sort utility correctly orders tasks with diamond dependencies. 3. Component test: tasks with dependencies show indentation or visual connectors. 4. Edge case test: circular dependencies don't crash the component.
+Unit test `generateReport` with mock PipelineRun and verification data. Assert output matches the ValidationReport schema. Assert `warnings` array contains entries when agent mappings fail. Assert `research_included` is true when deliberation has non-empty research memos and false otherwise. Assert `storeReport` + `getReport` round-trips correctly.

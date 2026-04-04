@@ -1,6 +1,8 @@
 ## Decision Points
 
-- Should secrets be provisioned via external-secrets operator CRs (if available in the cluster) or sealed-secrets? This depends on which secret management operator is currently deployed and operational.
+- Which SecretStore (ClusterSecretStore vs namespaced SecretStore) should the ExternalSecrets reference, and what is the exact store name in the cluster?
+- What are the exact backing store paths (e.g., Vault paths, AWS SSM parameter names) for each of the 4 secrets — do they already exist or need manual pre-population?
+- What is the correct NOUS_API_URL endpoint — is it `https://api.nous.com` or a different URL, and should HERMES_URL be left empty or pointed at a known dev endpoint?
 
 ## Coordination Notes
 

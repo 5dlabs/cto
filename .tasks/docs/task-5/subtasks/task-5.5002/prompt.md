@@ -1,14 +1,16 @@
-Implement subtask 5002: Implement HTTP POST transport for discord-bridge-http
+Implement subtask 5002: Implement Discord bridge notification integration with rich embeds
 
 ## Objective
-Implement the NotificationTransport interface for HTTP POST dispatch to the discord-bridge-http service. Format the payload per the Discord bridge's expected schema and POST to the URL from the ConfigMap.
+Add Discord-specific notification methods to NotificationService: notifyPipelineStart, notifyPipelineComplete, and notifyPipelineError. Each method constructs a color-coded rich embed payload and POSTs it to DISCORD_BRIDGE_URL using the resilient HTTP client from subtask 5001.
 
 ## Steps
-1. Create `src/notification-dispatch/transports/http-discord.ts` implementing the `send()` method for the 'discord' target.
-2. Use Bun's native `fetch()` to POST to `DISCORD_BRIDGE_URL` with `Content-Type: application/json`.
-3. Format the JSON body as `{ event, pipeline_id, status, task_count, assigned_count, pr_url, linear_session_url, timestamp }`.
-4. Set a reasonable timeout (5 seconds) on the fetch to avoid hanging on unresponsive bridges.
-5. Return the response status for the error handling layer to inspect.
+1. In `notification.service.ts` (or a dedicated `discord-notifier.ts` that composes the base service), implement:
+   - `notifyDiscordPipelineStart(runId: string, prdTitle: string, taskCount: number)`: green embed (color 0x00FF00), title 'Pipeline Started', fields for Run ID, PRD title, task count.
+   - `notifyDiscordPipelineComplete(runId: string, summary: {tasksCreated: number; agentsAssigned: string[]; prUrl?: string; warnings?: string[]})`: blue embed (color 0x0000FF), title 'Pipeline Complete', fields for task count, agents, PR URL link, warnings if any.
+   - `notifyDiscordPipelineError(runId: string, stage: string, error: string)`: red embed (color 0xFF0000), title 'Pipeline Error', fields for run ID, stage name, error message.
+2. Payload format: construct the payload matching discord-bridge-http's expected schema. If the bridge expects raw Discord webhook format, use `{embeds: [{title, color, fields: [{name, value}]}]}`. If simpler, adapt accordingly. Add a TODO/comment noting the format may need adjustment after bridge API discovery.
+3. Call `postWithRetry(DISCORD_BRIDGE_URL, payload)` for each.
+4. Export these methods for use by the lifecycle hook layer.
 
 ## Validation
-Unit test: Call the Discord HTTP transport's send() with a pipeline.start event. Verify the outgoing HTTP POST targets the correct URL with the correct JSON body shape including all required fields (event, pipeline_id, timestamp).
+Unit test: notifyDiscordPipelineStart builds a payload with green color, runId, prdTitle, and taskCount in fields, and calls postWithRetry with DISCORD_BRIDGE_URL. Unit test: notifyDiscordPipelineComplete includes PR URL and agent list in the payload. Unit test: notifyDiscordPipelineError builds a red embed with stage and error fields. Unit test: verify each method returns gracefully (no throw) even when postWithRetry returns {ok: false}.

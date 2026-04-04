@@ -1,19 +1,18 @@
-Implement subtask 10008: Enable Kubernetes audit logging for sigma-1-dev namespace
+Implement subtask 10008: Create security scanning CronJob with Trivy
 
 ## Objective
-Configure Kubernetes audit logging to capture all create, update, and delete operations on secrets, configmaps, and deployments within the sigma-1-dev namespace.
+Add a Kubernetes CronJob that runs Trivy (or equivalent vulnerability scanner) weekly against the cto-pm container image and alerts via the Discord bridge on HIGH/CRITICAL findings.
 
 ## Steps
-1. Create or update the Kubernetes audit policy file (typically at `/etc/kubernetes/audit-policy.yaml` on the control plane, or via the cluster provider's audit configuration).
-2. Add an audit rule:
-   - level: RequestResponse
-   - resources: [{group: "", resources: ["secrets", "configmaps"]}, {group: "apps", resources: ["deployments"]}]
-   - namespaces: ["sigma-1-dev"]
-   - verbs: ["create", "update", "patch", "delete"]
-3. If the cluster is managed (EKS, GKE, AKS), use the provider's audit log configuration (CloudWatch, Cloud Logging, Azure Monitor) and document the configuration steps.
-4. If using a self-managed cluster, ensure the API server is configured with `--audit-policy-file` and `--audit-log-path` flags.
-5. Document the audit log location and how to query it in `docs/production/audit-logging.md`.
-6. Verify that a test operation (e.g., `kubectl annotate configmap sigma-1-infra-endpoints test=true -n sigma-1-dev && kubectl annotate configmap sigma-1-infra-endpoints test- -n sigma-1-dev`) appears in the audit log.
+Step-by-step:
+1. Create `cronjobs/security-scan.yaml` defining a CronJob `sigma-1-security-scan` with schedule `0 2 * * 0` (weekly, Sunday 2am).
+2. The Job container uses the `aquasec/trivy:latest` image (or a pinned version).
+3. The Job command: `trivy image --severity HIGH,CRITICAL --exit-code 1 --format json <cto-pm-image>:<tag>`
+4. If exit code is 1 (vulnerabilities found), a sidecar step or post-scan script sends an alert to the Discord bridge webhook with a summary (CVE count by severity).
+5. Store the scan report as a Job log (captured by cluster logging).
+6. Use the `sigma-1-pipeline-sa` ServiceAccount (ensure it has no extra privileges).
+7. Set `successfulJobsHistoryLimit: 3` and `failedJobsHistoryLimit: 5`.
+8. The image reference should be parameterized (via ConfigMap or Helm value) so it stays in sync with deployments.
 
 ## Validation
-Perform a test annotation on a configmap in sigma-1-dev, then query the audit log (via kubectl logs, CloudWatch, or the configured sink) and confirm the create/update event is recorded with the correct namespace, resource, and verb.
+Run `kubectl get cronjob sigma-1-security-scan -n sigma-1` — exists with weekly schedule. Manually trigger with `kubectl create job --from=cronjob/sigma-1-security-scan test-scan -n sigma-1`. Verify the Job runs to completion. Check Job logs for a Trivy scan report (JSON output). If vulnerabilities are found, verify the Discord alert fires. If no vulnerabilities, verify the Job exits with code 0 and logs a clean report.

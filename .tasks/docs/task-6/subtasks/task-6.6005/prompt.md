@@ -1,14 +1,23 @@
-Implement subtask 6005: Implement pipeline summary header component
+Implement subtask 6005: Expose GET /api/validation/report/{run_id} Elysia endpoint
 
 ## Objective
-Build a summary header component that displays aggregate pipeline statistics: total tasks, assigned count, unresolved count, and pipeline status.
+Create the Elysia HTTP endpoint that serves the validation report by run_id, returning 200 with the full JSON report or 404 if the run_id is not found.
 
 ## Steps
-1. Create `components/pipeline/PipelineSummary.tsx` accepting `tasks: Task[]` and `pipelineStatus: string` props.
-2. Compute aggregate counts: `totalTasks = tasks.length`, `assignedCount = tasks.filter(t => t.delegate_id !== null).length`, `unresolvedCount = tasks.filter(t => t.delegate_id === null).length`.
-3. Render a header bar with: pipeline status badge (running=blue, completed=green, error=red), and text showing '{totalTasks} tasks, {assignedCount} assigned, {unresolvedCount} unresolved'.
-4. Use shadcn/ui Badge for the pipeline status indicator.
-5. Style with Tailwind for clear visual hierarchy — larger text for counts, status badge prominent.
+1. Create `src/validation/routes.ts` (or add to existing route file).
+2. Define the Elysia route:
+   ```typescript
+   app.get('/api/validation/report/:run_id', async ({ params }) => {
+     const report = await getReport(params.run_id);
+     if (!report) {
+       return new Response(JSON.stringify({ error: 'Report not found' }), { status: 404 });
+     }
+     return report;
+   });
+   ```
+3. Add response schema validation using Elysia's built-in schema support (or typebox) to ensure the response matches the ValidationReport type.
+4. Register the route in the main app entrypoint.
+5. Add error handling for malformed run_id parameters (return 400).
 
 ## Validation
-Component test: Given 5 tasks with 4 having delegate_id and 1 with null, the summary header displays '5 tasks, 4 assigned, 1 unresolved'. Pipeline status badge shows correct color for 'running' vs 'completed' states.
+Integration test: store a mock report via `storeReport`, then call `GET /api/validation/report/{run_id}` and assert 200 with valid JSON containing all required fields (`run_id`, `total_tasks`, `assigned_tasks`, `pending_tasks`, `issues`, `research_included`, `warnings`). Call with a nonexistent run_id and assert 404. Call with a malformed run_id and assert 400.

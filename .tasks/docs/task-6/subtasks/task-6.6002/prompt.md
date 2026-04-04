@@ -1,15 +1,20 @@
-Implement subtask 6002: Create pipeline dashboard page with data fetching
+Implement subtask 6002: Implement pipeline execution orchestrator with stage-level checkpoints
 
 ## Objective
-Implement the `/pipeline/[sessionId]` page route that fetches task data from the PM server API and passes it to child components.
+Build the orchestration function that drives the test PRD through all 5 pipeline stages (intake, deliberation, task generation, agent delegation resolution, Linear issue creation) and captures structured checkpoint results at each stage.
 
 ## Steps
-1. Create `app/pipeline/[sessionId]/page.tsx` as a server component (or client component with useEffect, depending on data freshness needs).
-2. Implement a data fetching function in `lib/api/pipeline.ts`: `async function fetchPipelineTasks(sessionId: string): Promise<PipelineData>` that calls `${NEXT_PUBLIC_PM_SERVER_URL}/api/pipeline/${sessionId}/tasks`.
-3. Define TypeScript types for the API response: `PipelineData { session_id: string; status: string; tasks: Task[] }` and `Task { id: number; title: string; agent: string; stack: string; priority: string; status: string; delegate_id: string | null; dependencies: number[] }`.
-4. Handle loading state with a skeleton/loading UI.
-5. Handle error state (API unreachable, 404 session) with a user-friendly error message.
-6. Pass fetched data to TaskList and summary header components.
+1. Create `src/validation/pipeline-runner.ts`.
+2. Define a `PipelineRun` type with fields: `runId` (UUID), `stages` (array of `StageResult`), `startedAt`, `completedAt`, `status` ('success' | 'failure').
+3. Define `StageResult` with: `name`, `status`, `durationMs`, `output` (unknown), `errors` (string[]).
+4. Implement `runPipeline(prd: TestPRD): Promise<PipelineRun>` that sequentially executes:
+   - Stage 1 — PRD parsing/intake: call the existing intake module, capture parsed output.
+   - Stage 2 — Deliberation: invoke deliberation, pass through research context if available from Task 3 integration. Set `research_included` flag based on whether research memos are non-empty.
+   - Stage 3 — Task generation: invoke task generation, capture the generated tasks array. Assert `tasks.length >= 5` at this checkpoint — if assertion fails, mark stage as failed and record error.
+   - Stage 4 — Agent delegation resolution: call `resolve_agent_delegates()`, capture mapping results. Assert at least 5 tasks have non-null `delegate_id`. Track any tasks that fall back to `agent:pending`.
+   - Stage 5 — Linear issue creation: iterate over tasks, create Linear issues with `assigneeId` set. Implement 100ms backoff between API calls to avoid rate limiting.
+5. Each stage wraps execution in try/catch — capture errors but continue to produce partial results where possible.
+6. Return the full `PipelineRun` object for downstream consumption.
 
 ## Validation
-Verify: (1) the page fetches from the correct API URL with the sessionId from the route, (2) loading state renders a skeleton UI, (3) error state renders an error message when fetch fails, (4) successful fetch passes task data to child components.
+Unit test `runPipeline` with a mocked pipeline (mock each stage module). Verify all 5 stages execute in order. Verify that a stage failure is captured in `StageResult.errors` without crashing the orchestrator. Verify `runId` is a valid UUID. Verify backoff delay is applied between Linear API calls.

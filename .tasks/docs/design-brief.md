@@ -1,5 +1,3 @@
-
-
 # Enhanced PRD
 
 ## 1. Original Requirements
@@ -37,311 +35,364 @@
 
 ## 2. Project Scope
 
-The initial task decomposition identified **10 tasks** across two agents and two technology stacks.
+The initial task decomposition identified **10 tasks** spanning three agents and two technology stacks. A significant finding from deliberation is that several tasks exceed the PRD's stated acceptance criteria — this is documented in the Resolved Decisions section below.
 
 ### Task Summary
 
 | ID | Title | Agent | Stack | Priority | Dependencies |
-|----|-------|-------|-------|----------|--------------|
+|----|-------|-------|-------|----------|-------------|
 | 1 | Provision Dev Infrastructure for Sigma-1 E2E Pipeline | Bolt | Kubernetes/Helm | High | — |
 | 2 | Extend PM Server for Agent Delegation in Linear Issues | Nova | Bun/Elysia | High | 1 |
-| 3 | Integrate Hermes Research Content in Deliberation Path | Nova | Bun/Elysia | High | 1 |
+| 3 | Integrate Hermes Research into Deliberation Path | Nova | Bun/Elysia | High | 1 |
 | 4 | Implement Design Snapshot PR Surfacing | Nova | Bun/Elysia | Medium | 1 |
-| 5 | Enable Discord and Linear Bridge Notifications | Nova | Bun/Elysia | Medium | 1 |
-| 6 | Modernize Web Frontend for Agent Assignment Visualization | Blaze | React/Next.js | Medium | 2 |
-| 7 | Add Research Memo Display to Web Frontend | Blaze | React/Next.js | Medium | 3, 6 |
-| 8 | Display Design Snapshot PRs in Web Frontend | Blaze | React/Next.js | Low | 4, 6 |
-| 9 | Show Pipeline Status Notifications in Web Frontend | Blaze | React/Next.js | Low | 5, 6 |
-| 10 | Production Hardening: HA, Ingress, and Security | Bolt | Kubernetes/Helm | High | 2–9 |
+| 5 | Enable Discord and Linear Bridge Notifications | Nova | Bun/Elysia | High | 1 |
+| 6 | Validate Task Generation with Agent Assignment | Nova | Bun/Elysia | High | 2, 3 |
+| 7 | Implement Web Frontend for Delegation Status | Blaze | React/Next.js | Medium | 6 |
+| 8 | End-to-End Pipeline Integration Test | Tess | Test frameworks | High | 2, 3, 4, 5, 6, 7 |
+| 9 | Production Hardening: HA Scaling, Ingress, Network Policies | Bolt | Kubernetes/Helm | Medium | 8 |
+| 10 | Production Hardening: RBAC, Secret Rotation, Audit Logging | Bolt | Kubernetes/Helm | Medium | 9 |
 
 ### Key Services and Components
 
-- **PM Server** (Bun/Elysia) — existing service with `resolve_agent_delegates()`; extended for delegation, Hermes integration, PR surfacing, and notifications
-- **Hermes Research API** — external service accessed via NOUS_API_KEY for research memo content
-- **Bridge Services** — `bots/discord-bridge-http` and `bots/linear-bridge` already deployed in-cluster
-- **Cloudflare Operator** — `cloudflare-operator-system` with accesstunnels/clustertunnels CRDs for ingress
-- **Web Frontend** (React/Next.js) — Tasks 6–9 add visualization for assignments, memos, PRs, and notifications
+- **PM Server** (`cto/cto-pm`): Existing Bun/Elysia service containing `resolve_agent_delegates()` — the core of the delegation pipeline
+- **Discord Bridge** (`bots/discord-bridge-http`): In-cluster notification service for Discord
+- **Linear Bridge** (`bots/linear-bridge`): In-cluster notification service for Linear
+- **External-Secrets Operator**: Deployed in-cluster with CRDs for secret management
+- **Hermes Agent / NOUS API**: Research integration (in-cluster primary, external fallback)
+- **tweakcn** (`cto/tweakcn`): Deployed in-cluster, indicating organizational shadcn/ui familiarity
 
 ### Agent Assignments
 
-- **Bolt** (Kubernetes/Helm): Infrastructure provisioning (Task 1) and production hardening (Task 10)
-- **Nova** (Bun/Elysia): All backend pipeline work (Tasks 2–5)
-- **Blaze** (React/Next.js): All frontend visualization work (Tasks 6–9)
+- **Bolt** (Kubernetes/Helm): Infrastructure provisioning and production hardening (Tasks 1, 9, 10)
+- **Nova** (Bun/Elysia): Core pipeline logic — delegation, research, PR surfacing, notifications, validation (Tasks 2, 3, 4, 5, 6)
+- **Blaze** (React/Next.js): Web frontend dashboard (Task 7)
+- **Tess** (Test frameworks): E2E integration test (Task 8)
 
 ### Cross-Cutting Concerns
 
-- Secret management via Kubernetes secrets and external-secrets operator
-- Service discovery via `sigma-1-infra-endpoints` ConfigMap
-- 8 unique decision points spanning service-topology, api-design, platform-choice, data-model, ux-behavior, component-library, security, and ingress
+- Secret management touches Tasks 1, 3, 9, and 10
+- Service topology decision (dp-1) affects Tasks 2, 3, and 6
+- Scope questions around Tasks 7, 9, and 10 were a central point of debate (see Section 3)
+- The dependency chain is deep: Task 10 → 9 → 8 → {2,3,4,5,6,7} → 1
 
 ## 3. Resolved Decisions
 
-### [D1] Should agent delegation and Hermes research integration be separate microservices or extensions to the existing PM server?
+### [D1] Should agent delegation and Hermes integration be extensions to the existing PM server, or separate microservices?
 
 **Status:** Accepted
 
-**Task Context:** Task 2 (Extend PM Server for Agent Delegation), Task 3 (Integrate Hermes Research Content)
+**Task Context:** Tasks 2, 3, 6 — PM server delegation logic, Hermes research integration, task generation validation
 
-**Context:** Both debaters agreed unanimously. The PM server already contains `resolve_agent_delegates()`. Extracting this into microservices for a validation pipeline adds deployment coordination and network hops with no functional benefit at current scale.
+**Context:** Both debaters agreed unanimously. The PM server (`cto/cto-pm`) already contains `resolve_agent_delegates()` and is deployed in-cluster. The PRD is a validation exercise for existing behavior, not a greenfield product. Splitting into microservices would add Helm charts, health checks, network policies, and inter-service failure modes for zero demonstrated scaling need.
 
-**Decision:** Extend the existing PM server (Bun/Elysia) with both agent delegation and Hermes research integration as internal modules with clean interface boundaries, extractable later if needed.
+**Decision:** Extend the existing PM server (Bun/Elysia) — add delegation resolution and Hermes integration logic as endpoints within `cto-pm`. No new services.
 
 **Consensus:** 2/2 (100%)
 
 **Consequences:**
-- *Positive:* Zero new services to deploy, no inter-service network hops, no deployment coordination overhead. Module boundaries provide separation of concerns within the codebase.
-- *Negative:* PM server grows in responsibility. If Hermes integration becomes complex, extraction will require a later migration.
-- *Caveats:* The Hermes integration should be implemented as a pluggable module with a clean interface so it can be extracted into its own service if the research pipeline grows significantly.
+- **Positive:** Zero new deployment surface; leverages existing operational infrastructure; simplest path to validation
+- **Negative:** If delegation or research logic later needs independent scaling, extraction will be required
+- **Caveats:** None raised — both debaters agreed this is the correct topology for a validation run with no scaling requirements
 
 ---
 
-### [D3] Use existing in-cluster bridge services or integrate directly with Discord/Linear APIs?
+### [D2] Which notification bridge services should be used for Discord and Linear integration?
 
 **Status:** Accepted
 
-**Task Context:** Task 5 (Enable Discord and Linear Bridge Notifications), Task 9 (Show Pipeline Status Notifications)
+**Task Context:** Tasks 5, 8 — Notification enablement and E2E test
 
-**Context:** Both debaters agreed unanimously. `bots/discord-bridge-http` and `bots/linear-bridge` are already deployed and operational in-cluster. Reimplementing their functionality inside the PM server duplicates tested infrastructure and couples the PM server to notification concerns (token management, rate limiting, webhook formatting).
+**Context:** Both debaters agreed unanimously. `bots/discord-bridge-http` and `bots/linear-bridge` are already deployed and operational in-cluster. Using external SaaS (Zapier, Pipedream) would introduce egress latency, third-party auth tokens, billing dependencies, and external infrastructure routing for an internal private pipeline.
 
-**Decision:** Use the existing `bots/discord-bridge-http` and `bots/linear-bridge` services for all notification delivery.
+**Decision:** Use the existing in-cluster `bots/discord-bridge-http` and `bots/linear-bridge` services.
 
 **Consensus:** 2/2 (100%)
 
 **Consequences:**
-- *Positive:* Reuses tested, deployed infrastructure. Avoids managing Discord bot tokens, Linear API keys, and rate limiting inside the PM server. Aligns with organizational preference for self-hosted in-cluster services.
-- *Negative:* PM server depends on bridge service availability. If bridge services are down, notifications fail silently unless error handling is implemented.
-- *Caveats:* None raised — both speakers strongly aligned.
+- **Positive:** Zero new dependencies; low-latency in-cluster HTTP calls; no external auth surface
+- **Negative:** If bridge services are down, notifications fail with no external fallback
+- **Caveats:** None — both debaters considered external SaaS clearly inappropriate for this use case
 
 ---
 
-### [D4] How should delegate_id and research memos be represented in the data model?
+### [D3] How should secrets be managed and injected into the pipeline?
 
 **Status:** Accepted
 
-**Task Context:** Task 2 (PM Server Delegation), Task 3 (Hermes Integration), Task 6 (Frontend Assignment Visualization), Task 7 (Frontend Memo Display)
+**Task Context:** Tasks 1, 3, 9, 10 — Infrastructure provisioning, Hermes integration, production hardening
 
-**Context:** Both debaters agreed unanimously. The PRD specifies 1:1 assignment (one delegate per task). Creating separate entities for a 1:1 relationship adds join complexity with no normalization benefit.
+**Context:** Both debaters agreed on using the external-secrets operator, which is already deployed with CRDs in the cluster. The Pessimist raised a critical operational caveat: ExternalSecret CRDs that point to nonexistent paths in the backing secret provider will silently create empty Kubernetes Secrets, causing downstream services to fail with opaque "unauthorized" errors rather than clear "missing secret" errors.
 
-**Decision:** Extend the existing task schema with `delegate_id` (string) and `research_memo` (embedded object with `content`, `source`, and `timestamp` fields) directly on the task entity.
+**Decision:** Use the existing external-secrets operator with ExternalSecret CRDs backed by the cluster's SecretStore. **Task 1 must include a validation step** that verifies ExternalSecret resources resolve to non-empty values before downstream tasks proceed.
 
 **Consensus:** 2/2 (100%)
 
 **Consequences:**
-- *Positive:* Single task fetch returns everything the frontend needs. No joins, simple API surface. Appropriate for the 1:1 cardinality in this validation pipeline.
-- *Negative:* If multi-assignment becomes a requirement later, a schema migration will be needed.
-- *Caveats:* None — both speakers considered this straightforward given the cardinality.
+- **Positive:** Automated, auditable, rotation-capable secret management using already-deployed infrastructure
+- **Negative:** Depends on backing provider (Vault, AWS SSM, etc.) being correctly configured with the required paths
+- **Caveats (Pessimist):** Empty-secret failure mode is a known issue with external-secrets operator. Task 1 **must** verify that `NOUS_API_KEY`, Linear tokens, and Discord webhook URLs resolve to non-empty values. This is a blocking prerequisite for Task 3.
 
 ---
 
-### [D8] Which ingress/CDN solution for Sigma-1?
+### [D4] What API paradigm should the frontend use for delegation status?
+
+**Status:** Accepted (conditional — see Scope Caveat)
+
+**Task Context:** Tasks 2, 7 — PM server API and web frontend dashboard
+
+**Context:** The Pessimist argued that Task 7 (web dashboard) is not in the PRD's acceptance criteria and should be descoped entirely, which would make this decision point moot. The Optimist proposed REST endpoints as the appropriate paradigm for flat task-list data. Both agreed that if Task 7 is retained, REST is the correct choice — GraphQL adds schema/resolver overhead for a single-view dashboard with no nested data.
+
+**Decision:** REST endpoints from the PM server. The data model is a flat list of tasks with assignee and status fields — no graph-shaped data justifies GraphQL complexity.
+
+**Consensus:** 2/2 (100%) on REST if Task 7 is retained
+
+**Consequences:**
+- **Positive:** Native to Bun/Elysia; no additional schema layer or client dependencies (Apollo/urql)
+- **Negative:** If future dashboards need flexible querying across multiple entities, REST may require multiple endpoints
+- **Scope Caveat:** The Pessimist's position is that Task 7 should be descoped. If Task 7 is descoped, this decision is moot. **Implementing agents should treat Task 7 as lower priority than core pipeline tasks (1–6, 8).**
+
+---
+
+### [D5] How should agent assignments and delegation status be modeled?
 
 **Status:** Accepted
 
-**Task Context:** Task 1 (Provision Dev Infrastructure), Task 10 (Production Hardening)
+**Task Context:** Tasks 2, 6, 7 — Delegation logic, task generation validation, dashboard
 
-**Context:** Both debaters agreed unanimously. The `cloudflare-operator-system` is deployed with webhook and metrics services active. Cloudflare Tunnel CRDs (`accesstunnels.networking.cfargotunnel.com`, `clustertunnels.networking.cfargotunnel.com`) are registered and operational.
+**Context:** Both debaters agreed unanimously. The PRD's acceptance criterion is "issues have delegate_id set" — this is a field, not an event stream. Event sourcing would add projection layers, replay logic, and eventual consistency semantics for what amounts to writing and reading two columns. Audit trail needs (if in scope via Task 10) are satisfied by infrastructure-layer logging, not data model complexity.
 
-**Decision:** Use the existing Cloudflare operator with networking CRDs (accesstunnels, clustertunnels) for ingress, CDN, and TLS termination. Do not deploy a separate ingress controller.
+**Decision:** Extend the existing task schema with `delegate_id` (string, nullable) and `status` (enum) fields using a standard CRUD model.
 
 **Consensus:** 2/2 (100%)
 
 **Consequences:**
-- *Positive:* Zero-trust ingress, automatic TLS, and CDN without deploying additional infrastructure. Task 10 benefits directly from existing CRDs.
-- *Negative:* Dependency on Cloudflare ecosystem. Debugging tunnel issues requires Cloudflare-specific knowledge.
-- *Caveats:* Deploying NGINX alongside the Cloudflare operator would create dual-ingress complexity — explicitly ruled out.
+- **Positive:** Minimal schema change; straightforward read/write; no new infrastructure (event store, projections)
+- **Negative:** No built-in history of status transitions at the data layer
+- **Caveats:** If audit logging of status transitions is later required, it should be implemented at the application/infrastructure logging layer, not by retrofitting event sourcing
 
 ---
 
-### [D6] Which component library for new frontend UI elements?
+### [D6] What authentication mechanism for the web frontend dashboard?
 
-**Status:** Accepted (conditional — contingent on frontend tasks remaining in scope per D5)
+**Status:** Accepted (conditional — see Scope Caveat)
 
-**Task Context:** Tasks 6, 7, 8, 9 (all frontend visualization tasks)
+**Task Context:** Task 7 — Web frontend dashboard
 
-**Context:** Both debaters agreed on the choice itself. The Pessimist noted this decision is moot if frontend tasks are deferred (per dp-5) but conceded that if frontend work proceeds, shadcn/ui is the obvious choice. The existing `cto/tweakcn` service deployed in-cluster indicates the team is already in the shadcn/ui ecosystem.
+**Context:** The Pessimist argued Task 7 should be descoped entirely, making this decision moot. If retained, both agreed: JWT-based stateless auth with httpOnly cookies. The PM server is a stateless Bun process — adding a session store (Redis) introduces a new dependency; in-memory sessions break on restart. JWT with short-lived tokens in httpOnly cookies provides XSS mitigation without operational overhead.
 
-**Decision:** Use shadcn/ui (built on Radix UI primitives) for all new components in Tasks 6–9.
+**Decision:** JWT-based stateless authentication with short-lived tokens stored in httpOnly cookies.
 
-**Consensus:** 2/2 (100%) — conditional on frontend tasks being in scope
+**Consensus:** 2/2 (100%) on JWT if Task 7 is retained
 
 **Consequences:**
-- *Positive:* Components are copy-paste-owned, not imported — no version lock-in. Radix primitives provide accessibility compliance. Most adopted component approach in the Next.js ecosystem. `tweakcn` in-cluster confirms existing team familiarity.
-- *Negative:* Copy-paste-own model means the team is responsible for component maintenance and updates.
-- *Caveats:* This decision only applies if Tasks 6–9 remain in scope. See [D5] for the scope question.
+- **Positive:** No session store dependency; works natively with Next.js middleware; httpOnly cookies mitigate XSS
+- **Negative:** Token revocation requires a blocklist (adds complexity) or short expiry with refresh tokens
+- **Scope Caveat:** Same as D4 — conditional on Task 7 remaining in scope
+
+---
+
+### [D7] How should the frontend handle pipeline progress and error states?
+
+**Status:** Accepted (conditional — see Scope Caveat)
+
+**Task Context:** Task 7 — Web frontend dashboard
+
+**Context:** The Pessimist argued Task 7 should be descoped. If retained, both agreed: polling at 5-second intervals with inline error banners. Pipeline runs take minutes, making 5s polling indistinguishable from real-time. WebSocket infrastructure in Bun/Elysia adds complexity for no perceptible UX benefit. Inline banners (not modal dialogs) because errors shouldn't block the user from viewing other tasks.
+
+**Decision:** Polling with 5-second periodic refresh. Inline error banners for error states (not modal dialogs).
+
+**Consensus:** 2/2 (100%) on polling with inline errors if Task 7 is retained
+
+**Consequences:**
+- **Positive:** No WebSocket infrastructure needed; simple implementation; non-blocking error UX
+- **Negative:** Slightly higher server load from polling vs. push; 0–5s latency on status updates
+- **Scope Caveat:** Same as D4 — conditional on Task 7 remaining in scope
+
+---
+
+### [D8] Should Hermes integration use the in-house agent or external research API?
+
+**Status:** Accepted
+
+**Task Context:** Task 3 — Hermes research integration
+
+**Context:** Both debaters agreed on in-house Hermes as primary with NOUS API as fallback. The Pessimist raised a critical point about failure semantics: the PRD says "where NOUS_API_KEY is available," using conditional language that implies graceful degradation. If neither Hermes nor NOUS is available, the pipeline **must not fail** — research is enrichment, not a gate. The risk is Task 3 treating missing research as a fatal error that blocks the entire validation run.
+
+**Decision:** In-house Hermes agent as primary, NOUS API as fallback when `NOUS_API_KEY` is present, and **graceful skip** if neither is available. Research is conditional enrichment, not a pipeline gate.
+
+**Consensus:** 2/2 (100%)
+
+**Consequences:**
+- **Positive:** Keeps data in-cluster when possible; reduces external API costs; graceful degradation preserves pipeline reliability
+- **Negative:** Research memos may be absent in some runs, reducing deliberation quality
+- **Caveats (Pessimist):** Task 3 must implement a circuit breaker or skip pattern. Three explicit cases must be handled: (1) Hermes available → use it, (2) Hermes unavailable + NOUS_API_KEY present → call NOUS, (3) neither available → skip research, log warning, continue pipeline. **Case 3 must not be a fatal error.**
+
+---
+
+### [D9] What component library for the frontend dashboard?
+
+**Status:** Accepted (conditional — see Scope Caveat)
+
+**Task Context:** Task 7 — Web frontend dashboard
+
+**Context:** Both agreed: shadcn/ui with Radix primitives. `cto/tweakcn` is deployed in-cluster, confirming organizational familiarity and likely existing theme customization. Custom components for an internal validation dashboard would be waste. The Pessimist's primary position was to descope Task 7 entirely.
+
+**Decision:** shadcn/ui with Radix primitives as the component library.
+
+**Consensus:** 2/2 (100%) on shadcn/ui if Task 7 is retained
+
+**Consequences:**
+- **Positive:** Copy-paste model (no npm vendor lock-in); accessible primitives via Radix; organizational alignment confirmed by tweakcn deployment
+- **Negative:** shadcn components require Tailwind CSS — adds to bundle if not already configured
+- **Scope Caveat:** Same as D4 — conditional on Task 7 remaining in scope
+
+---
+
+### [D-SCOPE] Should Tasks 7, 9, and 10 be included in the validation run?
+
+**Status:** Accepted — **Tasks 7, 9, 10 are deprioritized; core validation is Tasks 1–6 and 8**
+
+**Task Context:** Tasks 7, 9, 10 — Web dashboard, HA scaling, RBAC/audit logging
+
+**Context:** The Pessimist raised the strongest meta-argument of the deliberation: Tasks 7, 9, and 10 represent ~40% of the task list but support zero PRD acceptance criteria. The PRD's acceptance criteria are: pipeline completes, Linear issues have assignees, PR is created, Discord notifications fire. A web dashboard, production HA scaling, and RBAC/audit logging do not validate delegation — they build a product around a validation run. The Optimist did not contest this point and acknowledged Task 7 is "the lowest-priority task."
+
+**Decision:** The core validation scope is **Tasks 1–6 and 8**. Tasks 7, 9, and 10 are acknowledged as beyond the PRD's acceptance criteria and should be treated as **stretch/deferred work**. Implementing agents should complete Tasks 1–6 and 8 before beginning Tasks 7, 9, or 10. Task 8 (E2E test) should remove its dependency on Task 7 to avoid blocking validation on dashboard completion.
+
+**Consensus:** 2/2 (100%) that Tasks 7, 9, 10 are not required by the PRD
+
+**Consequences:**
+- **Positive:** Focuses effort on the 6 tasks that directly validate the PRD's acceptance criteria; reduces timeline risk by ~40%
+- **Negative:** No dashboard for visual monitoring; no production hardening in this phase
+- **Caveats:** If organizational stakeholders require Task 7, it should be implemented after core validation passes. Task 8's dependency on Task 7 should be removed — the E2E test should validate pipeline artifacts (Linear issues, PR, notifications), not dashboard rendering.
 
 ## 4. Escalated Decisions
 
-### [D2] What API paradigm should be used for PM server integrations? — ESCALATED
-
-**Status:** Pending human decision
-
-**Task Context:** Task 2 (PM Server Delegation), Task 3 (Hermes Integration), Task 5 (Discord/Linear Notifications)
-
-**Options:**
-
-| | Option A (Optimist) | Option B (Pessimist) |
-|---|---|---|
-| **Approach** | REST for synchronous (Hermes calls in Task 3), NATS pub/sub for asynchronous notifications (Task 5) | REST/HTTP for all integrations — synchronous calls to Hermes and direct HTTP POSTs to bridge services |
-| **Async model** | NATS subjects for pipeline events; bridge services subscribe | Direct HTTP POSTs from PM server to bridge services |
-| **Failure mode** | NATS subject mismatches are silent failures | HTTP errors are immediate (404, connection refused) |
-
-**Optimist argued:** NATS is already deployed in-cluster (`openclaw-nats.openclaw.svc.cluster.local`). Notifications are textbook fire-and-forget async — Discord and Linear don't need synchronous responses. NATS subjects provide decoupling, retry semantics, and observability. The bridge services can subscribe independently, and the PM server doesn't need to know about notification delivery details.
-
-**Pessimist argued:** The bridge services are HTTP services by name and design (`discord-bridge-http`). NATS requires either adding NATS subscribers to both bridge services or building a NATS-to-HTTP adapter — both add code and testing surface for exactly **two notification calls per pipeline run**. NATS subject misconfiguration (`pipeline.complete` vs `pipeline.completed`) is a silent failure — messages vanish without errors. HTTP failures are immediate and debuggable. The decoupling benefit of pub/sub is irrelevant when there are exactly 2 known consumers. REST everywhere keeps the integration surface uniform.
-
-**Recommendation:** The Pessimist's argument is more compelling for this specific scope. The pipeline fires two notifications per run. The blast radius of failure is a missing Discord message, not data loss. HTTP's immediate error feedback is more valuable than NATS's decoupling for two known consumers. However, if the team plans to add more notification consumers (e.g., Slack, email) beyond this E2E validation, NATS becomes the better long-term choice. **For E2E validation scope, recommend Option B (REST everywhere).** If NATS adoption is a strategic goal, consider it for a follow-up iteration when there are more than 2 consumers.
-
----
-
-### [D5] How should agent assignments and research memos be visualized? — ESCALATED
-
-**Status:** Pending human decision
-
-**Task Context:** Tasks 6, 7, 8, 9 (all frontend work — 40% of project scope)
-
-**Options:**
-
-| | Option A (Optimist) | Option B (Pessimist) |
-|---|---|---|
-| **Approach** | Build inline display within task cards — delegate_id as avatar/badge, research memo as collapsible preview | No new frontend visualization; verify delegate_id in Linear's UI and research memos in PR content; defer Tasks 6–9 entirely |
-| **Scope impact** | 10 tasks (full scope) | 6 tasks (Tasks 1–5, 10 only) |
-| **Acceptance criteria coverage** | Extends beyond AC | Covers all 5 AC as written |
-
-**Optimist argued:** For a validation/E2E pipeline dashboard, information density matters more than progressive disclosure. Operators verifying pipeline correctness need to scan assignments and memo status at a glance without clicking into each task. Inline display with collapsible memo sections gives both scannability and detail access.
-
-**Pessimist argued:** The PRD has five acceptance criteria, none of which mention a web frontend. The criteria say "visible as assignee **in Linear**" — Linear is the UI. Tasks 6–9 represent 40% of the task list and add scope that satisfies zero acceptance criteria. The design context shows `stitch_status=failed`, meaning there are no design artifacts to implement against. Building 4 frontend tasks to visualize data that Linear and GitHub already display is scope creep. Validate the pipeline first; build a dashboard later if needed.
-
-**Recommendation:** The Pessimist raises a legitimate scope concern. The five acceptance criteria are all satisfiable without a custom frontend. However, the original task decomposition included these tasks, suggesting the project sponsor may have intended a dashboard. **This is a scope decision that should be made by the project owner.** Two paths:
-
-1. **Minimal (recommended for speed):** Defer Tasks 6–9. Focus on Tasks 1–5 and a reduced Task 10. Validate the pipeline E2E against all 5 acceptance criteria. This cuts 40% of scope and eliminates frontend dependencies.
-2. **Full scope:** Keep Tasks 6–9 if a pipeline dashboard is desired for ongoing operational use beyond this single E2E validation run. If choosing this path, use shadcn/ui per [D6].
-
----
-
-### [D7] Authentication mechanism for frontend and API? — ESCALATED
-
-**Status:** Pending human decision
-
-**Task Context:** Tasks 6, 7, 8, 9 (frontend auth), Task 10 (production hardening RBAC)
-
-**Options:**
-
-| | Option A (Optimist) | Option B (Pessimist) |
-|---|---|---|
-| **Approach** | JWT-based authentication with RBAC, validated at ingress/gateway | Cloudflare Access via existing accesstunnels CRD; no application-level auth for E2E scope |
-| **Implementation** | JWT issuance, validation middleware, RBAC roles, key rotation | Zero application code — Cloudflare Access handles SSO/MFA at the tunnel layer |
-| **Future RBAC** | Built-in from day one | Layer RBAC on `Cf-Access-Jwt-Assertion` header identity later |
-
-**Optimist argued:** JWT-based auth with RBAC is stateless, scales horizontally, and is the standard pattern for Kubernetes-native services. The cluster uses external-secrets operator for key management. Task 10 explicitly mentions RBAC enforcement, so building it now avoids retrofitting.
-
-**Pessimist argued:** Cloudflare Access is already available via the `accesstunnels` CRD (resolved in [D8]). It provides SSO, MFA, and identity at the tunnel layer with zero application code. Building JWT issuance, validation middleware, and RBAC for an internal validation tool is overengineered when infrastructure already provides authentication at the edge. RBAC is a production hardening concern for Task 10, not an E2E validation concern. If RBAC is needed later, it can be layered on the `Cf-Access-Jwt-Assertion` header identity that Cloudflare Access already provides.
-
-**Recommendation:** This decision is strongly coupled to [D5]. If Tasks 6–9 are deferred, there is no frontend auth surface and this decision is moot for E2E scope — Cloudflare Access alone is sufficient. If Tasks 6–9 proceed, Cloudflare Access still provides the authentication layer, but RBAC may need to be added at the application level. **Recommend Option B (Cloudflare Access) for E2E validation scope.** Revisit JWT/RBAC when production hardening (Task 10) is in active development and multi-user access patterns are defined.
+No decisions were escalated. All decision points reached consensus during deliberation.
 
 ## 5. Architecture Overview
 
 ### Agreed Approach
 
-The architecture extends the **existing PM server (Bun/Elysia)** rather than introducing new services. All backend pipeline logic — agent delegation, Hermes research integration, design snapshot PR surfacing, and notification dispatch — lives within the PM server as internal modules with clean interface boundaries.
+The Sigma-1 E2E validation run follows a **monolithic extension** pattern — all new functionality is added to the existing `cto/cto-pm` Bun/Elysia service. No new microservices are created.
 
 ### Technology Stack
 
 | Layer | Technology | Notes |
 |-------|-----------|-------|
-| **Backend** | Bun/Elysia | Existing PM server, extended |
-| **Frontend** (if in scope) | React/Next.js with shadcn/ui | Contingent on [D5] resolution |
-| **Infrastructure** | Kubernetes/Helm | Existing cluster |
-| **Ingress/CDN/TLS** | Cloudflare operator + accesstunnels/clustertunnels CRDs | Resolved in [D8] |
-| **Notifications** | Existing `bots/discord-bridge-http` and `bots/linear-bridge` | Resolved in [D3] |
-| **Messaging** (pending) | NATS or direct HTTP | Pending [D2] resolution |
-| **Auth** (pending) | Cloudflare Access or JWT+RBAC | Pending [D7] resolution |
+| Runtime | Bun | Existing PM server runtime |
+| API Framework | Elysia | REST endpoints; existing patterns |
+| Frontend (if retained) | React/Next.js + shadcn/ui + Radix | Stretch scope — Task 7 |
+| Infrastructure | Kubernetes/Helm | Existing cluster |
+| Secret Management | external-secrets operator | Already deployed with CRDs |
+| Notifications | In-cluster discord-bridge-http + linear-bridge | Already operational |
+| Research | In-house Hermes → NOUS API fallback → graceful skip | Three-tier degradation |
+| Data Model | CRUD — extend task schema with `delegate_id` + `status` | No event sourcing |
 
 ### Service Architecture
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                  PM Server (Bun/Elysia)              │
-│                                                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────┐  │
-│  │ Agent        │  │ Hermes       │  │ Design    │  │
-│  │ Delegation   │  │ Research     │  │ Snapshot  │  │
-│  │ Module       │  │ Module       │  │ Module    │  │
-│  └──────┬───────┘  └──────┬───────┘  └─────┬─────┘  │
-│         │                 │                 │        │
-│  ┌──────┴─────────────────┴─────────────────┴─────┐  │
-│  │          Notification Dispatch Layer            │  │
-│  └──────────────────┬─────────────────────────────┘  │
-└─────────────────────┼────────────────────────────────┘
-                      │ HTTP or NATS (pending D2)
-          ┌───────────┴───────────┐
-          ▼                       ▼
-┌──────────────────┐   ┌──────────────────┐
-│ discord-bridge-  │   │ linear-bridge    │
-│ http             │   │                  │
-└──────────────────┘   └──────────────────┘
-
-External Services:
-  - Linear API (issue creation with delegate_id)
-  - Hermes/NOUS API (research memos, requires NOUS_API_KEY)
-  - GitHub API (PR creation in 5dlabs/sigma-1)
-
-Ingress:
-  Cloudflare Tunnel → accesstunnel CRD → PM Server / Frontend
+┌─────────────────────────────────────────────────────────────┐
+│                    Kubernetes Cluster                        │
+│                                                             │
+│  ┌───────────────┐     ┌─────────────────────────────────┐ │
+│  │  cto/cto-pm   │────▶│  Linear API (external)          │ │
+│  │  (Bun/Elysia) │     │  - Create issues w/ delegate_id │ │
+│  │               │     └─────────────────────────────────┘ │
+│  │  Extended:    │                                         │
+│  │  - delegation │     ┌─────────────────────────────────┐ │
+│  │  - research   │────▶│  Hermes (in-cluster) or NOUS    │ │
+│  │  - PR surface │     │  (external, conditional)         │ │
+│  │               │     └─────────────────────────────────┘ │
+│  │               │                                         │
+│  │               │     ┌─────────────────────────────────┐ │
+│  │               │────▶│  bots/discord-bridge-http        │ │
+│  │               │     └─────────────────────────────────┘ │
+│  │               │                                         │
+│  │               │     ┌─────────────────────────────────┐ │
+│  │               │────▶│  bots/linear-bridge              │ │
+│  └───────────────┘     └─────────────────────────────────┘ │
+│                                                             │
+│  ┌───────────────┐     ┌─────────────────────────────────┐ │
+│  │ external-     │────▶│  Backing store (Vault/SSM/etc.) │ │
+│  │ secrets op    │     └─────────────────────────────────┘ │
+│  └───────────────┘                                         │
+│                                                             │
+│  ┌───────────────┐                                         │
+│  │  sigma-1 repo │◀── PR with task scaffolds + design      │
+│  │  (5dlabs)     │    snapshots                            │
+│  └───────────────┘                                         │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Data Model
+### Key Patterns
 
-The task entity is extended with two fields:
-- `delegate_id: string` — Linear user ID resolved from agent hint
-- `research_memo: { content: string, source: string, timestamp: Date }` — embedded Hermes research output
+1. **Monolithic extension**: All logic within `cto-pm` — no new service deployments
+2. **Three-tier research degradation**: Hermes (in-cluster) → NOUS API (external fallback) → graceful skip
+3. **Secret validation gate**: ExternalSecret resources must resolve to non-empty values before pipeline proceeds
+4. **CRUD data model**: `delegate_id` and `status` fields on existing task schema
+5. **In-cluster notification**: HTTP calls to co-located bridge services
 
-### What Was Explicitly Ruled Out
+### Explicitly Ruled Out
 
-| Ruled Out | Reason |
-|-----------|--------|
-| Separate microservices for delegation/research | `resolve_agent_delegates()` already exists in PM server; network hops add latency for zero benefit at current scale |
-| Direct Discord/Linear API integration from PM server | Bridge services are deployed, tested, and purpose-built; reimplementation duplicates work |
-| NGINX ingress controller | Cloudflare operator is deployed with CRDs active; dual-ingress creates split-brain complexity |
-| gRPC for integrations | Protobuf compilation and code generation overhead unjustified for 2–3 integration points |
-| Separate data entities for delegate_id/research_memo | 1:1 cardinality; joins add complexity with no normalization benefit |
+| Approach | Reason |
+|----------|--------|
+| Separate microservices for delegation/research | Premature decomposition; adds deployment surface for a validation run with no scaling needs |
+| External SaaS notifications (Zapier/Pipedream) | Unnecessary egress, auth surface, and cost for private internal pipeline |
+| Manual secret provisioning | Compliance risk; operator already deployed; no audit trail |
+| GraphQL API | Over-engineering for flat task-list data; adds schema/resolver overhead |
+| Event sourcing for delegation state | "Issues have delegate_id set" is a column, not an event stream |
+| Session-based auth for dashboard | Requires session store (Redis) — PM server is stateless |
+| WebSocket real-time updates | Pipeline runs take minutes; 5s polling is indistinguishable from real-time |
+| Custom component library | Internal tooling doesn't justify custom UI when shadcn is organizationally aligned |
 
 ## 6. Implementation Constraints
 
 ### Security Requirements
 
-- All secrets (Linear API key, Discord webhook URL, NOUS_API_KEY, GitHub tokens) must be stored in Kubernetes secrets, not ConfigMaps or environment variables
-- Ingress must use Cloudflare Tunnel with TLS termination (no plain HTTP exposure)
-- Authentication mechanism pending [D7] resolution — **do not implement JWT or RBAC until this is resolved**
-- Task 10 must enforce RBAC for all service accounts and enable audit logging
+- **Secrets must use the external-secrets operator** — no manual Kubernetes secrets in manifests or CI
+- **ExternalSecret validation is mandatory**: Task 1 must confirm that secrets resolve to non-empty values before marking infrastructure as ready
+- **If Task 7 is implemented**: JWT with short-lived tokens in httpOnly cookies; no localStorage token storage
+- Target repository (`5dlabs/sigma-1`) is private — all Git operations must use authenticated credentials
 
 ### Performance Targets
 
-- Pipeline must complete all stages (deliberation → task generation → issue creation) without fatal errors
-- At least 5 tasks must be generated with valid agent assignments per run
-- Hermes research integration must gracefully degrade (skip, not fail) when NOUS_API_KEY is unavailable
+- Pipeline must complete through all stages without fatal errors (PRD acceptance criterion)
+- At least 5 tasks generated with valid agent assignments per run
+- Notification delivery to Discord and Linear should complete within the pipeline run (not queued indefinitely)
 
 ### Operational Requirements
 
-- All services provisioned in a dedicated `sigma-1-dev` namespace
-- Service endpoints aggregated in `sigma-1-infra-endpoints` ConfigMap for consistent discovery
-- Error handling required for: agent mapping failures (fallback assignee or logged error), notification delivery failures, Hermes API unavailability
-- Bridge service integration must handle bridge service downtime without crashing the pipeline
+- **Research integration must not block the pipeline**: Missing Hermes + missing NOUS_API_KEY = skip research with warning log, not fatal error
+- **Backward compatibility**: If agent mapping is unavailable for a specific task, fall back to `agent:pending` label (do not fail)
+- All resources in the sigma-1 namespace must be labeled for easy cleanup and traceability
+- ConfigMap `sigma-1-infra-endpoints` must aggregate all connection strings and service URLs
 
 ### Service Dependencies and Integration Points
 
-| Service | Cluster Address | Purpose |
-|---------|----------------|---------|
-| `bots/discord-bridge-http` | In-cluster | Discord notifications |
-| `bots/linear-bridge` | In-cluster | Linear notifications |
-| `openclaw-nats` | `openclaw-nats.openclaw.svc.cluster.local` | Messaging (if [D2] resolves to NATS) |
-| `cloudflare-operator-system` | In-cluster | Ingress, TLS, CDN |
-| `cto/tweakcn` | In-cluster | Confirms shadcn/ui ecosystem adoption |
+| Service | Type | Required For |
+|---------|------|-------------|
+| `cto/cto-pm` | In-cluster, existing | Tasks 2, 3, 4, 5, 6 |
+| `bots/discord-bridge-http` | In-cluster, existing | Task 5, 8 |
+| `bots/linear-bridge` | In-cluster, existing | Task 5, 8 |
+| Linear API | External | Task 2, 6 (issue creation with delegate_id) |
+| Hermes agent | In-cluster, conditional | Task 3 (primary research) |
+| NOUS API | External, conditional | Task 3 (fallback research, requires NOUS_API_KEY) |
+| GitHub API | External | Task 4 (PR creation in sigma-1) |
+| external-secrets operator | In-cluster, existing | Task 1 (secret provisioning) |
 
 ### Organizational Preferences
 
-- Prefer self-hosted in-cluster services over external SaaS equivalents
-- Prefer extending existing services over creating new ones
-- Prefer copy-paste-own component patterns (shadcn/ui) over opaque library dependencies
+- **Prefer in-cluster services** over external SaaS when equivalent functionality exists
+- **Use existing infrastructure** (operators, bridges, services) rather than deploying new tooling
+- **shadcn/ui** is the organizational standard for React dashboards (confirmed by `cto/tweakcn` deployment)
+
+### Task Priority and Ordering
+
+Implementing agents must respect the following priority:
+
+1. **Critical path (must complete):** Tasks 1 → 2, 3, 4, 5 → 6 → 8
+2. **Stretch/deferred:** Task 7 (dashboard), Task 9 (HA), Task 10 (RBAC)
+3. **Dependency fix:** Task 8 (E2E test) should **not** depend on Task 7 — remove this dependency to avoid blocking validation on stretch scope
 
 ## 7. Design Intake Summary
 
@@ -349,19 +400,30 @@ The task entity is extended with two fields:
 
 - **`hasFrontend`:** true
 - **`frontendTargets`:** web
-- **`stitch_status`:** failed — no Stitch design artifacts were generated
-- **`stitch_reason`:** (empty — no reason provided)
+- **Mode:** `ingest_plus_stitch`
+
+### Provider Status
+
+| Provider | Status | Notes |
+|----------|--------|-------|
+| Stitch | Failed | No generated design artifacts available |
+| Framer | Unknown | Not attempted or no results |
 
 ### Supplied Design Artifacts
 
-None. No design mockups, wireframes, or reference URLs were supplied.
+No design artifacts were supplied with the PRD. No reference URLs were provided.
+
+### Component Library Context
+
+- **tweakcn** (`cto/tweakcn`) is deployed in-cluster, confirming organizational adoption of shadcn/ui
+- Decision D9 establishes shadcn/ui with Radix primitives as the component library if Task 7 (web dashboard) is implemented
 
 ### Implications for Implementation
 
-1. **No visual reference exists.** Frontend tasks (6–9), if they proceed, have no design artifacts to implement against. Implementing agents must use shadcn/ui defaults and their best judgment for layout, spacing, and visual hierarchy.
-2. **Stitch generation failed.** There are no AI-generated design candidates to select from. This reinforces the Pessimist's argument in [D5] that frontend work lacks specification.
-3. **If frontend tasks proceed:** Agents should use shadcn/ui's default theme (or the team's tweakcn configuration if accessible), Radix UI primitives for accessibility, and a minimal, functional layout focused on data display (task lists, collapsible memos, status badges).
-4. **If frontend tasks are deferred:** All validation criteria can be confirmed through Linear's UI, GitHub's PR interface, and Discord channel inspection. No design work is needed.
+1. **Task 7 (if retained)** should use shadcn/ui with Radix primitives and Tailwind CSS, consistent with the tweakcn deployment
+2. **No generated designs are available** — the dashboard UI must be implemented from component library defaults with functional requirements only (task list, assignee display, pipeline status)
+3. **Stitch failure** means there are no visual mockups to reference; implementing agents should prioritize functional correctness over visual polish for this internal validation tool
+4. Since no design artifacts exist and this is an internal tooling dashboard, visual design decisions should default to shadcn/ui's standard theme unless organizational overrides exist via tweakcn
 
 ### 7a. Selected Design Direction
 
@@ -373,17 +435,17 @@ No design deliberation was conducted.
 
 ## 8. Open Questions
 
-The following items were not resolved in deliberation and are non-blocking. Implementing agents should use their best judgment.
+The following items were not resolved in deliberation and should be handled by implementing agents using best judgment:
 
-1. **Fallback behavior for failed agent mapping (Task 2):** When `resolve_agent_delegates()` cannot map an agent hint to a Linear user ID, should the issue be created unassigned with a log entry, or assigned to a default/fallback user? The PRD implies issues should have assignees; a logged warning with unassigned creation is the safer default.
+1. **Backing secret store configuration**: Which backing provider (Vault, AWS SSM, GCP Secret Manager) is configured for the external-secrets operator? Task 1 must discover this during infrastructure provisioning. If the backing store paths for `NOUS_API_KEY`, Linear tokens, and Discord webhook URLs are not pre-configured, the agent should document what's needed and flag it.
 
-2. **Research memo format and depth (Task 3):** The embedded `research_memo` object structure (`content`, `source`, `timestamp`) is agreed, but the expected content length and format from Hermes is unspecified. Agents should accept whatever Hermes returns and store it verbatim.
+2. **Hermes agent endpoint discovery**: The exact in-cluster endpoint for the Hermes agent is not specified. Task 3 should check `cto/cto-tools` or service discovery for a Hermes-compatible API. If not found, fall back directly to NOUS API.
 
-3. **Design snapshot trigger conditions (Task 4):** The PRD says "Design snapshot PR surfacing works" but doesn't define what constitutes a "design change" that triggers PR creation. Given `stitch_status=failed`, implementing agents should trigger PR creation for any task scaffold generation and include whatever artifacts the pipeline produces.
+3. **Linear user ID mapping source**: `resolve_agent_delegates()` maps agent hints to Linear user IDs, but the source of this mapping (hardcoded, API lookup, configuration file) is not specified. Task 2 should use the existing mapping logic and extend it only if the current implementation is insufficient for 5+ agent assignments.
 
-4. **Notification payload format (Task 5):** The exact structure of Discord and Linear notification payloads (what fields, what formatting) is left to implementing agents. Should include at minimum: pipeline status, link to Linear session, link to PR, and task count summary.
+4. **Design snapshot generation mechanism**: Task 4 references "design snapshot generation" but the PRD doesn't specify what generates the snapshots. The implementing agent should integrate with whatever design snapshot mechanism currently exists in the pipeline, or create placeholder scaffolds in the PR if no mechanism is found.
 
-5. **Task 10 scope reduction:** If Tasks 6–9 are deferred per [D5], Task 10's dependency list should be updated to `[2, 3, 4, 5]` only. Production hardening scope (HA, RBAC, audit logging) applies to whatever services remain in scope.
+5. **E2E test mocking strategy**: Task 8 notes "mock external dependencies as needed for repeatability" — the implementing agent should decide which dependencies (Linear, Discord, GitHub) to mock vs. call live based on test environment constraints and idempotency requirements.
 
-6. **NATS infrastructure in Task 1:** If [D2] resolves to REST-everywhere, the NATS provisioning step in Task 1 may be unnecessary (NATS is already deployed in-cluster regardless, but no new NATS configuration would be needed for this pipeline).
+6. **Dashboard scope (if Task 7 proceeds)**: The exact fields to display, filtering/sorting capabilities, and any role-based visibility are undefined. Implement a minimal read-only view: task title, agent assignment, delegate_id, pipeline status. No CRUD operations from the dashboard.
 

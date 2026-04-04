@@ -1,23 +1,61 @@
-Implement subtask 9003: Write comprehensive component and accessibility tests for pipeline status UI
+Implement subtask 9003: Configure Ingress resource with TLS termination via cert-manager
 
 ## Objective
-Write full test suite covering all PipelineStatus states, NotificationTimeline rendering and ordering, polling behavior verification, error alert display, and accessibility compliance for the error alert.
+Create an Ingress resource for the cto-pm service with TLS termination using cert-manager, including a ClusterIssuer or Issuer for certificate provisioning.
 
 ## Steps
-1. Create `src/components/__tests__/PipelineStatus.test.tsx`:
-   - Test: status='running' renders blue 'Running' badge (check className or data attribute for blue variant).
-   - Test: status='complete' renders green 'Complete' badge and renders Linear session link and PR link with correct href values.
-   - Test: status='error' renders red Alert with the exact error message text visible in the DOM.
-   - Test: status='error' Alert element has `role='alert'` attribute.
-2. Create `src/components/__tests__/NotificationTimeline.test.tsx`:
-   - Test: 3 events passed as props render 3 timeline items.
-   - Test: Events appear in correct chronological order (verify DOM order matches timestamp sort).
-   - Test: Each event displays its type label, formatted timestamp, and description.
-   - Test: Empty events array renders an empty state or no items.
-3. Create `src/hooks/__tests__/usePipelineStatus.test.ts` or integration test:
-   - Test: Mock API with MSW or jest mock. Render component using the hook. Assert initial data loads.
-   - Test: Use fake timers, advance 5 seconds, assert re-fetch occurs and updated data renders.
-4. Run all tests with `npm test` or `vitest` and verify 100% of the above cases pass.
+Step-by-step:
+1. Ensure cert-manager is installed in the cluster (check `kubectl get pods -n cert-manager`). If not, this is a prerequisite.
+2. Create a ClusterIssuer (or Issuer in sigma-1 namespace) for the chosen CA (Let's Encrypt staging first, then production):
+   ```yaml
+   apiVersion: cert-manager.io/v1
+   kind: ClusterIssuer
+   metadata:
+     name: letsencrypt-prod
+   spec:
+     acme:
+       server: https://acme-v02.api.letsencrypt.org/directory
+       email: ops@<org>.com
+       privateKeySecretRef:
+         name: letsencrypt-prod-key
+       solvers:
+       - http01:
+           ingress:
+             class: nginx
+   ```
+3. Create the Ingress resource:
+   ```yaml
+   apiVersion: networking.k8s.io/v1
+   kind: Ingress
+   metadata:
+     name: cto-pm-ingress
+     namespace: sigma-1
+     labels:
+       sigma-1-pipeline: production
+     annotations:
+       cert-manager.io/cluster-issuer: letsencrypt-prod
+       nginx.ingress.kubernetes.io/rate-limit: "100"
+       nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+   spec:
+     ingressClassName: nginx
+     tls:
+     - hosts:
+       - <cto-pm-hostname>
+       secretName: cto-pm-tls
+     rules:
+     - host: <cto-pm-hostname>
+       http:
+         paths:
+         - path: /
+           pathType: Prefix
+           backend:
+             service:
+               name: cto-pm
+               port:
+                 number: 3000
+   ```
+4. Apply and wait for cert-manager to issue the certificate: `kubectl get certificate -n sigma-1`.
+5. Verify TLS: `curl -v https://<cto-pm-hostname>` shows valid TLS handshake.
 
 ## Validation
-All specified tests pass: 3 PipelineStatus state tests, 1 accessibility test (role='alert'), 4 NotificationTimeline tests (rendering, ordering, labels, empty state), and 2 polling integration tests (initial load, 5-second revalidation). Run via test runner with coverage report showing PipelineStatus.tsx, NotificationTimeline.tsx, and usePipelineStatus.ts covered.
+`kubectl get ingress cto-pm-ingress -n sigma-1` shows the Ingress with TLS configured. `kubectl get certificate -n sigma-1` shows the certificate in `Ready: True` state. `curl -v https://<cto-pm-hostname>` completes TLS handshake with a valid certificate and returns a response from cto-pm.

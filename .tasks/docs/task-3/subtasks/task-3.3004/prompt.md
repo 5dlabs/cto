@@ -1,15 +1,14 @@
-Implement subtask 3004: Integrate fetchResearchMemo into the deliberation pipeline stage
+Implement subtask 3004: Implement SkipProvider concrete implementation
 
 ## Objective
-Wire the hermes-research module into the existing deliberation pipeline so that fetchResearchMemo is called for each task after initial task context assembly, and the returned memo is stored on the task's research_memo field.
+Implement SkipProvider that returns an empty research result with skipped=true and a descriptive reason, logging a warning. This provider never throws.
 
 ## Steps
-1. Locate the deliberation pipeline stage in the PM server codebase where tasks are assembled with their context.
-2. After task context assembly, iterate over the tasks and call `fetchResearchMemo(taskContext)` for each one.
-3. Assign the result (ResearchMemo or null) to `task.research_memo`.
-4. Decide on sequential vs. concurrent execution (consider using Promise.all or a concurrency-limited approach if there are many tasks).
-5. Ensure the pipeline continues even if all research memo calls return null.
-6. Verify that downstream pipeline stages (e.g., notification, PR creation) can access `research_memo` from the task objects.
+1. Create `src/research/providers/skip-provider.ts`.
+2. Constructor takes no arguments.
+3. `execute()` method: immediately returns `{ content: '', provider: 'skip', skipped: true, reason: 'no research provider available', responseTimeMs: 0, contentLength: 0 }`.
+4. Log a structured warning: `[research:skip] No research provider available — continuing pipeline without research enrichment`.
+5. This provider must never throw under any circumstances.
 
 ## Validation
-Integration test: Run the deliberation pipeline with NOUS_API_KEY set and a mocked Hermes API returning valid content. Verify that at least one task in the pipeline output has a non-null research_memo with all three fields (content, source, timestamp) populated. Also verify that when the API key is unset, the pipeline completes successfully with all research_memo fields set to null.
+Unit test: (1) execute() returns a ResearchResult with skipped=true and reason='no research provider available'. (2) A warning log is emitted containing 'no research provider available'. (3) Calling execute() multiple times never throws.

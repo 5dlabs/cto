@@ -1,7 +1,7 @@
-## Integrate Hermes Research Content in Deliberation Path (Nova - Bun/Elysia)
+## Integrate Hermes Research into Deliberation Path (Nova - Bun/Elysia)
 
 ### Objective
-Add a Hermes research integration module to the PM server's deliberation stage. When NOUS_API_KEY is available, the module calls the Hermes/NOUS API to generate research memos that are embedded directly on each task's research_memo field. The integration must gracefully degrade when the API key is unavailable or the Hermes service is unreachable.
+Add three-tier research integration to the cto/cto-pm deliberation path: in-cluster Hermes agent as primary, NOUS API as fallback when NOUS_API_KEY is present, and graceful skip with warning log if neither is available. Research is conditional enrichment — it must never block the pipeline.
 
 ### Ownership
 - Agent: nova
@@ -11,19 +11,44 @@ Add a Hermes research integration module to the PM server's deliberation stage. 
 - Dependencies: 1
 
 ### Implementation Details
-1. Create a new internal module `hermes-research` within the PM server codebase with a clean interface: `async function fetchResearchMemo(taskContext: TaskContext): Promise<ResearchMemo | null>`.
-2. Define the `ResearchMemo` type: `{ content: string, source: string, timestamp: Date }`.
-3. Extend the task entity/type definition to include `research_memo: ResearchMemo | null`.
-4. In the deliberation pipeline stage, after initial task context is assembled, call `fetchResearchMemo()` for each task.
-5. The Hermes API call should: read `NOUS_API_KEY` from environment (injected from `sigma-1-secrets`), send the task description/context as the research query, parse the response into the `ResearchMemo` structure, store the raw Hermes response verbatim in `content`.
-6. Implement graceful degradation: if `NOUS_API_KEY` is not set, log an info message ('Hermes integration skipped: NOUS_API_KEY not configured') and set `research_memo` to null. If the Hermes API returns an error or times out (30s timeout), log a warning and set `research_memo` to null. Pipeline must never fail due to Hermes unavailability.
-7. Ensure the module interface is clean enough for future extraction into a separate service per D1.
-8. Write unit tests for: successful memo fetch, missing API key skip, API timeout handling, API error handling.
-9. Write an integration test that verifies research memos appear in the deliberation output when the API key is provided.
+Step-by-step implementation:
+
+1. Discover the Hermes agent endpoint:
+   - Check `HERMES_URL` from the `sigma-1-infra-endpoints` ConfigMap
+   - If empty, attempt service discovery by querying `hermes.cto.svc.cluster.local` and `hermes.cto-tools.svc.cluster.local`
+   - Log the discovered endpoint or log warning if none found
+
+2. Implement a `ResearchProvider` abstraction in cto-pm with three strategies:
+   - `HermesProvider`: calls in-cluster Hermes endpoint with a 30-second timeout
+   - `NousProvider`: calls external NOUS API using `NOUS_API_KEY` from ExternalSecret, 30-second timeout
+   - `SkipProvider`: returns empty research result with `{ skipped: true, reason: 'no research provider available' }`
+
+3. Implement provider selection logic (circuit-breaker pattern):
+   ```
+   if (hermes_available && hermes_healthy) → HermesProvider
+   else if (NOUS_API_KEY is non-empty) → NousProvider
+   else → SkipProvider (log warning, continue pipeline)
+   ```
+
+4. Health check for Hermes: send a lightweight ping/health request before committing to Hermes for the full research call. Cache health status for 60 seconds.
+
+5. Integrate into the deliberation path:
+   - After PRD parsing and before task generation, invoke the selected research provider
+   - Write research results to the deliberation output path as research memos
+   - If SkipProvider is used, write a memo stating research was unavailable with timestamp
+
+6. Error handling:
+   - HermesProvider timeout or 5xx → fall through to NousProvider
+   - NousProvider timeout or 5xx → fall through to SkipProvider
+   - Never throw from the research integration — all errors are caught and logged
+
+7. Add structured logging at each decision point: which provider was selected, response time, content length, or skip reason.
 
 ### Subtasks
-- [ ] Define ResearchMemo type and extend task entity type: Create the ResearchMemo TypeScript type definition and extend the existing task entity/type to include the research_memo field as ResearchMemo | null.
-- [ ] Implement Hermes API client with NOUS_API_KEY reading and 30s timeout: Create the core hermes-research module with the fetchResearchMemo function that reads NOUS_API_KEY from environment, calls the Hermes/NOUS API with the task context, and parses the response into a ResearchMemo.
-- [ ] Implement graceful degradation for missing API key, timeouts, and API errors: Add all error handling paths to fetchResearchMemo: missing NOUS_API_KEY skip with info log, 30s timeout handling with warning log, and HTTP error handling with warning log. None of these should throw.
-- [ ] Integrate fetchResearchMemo into the deliberation pipeline stage: Wire the hermes-research module into the existing deliberation pipeline so that fetchResearchMemo is called for each task after initial task context assembly, and the returned memo is stored on the task's research_memo field.
-- [ ] Write comprehensive unit and integration tests for hermes-research module: Create the full test suite covering all fetchResearchMemo paths and the pipeline integration, using Bun's test runner and mocked HTTP responses.
+- [ ] Implement Hermes endpoint discovery with ConfigMap and service discovery fallback: Create a module that resolves the Hermes agent endpoint URL by first checking the HERMES_URL environment variable (sourced from sigma-1-infra-endpoints ConfigMap), then falling back to Kubernetes service discovery at hermes.cto.svc.cluster.local and hermes.cto-tools.svc.cluster.local, and finally returning null if neither is reachable.
+- [ ] Implement ResearchProvider interface and HermesProvider concrete implementation: Define the ResearchProvider abstraction (TypeScript interface) and implement HermesProvider that calls the in-cluster Hermes agent with a 30-second timeout and returns structured research results.
+- [ ] Implement NousProvider concrete implementation: Implement NousProvider that calls the external NOUS API using NOUS_API_KEY with a 30-second timeout and returns structured research results following the ResearchProvider interface.
+- [ ] Implement SkipProvider concrete implementation: Implement SkipProvider that returns an empty research result with skipped=true and a descriptive reason, logging a warning. This provider never throws.
+- [ ] Implement provider selection logic with health check and cached health status: Create the provider selector that implements the three-tier fallback strategy: check Hermes health (cached for 60s), fall back to NOUS if API key present, then fall back to SkipProvider. Implements circuit-breaker-style cascading.
+- [ ] Integrate research provider into the deliberation path and write research memos: Hook the research provider selector into the existing cto-pm deliberation pipeline — invoke it after PRD parsing and before task generation, write results as research memo files to the deliberation output directory.
+- [ ] Add structured logging across all research providers and selection logic: Ensure every decision point, fallback transition, timing measurement, and error in the research integration emits structured JSON log entries with consistent fields.

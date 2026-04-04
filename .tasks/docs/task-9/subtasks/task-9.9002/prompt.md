@@ -1,14 +1,27 @@
-Implement subtask 9002: Implement NotificationTimeline component with polling data fetching
+Implement subtask 9002: Create PodDisruptionBudget for cto-pm
 
 ## Objective
-Create the NotificationTimeline component that displays a chronological list of pipeline events (start/complete/error with timestamps and descriptions). Implement SWR or React Query polling hook with 5-second revalidation interval against the PM server API to fetch pipeline status and event history. Wire both PipelineStatus and NotificationTimeline into the dashboard layout.
+Define a PodDisruptionBudget resource ensuring at least one cto-pm pod remains available during voluntary disruptions (node drains, upgrades).
 
 ## Steps
-1. Create a data-fetching hook `src/hooks/usePipelineStatus.ts` using SWR (or React Query) that calls the PM server API endpoint (e.g., `GET /api/pipeline/status`). Configure `refreshInterval: 5000` for 5-second polling. The hook should return `{ status, events, error, isLoading }`.
-2. Define TypeScript types: `PipelineEvent { type: 'start' | 'complete' | 'error'; timestamp: string; description: string }` and `PipelineStatusResponse { status: 'running' | 'complete' | 'error'; errorMessage?: string; linearSessionUrl?: string; prUrl?: string; events: PipelineEvent[] }`.
-3. Create `src/components/NotificationTimeline.tsx`. Accept props: `events: PipelineEvent[]`. Render a vertical timeline list sorted chronologically (newest first or oldest first — follow the existing dashboard design convention). Each item shows: event type as a labeled icon/badge, formatted timestamp, and description text.
-4. Create a container component `src/components/PipelineStatusPanel.tsx` that uses the `usePipelineStatus` hook, passes data to `PipelineStatus` (in dashboard header) and `NotificationTimeline` (in sidebar or below task list).
-5. Integrate PipelineStatusPanel into the existing dashboard page layout from Task 6: PipelineStatus in the header row, NotificationTimeline in a collapsible sidebar or section below the task list.
+Step-by-step:
+1. Create a PodDisruptionBudget manifest:
+   ```yaml
+   apiVersion: policy/v1
+   kind: PodDisruptionBudget
+   metadata:
+     name: cto-pm-pdb
+     namespace: sigma-1
+     labels:
+       sigma-1-pipeline: production
+   spec:
+     minAvailable: 1
+     selector:
+       matchLabels:
+         app: cto-pm
+   ```
+2. Apply with `kubectl apply -f cto-pm-pdb.yaml`.
+3. Validate: `kubectl get pdb -n sigma-1` shows `cto-pm-pdb` with `MIN AVAILABLE: 1` and `ALLOWED DISRUPTIONS >= 1` (when 2+ pods are running).
 
 ## Validation
-Component test: Render NotificationTimeline with 3 mock events and assert they appear in chronological order with correct type labels and formatted timestamps. Integration test: Mock the PM server API, render PipelineStatusPanel, advance timers by 5 seconds using fake timers, and assert that SWR/React Query re-fetches and the display updates with new data.
+`kubectl get pdb cto-pm-pdb -n sigma-1` shows minAvailable=1 and allowedDisruptions >= 1. Attempting `kubectl drain` on one node hosting a cto-pm pod succeeds while the other pod remains running. Attempting to drain both nodes simultaneously is blocked.

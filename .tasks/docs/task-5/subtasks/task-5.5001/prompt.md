@@ -1,14 +1,18 @@
-Implement subtask 5001: Define PipelineEvent types and notification-dispatch facade interface
+Implement subtask 5001: Implement base NotificationService module with resilient HTTP client and retry logic
 
 ## Objective
-Create the notification-dispatch module with the PipelineEvent type union ('pipeline.start' | 'pipeline.complete' | 'pipeline.error'), payload type definitions, and the `notify()` facade function signature. Design the transport abstraction layer (a NotificationTransport interface) so HTTP and NATS implementations can be swapped without changing callers.
+Create the foundational NotificationService class/module that provides a resilient HTTP POST helper with 1-retry / 2-second-backoff semantics, structured logging for every call (bridge URL, payload size, response status, latency), and graceful degradation (never throws on notification failure). Read DISCORD_BRIDGE_URL and LINEAR_BRIDGE_URL from the sigma-1-infra-endpoints ConfigMap via envFrom.
 
 ## Steps
-1. Create `src/notification-dispatch/types.ts` with PipelineEvent type: `{ event: 'pipeline.start' | 'pipeline.complete' | 'pipeline.error'; pipeline_id: string; status: string; task_count: number; assigned_count: number; pr_url?: string; linear_session_url?: string; timestamp: string }`.
-2. Define a `NotificationTransport` interface with method `send(target: 'discord' | 'linear', payload: PipelineEvent): Promise<void>`.
-3. Create `src/notification-dispatch/index.ts` exporting `async function notify(event: PipelineEvent): Promise<void>` that delegates to the configured transport implementation for both Discord and Linear targets.
-4. Use dependency injection or a factory pattern so the transport can be swapped at initialization time (e.g., `createNotifier(transport: NotificationTransport)`).
-5. Read `DISCORD_BRIDGE_URL` and `LINEAR_BRIDGE_URL` from environment (sourced via `envFrom` on `sigma-1-infra-endpoints` ConfigMap) and pass them to the transport constructor.
+1. Create `src/services/notification.service.ts`.
+2. In the constructor / init, read `DISCORD_BRIDGE_URL` and `LINEAR_BRIDGE_URL` from `process.env` (populated via ConfigMap envFrom).
+3. Implement a private `postWithRetry(url: string, payload: unknown): Promise<{ok: boolean; status?: number; latencyMs: number}>` method:
+   - Uses `fetch` (Bun-native) to POST JSON.
+   - On 5xx or network error, wait 2 seconds and retry once.
+   - After final failure, log a structured warning (level: warn) with bridge URL, error message, and latency — then return `{ok: false}`.
+4. Wrap every call in a try/catch so no notification failure can propagate an exception to the caller.
+5. Add structured JSON logging (e.g., via `console.log(JSON.stringify({...}))` or a lightweight logger) capturing: event type, bridge URL, payload byte size, HTTP status, latency in ms.
+6. Export the singleton or factory for use by Discord and Linear integration modules.
 
 ## Validation
-Verify that the notify() function accepts a PipelineEvent and delegates to the injected transport's send() method for both 'discord' and 'linear' targets. A mock transport should receive exactly 2 send() calls per notify() invocation.
+Unit test: mock fetch to return 200 — verify postWithRetry returns {ok: true} and logs include status 200 and latency. Unit test: mock fetch to return 503 twice — verify exactly 2 fetch calls occur (initial + 1 retry), a warning is logged, and the method returns {ok: false} without throwing. Unit test: mock fetch to throw a network error — verify retry occurs and warning is logged. Unit test: verify DISCORD_BRIDGE_URL and LINEAR_BRIDGE_URL are read from process.env.

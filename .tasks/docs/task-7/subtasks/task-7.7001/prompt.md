@@ -1,10 +1,15 @@
-Implement subtask 7001: Create ResearchMemo collapsible component with shadcn/ui
+Implement subtask 7001: Scaffold Next.js App Router project with TypeScript and Tailwind CSS
 
 ## Objective
-Build a self-contained ResearchMemo component using shadcn/ui Collapsible (Radix-based) that accepts research_memo data as props and renders a collapsible section with proper aria-expanded state management.
+Initialize a new Next.js application using the App Router with TypeScript enabled and Tailwind CSS configured. Set up the project structure with `src/app` directory layout, configure `tsconfig.json`, `tailwind.config.ts`, and `postcss.config.js`. Ensure `next build` passes cleanly with no errors.
 
 ## Steps
-1. Create `components/research-memo.tsx`. 2. Import and use shadcn/ui Collapsible (CollapsibleTrigger + CollapsibleContent) which wraps Radix primitives. 3. Accept props: `researchMemo: { content: string; source: string; timestamp: string } | null`. 4. When `researchMemo` is non-null, render a 'Research' Badge (shadcn/ui Badge) as the CollapsibleTrigger. 5. Manage open/closed state via React useState. 6. When `researchMemo` is null, render nothing (return null) — the null-state text will be handled at the TaskCard level if needed. 7. Ensure CollapsibleTrigger responds to Enter and Space keys natively via Radix primitives. 8. Export the component for use in TaskCard.
+1. Run `npx create-next-app@latest` with `--typescript`, `--tailwind`, `--app`, `--src-dir` flags.
+2. Verify `tsconfig.json` has strict mode enabled and path aliases configured (`@/*` → `src/*`).
+3. Confirm Tailwind CSS is working by adding a test utility class to `src/app/page.tsx` and verifying it renders.
+4. Set up base layout in `src/app/layout.tsx` with html lang attribute and basic metadata.
+5. Add `PM_SERVER_URL` to `.env.local` and `next.config.js` for runtime environment variable exposure.
+6. Verify `next dev` starts and `next build` exits 0.
 
 ## Validation
-Render ResearchMemo with non-null props; verify Badge is visible, clicking toggles CollapsibleContent visibility, aria-expanded toggles between true/false. Render with null props; verify nothing is rendered.
+`next build` exits 0. `next dev` starts on port 3000 and renders the default page. Tailwind utility classes render correctly in the browser.

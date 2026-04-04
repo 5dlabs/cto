@@ -1,14 +1,16 @@
-Implement subtask 5003: Implement HTTP POST transport for linear-bridge
+Implement subtask 5003: Implement Linear bridge notification integration with session references
 
 ## Objective
-Implement the NotificationTransport interface for HTTP POST dispatch to the linear-bridge service. Format the payload per the Linear bridge's expected schema and POST to the URL from the ConfigMap.
+Add Linear-specific notification methods to NotificationService that POST to LINEAR_BRIDGE_URL. Include Linear session/project references and PR links in the payload.
 
 ## Steps
-1. Create `src/notification-dispatch/transports/http-linear.ts` implementing the `send()` method for the 'linear' target.
-2. Use Bun's native `fetch()` to POST to `LINEAR_BRIDGE_URL` with `Content-Type: application/json`.
-3. Format the JSON body with fields: `{ event, pipeline_id, status, task_count, assigned_count, pr_url, linear_session_url, timestamp }`. The Linear bridge may expect slightly different field names — check the bridge API contract and map accordingly.
-4. Set a reasonable timeout (5 seconds) on the fetch.
-5. Return the response status for the error handling layer to inspect.
+1. In `notification.service.ts` (or a dedicated `linear-notifier.ts` that composes the base service), implement:
+   - `notifyLinearPipelineStart(runId: string, prdTitle: string, taskCount: number, linearSessionId?: string)`: payload includes run metadata and optional Linear session/project reference.
+   - `notifyLinearPipelineComplete(runId: string, summary: {tasksCreated: number; agentsAssigned: string[]; prUrl?: string; linearSessionId?: string; warnings?: string[]})`: payload includes session reference and PR URL.
+   - `notifyLinearPipelineError(runId: string, stage: string, error: string, linearSessionId?: string)`: payload includes error context and session reference.
+2. Payload format: construct JSON matching linear-bridge's expected schema. Include fields: `type` (start/complete/error), `runId`, `sessionId`, `prUrl`, `summary`. Add a TODO/comment noting the format may need adjustment after bridge API discovery.
+3. Call `postWithRetry(LINEAR_BRIDGE_URL, payload)` for each.
+4. Export these methods for use by the lifecycle hook layer.
 
 ## Validation
-Unit test: Call the Linear HTTP transport's send() with a pipeline.complete event. Verify the outgoing HTTP POST targets LINEAR_BRIDGE_URL with JSON body containing task_count, assigned_count, pr_url, and linear_session_url.
+Unit test: notifyLinearPipelineStart constructs a payload with runId, prdTitle, taskCount, and linearSessionId, and calls postWithRetry with LINEAR_BRIDGE_URL. Unit test: notifyLinearPipelineComplete includes prUrl and session reference in the payload. Unit test: notifyLinearPipelineError includes stage and error in the payload. Unit test: when linearSessionId is undefined, it is omitted or null in the payload without error.

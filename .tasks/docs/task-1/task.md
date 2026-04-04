@@ -1,7 +1,7 @@
 ## Provision Dev Infrastructure for Sigma-1 E2E Pipeline (Bolt - Kubernetes/Helm)
 
 ### Objective
-Bootstrap the sigma-1-dev namespace with all required infrastructure resources: namespace creation, Kubernetes secrets for Linear API key, Discord webhook URL, NOUS_API_KEY, and GitHub tokens, plus a sigma-1-infra-endpoints ConfigMap aggregating connection strings for all in-cluster services (discord-bridge-http, linear-bridge, openclaw-nats, cloudflare-operator). This task provides the foundational infrastructure that all subsequent tasks depend on.
+Bootstrap the sigma-1 namespace with all required infrastructure resources: ExternalSecret CRDs for NOUS_API_KEY, Linear API token, Discord webhook URL, and GitHub token; a ConfigMap aggregating service endpoints; and validation that all secrets resolve to non-empty values before downstream tasks proceed.
 
 ### Ownership
 - Agent: bolt
@@ -11,22 +11,46 @@ Bootstrap the sigma-1-dev namespace with all required infrastructure resources: 
 - Dependencies: None
 
 ### Implementation Details
-1. Create the `sigma-1-dev` namespace with appropriate labels (`project: sigma-1`, `env: dev`).
-2. Create Kubernetes Secret `sigma-1-secrets` containing keys: `LINEAR_API_KEY`, `DISCORD_WEBHOOK_URL`, `NOUS_API_KEY`, `GITHUB_TOKEN`. Values should reference external-secrets operator CRs if available, otherwise placeholder sealed-secrets for dev.
-3. Create ConfigMap `sigma-1-infra-endpoints` with the following keys:
-   - `DISCORD_BRIDGE_URL`: internal cluster URL for `bots/discord-bridge-http` service
-   - `LINEAR_BRIDGE_URL`: internal cluster URL for `bots/linear-bridge` service
-   - `NATS_URL`: `openclaw-nats.openclaw.svc.cluster.local` (reference only; may not be used per D2 resolution)
-   - `CLOUDFLARE_OPERATOR_NS`: `cloudflare-operator-system`
-4. Create a ServiceAccount `sigma-1-pm-server` with minimal RBAC (get/list on configmaps and secrets in `sigma-1-dev` namespace only).
-5. Validate that existing in-cluster services are reachable from the namespace: `bots/discord-bridge-http`, `bots/linear-bridge`, `cloudflare-operator-system` webhook service.
-6. Create a Helm values file `values-dev.yaml` capturing all namespace-scoped resource names for downstream consumption.
-7. Do NOT provision new NATS instances — NATS is already deployed at `openclaw-nats.openclaw.svc.cluster.local`. Do NOT deploy any ingress controller — Cloudflare operator handles ingress per D8.
+Step-by-step implementation:
+
+1. Create namespace `sigma-1` with standard labels (`app.kubernetes.io/part-of: sigma-1`, `env: dev`).
+
+2. Create ExternalSecret CRDs referencing the cluster's existing SecretStore:
+   - `sigma-1-linear-token` → Linear API token
+   - `sigma-1-discord-webhook` → Discord webhook URL
+   - `sigma-1-nous-api-key` → NOUS_API_KEY (mark as optional — pipeline must not fail if absent)
+   - `sigma-1-github-token` → GitHub PAT for 5dlabs/sigma-1 repo
+
+3. Create a Kubernetes Job or init-container script (`secret-validation-job`) that:
+   a. Waits up to 60s for ExternalSecret resources to sync
+   b. Reads each resulting Secret and asserts the data field is non-empty
+   c. For `sigma-1-nous-api-key`: log a warning if empty but do NOT fail (consistent with D8 graceful skip)
+   d. For all other secrets: fail with a clear error message identifying which secret path is missing
+   e. Exits 0 only when all required secrets are populated
+
+4. Create ConfigMap `sigma-1-infra-endpoints` with keys:
+   - `DISCORD_BRIDGE_URL` → `http://discord-bridge-http.bots.svc.cluster.local`
+   - `LINEAR_BRIDGE_URL` → `http://linear-bridge.bots.svc.cluster.local`
+   - `PM_SERVER_URL` → `http://cto-pm.cto.svc.cluster.local`
+   - `HERMES_URL` → discovered Hermes endpoint or empty string
+   - `NOUS_API_URL` → `https://api.nous.com` (or appropriate external endpoint)
+
+5. Verify existing services are reachable from the namespace:
+   - `bots/discord-bridge-http` responds to health check
+   - `bots/linear-bridge` responds to health check
+   - `cto/cto-pm` responds to health check
+
+6. Label all resources with `sigma-1-pipeline: infra` for cleanup traceability.
+
+7. Document in a README any backing store paths that need manual pre-configuration if not already present (Open Question #1).
 
 ### Subtasks
-- [ ] Create sigma-1-dev namespace with labels: Create the sigma-1-dev Kubernetes namespace with project and environment labels that all subsequent resources will be deployed into.
-- [ ] Create sigma-1-secrets Kubernetes Secret with 4 keys: Create the Kubernetes Secret `sigma-1-secrets` in the sigma-1-dev namespace containing LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, and GITHUB_TOKEN. Use external-secrets CRs if available, otherwise sealed-secrets placeholders for dev.
-- [ ] Create sigma-1-infra-endpoints ConfigMap: Create the ConfigMap `sigma-1-infra-endpoints` in sigma-1-dev namespace with all 4 endpoint keys pointing to existing in-cluster services.
-- [ ] Create ServiceAccount sigma-1-pm-server with RBAC Role and RoleBinding: Create a ServiceAccount, Role, and RoleBinding in sigma-1-dev namespace granting minimal get/list permissions on configmaps and secrets.
-- [ ] Generate Helm values-dev.yaml capturing all resource names: Create a Helm values file that aggregates all namespace-scoped resource names (namespace, secret, configmap, service account) for downstream chart consumption.
-- [ ] Validate cross-namespace connectivity from sigma-1-dev to existing services: Deploy a temporary test pod in sigma-1-dev namespace to verify DNS resolution and HTTP connectivity to discord-bridge-http, linear-bridge, and openclaw-nats services.
+- [ ] Create sigma-1 namespace with standard labels: Create the Kubernetes namespace `sigma-1` with the required labels for project identification and environment tagging. This is the foundational resource all other subtasks depend on.
+- [ ] Create ExternalSecret CRD for sigma-1-linear-token: Define and apply the ExternalSecret resource for the Linear API token, referencing the cluster's existing SecretStore and targeting the correct backing store path.
+- [ ] Create ExternalSecret CRD for sigma-1-discord-webhook: Define and apply the ExternalSecret resource for the Discord webhook URL, referencing the cluster's existing SecretStore.
+- [ ] Create ExternalSecret CRD for sigma-1-nous-api-key (optional): Define and apply the ExternalSecret resource for NOUS_API_KEY, marked as optional so that its absence does not block the pipeline.
+- [ ] Create ExternalSecret CRD for sigma-1-github-token: Define and apply the ExternalSecret resource for the GitHub PAT used to access the 5dlabs/sigma-1 repository.
+- [ ] Implement secret-validation-job with conditional logic for optional NOUS_API_KEY: Create a Kubernetes Job that waits for ExternalSecrets to sync, validates that all required secrets are non-empty, warns (but does not fail) if the optional NOUS_API_KEY is absent, and fails clearly if any required secret is missing.
+- [ ] Create sigma-1-infra-endpoints ConfigMap with service endpoints: Create the ConfigMap `sigma-1-infra-endpoints` containing all service endpoint URLs that downstream tasks will consume via `envFrom`.
+- [ ] Verify cross-namespace service health checks from sigma-1: Run health check probes from within the sigma-1 namespace to confirm that discord-bridge-http, linear-bridge, and cto-pm services in their respective namespaces are reachable and responding.
+- [ ] Document backing store paths and manual prerequisites in README: Write a README documenting all backing store secret paths that must be pre-configured, the ExternalSecret-to-SecretStore mapping, the ConfigMap contract for downstream consumers, and any manual steps required before running the infrastructure provisioning.

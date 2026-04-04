@@ -1,14 +1,15 @@
-Implement subtask 4001: Create design-snapshot module interface, types, and GitHub API client setup
+Implement subtask 4001: Investigate existing design snapshot mechanisms in cto-pm
 
 ## Objective
-Set up the design-snapshot module with the createSnapshotPR function signature, define PipelineOutput and PRResult types, and configure the GitHub API client with GITHUB_TOKEN from environment.
+Search the cto-pm codebase for any existing design artifact generation, snapshot export, or design document output that the pipeline already produces. Document findings to determine whether to integrate with an existing mechanism or fall back to placeholder scaffolds.
 
 ## Steps
-1. Create `src/design-snapshot/types.ts` defining: `PipelineOutput` (containing tasks array with id, title, slug, description, agent, dependencies, acceptance_criteria, research_memo), `PRResult` (containing prUrl: string | null, skipped: boolean, error?: string), and `TaskScaffold` (the shape of a generated task file).
-2. Create `src/design-snapshot/index.ts` exporting `async function createSnapshotPR(pipelineOutput: PipelineOutput): Promise<PRResult>`.
-3. Read `GITHUB_TOKEN` from `process.env.GITHUB_TOKEN` (or `Bun.env`). If missing, log an error and return `{ prUrl: null, skipped: true, error: 'GITHUB_TOKEN not configured' }` immediately.
-4. Set up the GitHub API client (Octokit instance or a configured fetch wrapper) with the token in the Authorization header and base URL pointing to `https://api.github.com`.
-5. Define constants: `REPO_OWNER = '5dlabs'`, `REPO_NAME = 'sigma-1'`, `BASE_BRANCH = 'main'`.
+1. Search the cto-pm repository for keywords: 'snapshot', 'design', 'artifact', 'export', 'scaffold'.
+2. Check pipeline output directories and any artifact-writing modules.
+3. Look for any configuration referencing design document generation.
+4. Produce a short findings document (can be inline comments or a research memo) summarizing: (a) whether a mechanism exists, (b) what format it outputs, (c) how to invoke it.
+5. If nothing exists, confirm the placeholder scaffold approach and document the decision.
+6. Export a boolean flag or config constant (e.g., `HAS_EXISTING_SNAPSHOTS`) that downstream subtasks can reference.
 
 ## Validation
-TypeScript compilation passes. Unit test: with GITHUB_TOKEN unset, createSnapshotPR returns PRResult with skipped=true and prUrl=null without throwing. Verify the error log message is emitted.
+Verify the research produces a documented finding (boolean flag or config constant) that is importable by sibling modules. If no mechanism exists, the flag is false and a brief justification comment exists in the code.

@@ -1,13 +1,22 @@
-Implement subtask 1001: Create sigma-1-dev namespace with labels
+Implement subtask 1001: Create sigma-1 namespace with standard labels
 
 ## Objective
-Create the sigma-1-dev Kubernetes namespace with project and environment labels that all subsequent resources will be deployed into.
+Create the Kubernetes namespace `sigma-1` with the required labels for project identification and environment tagging. This is the foundational resource all other subtasks depend on.
 
 ## Steps
-1. Create a namespace manifest YAML file `namespace.yaml` defining `sigma-1-dev` namespace.
-2. Add labels: `project: sigma-1`, `env: dev`.
-3. Apply the manifest with `kubectl apply -f namespace.yaml`.
-4. Verify the namespace is Active via `kubectl get namespace sigma-1-dev`.
+1. Create a YAML manifest `namespace.yaml` defining:
+   ```yaml
+   apiVersion: v1
+   kind: Namespace
+   metadata:
+     name: sigma-1
+     labels:
+       app.kubernetes.io/part-of: sigma-1
+       env: dev
+       sigma-1-pipeline: infra
+   ```
+2. Apply with `kubectl apply -f namespace.yaml`.
+3. Verify the namespace is Active and labels are present.
 
 ## Validation
-`kubectl get namespace sigma-1-dev -o jsonpath='{.status.phase}'` returns 'Active'. `kubectl get namespace sigma-1-dev -o jsonpath='{.metadata.labels.project}'` returns 'sigma-1'. `kubectl get namespace sigma-1-dev -o jsonpath='{.metadata.labels.env}'` returns 'dev'.
+`kubectl get ns sigma-1 -o jsonpath='{.status.phase}'` returns 'Active'. `kubectl get ns sigma-1 --show-labels` includes `app.kubernetes.io/part-of=sigma-1`, `env=dev`, and `sigma-1-pipeline=infra`.

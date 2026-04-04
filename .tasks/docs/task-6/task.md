@@ -1,30 +1,63 @@
-## Scaffold Web Frontend with Agent Assignment Visualization (Blaze - React/Next.js)
+## Validate Task Generation with Agent Assignment (Nova - Bun/Elysia)
 
 ### Objective
-Create or extend the web frontend application to display pipeline task lists with agent assignment visualization. Each task card shows the delegate_id as an agent avatar/badge, assignment status, and task metadata. Uses shadcn/ui (per D6) with Radix UI primitives for accessibility. Note: This task is contingent on D5 resolution — if D5 resolves to defer frontend tasks, this task should be skipped.
+Run the full pipeline from PRD intake through deliberation, task generation, and Linear issue creation. Validate that at least 5 tasks are generated with valid agent assignments, Linear issues have delegate_id set, and the pipeline completes through all stages without fatal errors.
 
 ### Ownership
-- Agent: blaze
-- Stack: React/Next.js
-- Priority: medium
+- Agent: nova
+- Stack: Bun/Elysia
+- Priority: high
 - Status: pending
-- Dependencies: 2
+- Dependencies: 2, 3
 
 ### Implementation Details
-1. Initialize or extend the Next.js application in the project with shadcn/ui components (per D6, using the team's tweakcn configuration if accessible, otherwise shadcn/ui defaults).
-2. Create a pipeline dashboard page at `/pipeline/[sessionId]` that fetches task data from the PM server API.
-3. Implement a `TaskCard` component using shadcn/ui Card, Badge, and Avatar components: display task title, agent name, stack, priority, status, and dependencies. Show `delegate_id` as an agent avatar with the agent name (e.g., 'Bolt', 'Nova') as a badge. Use color-coded badges: green for assigned, amber for unresolved (`agent:unresolved`), gray for pending.
-4. Implement a `TaskList` component that renders all tasks in dependency order with a visual dependency graph (simple indentation or connecting lines).
-5. Add a summary header showing: total tasks, assigned count, unresolved count, pipeline status.
-6. Use `envFrom` to read the PM server API URL from `sigma-1-infra-endpoints` ConfigMap.
-7. Ensure all components meet WCAG 2.1 AA accessibility standards (Radix primitives handle focus management, keyboard navigation, and ARIA attributes).
-8. No authentication implementation — this is deferred per D7 recommendation (Cloudflare Access handles auth at ingress layer).
-9. Write component tests for: TaskCard rendering with assigned agent, TaskCard rendering with unresolved agent, TaskList ordering by dependencies, summary header counts.
+Step-by-step implementation:
+
+1. Prepare a test PRD input that exercises the full pipeline:
+   - Use the Sigma-1 E2E PRD itself or a well-structured test PRD
+   - Ensure it references at least 5 distinct agent types (Bolt, Nova, Blaze, Tess, and one more)
+
+2. Execute the pipeline end-to-end within cto-pm:
+   - Stage 1: PRD parsing and intake
+   - Stage 2: Deliberation (with research from Task 3 integration)
+   - Stage 3: Task generation — verify output includes agent hints
+   - Stage 4: Agent delegation resolution — `resolve_agent_delegates()` maps hints to Linear user IDs
+   - Stage 5: Linear issue creation with `assigneeId` set
+
+3. Validation checkpoints at each stage:
+   - After task generation: assert `tasks.length >= 5`
+   - After delegation resolution: assert at least 5 tasks have non-null `delegate_id`
+   - After issue creation: for each created issue, query Linear API to confirm `assignee` is set (not null, not just `agent:pending` label)
+
+4. Handle edge cases:
+   - If fewer than 5 agent mappings exist, this is a blocker — log which agents failed resolution
+   - If Linear API rate-limits issue creation, implement backoff (100ms between creates)
+   - Track which tasks fell back to `agent:pending` and report as warnings
+
+5. Produce a validation report:
+   ```json
+   {
+     "run_id": "...",
+     "total_tasks": N,
+     "assigned_tasks": N,
+     "pending_tasks": N,
+     "linear_session_url": "...",
+     "issues": [
+       { "id": "...", "title": "...", "agent": "...", "delegate_id": "...", "linear_url": "..." }
+     ],
+     "research_included": true/false,
+     "warnings": [...]
+   }
+   ```
+
+6. Store the validation report in pipeline state — it will be consumed by Task 5 (notifications), Task 4 (PR content), and Task 8 (E2E test).
+
+7. Expose the report via `GET /api/validation/report/{run_id}`.
 
 ### Subtasks
-- [ ] Initialize Next.js application with shadcn/ui setup: Set up or extend the Next.js project with shadcn/ui component library, Tailwind CSS configuration, and project structure for the pipeline dashboard feature.
-- [ ] Create pipeline dashboard page with data fetching: Implement the `/pipeline/[sessionId]` page route that fetches task data from the PM server API and passes it to child components.
-- [ ] Implement TaskCard component with agent avatar and color-coded badges: Build the TaskCard component using shadcn/ui Card, Badge, and Avatar primitives to display task metadata with agent assignment visualization and color-coded status indicators.
-- [ ] Implement TaskList component with dependency-ordered rendering: Build the TaskList component that topologically sorts tasks by their dependencies and renders TaskCards in correct order with visual dependency indicators.
-- [ ] Implement pipeline summary header component: Build a summary header component that displays aggregate pipeline statistics: total tasks, assigned count, unresolved count, and pipeline status.
-- [ ] Write component tests and accessibility tests: Write comprehensive component tests for TaskCard, TaskList, and PipelineSummary, plus accessibility tests verifying WCAG 2.1 AA compliance using axe-core.
+- [ ] Prepare test PRD fixture with 5+ distinct agent type references: Create a well-structured test PRD document that references at least 5 distinct agent types (Bolt, Nova, Blaze, Tess, and at least one more such as Rex or Grizz). This PRD will serve as the canonical input for the full pipeline validation run.
+- [ ] Implement pipeline execution orchestrator with stage-level checkpoints: Build the orchestration function that drives the test PRD through all 5 pipeline stages (intake, deliberation, task generation, agent delegation resolution, Linear issue creation) and captures structured checkpoint results at each stage.
+- [ ] Implement Linear API verification for issue assignees: After Linear issues are created in Stage 5, query the Linear API for each created issue to independently confirm that the `assignee.id` matches the expected `delegate_id` from the delegation resolution stage.
+- [ ] Build validation report generator with edge case tracking: Consume the PipelineRun output and LinearVerificationResults to produce the structured validation report JSON with all required fields, including warnings for edge cases like agent mapping failures and fallback to agent:pending.
+- [ ] Expose GET /api/validation/report/{run_id} Elysia endpoint: Create the Elysia HTTP endpoint that serves the validation report by run_id, returning 200 with the full JSON report or 404 if the run_id is not found.
+- [ ] Write end-to-end integration test for full pipeline validation: Create an integration test that invokes the pipeline runner with the test PRD fixture, runs all stages, verifies Linear assignees, generates the report, and asserts all acceptance criteria from the test strategy.
