@@ -74,31 +74,31 @@ const founderTimeline = [
   },
 ];
 
-/* ─── Slide 4: Why Now — four convergence factors ─── */
+/* ─── Slide 4: Why Now — structural shift + convergence ─── */
 const convergenceFactors = [
+  {
+    stat: "N×",
+    label: "Parallel ventures, not serial bets",
+    detail: "Agentic coding collapsed the cost of parallel execution. Run multiple ventures simultaneously on shared infrastructure — fail fast instead of pivoting near the end of your runway.",
+    source: "Core thesis",
+  },
   {
     stat: "280×",
     label: "Inference cost collapse",
-    detail: "Inference API pricing fell >280× in 18 months. The same collapse makes self-hosted AI viable on dedicated hardware.",
+    detail: "API pricing fell >280× in 18 months. Open-weight models (Llama, Mistral, DeepSeek) run on your hardware — no vendor lock-in, owned economics.",
     source: "Stanford AI Index 2025",
-  },
-  {
-    stat: "Open",
-    label: "Open-weight models",
-    detail: "Llama 3, Mistral, DeepSeek — production-grade models you can run on dedicated infrastructure, no vendor lock-in.",
-    source: "Meta, Mistral, DeepSeek — 2024–25",
   },
   {
     stat: "59%",
     label: "Bare-metal validation",
-    detail: "37signals publicly cut cloud from $3.2M to ~$1.3M/yr on bare metal. Hyperscale performance at a fraction of the cost.",
+    detail: "37signals cut cloud from $3.2M to ~$1.3M/yr on bare metal. The economics are proven — now automation makes it accessible.",
     source: "The Register, 2024",
   },
   {
-    stat: "Prod",
-    label: "Agentic tooling maturity",
-    detail: "Coding agents went from demos to production-grade in 2025. Multi-agent systems now ship real software autonomously.",
-    source: "Industry consensus, 2025–26",
+    stat: "On-chain",
+    label: "Tokenized assets need infrastructure now",
+    detail: "Tokenized securities, real-world assets, and new on-chain instrument classes are going live. The teams building them need infrastructure that isn't rented from the same cloud vendors they're trying to disintermediate.",
+    source: "SEC, EU MiCA — 2024–26",
   },
 ];
 
@@ -151,16 +151,28 @@ const pipelineNodes = [
   },
 ];
 
-/* ─── Slide 6: Product replacement map ─── */
-const replacements = [
-  { from: "CI/CD SaaS (any cloud)", to: "5D Deploy", status: "live" as const },
-  { from: "APM + observability (native + SaaS)", to: "5D Observe", status: "live" as const },
-  { from: "Secrets + KMS", to: "5D Vault", status: "live" as const },
-  { from: "Managed DB (RDS, Cloud SQL, Aurora, Cosmos…)", to: "5D Data", status: "next" as const },
-  { from: "Managed inference (Vertex, SageMaker, Bedrock…)", to: "5D Inference", status: "next" as const },
-  { from: "Managed workflows (Step Functions, Logic Apps…)", to: "5D Deploy", status: "next" as const },
-  { from: "Object storage (S3, GCS, Blob…)", to: "5D Store", status: "planned" as const },
-  { from: "CDN + edge DNS (CloudFront, Front Door…)", to: "5D Edge", status: "planned" as const },
+/* ─── Slide 6: Platform services (from 5dlabs.ai/cto/services) ─── */
+const platformServices = [
+  { name: "5D Deploy", desc: "GitOps-driven delivery pipeline", replaces: "CI/CD SaaS" },
+  { name: "5D Observe", desc: "Unified monitoring, logs, and traces", replaces: "Datadog, New Relic" },
+  { name: "5D Vault", desc: "Secrets management and dynamic credentials", replaces: "AWS Secrets Manager, HashiCorp" },
+  { name: "5D Data", desc: "Managed PostgreSQL with HA failover", replaces: "RDS, Cloud SQL, Aurora" },
+  { name: "5D Inference", desc: "Managed model runtime on your GPUs", replaces: "SageMaker, Vertex AI" },
+  { name: "5D Store", desc: "S3-compatible distributed object storage", replaces: "S3, GCS, Blob Storage" },
+  { name: "5D Sentinel", desc: "Continuous security scanning + AI remediation", replaces: "Snyk, Wiz" },
+  { name: "5D Edge", desc: "Ingress, TLS, and DNS automation", replaces: "CloudFront, Cloudflare" },
+  { name: "5D Stream", desc: "Messaging and event streaming", replaces: "SQS, Pub/Sub, Kafka" },
+  { name: "5D Node", desc: "Validator and RPC node operations", replaces: "Alchemy, QuickNode" },
+  { name: "5D Mesh", desc: "Service mesh, mTLS, and network policy", replaces: "Istio, Linkerd" },
+  { name: "5D Auth", desc: "Identity, SSO, and role-based access", replaces: "Auth0, Okta" },
+  { name: "5D Registry", desc: "Private container and artifact registry", replaces: "ECR, GCR, Docker Hub" },
+  { name: "5D Cache", desc: "Managed Redis / Valkey with clustering", replaces: "ElastiCache, Memorystore" },
+  { name: "5D Queue", desc: "Background job and task processing", replaces: "SQS, Cloud Tasks" },
+  { name: "5D Backup", desc: "Automated snapshots and disaster recovery", replaces: "AWS Backup" },
+  { name: "5D Network", desc: "VPN, WireGuard, and private networking", replaces: "AWS VPC, Tailscale" },
+  { name: "5D Search", desc: "Full-text search and vector indexing", replaces: "Elasticsearch, Algolia" },
+  { name: "5D GPU", desc: "GPU scheduling and fractional sharing", replaces: "Lambda Cloud, CoreWeave" },
+  { name: "5D Catalog", desc: "Service catalog and developer portal", replaces: "Backstage, Port" },
 ];
 
 /* ─── Slide 8: Market rings ─── */
@@ -177,15 +189,15 @@ const marketRings: [
 /* ─── Slide 9: GTM funnel ─── */
 const funnelStages = [
   { label: "Free tier", description: "Developers try a lightweight version of CTO at no cost." },
-  { label: "Paid plans", description: "Teams upgrade for the full AI workforce and dedicated infrastructure." },
+  { label: "Paid plans", description: "Teams upgrade for the full AI workforce and bare-metal infrastructure." },
   { label: "Recurring revenue", description: "Monthly subscriptions with margins that improve over time." },
 ];
 
 const revenueStreams = [
-  { name: "Subscriptions", type: "Recurring", desc: "Monthly plans tiered by team size and usage." },
-  { name: "Margin expansion", type: "Structural", desc: "Infrastructure costs fall; customer pricing stays." },
-  { name: "Implementation", type: "Services", desc: "Hands-on setup for early enterprise adopters." },
-  { name: "Partner channel", type: "Distribution", desc: "MSPs and DevOps consultancies resell to their clients." },
+  { name: "CTO subscriptions", type: "Recurring", desc: "Monthly plans from Free to Enterprise. CodeRun-based usage." },
+  { name: "Bare-metal rev-share", type: "Recurring", desc: "Infrastructure margin on dedicated hardware we provision." },
+  { name: "Proprietary trading", type: "Bootstrap", desc: "In-house capital engine. Funds experiments + provides market signal." },
+  { name: "Advisory + implementation", type: "Services", desc: "Hands-on setup for early adopters and enterprise pilots." },
 ];
 
 /* ─── Slide 10: Use of funds ─── */
@@ -222,10 +234,10 @@ function SlideSection({
 function SlideLabel({ number, title }: { number: string; title: string }) {
   return (
     <div className="flex items-center gap-3 mb-6">
-      <span className="text-xs font-mono text-muted-foreground/50 tabular-nums">
+      <span className="text-xs font-mono text-muted-foreground tabular-nums">
         {number}
       </span>
-      <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground/50">
+      <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
         {title}
       </span>
     </div>
@@ -275,7 +287,7 @@ export default function PitchPage() {
                 <span className="text-foreground">Software out.</span>
               </h1>
 
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
+              <p className="text-xl text-foreground/70 max-w-2xl mx-auto mb-10">
                 You describe what you want built. Our AI builds, tests, and ships it
                 &mdash; hyperscale performance, bare-metal economics. Targeting a $420B+ cloud
                 market where ~29% of spend is wasted.
@@ -345,7 +357,7 @@ export default function PitchPage() {
                 <h2 className="text-3xl sm:text-4xl font-bold mb-3">
                   Jonathon Fritz
                 </h2>
-                <p className="text-lg text-muted-foreground">
+                <p className="text-lg text-foreground/70">
                   20 years building infrastructure at scale. Built this solo.
                 </p>
               </div>
@@ -360,10 +372,11 @@ export default function PitchPage() {
           <SlideSection id="why-now">
             <SlideLabel number="04" title="Why now" />
             <h2 className="text-3xl sm:text-4xl font-bold mb-6">
-              Four forces just converged.
+              The old startup model is structurally disadvantaged.
             </h2>
-            <p className="text-sm text-muted-foreground mb-6 max-w-3xl">
-              Each existed before. Together they make AI-native infrastructure on owned hardware viable for the first time.
+            <p className="text-base text-foreground/70 mb-6 max-w-3xl">
+              One bet, 18 months of runway, pivot when you learn too late. Agentic coding + owned infrastructure
+              changes the math — run multiple ventures in parallel, fail fast, compound what works.
             </p>
 
             <div className="grid sm:grid-cols-2 gap-4">
@@ -378,8 +391,8 @@ export default function PitchPage() {
                 >
                   <p className="text-2xl font-bold gradient-text mb-1">{f.stat}</p>
                   <p className="text-sm font-semibold">{f.label}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{f.detail}</p>
-                  <p className="text-[10px] text-muted-foreground/40 mt-2 font-mono">{f.source}</p>
+                  <p className="text-sm text-foreground/60 mt-1">{f.detail}</p>
+                  <p className="text-xs text-muted-foreground/70 mt-2 font-mono">{f.source}</p>
                 </motion.div>
               ))}
             </div>
@@ -400,21 +413,23 @@ export default function PitchPage() {
               {[
                 {
                   title: "Your servers",
-                  desc: "You control the economics.",
+                  desc: "Bare-metal servers we provision through hardware partners (Cherry, Hetzner, Latitude). You control the economics.",
                   icon: (
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
                     </svg>
                   ),
+                  emphasis: true,
                 },
                 {
                   title: "Always current",
-                  desc: "AI changes, we update. You never rewrite.",
+                  desc: "AI tools change constantly. We absorb the updates — no context-switching for your team.",
                   icon: (
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                   ),
+                  emphasis: false,
                 },
                 {
                   title: "Self-healing",
@@ -424,11 +439,12 @@ export default function PitchPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
                   ),
+                  emphasis: false,
                 },
               ].map((card, i) => (
                 <motion.div
                   key={card.title}
-                  className="rounded-xl premium-shell p-5 backdrop-blur-sm"
+                  className={`rounded-xl premium-shell p-5 backdrop-blur-sm ${card.emphasis ? "border border-cyan/30 shadow-[0_0_24px_-6px_rgba(34,211,238,0.15)]" : ""}`}
                   initial={{ opacity: 0, y: 14 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-40px" }}
@@ -437,30 +453,45 @@ export default function PitchPage() {
                   <div className="w-9 h-9 rounded-lg bg-cyan/10 border border-cyan/20 flex items-center justify-center text-cyan mb-3">
                     {card.icon}
                   </div>
-                  <p className="text-sm font-semibold mb-1">{card.title}</p>
-                  <p className="text-xs text-muted-foreground">{card.desc}</p>
+                  <p className="text-base font-semibold mb-1">{card.title}</p>
+                  <p className="text-sm text-foreground/80">{card.desc}</p>
                 </motion.div>
               ))}
             </div>
           </SlideSection>
 
-          {/* ── SLIDE 6: PRODUCT ── */}
+          {/* ── SLIDE 6: PRODUCT — AGENTIC PRIVATE CLOUD ── */}
           <SlideSection id="product">
             <SlideLabel number="06" title="Product" />
             <h2 className="text-3xl sm:text-4xl font-bold mb-6">
-              Replaces the managed cloud services that eat your margin.
+              Agentic private cloud — 20+ services on your hardware.
             </h2>
-            <p className="text-sm text-muted-foreground mb-6 max-w-3xl">
-              AWS, GCP, Azure, and the rest — same categories, not a fixed vendor list. The stack keeps
-              growing as we replace more of the bill.
+            <p className="text-base text-foreground/70 mb-6 max-w-3xl">
+              Everything a team needs to build, ship, and run software — without renting it from AWS.
+              Same capabilities. Your economics.
             </p>
 
-            <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm">
-              <ComparisonMap
-                rows={replacements}
-                callout="Representative swaps — same capabilities; hyperscale TCO varies by workload (slide 04 sources)."
-              />
+            <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {platformServices.map((svc, i) => (
+                <motion.div
+                  key={svc.name}
+                  className="rounded-xl border border-border/50 bg-card/30 p-4 backdrop-blur-sm"
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-40px" }}
+                  transition={{ duration: 0.4, delay: i * 0.03, ease: [0.25, 0.4, 0, 1] }}
+                >
+                  <p className="text-sm font-bold gradient-text">{svc.name}</p>
+                  <p className="text-sm text-foreground/60 mt-1">{svc.desc}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5 font-mono">
+                    Replaces {svc.replaces}
+                  </p>
+                </motion.div>
+              ))}
             </div>
+            <p className="text-xs text-muted-foreground/70 mt-4 font-mono">
+              20 managed services across compute, data, security, networking, AI, and blockchain.
+            </p>
           </SlideSection>
 
           {/* ── SLIDE 7: TRACTION ── */}
@@ -493,7 +524,7 @@ export default function PitchPage() {
                     className="text-3xl font-bold gradient-text block"
                   />
                   <p className="text-sm font-semibold mt-2">{m.label}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{m.note}</p>
+                  <p className="text-sm text-foreground/60 mt-1">{m.note}</p>
                 </motion.article>
               ))}
             </div>
@@ -507,7 +538,7 @@ export default function PitchPage() {
                 <h2 className="text-3xl sm:text-4xl font-bold mb-3">
                   $420B+ spent on cloud every year.
                 </h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-base text-foreground/70">
                   We start where teams already feel the pain.
                 </p>
               </div>
@@ -527,33 +558,33 @@ export default function PitchPage() {
             <h2 className="text-3xl sm:text-4xl font-bold mb-3">
               No one else combines both.
             </h2>
-            <p className="text-sm text-muted-foreground mb-6 max-w-3xl">
-              AI code tools assume cloud. Infrastructure tools assume human engineers. We’re the only player combining AI-native development with owned infrastructure economics.
+            <p className="text-base text-foreground/70 mb-6 max-w-3xl">
+              AI code tools assume cloud. Infrastructure tools assume human engineers. We’re the only player combining AI-native development with bare-metal economics.
             </p>
 
             <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm">
               <div className="grid grid-cols-2 gap-px bg-border/20 rounded-lg overflow-hidden">
                 <div className="bg-card/40 p-5">
-                  <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-wider mb-3">Cloud-managed + Human-built</p>
+                  <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-3">Cloud-managed + Human-built</p>
                   <div className="space-y-1.5">
                     {["AWS / GCP / Azure", "Heroku / Render", "Vercel / Netlify"].map((name) => (
-                      <p key={name} className="text-sm text-muted-foreground">{name}</p>
+                      <p key={name} className="text-sm text-foreground/60">{name}</p>
                     ))}
                   </div>
                 </div>
                 <div className="bg-card/40 p-5">
-                  <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-wider mb-3">Cloud-managed + AI-built</p>
+                  <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-3">Cloud-managed + AI-built</p>
                   <div className="space-y-1.5">
                     {["Replit / Bolt", "GitHub Copilot Workspace", "Vercel v0"].map((name) => (
-                      <p key={name} className="text-sm text-muted-foreground">{name}</p>
+                      <p key={name} className="text-sm text-foreground/60">{name}</p>
                     ))}
                   </div>
                 </div>
                 <div className="bg-card/40 p-5">
-                  <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-wider mb-3">Self-hosted + Human-built</p>
+                  <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-3">Bare metal + Human-built</p>
                   <div className="space-y-1.5">
                     {["Coolify / CapRover", "Hetzner + Terraform", "Oxide Computer"].map((name) => (
-                      <p key={name} className="text-sm text-muted-foreground">{name}</p>
+                      <p key={name} className="text-sm text-foreground/60">{name}</p>
                     ))}
                   </div>
                 </div>
@@ -564,9 +595,9 @@ export default function PitchPage() {
                   viewport={{ once: true, margin: "-40px" }}
                   transition={{ duration: 0.6, ease: [0.25, 0.4, 0, 1] }}
                 >
-                  <p className="text-[10px] font-mono text-cyan uppercase tracking-wider mb-3">Self-hosted + AI-built</p>
+                  <p className="text-[10px] font-mono text-cyan uppercase tracking-wider mb-3">Bare metal + AI-built</p>
                   <p className="text-lg font-bold gradient-text">5D Labs</p>
-                  <p className="text-xs text-muted-foreground mt-1">Spec in, software out — on your hardware.</p>
+                  <p className="text-sm text-foreground/60 mt-1">Spec in, software out — on your hardware.</p>
                 </motion.div>
               </div>
             </div>
@@ -576,19 +607,19 @@ export default function PitchPage() {
           <SlideSection id="business-gtm">
             <SlideLabel number="10" title="Business + GTM" />
             <h2 className="text-3xl sm:text-4xl font-bold mb-6">
-              Recurring revenue. Expanding margins.
+              Four revenue streams. One stack.
             </h2>
 
             <div className="grid lg:grid-cols-2 gap-8">
               <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm">
-                <p className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wider">
+                <p className="text-sm font-semibold mb-4 text-foreground/60 uppercase tracking-wider">
                   How customers find us
                 </p>
                 <FunnelDiagram stages={funnelStages} />
               </div>
 
               <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm">
-                <p className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wider">
+                <p className="text-sm font-semibold mb-4 text-foreground/60 uppercase tracking-wider">
                   Revenue streams
                 </p>
                 <div className="grid sm:grid-cols-2 gap-3">
@@ -607,7 +638,7 @@ export default function PitchPage() {
                           {s.type}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground">{s.desc}</p>
+                      <p className="text-sm text-foreground/60">{s.desc}</p>
                     </motion.div>
                   ))}
                 </div>
@@ -648,16 +679,16 @@ export default function PitchPage() {
               <p className="text-2xl font-semibold mb-2">
                 Product live. Customer paying. Pipeline in hand.
               </p>
-              <p className="text-lg text-muted-foreground mb-4">
+              <p className="text-lg text-foreground/70 mb-4">
                 Post-money SAFE. Cap aligned to AI infrastructure comps.
               </p>
-              <p className="text-sm text-muted-foreground/80 mb-8 font-mono">
+              <p className="text-base text-foreground/60 mb-8 font-mono">
                 3–5 customers at $5–8K/mo MRR = breakeven at month 15–18.
               </p>
 
               <InvestorCtaButtons />
 
-              <p className="text-sm text-muted-foreground mt-8">
+              <p className="text-base text-foreground/60 mt-8">
                 Live demo available in any meeting.
               </p>
             </motion.div>
@@ -665,7 +696,7 @@ export default function PitchPage() {
 
           {/* Minimal footer — no site links */}
           <div className="py-8 px-6 text-center print:hidden">
-            <p className="text-xs text-muted-foreground/40">
+            <p className="text-xs text-muted-foreground/60">
               &copy; {new Date().getFullYear()} 5D Labs Inc. &middot; Confidential
             </p>
           </div>
