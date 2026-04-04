@@ -1,18 +1,36 @@
 [
   {
-    "id": "dp-7",
+    "id": "dp-10",
     "category": "ux-behavior",
-    "description": "How should design snapshot PRs be surfaced in the frontend for user interaction?",
+    "description": "What user interaction pattern should be used for the Morgan web chat widget on the website and mobile app?",
     "options": [
-      "Display design snapshot PRs as a dedicated section in the dashboard with metadata and links",
-      "Integrate design snapshot PRs into the existing activity feed or notifications panel"
+      "Persistent chat widget anchored in the bottom-right corner (standard support/chat pattern)",
+      "Full-page chat experience (modal or dedicated route)",
+      "Contextual chat (appears only on certain pages or after user action)"
     ],
     "requires_approval": false,
     "constraint_type": "open",
     "affected_tasks": [
-      4,
+      8,
       9
     ],
-    "rationale": "The frontend can surface design PRs in multiple ways, affecting discoverability and user workflow. The PRD requires surfacing but not the specific UX pattern."
+    "rationale": "Morgan's web chat is a key user entry point. The interaction pattern affects discoverability, user engagement, and mobile responsiveness. The choice should align with best practices and the target audience's expectations."
+  },
+  {
+    "id": "dp-11",
+    "category": "design-system",
+    "description": "What approach should be used for the frontend component library and design system?",
+    "options": [
+      "Use shadcn/ui with TailwindCSS 4 (as specified in PRD)",
+      "Adopt Radix UI for accessibility and composability",
+      "Develop a custom component library for unique brand expression"
+    ],
+    "requires_approval": false,
+    "constraint_type": "soft",
+    "affected_tasks": [
+      8,
+      9
+    ],
+    "rationale": "The PRD specifies shadcn/ui and TailwindCSS 4, but Radix UI or a custom library could offer different tradeoffs in accessibility, flexibility, and branding. The decision impacts frontend velocity and maintainability."
   }
 ]

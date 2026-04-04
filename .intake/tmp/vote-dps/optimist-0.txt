@@ -1,1 +1,1 @@
-Kubernetes service account tokens and RBAC for internal auth, with external-secrets for external API keys (NOUS_API_KEY)
+Hybrid — gRPC for synchronous request/response paths, NATS (already in-cluster) for event-driven async workflows

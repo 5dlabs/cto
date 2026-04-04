@@ -1,1 +1,1 @@
-Event-driven (NATS) or synchronous request-response for pipeline orchestration?
+What API paradigm for internal and external service communication?

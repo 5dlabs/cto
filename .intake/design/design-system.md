@@ -1,6 +1,6 @@
 # Design System
 
-Project: sigma-1-e2e-20260403-234440
+Project: sigma-1-20260404-073027
 Provider mode: stitch
 Providers generated: stitch
 

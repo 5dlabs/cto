@@ -1,1 +1,1 @@
-Descope Task 7. If retained: JWT with httpOnly cookies, matching the Optimist's position.
+Agree with Optimist — single database, domain schemas, org_id columns. Flag: cross-schema FK cascades for GDPR deletion require explicit design in Task 10.

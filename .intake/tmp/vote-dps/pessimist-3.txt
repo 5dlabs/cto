@@ -1,1 +1,1 @@
-Descope Task 7. If retained: polling with inline error banners, matching the Optimist.
+JWT for web/mobile sessions (issued by API gateway), pre-shared API keys for service-to-service auth in Phase 1. Defer auth service to Phase 2.

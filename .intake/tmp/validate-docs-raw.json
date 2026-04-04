@@ -1,1058 +1,2045 @@
 [
   {
-    "decision_points": [
-      {
-        "topic": "External secret store backend selection",
-        "required_input": "The name and kind (SecretStore or ClusterSecretStore) of the external secret store to reference in all ExternalSecret CRDs. Example: 'openclaw-aws-secrets' (ClusterSecretStore) or 'vault-main' (SecretStore).",
-        "impact": "This determines the .spec.secretStoreRef.name and .spec.secretStoreRef.kind fields in all ExternalSecret manifests. If not provided, manifests will be incomplete and cannot be applied."
-      },
-      {
-        "topic": "Redis deployment mechanism",
-        "required_input": "Choose one: (1) Bare Deployment/StatefulSet (no operator dependency), (2) Spotahome redis-operator CR, (3) Bitnami Helm chart. If using an operator or Helm, specify if the operator/chart is already installed in the cluster.",
-        "impact": "This determines whether the Redis manifest is a simple Deployment+Service (option 1), a Redis CR (option 2), or a HelmRelease/Helm chart (option 3). If operator/chart is not present, additional installation steps are required."
-      }
-    ],
-    "blocking_questions": [
-      "What is the name and kind (SecretStore or ClusterSecretStore) of the external secret store to use for all ExternalSecret CRDs in sigma-1-dev?",
-      "Should Redis be deployed as a bare Deployment+Service (no operator), as a Spotahome redis-operator CR, or via Bitnami Helm chart? If operator/chart, is it already installed?"
-    ],
-    "next_steps": [
-      {
-        "step": "Resolve decision points",
-        "details": "Provide the external secret store name/kind and select the Redis deployment mechanism."
-      },
-      {
-        "step": "Once resolved, generate manifests for all 12 files in the scaffold, using the provided field structure and subtask details."
-      }
-    ],
-    "can_proceed": false,
-    "reason": "Provisioning is blocked until the external secret store reference and Redis deployment method are specified. All other requirements are clear and can be implemented once these decisions are made."
+    "scaffold_analysis": {
+      "task_id": 1,
+      "summary": "Provision core infrastructure for the sigma1 application using Kubernetes manifests and CRDs. This includes namespaces, CloudNative-PG PostgreSQL cluster with PgBouncer, Valkey (Redis) via operator, Cloudflare R2 credentials, Signal-CLI sidecar template, Cloudflare Tunnel, aggregated ConfigMap for endpoints, Prometheus ServiceMonitors, and network policies.",
+      "key_resources": [
+        "Namespaces: sigma1, sigma1-db",
+        "CloudNative-PG Cluster CR: sigma1-postgres",
+        "CloudNative-PG Pooler CR: sigma1-postgres-pooler",
+        "Valkey CR: sigma1-valkey",
+        "Kubernetes Secrets: sigma1-db-credentials, sigma1-r2-credentials, sigma1-stripe-credentials, sigma1-external-apis, sigma1-service-api-keys",
+        "ConfigMap: sigma1-infra-endpoints",
+        "Cloudflare Tunnel Deployment/Service",
+        "Signal-CLI sidecar template (Kustomize component or ConfigMap)",
+        "Prometheus ServiceMonitor CRs",
+        "NetworkPolicy: allow sigma1 to sigma1-db"
+      ],
+      "critical_paths": [
+        "Namespace creation (sigma1, sigma1-db) is a prerequisite for all other resources.",
+        "CloudNative-PG Cluster must be deployed and healthy before running init SQL and deploying Pooler.",
+        "Service roles and schema creation (init SQL) must precede creation of db-credentials Secret.",
+        "Valkey and Pooler must be deployed before endpoints ConfigMap and network policy.",
+        "Secrets and ConfigMap must be created before application Deployments can consume them."
+      ],
+      "decision_points": [
+        {
+          "question": "Should sigma1-db be a new dedicated namespace or reuse an existing 'databases' namespace?",
+          "impact": "Affects network policy scope, RBAC, and resource isolation."
+        },
+        {
+          "question": "Signal-CLI sidecar template: Kustomize component or ConfigMap?",
+          "impact": "Kustomize is more composable but requires adoption; ConfigMap is simpler but less flexible."
+        },
+        {
+          "question": "Inter-service API keys: how many pairs, symmetric or asymmetric?",
+          "impact": "Determines secret structure, rotation, and security model."
+        }
+      ],
+      "test_plan": [
+        "Verify namespaces exist and have correct labels.",
+        "Check CloudNative-PG cluster is READY with 2/2 instances.",
+        "Connect to sigma1-postgres via PgBouncer and verify schemas/roles.",
+        "Check Valkey pod is running and responds to PING.",
+        "Ensure all Secrets and ConfigMap exist and have correct keys.",
+        "Cloudflare Tunnel pod is running and tunnel is CONNECTED.",
+        "Prometheus ServiceMonitors are discovered by Prometheus.",
+        "NetworkPolicy allows connections from sigma1 to sigma1-db on required ports, denies others."
+      ],
+      "scaffold_files": [
+        {
+          "path": "k8s/namespaces/sigma1-namespace.yaml",
+          "description": "Namespace manifest for sigma1 with standard labels.",
+          "action": "create"
+        },
+        {
+          "path": "k8s/namespaces/sigma1-db-namespace.yaml",
+          "description": "Namespace manifest for sigma1-db (or databases) with standard labels.",
+          "action": "create"
+        },
+        {
+          "path": "k8s/db/sigma1-postgres-cluster.yaml",
+          "description": "CloudNative-PG Cluster CR for sigma1-postgres with initdb bootstrap.",
+          "action": "create"
+        },
+        {
+          "path": "k8s/db/sigma1-postgres-init-sql-job.yaml",
+          "description": "Kubernetes Job or Cluster CR postInitSQL for per-service roles and schemas.",
+          "action": "create"
+        },
+        {
+          "path": "k8s/db/sigma1-postgres-pooler.yaml",
+          "description": "CloudNative-PG Pooler CR for PgBouncer connection pooling.",
+          "action": "create"
+        },
+        {
+          "path": "k8s/db/sigma1-valkey.yaml",
+          "description": "Valkey CR using redis.opstreelabs.in/v1beta2 operator.",
+          "action": "create"
+        },
+        {
+          "path": "k8s/secrets/sigma1-db-credentials.yaml",
+          "description": "Opaque Secret for PostgreSQL connection strings per service role.",
+          "action": "create"
+        },
+        {
+          "path": "k8s/secrets/sigma1-r2-credentials.yaml",
+          "description": "Opaque Secret for Cloudflare R2 credentials.",
+          "action": "create"
+        },
+        {
+          "path": "k8s/secrets/sigma1-stripe-credentials.yaml",
+          "description": "Opaque Secret for Stripe API keys (placeholders).",
+          "action": "create"
+        },
+        {
+          "path": "k8s/secrets/sigma1-external-apis.yaml",
+          "description": "Opaque Secret for external API keys (OpenCorporates, ElevenLabs, etc).",
+          "action": "create"
+        },
+        {
+          "path": "k8s/secrets/sigma1-service-api-keys.yaml",
+          "description": "Opaque Secret for inter-service API keys.",
+          "action": "create"
+        },
+        {
+          "path": "k8s/configmaps/sigma1-infra-endpoints.yaml",
+          "description": "ConfigMap aggregating all non-secret connection strings and endpoints.",
+          "action": "create"
+        },
+        {
+          "path": "k8s/cloudflare/sigma1-cloudflare-tunnel.yaml",
+          "description": "Deployment and Service for Cloudflare Tunnel (cloudflared) for external access.",
+          "action": "create"
+        },
+        {
+          "path": "k8s/sidecars/signal-cli-sidecar-template.yaml",
+          "description": "Kustomize component or ConfigMap for reusable Signal-CLI sidecar container spec.",
+          "action": "create"
+        },
+        {
+          "path": "k8s/monitoring/sigma1-servicemonitor.yaml",
+          "description": "Prometheus ServiceMonitor CR for sigma1 services.",
+          "action": "create"
+        },
+        {
+          "path": "k8s/monitoring/sigma1-db-servicemonitor.yaml",
+          "description": "Prometheus ServiceMonitor CR for sigma1-db (optional, for DB/Valkey).",
+          "action": "create"
+        },
+        {
+          "path": "k8s/network/sigma1-db-networkpolicy.yaml",
+          "description": "NetworkPolicy allowing ingress from sigma1 to sigma1-db for PgBouncer/Valkey.",
+          "action": "create"
+        }
+      ],
+      "subtasks": [
+        {
+          "id": 1001,
+          "title": "Create sigma1 and sigma1-db namespaces with labels",
+          "status": "pending"
+        },
+        {
+          "id": 1002,
+          "title": "Deploy CloudNative-PG Cluster CR with initdb bootstrap",
+          "status": "pending"
+        },
+        {
+          "id": 1003,
+          "title": "Create per-service PostgreSQL roles and schemas via init SQL",
+          "status": "pending"
+        },
+        {
+          "id": 1004,
+          "title": "Deploy PgBouncer Pooler CR for connection pooling",
+          "status": "pending"
+        },
+        {
+          "id": 1005,
+          "title": "Deploy Valkey CR via Redis operator",
+          "status": "pending"
+        },
+        {
+          "id": 1006,
+          "title": "Create Kubernetes Secrets for database credentials",
+          "status": "pending"
+        },
+        {
+          "id": 1007,
+          "title": "Create Kubernetes Secrets for R2, Stripe, external APIs, and inter-service keys",
+          "status": "pending"
+        },
+        {
+          "id": 1008,
+          "title": "Create sigma1-infra-endpoints ConfigMap",
+          "status": "pending"
+        },
+        {
+          "id": 1009,
+          "title": "Deploy Cloudflare Tunnel Deployment and Service",
+          "status": "pending"
+        },
+        {
+          "id": 1010,
+          "title": "Define Signal-CLI sidecar container template",
+          "status": "pending"
+        },
+        {
+          "id": 1011,
+          "title": "Create Prometheus ServiceMonitor CRs for sigma1 services",
+          "status": "pending"
+        },
+        {
+          "id": 1012,
+          "title": "Create NetworkPolicy allowing sigma1 to sigma1-db ingress",
+          "status": "pending"
+        }
+      ],
+      "parallelization_notes": [
+        "Subtasks 1004 (PgBouncer Pooler), 1005 (Valkey), 1007 (Secrets for R2/Stripe/etc), 1009 (Cloudflare Tunnel), 1010 (Signal-CLI sidecar), and 1011 (ServiceMonitors) can be executed in parallel after their respective dependencies are met.",
+        "Subtasks 1001 (namespaces), 1002 (PG cluster), 1003 (init SQL), 1006 (db-credentials Secret), 1008 (infra-endpoints ConfigMap), and 1012 (NetworkPolicy) are sequential and must be completed in order."
+      ],
+      "risks": [
+        "Incorrect namespace or label configuration may break observability and network policy.",
+        "CloudNative-PG cluster misconfiguration could block all downstream DB tasks.",
+        "Password/secret management for service roles must be handled securely and consistently.",
+        "NetworkPolicy misconfiguration could block legitimate traffic or expose DB to unwanted sources.",
+        "Signal-CLI sidecar template must be compatible with downstream service deployment patterns."
+      ]
+    }
   },
   {
-    "scaffold_analysis": {
-      "task_id": 2,
-      "scaffold_dependencies": [
-        {
-          "scaffold_task_id": 1,
-          "required_files": [
-            "k8s/sigma-1-dev/configmap-infra-endpoints.yaml",
-            "k8s/sigma-1-dev/externalsecret-linear.yaml"
-          ],
-          "reason": "PM server requires Linear API credentials and infra endpoints as environment variables, which are provided by these manifests. The deployment manifest for the PM server must mount these as envFrom sources."
-        }
-      ],
-      "required_k8s_resources": [
-        {
-          "kind": "ConfigMap",
-          "name": "sigma-1-infra-endpoints",
-          "namespace": "sigma-1-dev",
-          "mount_type": "envFrom"
-        },
-        {
-          "kind": "Secret",
-          "name": "sigma-1-linear-api-token",
-          "namespace": "sigma-1-dev",
-          "mount_type": "envFrom"
-        }
-      ],
-      "missing_k8s_resources": [
-        {
-          "kind": "Deployment",
-          "name": "pm-server",
-          "namespace": "sigma-1-dev",
-          "reason": "No deployment manifest for the PM server is present in the provided scaffold. This is required to mount the ConfigMap and Secret as environment variables."
-        }
-      ],
-      "scaffold_modifications_required": [
-        {
-          "file": "k8s/sigma-1-dev/configmap-infra-endpoints.yaml",
-          "action": "ensure",
-          "description": "Must contain all required infra endpoint environment variables for the PM server, including Linear team ID and any other relevant endpoints."
-        },
-        {
-          "file": "k8s/sigma-1-dev/externalsecret-linear.yaml",
-          "action": "ensure",
-          "description": "Must create a Secret with the Linear API token, named so it can be referenced as envFrom in the PM server deployment."
-        },
-        {
-          "file": "k8s/sigma-1-dev/pm-server-deployment.yaml",
-          "action": "create",
-          "description": "Create a Deployment manifest for the PM server, mounting the above ConfigMap and Secret via envFrom. Set container envFrom for both resources."
-        }
-      ],
-      "env_var_requirements": [
-        "LINEAR_API_KEY",
-        "LINEAR_TEAM_ID"
-      ],
-      "test_stub_commands": [
-        "kubectl get configmap sigma-1-infra-endpoints -n sigma-1-dev -o yaml",
-        "kubectl get secret sigma-1-linear-api-token -n sigma-1-dev -o yaml",
-        "kubectl get deployment pm-server -n sigma-1-dev",
-        "kubectl exec -it <pm-server-pod> -n sigma-1-dev -- env | grep LINEAR"
-      ]
-    },
-    "codebase_analysis": {
-      "task_id": 2,
-      "required_modules": [
-        "src/delegates/resolve-agent-delegates.ts",
-        "src/pipeline/idempotency.ts",
-        "src/pipeline/create-issues.ts",
-        "src/lib/linear-retry.ts",
-        "src/lib/logger.ts",
-        "src/routes/pipeline.ts"
-      ],
-      "env_file": "src/env.ts",
-      "env_vars": [
-        "LINEAR_API_KEY",
-        "LINEAR_TEAM_ID",
-        "DELEGATE_MAP_*"
-      ],
-      "function_signatures": [
-        {
-          "name": "resolve_agent_delegates",
-          "signature": "resolve_agent_delegates(agentHints: string[]): Map<string, string | undefined>"
-        },
-        {
-          "name": "getDelegateMap",
-          "signature": "getDelegateMap(): Record<string, string>"
-        },
-        {
-          "name": "computeIdempotencyKey",
-          "signature": "computeIdempotencyKey(prdContent: string, taskId: string | number): string"
-        },
-        {
-          "name": "findExistingIssue",
-          "signature": "findExistingIssue(linearClient, teamId: string, idempotencyKey: string): Promise<string | null>"
-        },
-        {
-          "name": "withRetry",
-          "signature": "withRetry<T>(fn: () => Promise<T>, options: { maxRetries: number, baseDelayMs: number, stage: string }): Promise<T>"
-        },
-        {
-          "name": "pipelineLog",
-          "signature": "pipelineLog(entry: { level: 'debug'|'info'|'warn'|'error', stage: string, [key: string]: unknown }): void"
-        }
-      ],
-      "rest_endpoints": [
-        {
-          "method": "POST",
-          "path": "/api/pipeline/delegate-status",
-          "response": {
-            "delegates": "Record<string, string>",
-            "count": "number",
-            "timestamp": "string (ISO 8601)"
-          }
-        }
-      ],
-      "logging_schema": {
-        "required_fields": [
-          "level",
-          "stage",
-          "timestamp"
+    "decision_points": [
+      {
+        "question": "Should image URLs be stored as R2 presigned URLs generated on-the-fly or as static public CDN paths?",
+        "context": "Presigned URLs offer access control but expire and add latency to generate; public CDN paths are simpler and faster but expose assets publicly. The PRD mentions both options without deciding.",
+        "options": [
+          "Generate presigned R2 URLs per-request with configurable TTL",
+          "Store and serve static public CDN paths (e.g., via Cloudflare R2 public bucket)"
         ],
-        "examples": [
-          {
-            "level": "error",
-            "stage": "delegate_resolution",
-            "agent": "unknown_agent",
-            "reason": "unmapped",
-            "timestamp": "2024-06-01T12:00:00.000Z"
-          },
-          {
-            "level": "info",
-            "stage": "issue_creation",
-            "action": "skipped_duplicate",
-            "idempotencyKey": "prd:abc123:task:3",
-            "timestamp": "2024-06-01T12:00:01.000Z"
-          }
-        ]
-      }
-    },
-    "decision_points_analysis": [
-      {
-        "topic": "Agent-to-Linear-user-ID mapping source",
-        "recommended_option": "JSON/YAML config file mounted via ConfigMap",
-        "reason": "Allows hot-reload of delegate mappings without redeploying the PM server, is simple to implement, and avoids DB dependency. Can be mounted as a file or env var via ConfigMap."
+        "impact": "Affects product serialization logic, R2 credential requirements, response latency, and security posture for product images.",
+        "recommendation": "Store and serve static public CDN paths (e.g., via Cloudflare R2 public bucket)",
+        "rationale": "For a catalog with 500+ products and high-performance requirements (<500ms p99), static public CDN paths minimize latency, reduce operational complexity, and avoid the need to generate presigned URLs on every request. Security risk is low for product images, and public access is typical for e-commerce/catalog assets. If access control is needed in the future, presigned URLs can be added as an enhancement."
       },
       {
-        "topic": "Idempotency deterministic identifier strategy",
-        "recommended_option": "Embed a deterministic key (PRD hash + task index) in the issue description body and search via Linear's issue filter API",
-        "reason": "Does not require additional DB or local state, is robust to restarts, and leverages Linear's search/filter capabilities. Using an HTML comment ensures the key is not visible to end users."
-      }
-    ],
-    "test_strategy_analysis": {
-      "unit_tests": [
-        "resolve_agent_delegates returns correct mapping and undefined for unknown agents",
-        "computeIdempotencyKey returns deterministic keys for same inputs"
-      ],
-      "integration_tests": [
-        "Issue creation flow creates issues with correct assigneeId and skips duplicates",
-        "POST /api/pipeline/delegate-status returns correct mapping and metadata"
-      ],
-      "idempotency_tests": [
-        "Second run of the same PRD creates zero new issues, all are skipped"
-      ],
-      "error_handling_tests": [
-        "Invalid delegate results in unassigned issue and error log",
-        "Linear API retry logic retries on failure and logs attempts"
-      ],
-      "logging_tests": [
-        "All logs are valid JSON and include required fields"
-      ]
-    },
-    "implementation_plan": [
-      {
-        "step": 1,
-        "description": "Update or create PM server deployment manifest to mount sigma-1-infra-endpoints ConfigMap and sigma-1-linear-api-token Secret via envFrom."
-      },
-      {
-        "step": 2,
-        "description": "Implement resolve_agent_delegates and getDelegateMap in src/delegates/resolve-agent-delegates.ts, loading mapping from env or config file."
-      },
-      {
-        "step": 3,
-        "description": "Implement idempotency logic in src/pipeline/idempotency.ts and integrate into issue creation flow."
-      },
-      {
-        "step": 4,
-        "description": "Wire delegate resolution into issue creation, passing assigneeId if resolved, logging errors if not."
-      },
-      {
-        "step": 5,
-        "description": "Wrap Linear API calls with withRetry for exponential backoff and logging."
-      },
-      {
-        "step": 6,
-        "description": "Add POST /api/pipeline/delegate-status endpoint in Elysia, returning current delegate mapping."
-      },
-      {
-        "step": 7,
-        "description": "Standardize structured JSON logging across all pipeline stages using pipelineLog."
+        "question": "What is the availability model — continuous date ranges or discrete calendar days?",
+        "context": "The schema shows date_from/date_to ranges with quantity_total/reserved/booked columns. It's unclear whether availability should be tracked as overlapping ranges (requiring interval arithmetic) or materialized into per-day rows (simpler queries but more storage). This affects query performance for the <500ms target.",
+        "options": [
+          "Interval-based ranges with overlap queries",
+          "Materialized per-day availability rows"
+        ],
+        "impact": "Directly impacts availability query complexity, indexing strategy, checkout atomicity approach, and whether the <500ms p99 target is achievable without caching.",
+        "recommendation": "Materialized per-day availability rows",
+        "rationale": "Materializing per-day rows enables simple, fast queries (single index scan on product_id, date), atomic updates for checkout, and straightforward enforcement of constraints. This approach is proven in rental/booking systems and is necessary to reliably hit the <500ms p99 target at scale. Storage overhead is manageable for 90-day windows and 500+ products."
       }
     ]
   },
   {
-    "task_analysis": {
-      "task_id": 3,
-      "title": "Integrate Hermes Research in Deliberation Path (Nova - Bun/Elysia)",
-      "summary": "Integrate Hermes SaaS research API into the PM server's deliberation pipeline (Bun/Elysia stack), with a circuit breaker, timeout, fallback, and health check. Ensure NOUS_API_KEY gating, structured logging, and persistence of research memos for downstream validation.",
-      "key_requirements": [
-        "Hermes API client module with NOUS_API_KEY authentication and error handling.",
-        "Circuit breaker (timeout, failure threshold, reset) around Hermes calls; Bun-compatible.",
-        "Availability gating: skip Hermes if NOUS_API_KEY is missing.",
-        "Fallback memo generation for circuit open, timeout, or Hermes errors.",
-        "Integrate Hermes research into deliberation pipeline after PRD parsing, before task generation.",
-        "Persist research memo in deliberation artifacts for downstream use.",
-        "Expose Hermes circuit breaker state in GET /api/pipeline/status.",
-        "Comprehensive test suite for all scenarios (success, timeout, circuit open, no API key, etc.)."
-      ],
-      "decision_points": [
-        "Confirm circuit breaker library compatibility with Bun (opossum vs. cockatiel vs. custom).",
-        "Resolve Hermes SaaS API contract: endpoint, request/response schema, auth header.",
-        "Decide on research memo persistence: DB vs. in-memory pipeline state."
-      ],
-      "subtasks": [
+    "scaffolds": {
+      "scaffolds": [
         {
-          "id": 3001,
-          "title": "Implement Hermes API client module with NOUS_API_KEY authentication",
-          "status": "pending"
-        },
-        {
-          "id": 3002,
-          "title": "Implement circuit breaker wrapper with configurable timeout, failure threshold, and reset",
-          "status": "pending"
-        },
-        {
-          "id": 3003,
-          "title": "Implement availability gating for missing NOUS_API_KEY",
-          "status": "pending"
-        },
-        {
-          "id": 3004,
-          "title": "Implement fallback behavior for circuit-open, timeout, and error scenarios",
-          "status": "pending"
-        },
-        {
-          "id": 3005,
-          "title": "Integrate Hermes research call into the deliberation pipeline stage",
-          "status": "pending"
-        },
-        {
-          "id": 3006,
-          "title": "Add circuit breaker state to GET /api/pipeline/status health check",
-          "status": "pending"
-        },
-        {
-          "id": 3007,
-          "title": "Write comprehensive test suite for the Hermes integration",
-          "status": "pending"
+          "task_id": 1,
+          "file_structure": [
+            {
+              "path": "k8s/namespaces/sigma1-namespace.yaml",
+              "description": "Namespace manifest for sigma1 with standard labels.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/namespaces/sigma1-db-namespace.yaml",
+              "description": "Namespace manifest for sigma1-db (or databases) with standard labels.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/db/sigma1-postgres-cluster.yaml",
+              "description": "CloudNative-PG Cluster CR for sigma1-postgres with initdb bootstrap.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/db/sigma1-postgres-init-sql-job.yaml",
+              "description": "Kubernetes Job or Cluster CR postInitSQL for per-service roles and schemas.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/db/sigma1-postgres-pooler.yaml",
+              "description": "CloudNative-PG Pooler CR for PgBouncer connection pooling.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/db/sigma1-valkey.yaml",
+              "description": "Valkey CR using redis.opstreelabs.in/v1beta2 operator.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/secrets/sigma1-db-credentials.yaml",
+              "description": "Opaque Secret for PostgreSQL connection strings per service role.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/secrets/sigma1-r2-credentials.yaml",
+              "description": "Opaque Secret for Cloudflare R2 credentials.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/secrets/sigma1-stripe-credentials.yaml",
+              "description": "Opaque Secret for Stripe API keys (placeholders).",
+              "action": "create"
+            },
+            {
+              "path": "k8s/secrets/sigma1-external-apis.yaml",
+              "description": "Opaque Secret for external API keys (OpenCorporates, ElevenLabs, etc).",
+              "action": "create"
+            },
+            {
+              "path": "k8s/secrets/sigma1-service-api-keys.yaml",
+              "description": "Opaque Secret for inter-service API keys.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/configmaps/sigma1-infra-endpoints.yaml",
+              "description": "ConfigMap aggregating all non-secret connection strings and endpoints.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/cloudflare/sigma1-cloudflare-tunnel.yaml",
+              "description": "Deployment and Service for Cloudflare Tunnel (cloudflared) for external access.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/sidecars/signal-cli-sidecar-template.yaml",
+              "description": "Kustomize component or ConfigMap for reusable Signal-CLI sidecar container spec.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/monitoring/sigma1-servicemonitor.yaml",
+              "description": "Prometheus ServiceMonitor CR for sigma1 services.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/monitoring/sigma1-db-servicemonitor.yaml",
+              "description": "Prometheus ServiceMonitor CR for sigma1-db (optional, for DB/Valkey).",
+              "action": "create"
+            },
+            {
+              "path": "k8s/network/sigma1-db-networkpolicy.yaml",
+              "description": "NetworkPolicy allowing ingress from sigma1 to sigma1-db for PgBouncer/Valkey.",
+              "action": "create"
+            }
+          ],
+          "interfaces": "# No code interfaces for Bolt tasks; see YAML CRD structure below.\n# Example: CloudNative-PG Cluster CR (partial)\n# apiVersion: postgresql.cnpg.io/v1\n# kind: Cluster\n# metadata:\n#   name: sigma1-postgres\n#   namespace: sigma1-db\n# spec:\n#   instances: 2\n#   storage:\n#     size: 50Gi\n#   bootstrap:\n#     initdb:\n#       database: sigma1\n#       owner: sigma1_user\n#       secret:\n#         name: sigma1-postgres-superuser\n",
+          "function_signatures": "# Not applicable for Bolt (Kubernetes YAML) tasks.\n# See YAML resource structure for each manifest.",
+          "test_stubs": "# Test Plan (not code):\n# 1. kubectl get ns sigma1 -o jsonpath='{.metadata.labels}'\n# 2. kubectl get cluster sigma1-postgres -n sigma1-db\n# 3. kubectl exec into sigma1 pod, psql via pooler, \\dn\n# 4. redis-cli -u $VALKEY_URL PING\n# 5. kubectl get configmap sigma1-infra-endpoints -n sigma1\n# 6. kubectl get secret sigma1-db-credentials -n sigma1\n# 7. kubectl get pods -n sigma1 -l app=sigma1-cloudflare-tunnel\n# 8. kubectl get servicemonitor -n sigma1\n# 9. kubectl get networkpolicy -n sigma1-db",
+          "pattern_examples": null
         }
-      ],
+      ]
+    },
+    "codebase_context": "",
+    "infrastructure_context": "## Deployed Operators\n\n## ArgoCD Applications\n- (argocd skipped: set ARGOCD_SERVER, ensure argocd is on PATH, and run argocd login — or ignore for local runs)\n\n## Custom Resource Definitions\n- accesstunnels.networking.cfargotunnel.com\n- acraccesstokens.generators.external-secrets.io\n- addons.k3s.cattle.io\n- aptosnodes.blockchain.5dlabs.io\n- autoscalinglisteners.actions.github.com\n- autoscalingrunnersets.actions.github.com\n- ciliumcidrgroups.cilium.io\n- ciliumclusterwidenetworkpolicies.cilium.io\n- ciliumendpoints.cilium.io\n- ciliumidentities.cilium.io\n- ciliuml2announcementpolicies.cilium.io\n- ciliumloadbalancerippools.cilium.io\n- ciliumnetworkpolicies.cilium.io\n- ciliumnodeconfigs.cilium.io\n- ciliumnodes.cilium.io\n- ciliumpodippools.cilium.io\n- clusterexternalsecrets.external-secrets.io\n- clustergenerators.generators.external-secrets.io\n- clustersecretstores.external-secrets.io\n- clustertunnels.networking.cfargotunnel.com\n- ecrauthorizationtokens.generators.external-secrets.io\n- ephemeralrunners.actions.github.com\n- ephemeralrunnersets.actions.github.com\n- etcdsnapshotfiles.k3s.cattle.io\n- externalsecrets.external-secrets.io\n- fakes.generators.external-secrets.io\n- gcraccesstokens.generators.external-secrets.io\n- githubaccesstokens.generators.external-secrets.io\n- helmchartconfigs.helm.cattle.io\n- helmcharts.helm.cattle.io\n\n## Services (non-kube-system)\n- argocd/argocd-applicationset-controller (<none>)\n- argocd/argocd-dex-server (<none>)\n- argocd/argocd-metrics (<none>)\n- argocd/argocd-notifications-controller-metrics (<none>)\n- argocd/argocd-redis (<none>)\n- argocd/argocd-repo-server (<none>)\n- argocd/argocd-server (<none>)\n- argocd/argocd-server-metrics (<none>)\n- bots/discord-bridge-http (<none>)\n- bots/linear-bridge (<none>)\n- cloudflare-operator-system/cloudflare-operator-controller-manager-metrics-service (<none>)\n- cloudflare-operator-system/cloudflare-operator-webhook-service (<none>)\n- cto/cto-controller (<none>)\n- cto/cto-openmemory (<none>)\n- cto/cto-pm (<none>)\n- cto/cto-tools (<none>)\n- cto/cto-web (<none>)\n- cto/tweakcn (<none>)\n- default/kubernetes (<none>)\n- external-secrets/openclaw-external-secrets-webhook (<none>)\n- gitlab/gitlab-certmanager (<none>)\n- gitlab/gitlab-certmanager-cainjector (<none>)\n- gitlab/gitlab-certmanager-webhook (<none>)\n- gitlab/gitlab-gitaly (<none>)\n- gitlab/gitlab-gitlab-shell (<none>)\n- gitlab/gitlab-kas (<none>)\n- gitlab/gitlab-minio-svc (<none>)\n- gitlab/gitlab-postgresql (<none>)\n- gitlab/gitlab-postgresql-hl (<none>)\n- gitlab/gitlab-postgresql-metrics (<none>)\n- gitlab/gitlab-redis-headless (<none>)\n- gitlab/gitlab-redis-master (<none>)\n- gitlab/gitlab-redis-metrics (<none>)\n- gitlab/gitlab-registry (<none>)\n- gitlab/gitlab-webservice-default (<none>)\n- messaging/nats (openclaw-nats.openclaw.svc.cluster.local)\n- openclaw/loki-canary (<none>)\n- openclaw/loki-headless (<none>)\n- openclaw/loki-memberlist (<none>)\n- openclaw/openclaw-angie (<none>)\n",
+    "task": {
+      "id": 3,
+      "title": "Develop Rental Management System (Grizz - Go/gRPC)",
+      "agent": "grizz",
+      "stack": "Go 1.22+/gRPC",
+      "description": "Build the full RMS service replacing Current RMS — opportunities (quotes), projects, inventory transactions, crew scheduling, and delivery management. Implements gRPC services with grpc-gateway for REST, Google Calendar integration, and conflict detection.",
+      "status": "pending",
       "dependencies": [
         1
       ],
       "priority": "high",
-      "test_strategy": [
-        "Unit test: mock Hermes API returning valid research content; assert the deliberation output contains Hermes-sourced content with source: 'hermes'.",
-        "Timeout test: mock Hermes API with 35s delay; assert circuit breaker opens after timeout and fallback memo is generated within 31s.",
-        "Circuit breaker test: trigger 3 consecutive failures; assert subsequent calls return fallback immediately without HTTP calls for 60s, then half-open allows one probe.",
-        "No-API-key test: unset NOUS_API_KEY; assert deliberation completes with skip log entry and no HTTP calls to Hermes.",
-        "Integration test: run deliberation with a real or stubbed Hermes endpoint; assert the returned research memo has non-empty content field and is persisted in the deliberation artifacts."
+      "details": "1. Initialize Go module `github.com/sigma1/rms` with Go 1.22+.\n2. Define protobuf files in `proto/` directory for all 5 gRPC services per PRD:\n   - `opportunity.proto` — CreateOpportunity, GetOpportunity, UpdateOpportunity, ListOpportunities, ScoreLead\n   - `project.proto` — CreateProject, GetProject, UpdateProject, CheckOut, CheckIn\n   - `inventory.proto` — GetStockLevel, RecordTransaction, ScanBarcode\n   - `crew.proto` — ListCrew, AssignCrew, ScheduleCrew\n   - `delivery.proto` — ScheduleDelivery, UpdateDeliveryStatus, OptimizeRoute\n   Use `buf` for protobuf management and code generation.\n3. Configure grpc-gateway annotations in proto files for all REST endpoints per PRD:\n   - `/api/v1/opportunities`, `/api/v1/projects`, `/api/v1/inventory/transactions`, `/api/v1/crew`, `/api/v1/deliveries/*`\n   - Include `POST /api/v1/opportunities/:id/approve` and `POST /api/v1/opportunities/:id/convert`\n4. Database layer:\n   - Use `pgx/v5` for PostgreSQL, connecting via PgBouncer URL from `sigma1-infra-endpoints`.\n   - Migrations using `golang-migrate`: create tables in `rms` schema — opportunities, projects, project_line_items, inventory_items, inventory_transactions, crew_members, crew_assignments, deliveries, delivery_routes.\n   - All tables include `org_id UUID NOT NULL` column for row-level filtering (per D6).\n5. Business logic:\n   - **Quote-to-Project workflow**: Opportunity status machine (pending → qualified → approved → converted). Converting creates a Project linked by opportunity_id.\n   - **Lead scoring**: ScoreLead RPC computes GREEN/YELLOW/RED based on customer vetting data, event size, and payment history. Returns `LeadScore` with breakdown.\n   - **Conflict detection**: Before confirming checkout, check equipment availability across overlapping date ranges. Return conflicts with affected project IDs.\n   - **Barcode scanning**: ScanBarcode accepts barcode string, returns InventoryItem with current location and status.\n   - **Crew scheduling**: Calendar-based assignment with conflict detection against existing assignments.\n   - **Google Calendar integration**: Use Google Calendar API to sync project events. OAuth2 service account credentials from K8s Secret.\n6. Inter-service auth: Validate API key from `Authorization: Bearer <key>` header against `sigma1-service-api-keys` secret.\n7. Health and observability:\n   - gRPC health checking protocol (`grpc.health.v1.Health`)\n   - REST `/health/live` and `/health/ready` via grpc-gateway\n   - Prometheus metrics via `grpc-prometheus` interceptor + `/metrics` endpoint\n   - Structured logging with `slog`\n8. GDPR endpoint: `DELETE /api/v1/gdpr/customer/:id` — delete opportunities, projects, crew assignments for customer, return structured confirmation.\n9. Dockerfile: multi-stage build (golang:1.22 builder → gcr.io/distroless/static-debian12 runtime).\n10. Kubernetes Deployment:\n    - Namespace: `sigma1`, replicas: 2\n    - Ports: 50051 (gRPC), 8081 (REST gateway)\n    - `envFrom` sigma1-infra-endpoints ConfigMap\n    - Secret refs for DB credentials, Google Calendar API, service API keys\n    - Liveness/readiness probes\n11. Generate OpenAPI spec from grpc-gateway annotations using `protoc-gen-openapiv2`.",
+      "test_strategy": "1. Unit tests for opportunity state machine: verify all valid transitions (pending→qualified→approved→converted) and reject invalid transitions (e.g., pending→converted) — cover all 4 states × valid/invalid inputs. 2. Unit tests for lead scoring algorithm: verify GREEN/YELLOW/RED boundaries with parameterized test cases. 3. Integration tests using testcontainers-go with PostgreSQL: full CRUD cycle for opportunities and projects; verify convert endpoint creates project with correct opportunity_id link. 4. Conflict detection test: create two overlapping bookings for same equipment, verify CheckOut returns conflict error with affected project ID. 5. gRPC reflection test: `grpcurl` lists all 5 services and their methods. 6. REST gateway test: `curl` all REST endpoints and verify responses match protobuf-JSON mapping. 7. OpenAPI spec generated by `protoc-gen-openapiv2` validates with swagger-cli. 8. GDPR deletion: create opportunity + project, call DELETE, verify all related records removed. 9. Minimum 80% code coverage via `go test -cover`.",
+      "decision_points": [
+        "Lead scoring algorithm: What are the exact thresholds and weighting factors for GREEN/YELLOW/RED scoring? The PRD mentions customer vetting data, event size, and payment history but doesn't specify numeric boundaries or relative weights. This needs product input before implementation.",
+        "Google Calendar integration scope: Should calendar sync be bidirectional (changes in Google Calendar reflected back into RMS) or unidirectional (RMS pushes events to Google Calendar only)? Bidirectional adds significant webhook/polling complexity.",
+        "Delivery route optimization: The OptimizeRoute RPC implies a routing algorithm — should this use an external API (Google Directions, OSRM, Mapbox) or a simple heuristic? External APIs have cost and latency implications.",
+        "Multi-tenancy enforcement: org_id column is specified for row-level filtering, but should this be enforced via PostgreSQL Row-Level Security policies or purely in application code? RLS is more secure but adds migration complexity."
       ],
-      "acceptance_criteria": [
-        "Hermes research is invoked in the deliberation pipeline only if NOUS_API_KEY is set.",
-        "Circuit breaker prevents blocking the event loop on Hermes API latency or repeated failures.",
-        "Fallback memo is generated and logged on Hermes unavailability, circuit open, or timeout.",
-        "Research memo (Hermes, fallback, or skip) is persisted in deliberation artifacts.",
-        "GET /api/pipeline/status returns Hermes circuit breaker state and API key configured status.",
-        "Test suite covers all major scenarios and edge cases."
+      "subtasks": [
+        {
+          "id": 3001,
+          "title": "Initialize Go module and buf protobuf toolchain",
+          "description": "Set up the Go module, directory structure, and buf configuration for protobuf management and code generation across all 5 services.",
+          "dependencies": [],
+          "details": "1. Run `go mod init github.com/sigma1/rms` with Go 1.22+.\n2. Create directory structure: `proto/`, `internal/`, `cmd/server/`, `db/migrations/`.\n3. Install and configure buf: create `buf.yaml` with `name: buf.build/sigma1/rms` and lint/breaking rules.\n4. Create `buf.gen.yaml` with plugins: `protoc-gen-go`, `protoc-gen-go-grpc`, `protoc-gen-grpc-gateway`, `protoc-gen-openapiv2`.\n5. Add `google/api/annotations.proto` and `google/api/http.proto` dependencies via buf BSR.\n6. Create a minimal `proto/rms/v1/common.proto` with shared message types: `Timestamp`, `Money`, `Address`, `PaginationRequest`, `PaginationResponse`, `OrgId`.\n7. Run `buf generate` to verify toolchain produces Go code in `gen/` directory.\n8. Add Makefile targets: `proto-gen`, `proto-lint`, `proto-breaking`.",
+          "status": "pending",
+          "test_strategy": "Run `buf lint` with zero errors. Run `buf generate` and verify Go files are generated in the expected output directory. Verify `go build ./...` succeeds with generated code.",
+          "subagentType": "implementer",
+          "parallelizable": false
+        },
+        {
+          "id": 3002,
+          "title": "Define opportunity.proto and project.proto with grpc-gateway annotations",
+          "description": "Create protobuf definitions for the Opportunity and Project gRPC services with full REST gateway annotations for all endpoints including approve and convert actions.",
+          "dependencies": [
+            3001
+          ],
+          "details": "1. Create `proto/rms/v1/opportunity.proto`:\n   - Service `OpportunityService` with RPCs: `CreateOpportunity`, `GetOpportunity`, `UpdateOpportunity`, `ListOpportunities`, `ScoreLead`, `ApproveOpportunity`, `ConvertOpportunity`.\n   - Messages: `Opportunity` (id, org_id, customer_id, title, description, event_date_start, event_date_end, status enum [PENDING, QUALIFIED, APPROVED, CONVERTED], lead_score, line_items repeated, created_at, updated_at), `LeadScore` (score enum [GREEN, YELLOW, RED], breakdown map), `OpportunityLineItem`.\n   - grpc-gateway annotations: `POST /api/v1/opportunities`, `GET /api/v1/opportunities/{id}`, `PUT /api/v1/opportunities/{id}`, `GET /api/v1/opportunities`, `POST /api/v1/opportunities/{id}/score`, `POST /api/v1/opportunities/{id}/approve`, `POST /api/v1/opportunities/{id}/convert`.\n2. Create `proto/rms/v1/project.proto`:\n   - Service `ProjectService` with RPCs: `CreateProject`, `GetProject`, `UpdateProject`, `ListProjects`, `CheckOut`, `CheckIn`.\n   - Messages: `Project` (id, org_id, opportunity_id, customer_id, title, status, line_items, checkout_date, checkin_date, created_at, updated_at), `CheckOutRequest` (project_id, item_ids, date_range), `CheckOutResponse` (success, conflicts repeated), `Conflict` (item_id, conflicting_project_id, date_range).\n   - grpc-gateway annotations: `POST /api/v1/projects`, `GET /api/v1/projects/{id}`, `PUT /api/v1/projects/{id}`, `GET /api/v1/projects`, `POST /api/v1/projects/{id}/checkout`, `POST /api/v1/projects/{id}/checkin`.\n3. Run `buf generate` and verify Go stubs compile.",
+          "status": "pending",
+          "test_strategy": "Run `buf lint` with zero errors on both proto files. Run `buf generate` and verify generated Go service interfaces contain all defined RPCs. Verify grpc-gateway reverse proxy code is generated with correct HTTP method/path mappings.",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 3003,
+          "title": "Define inventory.proto, crew.proto, and delivery.proto with grpc-gateway annotations",
+          "description": "Create protobuf definitions for the Inventory, Crew, and Delivery gRPC services with full REST gateway annotations.",
+          "dependencies": [
+            3001
+          ],
+          "details": "1. Create `proto/rms/v1/inventory.proto`:\n   - Service `InventoryService` with RPCs: `GetStockLevel`, `RecordTransaction`, `ScanBarcode`, `ListInventoryItems`.\n   - Messages: `InventoryItem` (id, org_id, name, barcode, category, current_location, status enum [AVAILABLE, CHECKED_OUT, MAINTENANCE, RETIRED], quantity_total, quantity_available), `InventoryTransaction` (id, item_id, project_id, type enum [CHECK_OUT, CHECK_IN, TRANSFER, ADJUSTMENT], quantity, timestamp), `ScanBarcodeResponse` (item with current location and status).\n   - grpc-gateway: `GET /api/v1/inventory/{id}/stock`, `POST /api/v1/inventory/transactions`, `POST /api/v1/inventory/scan`, `GET /api/v1/inventory`.\n2. Create `proto/rms/v1/crew.proto`:\n   - Service `CrewService` with RPCs: `ListCrew`, `AssignCrew`, `ScheduleCrew`, `GetCrewAvailability`.\n   - Messages: `CrewMember` (id, org_id, name, email, role, skills), `CrewAssignment` (id, crew_member_id, project_id, date_start, date_end, role), `AvailabilitySlot`.\n   - grpc-gateway: `GET /api/v1/crew`, `POST /api/v1/crew/assign`, `POST /api/v1/crew/schedule`, `GET /api/v1/crew/{id}/availability`.\n3. Create `proto/rms/v1/delivery.proto`:\n   - Service `DeliveryService` with RPCs: `ScheduleDelivery`, `UpdateDeliveryStatus`, `OptimizeRoute`, `ListDeliveries`.\n   - Messages: `Delivery` (id, org_id, project_id, type enum [DELIVERY, PICKUP], address, scheduled_at, status enum [SCHEDULED, IN_TRANSIT, DELIVERED, CANCELLED]), `DeliveryRoute` (id, delivery_ids, optimized_order, estimated_duration).\n   - grpc-gateway: `POST /api/v1/deliveries`, `PUT /api/v1/deliveries/{id}/status`, `POST /api/v1/deliveries/optimize-route`, `GET /api/v1/deliveries`.\n4. Run `buf generate` and verify all stubs compile.",
+          "status": "pending",
+          "test_strategy": "Run `buf lint` with zero errors on all three proto files. Run `buf generate` and verify all Go service interfaces and message types are generated. Confirm grpc-gateway annotations produce correct HTTP paths.",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 3004,
+          "title": "Database migrations for all RMS schema tables",
+          "description": "Create golang-migrate migration files for all 9 tables in the rms schema with org_id column, indexes, and foreign key constraints.",
+          "dependencies": [
+            3001
+          ],
+          "details": "1. Add `golang-migrate` and `pgx/v5` dependencies to go.mod.\n2. Create migration `000001_create_rms_schema.up.sql`: `CREATE SCHEMA IF NOT EXISTS rms;`\n3. Create migration `000002_create_opportunities.up.sql`: table `rms.opportunities` with columns: id UUID PK DEFAULT gen_random_uuid(), org_id UUID NOT NULL, customer_id UUID NOT NULL, title TEXT NOT NULL, description TEXT, event_date_start TIMESTAMPTZ, event_date_end TIMESTAMPTZ, status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','QUALIFIED','APPROVED','CONVERTED')), lead_score TEXT, created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now(). Index on (org_id), (org_id, status), (org_id, customer_id).\n4. Create migration `000003_create_projects.up.sql`: table `rms.projects` with: id UUID PK, org_id UUID NOT NULL, opportunity_id UUID REFERENCES rms.opportunities(id), customer_id UUID NOT NULL, title TEXT, status TEXT, checkout_date TIMESTAMPTZ, checkin_date TIMESTAMPTZ, created_at, updated_at. Index on (org_id), (opportunity_id).\n5. Create migration `000004_create_project_line_items.up.sql`: table `rms.project_line_items` with: id UUID PK, org_id UUID NOT NULL, project_id UUID REFERENCES rms.projects(id), inventory_item_id UUID, quantity INT, unit_price NUMERIC(10,2), created_at.\n6. Create migration `000005_create_inventory_items.up.sql`: table `rms.inventory_items` with: id UUID PK, org_id UUID NOT NULL, name TEXT, barcode TEXT UNIQUE, category TEXT, current_location TEXT, status TEXT DEFAULT 'AVAILABLE', quantity_total INT, quantity_available INT, created_at, updated_at. Index on (org_id), (barcode), (org_id, status).\n7. Create migration `000006_create_inventory_transactions.up.sql`: table `rms.inventory_transactions` with: id UUID PK, org_id UUID NOT NULL, item_id UUID REFERENCES rms.inventory_items(id), project_id UUID REFERENCES rms.projects(id), type TEXT, quantity INT, timestamp TIMESTAMPTZ DEFAULT now(). Index on (item_id, timestamp), (project_id).\n8. Create migration `000007_create_crew_members.up.sql`: table `rms.crew_members` with: id UUID PK, org_id UUID NOT NULL, name TEXT, email TEXT, role TEXT, skills TEXT[]. Index on (org_id).\n9. Create migration `000008_create_crew_assignments.up.sql`: table `rms.crew_assignments` with: id UUID PK, org_id UUID NOT NULL, crew_member_id UUID REFERENCES rms.crew_members(id), project_id UUID REFERENCES rms.projects(id), date_start TIMESTAMPTZ, date_end TIMESTAMPTZ, role TEXT. Index on (crew_member_id, date_start, date_end), (project_id).\n10. Create migration `000009_create_deliveries.up.sql`: table `rms.deliveries` with: id UUID PK, org_id UUID NOT NULL, project_id UUID REFERENCES rms.projects(id), type TEXT, address JSONB, scheduled_at TIMESTAMPTZ, status TEXT DEFAULT 'SCHEDULED', created_at, updated_at.\n11. Create migration `000010_create_delivery_routes.up.sql`: table `rms.delivery_routes` with: id UUID PK, org_id UUID NOT NULL, delivery_ids UUID[], optimized_order INT[], estimated_duration_minutes INT, created_at.\n12. Create corresponding `.down.sql` files for all migrations.\n13. Write a `db/db.go` package that initializes pgx pool from `DATABASE_URL` env var (PgBouncer from sigma1-infra-endpoints) and runs migrations on startup.",
+          "status": "pending",
+          "test_strategy": "Use testcontainers-go to spin up a PostgreSQL container. Run all migrations up, verify all 9 tables exist in rms schema with correct columns via `information_schema.columns` queries. Run all migrations down, verify schema is clean. Run migrations up again to verify idempotency.",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 3005,
+          "title": "Implement database repository layer with pgx",
+          "description": "Build the Go repository layer using pgx/v5 for all RMS entities with org_id-scoped queries, providing CRUD operations consumed by gRPC service implementations.",
+          "dependencies": [
+            3004
+          ],
+          "details": "1. Create `internal/repo/` package with one file per entity: `opportunity_repo.go`, `project_repo.go`, `inventory_repo.go`, `crew_repo.go`, `delivery_repo.go`.\n2. Define repository interfaces in `internal/repo/interfaces.go` for each entity (e.g., `OpportunityRepo` with Create, Get, Update, List, UpdateStatus methods).\n3. `opportunity_repo.go`: Implement `Create(ctx, orgID, opp)`, `GetByID(ctx, orgID, id)`, `Update(ctx, orgID, id, opp)`, `List(ctx, orgID, filters, pagination)`, `UpdateStatus(ctx, orgID, id, newStatus)`. All queries filter by `org_id = $orgID`. Use `pgx.CollectRows` for list queries.\n4. `project_repo.go`: Implement `Create`, `GetByID`, `Update`, `List`, `CreateFromOpportunity(ctx, orgID, oppID)` which inserts project and copies line items in a transaction.\n5. `inventory_repo.go`: Implement `GetByID`, `GetByBarcode(ctx, orgID, barcode)`, `GetStockLevel(ctx, orgID, itemID)`, `RecordTransaction(ctx, orgID, txn)` which updates quantity_available atomically in a transaction, `CheckAvailability(ctx, orgID, itemIDs, dateStart, dateEnd)` which queries overlapping transactions.\n6. `crew_repo.go`: Implement `List(ctx, orgID)`, `CreateAssignment(ctx, orgID, assignment)`, `GetConflicts(ctx, orgID, crewMemberID, dateStart, dateEnd)` which queries overlapping crew_assignments.\n7. `delivery_repo.go`: Implement `Create`, `UpdateStatus`, `List`, `SaveRoute`.\n8. Use `pgx.Pool` injected into each repo struct. Use squirrel or raw SQL with parameterized queries.\n9. All methods return domain structs (not protobuf types) defined in `internal/domain/` package.",
+          "status": "pending",
+          "test_strategy": "Integration tests with testcontainers-go PostgreSQL: for each repo, test Create→Get roundtrip, verify org_id filtering (insert with org_id A, query with org_id B returns empty), test List with pagination. For inventory repo, test RecordTransaction atomically updates quantity_available. For crew repo, test GetConflicts returns overlapping assignments.",
+          "subagentType": "implementer",
+          "parallelizable": false
+        },
+        {
+          "id": 3006,
+          "title": "Implement Opportunity service with state machine, lead scoring, and convert-to-project",
+          "description": "Build the OpportunityService gRPC implementation with the full quote-to-project workflow including status state machine, lead scoring algorithm, and opportunity-to-project conversion.",
+          "dependencies": [
+            3002,
+            3005
+          ],
+          "details": "1. Create `internal/service/opportunity_svc.go` implementing the generated `OpportunityServiceServer` interface.\n2. Implement the state machine in `internal/domain/opportunity_state.go`:\n   - Define valid transitions: PENDING→QUALIFIED, QUALIFIED→APPROVED, APPROVED→CONVERTED. Also allow PENDING→QUALIFIED→APPROVED as composite path.\n   - `ValidateTransition(current, next Status) error` returns descriptive error for invalid transitions (e.g., PENDING→CONVERTED is invalid).\n   - State transitions are enforced in `UpdateOpportunity` and dedicated RPCs.\n3. Implement `ScoreLead` RPC in `internal/domain/lead_scoring.go`:\n   - Input: customer vetting data (bool flags: verified_identity, verified_insurance, positive_references), event_size (int), payment_history (enum: GOOD, MIXED, BAD, NEW).\n   - Scoring: assign points per factor. GREEN >= 80 points, YELLOW 50-79, RED < 50. Return `LeadScore` with per-factor breakdown.\n4. Implement `ApproveOpportunity` RPC: validate QUALIFIED→APPROVED transition, update status.\n5. Implement `ConvertOpportunity` RPC:\n   - Validate status is APPROVED.\n   - Call `projectRepo.CreateFromOpportunity(ctx, orgID, oppID)` to create project with linked opportunity_id and copied line items.\n   - Update opportunity status to CONVERTED.\n   - Return the new Project ID.\n   - Wrap in a database transaction (via pgx.Tx passed through repo).\n6. Implement `CreateOpportunity`, `GetOpportunity`, `UpdateOpportunity`, `ListOpportunities` as standard CRUD delegating to repo.\n7. Wire service into gRPC server registration in `cmd/server/main.go`.",
+          "status": "pending",
+          "test_strategy": "Unit tests for state machine: test all 4 states × all possible next states, verify exactly 3 valid transitions pass and all others return error. Unit tests for lead scoring with parameterized table: test GREEN boundary (80+), YELLOW (50-79), RED (<50) with various input combinations. Integration test: CreateOpportunity → ScoreLead → UpdateStatus to QUALIFIED → Approve → Convert → verify Project exists with correct opportunity_id link and line items copied.",
+          "subagentType": "implementer",
+          "parallelizable": false
+        },
+        {
+          "id": 3007,
+          "title": "Implement Inventory service with conflict detection and barcode scanning",
+          "description": "Build the InventoryService gRPC implementation with stock level tracking, transaction recording, equipment availability conflict detection, and barcode scanning lookup.",
+          "dependencies": [
+            3003,
+            3005
+          ],
+          "details": "1. Create `internal/service/inventory_svc.go` implementing `InventoryServiceServer`.\n2. Implement `GetStockLevel` RPC: delegate to `inventoryRepo.GetStockLevel()`, return item with quantity_total and quantity_available.\n3. Implement `RecordTransaction` RPC:\n   - Validate transaction type (CHECK_OUT, CHECK_IN, TRANSFER, ADJUSTMENT).\n   - For CHECK_OUT: verify quantity_available >= requested quantity, decrement atomically.\n   - For CHECK_IN: increment quantity_available, update item status.\n   - Delegate to `inventoryRepo.RecordTransaction()` which uses pgx transaction.\n4. Implement conflict detection in `internal/domain/conflict_detector.go`:\n   - `DetectConflicts(ctx, orgID, itemIDs []UUID, dateStart, dateEnd time.Time) ([]Conflict, error)`\n   - Query inventory_transactions joined with projects to find overlapping CHECK_OUT periods for the same items.\n   - Return list of Conflict structs with item_id, conflicting_project_id, conflicting_date_range.\n5. Integrate conflict detection into Project service's `CheckOut` RPC: before recording transactions, call DetectConflicts. If conflicts found, return them in CheckOutResponse with success=false.\n6. Implement `ScanBarcode` RPC: call `inventoryRepo.GetByBarcode(ctx, orgID, barcode)`, return InventoryItem with current_location and status. Return NOT_FOUND if barcode doesn't exist.\n7. Implement `ListInventoryItems` with org_id filtering and pagination.\n8. Register service in gRPC server.",
+          "status": "pending",
+          "test_strategy": "Integration tests with testcontainers-go: 1) Create inventory item, RecordTransaction CHECK_OUT, verify quantity_available decremented. RecordTransaction CHECK_IN, verify quantity_available restored. 2) Conflict detection: create item, check out to project A for dates Jan 1-5, attempt checkout to project B for Jan 3-7, verify conflict returned with project A's ID and overlapping range. 3) ScanBarcode: create item with barcode 'ABC123', scan returns correct item; scan non-existent barcode returns NOT_FOUND. 4) Verify CHECK_OUT fails when quantity_available < requested.",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 3008,
+          "title": "Implement Crew scheduling service with conflict detection",
+          "description": "Build the CrewService gRPC implementation with crew listing, assignment, scheduling with overlap conflict detection, and availability queries.",
+          "dependencies": [
+            3003,
+            3005
+          ],
+          "details": "1. Create `internal/service/crew_svc.go` implementing `CrewServiceServer`.\n2. Implement `ListCrew` RPC: delegate to `crewRepo.List(ctx, orgID)` with optional skill/role filters.\n3. Implement `AssignCrew` RPC:\n   - Accept crew_member_id, project_id, date_start, date_end, role.\n   - Call `crewRepo.GetConflicts(ctx, orgID, crewMemberID, dateStart, dateEnd)` to check for overlapping assignments.\n   - If conflicts exist, return error with details of conflicting assignments (project_id, dates).\n   - If no conflicts, call `crewRepo.CreateAssignment(ctx, orgID, assignment)`.\n4. Implement `ScheduleCrew` RPC: bulk assign multiple crew members to a project, checking conflicts for each. Return summary of successful assignments and any conflicts.\n5. Implement `GetCrewAvailability` RPC:\n   - For a given crew_member_id and date range, query existing assignments and return available time slots.\n   - Return list of `AvailabilitySlot` (date_start, date_end, is_available).\n6. Register service in gRPC server.",
+          "status": "pending",
+          "test_strategy": "Integration tests: 1) Create crew member, assign to project A for Jan 1-5, attempt assign to project B for Jan 3-7 → verify conflict error with project A details. 2) Assign to non-overlapping period Jan 6-10 → verify success. 3) GetCrewAvailability for Jan 1-15 → verify slot Jan 1-5 shows unavailable, Jan 6-10 unavailable, Jan 11-15 available. 4) ScheduleCrew bulk: 3 crew members, 1 has conflict → verify 2 succeed and 1 returns conflict.",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 3009,
+          "title": "Implement Google Calendar integration for crew/project sync",
+          "description": "Build Google Calendar API integration to sync project events and crew assignments to Google Calendar using OAuth2 service account credentials.",
+          "dependencies": [
+            3008,
+            3006
+          ],
+          "details": "1. Create `internal/gcal/client.go` package.\n2. Initialize Google Calendar API client using service account JSON key from K8s Secret (env var `GOOGLE_CALENDAR_SA_KEY` or file path `GOOGLE_APPLICATION_CREDENTIALS`).\n3. Implement `SyncProjectEvent(ctx, project Project) (eventID string, error)`:\n   - Create/update a Google Calendar event with project title, date range, description, and assigned crew as attendees.\n   - Use calendar ID from config (env var `GOOGLE_CALENDAR_ID`).\n   - Store returned event ID on the project record for future updates.\n4. Implement `SyncCrewAssignment(ctx, assignment CrewAssignment, crewEmail string) error`:\n   - Create a calendar event for the crew member's assignment period.\n   - Include project details in event description.\n5. Implement `DeleteEvent(ctx, eventID string) error` for cleanup on project/assignment deletion.\n6. Add an interface `CalendarSyncer` in `internal/gcal/interface.go` to allow mocking in tests.\n7. Integrate into OpportunityService's `ConvertOpportunity` (create calendar event for new project) and CrewService's `AssignCrew` (create event for assignment).\n8. Handle API errors gracefully: log and continue if Calendar API is unavailable (non-blocking sync).",
+          "status": "pending",
+          "test_strategy": "Unit tests with mock CalendarSyncer: verify ConvertOpportunity calls SyncProjectEvent with correct project data, verify AssignCrew calls SyncCrewAssignment with correct crew email and dates. Test error handling: mock Calendar API failure, verify assignment still succeeds and error is logged. Integration test (optional, requires test calendar): create event, verify it appears, update it, delete it.",
+          "subagentType": "implementer",
+          "parallelizable": false
+        },
+        {
+          "id": 3010,
+          "title": "Implement Delivery management service",
+          "description": "Build the DeliveryService gRPC implementation with delivery scheduling, status updates, route optimization, and listing.",
+          "dependencies": [
+            3003,
+            3005
+          ],
+          "details": "1. Create `internal/service/delivery_svc.go` implementing `DeliveryServiceServer`.\n2. Implement `ScheduleDelivery` RPC:\n   - Accept project_id, type (DELIVERY/PICKUP), address, scheduled_at.\n   - Validate project exists via projectRepo.\n   - Create delivery record via deliveryRepo.Create().\n   - Return created Delivery with ID.\n3. Implement `UpdateDeliveryStatus` RPC:\n   - Accept delivery_id and new status.\n   - Validate status transition: SCHEDULED→IN_TRANSIT→DELIVERED, or SCHEDULED→CANCELLED.\n   - Update via deliveryRepo.UpdateStatus().\n4. Implement `OptimizeRoute` RPC:\n   - Accept list of delivery_ids.\n   - Fetch all deliveries with addresses.\n   - Implement a simple nearest-neighbor heuristic for route ordering (v1 — no external API dependency).\n   - Save DeliveryRoute with optimized_order and estimated_duration.\n   - Return DeliveryRoute.\n5. Implement `ListDeliveries` with org_id filtering, optional project_id filter, and pagination.\n6. Register service in gRPC server.",
+          "status": "pending",
+          "test_strategy": "Integration tests: 1) ScheduleDelivery for existing project → verify delivery created with SCHEDULED status. 2) UpdateDeliveryStatus SCHEDULED→IN_TRANSIT→DELIVERED → verify each transition. 3) Attempt invalid transition DELIVERED→SCHEDULED → verify error. 4) OptimizeRoute with 3 deliveries → verify route returned with all delivery_ids, optimized_order has length 3. 5) ListDeliveries filtered by project_id returns only related deliveries.",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 3011,
+          "title": "Implement inter-service auth, GDPR endpoint, and gRPC server bootstrap",
+          "description": "Build the API key authentication interceptor, GDPR customer deletion endpoint, and the main gRPC + grpc-gateway server wiring.",
+          "dependencies": [
+            3006,
+            3007,
+            3008,
+            3010
+          ],
+          "details": "1. Create `internal/auth/apikey.go`:\n   - gRPC unary and stream interceptors that extract `Authorization: Bearer <key>` from metadata.\n   - Validate key against `sigma1-service-api-keys` secret loaded from env var `SERVICE_API_KEYS` (comma-separated valid keys).\n   - Return `codes.Unauthenticated` for missing/invalid keys.\n   - Exempt health check endpoints from auth.\n2. Create `internal/gdpr/handler.go`:\n   - Implement GDPR deletion: given customer_id, delete across all tables in a single transaction.\n   - Order: crew_assignments (by project's customer_id) → inventory_transactions (by project) → project_line_items → deliveries → delivery_routes → projects → opportunities.\n   - Return structured confirmation: `{deleted: {opportunities: N, projects: N, crew_assignments: N, ...}}`.\n   - Register as REST endpoint `DELETE /api/v1/gdpr/customer/{id}` via grpc-gateway or custom HTTP handler on the gateway mux.\n3. Create `cmd/server/main.go`:\n   - Initialize pgx pool from `DATABASE_URL` env.\n   - Run migrations.\n   - Create all repo instances.\n   - Create all service instances, inject repos and CalendarSyncer.\n   - Start gRPC server on port 50051 with auth interceptor.\n   - Start grpc-gateway HTTP server on port 8081, registering all services.\n   - Mount GDPR handler, health endpoints, and metrics endpoint on the HTTP mux.\n   - Graceful shutdown on SIGTERM.",
+          "status": "pending",
+          "test_strategy": "1) Auth interceptor test: send gRPC request without auth header → verify Unauthenticated error. Send with invalid key → same. Send with valid key → verify request passes through. 2) GDPR integration test: create opportunity, convert to project, assign crew, create delivery. Call GDPR delete for customer_id. Verify all records deleted and confirmation counts are correct. 3) Server bootstrap test: start server, verify both ports accept connections, verify gRPC reflection lists all 5 services.",
+          "subagentType": "implementer",
+          "parallelizable": false
+        },
+        {
+          "id": 3012,
+          "title": "Implement health checks, Prometheus metrics, and structured logging",
+          "description": "Add gRPC health checking protocol, REST health endpoints, Prometheus metrics via grpc-prometheus, and structured logging with slog throughout the service.",
+          "dependencies": [
+            3011
+          ],
+          "details": "1. Health checks in `internal/health/health.go`:\n   - Implement `grpc.health.v1.Health` service: `Check` and `Watch` RPCs.\n   - Liveness: always SERVING if process is running.\n   - Readiness: check pgx pool connectivity (`pool.Ping(ctx)`), return NOT_SERVING if DB unreachable.\n   - Register on gRPC server.\n2. REST health endpoints on grpc-gateway mux:\n   - `GET /health/live` → 200 if process running.\n   - `GET /health/ready` → 200 if DB connected, 503 otherwise.\n3. Prometheus metrics:\n   - Add `grpc-prometheus` server interceptors (unary + stream) to gRPC server.\n   - Initialize `grpc_prometheus.EnableHandlingTimeHistogram()`.\n   - Mount `/metrics` endpoint on HTTP mux using `promhttp.Handler()`.\n   - Add custom business metrics: `rms_opportunities_converted_total`, `rms_conflict_detections_total`, `rms_gdpr_deletions_total` as Prometheus counters.\n4. Structured logging:\n   - Configure `slog.NewJSONHandler` as default logger in `cmd/server/main.go`.\n   - Add `slog` logging to all service methods: log request start (with org_id, method), log errors, log completion with duration.\n   - Add gRPC logging interceptor using `slog` for request/response metadata.\n   - Include request_id in log context (extract from gRPC metadata or generate UUID).",
+          "status": "pending",
+          "test_strategy": "1) Health: start server, call gRPC Health.Check → SERVING. Call /health/live → 200. Call /health/ready with DB up → 200. Stop DB container, call /health/ready → 503. 2) Metrics: send 5 gRPC requests, scrape /metrics, verify grpc_server_handled_total counter = 5. Convert an opportunity, verify rms_opportunities_converted_total = 1. 3) Logging: capture log output during a request, verify JSON format with org_id, method, duration fields.",
+          "subagentType": "implementer",
+          "parallelizable": false
+        },
+        {
+          "id": 3013,
+          "title": "Create Dockerfile and Kubernetes deployment manifests",
+          "description": "Build the multi-stage Dockerfile and Kubernetes manifests for deploying the RMS service in the sigma1 namespace with proper configuration, secrets, and probes.",
+          "dependencies": [
+            3012
+          ],
+          "details": "1. Create `Dockerfile`:\n   - Stage 1 (builder): `FROM golang:1.22 AS builder`, WORKDIR /app, COPY go.mod go.sum, RUN go mod download, COPY . ., RUN CGO_ENABLED=0 GOOS=linux go build -o /rms ./cmd/server/\n   - Stage 2 (runtime): `FROM gcr.io/distroless/static-debian12`, COPY --from=builder /rms /rms, COPY db/migrations /migrations, EXPOSE 50051 8081, ENTRYPOINT [\"/rms\"]\n2. Create `k8s/deployment.yaml`:\n   - Namespace: sigma1, name: rms\n   - Replicas: 2\n   - Container ports: 50051 (grpc), 8081 (http)\n   - `envFrom`: [{configMapRef: {name: sigma1-infra-endpoints}}]\n   - `env` from secrets: DB credentials from sigma1-db-credentials, GOOGLE_CALENDAR_SA_KEY from sigma1-gcal-secret, SERVICE_API_KEYS from sigma1-service-api-keys.\n   - Liveness probe: httpGet /health/live port 8081, initialDelaySeconds 5, periodSeconds 10.\n   - Readiness probe: httpGet /health/ready port 8081, initialDelaySeconds 10, periodSeconds 5.\n   - Resources: requests 128Mi/100m, limits 512Mi/500m.\n3. Create `k8s/service.yaml`:\n   - ClusterIP service exposing ports 50051 (grpc) and 8081 (http).\n4. Create `k8s/kustomization.yaml` tying resources together.",
+          "status": "pending",
+          "test_strategy": "1) Docker build succeeds: `docker build -t rms:test .` completes without errors. 2) Docker image runs: `docker run rms:test` starts and listens (will fail on DB but should not crash). 3) Image size < 50MB (distroless base). 4) Kubernetes manifests validate: `kubectl apply --dry-run=client -f k8s/` succeeds. 5) Verify probes are configured: parse YAML and confirm liveness/readiness paths and ports.",
+          "subagentType": "implementer",
+          "parallelizable": false
+        },
+        {
+          "id": 3014,
+          "title": "Generate and validate OpenAPI spec from grpc-gateway annotations",
+          "description": "Generate the OpenAPI v2 specification from protobuf grpc-gateway annotations and validate it for correctness and completeness.",
+          "dependencies": [
+            3002,
+            3003
+          ],
+          "details": "1. Ensure `protoc-gen-openapiv2` is configured in `buf.gen.yaml` with output to `api/openapi/`.\n2. Run `buf generate` to produce the OpenAPI spec files.\n3. Merge per-proto OpenAPI files into a single `api/openapi/rms.swagger.json` using `swagger-cli bundle` or a custom merge script.\n4. Add metadata to the spec: title 'Sigma1 RMS API', version 'v1', description, contact info.\n5. Add security definition for Bearer API key auth: `securityDefinitions: {ApiKeyAuth: {type: apiKey, in: header, name: Authorization}}`.\n6. Verify all endpoints are present: count should match all REST paths defined across 5 services plus GDPR endpoint.\n7. Add Makefile target `openapi-gen` and `openapi-validate`.",
+          "status": "pending",
+          "test_strategy": "1) Run `swagger-cli validate api/openapi/rms.swagger.json` → exits 0 with no errors. 2) Parse spec and verify all expected paths exist: /api/v1/opportunities (GET, POST), /api/v1/opportunities/{id} (GET, PUT), /api/v1/opportunities/{id}/approve (POST), /api/v1/opportunities/{id}/convert (POST), etc. — total ~20+ endpoints. 3) Verify request/response schemas reference correct protobuf-generated types.",
+          "subagentType": "implementer",
+          "parallelizable": true
+        }
       ]
     }
   },
   {
-    "scaffold_plan": {
-      "components": [
+    "scaffold_analysis": {
+      "task_id": 4,
+      "title": "Implement Finance Service (Rex - Rust/Axum)",
+      "scaffold_dependencies": [
         {
-          "name": "DesignSnapshotPRList",
-          "type": "React Component",
-          "path": "components/DesignSnapshotPRList.tsx",
-          "description": "Displays a list/table of design snapshot PRs with status, repo, branch, date, and GitHub link. Handles loading, empty, and error states. Consumes useDesignSnapshotPRs hook."
+          "scaffold_file": "k8s/secrets/sigma1-stripe-credentials.yaml",
+          "purpose": "Provides Stripe API keys as Kubernetes Secret, required for Stripe integration in the finance service. The service will mount this secret as environment variables (e.g., STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET) for secure access to Stripe APIs and webhook verification."
         },
         {
-          "name": "DesignSnapshotPRDetail",
-          "type": "React Component",
-          "path": "components/DesignSnapshotPRDetail.tsx",
-          "description": "Displays full metadata for a selected PR and lists all scaffold files. Handles loading, empty, and error states. Consumes useDesignSnapshotPRDetail hook."
-        }
-      ],
-      "hooks": [
-        {
-          "name": "useDesignSnapshotPRs",
-          "type": "Custom React Hook",
-          "path": "hooks/useDesignSnapshotPRs.ts",
-          "description": "Fetches PR list data from GET /api/pipeline/design-prs scoped by pipelineRunId. Returns { data, isLoading, error, retry }."
+          "scaffold_file": "k8s/secrets/sigma1-db-credentials.yaml",
+          "purpose": "Provides PostgreSQL connection credentials as Kubernetes Secret. The finance service will use these credentials to connect to the database for all finance-related data (invoices, payments, payroll, etc.)."
         },
         {
-          "name": "useDesignSnapshotPRDetail",
-          "type": "Custom React Hook",
-          "path": "hooks/useDesignSnapshotPRDetail.ts",
-          "description": "Fetches scaffold file listing for a single PR by its ID. Returns { data, isLoading, error, retry }."
-        }
-      ],
-      "pages": [
-        {
-          "name": "Design PRs Dashboard Page",
-          "type": "Next.js Page",
-          "path": "app/dashboard/design-prs/page.tsx",
-          "description": "New dashboard route for design snapshot PRs. Accepts pipelineRunId as query param. Hosts the list and detail components."
-        }
-      ],
-      "navigation": [
-        {
-          "name": "Sidebar/Tab Entry",
-          "type": "Navigation Link",
-          "path": "components/layout/Sidebar.tsx (or equivalent)",
-          "description": "Adds a 'Design PRs' link/tab to the dashboard navigation, matching existing style and auth guards."
-        }
-      ],
-      "types": [
-        {
-          "name": "DesignSnapshotPR",
-          "type": "TypeScript Interface",
-          "path": "types/designSnapshotPR.ts (or inline in hooks)",
-          "description": "Defines PR metadata: id, title, status, repoName, branchName, createdAt, githubUrl, scaffoldFiles?"
+          "scaffold_file": "k8s/secrets/sigma1-service-api-keys.yaml",
+          "purpose": "Provides inter-service API keys for authenticating requests between services (e.g., Morgan for reminders, Catalog for project/org lookups). The finance service will use these for API key auth middleware."
         },
         {
-          "name": "ScaffoldFile",
-          "type": "TypeScript Interface",
-          "path": "types/scaffoldFile.ts (or inline in hooks)",
-          "description": "Defines scaffold file: filename, path, status"
-        }
-      ],
-      "accessibility": [
-        {
-          "name": "Accessibility Enhancements",
-          "type": "ARIA/Semantic HTML",
-          "path": "components/DesignSnapshotPRList.tsx, components/DesignSnapshotPRDetail.tsx",
-          "description": "Add aria-labels, semantic HTML, keyboard navigation, and focus management. Ensure axe-core compliance."
-        }
-      ],
-      "test_stubs": [
-        {
-          "name": "Component Render Tests",
-          "type": "Jest/React Testing Library",
-          "path": "components/__tests__/DesignSnapshotPRList.test.tsx",
-          "description": "Test loading, empty, error, and populated states. Assert on DOM elements, links, and accessibility."
+          "scaffold_file": "k8s/secrets/sigma1-external-apis.yaml",
+          "purpose": "Provides API keys for external services (e.g., currency rate providers if using Open Exchange Rates). The finance service may use this for background currency sync if a paid provider is chosen."
         },
         {
-          "name": "Hook Unit Tests",
-          "type": "Jest",
-          "path": "hooks/__tests__/useDesignSnapshotPRs.test.ts",
-          "description": "Test hook loading, success, error, and retry logic with fetch mocks."
+          "scaffold_file": "k8s/secrets/sigma1-r2-credentials.yaml",
+          "purpose": "Not directly required for finance, but may be used if the service needs to store invoice PDFs or attachments in Cloudflare R2. Can be omitted unless file storage is implemented."
         },
         {
-          "name": "Accessibility Tests",
-          "type": "jest-axe",
-          "path": "components/__tests__/DesignSnapshotPRList.a11y.test.tsx",
-          "description": "Run axe-core on all component states to ensure zero violations."
+          "scaffold_file": "k8s/configmaps/sigma1-infra-endpoints.yaml",
+          "purpose": "Aggregates non-secret connection strings and endpoints (e.g., Valkey/Redis URL, service URLs). The finance service will use this for Valkey connection (currency cache), and possibly for service discovery."
+        },
+        {
+          "scaffold_file": "k8s/db/sigma1-postgres-cluster.yaml",
+          "purpose": "Defines the CloudNative-PG PostgreSQL cluster used by the finance service. The service's DB credentials and connection string must match this cluster."
+        },
+        {
+          "scaffold_file": "k8s/db/sigma1-valkey.yaml",
+          "purpose": "Defines the Valkey (Redis-compatible) instance for caching (e.g., currency rates). The finance service will connect to this for caching currency rates and possibly other ephemeral data."
+        },
+        {
+          "scaffold_file": "k8s/db/sigma1-postgres-pooler.yaml",
+          "purpose": "Defines PgBouncer pooler for PostgreSQL connections. The finance service should use the pooler endpoint for efficient DB connections."
+        },
+        {
+          "scaffold_file": "k8s/namespaces/sigma1-namespace.yaml",
+          "purpose": "Namespace for the finance service deployment and related resources."
+        },
+        {
+          "scaffold_file": "k8s/finance/deployment.yaml",
+          "purpose": "Deployment manifest for the finance service, specifying replicas, container image, environment variables, probes, and resource limits."
+        },
+        {
+          "scaffold_file": "k8s/finance/service.yaml",
+          "purpose": "ClusterIP Service manifest exposing the finance service on the cluster network."
+        },
+        {
+          "scaffold_file": "k8s/finance/hpa.yaml",
+          "purpose": "Optional HorizontalPodAutoscaler for the finance service, enabling auto-scaling based on CPU usage."
+        },
+        {
+          "scaffold_file": "k8s/monitoring/sigma1-servicemonitor.yaml",
+          "purpose": "Prometheus ServiceMonitor for scraping finance service metrics (if metrics endpoint is exposed)."
+        },
+        {
+          "scaffold_file": "k8s/network/sigma1-db-networkpolicy.yaml",
+          "purpose": "NetworkPolicy allowing the finance service to connect to the database and Valkey in the sigma1-db namespace."
         }
+      ],
+      "scaffold_requirements_for_task": [
+        "The finance service requires Kubernetes Secrets for database, Stripe, and API key credentials. These must be created and referenced in the Deployment manifest.",
+        "ConfigMap for non-secret endpoints (Valkey, service URLs) must be present and referenced via envFrom in the Deployment.",
+        "PostgreSQL and Valkey must be provisioned and accessible; the finance service will use these for persistent and cache storage.",
+        "PgBouncer pooler endpoint should be used for DB connections for efficiency.",
+        "Namespace and network policies must allow the finance service to communicate with its dependencies.",
+        "Monitoring and autoscaling manifests are recommended for production readiness."
+      ],
+      "scaffold_gaps_or_missing_files": [
+        {
+          "missing_file": "k8s/finance/ingress.yaml",
+          "impact": "No Ingress or external access is defined for the finance service. If the service needs to be accessible outside the cluster (e.g., for Stripe webhooks), an Ingress or Cloudflare Tunnel manifest is required."
+        },
+        {
+          "missing_file": "k8s/finance/servicemonitor.yaml",
+          "impact": "A dedicated ServiceMonitor for the finance service is not listed (only a generic one). If fine-grained monitoring is needed, a specific ServiceMonitor should be added."
+        }
+      ],
+      "scaffold_to_subtask_mapping": [
+        {
+          "subtask_id": 4001,
+          "scaffold_files": [
+            "k8s/namespaces/sigma1-namespace.yaml",
+            "k8s/finance/deployment.yaml",
+            "k8s/finance/service.yaml",
+            "k8s/finance/hpa.yaml",
+            "k8s/secrets/sigma1-db-credentials.yaml",
+            "k8s/secrets/sigma1-service-api-keys.yaml",
+            "k8s/configmaps/sigma1-infra-endpoints.yaml"
+          ]
+        },
+        {
+          "subtask_id": 4002,
+          "scaffold_files": [
+            "k8s/db/sigma1-postgres-cluster.yaml",
+            "k8s/db/sigma1-postgres-pooler.yaml",
+            "k8s/secrets/sigma1-db-credentials.yaml"
+          ]
+        },
+        {
+          "subtask_id": 4003,
+          "scaffold_files": [
+            "k8s/db/sigma1-postgres-cluster.yaml"
+          ]
+        },
+        {
+          "subtask_id": 4004,
+          "scaffold_files": [
+            "k8s/db/sigma1-postgres-cluster.yaml"
+          ]
+        },
+        {
+          "subtask_id": 4005,
+          "scaffold_files": [
+            "k8s/db/sigma1-postgres-cluster.yaml"
+          ]
+        },
+        {
+          "subtask_id": 4006,
+          "scaffold_files": [
+            "k8s/db/sigma1-postgres-cluster.yaml"
+          ]
+        },
+        {
+          "subtask_id": 4007,
+          "scaffold_files": [
+            "k8s/secrets/sigma1-stripe-credentials.yaml"
+          ]
+        },
+        {
+          "subtask_id": 4008,
+          "scaffold_files": [
+            "k8s/db/sigma1-postgres-cluster.yaml"
+          ]
+        },
+        {
+          "subtask_id": 4009,
+          "scaffold_files": [
+            "k8s/db/sigma1-postgres-cluster.yaml",
+            "k8s/db/sigma1-valkey.yaml",
+            "k8s/configmaps/sigma1-infra-endpoints.yaml"
+          ]
+        },
+        {
+          "subtask_id": 4010,
+          "scaffold_files": [
+            "k8s/db/sigma1-valkey.yaml",
+            "k8s/configmaps/sigma1-infra-endpoints.yaml",
+            "k8s/secrets/sigma1-external-apis.yaml"
+          ]
+        },
+        {
+          "subtask_id": 4011,
+          "scaffold_files": [
+            "k8s/db/sigma1-postgres-cluster.yaml"
+          ]
+        },
+        {
+          "subtask_id": 4012,
+          "scaffold_files": [
+            "k8s/db/sigma1-postgres-cluster.yaml"
+          ]
+        },
+        {
+          "subtask_id": 4013,
+          "scaffold_files": []
+        },
+        {
+          "subtask_id": 4014,
+          "scaffold_files": [
+            "k8s/finance/deployment.yaml",
+            "k8s/finance/service.yaml",
+            "k8s/finance/hpa.yaml",
+            "k8s/namespaces/sigma1-namespace.yaml",
+            "k8s/secrets/sigma1-db-credentials.yaml",
+            "k8s/secrets/sigma1-stripe-credentials.yaml",
+            "k8s/secrets/sigma1-service-api-keys.yaml",
+            "k8s/configmaps/sigma1-infra-endpoints.yaml"
+          ]
+        }
+      ],
+      "scaffold_notes": [
+        "All secret and configmap references in the finance Deployment must match the names in the provided manifests.",
+        "If Stripe integration is not enabled, the finance service should still function (Stripe secret can be omitted in that case).",
+        "Valkey is required for currency rate caching; ensure the finance service has network access to the Valkey service.",
+        "If external webhook access is needed (e.g., Stripe webhooks), ensure an Ingress or Cloudflare Tunnel is configured for the finance service."
       ]
-    },
-    "api_contract": {
-      "list_endpoint": "GET /api/pipeline/design-prs?pipelineRunId={id}",
-      "list_response_shape": [
+    }
+  },
+  {
+    "scaffold_analysis": {
+      "task_id": 5,
+      "title": "Build Customer Vetting Service (Rex - Rust/Axum)",
+      "scaffold_dependencies": [
         {
-          "id": "string",
-          "title": "string",
-          "status": "open | merged | closed",
-          "repoName": "string",
-          "branchName": "string",
-          "createdAt": "ISO string",
-          "githubUrl": "string"
+          "type": "k8s_namespace",
+          "path": "k8s/namespaces/sigma1-namespace.yaml",
+          "purpose": "Defines the Kubernetes namespace for the vetting service deployment and related resources."
+        },
+        {
+          "type": "k8s_secret",
+          "path": "k8s/secrets/sigma1-external-apis.yaml",
+          "purpose": "Provides API keys for OpenCorporates, Google Places, and other external APIs required by the vetting pipeline."
+        },
+        {
+          "type": "k8s_configmap",
+          "path": "k8s/configmaps/sigma1-infra-endpoints.yaml",
+          "purpose": "Supplies non-secret configuration such as database endpoints, used for envFrom in the deployment."
+        },
+        {
+          "type": "k8s_db_cluster",
+          "path": "k8s/db/sigma1-postgres-cluster.yaml",
+          "purpose": "Defines the CloudNative-PG cluster for persistent storage of vetting results and requests."
+        },
+        {
+          "type": "k8s_db_pooler",
+          "path": "k8s/db/sigma1-postgres-pooler.yaml",
+          "purpose": "Provides PgBouncer connection pooling for efficient database access from the vetting service."
+        },
+        {
+          "type": "k8s_secret",
+          "path": "k8s/secrets/sigma1-db-credentials.yaml",
+          "purpose": "Supplies database connection credentials for the vetting service."
+        },
+        {
+          "type": "k8s_deployment",
+          "path": "k8s/vetting/deployment.yaml",
+          "purpose": "Defines the deployment of the vetting service, including replicas, probes, and environment variable wiring."
+        },
+        {
+          "type": "k8s_service",
+          "path": "k8s/vetting/service.yaml",
+          "purpose": "Exposes the vetting service within the cluster on port 8083."
         }
       ],
-      "detail_endpoint": "GET /api/pipeline/design-prs/{prId}",
-      "detail_response_shape": {
-        "id": "string",
-        "title": "string",
-        "status": "open | merged | closed",
-        "repoName": "string",
-        "branchName": "string",
-        "createdAt": "ISO string",
-        "githubUrl": "string",
-        "scaffoldFiles": [
+      "scaffold_requirements": [
+        "Kubernetes namespace and RBAC for service isolation.",
+        "PostgreSQL cluster and pooler for persistent storage.",
+        "Secrets for external API keys and database credentials.",
+        "ConfigMap for non-secret configuration.",
+        "Deployment manifest with correct envFrom and secret references.",
+        "Service manifest for cluster networking.",
+        "Readiness and liveness probes for health monitoring."
+      ],
+      "scaffold_gaps": [
+        {
+          "gap": "No explicit RBAC (Role/RoleBinding) manifests for the vetting service.",
+          "impact": "May need to add RBAC if the service requires access to Kubernetes API or other resources."
+        },
+        {
+          "gap": "No explicit PersistentVolumeClaim for logs or local storage.",
+          "impact": "If the vetting service needs to store files locally, a PVC may be required."
+        },
+        {
+          "gap": "No Ingress or external exposure defined.",
+          "impact": "If the vetting API needs to be accessed externally, an Ingress or Cloudflare Tunnel may be needed."
+        }
+      ],
+      "scaffold_alignment": {
+        "namespace": "sigma1",
+        "db_namespace": "sigma1-db",
+        "deployment_envFrom": [
+          "configMapRef: sigma1-infra-endpoints",
+          "secretRef: sigma1-external-apis"
+        ],
+        "db_connection": "Uses PgBouncer pooler and credentials from sigma1-db-credentials secret.",
+        "api_keys": "Sourced from sigma1-external-apis secret, mapped to OPENCORPORATES_API_KEY, GOOGLE_PLACES_API_KEY env vars.",
+        "probes": "Readiness and liveness probes on /health as required."
+      },
+      "scaffold_actions": [
+        {
+          "action": "create",
+          "path": "k8s/vetting/deployment.yaml",
+          "description": "Deployment manifest for the vetting service with envFrom, secret refs, probes, and resource limits."
+        },
+        {
+          "action": "create",
+          "path": "k8s/vetting/service.yaml",
+          "description": "ClusterIP service exposing the vetting API on port 8083."
+        },
+        {
+          "action": "update",
+          "path": "k8s/configmaps/sigma1-infra-endpoints.yaml",
+          "description": "Add vetting service endpoint and any required non-secret config."
+        },
+        {
+          "action": "update",
+          "path": "k8s/secrets/sigma1-external-apis.yaml",
+          "description": "Ensure OpenCorporates and Google Places API keys are present."
+        },
+        {
+          "action": "update",
+          "path": "k8s/secrets/sigma1-db-credentials.yaml",
+          "description": "Ensure vetting service has a DB user/role and connection string."
+        }
+      ],
+      "scaffold_test_plan": [
+        "kubectl get deployment vetting -n sigma1",
+        "kubectl get service vetting -n sigma1",
+        "kubectl get secret sigma1-external-apis -n sigma1",
+        "kubectl get configmap sigma1-infra-endpoints -n sigma1",
+        "kubectl logs deployment/vetting -n sigma1",
+        "kubectl port-forward service/vetting 8083:8083 -n sigma1; curl http://localhost:8083/health"
+      ]
+    }
+  },
+  {
+    "scaffold_analysis": {
+      "kubernetes": {
+        "namespaces": [
           {
-            "filename": "string",
-            "path": "string",
-            "status": "string"
+            "file": "k8s/namespaces/sigma1-namespace.yaml",
+            "purpose": "Namespace for the main social engine and related services"
+          },
+          {
+            "file": "k8s/namespaces/sigma1-db-namespace.yaml",
+            "purpose": "Namespace for database resources (Postgres, Valkey)"
+          }
+        ],
+        "db": [
+          {
+            "file": "k8s/db/sigma1-postgres-cluster.yaml",
+            "purpose": "CloudNative-PG Cluster for social engine data"
+          },
+          {
+            "file": "k8s/db/sigma1-postgres-init-sql-job.yaml",
+            "purpose": "Init SQL for per-service roles/schemas"
+          },
+          {
+            "file": "k8s/db/sigma1-postgres-pooler.yaml",
+            "purpose": "PgBouncer pooler for connection management"
+          },
+          {
+            "file": "k8s/db/sigma1-valkey.yaml",
+            "purpose": "Valkey (Redis-compatible) for caching/queueing"
+          }
+        ],
+        "secrets": [
+          {
+            "file": "k8s/secrets/sigma1-db-credentials.yaml",
+            "purpose": "Postgres connection strings per service"
+          },
+          {
+            "file": "k8s/secrets/sigma1-r2-credentials.yaml",
+            "purpose": "Cloudflare R2 S3 credentials"
+          },
+          {
+            "file": "k8s/secrets/sigma1-stripe-credentials.yaml",
+            "purpose": "Stripe API keys (not directly used by social engine, but present)"
+          },
+          {
+            "file": "k8s/secrets/sigma1-external-apis.yaml",
+            "purpose": "External API keys (OpenAI, OpenCorporates, etc)"
+          },
+          {
+            "file": "k8s/secrets/sigma1-service-api-keys.yaml",
+            "purpose": "Inter-service API keys"
+          }
+        ],
+        "configmaps": [
+          {
+            "file": "k8s/configmaps/sigma1-infra-endpoints.yaml",
+            "purpose": "Non-secret endpoints (NATS URL, R2 public URL, etc)"
+          }
+        ],
+        "cloudflare": [
+          {
+            "file": "k8s/cloudflare/sigma1-cloudflare-tunnel.yaml",
+            "purpose": "Cloudflare Tunnel for secure external access"
+          }
+        ],
+        "sidecars": [
+          {
+            "file": "k8s/sidecars/signal-cli-sidecar-template.yaml",
+            "purpose": "Reusable Signal-CLI sidecar (not directly used by social engine, but available)"
+          }
+        ],
+        "monitoring": [
+          {
+            "file": "k8s/monitoring/sigma1-servicemonitor.yaml",
+            "purpose": "Prometheus ServiceMonitor for main app"
+          },
+          {
+            "file": "k8s/monitoring/sigma1-db-servicemonitor.yaml",
+            "purpose": "Prometheus ServiceMonitor for DB/Valkey"
+          }
+        ],
+        "network": [
+          {
+            "file": "k8s/network/sigma1-db-networkpolicy.yaml",
+            "purpose": "NetworkPolicy for DB access from app"
           }
         ]
       }
     },
-    "decision_points": [
-      "Route vs Tab: Default to new route /dashboard/design-prs unless app's dashboard is strictly tab-based.",
-      "API contract: Assume above response shape; if actual API differs, update interfaces and data mapping accordingly.",
-      "Detail view: Use drill-down route /dashboard/design-prs/[prId] if app supports dynamic routes, else expandable panel in list.",
-      "Data fetching: Use existing project pattern (SWR, React Query, or fetch/useEffect) — do not introduce new libraries.",
-      "UI: Use only existing design system components for cards, tables, badges, loading, and icons."
-    ],
-    "test_strategy": [
-      "Component renders with valid PR data (mock 2+ PRs).",
-      "Empty state renders when API returns empty array.",
-      "Error state renders with retry button on fetch failure.",
-      "Each PR card shows title, status badge, repo, branch, date, and GitHub link.",
-      "Detail view lists at least one scaffold file with filename and path.",
-      "Accessibility: axe-core scan returns zero violations.",
-      "Navigation entry is present and routes correctly.",
-      "Tab/keyboard navigation covers all interactive elements."
-    ]
-  },
-  {
-    "scaffold_plan": {
-      "files": [
-        {
-          "path": "src/notifications/dispatcher.ts",
-          "description": "Notification dispatcher module with uniform interface, dependency-injectable HTTP client, and graceful degradation. Orchestrates Discord and Linear bridge notifications with retry and logging."
-        },
-        {
-          "path": "src/notifications/discord-notifier.ts",
-          "description": "Discord bridge notification sender. Formats payload, sets Authorization header, POSTs to Discord bridge URL, throws on error, logs on success."
-        },
-        {
-          "path": "src/notifications/linear-notifier.ts",
-          "description": "Linear bridge notification sender. Formats payload (including session ID and delegate assignments), sets Authorization header, POSTs to Linear bridge URL, throws on error, logs on success."
-        },
-        {
-          "path": "src/notifications/retry.ts",
-          "description": "Generic retry utility with exponential backoff, structured logging, and injectable sleep function. Used by dispatcher to wrap bridge notification calls."
-        }
+    "task_analysis": {
+      "id": 6,
+      "title": "Develop Social Media Engine (Nova - Node.js/Elysia+Effect)",
+      "stack": "Node.js 20+/Elysia 1.x + Effect 3.x",
+      "description": "Automated content curation, AI captioning, multi-platform publishing, Signal-based approval, NATS async pipeline.",
+      "status": "pending",
+      "priority": "medium",
+      "dependencies": [
+        1
       ],
-      "integration_points": [
-        {
-          "file": "src/pipeline/orchestrator.ts",
-          "description": "Pipeline orchestrator entry point. Instantiates notification dispatcher with config from environment/ConfigMap. Calls notify('pipeline_start', ...) at start and notify('pipeline_complete', ...) at end (in finally block), with structured logging at each hook."
-        }
+      "key_components": [
+        "Bun/Elysia/Effect/TypeScript project structure",
+        "Postgres (CloudNative-PG) with social schema",
+        "Cloudflare R2 (S3-compatible) for photo storage",
+        "OpenAI/Claude for AI curation and captioning",
+        "Sharp for image processing",
+        "NATS for async publish pipeline",
+        "Effect Service pattern for platform APIs",
+        "Prometheus metrics, health endpoints, OpenAPI docs",
+        "Kubernetes deployment in sigma1 namespace"
       ],
-      "env_config": [
-        "DISCORD_BRIDGE_URL",
-        "LINEAR_BRIDGE_URL",
-        "SERVICE_API_KEY"
+      "decision_points": [
+        "AI model selection (OpenAI Vision vs Claude)",
+        "Postgres client library choice (@effect/sql-pg vs postgresjs)",
+        "Instagram/TikTok API access (app review, sandboxing)",
+        "GDPR deletion guarantees"
       ],
-      "test_stubs": [
-        {
-          "type": "unit",
-          "targets": [
-            "dispatcher: calls both notifiers, handles failures gracefully, logs warnings",
-            "discord-notifier: correct POST, headers, payload, error on 4xx/5xx",
-            "linear-notifier: correct POST, headers, payload, error on 4xx/5xx",
-            "retry: retries with exponential backoff, logs attempts, throws after max"
-          ]
-        },
-        {
-          "type": "integration",
-          "targets": [
-            "pipeline orchestrator: notifications fire at start/end, pipeline continues on notification failure, logs present"
-          ]
-        }
+      "test_strategy": [
+        "Unit tests for AI scoring/selection",
+        "Schema validation for endpoints",
+        "Integration tests for upload, R2, NATS, platform publish",
+        "Retry/dead-letter handling",
+        "GDPR deletion end-to-end",
+        "80%+ code coverage"
       ]
+    },
+    "subtasks": [
+      {
+        "id": 6001,
+        "title": "Initialize Bun/Elysia/Effect project scaffold and database migrations for social schema",
+        "dependencies": [],
+        "parallelizable": false,
+        "k8s_requirements": [
+          "Postgres cluster (CloudNative-PG) in sigma1-db namespace",
+          "DB credentials secret (sigma1-db-credentials)",
+          "ConfigMap for DB endpoint"
+        ]
+      },
+      {
+        "id": 6002,
+        "title": "Implement Cloudflare R2 integration service with S3-compatible client",
+        "dependencies": [
+          6001
+        ],
+        "parallelizable": false,
+        "k8s_requirements": [
+          "R2 credentials secret (sigma1-r2-credentials)",
+          "ConfigMap for R2 public URL"
+        ]
+      },
+      {
+        "id": 6003,
+        "title": "Implement photo upload endpoint with multipart handling and R2 storage",
+        "dependencies": [
+          6001,
+          6002
+        ],
+        "parallelizable": false,
+        "k8s_requirements": [
+          "R2 and DB credentials",
+          "ConfigMap for endpoints"
+        ]
+      },
+      {
+        "id": 6004,
+        "title": "Implement draft management REST endpoints with Effect Schema validation",
+        "dependencies": [
+          6001
+        ],
+        "parallelizable": true,
+        "k8s_requirements": [
+          "DB credentials/config"
+        ]
+      },
+      {
+        "id": 6005,
+        "title": "Implement AI photo scoring pipeline with OpenAI Vision API",
+        "dependencies": [
+          6001,
+          6002
+        ],
+        "parallelizable": true,
+        "k8s_requirements": [
+          "OpenAI API key secret (sigma1-external-apis)"
+        ]
+      },
+      {
+        "id": 6006,
+        "title": "Implement platform-specific image cropping pipeline with sharp",
+        "dependencies": [
+          6002,
+          6005
+        ],
+        "parallelizable": true,
+        "k8s_requirements": [
+          "R2 credentials/config"
+        ]
+      },
+      {
+        "id": 6007,
+        "title": "Implement AI caption generation and draft creation pipeline",
+        "dependencies": [
+          6003,
+          6005,
+          6006
+        ],
+        "parallelizable": false,
+        "k8s_requirements": [
+          "OpenAI/Claude API key secret"
+        ]
+      },
+      {
+        "id": 6008,
+        "title": "Implement Effect Service clients for Instagram, LinkedIn, Facebook, and TikTok APIs",
+        "dependencies": [
+          6001
+        ],
+        "parallelizable": true,
+        "k8s_requirements": [
+          "Platform API credentials secret (sigma1-external-apis or sigma1-service-api-keys)"
+        ]
+      },
+      {
+        "id": 6009,
+        "title": "Implement NATS integration for async publish pipeline with dead-letter handling",
+        "dependencies": [
+          6004,
+          6008
+        ],
+        "parallelizable": false,
+        "k8s_requirements": [
+          "NATS URL in configmap",
+          "NATS credentials if required"
+        ]
+      },
+      {
+        "id": 6010,
+        "title": "Implement GDPR deletion endpoint with R2 cleanup",
+        "dependencies": [
+          6001,
+          6002,
+          6004
+        ],
+        "parallelizable": true,
+        "k8s_requirements": [
+          "R2 and DB credentials"
+        ]
+      },
+      {
+        "id": 6011,
+        "title": "Implement health/metrics endpoints, OpenAPI spec, Dockerfile, and Kubernetes deployment manifest",
+        "dependencies": [
+          6003,
+          6004,
+          6007,
+          6009,
+          6010
+        ],
+        "parallelizable": false,
+        "k8s_requirements": [
+          "Deployment in sigma1 namespace",
+          "envFrom configmap/secrets for all required env",
+          "Liveness/readiness probes",
+          "ServiceMonitor for Prometheus"
+        ]
+      }
+    ],
+    "k8s_mapping": {
+      "namespace": "sigma1",
+      "db_namespace": "sigma1-db",
+      "required_secrets": [
+        "sigma1-db-credentials",
+        "sigma1-r2-credentials",
+        "sigma1-external-apis",
+        "sigma1-service-api-keys"
+      ],
+      "required_configmaps": [
+        "sigma1-infra-endpoints"
+      ],
+      "deployment_manifest": "k8s/deployment.yaml",
+      "service_monitor": "k8s/monitoring/sigma1-servicemonitor.yaml"
+    },
+    "integration_points": [
+      {
+        "service": "Postgres",
+        "k8s": "CloudNative-PG cluster, pooler, secret"
+      },
+      {
+        "service": "Cloudflare R2",
+        "k8s": "R2 credentials secret, configmap for public URL"
+      },
+      {
+        "service": "NATS",
+        "k8s": "ConfigMap for endpoint"
+      },
+      {
+        "service": "OpenAI/Claude",
+        "k8s": "API key secret"
+      },
+      {
+        "service": "Platform APIs",
+        "k8s": "API credentials secret"
+      }
+    ],
+    "deployment_requirements": {
+      "namespace": "sigma1",
+      "replicas": 1,
+      "resources": {
+        "requests": {
+          "cpu": "250m",
+          "memory": "512Mi"
+        },
+        "limits": {
+          "cpu": "500m",
+          "memory": "1Gi"
+        }
+      },
+      "envFrom": [
+        "ConfigMap: sigma1-infra-endpoints",
+        "Secret: social-engine-secrets"
+      ],
+      "probes": {
+        "liveness": "/health/live",
+        "readiness": "/health/ready"
+      },
+      "service": {
+        "type": "ClusterIP",
+        "port": 3000
+      }
     }
   },
   {
     "task_analysis": {
-      "task_id": 6,
-      "title": "Validate End-to-End Pipeline Completion (Tess - Test frameworks)",
-      "status": "pending",
-      "priority": "high",
-      "dependencies": [
-        2,
-        3,
-        4,
-        5
-      ],
-      "summary": "This task requires building and executing a comprehensive E2E test suite to validate the Sigma-1 intake pipeline, ensuring it completes all stages (deliberation, task generation, issue creation, agent assignment, notifications) for a single PRD. The test suite must use the existing test framework (Jest, Vitest, etc.), run against the deployed dev environment, and assert all acceptance criteria via 7 test cases. The suite must be CI-ready, outputting a JUnit XML report.",
-      "acceptance_criteria": [
-        "Pipeline returns status: 'complete' with a valid pipelineRunId.",
-        "Task count >= 5 with all required fields populated.",
-        ">= 80% of tasks have non-null delegate_id or assigneeId.",
-        "Linear session exists with >= 5 issues.",
-        "PR URL matches GitHub sigma-1 repo pattern.",
-        "Execution time < 300s.",
-        "Zero fatal log entries."
-      ],
-      "env_vars_required": [
-        "PM_SERVER_URL",
-        "PM_AUTH_TOKEN (or equivalent, depending on auth scheme)",
-        "TEST_PRD_PATH (optional, for custom PRD fixture)"
-      ],
-      "test_framework_detection": {
-        "steps": [
-          "Check package.json for jest, vitest, or other test runner dependencies.",
-          "Look for jest.config.*, vitest.config.*, or test config in package.json.",
-          "Identify test directory convention (e2e/, tests/, __tests__/, etc.)."
+      "task_id": 7,
+      "title": "Implement Morgan AI Agent (Angie - OpenClaw/MCP)",
+      "summary": "Configure and deploy the Morgan AI agent as the central orchestrator for all customer interactions (Signal, voice, web chat), integrating with backend services via MCP tools and implementing business skills for sales, vetting, quoting, finance, social media, and admin workflows.",
+      "namespace": "openclaw",
+      "agent_id": "morgan",
+      "model": {
+        "primary": "openai-api/gpt-5.4-pro",
+        "fallback": "gpt-4o"
+      },
+      "persona": {
+        "description": "Professional, knowledgeable about lighting/visual production equipment, represents Sigma-1/Perception Events. Helpful but efficient, knows when to escalate to Mike.",
+        "escalation_triggers": [
+          "RED vetting result",
+          "budget > $50k",
+          "custom fabrication requests"
         ]
       },
-      "test_file_convention": "e2e/pipeline-completion.test.ts (or match existing convention)",
-      "test_cases": [
-        {
-          "id": 1,
-          "title": "Full pipeline execution",
-          "action": "POST sample PRD to PM server's pipeline trigger endpoint, assert 200 response, pipelineRunId present, status: 'complete'."
-        },
-        {
-          "id": 2,
-          "title": "Task generation",
-          "action": "GET /api/pipeline/runs/{runId}/tasks, assert >=5 tasks, each with non-empty title, agent, stack."
-        },
-        {
-          "id": 3,
-          "title": "Agent assignments",
-          "action": "Assert >=80% of tasks have non-null delegate_id or assigneeId."
-        },
-        {
-          "id": 4,
-          "title": "Linear session",
-          "action": "Assert linearSessionId is non-null, issueCount >= 5."
-        },
-        {
-          "id": 5,
-          "title": "PR creation",
-          "action": "Assert prUrl is non-null and matches https://github.com/5dlabs/sigma-1/pull/\\d+."
-        },
-        {
-          "id": 6,
-          "title": "Pipeline timing",
-          "action": "Assert total pipeline execution time < 300s."
-        },
-        {
-          "id": 7,
-          "title": "No fatal errors",
-          "action": "Assert PM server logs for the run contain zero entries with level: 'fatal' or level: 'error' and fatal: true."
-        }
+      "channels": [
+        "Signal (via Signal-CLI sidecar)",
+        "Voice (ElevenLabs + Twilio SIP)",
+        "Web chat (WebSocket endpoint)"
       ],
-      "test_timeout_ms": 360000,
-      "junit_reporter": {
-        "jest": "jest-junit",
-        "vitest": "vitest-junit-reporter",
-        "output_path": "test-results/e2e-pipeline.xml"
+      "skills": [
+        "sales-qual",
+        "customer-vet",
+        "quote-gen",
+        "upsell",
+        "finance",
+        "social-media",
+        "rms-*",
+        "admin"
+      ],
+      "tools": [
+        "sigma1_catalog_search",
+        "sigma1_check_availability",
+        "sigma1_generate_quote",
+        "sigma1_vet_customer",
+        "sigma1_score_lead",
+        "sigma1_create_invoice",
+        "sigma1_finance_report",
+        "sigma1_social_curate",
+        "sigma1_social_publish",
+        "sigma1_equipment_lookup"
+      ],
+      "integration_points": {
+        "Signal": {
+          "sidecar": "Signal-CLI REST API",
+          "inbound": "polling /v1/receive/{number}",
+          "outbound": "POST /v2/send",
+          "photo_handling": true,
+          "group_message_handling": true,
+          "account_rotation": {
+            "primary": "main Signal number",
+            "secondary": "fallback number",
+            "failover": "automatic on ban detection, manual fail-back"
+          }
+        },
+        "Voice": {
+          "provider": "Twilio SIP trunk",
+          "ai": "ElevenLabs Conversational AI",
+          "pipeline": "Twilio → ElevenLabs (STT) → Morgan (text) → ElevenLabs (TTS) → Twilio",
+          "webhook": "Twilio forwards to ElevenLabs endpoint",
+          "credentials": "Kubernetes secrets"
+        },
+        "WebChat": {
+          "protocol": "WebSocket",
+          "endpoint": "/ws/chat",
+          "message_format": {
+            "inbound": {
+              "type": "user_message",
+              "content": "string",
+              "metadata": {
+                "session_id": "string",
+                "timestamp": "string"
+              }
+            },
+            "outbound": {
+              "type": "agent_message",
+              "content": "string",
+              "metadata": {
+                "session_id": "string",
+                "timestamp": "string",
+                "tool_calls": "array"
+              }
+            }
+          },
+          "persistence": "morgan-workspace PVC"
+        }
       },
-      "decision_points": [
-        {
-          "topic": "Pipeline trigger endpoint and auth mechanism",
-          "recommendation": "Inspect PM server route definitions to confirm endpoint and auth scheme; parameterize via env vars."
-        },
-        {
-          "topic": "Log inspection mechanism for fatal error check",
-          "recommendation": "Prefer a dedicated API endpoint on the PM server for log queries; fallback to embedded logs/errors in pipeline run object if not available."
-        }
-      ],
-      "subtasks": [
-        {
-          "id": 6001,
-          "title": "Detect existing test framework and configure E2E test scaffold",
-          "status": "pending",
-          "parallelizable": false
-        },
-        {
-          "id": 6002,
-          "title": "Implement pipeline trigger test and timing SLA assertion",
-          "status": "pending",
-          "parallelizable": false
-        },
-        {
-          "id": 6003,
-          "title": "Implement task generation and agent assignment validation tests",
-          "status": "pending",
-          "parallelizable": false
-        },
-        {
-          "id": 6004,
-          "title": "Implement Linear session and PR creation validation tests",
-          "status": "pending",
-          "parallelizable": true
-        },
-        {
-          "id": 6005,
-          "title": "Implement no-fatal-errors log validation test",
-          "status": "pending",
-          "parallelizable": true
-        },
-        {
-          "id": 6006,
-          "title": "Execute full E2E test suite and generate JUnit XML report",
-          "status": "pending",
-          "parallelizable": false
-        }
-      ],
-      "test_strategy": "All 7 test cases must pass in a single run against the deployed dev environment. JUnit XML report must be generated and contain exactly 7 test case entries. Failures must be categorized and documented."
-    }
-  },
-  {
-    "scaffold_plan": {
-      "files": [
-        {
-          "path": "e2e/linear-delegate-assignments.test.ts",
-          "description": "End-to-end test suite for verifying Linear issue delegate assignments, agent mapping, and metadata. Uses Linear GraphQL API directly.",
-          "action": "create"
-        },
-        {
-          "path": "e2e/fixtures/delegate-mapping.json",
-          "description": "Fixture mapping agent hints to expected Linear user IDs for delegate assignment validation.",
-          "action": "create"
-        }
-      ],
-      "test_stubs": [
-        {
-          "file": "e2e/linear-delegate-assignments.test.ts",
-          "tests": [
+      "kubernetes": {
+        "deployment": {
+          "namespace": "openclaw",
+          "containers": [
             {
-              "name": "Setup: Load pipeline issue IDs, delegate mapping, and fetch Linear issue data",
-              "type": "beforeAll",
-              "assertions": [
-                "At least 5 issue IDs are loaded from pipeline results",
-                "Delegate mapping contains at least 4 entries",
-                "GraphQL responses for all issues are valid (no error fields)"
-              ]
+              "name": "morgan-agent",
+              "image": "Morgan agent image",
+              "ports": [
+                8081,
+                8082
+              ],
+              "env": [
+                "sigma1-service-api-keys",
+                "elevenlabs-api-key",
+                "twilio-credentials",
+                "signal-cli-credentials"
+              ],
+              "volumeMounts": [
+                {
+                  "name": "morgan-workspace",
+                  "mountPath": "/data/workspace"
+                }
+              ],
+              "resources": {
+                "limits": {
+                  "memory": "1Gi",
+                  "cpu": "1"
+                }
+              },
+              "livenessProbe": {
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 8081
+                }
+              },
+              "readinessProbe": {
+                "httpGet": {
+                  "path": "/readyz",
+                  "port": 8081
+                }
+              }
             },
             {
-              "name": "Assignee presence: >= 80% of issues have a non-null assignee",
-              "type": "test",
-              "assertions": [
-                "Count of issues with assignee !== null >= Math.max(4, Math.ceil(totalIssues * 0.8))"
-              ]
+              "name": "signal-cli-sidecar",
+              "image": "Signal-CLI REST API image",
+              "ports": [
+                8080
+              ],
+              "resources": {
+                "limits": {
+                  "memory": "512Mi",
+                  "cpu": "500m"
+                }
+              },
+              "livenessProbe": {
+                "httpGet": {
+                  "path": "/v1/about",
+                  "port": 8080
+                }
+              }
+            }
+          ],
+          "volumes": [
+            {
+              "name": "morgan-workspace",
+              "persistentVolumeClaim": {
+                "claimName": "morgan-workspace"
+              }
             },
             {
-              "name": "Correct mapping: Each assigned issue's assignee.id matches expected Linear user ID",
-              "type": "test",
-              "assertions": [
-                "For each assigned issue, assignee.id === expectedUserId from delegate mapping (skip if no mapping for agent hint)"
-              ]
-            },
-            {
-              "name": "Unassigned handling: Unassigned issues correspond to unmapped agent hints and have PM server error logs",
-              "type": "test",
-              "assertions": [
-                "For each unassigned issue, agent hint is not present in delegate mapping",
-                "PM server error log entry exists for each unassigned issue mentioning unmapped agent hint"
-              ]
-            },
-            {
-              "name": "No agent:pending labels: No issues have placeholder assignment labels",
-              "type": "test",
-              "assertions": [
-                "No issue has a label matching /^agent[:\\-_]?pending$/i or similar"
-              ]
-            },
-            {
-              "name": "Issue metadata: All issues have non-empty title, description, and correct project/team",
-              "type": "test",
-              "assertions": [
-                "Each issue.title and issue.description is a non-empty string",
-                "Each issue.project.id === expectedProjectId",
-                "Each issue.team.id === expectedTeamId"
-              ]
+              "name": "signal-cli-data",
+              "persistentVolumeClaim": {
+                "claimName": "signal-cli-data"
+              }
             }
           ]
+        },
+        "services": [
+          {
+            "name": "morgan-webchat",
+            "type": "ClusterIP",
+            "ports": [
+              {
+                "port": 8081,
+                "targetPort": 8081
+              }
+            ]
+          },
+          {
+            "name": "morgan-voice-adapter",
+            "type": "ClusterIP",
+            "ports": [
+              {
+                "port": 8082,
+                "targetPort": 8082
+              }
+            ]
+          }
+        ],
+        "pvc": [
+          {
+            "name": "morgan-workspace",
+            "size": "10Gi",
+            "accessModes": [
+              "ReadWriteOnce"
+            ]
+          },
+          {
+            "name": "signal-cli-data",
+            "size": "1Gi",
+            "accessModes": [
+              "ReadWriteOnce"
+            ]
+          }
+        ],
+        "secrets": [
+          "sigma1-service-api-keys",
+          "elevenlabs-api-key",
+          "twilio-credentials",
+          "signal-cli-credentials"
+        ],
+        "cloudflare_tunnel": "optional for external access"
+      },
+      "performance": {
+        "tool_call_parallelization": true,
+        "simple_query_latency_target": "<10s",
+        "voice_round_trip_target": "<5s"
+      },
+      "monitoring": {
+        "signal_cli_health": {
+          "metrics": [
+            "signal_messages_sent_total",
+            "signal_messages_failed_total",
+            "signal_cli_health_status"
+          ],
+          "grafana_alert": {
+            "condition": "signal_messages_failed_total rate > 0.5 for 5 minutes",
+            "notification": "Mike via secondary Signal or email"
+          }
         }
+      },
+      "test_strategy": [
+        "MCP tool connectivity test for all 10 tools",
+        "Signal round-trip test (inbound/outbound)",
+        "Skill test: sales-qual, customer-vet, quote-gen, upsell, finance, social-media, rms, admin",
+        "Voice integration test (Twilio + ElevenLabs)",
+        "Web chat WebSocket test",
+        "Performance test: 10 concurrent queries <10s",
+        "Signal-CLI health monitoring and failover"
       ],
-      "fixtures": [
-        {
-          "file": "e2e/fixtures/delegate-mapping.json",
-          "description": "JSON object: { \"agent_hint\": \"linear_user_id\", ... }"
-        }
+      "decision_points": [
+        "Model selection and fallback",
+        "ElevenLabs voice integration architecture",
+        "Signal-CLI message ingestion: polling vs webhook",
+        "Signal account rotation: automatic vs manual failover",
+        "Conversation state persistence: file-based vs database"
       ],
-      "env_vars": [
-        "LINEAR_API_TOKEN",
-        "expectedProjectId",
-        "expectedTeamId"
-      ],
-      "external_dependencies": [
-        "Lightweight GraphQL client (e.g., graphql-request or fetch)",
-        "Access to pipeline run results (issue IDs and agent hints) from Task 6 output or endpoint",
-        "Access to PM server logs (file or endpoint) for error validation"
-      ],
-      "notes": [
-        "All Linear API queries must use the LINEAR_API_TOKEN from environment",
-        "No PM server API calls for issue verification (only for error log lookup)",
-        "Test suite is parallelizable except for setup and mapping tests"
+      "subtasks": [
+        7001,
+        7002,
+        7003,
+        7004,
+        7005,
+        7006,
+        7007,
+        7008,
+        7009,
+        7010,
+        7011,
+        7012
       ]
     }
   },
   {
     "scaffold_analysis": {
       "task_id": 8,
-      "scaffold_required": false,
-      "reasoning": "This task and its subtasks are focused on implementing and validating end-to-end tests for Hermes research memo integration in the PM server pipeline. The work is entirely within the test codebase (e2e/hermes-research-validation.test.ts) and does not require any changes to Kubernetes manifests, infrastructure, or deployment configuration. The only relevant environment variable is NOUS_API_KEY, which is assumed to be set/unset in the test environment, not managed via new or changed ExternalSecret or ConfigMap resources. No new services, CRDs, or infra resources are needed for this testing work.",
-      "scaffold_actions": []
-    }
-  },
-  {
-    "e2e/design-pr-surfacing.test.ts": {
-      "description": "End-to-end Playwright test suite for Design Snapshot PR surfacing in the dashboard. Validates section visibility, PR data rendering, GitHub link correctness, scaffold file listing, empty state, accessibility, and pipeline scoping.",
-      "test_cases": [
-        {
-          "id": 1,
-          "title": "Design Snapshot PR section is visible and accessible",
-          "steps": [
-            "Launch browser and authenticate if required.",
-            "Navigate to /dashboard.",
-            "Locate the Design Snapshot PR section/tab using getByRole or locator (labelled 'Design Snapshot' or similar).",
-            "Assert the section/tab is visible.",
-            "If tabbed, click to activate and assert the content panel appears.",
-            "Tab to the section element and assert it receives keyboard focus."
-          ],
-          "assertions": [
-            "Section/tab is present in the DOM.",
-            "Section/tab is visible.",
-            "Section/tab is keyboard focusable."
-          ]
-        },
-        {
-          "id": 2,
-          "title": "PR card displays correct metadata after pipeline run",
-          "steps": [
-            "Navigate to the Design Snapshot PR section.",
-            "Locate at least one PR card (e.g., [data-testid='pr-card']).",
-            "Within the card, find elements for title, status badge, repo name, and date."
-          ],
-          "assertions": [
-            "Title is a non-empty string.",
-            "Status badge text matches /open|merged|closed/i.",
-            "Repo name contains '5dlabs/sigma-1'.",
-            "Date matches /\\d{4}-\\d{2}-\\d{2}/."
-          ]
-        },
-        {
-          "id": 3,
-          "title": "PR card contains valid GitHub link",
-          "steps": [
-            "Within a PR card, locate the anchor/link element.",
-            "Check href, target, and rel attributes."
-          ],
-          "assertions": [
-            "href matches https://github.com/5dlabs/sigma-1/pull/\\d+.",
-            "target equals '_blank'.",
-            "rel contains 'noopener'."
-          ]
-        },
-        {
-          "id": 4,
-          "title": "PR detail view lists scaffold files",
-          "steps": [
-            "Click PR card or expand detail button.",
-            "Wait for detail view to appear.",
-            "Locate scaffold file list items."
-          ],
-          "assertions": [
-            "At least one scaffold file is listed.",
-            "Each file has a non-empty filename."
-          ]
-        },
-        {
-          "id": 5,
-          "title": "Empty state message is shown when no PRs exist",
-          "steps": [
-            "Mock API to return empty PR list using page.route.",
-            "Navigate to Design Snapshot PR section.",
-            "Locate empty state element."
-          ],
-          "assertions": [
-            "Empty state element is visible.",
-            "Text matches /No design snapshot PRs found/i."
-          ]
-        },
-        {
-          "id": 6,
-          "title": "Accessibility: zero critical/serious axe-core violations",
-          "steps": [
-            "Navigate to Design Snapshot PR section with data present.",
-            "Run axe-core accessibility scan on the section."
-          ],
-          "assertions": [
-            "No violations with impact 'critical' or 'serious'."
-          ]
-        },
-        {
-          "id": 7,
-          "title": "PRs are scoped to the current pipelineRunId",
-          "steps": [
-            "Navigate to dashboard with ?pipelineRunId=run-abc-123.",
-            "Collect all PR cards and extract pipelineRunId metadata.",
-            "Assert all PRs match run-abc-123.",
-            "Navigate with a different pipelineRunId (e.g., run-xyz-456).",
-            "Assert previous PRs are not shown."
-          ],
-          "assertions": [
-            "All displayed PRs have pipelineRunId matching the query param.",
-            "No cross-run PR data is visible."
-          ]
-        }
-      ],
-      "setup": {
-        "beforeAll": [
-          "Launch browser context.",
-          "Authenticate if required.",
-          "Set base URL to dashboard."
+      "title": "Develop Web Frontend (Blaze - React/Next.js)",
+      "stack": "React 19/Next.js 15 + Effect 3.x",
+      "scaffold_type": "web-frontend",
+      "project_structure": {
+        "root": [
+          "app/",
+          "components/ui/",
+          "components/custom/",
+          "lib/",
+          "lib/effect/",
+          "lib/queries/",
+          "lib/seo.ts",
+          "lib/image-loader.ts",
+          "hooks/",
+          "types/",
+          "public/",
+          "public/og-default.jpg",
+          "tailwind.config.ts",
+          "next.config.ts",
+          "tsconfig.json",
+          ".env.local",
+          "package.json",
+          "wrangler.toml",
+          ".lighthouserc.js",
+          "README.md"
         ],
-        "beforeEach": [
-          "Reset mocks/routes.",
-          "Navigate to dashboard."
+        "routes": [
+          "/",
+          "/equipment",
+          "/equipment/:id",
+          "/quote",
+          "/portfolio",
+          "/llms.txt",
+          "/llms-full",
+          "/sitemap.xml",
+          "/robots.txt",
+          "/dev/styleguide"
         ],
-        "afterAll": [
-          "Close browser context."
+        "components": [
+          "ProductCard",
+          "AvailabilityCalendar",
+          "QuoteLineItem",
+          "ChatBubble",
+          "ChatWidget",
+          "ThemeProvider",
+          "Stepper",
+          "Breadcrumb",
+          "StyleGuide"
+        ],
+        "providers": [
+          "QueryClientProvider"
+        ],
+        "custom_hooks": [
+          "useQuoteStore",
+          "useChatSocket"
         ]
       },
-      "dependencies": [
-        "Playwright",
-        "@axe-core/playwright"
+      "key_integrations": {
+        "UI": "shadcn/ui (Radix UI primitives), TailwindCSS 4, custom design tokens",
+        "Data": "Effect 3.x for schema validation and data fetching, TanStack Query for client/server state",
+        "Chat": "WebSocket connection to Morgan agent, localStorage for session/message persistence",
+        "Image": "Next.js Image with R2 CDN loader",
+        "SEO/AI": "Schema.org JSON-LD, OpenGraph/Twitter meta, sitemap.xml, robots.txt, llms.txt, llms-full"
+      },
+      "api_endpoints": [
+        "GET /api/v1/catalog/categories",
+        "GET /api/v1/catalog/products",
+        "GET /api/v1/catalog/products/:id",
+        "GET /api/v1/catalog/products/:id/availability",
+        "POST /api/v1/quote",
+        "WebSocket: Morgan agent (NEXT_PUBLIC_WS_URL)"
       ],
-      "mocks": [
+      "env_variables": [
+        "NEXT_PUBLIC_API_BASE_URL",
+        "NEXT_PUBLIC_CDN_URL",
+        "NEXT_PUBLIC_WS_URL"
+      ],
+      "test_plan": [
+        "Component unit tests (Vitest + React Testing Library)",
+        "Page integration tests (mock API responses)",
+        "Quote builder flow test (multi-step, API payload)",
+        "Chat widget test (WebSocket mock, message flow)",
+        "SEO test (Schema.org JSON-LD, meta tags, llms.txt)",
+        "Accessibility audit (axe-core, WCAG 2.1 AA)",
+        "Lighthouse CI (Performance > 90, Accessibility > 95)",
+        "Cloudflare Pages build and preview",
+        "Responsive layout tests (mobile/tablet/desktop)"
+      ],
+      "decision_points": [
+        "Morgan chat WebSocket: direct vs. API gateway proxy",
+        "Quote builder submission: direct to RMS vs. via Morgan",
+        "R2 CDN image loader: custom loader vs. Cloudflare Image Resizing",
+        "Effect + TanStack Query integration pattern"
+      ],
+      "subtasks_summary": [
         {
-          "test_case": 5,
-          "route": "/api/design-prs*",
-          "response": {
-            "prs": []
-          }
+          "id": 8001,
+          "title": "Initialize Next.js 15 project with App Router, TypeScript, and TailwindCSS 4",
+          "type": "scaffold",
+          "status": "pending"
+        },
+        {
+          "id": 8002,
+          "title": "Configure shadcn/ui component library and design token system",
+          "type": "ui-theming",
+          "status": "pending"
+        },
+        {
+          "id": 8003,
+          "title": "Set up Effect 3.x integration and TanStack Query data fetching layer",
+          "type": "data-layer",
+          "status": "pending"
+        },
+        {
+          "id": 8004,
+          "title": "Build Home page with hero section, CTAs, and Schema.org Organization markup",
+          "type": "page",
+          "status": "pending"
+        },
+        {
+          "id": 8005,
+          "title": "Build Equipment Catalog listing page with filtering, search, and pagination",
+          "type": "page",
+          "status": "pending"
+        },
+        {
+          "id": 8006,
+          "title": "Build Product Detail page with image gallery, specs table, and Add to Quote",
+          "type": "page",
+          "status": "pending"
+        },
+        {
+          "id": 8007,
+          "title": "Build AvailabilityCalendar component with date range picker",
+          "type": "component",
+          "status": "pending"
+        },
+        {
+          "id": 8008,
+          "title": "Build Quote Builder multi-step form",
+          "type": "page",
+          "status": "pending"
+        },
+        {
+          "id": 8009,
+          "title": "Build Portfolio page with filterable gallery and lazy-loaded images",
+          "type": "page",
+          "status": "pending"
+        },
+        {
+          "id": 8010,
+          "title": "Build SEO infrastructure: sitemap.xml, robots.txt, llms.txt, and llms-full routes",
+          "type": "seo",
+          "status": "pending"
+        },
+        {
+          "id": 8011,
+          "title": "Build Morgan web chat widget with WebSocket connection and rich messages",
+          "type": "component",
+          "status": "pending"
+        },
+        {
+          "id": 8012,
+          "title": "Accessibility audit and WCAG 2.1 AA compliance verification",
+          "type": "testing",
+          "status": "pending"
+        },
+        {
+          "id": 8013,
+          "title": "Performance optimization and Lighthouse CI targets",
+          "type": "performance",
+          "status": "pending"
+        },
+        {
+          "id": 8014,
+          "title": "Configure Cloudflare Pages deployment with @cloudflare/next-on-pages",
+          "type": "deployment",
+          "status": "pending"
         }
       ],
-      "selectors": {
-        "section": "[data-testid='design-pr-section']",
-        "prCard": "[data-testid='pr-card']",
-        "prTitle": "[data-testid='pr-title']",
-        "prStatus": "[data-testid='pr-status']",
-        "prRepo": "[data-testid='pr-repo']",
-        "prDate": "[data-testid='pr-date']",
-        "prLink": "[data-testid='pr-link']",
-        "scaffoldList": "[data-testid='scaffold-list']",
-        "scaffoldFile": "[data-testid='scaffold-file']",
-        "emptyState": "[data-testid='empty-state']"
-      }
+      "parallelization_notes": [
+        "Subtasks 8003, 8004, 8005, 8006, 8007, 8009, 8010, 8011 can be parallelized after initial scaffold and UI theming (8001, 8002).",
+        "Quote builder (8008) depends on product detail and availability components.",
+        "Accessibility (8012), performance (8013), and deployment (8014) are finalization steps."
+      ],
+      "infrastructure_notes": [
+        "Cloudflare Pages deployment with edge runtime compatibility.",
+        "R2 CDN for images, API endpoints for catalog/availability/quote.",
+        "Morgan chat via WebSocket, session persistence in localStorage."
+      ],
+      "compliance_notes": [
+        "WCAG 2.1 AA accessibility required.",
+        "SEO and AI discoverability via Schema.org, llms.txt, llms-full.",
+        "Performance targets: Lighthouse > 90/95."
+      ]
     }
   },
   {
-    "plan": {
-      "summary": "Production hardening for the Sigma-1 dev Kubernetes infrastructure, focusing on HA, ingress/TLS, network security, RBAC, secret rotation, audit logging, and documentation. Each subtask is mapped to a concrete YAML or Helm change, with testable outcomes and documentation requirements.",
-      "decision_points": [
+    "scaffolds": {
+      "scaffolds": [
         {
-          "name": "Redis HA strategy",
-          "decision": "Use Bitnami Redis Helm chart with Sentinel enabled (sentinel.enabled=true) for robust HA, as the operator in use does not natively support Sentinel/replicated mode."
-        },
-        {
-          "name": "Ingress controller selection",
-          "decision": "Use Nginx Ingress Controller, as it is the most widely supported and compatible with cert-manager and required annotations."
-        },
-        {
-          "name": "TLS certificate provisioning",
-          "decision": "Use cert-manager with Let's Encrypt (ClusterIssuer) for automated certificate management and renewal."
-        },
-        {
-          "name": "External secrets backing store",
-          "decision": "Assume AWS Secrets Manager as the backend, as it is commonly used and supports rotation policies."
-        },
-        {
-          "name": "Audit logging approach",
-          "decision": "Use a Falco DaemonSet in the namespace to capture secret access and security events, as cluster-level audit policy changes may not be permitted."
+          "task_id": 1,
+          "file_structure": [
+            {
+              "path": "k8s/namespaces/sigma1-namespace.yaml",
+              "description": "Namespace manifest for sigma1 with standard labels.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/namespaces/sigma1-db-namespace.yaml",
+              "description": "Namespace manifest for sigma1-db (or databases) with standard labels.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/db/sigma1-postgres-cluster.yaml",
+              "description": "CloudNative-PG Cluster CR for sigma1-postgres with initdb bootstrap.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/db/sigma1-postgres-init-sql-job.yaml",
+              "description": "Kubernetes Job or Cluster CR postInitSQL for per-service roles and schemas.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/db/sigma1-postgres-pooler.yaml",
+              "description": "CloudNative-PG Pooler CR for PgBouncer connection pooling.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/db/sigma1-valkey.yaml",
+              "description": "Valkey CR using redis.opstreelabs.in/v1beta2 operator.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/secrets/sigma1-db-credentials.yaml",
+              "description": "Opaque Secret for PostgreSQL connection strings per service role.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/secrets/sigma1-r2-credentials.yaml",
+              "description": "Opaque Secret for Cloudflare R2 credentials.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/secrets/sigma1-stripe-credentials.yaml",
+              "description": "Opaque Secret for Stripe API keys (placeholders).",
+              "action": "create"
+            },
+            {
+              "path": "k8s/secrets/sigma1-external-apis.yaml",
+              "description": "Opaque Secret for external API keys (OpenCorporates, ElevenLabs, etc).",
+              "action": "create"
+            },
+            {
+              "path": "k8s/secrets/sigma1-service-api-keys.yaml",
+              "description": "Opaque Secret for inter-service API keys.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/configmaps/sigma1-infra-endpoints.yaml",
+              "description": "ConfigMap aggregating all non-secret connection strings and endpoints.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/cloudflare/sigma1-cloudflare-tunnel.yaml",
+              "description": "Deployment and Service for Cloudflare Tunnel (cloudflared) for external access.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/sidecars/signal-cli-sidecar-template.yaml",
+              "description": "Kustomize component or ConfigMap for reusable Signal-CLI sidecar container spec.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/monitoring/sigma1-servicemonitor.yaml",
+              "description": "Prometheus ServiceMonitor CR for sigma1 services.",
+              "action": "create"
+            },
+            {
+              "path": "k8s/monitoring/sigma1-db-servicemonitor.yaml",
+              "description": "Prometheus ServiceMonitor CR for sigma1-db (optional, for DB/Valkey).",
+              "action": "create"
+            },
+            {
+              "path": "k8s/network/sigma1-db-networkpolicy.yaml",
+              "description": "NetworkPolicy allowing ingress from sigma1 to sigma1-db for PgBouncer/Valkey.",
+              "action": "create"
+            }
+          ],
+          "interfaces": "# No code interfaces for Bolt tasks; see YAML CRD structure below.\n# Example: CloudNative-PG Cluster CR (partial)\n# apiVersion: postgresql.cnpg.io/v1\n# kind: Cluster\n# metadata:\n#   name: sigma1-postgres\n#   namespace: sigma1-db\n# spec:\n#   instances: 2\n#   storage:\n#     size: 50Gi\n#   bootstrap:\n#     initdb:\n#       database: sigma1\n#       owner: sigma1_user\n#       secret:\n#         name: sigma1-postgres-superuser\n",
+          "function_signatures": "# Not applicable for Bolt (Kubernetes YAML) tasks.\n# See YAML resource structure for each manifest.",
+          "test_stubs": "# Test Plan (not code):\n# 1. kubectl get ns sigma1 -o jsonpath='{.metadata.labels}'\n# 2. kubectl get cluster sigma1-postgres -n sigma1-db\n# 3. kubectl exec into sigma1 pod, psql via pooler, \\dn\n# 4. redis-cli -u $VALKEY_URL PING\n# 5. kubectl get configmap sigma1-infra-endpoints -n sigma1\n# 6. kubectl get secret sigma1-db-credentials -n sigma1\n# 7. kubectl get pods -n sigma1 -l app=sigma1-cloudflare-tunnel\n# 8. kubectl get servicemonitor -n sigma1\n# 9. kubectl get networkpolicy -n sigma1-db",
+          "pattern_examples": null
         }
+      ]
+    },
+    "codebase_context": "",
+    "infrastructure_context": "## Deployed Operators\n\n## ArgoCD Applications\n- (argocd skipped: set ARGOCD_SERVER, ensure argocd is on PATH, and run argocd login — or ignore for local runs)\n\n## Custom Resource Definitions\n- accesstunnels.networking.cfargotunnel.com\n- acraccesstokens.generators.external-secrets.io\n- addons.k3s.cattle.io\n- aptosnodes.blockchain.5dlabs.io\n- autoscalinglisteners.actions.github.com\n- autoscalingrunnersets.actions.github.com\n- ciliumcidrgroups.cilium.io\n- ciliumclusterwidenetworkpolicies.cilium.io\n- ciliumendpoints.cilium.io\n- ciliumidentities.cilium.io\n- ciliuml2announcementpolicies.cilium.io\n- ciliumloadbalancerippools.cilium.io\n- ciliumnetworkpolicies.cilium.io\n- ciliumnodeconfigs.cilium.io\n- ciliumnodes.cilium.io\n- ciliumpodippools.cilium.io\n- clusterexternalsecrets.external-secrets.io\n- clustergenerators.generators.external-secrets.io\n- clustersecretstores.external-secrets.io\n- clustertunnels.networking.cfargotunnel.com\n- ecrauthorizationtokens.generators.external-secrets.io\n- ephemeralrunners.actions.github.com\n- ephemeralrunnersets.actions.github.com\n- etcdsnapshotfiles.k3s.cattle.io\n- externalsecrets.external-secrets.io\n- fakes.generators.external-secrets.io\n- gcraccesstokens.generators.external-secrets.io\n- githubaccesstokens.generators.external-secrets.io\n- helmchartconfigs.helm.cattle.io\n- helmcharts.helm.cattle.io\n\n## Services (non-kube-system)\n- argocd/argocd-applicationset-controller (<none>)\n- argocd/argocd-dex-server (<none>)\n- argocd/argocd-metrics (<none>)\n- argocd/argocd-notifications-controller-metrics (<none>)\n- argocd/argocd-redis (<none>)\n- argocd/argocd-repo-server (<none>)\n- argocd/argocd-server (<none>)\n- argocd/argocd-server-metrics (<none>)\n- bots/discord-bridge-http (<none>)\n- bots/linear-bridge (<none>)\n- cloudflare-operator-system/cloudflare-operator-controller-manager-metrics-service (<none>)\n- cloudflare-operator-system/cloudflare-operator-webhook-service (<none>)\n- cto/cto-controller (<none>)\n- cto/cto-openmemory (<none>)\n- cto/cto-pm (<none>)\n- cto/cto-tools (<none>)\n- cto/cto-web (<none>)\n- cto/tweakcn (<none>)\n- default/kubernetes (<none>)\n- external-secrets/openclaw-external-secrets-webhook (<none>)\n- gitlab/gitlab-certmanager (<none>)\n- gitlab/gitlab-certmanager-cainjector (<none>)\n- gitlab/gitlab-certmanager-webhook (<none>)\n- gitlab/gitlab-gitaly (<none>)\n- gitlab/gitlab-gitlab-shell (<none>)\n- gitlab/gitlab-kas (<none>)\n- gitlab/gitlab-minio-svc (<none>)\n- gitlab/gitlab-postgresql (<none>)\n- gitlab/gitlab-postgresql-hl (<none>)\n- gitlab/gitlab-postgresql-metrics (<none>)\n- gitlab/gitlab-redis-headless (<none>)\n- gitlab/gitlab-redis-master (<none>)\n- gitlab/gitlab-redis-metrics (<none>)\n- gitlab/gitlab-registry (<none>)\n- gitlab/gitlab-webservice-default (<none>)\n- messaging/nats (openclaw-nats.openclaw.svc.cluster.local)\n- openclaw/loki-canary (<none>)\n- openclaw/loki-headless (<none>)\n- openclaw/loki-memberlist (<none>)\n- openclaw/openclaw-angie (<none>)\n",
+    "task": {
+      "id": 9,
+      "title": "Develop Mobile App (Tap - Expo/React Native)",
+      "agent": "tap",
+      "stack": "Expo (React Native)",
+      "description": "Build the Sigma-1 mobile app using Expo with equipment catalog browsing, self-service quote builder, dedicated Morgan chat screen, and barcode scanning for equipment check-in/check-out. Maintains visual consistency with the web frontend.",
+      "status": "pending",
+      "dependencies": [
+        2,
+        7
       ],
-      "file_changes": [
-        {
-          "path": "k8s/sigma-1-dev/cnpg-cluster.yaml",
-          "action": "update",
-          "description": "Set spec.instances: 3, ensure failover settings are present, and pg_hba allows replication."
-        },
-        {
-          "path": "k8s/sigma-1-dev/redis-ha.yaml",
-          "action": "create",
-          "description": "Bitnami Redis Helm values YAML for 3-node Redis with Sentinel enabled."
-        },
-        {
-          "path": "k8s/sigma-1-dev/configmap-infra-endpoints.yaml",
-          "action": "update",
-          "description": "Update REDIS_URL to use Sentinel-aware connection string."
-        },
-        {
-          "path": "k8s/sigma-1-dev/pm-ingress.yaml",
-          "action": "create",
-          "description": "Ingress resource for PM server with TLS, rate limiting, and body size annotations."
-        },
-        {
-          "path": "k8s/sigma-1-dev/cert-issuer.yaml",
-          "action": "create",
-          "description": "ClusterIssuer for cert-manager using Let's Encrypt."
-        },
-        {
-          "path": "k8s/sigma-1-dev/cilium-networkpolicies.yaml",
-          "action": "update",
-          "description": "Add default deny-all policy and explicit allowlist policies for required ports and FQDNs."
-        },
-        {
-          "path": "k8s/sigma-1-dev/pm-serviceaccount.yaml",
-          "action": "update",
-          "description": "Remove any wildcard or cluster-admin bindings. Add Role/RoleBinding for PM server with least privilege."
-        },
-        {
-          "path": "k8s/sigma-1-dev/roles.yaml",
-          "action": "create",
-          "description": "Dedicated Roles/RoleBindings for all service accounts in the namespace."
-        },
-        {
-          "path": "k8s/sigma-1-dev/externalsecret-*.yaml",
-          "action": "update",
-          "description": "Add spec.refreshInterval: 1h to all ExternalSecret CRs."
-        },
-        {
-          "path": "k8s/sigma-1-dev/reloader.yaml",
-          "action": "create",
-          "description": "Helm values or manifest for stakater/reloader to trigger rolling restarts on secret changes."
-        },
-        {
-          "path": "k8s/sigma-1-dev/falco.yaml",
-          "action": "create",
-          "description": "Falco DaemonSet manifest for audit logging in sigma-1-dev namespace."
-        },
-        {
-          "path": "docs/production-hardening.md",
-          "action": "create",
-          "description": "Comprehensive documentation of all hardening measures, rationale, configuration, and verification."
-        }
+      "priority": "medium",
+      "details": "1. Initialize Expo project (SDK 51+) with TypeScript, Expo Router for file-based navigation.\n2. Design system:\n   - Port design tokens from web (Task 8) to React Native: colors, typography (using expo-font), spacing scale.\n   - Use React Native equivalents of shadcn/ui patterns: NativeWind (TailwindCSS for RN) or styled components matching web aesthetic.\n   - Component library: ProductCard, AvailabilityBadge, QuoteLineItem, ChatBubble, BarcodeScanner.\n3. Navigation structure (Expo Router tabs):\n   - **Equipment tab**: Category list → Product grid → Product detail with availability. Pull-to-refresh. Infinite scroll pagination.\n   - **Quote tab**: Quote builder adapted for mobile. Step-by-step wizard with native date picker, equipment selector (searchable list), venue input, review screen. Submit creates opportunity.\n   - **Chat tab** (dedicated screen per D10): Full-screen Morgan chat. WebSocket connection to Morgan agent. Message history. Support rich messages (product cards as interactive elements). Push notification integration for incoming messages.\n   - **Scan tab**: Camera-based barcode scanner using `expo-camera` or `expo-barcode-scanner`. Scans equipment barcode → calls RMS ScanBarcode → shows equipment details and check-in/check-out actions.\n   - **Profile/Settings tab**: User info, notification preferences, saved quotes.\n4. API integration:\n   - Shared API client module using `fetch` or `axios` with Effect for error handling.\n   - Base URL configurable per environment (dev/staging/prod).\n   - JWT token storage in `expo-secure-store`.\n   - API key auth for service calls (if needed, else JWT from user session).\n5. Morgan Chat (dedicated screen):\n   - WebSocket connection to Morgan agent (same endpoint as web).\n   - Push notifications via Expo Notifications for incoming Morgan messages when app is backgrounded.\n   - Conversation persistence in AsyncStorage with sync to server.\n   - Support photo sending (for social pipeline): use `expo-image-picker`, upload to social engine.\n6. Barcode scanning:\n   - `expo-camera` with barcode detection.\n   - On scan: call RMS `POST /api/v1/inventory/scan` (ScanBarcode via REST gateway).\n   - Display equipment details, current status, option to check-out or check-in.\n   - Haptic feedback on successful scan.\n7. Offline capability:\n   - Cache equipment catalog locally using AsyncStorage or MMKV.\n   - Queue quote submissions if offline, submit when connectivity restored.\n8. Build configuration:\n   - EAS Build profiles for development, preview, production.\n   - iOS and Android builds.\n   - App icons and splash screen matching Sigma-1 branding.",
+      "test_strategy": "1. Component tests (Jest + React Native Testing Library): ProductCard renders correctly with mock data; ChatBubble displays message text and timestamp; QuoteLineItem shows product name and quantity. 2. Navigation test: verify tab navigation renders correct screens; verify Equipment tab → Product detail deep link works. 3. Chat flow test: mock WebSocket, send message from Chat tab, verify message appears in conversation; verify incoming message triggers notification mock. 4. Barcode scanner test: mock camera barcode detection event, verify RMS API called with scanned code, verify equipment details screen shown. 5. Quote builder test: complete all steps with mock data, verify API submission payload contains correct products, dates, and venue. 6. Offline test: enable airplane mode mock, add items to quote, verify queued; disable airplane mode, verify submission fires. 7. EAS build: `eas build --platform all --profile preview` completes successfully. 8. Visual regression: screenshot comparison of key screens at iPhone SE (375px) and iPhone 15 Pro (393px) widths.",
+      "decision_points": [
+        "NativeWind vs styled-components/Tamagui for the React Native styling approach — NativeWind mirrors web Tailwind classes but may have RN edge cases; Tamagui provides cross-platform tokens natively.",
+        "AsyncStorage vs MMKV for local caching and offline storage — MMKV is significantly faster but adds a native dependency; AsyncStorage is built-in but slower for large datasets like equipment catalogs.",
+        "Push notification service: Expo Push Notification service vs direct integration with FCM/APNs — Expo simplifies cross-platform but adds a proxy dependency."
       ],
       "subtasks": [
         {
-          "id": 10001,
-          "title": "Scale CloudNative-PG cluster to 3 replicas with automated failover",
+          "id": 9001,
+          "title": "Initialize Expo project with TypeScript and Expo Router tab navigation",
+          "description": "Scaffold the Expo SDK 51+ project with TypeScript configuration, install Expo Router, and configure file-based tab navigation with all five tab screens (Equipment, Quote, Chat, Scan, Profile).",
+          "dependencies": [],
+          "details": "1. Run `npx create-expo-app sigma1-mobile --template expo-template-blank-typescript` or equivalent SDK 51+ template.\n2. Install Expo Router: `npx expo install expo-router react-native-safe-area-context react-native-screens expo-linking expo-constants expo-status-bar`.\n3. Configure `app.json` / `app.config.ts` with scheme, bundleIdentifier, and package name for Sigma-1.\n4. Create the `app/` directory with `_layout.tsx` as root layout using `<Tabs>` from Expo Router.\n5. Create five tab files: `app/(tabs)/equipment.tsx`, `app/(tabs)/quote.tsx`, `app/(tabs)/chat.tsx`, `app/(tabs)/scan.tsx`, `app/(tabs)/profile.tsx`.\n6. Configure tab bar icons (use `@expo/vector-icons` or custom SVGs) and labels.\n7. Add nested routes for Equipment tab: `app/(tabs)/equipment/index.tsx` (category list), `app/(tabs)/equipment/[categoryId].tsx` (product grid), `app/(tabs)/equipment/product/[productId].tsx` (product detail).\n8. Verify TypeScript strict mode is enabled in `tsconfig.json`.\n9. Configure path aliases (`@/components`, `@/lib`, `@/hooks`) in `tsconfig.json`.",
           "status": "pending",
-          "implementation": [
-            "Edit k8s/sigma-1-dev/cnpg-cluster.yaml: set spec.instances: 3, ensure failoverDelay is set (e.g., 10s), and pg_hba allows replication.",
-            "Apply: kubectl apply -f k8s/sigma-1-dev/cnpg-cluster.yaml -n sigma-1-dev",
-            "Test: kubectl get cluster sigma-1-pg -n sigma-1-dev -o jsonpath='{.status.readyInstances}' == 3; delete primary pod and verify failover."
-          ]
+          "test_strategy": "Run `npx expo start` and verify the app launches in iOS Simulator and Android Emulator with all five tabs visible. Tapping each tab renders its placeholder screen. Deep navigation in Equipment tab (index → category → product) works via Expo Router links.",
+          "subagentType": "implementer",
+          "parallelizable": false
         },
         {
-          "id": 10002,
-          "title": "Configure Redis HA with Sentinel and update ConfigMap connection string",
+          "id": 9002,
+          "title": "Port design system tokens and build shared component library",
+          "description": "Port the web frontend's design tokens (colors, typography, spacing) to React Native using NativeWind or chosen styling approach. Build the shared component library: ProductCard, AvailabilityBadge, QuoteLineItem, ChatBubble.",
+          "dependencies": [
+            9001
+          ],
+          "details": "1. Install NativeWind v4: `npx expo install nativewind tailwindcss` and configure `tailwind.config.js` to match web design tokens (dark theme colors, spacing scale, border radii).\n2. Create `lib/tokens.ts` exporting color palette, typography scale, and spacing values mirrored from the web Task 8 design system.\n3. Install `expo-font` and load custom brand fonts; configure fallback fonts.\n4. Build `components/ProductCard.tsx`: product image (expo-image), name, price, AvailabilityBadge. Accept `onPress` for navigation.\n5. Build `components/AvailabilityBadge.tsx`: colored badge showing 'Available', 'Limited', 'Unavailable' with appropriate brand colors.\n6. Build `components/QuoteLineItem.tsx`: product name, quantity stepper, date range display, remove action.\n7. Build `components/ChatBubble.tsx`: message text, timestamp, sent/received styling differentiation, support for rich content slot (e.g., embedded ProductCard).\n8. Build common UI primitives: `Button`, `TextInput`, `Card`, `Badge`, `LoadingSpinner`, `EmptyState`.\n9. Ensure all components handle dark theme as default, matching web visual language.",
           "status": "pending",
-          "implementation": [
-            "Create k8s/sigma-1-dev/redis-ha.yaml: Bitnami Redis Helm values for 3 Redis nodes and 3 Sentinels.",
-            "Deploy: helm upgrade --install sigma-1-redis bitnami/redis -f k8s/sigma-1-dev/redis-ha.yaml -n sigma-1-dev",
-            "Update k8s/sigma-1-dev/configmap-infra-endpoints.yaml: set REDIS_URL to redis-sentinel://sentinel-0:26379,sentinel-1:26379,sentinel-2:26379/sigma-1-redis",
-            "Test: redis-cli -h <sentinel-service> -p 26379 sentinel master sigma-1-redis"
-          ]
+          "test_strategy": "Jest + React Native Testing Library: Render each component with mock props and snapshot test. ProductCard renders image, name, price, and badge. ChatBubble differentiates sent vs received styling. QuoteLineItem quantity stepper increments/decrements correctly. Visual check on iOS Simulator at iPhone SE and iPhone 15 Pro widths.",
+          "subagentType": "implementer",
+          "parallelizable": false
         },
         {
-          "id": 10003,
-          "title": "Configure Ingress with TLS termination via cert-manager for PM server",
+          "id": 9003,
+          "title": "Build shared API client with JWT auth and environment configuration",
+          "description": "Create a shared API client module with configurable base URL per environment, JWT token storage in expo-secure-store, automatic token refresh, and Effect-based error handling.",
+          "dependencies": [
+            9001
+          ],
+          "details": "1. Install dependencies: `npx expo install expo-secure-store` and `npm install effect` (or `@effect/io` depending on version).\n2. Create `lib/api/client.ts`: base HTTP client using `fetch` with interceptors for auth headers.\n3. Implement environment config in `lib/config.ts`: read `EXPO_PUBLIC_API_BASE_URL` from env vars, support dev/staging/prod profiles.\n4. Create `lib/auth/tokenStore.ts`: store JWT access token and refresh token in `expo-secure-store`. Export `getToken()`, `setTokens()`, `clearTokens()`.\n5. Implement automatic `Authorization: Bearer <token>` header injection on every API request.\n6. Implement token refresh logic: if 401 received, attempt refresh using stored refresh token, retry original request.\n7. Create typed API modules: `lib/api/equipment.ts` (getCategories, getProducts, getProductDetail), `lib/api/quotes.ts` (createQuote, getQuotes), `lib/api/inventory.ts` (scanBarcode, checkIn, checkOut).\n8. Wrap API calls in Effect for structured error handling (network errors, auth errors, validation errors).\n9. Create a `useApi` hook or context provider that exposes the client instance to components.",
           "status": "pending",
-          "implementation": [
-            "Create k8s/sigma-1-dev/cert-issuer.yaml: ClusterIssuer for Let's Encrypt.",
-            "Create k8s/sigma-1-dev/pm-ingress.yaml: Ingress resource with TLS, rate limiting, and body size annotations.",
-            "Apply: kubectl apply -f k8s/sigma-1-dev/cert-issuer.yaml; kubectl apply -f k8s/sigma-1-dev/pm-ingress.yaml",
-            "Test: kubectl get certificate sigma-1-pm-tls -n sigma-1-dev; curl -k https://<ingress-host>/api/pipeline/status"
-          ]
+          "test_strategy": "Unit test the API client: mock `fetch` to verify correct headers (Authorization, Content-Type) are sent. Test token refresh flow: mock a 401 response followed by successful refresh, verify retry succeeds. Test `expo-secure-store` read/write with mocked module. Verify environment config resolves correct base URL per EXPO_PUBLIC_API_BASE_URL value.",
+          "subagentType": "implementer",
+          "parallelizable": true
         },
         {
-          "id": 10004,
-          "title": "Harden Cilium NetworkPolicies with deny-all default and exact port allowlisting",
+          "id": 9004,
+          "title": "Implement Equipment tab with category browsing, product grid, and infinite scroll",
+          "description": "Build the Equipment tab screens: category list, product grid with infinite scroll pagination, product detail with availability display, and pull-to-refresh across list screens.",
+          "dependencies": [
+            9002,
+            9003
+          ],
+          "details": "1. **Category List** (`equipment/index.tsx`): Fetch categories from API, render as a scrollable list/grid of category cards with icons/images. Pull-to-refresh using `RefreshControl`.\n2. **Product Grid** (`equipment/[categoryId].tsx`): Fetch products for selected category with cursor-based pagination. Use `FlatList` with `onEndReached` for infinite scroll. Render `ProductCard` components in 2-column grid. Pull-to-refresh. Show loading skeleton while fetching.\n3. **Product Detail** (`equipment/product/[productId].tsx`): Fetch single product details. Display full-size image carousel (use `expo-image` or `react-native-reanimated-carousel`), description, specifications, pricing info, `AvailabilityBadge`. Add 'Add to Quote' button that navigates to Quote tab with product pre-selected.\n4. Implement search bar at the top of category list for filtering equipment by name.\n5. Handle empty states (no products in category) and error states (network failure) with retry option.\n6. Use React Query (`@tanstack/react-query`) or SWR for data fetching with caching, background refetch, and stale-while-revalidate.\n7. Optimize `FlatList` performance: `getItemLayout` for fixed-height items, `keyExtractor`, `windowSize` tuning.",
           "status": "pending",
-          "implementation": [
-            "Update k8s/sigma-1-dev/cilium-networkpolicies.yaml: add default deny-all policy and explicit allowlist for required ports/services/FQDNs.",
-            "Apply: kubectl apply -f k8s/sigma-1-dev/cilium-networkpolicies.yaml",
-            "Test: Deploy nettest pod and verify denied/allowed connections as per test strategy."
-          ]
+          "test_strategy": "Component tests: category list renders mock categories; product grid renders 2-column layout with mock products; product detail shows all fields. Integration test: mock paginated API response, verify infinite scroll triggers next page fetch when scrolled to end. Pull-to-refresh test: verify API refetch on refresh gesture. Empty state test: mock empty product response, verify empty state component renders.",
+          "subagentType": "implementer",
+          "parallelizable": true
         },
         {
-          "id": 10005,
-          "title": "Audit and tighten RBAC with dedicated Roles for all service accounts",
+          "id": 9005,
+          "title": "Build Quote Builder tab with step-by-step wizard and submission",
+          "description": "Implement the Quote tab as a multi-step wizard: equipment selection (searchable list), date range picker, venue input, review screen, and API submission to create an opportunity.",
+          "dependencies": [
+            9002,
+            9003
+          ],
+          "details": "1. Create wizard state management using React context or zustand: track current step, selected equipment (array of {productId, quantity}), date range, venue, and contact info.\n2. **Step 1 - Equipment Selector**: Searchable equipment list. Each item shows ProductCard with quantity stepper. Selected items shown as chips/badges at top. 'Next' button enabled when ≥1 item selected.\n3. **Step 2 - Date Range**: Use `@react-native-community/datetimepicker` or Expo's native date picker. Select event start and end dates. Validate end > start.\n4. **Step 3 - Venue Input**: Text input for venue name/address. Optional map integration or just free-text. Add any special instructions textarea.\n5. **Step 4 - Review**: Summary screen showing all `QuoteLineItem` components, dates, venue. Edit buttons to jump back to specific steps. Total estimate if pricing is available.\n6. **Submit**: POST to quotes API with full payload (products, dates, venue). Show loading state during submission. On success, navigate to confirmation screen with quote ID. On failure, show error with retry.\n7. Implement progress indicator (step dots or progress bar) at top of wizard.\n8. Support pre-population: if user tapped 'Add to Quote' from Equipment tab product detail, the product should appear pre-selected in Step 1.",
           "status": "pending",
-          "implementation": [
-            "Audit: kubectl get rolebindings,clusterrolebindings -n sigma-1-dev -o yaml",
-            "Update k8s/sigma-1-dev/pm-serviceaccount.yaml: remove wildcards, add least-privilege Role/RoleBinding for PM server.",
-            "Create k8s/sigma-1-dev/roles.yaml: Roles/RoleBindings for all SAs.",
-            "Apply: kubectl apply -f k8s/sigma-1-dev/pm-serviceaccount.yaml; kubectl apply -f k8s/sigma-1-dev/roles.yaml",
-            "Test: kubectl auth can-i --as=system:serviceaccount:sigma-1-dev:sigma-1-pm-sa create pods -n sigma-1-dev"
-          ]
+          "test_strategy": "Wizard flow test: complete all steps with mock data, verify final submission payload contains correct product IDs, quantities, dates, and venue. Step validation: verify 'Next' is disabled when no equipment selected. Date validation: verify end-before-start shows error. Pre-population test: navigate from product detail with product context, verify Step 1 has product pre-selected. Review screen test: verify all QuoteLineItems render correctly.",
+          "subagentType": "implementer",
+          "parallelizable": true
         },
         {
-          "id": 10006,
-          "title": "Configure secret rotation via external-secrets with refreshInterval and rolling restart triggers",
+          "id": 9006,
+          "title": "Implement offline quote queuing and equipment catalog caching",
+          "description": "Add offline capability: cache equipment catalog locally for offline browsing and queue quote submissions when offline, auto-submitting when connectivity is restored.",
+          "dependencies": [
+            9004,
+            9005
+          ],
+          "details": "1. Install `@react-native-community/netinfo` for connectivity detection.\n2. Create `lib/offline/connectivityMonitor.ts`: export a `useIsOnline()` hook that reflects current network state.\n3. **Equipment caching**: After successful API fetch of categories and products, persist to AsyncStorage (or MMKV if chosen). On app launch or when offline, read from cache. Display a banner indicating 'Viewing cached data' when offline.\n4. **Quote queue**: Create `lib/offline/quoteQueue.ts`. When submitting a quote and `isOnline === false`, serialize the quote payload and store in AsyncStorage under a queue key. Show user a 'Quote saved — will submit when online' toast.\n5. **Queue processor**: On connectivity restored (NetInfo event), read pending quotes from queue, submit each sequentially, remove from queue on success. Show local notification on successful background submission.\n6. Implement queue status indicator in Quote tab: show count of pending offline quotes.\n7. Handle edge case: if the same quote is queued multiple times, deduplicate by hash of payload.",
           "status": "pending",
-          "implementation": [
-            "Update all k8s/sigma-1-dev/externalsecret-*.yaml: add spec.refreshInterval: 1h",
-            "Create k8s/sigma-1-dev/reloader.yaml: stakater/reloader manifest or Helm values.",
-            "Annotate Deployments with reloader.stakater.com/auto: \"true\"",
-            "Apply: kubectl apply -f k8s/sigma-1-dev/externalsecret-*.yaml; helm install reloader stakater/reloader -n sigma-1-dev",
-            "Test: Modify secret in AWS Secrets Manager, wait for refresh, verify resourceVersion and pod restart."
-          ]
+          "test_strategy": "Mock NetInfo to simulate offline state. Attempt quote submission while offline — verify payload is stored in AsyncStorage queue. Simulate connectivity restored — verify queued quote is submitted via API. Verify equipment catalog renders from cache when offline. Verify 'cached data' banner appears. Deduplicate test: queue same payload twice, verify only one submission.",
+          "subagentType": "implementer",
+          "parallelizable": false
         },
         {
-          "id": 10007,
-          "title": "Add audit logging for namespace security events",
+          "id": 9007,
+          "title": "Build Morgan Chat tab with WebSocket connection and message history",
+          "description": "Implement the dedicated Morgan chat screen with full-screen WebSocket-based conversation, message history persistence in AsyncStorage, and support for rich messages (interactive product cards).",
+          "dependencies": [
+            9002,
+            9003
+          ],
+          "details": "1. Create `lib/chat/websocket.ts`: WebSocket client connecting to Morgan agent endpoint (same URL as web frontend). Handle connection lifecycle: connect, reconnect on drop (exponential backoff), disconnect on screen unmount or app background.\n2. Build `screens/chat/ChatScreen.tsx`: Full-screen layout with message list (`FlatList` inverted), text input bar with send button, and connection status indicator.\n3. Render messages using `ChatBubble` component. Differentiate user messages (right-aligned) from Morgan messages (left-aligned, with avatar).\n4. **Rich messages**: Parse Morgan responses for embedded product references. Render interactive `ProductCard` within the chat that the user can tap to navigate to Equipment product detail.\n5. **Message history**: On conversation load, fetch message history from server API. Persist messages locally in AsyncStorage keyed by conversation ID. On reconnect, sync delta from server.\n6. **Photo sending**: Integrate `expo-image-picker` for camera/gallery photo selection. Upload photo to social engine endpoint. Send photo message reference through WebSocket. Display photo thumbnails in chat.\n7. Implement typing indicator when Morgan is processing.\n8. Auto-scroll to latest message on new incoming message. Manual scroll-up should disable auto-scroll until user scrolls back to bottom.",
           "status": "pending",
-          "implementation": [
-            "Create k8s/sigma-1-dev/falco.yaml: Falco DaemonSet manifest for sigma-1-dev.",
-            "Apply: kubectl apply -f k8s/sigma-1-dev/falco.yaml",
-            "Test: Access a secret and verify Falco logs the event."
-          ]
+          "test_strategy": "Mock WebSocket: send a user message, verify it appears in FlatList as sent bubble. Mock incoming Morgan message, verify it appears as received bubble with avatar. Rich message test: mock a message containing product reference, verify ProductCard renders inline. Photo test: mock image picker selection, verify upload API called and photo thumbnail appears in chat. History test: mock API returning prior messages, verify they render on screen load.",
+          "subagentType": "implementer",
+          "parallelizable": true
         },
         {
-          "id": 10008,
-          "title": "Document all production hardening changes in docs/production-hardening.md",
+          "id": 9008,
+          "title": "Integrate push notifications for Morgan chat via Expo Notifications",
+          "description": "Set up Expo Notifications to receive push notifications for incoming Morgan messages when the app is backgrounded, including permission handling and notification tap navigation.",
+          "dependencies": [
+            9007
+          ],
+          "details": "1. Install `expo-notifications` and `expo-device`.\n2. Create `lib/notifications/setup.ts`: request notification permissions on first launch (iOS requires explicit prompt). Store Expo push token and register it with the backend API.\n3. Configure notification handler: when app is in foreground, show in-app notification banner (not system notification). When app is backgrounded, system notification appears.\n4. Implement notification tap handler: tapping a Morgan message notification deep-links to the Chat tab and scrolls to the relevant message.\n5. Configure `app.json` / `app.config.ts` with notification settings: icon, color, sound for Android; category for iOS.\n6. Create `lib/notifications/tokenRefresh.ts`: handle push token refresh and re-register with backend.\n7. Handle permission denied gracefully: show settings prompt if user previously denied.",
           "status": "pending",
-          "implementation": [
-            "Create docs/production-hardening.md with sections for each hardening measure, rationale, YAML/config references, and verification commands.",
-            "Add summary table and ensure at least 6 sections and 500+ words.",
-            "Test: grep for section headers, check word count, and verify presence of rationale and verification in each section."
-          ]
+          "test_strategy": "Mock Expo Notifications module. Verify push token is obtained and sent to backend API on first launch. Verify foreground notification renders in-app banner. Verify notification tap handler navigates to Chat tab. Verify permission denied state shows appropriate UI prompt.",
+          "subagentType": "implementer",
+          "parallelizable": false
+        },
+        {
+          "id": 9009,
+          "title": "Implement Barcode Scan tab with camera scanner and RMS integration",
+          "description": "Build the Scan tab with camera-based barcode detection using expo-camera, integration with RMS ScanBarcode API, equipment details display, and check-in/check-out actions with haptic feedback.",
+          "dependencies": [
+            9002,
+            9003
+          ],
+          "details": "1. Install `expo-camera` and `expo-haptics`.\n2. Build `screens/scan/ScanScreen.tsx`: Full-screen camera viewfinder with barcode scanning overlay (targeting area indicator). Request camera permissions on first access.\n3. Configure barcode types to detect: Code128, QR, EAN13 (based on RMS barcode format).\n4. On barcode detected: trigger haptic feedback (`Haptics.notificationAsync(Success)`), pause scanner, call `POST /api/v1/inventory/scan` with scanned barcode value.\n5. Build `screens/scan/EquipmentDetailSheet.tsx`: Bottom sheet or modal displaying scanned equipment details (name, serial number, current status, last location, assigned event).\n6. Add action buttons in detail sheet: 'Check Out' (assign to event/user) and 'Check In' (return to inventory). Each calls respective RMS API endpoint.\n7. Handle scan errors: invalid barcode (not found in RMS) shows 'Equipment not found' state. Network error shows retry option.\n8. Add manual entry option: text input for typing barcode number if camera scan fails.\n9. Handle camera permission denied: show explanation and settings link.",
+          "status": "pending",
+          "test_strategy": "Mock expo-camera barcode detection event with a test barcode value. Verify RMS scan API is called with the correct barcode. Mock successful API response, verify equipment detail sheet renders with name, status, serial number. Verify 'Check Out' button calls check-out API. Verify haptic feedback triggered on scan. Mock 'not found' API response, verify error state renders. Manual entry test: type barcode, submit, verify same API flow.",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 9010,
+          "title": "Build Profile/Settings tab with user info and notification preferences",
+          "description": "Implement the Profile tab displaying user information, notification preference toggles, saved quotes list, and sign-out functionality.",
+          "dependencies": [
+            9002,
+            9003
+          ],
+          "details": "1. Build `screens/profile/ProfileScreen.tsx`: Display user avatar, name, email, company from JWT claims or user API endpoint.\n2. **Notification preferences**: Toggle switches for push notifications (Morgan messages, quote updates, equipment alerts). Persist preferences to backend API and locally.\n3. **Saved quotes**: List of user's submitted and draft quotes. Each item shows quote ID, date, status (pending, approved, rejected), total. Tap navigates to quote detail.\n4. **Sign out**: Clear JWT tokens from expo-secure-store, clear AsyncStorage caches, disconnect WebSocket, navigate to auth/login screen.\n5. Add app version display at bottom of profile screen.\n6. Optional: Theme toggle (if supporting light/dark modes), language selector.",
+          "status": "pending",
+          "test_strategy": "Render profile screen with mock user data, verify name/email displayed. Toggle notification preference, verify API call and local persistence. Verify saved quotes list renders mock quotes with correct status badges. Sign out test: verify tokens cleared from secure store, navigation to login screen triggered.",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 9011,
+          "title": "Configure EAS Build profiles, app branding, and production build pipeline",
+          "description": "Set up EAS Build with development, preview, and production profiles. Configure app icons, splash screen, and branding assets. Verify builds for both iOS and Android platforms.",
+          "dependencies": [
+            9001
+          ],
+          "details": "1. Install EAS CLI: `npm install -g eas-cli`. Run `eas init` to link project.\n2. Create `eas.json` with three build profiles:\n   - `development`: development client build with expo-dev-client, internal distribution.\n   - `preview`: production-like build for testing, internal distribution (Ad Hoc for iOS, APK for Android).\n   - `production`: store-ready build with proper signing.\n3. Configure iOS provisioning: set up App Store Connect API key or Apple Developer credentials in EAS.\n4. Configure Android keystore: generate upload keystore, store in EAS secrets.\n5. Design and export app icon (1024x1024) matching Sigma-1 brand. Configure in `app.json` under `icon`.\n6. Design and export splash screen with Sigma-1 logo. Configure `splash` in `app.json` with background color matching dark theme.\n7. Configure adaptive icon for Android (foreground + background layers).\n8. Set `app.json` metadata: `name`, `slug`, `version`, `ios.bundleIdentifier`, `android.package`, `ios.buildNumber`, `android.versionCode`.\n9. Run `eas build --platform all --profile preview` to verify both platforms build successfully.\n10. Configure OTA updates via `expo-updates` for non-native code changes.",
+          "status": "pending",
+          "test_strategy": "Run `eas build --platform ios --profile preview` and verify it completes without errors and produces a valid .ipa. Run `eas build --platform android --profile preview` and verify it produces a valid .apk. Install preview builds on physical devices and verify app icon, splash screen, and basic navigation work. Verify `eas.json` contains all three profiles with correct distribution settings.",
+          "subagentType": "implementer",
+          "parallelizable": true
         }
-      ],
-      "test_strategy": [
-        "CloudNative-PG: status.readyInstances == 3; simulate failover by deleting primary pod.",
-        "Redis: redis-cli sentinel master returns valid master with 2 replicas; test failover.",
-        "Ingress: curl and openssl s_client to verify TLS and HTTP 200.",
-        "NetworkPolicies: nettest pod cannot connect to PM server; PM server can reach allowed services.",
-        "RBAC: kubectl auth can-i for each SA and verb.",
-        "Secret rotation: resourceVersion changes after backend update; pods restart automatically.",
-        "Audit logging: Falco logs secret access events.",
-        "Documentation: docs/production-hardening.md exists, 6+ sections, rationale and verification in each."
       ]
     }
+  },
+  {
+    "next_actions": [
+      {
+        "action": "decompose",
+        "target": "task",
+        "id": 10,
+        "subtasks": [
+          10001,
+          10002,
+          10003,
+          10004,
+          10005,
+          10006,
+          10007,
+          10008,
+          10009,
+          10010,
+          10011,
+          10012,
+          10013,
+          10014,
+          10015,
+          10016,
+          10017,
+          10018,
+          10019,
+          10020,
+          10021
+        ]
+      },
+      {
+        "action": "parallelize",
+        "subtasks": [
+          10001,
+          10002,
+          10003,
+          10009,
+          10011,
+          10013,
+          10014,
+          10016,
+          10019,
+          10020,
+          10021
+        ]
+      },
+      {
+        "action": "sequence",
+        "subtasks": [
+          [
+            10001,
+            10002
+          ],
+          [
+            10011,
+            10012
+          ],
+          [
+            10014,
+            10015
+          ],
+          [
+            10016,
+            10017,
+            10018
+          ],
+          [
+            10009,
+            10010
+          ]
+        ]
+      },
+      {
+        "action": "gate",
+        "subtasks": [
+          [
+            10004,
+            10005
+          ],
+          [
+            10004,
+            10006
+          ],
+          [
+            10004,
+            10007
+          ],
+          [
+            10004,
+            10008
+          ],
+          [
+            10016,
+            10017
+          ],
+          [
+            10017,
+            10018
+          ],
+          [
+            10014,
+            10015
+          ]
+        ]
+      },
+      {
+        "action": "document_decision_points",
+        "decision_points": [
+          "Container registry choice: ghcr.io vs Cloudflare Container Registry",
+          "Valkey HA strategy: Sentinel mode (if operator supports) vs documented single-instance limitation",
+          "Internal mTLS: implement now with cert-manager or defer to Phase 2",
+          "GDPR orchestrator trigger model: Morgan-triggered Kubernetes Job vs CronJob polling a queue table",
+          "Secret rotation strategy: manual documented process vs external-secrets-operator automation",
+          "Alerting destination: PagerDuty vs Signal notification vs both"
+        ]
+      }
+    ]
   }
 ]
