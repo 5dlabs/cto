@@ -34,10 +34,10 @@ export function ComparisonMap({ rows, callout }: ComparisonMapProps) {
               {row.from}
             </span>
 
-            {/* Animated arrow */}
+            {/* Animated arrow (screen) + static fallback (print) */}
             <motion.svg
               viewBox="0 0 40 16"
-              className="w-10 h-4 text-cyan"
+              className="w-10 h-4 text-cyan print:hidden"
               initial={{ pathLength: 0 }}
               whileInView={{ pathLength: 1 }}
               viewport={{ once: true }}
@@ -59,6 +59,19 @@ export function ComparisonMap({ rows, callout }: ComparisonMapProps) {
                 }}
               />
             </motion.svg>
+            <svg
+              viewBox="0 0 40 16"
+              className="w-10 h-4 text-cyan hidden print:block"
+            >
+              <path
+                d="M2 8 L30 8 M26 4 L32 8 L26 12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
 
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-cyan">{row.to}</span>

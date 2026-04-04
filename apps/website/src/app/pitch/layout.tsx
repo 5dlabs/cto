@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     follow: false,
   },
   alternates: {
-    canonical: "/investors/",
+    canonical: "/pitch/",
   },
   openGraph: {
     title: "5D Labs — Pitch Deck",
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default function InvestorsLayout({
+export default function PitchLayout({
   children,
 }: {
   children: React.ReactNode;

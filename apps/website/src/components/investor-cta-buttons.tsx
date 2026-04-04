@@ -24,7 +24,7 @@ export function InvestorCtaButtons() {
         Schedule a Call
       </motion.a>
       <motion.a
-        href="/cto/morgan"
+        href="https://5dlabs.ai/cto/morgan"
         className={secondaryClass}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
@@ -34,7 +34,7 @@ export function InvestorCtaButtons() {
         Talk to Morgan
       </motion.a>
       <motion.a
-        href="/founder"
+        href="https://5dlabs.ai/founder"
         className={secondaryClass}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
