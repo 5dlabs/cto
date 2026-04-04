@@ -203,9 +203,9 @@ function renderTable(
 function drawTractionStats(doc: jsPDF, margin: number, y: number, maxW: number): number {
   const metrics = TRACTION_METRICS;
   const cols = metrics.length;
-  const gap = 3;
+  const gap = 4;
   const boxW = (maxW - gap * (cols - 1)) / cols;
-  const boxH = 28;
+  const boxH = 40;
 
   y = ensureSpace(doc, y, boxH + 4, margin);
 
@@ -219,20 +219,20 @@ function drawTractionStats(doc: jsPDF, margin: number, y: number, maxW: number):
     doc.roundedRect(bx, y, boxW, boxH, 1.5, 1.5, "FD");
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
+    doc.setFontSize(22);
     doc.setTextColor(...T.accent);
-    doc.text(safe(m.value), bx + boxW / 2, y + 10, { align: "center" });
+    doc.text(safe(m.value), bx + boxW / 2, y + 14, { align: "center" });
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
+    doc.setFontSize(11);
     doc.setTextColor(...T.text);
-    doc.text(safe(m.label), bx + boxW / 2, y + 16.5, { align: "center" });
+    doc.text(safe(m.label), bx + boxW / 2, y + 22, { align: "center" });
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.5);
+    doc.setFontSize(8);
     doc.setTextColor(...T.muted);
     const noteLines: string[] = doc.splitTextToSize(safe(m.note), boxW - 6);
-    let ny = y + 20.5;
+    let ny = y + 28;
     for (const nl of noteLines) {
       doc.text(nl, bx + boxW / 2, ny, { align: "center" });
       ny += 3;
@@ -244,15 +244,16 @@ function drawTractionStats(doc: jsPDF, margin: number, y: number, maxW: number):
 
 function drawMarketRings(doc: jsPDF, margin: number, y: number, maxW: number): number {
   const rings = MARKET_RINGS;
-  const heights = [42, 30, 18];
+  const heights = [70, 48, 26];
   const widths = [maxW * 0.85, maxW * 0.6, maxW * 0.35];
   const fills: RGB[] = [[18, 28, 42], [20, 35, 50], [25, 45, 60]];
-  const borders: RGB[] = [[40, 80, 120], [50, 120, 160], T.accent];
+  const borders: RGB[] = [[50, 90, 130], [60, 130, 170], T.accent];
   const cx = margin + maxW / 2;
 
   y = ensureSpace(doc, y, heights[0] + 8, margin);
   const baseY = y;
 
+  /* Draw all fills first (large to small) */
   for (let i = 0; i < rings.length; i++) {
     const w = widths[i];
     const h = heights[i];
@@ -261,17 +262,37 @@ function drawMarketRings(doc: jsPDF, margin: number, y: number, maxW: number): n
 
     doc.setFillColor(...fills[i]);
     doc.setDrawColor(...borders[i]);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(rx, ry, w, h, 2, 2, "FD");
+    doc.setLineWidth(i === 2 ? 0.5 : 0.3);
+    doc.roundedRect(rx, ry, w, h, 3, 3, "FD");
+  }
 
-    const textY = ry + h / 2 - 1;
+  /* Draw text AFTER all fills so nothing is covered */
+  for (let i = 0; i < rings.length; i++) {
+    const h = heights[i];
+    const ry = baseY + (heights[0] - h) / 2;
+
+    /* Position text in the visible strip between this ring and the next inner one */
+    let textY: number;
+    if (i < rings.length - 1) {
+      const innerH = heights[i + 1];
+      const innerRy = baseY + (heights[0] - innerH) / 2;
+      /* Midpoint of visible top strip */
+      textY = ry + (innerRy - ry) / 2 + 1;
+    } else {
+      /* Innermost ring — center */
+      textY = ry + h / 2 - 2;
+    }
+
+    const labelFs = i === 2 ? 14 : i === 1 ? 12 : 11;
+    const descFs = i === 2 ? 10 : 9;
+
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(i === 2 ? 11 : i === 1 ? 10 : 9);
+    doc.setFontSize(labelFs);
     doc.setTextColor(...T.accent);
     doc.text(safe(`${rings[i].label}: ${rings[i].value}`), cx, textY, { align: "center" });
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(i === 2 ? 8 : 7);
+    doc.setFontSize(descFs);
     doc.setTextColor(...T.text);
     doc.text(safe(rings[i].description), cx, textY + 5, { align: "center" });
   }
@@ -282,7 +303,7 @@ function drawMarketRings(doc: jsPDF, margin: number, y: number, maxW: number): n
 function drawCompetitionQuadrant(doc: jsPDF, margin: number, y: number, maxW: number): number {
   const cells = COMPETITION_QUADRANT;
   const cellW = maxW / 2;
-  const cellH = 28;
+  const cellH = 38;
   const totalH = cellH * 2;
 
   y = ensureSpace(doc, y, totalH + 4, margin);
@@ -304,18 +325,18 @@ function drawCompetitionQuadrant(doc: jsPDF, margin: number, y: number, maxW: nu
 
     const lblColor: RGB = isHl ? T.accent : T.muted;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
+    doc.setFontSize(9);
     doc.setTextColor(...lblColor);
-    doc.text(safe(cell.label), cx + 4, cy + 5);
+    doc.text(safe(cell.label), cx + 5, cy + 7);
 
     const txtColor: RGB = isHl ? T.accent : T.text;
     doc.setFont("helvetica", isHl ? "bold" : "normal");
-    doc.setFontSize(isHl ? 11 : 8);
+    doc.setFontSize(isHl ? 14 : 11);
     doc.setTextColor(...txtColor);
-    let py = cy + 11;
+    let py = cy + 15;
     for (const p of cell.players) {
-      doc.text(safe(p), cx + 4, py);
-      py += isHl ? 5.5 : 4;
+      doc.text(safe(p), cx + 5, py);
+      py += isHl ? 7 : 5.5;
     }
   }
 
@@ -324,8 +345,8 @@ function drawCompetitionQuadrant(doc: jsPDF, margin: number, y: number, maxW: nu
 
 function drawFundBars(doc: jsPDF, margin: number, y: number, maxW: number): number {
   const items = FUND_ALLOCATION;
-  const barH = 7;
-  const gap = 3;
+  const barH = 9;
+  const gap = 4;
   const labelW = maxW * 0.42;
   const barAreaW = maxW * 0.40;
   const barX = margin + labelW;
@@ -335,19 +356,19 @@ function drawFundBars(doc: jsPDF, margin: number, y: number, maxW: number): numb
 
   for (const item of items) {
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
+    doc.setFontSize(11);
     doc.setTextColor(...T.text);
     doc.text(safe(item.label), margin, y + barH * 0.65);
 
     doc.setFillColor(20, 25, 40);
-    doc.roundedRect(barX, y, barAreaW, barH, 1, 1, "F");
+    doc.roundedRect(barX, y, barAreaW, barH, 1.5, 1.5, "F");
 
     const fillW = Math.max((item.percent / 100) * barAreaW, 2);
     doc.setFillColor(...T.accent);
-    doc.roundedRect(barX, y, fillW, barH, 1, 1, "F");
+    doc.roundedRect(barX, y, fillW, barH, 1.5, 1.5, "F");
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
+    doc.setFontSize(11);
     doc.setTextColor(...T.accent);
     doc.text(safe(item.value), barX + barAreaW + 3, y + barH * 0.65);
 
@@ -359,8 +380,8 @@ function drawFundBars(doc: jsPDF, margin: number, y: number, maxW: number): numb
 
 function drawPipelineFlow(doc: jsPDF, margin: number, y: number, maxW: number): number {
   const stages = PIPELINE_STAGES;
-  const boxW = 35;
-  const boxH = 14;
+  const boxW = 40;
+  const boxH = 18;
   const arrowW = 10;
   const totalW = stages.length * boxW + (stages.length - 1) * arrowW;
   const startX = margin + (maxW - totalW) / 2;
@@ -380,9 +401,9 @@ function drawPipelineFlow(doc: jsPDF, margin: number, y: number, maxW: number): 
 
     const txtColor: RGB = isEnd ? T.accent : T.text;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFontSize(12);
     doc.setTextColor(...txtColor);
-    doc.text(stages[i], bx + boxW / 2, y + boxH / 2 + 1.5, { align: "center" });
+    doc.text(stages[i], bx + boxW / 2, y + boxH / 2 + 2, { align: "center" });
 
     if (i < stages.length - 1) {
       const ax = bx + boxW + 1;
@@ -406,10 +427,10 @@ function drawCareerTimeline(doc: jsPDF, margin: number, y: number, maxW: number,
     { company: "5D Labs", detail: "Solo built: platform, first customer, $240K pipeline, 17+ server deployments.", current: true },
   ];
 
-  const dotR = 2;
+  const dotR = 3;
   const lineX = margin + dotR;
-  const textX = margin + dotR * 2 + 4;
-  const itemH = 14;
+  const textX = margin + dotR * 2 + 6;
+  const itemH = 20;
   const totalH = milestones.length * itemH;
 
   y = ensureSpace(doc, y, totalH + 4, margin);
@@ -438,10 +459,10 @@ function drawCareerTimeline(doc: jsPDF, margin: number, y: number, maxW: number,
     doc.setFontSize(fs - 2);
     doc.setTextColor(...T.muted);
     const detailLines: string[] = doc.splitTextToSize(safe(m.detail), maxW - textX + margin);
-    let dy = cy + 7;
+    let dy = cy + 9;
     for (const dl of detailLines) {
       doc.text(dl, textX, dy);
-      dy += 3.5;
+      dy += 4.5;
     }
   }
 
@@ -450,8 +471,8 @@ function drawCareerTimeline(doc: jsPDF, margin: number, y: number, maxW: number,
 
 function drawFunnel(doc: jsPDF, margin: number, y: number, maxW: number): number {
   const stages = FUNNEL_STAGES;
-  const stageH = 16;
-  const gap = 2;
+  const stageH = 20;
+  const gap = 3;
   const centerX = margin + maxW / 2;
   const fills: RGB[] = [[18, 28, 42], [23, 33, 48], [28, 38, 54]];
   const borders: RGB[] = [[55, 65, 85], [65, 80, 100], [80, 100, 120]];
@@ -472,14 +493,14 @@ function drawFunnel(doc: jsPDF, margin: number, y: number, maxW: number): number
     doc.roundedRect(bx, by, w, stageH, 1.5, 1.5, "FD");
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFontSize(12);
     doc.setTextColor(...T.accent);
-    doc.text(safe(s.label), centerX, by + 5.5, { align: "center" });
+    doc.text(safe(s.label), centerX, by + 7, { align: "center" });
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
+    doc.setFontSize(9);
     doc.setTextColor(...T.text);
-    doc.text(safe(s.description), centerX, by + 11, { align: "center" });
+    doc.text(safe(s.description), centerX, by + 14, { align: "center" });
   }
 
   return y + totalH + 4;
@@ -497,8 +518,8 @@ export async function createPitchDeckPdfBlob(
   const maxW = PG.w - 2 * margin;
 
   const sizes = density === "compact"
-    ? { meta: 9, label: 10, headline: 28, sub: 16, body: 14, small: 10, table: 10 }
-    : { meta: 10, label: 11, headline: 32, sub: 18, body: 16, small: 11, table: 11 };
+    ? { meta: 10, label: 11, headline: 34, sub: 18, body: 18, small: 11, table: 9 }
+    : { meta: 11, label: 12, headline: 38, sub: 20, body: 20, small: 12, table: 10 };
 
   const doc = new JsPDF({ orientation: "landscape", unit: "mm", format: [PG.w, PG.h] });
 

@@ -575,7 +575,7 @@ export default function PitchPage() {
                 <div className="bg-card/40 p-5">
                   <p className="text-xs font-mono text-foreground/60 uppercase tracking-wider mb-3">Cloud-managed + AI-built</p>
                   <div className="space-y-1.5">
-                    {["Replit / Bolt", "GitHub Copilot Workspace", "Vercel v0"].map((name) => (
+                    {["Devin (Cognition)", "Replit / Bolt", "GitHub Copilot Workspace", "Vercel v0"].map((name) => (
                       <p key={name} className="text-sm text-foreground/80">{name}</p>
                     ))}
                   </div>
