@@ -1,35 +1,37 @@
-Implement task 6: Scaffold Web Frontend with Agent Assignment Visualization (Blaze - React/Next.js)
+Implement task 6: Validate End-to-End Pipeline Completion (Tess - Test frameworks)
 
 ## Goal
-Create or extend the web frontend application to display pipeline task lists with agent assignment visualization. Each task card shows the delegate_id as an agent avatar/badge, assignment status, and task metadata. Uses shadcn/ui (per D6) with Radix UI primitives for accessibility. Note: This task is contingent on D5 resolution — if D5 resolves to defer frontend tasks, this task should be skipped.
+Build and execute an end-to-end test suite that validates the full intake pipeline completes through all stages — deliberation, task generation, issue creation with agent assignments, and notifications — for a single PRD. This is the primary acceptance gate for the Sigma-1 E2E validation run.
 
 ## Task Context
-- Agent owner: blaze
-- Stack: React/Next.js
-- Priority: medium
-- Dependencies: 2
+- Agent owner: tess
+- Stack: Test frameworks
+- Priority: high
+- Dependencies: 2, 3, 4, 5
 
 ## Implementation Plan
-1. Initialize or extend the Next.js application in the project with shadcn/ui components (per D6, using the team's tweakcn configuration if accessible, otherwise shadcn/ui defaults).
-2. Create a pipeline dashboard page at `/pipeline/[sessionId]` that fetches task data from the PM server API.
-3. Implement a `TaskCard` component using shadcn/ui Card, Badge, and Avatar components: display task title, agent name, stack, priority, status, and dependencies. Show `delegate_id` as an agent avatar with the agent name (e.g., 'Bolt', 'Nova') as a badge. Use color-coded badges: green for assigned, amber for unresolved (`agent:unresolved`), gray for pending.
-4. Implement a `TaskList` component that renders all tasks in dependency order with a visual dependency graph (simple indentation or connecting lines).
-5. Add a summary header showing: total tasks, assigned count, unresolved count, pipeline status.
-6. Use `envFrom` to read the PM server API URL from `sigma-1-infra-endpoints` ConfigMap.
-7. Ensure all components meet WCAG 2.1 AA accessibility standards (Radix primitives handle focus management, keyboard navigation, and ARIA attributes).
-8. No authentication implementation — this is deferred per D7 recommendation (Cloudflare Access handles auth at ingress layer).
-9. Write component tests for: TaskCard rendering with assigned agent, TaskCard rendering with unresolved agent, TaskList ordering by dependencies, summary header counts.
+1. Determine the existing test framework in the repository (Jest, Vitest, or other). Use what's configured; do not introduce a new framework.
+2. Create a test file `e2e/pipeline-completion.test.ts` (or matching existing convention).
+3. Test case 1 — Full pipeline execution: POST a sample PRD to the PM server's pipeline trigger endpoint. Assert: response status 200, response body contains `pipelineRunId` and `status: 'complete'`.
+4. Test case 2 — Task generation: query the pipeline results (GET `/api/pipeline/runs/{runId}/tasks`). Assert: at least 5 tasks returned, each with a non-empty `title`, `agent`, and `stack` field.
+5. Test case 3 — Agent assignments: for each generated task, assert the `delegate_id` or `assigneeId` field is present and non-null for at least 80% of tasks (allowing for unmapped agents).
+6. Test case 4 — Linear session: query pipeline results for Linear session metadata. Assert: `linearSessionId` is non-null, `issueCount >= 5`.
+7. Test case 5 — PR creation: query pipeline results for PR metadata. Assert: `prUrl` is non-null and matches `https://github.com/5dlabs/sigma-1/pull/\d+` pattern.
+8. Test case 6 — Pipeline timing: assert total pipeline execution time is less than 300 seconds (5 minute SLA).
+9. Test case 7 — No fatal errors: assert PM server logs for the run contain zero entries with `level: 'fatal'` or `level: 'error'` with `fatal: true`.
+10. Set test timeout to 360 seconds to accommodate external API latency.
+11. Use environment variables for PM server URL and auth credentials. Document required env vars in the test file header.
 
 ## Acceptance Criteria
-1. Component test: TaskCard rendered with `delegate_id='user_123'` and `agent='nova'` displays 'Nova' badge in green and shows the avatar. 2. Component test: TaskCard rendered with `delegate_id=null` displays 'Unresolved' badge in amber. 3. Component test: TaskList with 5 tasks renders them in dependency order (no task appears before its dependencies). 4. Component test: Summary header shows correct counts — given 5 tasks with 4 assigned and 1 unresolved, displays '5 tasks, 4 assigned, 1 unresolved'. 5. Accessibility test: All interactive elements in TaskCard and TaskList are keyboard-navigable and have appropriate ARIA labels (tested via @testing-library/jest-dom axe integration).
+All 7 test cases must pass in a single test run against the deployed dev environment. Specific pass criteria: 1. Pipeline returns `status: 'complete'` with a valid `pipelineRunId`. 2. Task count >= 5 with all required fields populated. 3. >= 80% of tasks have non-null `delegate_id`. 4. Linear session exists with >= 5 issues. 5. PR URL matches GitHub sigma-1 repo pattern. 6. Execution time < 300s. 7. Zero fatal log entries. Test report is generated as a JUnit XML artifact for CI integration.
 
 ## Subtasks
-- Initialize Next.js application with shadcn/ui setup: Set up or extend the Next.js project with shadcn/ui component library, Tailwind CSS configuration, and project structure for the pipeline dashboard feature.
-- Create pipeline dashboard page with data fetching: Implement the `/pipeline/[sessionId]` page route that fetches task data from the PM server API and passes it to child components.
-- Implement TaskCard component with agent avatar and color-coded badges: Build the TaskCard component using shadcn/ui Card, Badge, and Avatar primitives to display task metadata with agent assignment visualization and color-coded status indicators.
-- Implement TaskList component with dependency-ordered rendering: Build the TaskList component that topologically sorts tasks by their dependencies and renders TaskCards in correct order with visual dependency indicators.
-- Implement pipeline summary header component: Build a summary header component that displays aggregate pipeline statistics: total tasks, assigned count, unresolved count, and pipeline status.
-- Write component tests and accessibility tests: Write comprehensive component tests for TaskCard, TaskList, and PipelineSummary, plus accessibility tests verifying WCAG 2.1 AA compliance using axe-core.
+- Detect existing test framework and configure E2E test scaffold: Inspect the repository for the configured test framework (Jest, Vitest, or other), identify the existing test directory convention, and create the foundational test file `e2e/pipeline-completion.test.ts` with proper imports, describe blocks, global timeout configuration (360s), and environment variable documentation.
+- Implement pipeline trigger test and timing SLA assertion: Implement test case 1 (full pipeline execution — POST PRD, assert completion) and test case 6 (pipeline timing < 300s). These are the foundational tests that must pass before any downstream artifact checks.
+- Implement task generation and agent assignment validation tests: Implement test case 2 (task generation — at least 5 tasks with required fields) and test case 3 (agent assignments — >= 80% delegate coverage).
+- Implement Linear session and PR creation validation tests: Implement test case 4 (Linear session — linearSessionId non-null, issueCount >= 5) and test case 5 (PR creation — prUrl matches GitHub pattern).
+- Implement no-fatal-errors log validation test: Implement test case 7 — assert PM server logs for the pipeline run contain zero fatal-level entries.
+- Execute full E2E test suite and generate JUnit XML report: Run all 7 test cases in a single test execution against the deployed dev environment, verify all pass, and confirm JUnit XML artifact is generated.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

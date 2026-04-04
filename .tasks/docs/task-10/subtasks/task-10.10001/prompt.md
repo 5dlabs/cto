@@ -1,17 +1,16 @@
-Implement subtask 10001: Create Cloudflare Tunnel CR with route mapping for PM server and frontend
+Implement subtask 10001: Scale CloudNative-PG cluster to 3 replicas with automated failover
 
 ## Objective
-Create an accesstunnel or clustertunnel Custom Resource in the sigma-1-dev namespace to expose services via Cloudflare Tunnel. Configure route mappings for /api/* to the PM server service and / to the frontend service (if in scope per D5). TLS terminates at Cloudflare edge. No NGINX or other ingress controller.
+Update the CloudNative-PG Cluster CR `sigma-1-pg` to run 3 instances (1 primary, 2 read replicas) with automated failover enabled. Validate that all replicas reach ready state and streaming replication is active.
 
 ## Steps
-1. Create `manifests/production/cloudflare-tunnel.yaml` with an `accesstunnel` or `clustertunnel` CR (use whichever CRD is installed on the cluster — check with `kubectl api-resources | grep tunnel`).
-2. Set the CR namespace to `sigma-1-dev`. Configure the tunnel name (e.g., `sigma-1-tunnel`).
-3. Add ingress rules in the CR spec:
-   - Rule 1: path `/api/*` → service `sigma-1-pm-server` on port 8080 (or whatever the PM server service port is).
-   - Rule 2: path `/` → service `sigma-1-frontend` on port 3000 (only if D5 includes Tasks 6-9; otherwise omit).
-4. Configure TLS settings: `originRequest.noTLSVerify: true` if services use HTTP internally, since TLS terminates at Cloudflare edge.
-5. Apply the manifest: `kubectl apply -f manifests/production/cloudflare-tunnel.yaml`.
-6. Verify the tunnel CR reaches 'Active' or 'Ready' status.
+1. Edit the `sigma-1-pg` Cluster CR YAML: set `spec.instances: 3`.
+2. Ensure `spec.postgresql.pg_hba` allows replication connections between pods.
+3. Verify `spec.failoverDelay` or equivalent failover settings are configured for fast promotion (target <30s).
+4. Apply the updated CR: `kubectl apply -f cnpg-cluster.yaml -n sigma-1-dev`.
+5. Wait for all 3 pods to reach Running/Ready: `kubectl get pods -l cnpg.io/cluster=sigma-1-pg -n sigma-1-dev`.
+6. Confirm `status.instances == 3` and `status.readyInstances == 3` on the Cluster resource.
+7. Verify streaming replication: connect to a replica and run `SELECT pg_is_in_recovery();` — should return `true`.
 
 ## Validation
-`kubectl get accesstunnel -n sigma-1-dev` (or `clustertunnel`) returns the CR in 'Active' or 'Ready' state. External HTTPS request to the tunnel URL's `/api/health` endpoint returns HTTP 200 with valid TLS certificate.
+Run `kubectl get cluster sigma-1-pg -n sigma-1-dev -o jsonpath='{.status.readyInstances}'` and assert output is `3`. Delete the primary pod with `kubectl delete pod sigma-1-pg-1 -n sigma-1-dev` and verify a new primary is elected within 30 seconds by checking `status.currentPrimary` changes and all 3 instances return to ready state.

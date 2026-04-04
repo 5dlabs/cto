@@ -1,7 +1,7 @@
 Implement task 1: Provision Dev Infrastructure for Sigma-1 E2E Pipeline (Bolt - Kubernetes/Helm)
 
 ## Goal
-Bootstrap the sigma-1-dev namespace with all required infrastructure resources: namespace creation, Kubernetes secrets for Linear API key, Discord webhook URL, NOUS_API_KEY, and GitHub tokens, plus a sigma-1-infra-endpoints ConfigMap aggregating connection strings for all in-cluster services (discord-bridge-http, linear-bridge, openclaw-nats, cloudflare-operator). This task provides the foundational infrastructure that all subsequent tasks depend on.
+Bootstrap the dev namespace and all in-cluster infrastructure required by the Sigma-1 E2E pipeline. This includes CloudNative-PG Postgres, Redis, external-secrets ExternalSecret CRDs for all four sensitive tokens (Linear API, GitHub API, NOUS_API_KEY, Discord webhook / service-to-service API key), Cilium network policies restricting pod-to-pod traffic to declared paths, and a sigma-1-infra-endpoints ConfigMap aggregating all connection strings. All subsequent tasks depend on this foundation.
 
 ## Task Context
 - Agent owner: bolt
@@ -10,28 +10,29 @@ Bootstrap the sigma-1-dev namespace with all required infrastructure resources: 
 - Dependencies: None
 
 ## Implementation Plan
-1. Create the `sigma-1-dev` namespace with appropriate labels (`project: sigma-1`, `env: dev`).
-2. Create Kubernetes Secret `sigma-1-secrets` containing keys: `LINEAR_API_KEY`, `DISCORD_WEBHOOK_URL`, `NOUS_API_KEY`, `GITHUB_TOKEN`. Values should reference external-secrets operator CRs if available, otherwise placeholder sealed-secrets for dev.
-3. Create ConfigMap `sigma-1-infra-endpoints` with the following keys:
-   - `DISCORD_BRIDGE_URL`: internal cluster URL for `bots/discord-bridge-http` service
-   - `LINEAR_BRIDGE_URL`: internal cluster URL for `bots/linear-bridge` service
-   - `NATS_URL`: `openclaw-nats.openclaw.svc.cluster.local` (reference only; may not be used per D2 resolution)
-   - `CLOUDFLARE_OPERATOR_NS`: `cloudflare-operator-system`
-4. Create a ServiceAccount `sigma-1-pm-server` with minimal RBAC (get/list on configmaps and secrets in `sigma-1-dev` namespace only).
-5. Validate that existing in-cluster services are reachable from the namespace: `bots/discord-bridge-http`, `bots/linear-bridge`, `cloudflare-operator-system` webhook service.
-6. Create a Helm values file `values-dev.yaml` capturing all namespace-scoped resource names for downstream consumption.
-7. Do NOT provision new NATS instances — NATS is already deployed at `openclaw-nats.openclaw.svc.cluster.local`. Do NOT deploy any ingress controller — Cloudflare operator handles ingress per D8.
+1. Create namespace `sigma-1-dev` with resource quotas and limit ranges appropriate for a validation run.
+2. Deploy CloudNative-PG Cluster CR (`sigma-1-pg`, single replica, 1Gi storage) and wait for the `Ready` condition.
+3. Deploy Redis CR or StatefulSet (`sigma-1-redis`, single replica, no persistence needed for validation).
+4. Create ExternalSecret CRDs referencing the backing secret store for: `LINEAR_API_TOKEN`, `GITHUB_API_TOKEN`, `NOUS_API_KEY`, `DISCORD_WEBHOOK_URL`, `SERVICE_API_KEY` (shared service-to-service key per D5). Verify external-secrets operator syncs each to a Kubernetes Secret.
+5. Verify connectivity to the external secret store by checking each ExternalSecret's `status.conditions` for `Ready=True`.
+6. Create ConfigMap `sigma-1-infra-endpoints` with keys: `CNPG_SIGMA1_PG_URL` (Postgres connection string from CNPG secret), `REDIS_SIGMA1_URL` (Redis service URL), `DISCORD_BRIDGE_URL` (in-cluster `bots/discord-bridge-http` service URL), `LINEAR_BRIDGE_URL` (in-cluster `bots/linear-bridge` service URL).
+7. Apply Cilium NetworkPolicy CRDs: allow PM server → Postgres, PM server → Redis, PM server → discord-bridge-http, PM server → linear-bridge, PM server → egress for Linear/GitHub/Hermes APIs. Deny all other intra-namespace traffic.
+8. Create a ServiceAccount `sigma-1-pm-sa` with minimal RBAC (read ConfigMaps and Secrets in namespace only).
+9. Validate: run a smoke Pod that mounts the ConfigMap via `envFrom`, connects to Postgres and Redis, and resolves bridge service DNS names.
 
 ## Acceptance Criteria
-1. `kubectl get namespace sigma-1-dev` returns Active status. 2. `kubectl get secret sigma-1-secrets -n sigma-1-dev` exists and contains exactly 4 keys (LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, GITHUB_TOKEN). 3. `kubectl get configmap sigma-1-infra-endpoints -n sigma-1-dev -o json` contains all 4 endpoint keys with non-empty values. 4. `kubectl get serviceaccount sigma-1-pm-server -n sigma-1-dev` exists. 5. A connectivity test pod in `sigma-1-dev` can resolve DNS for `discord-bridge-http`, `linear-bridge`, and `openclaw-nats.openclaw.svc.cluster.local`.
+1. `kubectl get clusters.postgresql.cnpg.io sigma-1-pg -n sigma-1-dev -o jsonpath='{.status.phase}'` returns `Cluster in healthy state`. 2. `kubectl get secret` lists synced secrets for all five ExternalSecret CRDs with non-empty data keys. 3. ConfigMap `sigma-1-infra-endpoints` contains exactly 4 keys with non-empty values. 4. Smoke Pod exits 0 after successfully connecting to Postgres (SELECT 1), pinging Redis (PING → PONG), and resolving both bridge service DNS names. 5. Cilium NetworkPolicy count in namespace equals expected policy count (verify with `kubectl get cnp -n sigma-1-dev`).
 
 ## Subtasks
-- Create sigma-1-dev namespace with labels: Create the sigma-1-dev Kubernetes namespace with project and environment labels that all subsequent resources will be deployed into.
-- Create sigma-1-secrets Kubernetes Secret with 4 keys: Create the Kubernetes Secret `sigma-1-secrets` in the sigma-1-dev namespace containing LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, and GITHUB_TOKEN. Use external-secrets CRs if available, otherwise sealed-secrets placeholders for dev.
-- Create sigma-1-infra-endpoints ConfigMap: Create the ConfigMap `sigma-1-infra-endpoints` in sigma-1-dev namespace with all 4 endpoint keys pointing to existing in-cluster services.
-- Create ServiceAccount sigma-1-pm-server with RBAC Role and RoleBinding: Create a ServiceAccount, Role, and RoleBinding in sigma-1-dev namespace granting minimal get/list permissions on configmaps and secrets.
-- Generate Helm values-dev.yaml capturing all resource names: Create a Helm values file that aggregates all namespace-scoped resource names (namespace, secret, configmap, service account) for downstream chart consumption.
-- Validate cross-namespace connectivity from sigma-1-dev to existing services: Deploy a temporary test pod in sigma-1-dev namespace to verify DNS resolution and HTTP connectivity to discord-bridge-http, linear-bridge, and openclaw-nats services.
+- Create sigma-1-dev namespace with resource quotas and limit ranges: Create the Kubernetes namespace `sigma-1-dev` and apply ResourceQuota and LimitRange objects scoped for a dev validation run, ensuring pods cannot exceed reasonable CPU/memory bounds.
+- Deploy CloudNative-PG Postgres cluster CR and validate readiness: Deploy a single-replica CloudNative-PG Cluster custom resource named `sigma-1-pg` in the `sigma-1-dev` namespace with 1Gi storage, and wait until the cluster reaches a healthy state.
+- Deploy Redis single-replica instance: Deploy a single-replica Redis instance named `sigma-1-redis` in the `sigma-1-dev` namespace with no persistence, and expose it via a ClusterIP Service.
+- Create ExternalSecret CRDs for LINEAR_API_TOKEN and GITHUB_API_TOKEN: Create ExternalSecret CRDs that reference the cluster's backing secret store to sync `LINEAR_API_TOKEN` and `GITHUB_API_TOKEN` into Kubernetes Secrets in the `sigma-1-dev` namespace.
+- Create ExternalSecret CRDs for NOUS_API_KEY, DISCORD_WEBHOOK_URL, and SERVICE_API_KEY: Create ExternalSecret CRDs that reference the cluster's backing secret store to sync `NOUS_API_KEY`, `DISCORD_WEBHOOK_URL`, and `SERVICE_API_KEY` into Kubernetes Secrets in the `sigma-1-dev` namespace.
+- Create ServiceAccount sigma-1-pm-sa with minimal RBAC: Create a Kubernetes ServiceAccount `sigma-1-pm-sa` in the `sigma-1-dev` namespace with a Role and RoleBinding granting read-only access to ConfigMaps and Secrets within the namespace only.
+- Create sigma-1-infra-endpoints ConfigMap with all connection strings: Create the ConfigMap `sigma-1-infra-endpoints` in `sigma-1-dev` aggregating the Postgres connection string from the CNPG-generated secret, the Redis service URL, and the in-cluster URLs for the discord-bridge-http and linear-bridge services.
+- Apply Cilium NetworkPolicy CRDs for PM server traffic paths: Create and apply Cilium NetworkPolicy (CiliumNetworkPolicy) CRDs in the `sigma-1-dev` namespace that allow only declared traffic paths from the PM server to Postgres, Redis, discord-bridge-http, and linear-bridge, plus egress to external Linear/GitHub/Hermes APIs. Deny all other intra-namespace traffic.
+- Deploy smoke test Pod to validate end-to-end infrastructure connectivity: Create and run a smoke test Pod in `sigma-1-dev` that mounts the `sigma-1-infra-endpoints` ConfigMap via envFrom, uses the `sigma-1-pm-sa` ServiceAccount, connects to Postgres (SELECT 1), pings Redis (PING→PONG), and resolves both bridge service DNS names. The Pod must exit 0 on success.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

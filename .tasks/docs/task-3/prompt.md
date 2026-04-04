@@ -1,7 +1,7 @@
-Implement task 3: Integrate Hermes Research Content in Deliberation Path (Nova - Bun/Elysia)
+Implement task 3: Integrate Hermes Research in Deliberation Path (Nova - Bun/Elysia)
 
 ## Goal
-Add a Hermes research integration module to the PM server's deliberation stage. When NOUS_API_KEY is available, the module calls the Hermes/NOUS API to generate research memos that are embedded directly on each task's research_memo field. The integration must gracefully degrade when the API key is unavailable or the Hermes service is unreachable.
+Extend the PM server's deliberation stage to call the Hermes SaaS API for research content generation. The integration must include a circuit breaker with configurable timeout (default 30s) to prevent external API latency from blocking the Bun event loop. When Hermes is unavailable or the circuit is open, the system must fall back to default research memo behavior without blocking the pipeline.
 
 ## Task Context
 - Agent owner: nova
@@ -10,25 +10,25 @@ Add a Hermes research integration module to the PM server's deliberation stage. 
 - Dependencies: 1
 
 ## Implementation Plan
-1. Create a new internal module `hermes-research` within the PM server codebase with a clean interface: `async function fetchResearchMemo(taskContext: TaskContext): Promise<ResearchMemo | null>`.
-2. Define the `ResearchMemo` type: `{ content: string, source: string, timestamp: Date }`.
-3. Extend the task entity/type definition to include `research_memo: ResearchMemo | null`.
-4. In the deliberation pipeline stage, after initial task context is assembled, call `fetchResearchMemo()` for each task.
-5. The Hermes API call should: read `NOUS_API_KEY` from environment (injected from `sigma-1-secrets`), send the task description/context as the research query, parse the response into the `ResearchMemo` structure, store the raw Hermes response verbatim in `content`.
-6. Implement graceful degradation: if `NOUS_API_KEY` is not set, log an info message ('Hermes integration skipped: NOUS_API_KEY not configured') and set `research_memo` to null. If the Hermes API returns an error or times out (30s timeout), log a warning and set `research_memo` to null. Pipeline must never fail due to Hermes unavailability.
-7. Ensure the module interface is clean enough for future extraction into a separate service per D1.
-8. Write unit tests for: successful memo fetch, missing API key skip, API timeout handling, API error handling.
-9. Write an integration test that verifies research memos appear in the deliberation output when the API key is provided.
+1. Add the Hermes API client module: accepts a research query string, calls the Hermes SaaS endpoint with `NOUS_API_KEY` from the external-secrets-managed secret, returns structured research content.
+2. Implement a circuit breaker around the Hermes client. Evaluate existing dependencies first — check if `opossum` or a similar library is already in `package.json`. If not, add the lightest viable option (`opossum` is ~50KB, well-maintained for Node-compatible runtimes). Configure: timeout = 30s (from env `HERMES_TIMEOUT_MS` with default 30000), failure threshold = 3 consecutive failures, reset timeout = 60s.
+3. Integrate the Hermes call into the deliberation pipeline stage: after initial PRD parsing and before task generation, invoke the Hermes client with a research query derived from the PRD content. Store the response in the deliberation path artifacts.
+4. Implement fallback behavior: when the circuit is open or Hermes returns an error, generate a default research memo with `{ source: 'fallback', reason: 'hermes_unavailable' | 'circuit_open' | 'timeout', content: null }`. Log at `warn` level with structured fields.
+5. Implement availability gating: if `NOUS_API_KEY` is not set or empty, skip the Hermes call entirely and log `{ stage: 'hermes_research', action: 'skipped', reason: 'no_api_key' }`.
+6. Ensure the Hermes response is persisted in the deliberation output (DB or in-memory pipeline state) so Task 8 can validate its content.
+7. Add a health check sub-path or status field to `GET /api/pipeline/status` that reports the Hermes circuit breaker state (closed/open/half-open).
 
 ## Acceptance Criteria
-1. Unit test: With a mocked Hermes API returning valid content, `fetchResearchMemo()` returns a ResearchMemo with non-empty content, source, and valid timestamp. 2. Unit test: With NOUS_API_KEY unset, `fetchResearchMemo()` returns null and logs 'Hermes integration skipped'. 3. Unit test: With a mocked Hermes API that times out after 30s, `fetchResearchMemo()` returns null and logs a warning without throwing. 4. Unit test: With a mocked Hermes API returning 500, `fetchResearchMemo()` returns null and logs the error status. 5. Integration test: Run the deliberation pipeline with NOUS_API_KEY set and a mocked Hermes API; verify at least one task in the output has a non-null `research_memo` with all three fields populated.
+1. Unit test: mock Hermes API returning valid research content; assert the deliberation output contains Hermes-sourced content with `source: 'hermes'`. 2. Timeout test: mock Hermes API with 35s delay; assert circuit breaker opens after timeout and fallback memo is generated within 31s. 3. Circuit breaker test: trigger 3 consecutive failures; assert subsequent calls return fallback immediately without HTTP calls for 60s, then half-open allows one probe. 4. No-API-key test: unset `NOUS_API_KEY`; assert deliberation completes with skip log entry and no HTTP calls to Hermes. 5. Integration test: run deliberation with a real or stubbed Hermes endpoint; assert the returned research memo has non-empty `content` field and is persisted in the deliberation artifacts.
 
 ## Subtasks
-- Define ResearchMemo type and extend task entity type: Create the ResearchMemo TypeScript type definition and extend the existing task entity/type to include the research_memo field as ResearchMemo | null.
-- Implement Hermes API client with NOUS_API_KEY reading and 30s timeout: Create the core hermes-research module with the fetchResearchMemo function that reads NOUS_API_KEY from environment, calls the Hermes/NOUS API with the task context, and parses the response into a ResearchMemo.
-- Implement graceful degradation for missing API key, timeouts, and API errors: Add all error handling paths to fetchResearchMemo: missing NOUS_API_KEY skip with info log, 30s timeout handling with warning log, and HTTP error handling with warning log. None of these should throw.
-- Integrate fetchResearchMemo into the deliberation pipeline stage: Wire the hermes-research module into the existing deliberation pipeline so that fetchResearchMemo is called for each task after initial task context assembly, and the returned memo is stored on the task's research_memo field.
-- Write comprehensive unit and integration tests for hermes-research module: Create the full test suite covering all fetchResearchMemo paths and the pipeline integration, using Bun's test runner and mocked HTTP responses.
+- Implement Hermes API client module with NOUS_API_KEY authentication: Create a standalone TypeScript module that encapsulates all HTTP communication with the Hermes SaaS API, including authentication, request formatting, and response parsing into a structured research content type.
+- Implement circuit breaker wrapper with configurable timeout, failure threshold, and reset: Create a reusable circuit breaker module that wraps async functions with open/closed/half-open state management, configurable via environment variables. Evaluate opossum vs. cockatiel vs. a lightweight custom implementation for Bun compatibility.
+- Implement availability gating for missing NOUS_API_KEY: Add a pre-check that skips the Hermes research call entirely when NOUS_API_KEY is not set or empty, logging a structured skip event and producing a skip-type memo.
+- Implement fallback behavior for circuit-open, timeout, and error scenarios: Create the fallback memo generator that produces a structured default research memo when the Hermes call fails for any reason, with differentiated reason codes and warn-level structured logging.
+- Integrate Hermes research call into the deliberation pipeline stage: Wire the Hermes research orchestrator (client + circuit breaker + availability gate + fallback) into the existing deliberation pipeline, invoking it after PRD parsing and before task generation, and persisting the research memo in the deliberation artifacts.
+- Add circuit breaker state to GET /api/pipeline/status health check: Extend the existing pipeline status endpoint to include the Hermes circuit breaker state (closed/open/half-open) in its response payload.
+- Write comprehensive test suite for the Hermes integration: Create end-to-end and edge-case tests covering the full Hermes research integration: happy path, timeout, circuit breaker state transitions, no-API-key gating, and artifact persistence.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

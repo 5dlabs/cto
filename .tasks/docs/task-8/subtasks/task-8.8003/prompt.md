@@ -1,10 +1,16 @@
-Implement subtask 8003: Write component and accessibility tests for SnapshotPR
+Implement subtask 8003: Implement environment-aware test orchestration and path coverage guarantee
 
 ## Objective
-Write comprehensive component tests covering all PR display states (open, merged, closed, null) and accessibility requirements for external links.
+Add orchestration logic that detects API key availability, conditionally routes to the correct test path, and includes a meta-assertion ensuring at least one of the two paths (primary or fallback) executed and passed in the current run.
 
 ## Steps
-1. Create test file `__tests__/snapshot-pr.test.tsx`. 2. Test cases: (a) Valid PR with status='open' displays title, URL, green 'Open' badge, file count, branch. (b) Status='merged' displays purple 'Merged' badge. (c) Status='closed' displays red 'Closed' badge. (d) prResult=null displays 'No snapshot PR created'. (e) PR URL link element has `target='_blank'` and `rel='noopener noreferrer'` attributes. (f) Accessibility: PR link has appropriate aria-label or visually hidden text indicating external link for screen readers; verify ExternalLink icon is present. 3. Use React Testing Library. 4. Use getByRole, getByText for semantic queries.
+1. At the top of `e2e/hermes-research-validation.test.ts`, add a shared state tracker (e.g., `let primaryPathRan = false; let fallbackPathRan = false;`) that gets set to `true` inside the `beforeAll` of each conditional describe block.
+2. Add a final top-level `describe('Path coverage guarantee')` block that runs unconditionally:
+   a. **Test: At least one path validated** — `afterAll` or final test asserts `primaryPathRan || fallbackPathRan === true`. This ensures no silent skip of all tests.
+   b. **Test: Environment detection is consistent** — Assert that `hasApiKey()` returns a stable boolean (call it twice, compare). Log which path was selected for CI debugging.
+3. Add a descriptive console log at suite start: `'Running Hermes validation in mode: ${hasApiKey() ? "primary (with key)" : "fallback (no key)"}'`.
+4. Review the conditional skip mechanism to ensure the test framework reports skipped tests as `skipped` (not `passed` or `failed`). For example, in Vitest use `describe.skipIf()`; in Jest use `describe.skip` conditionally.
+5. Ensure the test file exports or documents the two environment configurations so CI can run the suite twice (once with key, once without) for full coverage if desired.
 
 ## Validation
-All 6 test cases pass. Link attributes verified via `expect(link).toHaveAttribute('target', '_blank')` and `expect(link).toHaveAttribute('rel', 'noopener noreferrer')`. Screen reader test verifies aria-label or sr-only text on external link.
+Run the full test suite in both configurations (with and without NOUS_API_KEY). In each run: exactly one path's tests pass, the other path's tests are reported as skipped (not failed), and the path coverage guarantee test passes. Confirm the meta-assertion fails if both paths are somehow skipped (e.g., by temporarily breaking the hasApiKey helper).

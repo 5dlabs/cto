@@ -1,19 +1,15 @@
-Implement subtask 1006: Validate cross-namespace connectivity from sigma-1-dev to existing services
+Implement subtask 1006: Create ServiceAccount sigma-1-pm-sa with minimal RBAC
 
 ## Objective
-Deploy a temporary test pod in sigma-1-dev namespace to verify DNS resolution and HTTP connectivity to discord-bridge-http, linear-bridge, and openclaw-nats services.
+Create a Kubernetes ServiceAccount `sigma-1-pm-sa` in the `sigma-1-dev` namespace with a Role and RoleBinding granting read-only access to ConfigMaps and Secrets within the namespace only.
 
 ## Steps
-1. Create a Job manifest `connectivity-test.yaml` that runs a busybox/curl container in `sigma-1-dev` namespace.
-2. The Job should execute DNS lookups for:
-   - `discord-bridge-http.bots.svc.cluster.local`
-   - `linear-bridge.bots.svc.cluster.local`
-   - `openclaw-nats.openclaw.svc.cluster.local`
-3. For HTTP services (discord-bridge-http, linear-bridge), attempt a basic HTTP health check (e.g., `curl -sf http://<service>:<port>/health` or just verify TCP connectivity).
-4. For NATS, verify TCP connectivity on port 4222.
-5. The Job should exit 0 only if all DNS resolutions succeed and all connectivity checks pass.
-6. Log results clearly for debugging if any check fails.
-7. Clean up the Job after validation (or set `ttlSecondsAfterFinished`).
+1. Create a ServiceAccount manifest: name=`sigma-1-pm-sa`, namespace=`sigma-1-dev`.
+2. Create a Role manifest: name=`sigma-1-pm-role`, namespace=`sigma-1-dev`, rules: apiGroups=[''], resources=['configmaps','secrets'], verbs=['get','list','watch'].
+3. Create a RoleBinding manifest: name=`sigma-1-pm-rolebinding`, namespace=`sigma-1-dev`, roleRef to `sigma-1-pm-role`, subject=ServiceAccount `sigma-1-pm-sa`.
+4. Apply all three manifests.
+5. Verify the ServiceAccount, Role, and RoleBinding exist.
+6. Verify using `kubectl auth can-i` that the SA can get configmaps and secrets but cannot create/delete pods in the namespace.
 
 ## Validation
-The connectivity test Job completes with exit code 0. `kubectl logs job/sigma-1-connectivity-test -n sigma-1-dev` shows successful DNS resolution for all 3 services and successful TCP/HTTP connectivity checks. No DNS NXDOMAIN or connection refused errors in the logs.
+`kubectl get sa sigma-1-pm-sa -n sigma-1-dev` exists. `kubectl auth can-i get configmaps -n sigma-1-dev --as=system:serviceaccount:sigma-1-dev:sigma-1-pm-sa` returns `yes`. `kubectl auth can-i get secrets -n sigma-1-dev --as=system:serviceaccount:sigma-1-dev:sigma-1-pm-sa` returns `yes`. `kubectl auth can-i create pods -n sigma-1-dev --as=system:serviceaccount:sigma-1-dev:sigma-1-pm-sa` returns `no`.

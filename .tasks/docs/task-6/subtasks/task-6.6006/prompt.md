@@ -1,15 +1,20 @@
-Implement subtask 6006: Write component tests and accessibility tests
+Implement subtask 6006: Execute full E2E test suite and generate JUnit XML report
 
 ## Objective
-Write comprehensive component tests for TaskCard, TaskList, and PipelineSummary, plus accessibility tests verifying WCAG 2.1 AA compliance using axe-core.
+Run all 7 test cases in a single test execution against the deployed dev environment, verify all pass, and confirm JUnit XML artifact is generated.
 
 ## Steps
-1. Set up testing with @testing-library/react, @testing-library/jest-dom, and jest-axe (or vitest-axe if using Vitest).
-2. TaskCard tests: (a) assigned agent renders green badge with name, (b) unresolved agent renders amber 'Unresolved' badge, (c) all metadata fields (title, agent, stack, priority, status) are visible.
-3. TaskList tests: (a) 5 tasks render in dependency order, (b) dependency indicators are present for tasks with dependencies.
-4. PipelineSummary tests: (a) correct counts for mixed assigned/unresolved tasks, (b) pipeline status badge shows correct variant.
-5. Accessibility tests using jest-axe: (a) run axe on rendered TaskCard — expect no violations, (b) run axe on rendered TaskList — expect no violations, (c) verify all interactive elements are keyboard-focusable, (d) verify Avatar has appropriate alt text or aria-label.
-6. Ensure all tests pass in CI with `npm test`.
+1. Ensure required environment variables are set: `PM_SERVER_URL`, `PM_AUTH_TOKEN` (or equivalent auth vars).
+2. Run the test command with JUnit reporter enabled, e.g.:
+   - Jest: `JEST_JUNIT_OUTPUT_DIR=test-results npx jest e2e/pipeline-completion --reporters=default --reporters=jest-junit`
+   - Vitest: `npx vitest run e2e/pipeline-completion --reporter=default --reporter=junit --outputFile=test-results/e2e-pipeline.xml`
+3. Verify all 7 test cases pass (exit code 0).
+4. Verify the JUnit XML file exists at the expected path and contains 7 test case entries.
+5. If any test fails, capture the failure output and categorize it:
+   - Environment issue (server unreachable, auth failure) → document fix.
+   - Assertion failure (wrong response shape) → adjust test to match actual API response.
+   - Timeout → check if 360s is sufficient or if the pipeline is genuinely slow.
+6. Document the final test run output (pass/fail counts, elapsed time) as the acceptance gate evidence for Sigma-1.
 
 ## Validation
-All component tests pass. Axe accessibility audit on TaskCard, TaskList, and PipelineSummary returns zero violations at WCAG 2.1 AA level. Keyboard navigation test confirms all interactive elements are reachable via Tab key.
+All 7 test cases pass in a single run. Exit code is 0. JUnit XML file is generated at `test-results/e2e-pipeline.xml` and contains exactly 7 test case entries. The XML file is well-formed and parseable.

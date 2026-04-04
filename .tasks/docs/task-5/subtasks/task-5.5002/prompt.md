@@ -1,14 +1,16 @@
-Implement subtask 5002: Implement HTTP POST transport for discord-bridge-http
+Implement subtask 5002: Implement Discord bridge notification with auth and payload formatting
 
 ## Objective
-Implement the NotificationTransport interface for HTTP POST dispatch to the discord-bridge-http service. Format the payload per the Discord bridge's expected schema and POST to the URL from the ConfigMap.
+Create the Discord-specific notification function that POSTs to the Discord bridge URL with the correct Authorization header and Discord-specific payload shape.
 
 ## Steps
-1. Create `src/notification-dispatch/transports/http-discord.ts` implementing the `send()` method for the 'discord' target.
-2. Use Bun's native `fetch()` to POST to `DISCORD_BRIDGE_URL` with `Content-Type: application/json`.
-3. Format the JSON body as `{ event, pipeline_id, status, task_count, assigned_count, pr_url, linear_session_url, timestamp }`.
-4. Set a reasonable timeout (5 seconds) on the fetch to avoid hanging on unresponsive bridges.
-5. Return the response status for the error handling layer to inspect.
+1. Create `src/notifications/discord-notifier.ts`.
+2. Export `createDiscordNotifier(httpClient: HttpClient, config: { discordBridgeUrl: string, serviceApiKey: string })`.
+3. Returns a function `sendDiscordNotification(event: 'pipeline_start' | 'pipeline_complete', payload: PipelineEventPayload): Promise<void>`.
+4. Build the outgoing POST body: `{ event, pipelineRunId: payload.pipelineRunId, prdTitle: payload.prdTitle, timestamp: payload.timestamp, status: payload.status, taskCount: payload.taskCount, issueCount: payload.issueCount }`.
+5. Set headers: `{ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + config.serviceApiKey }`.
+6. POST to `config.discordBridgeUrl`. If response status >= 400, throw an error including the status code for the retry layer to catch.
+7. Add structured log on success: `{ level: 'info', stage: 'notification', bridge: 'discord', event, status: 'sent' }`.
 
 ## Validation
-Unit test: Call the Discord HTTP transport's send() with a pipeline.start event. Verify the outgoing HTTP POST targets the correct URL with the correct JSON body shape including all required fields (event, pipeline_id, timestamp).
+Unit test: mock HTTP client returning 200; assert POST was made to the correct URL with correct Authorization header and payload fields. Error test: mock HTTP client returning 502; assert the function throws an error containing the status code. Auth test: assert the Authorization header value matches `Bearer <key>` with the configured API key.

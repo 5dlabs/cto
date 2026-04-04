@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. Unit test: Given a PipelineOutput with 5 tasks, the module generates exactly 5 task scaffold files with correct naming convention `tasks/task-<id>-<slug>.md`. 2. Unit test: PR body contains task count, list of agent assignments, and research memo availability summary. 3. Unit test: With GITHUB_TOKEN unset, `createSnapshotPR()` logs an error and returns a result indicating PR was skipped, without throwing. 4. Unit test: With a mocked GitHub API returning 500 on first call and 201 on retry, the module succeeds on retry. 5. Integration test: With a mocked GitHub API, run `createSnapshotPR()` with a full PipelineOutput and verify the sequence of API calls: create branch, commit files, create PR.
+- [ ] 1. Component renders without errors when given valid PR data (render test with mock data showing 2+ PRs). 2. Empty state renders correctly when API returns an empty array. 3. Error state renders with retry button when API call fails. 4. Each PR card displays title, status badge, repo name, branch, date, and a clickable GitHub link (assert on DOM elements). 5. `DesignSnapshotPRDetail` lists at least one scaffold file with filename and path. 6. Accessibility: axe-core scan of the rendered component returns zero violations. 7. Navigation entry point is present in the dashboard sidebar/tabs.
 
 ## Verification Notes
 

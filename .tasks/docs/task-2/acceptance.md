@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object mapping each to a valid Linear user ID string. 2. Unit test: `resolve_agent_delegates(['unknown_agent'])` returns null for the unknown agent and logs a warning. 3. Integration test: Run the task generation pipeline with a sample PRD; verify at least 5 task objects have non-null `delegate_id` values. 4. Integration test: Mock the Linear API create-issue endpoint; verify each call includes `assigneeId` matching the task's `delegate_id`. 5. Integration test: Verify the summary log line shows correct counts for assigned vs unresolved.
+- [ ] 1. Unit test: `resolve_agent_delegates(['nova', 'bolt', 'blaze', 'tess', 'unknown_agent'])` returns valid Linear user IDs for known agents and `undefined` for unknown agents. 2. Integration test: call the issue creation flow with a mock PRD containing 5 tasks; assert 5 Linear API `issueCreate` mutations were made, at least 4 with a non-null `assigneeId`. 3. Idempotency test: run the same PRD twice; assert the second run creates zero new issues (all skipped). 4. Invalid delegate test: inject an invalid delegate ID; assert the issue is created without an assignee and an error log entry with `stage: 'delegate_resolution'` is emitted. 5. `POST /api/pipeline/delegate-status` returns 200 with a JSON object mapping agent hints to user IDs.
 
 ## Verification Notes
 

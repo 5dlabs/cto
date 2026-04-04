@@ -1,17 +1,18 @@
-Implement subtask 2003: Integrate delegation into the task generation pipeline
+Implement subtask 2003: Implement idempotent issue creation with duplicate detection
 
 ## Objective
-Wire resolve_agent_delegates() into the task generation pipeline: after tasks are generated with agent hints, batch-resolve them and populate delegate_id on each task, then pass assigneeId to the Linear API issue creation calls.
+Add idempotency logic to the issue creation flow: before creating a Linear issue, compute a deterministic identifier from PRD hash + task ID, query Linear for existing issues with that identifier, and skip creation if a duplicate is found.
 
 ## Steps
-1. Locate the task generation pipeline code where tasks are created with agent hints.
-2. After the task generation step completes, collect all unique agent hints from the generated tasks.
-3. Call `resolve_agent_delegates(uniqueAgentHints)` to get the mapping.
-4. Iterate over all generated tasks and set `task.delegate_id = mapping[task.agent] ?? null` for each.
-5. Locate the Linear issue creation step in the pipeline.
-6. When creating each Linear issue, pass `assigneeId: task.delegate_id` if `delegate_id` is non-null. If `delegate_id` is null, omit `assigneeId` from the Linear API call (or pass undefined).
-7. Ensure the pipeline awaits the resolution before proceeding to issue creation.
-8. Ensure the PM server reads `LINEAR_API_KEY` from `sigma-1-secrets` and endpoints from `sigma-1-infra-endpoints` ConfigMap via `envFrom` environment variables.
+1. Create `src/pipeline/idempotency.ts`.
+2. Implement `computeIdempotencyKey(prdContent: string, taskId: string | number): string` — hash the PRD content (e.g., SHA-256 truncated to 12 chars) and concatenate with taskId to form a deterministic key like `prd:abc123def456:task:3`.
+3. Implement `findExistingIssue(linearClient, teamId: string, idempotencyKey: string): Promise<string | null>` — query Linear's `issues` endpoint filtering by the team and searching for the idempotency key string in the issue description. Return the issue ID if found, null otherwise.
+4. In the main issue creation orchestrator, before each `issueCreate` call:
+   a. Compute the idempotency key.
+   b. Call `findExistingIssue()`.
+   c. If found, log `{ level: 'info', stage: 'issue_creation', action: 'skipped_duplicate', idempotencyKey }` and continue to the next task.
+   d. If not found, embed the idempotency key in the issue description (e.g., as a footer line `<!-- idempotency:prd:abc123:task:3 -->`) and proceed with creation.
+5. Ensure the idempotency key is never visible to end users (use HTML comment syntax in Linear markdown).
 
 ## Validation
-Run the pipeline with a sample PRD containing at least 5 tasks with known agent hints. Verify each task object has a non-null `delegate_id` after resolution. Verify the Linear API create-issue calls include `assigneeId` matching the task's `delegate_id`. Trace logs show resolve_agent_delegates was called once with the batch of agent hints.
+Unit test: computeIdempotencyKey with identical inputs returns identical keys; different inputs return different keys. Integration test: mock Linear's issues query to return an existing issue matching the key — assert issueCreate is NOT called and a 'skipped_duplicate' log is emitted. Mock returning no match — assert issueCreate IS called with the key embedded in the description.

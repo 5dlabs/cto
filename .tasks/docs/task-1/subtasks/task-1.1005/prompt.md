@@ -1,18 +1,15 @@
-Implement subtask 1005: Generate Helm values-dev.yaml capturing all resource names
+Implement subtask 1005: Create ExternalSecret CRDs for NOUS_API_KEY, DISCORD_WEBHOOK_URL, and SERVICE_API_KEY
 
 ## Objective
-Create a Helm values file that aggregates all namespace-scoped resource names (namespace, secret, configmap, service account) for downstream chart consumption.
+Create ExternalSecret CRDs that reference the cluster's backing secret store to sync `NOUS_API_KEY`, `DISCORD_WEBHOOK_URL`, and `SERVICE_API_KEY` into Kubernetes Secrets in the `sigma-1-dev` namespace.
 
 ## Steps
-1. Create `values-dev.yaml` in the project's Helm chart directory.
-2. Include the following keys:
-   - `namespace: sigma-1-dev`
-   - `secrets.name: sigma-1-secrets`
-   - `configmap.endpoints: sigma-1-infra-endpoints`
-   - `serviceAccount.name: sigma-1-pm-server`
-   - `externalServices.discordBridge`, `externalServices.linearBridge`, `externalServices.nats`, `externalServices.cloudflareOperatorNs` with their respective URLs/values
-3. Ensure the values file is valid YAML and can be consumed by `helm template` without errors.
-4. Add a comment block at the top explaining this is the dev environment values file for the sigma-1 pipeline.
+1. Create an ExternalSecret CR for `NOUS_API_KEY`: name=`sigma-1-nous-api-key`, namespace=`sigma-1-dev`, secretStoreRef pointing to the cluster's SecretStore/ClusterSecretStore, remoteRef.key=`sigma-1/nous-api-key`, target secret name=`sigma-1-nous-api-key`.
+2. Create an ExternalSecret CR for `DISCORD_WEBHOOK_URL`: name=`sigma-1-discord-webhook-url`, remoteRef.key=`sigma-1/discord-webhook-url`, target secret name=`sigma-1-discord-webhook-url`.
+3. Create an ExternalSecret CR for `SERVICE_API_KEY`: name=`sigma-1-service-api-key`, remoteRef.key=`sigma-1/service-api-key`, target secret name=`sigma-1-service-api-key`.
+4. Apply all three manifests.
+5. Verify each ExternalSecret reaches `Ready=True` within 2 minutes.
+6. Verify the target Kubernetes Secrets exist and have non-empty data keys.
 
 ## Validation
-`helm template . -f values-dev.yaml` runs without errors. The values file contains keys for namespace, secrets.name, configmap.endpoints, and serviceAccount.name with correct string values matching the created resources.
+All three ExternalSecrets (`sigma-1-nous-api-key`, `sigma-1-discord-webhook-url`, `sigma-1-service-api-key`) show `Ready=True` in status.conditions. All three target Kubernetes Secrets exist with non-empty data. Total synced secret count in namespace is 5 (combined with subtask 1004).

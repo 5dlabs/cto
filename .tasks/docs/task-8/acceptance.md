@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. Component test: SnapshotPR rendered with a valid PR result displays the PR title, a clickable URL linking to `github.com/5dlabs/sigma-1/pull/N`, and an 'Open' badge in green. 2. Component test: SnapshotPR rendered with status='merged' displays a 'Merged' badge in purple. 3. Component test: SnapshotPR rendered with `pr_result=null` displays 'No snapshot PR created'. 4. Component test: PR URL link has `target='_blank'` and `rel='noopener noreferrer'` attributes. 5. Accessibility test: PR link is announced as an external link by screen readers.
+- [ ] 1. When NOUS_API_KEY is set: deliberation artifacts contain at least one memo with `source: 'hermes'` and `content.length > 100`. Circuit breaker reports `closed` state. No `skipped` log entries for hermes_research stage. 2. When NOUS_API_KEY is not set: deliberation artifacts contain a fallback memo with `source: 'fallback'` and `reason: 'no_api_key'`. Pipeline still completes successfully. 3. At least one of the two paths (with key or without) must execute and pass in the test run, depending on environment configuration.
 
 ## Verification Notes
 

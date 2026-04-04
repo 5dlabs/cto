@@ -1,14 +1,20 @@
-Implement subtask 6005: Implement pipeline summary header component
+Implement subtask 6005: Implement no-fatal-errors log validation test
 
 ## Objective
-Build a summary header component that displays aggregate pipeline statistics: total tasks, assigned count, unresolved count, and pipeline status.
+Implement test case 7 — assert PM server logs for the pipeline run contain zero fatal-level entries.
 
 ## Steps
-1. Create `components/pipeline/PipelineSummary.tsx` accepting `tasks: Task[]` and `pipelineStatus: string` props.
-2. Compute aggregate counts: `totalTasks = tasks.length`, `assignedCount = tasks.filter(t => t.delegate_id !== null).length`, `unresolvedCount = tasks.filter(t => t.delegate_id === null).length`.
-3. Render a header bar with: pipeline status badge (running=blue, completed=green, error=red), and text showing '{totalTasks} tasks, {assignedCount} assigned, {unresolvedCount} unresolved'.
-4. Use shadcn/ui Badge for the pipeline status indicator.
-5. Style with Tailwind for clear visual hierarchy — larger text for counts, status badge prominent.
+1. Test case 7 — `it('should have zero fatal errors in PM server logs')`:
+   - Query PM server for logs associated with the pipeline run. Try `GET ${PM_SERVER_URL}/api/pipeline/runs/${pipelineRunId}/logs` first.
+   - If a dedicated log endpoint doesn't exist, check the pipeline run result object for an embedded `logs` or `errors` array.
+   - Parse the log entries and filter for entries where `level === 'fatal'` OR (`level === 'error'` AND `fatal === true`).
+   - Assert the filtered array length is 0.
+   - On failure, include the first 3 fatal log entries in the assertion message for debugging.
+2. If no log API endpoint exists, implement a fallback approach:
+   - Check the pipeline run response for an `errors` array.
+   - Assert it is empty or contains no fatal-level entries.
+3. Add a descriptive skip message if the log endpoint returns 404, so the test is explicitly skipped rather than silently passing: `it.skip('Log endpoint not available — manual log review required')`.
+4. This test can run in parallel with 6003 and 6004 since it only depends on the pipeline run ID from 6002.
 
 ## Validation
-Component test: Given 5 tasks with 4 having delegate_id and 1 with null, the summary header displays '5 tasks, 4 assigned, 1 unresolved'. Pipeline status badge shows correct color for 'running' vs 'completed' states.
+Test case 7 passes: zero log entries with `level: 'fatal'` or `level: 'error'` + `fatal: true` are found. If the log endpoint is unavailable, the test is explicitly skipped with a clear message rather than passing vacuously.

@@ -1,23 +1,25 @@
-Implement subtask 9003: Write comprehensive component and accessibility tests for pipeline status UI
+Implement subtask 9003: Implement empty state, accessibility scan, and pipeline scoping tests
 
 ## Objective
-Write full test suite covering all PipelineStatus states, NotificationTimeline rendering and ordering, polling behavior verification, error alert display, and accessibility compliance for the error alert.
+Add Test Cases 5, 6, and 7 — verifying the empty state message when no PRs exist, running an axe-core accessibility audit with zero critical/serious violations, and asserting PR data is scoped to the current pipelineRunId with no cross-run leakage.
 
 ## Steps
-1. Create `src/components/__tests__/PipelineStatus.test.tsx`:
-   - Test: status='running' renders blue 'Running' badge (check className or data attribute for blue variant).
-   - Test: status='complete' renders green 'Complete' badge and renders Linear session link and PR link with correct href values.
-   - Test: status='error' renders red Alert with the exact error message text visible in the DOM.
-   - Test: status='error' Alert element has `role='alert'` attribute.
-2. Create `src/components/__tests__/NotificationTimeline.test.tsx`:
-   - Test: 3 events passed as props render 3 timeline items.
-   - Test: Events appear in correct chronological order (verify DOM order matches timestamp sort).
-   - Test: Each event displays its type label, formatted timestamp, and description.
-   - Test: Empty events array renders an empty state or no items.
-3. Create `src/hooks/__tests__/usePipelineStatus.test.ts` or integration test:
-   - Test: Mock API with MSW or jest mock. Render component using the hook. Assert initial data loads.
-   - Test: Use fake timers, advance 5 seconds, assert re-fetch occurs and updated data renders.
-4. Run all tests with `npm test` or `vitest` and verify 100% of the above cases pass.
+1. Test Case 5 — Empty state:
+   a. Mock the API response to return an empty PR list (use Playwright `page.route` to intercept the PR endpoint and respond with `{ prs: [] }`).
+   b. Navigate to the Design Snapshot PR section.
+   c. Assert the empty state element is visible and contains text matching 'No design snapshot PRs found' (case-insensitive).
+   d. Restore the original route after the test.
+2. Test Case 6 — Accessibility:
+   a. Install/import `@axe-core/playwright` (or use `axe-playwright`).
+   b. Navigate to the Design Snapshot PR section with data present.
+   c. Run `new AxeBuilder({ page }).include('[data-testid="design-pr-section"]').analyze()`.
+   d. Filter results for violations with impact `critical` or `serious`.
+   e. Assert the filtered violations array has length 0; if not, log violation details for debugging.
+3. Test Case 7 — Pipeline scoping:
+   a. Navigate to the dashboard with a specific `pipelineRunId` query param (e.g., `?pipelineRunId=run-abc-123`).
+   b. Collect all displayed PR card elements and extract their associated pipelineRunId data attributes or API-sourced metadata.
+   c. Assert every PR card's pipelineRunId matches `run-abc-123`.
+   d. Navigate with a different `pipelineRunId` (e.g., `run-xyz-456`) and assert the previously displayed PRs are NOT shown (no cross-run data leak).
 
 ## Validation
-All specified tests pass: 3 PipelineStatus state tests, 1 accessibility test (role='alert'), 4 NotificationTimeline tests (rendering, ordering, labels, empty state), and 2 polling integration tests (initial load, 5-second revalidation). Run via test runner with coverage report showing PipelineStatus.tsx, NotificationTimeline.tsx, and usePipelineStatus.ts covered.
+Run `npx playwright test e2e/design-pr-surfacing.test.ts --grep 'empty state|accessibility|pipeline scoping'`. Empty state test passes when mocked empty response triggers correct message. Accessibility test passes with zero critical/serious axe violations. Pipeline scoping test passes when switching pipelineRunId shows only run-specific PRs with no leakage.

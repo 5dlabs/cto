@@ -1,25 +1,26 @@
-Implement subtask 10007: Create NetworkPolicy resources restricting egress traffic
+Implement subtask 10007: Add audit logging for namespace security events
 
 ## Objective
-Create Kubernetes NetworkPolicy resources to restrict traffic flow: PM server can reach bridge services, GitHub API, Hermes API, and Linear API. Frontend can only reach PM server. Block all other egress from sigma-1-dev except DNS.
+Enable audit logging for the sigma-1-dev namespace to capture secret access events and security-relevant API calls, either via cluster audit policy or a structured logging sidecar.
 
 ## Steps
-1. Create `manifests/production/network-policies.yaml`.
-2. Define a default-deny egress NetworkPolicy for the sigma-1-dev namespace:
-   - podSelector: {} (all pods)
-   - policyTypes: [Egress]
-   - egress: allow DNS (UDP port 53 to kube-dns).
-3. Define a PM server egress NetworkPolicy:
-   - podSelector: matchLabels app=sigma-1-pm-server
-   - egress rules allowing:
-     - To pods matching labels for bridge services (discord-bridge, linear-bridge) within the namespace.
-     - To external IPs/CIDRs for GitHub API (140.82.112.0/20, 192.30.252.0/22), Linear API, and Hermes API. Alternatively, if external egress can't be IP-restricted, allow all egress on port 443 from PM server only.
-     - DNS (UDP 53).
-4. Define a frontend egress NetworkPolicy:
-   - podSelector: matchLabels app=sigma-1-frontend
-   - egress: allow to PM server pods only (podSelector matchLabels app=sigma-1-pm-server) on the service port, plus DNS.
-5. Apply: `kubectl apply -f manifests/production/network-policies.yaml`.
-6. Test connectivity from pods.
+1. Determine if cluster-level audit policy can be modified (requires cluster-admin access to the API server configuration).
+2. If cluster audit policy is accessible:
+   a. Add a namespace-scoped audit rule to the cluster audit policy YAML:
+      ```yaml
+      - level: RequestResponse
+        resources:
+        - group: ""
+          resources: ["secrets"]
+        namespaces: ["sigma-1-dev"]
+      ```
+   b. Restart the API server or wait for the policy to be picked up.
+3. If cluster audit policy is NOT accessible:
+   a. Deploy a structured logging sidecar (e.g., Falco or a custom audit logger) as a DaemonSet or sidecar in the namespace.
+   b. Configure it to watch for secret access, RBAC denials, and pod exec events.
+   c. Example: Use `kube-audit-rest` as a webhook backend to capture audit events for the namespace.
+4. Ensure audit logs are shipped to the cluster's logging backend (e.g., stdout for collection by Fluentd/Promtail, or directly to a log aggregator).
+5. Verify audit events appear for secret read operations in sigma-1-dev.
 
 ## Validation
-`kubectl get networkpolicy -n sigma-1-dev` returns at least 3 NetworkPolicy resources. `kubectl exec` into PM server pod: `curl -s discord-bridge-http:port/health` succeeds. `kubectl exec` into PM server pod: `curl -s --connect-timeout 3 http://example.com` times out or is refused (blocked by default deny). `kubectl exec` into frontend pod: `curl -s sigma-1-pm-server:8080/health` succeeds.
+Perform a secret access in the namespace: `kubectl get secret sigma-1-secrets -n sigma-1-dev`. Then check the audit log output (API server audit log file, or sidecar logs via `kubectl logs`) for a corresponding entry showing the secret access event with request metadata. Assert at least one audit log entry is captured for the operation.

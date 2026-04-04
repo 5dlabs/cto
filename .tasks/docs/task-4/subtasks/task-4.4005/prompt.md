@@ -1,15 +1,18 @@
-Implement subtask 4005: Implement error handling with retry logic for GitHub API failures
+Implement subtask 4005: Implement accessibility compliance across all design PR components
 
 ## Objective
-Add retry logic with exponential backoff for GitHub API calls and ensure the pipeline never fails due to GitHub API unavailability.
+Audit and enhance the DesignSnapshotPRList and DesignSnapshotPRDetail components for full accessibility: semantic HTML, ARIA labels, keyboard navigation, and focus management.
 
 ## Steps
-1. Create a reusable `retryWithBackoff(fn, maxRetries=1, baseDelay=1000)` utility in `src/design-snapshot/retry.ts`.
-2. Wrap the key GitHub API operations (branch creation, file commit, PR creation) with the retry utility.
-3. On first failure (non-2xx response or network error), wait `baseDelay` ms then retry once.
-4. If the retry also fails, log the error with details (HTTP status, error message, operation name) and return a PRResult with `{ prUrl: null, skipped: false, error: '<descriptive error>' }`.
-5. Ensure no unhandled exceptions escape createSnapshotPR — all errors must be caught and converted to PRResult responses.
-6. Integrate the retry logic into the main createSnapshotPR orchestration flow.
+1. Ensure all interactive elements (links, buttons, expandable rows) are reachable via keyboard Tab navigation and activatable via Enter/Space.
+2. Add `aria-label` attributes to:
+   - Each PR card/row (e.g., `aria-label="Pull request: {title}, status: {status}"`)
+   - The GitHub link button (e.g., `aria-label="Open PR {title} on GitHub"`)
+   - The Retry button (e.g., `aria-label="Retry loading design PRs"`)
+3. Use semantic HTML: `<nav>` for navigation, `<main>` for content, `<table>` or `<ul>` for lists, `<h2>`/`<h3>` for section headings with proper hierarchy.
+4. Status badges should not rely solely on color — include text labels (the badge already shows text like 'open', 'merged', 'closed').
+5. Ensure focus is managed when transitioning from list to detail view (focus moves to the detail heading).
+6. Run axe-core programmatically on each rendered component state (populated, empty, error) and resolve all violations.
 
 ## Validation
-Unit test: With a mocked GitHub API returning 500 on first call and 201 on retry, createSnapshotPR succeeds and returns a valid PR URL. Unit test: With a mocked GitHub API returning 500 on both attempts, createSnapshotPR returns PRResult with prUrl=null and a descriptive error, without throwing. Verify the backoff delay is applied between attempts.
+Run axe-core (via jest-axe or @axe-core/react) on: (1) DesignSnapshotPRList in populated state — zero violations. (2) DesignSnapshotPRList in empty state — zero violations. (3) DesignSnapshotPRList in error state — zero violations. (4) DesignSnapshotPRDetail in populated state — zero violations. (5) Manual verification: Tab through all interactive elements in sequence without getting stuck.

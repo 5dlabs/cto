@@ -1,16 +1,16 @@
-Implement subtask 3002: Implement Hermes API client with NOUS_API_KEY reading and 30s timeout
+Implement subtask 3002: Implement circuit breaker wrapper with configurable timeout, failure threshold, and reset
 
 ## Objective
-Create the core hermes-research module with the fetchResearchMemo function that reads NOUS_API_KEY from environment, calls the Hermes/NOUS API with the task context, and parses the response into a ResearchMemo.
+Create a reusable circuit breaker module that wraps async functions with open/closed/half-open state management, configurable via environment variables. Evaluate opossum vs. cockatiel vs. a lightweight custom implementation for Bun compatibility.
 
 ## Steps
-1. Create `src/hermes-research/index.ts` exporting `async function fetchResearchMemo(taskContext: TaskContext): Promise<ResearchMemo | null>`.
-2. Read `NOUS_API_KEY` from `process.env.NOUS_API_KEY` (or `Bun.env`).
-3. Construct the HTTP request to the Hermes API: use `fetch()` (native in Bun) with the API key in the Authorization header (Bearer token or whatever the API expects).
-4. Send the task description and context as the research query in the request body.
-5. Set `AbortController` with a 30-second timeout on the fetch call.
-6. On successful response, parse the JSON body and map it to `ResearchMemo`: store the raw response content verbatim in `content`, set `source` to the API endpoint or identifier, and `timestamp` to the current Date.
-7. Ensure the module interface is clean with a single exported function and no side effects on import, suitable for future extraction into a separate service.
+1. Research Bun compatibility: check if `opossum` works under Bun by reviewing its dependency on Node EventEmitter. If incompatible, evaluate `cockatiel` (Promise-based, no Node-specific APIs) or implement a minimal circuit breaker (~100 LOC).
+2. Create `src/lib/circuit-breaker.ts` that exports a `createCircuitBreaker<T>(fn: () => Promise<T>, options: CircuitBreakerOptions): WrappedFn<T>` factory.
+3. Define `CircuitBreakerOptions { timeout: number; failureThreshold: number; resetTimeout: number }` with defaults from env: `HERMES_TIMEOUT_MS` (default 30000), `HERMES_CB_FAILURE_THRESHOLD` (default 3), `HERMES_CB_RESET_MS` (default 60000).
+4. Implement state machine: CLOSED (normal operation, count consecutive failures) → OPEN (reject immediately, start reset timer) → HALF_OPEN (allow one probe call, success → CLOSED, failure → OPEN).
+5. Expose a `getState(): 'closed' | 'open' | 'half-open'` method for the health check integration.
+6. Ensure the timeout is implemented via `AbortController` + `setTimeout` to properly abort the underlying fetch if it exceeds the configured timeout.
+7. If using a third-party library, add it to `package.json` and document the rationale in a code comment.
 
 ## Validation
-Unit test with a mocked Hermes API (using Bun's test utilities or a mock server) returning valid JSON content: verify fetchResearchMemo returns a ResearchMemo with non-empty content, correct source string, and a valid Date timestamp.
+Unit tests: (1) Wrap a function that resolves; assert it returns the value and state remains 'closed'. (2) Wrap a function that rejects 3 times consecutively; assert state transitions to 'open' after the 3rd failure. (3) In 'open' state, call the wrapped function; assert it rejects immediately without invoking the inner function. (4) After resetTimeout elapses, assert state is 'half-open' and one probe call is allowed. (5) In 'half-open', a successful probe transitions to 'closed'. (6) In 'half-open', a failed probe transitions back to 'open'. (7) Wrap a function with a 100ms timeout around a 200ms delay; assert it rejects with a timeout error.

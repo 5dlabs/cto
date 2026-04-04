@@ -1,19 +1,17 @@
-Implement subtask 2004: Implement fallback behavior for unresolvable agents and summary logging
+Implement subtask 2004: Integrate delegate resolution into the issue creation flow with assigneeId
 
 ## Objective
-Add fallback logic for when resolve_agent_delegates() returns null for an agent hint: log a warning, create the issue unassigned, add an agent:unresolved label, and emit a summary log line after all issues are created.
+Wire resolve_agent_delegates() into the issue creation pipeline so that each task's agent hint is resolved to a Linear user ID and passed as assigneeId in the issueCreate mutation. Handle unmapped agents gracefully.
 
 ## Steps
-1. In the pipeline integration code (from subtask 2003), after populating delegate_id, check for tasks where `delegate_id === null`.
-2. For each such task, log a structured warning: `{ level: 'warn', message: 'Unresolved agent delegate', agentHint: task.agent, taskId: task.id }`.
-3. When creating the Linear issue for an unresolved task:
-   a. Omit `assigneeId` (or pass undefined).
-   b. Add a label `agent:unresolved` to the issue. Use the Linear API to find or create this label, then attach it.
-4. After all issues are created, compute and log a summary line:
-   - `Created N issues, M assigned, K unresolved`
-   - Where N = total issues, M = issues with non-null delegate_id, K = issues with null delegate_id.
-5. Use structured logging (JSON) consistent with the PM server's existing log format.
-6. Ensure the `agent:unresolved` label creation is idempotent (check if it exists before creating).
+1. In the issue creation orchestrator (e.g., `src/pipeline/create-issues.ts`), after task generation and before Linear API calls:
+   a. Collect all unique agent hints from the generated tasks.
+   b. Call `resolve_agent_delegates(agentHints)` once to batch-resolve all delegates.
+2. For each task, look up its agent hint in the returned Map:
+   a. If a valid Linear user ID is returned, include `assigneeId` in the `issueCreate` mutation variables.
+   b. If undefined, omit `assigneeId` from the mutation and log `{ level: 'error', stage: 'delegate_resolution', agent: hint, reason: 'unmapped' }`.
+3. Construct the `issueCreate` GraphQL mutation payload including: `title`, `description` (with embedded idempotency key), `teamId`, `assigneeId` (optional), and any labels.
+4. Ensure the pipeline continues creating remaining issues even if one delegate resolution fails — no short-circuiting.
 
 ## Validation
-Unit test: Given a task with an unknown agent hint, the warning log is emitted with the correct agent hint and task ID. Integration test: Run pipeline with one known and one unknown agent; verify the unknown agent's issue is created without assigneeId and has the `agent:unresolved` label. Verify the summary log line shows correct counts (e.g., 'Created 2 issues, 1 assigned, 1 unresolved').
+Integration test: provide a mock PRD generating 5 tasks with agents ['nova', 'bolt', 'blaze', 'grizz', 'unknown']. Assert 5 issueCreate calls were made. Assert 4 include a non-null assigneeId. Assert 1 (unknown) has no assigneeId and an error log with stage 'delegate_resolution' was emitted.

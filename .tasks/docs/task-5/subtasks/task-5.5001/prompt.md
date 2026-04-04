@@ -1,14 +1,15 @@
-Implement subtask 5001: Define PipelineEvent types and notification-dispatch facade interface
+Implement subtask 5001: Create notification dispatcher module with uniform interface and injectable HTTP client
 
 ## Objective
-Create the notification-dispatch module with the PipelineEvent type union ('pipeline.start' | 'pipeline.complete' | 'pipeline.error'), payload type definitions, and the `notify()` facade function signature. Design the transport abstraction layer (a NotificationTransport interface) so HTTP and NATS implementations can be swapped without changing callers.
+Build the core notification dispatcher module that defines the PipelineEventPayload type, the uniform `notify(event, payload)` interface, and accepts an injectable HTTP client for testability. This module orchestrates calls to individual bridge notifiers and applies graceful degradation (try/catch per bridge, warn-level logging on final failure, never throws).
 
 ## Steps
-1. Create `src/notification-dispatch/types.ts` with PipelineEvent type: `{ event: 'pipeline.start' | 'pipeline.complete' | 'pipeline.error'; pipeline_id: string; status: string; task_count: number; assigned_count: number; pr_url?: string; linear_session_url?: string; timestamp: string }`.
-2. Define a `NotificationTransport` interface with method `send(target: 'discord' | 'linear', payload: PipelineEvent): Promise<void>`.
-3. Create `src/notification-dispatch/index.ts` exporting `async function notify(event: PipelineEvent): Promise<void>` that delegates to the configured transport implementation for both Discord and Linear targets.
-4. Use dependency injection or a factory pattern so the transport can be swapped at initialization time (e.g., `createNotifier(transport: NotificationTransport)`).
-5. Read `DISCORD_BRIDGE_URL` and `LINEAR_BRIDGE_URL` from environment (sourced via `envFrom` on `sigma-1-infra-endpoints` ConfigMap) and pass them to the transport constructor.
+1. Create `src/notifications/dispatcher.ts`.
+2. Define `PipelineEventPayload` type with fields: `pipelineRunId: string`, `prdTitle: string`, `timestamp: string`, `status: string`, `taskCount?: number`, `issueCount?: number`, `linearSessionId?: string`, `delegateAssignmentSummary?: Record<string, unknown>`.
+3. Define an `HttpClient` interface: `{ post(url: string, body: unknown, headers: Record<string, string>): Promise<{ status: number }> }`. Default implementation wraps `fetch`.
+4. Export a factory function `createNotificationDispatcher(httpClient: HttpClient, config: { discordBridgeUrl: string, linearBridgeUrl: string, serviceApiKey: string })` that returns `{ notify(event: 'pipeline_start' | 'pipeline_complete', payload: PipelineEventPayload): Promise<void> }`.
+5. Inside `notify`, call Discord and Linear notifiers concurrently via `Promise.allSettled`. For each settled rejection, log at warn level `{ level: 'warn', stage: 'notification', bridge, event, error }` and continue. Never throw from `notify`.
+6. Read `DISCORD_BRIDGE_URL`, `LINEAR_BRIDGE_URL`, and `SERVICE_API_KEY` from environment/ConfigMap in the config initialization code.
 
 ## Validation
-Verify that the notify() function accepts a PipelineEvent and delegates to the injected transport's send() method for both 'discord' and 'linear' targets. A mock transport should receive exactly 2 send() calls per notify() invocation.
+Unit test: create dispatcher with a mock HTTP client and both URLs. Call `notify('pipeline_start', payload)`. Assert that the mock HTTP client's `post` was called twice (once per bridge). Graceful degradation test: have both mock calls reject; assert `notify` resolves without throwing and warn logs are emitted.

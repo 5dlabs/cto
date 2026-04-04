@@ -1,16 +1,17 @@
-Implement subtask 3005: Write comprehensive unit and integration tests for hermes-research module
+Implement subtask 3005: Integrate Hermes research call into the deliberation pipeline stage
 
 ## Objective
-Create the full test suite covering all fetchResearchMemo paths and the pipeline integration, using Bun's test runner and mocked HTTP responses.
+Wire the Hermes research orchestrator (client + circuit breaker + availability gate + fallback) into the existing deliberation pipeline, invoking it after PRD parsing and before task generation, and persisting the research memo in the deliberation artifacts.
 
 ## Steps
-1. Create `src/hermes-research/__tests__/fetchResearchMemo.test.ts`.
-2. Unit test - success path: Mock fetch to return a 200 response with valid JSON. Assert fetchResearchMemo returns a ResearchMemo with non-empty content, source, and valid Date timestamp.
-3. Unit test - missing API key: Temporarily unset NOUS_API_KEY in the test env. Assert return is null. Assert the info log message 'Hermes integration skipped: NOUS_API_KEY not configured' was emitted (spy on logger).
-4. Unit test - timeout: Mock fetch to delay beyond 30 seconds (use a fake timer or AbortController mock). Assert return is null and warning is logged.
-5. Unit test - HTTP error: Mock fetch to return 500. Assert return is null and warning with status code is logged.
-6. Create `src/hermes-research/__tests__/pipeline-integration.test.ts`. Set NOUS_API_KEY, mock the Hermes API globally, run the deliberation pipeline with sample task data, and verify the output tasks have populated research_memo fields.
-7. Ensure all tests clean up environment variables and mocks properly.
+1. Locate the deliberation pipeline entry point (likely `src/pipeline/deliberation.ts` or similar).
+2. After the PRD parsing step and before the task generation step, add a new stage: `hermes_research`.
+3. Derive a research query from the parsed PRD content — extract the PRD title + key requirements as a condensed query string (keep under 2000 chars).
+4. Call the research orchestrator function (which internally checks availability → circuit breaker → Hermes client → fallback).
+5. Store the returned research memo (whether from Hermes, fallback, or skip) in the deliberation artifacts object under a `researchMemo` key so downstream stages and Task 8 can access it.
+6. Ensure the pipeline does not fail if the research stage returns a fallback or skip memo — the memo is informational/supplementary, not blocking.
+7. Pass the research memo content (when available) into the task generation stage context so it can influence task breakdown quality.
+8. Persist the deliberation artifacts (including researchMemo) to the DB or pipeline state store, depending on the existing persistence mechanism.
 
 ## Validation
-All 5 test cases pass: (1) success returns valid ResearchMemo, (2) missing key returns null with correct log, (3) timeout returns null with warning, (4) HTTP 500 returns null with warning, (5) integration test shows pipeline output with non-null research_memo. Run `bun test` and verify 100% of tests pass with no flaky behavior.
+Integration tests: (1) Run the deliberation pipeline with a mocked Hermes returning valid content; assert the deliberation output contains `researchMemo` with `source: 'hermes'` and non-null content. (2) Run the pipeline with Hermes mocked to fail; assert the output contains a fallback memo and the pipeline completes successfully (no thrown errors). (3) Run the pipeline with no NOUS_API_KEY; assert the output contains a skip memo and pipeline completes. (4) Assert the researchMemo is persisted and retrievable from the pipeline state/DB. (5) Assert the task generation stage receives the research content in its context when Hermes succeeds.

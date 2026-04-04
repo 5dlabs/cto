@@ -1,14 +1,16 @@
-Implement subtask 5003: Implement HTTP POST transport for linear-bridge
+Implement subtask 5003: Implement Linear bridge notification with auth and payload formatting
 
 ## Objective
-Implement the NotificationTransport interface for HTTP POST dispatch to the linear-bridge service. Format the payload per the Linear bridge's expected schema and POST to the URL from the ConfigMap.
+Create the Linear-specific notification function that POSTs to the Linear bridge URL with the correct Authorization header and Linear-specific payload shape including session ID and delegate assignments.
 
 ## Steps
-1. Create `src/notification-dispatch/transports/http-linear.ts` implementing the `send()` method for the 'linear' target.
-2. Use Bun's native `fetch()` to POST to `LINEAR_BRIDGE_URL` with `Content-Type: application/json`.
-3. Format the JSON body with fields: `{ event, pipeline_id, status, task_count, assigned_count, pr_url, linear_session_url, timestamp }`. The Linear bridge may expect slightly different field names — check the bridge API contract and map accordingly.
-4. Set a reasonable timeout (5 seconds) on the fetch.
-5. Return the response status for the error handling layer to inspect.
+1. Create `src/notifications/linear-notifier.ts`.
+2. Export `createLinearNotifier(httpClient: HttpClient, config: { linearBridgeUrl: string, serviceApiKey: string })`.
+3. Returns a function `sendLinearNotification(event: 'pipeline_start' | 'pipeline_complete', payload: PipelineEventPayload): Promise<void>`.
+4. Build the outgoing POST body: `{ event, pipelineRunId: payload.pipelineRunId, prdTitle: payload.prdTitle, timestamp: payload.timestamp, status: payload.status, linearSessionId: payload.linearSessionId, issueCount: payload.issueCount, delegateAssignmentSummary: payload.delegateAssignmentSummary }`.
+5. Set headers: `{ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + config.serviceApiKey }`.
+6. POST to `config.linearBridgeUrl`. If response status >= 400, throw an error including the status code.
+7. Add structured log on success: `{ level: 'info', stage: 'notification', bridge: 'linear', event, status: 'sent' }`.
 
 ## Validation
-Unit test: Call the Linear HTTP transport's send() with a pipeline.complete event. Verify the outgoing HTTP POST targets LINEAR_BRIDGE_URL with JSON body containing task_count, assigned_count, pr_url, and linear_session_url.
+Unit test: mock HTTP client returning 200; assert POST was made to the correct Linear URL with correct Authorization header and payload containing linearSessionId and delegateAssignmentSummary. Error test: mock HTTP client returning 500; assert the function throws. Auth test: assert Authorization header is present and non-empty.

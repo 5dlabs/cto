@@ -1,9 +1,9 @@
 name: implement-task-7
 metadata:
   task_id: 7
-  agent: blaze
-  stack: React/Next.js
-  depends_on_tasks: [3, 6]
+  agent: tess
+  stack: Test frameworks
+  depends_on_tasks: [2, 6]
 
 inputs:
   - name: task_dir
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-7/feature-branch"
   - name: agent
-    default: "blaze"
+    default: "tess"
   - name: cli
     default: "claude"
   - name: model
@@ -37,7 +37,7 @@ steps:
     depends_on: [implement-subtask-7001]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7002
     depends_on: [validate-subtask-7001]
@@ -49,7 +49,7 @@ steps:
     depends_on: [implement-subtask-7002]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7003
     depends_on: [validate-subtask-7001]
@@ -61,46 +61,10 @@ steps:
     depends_on: [implement-subtask-7003]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
-
-  - name: implement-subtask-7004
-    depends_on: [validate-subtask-7002, validate-subtask-7003]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7004/prompt.md
-
-  - name: validate-subtask-7004
-    depends_on: [implement-subtask-7004]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
-
-  - name: implement-subtask-7005
-    depends_on: [setup]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7005/prompt.md
-
-  - name: validate-subtask-7005
-    depends_on: [implement-subtask-7005]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
-
-  - name: implement-subtask-7006
-    depends_on: [validate-subtask-7004, validate-subtask-7005]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7006/prompt.md
-
-  - name: validate-subtask-7006
-    depends_on: [implement-subtask-7006]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: integration-validation
-    depends_on: [validate-subtask-7001, validate-subtask-7002, validate-subtask-7003, validate-subtask-7004, validate-subtask-7005, validate-subtask-7006]
+    depends_on: [validate-subtask-7001, validate-subtask-7002, validate-subtask-7003]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

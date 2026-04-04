@@ -1,10 +1,15 @@
-Implement subtask 7001: Create ResearchMemo collapsible component with shadcn/ui
+Implement subtask 7001: Set up test file, Linear GraphQL client, and retrieve pipeline issue IDs
 
 ## Objective
-Build a self-contained ResearchMemo component using shadcn/ui Collapsible (Radix-based) that accepts research_memo data as props and renders a collapsible section with proper aria-expanded state management.
+Create `e2e/linear-delegate-assignments.test.ts` with a configured Linear GraphQL client using `LINEAR_API_TOKEN` from environment. In the test setup (beforeAll), retrieve the list of created issue IDs from the Task 6 pipeline run output. Also fetch the reference agent-to-Linear-user-ID mapping from the delegate-status endpoint or a test fixture, storing both for use across all test cases.
 
 ## Steps
-1. Create `components/research-memo.tsx`. 2. Import and use shadcn/ui Collapsible (CollapsibleTrigger + CollapsibleContent) which wraps Radix primitives. 3. Accept props: `researchMemo: { content: string; source: string; timestamp: string } | null`. 4. When `researchMemo` is non-null, render a 'Research' Badge (shadcn/ui Badge) as the CollapsibleTrigger. 5. Manage open/closed state via React useState. 6. When `researchMemo` is null, render nothing (return null) — the null-state text will be handled at the TaskCard level if needed. 7. Ensure CollapsibleTrigger responds to Enter and Space keys natively via Radix primitives. 8. Export the component for use in TaskCard.
+1. Create `e2e/linear-delegate-assignments.test.ts`.
+2. Import or create a lightweight GraphQL client that hits `https://api.linear.app/graphql` with the `LINEAR_API_TOKEN` bearer token.
+3. In `beforeAll`, load the pipeline run results (issue IDs and their associated agent hints) — either from a shared test artifact file written by Task 6, or by querying a known endpoint.
+4. Also in `beforeAll`, load the delegate mapping (agent hint → expected Linear user ID). This can come from the delegate-status endpoint or a co-located fixture file `e2e/fixtures/delegate-mapping.json`.
+5. For each issue ID, execute a GraphQL query: `query($id: String!) { issue(id: $id) { id title description assignee { id name } labels { nodes { name } } project { id name } team { id name } } }` and store the full response objects for assertion in sibling subtasks.
+6. Validate the setup itself: assert that at least 5 issue IDs were retrieved and that the GraphQL responses are non-error.
 
 ## Validation
-Render ResearchMemo with non-null props; verify Badge is visible, clicking toggles CollapsibleContent visibility, aria-expanded toggles between true/false. Render with null props; verify nothing is rendered.
+beforeAll completes without errors; at least 5 issue IDs are loaded; GraphQL responses for all issues return valid data (no error fields); delegate mapping contains at least 4 entries.

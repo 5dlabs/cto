@@ -1,10 +1,13 @@
-Implement subtask 7003: Add relative timestamp formatting for memo timestamp
+Implement subtask 7003: Test unassigned issue handling, label validation, and issue metadata
 
 ## Objective
-Format the research memo timestamp as a human-readable relative time string (e.g., '2 hours ago') using a lightweight date utility.
+Write test cases covering edge cases and metadata: (1) unassigned issues correspond to unmapped agent hints and have matching PM server error logs, (2) no issues carry 'agent:pending' or similar placeholder labels, (3) all issues have non-empty titles, descriptions, and belong to the expected Linear project/team.
 
 ## Steps
-1. Use `date-fns/formatDistanceToNow` (or similar from an already-installed date library) to convert the ISO timestamp string to relative time. 2. In the ResearchMemo component, display the formatted timestamp below the markdown content as a muted metadata line, e.g., `<p className='text-xs text-muted-foreground'>2 hours ago</p>`. 3. Also display the `source` field on the same metadata line or adjacent to it, e.g., 'Source: hermes · 2 hours ago'. 4. Handle edge cases: invalid timestamp string should fall back to displaying the raw string.
+1. Test case 'Unassigned handling': collect all issues where `assignee === null`. For each, assert the associated agent hint is NOT present in the delegate mapping (i.e., it's genuinely unmapped). Additionally, query PM server logs (via log file or logging endpoint) and assert that an error entry exists for each unassigned issue ID mentioning the unmapped agent hint. If no unassigned issues exist, the test should pass trivially.
+2. Test case 'No agent:pending labels': for each issue, iterate `labels.nodes` and assert no label name matches patterns like `agent:pending`, `agent-pending`, `pending-assignment`, or similar placeholders. Use a regex like `/^agent[:\-_]?pending$/i` for flexibility.
+3. Test case 'Issue metadata — title and description': for each issue, assert `issue.title` is a non-empty string with length > 0 and `issue.description` is a non-empty string with length > 0.
+4. Test case 'Issue metadata — project/team': define the expected project ID and team ID (from env vars or fixture). For each issue, assert `issue.project.id === expectedProjectId` and `issue.team.id === expectedTeamId`.
 
 ## Validation
-Component test: pass timestamp '2024-01-15T10:30:00Z' and mock Date.now to a known value; verify the rendered text contains a relative time string like '3 months ago'. Test with an invalid timestamp string; verify it falls back gracefully.
+Unassigned issues (if any) all correspond to unmapped agent hints with matching error log entries. Zero issues have labels matching agent:pending patterns. All issues have non-empty title and description. All issues belong to the expected Linear project and team.

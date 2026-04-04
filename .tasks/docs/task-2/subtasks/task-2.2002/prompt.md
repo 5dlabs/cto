@@ -1,18 +1,15 @@
-Implement subtask 2002: Implement and verify resolve_agent_delegates() function
+Implement subtask 2002: Implement resolve_agent_delegates() function with agent-to-Linear-user-ID mapping
 
 ## Objective
-Locate or implement the resolve_agent_delegates() function that accepts an array of agent hint strings and returns a mapping of agent hints to Linear user IDs, with null for unresolvable agents.
+Create the resolve_agent_delegates() function that accepts an array of agent hint strings, looks up each against an agent-to-Linear-user-ID mapping, and returns a Map<string, string | undefined>. Unknown or invalid agents must return undefined.
 
 ## Steps
-1. Locate the existing `resolve_agent_delegates()` function in the PM server codebase.
-2. Verify it accepts an array of agent hint strings (e.g., `['bolt', 'nova', 'blaze']`) and returns a `Record<string, string | null>` mapping each hint to a Linear user ID or null.
-3. If the function does not exist, implement it:
-   a. Define the agent-to-Linear-user-ID mapping (source TBD per decision point — hardcoded map, ConfigMap, or Linear API query).
-   b. Accept `string[]` of agent hints.
-   c. Return `Record<string, string | null>` with resolved IDs or null for unknown agents.
-4. Ensure the function handles edge cases: empty array input, duplicate agent hints, case-insensitive matching.
-5. The function should be a pure batch operation — resolve all hints in a single call.
-6. Export the function for import by the pipeline integration code.
+1. Create `src/delegates/resolve-agent-delegates.ts`.
+2. Define the mapping source: load a `DELEGATE_MAP` from environment variables or a JSON config (e.g., `DELEGATE_MAP_NOVA=lin_user_xxx`). Parse at module load time into a `Record<string, string>`.
+3. Export `resolve_agent_delegates(agentHints: string[]): Map<string, string | undefined>` — iterate hints, look up each in the parsed map, return the Map.
+4. For any hint not found in the map, the Map entry should be `undefined`.
+5. Log at `debug` level: `{ stage: 'delegate_resolution', mapped: number, unmapped: string[] }` summarizing the resolution result.
+6. Export the raw mapping as `getDelegateMap(): Record<string, string>` for use by the observability endpoint.
 
 ## Validation
-Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object with 3 keys, each mapping to a non-empty string (Linear user ID). Unit test: `resolve_agent_delegates([])` returns an empty object. Unit test: `resolve_agent_delegates(['unknown_agent'])` returns `{ unknown_agent: null }`.
+Unit test: call resolve_agent_delegates(['nova', 'bolt', 'unknown_agent']) with a known test mapping. Assert 'nova' and 'bolt' resolve to correct Linear user IDs and 'unknown_agent' resolves to undefined. Assert getDelegateMap() returns the full mapping object.

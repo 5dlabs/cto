@@ -1,16 +1,26 @@
-Implement subtask 6003: Implement TaskCard component with agent avatar and color-coded badges
+Implement subtask 6003: Implement task generation and agent assignment validation tests
 
 ## Objective
-Build the TaskCard component using shadcn/ui Card, Badge, and Avatar primitives to display task metadata with agent assignment visualization and color-coded status indicators.
+Implement test case 2 (task generation — at least 5 tasks with required fields) and test case 3 (agent assignments — >= 80% delegate coverage).
 
 ## Steps
-1. Create `components/pipeline/TaskCard.tsx` accepting a `Task` prop.
-2. Use shadcn/ui `Card` as the outer container with `CardHeader` and `CardContent`.
-3. Display task title in `CardHeader`, and in `CardContent` show: agent name, stack, priority, status, and dependency IDs.
-4. Agent visualization: use shadcn/ui `Avatar` with a colored background based on agent name (e.g., bolt=blue, nova=purple, rex=orange, grizz=green, blaze=red, cipher=gray). Display agent name initial in the avatar.
-5. Assignment status badge using shadcn/ui `Badge`: if `delegate_id` is non-null, render a green badge with the agent name (e.g., 'Nova'). If `delegate_id` is null, render an amber badge with 'Unresolved'. If status is 'pending', render a gray badge with 'Pending'.
-6. Show priority as a small secondary badge (high=red, medium=amber, low=gray).
-7. Ensure all text has sufficient contrast (WCAG AA 4.5:1 ratio).
+1. Test case 2 — `it('should generate at least 5 tasks with required fields')`:
+   - GET `${PM_SERVER_URL}/api/pipeline/runs/${pipelineRunId}/tasks`.
+   - Assert response status 200.
+   - Parse the response body as an array of task objects.
+   - Assert `tasks.length >= 5`.
+   - For each task, assert:
+     - `task.title` is a non-empty string.
+     - `task.agent` is a non-empty string.
+     - `task.stack` is a non-empty string.
+   - Store tasks array in suite-level variable for test case 3.
+2. Test case 3 — `it('should assign agents to at least 80% of tasks')`:
+   - Iterate over the tasks array.
+   - For each task, check if `task.delegate_id` OR `task.assigneeId` is present and non-null.
+   - Count assigned vs total.
+   - Assert `(assignedCount / totalCount) >= 0.8`.
+   - Include actual ratio in assertion message (e.g., `Expected >= 80% assigned, got 3/7 (42.8%)`).
+3. Handle field name ambiguity: check for both `delegate_id` and `assigneeId` since the field name may vary. Consider a task assigned if either field is present and non-null.
 
 ## Validation
-1. Component test: TaskCard with delegate_id='user_123' and agent='nova' displays 'Nova' badge in green variant. 2. Component test: TaskCard with delegate_id=null displays 'Unresolved' badge in amber variant. 3. Component test: TaskCard with status='pending' and no delegate_id displays gray 'Pending' badge. 4. Snapshot test: TaskCard renders all metadata fields (title, agent, stack, priority, status).
+Test case 2 passes: GET returns 200 with an array of >= 5 tasks, each having non-empty `title`, `agent`, and `stack`. Test case 3 passes: >= 80% of tasks have a non-null `delegate_id` or `assigneeId`. Assertion messages include actual counts for debugging.

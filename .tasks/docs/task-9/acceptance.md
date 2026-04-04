@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. Component test: PipelineStatus with status='running' renders a blue 'Running' badge. 2. Component test: PipelineStatus with status='complete' renders a green 'Complete' badge and displays Linear session and PR links. 3. Component test: PipelineStatus with status='error' renders a red Alert component with the error message text visible. 4. Component test: NotificationTimeline with 3 events renders them in chronological order with correct timestamps and event type labels. 5. Integration test: Mock the PM server API with SWR/React Query; verify that the component re-fetches status after the 5-second polling interval and updates the display. 6. Accessibility test: Error alert has role='alert' for screen reader announcement.
+- [ ] 1. Design PR section is reachable from the dashboard navigation. 2. After a pipeline run, at least one PR card renders with: title (non-empty string), status badge, repo name '5dlabs/sigma-1', and ISO-formatted date. 3. GitHub PR link matches expected URL pattern and has `target="_blank"`. 4. PR detail view lists >= 1 scaffold file. 5. Empty state renders correct message when no PRs exist. 6. axe-core accessibility scan returns zero critical/serious violations. 7. Displayed PRs are scoped to the specified pipelineRunId.
 
 ## Verification Notes
 

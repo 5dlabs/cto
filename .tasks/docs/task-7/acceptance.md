@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. Component test: TaskCard with a non-null `research_memo` shows a 'Research' badge; clicking it reveals content, source, and timestamp. 2. Component test: TaskCard with `research_memo=null` does not render the Research badge or collapsible section. 3. Component test: Markdown content in research memo (e.g., headers, links, code blocks) renders correctly via react-markdown. 4. Component test: Timestamp '2024-01-15T10:30:00Z' renders as a human-readable relative time string. 5. Component test: Summary header with 3 of 5 tasks having memos displays '3 of 5 tasks have research memos'. 6. Accessibility test: Collapsible section toggles with Enter and Space keys; expanded state is announced via aria-expanded.
+- [ ] 1. >= 80% of created issues (at minimum 4 of 5) have a non-null `assignee` when queried directly via Linear GraphQL API. 2. Each assigned issue's `assignee.id` matches the expected user ID from the delegate mapping. 3. Zero issues carry an `agent:pending` label. 4. Issues without assignees are accounted for by corresponding error log entries. 5. All issues belong to the expected Linear project and have non-empty titles and descriptions.
 
 ## Verification Notes
 

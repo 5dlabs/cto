@@ -1,15 +1,23 @@
-Implement subtask 6002: Create pipeline dashboard page with data fetching
+Implement subtask 6002: Implement pipeline trigger test and timing SLA assertion
 
 ## Objective
-Implement the `/pipeline/[sessionId]` page route that fetches task data from the PM server API and passes it to child components.
+Implement test case 1 (full pipeline execution — POST PRD, assert completion) and test case 6 (pipeline timing < 300s). These are the foundational tests that must pass before any downstream artifact checks.
 
 ## Steps
-1. Create `app/pipeline/[sessionId]/page.tsx` as a server component (or client component with useEffect, depending on data freshness needs).
-2. Implement a data fetching function in `lib/api/pipeline.ts`: `async function fetchPipelineTasks(sessionId: string): Promise<PipelineData>` that calls `${NEXT_PUBLIC_PM_SERVER_URL}/api/pipeline/${sessionId}/tasks`.
-3. Define TypeScript types for the API response: `PipelineData { session_id: string; status: string; tasks: Task[] }` and `Task { id: number; title: string; agent: string; stack: string; priority: string; status: string; delegate_id: string | null; dependencies: number[] }`.
-4. Handle loading state with a skeleton/loading UI.
-5. Handle error state (API unreachable, 404 session) with a user-friendly error message.
-6. Pass fetched data to TaskList and summary header components.
+1. In the `describe('Pipeline E2E Completion')` block, add a `beforeAll` that:
+   - Reads env vars and validates they are set.
+   - Records `startTime = Date.now()`.
+   - POSTs the sample PRD fixture to `${PM_SERVER_URL}/api/pipeline/trigger` (or the correct endpoint — check PM server routes).
+   - Stores the response body in a shared suite-level variable (`pipelineResult`) for use by subsequent tests.
+   - Records `endTime = Date.now()` after the POST resolves.
+   - Stores `elapsedMs = endTime - startTime`.
+2. If the pipeline endpoint is async (returns immediately with a run ID and requires polling), implement a polling loop:
+   - Poll `GET /api/pipeline/runs/{runId}/status` every 5 seconds.
+   - Timeout after 300 seconds.
+   - Store the final status response.
+3. Test case 1 — `it('should complete the full pipeline')`: Assert response status is 200. Assert response body contains `pipelineRunId` (non-null string). Assert `status` field equals `'complete'`.
+4. Test case 6 — `it('should complete within 300 second SLA')`: Assert `elapsedMs < 300000`. Include the actual elapsed time in the assertion message for debugging.
+5. Export the `pipelineRunId` to a suite-level variable so downstream test cases can reference it.
 
 ## Validation
-Verify: (1) the page fetches from the correct API URL with the sessionId from the route, (2) loading state renders a skeleton UI, (3) error state renders an error message when fetch fails, (4) successful fetch passes task data to child components.
+Test case 1 passes: POST returns 200 with `pipelineRunId` and `status: 'complete'`. Test case 6 passes: elapsed time is under 300 seconds. Both tests fail with descriptive messages if assertions fail (e.g., actual status, actual elapsed time).

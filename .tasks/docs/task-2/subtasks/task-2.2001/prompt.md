@@ -1,15 +1,14 @@
-Implement subtask 2001: Extend task entity type definition with delegate_id field
+Implement subtask 2001: Configure ConfigMap and secret mounting for PM server deployment
 
 ## Objective
-Add the `delegate_id: string | null` field to the task entity/type definition used throughout the PM server's task generation and issue creation pipeline.
+Update the PM server Kubernetes deployment manifest to mount the sigma-1-infra-endpoints ConfigMap and external-secrets-managed secrets via envFrom, making Linear API tokens and infra endpoints available as environment variables.
 
 ## Steps
-1. Locate the task entity type definition in the PM server codebase (likely a TypeScript interface or type).
-2. Add `delegate_id: string | null` to the type definition.
-3. Set the default value to `null` for backward compatibility.
-4. Update any task factory/builder functions to initialize `delegate_id` as `null`.
-5. If there are Zod schemas or other validation schemas for the task entity, update those as well to include the new field.
-6. Ensure existing code that creates task objects still compiles without modification (the new field should be optional or default to null).
+1. Open the PM server deployment YAML (e.g., `k8s/pm-server/deployment.yaml`).
+2. Add an `envFrom` entry referencing the `sigma-1-infra-endpoints` ConfigMap.
+3. Add an `envFrom` entry referencing the ExternalSecret-managed secret (e.g., `sigma-1-secrets`) that contains the Linear API key.
+4. Verify env vars are typed in a shared `env.ts` file using Bun's `process.env` or `Bun.env`, exporting typed constants like `LINEAR_API_KEY`, `LINEAR_TEAM_ID`.
+5. Add validation at server startup that all required env vars are present; throw a clear error if any are missing.
 
 ## Validation
-TypeScript compilation passes with no errors. Existing task creation code continues to work without modification. A new task object created with the factory has `delegate_id: null` by default. Type-checking confirms that `delegate_id` accepts both `string` and `null`.
+Deploy the updated manifest to a dev namespace. Exec into the pod and verify `echo $LINEAR_API_KEY` and `echo $LINEAR_TEAM_ID` return non-empty values. Verify server startup logs confirm all required env vars are present.

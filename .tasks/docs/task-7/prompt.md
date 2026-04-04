@@ -1,33 +1,31 @@
-Implement task 7: Add Research Memo Display to Web Frontend (Blaze - React/Next.js)
+Implement task 7: Verify Linear Issues Have Delegate Assignments (Tess - Test frameworks)
 
 ## Goal
-Extend the pipeline dashboard to display Hermes research memos associated with each task. Memos are shown as collapsible sections within task cards, displaying the content, source, and timestamp. Contingent on D5 resolution.
+Validate that Linear issues created by the pipeline have the correct assignee set via delegate_id resolution. Query the Linear API directly to confirm assigneeId is populated and corresponds to the expected agent-to-user mapping, not just labels or custom fields.
 
 ## Task Context
-- Agent owner: blaze
-- Stack: React/Next.js
-- Priority: medium
-- Dependencies: 3, 6
+- Agent owner: tess
+- Stack: Test frameworks
+- Priority: high
+- Dependencies: 2, 6
 
 ## Implementation Plan
-1. Extend the `TaskCard` component to include a collapsible `ResearchMemo` section using shadcn/ui Collapsible (or Accordion) component.
-2. When `research_memo` is non-null on a task, display a 'Research' indicator badge on the task card. Clicking it expands the collapsible section.
-3. The expanded section shows: `content` rendered as markdown (use a lightweight markdown renderer like react-markdown), `source` displayed as a subtle metadata line, `timestamp` formatted as relative time (e.g., '2 hours ago').
-4. When `research_memo` is null, display a muted 'No research data' text or hide the section entirely.
-5. Update the summary header to include a research memo count: 'N of M tasks have research memos'.
-6. Ensure the collapsible interaction is keyboard-accessible (Enter/Space to toggle) via Radix primitives.
-7. Write component tests for: memo present (expanded and collapsed states), memo absent, markdown rendering, summary count.
+1. Create test file `e2e/linear-delegate-assignments.test.ts`.
+2. Prerequisite: retrieve the `linearSessionId` and list of created issue IDs from the pipeline run results (from Task 6's pipeline output or a dedicated API endpoint).
+3. Test case 1 — Assignee presence: for each created Linear issue, query the Linear GraphQL API (`issue { assignee { id name } }`). Assert: at least 4 out of 5+ issues have a non-null `assignee`.
+4. Test case 2 — Correct mapping: maintain a reference mapping of agent hints to expected Linear user IDs (sourced from the delegate-status endpoint or a fixture). For each assigned issue, assert the `assignee.id` matches the expected Linear user ID for that task's agent.
+5. Test case 3 — Unassigned handling: if any issues lack an assignee, assert they correspond to tasks with unknown/unmapped agent hints, and that the PM server logged an error for each.
+6. Test case 4 — No "agent:pending" labels: assert none of the created issues have a label matching `agent:pending` or similar placeholder patterns.
+7. Test case 5 — Issue metadata: assert each issue has a title, description, and is in the correct Linear project/team.
+8. Use the `LINEAR_API_TOKEN` from environment for direct API queries. Do not go through the PM server for verification — query Linear independently to avoid circular validation.
 
 ## Acceptance Criteria
-1. Component test: TaskCard with a non-null `research_memo` shows a 'Research' badge; clicking it reveals content, source, and timestamp. 2. Component test: TaskCard with `research_memo=null` does not render the Research badge or collapsible section. 3. Component test: Markdown content in research memo (e.g., headers, links, code blocks) renders correctly via react-markdown. 4. Component test: Timestamp '2024-01-15T10:30:00Z' renders as a human-readable relative time string. 5. Component test: Summary header with 3 of 5 tasks having memos displays '3 of 5 tasks have research memos'. 6. Accessibility test: Collapsible section toggles with Enter and Space keys; expanded state is announced via aria-expanded.
+1. >= 80% of created issues (at minimum 4 of 5) have a non-null `assignee` when queried directly via Linear GraphQL API. 2. Each assigned issue's `assignee.id` matches the expected user ID from the delegate mapping. 3. Zero issues carry an `agent:pending` label. 4. Issues without assignees are accounted for by corresponding error log entries. 5. All issues belong to the expected Linear project and have non-empty titles and descriptions.
 
 ## Subtasks
-- Create ResearchMemo collapsible component with shadcn/ui: Build a self-contained ResearchMemo component using shadcn/ui Collapsible (Radix-based) that accepts research_memo data as props and renders a collapsible section with proper aria-expanded state management.
-- Integrate react-markdown for memo content rendering: Install react-markdown and integrate it into the ResearchMemo component to render the `content` field as formatted markdown, including headers, links, and code blocks.
-- Add relative timestamp formatting for memo timestamp: Format the research memo timestamp as a human-readable relative time string (e.g., '2 hours ago') using a lightweight date utility.
-- Integrate ResearchMemo into TaskCard component: Extend the existing TaskCard component to conditionally render the ResearchMemo collapsible section when research_memo data is present on a task, and show a muted 'No research data' text when absent.
-- Add research memo count to summary header: Update the pipeline dashboard summary header to display a count of how many tasks have research memos out of the total, e.g., '3 of 5 tasks have research memos'.
-- Write comprehensive component and accessibility tests: Write component tests covering all memo display states (present/absent, expanded/collapsed), markdown rendering, timestamp formatting, summary count, and keyboard accessibility of the collapsible section.
+- Set up test file, Linear GraphQL client, and retrieve pipeline issue IDs: Create `e2e/linear-delegate-assignments.test.ts` with a configured Linear GraphQL client using `LINEAR_API_TOKEN` from environment. In the test setup (beforeAll), retrieve the list of created issue IDs from the Task 6 pipeline run output. Also fetch the reference agent-to-Linear-user-ID mapping from the delegate-status endpoint or a test fixture, storing both for use across all test cases.
+- Test assignee presence and correct delegate mapping on Linear issues: Using the fetched issue data and delegate mapping from setup, write test cases asserting: (1) at least 80% of issues (minimum 4 of 5+) have a non-null assignee, and (2) each assigned issue's assignee.id matches the expected Linear user ID for that task's agent hint from the reference mapping.
+- Test unassigned issue handling, label validation, and issue metadata: Write test cases covering edge cases and metadata: (1) unassigned issues correspond to unmapped agent hints and have matching PM server error logs, (2) no issues carry 'agent:pending' or similar placeholder labels, (3) all issues have non-empty titles, descriptions, and belong to the expected Linear project/team.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

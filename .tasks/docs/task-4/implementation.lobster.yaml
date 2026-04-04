@@ -1,8 +1,8 @@
 name: implement-task-4
 metadata:
   task_id: 4
-  agent: nova
-  stack: Bun/Elysia
+  agent: blaze
+  stack: React/Next.js
   depends_on_tasks: [1]
 
 inputs:
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-4/feature-branch"
   - name: agent
-    default: "nova"
+    default: "blaze"
   - name: cli
     default: "claude"
   - name: model
@@ -64,7 +64,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-4004
-    depends_on: [validate-subtask-4003]
+    depends_on: [validate-subtask-4002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4004/prompt.md
@@ -87,20 +87,8 @@ steps:
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
-  - name: implement-subtask-4006
-    depends_on: [validate-subtask-4005]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4006/prompt.md
-
-  - name: validate-subtask-4006
-    depends_on: [implement-subtask-4006]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
-
   - name: integration-validation
-    depends_on: [validate-subtask-4001, validate-subtask-4002, validate-subtask-4003, validate-subtask-4004, validate-subtask-4005, validate-subtask-4006]
+    depends_on: [validate-subtask-4001, validate-subtask-4002, validate-subtask-4003, validate-subtask-4004, validate-subtask-4005]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

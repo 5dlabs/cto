@@ -1,18 +1,36 @@
-Implement subtask 10006: Configure liveness and readiness probes on all deployments
+Implement subtask 10006: Configure secret rotation via external-secrets with refreshInterval and rolling restart triggers
 
 ## Objective
-Add HTTP liveness probes (GET /health, 10s interval) and readiness probes (GET /ready, 5s interval) to all service deployments in sigma-1-dev.
+Update all ExternalSecret CRDs to include `refreshInterval: 1h` for automatic rotation. Configure pod rolling restart triggers so rotated secrets are picked up without manual intervention.
 
 ## Steps
-1. Edit the PM server Deployment manifest to add probes under `spec.template.spec.containers[0]`:
-   - livenessProbe: httpGet path=/health port=8080, periodSeconds=10, initialDelaySeconds=5, failureThreshold=3
-   - readinessProbe: httpGet path=/ready port=8080, periodSeconds=5, initialDelaySeconds=3, failureThreshold=3
-2. Edit the frontend Deployment manifest similarly:
-   - livenessProbe: httpGet path=/health port=3000, periodSeconds=10, initialDelaySeconds=5
-   - readinessProbe: httpGet path=/ready port=3000, periodSeconds=5, initialDelaySeconds=3
-3. Ensure the PM server and frontend applications actually implement /health and /ready endpoints. If not, document that those endpoints need to be added (or use TCP socket probes as a fallback).
-4. Apply manifests and verify pods transition to Ready state.
-5. Verify probe configuration via `kubectl get deployment -o json`.
+1. Identify all ExternalSecret resources in sigma-1-dev: `kubectl get externalsecrets -n sigma-1-dev`.
+2. Update each ExternalSecret CR to include `spec.refreshInterval: 1h`:
+   ```yaml
+   apiVersion: external-secrets.io/v1beta1
+   kind: ExternalSecret
+   metadata:
+     name: sigma-1-secrets
+     namespace: sigma-1-dev
+   spec:
+     refreshInterval: 1h
+     secretStoreRef:
+       name: <store-name>
+       kind: SecretStore
+     target:
+       name: sigma-1-secrets
+       creationPolicy: Owner
+     data:
+     - secretKey: <key>
+       remoteRef:
+         key: <remote-path>
+   ```
+3. For pods that mount secrets as environment variables (not volume mounts), configure a rolling restart trigger. Options:
+   a. Use Reloader (stakater/reloader) to watch for Secret changes and trigger rolling restarts.
+   b. Or add a hash annotation in the Deployment template that references the Secret's resourceVersion (requires a controller or CI step).
+4. Install Reloader if chosen: `helm install reloader stakater/reloader -n sigma-1-dev --set reloader.watchGlobally=false`.
+5. Annotate Deployments: `reloader.stakater.com/auto: "true"`.
+6. Apply all changes and verify the external-secrets operator is reconciling on schedule.
 
 ## Validation
-`kubectl get deployment sigma-1-pm-server -n sigma-1-dev -o jsonpath='{.spec.template.spec.containers[0].livenessProbe}'` returns a non-empty JSON object with httpGet path=/health. `kubectl get deployment sigma-1-pm-server -n sigma-1-dev -o jsonpath='{.spec.template.spec.containers[0].readinessProbe}'` returns httpGet path=/ready. Pods are in Ready state (READY 1/1).
+Record the `resourceVersion` of a target Kubernetes Secret: `kubectl get secret sigma-1-secrets -n sigma-1-dev -o jsonpath='{.metadata.resourceVersion}'`. Modify the corresponding value in the backing secret store. Wait up to 70 minutes (slightly beyond refreshInterval). Re-check `resourceVersion` and assert it has changed. If Reloader is installed, verify the associated Deployment's pods were restarted (check pod age is less than refreshInterval).

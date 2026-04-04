@@ -1,35 +1,31 @@
-## Production Hardening: HA, Ingress, RBAC, and Security (Bolt - Kubernetes/Helm)
+## Production Hardening: HA, Ingress, Security, and RBAC (Bolt - Kubernetes/Helm)
 
 ### Objective
-Harden the sigma-1-dev deployment for production readiness: configure Cloudflare Tunnel ingress via accesstunnel/clustertunnel CRDs, enforce RBAC on all service accounts, enable audit logging, configure resource limits and health probes, and set up secret rotation policies. This task depends on all implementation tasks being complete.
+Harden the Sigma-1 dev infrastructure for production-readiness: scale CloudNative-PG and Redis to HA configurations, configure ingress with TLS termination, tighten Cilium network policies, enforce RBAC on all service accounts, enable secret rotation via external-secrets, and add audit logging. This task depends on all implementation and validation tasks completing successfully.
 
 ### Ownership
 - Agent: bolt
 - Stack: Kubernetes/Helm
-- Priority: high
+- Priority: medium
 - Status: pending
 - Dependencies: 2, 3, 4, 5, 6, 7, 8, 9
 
 ### Implementation Details
-1. **Cloudflare Tunnel Ingress (per D8):** Create an `accesstunnel` or `clustertunnel` CR in `sigma-1-dev` namespace to expose the PM server and frontend (if deployed) via Cloudflare Tunnel. Configure TLS termination at the Cloudflare edge. Map routes: `/api/*` → PM server service, `/` → frontend service (if Tasks 6-9 are deployed). Do NOT deploy NGINX or any other ingress controller.
-2. **Cloudflare Access (per D7 recommendation):** Configure a Cloudflare Access application on the tunnel to restrict access to authorized users. This provides SSO/MFA without any application-level auth code. If D7 resolves to JWT/RBAC instead, this step would need to be replaced with application-level auth middleware.
-3. **RBAC Hardening:** Tighten the `sigma-1-pm-server` ServiceAccount RBAC: read-only access to configmaps and secrets in `sigma-1-dev` only. Create a separate ServiceAccount for the frontend deployment with read-only API access. Ensure no service account has cluster-wide permissions.
-4. **Resource Limits and Probes:** Set CPU/memory requests and limits on all deployments (PM server: 256m/512Mi request, 1000m/1Gi limit; frontend: 128m/256Mi request, 500m/512Mi limit). Configure liveness probes (HTTP GET /health, 10s interval) and readiness probes (HTTP GET /ready, 5s interval) on all services.
-5. **Network Policies:** Create NetworkPolicy resources to restrict traffic: PM server can reach bridge services, GitHub API, Hermes API, and Linear API. Frontend can only reach PM server. No other egress allowed from sigma-1-dev namespace except DNS.
-6. **Audit Logging:** Enable Kubernetes audit logging for the `sigma-1-dev` namespace. Log all create/update/delete operations on secrets, configmaps, and deployments.
-7. **Secret Rotation:** Configure external-secrets operator refresh interval to 24h for all secrets in `sigma-1-secrets`. Add annotations for rotation alerts.
-8. **HA Consideration:** For dev/validation, single replica is acceptable. Document the Helm values needed to scale to 2+ replicas for production (PM server: 2 replicas with PodDisruptionBudget minAvailable=1).
-9. **Note on scope:** If D5 resolves to defer Tasks 6-9, remove frontend-related ingress routes, service accounts, resource limits, and network policies. Update dependencies to [2, 3, 4, 5] only.
+1. Scale CloudNative-PG cluster `sigma-1-pg` to 3 replicas (1 primary, 2 read replicas) with automated failover. Verify HA by checking `status.instances` and `status.readyInstances` match.
+2. Scale Redis to a Sentinel or replicated configuration (3 nodes) if the operator supports it, or deploy a StatefulSet with Redis Sentinel. Update `sigma-1-infra-endpoints` ConfigMap with the Sentinel-aware connection string.
+3. Configure ingress (Nginx Ingress Controller or existing cluster ingress) for the PM server with TLS termination using cert-manager or a pre-provisioned certificate. Set up the ingress resource with appropriate annotations for rate limiting and request size limits.
+4. Tighten Cilium NetworkPolicies: review and restrict all policies to exact port numbers (not just pod selectors). Add explicit deny-all default policy for the namespace, then allowlist only required paths. Block all egress except to declared external API endpoints (Linear, GitHub, Hermes) and in-cluster services.
+5. Enforce RBAC: create dedicated ClusterRoles/Roles for each service account. PM server SA: read ConfigMaps/Secrets in namespace. No service account should have cluster-admin or wildcard permissions. Audit existing bindings and remove any overly permissive ones.
+6. Enable secret rotation: configure external-secrets ExternalSecret CRDs with `refreshInterval: 1h`. Add a rotation annotation or policy where the backing secret store supports it. Verify rotated secrets are picked up by pods without restart (or configure rolling restart triggers).
+7. Add audit logging: enable Kubernetes audit logging for the namespace (if cluster-level audit policy allows namespace scoping) or add structured logging sidecar for secret access events.
+8. Document all hardening changes in a `docs/production-hardening.md` file with the rationale for each change.
 
 ### Subtasks
-- [ ] Create Cloudflare Tunnel CR with route mapping for PM server and frontend: Create an accesstunnel or clustertunnel Custom Resource in the sigma-1-dev namespace to expose services via Cloudflare Tunnel. Configure route mappings for /api/* to the PM server service and / to the frontend service (if in scope per D5). TLS terminates at Cloudflare edge. No NGINX or other ingress controller.
-- [ ] Configure Cloudflare Access application for SSO/MFA on the tunnel: Set up a Cloudflare Access application on the tunnel to restrict access to authorized users, providing SSO/MFA at the edge without application-level auth code. This subtask is contingent on D7 resolving to Cloudflare Access (not JWT/RBAC).
-- [ ] Harden RBAC for PM server ServiceAccount: Tighten the sigma-1-pm-server ServiceAccount RBAC to read-only access for configmaps and secrets in the sigma-1-dev namespace only. Ensure no cluster-wide permissions exist.
-- [ ] Create frontend ServiceAccount with read-only API access: Create a separate ServiceAccount for the frontend deployment with minimal read-only permissions. Only applicable if D5 includes Tasks 6-9.
-- [ ] Configure resource limits and requests on all deployments: Set CPU and memory requests and limits on the PM server and frontend deployments per the specified values: PM server 256m/512Mi request, 1000m/1Gi limit; frontend 128m/256Mi request, 500m/512Mi limit.
-- [ ] Configure liveness and readiness probes on all deployments: Add HTTP liveness probes (GET /health, 10s interval) and readiness probes (GET /ready, 5s interval) to all service deployments in sigma-1-dev.
-- [ ] Create NetworkPolicy resources restricting egress traffic: Create Kubernetes NetworkPolicy resources to restrict traffic flow: PM server can reach bridge services, GitHub API, Hermes API, and Linear API. Frontend can only reach PM server. Block all other egress from sigma-1-dev except DNS.
-- [ ] Enable Kubernetes audit logging for sigma-1-dev namespace: Configure Kubernetes audit logging to capture all create, update, and delete operations on secrets, configmaps, and deployments within the sigma-1-dev namespace.
-- [ ] Configure external-secrets operator refresh interval and rotation alerts: Set the external-secrets operator refresh interval to 24 hours for all ExternalSecret resources in sigma-1-secrets and add annotations for rotation alerting.
-- [ ] Document HA scaling Helm values and conditional scope adjustment for D5: Document the Helm values needed to scale PM server to 2+ replicas with PodDisruptionBudget for production. Also document the scope adjustments needed if D5 resolves to defer Tasks 6-9 (remove frontend ingress routes, ServiceAccount, resource limits, and NetworkPolicies).
-- [ ] Security review of RBAC policies and NetworkPolicy configurations: Review all RBAC Role/RoleBinding manifests and NetworkPolicy manifests for correctness, least-privilege compliance, and absence of over-permissive rules.
+- [ ] Scale CloudNative-PG cluster to 3 replicas with automated failover: Update the CloudNative-PG Cluster CR `sigma-1-pg` to run 3 instances (1 primary, 2 read replicas) with automated failover enabled. Validate that all replicas reach ready state and streaming replication is active.
+- [ ] Configure Redis HA with Sentinel and update ConfigMap connection string: Scale Redis to a Sentinel or replicated configuration with 3 nodes. Update the `sigma-1-infra-endpoints` ConfigMap with the Sentinel-aware connection string so consumers use the HA endpoint.
+- [ ] Configure Ingress with TLS termination via cert-manager for PM server: Create an Ingress resource for the PM server with TLS termination using cert-manager. Add annotations for rate limiting and request size limits.
+- [ ] Harden Cilium NetworkPolicies with deny-all default and exact port allowlisting: Create an explicit deny-all default CiliumNetworkPolicy for the sigma-1-dev namespace, then author allowlist policies with exact port numbers for all required ingress and egress paths.
+- [ ] Audit and tighten RBAC with dedicated Roles for all service accounts: Audit all existing RoleBindings and ClusterRoleBindings in sigma-1-dev, remove overly permissive bindings, and create dedicated least-privilege Roles/RoleBindings for each service account.
+- [ ] Configure secret rotation via external-secrets with refreshInterval and rolling restart triggers: Update all ExternalSecret CRDs to include `refreshInterval: 1h` for automatic rotation. Configure pod rolling restart triggers so rotated secrets are picked up without manual intervention.
+- [ ] Add audit logging for namespace security events: Enable audit logging for the sigma-1-dev namespace to capture secret access events and security-relevant API calls, either via cluster audit policy or a structured logging sidecar.
+- [ ] Document all production hardening changes in docs/production-hardening.md: Create a comprehensive `docs/production-hardening.md` document covering all hardening measures applied, including rationale, configuration details, and verification steps for each.
