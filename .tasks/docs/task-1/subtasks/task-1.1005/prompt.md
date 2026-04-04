@@ -1,18 +1,18 @@
-Implement subtask 1005: Apply network policies for egress to Linear, Discord, GitHub, and Nous APIs
+Implement subtask 1005: Generate Helm values-dev.yaml capturing all resource names
 
 ## Objective
-Create and apply Kubernetes NetworkPolicy resources in sigma1-dev allowing egress traffic to Linear API, Discord webhooks, GitHub API, and Nous/Hermes API endpoints while denying all other egress by default.
+Create a Helm values file that aggregates all namespace-scoped resource names (namespace, secret, configmap, service account) for downstream chart consumption.
 
 ## Steps
-1. Create a default-deny egress NetworkPolicy `netpol-default-deny-egress.yaml` targeting all pods in sigma1-dev.
-2. Create an allow-egress NetworkPolicy `netpol-allow-external-apis.yaml` that permits egress to:
-   - Linear API: resolve `api.linear.app` IPs or use CIDR blocks; port 443.
-   - Discord webhooks: resolve `discord.com` IPs or use CIDR blocks; port 443.
-   - GitHub API: resolve `api.github.com` IPs or use CIDR blocks; port 443.
-   - Nous/Hermes API: resolve the Hermes endpoint IPs; port 443.
-3. Also allow egress to kube-dns (UDP/TCP 53) on the cluster DNS CIDR so pods can resolve hostnames.
-4. Also allow intra-namespace traffic for pod-to-pod communication (PM server ↔ auxiliary services).
-5. Apply all NetworkPolicy manifests: `kubectl apply -f netpol-*.yaml -n sigma1-dev`.
+1. Create `values-dev.yaml` in the project's Helm chart directory.
+2. Include the following keys:
+   - `namespace: sigma-1-dev`
+   - `secrets.name: sigma-1-secrets`
+   - `configmap.endpoints: sigma-1-infra-endpoints`
+   - `serviceAccount.name: sigma-1-pm-server`
+   - `externalServices.discordBridge`, `externalServices.linearBridge`, `externalServices.nats`, `externalServices.cloudflareOperatorNs` with their respective URLs/values
+3. Ensure the values file is valid YAML and can be consumed by `helm template` without errors.
+4. Add a comment block at the top explaining this is the dev environment values file for the sigma-1 pipeline.
 
 ## Validation
-`kubectl get networkpolicy -n sigma1-dev` lists the default-deny and allow policies. `kubectl describe networkpolicy -n sigma1-dev` shows correct egress rules for ports 443 and 53. Policy audit confirms no unexpected egress CIDRs are allowed.
+`helm template . -f values-dev.yaml` runs without errors. The values file contains keys for namespace, secrets.name, configmap.endpoints, and serviceAccount.name with correct string values matching the created resources.

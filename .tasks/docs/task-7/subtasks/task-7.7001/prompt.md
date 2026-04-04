@@ -1,16 +1,10 @@
-Implement subtask 7001: Create GitHubClient wrapper with authenticated fetch and error handling
+Implement subtask 7001: Create ResearchMemo collapsible component with shadcn/ui
 
 ## Objective
-Implement a reusable GitHubClient class/module that wraps fetch calls to the GitHub API with authentication headers, base URL resolution, JSON parsing, and structured error handling. This client will be used by all subsequent GitHub API operations.
+Build a self-contained ResearchMemo component using shadcn/ui Collapsible (Radix-based) that accepts research_memo data as props and renders a collapsible section with proper aria-expanded state management.
 
 ## Steps
-1. Create `src/services/github-client.ts`.
-2. Read `GITHUB_PAT` from environment (injected from secret) and `GITHUB_API_BASE` from environment (injected from ConfigMap), defaulting to `https://api.github.com`.
-3. Implement a class `GitHubClient` with methods: `get(path)`, `post(path, body)`, `patch(path, body)`.
-4. Each method adds `Authorization: Bearer {PAT}`, `Accept: application/vnd.github+json`, and `X-GitHub-Api-Version: 2022-11-28` headers.
-5. Parse response JSON; for non-2xx responses, throw a typed `GitHubApiError` with status code, message, and endpoint for debugging.
-6. For 404 specifically, throw a distinguishable error subtype so callers can detect repo-inaccessible scenarios.
-7. Export the client as a singleton or factory function.
+1. Create `components/research-memo.tsx`. 2. Import and use shadcn/ui Collapsible (CollapsibleTrigger + CollapsibleContent) which wraps Radix primitives. 3. Accept props: `researchMemo: { content: string; source: string; timestamp: string } | null`. 4. When `researchMemo` is non-null, render a 'Research' Badge (shadcn/ui Badge) as the CollapsibleTrigger. 5. Manage open/closed state via React useState. 6. When `researchMemo` is null, render nothing (return null) — the null-state text will be handled at the TaskCard level if needed. 7. Ensure CollapsibleTrigger responds to Enter and Space keys natively via Radix primitives. 8. Export the component for use in TaskCard.
 
 ## Validation
-Unit test: mock global fetch; verify correct headers are sent including Authorization and Accept. Unit test: verify 200 response returns parsed JSON. Unit test: verify 404 throws GitHubApiError with correct status. Unit test: verify missing GITHUB_PAT throws a clear configuration error at construction time.
+Render ResearchMemo with non-null props; verify Badge is visible, clicking toggles CollapsibleContent visibility, aria-expanded toggles between true/false. Render with null props; verify nothing is rendered.

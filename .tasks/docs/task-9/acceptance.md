@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. `kubectl get hpa -n sigma1-prod` shows PM server HPA with correct min/max/target. 2. `kubectl get ingress -n sigma1-prod` shows both ingresses with TLS configured. 3. `curl -I https://api.sigma1.5dlabs.io/health` returns 200 with valid TLS certificate. 4. `curl -I https://sigma1.5dlabs.io` returns 200 with Cache-Control header on static assets. 5. PDB validation: `kubectl get pdb -n sigma1-prod` shows correct minAvailable values. 6. Kill one PM server pod; verify traffic continues to be served (zero downtime confirmed by continuous health check). 7. Pod anti-affinity: verify pods are distributed across at least 2 nodes/zones via `kubectl get pods -o wide`.
+- [ ] 1. Component test: PipelineStatus with status='running' renders a blue 'Running' badge. 2. Component test: PipelineStatus with status='complete' renders a green 'Complete' badge and displays Linear session and PR links. 3. Component test: PipelineStatus with status='error' renders a red Alert component with the error message text visible. 4. Component test: NotificationTimeline with 3 events renders them in chronological order with correct timestamps and event type labels. 5. Integration test: Mock the PM server API with SWR/React Query; verify that the component re-fetches status after the 5-second polling interval and updates the display. 6. Accessibility test: Error alert has role='alert' for screen reader announcement.
 
 ## Verification Notes
 

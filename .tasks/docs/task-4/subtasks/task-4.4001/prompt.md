@@ -1,15 +1,14 @@
-Implement subtask 4001: Create page route and data-fetching hook for design snapshot PRs
+Implement subtask 4001: Create design-snapshot module interface, types, and GitHub API client setup
 
 ## Objective
-Set up the Next.js dynamic page route at `/pipeline/[runId]/design-snapshots` and implement a custom hook `useDesignSnapshotPRs(runId)` that fetches PR data from `GET /api/pipeline/:runId/prs`, returning loading, error, and data states.
+Set up the design-snapshot module with the createSnapshotPR function signature, define PipelineOutput and PRResult types, and configure the GitHub API client with GITHUB_TOKEN from environment.
 
 ## Steps
-1. Create the file `app/pipeline/[runId]/design-snapshots/page.tsx` (or `pages/pipeline/[runId]/design-snapshots.tsx` depending on the project's Next.js routing convention).
-2. Extract `runId` from the route params.
-3. Implement `useDesignSnapshotPRs(runId)` in a `hooks/` directory. Use `fetch` or the project's existing HTTP client to call `GET /api/pipeline/${runId}/prs`. Return `{ data, isLoading, error }` shape.
-4. Handle non-200 responses by throwing or returning an error object.
-5. The page component should call this hook and pass state down to child components (built in subsequent subtasks). For now, render a placeholder wrapper `<div>` that conditionally renders based on `isLoading`, `error`, and `data`.
-6. Use Tailwind CSS for the page layout container.
+1. Create `src/design-snapshot/types.ts` defining: `PipelineOutput` (containing tasks array with id, title, slug, description, agent, dependencies, acceptance_criteria, research_memo), `PRResult` (containing prUrl: string | null, skipped: boolean, error?: string), and `TaskScaffold` (the shape of a generated task file).
+2. Create `src/design-snapshot/index.ts` exporting `async function createSnapshotPR(pipelineOutput: PipelineOutput): Promise<PRResult>`.
+3. Read `GITHUB_TOKEN` from `process.env.GITHUB_TOKEN` (or `Bun.env`). If missing, log an error and return `{ prUrl: null, skipped: true, error: 'GITHUB_TOKEN not configured' }` immediately.
+4. Set up the GitHub API client (Octokit instance or a configured fetch wrapper) with the token in the Authorization header and base URL pointing to `https://api.github.com`.
+5. Define constants: `REPO_OWNER = '5dlabs'`, `REPO_NAME = 'sigma-1'`, `BASE_BRANCH = 'main'`.
 
 ## Validation
-Unit test the hook with msw or a fetch mock: verify it returns loading=true initially, resolves to data on 200, and returns an error object on 500. Verify the page route renders without crashing when given a valid runId.
+TypeScript compilation passes. Unit test: with GITHUB_TOKEN unset, createSnapshotPR returns PRResult with skipped=true and prUrl=null without throwing. Verify the error log message is emitted.

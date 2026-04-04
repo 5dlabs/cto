@@ -1,9 +1,8 @@
 ## Decision Points
 
-- Decision
-- Decision
+_No explicit decision points generated._
 
 ## Coordination Notes
 
-- Agent owner: tess
-- Primary stack: Test frameworks
+- Agent owner: blaze
+- Primary stack: React/Next.js

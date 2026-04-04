@@ -1,14 +1,19 @@
-Implement subtask 2004: Remove legacy agent:pending label code
+Implement subtask 2004: Implement fallback behavior for unresolvable agents and summary logging
 
 ## Objective
-Find and remove all code paths that set or reference the 'agent:pending' label on Linear issues as a fallback assignment mechanism.
+Add fallback logic for when resolve_agent_delegates() returns null for an agent hint: log a warning, create the issue unassigned, add an agent:unresolved label, and emit a summary log line after all issues are created.
 
 ## Steps
-1. Search the PM server codebase for all references to 'agent:pending' (string literals, label creation calls, label filtering logic).
-2. Remove label creation/attachment in the issueCreate mutation payload and any post-creation label-setting calls.
-3. Remove any helper functions or constants that define the 'agent:pending' label ID or name.
-4. Check for any webhook handlers or scheduled jobs that react to the 'agent:pending' label and remove/update them.
-5. If there are Linear labels already created in the workspace, note in a comment/README that existing 'agent:pending' labels on old issues can be cleaned up manually.
+1. In the pipeline integration code (from subtask 2003), after populating delegate_id, check for tasks where `delegate_id === null`.
+2. For each such task, log a structured warning: `{ level: 'warn', message: 'Unresolved agent delegate', agentHint: task.agent, taskId: task.id }`.
+3. When creating the Linear issue for an unresolved task:
+   a. Omit `assigneeId` (or pass undefined).
+   b. Add a label `agent:unresolved` to the issue. Use the Linear API to find or create this label, then attach it.
+4. After all issues are created, compute and log a summary line:
+   - `Created N issues, M assigned, K unresolved`
+   - Where N = total issues, M = issues with non-null delegate_id, K = issues with null delegate_id.
+5. Use structured logging (JSON) consistent with the PM server's existing log format.
+6. Ensure the `agent:unresolved` label creation is idempotent (check if it exists before creating).
 
 ## Validation
-Grep the entire codebase for 'agent:pending' — zero results expected. Run existing test suite to confirm no regressions from removed code paths.
+Unit test: Given a task with an unknown agent hint, the warning log is emitted with the correct agent hint and task ID. Integration test: Run pipeline with one known and one unknown agent; verify the unknown agent's issue is created without assigneeId and has the `agent:unresolved` label. Verify the summary log line shows correct counts (e.g., 'Created 2 issues, 1 assigned, 1 unresolved').

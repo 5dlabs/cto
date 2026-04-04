@@ -1,9 +1,9 @@
 name: implement-task-4
 metadata:
   task_id: 4
-  agent: blaze
-  stack: React/Next.js
-  depends_on_tasks: [1, 7]
+  agent: nova
+  stack: Bun/Elysia
+  depends_on_tasks: [1]
 
 inputs:
   - name: task_dir
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-4/feature-branch"
   - name: agent
-    default: "blaze"
+    default: "nova"
   - name: cli
     default: "claude"
   - name: model
@@ -52,7 +52,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-4003
-    depends_on: [validate-subtask-4001]
+    depends_on: [validate-subtask-4002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4003/prompt.md
@@ -64,7 +64,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-4004
-    depends_on: [validate-subtask-4002, validate-subtask-4003]
+    depends_on: [validate-subtask-4003]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4004/prompt.md
@@ -76,7 +76,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-4005
-    depends_on: [validate-subtask-4002, validate-subtask-4003]
+    depends_on: [validate-subtask-4003, validate-subtask-4004]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4005/prompt.md
@@ -88,7 +88,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-4006
-    depends_on: [validate-subtask-4004, validate-subtask-4005]
+    depends_on: [validate-subtask-4005]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4006/prompt.md

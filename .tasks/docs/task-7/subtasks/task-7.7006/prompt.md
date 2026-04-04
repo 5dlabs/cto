@@ -1,20 +1,10 @@
-Implement subtask 7006: Implement PRGenerator orchestrator service with error handling
+Implement subtask 7006: Write comprehensive component and accessibility tests
 
 ## Objective
-Create the top-level PRGenerator service that orchestrates the full flow: collect tasks → create branch → generate scaffolds → commit files → create PR, with error handling that logs failures and marks the PR step as failed without crashing the pipeline.
+Write component tests covering all memo display states (present/absent, expanded/collapsed), markdown rendering, timestamp formatting, summary count, and keyboard accessibility of the collapsible section.
 
 ## Steps
-1. Create `src/services/pr-generator.ts`.
-2. Implement `PRGenerator` class with method `generatePR(runId: string, tasks: TaskMeta[]): Promise<{ success: boolean, prUrl?: string, prNumber?: number, error?: string }>`.
-3. Orchestration flow:
-   a. Instantiate GitHubClient.
-   b. Call `createPipelineBranch(client, runId)` to get baseSha and branchRef.
-   c. Generate file entries: for each task, call `generateTaskReadme` and map to `{ path: 'tasks/{taskId}-{slug}/README.md', content }`. Also generate SUMMARY.md at `tasks/SUMMARY.md`.
-   d. Call `commitFiles(client, { baseSha, branchRef, files, message })` with commit message `chore: scaffold tasks for pipeline {runId}`.
-   e. Call `createPullRequest(client, { runId, taskCount, linearSessionUrl })`.
-   f. Return success with PR metadata.
-4. Wrap entire flow in try/catch. On GitHubApiError (especially 404), log structured error with runId and endpoint, return `{ success: false, error: message }`. Pipeline must NOT crash.
-5. Export this service for use by the pipeline orchestrator after task generation completes.
+1. Create test file `__tests__/research-memo.test.tsx` (or co-located test file). 2. Test cases: (a) TaskCard with non-null research_memo shows Research badge, click expands to show content/source/timestamp. (b) TaskCard with null research_memo does not render badge or collapsible. (c) Markdown content with headers, links, code blocks renders correctly. (d) Timestamp renders as relative time. (e) Summary header shows correct 'N of M' count. (f) Accessibility: collapsible toggle responds to Enter and Space keydown events; aria-expanded is true when open, false when closed. 3. Use React Testing Library with userEvent for interactions. 4. Mock date for deterministic timestamp tests.
 
 ## Validation
-Unit test: mock all sub-services; verify orchestration calls them in correct order with correct arguments. Unit test: mock branch creation throwing 404 GitHubApiError; verify function returns { success: false } with error message and does not throw. Unit test: mock commit step failing; verify PR creation is not attempted and error is returned. Unit test: with 3 tasks, verify file entries array has 4 items (3 READMEs + 1 SUMMARY). Integration test: run full PRGenerator with mocked GitHub API; verify all calls are sequenced correctly and PR metadata is stored.
+All 6 test cases pass. Keyboard accessibility tests use fireEvent.keyDown with Enter and Space and verify aria-expanded attribute toggles. Coverage report shows ResearchMemo component and summary count logic covered.

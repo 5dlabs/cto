@@ -1,16 +1,15 @@
-Implement subtask 2001: Implement resolve_agent_delegates() function with Linear Users API query
+Implement subtask 2001: Extend task entity type definition with delegate_id field
 
 ## Objective
-Create a new TypeScript module exporting resolve_agent_delegates(agentHints: string[]) that queries the Linear GraphQL users endpoint, matches agent hint strings to Linear user profiles, and returns a Map<string, string> of agentHint → linearUserId.
+Add the `delegate_id: string | null` field to the task entity/type definition used throughout the PM server's task generation and issue creation pipeline.
 
 ## Steps
-1. Create a new file `src/lib/resolve-agent-delegates.ts`.
-2. Define the function signature: `async function resolve_agent_delegates(agentHints: string[]): Promise<Map<string, string>>`.
-3. Use the Linear GraphQL API (`users` query) to fetch all workspace users. Filter/match each agent hint to a user by display name (or chosen matching strategy per decision point).
-4. For any hint that cannot be resolved, log a structured warning (agent hint, reason) and exclude it from the returned map — do NOT throw.
-5. Return the populated map.
-6. Export the function as a named export for consumption by the issue creation module.
-7. Ensure the Linear API token is read from environment variables sourced via `sigma1-infra-endpoints` ConfigMap (`envFrom`).
+1. Locate the task entity type definition in the PM server codebase (likely a TypeScript interface or type).
+2. Add `delegate_id: string | null` to the type definition.
+3. Set the default value to `null` for backward compatibility.
+4. Update any task factory/builder functions to initialize `delegate_id` as `null`.
+5. If there are Zod schemas or other validation schemas for the task entity, update those as well to include the new field.
+6. Ensure existing code that creates task objects still compiles without modification (the new field should be optional or default to null).
 
 ## Validation
-Unit test with a mocked Linear GraphQL client returning 3 known users. Verify: (a) all 3 known hints resolve correctly, (b) an unknown hint returns no entry and produces a warning log, (c) function returns a Map with expected size.
+TypeScript compilation passes with no errors. Existing task creation code continues to work without modification. A new task object created with the factory has `delegate_id: null` by default. Type-checking confirms that `delegate_id` accepts both `string` and `null`.

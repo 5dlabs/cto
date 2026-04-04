@@ -26,6 +26,11 @@ steps:
       git clone {{inputs.repo_url}} work && cd work &&
       git checkout -b {{inputs.branch_name}}
 
+  - name: scaffold-files
+    depends_on: [setup]
+    command: >
+      cd work && mkdir -p manifests charts/sigma-1
+
   - name: implement-subtask-1001
     depends_on: [scaffold-files]
     retry: { max: "{{inputs.max_implementation_retries}}" }
@@ -51,7 +56,7 @@ steps:
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-1003
-    depends_on: [validate-subtask-1001, validate-subtask-1002]
+    depends_on: [validate-subtask-1001]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.1003/prompt.md
@@ -63,7 +68,7 @@ steps:
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-1004
-    depends_on: [validate-subtask-1002, validate-subtask-1003]
+    depends_on: [validate-subtask-1001]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.1004/prompt.md
@@ -75,7 +80,7 @@ steps:
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-1005
-    depends_on: [validate-subtask-1001]
+    depends_on: [validate-subtask-1001, validate-subtask-1002, validate-subtask-1003, validate-subtask-1004]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.1005/prompt.md
@@ -87,7 +92,7 @@ steps:
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-1006
-    depends_on: [validate-subtask-1002, validate-subtask-1003, validate-subtask-1005]
+    depends_on: [validate-subtask-1001, validate-subtask-1003]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-1.1006/prompt.md

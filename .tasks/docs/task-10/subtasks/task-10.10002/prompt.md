@@ -1,14 +1,20 @@
-Implement subtask 10002: Update all Deployment specs to use dedicated ServiceAccounts
+Implement subtask 10002: Configure Cloudflare Access application for SSO/MFA on the tunnel
 
 ## Objective
-Modify every Deployment in sigma1-prod to reference its dedicated ServiceAccount, removing any reliance on the default ServiceAccount.
+Set up a Cloudflare Access application on the tunnel to restrict access to authorized users, providing SSO/MFA at the edge without application-level auth code. This subtask is contingent on D7 resolving to Cloudflare Access (not JWT/RBAC).
 
 ## Steps
-1. Edit the PM server Deployment spec: set `spec.template.spec.serviceAccountName: sa-pm-server` and `automountServiceAccountToken: true`.
-2. Edit the frontend Deployment spec: set `spec.template.spec.serviceAccountName: sa-frontend` and `automountServiceAccountToken: true`.
-3. Ensure no Deployment omits `serviceAccountName` (which would default to `default`).
-4. Apply updated Deployments and wait for rollout to complete.
-5. Verify with: `kubectl get pods -n sigma1-prod -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.serviceAccountName}{"\n"}{end}'` — no pod should show `default`.
+1. In the Cloudflare Zero Trust dashboard (or via Cloudflare API/Terraform if infrastructure-as-code is used), create an Access Application:
+   - Application name: `sigma-1-pm`.
+   - Application domain: the tunnel's public hostname.
+   - Session duration: 24 hours.
+2. Create an Access Policy:
+   - Policy name: `sigma-1-authorized-users`.
+   - Decision: Allow.
+   - Include rule: Email addresses or identity provider group that maps to authorized team members.
+3. If the cluster supports the Cloudflare Access CRD, create the Access application declaratively in a YAML manifest `manifests/production/cloudflare-access.yaml` and apply it.
+4. If not CRD-managed, document the Cloudflare dashboard configuration steps in `docs/production/cloudflare-access-setup.md` with screenshots or API call examples.
+5. Test that unauthenticated requests to the tunnel URL are redirected to the Cloudflare Access login page.
 
 ## Validation
-Run `kubectl get pods -n sigma1-prod -o jsonpath='{.items[*].spec.serviceAccountName}'` and confirm output contains only `sa-pm-server` and `sa-frontend`, never `default`.
+Unauthenticated request (curl without cookies/tokens) to the tunnel URL returns a 302 redirect to the Cloudflare Access login page. Authenticated request (after login or with valid CF_Authorization cookie) returns HTTP 200 from the PM server.

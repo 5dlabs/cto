@@ -1,22 +1,22 @@
 {
-  "generated_at": "2026-03-31T23:41:14Z",
-  "project_name": "sigma-1",
+  "generated_at": "2026-04-04T00:58:31Z",
+  "project_name": "sigma-1-e2e-delegation",
   "linear_session_id": "",
   "design_mode": "ingest_plus_stitch",
   "stitch_required": true,
-  "bundle_dir": "/Users/jonathon/5dlabs/cto/.tasks/design",
+  "bundle_dir": "./.tasks/design",
   "has_frontend": true,
   "stitch_status": "failed",
   "files": {
-    "design_context": "/Users/jonathon/5dlabs/cto/.tasks/design/design-context.json",
-    "crawled_urls": "/Users/jonathon/5dlabs/cto/.tasks/design/crawled/urls.json",
-    "stitch_run": "/Users/jonathon/5dlabs/cto/.tasks/design/stitch/stitch-run.json",
-    "stitch_candidates": "/Users/jonathon/5dlabs/cto/.tasks/design/stitch/candidates.json",
-    "design_variants": "/Users/jonathon/5dlabs/cto/.tasks/design/stitch/design-variants.json",
-    "design_selections": "/Users/jonathon/5dlabs/cto/.tasks/design/selections.json",
-    "source_screenshots": "/Users/jonathon/5dlabs/cto/.tasks/design/source-screenshots.json",
-    "snapshot_links_json": "/Users/jonathon/5dlabs/cto/.tasks/design/snapshot-links.json",
-    "snapshot_links_md": "/Users/jonathon/5dlabs/cto/.tasks/design/snapshot-links.md",
-    "auth_discovery": "/Users/jonathon/5dlabs/cto/.tasks/design/auth-discovery.json"
+    "design_context": "./.tasks/design/design-context.json",
+    "crawled_urls": "./.tasks/design/crawled/urls.json",
+    "stitch_run": "./.tasks/design/stitch/stitch-run.json",
+    "stitch_candidates": "./.tasks/design/stitch/candidates.json",
+    "design_variants": "./.tasks/design/stitch/design-variants.json",
+    "design_selections": "./.tasks/design/selections.json",
+    "source_screenshots": "./.tasks/design/source-screenshots.json",
+    "snapshot_links_json": "./.tasks/design/snapshot-links.json",
+    "snapshot_links_md": "./.tasks/design/snapshot-links.md",
+    "auth_discovery": "./.tasks/design/auth-discovery.json"
   }
 }

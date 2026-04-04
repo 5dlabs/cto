@@ -52,7 +52,7 @@ steps:
       cd work && bun tsc --noEmit && bun test && bun lint
 
   - name: implement-subtask-3003
-    depends_on: [validate-subtask-3001, validate-subtask-3002]
+    depends_on: [validate-subtask-3002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3003/prompt.md
@@ -63,8 +63,32 @@ steps:
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
+  - name: implement-subtask-3004
+    depends_on: [validate-subtask-3003]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3004/prompt.md
+
+  - name: validate-subtask-3004
+    depends_on: [implement-subtask-3004]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
+  - name: implement-subtask-3005
+    depends_on: [validate-subtask-3004]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3005/prompt.md
+
+  - name: validate-subtask-3005
+    depends_on: [implement-subtask-3005]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
   - name: integration-validation
-    depends_on: [validate-subtask-3001, validate-subtask-3002, validate-subtask-3003]
+    depends_on: [validate-subtask-3001, validate-subtask-3002, validate-subtask-3003, validate-subtask-3004, validate-subtask-3005]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

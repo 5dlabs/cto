@@ -1,23 +1,16 @@
-Implement subtask 3002: Format research memo section and integrate into deliberation output with artifact storage
+Implement subtask 3002: Implement Hermes API client with NOUS_API_KEY reading and 30s timeout
 
 ## Objective
-Take filtered Hermes results, format them into a Markdown research memo section, append it to the deliberation output, and persist the raw Hermes response to the deliberation artifacts directory.
+Create the core hermes-research module with the fetchResearchMemo function that reads NOUS_API_KEY from environment, calls the Hermes/NOUS API with the task context, and parses the response into a ResearchMemo.
 
 ## Steps
-1. Create or extend `src/deliberation/research-memo.ts`.
-2. Export a function `formatHermesMemo(results: HermesResult[]): string` that:
-   - Returns an empty string if the results array is empty.
-   - Otherwise builds a Markdown section starting with `## Hermes Research Findings\n`.
-   - For each result, appends: `- **{title}** ({relevance_score}): {summary} [source]({url})\n`.
-3. In the main deliberation pipeline file (e.g., `src/deliberation/index.ts` or equivalent):
-   a. After existing deliberation logic, call `fetchHermesResearch({ title: prd.title, description: prd.description })`.
-   b. If the result is not null and has length > 0, call `formatHermesMemo(results)` and append the returned string to the deliberation output text before passing it to the task generation stage.
-   c. If the result is null (key missing or error), do nothing — deliberation output proceeds unchanged.
-4. Implement artifact storage:
-   a. Determine the artifacts directory path from config or convention (e.g., `artifacts/deliberation/{sessionId}/`).
-   b. If Hermes was called (regardless of filtering), write the raw JSON response to `hermes-raw-response.json` in that directory using `Bun.write()`.
-   c. Ensure the directory is created if it doesn't exist (`mkdir -p` equivalent via `fs`).
-5. Ensure the deliberation module's overall export/interface remains unchanged for downstream consumers (task generation stage receives the same shape, just with an optional extra Markdown section).
+1. Create `src/hermes-research/index.ts` exporting `async function fetchResearchMemo(taskContext: TaskContext): Promise<ResearchMemo | null>`.
+2. Read `NOUS_API_KEY` from `process.env.NOUS_API_KEY` (or `Bun.env`).
+3. Construct the HTTP request to the Hermes API: use `fetch()` (native in Bun) with the API key in the Authorization header (Bearer token or whatever the API expects).
+4. Send the task description and context as the research query in the request body.
+5. Set `AbortController` with a 30-second timeout on the fetch call.
+6. On successful response, parse the JSON body and map it to `ResearchMemo`: store the raw response content verbatim in `content`, set `source` to the API endpoint or identifier, and `timestamp` to the current Date.
+7. Ensure the module interface is clean with a single exported function and no side effects on import, suitable for future extraction into a separate service.
 
 ## Validation
-Unit test: pass a list of 3 HermesResult objects to formatHermesMemo; verify output contains '## Hermes Research Findings' header and all 3 entries formatted correctly with Markdown links. Unit test: pass empty array; verify empty string returned. Integration test: run the deliberation pipeline with mocked Hermes client returning results; verify the final deliberation output string contains the Hermes section appended. Verify hermes-raw-response.json file is written to the artifacts directory with correct JSON content.
+Unit test with a mocked Hermes API (using Bun's test utilities or a mock server) returning valid JSON content: verify fetchResearchMemo returns a ResearchMemo with non-empty content, correct source string, and a valid Date timestamp.

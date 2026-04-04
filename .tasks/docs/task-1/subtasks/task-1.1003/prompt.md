@@ -1,17 +1,17 @@
-Implement subtask 1003: Create sigma1-infra-endpoints ConfigMap
+Implement subtask 1003: Create sigma-1-infra-endpoints ConfigMap
 
 ## Objective
-Deploy the `sigma1-infra-endpoints` ConfigMap in sigma1-dev containing all five service connection strings (PM_SERVER_URL, LINEAR_API_BASE, DISCORD_WEBHOOK_URL, GITHUB_API_BASE, NOUS_API_BASE) that downstream tasks consume via envFrom.
+Create the ConfigMap `sigma-1-infra-endpoints` in sigma-1-dev namespace with all 4 endpoint keys pointing to existing in-cluster services.
 
 ## Steps
-1. Author `configmap-sigma1-infra-endpoints.yaml` with:
-   - `PM_SERVER_URL`: internal K8s service URL for the PM server (e.g., `http://pm-server.sigma1-dev.svc.cluster.local:8080`).
-   - `LINEAR_API_BASE`: `https://api.linear.app/graphql`.
-   - `DISCORD_WEBHOOK_URL`: value referencing the convention that pods mount the `discord-webhook-url` secret separately; set to a placeholder note or the secret-reference pattern your stack uses.
-   - `GITHUB_API_BASE`: `https://api.github.com`.
-   - `NOUS_API_BASE`: Hermes research endpoint URL.
-2. Apply: `kubectl apply -f configmap-sigma1-infra-endpoints.yaml -n sigma1-dev`.
-3. Ensure the ConfigMap is consumable via `envFrom` by downstream Deployments.
+1. Create a ConfigMap manifest `configmap-endpoints.yaml` in namespace `sigma-1-dev`.
+2. Populate the following keys:
+   - `DISCORD_BRIDGE_URL`: `http://discord-bridge-http.bots.svc.cluster.local` (verify actual service name/port from the bots namespace)
+   - `LINEAR_BRIDGE_URL`: `http://linear-bridge.bots.svc.cluster.local` (verify actual service name/port from the bots namespace)
+   - `NATS_URL`: `nats://openclaw-nats.openclaw.svc.cluster.local:4222`
+   - `CLOUDFLARE_OPERATOR_NS`: `cloudflare-operator-system`
+3. Apply with `kubectl apply -f configmap-endpoints.yaml`.
+4. Verify all 4 keys are present and non-empty.
 
 ## Validation
-`kubectl get configmap sigma1-infra-endpoints -n sigma1-dev -o json | jq '.data'` contains exactly the five keys: PM_SERVER_URL, LINEAR_API_BASE, DISCORD_WEBHOOK_URL, GITHUB_API_BASE, NOUS_API_BASE, each with non-empty values.
+`kubectl get configmap sigma-1-infra-endpoints -n sigma-1-dev -o json | jq '.data'` contains exactly 4 keys (DISCORD_BRIDGE_URL, LINEAR_BRIDGE_URL, NATS_URL, CLOUDFLARE_OPERATOR_NS), each with a non-empty string value.

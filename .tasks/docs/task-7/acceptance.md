@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. Unit test: mock GitHub API; verify branch creation, blob/tree/commit sequence, and PR creation calls are made in correct order. 2. Unit test: verify scaffold file content for a sample task contains all required sections (title, agent, stack, description, details, test strategy). 3. Unit test: verify SUMMARY.md contains a markdown table with correct task count and agent assignments. 4. Unit test: mock 404 on repo access; verify error is logged and pipeline continues. 5. Integration test: run pipeline against 5dlabs/sigma-1; verify PR exists with correct branch name, file count matches task count + 1 (summary), and PR body contains run ID.
+- [ ] 1. Component test: TaskCard with a non-null `research_memo` shows a 'Research' badge; clicking it reveals content, source, and timestamp. 2. Component test: TaskCard with `research_memo=null` does not render the Research badge or collapsible section. 3. Component test: Markdown content in research memo (e.g., headers, links, code blocks) renders correctly via react-markdown. 4. Component test: Timestamp '2024-01-15T10:30:00Z' renders as a human-readable relative time string. 5. Component test: Summary header with 3 of 5 tasks having memos displays '3 of 5 tasks have research memos'. 6. Accessibility test: Collapsible section toggles with Enter and Space keys; expanded state is announced via aria-expanded.
 
 ## Verification Notes
 
