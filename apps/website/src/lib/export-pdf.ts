@@ -521,8 +521,8 @@ export async function createPitchDeckPdfBlob(
   const maxW = PG.w - 2 * margin;
 
   const sizes = density === "compact"
-    ? { meta: 10, label: 11, headline: 34, sub: 18, body: 18, small: 11, table: 9 }
-    : { meta: 11, label: 12, headline: 38, sub: 20, body: 20, small: 12, table: 10 };
+    ? { meta: 12, label: 13, headline: 34, sub: 20, body: 20, small: 14, table: 11 }
+    : { meta: 13, label: 14, headline: 42, sub: 22, body: 22, small: 15, table: 12 };
 
   const doc = new JsPDF({ orientation: "landscape", unit: "mm", format: [PG.w, PG.h] });
 
