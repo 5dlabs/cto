@@ -257,7 +257,7 @@ export const SLIDES: DeckSlide[] = [
   {
     id: "product",
     label: "06 \u00b7 Product",
-    headline: "Agentic private cloud \u2014 20+ services on your hardware.",
+    headline: "Agentic private cloud \u2014 20+ services on your bare metal.",
     body: "Everything a team needs to build, ship, and run software \u2014 without renting it from AWS. Same capabilities. Your economics.",
     table: {
       headers: ["Service", "Description", "Replaces"],
