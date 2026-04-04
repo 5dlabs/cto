@@ -42,11 +42,12 @@ export function AnimatedBarChart({
             </div>
             <div className="h-3 w-full rounded-full bg-secondary/50 overflow-hidden">
               <motion.div
-                className="h-full rounded-full"
+                className="h-full rounded-full print:!w-[var(--print-w)]"
                 style={{
                   background: item.colorVar
                     ? `var(${item.colorVar})`
                     : "linear-gradient(90deg, var(--cyan), var(--chart-4))",
+                  ["--print-w" as string]: `${item.percent}%`,
                 }}
                 initial={{ width: 0 }}
                 whileInView={{ width: `${item.percent}%` }}

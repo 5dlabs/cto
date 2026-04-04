@@ -226,7 +226,7 @@ function SlideLabel({ number, title }: { number: string; title: string }) {
    MAIN PAGE
    ═══════════════════════════════════════════════════════════════ */
 
-export default function InvestorsStagingPage() {
+export default function PitchPage() {
   return (
     <MotionConfig reducedMotion="user">
       <div className="relative min-h-screen overflow-hidden">
@@ -234,29 +234,14 @@ export default function InvestorsStagingPage() {
         <div className="fixed inset-0 circuit-bg z-[1]" />
         <div className="fixed inset-0 noise-overlay z-[3]" />
 
-        {/* Pitch-only header — main site lives at 5dlabs.ai */}
+        {/* Deck is standalone — one exit back to the main site */}
         <header className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4 print:hidden">
-          <div className="premium-shell flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-2 rounded-full backdrop-blur-xl">
-            <a
-              href="https://5dlabs.ai/"
-              className="text-sm font-bold text-cyan tracking-tight hover:text-cyan/90"
-            >
-              5D Labs
-            </a>
-            <span className="text-foreground/35 select-none" aria-hidden>
-              |
-            </span>
-            <span className="text-sm font-semibold text-foreground/90">Pitch deck (staging)</span>
-            <span className="text-foreground/35 select-none" aria-hidden>
-              |
-            </span>
-            <a
-              href="https://5dlabs.ai/"
-              className="text-sm font-medium text-foreground/95 underline-offset-4 hover:text-cyan hover:underline"
-            >
-              Full site
-            </a>
-          </div>
+          <a
+            href="https://5dlabs.ai/"
+            className="premium-shell inline-flex items-center px-4 py-2 rounded-full backdrop-blur-xl text-sm font-bold text-cyan tracking-tight hover:text-cyan/90 transition-colors"
+          >
+            5D Labs
+          </a>
         </header>
 
         <main className="relative z-10 pt-20">

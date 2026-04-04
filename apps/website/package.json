@@ -8,9 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test:header-nav": "node ./scripts/header-nav-regression.mjs",
-    "deploy:pitch-staging": "npm run build && wrangler pages deploy out --project-name 5dlabs-splash --branch pitch-staging",
-    "deploy:pitch-prod": "npm run build && echo '/ /investors/ 302' > out/_redirects && wrangler pages deploy out --project-name 5dlabs-pitch-deck --branch main --commit-dirty=true",
-    "deploy:splash": "npm run build && printf '%s\\n' '/investors / 302' '/investors/ / 302' '/investors/staging / 302' '/investors/staging/ / 302' > out/_redirects && npx wrangler pages deploy out --project-name 5dlabs-splash --branch main --commit-dirty=true"
+    "deploy:pitch": "npm run build && cp out/pitch/index.html out/index.html && npx wrangler pages deploy out --project-name 5dlabs-pitch-deck --branch main --commit-dirty=true",
+    "deploy:splash": "npm run build && printf '%s\\n' '/investors / 302' '/investors/ / 302' > out/_redirects && npx wrangler pages deploy out --project-name 5dlabs-splash --branch main --commit-dirty=true",
+    "export:gdrive": "node scripts/export-to-gdrive.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
@@ -41,6 +41,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "googleapis": "^171.4.0",
     "playwright": "^1.59.1",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.4.0",

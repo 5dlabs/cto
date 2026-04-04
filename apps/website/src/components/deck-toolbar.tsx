@@ -252,6 +252,17 @@ export function DeckToolbar() {
     }
   }, []);
 
+  const handleGdrive = useCallback(() => {
+    const w = window.open(
+      "https://drive.google.com/drive/my-drive",
+      "_blank",
+      "noopener,noreferrer"
+    );
+    if (w) {
+      window.print();
+    }
+  }, []);
+
   return (
     <>
       <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-4 pointer-events-none print:hidden">
@@ -295,10 +306,20 @@ export function DeckToolbar() {
             </AnimatePresence>
             PowerPoint
           </ToolbarButton>
+
+          <ToolbarButton
+            onClick={handleGdrive}
+            title="Save PDF, then upload to Google Drive"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7.71 3.5L1.15 15l3.47 6h4.94L3.01 9.5 7.71 3.5zm1.43 0l6.56 11.5H9.15l-3.47-6L7.71 3.5h1.43zm7.72 0L22.85 15l-3.47 6h-4.94l6.55-11.5L14.86 3.5z" />
+            </svg>
+            Google Drive
+          </ToolbarButton>
         </motion.div>
       </div>
 
-      {/* Print-specific styles — preserve dark theme and colors */}
+      {/* Print-specific styles — preserve dark theme, force animated states */}
       <style jsx global>{`
         @media print {
           -webkit-print-color-adjust: exact !important;
@@ -327,8 +348,8 @@ export function DeckToolbar() {
             page-break-inside: avoid;
             break-inside: avoid;
             min-height: auto !important;
-            padding-top: 1.5rem !important;
-            padding-bottom: 1.5rem !important;
+            padding-top: 1rem !important;
+            padding-bottom: 1rem !important;
           }
 
           .backdrop-blur-sm, .backdrop-blur-md, .backdrop-blur-xl {
@@ -342,11 +363,31 @@ export function DeckToolbar() {
             transition-duration: 0s !important;
           }
 
-          [style*="opacity: 0"] {
+          /* Force all Framer Motion whileInView elements visible */
+          [style*="opacity: 0"],
+          [style*="opacity:0"] {
             opacity: 1 !important;
           }
           [style*="transform"] {
             transform: none !important;
+          }
+
+          /* Force bar chart widths via CSS custom property */
+          .print\\:!w-\\[var\\(--print-w\\)\\],
+          .print\\:\\!w-\\[var\\(--print-w\\)\\] {
+            width: var(--print-w) !important;
+          }
+
+          /* Tighter cover to avoid wasted page */
+          section:first-of-type {
+            min-height: auto !important;
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
+          }
+
+          /* Tighter page margins */
+          @page {
+            margin: 0.5in 0.4in;
           }
         }
       `}</style>

@@ -1,7 +1,7 @@
 # 5D Labs — Pitch Deck (text export)
 
 **Exported:** 2026-04-03  
-**Live deck:** https://pitch.5dlabs.ai/ (canonical pitch URL; not listed on 5dlabs.ai)  
+**Live deck:** https://pitch.5dlabs.ai/ (redirects to `/pitch/`; not listed on 5dlabs.ai)  
 **Purpose:** Upload this file to your team Google Drive; or use **Print → Save as PDF** on the live URL for a visual copy.
 
 ---
