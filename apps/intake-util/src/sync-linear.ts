@@ -497,15 +497,15 @@ function buildTaskDescription(task: GeneratedTask, baseUrl: string, prUrl: strin
 
   const taskDoc = readDocSnippet(taskDocPath, 4000);
   if (taskDoc) {
-    lines.push('', '## task.md (embedded)', '```markdown', taskDoc, '```');
+    lines.push('', '## Task Document (embedded)', '```markdown', taskDoc, '```');
   }
   const acceptanceDoc = readDocSnippet(acceptanceDocPath, 3000);
   if (acceptanceDoc) {
-    lines.push('', '## acceptance.md (embedded)', '```markdown', acceptanceDoc, '```');
+    lines.push('', '## Acceptance Criteria (embedded)', '```markdown', acceptanceDoc, '```');
   }
   const promptDoc = readDocSnippet(promptDocPath, 2500);
   if (promptDoc) {
-    lines.push('', '## prompt.md (embedded excerpt)', '```markdown', promptDoc, '```');
+    lines.push('', '## Prompt (embedded excerpt)', '```markdown', promptDoc, '```');
   }
 
   return lines.join('\n');
@@ -538,16 +538,16 @@ function buildSubtaskDescription(
 
   if (baseUrl) {
     lines.push('', '---');
-    lines.push(`**Prompt:** [prompt.md](${baseUrl}/.tasks/docs/task-${taskId}/subtasks/task-${subtask.id}/prompt.md)`);
+    lines.push(`**Prompt:** [prompt.md](${baseUrl}/.tasks/docs/task-${taskId}/subtasks/task-${taskId}.${subtask.id}/prompt.md)`);
   }
   if (prUrl) {
     lines.push(`**PR:** ${prUrl}`);
   }
 
-  const subtaskPromptPath = path.join('.tasks', 'docs', `task-${taskId}`, 'subtasks', `task-${subtask.id}`, 'prompt.md');
+  const subtaskPromptPath = path.join('.tasks', 'docs', `task-${taskId}`, 'subtasks', `task-${taskId}.${subtask.id}`, 'prompt.md');
   const subtaskPrompt = readDocSnippet(subtaskPromptPath, 2500);
   if (subtaskPrompt) {
-    lines.push('', '## prompt.md (embedded excerpt)', '```markdown', subtaskPrompt, '```');
+    lines.push('', '## Prompt (embedded excerpt)', '```markdown', subtaskPrompt, '```');
   }
 
   return lines.join('\n');
