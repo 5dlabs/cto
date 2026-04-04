@@ -1,16 +1,20 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Investor Relations | 5D Labs — AI-Native Venture Studio",
+  title: "Pitch Deck | 5D Labs — AI-Native Venture Studio",
   description:
-    "5D Labs is building an AI-native venture studio powered by CTO, an internal trading engine, and OpenClaw platform orchestration. See the thesis, operating model, and investment narrative.",
+    "5D Labs pitch deck. CTO turns a product spec into production-ready software with 22 AI agents on owned infrastructure — economics benchmarked to public case studies (Stanford AI Index, Flexera, 37signals).",
+  robots: {
+    index: false,
+    follow: false,
+  },
   alternates: {
     canonical: "/investors/",
   },
   openGraph: {
-    title: "Investor Relations | 5D Labs",
+    title: "5D Labs — Pitch Deck",
     description:
-      "Invest in an AI-native venture studio powered by CTO, an internal trading engine, and the OpenClaw platform.",
+      "Spec in, software out. 22 AI agents. Research-backed infra economics. Pre-seed $750K.",
   },
 };
 

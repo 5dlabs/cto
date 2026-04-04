@@ -1,303 +1,637 @@
-import { Header } from "@/components/header";
-import { Footer } from "@/components/footer";
-import { InvestorCtaButtons } from "@/components/investor-cta-buttons";
+"use client";
 
-const highlights = [
+import { motion, MotionConfig } from "framer-motion";
+import { InvestorCtaButtons } from "@/components/investor-cta-buttons";
+import { AnimatedCounter } from "@/components/animated-counter";
+import {
+  StatCard,
+  AccelerationTimeline,
+  PipelineFlow,
+  ComparisonMap,
+  ConcentricRings,
+  AnimatedBarChart,
+  CareerTimeline,
+  FunnelDiagram,
+} from "@/components/charts";
+import { DeckToolbar } from "@/components/deck-toolbar";
+
+/* ─── Slide 2: Problem ─── */
+const painPoints = [
   {
-    metric: "1",
-    label: "Operating Stack",
-    description: "CTO and the internal trading engine working as one coordinated system to launch ventures",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+    ),
+    value: "Out of sync",
+    label: "AI moves faster than your roadmap",
+    note: "Training compute for notable models doubles ~every 5 months — Stanford AI Index 2025.",
   },
   {
-    metric: "5+",
-    label: "Venture Themes",
-    description: "Multiple venture directions explored from a shared operating model",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    value: "Opaque",
+    label: "Cloud bills hide real costs",
+    note: "Surveyed orgs report ~29% of cloud spend wasted — Flexera State of the Cloud 2026.",
   },
   {
-    metric: "17+",
-    label: "Infra Providers",
-    description: "Global bare metal providers across every major region",
-  },
-  {
-    metric: "4",
-    label: "On-Chain Environments",
-    description: "Internal trading infrastructure active across Solana, Base, Polygon, Near, and Sui",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+    value: "Sprawl",
+    label: "Stack and integration debt",
+    note: "More vendors, more glue code, more meetings — not more velocity.",
   },
 ];
 
-const differentiators = [
+/* ─── Slide 3: Founder ─── */
+const founderTimeline = [
   {
-    title: "One Operating Model",
-    description:
-      "CTO and the internal trading engine are not separate company theses. They are coordinated parts of one venture creation system, each reinforcing the other.",
+    company: "Pocket",
+    role: "Head of Infrastructure",
+    highlight: "13 engineers. 1B+ requests/day. 50+ network integrations.",
+  },
+  {
+    company: "Coinmiles",
+    role: "Senior Engineer → CTO",
+    highlight: "Promoted to CTO in 3 months.",
+  },
+  {
+    company: "Blocknative",
+    role: "Infrastructure Engineering",
+    highlight: "Real-time transaction monitoring at scale.",
+  },
+  {
+    company: "5D Labs",
+    role: "Founder & CEO",
+    highlight:
+      "Solo built: platform, pilot customer, $240K pipeline, 17+ bare-metal deployments.",
+    current: true,
+  },
+];
+
+/* ─── Slide 4: Why Now ─── */
+const accelerationPoints = [
+  {
+    year: "2023",
+    label: "149 foundation models",
+    detail: "More than double vs. 2022 — Stanford AI Index 2025.",
+  },
+  {
+    year: "2024–25",
+    label: "Compute compounding",
+    detail: "Training compute for notable models doubles ~every 5 months — Stanford AI Index 2025.",
+  },
+  {
+    year: "2026+",
+    label: "~29% cloud waste",
+    detail: "Survey respondents’ wasted spend — Flexera State of the Cloud 2026.",
+  },
+];
+
+/* ─── Slide 5: Solution pipeline ─── */
+const pipelineNodes = [
+  {
+    label: "You write a spec",
+    sublabel: "Plain English",
     icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+  },
+  {
+    label: "AI plans it",
+    sublabel: "Breaks it into tasks",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
       </svg>
     ),
   },
   {
-    title: "CTO as Commercial Wedge",
-    description:
-      "CTO is the build engine we use internally and the first service we can sell externally. It proves the system can win in the open market.",
+    label: "22 AI workers build it",
+    sublabel: "Specialized roles",
     icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
       </svg>
     ),
   },
   {
-    title: "In-House Capital Engine",
-    description:
-      "The trading engine helps finance experimentation and generate live market intelligence — giving the studio its own source of capital and real-time signal.",
+    label: "Automated QA",
+    sublabel: "Tests + code review",
     icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
       </svg>
     ),
   },
   {
-    title: "Venture Acceleration",
-    description:
-      "Because the studio runs its own build engine and capital engine, new ventures start with infrastructure already in place — dramatically compressing the time from idea to market.",
+    label: "Ships + monitors",
+    sublabel: "Auto-fixes issues",
     icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
       </svg>
     ),
   },
 ];
 
+/* ─── Slide 6: Product replacement map ─── */
+const replacements = [
+  { from: "Managed DB (RDS, Cloud SQL, Aurora, Cosmos…)", to: "5D Data" },
+  { from: "Object storage (S3, GCS, Blob…)", to: "5D Store" },
+  { from: "Managed inference (Vertex, SageMaker, Bedrock…)", to: "5D Inference" },
+  { from: "APM + observability (native + SaaS)", to: "5D Observe" },
+  { from: "CI/CD SaaS (any cloud)", to: "5D Deploy" },
+  { from: "Secrets + KMS", to: "5D Vault" },
+  { from: "CDN + edge DNS (CloudFront, Front Door…)", to: "5D Edge" },
+  { from: "Managed workflows (Step Functions, Logic Apps…)", to: "5D Deploy" },
+];
+
+/* ─── Slide 8: Market rings ─── */
+const marketRings: [
+  { label: string; value: string; description: string },
+  { label: string; value: string; description: string },
+  { label: string; value: string; description: string },
+] = [
+  { label: "TAM", value: "$420B+", description: "Global cloud IaaS + PaaS" },
+  { label: "SAM", value: "$40-80B", description: "AI-native dev teams + startups" },
+  { label: "Beachhead", value: "$3-5B", description: "Teams replacing cloud with bare metal" },
+];
+
+/* ─── Slide 9: GTM funnel ─── */
+const funnelStages = [
+  { label: "Free tier", description: "Developers try a lightweight version of CTO at no cost." },
+  { label: "Paid plans", description: "Teams upgrade for the full AI workforce and dedicated infrastructure." },
+  { label: "Recurring revenue", description: "Monthly subscriptions with margins that improve over time." },
+];
+
+const revenueStreams = [
+  { name: "Subscriptions", type: "Recurring", desc: "Monthly plans tiered by team size and usage." },
+  { name: "Margin expansion", type: "Structural", desc: "Infrastructure costs fall; customer pricing stays." },
+  { name: "Implementation", type: "Services", desc: "Hands-on setup for early enterprise adopters." },
+  { name: "Trading engine", type: "Internal", desc: "Funds operations internally. Investor capital never at risk." },
+];
+
+/* ─── Slide 10: Use of funds ─── */
+const fundBars = [
+  { label: "Engineering (2 hires)", value: "$300-400K", percent: 100, colorVar: "--chart-1" },
+  { label: "Founder salary", value: "$100-120K", percent: 30, colorVar: "--chart-1" },
+  { label: "AI model costs", value: "$30-50K", percent: 11, colorVar: "--chart-4" },
+  { label: "Market infra", value: "$20-40K", percent: 8, colorVar: "--chart-4" },
+  { label: "Lab server", value: "$16-20K", percent: 5, colorVar: "--chart-4" },
+];
+
+/* ─── Slide divider helper ─── */
+function SlideSection({
+  id,
+  children,
+  className = "",
+}: {
+  id: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      id={id}
+      className={`py-16 px-6 border-t border-border/30 first:border-t-0 ${className}`}
+    >
+      <div className="max-w-6xl mx-auto w-full">{children}</div>
+    </section>
+  );
+}
+
+function SlideLabel({ number, title }: { number: string; title: string }) {
+  return (
+    <div className="flex items-center gap-3 mb-6">
+      <span className="text-xs font-mono text-muted-foreground/50 tabular-nums">
+        {number}
+      </span>
+      <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground/50">
+        {title}
+      </span>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN PAGE
+   ═══════════════════════════════════════════════════════════════ */
+
 export default function InvestorsPage() {
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      {/* Background layers */}
-      <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.04_0.02_260)] z-0" />
-      <div className="fixed inset-0 circuit-bg z-[1]" />
-      {/* GridPulse at z-[2] from layout */}
-      <div className="fixed inset-0 noise-overlay z-[3]" />
+    <MotionConfig reducedMotion="user">
+      <div className="relative min-h-screen overflow-hidden">
+        <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.04_0.02_260)] z-0" />
+        <div className="fixed inset-0 circuit-bg z-[1]" />
+        <div className="fixed inset-0 noise-overlay z-[3]" />
 
-      <Header />
+        {/* Deck is standalone — one exit back to the main site */}
+        <header className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4 print:hidden">
+          <a
+            href="https://5dlabs.ai/"
+            className="premium-shell inline-flex items-center px-4 py-2 rounded-full backdrop-blur-xl text-sm font-bold text-cyan tracking-tight hover:text-cyan/90 transition-colors"
+          >
+            5D Labs
+          </a>
+        </header>
 
-      <main className="relative z-10 pt-24">
-        {/* Hero */}
-        <section className="py-20 px-6">
-          <div className="max-w-4xl mx-auto text-center">
-            <div>
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
-                <span className="w-2 h-2 rounded-full bg-cyan animate-[pulse_3s_ease-in-out_infinite]" />
+        <main className="relative z-10 pt-20">
+          {/* ── SLIDE 1: COVER ── */}
+          <section className="min-h-[70vh] flex flex-col items-center justify-center px-6">
+            <motion.div
+              className="text-center max-w-4xl mx-auto"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, ease: [0.25, 0.4, 0, 1] }}
+            >
+              <span className="inline-flex items-center gap-2 rounded-full border border-cyan/30 bg-cyan/10 px-4 py-1.5 mb-8">
+                <span className="size-2 rounded-full bg-cyan animate-[glowPulse_3s_ease-in-out_infinite]" />
                 <span className="text-sm text-cyan font-medium">
-                  Investor Relations
+                  Pre-seed &middot; $750K &middot; Delaware C-Corp
                 </span>
-              </div>
+              </span>
 
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-6">
-                Invest in the <span className="gradient-text glow-text-cyan">Engine</span>{" "}
-                Behind the Ventures
+              <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6">
+                <span className="gradient-text glow-text-cyan">Spec in.</span>{" "}
+                <span className="text-foreground">Software out.</span>
               </h1>
 
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                5D Labs is building the operating stack behind an AI-native venture
-                studio. CTO is the commercial build engine. The internal trading engine
-                is the capital engine. Together they power venture creation.
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
+                You describe what you want built. Our AI builds, tests, and ships it
+                &mdash; on owned hardware. Economics on slide 04 cite Stanford AI Index, Flexera, and
+                a public bare-metal exit (37signals).
               </p>
-            </div>
-          </div>
-        </section>
 
-        {/* Key Metrics */}
-        <section className="py-12 px-6">
-          <div className="max-w-5xl mx-auto">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {highlights.map((item) => (
-                <div
-                  key={item.label}
-                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
-                >
-                  <p className="text-3xl font-bold gradient-text mb-1">
-                    {item.metric}
-                  </p>
-                  <p className="text-sm font-semibold text-foreground mb-1">
-                    {item.label}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {item.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Mission */}
-        <section className="py-20 px-6 border-t border-border/30">
-          <div className="max-w-4xl mx-auto">
-            <div>
-              <h2 className="text-3xl sm:text-4xl font-bold mb-8 text-center">
-                The <span className="gradient-text">Opportunity</span>
-              </h2>
-
-              <div className="space-y-6 text-lg text-muted-foreground max-w-3xl mx-auto">
-                <p>
-                  The cost of building software is collapsing. AI coding agents
-                  are becoming good enough to ship production features
-                  autonomously. This means the bottleneck is no longer
-                  engineering headcount — it&apos;s <span className="text-foreground font-medium">ideas, capital,
-                  direction, and the infrastructure to orchestrate execution at scale</span>.
-                </p>
-                <p>
-                  5D Labs is building an operating stack for venture creation.
-                  <span className="text-foreground font-medium"> CTO </span>
-                  is the build engine — an operating system for software delivery.
-                  The
-                  <span className="text-foreground font-medium"> internal trading engine </span>
-                  is the capital and market-intelligence engine that finances experimentation and keeps the team close to real markets.
-                </p>
-                <p>
-                  CTO can be commercialized and sold as a service. The trading
-                  engine is intentionally kept in-house because it is part of the
-                  firm&apos;s edge rather than a product we want to distribute.
-                </p>
-                <p>
-                  This isn&apos;t a bet on one app. It&apos;s a bet on a repeatable{" "}
-                  <span className="text-foreground font-medium">
-                    system for discovering, financing, and shipping AI-native ventures
-                  </span>.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Differentiators */}
-        <section className="py-20 px-6 border-t border-border/30">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                Why <span className="gradient-text">5D Labs</span>
-              </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                What makes us different from every other AI company you&apos;ll
-                hear a pitch from this year.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              {differentiators.map((item) => (
-                <div
-                  key={item.title}
-                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-                >
-                  <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mb-4 text-cyan">
-                    {item.icon}
+              {/* Mini pipeline visual */}
+              <motion.div
+                className="flex items-center justify-center gap-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.6, duration: 0.8 }}
+              >
+                {["Spec", "Plan", "Build", "Test", "Ship"].map((step, i) => (
+                  <div key={step} className="flex items-center">
+                    <motion.div
+                      className="flex flex-col items-center"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.8 + i * 0.12, duration: 0.4 }}
+                    >
+                      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 flex items-center justify-center text-xs sm:text-sm font-semibold ${
+                        i === 0 ? "border-cyan/60 bg-cyan/15 text-cyan" :
+                        i === 4 ? "border-cyan/60 bg-cyan/15 text-cyan" :
+                        "border-border/50 bg-card/30 text-muted-foreground"
+                      }`}>
+                        {step}
+                      </div>
+                    </motion.div>
+                    {i < 4 && (
+                      <motion.div
+                        className="w-6 sm:w-10 h-px bg-gradient-to-r from-cyan/40 to-cyan/10 mx-1"
+                        initial={{ scaleX: 0 }}
+                        animate={{ scaleX: 1 }}
+                        transition={{ delay: 1 + i * 0.12, duration: 0.3 }}
+                      />
+                    )}
                   </div>
-                  <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {item.description}
-                  </p>
-                </div>
+                ))}
+              </motion.div>
+            </motion.div>
+          </section>
+
+          {/* ── SLIDE 2: PROBLEM ── */}
+          <SlideSection id="problem">
+            <SlideLabel number="02" title="Problem" />
+            <h2 className="text-3xl sm:text-4xl font-bold mb-6">
+              AI changes faster than teams can ship.
+            </h2>
+            <div className="grid sm:grid-cols-3 gap-4">
+              {painPoints.map((p) => (
+                <StatCard
+                  key={p.label}
+                  icon={p.icon}
+                  value={p.value}
+                  label={p.label}
+                  note={p.note}
+                />
               ))}
             </div>
-          </div>
-        </section>
+          </SlideSection>
 
-        {/* Ventures Overview */}
-        <section className="py-20 px-6 border-t border-border/30">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                How the Studio <span className="gradient-text">Works</span>
-              </h2>
-            </div>
-
-            <div className="space-y-6">
-              <div className="p-8 rounded-xl border border-cyan/30 bg-cyan/5 backdrop-blur-sm">
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="text-2xl font-bold">CTO</h3>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse" />
-                    Building
-                  </span>
-                </div>
-                <p className="text-cyan text-sm font-medium mb-2">
-                  Commercial Build Engine
-                </p>
-                <p className="text-muted-foreground mb-4">
-                  CTO is the system we use internally to build software and the
-                  first service we can sell externally. It is both a product and
-                  the clearest proof that the operating model works.
-                </p>
-                <a
-                  href="/cto"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-cyan hover:text-cyan/80 underline underline-offset-4 transition-colors"
-                >
-                  Visit /cto
-                </a>
-              </div>
-
-              <div className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="text-2xl font-bold">Internal Trading Engine</h3>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[oklch(0.7_0.25_320)]/10 text-[oklch(0.7_0.25_320)]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[oklch(0.7_0.25_320)] animate-pulse" />
-                    Internal
-                  </span>
-                </div>
-                <p className="text-[oklch(0.7_0.25_320)] text-sm font-medium mb-2">
-                  In-House Capital + Market-Intelligence Engine
-                </p>
-                <p className="text-muted-foreground">
-                  This system helps 5D Labs generate internal revenue, stay close
-                  to live on-chain markets, and finance venture creation. It is
-                  built to keep the studio funded and informed with real market
-                  signal.
+          {/* ── SLIDE 3: FOUNDER ── */}
+          <SlideSection id="founder">
+            <SlideLabel number="03" title="Founder" />
+            <div className="grid lg:grid-cols-[1fr_1.3fr] gap-8 items-start">
+              <div>
+                <h2 className="text-3xl sm:text-4xl font-bold mb-3">
+                  Jonathon Fritz
+                </h2>
+                <p className="text-lg text-muted-foreground">
+                  20 years building infrastructure at scale. Built this solo.
                 </p>
               </div>
 
-              <div className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="text-2xl font-bold">Venture Pipeline</h3>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
-                    Exploring
-                  </span>
-                </div>
-                <p className="text-yellow-400 text-sm font-medium mb-2">
-                  The Products That Emerge from the System
-                </p>
-                <p className="text-muted-foreground">
-                  The long-term outcome is not just CTO or trading. The stack exists
-                  to help 5D Labs discover, validate, and launch new customer-facing
-                  ventures with more speed and better economics than a traditional
-                  startup model.
-                </p>
+              <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm">
+                <CareerTimeline milestones={founderTimeline} />
               </div>
             </div>
-          </div>
-        </section>
+          </SlideSection>
 
-        {/* Investor CTA */}
-        <section className="py-20 px-6 border-t border-border/30">
-          <div className="max-w-2xl mx-auto text-center">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              Let&apos;s <span className="gradient-text">Talk</span>
+          {/* ── SLIDE 4: WHY NOW ── */}
+          <SlideSection id="why-now">
+            <SlideLabel number="04" title="Why now" />
+            <h2 className="text-3xl sm:text-4xl font-bold mb-6">
+              The window is closing.
             </h2>
-            <p className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto">
-              Interested in learning more? Schedule a conversation or meet the
-              founder.
+
+            <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm mb-5">
+              <AccelerationTimeline
+                points={accelerationPoints}
+                callout="Bare metal economics: 37signals cut annual cloud spend from $3.2M → ~$1.3M (The Register, 2024 — public exit case)."
+              />
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <motion.div
+                className="rounded-xl premium-shell p-5 backdrop-blur-sm"
+                initial={{ opacity: 0, y: 14 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ duration: 0.5, ease: [0.25, 0.4, 0, 1] }}
+              >
+                <p className="text-2xl font-bold gradient-text mb-1">
+                  <AnimatedCounter value="59" className="text-2xl font-bold gradient-text" />%
+                </p>
+                <p className="text-sm font-semibold">lower annual infra (public case)</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  37signals cloud exit — workload-dependent; not a guarantee for every architecture.
+                </p>
+              </motion.div>
+              <motion.div
+                className="rounded-xl premium-shell p-5 backdrop-blur-sm"
+                initial={{ opacity: 0, y: 14 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.4, 0, 1] }}
+              >
+                <p className="text-2xl font-bold gradient-text mb-1">
+                  <AnimatedCounter value="280" className="text-2xl font-bold gradient-text" />×
+                </p>
+                <p className="text-sm font-semibold">cheaper GPT-3.5-class inference</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  $/M tokens Nov 2022 → Oct 2024 — Stanford AI Index 2025.
+                </p>
+              </motion.div>
+            </div>
+            <p className="text-[10px] text-muted-foreground/60 mt-4 text-center max-w-2xl mx-auto leading-relaxed">
+              Sources: Stanford HAI AI Index Report 2025 (hai.stanford.edu); Flexera State of the Cloud
+              2026; The Register (37signals).
+            </p>
+          </SlideSection>
+
+          {/* ── SLIDE 5: SOLUTION + HOW IT WORKS ── */}
+          <SlideSection id="solution">
+            <SlideLabel number="05" title="Solution" />
+            <h2 className="text-3xl sm:text-4xl font-bold mb-6">
+              One system: spec in, deployed software out.
+            </h2>
+
+            <div className="rounded-xl border border-cyan/20 bg-cyan/5 p-6 backdrop-blur-sm mb-5">
+              <PipelineFlow nodes={pipelineNodes} />
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-4">
+              {[
+                {
+                  title: "Your servers",
+                  desc: "You control the economics.",
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                    </svg>
+                  ),
+                },
+                {
+                  title: "Always current",
+                  desc: "AI changes, we update. You never rewrite.",
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  ),
+                },
+                {
+                  title: "Self-healing",
+                  desc: "Issues fixed before your team wakes up.",
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  ),
+                },
+              ].map((card, i) => (
+                <motion.div
+                  key={card.title}
+                  className="rounded-xl premium-shell p-5 backdrop-blur-sm"
+                  initial={{ opacity: 0, y: 14 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-40px" }}
+                  transition={{ duration: 0.5, delay: i * 0.1, ease: [0.25, 0.4, 0, 1] }}
+                >
+                  <div className="w-9 h-9 rounded-lg bg-cyan/10 border border-cyan/20 flex items-center justify-center text-cyan mb-3">
+                    {card.icon}
+                  </div>
+                  <p className="text-sm font-semibold mb-1">{card.title}</p>
+                  <p className="text-xs text-muted-foreground">{card.desc}</p>
+                </motion.div>
+              ))}
+            </div>
+          </SlideSection>
+
+          {/* ── SLIDE 6: PRODUCT ── */}
+          <SlideSection id="product">
+            <SlideLabel number="06" title="Product" />
+            <h2 className="text-3xl sm:text-4xl font-bold mb-6">
+              Replaces the managed cloud services that eat your margin.
+            </h2>
+            <p className="text-sm text-muted-foreground mb-6 max-w-3xl">
+              AWS, GCP, Azure, and the rest — same categories, not a fixed vendor list. The stack keeps
+              growing as we replace more of the bill.
             </p>
 
-            <InvestorCtaButtons />
-            <p className="text-sm text-muted-foreground mt-6">
-              Full pitch deck available upon request.
+            <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm">
+              <ComparisonMap
+                rows={replacements}
+                callout="Representative swaps — same capabilities; hyperscale TCO varies by workload (slide 04 sources)."
+              />
+            </div>
+          </SlideSection>
+
+          {/* ── SLIDE 7: TRACTION ── */}
+          <SlideSection id="traction">
+            <SlideLabel number="07" title="Traction" />
+            <h2 className="text-3xl sm:text-4xl font-bold mb-6">
+              Revenue before fundraising.
+            </h2>
+
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              {[
+                { value: "1", label: "Paying customer", note: "Sigma One — live in production" },
+                { value: "$240K", label: "Pipeline", note: "Annual contract value in discussions" },
+                { value: "17+", label: "Server deployments", note: "Across multiple regions" },
+                { value: "22", label: "AI workers", note: "Specialized, coordinated roles" },
+                { value: "$0", label: "Outside capital to date", note: "Entirely self-funded" },
+              ].map((m, i) => (
+                <motion.article
+                  key={m.label}
+                  className={`rounded-xl border border-border/50 bg-card/30 p-5 backdrop-blur-sm text-center ${
+                    i === 4 ? "col-span-2 lg:col-span-1" : ""
+                  }`}
+                  initial={{ opacity: 0, y: 14 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-40px" }}
+                  transition={{ duration: 0.5, ease: [0.25, 0.4, 0, 1] }}
+                >
+                  <AnimatedCounter
+                    value={m.value}
+                    className="text-3xl font-bold gradient-text block"
+                  />
+                  <p className="text-sm font-semibold mt-2">{m.label}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{m.note}</p>
+                </motion.article>
+              ))}
+            </div>
+          </SlideSection>
+
+          {/* ── SLIDE 8: MARKET ── */}
+          <SlideSection id="market">
+            <SlideLabel number="08" title="Market" />
+            <div className="grid lg:grid-cols-[1fr_1fr] gap-8 items-center">
+              <div>
+                <h2 className="text-3xl sm:text-4xl font-bold mb-3">
+                  $420B+ spent on cloud every year.
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  We start where teams already feel the pain.
+                </p>
+              </div>
+
+              <div className="flex justify-center">
+                <ConcentricRings
+                  rings={marketRings}
+                  source="Gartner public-cloud forecast, Nov 2024."
+                />
+              </div>
+            </div>
+          </SlideSection>
+
+          {/* ── SLIDE 9: BUSINESS MODEL + GTM ── */}
+          <SlideSection id="business-gtm">
+            <SlideLabel number="09" title="Business + GTM" />
+            <h2 className="text-3xl sm:text-4xl font-bold mb-6">
+              Recurring revenue. Expanding margins.
+            </h2>
+
+            <div className="grid lg:grid-cols-2 gap-8">
+              <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm">
+                <p className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wider">
+                  How customers find us
+                </p>
+                <FunnelDiagram stages={funnelStages} />
+              </div>
+
+              <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm">
+                <p className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wider">
+                  Revenue streams
+                </p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {revenueStreams.map((s, i) => (
+                    <motion.div
+                      key={s.name}
+                      className="rounded-lg border border-border/40 bg-background/40 p-4"
+                      initial={{ opacity: 0, y: 10 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, margin: "-40px" }}
+                      transition={{ duration: 0.4, delay: i * 0.08, ease: [0.25, 0.4, 0, 1] }}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-semibold">{s.name}</span>
+                        <span className="text-[10px] font-mono text-cyan bg-cyan/10 px-1.5 py-0.5 rounded">
+                          {s.type}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{s.desc}</p>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </SlideSection>
+
+          {/* ── SLIDE 10: USE OF FUNDS ── */}
+          <SlideSection id="funds">
+            <SlideLabel number="10" title="Use of funds" />
+            <h2 className="text-3xl sm:text-4xl font-bold mb-6">
+              $750K. Two engineers. 18 months.
+            </h2>
+
+            <div className="rounded-xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm">
+              <AnimatedBarChart
+                items={fundBars}
+                heading="Scaling, not discovery."
+                subheading="Product works. Customer live. 18-month path to cash-flow positive."
+              />
+            </div>
+          </SlideSection>
+
+          {/* ── SLIDE 11: THE ASK ── */}
+          <section className="min-h-[55vh] flex items-center justify-center px-6 border-t border-border/30">
+            <motion.div
+              className="text-center max-w-3xl mx-auto"
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+            >
+              <SlideLabel number="11" title="The ask" />
+
+              <p className="text-6xl sm:text-7xl font-bold gradient-text mb-6">
+                $750K
+              </p>
+              <p className="text-2xl font-semibold mb-2">
+                Product live. Customer paying. Pipeline in hand.
+              </p>
+              <p className="text-lg text-muted-foreground mb-8">
+                Post-money SAFE. Cap aligned to AI infrastructure comps.
+              </p>
+
+              <InvestorCtaButtons />
+
+              <p className="text-sm text-muted-foreground mt-8">
+                Live demo available in any meeting.
+              </p>
+            </motion.div>
+          </section>
+
+          {/* Minimal footer — no site links */}
+          <div className="py-8 px-6 text-center print:hidden">
+            <p className="text-xs text-muted-foreground/40">
+              &copy; {new Date().getFullYear()} 5D Labs Inc. &middot; Confidential
             </p>
           </div>
-        </section>
+        </main>
 
-        <Footer />
-      </main>
-    </div>
+        <DeckToolbar />
+      </div>
+    </MotionConfig>
   );
 }

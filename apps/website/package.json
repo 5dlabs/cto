@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test:header-nav": "node ./scripts/header-nav-regression.mjs",
-    "deploy:pitch-staging": "npm run build && wrangler pages deploy out --project-name 5dlabs-splash --branch pitch-staging"
+    "deploy:pitch-staging": "npm run build && wrangler pages deploy out --project-name 5dlabs-splash --branch pitch-staging",
+    "deploy:pitch-prod": "npm run build && echo '/ /investors/ 302' > out/_redirects && wrangler pages deploy out --project-name 5dlabs-pitch-deck --branch main --commit-dirty=true",
+    "deploy:splash": "npm run build && printf '%s\\n' '/investors / 302' '/investors/ / 302' '/investors/staging / 302' '/investors/staging/ / 302' > out/_redirects && npx wrangler pages deploy out --project-name 5dlabs-splash --branch main --commit-dirty=true"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
@@ -19,6 +21,7 @@
     "framer-motion": "^12.30.0",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
+    "pptxgenjs": "^4.0.1",
     "radix-ui": "^1.4.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
