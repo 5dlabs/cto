@@ -182,17 +182,17 @@ function renderTable(
       fontSize: tableFs,
       cellPadding: 2.8,
       textColor: T.text,
-      fillColor: T.bg,
-      lineColor: [55, 65, 85] as RGB,
+      fillColor: [12, 16, 28] as RGB,
+      lineColor: [35, 45, 65] as RGB,
       lineWidth: 0.15,
     },
     headStyles: {
-      fillColor: [22, 35, 48] as RGB,
+      fillColor: [18, 30, 45] as RGB,
       textColor: T.accent,
       fontStyle: "bold",
     },
-    alternateRowStyles: { fillColor: [14, 18, 30] as RGB },
-    theme: "grid",
+    alternateRowStyles: { fillColor: [16, 20, 34] as RGB },
+    theme: "striped",
   });
   const dt = doc as DocWithTable;
   return (dt.lastAutoTable?.finalY ?? y + 40) + 4;
@@ -557,7 +557,7 @@ export async function createPitchDeckPdfBlob(
     /* ── label ── */
     y = writeLines(doc, safe(slide.label.toUpperCase()), margin, y, maxW, sizes.label, {
       color: T.muted,
-    }) + 6;
+    }) + 14;
 
     /* ── headline ── */
     const headlineFs = slide.id === "cover" ? 44 : slide.id === "ask" ? 48 : sizes.headline;
