@@ -29,7 +29,9 @@ EOF
 
 # Extract the Goal section from the design brief if available
 if [ -f "$DESIGN_BRIEF" ]; then
-  GOAL=$(sed -n '/^> ## Goal/,/^>/{ /^> ## Goal/d; /^>[[:space:]]*$/d; s/^> //; p; }' "$DESIGN_BRIEF" 2>/dev/null | head -8)
+  GOAL=$(sed -n '/^> ## Vision/,/^> ##/{ /^> ## Vision/d; /^> ##/d; /^>[[:space:]]*$/d; s/^> //; s/^>//; p; }' "$DESIGN_BRIEF" 2>/dev/null | head -8)
+  # Fallback: try > ## Goal
+  [ -z "$GOAL" ] && GOAL=$(sed -n '/^> ## Goal/,/^>/{ /^> ## Goal/d; /^>[[:space:]]*$/d; s/^> //; p; }' "$DESIGN_BRIEF" 2>/dev/null | head -8)
   if [ -n "$GOAL" ]; then
     printf '%s\n' "$GOAL"
     printf '\n'
@@ -39,7 +41,7 @@ fi
 # --- Architecture decisions from design brief ---
 if [ -f "$DESIGN_BRIEF" ]; then
   # Extract decision summaries
-  DECISIONS=$(grep -A2 '^\*\*Decision:\*\*' "$DESIGN_BRIEF" 2>/dev/null | grep '^\*\*Decision:\*\*' | sed 's/\*\*Decision:\*\* //' | head -8)
+  DECISIONS=$(grep -E '^\*\*Decision\*\*:|^\*\*Decision:\*\*' "$DESIGN_BRIEF" 2>/dev/null | head -8)
   if [ -n "$DECISIONS" ]; then
     cat <<'DECEOF'
 ---
@@ -56,9 +58,10 @@ DECEOF
         sub(/^### \[D[0-9]+\] /, "", q)
         sub(/ — ESCALATED$/, "", q)
       }
-      /^\*\*Decision:\*\*/ {
+      /^\*\*Decision\*\*:/ || /^\*\*Decision:\*\*/ {
         d = $0
-        sub(/\*\*Decision:\*\* /, "", d)
+        sub(/\*\*Decision\*\*: ?/, "", d)
+        sub(/\*\*Decision:\*\* ?/, "", d)
         if (q != "") print "| " q " | " d " |"
       }
     ' "$DESIGN_BRIEF" 2>/dev/null
