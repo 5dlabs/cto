@@ -1680,7 +1680,8 @@ steps:
         jq -nc '{"synced":false,"reason":"no .tasks directory"}'
         exit 0
       fi
-      rsync -a --delete "$root/.tasks/" "$TARGET/.tasks/"
+      rm -rf "$TARGET/.tasks"
+      rsync -a "$root/.tasks/" "$TARGET/.tasks/"
       BRANCH_NAME="intake/${project_name}-$(date +%Y%m%d-%H%M%S)"
       cd "$TARGET"
       git checkout -b "$BRANCH_NAME" 2>/dev/null || {
