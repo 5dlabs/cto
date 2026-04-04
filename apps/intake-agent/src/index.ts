@@ -96,7 +96,9 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
         design_prompt?: string;
         design_artifacts_path?: string;
         design_urls?: string;
-        design_mode?: 'ingest_only' | 'ingest_plus_stitch';
+        design_mode?: 'ingest_only' | 'ingest_plus_stitch' | 'stitch' | 'framer' | 'both' | 'auto';
+        design_provider?: 'stitch' | 'framer' | 'both' | 'auto';
+        design_framer_project?: string;
         output_dir?: string;
         project_name?: string;
       };
@@ -109,8 +111,8 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
         success: true,
         data: designContext,
         usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
-        model: 'detector+stitch',
-        provider: '@google/stitch-sdk',
+        model: 'detector+providers',
+        provider: 'stitch+framer',
       };
     }
 
@@ -188,8 +190,8 @@ Usage:
 Operations:
   ping                   Health check
   prd_research           Research PRD context via Exa/Perplexity/Tavily/Firecrawl
-  design_intake          Normalize design inputs + optional Stitch generation
-  design_variants        Generate design variants from existing Stitch candidates
+  design_intake          Normalize design inputs + provider generation (Stitch/Framer)
+  design_variants        Generate design variants from existing provider candidates
 
 Options:
   -h, --help             Show this help message
