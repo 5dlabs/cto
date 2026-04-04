@@ -1,0 +1,14 @@
+[
+  {
+    "provider": "stitch",
+    "target": "web",
+    "deviceType": "DESKTOP",
+    "screenId": "f8ac3e138b264b3da89155e6acef66db",
+    "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzRiMzE2MWZmNTc4OTQyYmE5YzM4Y2IwZWFlZTYxZWE0EgsSBxD0x7nTwxwYAZIBIwoKcHJvamVjdF9pZBIVQhM1MzkyNTEyNDkxNDk2ODc4MjQ2&filename=&opi=96797242",
+    "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0uj9nl4JC4sDLbT1M_D8HFAYwGkOJkwt0oE3B31IS2qRJRrPyiQ4tFymUt-mlWCQuMRkEanzCgWvXiRw1T_3T1uNHdTYJIGvZG6EMlduQttHxQZRk8PRGVko7YD6remSlZTRitOQLRvCI_-5dQVPXI4HksJbepWlFLtFiiMutv9rkXJz24hJpmf2mYyyrbLWOEMITw1hyy9rXqRzui7gl5uScmv-6rOZr-RGw91cIhqGWUSiltsHS-EZZ9o",
+    "rationale": "Generated web modernization candidate from intake design context.",
+    "prompt": "Improve and modernize this web interface for project optimizer-poc-baseline-1. Design intent: Modernize UI while preserving product tone and implementation realism. Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
+    "status": "generated",
+    "candidate_id": "stitch-web-1"
+  }
+]

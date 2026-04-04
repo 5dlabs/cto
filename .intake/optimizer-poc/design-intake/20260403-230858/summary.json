@@ -1,0 +1,21 @@
+{
+  "baseline": {
+    "provider_mode": "stitch",
+    "runs": 1,
+    "successful_runs": 1,
+    "avg_score": 121.6,
+    "avg_duration_s": 117,
+    "avg_generated_candidates": 1
+  },
+  "candidate": {
+    "provider_mode": "both",
+    "runs": 1,
+    "successful_runs": 1,
+    "avg_score": 127.4,
+    "avg_duration_s": 78,
+    "avg_generated_candidates": 1
+  },
+  "score_delta": 5.800000000000011,
+  "keep_threshold": 5,
+  "decision": "KEEP"
+}

@@ -1,0 +1,96 @@
+{
+  "projectName": "optimizer-poc-candidate-1",
+  "mode": "ingest_plus_stitch",
+  "providerMode": "both",
+  "prompt": "Modernize UI while preserving product tone and implementation realism.",
+  "artifactPath": "",
+  "urls": [],
+  "crawledUrls": [],
+  "hasFrontend": true,
+  "frontendTargets": [
+    "web"
+  ],
+  "confidence": 0.7999999999999999,
+  "evidence": [
+    "[web] Modernize UI while preserving product tone and implementation realism."
+  ],
+  "providers": {
+    "stitch": {
+      "status": "generated",
+      "projectId": "12331529836228474647",
+      "warnings": [],
+      "candidates": [
+        {
+          "provider": "stitch",
+          "target": "web",
+          "deviceType": "DESKTOP",
+          "screenId": "1bc2c1b277dc4427bbf84ef6828eb3a7",
+          "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzgyY2IwNjJhZmY5ZjQ3M2RhZDEzZWU2OGM3MzAxOGJjEgsSBxD0x7nTwxwYAZIBJAoKcHJvamVjdF9pZBIWQhQxMjMzMTUyOTgzNjIyODQ3NDY0Nw&filename=&opi=96797242",
+          "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0uhnP91jFpwt-Fu8nduz7rjojNBevUd4YnU3EEhpz8VqZcYf-e7UwSm6c2chij1KTcukgNXdL1IwwUTr1_J2J7HEEjIaPbFqmlFVcZHSxWUDMDdYsYQuPCcbpmolIjLvnbHFiCiS4Z8hH5RUN_KvxK42KTefbyR-E1jslPpt04UIw1I6gxcPod_8KuG3UGNjyjA1GrmlCHPEUNHOgBEWja1_ZdnYHkkUiBzN-ueTGMEEz-Z4dWhHZCxY3ptZ",
+          "rationale": "Generated web modernization candidate from intake design context.",
+          "prompt": "Improve and modernize this web interface for project optimizer-poc-candidate-1. Design intent: Modernize UI while preserving product tone and implementation realism. Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
+          "status": "generated",
+          "candidate_id": "stitch-web-1"
+        }
+      ]
+    },
+    "framer": {
+      "status": "skipped",
+      "reason": "missing_framer_credentials",
+      "warnings": [
+        "FRAMER_API_KEY and a Framer project target (design_framer_project, FRAMER_PROJECT_URL, or FRAMER_PROJECT_ID) are required; skipping Framer generation."
+      ],
+      "candidates": []
+    }
+  },
+  "stitch": {
+    "status": "generated",
+    "projectId": "12331529836228474647",
+    "warnings": [],
+    "candidates": [
+      {
+        "provider": "stitch",
+        "target": "web",
+        "deviceType": "DESKTOP",
+        "screenId": "1bc2c1b277dc4427bbf84ef6828eb3a7",
+        "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzgyY2IwNjJhZmY5ZjQ3M2RhZDEzZWU2OGM3MzAxOGJjEgsSBxD0x7nTwxwYAZIBJAoKcHJvamVjdF9pZBIWQhQxMjMzMTUyOTgzNjIyODQ3NDY0Nw&filename=&opi=96797242",
+        "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0uhnP91jFpwt-Fu8nduz7rjojNBevUd4YnU3EEhpz8VqZcYf-e7UwSm6c2chij1KTcukgNXdL1IwwUTr1_J2J7HEEjIaPbFqmlFVcZHSxWUDMDdYsYQuPCcbpmolIjLvnbHFiCiS4Z8hH5RUN_KvxK42KTefbyR-E1jslPpt04UIw1I6gxcPod_8KuG3UGNjyjA1GrmlCHPEUNHOgBEWja1_ZdnYHkkUiBzN-ueTGMEEz-Z4dWhHZCxY3ptZ",
+        "rationale": "Generated web modernization candidate from intake design context.",
+        "prompt": "Improve and modernize this web interface for project optimizer-poc-candidate-1. Design intent: Modernize UI while preserving product tone and implementation realism. Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
+        "status": "generated",
+        "candidate_id": "stitch-web-1"
+      }
+    ]
+  },
+  "framer": {
+    "status": "skipped",
+    "reason": "missing_framer_credentials",
+    "warnings": [
+      "FRAMER_API_KEY and a Framer project target (design_framer_project, FRAMER_PROJECT_URL, or FRAMER_PROJECT_ID) are required; skipping Framer generation."
+    ],
+    "candidates": []
+  },
+  "normalized_candidates": [
+    {
+      "provider": "stitch",
+      "target": "web",
+      "deviceType": "DESKTOP",
+      "screenId": "1bc2c1b277dc4427bbf84ef6828eb3a7",
+      "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzgyY2IwNjJhZmY5ZjQ3M2RhZDEzZWU2OGM3MzAxOGJjEgsSBxD0x7nTwxwYAZIBJAoKcHJvamVjdF9pZBIWQhQxMjMzMTUyOTgzNjIyODQ3NDY0Nw&filename=&opi=96797242",
+      "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0uhnP91jFpwt-Fu8nduz7rjojNBevUd4YnU3EEhpz8VqZcYf-e7UwSm6c2chij1KTcukgNXdL1IwwUTr1_J2J7HEEjIaPbFqmlFVcZHSxWUDMDdYsYQuPCcbpmolIjLvnbHFiCiS4Z8hH5RUN_KvxK42KTefbyR-E1jslPpt04UIw1I6gxcPod_8KuG3UGNjyjA1GrmlCHPEUNHOgBEWja1_ZdnYHkkUiBzN-ueTGMEEz-Z4dWhHZCxY3ptZ",
+      "rationale": "Generated web modernization candidate from intake design context.",
+      "prompt": "Improve and modernize this web interface for project optimizer-poc-candidate-1. Design intent: Modernize UI while preserving product tone and implementation realism. Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
+      "status": "generated",
+      "candidate_id": "stitch-web-1"
+    }
+  ],
+  "component_library": {
+    "path": "/Users/jonathon/5dlabs/cto/.intake/optimizer-poc/design-intake/20260403-222820/runs/candidate/run-1/component-library.json",
+    "format": "json",
+    "version": "1.0.0"
+  },
+  "design_system": {
+    "path": "/Users/jonathon/5dlabs/cto/.intake/optimizer-poc/design-intake/20260403-222820/runs/candidate/run-1/design-system.md",
+    "format": "markdown"
+  }
+}
