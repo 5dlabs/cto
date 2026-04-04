@@ -72,19 +72,16 @@ export function requestDriveFileAccessToken(
   client.requestAccessToken({ prompt: "consent" });
 }
 
-export async function uploadPptxBlobToDrive(
+export async function uploadBlobToDrive(
   accessToken: string,
   fileBlob: Blob,
-  options?: { folderId?: string; fileName?: string },
+  fileName: string,
+  mimeType: string,
+  options?: { folderId?: string },
 ): Promise<DriveUploadResult> {
-  const fileName = options?.fileName ?? "5D-Labs-Pitch-Deck.pptx";
   const boundary = `5d_pitch_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-  const metadata: Record<string, unknown> = {
-    name: fileName,
-    mimeType:
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  };
+  const metadata: Record<string, unknown> = { name: fileName, mimeType };
   if (options?.folderId) {
     metadata.parents = [options.folderId];
   }
@@ -94,18 +91,18 @@ export async function uploadPptxBlobToDrive(
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`,
   );
   const fileHeader = encoder.encode(
-    `--${boundary}\r\nContent-Type: application/vnd.openxmlformats-officedocument.presentationml.presentation\r\n\r\n`,
+    `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`,
   );
-  const pptxBytes = new Uint8Array(await fileBlob.arrayBuffer());
+  const fileBytes = new Uint8Array(await fileBlob.arrayBuffer());
   const endChunk = encoder.encode(`\r\n--${boundary}--`);
 
   const body = new Uint8Array(
-    metaChunk.length + fileHeader.length + pptxBytes.length + endChunk.length,
+    metaChunk.length + fileHeader.length + fileBytes.length + endChunk.length,
   );
   body.set(metaChunk, 0);
   body.set(fileHeader, metaChunk.length);
-  body.set(pptxBytes, metaChunk.length + fileHeader.length);
-  body.set(endChunk, metaChunk.length + fileHeader.length + pptxBytes.length);
+  body.set(fileBytes, metaChunk.length + fileHeader.length);
+  body.set(endChunk, metaChunk.length + fileHeader.length + fileBytes.length);
 
   const q = new URLSearchParams({
     uploadType: "multipart",
