@@ -23,6 +23,7 @@ const footerLinks = [
       { name: "Founder", href: "/founder" },
       { name: "Team", href: teamHref },
       { name: "Investors", href: "/investors" },
+      { name: "Privacy Policy", href: "/privacy-policy" },
     ],
   },
   {

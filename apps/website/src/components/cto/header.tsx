@@ -3,7 +3,7 @@
 import type { MouseEvent } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { featureFlags } from "@/config/feature-flags";
 import { cn } from "@/lib/utils";
 
@@ -32,24 +32,33 @@ const socials = [
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const [currentHash, setCurrentHash] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isSubdomain, setIsSubdomain] = useState(false);
-
-  useEffect(() => {
-    setIsSubdomain(window.location.hostname.startsWith("cto."));
-  }, []);
+  const [isSubdomain] = useState(() =>
+    typeof window !== "undefined" && window.location.hostname.startsWith("cto.")
+  );
 
   useEffect(() => {
     const syncHash = () => setCurrentHash(window.location.hash);
     syncHash();
     window.addEventListener("hashchange", syncHash);
     return () => window.removeEventListener("hashchange", syncHash);
-  }, []);
+  }, [pathname]);
 
   const resolveHref = (href: string): string => {
     if (!isSubdomain) return href;
-    if (href.startsWith("/cto")) return href.replace(/^\/cto/, "") || "/";
+    if (href.startsWith("/cto")) {
+      if (href.startsWith("/cto#")) {
+        return href;
+      }
+      // Some subdomain deployments are mounted at /cto while others are mounted at /.
+      // Preserve /cto paths when already within that namespace; otherwise strip it.
+      if (pathname === "/cto" || pathname.startsWith("/cto/")) {
+        return href;
+      }
+      return href.replace(/^\/cto/, "") || "/";
+    }
     return href;
   };
 
@@ -88,22 +97,30 @@ export function Header() {
     const normalizedTargetPath = (targetPath || "/").replace(/\/+$/, "") || "/";
     const normalizedPathname = pathname.replace(/\/+$/, "") || "/";
 
-    // Same-page hash navigation can no-op under router transitions.
-    // Force a deterministic in-page scroll so clicks always respond.
-    if (hash && normalizedPathname === normalizedTargetPath) {
-      const targetId = rawHash;
-      if (!targetId) {
-        return;
-      }
-      const target = document.getElementById(targetId);
-      if (!target) {
+    if (hash) {
+      event.preventDefault();
+
+      // Same-page hash navigation can no-op under router transitions.
+      // Force a deterministic in-page scroll so clicks always respond.
+      if (normalizedPathname === normalizedTargetPath) {
+        const targetId = rawHash;
+        if (!targetId) {
+          return;
+        }
+        const target = document.getElementById(targetId);
+        if (!target) {
+          return;
+        }
+
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        window.history.replaceState(null, "", hash);
+        setCurrentHash(hash);
         return;
       }
 
-      event.preventDefault();
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-      window.history.replaceState(null, "", hash);
-      setCurrentHash(hash);
+      // Cross-page hash navigation can occasionally miss target anchors.
+      // Route explicitly so the destination hash is preserved every time.
+      router.push(resolved);
       return;
     }
 
