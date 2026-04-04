@@ -1,1 +1,1 @@
-What authentication mechanism for the web frontend dashboard?
+Row-level tenant isolation within shared schemas, or separate databases per tenant?

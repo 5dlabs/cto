@@ -1,1 +1,1 @@
-Service-to-service auth mechanism?
+Synchronous-only service communication or hybrid sync + async via NATS?

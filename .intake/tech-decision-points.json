@@ -1,111 +1,109 @@
 [
   {
     "id": "dp-1",
-    "category": "service-topology",
-    "description": "Should the PM server's agent delegate resolution and Hermes research integration be implemented as extensions to the existing PM server, or as separate microservices?",
+    "category": "platform-choice",
+    "description": "Which Redis-compatible engine should be used for caching, rate limiting, and session storage across services?",
     "options": [
-      "Extend the existing PM server (Bun/Elysia) with new endpoints and logic for agent delegate resolution and Hermes research integration",
-      "Create separate microservices for agent delegate resolution and Hermes research, communicating with the PM server via API or message queue"
+      "Use the existing Valkey operator (redis.redis.opstreelabs.in) deployed as 'sigma1-valkey' in-cluster",
+      "Provision a new Redis instance (e.g., Bitnami Redis Helm chart) dedicated to Sigma-1"
     ],
     "requires_approval": false,
     "constraint_type": "open",
     "affected_tasks": [
+      1,
       2,
       3,
-      5
+      4
     ],
-    "rationale": "Both features (delegate resolution and Hermes integration) could be tightly coupled to the PM server or split out for modularity and independent scaling. The choice impacts deployment, testing, and future extensibility."
+    "rationale": "Multiple services require Redis-compatible caching. The cluster already has a Valkey operator deployed, but a dedicated Redis instance could offer isolation or advanced features. Choosing between reusing Valkey or provisioning a new Redis instance impacts operational complexity and resource allocation."
   },
   {
     "id": "dp-2",
     "category": "platform-choice",
-    "description": "Which notification bridge services should be used for Discord and Linear integration?",
+    "description": "Which object storage provider should be used for product images, event photos, and other media assets?",
     "options": [
-      "Use the existing in-cluster bots/discord-bridge-http and bots/linear-bridge services",
-      "Integrate with external SaaS notification services (e.g., Zapier, Pipedream) for Discord and Linear"
+      "Use Cloudflare R2 (preferred for CDN integration and cost)",
+      "Use AWS S3 (broader ecosystem, but external to cluster)"
     ],
     "requires_approval": false,
     "constraint_type": "open",
     "affected_tasks": [
-      5
+      1,
+      2,
+      6
     ],
-    "rationale": "In-cluster bridge services are already deployed, but external SaaS could offer easier setup or richer features. Organizational bias prefers in-cluster, but both are viable."
+    "rationale": "Both Cloudflare R2 and AWS S3 are supported for object storage. R2 offers seamless CDN integration and is likely more cost-effective, but S3 is the industry standard. The choice affects integration, cost, and performance for media-heavy workflows."
   },
   {
     "id": "dp-3",
-    "category": "data-model",
-    "description": "How should agent delegate assignments be represented in the Linear issue creation payload?",
+    "category": "platform-choice",
+    "description": "Which PostgreSQL operator/instance should be used for structured data across all services?",
     "options": [
-      "Set the delegate_id as the Linear assignee field directly",
-      "Use a custom field or label to represent agent assignment, in addition to or instead of the assignee"
+      "Use the existing CloudNative-PG operator and the 'sigma1-postgres' cluster",
+      "Provision a separate PostgreSQL instance for high isolation (e.g., per-service or per-domain)"
     ],
     "requires_approval": false,
     "constraint_type": "open",
     "affected_tasks": [
+      1,
       2,
-      7
+      3,
+      4,
+      5,
+      6
     ],
-    "rationale": "Linear supports both assignee fields and custom labels/fields. The choice affects downstream integrations, reporting, and UI clarity."
+    "rationale": "All services require PostgreSQL. The cluster has a CloudNative-PG operator and a shared instance, but some architectures prefer isolated databases per service for security and blast radius. This decision impacts schema management, backup, and cross-service queries."
   },
   {
     "id": "dp-4",
-    "category": "api-design",
-    "description": "What API paradigm should be used for the PM server's endpoints for agent delegate resolution and Hermes research integration?",
+    "category": "architecture",
+    "description": "How should service-to-service communication be handled between microservices (e.g., Morgan agent, RMS, Catalog, Finance, Vetting, Social Engine)?",
     "options": [
-      "RESTful HTTP endpoints (existing Elysia pattern)",
-      "GraphQL endpoint for more flexible queries"
+      "Direct synchronous HTTP/gRPC calls between services",
+      "Introduce an event-driven architecture using a message broker (e.g., NATS, Kafka) for decoupling and async workflows"
     ],
     "requires_approval": false,
     "constraint_type": "open",
     "affected_tasks": [
       2,
       3,
-      5
+      4,
+      5,
+      6,
+      7
     ],
-    "rationale": "The PM server currently uses Elysia, which supports both REST and GraphQL. The choice impacts client flexibility, documentation, and future extensibility."
+    "rationale": "The platform is microservices-based, and services must coordinate (e.g., quote-to-invoice, vetting, social approval). Synchronous calls are simpler but tightly coupled; event-driven patterns improve decoupling and resilience but add complexity. The choice affects scalability, error handling, and future extensibility."
   },
   {
     "id": "dp-5",
-    "category": "security",
-    "description": "What authentication mechanism should be used for internal service-to-service communication (e.g., PM server to notification bridges, Hermes integration)?",
+    "category": "api-design",
+    "description": "What API paradigm should be used for public and internal service APIs (REST, gRPC, GraphQL, or hybrid)?",
     "options": [
-      "Use Kubernetes service account tokens and RBAC for internal authentication",
-      "Implement API key-based authentication between services"
+      "REST for all services (with OpenAPI/Swagger)",
+      "gRPC for internal APIs, REST for public APIs (hybrid)",
+      "GraphQL for aggregation and frontend consumption"
     ],
     "requires_approval": false,
     "constraint_type": "open",
     "affected_tasks": [
-      1,
       2,
       3,
+      4,
       5,
-      10
+      6,
+      7,
+      8,
+      9
     ],
-    "rationale": "Internal service communication can leverage Kubernetes-native security or explicit API keys. The choice affects operational complexity and security posture."
+    "rationale": "Services expose APIs for both internal and external consumption. REST is widely supported, gRPC offers performance and strong typing, and GraphQL enables flexible frontend queries. The choice impacts client integration, documentation, and developer experience."
   },
   {
     "id": "dp-6",
-    "category": "build-vs-buy",
-    "description": "Should Hermes research integration use a self-hosted Hermes instance or rely on an external SaaS API?",
+    "category": "data-model",
+    "description": "How should multi-tenancy and data isolation be handled in the PostgreSQL schema?",
     "options": [
-      "Integrate with a self-hosted Hermes service (if available in-cluster or deployable)",
-      "Use the external Hermes SaaS API via NOUS_API_KEY"
-    ],
-    "requires_approval": false,
-    "constraint_type": "open",
-    "affected_tasks": [
-      3,
-      8
-    ],
-    "rationale": "Self-hosting may offer more control and privacy, but external SaaS is simpler if NOUS_API_KEY is available. The PRD references NOUS_API_KEY, but does not mandate SaaS."
-  },
-  {
-    "id": "dp-8",
-    "category": "architecture",
-    "description": "What pattern should be used for pipeline orchestration: event-driven (message queue) or request-response (synchronous API calls)?",
-    "options": [
-      "Use an event-driven architecture with a message queue (e.g., NATS, already present in-cluster)",
-      "Use synchronous request-response API calls between pipeline stages"
+      "Single database with multiple schemas (e.g., rms, crm, finance, audit, public) and tenant_id columns for row-level isolation",
+      "Separate databases or schemas per tenant for strong isolation"
     ],
     "requires_approval": false,
     "constraint_type": "open",
@@ -113,26 +111,109 @@
       1,
       2,
       3,
+      4,
       5,
-      6,
-      10
+      6
     ],
-    "rationale": "The pipeline can be orchestrated via events (scalable, decoupled) or direct API calls (simpler, more tightly coupled). NATS is available in-cluster, making event-driven feasible."
+    "rationale": "The PRD references multiple schemas and the need for GDPR compliance. The approach to multi-tenancy affects data isolation, compliance, and operational complexity. Row-level isolation is simpler but riskier; separate schemas/databases are more secure but harder to manage."
   },
   {
-    "id": "dp-9",
+    "id": "dp-7",
     "category": "security",
-    "description": "What approach should be used for secret management and rotation in the pipeline infrastructure?",
+    "description": "What authentication and authorization mechanism should be used for service APIs and user-facing endpoints?",
     "options": [
-      "Use the existing external-secrets operator and CRDs for secret management",
-      "Manage secrets manually via Kubernetes Secrets"
+      "JWT-based stateless authentication with role-based access control (RBAC)",
+      "Session-based authentication with Redis-backed sessions",
+      "OAuth2/OIDC integration for third-party login (e.g., Google, Microsoft)"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      8,
+      9,
+      10
+    ],
+    "rationale": "Multiple services and frontends require secure authentication. JWT is scalable and stateless, sessions are familiar and can leverage Redis, and OAuth2 enables SSO. The choice impacts security, scalability, and user experience."
+  },
+  {
+    "id": "dp-8",
+    "category": "build-vs-buy",
+    "description": "How should the Signal messenger integration for Morgan be implemented?",
+    "options": [
+      "Use the existing Signal-CLI as a sidecar or separate pod (self-hosted, open source)",
+      "Leverage a third-party Signal messaging SaaS (if available, for reduced maintenance)"
     ],
     "requires_approval": false,
     "constraint_type": "open",
     "affected_tasks": [
       1,
+      7
+    ],
+    "rationale": "Morgan's core channel is Signal. Signal-CLI is already referenced in the infrastructure, but SaaS options may offer easier scaling and maintenance. The choice affects operational burden, reliability, and compliance."
+  },
+  {
+    "id": "dp-9",
+    "category": "service-topology",
+    "description": "Should the Finance and Equipment Catalog services be implemented as separate microservices or merged into a single Rust/Axum service?",
+    "options": [
+      "Implement as separate microservices (Finance and Catalog distinct)",
+      "Merge into a single service for operational simplicity"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      2,
+      4
+    ],
+    "rationale": "Both services are planned in Rust/Axum and share some data models. Keeping them separate aligns with microservices best practices, but merging could reduce deployment and operational overhead. The decision impacts service boundaries and future scalability."
+  },
+  {
+    "id": "dp-12",
+    "category": "security",
+    "description": "How should GDPR compliance (data export and customer deletion) be implemented across services?",
+    "options": [
+      "Implement per-service GDPR endpoints and data erasure logic (distributed responsibility)",
+      "Centralize GDPR compliance in a dedicated service or orchestrator"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
       10
     ],
-    "rationale": "The cluster has external-secrets and related CRDs deployed, enabling automated secret management. Manual management is possible but less robust."
+    "rationale": "GDPR compliance is a hard requirement. Implementing it per service increases code duplication but aligns with microservices, while centralizing it simplifies compliance but adds a new service. The choice affects auditability and maintainability."
+  },
+  {
+    "id": "dp-13",
+    "category": "api-design",
+    "description": "What versioning strategy should be used for public APIs?",
+    "options": [
+      "URI-based versioning (e.g., /api/v1/...)",
+      "Header-based versioning",
+      "No versioning (breaking changes require coordinated releases)"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "rationale": "API versioning is critical for long-term maintainability. URI-based is explicit and widely adopted, header-based is more flexible, and no versioning is simplest but risky. The choice impacts client compatibility and upgrade paths."
   }
 ]

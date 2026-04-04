@@ -1,1 +1,1 @@
-Monolithic workflow in PM server or loosely coupled microservices via NATS?
+Distributed per-service GDPR implementation or centralized orchestrator?

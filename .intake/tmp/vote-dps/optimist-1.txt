@@ -1,1 +1,1 @@
-Event-driven architecture using the in-cluster NATS service
+gRPC (tonic for Rust, native for Go) for internal service-to-service; REST via grpc-gateway/tonic-web for public APIs. No GraphQL.

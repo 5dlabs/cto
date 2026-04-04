@@ -1,1 +1,1 @@
-Polling with periodic refresh (5s interval) and inline error banners (not modal dialogs — modals block interaction)
+JWT with RBAC — stateless, service-mesh friendly, with short-lived tokens (15min) and refresh tokens stored in Valkey

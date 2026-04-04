@@ -1,1 +1,1 @@
-PM server as the orchestrator with NATS-based event emission at stage boundaries — not a full microservices decomposition
+Centralized GDPR orchestrator that fans out to per-service deletion/export endpoints, with unified audit log

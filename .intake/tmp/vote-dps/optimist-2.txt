@@ -1,1 +1,1 @@
-JWT-based stateless authentication with short-lived tokens in httpOnly cookies
+Single database, domain schemas (rms, finance, etc.), with org_id/tenant_id columns for row-level filtering

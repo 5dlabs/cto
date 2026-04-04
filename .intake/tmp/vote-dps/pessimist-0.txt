@@ -1,1 +1,1 @@
-API key-based authentication with keys managed by external-secrets operator
+Synchronous gRPC for all service-to-service calls orchestrated by Morgan; NATS only for social media publish pipeline (Task 6) and optional audit event streaming

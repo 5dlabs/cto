@@ -1,1 +1,1 @@
-How should the frontend handle pipeline progress and error states?
+JWT-based auth, session-based, or OAuth2/OIDC?
