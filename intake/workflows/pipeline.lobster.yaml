@@ -1835,6 +1835,37 @@ steps:
         --old-base-url "$OLD_BASE" \
         --new-base-url "$NEW_BASE"
 
+  - id: sync-github-issues
+    env:
+      CTO_CREATE_LINEAR_JSON: $create-linear-project.stdout
+      CTO_SYNC_TARGET_REPO_JSON: $sync-to-target-repo.stdout
+    command: |
+      # Only sync if target repo was synced
+      TARGET_SYNCED="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | jq -r '.synced // false' 2>/dev/null || echo false)"
+      if [ "$TARGET_SYNCED" != "true" ]; then
+        echo "sync-github-issues: target repo not synced — skipping" >&2
+        jq -nc '{"skipped":true,"reason":"target not synced"}'
+        exit 0
+      fi
+      REPO="$(printf '%s' "${repository_url}" | sed -E 's#https://github.com/##; s#\.git$##')"
+      BRANCH="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | jq -r '.branch // empty' 2>/dev/null || true)"
+      if [ -z "$BRANCH" ]; then
+        echo "sync-github-issues: no branch — skipping" >&2
+        jq -nc '{"skipped":true,"reason":"no branch"}'
+        exit 0
+      fi
+      PROJECT_ID="$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.projectId // empty' 2>/dev/null || true)"
+      if [ -z "$PROJECT_ID" ]; then
+        echo "sync-github-issues: no project ID — skipping" >&2
+        jq -nc '{"skipped":true,"reason":"no project ID"}'
+        exit 0
+      fi
+      echo "sync-github-issues: syncing Linear project $PROJECT_ID → $REPO (branch: $BRANCH)" >&2
+      intake-util sync-linear github-sync \
+        --project-id "$PROJECT_ID" \
+        --repo "$REPO" \
+        --branch "$BRANCH"
+
   - id: notify-pipeline-complete
     env:
       CTO_REGISTER_RUN_JSON: $register-run.stdout

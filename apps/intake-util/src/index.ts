@@ -10,6 +10,7 @@
  *   sync-linear init         --project-name <name> --team-id <id> --prd-content <file>
  *   sync-linear issues       --project-id <id> --prd-issue-id <id> --team-id <id>
  *   sync-linear rewrite-urls --project-id <id> --old-base-url <url> --new-base-url <url>
+ *   sync-linear github-sync  --project-id <id> --repo <owner/repo> --branch <branch>
  *   parse-decision-points    (stdin: {content, speaker})
  *   bridge-notify            --from <agent> --to <agent> [--metadata <json>]
  *   bridge-elicitation       --session-id <id> --decision-id <id> --vote-result <json>
@@ -28,7 +29,7 @@
 
 import { writeFiles } from './write-files';
 import { tallyVotes } from './tally';
-import { createProjectAndPrdIssue, syncTaskIssues, rewriteProjectUrls } from './sync-linear';
+import { createProjectAndPrdIssue, syncTaskIssues, rewriteProjectUrls, syncGitHubIssues } from './sync-linear';
 import { fanOut } from './fan-out';
 import { validateDocs, validatePrompts, validateWorkflows, validateGeneric } from './validate';
 import { parseDecisionPoints } from './parse-decision-points';
@@ -88,6 +89,11 @@ Subcommands:
   sync-linear init           Create Linear project and PRD issue
   sync-linear issues         Create Linear issues for tasks and subtasks
   sync-linear rewrite-urls   Bulk-replace base URL in project issue descriptions
+  sync-linear github-sync    Create GitHub issues mirroring Linear project issues
+    --project-id <id>        Linear project ID (required)
+    --repo <owner/repo>      GitHub repository (required)
+    --branch <branch>        Branch name for linking (required)
+    --github-project <num>   GitHub Project number (optional)
 
   parse-decision-points  Extract DECISION_POINT blocks from debate text
     (stdin: {content: string, speaker: "optimist"|"pessimist"})
@@ -477,8 +483,35 @@ async function main(): Promise<void> {
 
         console.log(JSON.stringify(result, null, 2));
         process.exit(0);
+      } else if (subMode === 'github-sync') {
+        const projectId = getArg(args, '--project-id');
+        const repo = getArg(args, '--repo');
+        const branch = getArg(args, '--branch');
+        const githubProjectArg = getArg(args, '--github-project');
+
+        if (!projectId || !repo || !branch) {
+          console.error('Error: --project-id, --repo, and --branch are required');
+          process.exit(1);
+        }
+
+        const githubProject = githubProjectArg ? parseInt(githubProjectArg, 10) : undefined;
+        if (githubProjectArg && (!githubProject || isNaN(githubProject))) {
+          console.error(`Error: --github-project must be a number, got "${githubProjectArg}"`);
+          process.exit(1);
+        }
+
+        const result = await syncGitHubIssues({
+          projectId,
+          repo,
+          branch,
+          apiKey,
+          githubProject,
+        });
+
+        console.log(JSON.stringify(result, null, 2));
+        process.exit(0);
       } else {
-        console.error(`Error: Unknown sync-linear sub-mode "${subMode}". Use "init", "issues", or "rewrite-urls".`);
+        console.error(`Error: Unknown sync-linear sub-mode "${subMode}". Use "init", "issues", "rewrite-urls", or "github-sync".`);
         process.exit(1);
       }
       break;
