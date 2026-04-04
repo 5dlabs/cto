@@ -1,34 +1,71 @@
-Implement task 3: Integrate Hermes Research Content in Deliberation Path (Nova - Bun/Elysia)
+Implement task 3: Develop Rental Management System (Grizz - Go/gRPC)
 
 ## Goal
-Add a Hermes research integration module to the PM server's deliberation stage. When NOUS_API_KEY is available, the module calls the Hermes/NOUS API to generate research memos that are embedded directly on each task's research_memo field. The integration must gracefully degrade when the API key is unavailable or the Hermes service is unreachable.
+Build the full RMS service replacing Current RMS — opportunities (quotes), projects, inventory transactions, crew scheduling, and delivery management. Implements gRPC services with grpc-gateway for REST, Google Calendar integration, and conflict detection.
 
 ## Task Context
-- Agent owner: nova
-- Stack: Bun/Elysia
+- Agent owner: grizz
+- Stack: Go 1.22+/gRPC
 - Priority: high
 - Dependencies: 1
 
 ## Implementation Plan
-1. Create a new internal module `hermes-research` within the PM server codebase with a clean interface: `async function fetchResearchMemo(taskContext: TaskContext): Promise<ResearchMemo | null>`.
-2. Define the `ResearchMemo` type: `{ content: string, source: string, timestamp: Date }`.
-3. Extend the task entity/type definition to include `research_memo: ResearchMemo | null`.
-4. In the deliberation pipeline stage, after initial task context is assembled, call `fetchResearchMemo()` for each task.
-5. The Hermes API call should: read `NOUS_API_KEY` from environment (injected from `sigma-1-secrets`), send the task description/context as the research query, parse the response into the `ResearchMemo` structure, store the raw Hermes response verbatim in `content`.
-6. Implement graceful degradation: if `NOUS_API_KEY` is not set, log an info message ('Hermes integration skipped: NOUS_API_KEY not configured') and set `research_memo` to null. If the Hermes API returns an error or times out (30s timeout), log a warning and set `research_memo` to null. Pipeline must never fail due to Hermes unavailability.
-7. Ensure the module interface is clean enough for future extraction into a separate service per D1.
-8. Write unit tests for: successful memo fetch, missing API key skip, API timeout handling, API error handling.
-9. Write an integration test that verifies research memos appear in the deliberation output when the API key is provided.
+1. Initialize Go module `github.com/sigma1/rms` with Go 1.22+.
+2. Define protobuf files in `proto/` directory for all 5 gRPC services per PRD:
+   - `opportunity.proto` — CreateOpportunity, GetOpportunity, UpdateOpportunity, ListOpportunities, ScoreLead
+   - `project.proto` — CreateProject, GetProject, UpdateProject, CheckOut, CheckIn
+   - `inventory.proto` — GetStockLevel, RecordTransaction, ScanBarcode
+   - `crew.proto` — ListCrew, AssignCrew, ScheduleCrew
+   - `delivery.proto` — ScheduleDelivery, UpdateDeliveryStatus, OptimizeRoute
+   Use `buf` for protobuf management and code generation.
+3. Configure grpc-gateway annotations in proto files for all REST endpoints per PRD:
+   - `/api/v1/opportunities`, `/api/v1/projects`, `/api/v1/inventory/transactions`, `/api/v1/crew`, `/api/v1/deliveries/*`
+   - Include `POST /api/v1/opportunities/:id/approve` and `POST /api/v1/opportunities/:id/convert`
+4. Database layer:
+   - Use `pgx/v5` for PostgreSQL, connecting via PgBouncer URL from `sigma1-infra-endpoints`.
+   - Migrations using `golang-migrate`: create tables in `rms` schema — opportunities, projects, project_line_items, inventory_items, inventory_transactions, crew_members, crew_assignments, deliveries, delivery_routes.
+   - All tables include `org_id UUID NOT NULL` column for row-level filtering (per D6).
+5. Business logic:
+   - **Quote-to-Project workflow**: Opportunity status machine (pending → qualified → approved → converted). Converting creates a Project linked by opportunity_id.
+   - **Lead scoring**: ScoreLead RPC computes GREEN/YELLOW/RED based on customer vetting data, event size, and payment history. Returns `LeadScore` with breakdown.
+   - **Conflict detection**: Before confirming checkout, check equipment availability across overlapping date ranges. Return conflicts with affected project IDs.
+   - **Barcode scanning**: ScanBarcode accepts barcode string, returns InventoryItem with current location and status.
+   - **Crew scheduling**: Calendar-based assignment with conflict detection against existing assignments.
+   - **Google Calendar integration**: Use Google Calendar API to sync project events. OAuth2 service account credentials from K8s Secret.
+6. Inter-service auth: Validate API key from `Authorization: Bearer <key>` header against `sigma1-service-api-keys` secret.
+7. Health and observability:
+   - gRPC health checking protocol (`grpc.health.v1.Health`)
+   - REST `/health/live` and `/health/ready` via grpc-gateway
+   - Prometheus metrics via `grpc-prometheus` interceptor + `/metrics` endpoint
+   - Structured logging with `slog`
+8. GDPR endpoint: `DELETE /api/v1/gdpr/customer/:id` — delete opportunities, projects, crew assignments for customer, return structured confirmation.
+9. Dockerfile: multi-stage build (golang:1.22 builder → gcr.io/distroless/static-debian12 runtime).
+10. Kubernetes Deployment:
+    - Namespace: `sigma1`, replicas: 2
+    - Ports: 50051 (gRPC), 8081 (REST gateway)
+    - `envFrom` sigma1-infra-endpoints ConfigMap
+    - Secret refs for DB credentials, Google Calendar API, service API keys
+    - Liveness/readiness probes
+11. Generate OpenAPI spec from grpc-gateway annotations using `protoc-gen-openapiv2`.
 
 ## Acceptance Criteria
-1. Unit test: With a mocked Hermes API returning valid content, `fetchResearchMemo()` returns a ResearchMemo with non-empty content, source, and valid timestamp. 2. Unit test: With NOUS_API_KEY unset, `fetchResearchMemo()` returns null and logs 'Hermes integration skipped'. 3. Unit test: With a mocked Hermes API that times out after 30s, `fetchResearchMemo()` returns null and logs a warning without throwing. 4. Unit test: With a mocked Hermes API returning 500, `fetchResearchMemo()` returns null and logs the error status. 5. Integration test: Run the deliberation pipeline with NOUS_API_KEY set and a mocked Hermes API; verify at least one task in the output has a non-null `research_memo` with all three fields populated.
+1. Unit tests for opportunity state machine: verify all valid transitions (pending→qualified→approved→converted) and reject invalid transitions (e.g., pending→converted) — cover all 4 states × valid/invalid inputs. 2. Unit tests for lead scoring algorithm: verify GREEN/YELLOW/RED boundaries with parameterized test cases. 3. Integration tests using testcontainers-go with PostgreSQL: full CRUD cycle for opportunities and projects; verify convert endpoint creates project with correct opportunity_id link. 4. Conflict detection test: create two overlapping bookings for same equipment, verify CheckOut returns conflict error with affected project ID. 5. gRPC reflection test: `grpcurl` lists all 5 services and their methods. 6. REST gateway test: `curl` all REST endpoints and verify responses match protobuf-JSON mapping. 7. OpenAPI spec generated by `protoc-gen-openapiv2` validates with swagger-cli. 8. GDPR deletion: create opportunity + project, call DELETE, verify all related records removed. 9. Minimum 80% code coverage via `go test -cover`.
 
 ## Subtasks
-- Define ResearchMemo type and extend task entity type: Create the ResearchMemo TypeScript type definition and extend the existing task entity/type to include the research_memo field as ResearchMemo | null.
-- Implement Hermes API client with NOUS_API_KEY reading and 30s timeout: Create the core hermes-research module with the fetchResearchMemo function that reads NOUS_API_KEY from environment, calls the Hermes/NOUS API with the task context, and parses the response into a ResearchMemo.
-- Implement graceful degradation for missing API key, timeouts, and API errors: Add all error handling paths to fetchResearchMemo: missing NOUS_API_KEY skip with info log, 30s timeout handling with warning log, and HTTP error handling with warning log. None of these should throw.
-- Integrate fetchResearchMemo into the deliberation pipeline stage: Wire the hermes-research module into the existing deliberation pipeline so that fetchResearchMemo is called for each task after initial task context assembly, and the returned memo is stored on the task's research_memo field.
-- Write comprehensive unit and integration tests for hermes-research module: Create the full test suite covering all fetchResearchMemo paths and the pipeline integration, using Bun's test runner and mocked HTTP responses.
+- Initialize Go module and buf protobuf toolchain: Set up the Go module, directory structure, and buf configuration for protobuf management and code generation across all 5 services.
+- Define opportunity.proto and project.proto with grpc-gateway annotations: Create protobuf definitions for the Opportunity and Project gRPC services with full REST gateway annotations for all endpoints including approve and convert actions.
+- Define inventory.proto, crew.proto, and delivery.proto with grpc-gateway annotations: Create protobuf definitions for the Inventory, Crew, and Delivery gRPC services with full REST gateway annotations.
+- Database migrations for all RMS schema tables: Create golang-migrate migration files for all 9 tables in the rms schema with org_id column, indexes, and foreign key constraints.
+- Implement database repository layer with pgx: Build the Go repository layer using pgx/v5 for all RMS entities with org_id-scoped queries, providing CRUD operations consumed by gRPC service implementations.
+- Implement Opportunity service with state machine, lead scoring, and convert-to-project: Build the OpportunityService gRPC implementation with the full quote-to-project workflow including status state machine, lead scoring algorithm, and opportunity-to-project conversion.
+- Implement Inventory service with conflict detection and barcode scanning: Build the InventoryService gRPC implementation with stock level tracking, transaction recording, equipment availability conflict detection, and barcode scanning lookup.
+- Implement Crew scheduling service with conflict detection: Build the CrewService gRPC implementation with crew listing, assignment, scheduling with overlap conflict detection, and availability queries.
+- Implement Google Calendar integration for crew/project sync: Build Google Calendar API integration to sync project events and crew assignments to Google Calendar using OAuth2 service account credentials.
+- Implement Delivery management service: Build the DeliveryService gRPC implementation with delivery scheduling, status updates, route optimization, and listing.
+- Implement inter-service auth, GDPR endpoint, and gRPC server bootstrap: Build the API key authentication interceptor, GDPR customer deletion endpoint, and the main gRPC + grpc-gateway server wiring.
+- Implement health checks, Prometheus metrics, and structured logging: Add gRPC health checking protocol, REST health endpoints, Prometheus metrics via grpc-prometheus, and structured logging with slog throughout the service.
+- Create Dockerfile and Kubernetes deployment manifests: Build the multi-stage Dockerfile and Kubernetes manifests for deploying the RMS service in the sigma1 namespace with proper configuration, secrets, and probes.
+- Generate and validate OpenAPI spec from grpc-gateway annotations: Generate the OpenAPI v2 specification from protobuf grpc-gateway annotations and validate it for correctness and completeness.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

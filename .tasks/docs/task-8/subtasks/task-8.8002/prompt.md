@@ -1,10 +1,20 @@
-Implement subtask 8002: Integrate SnapshotPR into pipeline dashboard page with data fetching
+Implement subtask 8002: Configure shadcn/ui component library and design token system
 
 ## Objective
-Place the SnapshotPR component in the pipeline dashboard page below the summary header and above the task list, fetching PR data from the PM server API endpoint.
+Install and configure shadcn/ui with Radix UI primitives. Define the dark/moody design token system in tailwind.config.ts reflecting the Sigma-1 lighting/production company brand: dark palette, accent colors, professional typography, generous spacing.
 
 ## Steps
-1. In the pipeline dashboard page component, identify the location between the summary header and the task list. 2. Fetch PR data from the PM server API endpoint (e.g., `/api/pipeline/snapshot-pr` or wherever the Task 4 PR result is exposed). Use the existing data fetching pattern from the dashboard (SWR, fetch, or server component data loading). 3. Pass the fetched prResult (or null if the endpoint returns no PR) to `<SnapshotPR prResult={data} />`. 4. Handle loading state with a subtle skeleton or nothing (component is small). 5. Handle fetch error gracefully: treat as null prResult with reason 'Failed to load PR data'.
+1. Run `npx shadcn@latest init` — select default style, dark theme, CSS variables.
+2. Install required shadcn/ui components: Button, Card, Dialog, Form, Input, Select, Table, Tabs, Badge, Calendar, Sheet, Popover, Separator, ScrollArea, Skeleton.
+3. Define design tokens in `tailwind.config.ts` / CSS variables:
+   - Colors: dark background (#0a0a0a range), muted surfaces (#1a1a1a), accent (warm amber/gold for lighting brand), destructive, muted foreground.
+   - Border radius: default 0.5rem.
+   - Font family: Inter or similar professional sans-serif via `next/font`.
+   - Spacing scale: generous padding/margins for premium feel.
+4. Create `components/ui/` barrel exports.
+5. Create a `ThemeProvider` if needed (for dark mode toggle future-proofing, but default to dark).
+6. Build a style guide page at `/dev/styleguide` (dev only) showing all shadcn components with design tokens applied.
+7. Verify all installed components render correctly with the custom theme.
 
 ## Validation
-Integration test: mock the API endpoint to return a valid PR result; verify SnapshotPR component renders on the page between summary header and task list. Mock API returning null; verify 'No snapshot PR created' message appears. Mock API error; verify graceful fallback.
+Render each installed shadcn/ui component in a test and verify it mounts without errors. Visually confirm design tokens apply (dark background, accent colors) on the styleguide page. Verify `next/font` loads correctly.

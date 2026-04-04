@@ -1,8 +1,11 @@
 ## Decision Points
 
-- The API paradigm (HTTP POST vs NATS publish) for bridge communication is pending D2 resolution. This task implements HTTP as the default, but the facade must accommodate a swap to NATS. If D2 resolves to NATS, the HTTP implementation subtask would need rework.
+- LinkedIn data retrieval strategy: use official LinkedIn Company API (requires partnership/OAuth), or fall back to HTTP scraping of public company pages, or use a third-party enrichment service (e.g., Proxycurl, PeopleDataLabs). This affects reliability and legal compliance.
+- Google Reviews data source: Google Business Profile API vs Google Places API vs structured search scraping. Each has different pricing, rate limits, and ToS implications.
+- Credit provider selection: which commercial credit API to integrate (e.g., Dun & Bradstreet, Experian Business, CreditSafe)? The trait abstraction is decided, but the initial concrete implementation beyond the stub needs a vendor choice.
+- Scoring weight calibration: the 30/20/20/20/10 point allocation and GREEN≥70/YELLOW≥40/RED<40 thresholds are specified but may need business stakeholder validation before hardcoding.
 
 ## Coordination Notes
 
-- Agent owner: nova
-- Primary stack: Bun/Elysia
+- Agent owner: rex
+- Primary stack: Rust 1.75+/Axum 0.7

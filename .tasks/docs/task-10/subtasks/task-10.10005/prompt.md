@@ -1,18 +1,22 @@
-Implement subtask 10005: Configure resource limits and requests on all deployments
+Implement subtask 10005: Network policies: allow sigma1 services to sigma1-db namespace (PostgreSQL and Valkey)
 
 ## Objective
-Set CPU and memory requests and limits on the PM server and frontend deployments per the specified values: PM server 256m/512Mi request, 1000m/1Gi limit; frontend 128m/256Mi request, 500m/512Mi limit.
+Create NetworkPolicy allowing sigma1 service pods to reach PostgreSQL on port 5432 and Valkey on port 6379 in the sigma1-db namespace.
 
 ## Steps
-1. Edit the PM server Deployment manifest (or Helm values) to add under `spec.template.spec.containers[0].resources`:
-   - requests: cpu=256m, memory=512Mi
-   - limits: cpu=1000m, memory=1Gi
-2. Edit the frontend Deployment manifest (or Helm values) to add:
-   - requests: cpu=128m, memory=256Mi
-   - limits: cpu=500m, memory=512Mi
-3. If there are any other deployments in sigma-1-dev (bridge services), apply reasonable resource limits (128m/256Mi request, 500m/512Mi limit as a default).
-4. Apply updated manifests.
-5. Verify with `kubectl describe pod` that all pods show non-zero resource requests and limits.
+Step-by-step:
+1. Create `netpol-allow-db.yaml` with two NetworkPolicy resources:
+   a. **PostgreSQL egress** from sigma1:
+      - `podSelector: {}` (all sigma1 pods)
+      - `policyTypes: [Egress]`
+      - `egress[0].to[0].namespaceSelector.matchLabels: {name: sigma1-db}`, `egress[0].ports: [{protocol: TCP, port: 5432}]`
+   b. **Valkey egress** from sigma1:
+      - Same structure but port 6379.
+2. Create corresponding **ingress** policies in the `sigma1-db` namespace:
+   a. Allow ingress from `sigma1` namespace pods on port 5432 for PostgreSQL pods.
+   b. Allow ingress from `sigma1` namespace pods on port 6379 for Valkey pods.
+3. Ensure namespaces have labels: `sigma1-db` namespace needs `name: sigma1-db`, `sigma1` namespace needs `name: sigma1`.
+4. Also allow DNS egress (port 53 TCP/UDP to kube-system) so pods can resolve service names.
 
 ## Validation
-`kubectl describe pod -l app=sigma-1-pm-server -n sigma-1-dev` shows Requests: cpu=256m, memory=512Mi and Limits: cpu=1000m, memory=1Gi. Same verification for frontend pod with its specified values. No pod in the namespace has empty resource requests.
+From a test pod in sigma1 namespace, run `nc -zv <postgres-service>.sigma1-db.svc.cluster.local 5432` and verify connection succeeds. Run `nc -zv <valkey-service>.sigma1-db.svc.cluster.local 6379` and verify success. Attempt connection on port 3306 (MySQL) and verify it is denied.

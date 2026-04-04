@@ -1,8 +1,8 @@
 name: implement-task-4
 metadata:
   task_id: 4
-  agent: nova
-  stack: Bun/Elysia
+  agent: rex
+  stack: Rust 1.75+/Axum 0.7
   depends_on_tasks: [1]
 
 inputs:
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-4/feature-branch"
   - name: agent
-    default: "nova"
+    default: "rex"
   - name: cli
     default: "claude"
   - name: model
@@ -37,7 +37,7 @@ steps:
     depends_on: [implement-subtask-4001]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-4002
     depends_on: [validate-subtask-4001]
@@ -49,7 +49,7 @@ steps:
     depends_on: [implement-subtask-4002]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-4003
     depends_on: [validate-subtask-4002]
@@ -61,10 +61,10 @@ steps:
     depends_on: [implement-subtask-4003]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-4004
-    depends_on: [validate-subtask-4003]
+    depends_on: [validate-subtask-4002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4004/prompt.md
@@ -73,7 +73,7 @@ steps:
     depends_on: [implement-subtask-4004]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-4005
     depends_on: [validate-subtask-4003, validate-subtask-4004]
@@ -85,7 +85,7 @@ steps:
     depends_on: [implement-subtask-4005]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-4006
     depends_on: [validate-subtask-4005]
@@ -97,10 +97,106 @@ steps:
     depends_on: [implement-subtask-4006]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-4007
+    depends_on: [validate-subtask-4006]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4007/prompt.md
+
+  - name: validate-subtask-4007
+    depends_on: [implement-subtask-4007]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-4008
+    depends_on: [validate-subtask-4006]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4008/prompt.md
+
+  - name: validate-subtask-4008
+    depends_on: [implement-subtask-4008]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-4009
+    depends_on: [validate-subtask-4002]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4009/prompt.md
+
+  - name: validate-subtask-4009
+    depends_on: [implement-subtask-4009]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-4010
+    depends_on: [validate-subtask-4009]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4010/prompt.md
+
+  - name: validate-subtask-4010
+    depends_on: [implement-subtask-4010]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-4011
+    depends_on: [validate-subtask-4006]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4011/prompt.md
+
+  - name: validate-subtask-4011
+    depends_on: [implement-subtask-4011]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-4012
+    depends_on: [validate-subtask-4005]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4012/prompt.md
+
+  - name: validate-subtask-4012
+    depends_on: [implement-subtask-4012]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-4013
+    depends_on: [validate-subtask-4005, validate-subtask-4006, validate-subtask-4007, validate-subtask-4008, validate-subtask-4009, validate-subtask-4011, validate-subtask-4012]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4013/prompt.md
+
+  - name: validate-subtask-4013
+    depends_on: [implement-subtask-4013]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - name: implement-subtask-4014
+    depends_on: [validate-subtask-4001]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4014/prompt.md
+
+  - name: validate-subtask-4014
+    depends_on: [implement-subtask-4014]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: integration-validation
-    depends_on: [validate-subtask-4001, validate-subtask-4002, validate-subtask-4003, validate-subtask-4004, validate-subtask-4005, validate-subtask-4006]
+    depends_on: [validate-subtask-4001, validate-subtask-4002, validate-subtask-4003, validate-subtask-4004, validate-subtask-4005, validate-subtask-4006, validate-subtask-4007, validate-subtask-4008, validate-subtask-4009, validate-subtask-4010, validate-subtask-4011, validate-subtask-4012, validate-subtask-4013, validate-subtask-4014]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

@@ -1,18 +1,19 @@
-Implement subtask 1005: Generate Helm values-dev.yaml capturing all resource names
+Implement subtask 1005: Deploy Valkey CR via Redis operator
 
 ## Objective
-Create a Helm values file that aggregates all namespace-scoped resource names (namespace, secret, configmap, service account) for downstream chart consumption.
+Deploy the Valkey 7.2 instance using the existing `redis.redis.opstreelabs.in/v1beta2` operator in the `sigma1-db` namespace.
 
 ## Steps
-1. Create `values-dev.yaml` in the project's Helm chart directory.
-2. Include the following keys:
-   - `namespace: sigma-1-dev`
-   - `secrets.name: sigma-1-secrets`
-   - `configmap.endpoints: sigma-1-infra-endpoints`
-   - `serviceAccount.name: sigma-1-pm-server`
-   - `externalServices.discordBridge`, `externalServices.linearBridge`, `externalServices.nats`, `externalServices.cloudflareOperatorNs` with their respective URLs/values
-3. Ensure the values file is valid YAML and can be consumed by `helm template` without errors.
-4. Add a comment block at the top explaining this is the dev environment values file for the sigma-1 pipeline.
+1. Create `Redis` CR YAML named `sigma1-valkey` in `sigma1-db` namespace using API version `redis.redis.opstreelabs.in/v1beta2`:
+   - `spec.kubernetesConfig.image: valkey/valkey:7.2-alpine`
+   - `spec.kubernetesConfig.resources.limits.memory: 256Mi`
+   - `spec.kubernetesConfig.resources.limits.cpu: 250m`
+   - `spec.kubernetesConfig.resources.requests.memory: 128Mi`
+   - `spec.kubernetesConfig.resources.requests.cpu: 100m`
+   - Standalone mode (no cluster, no sentinel for dev)
+2. Apply the Redis CR.
+3. Wait for the Valkey pod to reach Running state.
+4. Verify the service `sigma1-valkey.sigma1-db.svc.cluster.local:6379` is reachable.
 
 ## Validation
-`helm template . -f values-dev.yaml` runs without errors. The values file contains keys for namespace, secrets.name, configmap.endpoints, and serviceAccount.name with correct string values matching the created resources.
+`kubectl get redis sigma1-valkey -n sigma1-db` shows the CR in a ready state. From a pod in sigma1 namespace: `redis-cli -h sigma1-valkey.sigma1-db.svc.cluster.local PING` returns PONG. `redis-cli INFO server` shows valkey version 7.2.

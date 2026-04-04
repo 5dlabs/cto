@@ -1,10 +1,27 @@
-Implement subtask 7005: Add research memo count to summary header
+Implement subtask 7005: Implement quote-gen and upsell skills
 
 ## Objective
-Update the pipeline dashboard summary header to display a count of how many tasks have research memos out of the total, e.g., '3 of 5 tasks have research memos'.
+Build the quote-gen skill that assembles line items from catalog data, calculates totals, creates an opportunity via RMS, and sends a quote summary. Build the upsell skill that suggests additional services/equipment after quote generation.
 
 ## Steps
-1. In the summary header component/section of the pipeline dashboard page, compute the count: `const memoCount = tasks.filter(t => t.research_memo != null).length`. 2. Display: `{memoCount} of {tasks.length} tasks have research memos`. 3. Place this line alongside existing summary statistics (e.g., task counts by status). 4. If memoCount is 0, display '0 of N tasks have research memos' (still informative).
+1. `quote-gen` skill:
+   a. Accept gathered product/event data from sales-qual conversation state.
+   b. Assemble line items: product name, quantity, daily/weekly rate, rental period calculation.
+   c. Calculate subtotals, delivery fees (if applicable), damage waiver/insurance, tax estimates.
+   d. Call `sigma1_generate_quote` (POST to RMS /api/v1/opportunities) with the assembled quote data.
+   e. Format the quote summary as a readable message: itemized list, totals, rental period, pickup/delivery options.
+   f. Send quote summary back to customer via the active channel (Signal, voice, or web chat).
+   g. Store opportunity ID in conversation state for follow-up.
+2. `upsell` skill:
+   a. Trigger after quote-gen completes successfully.
+   b. Based on event type and selected equipment, suggest complementary items:
+      - Weddings: uplighting add-on, haze machine, photo booth lighting
+      - Corporate: confidence monitors, presentation clickers, podium lighting
+      - Concerts: additional moving heads, fog machines, follow spots
+   c. Suggest insurance/damage waiver if not already included.
+   d. Suggest delivery/setup service if customer selected pickup.
+   e. Use `sigma1_catalog_search` to find upsell products and `sigma1_check_availability` to verify.
+   f. If customer accepts upsell items, regenerate quote via quote-gen with updated line items.
 
 ## Validation
-Component test: render summary header with an array of 5 tasks where 3 have non-null research_memo; verify text '3 of 5 tasks have research memos' is displayed. Test with 0 memos; verify '0 of 5 tasks have research memos'.
+Verify quote-gen produces a correctly formatted quote with accurate line item calculations by providing known product data and verifying totals. Verify RMS opportunity is created with correct data. Verify upsell suggests relevant items for a wedding event type and can regenerate the quote with accepted additions.

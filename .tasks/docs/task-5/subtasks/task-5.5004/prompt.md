@@ -1,14 +1,18 @@
-Implement subtask 5004: Implement best-effort error handling for notification dispatch
+Implement subtask 5004: Implement Stage 1: Business Verification via OpenCorporates API
 
 ## Objective
-Wrap the transport send() calls with error handling that catches connection refused, timeouts, and HTTP error responses (4xx/5xx), logging warnings without throwing or failing the pipeline.
+Build the OpenCorporates integration stage that searches for a company by name, verifies existence and incorporation status, extracts directors, and returns structured results with raw response capture.
 
 ## Steps
-1. In the notify() facade, wrap each transport.send() call in a try/catch block.
-2. On catch (connection refused, timeout, network error): log a structured warning with `{ service: 'discord' | 'linear', error: message, pipeline_id }` and resolve the promise normally.
-3. On non-2xx HTTP response: log a structured warning with `{ service, statusCode, pipeline_id }` and resolve normally.
-4. Use `Promise.allSettled()` to dispatch to both bridges concurrently and handle each independently — a failure in one bridge must not prevent notification to the other.
-5. Ensure the notify() function always resolves (never rejects) regardless of transport errors.
+1. Create `src/stages/business_verification.rs` module.
+2. Define `BusinessVerificationResult` struct: company_found (bool), incorporation_status (Option<String>), directors (Vec<String>), opencorporates_data (serde_json::Value).
+3. Implement `run_business_verification(client: &ResilientClient, company_name: &str, api_key: &str) -> StageResult<BusinessVerificationResult>`.
+4. Call OpenCorporates API: `GET https://api.opencorporates.com/v0.4/companies/search?q={company_name}&api_token={api_key}`.
+5. Parse response JSON: extract `results.companies[0].company` — check `inactive` field for incorporation status, extract `officers` endpoint for directors if available.
+6. API key sourced from `sigma1-external-apis` Kubernetes secret, passed via environment variable `OPENCORPORATES_API_KEY`.
+7. Use `ResilientClient.execute_with_retry` with the `opencorporates` circuit breaker.
+8. On circuit open or all retries exhausted, return `StageResult::Unavailable` with reason string.
+9. Return raw API response JSON alongside parsed result for audit storage.
 
 ## Validation
-1. Unit test: When DISCORD_BRIDGE_URL is unreachable (mock fetch to throw connection refused), notify() logs a warning containing 'discord' and resolves without throwing. 2. Unit test: When LINEAR_BRIDGE_URL returns HTTP 500, notify() logs a warning containing 'linear' and status 500, and resolves without throwing. 3. Unit test: When both bridges fail, notify() still resolves and both warnings are logged.
+Unit tests with wiremock-rs: mock OpenCorporates search endpoint returning a valid company response, verify BusinessVerificationResult has company_found=true, correct incorporation status, and extracted directors. Test with empty results (company not found). Test with malformed JSON response (graceful error handling). Verify raw_response is captured.

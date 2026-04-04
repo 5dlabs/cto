@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "source_url": "https://deployiq.maximinimal.ca",
+    "success": true,
+    "asset_url": "https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/2f6470fc-2dc0-4b51-8159-e0b88c643ad1/da8f79bc-2046-40e3-ba28-f952516005f2",
+    "local_path": "./.intake/design/stitch/screenshots/deployiq.maximinimal.ca-ccf901c1.png",
+    "error": ""
+  },
+  {
+    "source_url": "https://sigma-1.com",
+    "success": true,
+    "asset_url": "https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/e1e56bbb-1fc7-42f5-8fbf-15509b4e43fb/66fc510b-c46d-4cc8-b272-ac0e69a7e30c",
+    "local_path": "./.intake/design/stitch/screenshots/sigma-1.com-20442cf4.png",
+    "error": ""
+  }
+]

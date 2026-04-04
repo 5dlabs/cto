@@ -1,14 +1,16 @@
-Implement subtask 5001: Define PipelineEvent types and notification-dispatch facade interface
+Implement subtask 5001: Create vetting crate and SQLx database migrations
 
 ## Objective
-Create the notification-dispatch module with the PipelineEvent type union ('pipeline.start' | 'pipeline.complete' | 'pipeline.error'), payload type definitions, and the `notify()` facade function signature. Design the transport abstraction layer (a NotificationTransport interface) so HTTP and NATS implementations can be swapped without changing callers.
+Add the `vetting` crate to the Cargo workspace at `services/rust/vetting` and create SQLx migrations for the `vetting_results` and `vetting_requests` tables with all specified columns, types, and indexes.
 
 ## Steps
-1. Create `src/notification-dispatch/types.ts` with PipelineEvent type: `{ event: 'pipeline.start' | 'pipeline.complete' | 'pipeline.error'; pipeline_id: string; status: string; task_count: number; assigned_count: number; pr_url?: string; linear_session_url?: string; timestamp: string }`.
-2. Define a `NotificationTransport` interface with method `send(target: 'discord' | 'linear', payload: PipelineEvent): Promise<void>`.
-3. Create `src/notification-dispatch/index.ts` exporting `async function notify(event: PipelineEvent): Promise<void>` that delegates to the configured transport implementation for both Discord and Linear targets.
-4. Use dependency injection or a factory pattern so the transport can be swapped at initialization time (e.g., `createNotifier(transport: NotificationTransport)`).
-5. Read `DISCORD_BRIDGE_URL` and `LINEAR_BRIDGE_URL` from environment (sourced via `envFrom` on `sigma-1-infra-endpoints` ConfigMap) and pass them to the transport constructor.
+1. Create `services/rust/vetting` directory with `Cargo.toml` referencing workspace dependencies (axum 0.7, sqlx with postgres feature, serde, uuid, chrono, tokio, reqwest, utoipa).
+2. Add the crate to the root `Cargo.toml` workspace members list.
+3. Create SQLx migration for `vetting_results` table: org_id UUID PRIMARY KEY, business_verified BOOL NOT NULL DEFAULT false, opencorporates_data JSONB, linkedin_exists BOOL NOT NULL DEFAULT false, linkedin_followers INT DEFAULT 0, google_reviews_rating FLOAT, google_reviews_count INT DEFAULT 0, credit_score INT, risk_flags TEXT[] NOT NULL DEFAULT '{}', final_score VARCHAR(6) NOT NULL, vetted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), raw_responses JSONB NOT NULL DEFAULT '{}'.
+4. Create SQLx migration for `vetting_requests` table: id UUID PRIMARY KEY DEFAULT gen_random_uuid(), org_id UUID NOT NULL, requested_by UUID NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','completed','failed')), started_at TIMESTAMPTZ, completed_at TIMESTAMPTZ, error_message TEXT, FOREIGN KEY org_id REFERENCES vetting_results or allow standalone.
+5. Add indexes: idx_vetting_requests_org_id, idx_vetting_requests_status, idx_vetting_results_final_score.
+6. Define Rust domain structs: VettingResult, VettingRequest with sqlx::FromRow derives and serde Serialize/Deserialize.
+7. Verify migrations run cleanly against the dev PostgreSQL instance.
 
 ## Validation
-Verify that the notify() function accepts a PipelineEvent and delegates to the injected transport's send() method for both 'discord' and 'linear' targets. A mock transport should receive exactly 2 send() calls per notify() invocation.
+Run `sqlx migrate run` against a test database. Verify both tables are created with correct columns via `\d vetting_results` and `\d vetting_requests`. Insert sample rows and verify constraints (e.g., invalid status value is rejected, UUID generation works).

@@ -1,15 +1,16 @@
-Implement subtask 2001: Extend task entity type definition with delegate_id field
+Implement subtask 2001: Initialize Cargo workspace and shared crate with DB pool, error types, and ConfigMap env parsing
 
 ## Objective
-Add the `delegate_id: string | null` field to the task entity/type definition used throughout the PM server's task generation and issue creation pipeline.
+Create the Cargo workspace at services/rust/ with members catalog, finance, vetting, and shared. Implement the shared crate foundation: PgPool setup reading POSTGRES_URL from env (sigma1-infra-endpoints ConfigMap), standard JSON error response type, and env/config parsing utilities.
 
 ## Steps
-1. Locate the task entity type definition in the PM server codebase (likely a TypeScript interface or type).
-2. Add `delegate_id: string | null` to the type definition.
-3. Set the default value to `null` for backward compatibility.
-4. Update any task factory/builder functions to initialize `delegate_id` as `null`.
-5. If there are Zod schemas or other validation schemas for the task entity, update those as well to include the new field.
-6. Ensure existing code that creates task objects still compiles without modification (the new field should be optional or default to null).
+1. Create `services/rust/Cargo.toml` as a workspace with members `shared`, `catalog`, `finance`, `vetting`.
+2. In `shared/Cargo.toml`, add dependencies: `sqlx` (with postgres, runtime-tokio, tls-rustls features), `serde`, `serde_json`, `axum 0.7`, `tokio`, `thiserror`.
+3. Implement `shared::db` module: `pub async fn create_pool() -> Result<PgPool>` that reads `POSTGRES_URL` from env, configures max connections (default 10), connect timeout (5s), and returns the pool.
+4. Implement `shared::error` module: define `AppError` enum with variants (NotFound, BadRequest, Unauthorized, Internal, Conflict) that implements `IntoResponse` returning JSON `{"error": "...", "code": N}` with appropriate HTTP status codes.
+5. Implement `shared::config` module: struct `InfraConfig` that deserializes from env vars matching the sigma1-infra-endpoints ConfigMap keys (POSTGRES_URL, VALKEY_URL, R2_ENDPOINT, etc.).
+6. Create stub `catalog/Cargo.toml` depending on `shared` via path reference.
+7. Verify workspace compiles with `cargo check --workspace`.
 
 ## Validation
-TypeScript compilation passes with no errors. Existing task creation code continues to work without modification. A new task object created with the factory has `delegate_id: null` by default. Type-checking confirms that `delegate_id` accepts both `string` and `null`.
+Run `cargo check --workspace` succeeds. Unit test that `AppError::NotFound` produces a 404 JSON response. Unit test that `InfraConfig` parses from env vars correctly. Test `create_pool` returns error with invalid POSTGRES_URL.

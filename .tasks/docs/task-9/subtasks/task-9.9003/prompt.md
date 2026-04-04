@@ -1,23 +1,18 @@
-Implement subtask 9003: Write comprehensive component and accessibility tests for pipeline status UI
+Implement subtask 9003: Build shared API client with JWT auth and environment configuration
 
 ## Objective
-Write full test suite covering all PipelineStatus states, NotificationTimeline rendering and ordering, polling behavior verification, error alert display, and accessibility compliance for the error alert.
+Create a shared API client module with configurable base URL per environment, JWT token storage in expo-secure-store, automatic token refresh, and Effect-based error handling.
 
 ## Steps
-1. Create `src/components/__tests__/PipelineStatus.test.tsx`:
-   - Test: status='running' renders blue 'Running' badge (check className or data attribute for blue variant).
-   - Test: status='complete' renders green 'Complete' badge and renders Linear session link and PR link with correct href values.
-   - Test: status='error' renders red Alert with the exact error message text visible in the DOM.
-   - Test: status='error' Alert element has `role='alert'` attribute.
-2. Create `src/components/__tests__/NotificationTimeline.test.tsx`:
-   - Test: 3 events passed as props render 3 timeline items.
-   - Test: Events appear in correct chronological order (verify DOM order matches timestamp sort).
-   - Test: Each event displays its type label, formatted timestamp, and description.
-   - Test: Empty events array renders an empty state or no items.
-3. Create `src/hooks/__tests__/usePipelineStatus.test.ts` or integration test:
-   - Test: Mock API with MSW or jest mock. Render component using the hook. Assert initial data loads.
-   - Test: Use fake timers, advance 5 seconds, assert re-fetch occurs and updated data renders.
-4. Run all tests with `npm test` or `vitest` and verify 100% of the above cases pass.
+1. Install dependencies: `npx expo install expo-secure-store` and `npm install effect` (or `@effect/io` depending on version).
+2. Create `lib/api/client.ts`: base HTTP client using `fetch` with interceptors for auth headers.
+3. Implement environment config in `lib/config.ts`: read `EXPO_PUBLIC_API_BASE_URL` from env vars, support dev/staging/prod profiles.
+4. Create `lib/auth/tokenStore.ts`: store JWT access token and refresh token in `expo-secure-store`. Export `getToken()`, `setTokens()`, `clearTokens()`.
+5. Implement automatic `Authorization: Bearer <token>` header injection on every API request.
+6. Implement token refresh logic: if 401 received, attempt refresh using stored refresh token, retry original request.
+7. Create typed API modules: `lib/api/equipment.ts` (getCategories, getProducts, getProductDetail), `lib/api/quotes.ts` (createQuote, getQuotes), `lib/api/inventory.ts` (scanBarcode, checkIn, checkOut).
+8. Wrap API calls in Effect for structured error handling (network errors, auth errors, validation errors).
+9. Create a `useApi` hook or context provider that exposes the client instance to components.
 
 ## Validation
-All specified tests pass: 3 PipelineStatus state tests, 1 accessibility test (role='alert'), 4 NotificationTimeline tests (rendering, ordering, labels, empty state), and 2 polling integration tests (initial load, 5-second revalidation). Run via test runner with coverage report showing PipelineStatus.tsx, NotificationTimeline.tsx, and usePipelineStatus.ts covered.
+Unit test the API client: mock `fetch` to verify correct headers (Authorization, Content-Type) are sent. Test token refresh flow: mock a 401 response followed by successful refresh, verify retry succeeds. Test `expo-secure-store` read/write with mocked module. Verify environment config resolves correct base URL per EXPO_PUBLIC_API_BASE_URL value.

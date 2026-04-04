@@ -1,35 +1,61 @@
-Implement task 5: Enable Discord and Linear Bridge Notifications (Nova - Bun/Elysia)
+Implement task 5: Build Customer Vetting Service (Rex - Rust/Axum)
 
 ## Goal
-Implement the notification dispatch layer in the PM server that sends pipeline lifecycle events (start, complete, error) to the existing in-cluster discord-bridge-http and linear-bridge services. Per D3, notifications are dispatched via the existing bridge services. The API paradigm (HTTP vs NATS) is pending D2 resolution; this task implements HTTP POST dispatch as the recommended default, with the interface designed to swap to NATS if D2 resolves differently.
+Build the Customer Vetting Service that runs automated background research on prospects through a multi-stage pipeline: business verification (OpenCorporates), online presence (LinkedIn), reputation (Google Reviews), credit signals, and final GREEN/YELLOW/RED scoring.
 
 ## Task Context
-- Agent owner: nova
-- Stack: Bun/Elysia
-- Priority: medium
+- Agent owner: rex
+- Stack: Rust 1.75+/Axum 0.7
+- Priority: high
 - Dependencies: 1
 
 ## Implementation Plan
-1. Create an internal module `notification-dispatch` with interface: `async function notify(event: PipelineEvent): Promise<void>` where PipelineEvent has type `'pipeline.start' | 'pipeline.complete' | 'pipeline.error'` and payload fields.
-2. Read bridge service URLs from `sigma-1-infra-endpoints` ConfigMap: `DISCORD_BRIDGE_URL` and `LINEAR_BRIDGE_URL`.
-3. Implement HTTP POST dispatch (recommended per D2 escalation): POST to discord-bridge-http with payload `{ event, pipeline_id, status, task_count, assigned_count, pr_url, linear_session_url, timestamp }`. POST to linear-bridge with similar payload for Linear comment/update.
-4. Design the `notify()` interface as a facade so the underlying transport (HTTP or NATS) can be swapped without changing callers. If D2 resolves to NATS, a NATS publisher implementation can replace the HTTP implementation behind the same interface.
-5. Notification payload must include at minimum: pipeline status, link to Linear session, link to PR (from Task 4), and task count summary.
-6. Error handling: if a bridge service is unreachable, log a warning with the service name and error, but do NOT fail the pipeline. Notifications are best-effort.
-7. Integrate notification calls into the pipeline: call `notify('pipeline.start')` at pipeline initiation, `notify('pipeline.complete')` after all issues are created and PR is submitted, `notify('pipeline.error')` if the pipeline encounters a fatal error.
-8. Write unit tests for: HTTP payload formatting, error handling on bridge unavailability, facade interface contract.
-9. Write an integration test that verifies both Discord and Linear bridge services receive POST requests during a full pipeline run.
+1. Add `vetting` crate to existing Cargo workspace at `services/rust/vetting`.
+2. SQLx migrations for `vetting` schema:
+   - `vetting_results` table: org_id (UUID PK or FK), business_verified (BOOL), opencorporates_data (JSONB), linkedin_exists (BOOL), linkedin_followers (INT), google_reviews_rating (FLOAT), google_reviews_count (INT), credit_score (INT nullable), risk_flags (TEXT[]), final_score (VARCHAR(6) — GREEN/YELLOW/RED), vetted_at (TIMESTAMPTZ), raw_responses (JSONB — store all API responses for audit).
+   - `vetting_requests` table: id, org_id, requested_by, status (pending/running/completed/failed), started_at, completed_at, error_message.
+3. Implement REST endpoints:
+   - `POST /api/v1/vetting/run` — accepts org_id and company_name/domain. Spawns async vetting pipeline. Returns 202 Accepted with request ID.
+   - `GET /api/v1/vetting/:org_id` — returns latest VettingResult or 404.
+   - `GET /api/v1/vetting/credit/:org_id` — returns credit signals subset.
+4. Vetting pipeline (5 stages, executed concurrently where possible):
+   - **Stage 1 — Business Verification**: Call OpenCorporates API (`/companies/search`). Verify company exists, check incorporation status, extract directors. API key from `sigma1-external-apis` secret.
+   - **Stage 2 — Online Presence**: Check LinkedIn Company API (if available) or fallback to LinkedIn company page scraping via headless request. Check for website existence via DNS/HTTP probe.
+   - **Stage 3 — Reputation**: Query Google Business Profile API (preferred) or Google Places API for reviews and rating. Fallback: structured Google search scraping. Extract rating and review count.
+   - **Stage 4 — Credit Signals**: Call commercial credit API (design as a trait `CreditProvider` with pluggable implementations). Initial implementation can be a stub returning UNKNOWN if no API selected (per open question #4). Log that credit data is unavailable.
+   - **Stage 5 — Final Scoring**: Weighted algorithm:
+     - business_verified: 30 points
+     - linkedin_exists && followers > 50: 20 points
+     - google_reviews_rating >= 4.0 && count >= 10: 20 points
+     - credit_score > 650: 20 points (or 10 if unavailable)
+     - No risk_flags: 10 points
+     - Total >= 70 → GREEN, 40-69 → YELLOW, < 40 → RED
+5. Each external API call uses `reqwest` with:
+   - Timeout: 10 seconds per call
+   - Retry: 2 retries with exponential backoff
+   - Circuit breaker pattern: if API fails 5 times in 5 minutes, mark stage as unavailable rather than failing entire pipeline
+6. Store all raw API responses in `raw_responses` JSONB for audit trail.
+7. GDPR endpoint: `DELETE /api/v1/gdpr/customer/:id` — delete all vetting data for org_id, return confirmation.
+8. Reuse shared crate: health, metrics, rate limiting, DB pool, API key auth.
+9. OpenAPI spec via `utoipa` at `/api/v1/vetting/openapi.json`.
+10. Dockerfile + Kubernetes Deployment: namespace sigma1, replicas 2, envFrom ConfigMap, secret refs, port 8083.
 
 ## Acceptance Criteria
-1. Unit test: `notify('pipeline.start')` sends an HTTP POST to DISCORD_BRIDGE_URL with a JSON body containing event='pipeline.start', pipeline_id, and timestamp. 2. Unit test: `notify('pipeline.complete')` payload includes task_count >= 5, assigned_count, pr_url, and linear_session_url. 3. Unit test: When DISCORD_BRIDGE_URL is unreachable (connection refused), `notify()` logs a warning and resolves without throwing. 4. Unit test: When LINEAR_BRIDGE_URL returns 500, `notify()` logs a warning and resolves without throwing. 5. Integration test: With mocked bridge HTTP endpoints, run the full pipeline and verify exactly 2 notification calls per bridge (start + complete), with correct payloads.
+1. Unit tests for scoring algorithm: parameterized tests covering all boundary conditions — all stages pass (GREEN), mixed results (YELLOW), all stages fail (RED), credit unavailable scenarios. Verify exact point calculations. 2. Unit tests for each pipeline stage with mocked HTTP responses: verify OpenCorporates parsing extracts company status and directors; verify Google Reviews parsing extracts rating and count; verify LinkedIn check correctly identifies presence. 3. Integration test: mock all external APIs using `wiremock-rs`, run full pipeline end-to-end, verify VettingResult stored in DB with correct score. 4. Circuit breaker test: simulate 5 consecutive failures on OpenCorporates mock, verify 6th call returns unavailable without attempting HTTP call. 5. Timeout test: mock slow API response (15s), verify pipeline stage times out at 10s and marks stage as unavailable. 6. GDPR test: create vetting result, call DELETE, verify all data removed. 7. `POST /api/v1/vetting/run` returns 202 and request ID; subsequent GET returns completed result. 8. Minimum 80% coverage.
 
 ## Subtasks
-- Define PipelineEvent types and notification-dispatch facade interface: Create the notification-dispatch module with the PipelineEvent type union ('pipeline.start' | 'pipeline.complete' | 'pipeline.error'), payload type definitions, and the `notify()` facade function signature. Design the transport abstraction layer (a NotificationTransport interface) so HTTP and NATS implementations can be swapped without changing callers.
-- Implement HTTP POST transport for discord-bridge-http: Implement the NotificationTransport interface for HTTP POST dispatch to the discord-bridge-http service. Format the payload per the Discord bridge's expected schema and POST to the URL from the ConfigMap.
-- Implement HTTP POST transport for linear-bridge: Implement the NotificationTransport interface for HTTP POST dispatch to the linear-bridge service. Format the payload per the Linear bridge's expected schema and POST to the URL from the ConfigMap.
-- Implement best-effort error handling for notification dispatch: Wrap the transport send() calls with error handling that catches connection refused, timeouts, and HTTP error responses (4xx/5xx), logging warnings without throwing or failing the pipeline.
-- Integrate notify() calls into the pipeline lifecycle: Wire the notify() function into the existing pipeline orchestration code, calling it at pipeline start, successful completion, and on fatal error.
-- Write unit tests for notification-dispatch module: Write comprehensive unit tests covering payload formatting, facade contract, and error handling for the notification-dispatch module.
+- Create vetting crate and SQLx database migrations: Add the `vetting` crate to the Cargo workspace at `services/rust/vetting` and create SQLx migrations for the `vetting_results` and `vetting_requests` tables with all specified columns, types, and indexes.
+- Implement REST endpoint scaffolding and async pipeline dispatch: Build the Axum router with POST /api/v1/vetting/run (202 Accepted), GET /api/v1/vetting/:org_id, and GET /api/v1/vetting/credit/:org_id endpoints. Wire up the 202 pattern that spawns the vetting pipeline as a background tokio task and updates vetting_requests status.
+- Build HTTP client utilities: timeout, retry with backoff, and circuit breaker: Implement a reusable HTTP client wrapper providing per-request 10-second timeouts, 2 retries with exponential backoff, and a circuit breaker that opens after 5 failures in 5 minutes, marking the stage as unavailable instead of failing the pipeline.
+- Implement Stage 1: Business Verification via OpenCorporates API: Build the OpenCorporates integration stage that searches for a company by name, verifies existence and incorporation status, extracts directors, and returns structured results with raw response capture.
+- Implement Stage 2: Online Presence Check (LinkedIn and Website): Build the online presence stage that checks for a company's LinkedIn page existence and follower count, and probes for website existence via DNS/HTTP.
+- Implement Stage 3: Reputation Check via Google Reviews/Places API: Build the reputation stage that queries Google Business Profile or Google Places API to extract review rating and review count for the company.
+- Implement Stage 4: Credit Signals with CreditProvider trait and stub: Design the CreditProvider trait for pluggable credit API implementations and build the initial stub implementation that returns UNKNOWN/unavailable credit data with appropriate logging.
+- Implement Stage 5: Final scoring algorithm with weighted point system: Build the scoring algorithm that takes results from all 5 stages, applies the weighted 100-point system (30/20/20/20/10), and produces a GREEN/YELLOW/RED classification.
+- Build async pipeline orchestrator with concurrent stage execution: Implement the pipeline orchestrator that runs stages 1-4 concurrently via tokio::join!, feeds results into the scoring stage, persists VettingResult to the database, and updates VettingRequest status throughout.
+- Implement GDPR deletion endpoint: Build the DELETE /api/v1/gdpr/customer/:id endpoint that removes all vetting data (vetting_results and vetting_requests) for a given org_id and returns confirmation.
+- Generate OpenAPI spec with utoipa: Add utoipa annotations to all endpoints and data models, and expose the OpenAPI JSON spec at /api/v1/vetting/openapi.json.
+- Create Dockerfile and Kubernetes deployment manifest: Build the multi-stage Dockerfile for the vetting service and create the Kubernetes Deployment, Service, and related manifests for namespace sigma1 with proper secret and ConfigMap references.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

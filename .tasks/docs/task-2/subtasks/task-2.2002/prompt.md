@@ -1,18 +1,17 @@
-Implement subtask 2002: Implement and verify resolve_agent_delegates() function
+Implement subtask 2002: Implement shared health check handlers (liveness and readiness)
 
 ## Objective
-Locate or implement the resolve_agent_delegates() function that accepts an array of agent hint strings and returns a mapping of agent hints to Linear user IDs, with null for unresolvable agents.
+Add health check route handlers to the shared crate: GET /health/live returns 200 unconditionally, GET /health/ready checks PostgreSQL and Valkey connectivity and returns 200 or 503.
 
 ## Steps
-1. Locate the existing `resolve_agent_delegates()` function in the PM server codebase.
-2. Verify it accepts an array of agent hint strings (e.g., `['bolt', 'nova', 'blaze']`) and returns a `Record<string, string | null>` mapping each hint to a Linear user ID or null.
-3. If the function does not exist, implement it:
-   a. Define the agent-to-Linear-user-ID mapping (source TBD per decision point — hardcoded map, ConfigMap, or Linear API query).
-   b. Accept `string[]` of agent hints.
-   c. Return `Record<string, string | null>` with resolved IDs or null for unknown agents.
-4. Ensure the function handles edge cases: empty array input, duplicate agent hints, case-insensitive matching.
-5. The function should be a pure batch operation — resolve all hints in a single call.
-6. Export the function for import by the pipeline integration code.
+1. In `shared/src/health.rs`, implement `pub async fn liveness() -> impl IntoResponse` returning `StatusCode::OK` with `{"status": "ok"}`.
+2. Implement `pub async fn readiness(State(pool): State<PgPool>, State(valkey): State<ValkeyCon>) -> impl IntoResponse` that:
+   - Executes `SELECT 1` on PgPool
+   - Executes `PING` on Valkey connection
+   - Returns 200 if both succeed, 503 with `{"status": "degraded", "checks": {"db": "ok/fail", "valkey": "ok/fail"}}` if either fails.
+3. Add `redis-rs` (with `tokio-comp` feature) to shared dependencies for Valkey connectivity.
+4. Implement `shared::valkey` module: `pub async fn create_valkey_client() -> Result<Client>` reading `VALKEY_URL` from env.
+5. Export a `pub fn health_routes() -> Router` that mounts both handlers.
 
 ## Validation
-Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object with 3 keys, each mapping to a non-empty string (Linear user ID). Unit test: `resolve_agent_delegates([])` returns an empty object. Unit test: `resolve_agent_delegates(['unknown_agent'])` returns `{ unknown_agent: null }`.
+Unit test liveness always returns 200. Integration test with real Postgres and Valkey: readiness returns 200. Test readiness returns 503 with degraded status when Valkey is unavailable (use invalid URL).

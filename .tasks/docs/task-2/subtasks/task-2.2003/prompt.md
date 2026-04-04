@@ -1,17 +1,16 @@
-Implement subtask 2003: Integrate delegation into the task generation pipeline
+Implement subtask 2003: Implement shared Prometheus metrics middleware
 
 ## Objective
-Wire resolve_agent_delegates() into the task generation pipeline: after tasks are generated with agent hints, batch-resolve them and populate delegate_id on each task, then pass assigneeId to the Linear API issue creation calls.
+Add request metrics middleware to the shared crate using the metrics and metrics-exporter-prometheus crates, exposed at GET /metrics.
 
 ## Steps
-1. Locate the task generation pipeline code where tasks are created with agent hints.
-2. After the task generation step completes, collect all unique agent hints from the generated tasks.
-3. Call `resolve_agent_delegates(uniqueAgentHints)` to get the mapping.
-4. Iterate over all generated tasks and set `task.delegate_id = mapping[task.agent] ?? null` for each.
-5. Locate the Linear issue creation step in the pipeline.
-6. When creating each Linear issue, pass `assigneeId: task.delegate_id` if `delegate_id` is non-null. If `delegate_id` is null, omit `assigneeId` from the Linear API call (or pass undefined).
-7. Ensure the pipeline awaits the resolution before proceeding to issue creation.
-8. Ensure the PM server reads `LINEAR_API_KEY` from `sigma-1-secrets` and endpoints from `sigma-1-infra-endpoints` ConfigMap via `envFrom` environment variables.
+1. Add `metrics 0.22`, `metrics-exporter-prometheus 0.13` to shared Cargo.toml.
+2. In `shared/src/metrics.rs`, implement setup function `pub fn init_metrics() -> PrometheusHandle` that installs the Prometheus recorder.
+3. Create an Axum middleware layer `pub fn metrics_layer() -> impl Layer` that records:
+   - `http_requests_total` counter with labels: method, path, status_code
+   - `http_request_duration_seconds` histogram with labels: method, path
+4. Implement `pub async fn metrics_handler(State(handle): State<PrometheusHandle>) -> impl IntoResponse` that renders Prometheus text format.
+5. Export convenience function `pub fn metrics_route(handle: PrometheusHandle) -> Router` mounting at `GET /metrics`.
 
 ## Validation
-Run the pipeline with a sample PRD containing at least 5 tasks with known agent hints. Verify each task object has a non-null `delegate_id` after resolution. Verify the Linear API create-issue calls include `assigneeId` matching the task's `delegate_id`. Trace logs show resolve_agent_delegates was called once with the batch of agent hints.
+Unit test that metrics_layer records counter increments. Integration test: send a request through a test Axum app with metrics middleware, then GET /metrics and verify http_requests_total and http_request_duration_seconds appear in the response body with expected labels.

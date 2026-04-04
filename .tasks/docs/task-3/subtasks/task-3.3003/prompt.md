@@ -1,14 +1,22 @@
-Implement subtask 3003: Implement graceful degradation for missing API key, timeouts, and API errors
+Implement subtask 3003: Define inventory.proto, crew.proto, and delivery.proto with grpc-gateway annotations
 
 ## Objective
-Add all error handling paths to fetchResearchMemo: missing NOUS_API_KEY skip with info log, 30s timeout handling with warning log, and HTTP error handling with warning log. None of these should throw.
+Create protobuf definitions for the Inventory, Crew, and Delivery gRPC services with full REST gateway annotations.
 
 ## Steps
-1. At the top of `fetchResearchMemo`, check if `NOUS_API_KEY` is falsy. If so, log an info message exactly: 'Hermes integration skipped: NOUS_API_KEY not configured' and return null immediately.
-2. Wrap the fetch call in a try/catch. If the AbortController fires (timeout after 30s), catch the AbortError, log a warning with the task context identifier (e.g., 'Hermes API timeout for task <id>'), and return null.
-3. After the fetch, check `response.ok`. If the status is not 2xx, log a warning including the HTTP status code (e.g., 'Hermes API error: status 500 for task <id>'), and return null.
-4. Catch any other unexpected errors (network errors, JSON parse errors), log them as warnings, and return null.
-5. Ensure no code path in fetchResearchMemo can throw an unhandled exception — the pipeline must never fail due to Hermes unavailability.
+1. Create `proto/rms/v1/inventory.proto`:
+   - Service `InventoryService` with RPCs: `GetStockLevel`, `RecordTransaction`, `ScanBarcode`, `ListInventoryItems`.
+   - Messages: `InventoryItem` (id, org_id, name, barcode, category, current_location, status enum [AVAILABLE, CHECKED_OUT, MAINTENANCE, RETIRED], quantity_total, quantity_available), `InventoryTransaction` (id, item_id, project_id, type enum [CHECK_OUT, CHECK_IN, TRANSFER, ADJUSTMENT], quantity, timestamp), `ScanBarcodeResponse` (item with current location and status).
+   - grpc-gateway: `GET /api/v1/inventory/{id}/stock`, `POST /api/v1/inventory/transactions`, `POST /api/v1/inventory/scan`, `GET /api/v1/inventory`.
+2. Create `proto/rms/v1/crew.proto`:
+   - Service `CrewService` with RPCs: `ListCrew`, `AssignCrew`, `ScheduleCrew`, `GetCrewAvailability`.
+   - Messages: `CrewMember` (id, org_id, name, email, role, skills), `CrewAssignment` (id, crew_member_id, project_id, date_start, date_end, role), `AvailabilitySlot`.
+   - grpc-gateway: `GET /api/v1/crew`, `POST /api/v1/crew/assign`, `POST /api/v1/crew/schedule`, `GET /api/v1/crew/{id}/availability`.
+3. Create `proto/rms/v1/delivery.proto`:
+   - Service `DeliveryService` with RPCs: `ScheduleDelivery`, `UpdateDeliveryStatus`, `OptimizeRoute`, `ListDeliveries`.
+   - Messages: `Delivery` (id, org_id, project_id, type enum [DELIVERY, PICKUP], address, scheduled_at, status enum [SCHEDULED, IN_TRANSIT, DELIVERED, CANCELLED]), `DeliveryRoute` (id, delivery_ids, optimized_order, estimated_duration).
+   - grpc-gateway: `POST /api/v1/deliveries`, `PUT /api/v1/deliveries/{id}/status`, `POST /api/v1/deliveries/optimize-route`, `GET /api/v1/deliveries`.
+4. Run `buf generate` and verify all stubs compile.
 
 ## Validation
-Unit test 1: With NOUS_API_KEY unset, fetchResearchMemo returns null and the info log 'Hermes integration skipped' is emitted. Unit test 2: With a mocked API that never responds (simulating 30s+ delay), fetchResearchMemo returns null and a timeout warning is logged. Unit test 3: With a mocked API returning HTTP 500, fetchResearchMemo returns null and the error status is logged. Unit test 4: With a mocked API returning malformed JSON, fetchResearchMemo returns null without throwing.
+Run `buf lint` with zero errors on all three proto files. Run `buf generate` and verify all Go service interfaces and message types are generated. Confirm grpc-gateway annotations produce correct HTTP paths.

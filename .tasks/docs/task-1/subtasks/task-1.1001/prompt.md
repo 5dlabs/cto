@@ -1,13 +1,13 @@
-Implement subtask 1001: Create sigma-1-dev namespace with labels
+Implement subtask 1001: Create sigma1 and sigma1-db namespaces with labels
 
 ## Objective
-Create the sigma-1-dev Kubernetes namespace with project and environment labels that all subsequent resources will be deployed into.
+Create the `sigma1` application namespace and the `sigma1-db` database namespace (or reuse `databases` per cluster convention). Apply standard labels including `app.kubernetes.io/part-of: sigma1` for observability selector matching.
 
 ## Steps
-1. Create a namespace manifest YAML file `namespace.yaml` defining `sigma-1-dev` namespace.
-2. Add labels: `project: sigma-1`, `env: dev`.
-3. Apply the manifest with `kubectl apply -f namespace.yaml`.
-4. Verify the namespace is Active via `kubectl get namespace sigma-1-dev`.
+1. Create namespace manifest for `sigma1` with labels: `app.kubernetes.io/part-of: sigma1`, `purpose: application`.
+2. Create namespace manifest for `sigma1-db` with labels: `app.kubernetes.io/part-of: sigma1`, `purpose: database`.
+3. Apply both namespace YAMLs via `kubectl apply`.
+4. Verify namespaces exist and labels are correctly applied.
 
 ## Validation
-`kubectl get namespace sigma-1-dev -o jsonpath='{.status.phase}'` returns 'Active'. `kubectl get namespace sigma-1-dev -o jsonpath='{.metadata.labels.project}'` returns 'sigma-1'. `kubectl get namespace sigma-1-dev -o jsonpath='{.metadata.labels.env}'` returns 'dev'.
+`kubectl get ns sigma1 -o jsonpath='{.metadata.labels}'` returns expected labels. Same for `sigma1-db`. Both namespaces are in Active phase.
