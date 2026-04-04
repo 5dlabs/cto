@@ -47,15 +47,22 @@ Design intake accepts any combination of:
 - `design_prompt` - freeform design intent or UX goals
 - `design_artifacts_path` - relative path to sketches/mockups/assets
 - `design_urls` - existing site/app URLs for modernization context
-- `design_mode` - `ingest_only` or `ingest_plus_stitch` (default)
+- `design_mode` - legacy toggle (`ingest_only` or `ingest_plus_stitch`) for backward compatibility
+- `design_provider` - provider routing mode: `stitch`, `framer`, `both`, or `auto` (default rollout uses `stitch`)
 
 Materialized outputs are written to:
 
 ```
 .intake/design/
 ├── design-context.json
+├── candidates.normalized.json
+├── component-library.json
+├── design-system.md
 ├── assets/
 ├── crawled/urls.json
+├── framer/
+│   ├── framer-run.json
+│   └── candidates.json
 └── stitch/
     ├── stitch-run.json
     └── candidates.json
@@ -73,6 +80,7 @@ When frontend is not detected (`hasFrontend=false`), intake preserves artifacts/
   "include_codebase": false,
   "generate_ai_prompts": true,
   "design_mode": "ingest_plus_stitch",
+  "design_provider": "stitch",
   "design_prompt": "Modernize UI and improve conversion",
   "design_urls": ["https://sigma1.led.video/"]
 }
@@ -150,21 +158,31 @@ Runs immediately after PRD materialization in `pipeline.lobster.yaml`.
 1. Copies local design artifacts into `.intake/design/assets/`
 2. Normalizes URL inputs and crawls basic page metadata into `.intake/design/crawled/urls.json`
 3. Detects frontend scope and targets (`web`, `mobile`, `desktop`)
-4. Enforces a Stitch credential gate when `design_mode=ingest_plus_stitch`:
+4. Enforces provider credential gates by mode:
    - Requires `STITCH_API_KEY`
-   - Emits credential discovery state (`STITCH_API_KEY`, `STITCH_PROJECT_ID`, `STITCH_ACCESS_TOKEN`, `GOOGLE_CLOUD_PROJECT`) to `.intake/design/auth-discovery.json`
+   - Requires `FRAMER_API_KEY` + `FRAMER_PROJECT_URL` when `design_provider` is `framer`/`both`
+   - Emits credential discovery state (`STITCH_API_KEY`, `STITCH_PROJECT_ID`, `STITCH_ACCESS_TOKEN`, `GOOGLE_CLOUD_PROJECT`, `FRAMER_API_KEY`, `FRAMER_PROJECT_URL`) to `.intake/design/auth-discovery.json`
    - Fails fast with explicit gate output if required auth is missing
-5. If enabled and credentials exist, generates Stitch candidates and saves:
+5. If enabled and credentials exist, generates provider candidates and saves:
    - `.intake/design/stitch/stitch-run.json`
    - `.intake/design/stitch/candidates.json`
-6. Writes canonical `.intake/design/design-context.json` for downstream steps
-7. Saves a committed design bundle under `.tasks/design/`:
+   - `.intake/design/framer/framer-run.json`
+   - `.intake/design/framer/candidates.json`
+   - `.intake/design/candidates.normalized.json`
+6. Writes component artifacts for implementation planning:
+   - `.intake/design/component-library.json`
+   - `.intake/design/design-system.md`
+7. Writes canonical `.intake/design/design-context.json` for downstream steps
+8. Saves a committed design bundle under `.tasks/design/`:
    - `design-context.json`
    - `crawled/urls.json` (when available)
    - `stitch/stitch-run.json`, `stitch/candidates.json` (when available)
+   - `framer/framer-run.json`, `framer/candidates.json` (when available)
+   - `candidates.normalized.json`
+   - `component-library.json`, `design-system.md`
    - `auth-discovery.json`
    - `manifest.json`
-8. Persists a design snapshot to bridge SQLite history for audit/evidence reporting
+9. Persists a design snapshot to bridge SQLite history for audit/evidence reporting
 
 `design-context.json` is threaded into both deliberation and parse-prd task generation.
 
@@ -526,7 +544,8 @@ The core output contract is preserved:
 | **Repomix** | MCP tool | Pack existing codebase for analysis |
 | **OctoCode** | MCP tool | GitHub code search fallback |
 | **Tavily** | Research via intake-agent MCP | Pre-debate evidence gathering |
-| **Stitch SDK** | `@google/stitch-sdk` (TypeScript) | Optional UI candidate generation from design intake |
+| **Stitch SDK** | `@google/stitch-sdk` (TypeScript) | Visual candidate generation and variant exploration |
+| **Framer Server API** | `framer-api` (Node/Bun runtime import) | Framer project publishing/introspection and component-oriented candidate generation |
 
 ---
 
@@ -567,13 +586,18 @@ Output:
 
 ---
 
-## Stitch Authentication and Runtime Notes
+## Provider Authentication and Runtime Notes
 
-For `design_mode=ingest_plus_stitch`, set:
+For Stitch mode (`design_provider=stitch` or `both`, or legacy `design_mode=ingest_plus_stitch`), set:
 
 - `STITCH_API_KEY`
 
-The pipeline now enforces a hard gate on this credential in preflight materialization. If missing, the run fails before deliberation/tasking.
+For Framer mode (`design_provider=framer` or `both`), set:
+
+- `FRAMER_API_KEY`
+- `FRAMER_PROJECT_URL`
+
+The pipeline enforces hard gates for required credentials before deliberation/task generation.
 
 ### Sigma-1 example invocation
 
@@ -583,6 +607,7 @@ lobster run --mode tool intake/workflows/pipeline.lobster.yaml --args-json '{
   "prd_path": ".intake/run-prd.txt",
   "include_codebase": true,
   "design_mode": "ingest_plus_stitch",
+  "design_provider": "both",
   "design_prompt": "Improve existing site design while preserving brand tone",
   "design_urls": "https://sigma1.led.video/"
 }'

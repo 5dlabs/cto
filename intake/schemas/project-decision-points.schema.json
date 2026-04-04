@@ -26,6 +26,10 @@
             "data-model",
             "api-design",
             "ux-behavior",
+            "visual-identity",
+            "design-system",
+            "component-library",
+            "layout-pattern",
             "security"
           ]
         },
