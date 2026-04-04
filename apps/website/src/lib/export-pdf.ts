@@ -172,11 +172,20 @@ function renderTable(
 ): number {
   const estH = 8 + table.rows.length * 6;
   y = ensureSpace(doc, y, Math.min(estH, 55), margin);
+
+  /* Monkey-patch addPage so autotable overflow pages get dark chrome */
+  const origAddPage = doc.addPage.bind(doc);
+  doc.addPage = (...args: Parameters<typeof doc.addPage>) => {
+    const result = origAddPage(...args);
+    drawChrome(doc);
+    return result;
+  };
+
   autoTable(doc, {
     startY: y,
     head: [table.headers.map(safe)],
     body: table.rows.map((row) => row.map(safe)),
-    margin: { left: margin, right: margin },
+    margin: { left: margin, right: margin, top: margin + 6 },
     tableWidth: maxW,
     styles: {
       fontSize: tableFs,
@@ -194,6 +203,9 @@ function renderTable(
     alternateRowStyles: { fillColor: [16, 20, 34] as RGB },
     theme: "striped",
   });
+
+  /* Restore original addPage */
+  doc.addPage = origAddPage;
   const dt = doc as DocWithTable;
   return (dt.lastAutoTable?.finalY ?? y + 40) + 4;
 }
