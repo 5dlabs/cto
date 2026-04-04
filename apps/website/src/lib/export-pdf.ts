@@ -528,16 +528,26 @@ export async function createPitchDeckPdfBlob(
     drawChrome(doc);
 
     const slide = SLIDES[si];
-    let y = margin + 1.5;
 
-    /* ── header ── */
+    /* Vertical offset — push lighter slides toward center */
+    const vOffset = (() => {
+      switch (slide.id) {
+        case "cover": case "ask": return PG.h * 0.22;
+        case "problem": case "traction": return PG.h * 0.12;
+        case "founder": case "market": return PG.h * 0.06;
+        default: return margin + 1.5;
+      }
+    })();
+    let y = vOffset;
+
+    /* ── header — always at top regardless of offset ── */
     doc.setFont("helvetica", "normal");
     doc.setFontSize(sizes.meta);
     doc.setTextColor(...T.dim);
-    doc.text(safe(BRAND.header), margin, y);
+    doc.text(safe(BRAND.header), margin, margin + 1.5);
     doc.setTextColor(...T.muted);
-    doc.text(`${si + 1} / ${SLIDES.length}`, PG.w - margin, y, { align: "right" });
-    y += 5;
+    doc.text(`${si + 1} / ${SLIDES.length}`, PG.w - margin, margin + 1.5, { align: "right" });
+    y = Math.max(y, margin + 6.5);
 
     /* ── label ── */
     y = writeLines(doc, safe(slide.label.toUpperCase()), margin, y, maxW, sizes.label, {
