@@ -94,33 +94,49 @@ export async function createPitchDeckPptxBlob(): Promise<Blob> {
   /* ── chart: market concentric rings ── */
 
   function addMarketRings(slide: ReturnType<typeof pptx.addSlide>, y: number): number {
-    const widths = [W * 0.8, W * 0.55, W * 0.3];
-    const heights = [1.8, 1.3, 0.8];
+    const widths = [W * 0.85, W * 0.55, W * 0.28];
+    const heights = [2.8, 1.8, 0.8];
     const fills = ["121C2A", "142332", "193C4A"];
-    const borders = ["284060", "3278A0", H.cyan];
+    const borders = ["325A80", "3C82AA", H.cyan];
     const cx = M + W / 2;
 
+    /* Draw all shapes first (large to small) */
     for (let i = 0; i < MARKET_RINGS.length; i++) {
-      const r = MARKET_RINGS[i];
       const rx = cx - widths[i] / 2;
       const ry = y + (heights[0] - heights[i]) / 2;
-
       slide.addShape("roundRect", {
         x: rx, y: ry, w: widths[i], h: heights[i],
         fill: { color: fills[i] },
-        line: { color: borders[i], width: 0.5 },
+        line: { color: borders[i], width: i === 2 ? 1 : 0.5 },
         rectRadius: 0.05,
       });
+    }
+
+    /* Draw text AFTER all shapes so nothing is covered */
+    for (let i = 0; i < MARKET_RINGS.length; i++) {
+      const r = MARKET_RINGS[i];
+      const ry = y + (heights[0] - heights[i]) / 2;
+
+      let labelY: number;
+      let descY: number;
+      if (i < MARKET_RINGS.length - 1) {
+        const innerRy = y + (heights[0] - heights[i + 1]) / 2;
+        const stripH = innerRy - ry;
+        labelY = ry + stripH * 0.2;
+        descY = ry + stripH * 0.55;
+      } else {
+        labelY = ry + heights[i] * 0.2;
+        descY = ry + heights[i] * 0.5;
+      }
 
       slide.addText(`${r.label}: ${r.value}`, {
-        x: rx, y: ry + heights[i] * 0.15, w: widths[i], h: 0.3,
-        fontSize: i === 2 ? 12 : 10, bold: true, color: H.cyan, fontFace: "Arial",
+        x: M, y: labelY, w: W, h: 0.3,
+        fontSize: i === 2 ? 14 : 11, bold: true, color: H.cyan, fontFace: "Arial",
         align: "center",
       });
-
       slide.addText(r.description, {
-        x: rx, y: ry + heights[i] * 0.5, w: widths[i], h: 0.25,
-        fontSize: 8, color: H.white, fontFace: "Arial",
+        x: M, y: descY, w: W, h: 0.25,
+        fontSize: i === 2 ? 10 : 8, color: H.white, fontFace: "Arial",
         align: "center",
       });
     }
