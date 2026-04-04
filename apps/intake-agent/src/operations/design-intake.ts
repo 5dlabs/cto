@@ -2,17 +2,23 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { StitchDirectClient } from '../stitch-client';
 
+export type DesignProvider = 'stitch' | 'framer';
+export type DesignProviderMode = 'stitch' | 'framer' | 'both' | 'auto';
+export type LegacyDesignMode = 'ingest_only' | 'ingest_plus_stitch';
+type FrontendTarget = 'web' | 'mobile' | 'desktop';
+type DeviceType = 'DESKTOP' | 'MOBILE' | 'TABLET' | 'AGNOSTIC';
+
 export interface DesignIntakePayload {
   prd_content: string;
   design_prompt?: string;
   design_artifacts_path?: string;
   design_urls?: string;
-  design_mode?: 'ingest_only' | 'ingest_plus_stitch';
+  design_mode?: LegacyDesignMode | DesignProviderMode;
+  design_provider?: DesignProviderMode;
+  design_framer_project?: string;
   output_dir?: string;
   project_name?: string;
 }
-
-type FrontendTarget = 'web' | 'mobile' | 'desktop';
 
 interface FrontendDetectionResult {
   hasFrontend: boolean;
@@ -29,9 +35,11 @@ interface CrawledUrl {
   error?: string;
 }
 
-interface StitchCandidate {
+export interface ProviderCandidate {
+  provider: DesignProvider;
+  candidate_id?: string;
   target: FrontendTarget;
-  deviceType: 'DESKTOP' | 'MOBILE' | 'TABLET' | 'AGNOSTIC';
+  deviceType: DeviceType;
   screenId?: string;
   htmlUrl?: string;
   imageUrl?: string;
@@ -39,14 +47,15 @@ interface StitchCandidate {
   prompt: string;
   status: 'generated' | 'failed';
   error?: string;
+  meta?: Record<string, unknown>;
 }
 
-interface StitchSummary {
+export interface ProviderSummary {
   status: 'generated' | 'skipped' | 'failed';
   reason?: string;
   projectId?: string;
   warnings: string[];
-  candidates: StitchCandidate[];
+  candidates: ProviderCandidate[];
 }
 
 interface ScreenRef {
@@ -54,19 +63,94 @@ interface ScreenRef {
   screenId: string;
 }
 
+interface ComponentLibraryArtifact {
+  version: string;
+  projectName: string;
+  provider_mode: DesignProviderMode;
+  providers: DesignProvider[];
+  tokens: {
+    color: Array<{ name: string; value: string; description?: string }>;
+    typography: Array<{ name: string; value: string; description?: string }>;
+    spacing: Array<{ name: string; value: string; description?: string }>;
+    radius: Array<{ name: string; value: string; description?: string }>;
+  };
+  primitives: Array<{ name: string; description: string; states: string[]; provider_refs?: string[] }>;
+  patterns: Array<{ name: string; description: string; states: string[]; provider_refs?: string[] }>;
+  component_map: Array<{
+    target: FrontendTarget;
+    provider: DesignProvider;
+    candidate_id: string;
+    screen_id?: string;
+    notes?: string;
+  }>;
+  framer_code_components: Array<{
+    name: string;
+    props: Array<{ name: string; type: string; default?: string | number | boolean }>;
+    property_controls: string[];
+    notes?: string;
+  }>;
+  generated_at: string;
+}
+
+export interface DesignContextResult {
+  projectName: string;
+  mode: LegacyDesignMode | DesignProviderMode;
+  providerMode: DesignProviderMode;
+  prompt: string;
+  artifactPath: string;
+  urls: string[];
+  crawledUrls: CrawledUrl[];
+  hasFrontend: boolean;
+  frontendTargets: FrontendTarget[];
+  confidence: number;
+  evidence: string[];
+  providers: Record<DesignProvider, ProviderSummary>;
+  // Backward-compatible aliases
+  stitch: ProviderSummary;
+  framer: ProviderSummary;
+  normalized_candidates: ProviderCandidate[];
+  component_library?: {
+    path: string;
+    format: 'json';
+    version: string;
+  };
+  design_system?: {
+    path: string;
+    format: 'markdown';
+  };
+}
+
+interface ProviderExecutionContext {
+  projectName: string;
+  mode: LegacyDesignMode | DesignProviderMode;
+  providerMode: DesignProviderMode;
+  framerProjectRef: string;
+  prompt: string;
+  artifactPath: string;
+  urls: string[];
+  hasFrontend: boolean;
+  frontendTargets: FrontendTarget[];
+}
+
+interface DesignProviderHandler {
+  name: DesignProvider;
+  generate(context: ProviderExecutionContext, outputDir: string): Promise<ProviderSummary>;
+}
+
+async function dynamicImport(moduleName: string): Promise<unknown> {
+  const importer = new Function('moduleName', 'return import(moduleName);') as (moduleName: string) => Promise<unknown>;
+  return importer(moduleName);
+}
+
 function collectScreenRefs(value: unknown, out: ScreenRef[]): void {
-  if (!value) {
-    return;
-  }
+  if (!value) return;
   if (Array.isArray(value)) {
     for (const item of value) {
       collectScreenRefs(item, out);
     }
     return;
   }
-  if (typeof value !== 'object') {
-    return;
-  }
+  if (typeof value !== 'object') return;
 
   const obj = value as Record<string, unknown>;
   const nameValue = obj['name'];
@@ -96,25 +180,10 @@ function readDownloadUrl(result: Record<string, unknown>, key: string): string |
   return undefined;
 }
 
-export interface DesignContextResult {
-  projectName: string;
-  mode: 'ingest_only' | 'ingest_plus_stitch';
-  prompt: string;
-  artifactPath: string;
-  urls: string[];
-  crawledUrls: CrawledUrl[];
-  hasFrontend: boolean;
-  frontendTargets: FrontendTarget[];
-  confidence: number;
-  evidence: string[];
-  stitch: StitchSummary;
-}
-
 function parseDesignUrls(raw?: string): string[] {
   if (!raw || raw.trim() === '') {
     return [];
   }
-
   const trimmed = raw.trim();
   if (trimmed.startsWith('[')) {
     try {
@@ -128,7 +197,6 @@ function parseDesignUrls(raw?: string): string[] {
       // Fall through to CSV parsing.
     }
   }
-
   return trimmed
     .split(/[,\n]/g)
     .map((entry) => entry.trim())
@@ -138,7 +206,6 @@ function parseDesignUrls(raw?: string): string[] {
 function detectFrontendSignals(input: string): FrontendDetectionResult {
   const lines = input.split('\n');
   const evidence: string[] = [];
-
   const targetPatterns: Record<FrontendTarget, RegExp[]> = {
     web: [
       /\b(web|website|landing page|frontend|ui|ux|next\.js|react|svelte|vue)\b/i,
@@ -169,37 +236,29 @@ function detectFrontendSignals(input: string): FrontendDetectionResult {
 
   const backendOnlySignals = /\b(api only|backend only|service only|no frontend|headless)\b/i.test(input);
   const hasFrontend = matchedTargets.length > 0 || !backendOnlySignals;
-
   const confidenceBase = matchedTargets.length > 0 ? 0.7 : 0.45;
   const confidence = Math.min(0.95, confidenceBase + matchedTargets.length * 0.1);
-
   const frontendTargets: FrontendTarget[] = matchedTargets.length > 0 ? matchedTargets : (hasFrontend ? ['web'] : []);
-  return {
-    hasFrontend,
-    frontendTargets,
-    confidence,
-    evidence: evidence.slice(0, 6),
-  };
+  return { hasFrontend, frontendTargets, confidence, evidence: evidence.slice(0, 6) };
 }
 
 async function crawlUrls(urls: string[]): Promise<CrawledUrl[]> {
   const results: CrawledUrl[] = [];
-
   for (const url of urls) {
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        results.push({
-          url,
-          status: 'error',
-          error: `HTTP ${response.status}`,
-        });
+        results.push({ url, status: 'error', error: `HTTP ${response.status}` });
         continue;
       }
-
       const html = await response.text();
       const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
-      const plainText = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      const plainText = html
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
       results.push({
         url,
         status: 'ok',
@@ -214,11 +273,10 @@ async function crawlUrls(urls: string[]): Promise<CrawledUrl[]> {
       });
     }
   }
-
   return results;
 }
 
-function deviceForTarget(target: FrontendTarget): 'DESKTOP' | 'MOBILE' | 'TABLET' | 'AGNOSTIC' {
+function deviceForTarget(target: FrontendTarget): DeviceType {
   switch (target) {
     case 'mobile':
       return 'MOBILE';
@@ -231,34 +289,93 @@ function deviceForTarget(target: FrontendTarget): 'DESKTOP' | 'MOBILE' | 'TABLET
   }
 }
 
-async function generateStitchCandidates(
-  context: DesignContextResult,
-  outputDir: string,
-): Promise<StitchSummary> {
-  const warnings: string[] = [];
-
-  if (!context.hasFrontend) {
-    return {
-      status: 'skipped',
-      reason: 'frontend_not_detected',
-      warnings,
-      candidates: [],
-    };
+function deriveProviderMode(payload: DesignIntakePayload): DesignProviderMode {
+  const explicit = payload.design_provider?.trim() as DesignProviderMode | undefined;
+  if (explicit && ['stitch', 'framer', 'both', 'auto'].includes(explicit)) {
+    return explicit;
   }
+  const mode = payload.design_mode?.trim() as string | undefined;
+  switch (mode) {
+    case 'stitch':
+    case 'framer':
+    case 'both':
+    case 'auto':
+      return mode;
+    case 'ingest_plus_stitch':
+      return 'stitch';
+    default:
+      return 'auto';
+  }
+}
 
+function deriveLegacyMode(payload: DesignIntakePayload): LegacyDesignMode {
+  if (payload.design_mode === 'ingest_only') return 'ingest_only';
+  return 'ingest_plus_stitch';
+}
+
+function resolveFramerProjectUrl(projectRefRaw: string): string | undefined {
+  const projectRef = projectRefRaw.trim();
+  if (!projectRef) {
+    return undefined;
+  }
+  if (projectRef.startsWith('http://') || projectRef.startsWith('https://')) {
+    return projectRef;
+  }
+  // Support passing raw Framer project IDs (e.g. fr_xxx) by expanding to a project URL.
+  if (/^[a-zA-Z0-9_-]+$/.test(projectRef)) {
+    return `https://framer.com/projects/${projectRef}`;
+  }
+  return undefined;
+}
+
+function requestedProviders(providerMode: DesignProviderMode, legacyMode: LegacyDesignMode): DesignProvider[] {
+  if (legacyMode === 'ingest_only') return [];
+  switch (providerMode) {
+    case 'stitch':
+      return ['stitch'];
+    case 'framer':
+      return ['framer'];
+    case 'both':
+      return ['stitch', 'framer'];
+    case 'auto':
+      // Safe default in rollout: keep Stitch as baseline, enable Framer explicitly.
+      return ['stitch'];
+    default:
+      return ['stitch'];
+  }
+}
+
+function withCandidateIds(candidates: ProviderCandidate[]): ProviderCandidate[] {
+  return candidates.map((candidate, index) => ({
+    ...candidate,
+    candidate_id: candidate.candidate_id || `${candidate.provider}-${candidate.target}-${index + 1}`,
+  }));
+}
+
+function createEmptySummary(reason: string): ProviderSummary {
+  return {
+    status: 'skipped',
+    reason,
+    warnings: [],
+    candidates: [],
+  };
+}
+
+async function generateStitchCandidates(
+  context: ProviderExecutionContext,
+  outputDir: string,
+): Promise<ProviderSummary> {
+  const warnings: string[] = [];
+  if (!context.hasFrontend) {
+    return createEmptySummary('frontend_not_detected');
+  }
   const stitchApiKey = process.env['STITCH_API_KEY']?.trim();
   if (!stitchApiKey) {
-    warnings.push('STITCH_API_KEY is missing; skipping Stitch generation and continuing in ingest-only mode.');
-    return {
-      status: 'skipped',
-      reason: 'missing_stitch_api_key',
-      warnings,
-      candidates: [],
-    };
+    warnings.push('STITCH_API_KEY is missing; skipping Stitch generation.');
+    return { status: 'skipped', reason: 'missing_stitch_api_key', warnings, candidates: [] };
   }
 
   const client = new StitchDirectClient(stitchApiKey);
-
   let projectId = process.env['STITCH_PROJECT_ID']?.trim();
   try {
     if (!projectId) {
@@ -267,12 +384,8 @@ async function generateStitchCandidates(
       });
       const createAny = createResult as Record<string, unknown>;
       const nested = (createAny['result'] ?? {}) as Record<string, unknown>;
-      const namePath =
-        (createAny['name'] as string | undefined) ||
-        (nested['name'] as string | undefined) ||
-        '';
-      const projectIdFromName =
-        namePath.startsWith('projects/') ? namePath.replace(/^projects\//, '') : undefined;
+      const namePath = (createAny['name'] as string | undefined) || (nested['name'] as string | undefined) || '';
+      const projectIdFromName = namePath.startsWith('projects/') ? namePath.replace(/^projects\//, '') : undefined;
       projectId =
         (createAny['projectId'] as string | undefined) ||
         (createAny['id'] as string | undefined) ||
@@ -283,26 +396,16 @@ async function generateStitchCandidates(
   } catch (error) {
     warnings.push(`Failed to create Stitch project: ${error instanceof Error ? error.message : String(error)}`);
     await client.close();
-    return {
-      status: 'failed',
-      reason: 'create_project_failed',
-      warnings,
-      candidates: [],
-    };
+    return { status: 'failed', reason: 'create_project_failed', warnings, candidates: [] };
   }
 
   if (!projectId) {
     warnings.push('Unable to resolve Stitch project ID from create_project result.');
     await client.close();
-    return {
-      status: 'failed',
-      reason: 'missing_project_id',
-      warnings,
-      candidates: [],
-    };
+    return { status: 'failed', reason: 'missing_project_id', warnings, candidates: [] };
   }
 
-  const candidates: StitchCandidate[] = [];
+  const candidates: ProviderCandidate[] = [];
   for (const target of context.frontendTargets) {
     const deviceType = deviceForTarget(target);
     const promptParts = [
@@ -312,9 +415,7 @@ async function generateStitchCandidates(
       'Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.',
     ].filter(Boolean);
     const prompt = promptParts.join(' ');
-
     try {
-      console.error(`[design-intake] generating Stitch candidate for ${target} (${deviceType})`);
       const generateResult = await client.callTool('generate_screen_from_text', {
         projectId,
         prompt,
@@ -331,6 +432,7 @@ async function generateStitchCandidates(
 
       if (!primaryScreen) {
         candidates.push({
+          provider: 'stitch',
           target,
           deviceType,
           rationale: `Stitch returned no screen refs for ${target}.`,
@@ -351,6 +453,7 @@ async function generateStitchCandidates(
       const imageUrl = readDownloadUrl(screenAny, 'screenshot');
 
       candidates.push({
+        provider: 'stitch',
         target,
         deviceType,
         screenId: primaryScreen.screenId,
@@ -360,11 +463,10 @@ async function generateStitchCandidates(
         prompt,
         status: 'generated',
       });
-      console.error(`[design-intake] Stitch candidate ready for ${target} (${deviceType})`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error(`[design-intake] Stitch candidate failed for ${target} (${deviceType}): ${message}`);
       candidates.push({
+        provider: 'stitch',
         target,
         deviceType,
         rationale: `Failed to generate ${target} candidate.`,
@@ -376,7 +478,6 @@ async function generateStitchCandidates(
   }
 
   await client.close();
-
   const stitchDir = join(outputDir, 'stitch');
   await mkdir(stitchDir, { recursive: true });
   await writeFile(
@@ -384,8 +485,10 @@ async function generateStitchCandidates(
     JSON.stringify(
       {
         timestamp: new Date().toISOString(),
+        provider: 'stitch',
         projectId,
         mode: context.mode,
+        providerMode: context.providerMode,
         targets: context.frontendTargets,
       },
       null,
@@ -393,14 +496,292 @@ async function generateStitchCandidates(
     ),
   );
   await writeFile(join(stitchDir, 'candidates.json'), JSON.stringify(candidates, null, 2));
-
   const generatedCount = candidates.filter((candidate) => candidate.status === 'generated').length;
   return {
     status: generatedCount > 0 ? 'generated' : 'failed',
     projectId,
     warnings,
+    candidates: withCandidateIds(candidates),
+  };
+}
+
+async function generateFramerCandidates(
+  context: ProviderExecutionContext,
+  outputDir: string,
+): Promise<ProviderSummary> {
+  const warnings: string[] = [];
+  if (!context.hasFrontend) {
+    return createEmptySummary('frontend_not_detected');
+  }
+
+  const apiKey = process.env['FRAMER_API_KEY']?.trim();
+  const projectRef = context.framerProjectRef || process.env['FRAMER_PROJECT_URL']?.trim() || process.env['FRAMER_PROJECT_ID']?.trim() || '';
+  const projectUrl = resolveFramerProjectUrl(projectRef);
+  if (!apiKey || !projectUrl) {
+    warnings.push('FRAMER_API_KEY and a Framer project target (design_framer_project, FRAMER_PROJECT_URL, or FRAMER_PROJECT_ID) are required; skipping Framer generation.');
+    return {
+      status: 'skipped',
+      reason: 'missing_framer_credentials',
+      warnings,
+      candidates: [],
+    };
+  }
+
+  const framerDir = join(outputDir, 'framer');
+  await mkdir(framerDir, { recursive: true });
+
+  let publishUrl = process.env['FRAMER_PREVIEW_URL']?.trim();
+  let publishId: string | undefined;
+  let changedPaths: { added: string[]; removed: string[]; modified: string[] } | undefined;
+  let contributorCount: number | undefined;
+  let sdkAvailable = false;
+
+  try {
+    const framerApiMod = await dynamicImport('framer-api');
+    const connect = (framerApiMod as { connect?: (url: string, key: string) => Promise<any> }).connect;
+    if (typeof connect === 'function') {
+      sdkAvailable = true;
+      const framer = await connect(projectUrl, apiKey);
+      try {
+        const publishResult = await framer.publish?.();
+        publishId = publishResult?.deployment?.id;
+        if (publishId && framer.getPublishInfo) {
+          const publishInfo = await framer.getPublishInfo();
+          publishUrl =
+            publishInfo?.previewUrl ||
+            publishInfo?.preview_url ||
+            publishInfo?.stagingUrl ||
+            publishInfo?.staging_url ||
+            publishUrl;
+        }
+        if (framer.getChangedPaths) {
+          changedPaths = await framer.getChangedPaths();
+        }
+        if (framer.getChangeContributors) {
+          const contributors = await framer.getChangeContributors();
+          contributorCount = Array.isArray(contributors) ? contributors.length : undefined;
+        }
+      } finally {
+        await framer.disconnect?.();
+      }
+    } else {
+      warnings.push('framer-api package is unavailable; generating Framer artifacts in offline mode.');
+    }
+  } catch (error) {
+    warnings.push(`Framer API call failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const now = Date.now();
+  const candidates = withCandidateIds(
+    context.frontendTargets.map((target, idx) => {
+      const deviceType = deviceForTarget(target);
+      const promptParts = [
+        `Create a ${target} Framer implementation direction for ${context.projectName}.`,
+        context.prompt ? `Intent: ${context.prompt}` : '',
+        context.urls.length > 0 ? `Reference URLs: ${context.urls.join(', ')}` : '',
+        'Favor reusable components with clear property controls for Framer code components.',
+      ].filter(Boolean);
+      return {
+        provider: 'framer' as const,
+        target,
+        deviceType,
+        screenId: `framer-${target}-${now + idx}`,
+        htmlUrl: publishUrl,
+        imageUrl: undefined,
+        rationale: `Prepared ${target} Framer candidate with component-library oriented guidance.`,
+        prompt: promptParts.join(' '),
+        status: 'generated' as const,
+        meta: {
+          publish_id: publishId,
+          sdk_available: sdkAvailable,
+          changed_paths: changedPaths,
+          contributor_count: contributorCount,
+          project_url: projectUrl,
+          project_ref: projectRef,
+        },
+      };
+    }),
+  );
+
+  await writeFile(
+    join(framerDir, 'framer-run.json'),
+    JSON.stringify(
+      {
+        timestamp: new Date().toISOString(),
+        provider: 'framer',
+        mode: context.mode,
+        providerMode: context.providerMode,
+        projectRef,
+        projectUrl,
+        publishUrl,
+        publishId,
+        changedPaths,
+        contributorCount,
+        sdkAvailable,
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(join(framerDir, 'candidates.json'), JSON.stringify(candidates, null, 2));
+
+  return {
+    status: candidates.length > 0 ? 'generated' : 'failed',
+    reason: candidates.length > 0 ? undefined : 'no_candidates_generated',
+    warnings,
     candidates,
   };
+}
+
+function getProviderHandlers(): Record<DesignProvider, DesignProviderHandler> {
+  return {
+    stitch: {
+      name: 'stitch',
+      generate: generateStitchCandidates,
+    },
+    framer: {
+      name: 'framer',
+      generate: generateFramerCandidates,
+    },
+  };
+}
+
+async function writeComponentLibraryArtifacts(
+  outputDir: string,
+  context: Pick<DesignContextResult, 'projectName' | 'providerMode' | 'normalized_candidates' | 'frontendTargets' | 'providers'>,
+): Promise<{ componentPath: string; designSystemPath: string }> {
+  const providersInUse = Array.from(
+    new Set(context.normalized_candidates.map((candidate) => candidate.provider)),
+  ) as DesignProvider[];
+  const componentLibrary: ComponentLibraryArtifact = {
+    version: '1.0.0',
+    projectName: context.projectName,
+    provider_mode: context.providerMode,
+    providers: providersInUse,
+    tokens: {
+      color: [
+        { name: 'color.background.base', value: '#0B0C0F', description: 'Primary app background' },
+        { name: 'color.text.primary', value: '#F4F6F8', description: 'Primary text color' },
+        { name: 'color.accent.brand', value: '#7C5CFF', description: 'Primary call-to-action accent' },
+      ],
+      typography: [
+        { name: 'font.family.base', value: 'Inter, system-ui, sans-serif' },
+        { name: 'font.size.body', value: '16px' },
+        { name: 'font.size.h1', value: '40px' },
+      ],
+      spacing: [
+        { name: 'space.2', value: '8px' },
+        { name: 'space.4', value: '16px' },
+        { name: 'space.6', value: '24px' },
+      ],
+      radius: [
+        { name: 'radius.sm', value: '8px' },
+        { name: 'radius.md', value: '12px' },
+        { name: 'radius.lg', value: '16px' },
+      ],
+    },
+    primitives: [
+      {
+        name: 'Button',
+        description: 'Primary action with variant and size controls.',
+        states: ['default', 'hover', 'disabled', 'loading'],
+        provider_refs: providersInUse,
+      },
+      {
+        name: 'Input',
+        description: 'Text input with hint, error, and success states.',
+        states: ['default', 'focus', 'error', 'success'],
+        provider_refs: providersInUse,
+      },
+      {
+        name: 'Card',
+        description: 'Surface container used for content grouping.',
+        states: ['default', 'interactive', 'selected'],
+        provider_refs: providersInUse,
+      },
+    ],
+    patterns: [
+      {
+        name: 'HeroSection',
+        description: 'Top-level value proposition area with CTA and social proof.',
+        states: ['default', 'with-secondary-cta'],
+        provider_refs: providersInUse,
+      },
+      {
+        name: 'FeatureGrid',
+        description: 'Responsive feature list with icon, title, and supporting copy.',
+        states: ['2-column', '3-column', 'mobile-stack'],
+        provider_refs: providersInUse,
+      },
+      {
+        name: 'PricingStack',
+        description: 'Tiered pricing cards with highlighted recommended plan.',
+        states: ['monthly', 'annual', 'enterprise'],
+        provider_refs: providersInUse,
+      },
+    ],
+    component_map: context.normalized_candidates.map((candidate) => ({
+      target: candidate.target,
+      provider: candidate.provider,
+      candidate_id: candidate.candidate_id || `${candidate.provider}-${candidate.target}`,
+      screen_id: candidate.screenId,
+      notes: candidate.rationale,
+    })),
+    framer_code_components:
+      context.providers.framer.status === 'generated'
+        ? [
+            {
+              name: 'HeroCta',
+              props: [
+                { name: 'headline', type: 'string', default: 'Design systems that ship faster' },
+                { name: 'subcopy', type: 'string', default: 'From intake signal to implementation-ready components.' },
+                { name: 'ctaLabel', type: 'string', default: 'Get started' },
+              ],
+              property_controls: ['headline', 'subcopy', 'ctaLabel'],
+              notes: 'Use Framer property controls for copy and variant tuning.',
+            },
+            {
+              name: 'FeatureCard',
+              props: [
+                { name: 'title', type: 'string', default: 'Reusable component primitives' },
+                { name: 'description', type: 'string', default: 'Define once, compose everywhere.' },
+                { name: 'icon', type: 'string', default: 'sparkles' },
+              ],
+              property_controls: ['title', 'description', 'icon'],
+            },
+          ]
+        : [],
+    generated_at: new Date().toISOString(),
+  };
+
+  const componentPath = join(outputDir, 'component-library.json');
+  const designSystemPath = join(outputDir, 'design-system.md');
+  await writeFile(componentPath, JSON.stringify(componentLibrary, null, 2));
+
+  const designSystemDoc = [
+    '# Design System',
+    '',
+    `Project: ${context.projectName}`,
+    `Provider mode: ${context.providerMode}`,
+    `Providers generated: ${providersInUse.join(', ') || 'none'}`,
+    '',
+    '## Scope',
+    '- Output includes token foundations, reusable primitives, and interaction patterns.',
+    '- Component map ties each candidate back to provider provenance for traceability.',
+    '',
+    '## Core Primitives',
+    '- Button, Input, Card',
+    '',
+    '## Composition Patterns',
+    '- HeroSection, FeatureGrid, PricingStack',
+    '',
+    '## Provider Notes',
+    '- Stitch candidates prioritize visual exploration and variant generation.',
+    '- Framer candidates prioritize component composition and property-control readiness.',
+    '',
+  ].join('\n');
+  await writeFile(designSystemPath, designSystemDoc);
+  return { componentPath, designSystemPath };
 }
 
 // =============================================================================
@@ -418,6 +799,7 @@ export interface DesignVariant {
   variant_id: string;
   source_screen_id: string;
   source_target: FrontendTarget;
+  source_provider?: DesignProvider;
   label: string;
   description: string;
   aspects_changed: string[];
@@ -433,6 +815,7 @@ export interface DesignVariantsResult {
   screens: Array<{
     source_screen_id: string;
     source_target: FrontendTarget;
+    source_provider?: DesignProvider;
     variants: DesignVariant[];
   }>;
   total_variants: number;
@@ -440,6 +823,8 @@ export interface DesignVariantsResult {
 }
 
 const FIFE_HIRES_SUFFIX = '=w1920';
+const VARIANT_LABELS = ['Layout Focus', 'Color Scheme', 'Typography & Spacing'];
+const VARIANT_ASPECTS: string[][] = [['LAYOUT'], ['COLOR_SCHEME'], ['TEXT_FONT', 'TEXT_CONTENT']];
 
 function hiresImageUrl(url: string | undefined): string | undefined {
   if (!url) return undefined;
@@ -447,170 +832,203 @@ function hiresImageUrl(url: string | undefined): string | undefined {
   return `${url}${FIFE_HIRES_SUFFIX}`;
 }
 
-const VARIANT_LABELS = ['Layout Focus', 'Color Scheme', 'Typography & Spacing'];
-const VARIANT_ASPECTS: string[][] = [
-  ['LAYOUT'],
-  ['COLOR_SCHEME'],
-  ['TEXT_FONT', 'TEXT_CONTENT'],
-];
+function isProviderCandidateArray(value: unknown): value is ProviderCandidate[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'object' && item !== null && 'target' in item);
+}
 
 export async function generateDesignVariants(payload: DesignVariantPayload): Promise<DesignVariantsResult> {
   const { readFile } = await import('node:fs/promises');
-
   const candidatesRaw = await readFile(payload.candidates_path, 'utf-8');
-  const candidates: StitchCandidate[] = JSON.parse(candidatesRaw);
+  const parsedCandidates = JSON.parse(candidatesRaw) as unknown;
+  const candidates: ProviderCandidate[] = isProviderCandidateArray(parsedCandidates)
+    ? withCandidateIds(parsedCandidates as ProviderCandidate[])
+    : [];
 
-  const stitchRunRaw = await readFile(
-    payload.candidates_path.replace('candidates.json', 'stitch-run.json'),
-    'utf-8',
+  const stitchCandidates = candidates.filter(
+    (candidate) => (candidate.provider ?? 'stitch') === 'stitch' && candidate.status === 'generated' && candidate.screenId,
   );
-  const stitchRun: { projectId: string } = JSON.parse(stitchRunRaw);
-  const projectId = stitchRun.projectId;
+  const nonStitchCandidates = candidates.filter(
+    (candidate) => (candidate.provider ?? 'stitch') !== 'stitch' && candidate.status === 'generated',
+  );
 
-  const generatedCandidates = candidates.filter(c => c.status === 'generated' && c.screenId);
-  if (generatedCandidates.length === 0) {
-    return {
-      project_id: projectId,
-      screens: [],
-      total_variants: 0,
-      timestamp: new Date().toISOString(),
-    };
+  let projectId = process.env['STITCH_PROJECT_ID']?.trim() || 'design-intake';
+  try {
+    const stitchRunRaw = await readFile(payload.candidates_path.replace('candidates.json', 'stitch-run.json'), 'utf-8');
+    const stitchRun: { projectId?: string } = JSON.parse(stitchRunRaw);
+    if (stitchRun.projectId) {
+      projectId = stitchRun.projectId;
+    }
+  } catch {
+    // No stitch run file (e.g. framer-only mode); keep fallback project id.
   }
 
-  const stitchApiKey = process.env['STITCH_API_KEY']?.trim();
-  if (!stitchApiKey) {
-    throw new Error('STITCH_API_KEY is required for design variant generation');
-  }
-
-  const client = new StitchDirectClient(stitchApiKey);
   const variantCount = payload.variant_count ?? 3;
   const creativeRange = payload.creative_range ?? 'EXPLORE';
   const outputDir = payload.output_dir ?? '.intake/design/stitch';
-
   const screens: DesignVariantsResult['screens'] = [];
 
-  for (const candidate of generatedCandidates) {
-    const screenVariants: DesignVariant[] = [];
-
-    try {
-      const generateResult = await client.callTool('generate_variants', {
-        projectId,
-        selectedScreenIds: [candidate.screenId],
-        prompt: `Generate ${variantCount} design variants exploring different visual directions for this ${candidate.target} interface.`,
-        variantOptions: {
-          variantCount,
-          creativeRange,
-          aspects: [],
-        },
-        modelId: 'GEMINI_3_1_PRO',
-        deviceType: candidate.deviceType,
-      });
-
-      const resultAny = generateResult as Record<string, unknown>;
-      const components =
-        (resultAny['outputComponents'] as unknown[] | undefined) ||
-        (resultAny['output_components'] as unknown[] | undefined) ||
-        [];
-      const screenRefs: ScreenRef[] = [];
-      collectScreenRefs(components, screenRefs);
-
-      for (let i = 0; i < screenRefs.length && i < variantCount; i++) {
-        const ref = screenRefs[i];
-        const label = VARIANT_LABELS[i] ?? `Variant ${i + 1}`;
-        const aspects = VARIANT_ASPECTS[i] ?? [];
-
-        try {
-          const getScreenResult = await client.callTool('get_screen', {
-            name: ref.name,
-            projectId,
-            screenId: ref.screenId,
-          });
-          const screenAny = getScreenResult as Record<string, unknown>;
-          const htmlUrl = readDownloadUrl(screenAny, 'htmlCode');
-          const rawImageUrl = readDownloadUrl(screenAny, 'screenshot');
-
-          screenVariants.push({
-            variant_id: `${candidate.screenId}-v${i + 1}`,
-            source_screen_id: candidate.screenId!,
-            source_target: candidate.target,
-            label,
-            description: `${candidate.target} variant emphasizing ${label.toLowerCase()}.`,
-            aspects_changed: aspects,
-            screen_id: ref.screenId,
-            html_url: htmlUrl,
-            image_url: hiresImageUrl(rawImageUrl),
-            status: 'generated',
-          });
-        } catch (err) {
-          screenVariants.push({
-            variant_id: `${candidate.screenId}-v${i + 1}`,
-            source_screen_id: candidate.screenId!,
-            source_target: candidate.target,
-            label,
-            description: `Failed to retrieve variant screen.`,
-            aspects_changed: aspects,
-            status: 'failed',
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
-
-      if (screenRefs.length === 0) {
-        screenVariants.push({
-          variant_id: `${candidate.screenId}-v1`,
-          source_screen_id: candidate.screenId!,
+  // Framer and other non-Stitch providers currently provide a baseline generated variant.
+  for (const candidate of nonStitchCandidates) {
+    const sourceId = candidate.screenId || candidate.candidate_id || `${candidate.provider}-${candidate.target}`;
+    screens.push({
+      source_screen_id: sourceId,
+      source_target: candidate.target,
+      source_provider: candidate.provider,
+      variants: [
+        {
+          variant_id: `${sourceId}-v1`,
+          source_screen_id: sourceId,
           source_target: candidate.target,
-          label: 'Fallback',
-          description: 'No variants returned from Stitch; using original.',
-          aspects_changed: [],
+          source_provider: candidate.provider,
+          label: 'Baseline',
+          description: `${candidate.provider} baseline candidate for ${candidate.target}.`,
+          aspects_changed: ['COMPONENT_COMPOSITION'],
           screen_id: candidate.screenId,
           html_url: candidate.htmlUrl,
           image_url: hiresImageUrl(candidate.imageUrl),
           status: 'generated',
-        });
-      }
-    } catch (err) {
-      screenVariants.push({
-        variant_id: `${candidate.screenId}-v1`,
-        source_screen_id: candidate.screenId!,
-        source_target: candidate.target,
-        label: 'Original (fallback)',
-        description: `Variant generation failed; using original.`,
-        aspects_changed: [],
-        screen_id: candidate.screenId,
-        html_url: candidate.htmlUrl,
-        image_url: hiresImageUrl(candidate.imageUrl),
-        status: 'failed',
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-
-    screens.push({
-      source_screen_id: candidate.screenId!,
-      source_target: candidate.target,
-      variants: screenVariants,
+        },
+      ],
     });
   }
 
-  await client.close();
+  if (stitchCandidates.length > 0) {
+    const stitchApiKey = process.env['STITCH_API_KEY']?.trim();
+    if (!stitchApiKey) {
+      throw new Error('STITCH_API_KEY is required for Stitch design variant generation');
+    }
+    const client = new StitchDirectClient(stitchApiKey);
+    try {
+      for (const candidate of stitchCandidates) {
+        const screenVariants: DesignVariant[] = [];
+        try {
+          const generateResult = await client.callTool('generate_variants', {
+            projectId,
+            selectedScreenIds: [candidate.screenId],
+            prompt: `Generate ${variantCount} design variants exploring different visual directions for this ${candidate.target} interface.`,
+            variantOptions: {
+              variantCount,
+              creativeRange,
+              aspects: [],
+            },
+            modelId: 'GEMINI_3_1_PRO',
+            deviceType: candidate.deviceType,
+          });
+
+          const resultAny = generateResult as Record<string, unknown>;
+          const components =
+            (resultAny['outputComponents'] as unknown[] | undefined) ||
+            (resultAny['output_components'] as unknown[] | undefined) ||
+            [];
+          const screenRefs: ScreenRef[] = [];
+          collectScreenRefs(components, screenRefs);
+
+          for (let i = 0; i < screenRefs.length && i < variantCount; i++) {
+            const ref = screenRefs[i];
+            if (!ref) {
+              continue;
+            }
+            const label = VARIANT_LABELS[i] ?? `Variant ${i + 1}`;
+            const aspects = VARIANT_ASPECTS[i] ?? [];
+            try {
+              const getScreenResult = await client.callTool('get_screen', {
+                name: ref.name,
+                projectId,
+                screenId: ref.screenId,
+              });
+              const screenAny = getScreenResult as Record<string, unknown>;
+              const htmlUrl = readDownloadUrl(screenAny, 'htmlCode');
+              const rawImageUrl = readDownloadUrl(screenAny, 'screenshot');
+              screenVariants.push({
+                variant_id: `${candidate.screenId}-v${i + 1}`,
+                source_screen_id: candidate.screenId!,
+                source_target: candidate.target,
+                source_provider: 'stitch',
+                label,
+                description: `${candidate.target} variant emphasizing ${label.toLowerCase()}.`,
+                aspects_changed: aspects,
+                screen_id: ref.screenId,
+                html_url: htmlUrl,
+                image_url: hiresImageUrl(rawImageUrl),
+                status: 'generated',
+              });
+            } catch (err) {
+              screenVariants.push({
+                variant_id: `${candidate.screenId}-v${i + 1}`,
+                source_screen_id: candidate.screenId!,
+                source_target: candidate.target,
+                source_provider: 'stitch',
+                label,
+                description: 'Failed to retrieve variant screen.',
+                aspects_changed: aspects,
+                status: 'failed',
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
+
+          if (screenRefs.length === 0) {
+            screenVariants.push({
+              variant_id: `${candidate.screenId}-v1`,
+              source_screen_id: candidate.screenId!,
+              source_target: candidate.target,
+              source_provider: 'stitch',
+              label: 'Fallback',
+              description: 'No variants returned from Stitch; using original.',
+              aspects_changed: [],
+              screen_id: candidate.screenId,
+              html_url: candidate.htmlUrl,
+              image_url: hiresImageUrl(candidate.imageUrl),
+              status: 'generated',
+            });
+          }
+        } catch (err) {
+          screenVariants.push({
+            variant_id: `${candidate.screenId}-v1`,
+            source_screen_id: candidate.screenId!,
+            source_target: candidate.target,
+            source_provider: 'stitch',
+            label: 'Original (fallback)',
+            description: 'Variant generation failed; using original.',
+            aspects_changed: [],
+            screen_id: candidate.screenId,
+            html_url: candidate.htmlUrl,
+            image_url: hiresImageUrl(candidate.imageUrl),
+            status: 'failed',
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+
+        screens.push({
+          source_screen_id: candidate.screenId!,
+          source_target: candidate.target,
+          source_provider: 'stitch',
+          variants: screenVariants,
+        });
+      }
+    } finally {
+      await client.close();
+    }
+  }
 
   const result: DesignVariantsResult = {
     project_id: projectId,
     screens,
-    total_variants: screens.reduce((sum, s) => sum + s.variants.filter(v => v.status === 'generated').length, 0),
+    total_variants: screens.reduce((sum, screen) => sum + screen.variants.filter((v) => v.status === 'generated').length, 0),
     timestamp: new Date().toISOString(),
   };
 
   await mkdir(outputDir, { recursive: true });
   await writeFile(join(outputDir, 'design-variants.json'), JSON.stringify(result, null, 2));
-
   return result;
 }
 
 export async function designIntake(payload: DesignIntakePayload): Promise<DesignContextResult> {
   const outputDir = payload.output_dir?.trim() || '.intake/design';
   const projectName = payload.project_name?.trim() || 'project';
-  const mode = payload.design_mode === 'ingest_only' ? 'ingest_only' : 'ingest_plus_stitch';
+  const mode = payload.design_mode ?? 'ingest_plus_stitch';
+  const providerMode = deriveProviderMode(payload);
+  const legacyMode = deriveLegacyMode(payload);
   const prompt = payload.design_prompt?.trim() ?? '';
   const artifactPath = payload.design_artifacts_path?.trim() ?? '';
   const urls = parseDesignUrls(payload.design_urls);
@@ -623,9 +1041,43 @@ export async function designIntake(payload: DesignIntakePayload): Promise<Design
   const crawledUrls = await crawlUrls(urls);
   await writeFile(join(outputDir, 'crawled', 'urls.json'), JSON.stringify(crawledUrls, null, 2));
 
+  const providers: Record<DesignProvider, ProviderSummary> = {
+    stitch: createEmptySummary('not_requested'),
+    framer: createEmptySummary('not_requested'),
+  };
+
+  const providerContext: ProviderExecutionContext = {
+    projectName,
+    mode,
+    providerMode,
+    framerProjectRef: payload.design_framer_project?.trim() ?? '',
+    prompt,
+    artifactPath,
+    urls,
+    hasFrontend: detection.hasFrontend,
+    frontendTargets: detection.frontendTargets,
+  };
+  const handlers = getProviderHandlers();
+  const selectedProviders = requestedProviders(providerMode, legacyMode);
+
+  for (const providerName of selectedProviders) {
+    providers[providerName] = await handlers[providerName].generate(providerContext, outputDir);
+  }
+
+  const normalizedCandidates = withCandidateIds(
+    (['stitch', 'framer'] as DesignProvider[]).flatMap((provider) =>
+      providers[provider].candidates.map((candidate) => ({
+        ...candidate,
+        provider,
+      })),
+    ),
+  );
+  await writeFile(join(outputDir, 'candidates.normalized.json'), JSON.stringify(normalizedCandidates, null, 2));
+
   const context: DesignContextResult = {
     projectName,
     mode,
+    providerMode,
     prompt,
     artifactPath,
     urls,
@@ -634,17 +1086,21 @@ export async function designIntake(payload: DesignIntakePayload): Promise<Design
     frontendTargets: detection.frontendTargets,
     confidence: detection.confidence,
     evidence: detection.evidence,
-    stitch: {
-      status: 'skipped',
-      reason: 'not_requested',
-      warnings: [],
-      candidates: [],
-    },
+    providers,
+    stitch: providers.stitch,
+    framer: providers.framer,
+    normalized_candidates: normalizedCandidates,
   };
 
-  if (mode === 'ingest_plus_stitch') {
-    context.stitch = await generateStitchCandidates(context, outputDir);
-  }
+  const artifacts = await writeComponentLibraryArtifacts(outputDir, {
+    projectName: context.projectName,
+    providerMode: context.providerMode,
+    normalized_candidates: context.normalized_candidates,
+    frontendTargets: context.frontendTargets,
+    providers: context.providers,
+  });
+  context.component_library = { path: artifacts.componentPath, format: 'json', version: '1.0.0' };
+  context.design_system = { path: artifacts.designSystemPath, format: 'markdown' };
 
   await writeFile(join(outputDir, 'design-context.json'), JSON.stringify(context, null, 2));
   return context;

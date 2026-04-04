@@ -205,7 +205,20 @@ export interface CommitteeVote {
 export interface DeliberationDecisionPoint {
   id: string;
   question: string;
-  category: 'architecture' | 'error-handling' | 'data-model' | 'api-design' | 'ux-behavior' | 'performance' | 'security' | 'technology-choice' | 'infrastructure';
+  category:
+    | 'architecture'
+    | 'error-handling'
+    | 'data-model'
+    | 'api-design'
+    | 'ux-behavior'
+    | 'visual-identity'
+    | 'design-system'
+    | 'component-library'
+    | 'layout-pattern'
+    | 'performance'
+    | 'security'
+    | 'technology-choice'
+    | 'infrastructure';
   options: string[];
   raised_by: 'optimist' | 'pessimist' | 'intake';
   votes: CommitteeVote[];
