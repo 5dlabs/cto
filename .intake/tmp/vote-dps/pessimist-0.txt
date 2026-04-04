@@ -1,1 +1,1 @@
-Sequential orchestration within the PM server, with direct HTTP calls to existing bot services for notifications
+Descope Task 7 entirely — the PRD requires Linear issues with assignees and Discord notifications, not a dashboard. If retained: REST, matching the existing PM server's patterns.

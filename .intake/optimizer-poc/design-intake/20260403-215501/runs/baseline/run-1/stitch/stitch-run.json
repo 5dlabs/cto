@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-04-04T04:56:48.117Z",
+  "provider": "stitch",
+  "projectId": "4376836240724898658",
+  "mode": "ingest_plus_stitch",
+  "providerMode": "stitch",
+  "targets": [
+    "web"
+  ]
+}

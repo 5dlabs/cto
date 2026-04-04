@@ -1,1 +1,1 @@
-Inline within relevant task views, with a summary count badge on the dashboard
+Polling with periodic refresh (5s interval) and inline error banners (not modal dialogs — modals block interaction)

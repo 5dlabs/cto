@@ -1,1 +1,1 @@
-Display design snapshot PRs as linked items in the pipeline activity view — a PR link with status badge, not an interactive preview panel
+Extend existing task schema with delegate_id and status fields (CRUD)

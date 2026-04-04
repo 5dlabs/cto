@@ -1,1 +1,1 @@
-How should design snapshot PR surfacing be presented in the frontend?
+How should agent assignments and delegation status be modeled?

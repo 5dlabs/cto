@@ -1,1 +1,1 @@
-Event-driven pipeline stages communicating via NATS, orchestrated by the PM server as coordinator
+REST endpoints from the PM server

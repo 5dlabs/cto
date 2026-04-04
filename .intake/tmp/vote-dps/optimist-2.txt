@@ -1,1 +1,1 @@
-Store delegate_id as the native Linear assignee (assigneeId) field on the issue
+JWT-based stateless authentication with short-lived tokens in httpOnly cookies
