@@ -1,10 +1,24 @@
-Implement subtask 7002: Integrate react-markdown for memo content rendering
+Implement subtask 7002: Configure MCP Tool Server with all 10 tool definitions and JSON Schema mappings
 
 ## Objective
-Install react-markdown and integrate it into the ResearchMemo component to render the `content` field as formatted markdown, including headers, links, and code blocks.
+Define the MCP Tool Server configuration mapping all 10 backend service tools with their REST/gRPC endpoint URLs, parameter JSON Schemas, response schemas, and authentication headers. Each tool must be individually testable.
 
 ## Steps
-1. Install `react-markdown` via npm/bun. 2. In the ResearchMemo CollapsibleContent area, render `<ReactMarkdown>{researchMemo.content}</ReactMarkdown>`. 3. Apply appropriate Tailwind prose classes (e.g., `prose prose-sm dark:prose-invert`) for consistent styling within the card context. 4. Verify that headers (h1-h3), inline code, code blocks, links, and lists render correctly. 5. Do NOT add remark/rehype plugins unless explicitly needed — keep it lightweight for v1.
+1. Create MCP Tool Server configuration file(s) with 10 tool definitions:
+   - `sigma1_catalog_search`: GET to equipment-catalog service `/api/v1/catalog/products`, params: q (string), category (string, optional). Response: array of product objects.
+   - `sigma1_check_availability`: GET to equipment-catalog `/api/v1/catalog/products/{id}/availability`, params: id (string), from (ISO date), to (ISO date). Response: availability object with quantity/conflicts.
+   - `sigma1_generate_quote`: POST to RMS `/api/v1/opportunities`, body: customer info, line items, event details. Response: opportunity ID, total, status.
+   - `sigma1_vet_customer`: POST to vetting service `/api/v1/vetting/run`, body: org name, contact info. Response: rating (GREEN/YELLOW/RED), details.
+   - `sigma1_score_lead`: POST to RMS `/api/v1/opportunities/{id}/score`, params: opportunity ID. Response: score, factors.
+   - `sigma1_create_invoice`: POST to finance service `/api/v1/invoices`, body: opportunity ID, line items, terms. Response: invoice ID, PDF URL.
+   - `sigma1_finance_report`: GET to finance `/api/v1/finance/reports/{type}`, params: type (revenue/aging/etc.), period. Response: report data.
+   - `sigma1_social_curate`: POST to social engine `/api/v1/social/upload`, body: image data/URL, event context. Response: draft ID, curated content.
+   - `sigma1_social_publish`: POST to social engine `/api/v1/social/drafts/{id}/approve`. Response: published URLs.
+   - `sigma1_equipment_lookup`: GET to equipment API `/api/v1/equipment-api/catalog`. Response: machine-readable catalog.
+2. For each tool, define complete JSON Schema for input parameters and expected response format.
+3. Configure authentication: each tool call includes API key from `sigma1-service-api-keys` secret in Authorization header.
+4. Set per-tool timeout values (catalog/availability: 5s, quote/vetting: 15s, social upload: 30s).
+5. Configure base URLs using service DNS names within the cluster (e.g., `http://equipment-catalog.sigma1.svc.cluster.local`).
 
 ## Validation
-Component test: pass markdown string with h2 header, a link, and a code block as content. Verify rendered HTML contains <h2>, <a>, and <code>/<pre> elements respectively.
+For each of the 10 tools: invoke via MCP Tool Server with valid test parameters and verify a successful HTTP response from the corresponding backend service. Verify JSON Schema validation rejects malformed parameters. Verify auth headers are correctly attached. Verify timeout behavior by simulating a slow backend.

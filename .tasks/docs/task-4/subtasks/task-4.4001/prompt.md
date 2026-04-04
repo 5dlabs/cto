@@ -1,14 +1,16 @@
-Implement subtask 4001: Create design-snapshot module interface, types, and GitHub API client setup
+Implement subtask 4001: Scaffold finance crate in Cargo workspace with shared dependencies
 
 ## Objective
-Set up the design-snapshot module with the createSnapshotPR function signature, define PipelineOutput and PRResult types, and configure the GitHub API client with GITHUB_TOKEN from environment.
+Add the `finance` crate to the existing Rex Cargo workspace at `services/rust/finance`, configure Cargo.toml with dependencies (axum, sqlx, serde, utoipa, tokio, reqwest), and wire up the shared crate for health checks, metrics, error types, DB pool, and API key auth middleware. Set up the main.rs entrypoint with Axum router skeleton listening on port 8082.
 
 ## Steps
-1. Create `src/design-snapshot/types.ts` defining: `PipelineOutput` (containing tasks array with id, title, slug, description, agent, dependencies, acceptance_criteria, research_memo), `PRResult` (containing prUrl: string | null, skipped: boolean, error?: string), and `TaskScaffold` (the shape of a generated task file).
-2. Create `src/design-snapshot/index.ts` exporting `async function createSnapshotPR(pipelineOutput: PipelineOutput): Promise<PRResult>`.
-3. Read `GITHUB_TOKEN` from `process.env.GITHUB_TOKEN` (or `Bun.env`). If missing, log an error and return `{ prUrl: null, skipped: true, error: 'GITHUB_TOKEN not configured' }` immediately.
-4. Set up the GitHub API client (Octokit instance or a configured fetch wrapper) with the token in the Authorization header and base URL pointing to `https://api.github.com`.
-5. Define constants: `REPO_OWNER = '5dlabs'`, `REPO_NAME = 'sigma-1'`, `BASE_BRANCH = 'main'`.
+1. Create `services/rust/finance/` directory with `Cargo.toml` and `src/main.rs`.
+2. Add `finance` to the workspace `members` in the root `Cargo.toml`.
+3. Add dependencies: `axum = "0.7"`, `sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid", "chrono", "rust_decimal"] }`, `serde`, `serde_json`, `utoipa`, `tokio`, `reqwest`, `tracing`, `tracing-subscriber`.
+4. Add workspace-internal dependency on the shared crate (e.g., `common = { path = "../common" }`).
+5. In `main.rs`, initialize tracing, create DB pool via shared crate, build Axum router with health check from shared crate, bind to `0.0.0.0:8082`.
+6. Create module stubs: `mod routes;`, `mod models;`, `mod db;`, `mod services;`, `mod stripe;`, `mod background;`.
+7. Verify `cargo build` succeeds and `cargo test` runs (even if no tests yet).
 
 ## Validation
-TypeScript compilation passes. Unit test: with GITHUB_TOKEN unset, createSnapshotPR returns PRResult with skipped=true and prUrl=null without throwing. Verify the error log message is emitted.
+Verify `cargo build --workspace` succeeds. Verify `cargo run -p finance` starts and responds to GET /health with 200 OK. Verify shared crate health check and metrics middleware are active.

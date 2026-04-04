@@ -1,17 +1,16 @@
-Implement subtask 10001: Create Cloudflare Tunnel CR with route mapping for PM server and frontend
+Implement subtask 10001: HA scaling: update replica counts and pod anti-affinity for all application services
 
 ## Objective
-Create an accesstunnel or clustertunnel Custom Resource in the sigma-1-dev namespace to expose services via Cloudflare Tunnel. Configure route mappings for /api/* to the PM server service and / to the frontend service (if in scope per D5). TLS terminates at Cloudflare edge. No NGINX or other ingress controller.
+Update Kubernetes deployment manifests for Equipment Catalog, RMS, Finance, Customer Vetting, and Social Engine to 2 replicas each with pod anti-affinity rules. Document Morgan single-replica limitation with session affinity notes.
 
 ## Steps
-1. Create `manifests/production/cloudflare-tunnel.yaml` with an `accesstunnel` or `clustertunnel` CR (use whichever CRD is installed on the cluster — check with `kubectl api-resources | grep tunnel`).
-2. Set the CR namespace to `sigma-1-dev`. Configure the tunnel name (e.g., `sigma-1-tunnel`).
-3. Add ingress rules in the CR spec:
-   - Rule 1: path `/api/*` → service `sigma-1-pm-server` on port 8080 (or whatever the PM server service port is).
-   - Rule 2: path `/` → service `sigma-1-frontend` on port 3000 (only if D5 includes Tasks 6-9; otherwise omit).
-4. Configure TLS settings: `originRequest.noTLSVerify: true` if services use HTTP internally, since TLS terminates at Cloudflare edge.
-5. Apply the manifest: `kubectl apply -f manifests/production/cloudflare-tunnel.yaml`.
-6. Verify the tunnel CR reaches 'Active' or 'Ready' status.
+Step-by-step:
+1. For each service (equipment-catalog, rms, finance, customer-vetting, social-engine), update the Deployment manifest:
+   - Set `spec.replicas: 2`
+   - Add `spec.template.spec.affinity.podAntiAffinity` with `preferredDuringSchedulingIgnoredDuringExecution` targeting `topology.kubernetes.io/zone` and `requiredDuringSchedulingIgnoredDuringExecution` targeting `kubernetes.io/hostname` using label selector matching the service.
+2. For Equipment Catalog, verify the Task 2 manifest already has this; only patch if missing.
+3. For Morgan, add a comment block in the manifest documenting that HA requires session affinity design (workspace PVC is ReadWriteOnce), keep at 1 replica.
+4. All manifests should be in the Helm chart values or kustomize overlays under a `production` environment.
 
 ## Validation
-`kubectl get accesstunnel -n sigma-1-dev` (or `clustertunnel`) returns the CR in 'Active' or 'Ready' state. External HTTPS request to the tunnel URL's `/api/health` endpoint returns HTTP 200 with valid TLS certificate.
+Apply manifests to cluster. Run `kubectl get pods -l app=<service> -o wide` for each service and verify 2 pods are scheduled on different nodes. Verify Morgan remains at 1 replica.

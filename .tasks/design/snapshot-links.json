@@ -1,6 +1,22 @@
 {
-  "current_urls": [],
-  "current_site_snapshots": [],
+  "current_urls": [
+    "https://deployiq.maximinimal.ca",
+    "https://sigma-1.com"
+  ],
+  "current_site_snapshots": [
+    {
+      "source_url": "https://deployiq.maximinimal.ca",
+      "asset_url": "https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/2f6470fc-2dc0-4b51-8159-e0b88c643ad1/da8f79bc-2046-40e3-ba28-f952516005f2",
+      "success": true,
+      "error": ""
+    },
+    {
+      "source_url": "https://sigma-1.com",
+      "asset_url": "https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/e1e56bbb-1fc7-42f5-8fbf-15509b4e43fb/66fc510b-c46d-4cc8-b272-ac0e69a7e30c",
+      "success": true,
+      "error": ""
+    }
+  ],
   "generated_variants": [
     {
       "screen_id": "40b8b541e631423db20aa5f99d06e4d4",
@@ -33,8 +49,8 @@
     }
   ],
   "counts": {
-    "current_urls": 0,
-    "current_site_snapshots": 0,
+    "current_urls": 2,
+    "current_site_snapshots": 2,
     "generated_variants": 2,
     "selected_variants": 1
   }

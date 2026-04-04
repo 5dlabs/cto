@@ -1,36 +1,66 @@
-Implement task 2: Extend PM Server for Agent Delegation in Linear Issues (Nova - Bun/Elysia)
+Implement task 2: Implement Equipment Catalog Service (Rex - Rust/Axum)
 
 ## Goal
-Extend the existing PM server's task generation and Linear issue creation pipeline to resolve agent hints to Linear user IDs via resolve_agent_delegates() and set delegate_id on every created issue. This is the core delegation flow that the E2E validation is designed to prove. The task entity schema is extended with a delegate_id field, and fallback behavior is implemented for unmappable agents.
+Build the high-performance Equipment Catalog REST API serving 533+ products across 24 categories with real-time availability checking, barcode/SKU lookup, image serving via R2, a machine-readable equipment API for AI agents, and rate limiting. This is the first service in the shared Rex Cargo workspace.
 
 ## Task Context
-- Agent owner: nova
-- Stack: Bun/Elysia
+- Agent owner: rex
+- Stack: Rust 1.75+/Axum 0.7
 - Priority: high
 - Dependencies: 1
 
 ## Implementation Plan
-1. Locate the existing `resolve_agent_delegates()` function in the PM server codebase. Verify it accepts agent hints (e.g., 'bolt', 'nova', 'blaze') and returns Linear user IDs.
-2. Extend the task entity/type definition to include `delegate_id: string | null` field.
-3. In the task generation pipeline, after tasks are generated with agent hints, call `resolve_agent_delegates()` to batch-resolve all agent hints to Linear user IDs.
-4. Populate `delegate_id` on each task object with the resolved Linear user ID.
-5. In the Linear issue creation step, pass `assigneeId: task.delegate_id` when creating each issue via the Linear API.
-6. Implement fallback behavior: if `resolve_agent_delegates()` cannot resolve an agent hint, log a warning with the agent hint and task ID, create the issue unassigned (delegate_id = null), and add an `agent:unresolved` label to the issue.
-7. Add a summary log at the end of issue creation: `Created N issues, M assigned, K unresolved`.
-8. Ensure the PM server reads secrets from the `sigma-1-secrets` Kubernetes secret and endpoints from `sigma-1-infra-endpoints` ConfigMap via `envFrom`.
-9. Write unit tests for: resolve_agent_delegates mapping, fallback on unknown agent, delegate_id propagation to Linear API call.
-10. Write an integration test that runs the full pipeline with a mock Linear API and verifies at least 5 issues are created with non-null assigneeId.
+1. Initialize Cargo workspace at repo root `services/rust/` with members: `catalog`, `finance`, `vetting`, `shared`. The `shared` crate contains common types (health check handlers, error types, middleware, DB pool setup, ConfigMap env parsing, API key validation middleware).
+2. In `shared` crate:
+   - Database pool setup using `sqlx` with `PgPool` reading `POSTGRES_URL` from env (injected via `sigma1-infra-endpoints` ConfigMap).
+   - Health check handlers: `GET /health/live` (returns 200), `GET /health/ready` (checks DB + Valkey connectivity).
+   - Prometheus metrics middleware using `metrics` + `metrics-exporter-prometheus` crates, exposed at `GET /metrics`.
+   - Rate limiting middleware using Valkey (sliding window, `redis-rs` crate), configurable per-route.
+   - API key validation middleware reading from `sigma1-service-api-keys` secret (for inter-service auth per D7).
+   - Standard JSON error response type.
+3. In `catalog` crate:
+   - SQLx migrations for `catalog` schema: `categories` table, `products` table (with `specs` as JSONB, `image_urls` as TEXT[], `day_rate` as DECIMAL), `availability` table (product_id, date_from, date_to, quantity_total, reserved, booked), `bookings` table.
+   - Implement all REST endpoints per PRD:
+     - `GET /api/v1/catalog/categories` — list with optional `parent_id` filter
+     - `GET /api/v1/catalog/products` — paginated, filterable by category_id, name search (trigram), specs JSONB queries
+     - `GET /api/v1/catalog/products/:id` — full product detail with category join
+     - `GET /api/v1/catalog/products/:id/availability?from=&to=` — real-time availability check against bookings, must respond < 500ms
+     - `POST /api/v1/catalog/products` — admin create (API key auth)
+     - `PATCH /api/v1/catalog/products/:id` — admin update (API key auth)
+     - `GET /api/v1/equipment-api/catalog` — machine-readable JSON (flat structure optimized for AI agent consumption)
+     - `POST /api/v1/equipment-api/checkout` — programmatic booking (creates reservation, decrements availability)
+   - Image URLs stored as R2 presigned URLs or public CDN paths.
+   - Generate OpenAPI spec using `utoipa` crate, served at `/api/v1/catalog/openapi.json`.
+   - GDPR endpoint: `DELETE /api/v1/gdpr/customer/:id` — delete all customer-related booking data, return confirmation.
+4. Dockerfile: multi-stage build (rust:1.75 builder → distroless/cc runtime).
+5. Kubernetes Deployment manifest:
+   - Namespace: `sigma1`
+   - Replicas: 2
+   - `envFrom: [{configMapRef: {name: sigma1-infra-endpoints}}]`
+   - Secret refs for `sigma1-db-credentials`, `sigma1-r2-credentials`, `sigma1-service-api-keys`
+   - Liveness/readiness probes on `/health/live` and `/health/ready`
+   - Resource limits: 256Mi memory, 500m CPU
+   - Service exposing port 8080.
+6. Seed data script: SQL file with 24 categories and sample products for development.
 
 ## Acceptance Criteria
-1. Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object mapping each to a valid Linear user ID string. 2. Unit test: `resolve_agent_delegates(['unknown_agent'])` returns null for the unknown agent and logs a warning. 3. Integration test: Run the task generation pipeline with a sample PRD; verify at least 5 task objects have non-null `delegate_id` values. 4. Integration test: Mock the Linear API create-issue endpoint; verify each call includes `assigneeId` matching the task's `delegate_id`. 5. Integration test: Verify the summary log line shows correct counts for assigned vs unresolved.
+1. Unit tests for availability calculation logic covering overlapping date ranges, partial bookings, and full capacity — minimum 80% coverage on business logic modules. 2. Integration tests using `sqlx::test` with a real PostgreSQL instance: verify CRUD for products/categories, availability queries return correct counts after bookings, and checkout decrements availability atomically. 3. Availability endpoint benchmark: `cargo bench` or `wrk` test confirming p99 < 500ms for availability queries with 1000 products and 10,000 bookings. 4. Rate limiting test: send 101 requests in 60 seconds to a rate-limited endpoint, verify 429 status on request 101. 5. OpenAPI spec validates with `swagger-cli validate`. 6. GDPR deletion test: create booking, call DELETE endpoint, verify booking data is removed and confirmation JSON is returned. 7. Docker image builds successfully and `docker run` passes health checks.
 
 ## Subtasks
-- Extend task entity type definition with delegate_id field: Add the `delegate_id: string | null` field to the task entity/type definition used throughout the PM server's task generation and issue creation pipeline.
-- Implement and verify resolve_agent_delegates() function: Locate or implement the resolve_agent_delegates() function that accepts an array of agent hint strings and returns a mapping of agent hints to Linear user IDs, with null for unresolvable agents.
-- Integrate delegation into the task generation pipeline: Wire resolve_agent_delegates() into the task generation pipeline: after tasks are generated with agent hints, batch-resolve them and populate delegate_id on each task, then pass assigneeId to the Linear API issue creation calls.
-- Implement fallback behavior for unresolvable agents and summary logging: Add fallback logic for when resolve_agent_delegates() returns null for an agent hint: log a warning, create the issue unassigned, add an agent:unresolved label, and emit a summary log line after all issues are created.
-- Write unit tests for resolve_agent_delegates and delegate_id propagation: Create comprehensive unit tests covering resolve_agent_delegates mapping, fallback on unknown agents, and delegate_id propagation to the Linear API call layer.
-- Write integration test with mock Linear API validating full delegation pipeline: Create an integration test that runs the full task generation and issue creation pipeline against a mock Linear API, verifying at least 5 issues are created with non-null assigneeId and the summary log is correct.
+- Initialize Cargo workspace and shared crate with DB pool, error types, and ConfigMap env parsing: Create the Cargo workspace at services/rust/ with members catalog, finance, vetting, and shared. Implement the shared crate foundation: PgPool setup reading POSTGRES_URL from env (sigma1-infra-endpoints ConfigMap), standard JSON error response type, and env/config parsing utilities.
+- Implement shared health check handlers (liveness and readiness): Add health check route handlers to the shared crate: GET /health/live returns 200 unconditionally, GET /health/ready checks PostgreSQL and Valkey connectivity and returns 200 or 503.
+- Implement shared Prometheus metrics middleware: Add request metrics middleware to the shared crate using the metrics and metrics-exporter-prometheus crates, exposed at GET /metrics.
+- Implement shared rate limiting middleware using Valkey: Build a configurable per-route rate limiting middleware in the shared crate using a sliding window algorithm backed by Valkey (redis-rs).
+- Implement shared API key validation middleware: Build an API key authentication middleware in the shared crate that validates keys from the Authorization header against values in the sigma1-service-api-keys secret.
+- Create SQLx migrations for catalog schema: Write and validate SQLx migrations for the catalog database schema: categories, products (with JSONB specs, TEXT[] image_urls, DECIMAL day_rate), availability, and bookings tables with appropriate indexes.
+- Implement category and product CRUD endpoints with pagination and search: Build the core catalog REST endpoints: categories listing with parent_id filter, products listing with pagination/category filter/trigram search/JSONB spec queries, product detail, and admin create/update endpoints.
+- Implement availability checking and atomic checkout endpoints: Build the real-time availability endpoint (GET /api/v1/catalog/products/:id/availability) and the programmatic checkout endpoint (POST /api/v1/equipment-api/checkout) with atomic inventory decrement.
+- Implement machine-readable equipment API endpoint and OpenAPI spec generation: Build the GET /api/v1/equipment-api/catalog endpoint returning a flat JSON structure optimized for AI agent consumption, and generate the OpenAPI spec using utoipa served at /api/v1/catalog/openapi.json.
+- Implement GDPR deletion endpoint: Build the DELETE /api/v1/gdpr/customer/:id endpoint that removes all customer-related booking data and returns a confirmation response.
+- Create seed data script with 24 categories and sample products: Write a SQL seed data file with 24 equipment rental categories and representative sample products with realistic specs, pricing, and availability data for development.
+- Build catalog service main entrypoint with router composition: Create the catalog service binary entrypoint that composes all routes, middleware layers, and shared infrastructure (DB pool, Valkey, metrics, rate limiting) into a running Axum server.
+- Create multi-stage Dockerfile for catalog service: Write a multi-stage Dockerfile using rust:1.75 as builder and gcr.io/distroless/cc as runtime, producing a minimal production image for the catalog service.
+- Create Kubernetes deployment manifests for catalog service: Write Kubernetes Deployment, Service, and related manifests for the catalog service in the sigma1 namespace with proper ConfigMap/Secret references, probes, and resource limits.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

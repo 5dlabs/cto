@@ -1,19 +1,19 @@
-Implement subtask 1006: Validate cross-namespace connectivity from sigma-1-dev to existing services
+Implement subtask 1006: Create Kubernetes Secrets for database credentials
 
 ## Objective
-Deploy a temporary test pod in sigma-1-dev namespace to verify DNS resolution and HTTP connectivity to discord-bridge-http, linear-bridge, and openclaw-nats services.
+Create the `sigma1-db-credentials` Secret in the `sigma1` namespace containing PostgreSQL connection strings for each per-service role (catalog_svc, rms_svc, finance_svc, vetting_svc, social_svc) and the sigma1_user superuser.
 
 ## Steps
-1. Create a Job manifest `connectivity-test.yaml` that runs a busybox/curl container in `sigma-1-dev` namespace.
-2. The Job should execute DNS lookups for:
-   - `discord-bridge-http.bots.svc.cluster.local`
-   - `linear-bridge.bots.svc.cluster.local`
-   - `openclaw-nats.openclaw.svc.cluster.local`
-3. For HTTP services (discord-bridge-http, linear-bridge), attempt a basic HTTP health check (e.g., `curl -sf http://<service>:<port>/health` or just verify TCP connectivity).
-4. For NATS, verify TCP connectivity on port 4222.
-5. The Job should exit 0 only if all DNS resolutions succeed and all connectivity checks pass.
-6. Log results clearly for debugging if any check fails.
-7. Clean up the Job after validation (or set `ttlSecondsAfterFinished`).
+1. Create an Opaque Secret `sigma1-db-credentials` in `sigma1` namespace with data keys:
+   - `POSTGRES_URL` (sigma1_user connection via pooler)
+   - `CATALOG_SVC_POSTGRES_URL` (catalog_svc role connection via pooler)
+   - `RMS_SVC_POSTGRES_URL` (rms_svc role connection via pooler)
+   - `FINANCE_SVC_POSTGRES_URL` (finance_svc role connection via pooler)
+   - `VETTING_SVC_POSTGRES_URL` (vetting_svc role connection via pooler)
+   - `SOCIAL_SVC_POSTGRES_URL` (social_svc role connection via pooler)
+2. All URLs should point to the PgBouncer pooler endpoint: `sigma1-postgres-pooler.sigma1-db.svc.cluster.local:5432`.
+3. Passwords must match those set in the init SQL step (1003).
+4. Apply the Secret YAML.
 
 ## Validation
-The connectivity test Job completes with exit code 0. `kubectl logs job/sigma-1-connectivity-test -n sigma-1-dev` shows successful DNS resolution for all 3 services and successful TCP/HTTP connectivity checks. No DNS NXDOMAIN or connection refused errors in the logs.
+`kubectl get secret sigma1-db-credentials -n sigma1 -o json | jq '.data | keys'` lists all 6 expected keys. Each decoded URL is a valid PostgreSQL connection string. Test at least one role connection from a pod using the secret value.

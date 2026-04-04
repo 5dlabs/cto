@@ -1,13 +1,17 @@
-Implement subtask 3001: Define ResearchMemo type and extend task entity type
+Implement subtask 3001: Initialize Go module and buf protobuf toolchain
 
 ## Objective
-Create the ResearchMemo TypeScript type definition and extend the existing task entity/type to include the research_memo field as ResearchMemo | null.
+Set up the Go module, directory structure, and buf configuration for protobuf management and code generation across all 5 services.
 
 ## Steps
-1. In a new file (e.g., `src/hermes-research/types.ts`), define: `export type ResearchMemo = { content: string; source: string; timestamp: Date };`
-2. Define `TaskContext` type that captures the task description, dependencies, agent, and any other context needed for the Hermes query.
-3. Locate the existing task entity/type definition in the PM server codebase and add `research_memo: ResearchMemo | null` as a field, defaulting to null.
-4. Ensure all existing code that creates or serializes task objects handles the new nullable field without breaking.
+1. Run `go mod init github.com/sigma1/rms` with Go 1.22+.
+2. Create directory structure: `proto/`, `internal/`, `cmd/server/`, `db/migrations/`.
+3. Install and configure buf: create `buf.yaml` with `name: buf.build/sigma1/rms` and lint/breaking rules.
+4. Create `buf.gen.yaml` with plugins: `protoc-gen-go`, `protoc-gen-go-grpc`, `protoc-gen-grpc-gateway`, `protoc-gen-openapiv2`.
+5. Add `google/api/annotations.proto` and `google/api/http.proto` dependencies via buf BSR.
+6. Create a minimal `proto/rms/v1/common.proto` with shared message types: `Timestamp`, `Money`, `Address`, `PaginationRequest`, `PaginationResponse`, `OrgId`.
+7. Run `buf generate` to verify toolchain produces Go code in `gen/` directory.
+8. Add Makefile targets: `proto-gen`, `proto-lint`, `proto-breaking`.
 
 ## Validation
-Verify TypeScript compilation passes with the new types. Confirm existing task creation/serialization still works by running any existing tests. Manually inspect that ResearchMemo has exactly three fields (content: string, source: string, timestamp: Date).
+Run `buf lint` with zero errors. Run `buf generate` and verify Go files are generated in the expected output directory. Verify `go build ./...` succeeds with generated code.

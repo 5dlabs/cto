@@ -1,14 +1,18 @@
-Implement subtask 9002: Implement NotificationTimeline component with polling data fetching
+Implement subtask 9002: Port design system tokens and build shared component library
 
 ## Objective
-Create the NotificationTimeline component that displays a chronological list of pipeline events (start/complete/error with timestamps and descriptions). Implement SWR or React Query polling hook with 5-second revalidation interval against the PM server API to fetch pipeline status and event history. Wire both PipelineStatus and NotificationTimeline into the dashboard layout.
+Port the web frontend's design tokens (colors, typography, spacing) to React Native using NativeWind or chosen styling approach. Build the shared component library: ProductCard, AvailabilityBadge, QuoteLineItem, ChatBubble.
 
 ## Steps
-1. Create a data-fetching hook `src/hooks/usePipelineStatus.ts` using SWR (or React Query) that calls the PM server API endpoint (e.g., `GET /api/pipeline/status`). Configure `refreshInterval: 5000` for 5-second polling. The hook should return `{ status, events, error, isLoading }`.
-2. Define TypeScript types: `PipelineEvent { type: 'start' | 'complete' | 'error'; timestamp: string; description: string }` and `PipelineStatusResponse { status: 'running' | 'complete' | 'error'; errorMessage?: string; linearSessionUrl?: string; prUrl?: string; events: PipelineEvent[] }`.
-3. Create `src/components/NotificationTimeline.tsx`. Accept props: `events: PipelineEvent[]`. Render a vertical timeline list sorted chronologically (newest first or oldest first — follow the existing dashboard design convention). Each item shows: event type as a labeled icon/badge, formatted timestamp, and description text.
-4. Create a container component `src/components/PipelineStatusPanel.tsx` that uses the `usePipelineStatus` hook, passes data to `PipelineStatus` (in dashboard header) and `NotificationTimeline` (in sidebar or below task list).
-5. Integrate PipelineStatusPanel into the existing dashboard page layout from Task 6: PipelineStatus in the header row, NotificationTimeline in a collapsible sidebar or section below the task list.
+1. Install NativeWind v4: `npx expo install nativewind tailwindcss` and configure `tailwind.config.js` to match web design tokens (dark theme colors, spacing scale, border radii).
+2. Create `lib/tokens.ts` exporting color palette, typography scale, and spacing values mirrored from the web Task 8 design system.
+3. Install `expo-font` and load custom brand fonts; configure fallback fonts.
+4. Build `components/ProductCard.tsx`: product image (expo-image), name, price, AvailabilityBadge. Accept `onPress` for navigation.
+5. Build `components/AvailabilityBadge.tsx`: colored badge showing 'Available', 'Limited', 'Unavailable' with appropriate brand colors.
+6. Build `components/QuoteLineItem.tsx`: product name, quantity stepper, date range display, remove action.
+7. Build `components/ChatBubble.tsx`: message text, timestamp, sent/received styling differentiation, support for rich content slot (e.g., embedded ProductCard).
+8. Build common UI primitives: `Button`, `TextInput`, `Card`, `Badge`, `LoadingSpinner`, `EmptyState`.
+9. Ensure all components handle dark theme as default, matching web visual language.
 
 ## Validation
-Component test: Render NotificationTimeline with 3 mock events and assert they appear in chronological order with correct type labels and formatted timestamps. Integration test: Mock the PM server API, render PipelineStatusPanel, advance timers by 5 seconds using fake timers, and assert that SWR/React Query re-fetches and the display updates with new data.
+Jest + React Native Testing Library: Render each component with mock props and snapshot test. ProductCard renders image, name, price, and badge. ChatBubble differentiates sent vs received styling. QuoteLineItem quantity stepper increments/decrements correctly. Visual check on iOS Simulator at iPhone SE and iPhone 15 Pro widths.

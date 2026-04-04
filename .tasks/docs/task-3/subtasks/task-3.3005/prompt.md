@@ -1,16 +1,18 @@
-Implement subtask 3005: Write comprehensive unit and integration tests for hermes-research module
+Implement subtask 3005: Implement database repository layer with pgx
 
 ## Objective
-Create the full test suite covering all fetchResearchMemo paths and the pipeline integration, using Bun's test runner and mocked HTTP responses.
+Build the Go repository layer using pgx/v5 for all RMS entities with org_id-scoped queries, providing CRUD operations consumed by gRPC service implementations.
 
 ## Steps
-1. Create `src/hermes-research/__tests__/fetchResearchMemo.test.ts`.
-2. Unit test - success path: Mock fetch to return a 200 response with valid JSON. Assert fetchResearchMemo returns a ResearchMemo with non-empty content, source, and valid Date timestamp.
-3. Unit test - missing API key: Temporarily unset NOUS_API_KEY in the test env. Assert return is null. Assert the info log message 'Hermes integration skipped: NOUS_API_KEY not configured' was emitted (spy on logger).
-4. Unit test - timeout: Mock fetch to delay beyond 30 seconds (use a fake timer or AbortController mock). Assert return is null and warning is logged.
-5. Unit test - HTTP error: Mock fetch to return 500. Assert return is null and warning with status code is logged.
-6. Create `src/hermes-research/__tests__/pipeline-integration.test.ts`. Set NOUS_API_KEY, mock the Hermes API globally, run the deliberation pipeline with sample task data, and verify the output tasks have populated research_memo fields.
-7. Ensure all tests clean up environment variables and mocks properly.
+1. Create `internal/repo/` package with one file per entity: `opportunity_repo.go`, `project_repo.go`, `inventory_repo.go`, `crew_repo.go`, `delivery_repo.go`.
+2. Define repository interfaces in `internal/repo/interfaces.go` for each entity (e.g., `OpportunityRepo` with Create, Get, Update, List, UpdateStatus methods).
+3. `opportunity_repo.go`: Implement `Create(ctx, orgID, opp)`, `GetByID(ctx, orgID, id)`, `Update(ctx, orgID, id, opp)`, `List(ctx, orgID, filters, pagination)`, `UpdateStatus(ctx, orgID, id, newStatus)`. All queries filter by `org_id = $orgID`. Use `pgx.CollectRows` for list queries.
+4. `project_repo.go`: Implement `Create`, `GetByID`, `Update`, `List`, `CreateFromOpportunity(ctx, orgID, oppID)` which inserts project and copies line items in a transaction.
+5. `inventory_repo.go`: Implement `GetByID`, `GetByBarcode(ctx, orgID, barcode)`, `GetStockLevel(ctx, orgID, itemID)`, `RecordTransaction(ctx, orgID, txn)` which updates quantity_available atomically in a transaction, `CheckAvailability(ctx, orgID, itemIDs, dateStart, dateEnd)` which queries overlapping transactions.
+6. `crew_repo.go`: Implement `List(ctx, orgID)`, `CreateAssignment(ctx, orgID, assignment)`, `GetConflicts(ctx, orgID, crewMemberID, dateStart, dateEnd)` which queries overlapping crew_assignments.
+7. `delivery_repo.go`: Implement `Create`, `UpdateStatus`, `List`, `SaveRoute`.
+8. Use `pgx.Pool` injected into each repo struct. Use squirrel or raw SQL with parameterized queries.
+9. All methods return domain structs (not protobuf types) defined in `internal/domain/` package.
 
 ## Validation
-All 5 test cases pass: (1) success returns valid ResearchMemo, (2) missing key returns null with correct log, (3) timeout returns null with warning, (4) HTTP 500 returns null with warning, (5) integration test shows pipeline output with non-null research_memo. Run `bun test` and verify 100% of tests pass with no flaky behavior.
+Integration tests with testcontainers-go PostgreSQL: for each repo, test Create→Get roundtrip, verify org_id filtering (insert with org_id A, query with org_id B returns empty), test List with pagination. For inventory repo, test RecordTransaction atomically updates quantity_available. For crew repo, test GetConflicts returns overlapping assignments.

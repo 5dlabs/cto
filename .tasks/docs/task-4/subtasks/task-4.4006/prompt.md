@@ -1,17 +1,32 @@
-Implement subtask 4006: Write integration test verifying full PR creation API call sequence
+Implement subtask 4006: Implement invoice send and payment recording endpoints
 
 ## Objective
-Create an integration test that runs createSnapshotPR end-to-end with a fully mocked GitHub API and verifies the complete sequence of operations.
+Build the invoice action endpoints: POST send (mark as sent), POST paid (record payment with partial/full tracking and status transitions), and payment CRUD endpoints under `/api/v1/payments`.
 
 ## Steps
-1. Create `src/design-snapshot/__tests__/integration.test.ts`.
-2. Set up a comprehensive GitHub API mock that records all incoming requests in order.
-3. Construct a full PipelineOutput with multiple tasks (some with research memos, some without).
-4. Call `createSnapshotPR(pipelineOutput)` with GITHUB_TOKEN set.
-5. Assert the API call sequence: (a) GET ref to main, (b) POST ref to create pipeline branch, (c) POST blobs for each file, (d) POST tree, (e) POST commit, (f) PATCH ref to update branch, (g) POST pull request.
-6. Verify the returned PRResult contains a valid prUrl.
-7. Verify the task scaffold files have correct paths and content structure.
-8. Verify the PR body formatting matches expected output.
+1. `POST /api/v1/invoices/:id/send`:
+   - Validate invoice exists and status allows transition to Sent (use state machine).
+   - Set `issued_at = now()` if not already set.
+   - Transition status to Sent.
+   - Return updated invoice.
+   - (Stripe integration will be added in a separate subtask — this endpoint just does the local state transition for now.)
+2. `POST /api/v1/invoices/:id/paid`:
+   - Accept `PaymentRequest`: amount_cents, currency, method.
+   - Validate invoice exists and is in a payable state (Sent, Viewed, Overdue).
+   - Insert payment record in `payments` table.
+   - Update invoice `paid_amount_cents += amount_cents`.
+   - If `paid_amount_cents >= total_cents`, transition status to Paid.
+   - All in a single DB transaction with row-level locking (`SELECT ... FOR UPDATE`).
+   - Return updated invoice with payment details.
+3. `POST /api/v1/payments`:
+   - Direct payment recording (same logic as above but via payments endpoint).
+4. `GET /api/v1/payments`:
+   - Query params: invoice_id (optional), org_id, offset, limit.
+5. `GET /api/v1/payments/invoice/:invoice_id`:
+   - List all payments for a specific invoice.
+6. Handle partial payments: if amount_cents < remaining, keep invoice in current status but update paid_amount_cents.
+7. Handle overpayment: reject payments where amount_cents would cause paid_amount_cents > total_cents.
+8. Add utoipa annotations.
 
 ## Validation
-Integration test passes with all API calls made in the correct order. PRResult.prUrl is non-null. The number of blob creation calls matches the number of generated files. PR body contains correct task count and agent assignments.
+Integration tests: (1) Create invoice, send it, verify status=Sent and issued_at set. (2) Record partial payment (50% of total), verify paid_amount_cents updated, status unchanged. (3) Record remaining payment, verify status transitions to Paid. (4) Attempt to pay a Draft invoice, verify 400 error. (5) Attempt overpayment, verify rejection. (6) GET payments by invoice_id returns both payments. (7) Verify DB transaction atomicity: concurrent payments don't cause race conditions (test with row locking).

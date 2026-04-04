@@ -1,22 +1,16 @@
-Implement subtask 10010: Document HA scaling Helm values and conditional scope adjustment for D5
+Implement subtask 10010: Ingress and CDN: configure CDN caching rules for equipment images vs API responses
 
 ## Objective
-Document the Helm values needed to scale PM server to 2+ replicas with PodDisruptionBudget for production. Also document the scope adjustments needed if D5 resolves to defer Tasks 6-9 (remove frontend ingress routes, ServiceAccount, resource limits, and NetworkPolicies).
+Set up Cloudflare CDN caching rules: 1-year cache for equipment images, no-cache or short TTL for API responses.
 
 ## Steps
-1. Create `docs/production/ha-scaling.md`.
-2. Document Helm values for HA PM server:
-   - `replicaCount: 2`
-   - PodDisruptionBudget manifest: `minAvailable: 1`, selector matching PM server pods.
-   - Note: for dev/validation, single replica is acceptable.
-3. Include the PDB manifest in `manifests/production/pdb-pm-server.yaml` (but do not apply it in dev — annotate with `# Apply for production only`).
-4. Create `docs/production/scope-adjustment-d5.md` documenting what to remove if D5 defers Tasks 6-9:
-   - Remove frontend route from Cloudflare Tunnel CR (subtask 10001).
-   - Remove sigma-1-frontend ServiceAccount and RBAC (subtask 10004).
-   - Remove frontend resource limits from deployment (subtask 10005).
-   - Remove frontend NetworkPolicy (subtask 10007).
-   - Update parent task dependencies from [2,3,4,5,6,7,8,9] to [2,3,4,5].
-5. List all affected manifest files and specific YAML blocks to remove.
+Step-by-step:
+1. In the Cloudflare dashboard (or via Terraform/API if IaC is used), create Page Rules or Cache Rules:
+   - Rule 1: `*sigma1.example.com/images/*` → Cache Level: Cache Everything, Edge Cache TTL: 1 year (31536000s), Browser Cache TTL: 1 year.
+   - Rule 2: `*sigma1.example.com/api/*` → Cache Level: Bypass (or Standard with `Cache-Control: no-store` respected).
+2. Ensure equipment-catalog service sets appropriate `Cache-Control` headers on image responses: `public, max-age=31536000, immutable`.
+3. Ensure all API endpoints set `Cache-Control: no-store` or `private, no-cache`.
+4. Document the mTLS Phase 2 decision: create `docs/mtls-phase2.md` explaining that internal service-to-service mTLS via cert-manager is deferred, with a brief architecture sketch for future implementation.
 
 ## Validation
-docs/production/ha-scaling.md exists and contains Helm values for replicaCount=2 and a PDB manifest with minAvailable=1. docs/production/scope-adjustment-d5.md exists and lists all frontend-related resources to remove with specific file paths and YAML references. PDB manifest file exists at manifests/production/pdb-pm-server.yaml.
+Fetch an equipment image URL via curl with `-I` flag, verify `CF-Cache-Status: HIT` on second request and appropriate cache headers. Fetch an API endpoint, verify `CF-Cache-Status: DYNAMIC` or `BYPASS` and no caching.

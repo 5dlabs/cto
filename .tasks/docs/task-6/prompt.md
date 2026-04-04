@@ -1,35 +1,67 @@
-Implement task 6: Scaffold Web Frontend with Agent Assignment Visualization (Blaze - React/Next.js)
+Implement task 6: Develop Social Media Engine (Nova - Node.js/Elysia+Effect)
 
 ## Goal
-Create or extend the web frontend application to display pipeline task lists with agent assignment visualization. Each task card shows the delegate_id as an agent avatar/badge, assignment status, and task metadata. Uses shadcn/ui (per D6) with Radix UI primitives for accessibility. Note: This task is contingent on D5 resolution — if D5 resolves to defer frontend tasks, this task should be skipped.
+Build the Social Media Engine for automated content curation, AI caption generation, multi-platform publishing (Instagram, LinkedIn, Facebook, TikTok), and Signal-based approval workflow. Uses NATS for async publish pipeline per D4 resolution.
 
 ## Task Context
-- Agent owner: blaze
-- Stack: React/Next.js
+- Agent owner: nova
+- Stack: Node.js 20+/Elysia 1.x + Effect 3.x
 - Priority: medium
-- Dependencies: 2
+- Dependencies: 1
 
 ## Implementation Plan
-1. Initialize or extend the Next.js application in the project with shadcn/ui components (per D6, using the team's tweakcn configuration if accessible, otherwise shadcn/ui defaults).
-2. Create a pipeline dashboard page at `/pipeline/[sessionId]` that fetches task data from the PM server API.
-3. Implement a `TaskCard` component using shadcn/ui Card, Badge, and Avatar components: display task title, agent name, stack, priority, status, and dependencies. Show `delegate_id` as an agent avatar with the agent name (e.g., 'Bolt', 'Nova') as a badge. Use color-coded badges: green for assigned, amber for unresolved (`agent:unresolved`), gray for pending.
-4. Implement a `TaskList` component that renders all tasks in dependency order with a visual dependency graph (simple indentation or connecting lines).
-5. Add a summary header showing: total tasks, assigned count, unresolved count, pipeline status.
-6. Use `envFrom` to read the PM server API URL from `sigma-1-infra-endpoints` ConfigMap.
-7. Ensure all components meet WCAG 2.1 AA accessibility standards (Radix primitives handle focus management, keyboard navigation, and ARIA attributes).
-8. No authentication implementation — this is deferred per D7 recommendation (Cloudflare Access handles auth at ingress layer).
-9. Write component tests for: TaskCard rendering with assigned agent, TaskCard rendering with unresolved agent, TaskList ordering by dependencies, summary header counts.
+1. Initialize project with Bun runtime, Elysia 1.x framework, Effect 3.x, TypeScript 5.x.
+2. Database: Use `@effect/sql-pg` or `postgres` (postgresjs) library. Migrations for `social` schema:
+   - `uploads` table: id, event_name, uploaded_by, uploaded_at, photo_count.
+   - `photos` table: id, upload_id, r2_key, original_filename, width, height, ai_score (FLOAT), selected (BOOL).
+   - `drafts` table: id, upload_id, platform (instagram/linkedin/facebook/tiktok), caption, hashtags (TEXT[]), image_keys (TEXT[]), status (draft/approved/rejected/published/failed), approved_by, approved_at, published_at, platform_post_id.
+   - `published_posts` table: id, draft_id, platform, post_url, engagement_data (JSONB), published_at.
+3. Implement REST endpoints with Elysia + Effect Schema validation:
+   - `POST /api/v1/social/upload` — accepts multipart form with photos. Upload to R2, store metadata, trigger AI curation pipeline.
+   - `GET /api/v1/social/drafts` — list drafts with pagination and status filter.
+   - `GET /api/v1/social/drafts/:id` — draft detail with photos and caption.
+   - `POST /api/v1/social/drafts/:id/approve` — mark approved, publish to NATS `social.publish` subject.
+   - `POST /api/v1/social/drafts/:id/reject` — mark rejected with optional reason.
+   - `POST /api/v1/social/drafts/:id/publish` — manual publish trigger (also publishes to NATS).
+   - `GET /api/v1/social/published` — list published posts.
+4. AI Curation Pipeline (triggered after upload):
+   - Use OpenAI Vision API (or Claude) to score each photo for composition, lighting quality, brand relevance.
+   - Select top 5-10 images based on score threshold.
+   - Generate platform-specific crops: Instagram square (1:1) + Story (9:16), LinkedIn landscape (1.91:1), TikTok (9:16).
+   - Use `sharp` library for image processing.
+   - Generate captions using OpenAI/Claude with event context, equipment featured, and platform-specific tone.
+   - Create draft records for each platform with appropriate crop + caption.
+5. Effect Service pattern:
+   - `InstagramService` — Instagram Graph API client (Effect.Service)
+   - `LinkedInService` — LinkedIn API client (Effect.Service)
+   - `FacebookService` — Facebook Graph API client (Effect.Service)
+   - `TikTokService` — TikTok API client (Effect.Service)
+   - All use `Effect.retry` with exponential backoff for API delivery.
+6. NATS integration (per D4 — async only for social publish):
+   - Subscribe to `social.publish` subject using `nats` npm package.
+   - On message: call appropriate platform service to publish, update draft status, create published_posts record.
+   - Dead-letter handling: after 3 failed attempts, mark draft as `failed` with error.
+7. R2 integration: Upload photos to Cloudflare R2 via S3-compatible API (`@aws-sdk/client-s3`). Generate CDN URLs for published content.
+8. Health/metrics: `/health/live`, `/health/ready`, `/metrics` (prom-client).
+9. GDPR endpoint: `DELETE /api/v1/gdpr/customer/:id` — delete photos and drafts associated with customer events, remove from R2, return confirmation.
+10. OpenAPI spec generation via Elysia's built-in Swagger plugin.
+11. Dockerfile: Bun-based image. Kubernetes Deployment: namespace sigma1, replicas 1 (medium priority), envFrom ConfigMap, secrets for R2, OpenAI API key, platform API credentials, NATS URL.
 
 ## Acceptance Criteria
-1. Component test: TaskCard rendered with `delegate_id='user_123'` and `agent='nova'` displays 'Nova' badge in green and shows the avatar. 2. Component test: TaskCard rendered with `delegate_id=null` displays 'Unresolved' badge in amber. 3. Component test: TaskList with 5 tasks renders them in dependency order (no task appears before its dependencies). 4. Component test: Summary header shows correct counts — given 5 tasks with 4 assigned and 1 unresolved, displays '5 tasks, 4 assigned, 1 unresolved'. 5. Accessibility test: All interactive elements in TaskCard and TaskList are keyboard-navigable and have appropriate ARIA labels (tested via @testing-library/jest-dom axe integration).
+1. Unit tests for scoring/selection algorithm: mock OpenAI responses, verify top N photos selected based on score threshold. 2. Effect Schema validation tests: verify all endpoints reject malformed requests with appropriate error messages. 3. Integration test for upload pipeline: upload test images, verify R2 upload (mock S3 client), verify photo records created in DB with dimensions. 4. Draft approval → NATS publish test: approve draft, verify message published to `social.publish` subject (use NATS test server). 5. Platform publishing test: mock Instagram Graph API, verify publish flow creates published_posts record with post_url. 6. Retry test: mock platform API returning 500 twice then 200, verify Effect.retry succeeds on third attempt. 7. Dead-letter test: mock platform API returning 500 always, verify draft marked as `failed` after 3 attempts. 8. GDPR test: create upload with photos and drafts, call DELETE, verify DB records removed and R2 delete called. 9. Minimum 80% code coverage via Vitest.
 
 ## Subtasks
-- Initialize Next.js application with shadcn/ui setup: Set up or extend the Next.js project with shadcn/ui component library, Tailwind CSS configuration, and project structure for the pipeline dashboard feature.
-- Create pipeline dashboard page with data fetching: Implement the `/pipeline/[sessionId]` page route that fetches task data from the PM server API and passes it to child components.
-- Implement TaskCard component with agent avatar and color-coded badges: Build the TaskCard component using shadcn/ui Card, Badge, and Avatar primitives to display task metadata with agent assignment visualization and color-coded status indicators.
-- Implement TaskList component with dependency-ordered rendering: Build the TaskList component that topologically sorts tasks by their dependencies and renders TaskCards in correct order with visual dependency indicators.
-- Implement pipeline summary header component: Build a summary header component that displays aggregate pipeline statistics: total tasks, assigned count, unresolved count, and pipeline status.
-- Write component tests and accessibility tests: Write comprehensive component tests for TaskCard, TaskList, and PipelineSummary, plus accessibility tests verifying WCAG 2.1 AA compliance using axe-core.
+- Initialize Bun/Elysia/Effect project scaffold and database migrations for social schema: Set up the project structure with Bun runtime, Elysia 1.x, Effect 3.x, and TypeScript 5.x. Create database migrations for the social schema including uploads, photos, drafts, and published_posts tables. Configure the Postgres client library and connection pooling via Effect layers.
+- Implement Cloudflare R2 integration service with S3-compatible client: Build an Effect Service for Cloudflare R2 using @aws-sdk/client-s3 that handles photo uploads, deletion, and CDN URL generation. This service is used by the upload endpoint, AI pipeline, and GDPR deletion.
+- Implement photo upload endpoint with multipart handling and R2 storage: Build the POST /api/v1/social/upload endpoint that accepts multipart form data with photos, uploads them to R2, extracts image dimensions, and stores metadata in the uploads and photos tables.
+- Implement draft management REST endpoints with Effect Schema validation: Build the draft listing, detail, approve, reject, and publish endpoints. Also implement the published posts listing endpoint. All endpoints use Effect Schema for request/response validation.
+- Implement AI photo scoring pipeline with OpenAI Vision API: Build the AI photo scoring service that uses OpenAI Vision API to evaluate each uploaded photo for composition, lighting quality, and brand relevance, then selects the top photos based on score threshold.
+- Implement platform-specific image cropping pipeline with sharp: Build the image processing service that generates platform-specific crops from selected photos: Instagram square (1:1) and Story (9:16), LinkedIn landscape (1.91:1), Facebook (1.91:1), and TikTok (9:16).
+- Implement AI caption generation and draft creation pipeline: Build the caption generation service using OpenAI/Claude that creates platform-specific captions with appropriate tone, hashtags, and formatting. Wire the full AI curation pipeline (score → select → crop → caption → create drafts) triggered after upload.
+- Implement Effect Service clients for Instagram, LinkedIn, Facebook, and TikTok APIs: Build four separate Effect.Service implementations for publishing content to each social media platform via their respective APIs, all with exponential backoff retry logic.
+- Implement NATS integration for async publish pipeline with dead-letter handling: Build the NATS subscriber that listens to the social.publish subject, dispatches to platform services, updates draft/published_posts records, and handles dead-letter after 3 failed attempts. Wire the approve and publish endpoints to emit NATS messages.
+- Implement GDPR deletion endpoint with R2 cleanup: Build the DELETE /api/v1/gdpr/customer/:id endpoint that removes all photos, drafts, published posts, and R2 objects associated with a customer's events.
+- Implement health/metrics endpoints, OpenAPI spec, Dockerfile, and Kubernetes deployment manifest: Add health check endpoints, Prometheus metrics, OpenAPI documentation via Elysia Swagger plugin, Bun-based Dockerfile, and Kubernetes deployment manifest for the sigma1 namespace.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

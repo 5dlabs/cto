@@ -1,17 +1,19 @@
-Implement subtask 10009: Configure external-secrets operator refresh interval and rotation alerts
+Implement subtask 10009: Ingress and TLS: configure Cloudflare Tunnel for all public endpoints
 
 ## Objective
-Set the external-secrets operator refresh interval to 24 hours for all ExternalSecret resources in sigma-1-secrets and add annotations for rotation alerting.
+Configure a Cloudflare Tunnel (cloudflared) deployment to expose all sigma1 public endpoints with TLS termination at the Cloudflare edge.
 
 ## Steps
-1. Edit all `ExternalSecret` CRs in the `sigma-1-secrets` namespace (or the Helm values that generate them).
-2. Set `spec.refreshInterval: 24h` on each ExternalSecret resource.
-3. Add annotations for monitoring/alerting:
-   - `sigma.io/secret-rotation-alert: "true"`
-   - `sigma.io/secret-last-rotated: "<timestamp>"` (to be updated by the rotation process).
-4. If using a monitoring stack (Prometheus/Grafana), create an alert rule that fires if `externalsecret_sync_status` is not 'SecretSynced' for more than 25 hours (indicating a failed refresh).
-5. Apply updated manifests: `kubectl apply -f manifests/production/external-secrets/`.
-6. Verify refresh interval with `kubectl get externalsecret -n sigma-1-secrets -o jsonpath='{.items[*].spec.refreshInterval}'`.
+Step-by-step:
+1. Create a `cloudflared` Deployment in the `ingress-system` namespace (or sigma1 if preferred).
+2. Create a Kubernetes Secret containing the Cloudflare Tunnel credentials JSON (tunnel ID, account tag, tunnel secret).
+3. Create a ConfigMap `cloudflared-config` with the ingress rules mapping hostnames to sigma1 services:
+   - `api.sigma1.example.com` → `http://equipment-catalog.sigma1.svc.cluster.local:8080`
+   - `rms.sigma1.example.com` → `http://rms.sigma1.svc.cluster.local:8080`
+   - Similar entries for finance, customer-vetting, and the Next.js frontend.
+   - Catch-all `http_status: 404`
+4. TLS is terminated at Cloudflare edge; internal traffic is plain HTTP within the cluster.
+5. Set replicas: 2 for cloudflared with pod anti-affinity for HA.
 
 ## Validation
-`kubectl get externalsecret -n sigma-1-secrets -o jsonpath='{.items[*].spec.refreshInterval}'` returns '24h' for all items. `kubectl get externalsecret -n sigma-1-secrets -o jsonpath='{.items[*].metadata.annotations}'` includes the rotation alert annotation on each resource.
+Deploy cloudflared and verify pods are running. Check Cloudflare dashboard to confirm tunnel is connected. Curl the public hostname (e.g., `curl https://api.sigma1.example.com/health`) from an external machine and verify a valid TLS-terminated response from the correct backend service.

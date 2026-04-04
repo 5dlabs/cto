@@ -1,16 +1,18 @@
-Implement subtask 3002: Implement Hermes API client with NOUS_API_KEY reading and 30s timeout
+Implement subtask 3002: Define opportunity.proto and project.proto with grpc-gateway annotations
 
 ## Objective
-Create the core hermes-research module with the fetchResearchMemo function that reads NOUS_API_KEY from environment, calls the Hermes/NOUS API with the task context, and parses the response into a ResearchMemo.
+Create protobuf definitions for the Opportunity and Project gRPC services with full REST gateway annotations for all endpoints including approve and convert actions.
 
 ## Steps
-1. Create `src/hermes-research/index.ts` exporting `async function fetchResearchMemo(taskContext: TaskContext): Promise<ResearchMemo | null>`.
-2. Read `NOUS_API_KEY` from `process.env.NOUS_API_KEY` (or `Bun.env`).
-3. Construct the HTTP request to the Hermes API: use `fetch()` (native in Bun) with the API key in the Authorization header (Bearer token or whatever the API expects).
-4. Send the task description and context as the research query in the request body.
-5. Set `AbortController` with a 30-second timeout on the fetch call.
-6. On successful response, parse the JSON body and map it to `ResearchMemo`: store the raw response content verbatim in `content`, set `source` to the API endpoint or identifier, and `timestamp` to the current Date.
-7. Ensure the module interface is clean with a single exported function and no side effects on import, suitable for future extraction into a separate service.
+1. Create `proto/rms/v1/opportunity.proto`:
+   - Service `OpportunityService` with RPCs: `CreateOpportunity`, `GetOpportunity`, `UpdateOpportunity`, `ListOpportunities`, `ScoreLead`, `ApproveOpportunity`, `ConvertOpportunity`.
+   - Messages: `Opportunity` (id, org_id, customer_id, title, description, event_date_start, event_date_end, status enum [PENDING, QUALIFIED, APPROVED, CONVERTED], lead_score, line_items repeated, created_at, updated_at), `LeadScore` (score enum [GREEN, YELLOW, RED], breakdown map), `OpportunityLineItem`.
+   - grpc-gateway annotations: `POST /api/v1/opportunities`, `GET /api/v1/opportunities/{id}`, `PUT /api/v1/opportunities/{id}`, `GET /api/v1/opportunities`, `POST /api/v1/opportunities/{id}/score`, `POST /api/v1/opportunities/{id}/approve`, `POST /api/v1/opportunities/{id}/convert`.
+2. Create `proto/rms/v1/project.proto`:
+   - Service `ProjectService` with RPCs: `CreateProject`, `GetProject`, `UpdateProject`, `ListProjects`, `CheckOut`, `CheckIn`.
+   - Messages: `Project` (id, org_id, opportunity_id, customer_id, title, status, line_items, checkout_date, checkin_date, created_at, updated_at), `CheckOutRequest` (project_id, item_ids, date_range), `CheckOutResponse` (success, conflicts repeated), `Conflict` (item_id, conflicting_project_id, date_range).
+   - grpc-gateway annotations: `POST /api/v1/projects`, `GET /api/v1/projects/{id}`, `PUT /api/v1/projects/{id}`, `GET /api/v1/projects`, `POST /api/v1/projects/{id}/checkout`, `POST /api/v1/projects/{id}/checkin`.
+3. Run `buf generate` and verify Go stubs compile.
 
 ## Validation
-Unit test with a mocked Hermes API (using Bun's test utilities or a mock server) returning valid JSON content: verify fetchResearchMemo returns a ResearchMemo with non-empty content, correct source string, and a valid Date timestamp.
+Run `buf lint` with zero errors on both proto files. Run `buf generate` and verify generated Go service interfaces contain all defined RPCs. Verify grpc-gateway reverse proxy code is generated with correct HTTP method/path mappings.

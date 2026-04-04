@@ -1,17 +1,26 @@
-Implement subtask 1003: Create sigma-1-infra-endpoints ConfigMap
+Implement subtask 1003: Create per-service PostgreSQL roles and schemas via init SQL
 
 ## Objective
-Create the ConfigMap `sigma-1-infra-endpoints` in sigma-1-dev namespace with all 4 endpoint keys pointing to existing in-cluster services.
+Run init SQL against the sigma1-postgres cluster to create 6 schemas (catalog, rms, finance, vetting, social, audit) and 5 per-service roles (catalog_svc, rms_svc, finance_svc, vetting_svc, social_svc) with schema-level GRANTs.
 
 ## Steps
-1. Create a ConfigMap manifest `configmap-endpoints.yaml` in namespace `sigma-1-dev`.
-2. Populate the following keys:
-   - `DISCORD_BRIDGE_URL`: `http://discord-bridge-http.bots.svc.cluster.local` (verify actual service name/port from the bots namespace)
-   - `LINEAR_BRIDGE_URL`: `http://linear-bridge.bots.svc.cluster.local` (verify actual service name/port from the bots namespace)
-   - `NATS_URL`: `nats://openclaw-nats.openclaw.svc.cluster.local:4222`
-   - `CLOUDFLARE_OPERATOR_NS`: `cloudflare-operator-system`
-3. Apply with `kubectl apply -f configmap-endpoints.yaml`.
-4. Verify all 4 keys are present and non-empty.
+1. Create a Kubernetes Job or use CloudNative-PG `spec.bootstrap.initdb.postInitSQL` / `postInitApplicationSQL` to run SQL.
+2. SQL script must:
+   - CREATE SCHEMA catalog, rms, finance, vetting, social, audit;
+   - CREATE ROLE catalog_svc LOGIN PASSWORD '<generated>';
+   - CREATE ROLE rms_svc LOGIN PASSWORD '<generated>';
+   - CREATE ROLE finance_svc LOGIN PASSWORD '<generated>';
+   - CREATE ROLE vetting_svc LOGIN PASSWORD '<generated>';
+   - CREATE ROLE social_svc LOGIN PASSWORD '<generated>';
+   - GRANT USAGE, CREATE ON SCHEMA catalog TO catalog_svc;
+   - GRANT USAGE, CREATE ON SCHEMA rms TO rms_svc;
+   - GRANT USAGE, CREATE ON SCHEMA finance TO finance_svc;
+   - GRANT USAGE, CREATE ON SCHEMA vetting TO vetting_svc;
+   - GRANT USAGE, CREATE ON SCHEMA social TO social_svc;
+   - GRANT USAGE ON SCHEMA audit TO catalog_svc, rms_svc, finance_svc, vetting_svc, social_svc;
+   - ALTER DEFAULT PRIVILEGES for each role in their respective schemas.
+3. If using a Job, store the SQL in a ConfigMap and mount it.
+4. Store generated passwords in a temporary secret or output them for use in step 1005.
 
 ## Validation
-`kubectl get configmap sigma-1-infra-endpoints -n sigma-1-dev -o json | jq '.data'` contains exactly 4 keys (DISCORD_BRIDGE_URL, LINEAR_BRIDGE_URL, NATS_URL, CLOUDFLARE_OPERATOR_NS), each with a non-empty string value.
+Connect to sigma1 database and run `\dn` to list all 6 schemas. Run `\du` to list all 5 service roles. Test each role can connect and create a table in its own schema but NOT in other schemas.

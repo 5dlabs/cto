@@ -1,15 +1,18 @@
-Implement subtask 1002: Create sigma-1-secrets Kubernetes Secret with 4 keys
+Implement subtask 1002: Deploy CloudNative-PG Cluster CR with initdb bootstrap
 
 ## Objective
-Create the Kubernetes Secret `sigma-1-secrets` in the sigma-1-dev namespace containing LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, and GITHUB_TOKEN. Use external-secrets CRs if available, otherwise sealed-secrets placeholders for dev.
+Deploy the CloudNative-PG `Cluster` CR named `sigma1-postgres` in the `sigma1-db` namespace with 2 instances, 50Gi storage, and initdb bootstrap creating the `sigma1` database owned by `sigma1_user`.
 
 ## Steps
-1. Create a Secret manifest `secret.yaml` of type Opaque in namespace `sigma-1-dev`.
-2. Define exactly 4 keys: `LINEAR_API_KEY`, `DISCORD_WEBHOOK_URL`, `NOUS_API_KEY`, `GITHUB_TOKEN`.
-3. If external-secrets operator is available in the cluster, create an ExternalSecret CR that syncs these keys from the external secret store into `sigma-1-secrets`.
-4. If external-secrets is not available, create a SealedSecret manifest with dev placeholder values that can be replaced before production.
-5. Apply the manifest and verify the secret exists with all 4 keys.
-6. Do NOT commit plaintext secret values to the repository — use sealed-secrets or external-secrets patterns only.
+1. Create `Cluster` CR YAML for `sigma1-postgres` in `sigma1-db` namespace:
+   - `spec.instances: 2`
+   - `spec.storage.size: 50Gi`
+   - `spec.bootstrap.initdb.database: sigma1`
+   - `spec.bootstrap.initdb.owner: sigma1_user`
+   - `spec.bootstrap.initdb.secret.name: sigma1-postgres-superuser` (auto-created by operator)
+2. Apply the Cluster CR.
+3. Wait for cluster to reach READY state with 2/2 instances healthy.
+4. Verify the `sigma1` database exists and `sigma1_user` is the owner.
 
 ## Validation
-`kubectl get secret sigma-1-secrets -n sigma-1-dev` exists. `kubectl get secret sigma-1-secrets -n sigma-1-dev -o jsonpath='{.data}'` contains exactly 4 keys: LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, GITHUB_TOKEN. Each key has a non-empty base64-encoded value.
+`kubectl get cluster sigma1-postgres -n sigma1-db` shows READY with 2/2 instances. `kubectl exec` into primary pod and run `psql -U sigma1_user -d sigma1 -c '\l'` to confirm database exists.
