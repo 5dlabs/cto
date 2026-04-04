@@ -223,11 +223,26 @@ steps:
         fi
       fi
 
+      RESOLVED_DESIGN_URLS="${design_urls}"
+      if [ -z "$RESOLVED_DESIGN_URLS" ] && [ -s "$WS/.intake/run-prd.txt" ]; then
+        RESOLVED_DESIGN_URLS=$(grep -oE 'https?://[^ )"<>]+' "$WS/.intake/run-prd.txt" \
+          | grep -v 'github\.com\|signal\.me\|img\.shields' \
+          | sort -u | head -5 | paste -sd',' -)
+      fi
+      if [ -z "$RESOLVED_DESIGN_URLS" ] && [ -n "${target_repo_local_path}" ] && [ -f "${target_repo_local_path}/README.md" ]; then
+        RESOLVED_DESIGN_URLS=$(grep -oE 'https?://[^ )"<>]+' "${target_repo_local_path}/README.md" \
+          | grep -v 'github\.com\|signal\.me\|img\.shields' \
+          | sort -u | head -5 | paste -sd',' -)
+      fi
+      if [ -n "$RESOLVED_DESIGN_URLS" ] && [ "$RESOLVED_DESIGN_URLS" != "${design_urls}" ]; then
+        echo "materialize-design-inputs: auto-discovered design URLs: $RESOLVED_DESIGN_URLS" >&2
+      fi
+
       jq -n \
         --rawfile prd "$WS/.intake/run-prd.txt" \
         --arg design_prompt "${design_prompt}" \
         --arg design_artifacts_path "$ASSETS_DIR" \
-        --arg design_urls "${design_urls}" \
+        --arg design_urls "$RESOLVED_DESIGN_URLS" \
         --arg design_mode "${design_mode}" \
         --arg design_provider "${PROVIDER_MODE}" \
         --arg design_framer_project "${FRAMER_PROJECT_TARGET}" \
