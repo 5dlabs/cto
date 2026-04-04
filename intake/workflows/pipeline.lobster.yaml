@@ -1653,7 +1653,7 @@ steps:
 
   - id: sync-to-target-repo
     command: |
-      root="${WORKSPACE:-.}"
+      root="$(cd "${WORKSPACE:-.}" && pwd)"
       "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "sync-to-target-repo" "${audio_debug}" "project ${project_name}"
       TARGET="${target_repo_local_path}"
       if [ -z "$TARGET" ]; then
