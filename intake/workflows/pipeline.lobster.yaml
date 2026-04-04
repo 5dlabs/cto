@@ -835,6 +835,19 @@ steps:
       fi
       printf '%s\n' "$AGENT_MAP"
 
+  # ── Coordinator session ─────────────────────────────────────────────
+  # This is the PIPELINE / COORDINATOR agent session used by
+  # `intake-util linear-activity` to post status updates during intake
+  # (e.g. "deliberation complete", "design mockups generated").
+  # It is NOT an agent-work session — agents do not use it to implement.
+  # This session MUST be created during intake so the pipeline can report
+  # progress to Linear.
+  #
+  # Agent-work sessions (per-agent sessions for play execution) should
+  # NOT be created during intake.  Gate any future agent-work session
+  # creation with:
+  #   if [ "${INTAKE_CREATE_AGENT_SESSIONS:-false}" = "true" ]; then ...
+  # ───────────────────────────────────────────────────────────────────
   - id: ensure-linear-session
     env:
       INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
@@ -1223,7 +1236,15 @@ steps:
         exit 0
       fi
 
-      # Create a SEPARATE Linear agent session for design deliberation (parallel to intake)
+      # ── Design deliberation session (debatable) ────────────────────────
+      # Creates a SEPARATE Linear agent session so design mockups and
+      # deliberation results are posted to their own thread.  This IS
+      # created during intake, which is useful for stakeholder visibility.
+      # If you decide design sessions should also be deferred to play
+      # execution, wrap this block with:
+      #   if [ "${INTAKE_CREATE_AGENT_SESSIONS:-false}" = "true" ]; then ...
+      # For now it stays because it drives the design feedback loop.
+      # ──────────────────────────────────────────────────────────────────
       PRD_ISSUE_ID="$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.prdIssueId // empty')"
       PRD_IDENTIFIER="$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.prdIdentifier // empty')"
       ISSUE_REF="${PRD_ISSUE_ID:-$PRD_IDENTIFIER}"
