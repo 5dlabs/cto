@@ -1,9 +1,10 @@
 /**
  * Linear sync utilities for the intake pipeline.
  *
- * Two operations:
- *   init   — Create a Linear project + PRD issue at pipeline start.
- *   issues — Create task/subtask issues after docs/prompts are generated.
+ * Three operations:
+ *   init         — Create a Linear project + PRD issue at pipeline start.
+ *   issues       — Create task/subtask issues after docs/prompts are generated.
+ *   rewrite-urls — Bulk-replace base URL in all project issue descriptions.
  *
  * Uses direct fetch to Linear GraphQL API (LINEAR_API_KEY env var).
  */
@@ -291,59 +292,66 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
 
   const project = projectData.projectCreate.project;
 
-  // 1b. Create a board (Kanban) view scoped to this project
-  try {
-    interface CustomViewResponse {
-      customViewCreate: { success: boolean; customView?: { id: string; name: string } };
+  // 1b. Create custom views scoped to this project
+  interface CustomViewResponse {
+    customViewCreate: { success: boolean; customView?: { id: string; name: string } };
+  }
+  const VIEW_MUTATION = `mutation CreateView($input: CustomViewCreateInput!) {
+    customViewCreate(input: $input) {
+      success
+      customView { id name }
     }
-    const viewData = await execute<CustomViewResponse>(
-      apiKey,
-      `mutation CreateView($input: CustomViewCreateInput!) {
-        customViewCreate(input: $input) {
-          success
-          customView { id name }
-        }
-      }`,
-      {
-        input: {
-          name: `${projectName} — Board`,
-          teamId,
-          projectId: project.id,
-          filterData: { project: { id: { eq: project.id } } },
-          shared: true,
-          modelName: 'customView',
-        },
+  }`;
+  const PREFS_MUTATION = `mutation SetViewPrefs($input: ViewPreferencesCreateInput!) {
+    viewPreferencesCreate(input: $input) { success }
+  }`;
+
+  const viewFilter = { project: { id: { eq: project.id } } };
+
+  // Helper: create a custom view and set its board preferences
+  async function createProjectView(
+    viewName: string,
+    grouping: string,
+  ): Promise<void> {
+    const viewData = await execute<CustomViewResponse>(apiKey, VIEW_MUTATION, {
+      input: {
+        name: viewName,
+        teamId,
+        projectId: project.id,
+        filterData: viewFilter,
+        shared: true,
       },
-    );
+    });
     if (viewData.customViewCreate.success && viewData.customViewCreate.customView) {
       const viewId = viewData.customViewCreate.customView.id;
-      console.error(`Created board view: ${viewData.customViewCreate.customView.name} (${viewId})`);
-
-      // Set layout to "board" (Kanban) with useful field visibility
-      await execute(
-        apiKey,
-        `mutation SetViewPrefs($input: ViewPreferencesCreateInput!) {
-          viewPreferencesCreate(input: $input) { success }
-        }`,
-        {
-          input: {
-            customViewId: viewId,
-            type: 'organization',
-            preferences: {
-              layout: 'board',
-              issueGrouping: 'status',
-              showSubIssues: true,
-              fieldAssignee: true,
-              fieldPriority: true,
-              fieldLabels: true,
-              fieldEstimate: true,
-            },
+      console.error(`Created view: ${viewData.customViewCreate.customView.name} (${viewId})`);
+      await execute(apiKey, PREFS_MUTATION, {
+        input: {
+          customViewId: viewId,
+          type: 'organization',
+          viewType: 'customView',
+          preferences: {
+            layout: 'board',
+            issueGrouping: grouping,
+            showSubIssues: true,
           },
         },
-      );
+      });
     }
+  }
+
+  // Board view (Kanban grouped by status)
+  try {
+    await createProjectView(`${projectName} — Board`, 'status');
   } catch (err) {
     console.error(`Warning: failed to create project board view: ${err}`);
+  }
+
+  // Agent view (board grouped by assignee)
+  try {
+    await createProjectView(`${projectName} — By Agent`, 'assignee');
+  } catch (err) {
+    console.error(`Warning: failed to create project agent view: ${err}`);
   }
 
   // 2. Get/create labels
@@ -838,4 +846,97 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
     unresolvedAgents: [...unresolvedAgents].sort(),
     issues,
   };
+}
+
+// =============================================================================
+// rewriteProjectUrls — Bulk-replace base URL in all project issue descriptions
+// =============================================================================
+
+export interface RewriteUrlsResult {
+  updatedCount: number;
+  skippedCount: number;
+  errorCount: number;
+  totalIssues: number;
+}
+
+export async function rewriteProjectUrls({
+  projectId,
+  oldBaseUrl,
+  newBaseUrl,
+  apiKey,
+}: {
+  projectId: string;
+  oldBaseUrl: string;
+  newBaseUrl: string;
+  apiKey: string;
+}): Promise<RewriteUrlsResult> {
+  let updatedCount = 0;
+  let skippedCount = 0;
+  let errorCount = 0;
+  let totalIssues = 0;
+  let hasNextPage = true;
+  let cursor: string | undefined;
+
+  console.error(`rewrite-urls: replacing "${oldBaseUrl}" → "${newBaseUrl}" in project ${projectId}`);
+
+  while (hasNextPage) {
+    const afterClause = cursor ? `, after: "${cursor}"` : '';
+    interface IssuesPage {
+      project: {
+        issues: {
+          nodes: Array<{ id: string; identifier: string; description: string | null }>;
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        };
+      };
+    }
+
+    const page = await execute<IssuesPage>(
+      apiKey,
+      `query($pid: String!) {
+        project(id: $pid) {
+          issues(first: 50${afterClause}) {
+            nodes { id identifier description }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }`,
+      { pid: projectId },
+    );
+
+    const issues = page.project.issues.nodes;
+    const pageInfo = page.project.issues.pageInfo;
+    totalIssues += issues.length;
+
+    for (const issue of issues) {
+      if (!issue.description || !issue.description.includes(oldBaseUrl)) {
+        skippedCount++;
+        continue;
+      }
+
+      const newDescription = issue.description.replaceAll(oldBaseUrl, newBaseUrl);
+      try {
+        interface UpdateResult {
+          issueUpdate: { success: boolean };
+        }
+        await execute<UpdateResult>(
+          apiKey,
+          `mutation($id: String!, $input: IssueUpdateInput!) {
+            issueUpdate(id: $id, input: $input) { success }
+          }`,
+          { id: issue.id, input: { description: newDescription } },
+        );
+        updatedCount++;
+      } catch (err) {
+        console.error(`rewrite-urls: failed to update ${issue.identifier}: ${err}`);
+        errorCount++;
+      }
+    }
+
+    hasNextPage = pageInfo.hasNextPage;
+    cursor = pageInfo.endCursor ?? undefined;
+
+    console.error(`rewrite-urls: processed ${totalIssues} issues (${updatedCount} updated, ${skippedCount} skipped, ${errorCount} errors)`);
+  }
+
+  return { updatedCount, skippedCount, errorCount, totalIssues };
 }
