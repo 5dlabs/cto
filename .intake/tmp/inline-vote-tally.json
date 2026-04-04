@@ -1,12 +1,12 @@
 {
   "verdict": "approve",
   "average_scores": {
-    "task_decomposition": 7.33,
-    "dependency_ordering": 7,
+    "task_decomposition": 7.67,
+    "dependency_ordering": 7.33,
     "decision_point_coverage": 7.67,
-    "test_strategy_quality": 7.67,
-    "agent_assignment": 8.67,
-    "overall": 7.4
+    "test_strategy_quality": 8.33,
+    "agent_assignment": 9,
+    "overall": 7.79
   },
   "vote_breakdown": {
     "approve": 2,
@@ -14,14 +14,14 @@
     "reject": 0
   },
   "suggestions": [
-    "Task 5 (notifications) references PR URL from Task 4 output in its completion notification payload, but does not declare Task 4 as a dependency — either add Task 4 as a soft dependency or document that the PR URL field is nullable when Task 4 has not completed, to make the data flow contract explicit at the architectural level.",
-    "Task 7 subtasks 7003-7004 (auth/JWT) introduce a new backend API surface (`POST /api/auth/login`, `/api/auth/refresh`) that does not exist in Task 2's scope — split this into a dedicated subtask under Task 2 for the auth endpoint implementation on cto-pm, and have Task 7's auth subtasks depend on it, to avoid a cross-layer responsibility gap where the frontend task implicitly requires backend changes.",
-    "Tasks 9 and 10 contain subtasks that could be parallelized more aggressively — specifically, 9004 (default-deny NetworkPolicy) has no real dependency on 9001 (HA scaling) but 9005/9006 correctly depend on 9004; similarly 10001 (RBAC), 10003 (secret rotation config), 10005 (audit policy), and 10006 (app-level audit) are all independent foundations that could run in parallel, which the plan already captures via empty dependencies on some but could make more explicit.",
-    "Add explicit tasks to define/confirm external service contracts and required endpoints before implementation: (a) discover and document discord-bridge-http payload schema + endpoint paths, (b) linear-bridge payload schema, (c) Hermes API contract (/health + /research path + request/response), (d) NOUS auth/header + endpoint; make these tasks dependencies for Tasks 3 and 5 (and partially 8).",
-    "Unblock E2E by adding missing backend/API surface tasks that current tests assume: implement pipeline intake/status endpoints used by 8005 (`POST /api/pipeline/intake`, `GET /api/pipeline/:runId/status`) and a notifications record endpoint assumed by 8004 (`GET /api/pipeline/:runId/notifications`) or revise 8004/8008 to use only already-planned interfaces.",
-    "Reduce unnecessary sequential dependencies to enable parallel work: let Task 7 depend on Task 2 (delegation/pipeline status endpoints) and Task 6 (validation report) rather than only Task 6; split Task 6 into (i) pipeline runner + report storage/API (6002/6004/6005) and (ii) Linear live verification (6003) so the core pipeline can ship and be demoed even if live Linear verification isn’t available in an environment.",
-    "Remove Tasks 7, 9, and 10 entirely from this plan or move them to a separate v2 task list — they are self-declared deferred and together account for ~35 subtasks that do not advance the PRD's stated acceptance criteria (AC-1 through AC-5). Their presence makes the critical path (Tasks 1-6, 8) harder to track and inflates the perceived scope.",
-    "Collapse subtasks 2006 and 3007 (standalone structured logging passes) into their respective implementation subtasks — logging should be an acceptance criterion on subtasks 2003/3005/3006, not a separate deliverable. A subtask that only 'audits and replaces ad-hoc console.log calls' after the fact is rework, not forward progress."
+    "Task 2 subtask 2001 has an empty dependencies array but references infrastructure from Task 1 (ConfigMap and secrets mounting). Since the parent task declares dependency on Task 1, this is architecturally sound at the parent level, but the subtask details mention modifying deployment manifests that depend on Task 1 artifacts — consider adding a note clarifying this is satisfied by the parent dependency to avoid confusion during parallel subtask execution.",
+    "Task 3's decision points are formatted as plain strings rather than the structured object format (with topic, options, impact) used in Tasks 1, 2, and 10. Normalize these to the structured format — particularly the Hermes API contract decision point, which is a hard constraint that blocks subtask 3001 implementation and should be flagged as an escalation-type constraint.",
+    "Tasks 7 and 8 both depend on Task 6, but their subtasks (7001, 8001) have empty dependency arrays despite needing pipeline run artifacts produced by Task 6. While parent-level dependencies cover this, making the cross-task data contract explicit — specifically how the pipeline run ID and issue IDs flow from Task 6's output to Tasks 7/8's input — would prevent integration-time surprises. Consider adding a shared test artifact contract or fixture schema.",
+    "Add an explicit Nova backend task (and subtasks) to implement the missing PM server endpoints relied on by the frontend/tests: at minimum `GET /api/pipeline/design-prs` (+ detail) for Task 4, `GET /api/pipeline/runs/:runId/tasks`, `GET /api/pipeline/runs/:runId/deliberation`, and `GET /api/pipeline/runs/:runId/logs` (or a documented alternative). Then update dependencies so Task 4 depends on that API task, and Tasks 6/7/8 depend on the artifact/log endpoints they query.",
+    "Break Task 10 into 3-5 separate tasks sized for shipping increments (e.g., 10a CNPG HA, 10b Redis HA, 10c Ingress/TLS, 10d RBAC/policy tightening, 10e secret rotation + audit logging + docs) and allow parallelism; right now it’s a single catch-all hardening epic with multiple independent domains.",
+    "Fix/test the dependency DAG to reduce unnecessary serial chains and reflect true prerequisites: e.g., 1008 (network policy) should depend on the PM server deployment labels/service (or the smoke pod should be explicitly labeled) otherwise policy tests may be non-actionable; similarly make 2001 depend on Task 1 (since it references ConfigMap/secrets created there) instead of having no dependencies.",
+    "Defer Task 10 entirely to a follow-on milestone. The PRD's stated goal is 'Sigma-1 E2E pipeline validation,' and Task 10's dependencies (tasks 2-9) mean it can only begin after the acceptance gate passes — making it a post-v1 concern. HA Postgres, Redis Sentinel, TLS ingress, audit logging, and production-hardening.md add zero value to validating the pipeline and inflate scope by ~8 subtasks. Remove Task 10 from this plan and track it separately.",
+    "Collapse subtask 2007 ('Standardize structured JSON logging') into the earlier implementation subtasks (2004, 2005, 2006). Creating a logger.ts module is 20 lines of code; making it a standalone subtask with its own dependency chain, test strategy, and parallelizable=false flag is over-decomposition. The pipelineLog() function should be created in 2002 and imported by all subsequent subtasks — not audited in a separate pass that blocks the final integration."
   ],
   "consensus_score": 0.67
 }

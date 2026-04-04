@@ -1,1 +1,1 @@
-What API paradigm should the frontend use for delegation status?
+Service-to-service auth mechanism?

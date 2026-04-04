@@ -1,1 +1,1 @@
-Extend existing task schema with delegate_id and status fields (CRUD)
+Synchronous request-response with the PM server as orchestrator

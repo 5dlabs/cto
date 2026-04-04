@@ -6,6 +6,7 @@
     "rationale": "Stitch returned no screen refs for web.",
     "prompt": "Improve and modernize this web interface for project sigma-1-e2e-20260403-234440. Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
     "status": "failed",
-    "error": "No screen returned from generate_screen_from_text"
+    "error": "No screen returned from generate_screen_from_text",
+    "candidate_id": "stitch-web-1"
   }
 ]

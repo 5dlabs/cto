@@ -2,6 +2,8 @@
 
 import { motion } from "framer-motion";
 
+import { investorMorganUrl } from "@/lib/morgan-agents";
+
 const primaryClass =
   "px-8 py-4 rounded-lg border border-cyan/30 bg-cyan/10 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/50 hover:bg-cyan/20 transition-colors text-center inline-block";
 
@@ -24,7 +26,9 @@ export function InvestorCtaButtons() {
         Schedule a Call
       </motion.a>
       <motion.a
-        href="https://5dlabs.ai/cto/morgan"
+        href={investorMorganUrl}
+        target="_blank"
+        rel="noopener noreferrer"
         className={secondaryClass}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}

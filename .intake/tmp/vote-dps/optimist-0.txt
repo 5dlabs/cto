@@ -1,1 +1,1 @@
-REST endpoints from the PM server
+Kubernetes service account tokens and RBAC for internal auth, with external-secrets for external API keys (NOUS_API_KEY)

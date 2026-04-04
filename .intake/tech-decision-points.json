@@ -2,19 +2,19 @@
   {
     "id": "dp-1",
     "category": "service-topology",
-    "description": "Should the PM server's agent delegation and Hermes research integration be implemented as extensions to the existing PM server, or as separate microservices?",
+    "description": "Should the PM server's agent delegate resolution and Hermes research integration be implemented as extensions to the existing PM server, or as separate microservices?",
     "options": [
-      "Extend the existing PM server (Bun/Elysia) with new endpoints and logic for agent delegation and Hermes integration",
-      "Create separate microservices for agent delegation and Hermes research, communicating with the PM server via API"
+      "Extend the existing PM server (Bun/Elysia) with new endpoints and logic for agent delegate resolution and Hermes research integration",
+      "Create separate microservices for agent delegate resolution and Hermes research, communicating with the PM server via API or message queue"
     ],
     "requires_approval": false,
     "constraint_type": "open",
     "affected_tasks": [
       2,
       3,
-      6
+      5
     ],
-    "rationale": "Both agent delegation and Hermes research integration are new capabilities. Deciding whether to extend the monolithic PM server or split into microservices impacts maintainability, deployment, and scaling."
+    "rationale": "Both features (delegate resolution and Hermes integration) could be tightly coupled to the PM server or split out for modularity and independent scaling. The choice impacts deployment, testing, and future extensibility."
   },
   {
     "id": "dp-2",
@@ -27,90 +27,112 @@
     "requires_approval": false,
     "constraint_type": "open",
     "affected_tasks": [
-      5,
-      8
+      5
     ],
-    "rationale": "There are in-cluster bridge services for Discord and Linear, but external SaaS options could offer faster setup or richer features. The choice affects reliability, cost, and control."
+    "rationale": "In-cluster bridge services are already deployed, but external SaaS could offer easier setup or richer features. Organizational bias prefers in-cluster, but both are viable."
   },
   {
     "id": "dp-3",
-    "category": "platform-choice",
-    "description": "How should secrets (e.g., NOUS_API_KEY, Linear tokens) be managed and injected into the pipeline?",
+    "category": "data-model",
+    "description": "How should agent delegate assignments be represented in the Linear issue creation payload?",
     "options": [
-      "Use the existing external-secrets operator and CRDs for secret management and injection",
-      "Manually provision Kubernetes secrets and mount them directly into pods"
+      "Set the delegate_id as the Linear assignee field directly",
+      "Use a custom field or label to represent agent assignment, in addition to or instead of the assignee"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      2,
+      7
+    ],
+    "rationale": "Linear supports both assignee fields and custom labels/fields. The choice affects downstream integrations, reporting, and UI clarity."
+  },
+  {
+    "id": "dp-4",
+    "category": "api-design",
+    "description": "What API paradigm should be used for the PM server's endpoints for agent delegate resolution and Hermes research integration?",
+    "options": [
+      "RESTful HTTP endpoints (existing Elysia pattern)",
+      "GraphQL endpoint for more flexible queries"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      2,
+      3,
+      5
+    ],
+    "rationale": "The PM server currently uses Elysia, which supports both REST and GraphQL. The choice impacts client flexibility, documentation, and future extensibility."
+  },
+  {
+    "id": "dp-5",
+    "category": "security",
+    "description": "What authentication mechanism should be used for internal service-to-service communication (e.g., PM server to notification bridges, Hermes integration)?",
+    "options": [
+      "Use Kubernetes service account tokens and RBAC for internal authentication",
+      "Implement API key-based authentication between services"
     ],
     "requires_approval": false,
     "constraint_type": "open",
     "affected_tasks": [
       1,
+      2,
       3,
-      9,
+      5,
       10
     ],
-    "rationale": "The cluster has external-secrets CRDs and operators, but manual secret management is possible. The approach impacts automation, security, and compliance."
-  },
-  {
-    "id": "dp-4",
-    "category": "api-design",
-    "description": "What API paradigm should be used for the web frontend to fetch delegation status and pipeline progress?",
-    "options": [
-      "Expose REST endpoints from the PM server for the frontend to consume",
-      "Expose a GraphQL API for flexible querying of delegation and pipeline status"
-    ],
-    "requires_approval": false,
-    "constraint_type": "open",
-    "affected_tasks": [
-      2,
-      7
-    ],
-    "rationale": "The frontend dashboard needs to display dynamic status data. REST is simple and conventional, while GraphQL offers flexibility for complex queries."
-  },
-  {
-    "id": "dp-5",
-    "category": "data-model",
-    "description": "How should agent assignments and delegation status be modeled in the backend?",
-    "options": [
-      "Extend the existing task schema to include delegate_id and status fields (CRUD model)",
-      "Adopt an event-sourced model to track delegation events and status transitions"
-    ],
-    "requires_approval": false,
-    "constraint_type": "open",
-    "affected_tasks": [
-      2,
-      6,
-      7
-    ],
-    "rationale": "Modeling delegation as simple fields is straightforward, but event sourcing enables richer audit trails and state transitions. The choice affects extensibility and observability."
+    "rationale": "Internal service communication can leverage Kubernetes-native security or explicit API keys. The choice affects operational complexity and security posture."
   },
   {
     "id": "dp-6",
-    "category": "security",
-    "description": "What authentication mechanism should be used for the web frontend dashboard displaying delegation status?",
+    "category": "build-vs-buy",
+    "description": "Should Hermes research integration use a self-hosted Hermes instance or rely on an external SaaS API?",
     "options": [
-      "Implement session-based authentication with server-side sessions",
-      "Use JWT-based stateless authentication"
+      "Integrate with a self-hosted Hermes service (if available in-cluster or deployable)",
+      "Use the external Hermes SaaS API via NOUS_API_KEY"
     ],
     "requires_approval": false,
     "constraint_type": "open",
     "affected_tasks": [
-      7
+      3,
+      8
     ],
-    "rationale": "The dashboard exposes sensitive assignment data. The authentication mechanism impacts security, scalability, and user experience."
+    "rationale": "Self-hosting may offer more control and privacy, but external SaaS is simpler if NOUS_API_KEY is available. The PRD references NOUS_API_KEY, but does not mandate SaaS."
   },
   {
     "id": "dp-8",
-    "category": "build-vs-buy",
-    "description": "Should the Hermes research integration use the in-house Hermes agent or leverage an external research API?",
+    "category": "architecture",
+    "description": "What pattern should be used for pipeline orchestration: event-driven (message queue) or request-response (synchronous API calls)?",
     "options": [
-      "Integrate with the in-house Hermes agent (if available in the cluster)",
-      "Call an external research API (e.g., OpenAI, NOUS) directly"
+      "Use an event-driven architecture with a message queue (e.g., NATS, already present in-cluster)",
+      "Use synchronous request-response API calls between pipeline stages"
     ],
     "requires_approval": false,
     "constraint_type": "open",
     "affected_tasks": [
-      3
+      1,
+      2,
+      3,
+      5,
+      6,
+      10
     ],
-    "rationale": "The PRD references Hermes research and NOUS_API_KEY. If Hermes is in-cluster, it should be preferred, but direct external API calls may be necessary if not available."
+    "rationale": "The pipeline can be orchestrated via events (scalable, decoupled) or direct API calls (simpler, more tightly coupled). NATS is available in-cluster, making event-driven feasible."
+  },
+  {
+    "id": "dp-9",
+    "category": "security",
+    "description": "What approach should be used for secret management and rotation in the pipeline infrastructure?",
+    "options": [
+      "Use the existing external-secrets operator and CRDs for secret management",
+      "Manage secrets manually via Kubernetes Secrets"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      1,
+      10
+    ],
+    "rationale": "The cluster has external-secrets and related CRDs deployed, enabling automated secret management. Manual management is possible but less robust."
   }
 ]
