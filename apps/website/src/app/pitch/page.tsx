@@ -464,7 +464,7 @@ export default function PitchPage() {
           <SlideSection id="product">
             <SlideLabel number="06" title="Product" />
             <h2 className="text-3xl sm:text-4xl font-bold mb-6">
-              Agentic private cloud — 20+ services on your hardware.
+              Agentic private cloud — 20+ services on your bare metal.
             </h2>
             <p className="text-base text-foreground/80 mb-6 max-w-3xl">
               Everything a team needs to build, ship, and run software — without renting it from AWS.
@@ -597,7 +597,7 @@ export default function PitchPage() {
                 >
                   <p className="text-[10px] font-mono text-cyan uppercase tracking-wider mb-3">Bare metal + AI-built</p>
                   <p className="text-lg font-bold gradient-text">5D Labs</p>
-                  <p className="text-sm text-foreground/80 mt-1">Spec in, software out — on your hardware.</p>
+                  <p className="text-sm text-foreground/80 mt-1">Spec in, software out — on your bare metal.</p>
                 </motion.div>
               </div>
             </div>
