@@ -244,8 +244,8 @@ function drawTractionStats(doc: jsPDF, margin: number, y: number, maxW: number):
 
 function drawMarketRings(doc: jsPDF, margin: number, y: number, maxW: number): number {
   const rings = MARKET_RINGS;
-  const heights = [70, 48, 26];
-  const widths = [maxW * 0.85, maxW * 0.6, maxW * 0.35];
+  const heights = [100, 64, 28];
+  const widths = [maxW * 0.88, maxW * 0.60, maxW * 0.32];
   const fills: RGB[] = [[18, 28, 42], [20, 35, 50], [25, 45, 60]];
   const borders: RGB[] = [[50, 90, 130], [60, 130, 170], T.accent];
   const cx = margin + maxW / 2;
@@ -272,29 +272,32 @@ function drawMarketRings(doc: jsPDF, margin: number, y: number, maxW: number): n
     const ry = baseY + (heights[0] - h) / 2;
 
     /* Position text in the visible strip between this ring and the next inner one */
-    let textY: number;
+    let labelY: number;
+    let descY: number;
     if (i < rings.length - 1) {
       const innerH = heights[i + 1];
       const innerRy = baseY + (heights[0] - innerH) / 2;
-      /* Midpoint of visible top strip */
-      textY = ry + (innerRy - ry) / 2 + 1;
+      const stripH = innerRy - ry;
+      labelY = ry + stripH * 0.35;
+      descY = ry + stripH * 0.65;
     } else {
       /* Innermost ring — center */
-      textY = ry + h / 2 - 2;
+      labelY = ry + h * 0.38;
+      descY = ry + h * 0.62;
     }
 
-    const labelFs = i === 2 ? 14 : i === 1 ? 12 : 11;
-    const descFs = i === 2 ? 10 : 9;
+    const labelFs = i === 2 ? 16 : i === 1 ? 13 : 12;
+    const descFs = i === 2 ? 11 : 9;
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(labelFs);
     doc.setTextColor(...T.accent);
-    doc.text(safe(`${rings[i].label}: ${rings[i].value}`), cx, textY, { align: "center" });
+    doc.text(safe(`${rings[i].label}: ${rings[i].value}`), cx, labelY, { align: "center" });
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(descFs);
     doc.setTextColor(...T.text);
-    doc.text(safe(rings[i].description), cx, textY + 5, { align: "center" });
+    doc.text(safe(rings[i].description), cx, descY, { align: "center" });
   }
 
   return baseY + heights[0] + 6;
