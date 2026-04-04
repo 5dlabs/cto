@@ -249,7 +249,7 @@ export const SLIDES: DeckSlide[] = [
     headline: "One system: spec in, deployed software out.",
     body: "Describe what you want in plain English. Our AI workforce builds it, tests it, and ships it to bare-metal infrastructure you control.",
     bullets: [
-      "Your servers \u2014 bare-metal servers we provision through hardware partners (Cherry, Hetzner, Latitude). You control the economics.",
+      "Your bare metal \u2014 servers we provision through hardware partners (Cherry, Hetzner, Latitude). You control the economics.",
       "Always current \u2014 AI tools change constantly. We absorb the updates, no context-switching for your team.",
       "Self-healing \u2014 production issues detected and fixed automatically.",
     ],
