@@ -71,9 +71,10 @@ RUN groupadd -g 1000 node 2>/dev/null || groupadd node 2>/dev/null || true && \
 
 # Install Node.js 22 LTS (required for modern MCP servers like firecrawl-mcp)
 RUN --mount=type=cache,target=/root/.cache \
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get -o Acquire::ForceIPv4=true install -y nodejs && \
-    npm install -g npm@latest && \
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in amd64) NODE_ARCH=x64 ;; arm64) NODE_ARCH=arm64 ;; *) NODE_ARCH=$ARCH ;; esac && \
+    NODE_VER=$(curl -fsSL https://nodejs.org/dist/index.json | jq -r '[.[] | select(.lts != false and (.version | startswith("v22")))][0].version') && \
+    curl -fsSL "https://nodejs.org/dist/${NODE_VER}/node-${NODE_VER}-linux-${NODE_ARCH}.tar.xz" | tar -xJ -C /usr/local --strip-components=1 && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Stitch SDK globally so design-intake dependencies
@@ -91,9 +92,9 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     rm -rf /var/lib/apt/lists/*
 
 # GitLab CLI (glab) for dual SCM support
-RUN GLAB_VERSION="1.46.1" && \
+RUN GLAB_VERSION="1.91.0" && \
     ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
-    curl -sLo /tmp/glab.tar.gz "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_Linux_${ARCH}.tar.gz" && \
+    curl -sLo /tmp/glab.tar.gz "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_${ARCH}.tar.gz" && \
     tar -xzf /tmp/glab.tar.gz -C /tmp && \
     mv /tmp/bin/glab /usr/local/bin/glab && \
     chmod +x /usr/local/bin/glab && \
@@ -319,9 +320,10 @@ RUN echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-node-nopasswd \
 
 # Install Node.js 22 LTS (required for modern MCP servers like firecrawl-mcp)
 RUN --mount=type=cache,target=/root/.cache \
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-  && apt-get -o Acquire::ForceIPv4=true install -y nodejs \
-  && npm install -g npm@latest \
+  ARCH=$(dpkg --print-architecture) \
+  && case "$ARCH" in amd64) NODE_ARCH=x64 ;; arm64) NODE_ARCH=arm64 ;; *) NODE_ARCH=$ARCH ;; esac \
+  && NODE_VER=$(curl -fsSL https://nodejs.org/dist/index.json | jq -r '[.[] | select(.lts != false and (.version | startswith("v22")))][0].version') \
+  && curl -fsSL "https://nodejs.org/dist/${NODE_VER}/node-${NODE_VER}-linux-${NODE_ARCH}.tar.xz" | tar -xJ -C /usr/local --strip-components=1 \
   && rm -rf /var/lib/apt/lists/*
 
 # Keep Stitch SDK available in full runtime variants too.
@@ -418,9 +420,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     gh extension install github/gh-codeql 2>/dev/null || true
 
 # GitLab CLI (glab) for dual SCM support
-RUN GLAB_VERSION="1.46.1" && \
+RUN GLAB_VERSION="1.91.0" && \
     ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
-    curl -sLo /tmp/glab.tar.gz "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_Linux_${ARCH}.tar.gz" && \
+    curl -sLo /tmp/glab.tar.gz "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_${ARCH}.tar.gz" && \
     tar -xzf /tmp/glab.tar.gz -C /tmp && \
     mv /tmp/bin/glab /usr/local/bin/glab && \
     chmod +x /usr/local/bin/glab && \
