@@ -1,10 +1,10 @@
-Implement subtask 3010: Add health, metrics, and API documentation endpoints
+Implement subtask 3010: Wire grpc-gateway REST endpoints, Prometheus metrics, and health checks
 
 ## Objective
-Implement Prometheus metrics collection, health/readiness probes, and generate API documentation for the RMS gRPC and REST endpoints.
+Complete the REST gateway configuration, add Prometheus instrumentation to all gRPC handlers, and implement readiness/liveness health check endpoints.
 
 ## Steps
-1. Add Prometheus Go client dependency. 2. Implement /healthz (liveness) and /readyz (readiness) endpoints that check PostgreSQL and Redis connectivity. 3. Register Prometheus metrics: request count, request duration histogram, error count — broken down by service and method. Add a /metrics endpoint. 4. Generate API documentation: use protoc-gen-openapiv2 to produce Swagger/OpenAPI spec from proto files with grpc-gateway annotations. 5. Optionally serve the Swagger JSON at /swagger.json or embed Swagger UI. 6. Verify all endpoints are accessible through both gRPC reflection and REST.
+1. In cmd/server/main.go, register all five service handlers on the grpc-gateway mux. Verify all HTTP annotations produce working REST endpoints. 2. Add grpc-ecosystem/go-grpc-prometheus middleware to the gRPC server to instrument all RPCs with request count, latency histograms, and error rate metrics. 3. Expose /metrics endpoint on the REST gateway (or a separate admin port) for Prometheus scraping. 4. Implement /healthz (liveness) that returns 200 if the process is running. 5. Implement /readyz (readiness) that checks PostgreSQL and Redis connectivity and returns 200 only if both are reachable. 6. Add custom business metrics: opportunities_created_total, projects_active_gauge, inventory_checked_out_gauge, deliveries_in_transit_gauge. 7. Verify all REST endpoints match the grpc-gateway annotations (test a sample from each service).
 
 ## Validation
-GET /healthz returns 200 when dependencies are up; GET /readyz returns 503 when PostgreSQL is unreachable; GET /metrics returns Prometheus-formatted metrics with expected labels; OpenAPI spec is valid JSON and documents all REST endpoints.
+curl requests to REST endpoints (e.g., POST /api/v1/opportunities) return correct responses; /metrics returns Prometheus-formatted metrics including gRPC histograms and custom counters; /healthz returns 200; /readyz returns 503 when database is down and 200 when up.

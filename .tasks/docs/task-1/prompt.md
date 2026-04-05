@@ -10,21 +10,20 @@ Provision all foundational infrastructure for Sigma-1, including PostgreSQL, Red
 - Dependencies: None
 
 ## Implementation Plan
-{"steps": ["Create Kubernetes namespaces: databases, sigma1, openclaw, social, web, etc.", "Deploy CloudNative-PG PostgreSQL cluster (single instance, 50Gi, schemas: rms, crm, finance, audit, public)", "Deploy Redis/Valkey using Opstree operator (single instance, 7.2-alpine)", "Provision S3/R2 buckets for product images and event photos, expose endpoints via ConfigMap", "Deploy Signal-CLI as a sidecar or separate pod in openclaw namespace", "Configure external service secrets for ElevenLabs, Twilio, OpenCorporates, LinkedIn, Google Reviews, Stripe, and store in Kubernetes secrets", "Create a ConfigMap named 'sigma1-infra-endpoints' with connection strings and API URLs for all services (POSTGRES_URL, REDIS_URL, S3_URL, SIGNAL_CLI_URL, etc.)", "Deploy Cloudflare Tunnel for Morgan agent ingress", "Document all endpoints and secret keys for downstream service consumption"]}
+{"steps": ["Create Kubernetes namespaces: databases, sigma1, openclaw, social, web, etc.", "Deploy CloudNative-PG PostgreSQL cluster (single instance, 50Gi, schemas: rms, crm, finance, audit, public)", "Deploy Redis/Valkey using Opstree operator (single instance)", "Provision S3/R2 buckets for product images and event photos, expose endpoints via ConfigMap", "Deploy Signal-CLI as a sidecar or separate pod in openclaw namespace", "Configure external service secrets for ElevenLabs, Twilio, Stripe, OpenCorporates, LinkedIn, Google Reviews, and store in Kubernetes secrets", "Create a ConfigMap named sigma1-infra-endpoints with connection strings and API URLs for all services (POSTGRES_URL, REDIS_URL, S3_URL, SIGNAL_CLI_URL, etc.)", "Document all endpoints and secret keys for downstream service consumption."]}
 
 ## Acceptance Criteria
-All pods are running and healthy; ConfigMap 'sigma1-infra-endpoints' is available in all namespaces; all secrets are mounted and accessible; test connections to PostgreSQL, Redis, S3/R2, and Signal-CLI succeed.
+Verify all pods are running and healthy; ConfigMap sigma1-infra-endpoints contains valid connection strings for each service; all secrets are present; test connectivity to PostgreSQL, Redis, S3/R2, and external APIs from a test pod.
 
 ## Subtasks
-- Create Kubernetes namespaces and base RBAC configuration: Create all required Kubernetes namespaces (databases, sigma1, openclaw, social, web) and configure basic RBAC ServiceAccounts so downstream deployments can reference secrets and ConfigMaps across namespaces.
-- Deploy CloudNative-PG PostgreSQL cluster with multi-schema setup: Deploy a single-instance CloudNative-PG PostgreSQL cluster in the databases namespace with 50Gi storage, and initialize the required schemas: rms, crm, finance, audit, and public.
-- Deploy Redis/Valkey using Opstree operator: Deploy a single-instance Redis/Valkey cache using the Opstree Redis operator in the databases namespace, configured with 7.2-alpine image.
-- Provision S3/R2 buckets and configure access credentials: Create S3/R2 buckets for product images and event photos, configure access keys, and store credentials as Kubernetes secrets.
-- Deploy Signal-CLI pod in openclaw namespace: Deploy Signal-CLI as a standalone pod or Deployment in the openclaw namespace, configured for Morgan agent messaging integration.
-- Create external service secrets for all third-party integrations: Create Kubernetes Secrets containing API keys and credentials for ElevenLabs, Twilio, OpenCorporates, LinkedIn, Google Reviews, and Stripe.
-- Deploy Cloudflare Tunnel for Morgan agent ingress: Deploy a Cloudflare Tunnel (cloudflared) in the cluster to provide secure external ingress for the Morgan agent without exposing a public IP.
-- Create aggregated 'sigma1-infra-endpoints' ConfigMap: Create the 'sigma1-infra-endpoints' ConfigMap that aggregates all service connection strings and API URLs, and make it available across all namespaces.
-- Document all infrastructure endpoints, secrets, and access patterns: Create comprehensive documentation of all provisioned infrastructure, including endpoint URLs, secret key names, access patterns, and instructions for downstream service consumption.
+- Create Kubernetes namespaces and RBAC foundations: Create all required Kubernetes namespaces (databases, sigma1, openclaw, social, web) and apply baseline RBAC roles and service accounts for each namespace to enable subsequent deployments.
+- Deploy CloudNative-PG PostgreSQL cluster with schema initialization: Deploy a single-instance CloudNative-PG PostgreSQL cluster in the databases namespace with 50Gi storage and initialize all required schemas (rms, crm, finance, audit, public).
+- Deploy Redis/Valkey via Opstree operator: Deploy a single-instance Redis/Valkey instance using the Opstree Redis operator in the databases namespace for caching, rate limiting, and session storage.
+- Provision S3/R2 buckets and configure access credentials: Provision S3-compatible object storage buckets for product images and event photos, and store access credentials and endpoint URLs as Kubernetes Secrets.
+- Deploy Signal-CLI pod in openclaw namespace: Deploy Signal-CLI as a standalone pod (or deployment) in the openclaw namespace, configured for REST API access by downstream services.
+- Create external service Kubernetes Secrets: Create Kubernetes Secrets for all external third-party API credentials: ElevenLabs, Twilio, Stripe, OpenCorporates, LinkedIn, and Google Reviews.
+- Create sigma1-infra-endpoints ConfigMap aggregating all service endpoints: Create the central ConfigMap named sigma1-infra-endpoints in the sigma1 namespace, containing connection strings and API URLs for all provisioned services.
+- Validate end-to-end infrastructure connectivity: Run a comprehensive connectivity test from a test pod to verify all provisioned infrastructure services are reachable and functional, and that the ConfigMap provides correct endpoints.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

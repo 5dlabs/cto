@@ -1,10 +1,15 @@
-Implement subtask 7005: Implement sales skills: lead qualification, quote generation, and upsell
+Implement subtask 7005: Implement sales and customer skills: sales-qual, customer-vet, quote-gen, upsell
 
 ## Objective
-Implement Morgan's sales-focused skills (sales-qual, quote-gen, upsell) that wire to sigma1_catalog_search, sigma1_check_availability, sigma1_generate_quote, sigma1_score_lead, and sigma1_equipment_lookup MCP tools to handle the full sales conversation flow.
+Develop the core customer-facing skills that handle lead qualification, customer vetting, quote generation, and upselling, wired to the corresponding MCP tools.
 
 ## Steps
-Step 1: Implement the sales-qual skill — Morgan asks qualifying questions (event type, date, location, budget, guest count), scores the lead via sigma1_score_lead, and routes high-value leads for priority handling. Step 2: Implement the quote-gen skill — Morgan searches the catalog via sigma1_catalog_search, checks availability via sigma1_check_availability, looks up equipment details via sigma1_equipment_lookup, and generates a quote via sigma1_generate_quote. Step 3: Implement the upsell skill — after initial quote generation, Morgan suggests complementary equipment, premium packages, or add-on services based on the event profile. Step 4: Implement conversation flow logic that naturally transitions between qualification → catalog browsing → quote generation → upsell. Step 5: Handle edge cases: unavailable equipment alternatives, date flexibility suggestions, budget-constrained recommendations. Step 6: Format quotes for display across all channels (Signal, voice summary, web chat with rich formatting).
+1. Implement the sales-qual skill: define the conversation flow for qualifying leads (budget, timeline, equipment needs), invoke sigma1_score_lead tool, and store qualification results.
+2. Implement the customer-vet skill: gather customer information, invoke sigma1_vet_customer tool to run background/credit checks, and present results to the conversation flow.
+3. Implement the quote-gen skill: collect equipment selections and rental parameters, invoke sigma1_catalog_search and sigma1_check_availability for validation, then call sigma1_generate_quote to produce a quote. Present the quote to the customer and handle acceptance/modification.
+4. Implement the upsell skill: after quote generation, analyze the quote context and suggest complementary equipment or extended rental periods using sigma1_equipment_lookup and sigma1_catalog_search.
+5. For each skill, define clear entry/exit conditions, required tool calls, and conversation prompts.
+6. Ensure skills can be composed (e.g., sales-qual → customer-vet → quote-gen → upsell as a single flow).
 
 ## Validation
-Simulate a full sales conversation where a customer describes an event, Morgan qualifies the lead, searches the catalog, checks availability, generates a quote with line items, and suggests upsells; verify each MCP tool is invoked with correct parameters; quote contains accurate pricing and availability data.
+Each skill can be triggered independently and produces correct tool calls; sales-qual invokes sigma1_score_lead and returns a qualification score; customer-vet invokes sigma1_vet_customer and returns a vet result; quote-gen produces a valid quote via sigma1_generate_quote; upsell suggests relevant items; the composed flow (qual → vet → quote → upsell) completes without errors.

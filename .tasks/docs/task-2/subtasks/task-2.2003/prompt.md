@@ -1,10 +1,16 @@
-Implement subtask 2003: Implement category and product listing/detail CRUD endpoints
+Implement subtask 2003: Implement category listing endpoint
 
 ## Objective
-Implement the core REST endpoints for categories listing, products listing with filtering/pagination, and product detail retrieval.
+Implement the GET /api/v1/catalog/categories endpoint that returns all equipment categories with optional tree structure support.
 
 ## Steps
-1. Create src/handlers/catalog.rs module. 2. Implement GET /api/v1/catalog/categories: query rms.categories, return JSON array with optional tree structure (parent_id nesting). 3. Implement GET /api/v1/catalog/products: query rms.products with optional query params: category_id (UUID filter), search (ILIKE on name/description), page (default 1), per_page (default 20). Return paginated JSON with items, total_count, page, per_page. 4. Implement GET /api/v1/catalog/products/:id: query rms.products by UUID, join with category name, return full product detail including specifications JSONB and image URL (constructed from S3 endpoint + image_key). 5. Create an AppState struct holding PgPool, RedisPool, and S3 config, pass as Axum State. 6. Register all routes in the main router with /api/v1/catalog prefix. 7. Implement proper error handling: 404 for not found, 400 for bad parameters, structured JSON error responses.
+1. Create a handlers/categories.rs module.
+2. Implement `list_categories` handler: query all categories from PostgreSQL, return as JSON array.
+3. Support optional query parameter `?tree=true` to return nested parent-child structure.
+4. Include image_url fields pointing to S3/R2 URLs.
+5. Register the route on the Axum router under /api/v1/catalog/categories.
+6. Add appropriate error handling (500 for DB errors, return empty array if no categories).
+7. Create a CategoryResponse DTO (separate from the DB model) with serde Serialize.
 
 ## Validation
-GET /api/v1/catalog/categories returns a valid JSON array; GET /api/v1/catalog/products returns paginated results; GET /api/v1/catalog/products/:id returns the correct product; 404 returned for non-existent product ID; filtering by category_id works correctly.
+GET /api/v1/catalog/categories returns 200 with a JSON array. With seeded data, verify categories appear with correct fields. With ?tree=true, verify nested structure. With empty DB, returns empty array.

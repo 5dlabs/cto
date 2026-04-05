@@ -1,23 +1,24 @@
 ## Build Customer Vetting Service (Rex - Rust/Axum)
 
 ### Objective
-Develop the Customer Vetting Service to automate business verification, online presence checks, reputation analysis, and credit scoring, integrating with OpenCorporates, LinkedIn, Google Reviews, and credit APIs.
+Develop the Customer Vetting Service to automate background checks, business verification, online presence, reputation, and credit signals.
 
 ### Ownership
 - Agent: Rex
-- Stack: Rust/Axum
+- Stack: Rust 1.75+/Axum 0.7
 - Priority: high
 - Status: pending
 - Dependencies: 1
 
 ### Implementation Details
-{"steps": ["Initialize Rust 1.75+ Axum 0.7 project.", "Define VettingResult and LeadScore models as per PRD.", "Implement endpoints: /api/v1/vetting/run, /api/v1/vetting/:org_id, /api/v1/vetting/credit/:org_id.", "Integrate with PostgreSQL for vetting results.", "Implement pipeline: OpenCorporates API, LinkedIn API, Google Reviews (scraping/API), credit data APIs.", "Aggregate results and compute final GREEN/YELLOW/RED score.", "Add Prometheus metrics and health endpoints.", "Document OpenAPI spec for endpoints."]}
+{"steps": ["Initialize Rust project with Axum 0.7, connect to PostgreSQL using ConfigMap.", "Define VettingResult and LeadScore models as per PRD.", "Implement endpoints: /api/v1/vetting/run, /api/v1/vetting/:org_id, /api/v1/vetting/credit/:org_id.", "Integrate OpenCorporates, LinkedIn, Google Reviews, and credit APIs using stored secrets.", "Implement vetting pipeline: business verification, online presence, reputation, credit signals, scoring.", "Store results in PostgreSQL.", "Add Prometheus metrics and health endpoints.", "Document OpenAPI spec for all endpoints."]}
 
 ### Subtasks
-- [ ] Initialize Rust/Axum project with data models and PostgreSQL schema: Set up the Rust 1.75+ Axum 0.7 project structure for the Customer Vetting Service, define VettingResult and LeadScore domain models, and create the PostgreSQL migration for storing vetting results.
-- [ ] Implement OpenCorporates API integration for business verification: Build the OpenCorporates API client module to look up company registration data, verify incorporation status, and return structured business verification results.
-- [ ] Implement LinkedIn API integration for online presence analysis: Build the LinkedIn API client module to retrieve company profile data including follower count, employee count, and company description for online presence scoring.
-- [ ] Implement Google Reviews integration for reputation analysis: Build the Google Reviews client module to fetch review data, average ratings, and review counts for an organization, and compute a reputation summary.
-- [ ] Implement credit scoring API integration: Build the credit data API client module to retrieve business credit scores and risk assessments for organizations.
-- [ ] Build aggregation pipeline and scoring engine (GREEN/YELLOW/RED): Implement the vetting pipeline that orchestrates all data source integrations concurrently, aggregates results, and computes the final GREEN/YELLOW/RED lead score.
-- [ ] Add Prometheus metrics, health endpoints, and OpenAPI documentation: Instrument the vetting service with Prometheus metrics for observability, add health/readiness endpoints, and generate OpenAPI documentation for all endpoints.
+- [ ] Initialize Rust/Axum project with PostgreSQL connectivity and database migrations: Scaffold the Rust project with Axum 0.7, configure PostgreSQL connection using the infra ConfigMap (envFrom), set up SQLx or Diesel for database access, and create migrations for VettingResult and LeadScore tables.
+- [ ] Implement OpenCorporates business verification integration: Build the HTTP client module for the OpenCorporates API to perform business entity verification, including company lookup, officer search, and filing status checks.
+- [ ] Implement LinkedIn online presence integration: Build the integration module for LinkedIn API to assess a company's online presence including company page data, follower count, and activity signals.
+- [ ] Implement Google Reviews reputation scoring integration: Build the integration module for Google Places/Reviews API to assess a company's reputation based on review ratings, volume, and recency.
+- [ ] Implement credit signal API integration: Build the integration module for credit signal checking, implementing the provider trait against the selected credit API to retrieve commercial credit scores and payment history.
+- [ ] Implement vetting pipeline orchestration and composite scoring algorithm: Build the vetting pipeline that orchestrates all four integration modules (business verification, online presence, reputation, credit signals) and computes the composite LeadScore.
+- [ ] Implement REST endpoints for vetting operations: Build the Axum route handlers for POST /api/v1/vetting/run, GET /api/v1/vetting/:org_id, and GET /api/v1/vetting/credit/:org_id with request validation and error handling.
+- [ ] Add Prometheus metrics and OpenAPI documentation: Instrument the vetting service with Prometheus metrics for observability and generate an OpenAPI specification documenting all endpoints.

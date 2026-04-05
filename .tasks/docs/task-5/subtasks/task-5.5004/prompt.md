@@ -1,10 +1,10 @@
-Implement subtask 5004: Implement Google Reviews integration for reputation analysis
+Implement subtask 5004: Implement Google Reviews reputation scoring integration
 
 ## Objective
-Build the Google Reviews client module to fetch review data, average ratings, and review counts for an organization, and compute a reputation summary.
+Build the integration module for Google Places/Reviews API to assess a company's reputation based on review ratings, volume, and recency.
 
 ## Steps
-1. Create a `sources/google_reviews.rs` module implementing the `VettingSource` trait. 2. Implement the Google Places API client (or scraping fallback, pending dp-14 decision). For the API path: use Google Places Text Search to find the business, then Place Details to get reviews. 3. Extract: average_rating, total_review_count, individual reviews (text, rating, date). 4. Compute a basic sentiment summary: count of 1-2 star reviews, 3 star reviews, 4-5 star reviews, and a simple sentiment_score. 5. Parse into a `ReputationAnalysis` struct with avg_rating, review_count, sentiment_score, sentiment_summary, recent_reviews (last 5). 6. Handle API key authentication, quota limits, and businesses with no reviews (return neutral score). 7. Write unit tests with mocked responses.
+1. Create a `vetting::integrations::google_reviews` module. 2. Define a trait `ReputationProvider` with method: `assess_reputation(company_name: &str, location: Option<&str>) -> Result<ReputationResult>`. 3. Implement Google Places API integration: first use Place Search to find the business, then use Place Details to fetch reviews. Use the Google API key from Kubernetes secrets. 4. Extract: average_rating, total_reviews, recent_reviews (last 6 months), review_sentiment_summary. 5. Compute a reputation_score (0.0-1.0) based on: average_rating normalized to 0-1 (weight 0.4), log(review_count) normalized (weight 0.3), recency of reviews (weight 0.3). 6. Define ReputationResult struct with score, average_rating, total_reviews, recent_review_count, most_recent_review_date. 7. Handle cases where business is not found (return neutral score with flag).
 
 ## Validation
-Unit tests pass for: successful review retrieval, business with no reviews (neutral score returned), API quota exceeded handling, correct sentiment calculation from mock review data. ReputationAnalysis struct populated correctly.
+Unit tests with mocked Google API responses: business with many positive reviews, business with few/no reviews, business not found. Verify scoring formula produces expected values for boundary conditions (0 reviews, 5.0 rating, 1.0 rating).

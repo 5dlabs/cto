@@ -1,10 +1,18 @@
-Implement subtask 2001: Initialize Rust/Axum project with database connection pooling and configuration
+Implement subtask 2001: Initialize Rust/Axum project with PostgreSQL and Redis connection pools
 
 ## Objective
-Scaffold the Rust 1.75+ Axum 0.7 project with Cargo workspace structure, configure environment-based settings loading from the sigma1-infra-endpoints ConfigMap, and set up PostgreSQL connection pooling using sqlx or deadpool-postgres.
+Scaffold the Rust project with Axum 0.7, configure connection pools for PostgreSQL (via sqlx) and Redis, reading endpoints from environment variables sourced from the sigma1-infra-endpoints ConfigMap.
 
 ## Steps
-1. Initialize a new Rust project: 'cargo init equipment-catalog'. 2. Add dependencies in Cargo.toml: axum 0.7, tokio, serde, serde_json, sqlx (with postgres and runtime-tokio features), dotenvy or config crate for env-based config. 3. Create a config module that reads POSTGRES_URL, REDIS_URL, S3_ENDPOINT, S3_PRODUCT_BUCKET from environment variables (injected via sigma1-infra-endpoints ConfigMap). 4. Initialize a sqlx::PgPool with connection pooling (max 10 connections for dev). 5. Create the main.rs Axum app with a basic router and graceful shutdown. 6. Add a Dockerfile (multi-stage build: rust:1.75-slim for build, debian:bookworm-slim for runtime). 7. Create a Kubernetes Deployment manifest referencing envFrom: sigma1-infra-endpoints ConfigMap and relevant secrets.
+1. Create a new Rust project with `cargo init equipment-catalog`.
+2. Add dependencies: axum 0.7, tokio, sqlx (with postgres and runtime-tokio features), redis (or deadpool-redis), serde, serde_json, dotenvy.
+3. Create a config module that reads POSTGRES_URL, REDIS_URL, S3_ENDPOINT, S3_PRODUCT_IMAGES_BUCKET from environment variables (populated via envFrom: sigma1-infra-endpoints ConfigMap).
+4. Initialize a sqlx::PgPool with the POSTGRES_URL.
+5. Initialize a Redis connection pool with the REDIS_URL.
+6. Create an AppState struct holding both pools and config, and pass it into Axum's Router as state.
+7. Create a basic main.rs that starts the Axum server on 0.0.0.0:8080.
+8. Add a Dockerfile for the service (multi-stage build with cargo-chef for caching).
+9. Add a Kubernetes Deployment manifest referencing the sigma1-infra-endpoints ConfigMap via envFrom.
 
 ## Validation
-Project compiles with 'cargo build'; the application starts and connects to PostgreSQL successfully when POSTGRES_URL is set; Docker image builds without errors.
+Cargo build succeeds with no errors. The application starts and binds to port 8080. With valid POSTGRES_URL and REDIS_URL env vars, connection pools initialize without error. A curl to the root path returns a response (even if 404).

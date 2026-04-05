@@ -1,10 +1,10 @@
-Implement subtask 3004: Implement OpportunityService with lead scoring and conflict detection
+Implement subtask 3004: Generate Go code from protobuf definitions
 
 ## Objective
-Build the OpportunityService gRPC handler with full CRUD, lead scoring algorithm (GREEN/YELLOW/RED), date/equipment conflict detection, and ConvertToProject RPC.
+Configure protoc/buf for Go code generation including gRPC stubs, grpc-gateway reverse proxies, and OpenAPI specs from the .proto files.
 
 ## Steps
-1. Implement the OpportunityService gRPC server in /internal/opportunity/. 2. Wire up CreateOpportunity, ListOpportunities, UpdateOpportunity RPCs to the OpportunityRepo. 3. Implement ScoreOpportunity RPC: calculate lead score based on factors like estimated value, equipment availability, date conflicts, customer history. Return GREEN (high confidence), YELLOW (needs review), RED (conflicts/issues). 4. Implement conflict detection: check for overlapping date ranges on the same equipment across existing projects and opportunities. 5. Implement ConvertToProject RPC: transition an approved opportunity into a new project record, copying relevant fields and updating opportunity status to 'converted'. 6. Register the service with the gRPC server and ensure grpc-gateway routes are connected.
+1. Create a buf.gen.yaml (or Makefile with protoc commands) that generates: Go protobuf messages (protoc-gen-go), gRPC service stubs (protoc-gen-go-grpc), grpc-gateway reverse proxy (protoc-gen-grpc-gateway), and optionally OpenAPI v2 spec (protoc-gen-openapiv2). 2. Run code generation and verify output lands in /internal/gen or /pkg/pb. 3. Ensure generated gateway code registers all five services on the gateway mux. 4. Add a `go generate` or Makefile target for repeatable generation. 5. Verify generated Go code compiles with `go build ./...`.
 
 ## Validation
-Unit tests for lead scoring return correct GREEN/YELLOW/RED for known scenarios; conflict detection identifies overlapping equipment bookings; ConvertToProject creates a valid project and marks opportunity as converted; gRPC and REST endpoints return expected responses.
+Running `make proto` or `buf generate` produces Go files for all 5 services; `go build ./...` succeeds with generated code; gateway registration code exists for all services.

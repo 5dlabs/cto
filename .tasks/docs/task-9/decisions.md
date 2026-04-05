@@ -1,10 +1,7 @@
 ## Decision Points
 
-- Which Redis-compatible cache should be used for rate limiting, session storage, and caching across services?
-- Which object storage provider should be used for product images and social media photos?
-- How should multi-tenancy and schema separation be handled in the PostgreSQL database?
-- What authentication and authorization mechanism should be used for internal service-to-service API calls?
-- Should the Signal integration for Morgan be self-hosted (Signal-CLI) or use a third-party Signal gateway service?
+- What Cloudflare plan tier is available, and which CDN features (e.g., WAF, Bot Management, Advanced DDoS) should be enabled for public endpoints?
+- Should Cloudflare Tunnel be deployed as a single replicated Deployment or as a DaemonSet for node-level redundancy?
 
 ## Coordination Notes
 

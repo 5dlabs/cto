@@ -1,10 +1,15 @@
-Implement subtask 1002: Deploy CloudNative-PG PostgreSQL cluster with multi-schema setup
+Implement subtask 1002: Deploy CloudNative-PG PostgreSQL cluster with schema initialization
 
 ## Objective
-Deploy a single-instance CloudNative-PG PostgreSQL cluster in the databases namespace with 50Gi storage, and initialize the required schemas: rms, crm, finance, audit, and public.
+Deploy a single-instance CloudNative-PG PostgreSQL cluster in the databases namespace with 50Gi storage and initialize all required schemas (rms, crm, finance, audit, public).
 
 ## Steps
-1. Write a CloudNative-PG Cluster CR YAML: single instance, 50Gi PVC, PostgreSQL 16+, in 'databases' namespace. 2. Configure the CR with an initdb section or a bootstrap SQL ConfigMap that creates schemas: rms, crm, finance, audit, public. 3. Create a dedicated database user per schema or a shared superuser (depending on dp-5 resolution). 4. Set resource requests/limits appropriate for dev (e.g., 512Mi-1Gi RAM, 500m CPU). 5. Apply the CR and wait for the cluster to reach 'Running' phase. 6. Record the resulting connection string (host, port, credentials) for inclusion in the aggregated ConfigMap.
+1. Create a CloudNative-PG Cluster CR in the databases namespace: single instance, 50Gi PVC, PostgreSQL 16.
+2. Configure the CR with superuser credentials stored in a Kubernetes Secret.
+3. Create an initdb SQL script (via ConfigMap or bootstrap.initdb) that creates schemas: rms, crm, finance, audit, public.
+4. Apply the Cluster CR and wait for the pod to reach Running and the cluster to report Ready.
+5. Verify schema creation by connecting and running \dn.
+6. Record the POSTGRES_URL connection string (host, port, dbname, credentials) for later ConfigMap aggregation.
 
 ## Validation
-CloudNative-PG cluster pod is Running; connect via psql and verify all five schemas exist; run a simple CREATE TABLE / INSERT / SELECT in each schema to confirm write access.
+Verify the CloudNative-PG Cluster CR status is 'Cluster in healthy state'. Connect from a test pod using psql and confirm all five schemas exist. Verify the Secret containing credentials is present in the databases namespace.

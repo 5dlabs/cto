@@ -1,17 +1,10 @@
-Implement subtask 9001: Scale PostgreSQL to HA with CloudNative-PG multi-replica and failover
+Implement subtask 9001: Scale PostgreSQL to HA multi-replica mode with CloudNative-PG
 
 ## Objective
-Update the CloudNative-PG cluster CR to enable multi-replica (at least 2 replicas + 1 primary), configure streaming replication, automatic failover, and pod anti-affinity rules for production resilience.
+Update the CloudNative-PG Cluster CR to enable multi-replica HA with synchronous replication and automatic failover for the production PostgreSQL instance.
 
 ## Steps
-1. Edit the CloudNative-PG Cluster CR to set `instances: 3` (1 primary, 2 replicas).
-2. Configure `podAntiAffinity` to spread instances across nodes/zones.
-3. Enable `enableSuperuserAccess: false` for security.
-4. Set `postgresql.pg_hba` to restrict replication connections.
-5. Configure backup and WAL archiving for point-in-time recovery.
-6. Verify the switchover/failover promotion policy (e.g., `failoverDelay`, `switchoverDelay`).
-7. Update the `{project}-infra-endpoints` ConfigMap with the HA-aware PostgreSQL service endpoint (the `-rw` service for writes, `-ro` for reads if applicable).
-8. Apply the updated CR and confirm all replicas are streaming.
+1. Edit the CloudNative-PG Cluster CR YAML to set `instances: 3` (1 primary + 2 replicas). 2. Configure `postgresql.synchronous` settings for synchronous replication to at least one replica. 3. Ensure `failover.enabled: true` and set appropriate promotion criteria. 4. Configure anti-affinity rules (`topologyKey: kubernetes.io/hostname`) so replicas spread across nodes. 5. Update PVC storage class and size if needed for production workload. 6. Apply the updated CR and verify all three instances reach streaming replication state. 7. Validate that `kubectl cnpg status <cluster-name>` shows healthy primary and replicas.
 
 ## Validation
-Verify 3 PostgreSQL pods are running across different nodes; confirm streaming replication lag < 1s; simulate primary pod deletion and confirm automatic failover completes within 30s; verify application reconnects to new primary without manual intervention.
+Verify `kubectl cnpg status` shows 3 healthy instances with streaming replication. Delete the primary pod and confirm automatic failover completes within 30 seconds with a new primary elected. Confirm application connections recover without manual intervention.

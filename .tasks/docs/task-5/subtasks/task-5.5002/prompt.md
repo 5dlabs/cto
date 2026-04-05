@@ -1,10 +1,10 @@
-Implement subtask 5002: Implement OpenCorporates API integration for business verification
+Implement subtask 5002: Implement OpenCorporates business verification integration
 
 ## Objective
-Build the OpenCorporates API client module to look up company registration data, verify incorporation status, and return structured business verification results.
+Build the HTTP client module for the OpenCorporates API to perform business entity verification, including company lookup, officer search, and filing status checks.
 
 ## Steps
-1. Create a `sources/opencorporates.rs` module. 2. Define an async trait `VettingSource` with a method `async fn fetch(&self, org_identifier: &str) -> Result<SourceResult, VettingError>` to allow uniform source handling. 3. Implement the OpenCorporates HTTP client using reqwest. 4. Handle authentication via API key from environment/secrets. 5. Parse the OpenCorporates JSON response into a `BusinessVerification` struct containing: company_name, jurisdiction, incorporation_date, company_status (active/inactive/dissolved), registered_address, officers list. 6. Implement error handling for rate limits (HTTP 429), not-found responses, and network failures using typed errors. 7. Add retry logic with exponential backoff for transient failures. 8. Write unit tests with mock HTTP responses (use wiremock or similar).
+1. Create a `vetting::integrations::opencorporates` module. 2. Define a trait `BusinessVerificationProvider` with async methods: `verify_company(name: &str, jurisdiction: &str) -> Result<BusinessVerification>`, `lookup_officers(company_number: &str) -> Result<Vec<Officer>>`. 3. Implement the trait for OpenCorporates using reqwest with the API key loaded from Kubernetes secrets. 4. Parse API responses into strongly typed structs: CompanyMatch (name, company_number, jurisdiction, status, incorporation_date), Officer (name, role, appointed_date). 5. Implement retry logic with exponential backoff (max 3 retries). 6. Return a BusinessVerificationResult with match_confidence (0.0-1.0), active_status (bool), incorporation_years, and officer_count. 7. Handle API rate limits (respect 429 responses with Retry-After header).
 
 ## Validation
-Unit tests pass with mocked OpenCorporates responses for: successful company lookup, company not found (404), rate limit (429 with retry), malformed response handling. The BusinessVerification struct is correctly populated from mock data.
+Unit tests with mocked HTTP responses covering: successful company match, no match found, API rate limit handling, network timeout retry behavior. Integration test against OpenCorporates sandbox API if available.

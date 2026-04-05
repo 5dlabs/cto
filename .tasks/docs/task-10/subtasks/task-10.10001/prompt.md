@@ -1,18 +1,10 @@
-Implement subtask 10001: Define and apply Kubernetes RBAC policies for all namespaces and service accounts
+Implement subtask 10001: Define Kubernetes RBAC Roles and RoleBindings for all service accounts
 
 ## Objective
-Create Role, ClusterRole, RoleBinding, and ClusterRoleBinding resources to enforce least-privilege access for all service accounts, operators, and human administrators across all namespaces.
+Create least-privilege RBAC Role and RoleBinding (or ClusterRole/ClusterRoleBinding) manifests for every service account in the application namespace, ensuring each service can only access the resources it needs.
 
 ## Steps
-1. Inventory all service accounts across namespaces (application services, operators, cloudflared, monitoring agents).
-2. Create namespace-scoped Roles for each service account granting only the permissions they need (e.g., app services: get/list configmaps, secrets in their namespace; operators: manage their CRDs).
-3. Create RoleBindings binding each service account to its Role.
-4. Create ClusterRoles for cluster-wide needs (e.g., monitoring agent needs read access to node metrics).
-5. Create a read-only ClusterRole for developer access (no secret read, no exec).
-6. Create an admin ClusterRole for ops with broader but still scoped permissions.
-7. Apply a default deny posture: ensure no service account uses the `cluster-admin` ClusterRole.
-8. Remove any auto-mounted default service account tokens where not needed (`automountServiceAccountToken: false`).
-9. Apply all RBAC manifests and verify with `kubectl auth can-i --list --as=system:serviceaccount:<ns>:<sa>`.
+1. Inventory all ServiceAccounts currently in use across all Deployments, StatefulSets, CronJobs, and operators. 2. For each ServiceAccount, determine the minimum set of Kubernetes API resources and verbs it needs (e.g., backend services may only need `get` on ConfigMaps/Secrets, cloudflared needs none, operators need specific CRD access). 3. Create Role manifests scoped to the application namespace for each service account with only the required rules. 4. Create corresponding RoleBinding manifests binding each Role to its ServiceAccount. 5. For cluster-scoped needs (e.g., operators that watch across namespaces), create ClusterRole/ClusterRoleBinding with tight resource scoping. 6. Remove any existing overly-permissive bindings (e.g., default `cluster-admin` grants). 7. Apply all manifests and verify with `kubectl auth can-i --as=system:serviceaccount:<ns>:<sa>` for each account.
 
 ## Validation
-For each service account, run `kubectl auth can-i` to confirm it can only perform its intended operations; verify a test service account cannot read secrets in other namespaces; verify developer role cannot exec into pods or read secrets; confirm no service account has cluster-admin binding.
+For each service account, run `kubectl auth can-i --list --as=system:serviceaccount:<ns>:<sa>` and verify the permissions match the documented minimum set. Attempt an unauthorized action (e.g., `kubectl auth can-i delete pods --as=system:serviceaccount:<ns>:backend-sa`) and confirm it returns 'no'. Verify all services continue to function correctly after RBAC is applied.

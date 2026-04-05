@@ -1,10 +1,10 @@
-Implement subtask 3005: Implement ProjectService with quote-to-project workflow
+Implement subtask 3005: Implement OpportunityService and ProjectService with quote-to-project workflow
 
 ## Objective
-Build the ProjectService gRPC handler supporting project lifecycle, quote generation, quote approval, and status transitions.
+Implement the gRPC handlers for OpportunityService and ProjectService, including the critical ConvertToProject business logic that transitions an accepted quote into an active project.
 
 ## Steps
-1. Implement ProjectService gRPC server in /internal/project/. 2. Wire up CreateProject, GetProject, ListProjects, UpdateProjectStatus RPCs to ProjectRepo. 3. Implement GenerateQuote RPC: calculate quote based on equipment list, rental duration, crew costs, delivery fees. Store quote with line items in the quotes table. 4. Implement ApproveQuote RPC: transition quote status to approved, update project status to 'confirmed', trigger any downstream effects (crew reservation, equipment hold). 5. Implement project status state machine: draft → quoted → confirmed → in_progress → completed → archived. Validate transitions. 6. Register service and verify grpc-gateway REST routes.
+1. Implement OpportunityService handlers in /internal/opportunity/service.go: CreateOpportunity (validate inputs, insert into DB), GetOpportunity, ListOpportunities (with pagination and status filtering), UpdateOpportunity (status transitions: draft→quoted→accepted/rejected). 2. Implement ConvertToProject RPC: validate opportunity status is 'accepted', begin a database transaction, create a new project record linked to the opportunity, update opportunity status to 'converted', commit transaction, return the new project. 3. Implement ProjectService handlers in /internal/project/service.go: GetProject (join with opportunity data), ListProjects (with status and date filtering), UpdateProject (status transitions with validation), GetProjectTimeline (aggregate assigned crew, inventory, deliveries). 4. Use repository pattern for database access. 5. Add input validation on all requests. 6. Return proper gRPC status codes (NotFound, InvalidArgument, FailedPrecondition for invalid state transitions).
 
 ## Validation
-Quote generation produces correct line items and totals for sample equipment lists; quote approval transitions project to confirmed status; invalid status transitions are rejected with appropriate errors; full quote-to-project workflow completes end-to-end.
+Unit tests cover all OpportunityService and ProjectService handlers with mocked repositories; ConvertToProject correctly creates a project and updates opportunity status atomically; invalid state transitions return FailedPrecondition; integration test runs ConvertToProject against a real database and verifies both tables are updated; >80% code coverage.

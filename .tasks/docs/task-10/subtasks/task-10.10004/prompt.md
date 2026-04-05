@@ -1,20 +1,10 @@
-Implement subtask 10004: Integrate audit logs and service logs with centralized Loki/Grafana logging
+Implement subtask 10004: Enable Kubernetes API audit logging
 
 ## Objective
-Ship Kubernetes API audit logs and managed service logs (PostgreSQL, Redis, operators) into the Loki centralized logging stack and create Grafana dashboards for security monitoring.
+Configure the Kubernetes API server audit policy and audit log backend to capture all security-relevant API operations.
 
 ## Steps
-1. Deploy or configure Promtail/Grafana Agent to scrape Kubernetes audit log files (or receive them via webhook/fluentd).
-2. Configure Promtail with pipeline stages to parse audit log JSON, extracting labels: `verb`, `user`, `resource`, `namespace`, `responseStatus`.
-3. Add scrape targets for PostgreSQL operator logs, Redis/Valkey operator logs, and cloudflared logs.
-4. Create Loki log queries for common security events:
-   - Failed authentication attempts
-   - Secret access events
-   - RBAC changes (Role/ClusterRole/Binding modifications)
-   - Pod exec events
-5. Create a Grafana dashboard with panels for: audit event volume over time, failed auth attempts, RBAC change log, secret access log.
-6. Create Grafana alerting rules for suspicious patterns (e.g., > 10 failed auth attempts in 5 minutes, unexpected secret access).
-7. Verify end-to-end log flow from event to Grafana dashboard.
+1. Create an audit policy YAML file defining rules at appropriate levels: a) `RequestResponse` level for write operations on Secrets, RBAC resources, and ServiceAccounts. b) `Request` level for all write operations on core resources (pods, deployments, etc.). c) `Metadata` level for read operations on sensitive resources. d) `None` level for health checks and other noise (e.g., `/healthz`, `/readyz`, system:nodes watch). 2. Configure the API server to use the audit policy: a) For managed Kubernetes (EKS/GKE/AKS), enable audit logging via the cloud provider's cluster configuration. b) For self-managed clusters, add `--audit-policy-file` and `--audit-log-path` flags to the kube-apiserver manifest. 3. Configure audit log shipping to the chosen storage backend (local file with rotation, or webhook to logging stack). 4. If using a centralized logging stack, deploy a log shipper (e.g., Fluent Bit DaemonSet) configured to tail audit log files and forward to Loki/Elasticsearch. 5. Verify audit logs are being generated and captured for test operations.
 
 ## Validation
-Trigger a known audit event and verify it appears in Loki within 60s; verify Grafana dashboard panels populate with real data; trigger a simulated suspicious pattern and confirm Grafana alert fires; verify all managed service logs (PG, Redis, cloudflared) are queryable in Loki.
+Perform a sensitive operation (e.g., `kubectl create secret generic test-audit --from-literal=key=value`) and verify the operation appears in the audit log within 60 seconds. Verify audit log entries contain the expected fields: user, verb, resource, timestamp, response code. Confirm that noisy endpoints (`/healthz`) are excluded from logs. If using centralized logging, query the logging backend and confirm audit events are searchable.

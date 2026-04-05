@@ -1,10 +1,10 @@
-Implement subtask 5003: Implement LinkedIn API integration for online presence analysis
+Implement subtask 5003: Implement LinkedIn online presence integration
 
 ## Objective
-Build the LinkedIn API client module to retrieve company profile data including follower count, employee count, and company description for online presence scoring.
+Build the integration module for LinkedIn API to assess a company's online presence including company page data, follower count, and activity signals.
 
 ## Steps
-1. Create a `sources/linkedin.rs` module implementing the `VettingSource` trait. 2. Implement OAuth 2.0 token management for LinkedIn API access (client credentials flow). Store client_id/client_secret in Kubernetes secrets. 3. Call LinkedIn Company API endpoints to retrieve: company name, description, follower_count, employee_count, industry, website_url, logo_url. 4. Parse responses into an `OnlinePresence` struct. 5. Handle LinkedIn-specific errors: expired tokens (auto-refresh), rate limits, private/unavailable profiles. 6. If the LinkedIn API requires specific partnership/approval, implement a fallback stub that returns partial data with a warning flag. 7. Write unit tests with mocked LinkedIn API responses.
+1. Create a `vetting::integrations::linkedin` module. 2. Define a trait `OnlinePresenceProvider` with method: `assess_presence(company_name: &str, domain: Option<&str>) -> Result<OnlinePresenceResult>`. 3. Implement LinkedIn API integration using OAuth2 client credentials flow; store client_id and client_secret in Kubernetes secrets. 4. Fetch company page data: follower count, post frequency, employee count range, company description completeness. 5. Compute an online_presence_score (0.0-1.0) based on: has_linkedin_page (0.2), follower_count > threshold (0.3), recent_activity within 30 days (0.3), profile_completeness (0.2). 6. Define OnlinePresenceResult struct with score, follower_count, last_activity_date, profile_completeness_pct. 7. Handle LinkedIn API pagination and rate limiting.
 
 ## Validation
-Unit tests pass for: successful company profile retrieval, token refresh on 401, rate limit handling, private profile graceful degradation. OnlinePresence struct correctly populated from mock data.
+Unit tests with mocked LinkedIn API responses for: complete profile, sparse profile, no page found, expired OAuth token refresh. Verify scoring algorithm produces expected scores for known input combinations.

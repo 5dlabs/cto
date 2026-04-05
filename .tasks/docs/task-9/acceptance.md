@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All services remain available during failover tests; static assets served via CDN with valid TLS; ingress routes traffic to correct services; network policies block unauthorized access; HA failover verified for PostgreSQL and Redis.
+- [ ] All services remain available during failover; public endpoints serve via Cloudflare with valid TLS; Morgan and website accessible via Cloudflare Tunnel; network policies block unauthorized access; simulate pod/node failure and verify recovery.
 
 ## Verification Notes
 

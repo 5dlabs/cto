@@ -1,10 +1,10 @@
-Implement subtask 3009: Integrate Redis session cache
+Implement subtask 3009: Implement DeliveryService with tracking
 
 ## Objective
-Set up Redis client connection using the ConfigMap URL and implement session caching for the RMS service.
+Implement gRPC handlers for DeliveryService including delivery CRUD, status tracking, and delivery state machine transitions.
 
 ## Steps
-1. Add a Redis Go client dependency (go-redis/redis/v9). 2. Create a cache package in /internal/cache/ that initializes a Redis client using the Redis URL from the ConfigMap. 3. Implement session storage helpers: SetSession(key, data, ttl), GetSession(key), DeleteSession(key). 4. Optionally implement a caching layer for frequently accessed data (e.g., inventory item lookups) with appropriate TTLs. 5. Ensure the Redis connection is health-checked and included in the overall service health status.
+1. Implement DeliveryService handlers in /internal/delivery/service.go: CreateDelivery (link to project, set initial status to 'pending', validate pickup/delivery addresses). 2. GetDelivery, ListDeliveries (filter by project_id, status, date range). 3. Implement UpdateDeliveryStatus RPC with state machine validation: pending→in_transit→delivered, or pending→in_transit→returned. Invalid transitions return FailedPrecondition. When status changes to 'delivered', set actual_date to now. 4. Implement TrackDelivery RPC: return current status, scheduled vs actual dates, and driver notes for a given delivery. 5. Use proper gRPC error codes for invalid transitions and not-found cases.
 
 ## Validation
-Session set/get/delete operations work correctly against Redis; expired sessions are not returned; Redis health check reports status accurately; service starts gracefully if Redis is temporarily unavailable.
+Unit tests verify valid and invalid state transitions; CreateDelivery links to project; TrackDelivery returns correct current state; integration test runs full pending→in_transit→delivered flow; >80% coverage.

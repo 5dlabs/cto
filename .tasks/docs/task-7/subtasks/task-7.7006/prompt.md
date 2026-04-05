@@ -1,10 +1,14 @@
-Implement subtask 7006: Implement operations skills: customer vetting, finance, and RMS workflows
+Implement subtask 7006: Implement finance skill: invoicing and finance reporting
 
 ## Objective
-Implement Morgan's operations-focused skills (customer-vet, finance, rms-*) that wire to sigma1_vet_customer, sigma1_create_invoice, sigma1_finance_report, and RMS-related MCP tools to handle customer verification, invoicing, financial reporting, and rental management workflows.
+Develop the finance skill for Morgan to create invoices and generate financial reports using the sigma1_create_invoice and sigma1_finance_report MCP tools.
 
 ## Steps
-Step 1: Implement the customer-vet skill — Morgan gathers customer identification info, invokes sigma1_vet_customer to run background/credit checks, and communicates the vetting result (approved, conditional, declined) with appropriate messaging. Step 2: Implement the finance skill — Morgan can generate invoices via sigma1_create_invoice (after quote approval), and retrieve financial reports/summaries via sigma1_finance_report for admin users. Step 3: Implement the rms-* skills — Morgan interfaces with the Rental Management System for operations like checking rental status, managing reservations, handling returns, and reporting equipment issues. Step 4: Implement role-based access control within conversation context — finance reports and admin operations are only available to authenticated admin users, not general customers. Step 5: Handle async workflows — vetting may take time, so implement a callback/polling mechanism to notify customers when vetting completes.
+1. Implement the invoice creation skill: after a quote is accepted, invoke sigma1_create_invoice with quote data and customer details. Handle invoice confirmation and present the invoice ID/link to the customer.
+2. Implement the finance reporting skill: handle admin requests for financial summaries by invoking sigma1_finance_report with date ranges and report types. Format report data for conversational presentation.
+3. Define role-based access: invoice creation is available in customer flows, finance reporting is restricted to admin/internal users.
+4. Handle error cases: failed invoice creation, incomplete data, report generation timeouts.
+5. Add logging for all finance operations (invoice ID, amount, report type, generation time).
 
 ## Validation
-Simulate a customer vetting workflow end-to-end: customer provides info, Morgan invokes sigma1_vet_customer, result is communicated; simulate invoice creation after quote approval; verify finance reports are only accessible to admin-role conversations; RMS tools return correct rental status data.
+Invoice creation skill invokes sigma1_create_invoice with correct parameters and returns an invoice ID; finance report skill invokes sigma1_finance_report and returns formatted data; role restrictions prevent customer-facing conversations from accessing finance reports; error handling triggers on simulated failures.

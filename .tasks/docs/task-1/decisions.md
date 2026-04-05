@@ -1,10 +1,10 @@
 ## Decision Points
 
-- Which Redis-compatible cache should be used for rate limiting, session storage, and caching across services?
-- Which object storage provider should be used for product images and social media photos?
+- Which Redis-compatible engine should be used for caching, rate limiting, and session storage across services?
+- Which object storage provider should be used for product images, event photos, and other media assets?
+- Which PostgreSQL operator should be used for managing the main transactional database?
 - How should multi-tenancy and schema separation be handled in the PostgreSQL database?
-- What authentication and authorization mechanism should be used for internal service-to-service API calls?
-- Should the Signal integration for Morgan be self-hosted (Signal-CLI) or use a third-party Signal gateway service?
+- Should the Signal integration for Morgan be self-hosted via Signal-CLI or use a third-party Signal gateway service?
 
 ## Coordination Notes
 

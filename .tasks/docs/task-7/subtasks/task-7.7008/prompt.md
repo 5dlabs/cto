@@ -1,10 +1,14 @@
-Implement subtask 7008: Performance optimization and load testing for 500+ concurrent connections
+Implement subtask 7008: Implement RMS and admin skills
 
 ## Objective
-Optimize Morgan's response pipeline to achieve <10s response time for simple queries and validate support for 500+ concurrent Signal connections through load testing and bottleneck identification.
+Develop skills for rental management system operations (equipment lookup, availability, status) and administrative functions.
 
 ## Steps
-Step 1: Profile the end-to-end response pipeline for simple queries (e.g., 'What equipment do you have?') — measure time from message receipt → agent processing → MCP tool invocation → response delivery. Step 2: Identify and optimize bottlenecks: connection pooling to MCP tool backends, agent LLM inference latency, message serialization overhead. Step 3: Implement response streaming where possible — start sending partial responses while the agent is still processing. Step 4: Create a load test harness that simulates 500+ concurrent Signal connections sending messages simultaneously. Step 5: Run load tests, capture latency percentiles (p50, p95, p99), throughput, error rates, and resource utilization. Step 6: Tune concurrency settings: connection pool sizes, worker thread counts, message queue depths. Step 7: Document performance baselines and capacity limits.
+1. Implement RMS skills (rms-*): equipment lookup via sigma1_equipment_lookup, availability checks via sigma1_check_availability, and catalog search via sigma1_catalog_search for operational queries (e.g., 'What excavators are available next week?').
+2. Implement the admin skill: handle administrative commands such as system status checks, user management queries, and configuration updates as supported by backend tools.
+3. Define conversation patterns for RMS queries: natural language equipment searches, availability date range queries, equipment detail requests.
+4. Ensure RMS skills are accessible from all channels (Signal, voice, web chat).
+5. Add logging for all RMS and admin operations.
 
 ## Validation
-Simple query response time is consistently <10 seconds at p95; load test with 500+ concurrent Signal connections completes without errors; p99 latency for simple queries under load is <15 seconds; no connection drops or timeouts during sustained load; resource utilization stays within pod limits.
+Equipment lookup skill returns correct data via sigma1_equipment_lookup; availability skill returns accurate availability for date ranges; admin skill handles system status queries; all skills produce correct tool invocations and parse responses; logs capture operations across channels.

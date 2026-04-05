@@ -1,16 +1,10 @@
-Implement subtask 9006: Failover testing and ConfigMap endpoint updates for HA services
+Implement subtask 9006: Apply Kubernetes NetworkPolicies for inter-service access restriction
 
 ## Objective
-Perform comprehensive failover testing for all HA stateful services (PostgreSQL, Redis/Valkey) and update ConfigMap endpoints to reflect HA-aware service addresses. Document all production configurations.
+Define and apply NetworkPolicy resources to enforce least-privilege network access between all services, databases, and external egress.
 
 ## Steps
-1. Validate the `{project}-infra-endpoints` ConfigMap contains HA-aware endpoints for PostgreSQL (read-write and read-only services) and Redis/Valkey (sentinel endpoint).
-2. Perform PostgreSQL failover test: delete the primary pod, verify automatic promotion, verify application connectivity resumes, verify no data loss via a test write/read cycle.
-3. Perform Redis/Valkey failover test: delete the primary pod, verify sentinel-triggered promotion, verify cache operations resume.
-4. Test simultaneous failure of one PG replica and one Redis replica — verify no service degradation.
-5. Measure and record Recovery Time Objective (RTO) for each failover scenario.
-6. Document all production ingress routes, CDN config, HA topology, and failover procedures in a runbook.
-7. Verify all application services reconnect automatically after failover without restart.
+1. Create a default-deny NetworkPolicy for all pods in the application namespace: deny all ingress and egress by default. 2. Create ingress NetworkPolicies for PostgreSQL allowing only backend service pods (label-selected) on port 5432. 3. Create ingress NetworkPolicies for Redis allowing only backend service pods on port 6379 and sentinel port 26379. 4. Create ingress NetworkPolicies for each backend service allowing traffic from cloudflared pods and other authorized services. 5. Create egress NetworkPolicies allowing backend services to reach databases, external APIs (Stripe, LinkedIn, etc.), and DNS (port 53). 6. Create egress NetworkPolicies for cloudflared pods to reach backend services. 7. Apply all policies and verify with `kubectl describe networkpolicy`. 8. Test that unauthorized cross-service connections are blocked.
 
 ## Validation
-All failover tests complete with RTO < 60s for PostgreSQL and < 30s for Redis; no data loss confirmed via test record integrity; all application services recover without manual pod restarts; runbook document is complete and reviewed.
+Deploy a test pod without authorized labels and attempt to connect to PostgreSQL on port 5432 — verify the connection is refused/timed out. Verify authorized backend pods can still connect to all required services. Run `kubectl exec` from a backend pod to confirm egress to external APIs succeeds while egress to unauthorized internal services is blocked.

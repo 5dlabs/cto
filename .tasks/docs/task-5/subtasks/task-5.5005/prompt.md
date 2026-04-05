@@ -1,10 +1,10 @@
-Implement subtask 5005: Implement credit scoring API integration
+Implement subtask 5005: Implement credit signal API integration
 
 ## Objective
-Build the credit data API client module to retrieve business credit scores and risk assessments for organizations.
+Build the integration module for credit signal checking, implementing the provider trait against the selected credit API to retrieve commercial credit scores and payment history.
 
 ## Steps
-1. Create a `sources/credit.rs` module implementing the `VettingSource` trait. 2. Implement the credit API client (provider pending dp-12 decision). Design behind a `CreditProvider` trait so the provider can be swapped. 3. For v1, implement against the chosen provider's REST API: authenticate, submit company identifier (DUNS number, company registration number, etc.), retrieve credit report. 4. Parse into a `CreditScore` struct: provider_name, credit_score (numeric), risk_level (low/medium/high), payment_history_summary, credit_limit_recommendation, report_date. 5. Handle: company not found in credit database, expired/stale reports, API authentication failures. 6. Implement the /api/v1/vetting/credit/:org_id endpoint that returns just the credit portion independently. 7. Write unit tests with mocked credit API responses.
+1. Create a `vetting::integrations::credit` module. 2. Define a trait `CreditProvider` with methods: `check_credit(org_name: &str, registration_number: Option<&str>) -> Result<CreditResult>`, `get_payment_history(org_id: &str) -> Result<PaymentHistory>`. 3. Implement the trait for the chosen credit provider (or a stub if dp-16 is unresolved). Load API credentials from Kubernetes secrets. 4. Define CreditResult struct: credit_score (Option<i32>), credit_limit (Option<f64>), payment_performance (enum: Excellent/Good/Fair/Poor/Unknown), years_in_business, has_ccjs_or_defaults (bool). 5. Compute a normalized credit_signal_score (0.0-1.0) from the raw data: credit_score normalized (weight 0.5), payment_performance mapped to 0-1 (weight 0.3), no defaults bonus (weight 0.2). 6. Implement a mock/stub provider that returns configurable test data for development and testing. 7. Handle credit API errors gracefully: if credit check fails, return CreditResult with Unknown status and 0.5 neutral score.
 
 ## Validation
-Unit tests pass for: successful credit report retrieval, company not found in credit DB, authentication failure handling. CreditScore struct correctly populated. The /api/v1/vetting/credit/:org_id endpoint returns credit data for a mocked org.
+Unit tests using the mock provider for: excellent credit, poor credit, unknown/unavailable credit data, API failure fallback. Verify normalized score calculations match expected outputs.

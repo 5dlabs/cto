@@ -1,16 +1,10 @@
-Implement subtask 9003: Configure Cloudflare CDN for static assets and SSL termination
+Implement subtask 9003: Increase backend service replicas for production concurrency
 
 ## Objective
-Set up Cloudflare CDN to serve static assets (product images, frontend bundles) with proper cache rules and configure SSL/TLS termination at the Cloudflare edge.
+Scale all backend service Deployments to multiple replicas with appropriate resource requests, HPA configuration, and pod disruption budgets.
 
 ## Steps
-1. Configure Cloudflare DNS records for the production domain pointing to the cluster ingress (or Cloudflare Tunnel).
-2. Enable Cloudflare SSL/TLS in Full (Strict) mode with an origin certificate installed on the cluster.
-3. Create Cloudflare page rules or cache rules for static asset paths (e.g., `/static/*`, `/images/*`, `/_next/static/*`) with appropriate TTLs.
-4. If using Cloudflare R2 for object storage, configure a custom domain on the R2 bucket and set cache headers.
-5. Enable Brotli/gzip compression at the edge.
-6. Configure security headers (HSTS, X-Frame-Options, CSP) via Cloudflare transform rules.
-7. Document the CDN configuration including cache purge procedures.
+1. For each backend Deployment (API services, workers, etc.), set `replicas: 2` minimum as baseline. 2. Create HorizontalPodAutoscaler (HPA) resources targeting 70% CPU utilization with `minReplicas: 2` and `maxReplicas` based on expected load. 3. Add PodDisruptionBudget (PDB) resources with `minAvailable: 1` for each Deployment to ensure availability during node drains. 4. Configure pod anti-affinity with `preferredDuringSchedulingIgnoredDuringExecution` on `kubernetes.io/hostname` to spread replicas. 5. Set appropriate resource `requests` and `limits` for CPU and memory based on observed usage. 6. Apply all manifests and verify pods are scheduled across multiple nodes.
 
 ## Validation
-Verify static assets return `cf-cache-status: HIT` header after second request; confirm TLS certificate is valid and HSTS header is present; verify Brotli compression is active; confirm origin is not directly accessible bypassing CDN.
+Verify each Deployment has at least 2 ready replicas with `kubectl get deployments`. Trigger a node drain and confirm PDBs prevent full service disruption. Simulate CPU load and verify HPA scales up within 2 minutes.

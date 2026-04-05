@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All endpoints return correct data as per OpenAPI spec; availability check returns in <500ms for 95th percentile; rate limiting enforced; product images load from S3/R2; Prometheus metrics and health endpoints respond as expected.
+- [ ] All endpoints return correct data as per OpenAPI spec; rate limiting enforced; product images load from S3/R2; health and metrics endpoints respond; integration tests cover all endpoints with >80% code coverage.
 
 ## Verification Notes
 

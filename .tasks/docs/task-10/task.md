@@ -1,7 +1,7 @@
 ## Production Hardening: RBAC, Secret Rotation, Audit Logging (Bolt - Kubernetes/Helm)
 
 ### Objective
-Enforce RBAC, automate secret rotation, and enable audit logging for all infrastructure and services to meet security and compliance requirements.
+Implement RBAC, automate secret rotation, and enable audit logging for all critical infrastructure and services.
 
 ### Ownership
 - Agent: Bolt
@@ -11,11 +11,13 @@ Enforce RBAC, automate secret rotation, and enable audit logging for all infrast
 - Dependencies: 9
 
 ### Implementation Details
-{"steps": ["Define and apply Kubernetes RBAC policies for all namespaces and service accounts.", "Automate secret rotation for all external service credentials (Stripe, LinkedIn, etc.) using Kubernetes operators or external secret managers.", "Enable and configure audit logging for Kubernetes API and all managed services.", "Integrate audit logs with centralized logging (Loki/Grafana).", "Test RBAC enforcement and secret rotation workflows.", "Document security and compliance posture."]}
+{"steps": ["Define Kubernetes RBAC roles and bindings for all service accounts.", "Integrate external secret management (e.g., Kubernetes External Secrets) for API keys and credentials.", "Automate secret rotation for all third-party integrations (Stripe, LinkedIn, etc.).", "Enable audit logging for Kubernetes API and all managed services.", "Document RBAC and secret rotation policies."]}
 
 ### Subtasks
-- [ ] Define and apply Kubernetes RBAC policies for all namespaces and service accounts: Create Role, ClusterRole, RoleBinding, and ClusterRoleBinding resources to enforce least-privilege access for all service accounts, operators, and human administrators across all namespaces.
-- [ ] Automate secret rotation for all external service credentials: Set up automated secret rotation for external API credentials (Stripe, LinkedIn, Cloudflare, etc.) using a Kubernetes secret management operator, ensuring zero-downtime rotation.
-- [ ] Enable and configure Kubernetes API server audit logging: Configure the Kubernetes API server audit policy to log security-relevant events (authentication, authorization, secret access, RBAC changes) and ship audit logs to persistent storage.
-- [ ] Integrate audit logs and service logs with centralized Loki/Grafana logging: Ship Kubernetes API audit logs and managed service logs (PostgreSQL, Redis, operators) into the Loki centralized logging stack and create Grafana dashboards for security monitoring.
-- [ ] Test RBAC enforcement, secret rotation workflows, and document security posture: Perform comprehensive validation of RBAC policies, secret rotation zero-downtime guarantees, audit log completeness, and produce a security/compliance documentation package.
+- [ ] Define Kubernetes RBAC Roles and RoleBindings for all service accounts: Create least-privilege RBAC Role and RoleBinding (or ClusterRole/ClusterRoleBinding) manifests for every service account in the application namespace, ensuring each service can only access the resources it needs.
+- [ ] Deploy and configure External Secrets Operator for centralized secret management: Install the Kubernetes External Secrets Operator (ESO) and configure SecretStore/ClusterSecretStore resources to sync secrets from the chosen external secrets backend into Kubernetes Secrets.
+- [ ] Implement automated secret rotation for third-party integration credentials: Configure automated rotation schedules for all third-party API keys and credentials (Stripe, LinkedIn, etc.) with zero-downtime pod update mechanisms.
+- [ ] Enable Kubernetes API audit logging: Configure the Kubernetes API server audit policy and audit log backend to capture all security-relevant API operations.
+- [ ] Enable audit logging for managed services (PostgreSQL, Redis): Configure application-level audit logging for PostgreSQL and Redis to capture data access and administrative operations.
+- [ ] Document RBAC policies, secret rotation procedures, and audit logging configuration: Create comprehensive documentation covering all RBAC roles and their justifications, secret rotation schedules and procedures, and audit logging configuration for operational reference.
+- [ ] Penetration test RBAC and secret access controls: Perform security validation by attempting unauthorized access patterns against RBAC policies, secrets, and audit logging to verify controls are effective.

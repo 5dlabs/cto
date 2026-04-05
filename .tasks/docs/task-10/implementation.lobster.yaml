@@ -52,7 +52,7 @@ steps:
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-10003
-    depends_on: [setup]
+    depends_on: [validate-subtask-10002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10003/prompt.md
@@ -64,7 +64,7 @@ steps:
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-10004
-    depends_on: [validate-subtask-10003]
+    depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10004/prompt.md
@@ -76,7 +76,7 @@ steps:
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-10005
-    depends_on: [validate-subtask-10001, validate-subtask-10002, validate-subtask-10004]
+    depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10005/prompt.md
@@ -87,8 +87,32 @@ steps:
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
+  - name: implement-subtask-10006
+    depends_on: [validate-subtask-10001, validate-subtask-10003, validate-subtask-10004, validate-subtask-10005]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10006/prompt.md
+
+  - name: validate-subtask-10006
+    depends_on: [implement-subtask-10006]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-10007
+    depends_on: [validate-subtask-10001, validate-subtask-10002, validate-subtask-10003, validate-subtask-10004]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10007/prompt.md
+
+  - name: validate-subtask-10007
+    depends_on: [implement-subtask-10007]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
   - name: integration-validation
-    depends_on: [validate-subtask-10001, validate-subtask-10002, validate-subtask-10003, validate-subtask-10004, validate-subtask-10005]
+    depends_on: [validate-subtask-10001, validate-subtask-10002, validate-subtask-10003, validate-subtask-10004, validate-subtask-10005, validate-subtask-10006, validate-subtask-10007]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

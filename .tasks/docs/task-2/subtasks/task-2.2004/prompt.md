@@ -1,10 +1,21 @@
-Implement subtask 2004: Implement availability check endpoint with performance optimization
+Implement subtask 2004: Implement product listing and product detail endpoints
 
 ## Objective
-Implement the GET /api/v1/catalog/products/:id/availability endpoint with a strict <500ms p95 response time requirement, using optimized queries and Redis caching.
+Implement GET /api/v1/catalog/products (with filtering and pagination) and GET /api/v1/catalog/products/:id for individual product details.
 
 ## Steps
-1. Create src/handlers/availability.rs module. 2. Implement GET /api/v1/catalog/products/:id/availability: accept optional query params date_from, date_to, location. 3. Query rms.availability table for the given product_id, compute available_quantity = total_quantity - reserved_quantity for the requested date range. 4. Add a Redis caching layer: cache availability results with key 'avail:{product_id}:{date_from}:{date_to}' and a 60-second TTL. Check Redis first, fall back to PostgreSQL on miss. 5. Ensure the PostgreSQL query uses an index on (product_id, available_from, available_until). Add migration for the index if not present. 6. Return JSON: { product_id, available_quantity, total_quantity, date_from, date_to, location, cached: bool }. 7. Add request timing middleware or manual timing to log p95 latency. 8. Register the route in the main router.
+1. Create a handlers/products.rs module.
+2. Implement `list_products` handler:
+   - Query products from PostgreSQL with pagination (limit/offset or cursor-based).
+   - Support query parameters: category_id, status, search (ILIKE on name/description), sort_by, order.
+   - Return paginated response with items, total_count, page, page_size.
+   - Map image_urls to full S3/R2 URLs using the S3_ENDPOINT and S3_PRODUCT_IMAGES_BUCKET from config.
+3. Implement `get_product` handler:
+   - Query a single product by ID (UUID or integer).
+   - Return full product details including category info (JOIN or nested query).
+   - Return 404 if product not found.
+4. Create ProductListResponse and ProductDetailResponse DTOs.
+5. Register routes: GET /api/v1/catalog/products and GET /api/v1/catalog/products/:id.
 
 ## Validation
-Endpoint returns correct availability data; response time is <500ms at p95 under load (test with 100 concurrent requests using hey or wrk); cached responses return faster than uncached; cache invalidation works when availability data changes.
+GET /api/v1/catalog/products returns 200 with paginated JSON. Filtering by category_id returns only matching products. GET /api/v1/catalog/products/:id returns correct product with full details. Non-existent ID returns 404. Image URLs contain the correct S3 endpoint prefix.

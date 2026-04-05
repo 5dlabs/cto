@@ -1,14 +1,13 @@
 ## Decision Points
 
-- Which object storage provider should be used for product images and social media photos?
-- How should multi-tenancy and schema separation be handled in the PostgreSQL database?
-- What authentication and authorization mechanism should be used for internal service-to-service API calls?
-- How should the public-facing API endpoints (e.g., Equipment Catalog, RMS REST, Finance) be versioned and exposed?
-- Which AI model/provider should be used for caption generation and image curation — OpenAI (GPT-4V for images, GPT-4 for text) or Anthropic Claude?
-- How should the Signal-based approval workflow be implemented — direct Signal API integration, or via Morgan (OpenClaw) as an intermediary?
-- How should Instagram, LinkedIn, and Facebook API tokens/credentials be managed for multi-platform publishing?
+- Which object storage provider should be used for product images, event photos, and other media assets?
+- Which PostgreSQL operator should be used for managing the main transactional database?
+- What authentication and authorization mechanism should be used for internal service-to-service and external API access?
+- How should API versioning be handled for public and internal APIs?
+- Which AI model provider should be used for image scoring and caption generation — OpenAI (GPT-4 Vision) or Anthropic (Claude)?
+- How should the Signal messaging integration for the approval workflow be implemented?
 
 ## Coordination Notes
 
 - Agent owner: Nova
-- Primary stack: Node.js/Elysia
+- Primary stack: Node.js 20+/Elysia 1.x + Effect

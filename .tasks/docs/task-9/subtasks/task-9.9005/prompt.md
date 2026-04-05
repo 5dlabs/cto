@@ -1,21 +1,10 @@
-Implement subtask 9005: Enforce Kubernetes network policies to restrict inter-service traffic
+Implement subtask 9005: Set up Cloudflare Tunnel ingress for Morgan and website
 
 ## Objective
-Define and apply Kubernetes NetworkPolicy resources for all namespaces to enforce least-privilege network access between services, blocking unauthorized pod-to-pod communication.
+Deploy Cloudflare Tunnel (cloudflared) as a Kubernetes Deployment to expose Morgan (Discord bot dashboard) and the public website without opening inbound ports.
 
 ## Steps
-1. Create a default-deny ingress NetworkPolicy for the application namespace.
-2. Define allow-list NetworkPolicies for each service:
-   - Web frontend → API service (specific port)
-   - API service → PostgreSQL (port 5432)
-   - API service → Redis/Valkey (port 6379)
-   - Morgan → API service, Signal-CLI sidecar
-   - Worker services → PostgreSQL, Redis, NATS/message queue
-3. Allow DNS egress (port 53) for all pods to kube-dns.
-4. Allow Cloudflare Tunnel pod to reach backend services.
-5. Block all other inter-pod traffic by default.
-6. Label all pods consistently to support selector-based policies.
-7. Apply policies and verify with `kubectl describe networkpolicy`.
+1. Create a Cloudflare Tunnel in the Cloudflare Zero Trust dashboard and obtain the tunnel token/credentials. 2. Store the tunnel credentials as a Kubernetes Secret. 3. Create a `cloudflared` Deployment with 2 replicas running the tunnel connector, mounting the credentials secret. 4. Create a ConfigMap with the `cloudflared` config YAML mapping public hostnames to internal Kubernetes service endpoints (e.g., `morgan.example.com` → `http://morgan-service.default.svc.cluster.local:3000`, `www.example.com` → `http://website-service.default.svc.cluster.local:3000`). 5. Configure DNS CNAME records in Cloudflare pointing to the tunnel UUID. 6. Verify both Morgan and website are reachable via their public URLs through the tunnel.
 
 ## Validation
-From a test pod, confirm connections to unauthorized services are refused (timeout/reset); confirm authorized service-to-service connections succeed; verify DNS resolution works for all pods; run a network policy audit tool (e.g., `kubectl np-viewer`) to confirm coverage.
+Verify `cloudflared` pods are running with 2 ready replicas. Access `https://morgan.example.com` and `https://www.example.com` from an external browser and confirm correct content loads. Kill one `cloudflared` pod and verify access remains uninterrupted through the surviving replica.

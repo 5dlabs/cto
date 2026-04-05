@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] Vetting pipeline runs end-to-end and returns results for test orgs; all integrations (OpenCorporates, LinkedIn, Google Reviews, credit API) return expected data; final score is computed and stored; endpoints return correct data as per spec.
+- [ ] Vetting pipeline runs end-to-end and stores results; endpoints return correct vetting data; integrations with all external APIs succeed; >80% code coverage on vetting logic.
 
 ## Verification Notes
 

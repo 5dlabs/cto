@@ -1,10 +1,17 @@
-Implement subtask 8006: Implement home page with hero section and CTA
+Implement subtask 8006: Embed Morgan web chat widget on the website
 
 ## Objective
-Build the / (home) page with a hero section, primary call-to-action, featured equipment highlights, trust signals, and quick links to key sections of the site.
+Integrate the Morgan AI web chat widget into the website, connecting it to the Morgan agent's WebSocket/HTTP chat endpoint.
 
 ## Steps
-Step 1: Create the / route as the landing page. Step 2: Implement the hero section: full-width background image or video, headline copy, subheadline, and primary CTA button ('Get a Quote' → /quote). Step 3: Implement a featured equipment section: 3-4 highlighted equipment categories with images and 'Browse' links to /equipment with category filters. Step 4: Implement trust signals section: customer count, events served, years in business, or similar social proof. Step 5: Implement a testimonial highlight: pull 1-2 top testimonials from portfolio data. Step 6: Implement a secondary CTA section: 'Chat with Morgan' that opens the chat widget, 'Call Us' with phone number. Step 7: Ensure the page is fully responsive and renders well on all viewport sizes.
+1. Create a `ChatWidget` React component that renders a floating chat bubble and expandable chat panel.
+2. Implement WebSocket or HTTP streaming connection to the Morgan web chat endpoint (defined in task 7009's communication contract).
+3. Build the chat UI: message list (user and Morgan messages with timestamps), text input with send button, typing indicator, and connection status.
+4. Implement session management: generate or restore a session ID, maintain conversation history in local state.
+5. Add open/close/minimize states for the widget.
+6. Place the widget in the root layout so it's available on all pages.
+7. Ensure the widget is responsive and doesn't interfere with page content or navigation.
+8. Style the widget to match the site's design system (shadcn/ui + TailwindCSS tokens).
 
 ## Validation
-Home page renders with hero section, CTA buttons navigate correctly (/quote, /equipment); featured equipment section links to filtered catalog; testimonial content displays; responsive layout works on mobile, tablet, and desktop viewports.
+Chat widget appears on all pages as a floating button; clicking opens the chat panel; messages can be sent and Morgan responses are displayed; typing indicator appears while waiting for response; widget can be minimized and reopened with conversation preserved; widget is responsive and doesn't overlap critical page elements.

@@ -1,10 +1,16 @@
-Implement subtask 7002: Integrate Signal-CLI for inbound/outbound messaging
+Implement subtask 7002: Integrate Signal-CLI for bidirectional messaging
 
 ## Objective
-Implement the Signal messaging channel for Morgan, connecting to Signal-CLI for receiving and sending messages, handling message parsing, conversation threading, and session management for concurrent users.
+Set up Signal-CLI for Morgan to receive and send messages via Signal, including message parsing, response routing, and conversation state management.
 
 ## Steps
-Step 1: Set up the Signal-CLI client connection (REST API or JSON-RPC interface to the Signal-CLI pod/sidecar). Step 2: Implement an inbound message handler that receives Signal messages, extracts sender identity, message body, and any attachments. Step 3: Implement conversation session management — map Signal phone numbers to active conversation contexts. Step 4: Implement outbound message sending — format agent responses and send via Signal-CLI, supporting text, links, and basic formatting. Step 5: Handle Signal-specific edge cases: group messages (ignore or respond), delivery receipts, read receipts, typing indicators. Step 6: Implement connection pooling and reconnection logic to support 500+ concurrent Signal connections. Step 7: Add structured logging for all inbound/outbound Signal messages.
+1. Deploy or configure Signal-CLI (self-hosted per PRD) and register a Signal phone number for Morgan.
+2. Implement a message listener that polls or subscribes to incoming Signal messages from Signal-CLI's REST/JSON-RPC interface.
+3. Parse incoming messages (text, attachments) and route them to the OpenClaw agent runtime as conversation inputs.
+4. Implement a response handler that sends agent responses back via Signal-CLI's send API.
+5. Handle conversation threading/state: map Signal sender numbers to ongoing conversation contexts.
+6. Implement error handling for Signal-CLI connectivity issues (retry logic, dead-letter logging).
+7. Add structured logging for all inbound/outbound Signal messages (sender, timestamp, message length, response latency).
 
 ## Validation
-Send a test Signal message to Morgan's number and receive a coherent response; verify conversation threading with multiple concurrent senders; confirm reconnection after Signal-CLI restart; log entries appear for each message exchange.
+Send a test Signal message to Morgan's number and receive a coherent response within 10s; verify conversation context is maintained across multiple messages; logs show inbound and outbound message metadata; error handling triggers on simulated Signal-CLI downtime.

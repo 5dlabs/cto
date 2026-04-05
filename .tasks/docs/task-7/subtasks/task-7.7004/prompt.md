@@ -1,10 +1,17 @@
-Implement subtask 7004: Implement web chat widget channel
+Implement subtask 7004: Integrate Twilio for phone/SIP voice channel
 
 ## Objective
-Build the web chat interface channel that Morgan uses to communicate with website visitors, implementing WebSocket-based real-time messaging, session management, and a lightweight embeddable widget API.
+Set up Twilio integration for inbound/outbound voice calls and SIP, routing voice interactions through Morgan's agent runtime with ElevenLabs TTS output.
 
 ## Steps
-Step 1: Implement a WebSocket server endpoint for real-time web chat communication. Step 2: Define the chat protocol: message format (JSON with type, content, timestamp, session_id), handshake, heartbeat, and disconnect handling. Step 3: Implement session management — create sessions on first connection, maintain context across messages, handle session expiry/timeout. Step 4: Wire the web chat channel into the OpenClaw agent runtime as an input/output channel. Step 5: Expose an HTTP endpoint for widget initialization that returns session tokens and WebSocket URLs. Step 6: Implement typing indicators and message delivery confirmations. Step 7: Add CORS configuration for cross-origin widget embedding from the Next.js frontend.
+1. Configure a Twilio phone number and set up webhook endpoints for incoming calls.
+2. Implement a Twilio voice webhook handler that receives inbound call events and initiates a conversation with the OpenClaw agent.
+3. Implement speech-to-text processing for caller audio (using Twilio's built-in STT or a separate service).
+4. Route transcribed text to the agent runtime, receive text responses, and pipe them through the ElevenLabs voice synthesis module (7003).
+5. Stream or play synthesized audio back to the caller via Twilio's TwiML or Media Streams API.
+6. Handle call lifecycle events: ringing, connected, on-hold, transfer, hangup.
+7. Implement SIP endpoint configuration if required for business phone system integration.
+8. Add logging for call metadata (duration, caller ID, transcript summary, latency).
 
 ## Validation
-Connect to the WebSocket endpoint and exchange messages with Morgan; verify session persistence across multiple messages; confirm CORS headers allow embedding from the frontend domain; typing indicators are sent during agent processing.
+Place a test call to the Twilio number; Morgan answers, transcribes speech, generates a response, and plays audio back; round-trip latency for a simple query is <10s; call lifecycle events are logged; SIP endpoint is reachable if configured.

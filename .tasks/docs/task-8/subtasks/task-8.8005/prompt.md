@@ -1,10 +1,17 @@
-Implement subtask 8005: Implement portfolio gallery with event photos and testimonials
+Implement subtask 8005: Implement self-service quote builder page (/quote) with Effect.Schema validation
 
 ## Objective
-Build the /portfolio page displaying a gallery of past event photos and customer testimonials, with filtering by event type and a lightbox view for images.
+Build the interactive quote builder page where customers can select equipment, specify rental dates, enter contact information, and submit a quote request with full Effect.Schema validation.
 
 ## Steps
-Step 1: Create the /portfolio route with a server component that fetches portfolio data (event photos and testimonials) from the backend API or static data source. Step 2: Implement the photo gallery UI: masonry or grid layout with responsive columns, lazy-loaded images via Next.js Image component (optimized from object storage). Step 3: Implement event type filtering (weddings, corporate, festivals, etc.) with animated transitions between filter states. Step 4: Implement a lightbox/modal view for full-size image viewing with next/previous navigation. Step 5: Implement the testimonials section: customer quotes with name, event type, and star rating, displayed as cards or a carousel. Step 6: Add Schema.org Review structured data for testimonials. Step 7: Implement loading skeletons for the gallery while images load.
+1. Create `app/quote/page.tsx` for the quote builder.
+2. Define the quote request schema using Effect.Schema: equipment selections (array of { equipmentId, quantity, startDate, endDate }), customer contact info (name, email, phone, company), optional notes.
+3. Build a multi-step form or single-page form: Step 1 - Equipment Selection (search/browse and add items with quantities and dates), Step 2 - Contact Information, Step 3 - Review & Submit.
+4. Implement equipment search within the builder using the catalog API (reuse TanStack Query hooks from 8003).
+5. Implement real-time validation using Effect.Schema on each field and the overall form.
+6. Submit the quote request to the backend API (sigma1_generate_quote endpoint or equivalent REST endpoint).
+7. Display a confirmation view with quote reference number on successful submission.
+8. Handle submission errors gracefully with retry options.
 
 ## Validation
-Portfolio page loads and displays event photos in a responsive grid; filters correctly show/hide photos by event type; lightbox opens on image click with navigation; testimonials display with customer info; images are lazy-loaded and optimized via Next.js Image; Schema.org Review data is present.
+Quote builder renders at `/quote`; users can search and add equipment items; date pickers work and validate date ranges; contact form validates all required fields via Effect.Schema; form submission sends correct payload to the API; confirmation view displays on success; validation errors display inline; submission errors show retry options.

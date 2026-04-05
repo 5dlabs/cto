@@ -1,10 +1,10 @@
-Implement subtask 3003: Implement PostgreSQL schema migrations and repository layer
+Implement subtask 3003: Define protobuf schemas for all five RMS services
 
 ## Objective
-Create SQL migration files for all RMS domain tables and implement a Go repository layer for database access using the PostgreSQL connection from ConfigMap.
+Write .proto files for OpportunityService, ProjectService, InventoryService, CrewService, and DeliveryService, including all request/response messages, enums, and grpc-gateway HTTP annotations.
 
 ## Steps
-1. Choose a migration tool (golang-migrate or goose). 2. Create migration files for tables: opportunities, projects, quotes, inventory_items, inventory_transactions, crew_members, crew_assignments, deliveries, delivery_schedules. Include proper indexes, foreign keys, and enums for statuses. 3. Implement a db package that initializes a connection pool (pgxpool) using the connection string from the ConfigMap. 4. Implement repository interfaces and concrete implementations for each domain: OpportunityRepo, ProjectRepo, InventoryRepo, CrewRepo, DeliveryRepo. 5. Each repo should support the CRUD operations needed by the gRPC services. 6. Add a migration command or auto-migrate on startup.
+1. Create proto/rms/v1/opportunity.proto: Define OpportunityService with RPCs: CreateOpportunity, GetOpportunity, ListOpportunities, UpdateOpportunity, ConvertToProject. Include message types for Opportunity, CreateOpportunityRequest/Response, etc. Add google.api.http annotations for REST mapping (e.g., POST /api/v1/opportunities). 2. Create proto/rms/v1/project.proto: Define ProjectService with RPCs: GetProject, ListProjects, UpdateProject, AssignInventory, AssignCrew, GetProjectTimeline. 3. Create proto/rms/v1/inventory.proto: Define InventoryService with RPCs: CreateItem, GetItem, ListItems, UpdateItem, ScanBarcode (takes barcode string, returns item), CheckoutItems, ReturnItems. 4. Create proto/rms/v1/crew.proto: Define CrewService with RPCs: CreateCrewMember, GetCrewMember, ListCrewMembers, UpdateCrewMember, GetAvailability, ScheduleCrewMember. 5. Create proto/rms/v1/delivery.proto: Define DeliveryService with RPCs: CreateDelivery, GetDelivery, ListDeliveries, UpdateDeliveryStatus, TrackDelivery. 6. Use shared proto for common types (Timestamp, Pagination, Money). 7. Ensure all RPCs have grpc-gateway HTTP annotations.
 
 ## Validation
-Migrations run successfully against a test PostgreSQL instance; all tables are created with correct columns, types, and constraints; repository methods perform CRUD operations correctly verified by integration tests.
+All .proto files pass `protoc --lint` or buf lint without errors; grpc-gateway annotations are present on every RPC; message types cover all fields from the database schema.

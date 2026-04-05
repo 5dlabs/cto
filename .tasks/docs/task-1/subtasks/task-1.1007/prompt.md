@@ -1,10 +1,25 @@
-Implement subtask 1007: Deploy Cloudflare Tunnel for Morgan agent ingress
+Implement subtask 1007: Create sigma1-infra-endpoints ConfigMap aggregating all service endpoints
 
 ## Objective
-Deploy a Cloudflare Tunnel (cloudflared) in the cluster to provide secure external ingress for the Morgan agent without exposing a public IP.
+Create the central ConfigMap named sigma1-infra-endpoints in the sigma1 namespace, containing connection strings and API URLs for all provisioned services.
 
 ## Steps
-1. Create a Cloudflare Tunnel via the Cloudflare dashboard or API, and obtain the tunnel token. 2. Store the tunnel credentials/token as a Kubernetes Secret 'sigma1-cloudflare-tunnel' in the 'sigma1' namespace. 3. Create a Deployment for cloudflared in the 'sigma1' namespace, mounting the tunnel credentials. 4. Configure the cloudflared config to route the desired hostnames to internal services (e.g., morgan.sigma1.svc.cluster.local). 5. Expose the tunnel as a ClusterIP Service if needed for health checks. 6. Verify DNS records in Cloudflare point to the tunnel. 7. Record the public ingress URL for the aggregated ConfigMap.
+1. Create a ConfigMap manifest named sigma1-infra-endpoints in the sigma1 namespace.
+2. Include the following keys with values from prior subtasks:
+   - POSTGRES_URL: connection string from CloudNative-PG deployment
+   - REDIS_URL: connection string from Redis/Valkey deployment
+   - S3_ENDPOINT: S3/R2 endpoint URL
+   - S3_PRODUCT_IMAGES_BUCKET: bucket name
+   - S3_EVENT_PHOTOS_BUCKET: bucket name
+   - SIGNAL_CLI_URL: http://signal-cli.openclaw.svc.cluster.local:8080
+   - ELEVENLABS_SECRET_REF: sigma1-elevenlabs-secret
+   - TWILIO_SECRET_REF: sigma1-twilio-secret
+   - STRIPE_SECRET_REF: sigma1-stripe-secret
+   - OPENCORPORATES_SECRET_REF: sigma1-opencorporates-secret
+   - LINKEDIN_SECRET_REF: sigma1-linkedin-secret
+   - GOOGLE_REVIEWS_SECRET_REF: sigma1-google-reviews-secret
+3. Apply the ConfigMap.
+4. Also copy or mirror the ConfigMap into other namespaces (databases, openclaw, social, web) if cross-namespace access is needed, or document how services should reference it.
 
 ## Validation
-cloudflared pod is Running; the configured public hostname resolves and returns a response from the target internal service; Cloudflare dashboard shows the tunnel as healthy.
+Verify the ConfigMap exists in the sigma1 namespace with all expected keys. From a test pod using envFrom referencing the ConfigMap, echo each environment variable and confirm non-empty values. Verify POSTGRES_URL connects to PostgreSQL, REDIS_URL connects to Redis, and SIGNAL_CLI_URL returns a valid response.

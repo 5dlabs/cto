@@ -1,10 +1,10 @@
-Implement subtask 6002: Implement S3/R2 photo upload and storage service
+Implement subtask 6002: Implement image upload endpoint with S3/R2 storage
 
 ## Objective
-Build the photo upload and storage module using S3-compatible API (Cloudflare R2 or AWS S3 per dp-4), handling multipart uploads, generating signed URLs for retrieval, and wiring into the /api/v1/social/upload endpoint.
+Build the POST /api/v1/social/upload endpoint that accepts image files, stores them in S3/R2, and returns the stored URLs.
 
 ## Steps
-1. Create a `services/storage.ts` module. 2. Use @aws-sdk/client-s3 (S3-compatible, works with both R2 and S3). 3. Configure the client from environment variables: endpoint, access_key_id, secret_access_key, bucket_name, region. 4. Implement `uploadPhotos(files: File[], eventName: string): Effect.Effect<PhotoReference[], StorageError>` — uploads each file with a unique key (e.g., `events/{eventName}/{uuid}.{ext}`), returns array of { key, url, size, mimeType }. 5. Implement `getSignedUrl(key: string): Effect.Effect<string, StorageError>` for temporary read access. 6. Wire into the POST /api/v1/social/upload endpoint: accept multipart form data with event_name and photos[], upload to storage, create a new Draft record with status 'pending_curation', return the draft with photo references. 7. Add Effect.retry with exponential backoff for upload failures. 8. Validate file types (JPEG, PNG, WEBP only) and size limits (max 20MB per file).
+1. Implement POST /api/v1/social/upload as a multipart form handler in Elysia. 2. Accept one or more image files (JPEG, PNG, WebP) with a max size of 10MB per file. 3. Validate file types and sizes using Effect.Schema. 4. Generate unique S3 keys using format: social/{year}/{month}/{uuid}.{ext}. 5. Upload each file to S3/R2 using the configured client with appropriate content-type headers. 6. Return a JSON response with an array of { url, key, size, content_type } for each uploaded file. 7. Handle upload failures gracefully — if one file in a batch fails, report which succeeded and which failed. 8. Wrap all S3 operations in Effect for structured error handling.
 
 ## Validation
-Upload endpoint accepts multipart form data with photos and returns a draft with photo references. File type validation rejects non-image files. Signed URLs are generated and accessible. Effect.retry retries on transient S3 errors. A Draft record is persisted in PostgreSQL with status 'pending_curation'.
+Upload single and multiple images; verify files are accessible in S3/R2; reject oversized files (>10MB); reject non-image MIME types; verify returned URLs are valid and accessible.

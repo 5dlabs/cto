@@ -1,14 +1,14 @@
 ## Decision Points
 
-- Which Redis-compatible cache should be used for rate limiting, session storage, and caching across services?
-- What API paradigm should be used for inter-service communication between Morgan (OpenClaw) and backend services?
+- Which Redis-compatible engine should be used for caching, rate limiting, and session storage across services?
+- Which PostgreSQL operator should be used for managing the main transactional database?
+- What API paradigm should be used for inter-service communication between backend services (e.g., Equipment Catalog, RMS, Finance, Vetting)?
 - How should multi-tenancy and schema separation be handled in the PostgreSQL database?
-- What authentication and authorization mechanism should be used for internal service-to-service API calls?
-- How should the public-facing API endpoints (e.g., Equipment Catalog, RMS REST, Finance) be versioned and exposed?
-- Which Google Calendar API client library or approach should be used for project scheduling integration?
-- How should lead scoring weights and thresholds (GREEN/YELLOW/RED) be configured?
+- What authentication and authorization mechanism should be used for internal service-to-service and external API access?
+- How should API versioning be handled for public and internal APIs?
+- Which Google Calendar API client library and authentication method should be used for project event integration?
 
 ## Coordination Notes
 
 - Agent owner: Grizz
-- Primary stack: Go/gRPC
+- Primary stack: Go 1.22+/gRPC

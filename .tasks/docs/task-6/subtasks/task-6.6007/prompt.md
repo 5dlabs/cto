@@ -1,10 +1,10 @@
 Implement subtask 6007: Implement LinkedIn API publishing integration
 
 ## Objective
-Build the LinkedIn publishing module to post approved content to a LinkedIn company page using the LinkedIn Marketing API.
+Build the LinkedIn publishing module using the LinkedIn Marketing API to publish approved images with professional captions to the company page.
 
 ## Steps
-1. Create a `services/publishers/linkedin.ts` module implementing the `Publisher` interface. 2. Implement LinkedIn Marketing API integration: a) Register image assets (POST /assets?action=registerUpload), upload binary, then create a share (POST /ugcPosts) with the uploaded asset and LinkedIn-specific caption. b) Handle multi-image shares if supported. 3. Manage LinkedIn OAuth 2.0 token: handle token refresh (LinkedIn tokens expire in 60 days for long-lived). 4. Target the company page (organization URN) rather than personal profile. 5. Handle: rate limits, permission errors, image format restrictions. 6. On success, create a `PublishedPost` record with platform='linkedin' and the LinkedIn post URN. 7. Use Effect.retry for transient failures.
+1. Create a `services/publishing/linkedin` module implementing the PublishingProvider interface. 2. Implement LinkedIn API integration using the Share API (v2): register image upload → upload image binary → create share with image and caption. 3. Use OAuth2 tokens stored in Kubernetes secrets. Implement refresh token flow. 4. Format caption for LinkedIn: professional tone, no hashtags in excess, include relevant mentions if configured. 5. Return PublishResult with platform_post_id (activityUrn), share URL, published_at. 6. Handle LinkedIn-specific errors: media upload failures, permission issues, rate limits (daily share limits).
 
 ## Validation
-With valid LinkedIn credentials and an approved draft, the publisher registers an image asset, uploads it, and creates a share on the company page. PublishedPost record is created with LinkedIn URN. Token refresh works when needed. Permission errors are surfaced clearly. Rate limits trigger retry.
+Unit test with mocked LinkedIn API: verify three-step upload/share flow, OAuth token refresh, rate limit handling. Verify caption formatting meets LinkedIn requirements (max 3000 chars). Integration test with LinkedIn test organization if available.

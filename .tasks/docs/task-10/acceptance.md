@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] RBAC policies prevent unauthorized access; secret rotation completes without service downtime; audit logs are generated and visible in centralized logging; compliance checklist is met for all services.
+- [ ] RBAC policies prevent unauthorized access; secrets rotate on schedule and are updated in pods; audit logs capture all access and changes; attempt unauthorized actions and verify they are blocked and logged.
 
 ## Verification Notes
 

@@ -1,10 +1,17 @@
-Implement subtask 2002: Define database schema and domain models for Product, Category, and Availability
+Implement subtask 2002: Define data models and create database migrations for catalog schema
 
 ## Objective
-Create SQL migration files for the catalog schema (products, categories, availability tables) and corresponding Rust struct models with sqlx FromRow derives and serde serialization.
+Define Rust structs for Product, Category, and Availability domain models, and create sqlx migrations to set up the corresponding tables in the public (or rms) PostgreSQL schema.
 
 ## Steps
-1. Create a migrations directory and use sqlx-cli for migration management. 2. Write migration 001: CREATE SCHEMA IF NOT EXISTS rms; CREATE TABLE rms.categories (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name VARCHAR(255) NOT NULL, slug VARCHAR(255) UNIQUE NOT NULL, description TEXT, parent_id UUID REFERENCES rms.categories(id), created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now()); 3. Write migration 002: CREATE TABLE rms.products (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name VARCHAR(255) NOT NULL, slug VARCHAR(255) UNIQUE NOT NULL, description TEXT, category_id UUID REFERENCES rms.categories(id), daily_rate DECIMAL(10,2), weekly_rate DECIMAL(10,2), monthly_rate DECIMAL(10,2), image_key VARCHAR(512), specifications JSONB, created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ); 4. Write migration 003: CREATE TABLE rms.availability (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), product_id UUID REFERENCES rms.products(id), total_quantity INT NOT NULL, reserved_quantity INT DEFAULT 0, available_from DATE, available_until DATE, location VARCHAR(255)); 5. Create Rust models in src/models/: Category, Product, Availability structs with sqlx::FromRow and serde::Serialize derives. 6. Run migrations against the dev database.
+1. Create a models module with structs: Category (id, name, slug, description, parent_id, image_url, created_at, updated_at), Product (id, category_id, name, slug, description, daily_rate, weekly_rate, monthly_rate, image_urls: Vec<String>, specs: JSONB, status: enum Active/Inactive, created_at, updated_at), Availability (id, product_id, date, is_available, reserved_by, reservation_id).
+2. Derive sqlx::FromRow, Serialize, Deserialize on all structs.
+3. Create sqlx migrations in migrations/ directory:
+   - 001_create_categories.sql: CREATE TABLE categories with columns matching the struct.
+   - 002_create_products.sql: CREATE TABLE products with FK to categories, GIN index on specs.
+   - 003_create_availability.sql: CREATE TABLE availability with FK to products, unique constraint on (product_id, date).
+   - Add indexes on slug columns and commonly queried fields.
+4. Run migrations with `sqlx migrate run` and verify tables exist.
 
 ## Validation
-Migrations run successfully via 'sqlx migrate run'; all tables exist in the rms schema; Rust models compile and can be used in sqlx::query_as! macros without errors.
+Run `sqlx migrate run` against a test PostgreSQL instance; all migrations succeed. Verify tables categories, products, availability exist with correct columns and constraints. Insert and query test rows to confirm FK relationships work.

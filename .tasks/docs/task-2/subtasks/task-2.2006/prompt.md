@@ -1,10 +1,21 @@
-Implement subtask 2006: Integrate Redis client for caching and rate limiting infrastructure
+Implement subtask 2006: Implement machine-readable API endpoints for Morgan agent
 
 ## Objective
-Set up the Redis connection pool and create reusable caching and rate limiting utility modules that other handlers will consume.
+Implement GET /api/v1/equipment-api/catalog and POST /api/v1/equipment-api/checkout endpoints designed for programmatic consumption by the Morgan AI agent.
 
 ## Steps
-1. Add the redis crate (with tokio-comp feature) or deadpool-redis to Cargo.toml. 2. Create src/services/redis.rs module. 3. Initialize a Redis connection pool from REDIS_URL environment variable, add to AppState. 4. Implement a generic cache helper: async fn cache_get<T: DeserializeOwned>(pool, key) -> Option<T> and async fn cache_set<T: Serialize>(pool, key, value, ttl_seconds). 5. Implement a rate limiting module src/middleware/rate_limit.rs: use a sliding window counter pattern with Redis INCR + EXPIRE. Key pattern: 'ratelimit:{tenant_id}:{endpoint}:{window}'. 6. Create an Axum middleware layer that extracts tenant_id from headers or API key and applies per-tenant rate limits (configurable: e.g., 100 req/min default). 7. Return 429 Too Many Requests with Retry-After header when limit exceeded.
+1. Create a handlers/equipment_api.rs module.
+2. Implement `agent_catalog` handler (GET /api/v1/equipment-api/catalog):
+   - Return a simplified, machine-friendly catalog listing with product IDs, names, rates, availability summary, and image URLs.
+   - Include metadata useful for AI agents: structured category hierarchy, rate breakdowns, availability windows.
+   - Response format should be flat and easy to parse (avoid deeply nested structures).
+3. Implement `agent_checkout` handler (POST /api/v1/equipment-api/checkout):
+   - Accept a JSON body with: product_id, customer_info, rental_dates (start, end), delivery_details.
+   - Validate availability for the requested dates.
+   - Create a reservation record (mark dates as unavailable).
+   - Return a reservation confirmation with ID, total cost calculation, and next steps.
+   - Handle conflicts (dates already reserved) with a 409 Conflict response.
+4. Register routes under /api/v1/equipment-api/.
 
 ## Validation
-Redis pool connects successfully; cache_set followed by cache_get returns the stored value; cache entries expire after TTL; rate limiter returns 429 after exceeding the configured limit; rate limit counters reset after the window expires.
+GET /api/v1/equipment-api/catalog returns a flat, parseable JSON with all products and availability summaries. POST /api/v1/equipment-api/checkout with valid data creates a reservation and returns confirmation. Attempting to double-book the same dates returns 409. Invalid product IDs return 404.

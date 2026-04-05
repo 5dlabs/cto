@@ -1,16 +1,10 @@
-Implement subtask 9002: Scale Redis/Valkey to HA with replica and sentinel/cluster configuration
+Implement subtask 9002: Scale Redis/Valkey to HA multi-replica mode
 
 ## Objective
-Update the Redis/Valkey operator CR to enable HA mode with multiple replicas and sentinel-based or cluster-based failover for production cache resilience.
+Update the Redis/Valkey operator CR to enable HA with sentinel or cluster mode, providing automatic failover for the production cache layer.
 
 ## Steps
-1. Update the Valkey (or Redis) operator CR to configure at least 3 nodes (1 primary + 2 replicas) with sentinel mode enabled.
-2. Configure sentinel to monitor the primary and trigger automatic failover.
-3. Set resource requests/limits appropriate for production workloads.
-4. Configure `podAntiAffinity` to distribute replicas across nodes.
-5. Enable persistence (AOF or RDB) if required for session durability.
-6. Update the `{project}-infra-endpoints` ConfigMap with the sentinel-aware Redis endpoint (sentinel service address and port).
-7. Apply and verify all replicas are connected and sentinel is monitoring.
+1. Update the Redis operator CR to enable sentinel-based HA with at least 3 sentinel instances and 1 primary + 2 replicas. 2. Configure `redis.replicas: 2` and `sentinel.replicas: 3`. 3. Set anti-affinity rules to distribute pods across nodes. 4. Update resource requests/limits for production workload. 5. Ensure the connection string in the `{project}-infra-endpoints` ConfigMap is updated to point to the sentinel endpoint. 6. Apply the CR and verify sentinel quorum is established. 7. Confirm all application services using Redis reconnect via the sentinel endpoint.
 
 ## Validation
-Verify 3 Redis/Valkey pods running with sentinel; simulate primary pod kill and confirm sentinel promotes a replica within 15s; verify client libraries reconnect via sentinel; confirm no data loss for persisted keys.
+Verify sentinel quorum with `redis-cli -p 26379 sentinel masters`. Kill the Redis primary pod and confirm sentinel promotes a replica within 15 seconds. Verify application services continue operating without errors after failover.
