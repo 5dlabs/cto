@@ -88,33 +88,54 @@ export interface SyncIssuesResult {
 
 async function execute<T>(apiKey: string, query: string, variables: Record<string, unknown> = {}): Promise<T> {
   const authHeader = apiKey.startsWith('lin_api_') ? apiKey : `Bearer ${apiKey}`;
+  const MAX_RETRIES = 4;
 
-  const response = await fetch(LINEAR_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: authHeader,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const response = await fetch(LINEAR_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: authHeader,
+      },
+      body: JSON.stringify({ query, variables }),
+    });
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Linear API returned ${response.status}: ${body}`);
+    // Rate-limit / usage-limit: back off and retry
+    if (response.status === 429 || response.status === 503) {
+      const retryAfter = parseInt(response.headers.get('retry-after') ?? '', 10);
+      const waitMs = (retryAfter > 0 ? retryAfter : Math.min(2 ** attempt * 2, 30)) * 1000;
+      console.error(`Linear API ${response.status} — retrying in ${waitMs / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Linear API returned ${response.status}: ${body}`);
+    }
+
+    const json = (await response.json()) as GraphQLResponse<T>;
+
+    if (json.errors?.length) {
+      const messages = json.errors.map((e) => e.message).join(', ');
+      // Retry on usage/rate limit errors surfaced as GraphQL errors
+      if (messages.includes('usage limit') || messages.includes('rate limit')) {
+        const waitMs = Math.min(2 ** attempt * 2, 30) * 1000;
+        console.error(`Linear GraphQL limit hit — retrying in ${waitMs / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+      throw new Error(`GraphQL errors: ${messages}`);
+    }
+
+    if (!json.data) {
+      throw new Error('No data in GraphQL response');
+    }
+
+    return json.data;
   }
 
-  const json = (await response.json()) as GraphQLResponse<T>;
-
-  if (json.errors?.length) {
-    const messages = json.errors.map((e) => e.message).join(', ');
-    throw new Error(`GraphQL errors: ${messages}`);
-  }
-
-  if (!json.data) {
-    throw new Error('No data in GraphQL response');
-  }
-
-  return json.data;
+  throw new Error('Linear API: max retries exceeded due to rate/usage limits');
 }
 
 // =============================================================================
