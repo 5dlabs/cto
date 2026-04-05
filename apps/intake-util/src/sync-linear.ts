@@ -88,7 +88,7 @@ export interface SyncIssuesResult {
 
 async function execute<T>(apiKey: string, query: string, variables: Record<string, unknown> = {}): Promise<T> {
   const authHeader = apiKey.startsWith('lin_api_') ? apiKey : `Bearer ${apiKey}`;
-  const MAX_RETRIES = 4;
+  const MAX_RETRIES = 5;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const response = await fetch(LINEAR_API_URL, {
@@ -103,7 +103,7 @@ async function execute<T>(apiKey: string, query: string, variables: Record<strin
     // Rate-limit / usage-limit: back off and retry
     if (response.status === 429 || response.status === 503) {
       const retryAfter = parseInt(response.headers.get('retry-after') ?? '', 10);
-      const waitMs = (retryAfter > 0 ? retryAfter : Math.min(2 ** attempt * 2, 30)) * 1000;
+      const waitMs = (retryAfter > 0 ? retryAfter : Math.min(2 ** attempt * 5, 60)) * 1000;
       console.error(`Linear API ${response.status} — retrying in ${waitMs / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
       await new Promise((r) => setTimeout(r, waitMs));
       continue;
@@ -120,7 +120,7 @@ async function execute<T>(apiKey: string, query: string, variables: Record<strin
       const messages = json.errors.map((e) => e.message).join(', ');
       // Retry on usage/rate limit errors surfaced as GraphQL errors
       if (messages.includes('usage limit') || messages.includes('rate limit')) {
-        const waitMs = Math.min(2 ** attempt * 2, 30) * 1000;
+        const waitMs = Math.min(2 ** attempt * 5, 60) * 1000;
         console.error(`Linear GraphQL limit hit — retrying in ${waitMs / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
         await new Promise((r) => setTimeout(r, waitMs));
         continue;
@@ -293,27 +293,47 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
   // Resolve team key (e.g., "CTOPA") → UUID
   const teamId = await resolveTeamId(apiKey, opts.teamId);
 
-  // 1. Create project
+  // 1. Find existing project by name, or create a new one
   interface ProjectResponse {
     projectCreate: { success: boolean; project?: LinearProject };
   }
-
-  const projectData = await execute<ProjectResponse>(
-    apiKey,
-    `mutation CreateProject($input: ProjectCreateInput!) {
-      projectCreate(input: $input) {
-        success
-        project { id name url }
-      }
-    }`,
-    { input: { name: projectName, teamIds: [teamId] } },
-  );
-
-  if (!projectData.projectCreate.success || !projectData.projectCreate.project) {
-    throw new Error('Failed to create Linear project');
+  interface ProjectSearchResponse {
+    projects: { nodes: LinearProject[] };
   }
 
-  const project = projectData.projectCreate.project;
+  let project: LinearProject;
+
+  const existingData = await execute<ProjectSearchResponse>(
+    apiKey,
+    `query FindProject($name: String!) {
+      projects(filter: { name: { eq: $name } }) {
+        nodes { id name url }
+      }
+    }`,
+    { name: projectName },
+  );
+
+  if (existingData.projects.nodes.length > 0) {
+    project = existingData.projects.nodes[0];
+    console.error(`Reusing existing Linear project: ${project.name} (${project.id})`);
+  } else {
+    const projectData = await execute<ProjectResponse>(
+      apiKey,
+      `mutation CreateProject($input: ProjectCreateInput!) {
+        projectCreate(input: $input) {
+          success
+          project { id name url }
+        }
+      }`,
+      { input: { name: projectName, teamIds: [teamId] } },
+    );
+
+    if (!projectData.projectCreate.success || !projectData.projectCreate.project) {
+      throw new Error('Failed to create Linear project');
+    }
+    project = projectData.projectCreate.project;
+    console.error(`Created new Linear project: ${project.name} (${project.id})`);
+  }
 
   // 1b. Create custom views scoped to this project
   interface CustomViewResponse {
@@ -391,8 +411,29 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
   interface MilestoneResponse {
     projectMilestoneCreate: { success: boolean; projectMilestone?: { id: string; name: string } };
   }
+  interface ExistingMilestonesResponse {
+    project: { projectMilestones: { nodes: { id: string; name: string }[] } };
+  }
   const milestoneMap: Record<string, string> = {};
+
+  // Check for existing milestones first (idempotent re-runs)
+  try {
+    const existing = await execute<ExistingMilestonesResponse>(apiKey,
+      `query GetMilestones($id: String!) { project(id: $id) { projectMilestones { nodes { id name } } } }`,
+      { id: project.id },
+    );
+    for (const ms of existing.project.projectMilestones.nodes) {
+      milestoneMap[ms.name.toLowerCase()] = ms.id;
+    }
+  } catch {
+    // ignore — will create fresh
+  }
+
   for (const stage of PLAY_STAGES) {
+    if (milestoneMap[stage.name.toLowerCase()]) {
+      console.error(`Milestone exists: ${stage.name} (${milestoneMap[stage.name.toLowerCase()]})`);
+      continue;
+    }
     try {
       const msData = await execute<MilestoneResponse>(apiKey,
         `mutation CreateMilestone($input: ProjectMilestoneCreateInput!) {
