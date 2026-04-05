@@ -1243,18 +1243,130 @@ function findExistingGitHubIssue(repo: string, title: string): { number: number;
   }
 }
 
-/**
- * Add a GitHub issue to a GitHub Project (Projects v2).
- * Requires the `gh` CLI with the `project` extension or native support.
- */
-function addIssueToProject(repo: string, issueNumber: number, projectNumber: number): void {
+/** Agent display names for GitHub Project board columns. */
+const AGENT_DISPLAY_NAMES: Record<string, string> = {
+  bolt: 'Bolt (Infrastructure)',
+  rex: 'Rex (Implementation)',
+  blaze: 'Blaze (Frontend)',
+  grizz: 'Grizz (Go)',
+  nova: 'Nova (Node)',
+  tess: 'Tess (QA)',
+  cleo: 'Cleo (Quality)',
+  cipher: 'Cipher (Security)',
+  morgan: 'Morgan (PM)',
+  atlas: 'Atlas (Integration)',
+  stitch: 'Stitch (Review)',
+  angie: 'Angie (Agent Systems)',
+  spark: 'Spark (Prototype)',
+  tap: 'Tap (Integration)',
+  vex: 'Vex (Debug)',
+  keeper: 'Keeper (Ops)',
+  healer: 'Healer (Self-Heal)',
+  pixel: 'Pixel (Desktop)',
+};
+
+/** Extract agent name from issue title patterns like [bolt], [rex], etc. */
+function extractAgentFromTitle(title: string): string | undefined {
+  const match = title.match(/^\[(\w+)\]/);
+  if (match) {
+    const name = match[1].toLowerCase();
+    if (AGENT_DISPLAY_NAMES[name]) return name;
+  }
+  return undefined;
+}
+
+/** Get the GitHub Projects V2 internal node ID for a project by its number. */
+function getProjectNodeId(owner: string, projectNumber: number): string | undefined {
   try {
-    const issueUrl = `https://github.com/${repo}/issues/${issueNumber}`;
-    gh(['project', 'item-add', String(projectNumber), '--owner', repo.split('/')[0], '--url', issueUrl]);
-    console.error(`github-sync: added issue #${issueNumber} to project #${projectNumber}`);
+    return gh(['api', 'graphql', '-f',
+      `query=query { organization(login: "${owner}") { projectV2(number: ${projectNumber}) { id } } }`,
+      '--jq', '.data.organization.projectV2.id']).trim() || undefined;
+  } catch {
+    try {
+      return gh(['api', 'graphql', '-f',
+        `query=query { user(login: "${owner}") { projectV2(number: ${projectNumber}) { id } } }`,
+        '--jq', '.data.user.projectV2.id']).trim() || undefined;
+    } catch { return undefined; }
+  }
+}
+
+/** Create an "Agent" single-select field on a project with all agent options. */
+function setupAgentField(projectNodeId: string): { fieldId: string; optionMap: Record<string, string> } | undefined {
+  // Check if field already exists
+  try {
+    const fieldsJson = gh(['api', 'graphql', '-f',
+      `query=query { node(id: "${projectNodeId}") { ... on ProjectV2 { fields(first: 30) { nodes { ... on ProjectV2SingleSelectField { id name options { id name } } } } } } }`,
+      '--jq', '.data.node.fields.nodes']);
+    const fields = JSON.parse(fieldsJson);
+    const existing = fields.find((f: { name?: string }) => f?.name === 'Agent');
+    if (existing) {
+      const optionMap: Record<string, string> = {};
+      for (const opt of existing.options || []) {
+        optionMap[opt.name] = opt.id;
+      }
+      return { fieldId: existing.id, optionMap };
+    }
+  } catch { /* proceed to create */ }
+
+  // Create the field with agent options
+  const options = Object.values(AGENT_DISPLAY_NAMES)
+    .map((name) => `{ name: "${name}", color: GRAY, description: "" }`)
+    .join(', ');
+  // Also add Pending and Complete
+  const allOptions = `{ name: "Pending", color: YELLOW, description: "" }, ${options}, { name: "Complete ✅", color: GREEN, description: "" }`;
+  try {
+    const result = gh(['api', 'graphql', '-f',
+      `query=mutation { createProjectV2Field(input: { projectId: "${projectNodeId}", dataType: SINGLE_SELECT, name: "Agent", singleSelectOptions: [${allOptions}] }) { projectV2Field { ... on ProjectV2SingleSelectField { id options { id name } } } } }`,
+      '--jq', '.data.createProjectV2Field.projectV2Field']);
+    const field = JSON.parse(result);
+    const optionMap: Record<string, string> = {};
+    for (const opt of field.options || []) {
+      optionMap[opt.name] = opt.id;
+    }
+    console.error(`github-sync: created "Agent" field with ${Object.keys(optionMap).length} options`);
+    return { fieldId: field.id, optionMap };
   } catch (err) {
-    // Non-fatal — project integration is optional
+    console.error(`github-sync: warning: could not create Agent field: ${err}`);
+    return undefined;
+  }
+}
+
+/** Add issue to project and optionally set its Agent field. Returns the project item ID. */
+function addIssueToProject(
+  repo: string,
+  issueNumber: number,
+  projectNodeId: string,
+  agentField?: { fieldId: string; optionMap: Record<string, string> },
+  agentName?: string,
+): string | undefined {
+  try {
+    // Get issue node ID
+    const nodeId = gh(['api', `repos/${repo}/issues/${issueNumber}`, '--jq', '.node_id']).trim();
+    if (!nodeId) return undefined;
+
+    // Add to project
+    const itemResult = gh(['api', 'graphql', '-f',
+      `query=mutation { addProjectV2ItemById(input: { projectId: "${projectNodeId}", contentId: "${nodeId}" }) { item { id } } }`,
+      '--jq', '.data.addProjectV2ItemById.item.id']);
+    const itemId = itemResult.trim();
+    if (!itemId) return undefined;
+
+    // Set Agent field value if we have one
+    if (agentField && agentName) {
+      const displayName = AGENT_DISPLAY_NAMES[agentName] || 'Pending';
+      const optionId = agentField.optionMap[displayName] || agentField.optionMap['Pending'];
+      if (optionId) {
+        try {
+          gh(['api', 'graphql', '-f',
+            `query=mutation { updateProjectV2ItemFieldValue(input: { projectId: "${projectNodeId}", itemId: "${itemId}", fieldId: "${agentField.fieldId}", value: { singleSelectOptionId: "${optionId}" } }) { projectV2Item { id } } }`]);
+        } catch { /* non-fatal */ }
+      }
+    }
+
+    return itemId;
+  } catch (err) {
     console.error(`github-sync: warning: could not add issue #${issueNumber} to project: ${err}`);
+    return undefined;
   }
 }
 
@@ -1388,13 +1500,14 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
 
   console.error(`github-sync: processing ${processingOrder.length} issues (${roots.length} roots)`);
 
-  // 2. Create or find a GitHub Project
+  // 2. Create or find a GitHub Project + set up Agent field
+  const owner = repo.split('/')[0];
   let ghProjectNumber: number | undefined = githubProject;
+  let ghProjectNodeId: string | undefined;
+
   if (!ghProjectNumber) {
-    const owner = repo.split('/')[0];
     const projectTitle = `${opts.projectName || 'intake'} - Intake`;
     try {
-      // Get owner node ID (try org first, then user)
       let ownerId = '';
       try {
         ownerId = gh(['api', 'graphql', '-f', `query={ organization(login: "${owner}") { id } }`, '--jq', '.data.organization.id']);
@@ -1403,13 +1516,26 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
       }
       if (ownerId) {
         const result = gh(['api', 'graphql', '-f',
-          `query=mutation { createProjectV2(input: { ownerId: "${ownerId}", title: "${projectTitle}" }) { projectV2 { number url } } }`,
-          '--jq', '.data.createProjectV2.projectV2.number']);
-        ghProjectNumber = parseInt(result.trim(), 10) || undefined;
+          `query=mutation { createProjectV2(input: { ownerId: "${ownerId}", title: "${projectTitle}" }) { projectV2 { id number url } } }`,
+          '--jq', '.data.createProjectV2.projectV2']);
+        const proj = JSON.parse(result);
+        ghProjectNumber = proj.number;
+        ghProjectNodeId = proj.id;
         console.error(`github-sync: created GitHub Project #${ghProjectNumber}: ${projectTitle}`);
       }
     } catch (err) {
       console.error(`github-sync: warning: could not create GitHub Project: ${err}`);
+    }
+  } else {
+    ghProjectNodeId = getProjectNodeId(owner, ghProjectNumber);
+  }
+
+  // Set up Agent single-select field on the project board
+  let agentField: { fieldId: string; optionMap: Record<string, string> } | undefined;
+  if (ghProjectNodeId) {
+    agentField = setupAgentField(ghProjectNodeId);
+    if (agentField) {
+      console.error(`github-sync: Agent field ready with ${Object.keys(agentField.optionMap).length} options`);
     }
   }
 
@@ -1504,11 +1630,6 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
         console.error(`github-sync: warning: could not update Linear back-link for ${issue.identifier}: ${err}`);
       }
 
-      // Add to GitHub Project
-      if (ghProjectNumber) {
-        addIssueToProject(repo, ghIssueNumber, ghProjectNumber);
-      }
-
       // Rate limit: ~2s between creates
       await sleep(2000);
     } catch (err) {
@@ -1520,6 +1641,7 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
   // 4. Link sub-issues to parents via the GitHub sub-issues API
   console.error(`github-sync: linking sub-issues...`);
   let linkedCount = 0;
+  let alreadyLinkedCount = 0;
 
   for (const issue of allIssues) {
     if (!issue.parent || !identifierSet.has(issue.parent.identifier)) continue;
@@ -1529,9 +1651,14 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
     if (!parentGh || !childGh || !childGh.nodeId) continue;
 
     try {
-      // GitHub sub-issues API: POST /repos/:owner/:repo/issues/:issue_number/sub_issues
-      // Requires the sub-issue's database ID (not node ID, not issue number)
-      // Get the database ID from the REST API
+      // Check if already linked by fetching parent's sub-issues
+      const existingSubs = gh(['api', `repos/${repo}/issues/${parentGh.number}/sub_issues`, '--jq', '.[].number']);
+      const existingNums = new Set(existingSubs.trim().split('\n').filter(Boolean).map(Number));
+      if (existingNums.has(childGh.number)) {
+        alreadyLinkedCount++;
+        continue;
+      }
+
       const issueJson = gh(['api', `repos/${repo}/issues/${childGh.number}`, '--jq', '.id']);
       const databaseId = parseInt(issueJson.trim(), 10);
       if (!databaseId) continue;
@@ -1542,13 +1669,47 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
       console.error(`github-sync: linked #${childGh.number} as sub-issue of #${parentGh.number}`);
       await sleep(1000);
     } catch (err) {
-      // Non-fatal — sub-issue linking is best-effort
       console.error(`github-sync: warning: could not link ${issue.identifier} → ${issue.parent.identifier}: ${err}`);
     }
   }
+  if (alreadyLinkedCount) {
+    console.error(`github-sync: ${alreadyLinkedCount} sub-issue links already existed (skipped)`);
+  }
+
+  // 5. Add all issues to GitHub Project with agent assignment
+  let projectAddedCount = 0;
+  if (ghProjectNodeId) {
+    console.error(`github-sync: populating GitHub Project board...`);
+    for (const issue of processingOrder) {
+      const ghEntry = ghIssueMap.get(issue.identifier);
+      if (!ghEntry) continue;
+
+      // Determine agent: check own title, own labels, then inherit from parent
+      let agentName = extractAgentFromTitle(issue.title)
+        || extractAgentLabel(issue.labels?.nodes || [])?.replace('agent:', '');
+
+      if (!agentName && issue.parent) {
+        const parent = issueByIdentifier.get(issue.parent.identifier);
+        if (parent) {
+          agentName = extractAgentFromTitle(parent.title)
+            || extractAgentLabel(parent.labels?.nodes || [])?.replace('agent:', '');
+        }
+      }
+
+      const itemId = addIssueToProject(repo, ghEntry.number, ghProjectNodeId, agentField, agentName);
+      if (itemId) {
+        projectAddedCount++;
+        if (projectAddedCount % 10 === 0) {
+          console.error(`github-sync: added ${projectAddedCount} issues to project...`);
+        }
+      }
+      await sleep(500);
+    }
+    console.error(`github-sync: added ${projectAddedCount} issues to project #${ghProjectNumber}`);
+  }
 
   console.error(
-    `github-sync: done — ${createdCount} created, ${skippedCount} skipped, ${errorCount} errors, ${linkedCount} sub-issue links`,
+    `github-sync: done — ${createdCount} created, ${skippedCount} skipped, ${errorCount} errors, ${linkedCount} sub-issue links, ${projectAddedCount} in project`,
   );
 
   return { createdCount, skippedCount, errorCount, totalLinearIssues: allIssues.length, mappings };
