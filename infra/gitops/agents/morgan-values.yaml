@@ -30,7 +30,7 @@ nodeOptions: "--max-old-space-size=4096"
 agent:
   id: "morgan"
   name: "Morgan"
-  model: "openai-codex/gpt-5.4"
+  model: "openai-codex/gpt-5.3-codex"
   heartbeat:
     every: "12h"
     target: "last"
@@ -45,7 +45,7 @@ agentDefaults:
   typingMode: "instant"
 
 modelDefaults:
-  primary: "openai-codex/gpt-5.4"
+  primary: "openai-codex/gpt-5.3-codex"
   fallbacks:
     - "google/gemini-2.5-pro"
     - "anthropic/claude-sonnet-4-20250514"
