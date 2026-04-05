@@ -1,7 +1,8 @@
-import { writeFileSync, unlinkSync } from "fs";
-import { join } from "path";
+import { appendFileSync, copyFileSync, mkdirSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from "fs";
+import { basename, dirname, join } from "path";
 import { tmpdir } from "os";
 import { randomBytes } from "crypto";
+import { execFileSync } from "child_process";
 
 import { getVoiceConfig, resolveLevel } from "./voices";
 import type { VoiceConfig, VoiceLevel, TtsProvider } from "./voices";
@@ -11,7 +12,7 @@ import { acquireLock, releaseLock, listLocks } from "./process-lock";
 import { synthesize } from "./elevenlabs";
 import { synthesizeOpenAI } from "./openai-tts";
 import { synthesizeXai } from "./xai-tts";
-import { getCached, putCached, pruneExpired } from "./cache";
+import { getCachedPath, putCached, pruneExpired } from "./cache";
 import { playAudio } from "./player";
 import { humanizeStep, humanizeGate, humanizeRaw } from "./humanize";
 import { llmHumanize } from "./llm-humanize";
@@ -107,6 +108,119 @@ function fallbackVoice(provider: TtsProvider): VoiceConfig {
 
 const CHUNK_LIMIT = 4000;
 
+type RenderStatusState = "pending" | "running" | "complete" | "failed";
+
+interface TranscriptSegment {
+  speaker: SpeakerId;
+  text: string;
+  label?: string;
+}
+
+interface TranscriptDocument {
+  kind?: string;
+  sessionId?: string;
+  generatedAt?: string;
+  segments: TranscriptSegment[];
+}
+
+interface RenderStatus {
+  status: RenderStatusState;
+  startedAt?: string;
+  finishedAt?: string;
+  outputPath?: string;
+  segmentCount?: number;
+  chunkCount?: number;
+  error?: string;
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+function ensureParentDir(filePath: string): void {
+  mkdirSync(dirname(filePath), { recursive: true });
+}
+
+function writeJsonFile(filePath: string, value: unknown): void {
+  ensureParentDir(filePath);
+  const tmpPath = `${filePath}.${randomBytes(4).toString("hex")}.tmp`;
+  writeFileSync(tmpPath, `${JSON.stringify(value, null, 2)}\n`);
+  renameSync(tmpPath, filePath);
+}
+
+function logRender(logPath: string | undefined, message: string): void {
+  const line = `[${nowIso()}] ${message}`;
+  process.stderr.write(`lobster-voice: ${message}\n`);
+  if (!logPath) return;
+  ensureParentDir(logPath);
+  appendFileSync(logPath, `${line}\n`);
+}
+
+function writeRenderStatus(statusPath: string | undefined, status: RenderStatus): void {
+  if (!statusPath) return;
+  writeJsonFile(statusPath, status);
+}
+
+function normalizeTranscriptSegment(raw: unknown, index: number): TranscriptSegment {
+  if (!raw || typeof raw !== "object") {
+    throw new Error(`render-transcript: segment ${index + 1} is not an object`);
+  }
+
+  const candidate = raw as Record<string, unknown>;
+  const speaker = typeof candidate.speaker === "string" ? candidate.speaker : "";
+  const text = typeof candidate.text === "string" ? candidate.text.trim() : "";
+  const label = typeof candidate.label === "string" && candidate.label.trim().length > 0
+    ? candidate.label.trim()
+    : undefined;
+
+  if (!isSpeakerId(speaker)) {
+    throw new Error(`render-transcript: segment ${index + 1} has invalid speaker "${speaker}"`);
+  }
+  if (!text) {
+    throw new Error(`render-transcript: segment ${index + 1} is missing text`);
+  }
+
+  return { speaker, text, label };
+}
+
+function readTranscriptDocument(inputPath: string): TranscriptDocument {
+  const raw = readFileSync(inputPath, "utf-8");
+  const parsed = JSON.parse(raw) as unknown;
+
+  if (Array.isArray(parsed)) {
+    return {
+      generatedAt: nowIso(),
+      segments: parsed.map((segment, index) => normalizeTranscriptSegment(segment, index)),
+    };
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("render-transcript: input must be an array or object with segments");
+  }
+
+  const record = parsed as Record<string, unknown>;
+  if (!Array.isArray(record.segments)) {
+    throw new Error("render-transcript: object input must include a segments array");
+  }
+
+  return {
+    kind: typeof record.kind === "string" ? record.kind : undefined,
+    sessionId: typeof record.sessionId === "string" ? record.sessionId : undefined,
+    generatedAt: typeof record.generatedAt === "string" ? record.generatedAt : nowIso(),
+    segments: record.segments.map((segment, index) => normalizeTranscriptSegment(segment, index)),
+  };
+}
+
+function escapeFfmpegListPath(filePath: string): string {
+  return filePath.replace(/'/g, `'\\''`);
+}
+
+function maybeTestAudio(): Buffer | null {
+  const fixturePath = process.env.LOBSTER_VOICE_TEST_MP3;
+  if (!fixturePath) return null;
+  return readFileSync(fixturePath);
+}
+
 function chunkText(text: string): string[] {
   if (text.length <= CHUNK_LIMIT) return [text];
 
@@ -129,36 +243,48 @@ function chunkText(text: string): string[] {
   return chunks;
 }
 
-async function speakChunk(text: string, voice: VoiceConfig, level: VoiceLevel, speaker?: SpeakerId): Promise<void> {
-  const cached = getCached(voice.voiceId, text);
-  if (cached) {
-    const tmpFile = join(tmpdir(), `lv-${randomBytes(4).toString("hex")}.mp3`);
-    writeFileSync(tmpFile, cached);
-    const ok = playAudio(tmpFile);
-    try { unlinkSync(tmpFile); } catch { /* ignore */ }
-    if (ok) return;
-  }
-
+async function resolveChunkAudioPath(text: string, voice: VoiceConfig, logPath?: string): Promise<string> {
   const chain = buildFallbackChain(voice.provider);
+  const testAudio = maybeTestAudio();
 
   for (const provider of chain) {
+    const effectiveVoice = provider === voice.provider ? voice : fallbackVoice(provider);
+    const cachedPath = getCachedPath(effectiveVoice.voiceId, text);
+    if (cachedPath) {
+      return cachedPath;
+    }
+
+    if (testAudio) {
+      return putCached(effectiveVoice.voiceId, text, testAudio);
+    }
+
     const apiKey = getApiKey(provider);
     if (!apiKey) continue;
 
-    const effectiveVoice = provider === voice.provider ? voice : fallbackVoice(provider);
-
     try {
       const audio = await synthesizeWithProvider(text, effectiveVoice, apiKey);
-      const cachedPath = putCached(effectiveVoice.voiceId, text, audio);
-      const ok = playAudio(cachedPath);
-      if (ok) return;
+      return putCached(effectiveVoice.voiceId, text, audio);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      process.stderr.write(`lobster-voice: ${provider} failed (${msg}), trying next provider\n`);
+      logRender(logPath, `${provider} failed for transcript chunk (${msg}), trying next provider`);
     }
   }
 
-  process.stderr.write(`lobster-voice: all TTS providers exhausted for chunk — silent skip\n`);
+  throw new Error("all TTS providers exhausted for chunk");
+}
+
+async function speakChunk(text: string, voice: VoiceConfig, level: VoiceLevel, speaker?: SpeakerId): Promise<void> {
+  try {
+    const audioPath = await resolveChunkAudioPath(text, voice);
+    const ok = playAudio(audioPath);
+    if (ok) return;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`lobster-voice: ${msg} — silent skip\n`);
+    return;
+  }
+
+  process.stderr.write("lobster-voice: audio playback failed — silent skip\n");
 }
 
 async function speakWithVoice(text: string, voice: VoiceConfig, level: VoiceLevel, speaker?: SpeakerId): Promise<void> {
@@ -300,6 +426,132 @@ async function cmdDebate(positional: string[], flags: Record<string, string>): P
   releaseLock(speakerArg);
 }
 
+async function cmdRenderTranscript(flags: Record<string, string>): Promise<void> {
+  const inputPath = flags.input;
+  const outputPath = flags.output;
+  const statusPath = flags.status;
+  const logPath = flags.log;
+
+  if (!inputPath || !outputPath) {
+    process.stderr.write("Usage: lobster-voice render-transcript --input <json> --output <mp3> [--status <json>] [--log <path>]\n");
+    process.exit(1);
+  }
+
+  const startedAt = nowIso();
+  let transcript: TranscriptDocument;
+  try {
+    transcript = readTranscriptDocument(inputPath);
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    writeRenderStatus(statusPath, {
+      status: "failed",
+      startedAt,
+      finishedAt: nowIso(),
+      outputPath,
+      segmentCount: 0,
+      chunkCount: 0,
+      error,
+    });
+    logRender(logPath, `render-transcript failed before synthesis: ${error}`);
+    throw err;
+  }
+  const segments = transcript.segments.filter((segment) => segment.text.trim().length > 0);
+
+  writeRenderStatus(statusPath, {
+    status: "running",
+    startedAt,
+    outputPath,
+    segmentCount: segments.length,
+    chunkCount: 0,
+  });
+  logRender(logPath, `render-transcript started for ${inputPath} → ${outputPath}`);
+
+  if (segments.length === 0) {
+    const error = "render-transcript: no transcript segments to render";
+    writeRenderStatus(statusPath, {
+      status: "failed",
+      startedAt,
+      finishedAt: nowIso(),
+      outputPath,
+      segmentCount: 0,
+      chunkCount: 0,
+      error,
+    });
+    throw new Error(error);
+  }
+
+  ensureParentDir(outputPath);
+  const tmpOutput = join(dirname(outputPath), `.${basename(outputPath)}.${randomBytes(4).toString("hex")}.tmp.mp3`);
+  const tempDir = join(tmpdir(), `lobster-voice-render-${randomBytes(6).toString("hex")}`);
+  mkdirSync(tempDir, { recursive: true });
+
+  let chunkCount = 0;
+
+  try {
+    const audioFiles: string[] = [];
+    for (const [index, segment] of segments.entries()) {
+      const speaker = getSpeaker(segment.speaker);
+      if (!speaker) {
+        throw new Error(`render-transcript: unknown speaker "${segment.speaker}"`);
+      }
+
+      const text = humanizeRaw(segment.text);
+      const chunks = chunkText(text);
+      chunkCount += chunks.length;
+      logRender(logPath, `rendering segment ${index + 1}/${segments.length} (${segment.speaker}) in ${chunks.length} chunk(s)`);
+
+      for (const chunk of chunks) {
+        audioFiles.push(await resolveChunkAudioPath(chunk, speaker.voice, logPath));
+      }
+    }
+
+    if (audioFiles.length === 0) {
+      throw new Error("render-transcript: no audio chunks were produced");
+    }
+
+    if (audioFiles.length === 1) {
+      copyFileSync(audioFiles[0], tmpOutput);
+    } else {
+      const ffmpegList = join(tempDir, "concat.txt");
+      const concatBody = audioFiles.map((filePath) => `file '${escapeFfmpegListPath(filePath)}'`).join("\n");
+      writeFileSync(ffmpegList, `${concatBody}\n`);
+      execFileSync(
+        "ffmpeg",
+        ["-y", "-f", "concat", "-safe", "0", "-i", ffmpegList, "-ac", "1", "-ar", "22050", "-b:a", "128k", tmpOutput],
+        { stdio: ["ignore", "pipe", "pipe"] },
+      );
+    }
+
+    renameSync(tmpOutput, outputPath);
+    const completeStatus: RenderStatus = {
+      status: "complete",
+      startedAt,
+      finishedAt: nowIso(),
+      outputPath,
+      segmentCount: segments.length,
+      chunkCount,
+    };
+    writeRenderStatus(statusPath, completeStatus);
+    logRender(logPath, `render-transcript complete (${chunkCount} chunk(s))`);
+  } catch (err) {
+    try { unlinkSync(tmpOutput); } catch { /* ignore */ }
+    const error = err instanceof Error ? err.message : String(err);
+    writeRenderStatus(statusPath, {
+      status: "failed",
+      startedAt,
+      finishedAt: nowIso(),
+      outputPath,
+      segmentCount: segments.length,
+      chunkCount,
+      error,
+    });
+    logRender(logPath, `render-transcript failed: ${error}`);
+    throw err;
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 function cmdLocks(): void {
   const locks = listLocks();
   if (locks.length === 0) {
@@ -344,6 +596,10 @@ Commands:
     Acquires a process lock and checks for rogue duplicates.
     --summarize extracts key points from long text (~500 chars max).
 
+  render-transcript --input <json> --output <mp3> [--status <json>] [--log <path>]
+    Render a durable MP3 from a multi-speaker transcript JSON file.
+    Supports either a raw array of segments or an object with { segments, kind, sessionId, generatedAt }.
+
   locks
     List all active voice process locks and their status.
 
@@ -357,6 +613,7 @@ Speakers:
   narrator    Pipeline narration (Nova — OpenAI)
   optimist    Debate optimist (Charlie — ElevenLabs)
   pessimist   Debate pessimist (Ara — xAI)
+  designer    Design deliberation voice (Shimmer — OpenAI)
   voter-1     Architect voter (Daniel — ElevenLabs)
   voter-2     Pragmatist voter (Shimmer — OpenAI)
   voter-3     Minimalist voter (Sal — xAI)
@@ -374,9 +631,9 @@ Environment:
   LOBSTER_VOICE_LLM_MODEL    LLM model for rewriting (default: gpt-4o-mini)
   WORKSPACE                  Repo root for cache/locks directory (default: cwd)
 
-TTS Provider Cascade:
-  Each speaker has a primary provider. If that provider fails or has no key,
-  the system cascades: ElevenLabs → OpenAI → xAI. Silent skip if all fail.
+TTS Provider:
+  All speakers use ElevenLabs exclusively (eleven_flash_v2_5 model).
+  OpenAI and xAI are retained as fallbacks but all primary voices are ElevenLabs.
 `;
   process.stdout.write(help);
 }
@@ -399,6 +656,9 @@ async function main(): Promise<void> {
       break;
     case "debate":
       await cmdDebate(positional, flags);
+      break;
+    case "render-transcript":
+      await cmdRenderTranscript(flags);
       break;
     case "locks":
       cmdLocks();

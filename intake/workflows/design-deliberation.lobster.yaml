@@ -322,6 +322,104 @@ steps:
           human_selections: $human_selections
         }'
 
+  - id: write-design-audio-transcript
+    env:
+      CTO_ASSEMBLE: $assemble-design-decisions.stdout
+    command: |
+      trap '' INT
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "design-deliberation" "write-design-audio-transcript" "${audio_debug}"
+      mkdir -p .tasks/audio .intake/audio
+      ASSEMBLE_FILE="$(mktemp)"
+      printf '%s' "$CTO_ASSEMBLE" > "$ASSEMBLE_FILE"
+      # Guard: if assemble result is empty or not valid JSON, write a fallback transcript
+      if [ ! -s "$ASSEMBLE_FILE" ] || ! jq -e '.' "$ASSEMBLE_FILE" >/dev/null 2>&1; then
+        echo "write-design-audio-transcript: assemble result empty or invalid JSON — writing fallback transcript" >&2
+        jq -n --arg session_id "${session_id}" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          '{kind:"design-deliberation",sessionId:$session_id,generatedAt:$ts,segments:[{speaker:"narrator",label:"Design Deliberation",text:"Design deliberation transcript could not be generated — source data was unavailable."}]}' \
+          > .tasks/audio/design-deliberation.transcript.json
+        rm -f "$ASSEMBLE_FILE"
+        printf '%s\n' ".tasks/audio/design-deliberation.transcript.json"
+        exit 0
+      fi
+      jq -n \
+        --slurpfile result "$ASSEMBLE_FILE" \
+        --arg session_id "${session_id}" \
+        --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '
+          ($result[0] // {}) as $r |
+          {
+            kind: "design-deliberation",
+            sessionId: $session_id,
+            generatedAt: $generated_at,
+            segments: (
+              [
+                {
+                  speaker: "narrator",
+                  label: "Design Deliberation",
+                  text:
+                    "Design deliberation for session " + $session_id + ". "
+                    + (($r.design_dp_count // 0) | tostring) + " design decision points were reviewed."
+                }
+              ]
+              + (if (($r.designer_output // "") | length) > 0 then
+                  [
+                    {
+                      speaker: "designer",
+                      label: "Designer",
+                      text: ($r.designer_output // "")
+                    }
+                  ]
+                else [] end)
+              + [
+                {
+                  speaker: "compiler",
+                  label: "Resolution Summary",
+                  text:
+                    "Design deliberation status: " + (($r.status // "unknown") | tostring) + ". "
+                    + "Decision points reviewed: " + (($r.design_dp_count // 0) | tostring) + ". "
+                    + (if (($r.human_selections // []) | length) > 0 then
+                        "Human selections: "
+                        + (
+                            ($r.human_selections // [])
+                            | map(
+                                (.decision_id // .id // .dp_id // "decision")
+                                + " selected "
+                                + (.selected_option // .value // .selection // "an option" | tostring)
+                              )
+                            | join("; ")
+                          )
+                      else
+                        "No human selections were recorded yet."
+                      end)
+                }
+              ]
+            )
+          }
+        ' > .tasks/audio/design-deliberation.transcript.json
+      rm -f "$ASSEMBLE_FILE"
+      printf '%s\n' ".tasks/audio/design-deliberation.transcript.json"
+
+  - id: launch-design-audio-export
+    env:
+      CTO_TRANSCRIPT_PATH: $write-design-audio-transcript.stdout
+    command: |
+      trap '' INT
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "design-deliberation" "launch-design-audio-export" "${audio_debug}"
+      TRANSCRIPT_PATH="$(printf '%s' "$CTO_TRANSCRIPT_PATH" | tail -n 1 | tr -d '\r')"
+      if [ ! -f "$TRANSCRIPT_PATH" ]; then
+        echo "launch-design-audio-export: transcript missing at $TRANSCRIPT_PATH" >&2
+        jq -nc --arg path "$TRANSCRIPT_PATH" '{"launched":false,"reason":"missing transcript","path":$path}'
+        exit 0
+      fi
+      "$root/intake/scripts/render-deliberation-audio.sh" \
+        "design-deliberation" \
+        "$TRANSCRIPT_PATH" \
+        "$root/.tasks/audio/design-deliberation.mp3" \
+        "$root/.intake/audio/design-deliberation.status.json" \
+        "$root/.intake/audio/design-deliberation.log" || true
+
   - id: linear-activity-design-complete
     env:
       CTO_ASSEMBLE: $assemble-design-decisions.stdout

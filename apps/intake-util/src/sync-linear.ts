@@ -356,6 +356,45 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
     console.error(`Warning: failed to create project agent view: ${err}`);
   }
 
+  // Play Pipeline milestones (ordered by workflow stage)
+  const PLAY_STAGES = [
+    { name: 'Infrastructure', sortOrder: 0 },
+    { name: 'Backend', sortOrder: 1 },
+    { name: 'Frontend', sortOrder: 2 },
+    { name: 'Testing', sortOrder: 3 },
+    { name: 'Quality', sortOrder: 4 },
+    { name: 'Security', sortOrder: 5 },
+    { name: 'Deploy', sortOrder: 6 },
+  ] as const;
+
+  interface MilestoneResponse {
+    projectMilestoneCreate: { success: boolean; projectMilestone?: { id: string; name: string } };
+  }
+  const milestoneMap: Record<string, string> = {};
+  for (const stage of PLAY_STAGES) {
+    try {
+      const msData = await execute<MilestoneResponse>(apiKey,
+        `mutation CreateMilestone($input: ProjectMilestoneCreateInput!) {
+          projectMilestoneCreate(input: $input) { success projectMilestone { id name } }
+        }`,
+        { input: { name: stage.name, projectId: project.id, sortOrder: stage.sortOrder } },
+      );
+      if (msData.projectMilestoneCreate.success && msData.projectMilestoneCreate.projectMilestone) {
+        milestoneMap[stage.name.toLowerCase()] = msData.projectMilestoneCreate.projectMilestone.id;
+        console.error(`Created milestone: ${stage.name}`);
+      }
+    } catch (err) {
+      console.error(`Warning: failed to create milestone ${stage.name}: ${err}`);
+    }
+  }
+
+  // Play Pipeline view (grouped by milestone)
+  try {
+    await createProjectView(`${projectName} — Play Pipeline`, 'projectMilestone');
+  } catch (err) {
+    console.error(`Warning: failed to create play pipeline view: ${err}`);
+  }
+
   // 2. Get/create labels
   const [intakeLabelId, prdLabelId] = await Promise.all([
     getOrCreateLabel(apiKey, teamId, 'intake'),
@@ -507,6 +546,81 @@ function readDocSnippet(filePath: string, maxChars: number): string {
   }
 }
 
+interface DeliberationAudioArtifact {
+  label: string;
+  mp3Path: string;
+  transcriptPath: string;
+  statusPath: string;
+  status: string;
+  mp3Exists: boolean;
+  transcriptExists: boolean;
+}
+
+function readJsonFile<T>(filePath: string): T | null {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T;
+  } catch {
+    return null;
+  }
+}
+
+function collectDeliberationAudioArtifacts(): DeliberationAudioArtifact[] {
+  const cwd = process.cwd();
+  const definitions = [
+    {
+      label: 'Architecture deliberation',
+      mp3Path: path.join(cwd, '.tasks', 'audio', 'architecture-deliberation.mp3'),
+      transcriptPath: path.join(cwd, '.tasks', 'audio', 'architecture-deliberation.transcript.json'),
+      statusPath: path.join(cwd, '.intake', 'audio', 'architecture-deliberation.status.json'),
+    },
+    {
+      label: 'Design deliberation',
+      mp3Path: path.join(cwd, '.tasks', 'audio', 'design-deliberation.mp3'),
+      transcriptPath: path.join(cwd, '.tasks', 'audio', 'design-deliberation.transcript.json'),
+      statusPath: path.join(cwd, '.intake', 'audio', 'design-deliberation.status.json'),
+    },
+  ];
+
+  return definitions.map((artifact) => {
+    const statusJson = readJsonFile<{ status?: string }>(artifact.statusPath);
+    const mp3Exists = fs.existsSync(artifact.mp3Path);
+    const transcriptExists = fs.existsSync(artifact.transcriptPath);
+    const status = mp3Exists ? 'ready' : (statusJson?.status ?? (transcriptExists ? 'pending' : 'not started'));
+    return {
+      ...artifact,
+      status,
+      mp3Exists,
+      transcriptExists,
+    };
+  });
+}
+
+function toRepoRelative(filePath: string): string {
+  return path.relative(process.cwd(), filePath).split(path.sep).join('/');
+}
+
+function buildDeliberationAudioSection(baseUrl: string): string[] {
+  const artifacts = collectDeliberationAudioArtifacts().filter((artifact) => artifact.transcriptExists || artifact.mp3Exists || artifact.status !== 'not started');
+  if (artifacts.length === 0) return [];
+
+  const lines: string[] = ['', '## Deliberation Audio'];
+  for (const artifact of artifacts) {
+    lines.push(`- **${artifact.label}:** ${artifact.status}`);
+    if (artifact.transcriptExists && baseUrl) {
+      const transcriptPath = toRepoRelative(artifact.transcriptPath);
+      lines.push(`  Transcript: [${transcriptPath}](${baseUrl}/${transcriptPath})`);
+    }
+    if (artifact.mp3Exists && baseUrl) {
+      const mp3Path = toRepoRelative(artifact.mp3Path);
+      lines.push(`  MP3: [${mp3Path}](${baseUrl}/${mp3Path})`);
+    } else if (!artifact.mp3Exists) {
+      lines.push('  MP3: pending background render');
+    }
+  }
+
+  return lines;
+}
+
 function buildTaskDescription(task: GeneratedTask, baseUrl: string, prUrl: string): string {
   const lines: string[] = [];
 
@@ -555,6 +669,8 @@ function buildTaskDescription(task: GeneratedTask, baseUrl: string, prUrl: strin
   if (prUrl) {
     lines.push('', `**PR:** ${prUrl}`);
   }
+
+  lines.push(...buildDeliberationAudioSection(baseUrl));
 
   const taskDocPath = path.join('.tasks', 'docs', `task-${task.id}`, 'task.md');
   const acceptanceDocPath = path.join('.tasks', 'docs', `task-${task.id}`, 'acceptance.md');
@@ -608,6 +724,8 @@ function buildSubtaskDescription(
   if (prUrl) {
     lines.push(`**PR:** ${prUrl}`);
   }
+
+  lines.push(...buildDeliberationAudioSection(baseUrl));
 
   const subtaskPromptPath = path.join('.tasks', 'docs', `task-${taskId}`, 'subtasks', `task-${taskId}.${subtask.id}`, 'prompt.md');
   const subtaskPrompt = readDocSnippet(subtaskPromptPath, 2500);

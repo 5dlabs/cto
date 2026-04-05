@@ -558,6 +558,108 @@ steps:
           ]
         }'
 
+  - id: write-architecture-audio-transcript
+    env:
+      CTO_ASSEMBLE_RESULT: $assemble-result.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "write-architecture-audio-transcript" "${audio_debug}"
+      mkdir -p .tasks/audio .intake/audio
+      RESULT_FILE="$(mktemp)"
+      printf '%s' "$CTO_ASSEMBLE_RESULT" > "$RESULT_FILE"
+      # Guard: if assemble result is empty or not valid JSON, write a fallback transcript
+      if [ ! -s "$RESULT_FILE" ] || ! jq -e '.' "$RESULT_FILE" >/dev/null 2>&1; then
+        echo "write-architecture-audio-transcript: assemble result empty or invalid JSON — writing fallback transcript" >&2
+        jq -n --arg session_id "${session_id}" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          '{kind:"architecture-deliberation",sessionId:$session_id,generatedAt:$ts,segments:[{speaker:"narrator",label:"Architecture Deliberation",text:"Architecture deliberation transcript could not be generated — source data was unavailable."}]}' \
+          > .tasks/audio/architecture-deliberation.transcript.json
+        rm -f "$RESULT_FILE"
+        printf '%s\n' ".tasks/audio/architecture-deliberation.transcript.json"
+        exit 0
+      fi
+      jq -n \
+        --slurpfile result "$RESULT_FILE" \
+        --arg session_id "${session_id}" \
+        --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '
+          ($result[0] // {}) as $r |
+          {
+            kind: "architecture-deliberation",
+            sessionId: $session_id,
+            generatedAt: $generated_at,
+            segments: (
+              [
+                {
+                  speaker: "narrator",
+                  label: "Architecture Deliberation",
+                  text:
+                    "Architecture deliberation for session " + $session_id + ". "
+                    + (($r.decision_points // []) | length | tostring) + " decision points were considered."
+                }
+              ]
+              + (
+                  ($r.debate_log // [])
+                  | map(
+                      select((.content // "") | length > 0)
+                      | {
+                          speaker: (.speaker // "narrator"),
+                          label: (
+                            ((.speaker // "speaker") | ascii_upcase)
+                            + (if (.turn? != null) then " turn " + (.turn | tostring) else "" end)
+                          ),
+                          text: (.content // "")
+                        }
+                    )
+                )
+              + [
+                {
+                  speaker: "compiler",
+                  label: "Resolution Summary",
+                  text:
+                    "Deliberation complete. Status: " + (($r.status // "unknown") | tostring) + ". "
+                    + "Resolved " + (($r.resolved_decisions // []) | length | tostring)
+                    + " of " + (($r.decision_points // []) | length | tostring) + " decisions. "
+                    + (if (($r.resolved_decisions // []) | length) > 0 then
+                        "Winning decisions: "
+                        + (
+                            ($r.resolved_decisions // [])
+                            | map(
+                                (.decision_id // .id // "decision")
+                                + " chose "
+                                + ((.winning_option // .winner // "an option") | tostring)
+                              )
+                            | join("; ")
+                          )
+                      else
+                        "No decisions were resolved."
+                      end)
+                }
+              ]
+            )
+          }
+        ' > .tasks/audio/architecture-deliberation.transcript.json
+      rm -f "$RESULT_FILE"
+      printf '%s\n' ".tasks/audio/architecture-deliberation.transcript.json"
+
+  - id: launch-architecture-audio-export
+    env:
+      CTO_TRANSCRIPT_PATH: $write-architecture-audio-transcript.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "launch-architecture-audio-export" "${audio_debug}"
+      TRANSCRIPT_PATH="$(printf '%s' "$CTO_TRANSCRIPT_PATH" | tail -n 1 | tr -d '\r')"
+      if [ ! -f "$TRANSCRIPT_PATH" ]; then
+        echo "launch-architecture-audio-export: transcript missing at $TRANSCRIPT_PATH" >&2
+        jq -nc --arg path "$TRANSCRIPT_PATH" '{"launched":false,"reason":"missing transcript","path":$path}'
+        exit 0
+      fi
+      "$root/intake/scripts/render-deliberation-audio.sh" \
+        "architecture-deliberation" \
+        "$TRANSCRIPT_PATH" \
+        "$root/.tasks/audio/architecture-deliberation.mp3" \
+        "$root/.intake/audio/architecture-deliberation.status.json" \
+        "$root/.intake/audio/architecture-deliberation.log" || true
+
   - id: notify-complete
     env:
       CTO_ASSEMBLE_RESULT: $assemble-result.stdout
