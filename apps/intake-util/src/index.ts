@@ -485,6 +485,7 @@ async function main(): Promise<void> {
         process.exit(0);
       } else if (subMode === 'github-sync') {
         const projectId = getArg(args, '--project-id');
+        const projectName = getArg(args, '--project-name');
         const repo = getArg(args, '--repo');
         const branch = getArg(args, '--branch');
         const githubProjectArg = getArg(args, '--github-project');
@@ -502,6 +503,7 @@ async function main(): Promise<void> {
 
         const result = await syncGitHubIssues({
           projectId,
+          projectName,
           repo,
           branch,
           apiKey,
