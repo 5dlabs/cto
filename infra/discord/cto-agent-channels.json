@@ -1,0 +1,110 @@
+{
+  "guild": {
+    "id": "1490117571977019524",
+    "name": "CTO-5DLabs"
+  },
+  "categories": {
+    "text": {
+      "id": "1490117572711026768",
+      "name": "Text Channels"
+    }
+  },
+  "patchRules": {
+    "createMissingChannels": true,
+    "moveChannelsIntoTextCategory": true,
+    "clearChannelPermissionOverwrites": true,
+    "visibilityPolicy": "inherit-category-permissions"
+  },
+  "agents": [
+    {
+      "agent": "Morgan",
+      "slug": "morgan",
+      "channelId": "1490372680124465245"
+    },
+    {
+      "agent": "Atlas",
+      "slug": "atlas",
+      "channelId": "1490424132662202433"
+    },
+    {
+      "agent": "Stitch",
+      "slug": "stitch",
+      "channelId": "1490424304968663292"
+    },
+    {
+      "agent": "Rex",
+      "slug": "rex",
+      "channelId": "1490424306499457117"
+    },
+    {
+      "agent": "Blaze",
+      "slug": "blaze",
+      "channelId": "1490424307673731373"
+    },
+    {
+      "agent": "Grizz",
+      "slug": "grizz",
+      "channelId": "1490424308902789291"
+    },
+    {
+      "agent": "Tess",
+      "slug": "tess",
+      "channelId": "1490424311012655358"
+    },
+    {
+      "agent": "Cleo",
+      "slug": "cleo",
+      "channelId": "1490424312224809001"
+    },
+    {
+      "agent": "Cipher",
+      "slug": "cipher",
+      "channelId": "1490424314078564442"
+    },
+    {
+      "agent": "Healer",
+      "slug": "healer",
+      "channelId": "1490424315370278942"
+    },
+    {
+      "agent": "Bolt",
+      "slug": "bolt",
+      "channelId": "1490424316855324868"
+    },
+    {
+      "agent": "Angie",
+      "slug": "angie",
+      "channelId": "1490424318151229533"
+    },
+    {
+      "agent": "Keeper",
+      "slug": "keeper",
+      "channelId": "1490424319485149376"
+    },
+    {
+      "agent": "Nova",
+      "slug": "nova",
+      "channelId": "1490424320860618872"
+    },
+    {
+      "agent": "Spark",
+      "slug": "spark",
+      "channelId": "1490424322513436955"
+    },
+    {
+      "agent": "Tap",
+      "slug": "tap",
+      "channelId": "1490424323670806570"
+    },
+    {
+      "agent": "Vex",
+      "slug": "vex",
+      "channelId": "1490424324920967229"
+    },
+    {
+      "agent": "Pixel",
+      "slug": "pixel",
+      "channelId": "1490424326111887462"
+    }
+  ]
+}
