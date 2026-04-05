@@ -12,7 +12,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import type { GeneratedTask } from './types';
 
 const LINEAR_API_URL = 'https://api.linear.app/graphql';
@@ -1194,6 +1194,7 @@ export interface GitHubSyncResult {
 
 export interface GitHubSyncOptions {
   projectId: string;
+  projectName?: string;
   repo: string;
   branch: string;
   apiKey: string;
@@ -1209,9 +1210,9 @@ function sleep(ms: number): Promise<void> {
  * Execute a `gh` CLI command and return the trimmed stdout.
  * Throws on non-zero exit with the stderr message.
  */
-function gh(args: string): string {
+function gh(args: string[]): string {
   try {
-    return execSync(`gh ${args}`, {
+    return execFileSync('gh', args, {
       encoding: 'utf-8',
       timeout: 30_000,
       env: { ...process.env },
@@ -1230,7 +1231,7 @@ function findExistingGitHubIssue(repo: string, title: string): { number: number;
   try {
     // Search for issues with the exact title (open or closed)
     const result = gh(
-      `issue list --repo ${JSON.stringify(repo)} --search ${JSON.stringify(`"${title}" in:title`)} --json number,title,url --limit 50`,
+      ['issue', 'list', '--repo', repo, '--search', `"${title}" in:title`, '--json', 'number,title,url', '--limit', '50'],
     );
     if (!result) return undefined;
 
@@ -1249,7 +1250,7 @@ function findExistingGitHubIssue(repo: string, title: string): { number: number;
 function addIssueToProject(repo: string, issueNumber: number, projectNumber: number): void {
   try {
     const issueUrl = `https://github.com/${repo}/issues/${issueNumber}`;
-    gh(`project item-add ${projectNumber} --owner ${repo.split('/')[0]} --url ${JSON.stringify(issueUrl)}`);
+    gh(['project', 'item-add', String(projectNumber), '--owner', repo.split('/')[0], '--url', issueUrl]);
     console.error(`github-sync: added issue #${issueNumber} to project #${projectNumber}`);
   } catch (err) {
     // Non-fatal — project integration is optional
@@ -1280,11 +1281,8 @@ function extractAgentLabel(labels: Array<{ name: string }>): string | undefined 
 /**
  * Sync all issues from a Linear project into GitHub issues with 1:1 mapping.
  *
- * For each Linear issue:
- *  1. Check if a GitHub issue with the same title already exists → skip
- *  2. Create a GitHub issue with matching title, body with Linear link, agent label
- *  3. Update the Linear issue description to include the GitHub issue link
- *  4. Optionally add the issue to a GitHub Project
+ * Creates a GitHub Project, mirrors the full Linear hierarchy (parent → sub-issues),
+ * uses full descriptions (no truncation), and links back to Linear.
  */
 export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubSyncResult> {
   const { projectId, repo, branch, apiKey, githubProject } = opts;
@@ -1293,33 +1291,45 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
   let createdCount = 0;
   let skippedCount = 0;
   let errorCount = 0;
-  let totalLinearIssues = 0;
-  let hasNextPage = true;
-  let cursor: string | undefined;
 
   console.error(`github-sync: syncing Linear project ${projectId} → GitHub repo ${repo} (branch: ${branch})`);
 
   // Verify gh CLI is available and authenticated
   try {
-    gh('auth status');
+    gh(['auth', 'status']);
   } catch (err) {
     throw new Error(`gh CLI is not authenticated. Run "gh auth login" first. Error: ${err}`);
   }
 
+  // Ensure required labels exist
+  for (const labelName of ['intake']) {
+    try {
+      gh(['label', 'create', labelName, '--repo', repo, '--force']);
+    } catch { /* label may already exist */ }
+  }
+
+  // 1. Fetch ALL issues from the Linear project with parent/child info
+  interface LinearIssueNode {
+    id: string;
+    identifier: string;
+    title: string;
+    description: string | null;
+    url: string;
+    labels: { nodes: Array<{ name: string }> };
+    parent: { id: string; identifier: string } | null;
+    children: { nodes: Array<{ id: string; identifier: string }> };
+  }
+
+  const allIssues: LinearIssueNode[] = [];
+  let hasNextPage = true;
+  let cursor: string | undefined;
+
   while (hasNextPage) {
     const afterClause = cursor ? `, after: "${cursor}"` : '';
-
     interface ProjectIssuesPage {
       project: {
         issues: {
-          nodes: Array<{
-            id: string;
-            identifier: string;
-            title: string;
-            description: string | null;
-            url: string;
-            labels: { nodes: Array<{ name: string }> };
-          }>;
+          nodes: LinearIssueNode[];
           pageInfo: { hasNextPage: boolean; endCursor: string | null };
         };
       };
@@ -1331,12 +1341,10 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
         project(id: $pid) {
           issues(first: 50${afterClause}) {
             nodes {
-              id
-              identifier
-              title
-              description
-              url
+              id identifier title description url
               labels { nodes { name } }
+              parent { id identifier }
+              children { nodes { id identifier } }
             }
             pageInfo { hasNextPage endCursor }
           }
@@ -1345,118 +1353,203 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
       { pid: projectId },
     );
 
-    const issues = page.project.issues.nodes;
-    const pageInfo = page.project.issues.pageInfo;
-    totalLinearIssues += issues.length;
+    allIssues.push(...page.project.issues.nodes);
+    hasNextPage = page.project.issues.pageInfo.hasNextPage;
+    cursor = page.project.issues.pageInfo.endCursor ?? undefined;
+  }
 
-    for (const issue of issues) {
-      // Check for existing GitHub issue with same title
-      const existing = findExistingGitHubIssue(repo, issue.title);
-      if (existing) {
-        console.error(`github-sync: skipping "${issue.identifier}" — GitHub issue #${existing.number} already exists`);
-        mappings.push({
-          linearId: issue.id,
-          linearIdentifier: issue.identifier,
-          linearTitle: issue.title,
-          githubIssueNumber: existing.number,
-          githubIssueUrl: existing.url,
-        });
-        skippedCount++;
+  console.error(`github-sync: fetched ${allIssues.length} Linear issues`);
+
+  // Build lookup maps
+  const identifierSet = new Set(allIssues.map((i) => i.identifier));
+  const issueByIdentifier = new Map(allIssues.map((i) => [i.identifier, i]));
+
+  // Classify: roots have no parent in this project, mid-level have parent + children, leaves have parent only
+  const roots = allIssues.filter((i) => !i.parent || !identifierSet.has(i.parent.identifier));
+  const childrenOf = (parentId: string) =>
+    allIssues.filter((i) => i.parent && i.parent.identifier === parentId);
+
+  // Sort: process roots first, then their children (breadth-first)
+  const processingOrder: LinearIssueNode[] = [];
+  for (const root of roots) {
+    processingOrder.push(root);
+    const mid = childrenOf(root.identifier);
+    for (const m of mid) {
+      processingOrder.push(m);
+      const leaves = childrenOf(m.identifier);
+      processingOrder.push(...leaves);
+    }
+  }
+  // Add any remaining issues not captured in the hierarchy
+  const seen = new Set(processingOrder.map((i) => i.identifier));
+  for (const issue of allIssues) {
+    if (!seen.has(issue.identifier)) processingOrder.push(issue);
+  }
+
+  console.error(`github-sync: processing ${processingOrder.length} issues (${roots.length} roots)`);
+
+  // 2. Create or find a GitHub Project
+  let ghProjectNumber: number | undefined = githubProject;
+  if (!ghProjectNumber) {
+    const owner = repo.split('/')[0];
+    const projectTitle = `${opts.projectName || 'intake'} - Intake`;
+    try {
+      // Get owner node ID (try org first, then user)
+      let ownerId = '';
+      try {
+        ownerId = gh(['api', 'graphql', '-f', `query={ organization(login: "${owner}") { id } }`, '--jq', '.data.organization.id']);
+      } catch {
+        ownerId = gh(['api', 'graphql', '-f', `query={ user(login: "${owner}") { id } }`, '--jq', '.data.user.id']);
+      }
+      if (ownerId) {
+        const result = gh(['api', 'graphql', '-f',
+          `query=mutation { createProjectV2(input: { ownerId: "${ownerId}", title: "${projectTitle}" }) { projectV2 { number url } } }`,
+          '--jq', '.data.createProjectV2.projectV2.number']);
+        ghProjectNumber = parseInt(result.trim(), 10) || undefined;
+        console.error(`github-sync: created GitHub Project #${ghProjectNumber}: ${projectTitle}`);
+      }
+    } catch (err) {
+      console.error(`github-sync: warning: could not create GitHub Project: ${err}`);
+    }
+  }
+
+  // 3. Create issues in hierarchy order, tracking identifier → GitHub issue number + node ID
+  const ghIssueMap = new Map<string, { number: number; url: string; nodeId: string }>();
+  const repoUrl = `https://github.com/${repo}`;
+  const branchUrl = `${repoUrl}/tree/${branch}`;
+
+  for (const issue of processingOrder) {
+    // Check for existing GitHub issue with same title
+    const existing = findExistingGitHubIssue(repo, issue.title);
+    if (existing) {
+      console.error(`github-sync: skipping "${issue.identifier}" — GitHub issue #${existing.number} already exists`);
+      // Get node ID for sub-issue linking
+      try {
+        const nodeId = gh(['issue', 'view', String(existing.number), '--repo', repo, '--json', 'id', '--jq', '.id']);
+        ghIssueMap.set(issue.identifier, { number: existing.number, url: existing.url, nodeId });
+      } catch { /* best effort */ }
+      mappings.push({
+        linearId: issue.id,
+        linearIdentifier: issue.identifier,
+        linearTitle: issue.title,
+        githubIssueNumber: existing.number,
+        githubIssueUrl: existing.url,
+      });
+      skippedCount++;
+      continue;
+    }
+
+    // Build full body (no truncation)
+    const description = issue.description || '_No description._';
+    const body = [
+      `> **Linear issue:** [${issue.identifier}](${issue.url})`,
+      `> **Branch:** [\`${branch}\`](${branchUrl})`,
+      '',
+      '---',
+      '',
+      description,
+    ].join('\n');
+
+    // Determine labels
+    const agentLabel = extractAgentLabel(issue.labels.nodes);
+    const ghLabels: string[] = ['intake'];
+    if (agentLabel) ghLabels.push(agentLabel);
+
+    try {
+      const createArgs = ['issue', 'create', '--repo', repo, '--title', issue.title, '--body', body];
+      for (const l of ghLabels) {
+        createArgs.push('--label', l);
+      }
+
+      const createResult = gh(createArgs);
+      const ghIssueUrl = createResult.trim();
+      const ghIssueNumberMatch = ghIssueUrl.match(/\/issues\/(\d+)$/);
+      const ghIssueNumber = ghIssueNumberMatch ? parseInt(ghIssueNumberMatch[1], 10) : 0;
+
+      if (!ghIssueNumber) {
+        console.error(`github-sync: warning: could not parse issue number from: ${createResult}`);
+        errorCount++;
         continue;
       }
 
-      // Build GitHub issue body
-      const descSnippet = issue.description
-        ? issue.description.slice(0, 500) + (issue.description.length > 500 ? '\n\n…_(truncated)_' : '')
-        : '_No description._';
-
-      const repoUrl = `https://github.com/${repo}`;
-      const branchUrl = `${repoUrl}/tree/${branch}`;
-
-      const body = [
-        `> **Linear issue:** [${issue.identifier}](${issue.url})`,
-        `> **Branch:** [\`${branch}\`](${branchUrl})`,
-        '',
-        '---',
-        '',
-        descSnippet,
-      ].join('\n');
-
-      // Determine labels
-      const agentLabel = extractAgentLabel(issue.labels.nodes);
-      const ghLabels: string[] = ['intake'];
-      if (agentLabel) ghLabels.push(agentLabel);
-
+      // Get the node ID for sub-issue linking
+      let nodeId = '';
       try {
-        // Build label args
-        const labelArgs = ghLabels.map((l) => `--label ${JSON.stringify(l)}`).join(' ');
+        nodeId = gh(['issue', 'view', String(ghIssueNumber), '--repo', repo, '--json', 'id', '--jq', '.id']);
+      } catch { /* best effort */ }
 
-        // Create the GitHub issue
-        const createResult = gh(
-          `issue create --repo ${JSON.stringify(repo)} --title ${JSON.stringify(issue.title)} --body ${JSON.stringify(body)} ${labelArgs}`,
+      ghIssueMap.set(issue.identifier, { number: ghIssueNumber, url: ghIssueUrl, nodeId });
+
+      console.error(`github-sync: created GitHub issue #${ghIssueNumber} for ${issue.identifier}`);
+
+      mappings.push({
+        linearId: issue.id,
+        linearIdentifier: issue.identifier,
+        linearTitle: issue.title,
+        githubIssueNumber: ghIssueNumber,
+        githubIssueUrl: ghIssueUrl,
+      });
+      createdCount++;
+
+      // Back-link in Linear
+      const ghLink = `\n\n---\n🔗 **GitHub issue:** [#${ghIssueNumber}](${ghIssueUrl})`;
+      const updatedDescription = (issue.description || '') + ghLink;
+      try {
+        interface UpdateResult { issueUpdate: { success: boolean } }
+        await execute<UpdateResult>(apiKey,
+          `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`,
+          { id: issue.id, input: { description: updatedDescription } },
         );
-
-        // gh issue create outputs the issue URL on success
-        const ghIssueUrl = createResult.trim();
-        const ghIssueNumberMatch = ghIssueUrl.match(/\/issues\/(\d+)$/);
-        const ghIssueNumber = ghIssueNumberMatch ? parseInt(ghIssueNumberMatch[1], 10) : 0;
-
-        if (!ghIssueNumber) {
-          console.error(`github-sync: warning: could not parse issue number from: ${createResult}`);
-          errorCount++;
-          continue;
-        }
-
-        console.error(`github-sync: created GitHub issue #${ghIssueNumber} for ${issue.identifier}`);
-
-        mappings.push({
-          linearId: issue.id,
-          linearIdentifier: issue.identifier,
-          linearTitle: issue.title,
-          githubIssueNumber: ghIssueNumber,
-          githubIssueUrl: ghIssueUrl,
-        });
-        createdCount++;
-
-        // Update Linear issue description with a back-link to the GitHub issue
-        const ghLink = `\n\n---\n🔗 **GitHub issue:** [#${ghIssueNumber}](${ghIssueUrl})`;
-        const updatedDescription = (issue.description || '') + ghLink;
-
-        try {
-          interface UpdateResult {
-            issueUpdate: { success: boolean };
-          }
-          await execute<UpdateResult>(
-            apiKey,
-            `mutation($id: String!, $input: IssueUpdateInput!) {
-              issueUpdate(id: $id, input: $input) { success }
-            }`,
-            { id: issue.id, input: { description: updatedDescription } },
-          );
-        } catch (err) {
-          console.error(`github-sync: warning: could not update Linear issue ${issue.identifier} with back-link: ${err}`);
-        }
-
-        // Optionally add to GitHub Project
-        if (githubProject) {
-          addIssueToProject(repo, ghIssueNumber, githubProject);
-        }
-
-        // Rate limit: ~2s between creates to stay under 30/min
-        await sleep(2000);
       } catch (err) {
-        console.error(`github-sync: failed to create GitHub issue for ${issue.identifier}: ${err}`);
-        errorCount++;
+        console.error(`github-sync: warning: could not update Linear back-link for ${issue.identifier}: ${err}`);
       }
+
+      // Add to GitHub Project
+      if (ghProjectNumber) {
+        addIssueToProject(repo, ghIssueNumber, ghProjectNumber);
+      }
+
+      // Rate limit: ~2s between creates
+      await sleep(2000);
+    } catch (err) {
+      console.error(`github-sync: failed to create GitHub issue for ${issue.identifier}: ${err}`);
+      errorCount++;
     }
-
-    hasNextPage = pageInfo.hasNextPage;
-    cursor = pageInfo.endCursor ?? undefined;
-
-    console.error(
-      `github-sync: processed ${totalLinearIssues} Linear issues (${createdCount} created, ${skippedCount} skipped, ${errorCount} errors)`,
-    );
   }
 
-  return { createdCount, skippedCount, errorCount, totalLinearIssues, mappings };
+  // 4. Link sub-issues to parents via the GitHub sub-issues API
+  console.error(`github-sync: linking sub-issues...`);
+  let linkedCount = 0;
+
+  for (const issue of allIssues) {
+    if (!issue.parent || !identifierSet.has(issue.parent.identifier)) continue;
+
+    const parentGh = ghIssueMap.get(issue.parent.identifier);
+    const childGh = ghIssueMap.get(issue.identifier);
+    if (!parentGh || !childGh || !childGh.nodeId) continue;
+
+    try {
+      // GitHub sub-issues API: POST /repos/:owner/:repo/issues/:issue_number/sub_issues
+      // Requires the sub-issue's database ID (not node ID, not issue number)
+      // Get the database ID from the REST API
+      const issueJson = gh(['api', `repos/${repo}/issues/${childGh.number}`, '--jq', '.id']);
+      const databaseId = parseInt(issueJson.trim(), 10);
+      if (!databaseId) continue;
+
+      gh(['api', `repos/${repo}/issues/${parentGh.number}/sub_issues`, '--method', 'POST',
+        '-F', `sub_issue_id=${databaseId}`]);
+      linkedCount++;
+      console.error(`github-sync: linked #${childGh.number} as sub-issue of #${parentGh.number}`);
+      await sleep(1000);
+    } catch (err) {
+      // Non-fatal — sub-issue linking is best-effort
+      console.error(`github-sync: warning: could not link ${issue.identifier} → ${issue.parent.identifier}: ${err}`);
+    }
+  }
+
+  console.error(
+    `github-sync: done — ${createdCount} created, ${skippedCount} skipped, ${errorCount} errors, ${linkedCount} sub-issue links`,
+  );
+
+  return { createdCount, skippedCount, errorCount, totalLinearIssues: allIssues.length, mappings };
 }
