@@ -592,9 +592,10 @@ steps:
                 {
                   speaker: "narrator",
                   label: "Architecture Deliberation",
-                  text:
+                  text: (
                     "Architecture deliberation for session " + $session_id + ". "
                     + (($r.decision_points // []) | length | tostring) + " decision points were considered."
+                  )
                 }
               ]
               + (
@@ -615,7 +616,7 @@ steps:
                 {
                   speaker: "compiler",
                   label: "Resolution Summary",
-                  text:
+                  text: (
                     "Deliberation complete. Status: " + (($r.status // "unknown") | tostring) + ". "
                     + "Resolved " + (($r.resolved_decisions // []) | length | tostring)
                     + " of " + (($r.decision_points // []) | length | tostring) + " decisions. "
@@ -633,12 +634,18 @@ steps:
                       else
                         "No decisions were resolved."
                       end)
+                  )
                 }
               ]
             )
           }
-        ' > .tasks/audio/architecture-deliberation.transcript.json
-      rm -f "$RESULT_FILE"
+        ' > "$RESULT_FILE.transcript" && mv "$RESULT_FILE.transcript" .tasks/audio/architecture-deliberation.transcript.json || {
+        echo "write-architecture-audio-transcript: jq template failed — writing fallback" >&2
+        jq -n --arg session_id "${session_id}" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          '{kind:"architecture-deliberation",sessionId:$session_id,generatedAt:$ts,segments:[{speaker:"narrator",label:"Architecture Deliberation",text:"Architecture deliberation transcript generation failed during template rendering."}]}' \
+          > .tasks/audio/architecture-deliberation.transcript.json
+      }
+      rm -f "$RESULT_FILE" "$RESULT_FILE.transcript"
       printf '%s\n' ".tasks/audio/architecture-deliberation.transcript.json"
 
   - id: launch-architecture-audio-export

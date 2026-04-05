@@ -357,9 +357,10 @@ steps:
                 {
                   speaker: "narrator",
                   label: "Design Deliberation",
-                  text:
+                  text: (
                     "Design deliberation for session " + $session_id + ". "
                     + (($r.design_dp_count // 0) | tostring) + " design decision points were reviewed."
+                  )
                 }
               ]
               + (if (($r.designer_output // "") | length) > 0 then
@@ -375,7 +376,7 @@ steps:
                 {
                   speaker: "compiler",
                   label: "Resolution Summary",
-                  text:
+                  text: (
                     "Design deliberation status: " + (($r.status // "unknown") | tostring) + ". "
                     + "Decision points reviewed: " + (($r.design_dp_count // 0) | tostring) + ". "
                     + (if (($r.human_selections // []) | length) > 0 then
@@ -392,12 +393,18 @@ steps:
                       else
                         "No human selections were recorded yet."
                       end)
+                  )
                 }
               ]
             )
           }
-        ' > .tasks/audio/design-deliberation.transcript.json
-      rm -f "$ASSEMBLE_FILE"
+        ' > "$ASSEMBLE_FILE.transcript" && mv "$ASSEMBLE_FILE.transcript" .tasks/audio/design-deliberation.transcript.json || {
+        echo "write-design-audio-transcript: jq template failed — writing fallback" >&2
+        jq -n --arg session_id "${session_id}" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          '{kind:"design-deliberation",sessionId:$session_id,generatedAt:$ts,segments:[{speaker:"narrator",label:"Design Deliberation",text:"Design deliberation transcript generation failed during template rendering."}]}' \
+          > .tasks/audio/design-deliberation.transcript.json
+      }
+      rm -f "$ASSEMBLE_FILE" "$ASSEMBLE_FILE.transcript"
       printf '%s\n' ".tasks/audio/design-deliberation.transcript.json"
 
   - id: launch-design-audio-export
