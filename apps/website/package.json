@@ -41,7 +41,7 @@
     "@types/node": "^25",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-next": "16.1.6",
     "googleapis": "^171.4.0",
     "playwright": "^1.59.1",
