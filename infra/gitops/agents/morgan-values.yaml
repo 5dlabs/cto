@@ -106,7 +106,7 @@ messaging:
           - "1466930035356078251"
           - "1466938744593715210"
         channels:
-          "1490117572711026770":
+          "1490372680124465245":
             allow: true
             requireMention: false
             users:
@@ -221,7 +221,7 @@ plugins:
       enabled: true
       token: "${DISCORD_TOKEN_MORGAN}"
       guildId: "1490117571977019524"
-      channelId: "1490117572711026770"
+      channelId: "1490372680124465245"
 
 workspace:
   repos:
