@@ -23,7 +23,18 @@ printf '{"ts":"%s","event":"run_start","run_id":"%s","project_name":"%s","mode":
   "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "$INTAKE_RUN_ID" "$PROJECT_NAME" "$NUM_TASKS" \
   >> "$INTAKE_LOG_DIR/runs.jsonl"
 
-rm -f "$ROOT/.intake/intake-sub-workflow.log" "$ROOT/.intake/intake-summary.json"
+rm -f \
+  "$ROOT/.intake/intake-sub-workflow.log" \
+  "$ROOT/.intake/intake-summary.json" \
+  "$ROOT/.intake/audio/architecture-deliberation.status.json" \
+  "$ROOT/.intake/audio/architecture-deliberation.log" \
+  "$ROOT/.intake/audio/design-deliberation.status.json" \
+  "$ROOT/.intake/audio/design-deliberation.log" \
+  "$ROOT/.tasks/audio/architecture-deliberation.mp3" \
+  "$ROOT/.tasks/audio/architecture-deliberation.transcript.json" \
+  "$ROOT/.tasks/audio/design-deliberation.mp3" \
+  "$ROOT/.tasks/audio/design-deliberation.transcript.json"
+rm -rf "$ROOT/.intake/design" "$ROOT/.tasks/design"
 
 ARGS_JSON="$(jq -nc \
   --arg prd_path ".intake/run-prd.txt" \
@@ -32,10 +43,11 @@ ARGS_JSON="$(jq -nc \
   --arg github_org "5dlabs" \
   --arg deliberate "true" \
   --arg audio_debug "false" \
-  --arg design_mode "ingest_plus_stitch" \
+  --arg design_mode "both" \
+  --arg design_provider "both" \
   --arg num_tasks "$NUM_TASKS" \
   --arg target_repo_local_path "$TARGET_REPO_PATH" \
-  '{prd_path:$prd_path,project_name:$project_name,repository_url:$repository_url,github_org:$github_org,deliberate:$deliberate,audio_debug:$audio_debug,design_mode:$design_mode,num_tasks:$num_tasks,target_repo_local_path:$target_repo_local_path}')"
+  '{prd_path:$prd_path,project_name:$project_name,repository_url:$repository_url,github_org:$github_org,deliberate:$deliberate,audio_debug:$audio_debug,design_mode:$design_mode,design_provider:$design_provider,num_tasks:$num_tasks,target_repo_local_path:$target_repo_local_path}')"
 
 RUN_START_EPOCH=$(date +%s)
 

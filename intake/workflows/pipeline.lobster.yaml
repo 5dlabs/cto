@@ -19,9 +19,9 @@ args:
   design_urls:
     default: ""
   design_mode:
-    default: ingest_plus_stitch
+    default: both
   design_provider:
-    default: stitch
+    default: both
   design_framer_project:
     default: ""
   project_name:
@@ -153,6 +153,7 @@ steps:
       "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "materialize-design-inputs" "${audio_debug}" "project ${project_name}"
       DESIGN_DIR="$WS/.intake/design"
       ASSETS_DIR="$DESIGN_DIR/assets"
+      rm -rf "$DESIGN_DIR"
       mkdir -p "$ASSETS_DIR"
       INTAKE_AGENT_BIN="${INTAKE_AGENT_BIN:-}"
       if [ -z "$INTAKE_AGENT_BIN" ]; then
@@ -179,8 +180,8 @@ steps:
           *) PROVIDER_MODE="stitch" ;;
         esac
       fi
-      export INTAKE_STITCH_GENERATION_TIMEOUT_MS="${INTAKE_STITCH_GENERATION_TIMEOUT_MS:-60000}"
-      export INTAKE_STITCH_GENERATION_MAX_RETRIES="${INTAKE_STITCH_GENERATION_MAX_RETRIES:-1}"
+      export INTAKE_STITCH_GENERATION_TIMEOUT_MS="${INTAKE_STITCH_GENERATION_TIMEOUT_MS:-120000}"
+      export INTAKE_STITCH_GENERATION_MAX_RETRIES="${INTAKE_STITCH_GENERATION_MAX_RETRIES:-2}"
       STITCH_KEY_STATE="missing"
       if [ -n "${STITCH_API_KEY:-}" ]; then
         STITCH_KEY_STATE="present"
