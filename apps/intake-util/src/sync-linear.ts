@@ -86,11 +86,22 @@ export interface SyncIssuesResult {
 // GraphQL Executor
 // =============================================================================
 
+const THROTTLE_MS = 500; // minimum gap between Linear API calls
+let lastCallAt = 0;
+
 async function execute<T>(apiKey: string, query: string, variables: Record<string, unknown> = {}): Promise<T> {
   const authHeader = apiKey.startsWith('lin_api_') ? apiKey : `Bearer ${apiKey}`;
-  const MAX_RETRIES = 5;
+  const MAX_RETRIES = 8;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    // Throttle: enforce minimum gap between API calls
+    const now = Date.now();
+    const elapsed = now - lastCallAt;
+    if (elapsed < THROTTLE_MS) {
+      await new Promise((r) => setTimeout(r, THROTTLE_MS - elapsed));
+    }
+    lastCallAt = Date.now();
+
     const response = await fetch(LINEAR_API_URL, {
       method: 'POST',
       headers: {
@@ -300,6 +311,9 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
   interface ProjectSearchResponse {
     projects: { nodes: LinearProject[] };
   }
+  interface ProjectIssueCountResponse {
+    project: { issues: { nodes: { id: string }[] } };
+  }
 
   let project: LinearProject;
 
@@ -314,7 +328,23 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
   );
 
   if (existingData.projects.nodes.length > 0) {
-    project = existingData.projects.nodes[0];
+    // If multiple projects share the same name, pick the one with the most issues
+    if (existingData.projects.nodes.length === 1) {
+      project = existingData.projects.nodes[0];
+    } else {
+      let best = existingData.projects.nodes[0];
+      let bestCount = 0;
+      for (const candidate of existingData.projects.nodes) {
+        try {
+          const countData = await execute<ProjectIssueCountResponse>(apiKey,
+            `query($id: String!) { project(id: $id) { issues { nodes { id } } } }`,
+            { id: candidate.id });
+          const count = countData.project.issues.nodes.length;
+          if (count > bestCount) { best = candidate; bestCount = count; }
+        } catch { /* use first as fallback */ }
+      }
+      project = best;
+    }
     console.error(`Reusing existing Linear project: ${project.name} (${project.id})`);
   } else {
     const projectData = await execute<ProjectResponse>(
@@ -349,6 +379,21 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
     viewPreferencesCreate(input: $input) { success }
   }`;
 
+  // Query existing custom views for this project to avoid duplicates
+  interface CustomViewListResponse {
+    customViews: { nodes: { id: string; name: string }[] };
+  }
+  const existingViews = new Set<string>();
+  try {
+    const viewList = await execute<CustomViewListResponse>(apiKey,
+      `query { customViews { nodes { id name } } }`, {});
+    for (const v of viewList.customViews.nodes) {
+      existingViews.add(v.name);
+    }
+  } catch {
+    // ignore — will attempt creation regardless
+  }
+
   const viewFilter = { project: { id: { eq: project.id } } };
 
   // Helper: create a custom view and set its board preferences
@@ -356,6 +401,10 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
     viewName: string,
     grouping: string,
   ): Promise<void> {
+    if (existingViews.has(viewName)) {
+      console.error(`View exists: ${viewName} — skipping`);
+      return;
+    }
     const viewData = await execute<CustomViewResponse>(apiKey, VIEW_MUTATION, {
       input: {
         name: viewName,
