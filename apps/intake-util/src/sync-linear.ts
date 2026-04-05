@@ -1476,29 +1476,48 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
   const identifierSet = new Set(allIssues.map((i) => i.identifier));
   const issueByIdentifier = new Map(allIssues.map((i) => [i.identifier, i]));
 
-  // Classify: roots have no parent in this project, mid-level have parent + children, leaves have parent only
+  // Classify hierarchy: roots have no parent in this project
   const roots = allIssues.filter((i) => !i.parent || !identifierSet.has(i.parent.identifier));
   const childrenOf = (parentId: string) =>
     allIssues.filter((i) => i.parent && i.parent.identifier === parentId);
 
-  // Sort: process roots first, then their children (breadth-first)
-  const processingOrder: LinearIssueNode[] = [];
+  // Flatten to 2 levels: skip "wrapper" roots that only serve as containers
+  // (e.g., "Main Implementation Task"). Their children become top-level tasks,
+  // and leaves stay as sub-issues of those tasks.
+  const topLevelTasks: LinearIssueNode[] = [];
+  const skipIssues = new Set<string>();
+
   for (const root of roots) {
-    processingOrder.push(root);
-    const mid = childrenOf(root.identifier);
-    for (const m of mid) {
-      processingOrder.push(m);
-      const leaves = childrenOf(m.identifier);
-      processingOrder.push(...leaves);
+    const children = childrenOf(root.identifier);
+    const hasGrandchildren = children.some((c) => childrenOf(c.identifier).length > 0);
+
+    if (hasGrandchildren && children.length > 0) {
+      // This root is a 3-level wrapper — skip it, promote its children
+      skipIssues.add(root.identifier);
+      console.error(`github-sync: skipping wrapper "${root.title}" — promoting ${children.length} children to top-level`);
+      topLevelTasks.push(...children);
+    } else {
+      // Root is either a standalone issue or a direct parent of leaves — keep it
+      topLevelTasks.push(root);
     }
   }
-  // Add any remaining issues not captured in the hierarchy
+
+  // Build processing order: top-level tasks first, then their leaf children
+  const processingOrder: LinearIssueNode[] = [];
+  for (const task of topLevelTasks) {
+    processingOrder.push(task);
+    const leaves = childrenOf(task.identifier);
+    processingOrder.push(...leaves);
+  }
+  // Add standalone issues (PRDs, etc.) not yet seen
   const seen = new Set(processingOrder.map((i) => i.identifier));
   for (const issue of allIssues) {
-    if (!seen.has(issue.identifier)) processingOrder.push(issue);
+    if (!seen.has(issue.identifier) && !skipIssues.has(issue.identifier)) {
+      processingOrder.push(issue);
+    }
   }
 
-  console.error(`github-sync: processing ${processingOrder.length} issues (${roots.length} roots)`);
+  console.error(`github-sync: processing ${processingOrder.length} issues (${topLevelTasks.length} top-level tasks, ${skipIssues.size} wrappers skipped)`);
 
   // 2. Create or find a GitHub Project + set up Agent field
   const owner = repo.split('/')[0];
@@ -1506,7 +1525,7 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
   let ghProjectNodeId: string | undefined;
 
   if (!ghProjectNumber) {
-    const projectTitle = `${opts.projectName || 'intake'} - Intake`;
+    const projectTitle = opts.projectName || 'intake';
     try {
       let ownerId = '';
       try {
@@ -1522,7 +1541,7 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
         ghProjectNumber = proj.number;
         ghProjectNodeId = proj.id;
         console.error(`github-sync: created GitHub Project #${ghProjectNumber}: ${projectTitle}`);
-        // Link project to the repository
+        // Link project to the repository and set description
         try {
           const repoNodeId = gh(['api', `repos/${repo}`, '--jq', '.node_id']).trim();
           if (repoNodeId && ghProjectNodeId) {
@@ -1530,6 +1549,11 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
               `query=mutation { linkProjectV2ToRepository(input: { projectId: "${ghProjectNodeId}", repositoryId: "${repoNodeId}" }) { repository { name } } }`]);
             console.error(`github-sync: linked project to ${repo}`);
           }
+        } catch { /* non-fatal */ }
+        try {
+          const desc = `Intake-generated project board. Show Agent column, hide Assignees (agents use GitHub Apps).`;
+          gh(['api', 'graphql', '-f',
+            `query=mutation { updateProjectV2(input: { projectId: "${ghProjectNodeId}", shortDescription: "${desc}" }) { projectV2 { id } } }`]);
         } catch { /* non-fatal */ }
       }
     } catch (err) {
@@ -1648,12 +1672,14 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
   }
 
   // 4. Link sub-issues to parents via the GitHub sub-issues API
+  // Skip links where the parent was a skipped wrapper issue
   console.error(`github-sync: linking sub-issues...`);
   let linkedCount = 0;
   let alreadyLinkedCount = 0;
 
   for (const issue of allIssues) {
     if (!issue.parent || !identifierSet.has(issue.parent.identifier)) continue;
+    if (skipIssues.has(issue.parent.identifier)) continue;  // parent was flattened out
 
     const parentGh = ghIssueMap.get(issue.parent.identifier);
     const childGh = ghIssueMap.get(issue.identifier);
