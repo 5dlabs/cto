@@ -1,1 +1,1 @@
-How should data be isolated for the various backend services (RMS, Finance, Catalog, etc.) within the single PostgreSQL cluster?
+Synchronous-only service communication or hybrid sync + async via NATS?

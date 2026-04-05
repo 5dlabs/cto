@@ -1,0 +1,22 @@
+[
+  {
+    "provider": "stitch",
+    "target": "web",
+    "deviceType": "DESKTOP",
+    "rationale": "Failed to generate web candidate.",
+    "prompt": "Improve and modernize this web interface for project sigma-1-20260404-073027. Reference URLs: https://deployiq.maximinimal.ca, https://sigma-1.com Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
+    "status": "failed",
+    "error": "Stitch MCP call \"tools/call\" timed out after 60s",
+    "candidate_id": "stitch-web-1"
+  },
+  {
+    "provider": "stitch",
+    "target": "mobile",
+    "deviceType": "MOBILE",
+    "rationale": "Failed to generate mobile candidate.",
+    "prompt": "Improve and modernize this mobile interface for project sigma-1-20260404-073027. Reference URLs: https://deployiq.maximinimal.ca, https://sigma-1.com Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
+    "status": "failed",
+    "error": "Stitch MCP call \"tools/call\" timed out after 60s",
+    "candidate_id": "stitch-mobile-2"
+  }
+]

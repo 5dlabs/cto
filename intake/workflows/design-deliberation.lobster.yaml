@@ -27,20 +27,21 @@ steps:
     command: |
       WS="${WORKSPACE:-.}"
       DP_FILE="$WS/.intake/design-decision-points.json"
-      STITCH_FILE="$WS/.intake/design/stitch/candidates.json"
+      CANDIDATES_FILE="$WS/.intake/design/candidates.normalized.json"
+      [ -f "$CANDIDATES_FILE" ] || CANDIDATES_FILE="$WS/.intake/design/stitch/candidates.json"
       # Try explicit DPs first
       if [ -f "$DP_FILE" ] && [ -s "$DP_FILE" ] && [ "$(jq 'length' "$DP_FILE" 2>/dev/null)" != "0" ]; then
         jq -c '{design_dp_count: length, decision_points: .}' "$DP_FILE"
         exit 0
       fi
-      # Generate DPs from Stitch candidates (each mockup = approve/reject decision)
-      if [ -f "$STITCH_FILE" ] && [ -s "$STITCH_FILE" ] && [ "$(jq 'length' "$STITCH_FILE" 2>/dev/null)" != "0" ]; then
-        jq -c '[.[] | {
-          id: ("design-mockup-" + .deviceType),
-          category: "design",
-          description: ("Approve design mockup for " + .target + " (" + .deviceType + "): " + (.rationale // "generated mockup")),
+      # Generate DPs from provider candidates (each mockup = approve/reject decision)
+      if [ -f "$CANDIDATES_FILE" ] && [ -s "$CANDIDATES_FILE" ] && [ "$(jq 'length' "$CANDIDATES_FILE" 2>/dev/null)" != "0" ]; then
+        jq -c '[.[] | select(.status == "generated") | {
+          id: ("design-mockup-" + (.provider // "stitch") + "-" + .deviceType),
+          category: "visual-identity",
+          description: ("Approve " + (.provider // "stitch") + " design mockup for " + .target + " (" + .deviceType + "): " + (.rationale // "generated mockup")),
           options: ["Approve this design", "Request changes", "Reject and redesign"]
-        }] | {design_dp_count: length, decision_points: .}' "$STITCH_FILE"
+        }] | {design_dp_count: length, decision_points: .}' "$CANDIDATES_FILE"
         exit 0
       fi
       jq -nc '{design_dp_count: 0, skipped: true}'
@@ -51,13 +52,17 @@ steps:
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "design-deliberation" "load-design-context" "${audio_debug}" 2>/dev/null || true
       DC_FILE="$root/${design_context_file}"
-      STITCH_FILE="$root/.intake/design/website-stitch-pass/stitch/candidates.json"
+      STITCH_FILE="$root/.intake/design/stitch/candidates.json"
+      NORMALIZED_FILE="$root/.intake/design/candidates.normalized.json"
       DESIGN_CTX_FILE="$root/.intake/design/design-context.json"
       DC_ARG="null"
       [ -f "$DC_FILE" ] && DC_ARG="\"$DC_FILE\"" || DC_ARG="null"
       STITCH_ARG="[]"
       [ -f "$STITCH_FILE" ] && STITCH_ARG="$(jq '.' "$STITCH_FILE" 2>/dev/null)" || STITCH_ARG="[]"
       [ -z "$STITCH_ARG" ] && STITCH_ARG="[]"
+      NORMALIZED_ARG="[]"
+      [ -f "$NORMALIZED_FILE" ] && NORMALIZED_ARG="$(jq '.' "$NORMALIZED_FILE" 2>/dev/null)" || NORMALIZED_ARG="[]"
+      [ -z "$NORMALIZED_ARG" ] && NORMALIZED_ARG="[]"
       DESIGN_INTAKE_ARG="{}"
       [ -f "$DESIGN_CTX_FILE" ] && DESIGN_INTAKE_ARG="$(jq '.' "$DESIGN_CTX_FILE" 2>/dev/null)" || DESIGN_INTAKE_ARG="{}"
       [ -z "$DESIGN_INTAKE_ARG" ] && DESIGN_INTAKE_ARG="{}"
@@ -65,14 +70,16 @@ steps:
         jq -n \
           --rawfile design_context "$DC_FILE" \
           --argjson stitch_candidates "$STITCH_ARG" \
+          --argjson normalized_candidates "$NORMALIZED_ARG" \
           --argjson design_intake "$DESIGN_INTAKE_ARG" \
-          '{design_context: $design_context, stitch_candidates: $stitch_candidates, design_intake: $design_intake}'
+          '{design_context: $design_context, stitch_candidates: $stitch_candidates, normalized_candidates: $normalized_candidates, design_intake: $design_intake}'
       else
         jq -n \
           --arg design_context "" \
           --argjson stitch_candidates "$STITCH_ARG" \
+          --argjson normalized_candidates "$NORMALIZED_ARG" \
           --argjson design_intake "$DESIGN_INTAKE_ARG" \
-          '{design_context: $design_context, stitch_candidates: $stitch_candidates, design_intake: $design_intake}'
+          '{design_context: $design_context, stitch_candidates: $stitch_candidates, normalized_candidates: $normalized_candidates, design_intake: $design_intake}'
       fi
 
   - id: designer-turn
@@ -91,6 +98,7 @@ steps:
       DPS=$(printf '%s' "$CTO_CLASSIFY" | jq -c '.decision_points')
       DESIGN_CTX=$(printf '%s' "$CTO_DESIGN_CTX" | jq -r '.design_context // ""')
       STITCH=$(printf '%s' "$CTO_DESIGN_CTX" | jq -c '.stitch_candidates // []')
+      NORMALIZED=$(printf '%s' "$CTO_DESIGN_CTX" | jq -c '.normalized_candidates // []')
       DESIGN_INTAKE=$(printf '%s' "$CTO_DESIGN_CTX" | jq -c '.design_intake // {}')
       DESIGNER_ARGS=$(jq -n \
         --rawfile prompt "$root/intake/prompts/debate-designer-soul.md" \
@@ -98,6 +106,7 @@ steps:
         --argjson decision_points "$DPS" \
         --arg design_context "$DESIGN_CTX" \
         --argjson stitch_candidates "$STITCH" \
+        --argjson normalized_candidates "$NORMALIZED" \
         --argjson design_intake "$DESIGN_INTAKE" \
         --rawfile infrastructure_context "$root/.intake/contexts/infrastructure.txt" \
         --rawfile codebase_context "$root/.intake/contexts/codebase.txt" \
@@ -110,6 +119,7 @@ steps:
             "decision_points": $decision_points,
             "design_context": $design_context,
             "stitch_candidates": $stitch_candidates,
+            "normalized_candidates": $normalized_candidates,
             "design_intake": $design_intake,
             "infrastructure_context": $infrastructure_context,
             "codebase_context": $codebase_context
@@ -261,7 +271,7 @@ steps:
       if [ -n "$LINEAR_SID" ]; then
         WAIT_BODY="$(printf '## 🎨 Designer\n\n> *Awaiting your selections...*\n\n**%d design decision(s)** need your review.\nPlease select your preferred options above.\n\n*Timeout: %d minutes*' \
           "$ELICIT_COUNT" "$((TIMEOUT_SEC / 60))")"
-        intake-util linear-activity --session-id "$LINEAR_SID" --type thought --body "$WAIT_BODY" 2>/dev/null || true
+        intake-util linear-activity --session-id "$LINEAR_SID" --type thought --body "$WAIT_BODY" >/dev/null 2>/dev/null || true
       fi
       while [ "$ELAPSED" -lt "$TIMEOUT_SEC" ]; do
         if [ -f "$SELECTIONS_FILE" ]; then

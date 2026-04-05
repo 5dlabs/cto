@@ -931,7 +931,9 @@ fn row_f64(row: &tokio_postgres::Row, idx: usize) -> Result<f64, Error> {
     }
     if let Ok(v) = row.try_get::<usize, String>(idx) {
         return v.parse::<f64>().map_err(|_| {
-            Error::Query(format!("unable to parse float column idx={idx} from string"))
+            Error::Query(format!(
+                "unable to parse float column idx={idx} from string"
+            ))
         });
     }
     Err(Error::Query(format!(

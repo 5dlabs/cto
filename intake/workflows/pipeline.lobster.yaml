@@ -20,6 +20,10 @@ args:
     default: ""
   design_mode:
     default: ingest_plus_stitch
+  design_provider:
+    default: stitch
+  design_framer_project:
+    default: ""
   project_name:
     default: project
   num_tasks:
@@ -105,7 +109,10 @@ steps:
       OUT="$WS/.intake/run-prd.txt"
       if [ -n "${prd_path}" ]; then
         REL=$(printf '%s' "${prd_path}" | sed 's|^\./||')
-        SRC="$WS/$REL"
+        case "$REL" in
+          /*) SRC="$REL" ;;          # absolute path (e.g. target repo PRD)
+          *)  SRC="$WS/$REL" ;;      # relative to workspace
+        esac
         if [ ! -f "$SRC" ]; then
           echo "materialize-prd: missing PRD file: $SRC (prd_path=${prd_path})" >&2
           exit 1
@@ -145,23 +152,62 @@ steps:
         exit 1
       fi
       MODE="${design_mode:-ingest_plus_stitch}"
+      PROVIDER_MODE="${design_provider:-}"
+      FRAMER_PROJECT_TARGET="${design_framer_project:-${FRAMER_PROJECT_URL:-${FRAMER_PROJECT_ID:-}}}"
+      if [ -z "$PROVIDER_MODE" ]; then
+        case "$MODE" in
+          stitch|framer|both|auto) PROVIDER_MODE="$MODE" ;;
+          ingest_only) PROVIDER_MODE="auto" ;;
+          *) PROVIDER_MODE="stitch" ;;
+        esac
+      fi
+      export INTAKE_STITCH_GENERATION_TIMEOUT_MS="${INTAKE_STITCH_GENERATION_TIMEOUT_MS:-60000}"
+      export INTAKE_STITCH_GENERATION_MAX_RETRIES="${INTAKE_STITCH_GENERATION_MAX_RETRIES:-1}"
       STITCH_KEY_STATE="missing"
       if [ -n "${STITCH_API_KEY:-}" ]; then
         STITCH_KEY_STATE="present"
       fi
+      FRAMER_KEY_STATE="missing"
+      if [ -n "${FRAMER_API_KEY:-}" ]; then
+        FRAMER_KEY_STATE="present"
+      fi
       AUTH_DISCOVERY_JSON="$DESIGN_DIR/auth-discovery.json"
       jq -n \
         --arg mode "$MODE" \
+        --arg provider_mode "$PROVIDER_MODE" \
         --arg stitch_api_key_state "$STITCH_KEY_STATE" \
+        --arg framer_api_key_state "$FRAMER_KEY_STATE" \
+        --arg framer_project_state "$( [ -n "${FRAMER_PROJECT_TARGET:-}" ] && printf 'present' || printf 'missing' )" \
+        --arg framer_project_url_state "$( [ -n "${FRAMER_PROJECT_URL:-}" ] && printf 'present' || printf 'missing' )" \
+        --arg framer_project_id_state "$( [ -n "${FRAMER_PROJECT_ID:-}" ] && printf 'present' || printf 'missing' )" \
         --arg stitch_project_id_state "$( [ -n "${STITCH_PROJECT_ID:-}" ] && printf 'present' || printf 'missing' )" \
         --arg stitch_access_token_state "$( [ -n "${STITCH_ACCESS_TOKEN:-}" ] && printf 'present' || printf 'missing' )" \
         --arg google_cloud_project_state "$( [ -n "${GOOGLE_CLOUD_PROJECT:-}" ] && printf 'present' || printf 'missing' )" \
-        '{mode:$mode, stitch_api_key:$stitch_api_key_state, stitch_project_id:$stitch_project_id_state, stitch_access_token:$stitch_access_token_state, google_cloud_project:$google_cloud_project_state}' \
+        '{mode:$mode, provider_mode:$provider_mode, stitch_api_key:$stitch_api_key_state, framer_api_key:$framer_api_key_state, framer_project:$framer_project_state, framer_project_url:$framer_project_url_state, framer_project_id:$framer_project_id_state, stitch_project_id:$stitch_project_id_state, stitch_access_token:$stitch_access_token_state, google_cloud_project:$google_cloud_project_state}' \
         > "$AUTH_DISCOVERY_JSON"
 
-      if [ "$MODE" = "ingest_plus_stitch" ] && [ -z "${STITCH_API_KEY:-}" ]; then
+      REQUIRES_STITCH=false
+      REQUIRES_FRAMER=false
+      case "$PROVIDER_MODE" in
+        stitch|both|auto) REQUIRES_STITCH=true ;;
+      esac
+      case "$PROVIDER_MODE" in
+        framer|both) REQUIRES_FRAMER=true ;;
+      esac
+
+      if [ "$MODE" = "ingest_plus_stitch" ]; then
+        REQUIRES_STITCH=true
+      fi
+
+      if [ "$REQUIRES_STITCH" = "true" ] && [ -z "${STITCH_API_KEY:-}" ]; then
         "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "stitch-credentials" "failed" "${audio_debug}" "error" "design_mode ${MODE}"
-        echo "materialize-design-inputs: STITCH_API_KEY is required when design_mode=${MODE}." >&2
+        echo "materialize-design-inputs: STITCH_API_KEY is required for provider mode ${PROVIDER_MODE}." >&2
+        echo "credential discovery: $(cat "$AUTH_DISCOVERY_JSON")" >&2
+        exit 1
+      fi
+      if [ "$REQUIRES_FRAMER" = "true" ] && { [ -z "${FRAMER_API_KEY:-}" ] || [ -z "${FRAMER_PROJECT_TARGET:-}" ]; }; then
+        "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "framer-credentials" "failed" "${audio_debug}" "error" "provider_mode ${PROVIDER_MODE}"
+        echo "materialize-design-inputs: FRAMER_API_KEY and a Framer project target are required for provider mode=${PROVIDER_MODE}." >&2
         echo "credential discovery: $(cat "$AUTH_DISCOVERY_JSON")" >&2
         exit 1
       fi
@@ -177,12 +223,29 @@ steps:
         fi
       fi
 
+      RESOLVED_DESIGN_URLS="${design_urls}"
+      if [ -z "$RESOLVED_DESIGN_URLS" ] && [ -s "$WS/.intake/run-prd.txt" ]; then
+        RESOLVED_DESIGN_URLS=$(grep -oE 'https?://[^ )"<>]+' "$WS/.intake/run-prd.txt" \
+          | grep -v 'github\.com\|signal\.me\|img\.shields' \
+          | sort -u | head -5 | paste -sd',' -)
+      fi
+      if [ -z "$RESOLVED_DESIGN_URLS" ] && [ -n "${target_repo_local_path}" ] && [ -f "${target_repo_local_path}/README.md" ]; then
+        RESOLVED_DESIGN_URLS=$(grep -oE 'https?://[^ )"<>]+' "${target_repo_local_path}/README.md" \
+          | grep -v 'github\.com\|signal\.me\|img\.shields' \
+          | sort -u | head -5 | paste -sd',' -)
+      fi
+      if [ -n "$RESOLVED_DESIGN_URLS" ] && [ "$RESOLVED_DESIGN_URLS" != "${design_urls}" ]; then
+        echo "materialize-design-inputs: auto-discovered design URLs: $RESOLVED_DESIGN_URLS" >&2
+      fi
+
       jq -n \
         --rawfile prd "$WS/.intake/run-prd.txt" \
         --arg design_prompt "${design_prompt}" \
         --arg design_artifacts_path "$ASSETS_DIR" \
-        --arg design_urls "${design_urls}" \
+        --arg design_urls "$RESOLVED_DESIGN_URLS" \
         --arg design_mode "${design_mode}" \
+        --arg design_provider "${PROVIDER_MODE}" \
+        --arg design_framer_project "${FRAMER_PROJECT_TARGET}" \
         --arg project_name "${project_name}" \
         --arg output_dir "$DESIGN_DIR" \
         '{
@@ -193,6 +256,8 @@ steps:
             design_artifacts_path: $design_artifacts_path,
             design_urls: $design_urls,
             design_mode: $design_mode,
+            design_provider: $design_provider,
+            design_framer_project: $design_framer_project,
             project_name: $project_name,
             output_dir: $output_dir
           }
@@ -204,7 +269,7 @@ steps:
           --arg project_name "${project_name}" \
           --arg design_mode "${design_mode}" \
           --arg design_prompt "${design_prompt}" \
-          '{"projectName":$project_name,"mode":$design_mode,"prompt":$design_prompt,"hasFrontend":false,"frontendTargets":[],"confidence":0,"evidence":[],"urls":[],"stitch":{"status":"failed","reason":"design_intake_failed","warnings":["intake-agent design_intake failed"],"candidates":[]}}' \
+          '{"projectName":$project_name,"mode":$design_mode,"providerMode":"stitch","prompt":$design_prompt,"hasFrontend":false,"frontendTargets":[],"confidence":0,"evidence":[],"urls":[],"providers":{"stitch":{"status":"failed","reason":"design_intake_failed","warnings":["intake-agent design_intake failed"],"candidates":[]},"framer":{"status":"skipped","reason":"not_requested","warnings":[],"candidates":[]}},"stitch":{"status":"failed","reason":"design_intake_failed","warnings":["intake-agent design_intake failed"],"candidates":[]},"framer":{"status":"skipped","reason":"not_requested","warnings":[],"candidates":[]},"normalized_candidates":[]}' \
           > "$DESIGN_DIR/design-context.json"
       else
         jq -c '.data' "/tmp/design-intake-$$.json" > "$DESIGN_DIR/design-context.json"
@@ -220,7 +285,7 @@ steps:
       "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "save-design-bundle" "${audio_debug}" "project ${project_name}"
       SRC_DIR="$WS/.intake/design"
       OUT_DIR="$WS/.tasks/design"
-      mkdir -p "$OUT_DIR/crawled" "$OUT_DIR/stitch"
+      mkdir -p "$OUT_DIR/crawled" "$OUT_DIR/stitch" "$OUT_DIR/framer"
       cp "$SRC_DIR/design-context.json" "$OUT_DIR/design-context.json"
       if [ -f "$SRC_DIR/crawled/urls.json" ]; then
         cp "$SRC_DIR/crawled/urls.json" "$OUT_DIR/crawled/urls.json"
@@ -231,6 +296,21 @@ steps:
       if [ -f "$SRC_DIR/stitch/candidates.json" ]; then
         cp "$SRC_DIR/stitch/candidates.json" "$OUT_DIR/stitch/candidates.json"
       fi
+      if [ -f "$SRC_DIR/framer/framer-run.json" ]; then
+        cp "$SRC_DIR/framer/framer-run.json" "$OUT_DIR/framer/framer-run.json"
+      fi
+      if [ -f "$SRC_DIR/framer/candidates.json" ]; then
+        cp "$SRC_DIR/framer/candidates.json" "$OUT_DIR/framer/candidates.json"
+      fi
+      if [ -f "$SRC_DIR/candidates.normalized.json" ]; then
+        cp "$SRC_DIR/candidates.normalized.json" "$OUT_DIR/candidates.normalized.json"
+      fi
+      if [ -f "$SRC_DIR/component-library.json" ]; then
+        cp "$SRC_DIR/component-library.json" "$OUT_DIR/component-library.json"
+      fi
+      if [ -f "$SRC_DIR/design-system.md" ]; then
+        cp "$SRC_DIR/design-system.md" "$OUT_DIR/design-system.md"
+      fi
       if [ -f "$SRC_DIR/auth-discovery.json" ]; then
         cp "$SRC_DIR/auth-discovery.json" "$OUT_DIR/auth-discovery.json"
       fi
@@ -239,23 +319,36 @@ steps:
         --arg project_name "${project_name}" \
         --arg linear_session_id "${linear_session_id}" \
         --arg design_mode "${design_mode}" \
+        --arg design_provider "${design_provider}" \
         --arg bundle_dir "$OUT_DIR" \
-        --arg stitch_required "$( [ "${design_mode}" = "ingest_plus_stitch" ] && printf 'true' || printf 'false' )" \
+        --arg stitch_required "$(if [ "${design_provider}" = "stitch" ] || [ "${design_provider}" = "both" ] || [ "${design_mode}" = "ingest_plus_stitch" ]; then printf 'true'; else printf 'false'; fi)" \
         --argjson context "$(cat "$SRC_DIR/design-context.json" 2>/dev/null || printf '{}')" \
         '{
           generated_at: $generated_at,
           project_name: $project_name,
           linear_session_id: $linear_session_id,
           design_mode: $design_mode,
+          design_provider: $design_provider,
           stitch_required: ($stitch_required == "true"),
           bundle_dir: $bundle_dir,
           has_frontend: ($context.hasFrontend // false),
           stitch_status: ($context.stitch.status // "unknown"),
+          framer_status: ($context.framer.status // "unknown"),
           files: {
             design_context: ($bundle_dir + "/design-context.json"),
             crawled_urls: ($bundle_dir + "/crawled/urls.json"),
             stitch_run: ($bundle_dir + "/stitch/stitch-run.json"),
             stitch_candidates: ($bundle_dir + "/stitch/candidates.json"),
+            framer_run: ($bundle_dir + "/framer/framer-run.json"),
+            framer_candidates: ($bundle_dir + "/framer/candidates.json"),
+            normalized_candidates: ($bundle_dir + "/candidates.normalized.json"),
+            component_library: ($bundle_dir + "/component-library.json"),
+            design_system: ($bundle_dir + "/design-system.md"),
+            design_variants: ($bundle_dir + "/stitch/design-variants.json"),
+            design_selections: ($bundle_dir + "/selections.json"),
+            source_screenshots: ($bundle_dir + "/source-screenshots.json"),
+            snapshot_links_json: ($bundle_dir + "/snapshot-links.json"),
+            snapshot_links_md: ($bundle_dir + "/snapshot-links.md"),
             auth_discovery: ($bundle_dir + "/auth-discovery.json")
           }
         }' > "$OUT_DIR/manifest.json"
@@ -273,12 +366,14 @@ steps:
         --arg run_id "" \
         --arg project_name "${project_name}" \
         --arg design_mode "${design_mode}" \
-        --arg stitch_required "$( [ "${design_mode}" = "ingest_plus_stitch" ] && printf 'true' || printf 'false' )" \
+        --arg design_provider "${design_provider}" \
+        --arg stitch_required "$(if [ "${design_provider}" = "stitch" ] || [ "${design_provider}" = "both" ] || [ "${design_mode}" = "ingest_plus_stitch" ]; then printf 'true'; else printf 'false'; fi)" \
         --arg stitch_status "$(printf '%s' "$DESIGN_CTX" | jq -r '.stitch.status // "unknown"')" \
+        --arg framer_status "$(printf '%s' "$DESIGN_CTX" | jq -r '.framer.status // "unknown"')" \
         --arg has_frontend "$(printf '%s' "$DESIGN_CTX" | jq -r '.hasFrontend // false')" \
         --arg artifact_bundle_path "$WS/.tasks/design" \
         --argjson context "$DESIGN_CTX" \
-        '{session_id:$session_id,run_id:$run_id,project_name:$project_name,design_mode:$design_mode,stitch_required:($stitch_required=="true"),stitch_status:$stitch_status,has_frontend:($has_frontend=="true"),artifact_bundle_path:$artifact_bundle_path,context:$context}')"
+        '{session_id:$session_id,run_id:$run_id,project_name:$project_name,design_mode:$design_mode,design_provider:$design_provider,stitch_required:($stitch_required=="true"),stitch_status:$stitch_status,framer_status:$framer_status,has_frontend:($has_frontend=="true"),artifact_bundle_path:$artifact_bundle_path,context:$context}')"
       LINEAR_URL="${LINEAR_BRIDGE_URL:-http://127.0.0.1:3100}"
       DISCORD_URL="${DISCORD_BRIDGE_URL:-http://127.0.0.1:3200}"
       linear_ok=false
@@ -308,10 +403,13 @@ steps:
     command: |
       WS="${WORKSPACE:-.}"
       "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "generate-design-variants" "${audio_debug}" "project ${project_name}"
-      CANDIDATES="$WS/.intake/design/stitch/candidates.json"
-      if [ "${design_mode}" != "ingest_plus_stitch" ]; then
+      CANDIDATES="$WS/.intake/design/candidates.normalized.json"
+      if [ ! -f "$CANDIDATES" ]; then
+        CANDIDATES="$WS/.intake/design/stitch/candidates.json"
+      fi
+      if [ "${design_mode}" = "ingest_only" ]; then
         echo "generate-design-variants: skipped (design_mode=${design_mode})" >&2
-        printf '{"skipped":true,"reason":"design_mode_not_stitch"}'
+        printf '{"skipped":true,"reason":"ingest_only"}'
         exit 0
       fi
       if [ ! -f "$CANDIDATES" ]; then
@@ -319,7 +417,7 @@ steps:
         printf '{"skipped":true,"reason":"no_candidates"}'
         exit 0
       fi
-      GENERATED=$(jq '[.[] | select(.status=="generated" and .screenId)] | length' "$CANDIDATES" 2>/dev/null || echo 0)
+      GENERATED=$(jq '[.[] | select(.status=="generated")] | length' "$CANDIDATES" 2>/dev/null || echo 0)
       if [ "$GENERATED" -eq 0 ]; then
         echo "generate-design-variants: no generated screens — skipping" >&2
         printf '{"skipped":true,"reason":"no_generated_screens"}'
@@ -389,6 +487,223 @@ steps:
       fi
       if [ -f "$WS/.intake/design/stitch/design-variants.json" ]; then
         cp "$WS/.intake/design/stitch/design-variants.json" "$WS/.tasks/design/stitch/design-variants.json" 2>/dev/null || true
+      fi
+      SOURCE_SCREENSHOTS="$WS/.tasks/design/source-screenshots.json"
+      jq -n '[]' > "$SOURCE_SCREENSHOTS"
+      if [ -f "$WS/.tasks/design/design-context.json" ]; then
+        URLS_FILE="$(mktemp)"
+        jq -r '((.urls // []) + ((.crawledUrls // []) | map(select(.status == "ok") | .url))) | map(select(type == "string" and length > 0)) | unique | .[:3][]' "$WS/.tasks/design/design-context.json" > "$URLS_FILE"
+        while IFS= read -r SOURCE_URL; do
+          [ -n "$SOURCE_URL" ] || continue
+          UPLOAD_FILE="$(mktemp)"
+          ATTEMPT=1
+          UPLOAD_OK=false
+          LAST_ERROR=""
+          while [ "$ATTEMPT" -le 2 ]; do
+            ERR_FILE="$(mktemp)"
+            set +e
+            UPLOAD_JSON="$("$WS/intake/scripts/upload-mockup-to-linear.sh" "$SOURCE_URL" DESKTOP 2>"$ERR_FILE")"
+            UPLOAD_STATUS=$?
+            set -e
+            STDERR_TEXT="$(cat "$ERR_FILE" 2>/dev/null || true)"
+            if [ "$UPLOAD_STATUS" -eq 0 ] && printf '%s' "${UPLOAD_JSON:-{}}" | jq -c '.' > "$UPLOAD_FILE" 2>/dev/null; then
+              if jq -e '.success == true' "$UPLOAD_FILE" >/dev/null 2>&1; then
+                UPLOAD_OK=true
+                rm -f "$ERR_FILE"
+                break
+              fi
+              LAST_ERROR="$(jq -r '.error // empty' "$UPLOAD_FILE" 2>/dev/null || true)"
+            else
+              LAST_ERROR="$(printf '%s' "$STDERR_TEXT" | tr '\n' ' ' | cut -c1-300)"
+            fi
+            FALLBACK_ASSET_URL="$(printf '%s\n' "$STDERR_TEXT" | sed -n 's/.*→ \(https:\/\/[^ ]*\).*/\1/p' | tail -n 1)"
+            FALLBACK_LOCAL_PATH="$(printf '%s\n' "$STDERR_TEXT" | sed -n 's/^Screenshot saved: \(.*\)$/\1/p' | tail -n 1)"
+            if [ -n "$FALLBACK_ASSET_URL" ]; then
+              jq -nc --arg url "$FALLBACK_ASSET_URL" --arg path "$FALLBACK_LOCAL_PATH" \
+                '{success:true, assetUrl:$url, localPath:$path}' > "$UPLOAD_FILE"
+              UPLOAD_OK=true
+              rm -f "$ERR_FILE"
+              break
+            fi
+            rm -f "$ERR_FILE"
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 2
+          done
+          if [ "$UPLOAD_OK" != true ]; then
+            printf '{"success":false,"error":%s}\n' "$(jq -Rn --arg err "${LAST_ERROR:-invalid upload response}" '$err')" > "$UPLOAD_FILE"
+          fi
+          TMP_SCREENSHOTS="$(mktemp)"
+          jq --arg source_url "$SOURCE_URL" --slurpfile upload "$UPLOAD_FILE" \
+            '. + [{
+              source_url: $source_url,
+              success: (($upload[0].success // false) == true),
+              asset_url: ($upload[0].assetUrl // ""),
+              local_path: ($upload[0].localPath // ""),
+              error: ($upload[0].error // "")
+            }]' "$SOURCE_SCREENSHOTS" > "$TMP_SCREENSHOTS" && mv "$TMP_SCREENSHOTS" "$SOURCE_SCREENSHOTS"
+          rm -f "$UPLOAD_FILE"
+        done < "$URLS_FILE"
+        rm -f "$URLS_FILE"
+      fi
+      SNAPSHOT_JSON="$WS/.tasks/design/snapshot-links.json"
+      SNAPSHOT_MD="$WS/.tasks/design/snapshot-links.md"
+      python3 - "$WS/.tasks/design/design-context.json" "$WS/.tasks/design/stitch/design-variants.json" "$WS/.tasks/design/selections.json" "$SOURCE_SCREENSHOTS" "$SNAPSHOT_JSON" "$SNAPSHOT_MD" <<'PY'
+      import json
+      import sys
+      from pathlib import Path
+
+      context_path = Path(sys.argv[1])
+      variants_path = Path(sys.argv[2])
+      selections_path = Path(sys.argv[3])
+      source_screenshots_path = Path(sys.argv[4])
+      snapshot_json_path = Path(sys.argv[5])
+      snapshot_md_path = Path(sys.argv[6])
+
+      def load_json(path: Path, default):
+          if not path.exists():
+              return default
+          try:
+              return json.loads(path.read_text())
+          except Exception:
+              return default
+
+      context = load_json(context_path, {})
+      variants = load_json(variants_path, {})
+      selections = load_json(selections_path, [])
+      source_screenshots = load_json(source_screenshots_path, [])
+
+      current_urls = []
+      for value in (context.get("urls") or []) + (context.get("crawledUrls") or []):
+          if isinstance(value, dict):
+              value = value.get("url")
+          if isinstance(value, str) and value and value not in current_urls:
+              current_urls.append(value)
+
+      selection_by_screen = {}
+      for selection in selections if isinstance(selections, list) else []:
+          screen_id = selection.get("screen_id")
+          variant_id = selection.get("selected_variant_id")
+          if isinstance(screen_id, str) and screen_id and isinstance(variant_id, str) and variant_id:
+              selection_by_screen[screen_id] = variant_id
+
+      generated_variants = []
+      for screen in (variants.get("screens") or []) if isinstance(variants, dict) else []:
+          if not isinstance(screen, dict):
+              continue
+          source_screen_id = screen.get("source_screen_id") or ""
+          source_target = screen.get("source_target") or ""
+          for variant in screen.get("variants") or []:
+              if not isinstance(variant, dict):
+                  continue
+              if variant.get("status") != "generated":
+                  continue
+              image_url = variant.get("image_url") or ""
+              html_url = variant.get("html_url") or ""
+              if not image_url and not html_url:
+                  continue
+              generated_variants.append({
+                  "screen_id": source_screen_id,
+                  "screen_target": source_target,
+                  "variant_id": variant.get("variant_id") or "",
+                  "label": variant.get("label") or variant.get("variant_id") or "variant",
+                  "selected": selection_by_screen.get(source_screen_id) == (variant.get("variant_id") or ""),
+                  "image_url": image_url,
+                  "html_url": html_url,
+              })
+
+      current_site_snapshots = []
+      for snapshot in source_screenshots if isinstance(source_screenshots, list) else []:
+          if not isinstance(snapshot, dict):
+              continue
+          source_url = snapshot.get("source_url")
+          if not isinstance(source_url, str) or not source_url:
+              continue
+          asset_url = snapshot.get("asset_url")
+          success = snapshot.get("success") is True
+          current_site_snapshots.append({
+              "source_url": source_url,
+              "asset_url": asset_url if isinstance(asset_url, str) else "",
+              "success": success,
+              "error": snapshot.get("error") if isinstance(snapshot.get("error"), str) else "",
+          })
+          if source_url not in current_urls:
+              current_urls.append(source_url)
+
+      selected_variants = [variant for variant in generated_variants if variant["selected"]]
+      snapshot_payload = {
+          "current_urls": current_urls,
+          "current_site_snapshots": current_site_snapshots,
+          "generated_variants": generated_variants,
+          "selected_variants": selected_variants,
+          "counts": {
+              "current_urls": len(current_urls),
+              "current_site_snapshots": len(current_site_snapshots),
+              "generated_variants": len(generated_variants),
+              "selected_variants": len(selected_variants),
+          },
+      }
+      snapshot_json_path.write_text(json.dumps(snapshot_payload, indent=2) + "\n")
+
+      md_lines = ["### Design snapshots", ""]
+      md_lines.append("#### Current site snapshots")
+      if current_site_snapshots:
+          for snapshot in current_site_snapshots:
+              line = f"- `{snapshot['source_url']}`"
+              if snapshot["asset_url"]:
+                  line += f" — [Image]({snapshot['asset_url']})"
+              elif snapshot["error"]:
+                  line += f" — screenshot failed: {snapshot['error']}"
+              md_lines.append(line)
+              if snapshot["asset_url"]:
+                  md_lines.extend(["", f"![Current site]({snapshot['asset_url']})", ""])
+      elif current_urls:
+          md_lines.extend(f"- `{url}`" for url in current_urls)
+      else:
+          md_lines.append("- None captured for this run.")
+
+      variants_for_md = selected_variants or generated_variants
+      md_lines.extend(["", "#### Generated variants"])
+      if variants_for_md:
+          for variant in variants_for_md:
+              links = []
+              if variant["html_url"]:
+                  links.append(f"[HTML]({variant['html_url']})")
+              if variant["image_url"]:
+                  links.append(f"[Image]({variant['image_url']})")
+              prefix = "- **" + (variant["screen_target"] or "design")
+              prefix += " / " + (variant["label"] or variant["variant_id"] or "variant") + "**"
+              if variant["selected"]:
+                  prefix += " _(selected)_"
+              if links:
+                  prefix += " — " + " · ".join(links)
+              md_lines.append(prefix)
+              if variant["image_url"]:
+                  alt = f"{variant['screen_target'] or 'design'} — {variant['label'] or 'variant'}"
+                  md_lines.extend(["", f"![{alt}]({variant['image_url']})", ""])
+      else:
+          md_lines.append("- No generated variant URLs were captured.")
+
+      snapshot_md_path.write_text("\n".join(md_lines).rstrip() + "\n")
+      PY
+      if [ -f "$WS/.tasks/design/manifest.json" ]; then
+        TMP_MANIFEST="$(mktemp)"
+        jq \
+          --arg design_variants "$WS/.tasks/design/stitch/design-variants.json" \
+          --arg design_selections "$WS/.tasks/design/selections.json" \
+          --arg source_screenshots "$SOURCE_SCREENSHOTS" \
+          --arg snapshot_links_json "$SNAPSHOT_JSON" \
+          --arg snapshot_links_md "$SNAPSHOT_MD" \
+          '.files.design_variants = $design_variants
+           | .files.design_selections = $design_selections
+           | .files.source_screenshots = $source_screenshots
+           | .files.snapshot_links_json = $snapshot_links_json
+           | .files.snapshot_links_md = $snapshot_links_md' \
+          "$WS/.tasks/design/manifest.json" > "$TMP_MANIFEST" && mv "$TMP_MANIFEST" "$WS/.tasks/design/manifest.json"
+      fi
+      if [ -f "$WS/.tasks/design/manifest.json" ]; then
+        cat "$WS/.tasks/design/manifest.json"
+      else
+        printf '{"skipped":false}'
       fi
 
   - id: notify-pipeline-start
@@ -482,6 +797,57 @@ steps:
         --project-name "${project_name}" \
         --team-id "$TEAM_ID" < "$WS/.intake/run-prd.txt"
 
+  - id: verify-agent-resolution
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+      CTO_CREATE_LINEAR_JSON: $create-linear-project.stdout
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "verify-agent-resolution" "${audio_debug}" "project ${project_name}"
+
+      AGENT_MAP="$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -c '.agentMap // {}')"
+      EXPECTED_AGENTS="morgan bolt rex grizz nova blaze tap spark cipher tess cleo atlas stitch angie"
+
+      RESOLVED=0
+      MISSING=""
+      for agent in $EXPECTED_AGENTS; do
+        uid="$(printf '%s' "$AGENT_MAP" | jq -r --arg a "$agent" '.[$a] // empty')"
+        if [ -n "$uid" ]; then
+          RESOLVED=$((RESOLVED + 1))
+        else
+          MISSING="${MISSING} ${agent}"
+        fi
+      done
+
+      TOTAL=14
+      echo "verify-agent-resolution: ${RESOLVED}/${TOTAL} agents resolved in Linear workspace" >&2
+      if [ -n "$MISSING" ]; then
+        echo "verify-agent-resolution: MISSING agents:${MISSING}" >&2
+        echo "verify-agent-resolution: ensure these users exist in Linear and match naming convention (see intake/docs/linear-agent-assignment-checklist.md)" >&2
+        if [ "${INTAKE_AGENT_GATE_SKIP:-false}" = "true" ] || [ "${INTAKE_AGENT_GATE_SKIP:-false}" = "1" ]; then
+          echo "verify-agent-resolution: bypassed via INTAKE_AGENT_GATE_SKIP — issues for missing agents will be unassigned" >&2
+        else
+          "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "agent-resolution" "failed — missing:${MISSING}" "${audio_debug}" "alert" "project ${project_name}" || true
+          exit 1
+        fi
+      else
+        echo "verify-agent-resolution: all agents resolved ✓" >&2
+      fi
+      printf '%s\n' "$AGENT_MAP"
+
+  # ── Coordinator session ─────────────────────────────────────────────
+  # This is the PIPELINE / COORDINATOR agent session used by
+  # `intake-util linear-activity` to post status updates during intake
+  # (e.g. "deliberation complete", "design mockups generated").
+  # It is NOT an agent-work session — agents do not use it to implement.
+  # This session MUST be created during intake so the pipeline can report
+  # progress to Linear.
+  #
+  # Agent-work sessions (per-agent sessions for play execution) should
+  # NOT be created during intake.  Gate any future agent-work session
+  # creation with:
+  #   if [ "${INTAKE_CREATE_AGENT_SESSIONS:-false}" = "true" ]; then ...
+  # ───────────────────────────────────────────────────────────────────
   - id: ensure-linear-session
     env:
       INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
@@ -508,8 +874,9 @@ steps:
         jq -nc '{linear_session_id: ""}'
         exit 0
       fi
-      # Dismiss any existing agent sessions before creating new ones
-      MORGAN_OAUTH="$(op read 'op://Automation/Linear Morgan OAuth/developer_token' 2>/dev/null)" || true
+      # Dismiss any existing agent sessions before creating new ones.
+      # Reuse the current runtime token instead of reading a cached token from 1Password.
+      MORGAN_OAUTH="${LINEAR_API_KEY:-}"
       if [ -n "$MORGAN_OAUTH" ]; then
         NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
         EXISTING="$(curl -s -X POST https://api.linear.app/graphql \
@@ -852,18 +1219,32 @@ steps:
       "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "design-deliberation" "${audio_debug}" "project ${project_name}"
       DESIGN_DPS=$(printf '%s' "$CTO_SPLIT_DPS_JSON" | jq -c '.design_decision_points // []')
       DESIGN_COUNT=$(printf '%s' "$CTO_SPLIT_DPS_JSON" | jq -r '.design_count // 0')
+      CANDIDATES_FILE="$WS/.intake/design/candidates.normalized.json"
+      if [ ! -f "$CANDIDATES_FILE" ]; then
+        CANDIDATES_FILE="$WS/.intake/design/stitch/candidates.json"
+      fi
+      MOCKUP_COUNT=0
+      [ -f "$CANDIDATES_FILE" ] && MOCKUP_COUNT="$(jq '[.[] | select(.status == "generated")] | length' "$CANDIDATES_FILE" 2>/dev/null || echo 0)"
       STITCH_FILE="$WS/.intake/design/stitch/candidates.json"
       STITCH_COUNT=0
-      [ -f "$STITCH_FILE" ] && STITCH_COUNT="$(jq 'length' "$STITCH_FILE" 2>/dev/null || echo 0)"
-      echo "design-deliberation-pipeline: DESIGN_COUNT=$DESIGN_COUNT STITCH_COUNT=$STITCH_COUNT" >&2
+      [ -f "$STITCH_FILE" ] && STITCH_COUNT="$(jq '[.[] | select(.status == "generated")] | length' "$STITCH_FILE" 2>/dev/null || echo 0)"
+      echo "design-deliberation-pipeline: DESIGN_COUNT=$DESIGN_COUNT MOCKUP_COUNT=$MOCKUP_COUNT STITCH_COUNT=$STITCH_COUNT" >&2
 
-      if [ "$DESIGN_COUNT" -eq 0 ] && [ "$STITCH_COUNT" -eq 0 ]; then
+      if [ "$DESIGN_COUNT" -eq 0 ] && [ "$MOCKUP_COUNT" -eq 0 ]; then
         echo "design-deliberation: no design decision points or mockups — skipping" >&2
         jq -nc '{skipped: true, design_decisions: []}'
         exit 0
       fi
 
-      # Create a SEPARATE Linear agent session for design deliberation (parallel to intake)
+      # ── Design deliberation session (debatable) ────────────────────────
+      # Creates a SEPARATE Linear agent session so design mockups and
+      # deliberation results are posted to their own thread.  This IS
+      # created during intake, which is useful for stakeholder visibility.
+      # If you decide design sessions should also be deferred to play
+      # execution, wrap this block with:
+      #   if [ "${INTAKE_CREATE_AGENT_SESSIONS:-false}" = "true" ]; then ...
+      # For now it stays because it drives the design feedback loop.
+      # ──────────────────────────────────────────────────────────────────
       PRD_ISSUE_ID="$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.prdIssueId // empty')"
       PRD_IDENTIFIER="$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.prdIdentifier // empty')"
       ISSUE_REF="${PRD_ISSUE_ID:-$PRD_IDENTIFIER}"
@@ -886,8 +1267,8 @@ steps:
       # Post assembly intro to the design session
       if [ -n "$DESIGN_LINEAR_SID" ]; then
         INTRO_BODY="$(printf '## 🎨 Design Deliberation\n\n**Mockups:** %s\n**Decision points:** %s\n\n**The design team is assembling:**\n🎨 **Designer** — crafting the visual identity\n🏛️ **Architect** — structural review\n⚖️ **Pragmatist** — practical constraints\n\n---\n\n*Reviewing design mockups and presenting options...*' \
-          "$STITCH_COUNT" "$DESIGN_COUNT")"
-        intake-util linear-activity --session-id "$DESIGN_LINEAR_SID" --type thought --body "$INTRO_BODY" 2>/dev/null || true
+          "$MOCKUP_COUNT" "$DESIGN_COUNT")"
+        intake-util linear-activity --session-id "$DESIGN_LINEAR_SID" --type thought --body "$INTRO_BODY" >/dev/null 2>/dev/null || true
       fi
 
       # Post Stitch mockups to the DESIGN session (screenshot + upload to Linear)
@@ -915,7 +1296,7 @@ steps:
           fi
           MOCK_BODY="$(printf '## 🎨 Designer\n\n> *Crafting the visual identity — form follows function.*\n\n**Mockup %d:** %s (%s)\n**Screen:** `%s`%s\n\n%s' \
             "$((i + 1))" "$TARGET" "$DEVICE" "$SCREEN_ID" "$IMG_MARKDOWN" "$RATIONALE")"
-          intake-util linear-activity --session-id "$DESIGN_LINEAR_SID" --type thought --body "$MOCK_BODY" 2>/dev/null || true
+          intake-util linear-activity --session-id "$DESIGN_LINEAR_SID" --type thought --body "$MOCK_BODY" >/dev/null 2>/dev/null || true
         done
       fi
 
@@ -970,10 +1351,13 @@ steps:
       CODEBASE_CTX="$(printf '%s' "$CTO_CODEBASE_ANALYSIS_STDOUT" | jq -r '.output[-1] // empty' 2>/dev/null || true)";
       DESIGN_CONTEXT_BRIEF="$(jq -r '[
         "mode=" + (.mode // "unknown"),
+        "provider_mode=" + (.providerMode // "unknown"),
         "has_frontend=" + ((.hasFrontend // false) | tostring),
         "targets=" + ((.frontendTargets // []) | join("|")),
         "stitch_status=" + (.stitch.status // "unknown"),
-        "stitch_reason=" + (.stitch.reason // "")
+        "stitch_reason=" + (.stitch.reason // ""),
+        "framer_status=" + (.framer.status // "unknown"),
+        "framer_reason=" + (.framer.reason // "")
       ] | join("; ")' "$WS/.intake/design/design-context.json" 2>/dev/null || printf '')";
       INITIAL_TASKS_JSON="$(printf '%s' "$CTO_INITIAL_PARSE_PRD_STDOUT")"
       if [ -z "$INITIAL_TASKS_JSON" ] || ! printf '%s' "$INITIAL_TASKS_JSON" | jq -e 'type' >/dev/null 2>&1; then
@@ -1064,7 +1448,7 @@ steps:
       intake-util linear-activity \
         --session-id "${linear_session_id}" \
         --type thought \
-        --body "$BODY" || true
+        --body "$BODY" >/dev/null || true
 
   - id: quality-gate-deliberation
     env:
@@ -1098,7 +1482,7 @@ steps:
           echo "__MISSING_OR_EMPTY__"
         fi
       } > "$GATE_IN"
-      "$root/intake/scripts/quality-gate.sh" --stage "pipeline-deliberation" --input-file "$GATE_IN" --provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" --model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')"
+      "$root/intake/scripts/quality-gate.sh" --stage "pipeline-deliberation" --input-file "$GATE_IN" --prompt "$root/intake/prompts/quality-gate-deliberation-system.md" --provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" --model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')"
 
   - id: gateway-health-check
     env:
@@ -1188,6 +1572,7 @@ steps:
         --arg linear_prd_issue_id "$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.prdIssueId')" \
         --arg linear_team_id "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.linear_team_id')" \
         --arg linear_agent_map "$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -c '.agentMap')" \
+        --arg pm_url "${PM_URL:-}" \
         --arg repository_url "$(printf '%s' "$CTO_SETUP_REPO_JSON" | jq -r '.repository_url')" \
         --arg verify "${verify}" \
         --arg breakpoints "${breakpoints}" \
@@ -1207,7 +1592,7 @@ steps:
         --arg voter_3_provider "$(printf '%s' "$LOAD_CFG" | jq -r '.voter_3_provider')" \
         --arg voter_3_model "$(printf '%s' "$LOAD_CFG" | jq -r '.voter_3_model')" \
         --arg audio_debug "${audio_debug}" \
-        '{prd_path: $prd_path, num_tasks: ($num_tasks_raw | tonumber), project_name: $project_name, intake_metadata: $intake_metadata, pr_base_branch: $pr_base_branch, linear_project_id: $linear_project_id, linear_prd_issue_id: $linear_prd_issue_id, linear_team_id: $linear_team_id, linear_agent_map: $linear_agent_map, repository_url: $repository_url, verify: $verify, breakpoints: $breakpoints, linear_session_id: $linear_session_id, linear_issue_id: $linear_issue_id, run_id: $run_id, model_primary_provider: $model_primary_provider, model_primary: $model_primary, model_fast_provider: $model_fast_provider, model_fast: $model_fast, model_frontier_provider: $model_frontier_provider, model_frontier: $model_frontier, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, audio_debug: $audio_debug}') &&
+        '{prd_path: $prd_path, num_tasks: ($num_tasks_raw | tonumber), project_name: $project_name, intake_metadata: $intake_metadata, pr_base_branch: $pr_base_branch, linear_project_id: $linear_project_id, linear_prd_issue_id: $linear_prd_issue_id, linear_team_id: $linear_team_id, linear_agent_map: $linear_agent_map, pm_url: $pm_url, repository_url: $repository_url, verify: $verify, breakpoints: $breakpoints, linear_session_id: $linear_session_id, linear_issue_id: $linear_issue_id, run_id: $run_id, model_primary_provider: $model_primary_provider, model_primary: $model_primary, model_fast_provider: $model_fast_provider, model_fast: $model_fast, model_frontier_provider: $model_frontier_provider, model_frontier: $model_frontier, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, audio_debug: $audio_debug}') &&
       INTAKE_LOG="$WS/.intake/intake-sub-workflow.log"
       lobster run --mode tool "$WS/intake/workflows/intake.lobster.yaml" --args-json "$ARGS" >"$INTAKE_LOG" 2>&1 || {
         echo "intake sub-workflow failed — detailed log:" >&2
@@ -1307,7 +1692,7 @@ steps:
 
   - id: sync-to-target-repo
     command: |
-      root="${WORKSPACE:-.}"
+      root="$(cd "${WORKSPACE:-.}" && pwd)"
       "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "sync-to-target-repo" "${audio_debug}" "project ${project_name}"
       TARGET="${target_repo_local_path}"
       if [ -z "$TARGET" ]; then
@@ -1334,9 +1719,12 @@ steps:
         jq -nc '{"synced":false,"reason":"no .tasks directory"}'
         exit 0
       fi
-      rsync -a --delete "$root/.tasks/" "$TARGET/.tasks/"
-      BRANCH_NAME="intake/${project_name}-$(date +%Y%m%d-%H%M%S)"
       cd "$TARGET"
+      git checkout main 2>/dev/null || true
+      git pull --ff-only origin main 2>/dev/null || true
+      rm -rf "$TARGET/.tasks"
+      rsync -a "$root/.tasks/" "$TARGET/.tasks/"
+      BRANCH_NAME="intake/${project_name}-$(date +%Y%m%d-%H%M%S)"
       git checkout -b "$BRANCH_NAME" 2>/dev/null || {
         echo "sync-to-target-repo: branch $BRANCH_NAME exists — using current branch" >&2
         BRANCH_NAME="$(git rev-parse --abbrev-ref HEAD)"
@@ -1351,13 +1739,10 @@ steps:
       fi
       TASK_COUNT="$(jq -r '.artifact_counts.task_count // 0' "$root/.intake/intake-summary.json" 2>/dev/null || echo 0)"
       git diff --staged --stat
-      git commit -m "feat(intake): generated ${TASK_COUNT} tasks for ${project_name}
-
-      Generated by Morgan intake pipeline. Contains:
-      - docs/design-brief.md: architecture decisions
-      - docs/: per-task documentation and agent prompts
-      - tasks/: expanded task breakdown
-      - design/: design context and Stitch candidates" || {
+      git commit \
+        -m "feat(intake): generated ${TASK_COUNT} tasks for ${project_name}" \
+        -m "Generated by Morgan intake pipeline." \
+        -m "Contains docs/design-brief.md, docs/research-prd.json when available, docs/, tasks/, and design/ artifacts." || {
         echo "sync-to-target-repo: git commit failed" >&2
         jq -nc '{"synced":false,"reason":"commit failed"}'
         exit 1
@@ -1369,33 +1754,117 @@ steps:
       }
       PR_URL=""
       if command -v gh >/dev/null 2>&1; then
-        PR_URL="$(gh pr create \
+        PR_BODY_FILE="$(mktemp)"
+        if [ -x "$root/intake/scripts/generate-pr-body.sh" ]; then
+          "$root/intake/scripts/generate-pr-body.sh" "$root" "${project_name}" > "$PR_BODY_FILE"
+        else
+          {
+            printf '%s\n' '## Intake Pipeline Output'
+            printf '\n'
+            printf '%s\n' 'Generated by Morgan intake pipeline (Lobster).'
+            printf '\n'
+            printf '**Tasks:** %s\n' "$TASK_COUNT"
+            printf '**Project:** %s\n' "${project_name}"
+          } > "$PR_BODY_FILE"
+        fi
+        PR_CREATE_OUTPUT="$(gh pr create \
           --title "feat(intake): ${project_name} task breakdown" \
-          --body "## Intake Pipeline Output
-
-      Generated by Morgan intake pipeline (Lobster).
-
-      **Tasks:** ${TASK_COUNT}
-      **Project:** ${project_name}
-
-      ### Contents
-      - \`.tasks/docs/design-brief.md\` — architecture decisions from deliberation
-      - \`.tasks/docs/\` — per-task documentation and per-agent prompts
-      - \`.tasks/tasks/\` — expanded task JSON
-      - \`.tasks/design/\` — design context and Stitch candidates
-
-      ---
-      *Auto-generated by the CTO intake pipeline.*" \
+          --body-file "$PR_BODY_FILE" \
           --base main 2>&1)" || {
-          echo "sync-to-target-repo: gh pr create failed: $PR_URL" >&2
+          echo "sync-to-target-repo: gh pr create failed: $PR_CREATE_OUTPUT" >&2
           PR_URL="none"
         }
+        if [ -z "$PR_URL" ]; then
+          PR_URL="$PR_CREATE_OUTPUT"
+        fi
+        rm -f "$PR_BODY_FILE"
       else
         echo "sync-to-target-repo: gh CLI not available — PR not created" >&2
         PR_URL="none"
       fi
       jq -nc --arg pr_url "$PR_URL" --arg branch "$BRANCH_NAME" --arg target "$TARGET" \
         '{"synced":true,"pr_url":$pr_url,"branch":$branch,"target_repo":$target}'
+
+  - id: fix-linear-urls-for-target
+    env:
+      CTO_SYNC_TARGET_REPO_JSON: $sync-to-target-repo.stdout
+      CTO_CREATE_LINEAR_JSON: $create-linear-project.stdout
+      CTO_INTAKE_OUT: $intake.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      TARGET_SYNCED="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | jq -r '.synced // false' 2>/dev/null || echo false)"
+      if [ "$TARGET_SYNCED" != "true" ]; then
+        echo "fix-linear-urls-for-target: target repo not synced — skipping" >&2
+        jq -nc '{"skipped":true,"reason":"target not synced"}'
+        exit 0
+      fi
+      TARGET_BRANCH="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | jq -r '.branch // empty' 2>/dev/null || true)"
+      if [ -z "$TARGET_BRANCH" ]; then
+        echo "fix-linear-urls-for-target: no target branch — skipping" >&2
+        jq -nc '{"skipped":true,"reason":"no target branch"}'
+        exit 0
+      fi
+      # The intake sub-workflow created a CTO branch; extract it from the intake log
+      CTO_BRANCH="$(cat "$root/.intake/intake-sub-workflow.log" 2>/dev/null | grep -oE 'intake/[^ ]+' | grep "${project_name}" | head -1 || true)"
+      if [ -z "$CTO_BRANCH" ]; then
+        # Fallback: find the most recently created intake branch in this workspace
+        CTO_BRANCH="$(cd "$root" && git --no-pager branch --sort=-committerdate | grep "${project_name}" | head -1 | tr -d ' *' || true)"
+      fi
+      if [ -z "$CTO_BRANCH" ]; then
+        echo "fix-linear-urls-for-target: could not determine CTO branch — skipping" >&2
+        jq -nc '{"skipped":true,"reason":"no CTO branch found"}'
+        exit 0
+      fi
+      REPO_WEB="$(printf '%s' "${repository_url}" | sed -E 's#\.git$##')"
+      OLD_BASE="${REPO_WEB}/blob/${CTO_BRANCH}"
+      NEW_BASE="${REPO_WEB}/blob/${TARGET_BRANCH}"
+      if [ "$OLD_BASE" = "$NEW_BASE" ]; then
+        echo "fix-linear-urls-for-target: branches match — no rewrite needed" >&2
+        jq -nc '{"skipped":true,"reason":"branches match"}'
+        exit 0
+      fi
+      PROJECT_ID="$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.projectId // empty')"
+      if [ -z "$PROJECT_ID" ]; then
+        echo "fix-linear-urls-for-target: no project ID — skipping" >&2
+        jq -nc '{"skipped":true,"reason":"no project ID"}'
+        exit 0
+      fi
+      echo "fix-linear-urls-for-target: rewriting $OLD_BASE → $NEW_BASE" >&2
+      intake-util sync-linear rewrite-urls \
+        --project-id "$PROJECT_ID" \
+        --old-base-url "$OLD_BASE" \
+        --new-base-url "$NEW_BASE"
+
+  - id: sync-github-issues
+    env:
+      CTO_CREATE_LINEAR_JSON: $create-linear-project.stdout
+      CTO_SYNC_TARGET_REPO_JSON: $sync-to-target-repo.stdout
+    command: |
+      # Only sync if target repo was synced
+      TARGET_SYNCED="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | jq -r '.synced // false' 2>/dev/null || echo false)"
+      if [ "$TARGET_SYNCED" != "true" ]; then
+        echo "sync-github-issues: target repo not synced — skipping" >&2
+        jq -nc '{"skipped":true,"reason":"target not synced"}'
+        exit 0
+      fi
+      REPO="$(printf '%s' "${repository_url}" | sed -E 's#https://github.com/##; s#\.git$##')"
+      BRANCH="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | jq -r '.branch // empty' 2>/dev/null || true)"
+      if [ -z "$BRANCH" ]; then
+        echo "sync-github-issues: no branch — skipping" >&2
+        jq -nc '{"skipped":true,"reason":"no branch"}'
+        exit 0
+      fi
+      PROJECT_ID="$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.projectId // empty' 2>/dev/null || true)"
+      if [ -z "$PROJECT_ID" ]; then
+        echo "sync-github-issues: no project ID — skipping" >&2
+        jq -nc '{"skipped":true,"reason":"no project ID"}'
+        exit 0
+      fi
+      echo "sync-github-issues: syncing Linear project $PROJECT_ID → $REPO (branch: $BRANCH)" >&2
+      intake-util sync-linear github-sync \
+        --project-id "$PROJECT_ID" \
+        --repo "$REPO" \
+        --branch "$BRANCH"
 
   - id: notify-pipeline-complete
     env:

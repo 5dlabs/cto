@@ -53,7 +53,9 @@ async fn main() -> Result<()> {
             }
         }
     } else {
-        info!("No LINEAR_OAUTH_TOKEN configured - API calls will be disabled");
+        info!(
+            "No shared LINEAR_OAUTH_TOKEN/LINEAR_API_KEY configured - endpoints that rely on the workspace client will be disabled, but per-agent minting remains available"
+        );
         None
     };
 
@@ -64,9 +66,15 @@ async fn main() -> Result<()> {
         info!("Token health manager started");
     }
 
+    let http_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
+
     // Build application state
     let state = server::AppState {
         config: config.clone(),
+        http_client,
         kube_client,
         linear_client,
         session_tracker: SessionTracker::default(),

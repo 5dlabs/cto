@@ -47,7 +47,8 @@ export function AnimatedCounter({ value, className }: AnimatedCounterProps) {
 
   return (
     <span ref={ref} className={className}>
-      <motion.span className="font-mono tabular-nums">{rounded}</motion.span>
+      <motion.span className="font-mono tabular-nums print:hidden">{rounded}</motion.span>
+      <span className="font-mono tabular-nums hidden print:inline">{numericPart}</span>
       {suffix}
     </span>
   );

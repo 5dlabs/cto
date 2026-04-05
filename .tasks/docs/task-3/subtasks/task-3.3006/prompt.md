@@ -1,20 +1,26 @@
-Implement subtask 3006: Add secret rotation annotations and document rotation procedure
+Implement subtask 3006: Implement Opportunity service with state machine, lead scoring, and convert-to-project
 
 ## Objective
-Annotate existing secrets for compatibility with external-secrets-operator or sealed-secrets, and create documentation for the secret rotation procedure.
+Build the OpportunityService gRPC implementation with the full quote-to-project workflow including status state machine, lead scoring algorithm, and opportunity-to-project conversion.
 
 ## Steps
-1. Update `infra/notifycore/templates/` secret templates to include annotations:
-   - For external-secrets-operator compatibility: add `external-secrets.io/` annotations (if ESO approach is chosen).
-   - For sealed-secrets compatibility: document how to create SealedSecret equivalents.
-   - Add labels for secret management: `app.kubernetes.io/managed-by: helm`, `notifycore.io/secret-type: credentials`.
-2. Add rotation-related annotations: `notifycore.io/rotation-period: 90d`, `notifycore.io/last-rotated: {{ now | date "2006-01-02" }}`.
-3. Create `docs/secret-rotation.md` documenting:
-   - How to rotate PostgreSQL credentials (CloudNativePG supports rolling secret updates).
-   - How to rotate Redis password (update secret, rolling restart of Redis and app pods).
-   - Verification steps after rotation.
-   - Rollback procedure if rotation fails.
-4. Values file should include `secretManagement.provider: none|external-secrets|sealed-secrets` for conditional annotation rendering.
+1. Create `internal/service/opportunity_svc.go` implementing the generated `OpportunityServiceServer` interface.
+2. Implement the state machine in `internal/domain/opportunity_state.go`:
+   - Define valid transitions: PENDING→QUALIFIED, QUALIFIED→APPROVED, APPROVED→CONVERTED. Also allow PENDING→QUALIFIED→APPROVED as composite path.
+   - `ValidateTransition(current, next Status) error` returns descriptive error for invalid transitions (e.g., PENDING→CONVERTED is invalid).
+   - State transitions are enforced in `UpdateOpportunity` and dedicated RPCs.
+3. Implement `ScoreLead` RPC in `internal/domain/lead_scoring.go`:
+   - Input: customer vetting data (bool flags: verified_identity, verified_insurance, positive_references), event_size (int), payment_history (enum: GOOD, MIXED, BAD, NEW).
+   - Scoring: assign points per factor. GREEN >= 80 points, YELLOW 50-79, RED < 50. Return `LeadScore` with per-factor breakdown.
+4. Implement `ApproveOpportunity` RPC: validate QUALIFIED→APPROVED transition, update status.
+5. Implement `ConvertOpportunity` RPC:
+   - Validate status is APPROVED.
+   - Call `projectRepo.CreateFromOpportunity(ctx, orgID, oppID)` to create project with linked opportunity_id and copied line items.
+   - Update opportunity status to CONVERTED.
+   - Return the new Project ID.
+   - Wrap in a database transaction (via pgx.Tx passed through repo).
+6. Implement `CreateOpportunity`, `GetOpportunity`, `UpdateOpportunity`, `ListOpportunities` as standard CRUD delegating to repo.
+7. Wire service into gRPC server registration in `cmd/server/main.go`.
 
 ## Validation
-Secret templates include rotation annotations. `docs/secret-rotation.md` exists and covers PostgreSQL rotation, Redis rotation, verification, and rollback sections. `helm template` renders secrets with appropriate annotations based on values.
+Unit tests for state machine: test all 4 states × all possible next states, verify exactly 3 valid transitions pass and all others return error. Unit tests for lead scoring with parameterized table: test GREEN boundary (80+), YELLOW (50-79), RED (<50) with various input combinations. Integration test: CreateOpportunity → ScoreLead → UpdateStatus to QUALIFIED → Approve → Convert → verify Project exists with correct opportunity_id link and line items copied.

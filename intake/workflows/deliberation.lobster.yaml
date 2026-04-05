@@ -103,6 +103,24 @@ steps:
         intake-util linear-plan --session-id "$LINEAR_SID" --step delib-research || true
       fi
 
+  - id: save-research-artifact
+    env:
+      CTO_RESEARCH_PRD: $research-prd.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "save-research-artifact" "${audio_debug}"
+      mkdir -p .tasks/docs
+      if printf '%s' "$CTO_RESEARCH_PRD" | jq . >/dev/null 2>&1; then
+        printf '%s' "$CTO_RESEARCH_PRD" | jq . > .tasks/docs/research-prd.json
+      else
+        printf '%s\n' "$CTO_RESEARCH_PRD" > .tasks/docs/research-prd.txt
+      fi
+      if [ -f .tasks/docs/research-prd.json ]; then
+        echo "Research bundle saved to .tasks/docs/research-prd.json"
+      else
+        echo "Research bundle saved to .tasks/docs/research-prd.txt"
+      fi
+
   - id: init-debate
     command: |
       root="${WORKSPACE:-.}"
@@ -127,7 +145,7 @@ steps:
         intake-util linear-activity \
           --session-id "$LINEAR_SID" \
           --type thought \
-          --body "$BODY" || true
+          --body "$BODY" >/dev/null || true
       fi
 
   - id: notify-start
@@ -244,7 +262,7 @@ steps:
         intake-util linear-activity \
           --session-id "$LINEAR_SID" \
           --type thought \
-          --body "$(printf '## ⚡ Optimist\n\n> *Pushing the frontier — modern, scalable, evidence-driven.*\n\n---\n\n%s' "$CTO_OT")" || true
+          --body "$(printf '## ⚡ Optimist\n\n> *Pushing the frontier — modern, scalable, evidence-driven.*\n\n---\n\n%s' "$CTO_OT")" >/dev/null || true
       else
         echo "linear-activity-opt: NO session ID — skipping" >&2
       fi
@@ -367,7 +385,7 @@ steps:
         intake-util linear-activity \
           --session-id "$LINEAR_SID" \
           --type thought \
-          --body "$(printf '## 🛡️ Pessimist\n\n> *Anchoring to proven ground — operational simplicity, named failure modes.*\n\n---\n\n%s' "$CTO_PT")" || true
+          --body "$(printf '## 🛡️ Pessimist\n\n> *Anchoring to proven ground — operational simplicity, named failure modes.*\n\n---\n\n%s' "$CTO_PT")" >/dev/null || true
       else
         echo "linear-activity-pes: NO session ID — skipping" >&2
       fi
@@ -601,7 +619,7 @@ steps:
         intake-util linear-activity \
           --session-id "$LINEAR_SID" \
           --type thought \
-          --body "$(printf '**%s**\n\n%s' "$TITLE" "$BODY")" || true
+          --body "$(printf '**%s**\n\n%s' "$TITLE" "$BODY")" >/dev/null || true
       else
         echo "linear-activity-complete: NO session ID — skipping" >&2
       fi
@@ -623,7 +641,8 @@ steps:
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "deliberation" "compile-brief" "${audio_debug}"
-      printf '%s' "$CTO_ASSEMBLE_RESULT" > /tmp/delib_result.json
+      DELIB_RESULT_FILE="$(mktemp)"
+      printf '%s' "$CTO_ASSEMBLE_RESULT" > "$DELIB_RESULT_FILE"
       PARSED_TASKS_JSON="$(cat "$root/.intake/initial-tasks.json" 2>/dev/null || echo '[]')"
       PARSED_TASKS_INPUT="[]"
       if [ -n "$PARSED_TASKS_JSON" ] && [ "$PARSED_TASKS_JSON" != "null" ] && [ "$PARSED_TASKS_JSON" != "" ]; then
@@ -636,7 +655,7 @@ steps:
         --argjson parsed_tasks "$PARSED_TASKS_INPUT" \
         --arg provider "${model_frontier_provider}" \
         --arg model "${model_frontier}" \
-        --slurpfile delib_result /tmp/delib_result.json \
+        --slurpfile delib_result "$DELIB_RESULT_FILE" \
         '{
           "prompt": $prompt,
           "input": {
@@ -649,7 +668,70 @@ steps:
           "model": $model,
           "temperature": 0.2
         }')
-      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action text --args-json "$BRIEF_ARGS"
+      if BRIEF_OUT="$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action text --args-json "$BRIEF_ARGS")"; then
+        printf '%s\n' "$BRIEF_OUT"
+      else
+        echo "compile-brief: LLM summarization failed; generating deterministic fallback brief" >&2
+        jq -rn \
+          --rawfile prd_content "$root/.intake/run-prd.txt" \
+          --rawfile design_context "$root/.intake/contexts/design.txt" \
+          --argjson parsed_tasks "$PARSED_TASKS_INPUT" \
+          --slurpfile delib_result "$DELIB_RESULT_FILE" '
+            ($delib_result[0] // {}) as $r |
+            def quote_block($text):
+              ($text // "")
+              | split("\n")
+              | map("> " + .)
+              | join("\n");
+            def task_scope($tasks):
+              if ($tasks | length) == 0 then
+                "- No initial tasks were parsed.\n"
+              else
+                ($tasks | map(
+                  "- Task " + ((.id // "?") | tostring)
+                  + ": " + (.title // "Untitled task")
+                  + (if (.description // "") != "" then " — " + .description else "" end)
+                ) | join("\n")) + "\n"
+              end;
+            def resolved_decisions($items):
+              if ($items | length) == 0 then
+                "_No resolved decisions were recorded._\n"
+              else
+                ($items | to_entries | map(
+                  "### [D" + ((.key + 1) | tostring) + "] " + (.value.question // .value.decision_id // ("Decision " + ((.key + 1) | tostring)) | tostring) + "\n\n"
+                  + "- Status: Accepted\n"
+                  + "- Decision: " + ((.value.winning_option // .value.winner // "Not specified") | tostring) + "\n"
+                  + "- Consensus: " + (
+                      if (.value.vote_counts? != null) then (.value.vote_counts | tostring)
+                      elif (.value.tally? != null) then (.value.tally | tostring)
+                      else "Recorded in deliberation output"
+                      end
+                    ) + "\n"
+                  + (if (.value.rationale // "") != "" then "- Rationale: " + (.value.rationale | tostring) + "\n" else "" end)
+                  + (if ((.value.caveats // []) | length) > 0 then "- Caveats:\n" + ((.value.caveats // []) | map("  - " + (. | tostring)) | join("\n")) + "\n" else "" end)
+                ) | join("\n"))
+              end;
+            "# Enhanced PRD\n\n"
+            + "## 1. Original Requirements\n\n"
+            + quote_block($prd_content) + "\n\n"
+            + "## 2. Project Scope\n\n"
+            + "- Total tasks identified: " + (($parsed_tasks | length) | tostring) + "\n"
+            + task_scope($parsed_tasks) + "\n"
+            + "## 3. Resolved Decisions\n\n"
+            + resolved_decisions($r.resolved_decisions // []) + "\n\n"
+            + "## 4. Architecture Overview\n\n"
+            + "- Deliberation status: " + (($r.status // "unknown") | tostring) + "\n"
+            + "- Debate turns: " + (($r.debate_turns // 0) | tostring) + "\n"
+            + "- Elapsed minutes: " + (($r.elapsed_minutes // 0) | tostring) + "\n"
+            + "- Decision points considered: " + ((($r.decision_points // []) | length) | tostring) + "\n"
+            + "- Decisions resolved: " + ((($r.resolved_decisions // []) | length) | tostring) + "\n\n"
+            + "## 5. Design Intake Summary\n\n"
+            + (if ($design_context | length) > 0 then $design_context else "_No design context available._" end) + "\n\n"
+            + "## 6. Open Questions\n\n"
+            + "- Use the deliberation record and task decomposition to resolve any remaining implementation details not captured above.\n"
+          '
+      fi
+      rm -f "$DELIB_RESULT_FILE"
 
   - id: save-brief
     env:

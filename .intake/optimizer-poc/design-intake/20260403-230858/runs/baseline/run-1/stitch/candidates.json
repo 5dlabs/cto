@@ -1,0 +1,13 @@
+[
+  {
+    "provider": "stitch",
+    "target": "web",
+    "deviceType": "DESKTOP",
+    "screenId": "8ef55ac6657f4cc2bed60221d98157f9",
+    "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ6Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpZCiVodG1sX2QyYjRkN2MwYjJiMDRjODlhZTZmZDIzMTQzOWE1ZDRmEgsSBxD0x7nTwxwYAZIBIgoKcHJvamVjdF9pZBIUQhI2NDgyNzc3NDA5MTQ5NzI2MjY&filename=&opi=96797242",
+    "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0ujLpVtZfTKIXdRv1Y4LSuoPugJPNtkRvaT5ScKZ9w2fWXKQWEIWUwmJpmpRmsY4G-lXVlMdGiDM2RKP4JM33OjIJE6GD244-WksNVdg-ZLmEMsNgOHMQzmLaF3MFYg_WOg7oHEDm629RAhGQNUtoRvbMa1P0ymfCj4e9gcsFaRTifyAoqs7e0KpWL1xVYMOuAqy2z6wcEqIi5bw46emh03Yr9BZ1nLwCjX0QR0NYWVU-R_VsaGlQIpDwQ",
+    "rationale": "Generated web modernization candidate from intake design context.",
+    "prompt": "Improve and modernize this web interface for project optimizer-poc-baseline-1. Design intent: Modernize UI while preserving product tone and implementation realism. Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
+    "status": "generated"
+  }
+]

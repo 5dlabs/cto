@@ -1,15 +1,18 @@
 /**
  * Linear sync utilities for the intake pipeline.
  *
- * Two operations:
- *   init   — Create a Linear project + PRD issue at pipeline start.
- *   issues — Create task/subtask issues after docs/prompts are generated.
+ * Four operations:
+ *   init         — Create a Linear project + PRD issue at pipeline start.
+ *   issues       — Create task/subtask issues after docs/prompts are generated.
+ *   rewrite-urls — Bulk-replace base URL in all project issue descriptions.
+ *   github-sync  — Create GitHub issues mirroring each Linear issue (1:1 mapping).
  *
  * Uses direct fetch to Linear GraphQL API (LINEAR_API_KEY env var).
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { execSync } from 'node:child_process';
 import type { GeneratedTask } from './types';
 
 const LINEAR_API_URL = 'https://api.linear.app/graphql';
@@ -291,6 +294,68 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
 
   const project = projectData.projectCreate.project;
 
+  // 1b. Create custom views scoped to this project
+  interface CustomViewResponse {
+    customViewCreate: { success: boolean; customView?: { id: string; name: string } };
+  }
+  const VIEW_MUTATION = `mutation CreateView($input: CustomViewCreateInput!) {
+    customViewCreate(input: $input) {
+      success
+      customView { id name }
+    }
+  }`;
+  const PREFS_MUTATION = `mutation SetViewPrefs($input: ViewPreferencesCreateInput!) {
+    viewPreferencesCreate(input: $input) { success }
+  }`;
+
+  const viewFilter = { project: { id: { eq: project.id } } };
+
+  // Helper: create a custom view and set its board preferences
+  async function createProjectView(
+    viewName: string,
+    grouping: string,
+  ): Promise<void> {
+    const viewData = await execute<CustomViewResponse>(apiKey, VIEW_MUTATION, {
+      input: {
+        name: viewName,
+        teamId,
+        projectId: project.id,
+        filterData: viewFilter,
+        shared: true,
+      },
+    });
+    if (viewData.customViewCreate.success && viewData.customViewCreate.customView) {
+      const viewId = viewData.customViewCreate.customView.id;
+      console.error(`Created view: ${viewData.customViewCreate.customView.name} (${viewId})`);
+      await execute(apiKey, PREFS_MUTATION, {
+        input: {
+          customViewId: viewId,
+          type: 'organization',
+          viewType: 'customView',
+          preferences: {
+            layout: 'board',
+            issueGrouping: grouping,
+            showSubIssues: true,
+          },
+        },
+      });
+    }
+  }
+
+  // Board view (Kanban grouped by status)
+  try {
+    await createProjectView(`${projectName} — Board`, 'status');
+  } catch (err) {
+    console.error(`Warning: failed to create project board view: ${err}`);
+  }
+
+  // Agent view (board grouped by assignee)
+  try {
+    await createProjectView(`${projectName} — By Agent`, 'assignee');
+  } catch (err) {
+    console.error(`Warning: failed to create project agent view: ${err}`);
+  }
+
   // 2. Get/create labels
   const [intakeLabelId, prdLabelId] = await Promise.all([
     getOrCreateLabel(apiKey, teamId, 'intake'),
@@ -358,6 +423,33 @@ export interface SyncIssuesOptions {
   prUrl?: string;
   agentMap: Record<string, string>;
   apiKey: string;
+  /** Personal API key that can assign to app users (lin_api_* prefix). */
+  personalApiKey?: string;
+  /** PM server URL for per-agent OAuth tokens (enables self-assignment). */
+  pmUrl?: string;
+}
+
+/**
+ * Fetch an agent's Linear OAuth token from the PM server.
+ * Returns the token string or null if unavailable.
+ */
+async function fetchAgentToken(pmUrl: string, agent: string): Promise<string | null> {
+  try {
+    const resp = await fetch(`${pmUrl}/oauth/token/${agent}`, { signal: AbortSignal.timeout(10_000) });
+    if (!resp.ok) {
+      console.error(`fetchAgentToken: ${agent} → HTTP ${resp.status}`);
+      return null;
+    }
+    const data = await resp.json() as { status: string; access_token?: string };
+    if (data.status === 'ok' && data.access_token) {
+      return data.access_token;
+    }
+    console.error(`fetchAgentToken: ${agent} → status=${data.status}, no token`);
+    return null;
+  } catch (err) {
+    console.error(`fetchAgentToken: ${agent} → ${err}`);
+    return null;
+  }
 }
 
 function extractAgent(task: GeneratedTask): string {
@@ -470,15 +562,15 @@ function buildTaskDescription(task: GeneratedTask, baseUrl: string, prUrl: strin
 
   const taskDoc = readDocSnippet(taskDocPath, 4000);
   if (taskDoc) {
-    lines.push('', '## task.md (embedded)', '```markdown', taskDoc, '```');
+    lines.push('', '## Task Document (embedded)', '```markdown', taskDoc, '```');
   }
   const acceptanceDoc = readDocSnippet(acceptanceDocPath, 3000);
   if (acceptanceDoc) {
-    lines.push('', '## acceptance.md (embedded)', '```markdown', acceptanceDoc, '```');
+    lines.push('', '## Acceptance Criteria (embedded)', '```markdown', acceptanceDoc, '```');
   }
   const promptDoc = readDocSnippet(promptDocPath, 2500);
   if (promptDoc) {
-    lines.push('', '## prompt.md (embedded excerpt)', '```markdown', promptDoc, '```');
+    lines.push('', '## Prompt (embedded excerpt)', '```markdown', promptDoc, '```');
   }
 
   return lines.join('\n');
@@ -511,16 +603,16 @@ function buildSubtaskDescription(
 
   if (baseUrl) {
     lines.push('', '---');
-    lines.push(`**Prompt:** [prompt.md](${baseUrl}/.tasks/docs/task-${taskId}/subtasks/task-${subtask.id}/prompt.md)`);
+    lines.push(`**Prompt:** [prompt.md](${baseUrl}/.tasks/docs/task-${taskId}/subtasks/task-${taskId}.${subtask.id}/prompt.md)`);
   }
   if (prUrl) {
     lines.push(`**PR:** ${prUrl}`);
   }
 
-  const subtaskPromptPath = path.join('.tasks', 'docs', `task-${taskId}`, 'subtasks', `task-${subtask.id}`, 'prompt.md');
+  const subtaskPromptPath = path.join('.tasks', 'docs', `task-${taskId}`, 'subtasks', `task-${taskId}.${subtask.id}`, 'prompt.md');
   const subtaskPrompt = readDocSnippet(subtaskPromptPath, 2500);
   if (subtaskPrompt) {
-    lines.push('', '## prompt.md (embedded excerpt)', '```markdown', subtaskPrompt, '```');
+    lines.push('', '## Prompt (embedded excerpt)', '```markdown', subtaskPrompt, '```');
   }
 
   return lines.join('\n');
@@ -533,7 +625,49 @@ const PRIORITY_MAP: Record<string, number> = {
 };
 
 export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssuesResult> {
-  const { tasks, projectId, prdIssueId, baseUrl, prUrl, agentMap, apiKey } = opts;
+  const { tasks, projectId, prdIssueId, baseUrl, prUrl, agentMap, apiKey, personalApiKey, pmUrl } = opts;
+
+  // ── Agent Delegation Model ──
+  // Linear's agent model uses "delegate" (not "assignee") for app users:
+  //   - issueCreate(input: { assigneeId: <app-user-id> }) sets the DELEGATE field
+  //   - The assignee field is set to the token owner (human)
+  //   - This is the intended behavior: humans maintain ownership, agents act on their behalf
+  // Requirements:
+  //   - Each agent app must have app:assignable scope (enabled via client_credentials token grant)
+  //   - A personal API key (lin_api_*) is the simplest way to create issues with delegation
+  //   - Agent self-assignment via OAuth tokens also works but is more complex
+  //
+  // Priority: personalApiKey > PM per-agent tokens > default apiKey
+  const assignApiKey = personalApiKey || apiKey;
+  if (personalApiKey) {
+    console.error(`syncTaskIssues: using personal API key for agent delegation`);
+  }
+
+  const mapKeys = Object.keys(agentMap);
+  console.error(`syncTaskIssues: agentMap has ${mapKeys.length} entries, tasks: ${tasks.length}`);
+  if (mapKeys.length > 0) {
+    console.error(`syncTaskIssues: agentMap sample keys: ${mapKeys.slice(0, 8).join(', ')}`);
+  }
+  const taskAgents = tasks.map(t => extractAgent(t));
+  const uniqueAgents = [...new Set(taskAgents)];
+  console.error(`syncTaskIssues: unique agents in tasks: ${uniqueAgents.join(', ')}`);
+  for (const a of uniqueAgents) {
+    console.error(`syncTaskIssues:   ${a} → ${agentMap[a] ? 'delegate:' + agentMap[a].slice(0, 8) + '...' : 'UNRESOLVED (no delegation)'}`);
+  }
+
+  // Pre-fetch per-agent tokens from PM server for self-assignment (fallback if no personal key).
+  const agentTokens = new Map<string, string>();
+  if (pmUrl && !personalApiKey) {
+    console.error(`syncTaskIssues: fetching per-agent tokens from ${pmUrl}`);
+    const tokenPromises = uniqueAgents.map(async (agent) => {
+      const token = await fetchAgentToken(pmUrl, agent);
+      if (token) {
+        agentTokens.set(agent, token);
+      }
+    });
+    await Promise.all(tokenPromises);
+    console.error(`syncTaskIssues: got tokens for ${agentTokens.size}/${uniqueAgents.length} agents`);
+  }
 
   // Resolve team key (e.g., "CTOPA") → UUID
   const teamId = await resolveTeamId(apiKey, opts.teamId);
@@ -588,18 +722,23 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
   const issues: SyncIssueEntry[] = [];
   const unresolvedAgents = new Set<string>();
   let subtaskIssueCount = 0;
-  let assignedIssueCount = 0;
-  let unassignedIssueCount = 0;
+  let delegatedIssueCount = 0;
+  let undelegatedIssueCount = 0;
 
   for (const task of tasks) {
     const agent = extractAgent(task);
     const agentLabelId = await getAgentLabelId(agent);
     const assigneeId = agentMap[agent] || undefined;
+    // Use personal API key for assignment (can assign to app users),
+    // or fall back to agent's own token, or default key.
+    const agentToken = agentTokens.get(agent);
+    const issueApiKey = personalApiKey || agentToken || apiKey;
+
     if (!assigneeId) {
       unresolvedAgents.add(agent);
-      unassignedIssueCount += 1;
+      undelegatedIssueCount += 1;
     } else {
-      assignedIssueCount += 1;
+      delegatedIssueCount += 1;
     }
 
     const labelIds = [intakeLabelId, agentLabelId].filter((id): id is string => id !== null);
@@ -617,11 +756,12 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
       issueInput.priority = PRIORITY_MAP[task.priority];
     }
 
-    // Helper: create issue, retrying without assigneeId if assignment fails
+    // Helper: create issue using the agent's token for self-assignment,
+    // falling back to default apiKey without assignee if assignment fails.
     async function createIssueWithFallback(input: Record<string, unknown>): Promise<LinearIssue> {
       try {
         const data = await execute<IssueResponse>(
-          apiKey,
+          issueApiKey,
           `mutation CreateIssue($input: IssueCreateInput!) {
             issueCreate(input: $input) {
               success
@@ -634,8 +774,9 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
           return data.issueCreate.issue;
         }
       } catch (err) {
-        // If assignment failed ("App user not valid"), retry without assignee
+        // If assignment failed ("App user not valid"), retry without assignee using default key
         if (input.assigneeId && String(err).includes('not valid')) {
+          console.error(`syncTaskIssues: assignment failed for ${agent}, retrying without assignee`);
           const { assigneeId: _, ...withoutAssignee } = input;
           const retry = await execute<IssueResponse>(
             apiKey,
@@ -672,9 +813,9 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
         if (intakeLabelId) subtaskInput.labelIds = [intakeLabelId];
         if (assigneeId) {
           subtaskInput.assigneeId = assigneeId;
-          assignedIssueCount += 1;
+          delegatedIssueCount += 1;
         } else {
-          unassignedIssueCount += 1;
+          undelegatedIssueCount += 1;
         }
 
         const subtaskIssue = await createIssueWithFallback(subtaskInput);
@@ -702,9 +843,391 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
     parentIssueIdentifier: parentIssue.identifier,
     taskIssueCount: issues.length,
     subtaskIssueCount,
-    assignedIssueCount,
-    unassignedIssueCount,
+    assignedIssueCount: delegatedIssueCount,
+    unassignedIssueCount: undelegatedIssueCount,
     unresolvedAgents: [...unresolvedAgents].sort(),
     issues,
   };
+}
+
+// =============================================================================
+// rewriteProjectUrls — Bulk-replace base URL in all project issue descriptions
+// =============================================================================
+
+export interface RewriteUrlsResult {
+  updatedCount: number;
+  skippedCount: number;
+  errorCount: number;
+  totalIssues: number;
+}
+
+export async function rewriteProjectUrls({
+  projectId,
+  oldBaseUrl,
+  newBaseUrl,
+  apiKey,
+}: {
+  projectId: string;
+  oldBaseUrl: string;
+  newBaseUrl: string;
+  apiKey: string;
+}): Promise<RewriteUrlsResult> {
+  let updatedCount = 0;
+  let skippedCount = 0;
+  let errorCount = 0;
+  let totalIssues = 0;
+  let hasNextPage = true;
+  let cursor: string | undefined;
+
+  console.error(`rewrite-urls: replacing "${oldBaseUrl}" → "${newBaseUrl}" in project ${projectId}`);
+
+  while (hasNextPage) {
+    const afterClause = cursor ? `, after: "${cursor}"` : '';
+    interface IssuesPage {
+      project: {
+        issues: {
+          nodes: Array<{ id: string; identifier: string; description: string | null }>;
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        };
+      };
+    }
+
+    const page = await execute<IssuesPage>(
+      apiKey,
+      `query($pid: String!) {
+        project(id: $pid) {
+          issues(first: 50${afterClause}) {
+            nodes { id identifier description }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }`,
+      { pid: projectId },
+    );
+
+    const issues = page.project.issues.nodes;
+    const pageInfo = page.project.issues.pageInfo;
+    totalIssues += issues.length;
+
+    for (const issue of issues) {
+      if (!issue.description || !issue.description.includes(oldBaseUrl)) {
+        skippedCount++;
+        continue;
+      }
+
+      const newDescription = issue.description.replaceAll(oldBaseUrl, newBaseUrl);
+      try {
+        interface UpdateResult {
+          issueUpdate: { success: boolean };
+        }
+        await execute<UpdateResult>(
+          apiKey,
+          `mutation($id: String!, $input: IssueUpdateInput!) {
+            issueUpdate(id: $id, input: $input) { success }
+          }`,
+          { id: issue.id, input: { description: newDescription } },
+        );
+        updatedCount++;
+      } catch (err) {
+        console.error(`rewrite-urls: failed to update ${issue.identifier}: ${err}`);
+        errorCount++;
+      }
+    }
+
+    hasNextPage = pageInfo.hasNextPage;
+    cursor = pageInfo.endCursor ?? undefined;
+
+    console.error(`rewrite-urls: processed ${totalIssues} issues (${updatedCount} updated, ${skippedCount} skipped, ${errorCount} errors)`);
+  }
+
+  return { updatedCount, skippedCount, errorCount, totalIssues };
+}
+
+// =============================================================================
+// GitHub Sync — Create GitHub issues mirroring Linear project issues (1:1)
+// =============================================================================
+
+export interface GitHubSyncMapping {
+  linearId: string;
+  linearIdentifier: string;
+  linearTitle: string;
+  githubIssueNumber: number;
+  githubIssueUrl: string;
+}
+
+export interface GitHubSyncResult {
+  createdCount: number;
+  skippedCount: number;
+  errorCount: number;
+  totalLinearIssues: number;
+  mappings: GitHubSyncMapping[];
+}
+
+export interface GitHubSyncOptions {
+  projectId: string;
+  repo: string;
+  branch: string;
+  apiKey: string;
+  githubProject?: number;
+}
+
+/** Small delay to respect GitHub's secondary rate limits (~30 creates/min). */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Execute a `gh` CLI command and return the trimmed stdout.
+ * Throws on non-zero exit with the stderr message.
+ */
+function gh(args: string): string {
+  try {
+    return execSync(`gh ${args}`, {
+      encoding: 'utf-8',
+      timeout: 30_000,
+      env: { ...process.env },
+    }).trim();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`gh CLI failed: ${message}`);
+  }
+}
+
+/**
+ * Check if a GitHub issue with the exact title already exists in the repo.
+ * Returns the issue number if found, undefined otherwise.
+ */
+function findExistingGitHubIssue(repo: string, title: string): { number: number; url: string } | undefined {
+  try {
+    // Search for issues with the exact title (open or closed)
+    const result = gh(
+      `issue list --repo ${JSON.stringify(repo)} --search ${JSON.stringify(`"${title}" in:title`)} --json number,title,url --limit 50`,
+    );
+    if (!result) return undefined;
+
+    const issues = JSON.parse(result) as Array<{ number: number; title: string; url: string }>;
+    const match = issues.find((i) => i.title === title);
+    return match ? { number: match.number, url: match.url } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Add a GitHub issue to a GitHub Project (Projects v2).
+ * Requires the `gh` CLI with the `project` extension or native support.
+ */
+function addIssueToProject(repo: string, issueNumber: number, projectNumber: number): void {
+  try {
+    const issueUrl = `https://github.com/${repo}/issues/${issueNumber}`;
+    gh(`project item-add ${projectNumber} --owner ${repo.split('/')[0]} --url ${JSON.stringify(issueUrl)}`);
+    console.error(`github-sync: added issue #${issueNumber} to project #${projectNumber}`);
+  } catch (err) {
+    // Non-fatal — project integration is optional
+    console.error(`github-sync: warning: could not add issue #${issueNumber} to project: ${err}`);
+  }
+}
+
+/**
+ * Extract the agent name from a Linear issue's labels.
+ * Looks for labels like "agent:bolt", "bolt", "rex", etc.
+ */
+function extractAgentLabel(labels: Array<{ name: string }>): string | undefined {
+  for (const label of labels) {
+    const lower = label.name.toLowerCase();
+    // Check for "agent:X" pattern
+    if (lower.startsWith('agent:')) return lower;
+    // Check for known agent names used as labels
+    const knownAgents = [
+      'bolt', 'rex', 'blaze', 'grizz', 'tess', 'cleo', 'cipher',
+      'healer', 'angie', 'keeper', 'nova', 'spark', 'tap', 'vex',
+      'pixel', 'morgan', 'atlas', 'stitch',
+    ];
+    if (knownAgents.includes(lower)) return `agent:${lower}`;
+  }
+  return undefined;
+}
+
+/**
+ * Sync all issues from a Linear project into GitHub issues with 1:1 mapping.
+ *
+ * For each Linear issue:
+ *  1. Check if a GitHub issue with the same title already exists → skip
+ *  2. Create a GitHub issue with matching title, body with Linear link, agent label
+ *  3. Update the Linear issue description to include the GitHub issue link
+ *  4. Optionally add the issue to a GitHub Project
+ */
+export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubSyncResult> {
+  const { projectId, repo, branch, apiKey, githubProject } = opts;
+
+  const mappings: GitHubSyncMapping[] = [];
+  let createdCount = 0;
+  let skippedCount = 0;
+  let errorCount = 0;
+  let totalLinearIssues = 0;
+  let hasNextPage = true;
+  let cursor: string | undefined;
+
+  console.error(`github-sync: syncing Linear project ${projectId} → GitHub repo ${repo} (branch: ${branch})`);
+
+  // Verify gh CLI is available and authenticated
+  try {
+    gh('auth status');
+  } catch (err) {
+    throw new Error(`gh CLI is not authenticated. Run "gh auth login" first. Error: ${err}`);
+  }
+
+  while (hasNextPage) {
+    const afterClause = cursor ? `, after: "${cursor}"` : '';
+
+    interface ProjectIssuesPage {
+      project: {
+        issues: {
+          nodes: Array<{
+            id: string;
+            identifier: string;
+            title: string;
+            description: string | null;
+            url: string;
+            labels: { nodes: Array<{ name: string }> };
+          }>;
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        };
+      };
+    }
+
+    const page = await execute<ProjectIssuesPage>(
+      apiKey,
+      `query($pid: String!) {
+        project(id: $pid) {
+          issues(first: 50${afterClause}) {
+            nodes {
+              id
+              identifier
+              title
+              description
+              url
+              labels { nodes { name } }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }`,
+      { pid: projectId },
+    );
+
+    const issues = page.project.issues.nodes;
+    const pageInfo = page.project.issues.pageInfo;
+    totalLinearIssues += issues.length;
+
+    for (const issue of issues) {
+      // Check for existing GitHub issue with same title
+      const existing = findExistingGitHubIssue(repo, issue.title);
+      if (existing) {
+        console.error(`github-sync: skipping "${issue.identifier}" — GitHub issue #${existing.number} already exists`);
+        mappings.push({
+          linearId: issue.id,
+          linearIdentifier: issue.identifier,
+          linearTitle: issue.title,
+          githubIssueNumber: existing.number,
+          githubIssueUrl: existing.url,
+        });
+        skippedCount++;
+        continue;
+      }
+
+      // Build GitHub issue body
+      const descSnippet = issue.description
+        ? issue.description.slice(0, 500) + (issue.description.length > 500 ? '\n\n…_(truncated)_' : '')
+        : '_No description._';
+
+      const repoUrl = `https://github.com/${repo}`;
+      const branchUrl = `${repoUrl}/tree/${branch}`;
+
+      const body = [
+        `> **Linear issue:** [${issue.identifier}](${issue.url})`,
+        `> **Branch:** [\`${branch}\`](${branchUrl})`,
+        '',
+        '---',
+        '',
+        descSnippet,
+      ].join('\n');
+
+      // Determine labels
+      const agentLabel = extractAgentLabel(issue.labels.nodes);
+      const ghLabels: string[] = ['intake'];
+      if (agentLabel) ghLabels.push(agentLabel);
+
+      try {
+        // Build label args
+        const labelArgs = ghLabels.map((l) => `--label ${JSON.stringify(l)}`).join(' ');
+
+        // Create the GitHub issue
+        const createResult = gh(
+          `issue create --repo ${JSON.stringify(repo)} --title ${JSON.stringify(issue.title)} --body ${JSON.stringify(body)} ${labelArgs}`,
+        );
+
+        // gh issue create outputs the issue URL on success
+        const ghIssueUrl = createResult.trim();
+        const ghIssueNumberMatch = ghIssueUrl.match(/\/issues\/(\d+)$/);
+        const ghIssueNumber = ghIssueNumberMatch ? parseInt(ghIssueNumberMatch[1], 10) : 0;
+
+        if (!ghIssueNumber) {
+          console.error(`github-sync: warning: could not parse issue number from: ${createResult}`);
+          errorCount++;
+          continue;
+        }
+
+        console.error(`github-sync: created GitHub issue #${ghIssueNumber} for ${issue.identifier}`);
+
+        mappings.push({
+          linearId: issue.id,
+          linearIdentifier: issue.identifier,
+          linearTitle: issue.title,
+          githubIssueNumber: ghIssueNumber,
+          githubIssueUrl: ghIssueUrl,
+        });
+        createdCount++;
+
+        // Update Linear issue description with a back-link to the GitHub issue
+        const ghLink = `\n\n---\n🔗 **GitHub issue:** [#${ghIssueNumber}](${ghIssueUrl})`;
+        const updatedDescription = (issue.description || '') + ghLink;
+
+        try {
+          interface UpdateResult {
+            issueUpdate: { success: boolean };
+          }
+          await execute<UpdateResult>(
+            apiKey,
+            `mutation($id: String!, $input: IssueUpdateInput!) {
+              issueUpdate(id: $id, input: $input) { success }
+            }`,
+            { id: issue.id, input: { description: updatedDescription } },
+          );
+        } catch (err) {
+          console.error(`github-sync: warning: could not update Linear issue ${issue.identifier} with back-link: ${err}`);
+        }
+
+        // Optionally add to GitHub Project
+        if (githubProject) {
+          addIssueToProject(repo, ghIssueNumber, githubProject);
+        }
+
+        // Rate limit: ~2s between creates to stay under 30/min
+        await sleep(2000);
+      } catch (err) {
+        console.error(`github-sync: failed to create GitHub issue for ${issue.identifier}: ${err}`);
+        errorCount++;
+      }
+    }
+
+    hasNextPage = pageInfo.hasNextPage;
+    cursor = pageInfo.endCursor ?? undefined;
+
+    console.error(
+      `github-sync: processed ${totalLinearIssues} Linear issues (${createdCount} created, ${skippedCount} skipped, ${errorCount} errors)`,
+    );
+  }
+
+  return { createdCount, skippedCount, errorCount, totalLinearIssues, mappings };
 }

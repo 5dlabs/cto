@@ -1,18 +1,18 @@
-Implement subtask 1002: Deploy CloudNativePG Cluster CR for PostgreSQL
+Implement subtask 1002: Deploy CloudNative-PG Cluster CR with initdb bootstrap
 
 ## Objective
-Create the CloudNativePG `Cluster` CR named `notifycore-pg` with a single replica, database `notifycore`, user `notifycore_app`, and credentials stored in Secret `notifycore-pg-app`.
+Deploy the CloudNative-PG `Cluster` CR named `sigma1-postgres` in the `sigma1-db` namespace with 2 instances, 50Gi storage, and initdb bootstrap creating the `sigma1` database owned by `sigma1_user`.
 
 ## Steps
-1. Create `infra/notifycore/templates/postgres-cluster.yaml` with a CloudNativePG `Cluster` CR:
-   - metadata.name: `notifycore-pg`, namespace: `notifycore`
-   - spec.instances: 1
-   - spec.bootstrap.initdb.database: `notifycore`
-   - spec.bootstrap.initdb.owner: `notifycore_app`
-   - spec.storage.size: `1Gi` (dev sizing from values-dev.yaml)
-2. The CloudNativePG operator will auto-generate a Secret `notifycore-pg-app` containing the credentials.
-3. Parameterize replica count and storage size through values-dev.yaml.
-4. Verify the CR schema is correct for the target CloudNativePG operator version.
+1. Create `Cluster` CR YAML for `sigma1-postgres` in `sigma1-db` namespace:
+   - `spec.instances: 2`
+   - `spec.storage.size: 50Gi`
+   - `spec.bootstrap.initdb.database: sigma1`
+   - `spec.bootstrap.initdb.owner: sigma1_user`
+   - `spec.bootstrap.initdb.secret.name: sigma1-postgres-superuser` (auto-created by operator)
+2. Apply the Cluster CR.
+3. Wait for cluster to reach READY state with 2/2 instances healthy.
+4. Verify the `sigma1` database exists and `sigma1_user` is the owner.
 
 ## Validation
-`kubectl get cluster notifycore-pg -n notifycore` shows the cluster in healthy state. `kubectl get secret notifycore-pg-app -n notifycore` exists with `username` and `password` keys. Pod `notifycore-pg-1` is Running/Ready within 120s.
+`kubectl get cluster sigma1-postgres -n sigma1-db` shows READY with 2/2 instances. `kubectl exec` into primary pod and run `psql -U sigma1_user -d sigma1 -c '\l'` to confirm database exists.

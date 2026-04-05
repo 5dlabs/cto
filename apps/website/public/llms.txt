@@ -13,7 +13,7 @@
 ## Technology
 
 - [OpenClaw](https://github.com/5dlabs): Open-source agent orchestration layer coordinating AI agents across multiple CLIs (Claude Code, Cursor, Codex, Factory, Gemini), self-healing bare metal Kubernetes, GitHub/Linear integrations, and MCP servers
-- [Infrastructure](https://5dlabs.ai/investors): Bare metal Kubernetes on Talos Linux, ArgoCD GitOps, Prometheus/Grafana/Loki observability, OpenBao secret management
+- [Infrastructure](https://5dlabs.ai/cto): Bare metal Kubernetes on Talos Linux, ArgoCD GitOps, Prometheus/Grafana/Loki observability, OpenBao secret management
 
 ## Consulting
 
@@ -28,14 +28,13 @@
 ## Company
 
 - [Founder](https://5dlabs.ai/founder): Jonathon Fritz — Founder & CEO
-- [Investors](https://5dlabs.ai/investors): Investment thesis, portfolio, and key metrics
 - [Team](https://5dlabs.ai/cto/team): Canonical CTO team roster and business team overview
 
 ## Connect
 
 - [GitHub](https://github.com/5dlabs): Open-source repositories
 - [Discord](https://discord.gg/r334tFP87Y): Community server
-- [X / Twitter](https://x.com/5dlabs): Updates and announcements
+- [X](https://x.com/5dlabs): Updates and announcements
 - [YouTube](https://youtube.com/@5dlabs): Demos and walkthroughs
 
 ## Optional

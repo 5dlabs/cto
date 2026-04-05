@@ -12,7 +12,9 @@ use tokio::task::JoinSet;
 use tracing::{debug, info, warn};
 
 use crate::config::Config;
-use crate::handlers::oauth::{refresh_access_token, store_access_token_public};
+use crate::handlers::oauth::{
+    mint_client_credentials_token, refresh_access_token, store_access_token_public,
+};
 
 const DEFAULT_REFRESH_INTERVAL_SECS: u64 = 300;
 const REFRESH_BUFFER_SECS: i64 = 3600;
@@ -62,29 +64,39 @@ impl TokenHealthManager {
                 .apps
                 .iter()
                 .filter_map(|(agent_name, app)| {
-                    app.access_token.as_ref()?;
-                    if !app.can_refresh() {
-                        return None;
+                    if app.can_refresh() {
+                        app.access_token.as_ref()?;
+
+                        let needs_refresh = match app.expires_at {
+                            Some(expires_at) => expires_at - now < REFRESH_BUFFER_SECS,
+                            None => true,
+                        };
+
+                        if !needs_refresh {
+                            return None;
+                        }
+
+                        let refresh_token = app.refresh_token.clone()?;
+
+                        return Some(TokenRotationCandidate::Refresh {
+                            agent_name: agent_name.clone(),
+                            refresh_token,
+                            client_id: app.client_id.clone(),
+                            client_secret: app.client_secret.clone(),
+                            expires_at: app.expires_at,
+                        });
                     }
 
-                    let needs_refresh = match app.expires_at {
-                        Some(expires_at) => expires_at - now < REFRESH_BUFFER_SECS,
-                        None => true,
-                    };
-
-                    if !needs_refresh {
-                        return None;
+                    if app.should_proactively_mint_client_credentials() {
+                        return Some(TokenRotationCandidate::Mint {
+                            agent_name: agent_name.clone(),
+                            client_id: app.client_id.clone(),
+                            client_secret: app.client_secret.clone(),
+                            expires_at: app.expires_at,
+                        });
                     }
 
-                    let refresh_token = app.refresh_token.clone()?;
-
-                    Some((
-                        agent_name.clone(),
-                        refresh_token,
-                        app.client_id.clone(),
-                        app.client_secret.clone(),
-                        app.expires_at,
-                    ))
+                    None
                 })
                 .collect::<Vec<_>>()
         };
@@ -100,23 +112,49 @@ impl TokenHealthManager {
         );
 
         let mut join_set = JoinSet::new();
-        for (agent_name, refresh_token, client_id, client_secret, expires_at) in candidates {
+        for candidate in candidates {
             let config = self.config.clone();
             let kube_client = self.kube_client.clone();
             let semaphore = Arc::clone(&self.refresh_semaphore);
 
             join_set.spawn(async move {
                 let _permit = semaphore.acquire().await.map_err(|_| "Semaphore closed")?;
-                refresh_agent_token(
-                    &config,
-                    &kube_client,
-                    &agent_name,
-                    &refresh_token,
-                    &client_id,
-                    &client_secret,
-                    expires_at,
-                )
-                .await
+                match candidate {
+                    TokenRotationCandidate::Refresh {
+                        agent_name,
+                        refresh_token,
+                        client_id,
+                        client_secret,
+                        expires_at,
+                    } => {
+                        refresh_agent_token(
+                            &config,
+                            &kube_client,
+                            &agent_name,
+                            &refresh_token,
+                            &client_id,
+                            &client_secret,
+                            expires_at,
+                        )
+                        .await
+                    }
+                    TokenRotationCandidate::Mint {
+                        agent_name,
+                        client_id,
+                        client_secret,
+                        expires_at,
+                    } => {
+                        mint_agent_token(
+                            &config,
+                            &kube_client,
+                            &agent_name,
+                            &client_id,
+                            &client_secret,
+                            expires_at,
+                        )
+                        .await
+                    }
+                }
             });
         }
 
@@ -130,6 +168,22 @@ impl TokenHealthManager {
 
         Ok(())
     }
+}
+
+enum TokenRotationCandidate {
+    Refresh {
+        agent_name: String,
+        refresh_token: String,
+        client_id: String,
+        client_secret: String,
+        expires_at: Option<i64>,
+    },
+    Mint {
+        agent_name: String,
+        client_id: String,
+        client_secret: String,
+        expires_at: Option<i64>,
+    },
 }
 
 async fn refresh_agent_token(
@@ -169,6 +223,55 @@ async fn refresh_agent_token(
             token_response.expires_in,
         );
         info!(agent = %agent_name, "Updated in-memory token config");
+    } else {
+        warn!(
+            agent = %agent_name,
+            "Failed to acquire write lock for in-memory token update"
+        );
+    }
+
+    Ok(())
+}
+
+async fn mint_agent_token(
+    config: &Config,
+    kube_client: &kube::Client,
+    agent_name: &str,
+    client_id: &str,
+    client_secret: &str,
+    expires_at: Option<i64>,
+) -> Result<(), String> {
+    let ttl = expires_at.map(|exp| exp - Utc::now().timestamp());
+    info!(
+        agent = %agent_name,
+        ttl_seconds = ?ttl,
+        "Minting Linear access token via client_credentials"
+    );
+
+    let token_response = mint_client_credentials_token(client_id, client_secret).await?;
+
+    store_access_token_public(
+        kube_client,
+        &config.namespace,
+        agent_name,
+        &token_response.access_token,
+        None,
+        token_response.expires_in,
+    )
+    .await
+    .map_err(|e| format!("Failed to persist minted token: {e}"))?;
+
+    if let Ok(mut linear_config) = config.linear.write() {
+        linear_config.update_tokens(
+            agent_name,
+            &token_response.access_token,
+            None,
+            token_response.expires_in,
+        );
+        info!(
+            agent = %agent_name,
+            "Updated in-memory token config from client_credentials"
+        );
     } else {
         warn!(
             agent = %agent_name,

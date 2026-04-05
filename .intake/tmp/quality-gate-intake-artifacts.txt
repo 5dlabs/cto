@@ -1,16 +1,16 @@
 stage=intake-artifacts
-project=sigma-1
+project=sigma-1-e2e-delegation
 summary:
-Generated 6 tasks with 35 subtasks and 63 documentation artifacts for sigma-1. Bundle below includes sampled summaries and file excerpts for the first 2 tasks.
+Generated 10 tasks with 58 subtasks and 103 documentation artifacts for sigma-1-e2e-delegation. Bundle below includes sampled summaries and file excerpts for the first 2 tasks.
 
 task_summaries:
-[{"id":1,"title":"Provision Core Infrastructure (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[],"subtask_count":6,"decision_point_count":4,"description":"Set up the foundational Kubernetes infrastructure including namespaces, PostgreSQL, Redis/Valkey, and S3/R2 storage. This task establishes the persistent data and caching layers required by all backend services.","test_strategy":"1. Verify `databases` and `sigma1` namespaces exist.2. Confirm `sigma1-postgres` Cluster and `sigma1-valkey` Redis instances are running and accessible within the cluster.3. Validate that the `sigma1-infra-endpoints` Con"},{"id":2,"title":"Develop Equipment Catalog Service (Rex - Rust/Axum)","agent":"rex","stack":"Rust/Axum","priority":"high","dependencies":[1],"subtask_count":6,"decision_point_count":4,"description":"Implement the high-performance Equipment Catalog Service, providing APIs for product inventory, availability, and image serving. This service is critical for Morgan's quoting capabilities and the website's product displa","test_strategy":"1. Deploy the service to Kubernetes and verify it starts successfully.2. Use `curl` or Postman to verify all defined API endpoints are accessible and return expected data structures.3. Test product creation, retrieval, a"}]
+[{"id":1,"title":"Provision Dev Infrastructure for Sigma-1 E2E Pipeline (Bolt - Kubernetes/Helm)","agent":"bolt","stack":"Kubernetes/Helm","priority":"high","dependencies":[],"subtask_count":6,"decision_point_count":1,"description":"Bootstrap the sigma-1-dev namespace with all required infrastructure resources: namespace creation, Kubernetes secrets for Linear API key, Discord webhook URL, NOUS_API_KEY, and GitHub tokens, plus a sigma-1-infra-endpoi","test_strategy":"1. `kubectl get namespace sigma-1-dev` returns Active status. 2. `kubectl get secret sigma-1-secrets -n sigma-1-dev` exists and contains exactly 4 keys (LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, GITHUB_TOKEN). 3"},{"id":2,"title":"Extend PM Server for Agent Delegation in Linear Issues (Nova - Bun/Elysia)","agent":"nova","stack":"Bun/Elysia","priority":"high","dependencies":[1],"subtask_count":6,"decision_point_count":2,"description":"Extend the existing PM server's task generation and Linear issue creation pipeline to resolve agent hints to Linear user IDs via resolve_agent_delegates() and set delegate_id on every created issue. This is the core dele","test_strategy":"1. Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object mapping each to a valid Linear user ID string. 2. Unit test: `resolve_agent_delegates(['unknown_agent'])` returns null for the unknown "}]
 
 === .tasks/docs/task-1/task.md ===
-## Provision Core Infrastructure (Bolt - Kubernetes/Helm)
+## Provision Dev Infrastructure for Sigma-1 E2E Pipeline (Bolt - Kubernetes/Helm)
 
 ### Objective
-Set up the foundational Kubernetes infrastructure including namespaces, PostgreSQL, Redis/Valkey, and S3/R2 storage. This task establishes the persistent data and caching layers required by all backend services.
+Bootstrap the sigma-1-dev namespace with all required infrastructure resources: namespace creation, Kubernetes secrets for Linear API key, Discord webhook URL, NOUS_API_KEY, and GitHub tokens, plus a sigma-1-infra-endpoints ConfigMap aggregating connection strings for all in-cluster services (discord-bridge-http, linear-bridge, openclaw-nats, cloudflare-operator). This task provides the foundational infrastructure that all subsequent tasks depend on.
 
 ### Ownership
 - Agent: bolt
@@ -20,19 +20,29 @@ Set up the foundational Kubernetes infrastructure including namespaces, PostgreS
 - Dependencies: None
 
 ### Implementation Details
-1. Create `databases` and `sigma1` Kubernetes namespaces.2. Deploy CloudNative-PG operator and provision a `sigma1-postgres` Cluster with a `sigma1` database and `sigma1_user` owner, 50Gi storage, and single instance for dev. Ensure multiple schemas (rms, crm, finance, audit, public) can be created within this database.3. Deploy Redis/Valkey operator and provision a `sigma1-valkey` Redis instance (Valkey 7.2-alpine) with single instance for dev.4. Configure S3/R2 bucket access (e.g., via Kubernetes secrets for credentials) for image storage.5. Create a `sigma1-infra-endpoints` ConfigMap in the `sigma1` namespace, containing connection strings for PostgreSQL and Redis/Valkey, following the pattern `{OPERATOR}_{INSTANCE}_URL` (e.g., `POSTGRES_SIGMA1_POSTGRES_URL`, `REDIS_SIGMA1_VALKEY_URL`).6. Ensure basic network policies are in place to allow internal service communication.
+1. Create the `sigma-1-dev` namespace with appropriate labels (`project: sigma-1`, `env: dev`).
+2. Create Kubernetes Secret `sigma-1-secrets` containing keys: `LINEAR_API_KEY`, `DISCORD_WEBHOOK_URL`, `NOUS_API_KEY`, `GITHUB_TOKEN`. Values should reference external-secrets operator CRs if available, otherwise placeholder sealed-secrets for dev.
+3. Create ConfigMap `sigma-1-infra-endpoints` with the following keys:
+   - `DISCORD_BRIDGE_URL`: internal cluster URL for `bots/discord-bridge-http` service
+   - `LINEAR_BRIDGE_URL`: internal cluster URL for `bots/linear-bridge` service
+   - `NATS_URL`: `openclaw-nats.openclaw.svc.cluster.local` (reference only; may not be used per D2 resolution)
+   - `CLOUDFLARE_OPERATOR_NS`: `cloudflare-operator-system`
+4. Create a ServiceAccount `sigma-1-pm-server` with minimal RBAC (get/list on configmaps and secrets in `sigma-1-dev` namespace only).
+5. Validate that existing in-cluster services are reachable from the namespace: `bots/discord-bridge-http`, `bots/linear-bridge`, `cloudflare-operator-system` webhook service.
+6. Create a Helm values file `values-dev.yaml` capturing all namespace-scoped resource names for downstream consumption.
+7. Do NOT provision new NATS instances — NATS is already deployed at `openclaw-nats.openclaw.svc.cluster.local`. Do NOT deploy any ingress controller — Cloudflare operator handles ingress per D8.
 
 ### Subtasks
-- [ ] Create core Kubernetes namespaces: Create the 'databases' and 'sigma1' Kubernetes namespaces to logically separate infrastructure components and application services.
-- [ ] Deploy CloudNative-PG operator and PostgreSQL cluster: Deploy the CloudNative-PG operator and provision a single-instance PostgreSQL cluster named 'sigma1-postgres' with a 'sigma1' database and 'sigma1_user' owner, 50Gi storage, within the 'databases' namespace.
-- [ ] Deploy Redis/Valkey operator and instance: Deploy the Redis/Valkey operator and provision a single-instance Redis/Valkey instance named 'sigma1-valkey' (Valkey 7.2-alpine) within the 'databases' namespace.
-- [ ] Configure S3/R2 bucket access credentials: Create Kubernetes secrets in the 'sigma1' namespace to securely store S3/R2 bucket access credentials for image storage.
-- [ ] Create sigma1-infra-endpoints ConfigMap: Create a ConfigMap named 'sigma1-infra-endpoints' in the 'sigma1' namespace, containing connection strings for the deployed PostgreSQL and Redis/Valkey instances.
-- [ ] Implement basic internal network policies: Apply basic network policies within the 'sigma1' namespace to allow internal service communication, ensuring services can reach PostgreSQL and Redis/Valkey.
+- [ ] Create sigma-1-dev namespace with labels: Create the sigma-1-dev Kubernetes namespace with project and environment labels that all subsequent resources will be deployed into.
+- [ ] Create sigma-1-secrets Kubernetes Secret with 4 keys: Create the Kubernetes Secret `sigma-1-secrets` in the sigma-1-dev namespace containing LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, and GITHUB_TOKEN. Use external-secrets CRs if available, otherwise sealed-secrets placeholders for dev.
+- [ ] Create sigma-1-infra-endpoints ConfigMap: Create the ConfigMap `sigma-1-infra-endpoints` in sigma-1-dev namespace with all 4 endpoint keys pointing to existing in-cluster services.
+- [ ] Create ServiceAccount sigma-1-pm-server with RBAC Role and RoleBinding: Create a ServiceAccount, Role, and RoleBinding in sigma-1-dev namespace granting minimal get/list permissions on configmaps and secrets.
+- [ ] Generate Helm values-dev.yaml capturing all resource names: Create a Helm values file that aggregates all namespace-scoped resource names (namespace, secret, configmap, service account) for downstream chart consumption.
+- [ ] Validate cross-namespace connectivity from sigma-1-dev to existing services: Deploy a temporary test pod in sigma-1-dev namespace to verify DNS resolution and HTTP connectivity to discord-bridge-http, linear-bridge, and openclaw-nats services.
 === .tasks/docs/task-1/acceptance.md ===
 ## Acceptance Criteria
 
-- [ ] 1. Verify `databases` and `sigma1` namespaces exist.2. Confirm `sigma1-postgres` Cluster and `sigma1-valkey` Redis instances are running and accessible within the cluster.3. Validate that the `sigma1-infra-endpoints` ConfigMap exists in the `sigma1` namespace and contains correct, accessible connection URLs for PostgreSQL and Redis/Valkey.4. Test S3/R2 access by attempting to create/read a dummy object using configured credentials.
+- [ ] 1. `kubectl get namespace sigma-1-dev` returns Active status. 2. `kubectl get secret sigma-1-secrets -n sigma-1-dev` exists and contains exactly 4 keys (LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, GITHUB_TOKEN). 3. `kubectl get configmap sigma-1-infra-endpoints -n sigma-1-dev -o json` contains all 4 endpoint keys with non-empty values. 4. `kubectl get serviceaccount sigma-1-pm-server -n sigma-1-dev` exists. 5. A connectivity test pod in `sigma-1-dev` can resolve DNS for `discord-bridge-http`, `linear-bridge`, and `openclaw-nats.openclaw.svc.cluster.local`.
 
 ## Verification Notes
 
@@ -40,10 +50,10 @@ Set up the foundational Kubernetes infrastructure including namespaces, PostgreS
 - [ ] Update tests, docs, and configuration touched by this task.
 - [ ] Validate the final behavior against the task objective.
 === .tasks/docs/task-1/prompt.md ===
-Implement task 1: Provision Core Infrastructure (Bolt - Kubernetes/Helm)
+Implement task 1: Provision Dev Infrastructure for Sigma-1 E2E Pipeline (Bolt - Kubernetes/Helm)
 
 ## Goal
-Set up the foundational Kubernetes infrastructure including namespaces, PostgreSQL, Redis/Valkey, and S3/R2 storage. This task establishes the persistent data and caching layers required by all backend services.
+Bootstrap the sigma-1-dev namespace with all required infrastructure resources: namespace creation, Kubernetes secrets for Linear API key, Discord webhook URL, NOUS_API_KEY, and GitHub tokens, plus a sigma-1-infra-endpoints ConfigMap aggregating connection strings for all in-cluster services (discord-bridge-http, linear-bridge, openclaw-nats, cloudflare-operator). This task provides the foundational infrastructure that all subsequent tasks depend on.
 
 ## Task Context
 - Agent owner: bolt
@@ -52,50 +62,69 @@ Set up the foundational Kubernetes infrastructure including namespaces, PostgreS
 - Dependencies: None
 
 ## Implementation Plan
-1. Create `databases` and `sigma1` Kubernetes namespaces.2. Deploy CloudNative-PG operator and provision a `sigma1-postgres` Cluster with a `sigma1` database and `sigma1_user` owner, 50Gi storage, and single instance for dev. Ensure multiple schemas (rms, crm, finance, audit, public) can be created within this database.3. Deploy Redis/Valkey operator and provision a `sigma1-valkey` Redis instance (Valkey 7.2-alpine) with single instance for dev.4. Configure S3/R2 bucket access (e.g., via Kubernetes secrets for credentials) for image storage.5. Create a `sigma1-infra-endpoints` ConfigMap in the `sigma1` namespace, containing connection strings for PostgreSQL and Redis/Valkey, following the pattern `{OPERATOR}_{INSTANCE}_URL` (e.g., `POSTGRES_SIGMA1_POSTGRES_URL`, `REDIS_SIGMA1_VALKEY_URL`).6. Ensure basic network policies are in place to allow internal service communication.
+1. Create the `sigma-1-dev` namespace with appropriate labels (`project: sigma-1`, `env: dev`).
+2. Create Kubernetes Secret `sigma-1-secrets` containing keys: `LINEAR_API_KEY`, `DISCORD_WEBHOOK_URL`, `NOUS_API_KEY`, `GITHUB_TOKEN`. Values should reference external-secrets operator CRs if available, otherwise placeholder sealed-secrets for dev.
+3. Create ConfigMap `sigma-1-infra-endpoints` with the following keys:
+   - `DISCORD_BRIDGE_URL`: internal cluster URL for `bots/discord-bridge-http` service
+   - `LINEAR_BRIDGE_URL`: internal cluster URL for `bots/linear-bridge` service
+   - `NATS_URL`: `openclaw-nats.openclaw.svc.cluster.local` (reference only; may not be used per D2 resolution)
+   - `CLOUDFLARE_OPERATOR_NS`: `cloudflare-operator-system`
+4. Create a ServiceAccount `sigma-1-pm-server` with minimal RBAC (get/list on configmaps and secrets in `sigma-1-dev` namespace only).
+5. Validate that existing in-cluster services are reachable from the namespace: `bots/discord-bridge-http`, `bots/linear-bridge`, `cloudflare-operator-system` webhook service.
+6. Create a Helm values file `values-dev.yaml` capturing all namespace-scoped resource names for downstream consumption.
+7. Do NOT provision new NATS instances — NATS is already deployed at `openclaw-nats.openclaw.svc.cluster.local`. Do NOT deploy any ingress controller — Cloudflare operator handles ingress per D8.
 
 ## Acceptance Criteria
-1. Verify `databases` and `sigma1` namespaces exist.2. Confirm `sigma1-postgres` Cluster and `sigma1-valkey` Redis instances are running and accessible within the cluster.3. Validate that the `sigma1-infra-endpoints` ConfigMap exists in the `sigma1` namespace and contains correct, accessible connection URLs for PostgreSQL and Redis/Valkey.4. Test S3/R2 access by attempting to create/read a dummy object using configured credentials.
+1. `kubectl get namespace sigma-1-dev` returns Active status. 2. `kubectl get secret sigma-1-secrets -n sigma-1-dev` exists and contains exactly 4 keys (LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, GITHUB_TOKEN). 3. `kubectl get configmap sigma-1-infra-endpoints -n sigma-1-dev -o json` contains all 4 endpoint keys with non-empty values. 4. `kubectl get serviceaccount sigma-1-pm-server -n sigma-1-dev` exists. 5. A connectivity test pod in `sigma-1-dev` can resolve DNS for `discord-bridge-http`, `linear-bridge`, and `openclaw-nats.openclaw.svc.cluster.local`.
 
 ## Subtasks
-- Create core Kubernetes namespaces: Create the 'databases' and 'sigma1' Kubernetes namespaces to logically separate infrastructure components and application services.
-- Deploy CloudNative-PG operator and PostgreSQL cluster: Deploy the CloudNative-PG operator and provision a single-instance PostgreSQL cluster named 'sigma1-postgres' with a 'sigma1' database and 'sigma1_user' owner, 50Gi storage, within the 'databases' namespace.
-- Deploy Redis/Valkey operator and instance: Deploy the Redis/Valkey operator and provision a single-instance Redis/Valkey instance named 'sigma1-valkey' (Valkey 7.2-alpine) within the 'databases' namespace.
-- Configure S3/R2 bucket access credentials: Create Kubernetes secrets in the 'sigma1' namespace to securely store S3/R2 bucket access credentials for image storage.
-- Create sigma1-infra-endpoints ConfigMap: Create a ConfigMap named 'sigma1-infra-endpoints' in the 'sigma1' namespace, containing connection strings for the deployed PostgreSQL and Redis/Valkey instances.
-- Implement basic internal network policies: Apply basic network policies within the 'sigma1' namespace to allow internal service communication, ensuring services can reach PostgreSQL and Redis/Valkey.
+- Create sigma-1-dev namespace with labels: Create the sigma-1-dev Kubernetes namespace with project and environment labels that all subsequent resources will be deployed into.
+- Create sigma-1-secrets Kubernetes Secret with 4 keys: Create the Kubernetes Secret `sigma-1-secrets` in the sigma-1-dev namespace containing LINEAR_API_KEY, DISCORD_WEBHOOK_URL, NOUS_API_KEY, and GITHUB_TOKEN. Use external-secrets CRs if available, otherwise sealed-secrets placeholders for dev.
+- Create sigma-1-infra-endpoints ConfigMap: Create the ConfigMap `sigma-1-infra-endpoints` in sigma-1-dev namespace with all 4 endpoint keys pointing to existing in-cluster services.
+- Create ServiceAccount sigma-1-pm-server with RBAC Role and RoleBinding: Create a ServiceAccount, Role, and RoleBinding in sigma-1-dev namespace granting minimal get/list permissions on configmaps and secrets.
+- Generate Helm values-dev.yaml capturing all resource names: Create a Helm values file that aggregates all namespace-scoped resource names (namespace, secret, configmap, service account) for downstream chart consumption.
+- Validate cross-namespace connectivity from sigma-1-dev to existing services: Deploy a temporary test pod in sigma-1-dev namespace to verify DNS resolution and HTTP connectivity to discord-bridge-http, linear-bridge, and openclaw-nats services.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.
 - Keep artifacts aligned with the acceptance criteria.
 - Document blockers or assumptions in your final summary.
 === .tasks/docs/task-2/task.md ===
-## Develop Equipment Catalog Service (Rex - Rust/Axum)
+## Extend PM Server for Agent Delegation in Linear Issues (Nova - Bun/Elysia)
 
 ### Objective
-Implement the high-performance Equipment Catalog Service, providing APIs for product inventory, availability, and image serving. This service is critical for Morgan's quoting capabilities and the website's product display.
+Extend the existing PM server's task generation and Linear issue creation pipeline to resolve agent hints to Linear user IDs via resolve_agent_delegates() and set delegate_id on every created issue. This is the core delegation flow that the E2E validation is designed to prove. The task entity schema is extended with a delegate_id field, and fallback behavior is implemented for unmappable agents.
 
 ### Ownership
-- Agent: rex
-- Stack: Rust/Axum
+- Agent: nova
+- Stack: Bun/Elysia
 - Priority: high
 - Status: pending
 - Dependencies: 1
 
 ### Implementation Details
-1. Initialize a new Rust project using `cargo new --bin equipment-catalog` targeting Rust 1.77.2.2. Set up Axum 0.7.5 with `tokio` runtime.3. Define `Product`, `Category`, and `Availability` data models using `sqlx` for PostgreSQL interaction. Implement database migrations for these schemas.4. Implement endpoints:    - `GET /api/v1/catalog/categories`    - `GET /api/v1/catalog/products` (filterable)    - `GET /api/v1/catalog/products/:id`    - `GET /api/v1/catalog/products/:id/availability?from=&to=`    - `POST /api/v1/catalog/products` (admin)    - `PATCH /api/v1/catalog/products/:id` (admin)    - `GET /api/v1/equipment-api/catalog` (machine-readable)    - `POST /api/v1/equipment-api/checkout` (programmatic booking)5. Integrate with PostgreSQL using `sqlx` and Redis for rate limiting and caching, referencing the `sigma1-infra-endpoints` ConfigMap.6. Implement S3/R2 integration for image serving, ensuring secure access and efficient retrieval.7. Add Prometheus metrics (`/metrics`), liveness (`/health/live`), and readiness (`/health/ready`) probes.8. Implement basic tenant-based rate limiting using Redis.
+1. Locate the existing `resolve_agent_delegates()` function in the PM server codebase. Verify it accepts agent hints (e.g., 'bolt', 'nova', 'blaze') and returns Linear user IDs.
+2. Extend the task entity/type definition to include `delegate_id: string | null` field.
+3. In the task generation pipeline, after tasks are generated with agent hints, call `resolve_agent_delegates()` to batch-resolve all agent hints to Linear user IDs.
+4. Populate `delegate_id` on each task object with the resolved Linear user ID.
+5. In the Linear issue creation step, pass `assigneeId: task.delegate_id` when creating each issue via the Linear API.
+6. Implement fallback behavior: if `resolve_agent_delegates()` cannot resolve an agent hint, log a warning with the agent hint and task ID, create the issue unassigned (delegate_id = null), and add an `agent:unresolved` label to the issue.
+7. Add a summary log at the end of issue creation: `Created N issues, M assigned, K unresolved`.
+8. Ensure the PM server reads secrets from the `sigma-1-secrets` Kubernetes secret and endpoints from `sigma-1-infra-endpoints` ConfigMap via `envFrom`.
+9. Write unit tests for: resolve_agent_delegates mapping, fallback on unknown agent, delegate_id propagation to Linear API call.
+10. Write an integration test that runs the full pipeline with a mock Linear API and verifies at least 5 issues are created with non-null assigneeId.
 
 ### Subtasks
-- [ ] Initialize Rust project and configure Axum framework: Set up a new Rust project for the Equipment Catalog Service, configure Axum 0.7.5 with Tokio runtime, and establish a basic server structure.
-- [ ] Define data models and implement database migrations: Define `Product`, `Category`, and `Availability` data models using `sqlx` and create initial database migration scripts for PostgreSQL.
-- [ ] Integrate PostgreSQL and Redis for data and caching: Connect the service to PostgreSQL using `sqlx` and integrate Redis for caching and rate limiting, utilizing the `sigma1-infra-endpoints` ConfigMap.
-- [ ] Implement core read-only catalog API endpoints: Develop the read-only API endpoints for categories, products, product details, and product availability, interacting with the PostgreSQL database.
-- [ ] Implement admin and machine-readable catalog API endpoints: Develop API endpoints for administrative product management (create/update) and machine-readable catalog access, including programmatic booking.
-- [ ] Implement S3/R2 image serving and service observability: Implement S3/R2 integration for secure and efficient image serving, and add Prometheus metrics, liveness, and readiness probes for service observability.
+- [ ] Extend task entity type definition with delegate_id field: Add the `delegate_id: string | null` field to the task entity/type definition used throughout the PM server's task generation and issue creation pipeline.
+- [ ] Implement and verify resolve_agent_delegates() function: Locate or implement the resolve_agent_delegates() function that accepts an array of agent hint strings and returns a mapping of agent hints to Linear user IDs, with null for unresolvable agents.
+- [ ] Integrate delegation into the task generation pipeline: Wire resolve_agent_delegates() into the task generation pipeline: after tasks are generated with agent hints, batch-resolve them and populate delegate_id on each task, then pass assigneeId to the Linear API issue creation calls.
+- [ ] Implement fallback behavior for unresolvable agents and summary logging: Add fallback logic for when resolve_agent_delegates() returns null for an agent hint: log a warning, create the issue unassigned, add an agent:unresolved label, and emit a summary log line after all issues are created.
+- [ ] Write unit tests for resolve_agent_delegates and delegate_id propagation: Create comprehensive unit tests covering resolve_agent_delegates mapping, fallback on unknown agents, and delegate_id propagation to the Linear API call layer.
+- [ ] Write integration test with mock Linear API validating full delegation pipeline: Create an integration test that runs the full task generation and issue creation pipeline against a mock Linear API, verifying at least 5 issues are created with non-null assigneeId and the summary log is correct.
 === .tasks/docs/task-2/acceptance.md ===
 ## Acceptance Criteria
 
-- [ ] 1. Deploy the service to Kubernetes and verify it starts successfully.2. Use `curl` or Postman to verify all defined API endpoints are accessible and return expected data structures.3. Test product creation, retrieval, and update operations.4. Verify availability checks return correct quantities for specified date ranges.5. Confirm rate limiting is active and blocks excessive requests.6. Ensure product images are correctly uploaded to and retrieved from S3/R2.7. Validate Prometheus metrics endpoint is exposed and returns data.
+- [ ] 1. Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object mapping each to a valid Linear user ID string. 2. Unit test: `resolve_agent_delegates(['unknown_agent'])` returns null for the unknown agent and logs a warning. 3. Integration test: Run the task generation pipeline with a sample PRD; verify at least 5 task objects have non-null `delegate_id` values. 4. Integration test: Mock the Linear API create-issue endpoint; verify each call includes `assigneeId` matching the task's `delegate_id`. 5. Integration test: Verify the summary log line shows correct counts for assigned vs unresolved.
 
 ## Verification Notes
 
@@ -103,30 +132,39 @@ Implement the high-performance Equipment Catalog Service, providing APIs for pro
 - [ ] Update tests, docs, and configuration touched by this task.
 - [ ] Validate the final behavior against the task objective.
 === .tasks/docs/task-2/prompt.md ===
-Implement task 2: Develop Equipment Catalog Service (Rex - Rust/Axum)
+Implement task 2: Extend PM Server for Agent Delegation in Linear Issues (Nova - Bun/Elysia)
 
 ## Goal
-Implement the high-performance Equipment Catalog Service, providing APIs for product inventory, availability, and image serving. This service is critical for Morgan's quoting capabilities and the website's product display.
+Extend the existing PM server's task generation and Linear issue creation pipeline to resolve agent hints to Linear user IDs via resolve_agent_delegates() and set delegate_id on every created issue. This is the core delegation flow that the E2E validation is designed to prove. The task entity schema is extended with a delegate_id field, and fallback behavior is implemented for unmappable agents.
 
 ## Task Context
-- Agent owner: rex
-- Stack: Rust/Axum
+- Agent owner: nova
+- Stack: Bun/Elysia
 - Priority: high
 - Dependencies: 1
 
 ## Implementation Plan
-1. Initialize a new Rust project using `cargo new --bin equipment-catalog` targeting Rust 1.77.2.2. Set up Axum 0.7.5 with `tokio` runtime.3. Define `Product`, `Category`, and `Availability` data models using `sqlx` for PostgreSQL interaction. Implement database migrations for these schemas.4. Implement endpoints:    - `GET /api/v1/catalog/categories`    - `GET /api/v1/catalog/products` (filterable)    - `GET /api/v1/catalog/products/:id`    - `GET /api/v1/catalog/products/:id/availability?from=&to=`    - `POST /api/v1/catalog/products` (admin)    - `PATCH /api/v1/catalog/products/:id` (admin)    - `GET /api/v1/equipment-api/catalog` (machine-readable)    - `POST /api/v1/equipment-api/checkout` (programmatic booking)5. Integrate with PostgreSQL using `sqlx` and Redis for rate limiting and caching, referencing the `sigma1-infra-endpoints` ConfigMap.6. Implement S3/R2 integration for image serving, ensuring secure access and efficient retrieval.7. Add Prometheus metrics (`/metrics`), liveness (`/health/live`), and readiness (`/health/ready`) probes.8. Implement basic tenant-based rate limiting using Redis.
+1. Locate the existing `resolve_agent_delegates()` function in the PM server codebase. Verify it accepts agent hints (e.g., 'bolt', 'nova', 'blaze') and returns Linear user IDs.
+2. Extend the task entity/type definition to include `delegate_id: string | null` field.
+3. In the task generation pipeline, after tasks are generated with agent hints, call `resolve_agent_delegates()` to batch-resolve all agent hints to Linear user IDs.
+4. Populate `delegate_id` on each task object with the resolved Linear user ID.
+5. In the Linear issue creation step, pass `assigneeId: task.delegate_id` when creating each issue via the Linear API.
+6. Implement fallback behavior: if `resolve_agent_delegates()` cannot resolve an agent hint, log a warning with the agent hint and task ID, create the issue unassigned (delegate_id = null), and add an `agent:unresolved` label to the issue.
+7. Add a summary log at the end of issue creation: `Created N issues, M assigned, K unresolved`.
+8. Ensure the PM server reads secrets from the `sigma-1-secrets` Kubernetes secret and endpoints from `sigma-1-infra-endpoints` ConfigMap via `envFrom`.
+9. Write unit tests for: resolve_agent_delegates mapping, fallback on unknown agent, delegate_id propagation to Linear API call.
+10. Write an integration test that runs the full pipeline with a mock Linear API and verifies at least 5 issues are created with non-null assigneeId.
 
 ## Acceptance Criteria
-1. Deploy the service to Kubernetes and verify it starts successfully.2. Use `curl` or Postman to verify all defined API endpoints are accessible and return expected data structures.3. Test product creation, retrieval, and update operations.4. Verify availability checks return correct quantities for specified date ranges.5. Confirm rate limiting is active and blocks excessive requests.6. Ensure product images are correctly uploaded to and retrieved from S3/R2.7. Validate Prometheus metrics endpoint is exposed and returns data.
+1. Unit test: `resolve_agent_delegates(['bolt', 'nova', 'blaze'])` returns an object mapping each to a valid Linear user ID string. 2. Unit test: `resolve_agent_delegates(['unknown_agent'])` returns null for the unknown agent and logs a warning. 3. Integration test: Run the task generation pipeline with a sample PRD; verify at least 5 task objects have non-null `delegate_id` values. 4. Integration test: Mock the Linear API create-issue endpoint; verify each call includes `assigneeId` matching the task's `delegate_id`. 5. Integration test: Verify the summary log line shows correct counts for assigned vs unresolved.
 
 ## Subtasks
-- Initialize Rust project and configure Axum framework: Set up a new Rust project for the Equipment Catalog Service, configure Axum 0.7.5 with Tokio runtime, and establish a basic server structure.
-- Define data models and implement database migrations: Define `Product`, `Category`, and `Availability` data models using `sqlx` and create initial database migration scripts for PostgreSQL.
-- Integrate PostgreSQL and Redis for data and caching: Connect the service to PostgreSQL using `sqlx` and integrate Redis for caching and rate limiting, utilizing the `sigma1-infra-endpoints` ConfigMap.
-- Implement core read-only catalog API endpoints: Develop the read-only API endpoints for categories, products, product details, and product availability, interacting with the PostgreSQL database.
-- Implement admin and machine-readable catalog API endpoints: Develop API endpoints for administrative product management (create/update) and machine-readable catalog access, including programmatic booking.
-- Implement S3/R2 image serving and service observability: Implement S3/R2 integration for secure and efficient image serving, and add Prometheus metrics, liveness, and readiness probes for service observability.
+- Extend task entity type definition with delegate_id field: Add the `delegate_id: string | null` field to the task entity/type definition used throughout the PM server's task generation and issue creation pipeline.
+- Implement and verify resolve_agent_delegates() function: Locate or implement the resolve_agent_delegates() function that accepts an array of agent hint strings and returns a mapping of agent hints to Linear user IDs, with null for unresolvable agents.
+- Integrate delegation into the task generation pipeline: Wire resolve_agent_delegates() into the task generation pipeline: after tasks are generated with agent hints, batch-resolve them and populate delegate_id on each task, then pass assigneeId to the Linear API issue creation calls.
+- Implement fallback behavior for unresolvable agents and summary logging: Add fallback logic for when resolve_agent_delegates() returns null for an agent hint: log a warning, create the issue unassigned, add an agent:unresolved label, and emit a summary log line after all issues are created.
+- Write unit tests for resolve_agent_delegates and delegate_id propagation: Create comprehensive unit tests covering resolve_agent_delegates mapping, fallback on unknown agents, and delegate_id propagation to the Linear API call layer.
+- Write integration test with mock Linear API validating full delegation pipeline: Create an integration test that runs the full task generation and issue creation pipeline against a mock Linear API, verifying at least 5 issues are created with non-null assigneeId and the summary log is correct.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

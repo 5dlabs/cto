@@ -1,0 +1,62 @@
+---
+apiVersion: datadoghq.com/v2alpha1
+kind: DatadogAgent
+metadata:
+  name: datadog
+  namespace: datadog-agent
+spec:
+  global:
+    clusterName: cto-ovh
+    site: us5.datadoghq.com
+    credentials:
+      apiSecret:
+        secretName: datadog-secret
+        keyName: api-key
+  features:
+    orchestratorExplorer:
+      enabled: true
+    clusterChecks:
+      enabled: true
+    logCollection:
+      enabled: true
+      containerCollectAll: false
+    apm:
+      instrumentation:
+        enabled: true
+        targets:
+          - name: cto-pm-nodejs
+            ddTraceVersions:
+              js: "5"
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: pm
+            namespaceSelector:
+              matchNames:
+                - cto
+            ddTraceConfigs:
+              - name: DD_PROFILING_ENABLED
+                value: "auto"
+          - name: bots-linear-bridge-nodejs
+            ddTraceVersions:
+              js: "5"
+            podSelector:
+              matchLabels:
+                app: linear-bridge
+            namespaceSelector:
+              matchNames:
+                - bots
+            ddTraceConfigs:
+              - name: DD_PROFILING_ENABLED
+                value: "auto"
+          - name: bots-discord-bridge-nodejs
+            ddTraceVersions:
+              js: "5"
+            podSelector:
+              matchLabels:
+                app: discord-bridge
+            namespaceSelector:
+              matchNames:
+                - bots
+            ddTraceConfigs:
+              - name: DD_PROFILING_ENABLED
+                value: "auto"

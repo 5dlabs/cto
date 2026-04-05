@@ -1,25 +1,28 @@
-Implement subtask 2007: Unit tests for validation logic, enum serialization, and pagination math
+Implement subtask 2007: Implement category and product CRUD endpoints with pagination and search
 
 ## Objective
-Write unit tests within src/ modules covering validation logic, enum serialization/deserialization to lowercase JSON, and pagination offset calculation.
+Build the core catalog REST endpoints: categories listing with parent_id filter, products listing with pagination/category filter/trigram search/JSONB spec queries, product detail, and admin create/update endpoints.
 
 ## Steps
-1. In `src/models.rs` (or a `#[cfg(test)]` module):
-   - Test `Channel` enum serializes to lowercase: `serde_json::to_string(&Channel::Email)` == `"email"`.
-   - Test `Priority` enum: all variants serialize correctly.
-   - Test `NotificationStatus` enum: all variants serialize correctly.
-   - Test deserialization of `CreateNotificationRequest` from valid JSON.
-   - Test deserialization rejects unknown channel values.
-2. In `src/handlers.rs` (or separate test module):
-   - Test pagination offset calculation: page=1, per_page=20 → offset=0. page=3, per_page=10 → offset=20.
-   - Test per_page clamping: per_page=200 → clamped to 100. per_page=0 → default to 20 (or minimum 1).
-   - Test page minimum: page=0 → clamped to 1.
-3. In `src/errors.rs`:
-   - Test `AppError::NotFound` produces StatusCode 404.
-   - Test `AppError::Validation` produces StatusCode 422.
-   - Test `AppError::Conflict` produces StatusCode 409.
-   - Test error JSON body shape is `{"error": "message"}`.
-4. Aim for at least 6 unit test cases across these modules.
+1. Define Axum router in `catalog/src/routes/mod.rs`.
+2. Implement `GET /api/v1/catalog/categories`:
+   - Query params: `parent_id` (optional UUID) to filter children of a category.
+   - Returns JSON array of categories.
+3. Implement `GET /api/v1/catalog/products`:
+   - Query params: `page` (default 1), `per_page` (default 20, max 100), `category_id` (optional), `search` (optional, trigram similarity on name with `%` ILIKE or `similarity()` function), `specs` (optional, JSONB containment query e.g., `specs @> '{"weight_kg": 5}'`).
+   - Return `{"data": [...], "meta": {"page", "per_page", "total", "total_pages"}}`.
+   - Use `sqlx::query_as!` with dynamic query building for filters.
+4. Implement `GET /api/v1/catalog/products/:id`:
+   - Join with categories to include category name.
+   - Return 404 if not found.
+5. Implement `POST /api/v1/catalog/products` (protected by API key auth middleware):
+   - Validate request body: name required, day_rate > 0, category_id must exist.
+   - Return 201 with created product.
+6. Implement `PATCH /api/v1/catalog/products/:id` (protected by API key auth middleware):
+   - Accept partial updates (only provided fields are updated).
+   - Update `updated_at` timestamp.
+   - Return 200 with updated product.
+7. Define SQLx model structs with `FromRow` for categories and products, and request/response DTOs with `serde::Serialize/Deserialize`.
 
 ## Validation
-`cargo test --lib` passes all unit tests. Tests cover: enum serialization (3 enum types × at least 1 variant each), pagination math (offset calculation, per_page clamping, page minimum), error response codes and body shapes. Minimum 6 passing unit test functions.
+Integration tests with sqlx::test: 1) Create categories, list all, filter by parent_id. 2) Create products, verify pagination meta is correct. 3) Search products by name trigram and verify relevant results appear. 4) Filter by JSONB specs containment. 5) Get product by ID returns category name. 6) Get non-existent ID returns 404. 7) POST without API key returns 401. 8) POST with valid key creates product and returns 201. 9) PATCH updates only provided fields.

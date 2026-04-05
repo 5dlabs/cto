@@ -1,18 +1,22 @@
-Implement subtask 3004: Implement namespace NetworkPolicies for default-deny and allowed traffic
+Implement subtask 3004: Database migrations for all RMS schema tables
 
 ## Objective
-Create five NetworkPolicy resources: default deny all, allow app→PostgreSQL, allow app→Redis, allow ingress controller→app, and allow DNS egress.
+Create golang-migrate migration files for all 9 tables in the rms schema with org_id column, indexes, and foreign key constraints.
 
 ## Steps
-1. Create `infra/notifycore/templates/network-policies/` directory with separate files for clarity.
-2. `default-deny.yaml`: NetworkPolicy with podSelector: {} (all pods), policyTypes: [Ingress, Egress], no ingress/egress rules (denies all by default).
-3. `allow-app-to-pg.yaml`: NetworkPolicy selecting notifycore app pods (label: app=notifycore), allowing egress to pods matching cnpg.io/cluster=notifycore-pg on port 5432/TCP.
-4. `allow-app-to-redis.yaml`: NetworkPolicy selecting notifycore app pods, allowing egress to pods matching app.kubernetes.io/name=redis on port 6379/TCP.
-5. `allow-ingress-to-app.yaml`: NetworkPolicy selecting notifycore app pods, allowing ingress from namespaceSelector matching the ingress controller namespace (e.g., label: kubernetes.io/metadata.name=ingress-nginx) on port 8080/TCP.
-6. `allow-dns-egress.yaml`: NetworkPolicy selecting all pods in namespace, allowing egress to kube-dns namespace on port 53 UDP and TCP.
-7. Conditionally render network policies when `networkPolicies.enabled: true` in values.
-8. `values-prod.yaml`: networkPolicies.enabled: true, ingressNamespace: ingress-nginx.
-9. `values-dev.yaml`: networkPolicies.enabled: false.
+1. Add `golang-migrate` and `pgx/v5` dependencies to go.mod.
+2. Create migration `000001_create_rms_schema.up.sql`: `CREATE SCHEMA IF NOT EXISTS rms;`
+3. Create migration `000002_create_opportunities.up.sql`: table `rms.opportunities` with columns: id UUID PK DEFAULT gen_random_uuid(), org_id UUID NOT NULL, customer_id UUID NOT NULL, title TEXT NOT NULL, description TEXT, event_date_start TIMESTAMPTZ, event_date_end TIMESTAMPTZ, status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','QUALIFIED','APPROVED','CONVERTED')), lead_score TEXT, created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now(). Index on (org_id), (org_id, status), (org_id, customer_id).
+4. Create migration `000003_create_projects.up.sql`: table `rms.projects` with: id UUID PK, org_id UUID NOT NULL, opportunity_id UUID REFERENCES rms.opportunities(id), customer_id UUID NOT NULL, title TEXT, status TEXT, checkout_date TIMESTAMPTZ, checkin_date TIMESTAMPTZ, created_at, updated_at. Index on (org_id), (opportunity_id).
+5. Create migration `000004_create_project_line_items.up.sql`: table `rms.project_line_items` with: id UUID PK, org_id UUID NOT NULL, project_id UUID REFERENCES rms.projects(id), inventory_item_id UUID, quantity INT, unit_price NUMERIC(10,2), created_at.
+6. Create migration `000005_create_inventory_items.up.sql`: table `rms.inventory_items` with: id UUID PK, org_id UUID NOT NULL, name TEXT, barcode TEXT UNIQUE, category TEXT, current_location TEXT, status TEXT DEFAULT 'AVAILABLE', quantity_total INT, quantity_available INT, created_at, updated_at. Index on (org_id), (barcode), (org_id, status).
+7. Create migration `000006_create_inventory_transactions.up.sql`: table `rms.inventory_transactions` with: id UUID PK, org_id UUID NOT NULL, item_id UUID REFERENCES rms.inventory_items(id), project_id UUID REFERENCES rms.projects(id), type TEXT, quantity INT, timestamp TIMESTAMPTZ DEFAULT now(). Index on (item_id, timestamp), (project_id).
+8. Create migration `000007_create_crew_members.up.sql`: table `rms.crew_members` with: id UUID PK, org_id UUID NOT NULL, name TEXT, email TEXT, role TEXT, skills TEXT[]. Index on (org_id).
+9. Create migration `000008_create_crew_assignments.up.sql`: table `rms.crew_assignments` with: id UUID PK, org_id UUID NOT NULL, crew_member_id UUID REFERENCES rms.crew_members(id), project_id UUID REFERENCES rms.projects(id), date_start TIMESTAMPTZ, date_end TIMESTAMPTZ, role TEXT. Index on (crew_member_id, date_start, date_end), (project_id).
+10. Create migration `000009_create_deliveries.up.sql`: table `rms.deliveries` with: id UUID PK, org_id UUID NOT NULL, project_id UUID REFERENCES rms.projects(id), type TEXT, address JSONB, scheduled_at TIMESTAMPTZ, status TEXT DEFAULT 'SCHEDULED', created_at, updated_at.
+11. Create migration `000010_create_delivery_routes.up.sql`: table `rms.delivery_routes` with: id UUID PK, org_id UUID NOT NULL, delivery_ids UUID[], optimized_order INT[], estimated_duration_minutes INT, created_at.
+12. Create corresponding `.down.sql` files for all migrations.
+13. Write a `db/db.go` package that initializes pgx pool from `DATABASE_URL` env var (PgBouncer from sigma1-infra-endpoints) and runs migrations on startup.
 
 ## Validation
-`helm template` with values-prod.yaml renders exactly 5 NetworkPolicy resources. Default deny policy has empty ingress and egress rules with both policyTypes. App-to-PG policy allows egress on port 5432. App-to-Redis allows egress on port 6379. Ingress-to-app allows ingress on 8080 from specific namespace. DNS policy allows egress on port 53. `values-dev.yaml` renders no NetworkPolicy resources.
+Use testcontainers-go to spin up a PostgreSQL container. Run all migrations up, verify all 9 tables exist in rms schema with correct columns via `information_schema.columns` queries. Run all migrations down, verify schema is clean. Run migrations up again to verify idempotency.

@@ -1,21 +1,24 @@
-Implement subtask 3007: Create values-prod.yaml consolidating all production settings
+Implement subtask 3007: Implement Inventory service with conflict detection and barcode scanning
 
 ## Objective
-Create the consolidated values-prod.yaml file integrating all HA, security, and scaling settings while ensuring values-dev.yaml remains unchanged.
+Build the InventoryService gRPC implementation with stock level tracking, transaction recording, equipment availability conflict detection, and barcode scanning lookup.
 
 ## Steps
-1. Create/finalize `infra/notifycore/values-prod.yaml` with all production settings:
-   - postgres.instances: 3, postgres.minSyncReplicas: 1, postgres.backup: (configured)
-   - redis.architecture: replication, redis.sentinel.enabled: true, redis.replica.replicaCount: 2
-   - ingress.enabled: true, domain: example.com (placeholder)
-   - networkPolicies.enabled: true, networkPolicies.ingressNamespace: ingress-nginx
-   - hpa.enabled: true, hpa.minReplicas: 2, hpa.maxReplicas: 10, hpa.targetCPU: 70
-   - resourceQuota.enabled: true
-   - secretManagement.provider: none (placeholder)
-2. Verify `values-dev.yaml` is unchanged from task 1 output (single-replica, no HA, no ingress, no network policies, no HPA, no resource quota).
-3. Run `helm template infra/notifycore -f infra/notifycore/values-prod.yaml` and verify all expected resources are rendered.
-4. Run `helm template infra/notifycore -f infra/notifycore/values-dev.yaml` and verify only dev resources are rendered.
-5. Run `kubectl apply --dry-run=server` against a test cluster API for both value sets.
+1. Create `internal/service/inventory_svc.go` implementing `InventoryServiceServer`.
+2. Implement `GetStockLevel` RPC: delegate to `inventoryRepo.GetStockLevel()`, return item with quantity_total and quantity_available.
+3. Implement `RecordTransaction` RPC:
+   - Validate transaction type (CHECK_OUT, CHECK_IN, TRANSFER, ADJUSTMENT).
+   - For CHECK_OUT: verify quantity_available >= requested quantity, decrement atomically.
+   - For CHECK_IN: increment quantity_available, update item status.
+   - Delegate to `inventoryRepo.RecordTransaction()` which uses pgx transaction.
+4. Implement conflict detection in `internal/domain/conflict_detector.go`:
+   - `DetectConflicts(ctx, orgID, itemIDs []UUID, dateStart, dateEnd time.Time) ([]Conflict, error)`
+   - Query inventory_transactions joined with projects to find overlapping CHECK_OUT periods for the same items.
+   - Return list of Conflict structs with item_id, conflicting_project_id, conflicting_date_range.
+5. Integrate conflict detection into Project service's `CheckOut` RPC: before recording transactions, call DetectConflicts. If conflicts found, return them in CheckOutResponse with success=false.
+6. Implement `ScanBarcode` RPC: call `inventoryRepo.GetByBarcode(ctx, orgID, barcode)`, return InventoryItem with current_location and status. Return NOT_FOUND if barcode doesn't exist.
+7. Implement `ListInventoryItems` with org_id filtering and pagination.
+8. Register service in gRPC server.
 
 ## Validation
-`helm template` with values-prod.yaml renders all expected resources: 3-replica PG cluster, Redis sentinel, Ingress with TLS, 5 NetworkPolicies, HPA, ResourceQuota, ServiceAccount, PDBs. `helm template` with values-dev.yaml renders only basic resources (1-replica PG, standalone Redis, ConfigMap, no ingress/netpol/HPA/quota). `kubectl apply --dry-run=server` succeeds for both value sets.
+Integration tests with testcontainers-go: 1) Create inventory item, RecordTransaction CHECK_OUT, verify quantity_available decremented. RecordTransaction CHECK_IN, verify quantity_available restored. 2) Conflict detection: create item, check out to project A for dates Jan 1-5, attempt checkout to project B for Jan 3-7, verify conflict returned with project A's ID and overlapping range. 3) ScanBarcode: create item with barcode 'ABC123', scan returns correct item; scan non-existent barcode returns NOT_FOUND. 4) Verify CHECK_OUT fails when quantity_available < requested.

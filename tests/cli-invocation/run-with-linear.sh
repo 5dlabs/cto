@@ -6,6 +6,7 @@
 # - Bare bones CLI image
 # - All config mounted (MCP, skills, etc.) - NOT baked into image
 # - Output piped to sidecar for Linear posting
+# - Runtime Linear token sourced from PM/Kubernetes, not 1Password
 #
 # Usage:
 #   LINEAR_ISSUE_IDENTIFIER="CTOPA-123" ./tests/cli-invocation/run-with-linear.sh
@@ -28,9 +29,16 @@ DOCTOR_OUTPUT="${WORKSPACE}/claude-doctor.txt"
 # Environment validation
 # =============================================================================
 if [[ -z "${LINEAR_OAUTH_TOKEN:-}" ]]; then
-    LINEAR_OAUTH_TOKEN=$(op read "op://Automation/Linear Morgan OAuth/developer_token" 2>/dev/null || echo "")
+    PM_BASE_URL="${PM_BASE_URL:-https://pm.5dlabs.ai}"
+    NAMESPACE="${NAMESPACE:-cto}"
+    LINEAR_AGENT_FOR_TESTS="${LINEAR_AGENT_FOR_TESTS:-morgan}"
+
+    curl -fsS -X POST "${PM_BASE_URL}/oauth/mint/${LINEAR_AGENT_FOR_TESTS}" >/dev/null 2>&1 || true
+
+    LINEAR_OAUTH_TOKEN=$(kubectl get secret "linear-app-${LINEAR_AGENT_FOR_TESTS}" -n "${NAMESPACE}" \
+        -o jsonpath='{.data.access_token}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
     if [[ -z "$LINEAR_OAUTH_TOKEN" ]]; then
-        echo "Need LINEAR_OAUTH_TOKEN. Set it or add to 1Password Automation vault."
+        echo "Need LINEAR_OAUTH_TOKEN. Set it or let PM mint one into linear-app-${LINEAR_AGENT_FOR_TESTS}."
         exit 1
     fi
     export LINEAR_OAUTH_TOKEN

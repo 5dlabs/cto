@@ -1,21 +1,17 @@
-Implement subtask 2002: Data models, enum definitions, and database migration
+Implement subtask 2002: Implement shared health check handlers (liveness and readiness)
 
 ## Objective
-Define all data models (Notification, Channel, Priority, NotificationStatus, CreateNotificationRequest, ListNotificationsQuery) with serde and sqlx derivations, and create the database migration SQL.
+Add health check route handlers to the shared crate: GET /health/live returns 200 unconditionally, GET /health/ready checks PostgreSQL and Valkey connectivity and returns 200 or 503.
 
 ## Steps
-1. Create `src/models.rs`:
-   - `Channel` enum: `email`, `sms`, `push`, `in_app` — derive Serialize, Deserialize with `#[serde(rename_all = "snake_case")]`. Map to/from VARCHAR for sqlx (impl sqlx::Type or use string mapping).
-   - `Priority` enum: `low`, `normal`, `high`, `urgent` — same derivations.
-   - `NotificationStatus` enum: `pending`, `sent`, `failed`, `cancelled` — same derivations.
-   - `Notification` struct: `id: Uuid`, `channel: Channel`, `priority: Priority`, `title: String`, `body: String`, `status: NotificationStatus`, `created_at: DateTime<Utc>`, `updated_at: DateTime<Utc>`. Derive Serialize, Deserialize, sqlx::FromRow.
-   - `CreateNotificationRequest` struct: `channel: Channel`, `priority: Priority`, `title: String`, `body: String`. Derive Deserialize.
-   - `ListNotificationsQuery` struct: `page: Option<u32>`, `per_page: Option<u32>`, `status: Option<NotificationStatus>`. Derive Deserialize.
-   - `PaginatedResponse<T>` struct: `data: Vec<T>`, `page: u32`, `per_page: u32`, `total: i64`.
-2. Create `migrations/001_create_notifications.sql`:
-   - CREATE TABLE notifications with all columns as specified.
-   - CREATE INDEX idx_notifications_status_created ON notifications (status, created_at DESC).
-3. Ensure sqlx migration runs on startup (already wired in AppState from 2001).
+1. In `shared/src/health.rs`, implement `pub async fn liveness() -> impl IntoResponse` returning `StatusCode::OK` with `{"status": "ok"}`.
+2. Implement `pub async fn readiness(State(pool): State<PgPool>, State(valkey): State<ValkeyCon>) -> impl IntoResponse` that:
+   - Executes `SELECT 1` on PgPool
+   - Executes `PING` on Valkey connection
+   - Returns 200 if both succeed, 503 with `{"status": "degraded", "checks": {"db": "ok/fail", "valkey": "ok/fail"}}` if either fails.
+3. Add `redis-rs` (with `tokio-comp` feature) to shared dependencies for Valkey connectivity.
+4. Implement `shared::valkey` module: `pub async fn create_valkey_client() -> Result<Client>` reading `VALKEY_URL` from env.
+5. Export a `pub fn health_routes() -> Router` that mounts both handlers.
 
 ## Validation
-`cargo build` compiles with all model types. Enum serialization unit tests verify lowercase JSON output (e.g., `Channel::Email` serializes to `"email"`). Migration SQL is syntactically valid (verified via sqlx migrate check or manual review).
+Unit test liveness always returns 200. Integration test with real Postgres and Valkey: readiness returns 200. Test readiness returns 503 with degraded status when Valkey is unavailable (use invalid URL).

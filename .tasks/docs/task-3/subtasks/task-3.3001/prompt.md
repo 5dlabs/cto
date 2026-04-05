@@ -1,22 +1,17 @@
-Implement subtask 3001: Upgrade CloudNativePG to 3-replica HA with synchronous replication and backups
+Implement subtask 3001: Initialize Go module and buf protobuf toolchain
 
 ## Objective
-Update the CloudNativePG Cluster CR for production: 3 replicas with synchronous replication (minSyncReplicas: 1), PodDisruptionBudget (maxUnavailable: 1), and automated backup configuration.
+Set up the Go module, directory structure, and buf configuration for protobuf management and code generation across all 5 services.
 
 ## Steps
-1. In `infra/notifycore/templates/postgres-cluster.yaml`, add conditional logic based on values:
-   - `spec.instances`: parameterize from values (3 for prod).
-   - `spec.minSyncReplicas: 1` (ensures at least one synchronous standby).
-   - `spec.maxSyncReplicas: 1`.
-2. Create `infra/notifycore/templates/postgres-pdb.yaml`:
-   - PodDisruptionBudget targeting the CloudNativePG pods (label selector matching `cnpg.io/cluster: notifycore-pg`).
-   - `spec.maxUnavailable: 1`.
-3. Add backup configuration to the Cluster CR:
-   - `spec.backup.barmanObjectStore` section (parameterized: object store endpoint, bucket, credentials secret) OR `spec.backup.volumeSnapshot` for PVC-based.
-   - Configure `spec.backup.retentionPolicy: "30d"`.
-   - Create a `ScheduledBackup` CR for daily backups at 2 AM.
-4. Update `values-prod.yaml` with postgres.instances: 3, postgres.backup settings.
-5. Ensure `values-dev.yaml` remains unchanged (instances: 1, no backups).
+1. Run `go mod init github.com/sigma1/rms` with Go 1.22+.
+2. Create directory structure: `proto/`, `internal/`, `cmd/server/`, `db/migrations/`.
+3. Install and configure buf: create `buf.yaml` with `name: buf.build/sigma1/rms` and lint/breaking rules.
+4. Create `buf.gen.yaml` with plugins: `protoc-gen-go`, `protoc-gen-go-grpc`, `protoc-gen-grpc-gateway`, `protoc-gen-openapiv2`.
+5. Add `google/api/annotations.proto` and `google/api/http.proto` dependencies via buf BSR.
+6. Create a minimal `proto/rms/v1/common.proto` with shared message types: `Timestamp`, `Money`, `Address`, `PaginationRequest`, `PaginationResponse`, `OrgId`.
+7. Run `buf generate` to verify toolchain produces Go code in `gen/` directory.
+8. Add Makefile targets: `proto-gen`, `proto-lint`, `proto-breaking`.
 
 ## Validation
-`helm template infra/notifycore -f infra/notifycore/values-prod.yaml` renders a CloudNativePG Cluster with instances=3, minSyncReplicas=1. A PodDisruptionBudget resource is rendered with maxUnavailable=1. Backup configuration section is present in the Cluster CR. `values-dev.yaml` still renders with instances=1 and no backup section.
+Run `buf lint` with zero errors. Run `buf generate` and verify Go files are generated in the expected output directory. Verify `go build ./...` succeeds with generated code.

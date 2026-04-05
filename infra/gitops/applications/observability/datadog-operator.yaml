@@ -1,0 +1,42 @@
+---
+# Argo CD Application for Datadog Operator
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: datadog-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: datadog-operator
+    app.kubernetes.io/part-of: platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://helm.datadoghq.com
+    targetRevision: 2.20.0
+    chart: datadog-operator
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: datadog-agent
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 5

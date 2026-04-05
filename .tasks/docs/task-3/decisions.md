@@ -1,13 +1,11 @@
 ## Decision Points
 
-- PostgreSQL backup target: object store (S3/GCS/MinIO) vs PVC-based WAL archiving — depends on available cloud infrastructure and backup retention requirements
-- Redis HA mode: Sentinel vs Redis Cluster — Sentinel is simpler for single-master with failover, Cluster provides sharding but adds complexity; depends on expected cache workload
-- Secret management: external-secrets-operator vs sealed-secrets — depends on existing secret management infrastructure (e.g., Vault, AWS Secrets Manager) vs GitOps-only approach
-- Ingress controller type: nginx-ingress vs other (Traefik, Envoy) — rate limiting annotations are nginx-specific; confirm cluster's ingress controller
-- Container registry: which registry to push Docker images to (GHCR, ECR, GCR, Docker Hub) — affects CI/CD pipeline configuration
-- Production domain: the actual domain for `notifycore.{domain}` needs to be decided for the Ingress and TLS certificate
+- Lead scoring algorithm: What are the exact thresholds and weighting factors for GREEN/YELLOW/RED scoring? The PRD mentions customer vetting data, event size, and payment history but doesn't specify numeric boundaries or relative weights. This needs product input before implementation.
+- Google Calendar integration scope: Should calendar sync be bidirectional (changes in Google Calendar reflected back into RMS) or unidirectional (RMS pushes events to Google Calendar only)? Bidirectional adds significant webhook/polling complexity.
+- Delivery route optimization: The OptimizeRoute RPC implies a routing algorithm — should this use an external API (Google Directions, OSRM, Mapbox) or a simple heuristic? External APIs have cost and latency implications.
+- Multi-tenancy enforcement: org_id column is specified for row-level filtering, but should this be enforced via PostgreSQL Row-Level Security policies or purely in application code? RLS is more secure but adds migration complexity.
 
 ## Coordination Notes
 
-- Agent owner: bolt
-- Primary stack: Kubernetes/Helm
+- Agent owner: grizz
+- Primary stack: Go 1.22+/gRPC

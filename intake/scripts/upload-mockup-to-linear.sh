@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Upload a local HTML mockup to Linear as a screenshot image.
-# Usage: upload-mockup-to-linear.sh <html_file> <device_type> [session_id]
-# Requires: playwright (python3), LINEAR_OAUTH_TOKEN or op://...
+# Upload a local HTML mockup or a live URL to Linear as a screenshot image.
+# Usage: upload-mockup-to-linear.sh <html_file_or_url> <device_type> [session_id]
+# Requires: playwright (python3), plus a runtime Linear token via env or PM/Kubernetes.
 # Returns: JSON { "assetUrl": "...", "success": true }
 
-HTML_FILE="${1:?usage: upload-mockup-to-linear.sh <html_file> <device_type> [session_id]}"
+INPUT_SOURCE="${1:?usage: upload-mockup-to-linear.sh <html_file_or_url> <device_type> [session_id]}"
 DEVICE="${2:-DESKTOP}"
 SESSION_ID="${3:-}"
 
@@ -14,7 +14,25 @@ ROOT="${WORKSPACE:-.}"
 SCREENSHOT_DIR="$ROOT/.intake/design/stitch/screenshots"
 mkdir -p "$SCREENSHOT_DIR"
 
-BASENAME="$(basename "$HTML_FILE" .html)"
+if [[ "$INPUT_SOURCE" =~ ^https?:// ]]; then
+  TARGET_URL="$INPUT_SOURCE"
+  BASENAME="$(python3 - "$INPUT_SOURCE" <<'PY'
+import hashlib
+import re
+import sys
+from urllib.parse import urlparse
+
+source = sys.argv[1]
+parsed = urlparse(source)
+base = (parsed.netloc + parsed.path).strip('/') or 'remote'
+base = re.sub(r'[^A-Za-z0-9._-]+', '-', base).strip('-') or 'remote'
+print(f"{base[:80]}-{hashlib.sha1(source.encode()).hexdigest()[:8]}")
+PY
+)"
+else
+  TARGET_URL="file://$INPUT_SOURCE"
+  BASENAME="$(basename "$INPUT_SOURCE" .html)"
+fi
 PNG_FILE="$SCREENSHOT_DIR/${BASENAME}.png"
 
 # Viewport dimensions
@@ -24,18 +42,18 @@ else
   WIDTH=1440; HEIGHT=900
 fi
 
-# Step 1: Screenshot the HTML with playwright
-python3 - "$HTML_FILE" "$PNG_FILE" "$WIDTH" "$HEIGHT" <<'PY'
+# Step 1: Screenshot the source with playwright
+python3 - "$TARGET_URL" "$PNG_FILE" "$WIDTH" "$HEIGHT" <<'PY'
 import sys
 from playwright.sync_api import sync_playwright
 
-html_file, png_file = sys.argv[1], sys.argv[2]
+target_url, png_file = sys.argv[1], sys.argv[2]
 width, height = int(sys.argv[3]), int(sys.argv[4])
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     page = browser.new_page(viewport={"width": width, "height": height})
-    page.goto(f"file://{html_file}", wait_until="networkidle")
+    page.goto(target_url, wait_until="networkidle")
     page.screenshot(path=png_file, full_page=False)
     browser.close()
 
@@ -50,13 +68,17 @@ fi
 
 FILE_SIZE=$(stat -f%z "$PNG_FILE" 2>/dev/null || stat -c%s "$PNG_FILE" 2>/dev/null)
 
-# Step 2: Get Linear OAuth token
-LINEAR_OAUTH="${LINEAR_OAUTH_TOKEN:-}"
+# Step 2: Get Linear runtime token
+LINEAR_OAUTH="${LINEAR_OAUTH_TOKEN:-${LINEAR_API_KEY:-}}"
 if [ -z "$LINEAR_OAUTH" ]; then
-  LINEAR_OAUTH="$(op read 'op://Automation/Linear Morgan OAuth/developer_token' 2>/dev/null)" || true
+  PM_BASE_URL="${PM_BASE_URL:-https://pm.5dlabs.ai}"
+  NAMESPACE="${NAMESPACE:-cto}"
+  curl -fsS -X POST "${PM_BASE_URL}/oauth/mint/morgan" >/dev/null 2>&1 || true
+  LINEAR_OAUTH="$(kubectl get secret linear-app-morgan -n "${NAMESPACE}" \
+    -o jsonpath='{.data.access_token}' 2>/dev/null | base64 -d 2>/dev/null || true)"
 fi
 if [ -z "$LINEAR_OAUTH" ]; then
-  echo "upload-mockup: no OAuth token available" >&2
+  echo "upload-mockup: no runtime token available" >&2
   jq -nc '{success: false, error: "no oauth token"}'
   exit 1
 fi

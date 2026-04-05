@@ -23,19 +23,17 @@ docker compose up claude
 
 ## Integration Test (Linear Agent Dialog)
 
-To stream real activity to a Linear issue, the sidecar **creates the agent session** from an issue. You supply the issue (by ID or identifier) and Morgan's OAuth token from 1Password; the sidecar creates the session and emits activities.
+To stream real activity to a Linear issue, the sidecar **creates the agent session** from an issue. You supply the issue (by ID or identifier) and a runtime Linear token. PM should mint that token from per-agent client credentials and store it in Kubernetes; do not read it from 1Password.
 
-### 1. Get Morgan's token from 1Password
-
-```bash
-# Morgan's Linear OAuth access token (Linear Agent Client Secrets)
-export LINEAR_OAUTH_TOKEN=$(op read "op://Development/Linear App Morgan/access_token" --reveal)
-```
-
-If your 1Password item/section name differs (e.g. "Linear Agent Client Secrets (Rotated YYYY-MM-DD)" with section "Morgan"):
+### 1. Ask PM to mint Morgan's runtime token
 
 ```bash
-export LINEAR_OAUTH_TOKEN=$(op read "op://VaultName/Item Name/Morgan/access_token" --reveal)
+# Override for local PM if needed:
+# export PM_BASE_URL=http://localhost:8081
+
+export PM_BASE_URL=${PM_BASE_URL:-https://pm.5dlabs.ai}
+curl -X POST "${PM_BASE_URL}/oauth/mint/morgan"
+export LINEAR_OAUTH_TOKEN=$(kubectl get secret linear-app-morgan -n cto -o jsonpath='{.data.access_token}' | base64 -d)
 ```
 
 ### 2. Set the target issue
@@ -59,9 +57,10 @@ From repo root, with token and issue set:
 ```bash
 cd tests/cli-invocation
 
-# Run Claude to produce stream, then sidecar to parse and emit to Linear
-# (Claude needs ANTHROPIC_API_KEY for real responses; sidecar needs LINEAR_OAUTH_TOKEN + issue)
-export LINEAR_OAUTH_TOKEN=$(op read "op://Development/Linear App Morgan/access_token" --reveal)
+# Run Claude to produce stream, then sidecar to parse and emit to Linear.
+# Claude needs ANTHROPIC_API_KEY; the sidecar needs LINEAR_OAUTH_TOKEN + issue.
+curl -X POST "${PM_BASE_URL:-https://pm.5dlabs.ai}/oauth/mint/morgan"
+export LINEAR_OAUTH_TOKEN=$(kubectl get secret linear-app-morgan -n cto -o jsonpath='{.data.access_token}' | base64 -d)
 export LINEAR_ISSUE_IDENTIFIER=CTOPA-2620   # or your test issue
 ./run-with-linear.sh
 ```
@@ -75,7 +74,8 @@ export LINEAR_WORKSPACE_SLUG=mycompany
 Or run the sidecar alone against an existing stream file (e.g. from a previous Claude run):
 
 ```bash
-export LINEAR_OAUTH_TOKEN=$(op read "op://Development/Linear App Morgan/access_token" --reveal)
+curl -X POST "${PM_BASE_URL:-https://pm.5dlabs.ai}/oauth/mint/morgan"
+export LINEAR_OAUTH_TOKEN=$(kubectl get secret linear-app-morgan -n cto -o jsonpath='{.data.access_token}' | base64 -d)
 export LINEAR_ISSUE_IDENTIFIER=CTOPA-2620
 export CLI_TYPE=claude
 export STREAM_FILE=$(pwd)/workspaces/claude/stream.jsonl
@@ -107,6 +107,6 @@ Open the issue in Linear and check the agent dialog: you should see the init sum
 | `LINEAR_SESSION_ID` | Existing agent session ID (skip session creation) |
 | `LINEAR_ISSUE_ID` | Issue UUID; sidecar creates session on this issue |
 | `LINEAR_ISSUE_IDENTIFIER` | Issue identifier (e.g. CTOPA-2620); resolved to UUID then session created |
-| `LINEAR_OAUTH_TOKEN` | OAuth access token (e.g. Morgan's from 1Password) |
+| `LINEAR_OAUTH_TOKEN` | Runtime Linear access token minted by PM and read from Kubernetes |
 | `LINEAR_API_KEY` | Alternative to `LINEAR_OAUTH_TOKEN` (Personal API key) |
 | `DRY_RUN=1` | Skip Linear API; log activities only |

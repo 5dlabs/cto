@@ -1,5 +1,7 @@
 # Rex's Solution: Kubernetes Operator + ExternalSecrets Pattern
 
+> Historical analysis. Superseded by the PM-managed `client_credentials` token broker flow documented in `tests/cli-invocation/docs/LINEAR-OAUTH.md`.
+
 ## Philosophy
 
 Token management is infrastructure, not application logic. Treat OAuth tokens like any other secret in Kubernetes - let specialized infrastructure handle rotation.

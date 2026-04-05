@@ -1,25 +1,26 @@
-Implement subtask 2008: Integration tests for all five endpoints including error cases
+Implement subtask 2008: Implement availability checking and atomic checkout endpoints
 
 ## Objective
-Write integration tests in the `tests/` directory using testcontainers-rs or sqlx test fixtures to test all five endpoints end-to-end, including error paths (404, 409, 422).
+Build the real-time availability endpoint (GET /api/v1/catalog/products/:id/availability) and the programmatic checkout endpoint (POST /api/v1/equipment-api/checkout) with atomic inventory decrement.
 
 ## Steps
-1. Create `tests/api_tests.rs`.
-2. Setup: Use testcontainers-rs to spin up a Postgres container, or use sqlx's `#[sqlx::test]` macro with a test database. Build the Axum app with test configuration. Use `axum::test::TestClient` or `tower::ServiceExt` with `oneshot` for in-process HTTP testing.
-3. Test cases (minimum 9 integration tests):
-   a. **POST valid notification** — 201, body contains UUID, status=pending, correct channel/priority/title/body.
-   b. **POST with empty title** — 422, body contains error message.
-   c. **POST with empty body** — 422.
-   d. **GET by valid ID** — create one first, then GET returns 200 with matching data.
-   e. **GET by unknown UUID** — 404 with `{"error": "not found"}`.
-   f. **GET list default pagination** — create 3 notifications, list returns page=1, per_page=20, total=3, data has 3 items.
-   g. **GET list with status filter** — create pending + cancel one, filter by status=cancelled returns only 1.
-   h. **DELETE pending notification** — 200, returned notification has status=cancelled.
-   i. **DELETE non-pending notification** — cancel one, try to cancel again, returns 409.
-   j. **DELETE unknown ID** — 404.
-   k. **GET /health** — 200 with `{"status": "healthy", "database": "connected"}`.
-4. Ensure test isolation: each test should clean up or use unique data.
-5. Run with `cargo test --test api_tests`.
+1. Implement `GET /api/v1/catalog/products/:id/availability?from=YYYY-MM-DD&to=YYYY-MM-DD`:
+   - Query the `availability` table for the product within the date range.
+   - For each day, return `quantity_total - reserved - booked` as available quantity.
+   - Return JSON: `{"product_id": "...", "availability": [{"date": "2024-01-01", "available": 3, "total": 5}, ...]}`.
+   - If no availability rows exist for requested dates, return 0 available.
+   - Optimize query with index on `(product_id, date)` — target p99 < 500ms.
+2. Implement `POST /api/v1/equipment-api/checkout`:
+   - Request body: `{"product_id": UUID, "customer_id": UUID, "date_from": Date, "date_to": Date, "quantity": u32}`.
+   - In a database transaction:
+     a. `SELECT ... FOR UPDATE` on availability rows for the product and date range.
+     b. Verify all days have sufficient available quantity (total - reserved - booked >= requested quantity).
+     c. If insufficient, rollback and return 409 Conflict with details on which dates are unavailable.
+     d. UPDATE availability SET reserved = reserved + quantity for each day.
+     e. INSERT into bookings table with status 'reserved'.
+     f. Commit and return 201 with booking ID.
+3. Implement the availability domain logic in a separate `catalog/src/domain/availability.rs` module for testability.
+4. Add appropriate error handling for invalid date ranges (from > to), non-existent products, etc.
 
 ## Validation
-`cargo test --test api_tests` passes all 11 integration test cases. Each test asserts both HTTP status code and response body structure. Tests complete within 60 seconds (testcontainers startup included). No test pollution between cases.
+Integration tests: 1) Seed availability rows, query availability and verify correct available counts. 2) Checkout reduces available count atomically. 3) Concurrent checkout test: two simultaneous checkouts for the last available unit — one succeeds, one gets 409. 4) Checkout with insufficient availability returns 409. 5) Checkout for non-existent product returns 404. 6) Invalid date range (from > to) returns 400. Unit tests on domain logic: overlapping date ranges, partial bookings, full capacity scenarios. Benchmark: seed 1000 products with 10,000 bookings, run `wrk` against availability endpoint and verify p99 < 500ms.

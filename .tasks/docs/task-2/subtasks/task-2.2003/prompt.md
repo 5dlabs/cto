@@ -1,20 +1,16 @@
-Implement subtask 2003: Custom AppError enum and error handling middleware
+Implement subtask 2003: Implement shared Prometheus metrics middleware
 
 ## Objective
-Implement the custom `AppError` enum with variants NotFound, Validation, Conflict, and Internal, implementing `IntoResponse` to return appropriate HTTP status codes and JSON error bodies.
+Add request metrics middleware to the shared crate using the metrics and metrics-exporter-prometheus crates, exposed at GET /metrics.
 
 ## Steps
-1. Create `src/errors.rs`:
-   - Define `AppError` enum with variants:
-     - `NotFound(String)` → 404 `{"error": "..."}`
-     - `Validation(String)` → 422 `{"error": "..."}`
-     - `Conflict(String)` → 409 `{"error": "..."}`
-     - `Internal(String)` → 500 `{"error": "internal server error"}`
-   - Implement `IntoResponse` for `AppError` that returns `(StatusCode, Json<serde_json::Value>)`.
-   - Implement `From<sqlx::Error>` for `AppError` — map `RowNotFound` to `NotFound`, others to `Internal` (logging the actual error via tracing::error!).
-   - Optionally implement `From<redis::RedisError>` for `AppError` mapping to `Internal`.
-2. All endpoint handlers will return `Result<impl IntoResponse, AppError>`.
-3. Ensure error responses always have a consistent `{"error": "message"}` JSON shape.
+1. Add `metrics 0.22`, `metrics-exporter-prometheus 0.13` to shared Cargo.toml.
+2. In `shared/src/metrics.rs`, implement setup function `pub fn init_metrics() -> PrometheusHandle` that installs the Prometheus recorder.
+3. Create an Axum middleware layer `pub fn metrics_layer() -> impl Layer` that records:
+   - `http_requests_total` counter with labels: method, path, status_code
+   - `http_request_duration_seconds` histogram with labels: method, path
+4. Implement `pub async fn metrics_handler(State(handle): State<PrometheusHandle>) -> impl IntoResponse` that renders Prometheus text format.
+5. Export convenience function `pub fn metrics_route(handle: PrometheusHandle) -> Router` mounting at `GET /metrics`.
 
 ## Validation
-Unit tests verify: `AppError::NotFound` produces 404 with correct JSON body, `AppError::Validation` produces 422, `AppError::Conflict` produces 409, `AppError::Internal` produces 500 with generic message (not leaking internal details). `From<sqlx::Error>` maps RowNotFound correctly.
+Unit test that metrics_layer records counter increments. Integration test: send a request through a test Axum app with metrics middleware, then GET /metrics and verify http_requests_total and http_request_duration_seconds appear in the response body with expected labels.

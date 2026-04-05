@@ -1,22 +1,20 @@
 [
   {
+    "provider": "stitch",
     "target": "web",
     "deviceType": "DESKTOP",
-    "screenId": "80f1f0afb3b04efcb64f077b59d86433",
-    "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sX2FiNjhkYWE5NDNkODRjYzZhYzgyZGE2NWVkYTlhZjFhEgsSBxD0x7nTwxwYAZIBIwoKcHJvamVjdF9pZBIVQhM4NjY1MzYxNTM1MDcxNjUyMDYw&filename=&opi=96797242",
-    "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0ujad8DmBHnZOZCgGgxlcDanUbosJLQPa-FpWCc499Fd_7bNlHLNnHWsLJETZOB_o0jI35LxVfv0jMgWt7opvXe4Ah3V3WAfNm-eh8rOBeLm2PHak_7xL1j2w-BC187KSlbPiVU3d5iO0T6OIT-00YsBcii--psIzKEs7ou9rrQzpMS0UTbwR3wcysl0ChRG-JESNeq8gvm9OxQ-QO3I5W5S-3q0zjcv3TrcagQ6EBFY-B2iQgxKvDt3gzI",
-    "rationale": "Generated web modernization candidate from intake design context.",
-    "prompt": "Improve and modernize this web interface for project sigma-1. Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
-    "status": "generated"
+    "rationale": "Failed to generate web candidate.",
+    "prompt": "Improve and modernize this web interface for project sigma-1-20260404-073027. Reference URLs: https://deployiq.maximinimal.ca, https://sigma-1.com Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
+    "status": "failed",
+    "error": "Stitch MCP call \"tools/call\" timed out after 60s"
   },
   {
+    "provider": "stitch",
     "target": "mobile",
     "deviceType": "MOBILE",
-    "screenId": "0f4028c9b1b940018d07c75ade168a5d",
-    "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzA0MzljOTRjYzZhZjRhYzQ5ODViNGIyNWRhYTcwNzgwEgsSBxD0x7nTwxwYAZIBIwoKcHJvamVjdF9pZBIVQhM4NjY1MzYxNTM1MDcxNjUyMDYw&filename=&opi=96797242",
-    "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0uhhGv_5MtJS5FEMHWN3PuYeyzME77HH4ouSsHRmlsBCoPIA3LltnrrQHoyDYmJ1USWSIFRoR_y2-UtnLL2i0BQXPD7DfdHStqTbYsM4RMStHNttv0C0u_tkt8tJmLrzcvMf0anWRpoxSyje24SFOzsF5b4LYy6mnwAHlM-gKpoG-ZoqmbvD13cSSgQG9ggjk61ht7vdnMhmlRjcdoL3FiBQLDKko4DtIpmwOWxsFsdQwhc78QlxqxLQpZk",
-    "rationale": "Generated mobile modernization candidate from intake design context.",
-    "prompt": "Improve and modernize this mobile interface for project sigma-1. Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
-    "status": "generated"
+    "rationale": "Failed to generate mobile candidate.",
+    "prompt": "Improve and modernize this mobile interface for project sigma-1-20260404-073027. Reference URLs: https://deployiq.maximinimal.ca, https://sigma-1.com Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
+    "status": "failed",
+    "error": "Stitch MCP call \"tools/call\" timed out after 60s"
   }
 ]

@@ -8,7 +8,7 @@ You receive these inputs:
 1. **`prd_content`** — The original PRD text, verbatim
 2. **`deliberation_result`** — The full `DeliberationResult` JSON: debate log, decision points, votes, outcomes (covers **technical** decisions resolved by Optimist/Pessimist debate)
 3. **`parsed_tasks`** — The initial task decomposition produced before deliberation, including task-level decision points
-4. **`design_context`** — Normalized design intake context including frontend targets, supplied artifacts, crawled references, and optional Stitch candidates
+4. **`design_context`** — Normalized design intake context including frontend targets, supplied artifacts, crawled references, provider summaries (Stitch/Framer), normalized candidates, and optional component-library artifacts
 5. **`design_selections`** (optional) — Human-selected design variants per screen, including variant ID, label, screen target, and any notes from the reviewer
 6. **`design_deliberation_result`** (optional) — Output from the Designer persona's deliberation on aesthetic/UX decision points (categories: visual-identity, design-system, component-library, layout-pattern, ux-behavior). Contains the Designer's curated options, recommendations, and any human selections made via Linear elicitation
 
@@ -74,7 +74,8 @@ Hard constraints that every implementing agent must respect:
 Summarize all usable design inputs:
 - `hasFrontend` and `frontendTargets`
 - Supplied design artifacts and reference URLs
-- Stitch generation status and best candidate ideas (if present)
+- Provider generation status (Stitch/Framer) and best candidate ideas (if present)
+- Component-library/design-system artifact highlights (if present)
 - Concrete implications for web/mobile/desktop implementation tasks
 
 ### 7a. Selected Design Direction (if `design_selections` is present)

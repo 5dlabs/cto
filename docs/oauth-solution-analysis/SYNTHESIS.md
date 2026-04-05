@@ -1,5 +1,7 @@
 # Synthesis: Linear OAuth Token Management
 
+> Historical analysis. Superseded by the PM-managed `client_credentials` token broker flow documented in `tests/cli-invocation/docs/LINEAR-OAUTH.md`.
+
 ## Summary of Critiques
 
 ### Universal Issues Identified

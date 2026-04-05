@@ -93,6 +93,11 @@ spec:
             tag: "tilt-dev"
             pullPolicy: Always
 
+        datadog:
+          enabled: true
+          tags:
+            env: production
+
         controller:
           enabled: true
           image:

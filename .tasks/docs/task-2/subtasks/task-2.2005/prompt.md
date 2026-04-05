@@ -1,27 +1,18 @@
-Implement subtask 2005: Implement GET /api/v1/notifications (list) and DELETE /api/v1/notifications/:id (cancel) endpoints
+Implement subtask 2005: Implement shared API key validation middleware
 
 ## Objective
-Implement the paginated list endpoint with optional status filtering and the cancel endpoint with conflict detection for non-pending notifications.
+Build an API key authentication middleware in the shared crate that validates keys from the Authorization header against values in the sigma1-service-api-keys secret.
 
 ## Steps
-1. **GET /api/v1/notifications** (list):
-   - Extract `Query<ListNotificationsQuery>` from URL params.
-   - Compute: `page = query.page.unwrap_or(1).max(1)`, `per_page = query.per_page.unwrap_or(20).min(100)`, `offset = (page - 1) * per_page`.
-   - Build dynamic query: if `status` filter is provided, add `WHERE status = $1`. Use sqlx query builder or conditional query.
-   - Count total: `SELECT COUNT(*) FROM notifications [WHERE status = $1]`.
-   - Fetch page: `SELECT * FROM notifications [WHERE status = $1] ORDER BY created_at DESC LIMIT $2 OFFSET $3`.
-   - Return `Json(PaginatedResponse { data, page, per_page, total })`.
-2. **DELETE /api/v1/notifications/:id** (cancel):
-   - Extract `Path(id): Path<Uuid>`.
-   - Query current notification: `SELECT * FROM notifications WHERE id = $1`.
-   - If not found, return `AppError::NotFound`.
-   - If status != Pending, return `AppError::Conflict("only pending notifications can be cancelled")`.
-   - Update: `UPDATE notifications SET status = 'cancelled', updated_at = NOW() WHERE id = $1 RETURNING *`.
-   - Return `(StatusCode::OK, Json(updated_notification))`.
-3. Register routes:
-   - `.route("/api/v1/notifications", get(list_notifications))` (alongside existing post)
-   - `.route("/api/v1/notifications/:id", delete(cancel_notification))` (alongside existing get)
-4. Consider using `.route("/api/v1/notifications", get(list).post(create))` and `.route("/api/v1/notifications/:id", get(get_one).delete(cancel))` for cleanliness.
+1. In `shared/src/auth.rs`, implement API key extraction from `Authorization: Bearer <key>` header.
+2. Define `ApiKeyStore` struct that loads keys from environment variables (injected from sigma1-service-api-keys secret). Keys should map to service identifiers (e.g., `CATALOG_ADMIN_KEY=xyz`, `FINANCE_SERVICE_KEY=abc`).
+3. Implement Axum middleware `pub fn api_key_auth_layer(store: ApiKeyStore) -> impl Layer` that:
+   - Extracts Bearer token from Authorization header
+   - Looks up token in the ApiKeyStore
+   - If valid, inserts the authenticated service identity into request extensions
+   - If missing or invalid, returns 401 Unauthorized with standard error JSON
+4. Provide a helper extractor `pub struct AuthenticatedService(pub String)` that can be used in handlers.
+5. Support role-based checks: `pub fn require_role(role: &str) -> impl Layer` for admin-only routes.
 
 ## Validation
-Integration tests: List with default pagination returns `{data, page: 1, per_page: 20, total}` structure. List with status filter returns only matching notifications. List with per_page=200 clamps to 100. Cancel a pending notification returns 200 with status=cancelled. Cancel a non-pending (e.g., already cancelled) notification returns 409. Cancel with unknown ID returns 404.
+Unit test: valid API key returns 200 and injects AuthenticatedService. Missing header returns 401. Invalid key returns 401. Test require_role rejects keys without the required role. Test multiple keys are supported simultaneously.

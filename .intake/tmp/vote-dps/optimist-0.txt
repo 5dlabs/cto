@@ -1,1 +1,1 @@
-Use a single PostgreSQL database with logically separated schemas (e.g., `rms`, `finance`, `catalog`) for each service.
+Hybrid — gRPC for synchronous request/response paths, NATS (already in-cluster) for event-driven async workflows

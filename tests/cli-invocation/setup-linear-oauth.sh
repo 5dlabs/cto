@@ -1,228 +1,194 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Setup Linear OAuth for All Agents
-# =============================================================================
+# Audit Linear client credentials and runtime tokens for CTO agents.
 #
-# Creates and validates Linear OAuth tokens for all CTO agents.
-# Tests authentication and attempts token refresh where possible.
+# This script treats 1Password as the source of truth for per-agent
+# client_id/client_secret, and Kubernetes as the source of truth for runtime
+# access tokens. Optionally, it asks PM to mint missing or stale runtime tokens.
 #
 # Usage:
-#   ./setup-linear-oauth.sh              # Audit all agents
-#   ./setup-linear-oauth.sh --refresh    # Attempt refresh for expired tokens
-#   ./setup-linear-oauth.sh bolt         # Test single agent
-#
-# =============================================================================
+#   ./setup-linear-oauth.sh            # Audit all agents
+#   ./setup-linear-oauth.sh --mint     # Audit and ask PM to mint when needed
+#   ./setup-linear-oauth.sh bolt       # Audit a single agent
 
-set -eo pipefail
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Parse arguments
-DO_REFRESH=false
+PM_BASE_URL="${PM_BASE_URL:-https://pm.5dlabs.ai}"
+NAMESPACE="${NAMESPACE:-cto}"
+DO_MINT=false
 SPECIFIC_AGENT=""
 
 for arg in "$@"; do
     case "$arg" in
-        --refresh) DO_REFRESH=true ;;
-        *)         SPECIFIC_AGENT="$arg" ;;
+        --mint|--refresh) DO_MINT=true ;;
+        *)                SPECIFIC_AGENT="$arg" ;;
     esac
 done
 
-# All agents (from PM deployment)
-ALL_AGENTS=(morgan rex blaze grizz nova tap spark cleo cipher tess atlas bolt stitch vex)
+ALL_AGENTS=(angie atlas blaze bolt cipher cleo grizz morgan nova pixel rex spark stitch tap tess vex)
 
-if [ -n "$SPECIFIC_AGENT" ]; then
+if [[ -n "$SPECIFIC_AGENT" ]]; then
     AGENTS=("$SPECIFIC_AGENT")
 else
     AGENTS=("${ALL_AGENTS[@]}")
 fi
 
-echo "🔐 Linear OAuth Setup for ${#AGENTS[@]} agent(s)"
-echo "=============================================="
-echo ""
-
-# Check 1Password
-if ! op whoami &> /dev/null; then
+if ! op whoami >/dev/null 2>&1; then
     echo "❌ Not signed in to 1Password"
     exit 1
 fi
 
-# Item name for client secrets
-SECRETS_ITEM="Linear Agent Client Secrets (Rotated 2026-01-02)"
-
-# Function to get client_secret from central item
-get_client_secret() {
-    local agent="$1"
-    # Capitalize first letter
-    local section
-    case "$agent" in
-        morgan) section="Morgan" ;;
-        rex)    section="Rex" ;;
-        blaze)  section="Blaze" ;;
-        grizz)  section="Grizz" ;;
-        nova)   section="Nova" ;;
-        tap)    section="Tap" ;;
-        spark)  section="Spark" ;;
-        cleo)   section="Cleo" ;;
-        cipher) section="Cipher" ;;
-        tess)   section="Tess" ;;
-        atlas)  section="Atlas" ;;
-        bolt)   section="Bolt" ;;
-        stitch) section="Stitch" ;;
-        vex)    section="Vex" ;;
-        *)      section="$agent" ;;
-    esac
-    op item get "$SECRETS_ITEM" --vault "Automation" --fields "section=${section}.client_secret" --reveal 2>/dev/null || echo ""
-}
-
-# Function to get agent's OAuth item name
 get_oauth_item() {
     local agent="$1"
-    case "$agent" in
-        morgan) echo "Linear Morgan OAuth" ;;
-        rex)    echo "Linear Rex OAuth" ;;
-        blaze)  echo "Linear Blaze OAuth" ;;
-        grizz)  echo "Linear Grizz OAuth" ;;
-        nova)   echo "Linear Nova OAuth" ;;
-        tap)    echo "Linear Tap OAuth" ;;
-        spark)  echo "Linear Spark OAuth" ;;
-        cleo)   echo "Linear Cleo OAuth" ;;
-        cipher) echo "Linear Cipher OAuth" ;;
-        tess)   echo "Linear Tess OAuth" ;;
-        atlas)  echo "Linear Atlas OAuth" ;;
-        bolt)   echo "Linear Bolt OAuth" ;;
-        stitch) echo "Linear Stitch OAuth" ;;
-        vex)    echo "Linear Vex OAuth" ;;
-        *)      echo "Linear $agent OAuth" ;;
-    esac
+    echo "Linear ${agent^} OAuth"
 }
 
-# Stats
-VALID=0
-EXPIRED=0
-MISSING=0
-REFRESHED=0
-NEEDS_AUTH=0
-NEED_ATTENTION=""
+read_runtime_token() {
+    local agent="$1"
+    kubectl get secret "linear-app-${agent}" -n "${NAMESPACE}" \
+        -o jsonpath='{.data.access_token}' 2>/dev/null | base64 -d 2>/dev/null || true
+}
 
-echo "📋 Agent OAuth Status"
-echo "--------------------------------------------"
-printf "%-10s %-12s %-40s\n" "Agent" "Status" "Details"
-echo "--------------------------------------------"
+verify_token() {
+    local token="$1"
+    curl -s -w "\n%{http_code}" \
+        -H "Authorization: Bearer ${token}" \
+        -H "Content-Type: application/json" \
+        -d '{"query":"{ viewer { id name email } }"}' \
+        "https://api.linear.app/graphql" 2>/dev/null || echo -e "\n000"
+}
+
+mint_via_pm() {
+    local agent="$1"
+    local response
+    local http_code
+
+    response=$(curl -sS -w "\n%{http_code}" -X POST \
+        "${PM_BASE_URL}/oauth/mint/${agent}" 2>/dev/null || echo -e "\n000")
+    http_code=$(echo "$response" | tail -1)
+
+    [[ "$http_code" == "200" ]]
+}
+
+echo "🔐 Linear Client Credentials + Runtime Token Audit"
+echo "=================================================="
+echo "Agents: ${#AGENTS[@]}"
+echo "Namespace: ${NAMESPACE}"
+echo "PM base URL: ${PM_BASE_URL}"
+if [[ "$DO_MINT" == true ]]; then
+    echo "PM mint on missing/invalid runtime tokens: enabled"
+fi
+echo ""
+
+VALID=0
+MINTED=0
+MISSING_CREDS=0
+MISSING_RUNTIME=0
+INVALID_RUNTIME=0
+NEEDS_ATTENTION=()
+
+printf "%-10s %-12s %-14s %-40s\n" "Agent" "Creds" "Runtime" "Details"
+printf "%-10s %-12s %-14s %-40s\n" "-----" "-----" "-------" "-------"
 
 for agent in "${AGENTS[@]}"; do
-    ITEM_NAME=$(get_oauth_item "$agent")
-    STATUS="?"
-    DETAILS=""
-    
-    # Check if per-agent OAuth item exists
-    if op item get "$ITEM_NAME" --vault "Automation" &>/dev/null 2>&1; then
-        # Get credentials
-        ACCESS_TOKEN=$(op item get "$ITEM_NAME" --vault "Automation" --fields label=developer_token --reveal 2>/dev/null || \
-                       op item get "$ITEM_NAME" --vault "Automation" --fields label=password --reveal 2>/dev/null || echo "")
-        CLIENT_ID=$(op item get "$ITEM_NAME" --vault "Automation" --fields label=client_id --reveal 2>/dev/null || echo "")
-        CLIENT_SECRET=$(op item get "$ITEM_NAME" --vault "Automation" --fields label=client_secret --reveal 2>/dev/null || echo "")
-        REFRESH_TOKEN=$(op item get "$ITEM_NAME" --vault "Automation" --fields label=refresh_token --reveal 2>/dev/null || echo "")
-        
-        if [ -n "$ACCESS_TOKEN" ]; then
-            # Test the token
-            RESPONSE=$(curl -s -w "\n%{http_code}" \
-                -H "Authorization: Bearer $ACCESS_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d '{"query":"{ viewer { id name } }"}' \
-                "https://api.linear.app/graphql" 2>/dev/null || echo -e "\n000")
-            
-            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-            BODY=$(echo "$RESPONSE" | sed '$d')
-            
-            if [ "$HTTP_CODE" = "200" ] && ! echo "$BODY" | jq -e '.errors' &>/dev/null; then
-                USER_NAME=$(echo "$BODY" | jq -r '.data.viewer.name // "unknown"')
-                STATUS="✅ valid"
-                DETAILS="user: $USER_NAME"
-                ((VALID++))
-            else
-                STATUS="❌ expired"
-                DETAILS="needs refresh"
-                ((EXPIRED++))
-                NEED_ATTENTION="$NEED_ATTENTION $agent"
-                
-                # Attempt refresh if requested
-                if [ "$DO_REFRESH" = true ] && [ -n "$REFRESH_TOKEN" ] && [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ]; then
-                    echo ""
-                    echo "   🔄 Attempting refresh for $agent..."
-                    
-                    REFRESH_RESPONSE=$(curl -s -X POST \
-                        -d "grant_type=refresh_token" \
-                        -d "refresh_token=$REFRESH_TOKEN" \
-                        -d "client_id=$CLIENT_ID" \
-                        -d "client_secret=$CLIENT_SECRET" \
-                        "https://api.linear.app/oauth/token" 2>/dev/null)
-                    
-                    NEW_TOKEN=$(echo "$REFRESH_RESPONSE" | jq -r '.access_token // empty')
-                    NEW_REFRESH=$(echo "$REFRESH_RESPONSE" | jq -r '.refresh_token // empty')
-                    
-                    if [ -n "$NEW_TOKEN" ]; then
-                        # Update 1Password
-                        op item edit "$ITEM_NAME" --vault "Automation" \
-                            "developer_token[concealed]=$NEW_TOKEN" \
-                            ${NEW_REFRESH:+"refresh_token[concealed]=$NEW_REFRESH"} &>/dev/null
-                        
-                        STATUS="🔄 refreshed"
-                        DETAILS="new token saved"
-                        ((REFRESHED++))
-                        
-                    else
-                        ERROR=$(echo "$REFRESH_RESPONSE" | jq -r '.error // "unknown"')
-                        DETAILS="refresh failed: $ERROR"
-                    fi
-                elif [ "$DO_REFRESH" = true ]; then
-                    DETAILS="missing refresh credentials"
-                fi
-            fi
-        else
-            STATUS="⚠️  no token"
-            DETAILS="has client creds, needs OAuth"
-            ((NEEDS_AUTH++))
-            NEED_ATTENTION="$NEED_ATTENTION $agent"
-        fi
+    item_name="$(get_oauth_item "$agent")"
+    creds_status="missing"
+    runtime_status="missing"
+    details=""
+
+    client_id=""
+    client_secret=""
+
+    if op item get "$item_name" --vault "Automation" >/dev/null 2>&1; then
+        client_id="$(op item get "$item_name" --vault "Automation" --fields label=client_id --reveal 2>/dev/null || true)"
+        client_secret="$(op item get "$item_name" --vault "Automation" --fields label=client_secret --reveal 2>/dev/null || true)"
+    fi
+
+    if [[ -n "$client_id" && -n "$client_secret" ]]; then
+        creds_status="ready"
     else
-        # No per-agent item - check if we have client_secret in central item
-        CENTRAL_SECRET=$(get_client_secret "$agent")
-        
-        if [ -n "$CENTRAL_SECRET" ]; then
-            STATUS="📦 partial"
-            DETAILS="has secret, needs OAuth item"
-            ((MISSING++))
-            NEED_ATTENTION="$NEED_ATTENTION $agent"
-        else
-            STATUS="❌ missing"
-            DETAILS="no OAuth app configured"
-            ((MISSING++))
-            NEED_ATTENTION="$NEED_ATTENTION $agent"
+        creds_status="missing"
+        ((MISSING_CREDS++))
+    fi
+
+    runtime_token="$(read_runtime_token "$agent")"
+    if [[ -z "$runtime_token" && "$DO_MINT" == true && "$creds_status" == "ready" ]]; then
+        if mint_via_pm "$agent"; then
+            runtime_token="$(read_runtime_token "$agent")"
+            [[ -n "$runtime_token" ]] && runtime_status="minted"
         fi
     fi
-    
-    printf "%-10s %-12s %-40s\n" "$agent" "$STATUS" "$DETAILS"
+
+    if [[ -n "$runtime_token" ]]; then
+        response="$(verify_token "$runtime_token")"
+        http_code="$(echo "$response" | tail -1)"
+        body="$(echo "$response" | sed '$d')"
+        if [[ "$http_code" == "200" ]] && ! echo "$body" | jq -e '.errors' >/dev/null 2>&1; then
+            user_name="$(echo "$body" | jq -r '.data.viewer.name // "unknown"')"
+            if [[ "$runtime_status" == "minted" ]]; then
+                details="fresh runtime token for ${user_name}"
+                ((MINTED++))
+            else
+                runtime_status="valid"
+                details="runtime token for ${user_name}"
+                ((VALID++))
+            fi
+        else
+            if [[ "$DO_MINT" == true && "$creds_status" == "ready" ]]; then
+                if mint_via_pm "$agent"; then
+                    runtime_token="$(read_runtime_token "$agent")"
+                    response="$(verify_token "$runtime_token")"
+                    http_code="$(echo "$response" | tail -1)"
+                    body="$(echo "$response" | sed '$d')"
+                    if [[ "$http_code" == "200" ]] && ! echo "$body" | jq -e '.errors' >/dev/null 2>&1; then
+                        user_name="$(echo "$body" | jq -r '.data.viewer.name // "unknown"')"
+                        runtime_status="minted"
+                        details="fresh runtime token for ${user_name}"
+                        ((MINTED++))
+                    else
+                        runtime_status="invalid"
+                        details="runtime token still rejected"
+                        ((INVALID_RUNTIME++))
+                    fi
+                else
+                    runtime_status="invalid"
+                    details="PM mint failed"
+                    ((INVALID_RUNTIME++))
+                fi
+            else
+                runtime_status="invalid"
+                details="runtime token rejected"
+                ((INVALID_RUNTIME++))
+            fi
+        fi
+    else
+        runtime_status="missing"
+        details="no runtime token in linear-app-${agent}"
+        ((MISSING_RUNTIME++))
+    fi
+
+    if [[ "$creds_status" != "ready" || ( "$runtime_status" != "valid" && "$runtime_status" != "minted" ) ]]; then
+        NEEDS_ATTENTION+=("$agent")
+    fi
+
+    printf "%-10s %-12s %-14s %-40s\n" "$agent" "$creds_status" "$runtime_status" "$details"
 done
 
-echo "--------------------------------------------"
 echo ""
-echo "📊 Summary"
-echo "   ✅ Valid:     $VALID"
-echo "   ❌ Expired:   $EXPIRED"
-echo "   🔄 Refreshed: $REFRESHED"
-echo "   ⚠️  Needs Auth: $NEEDS_AUTH"
-echo "   📦 Partial:   $MISSING"
+echo "Summary"
+echo "  Valid runtime tokens: ${VALID}"
+echo "  Minted during audit:  ${MINTED}"
+echo "  Missing credentials:  ${MISSING_CREDS}"
+echo "  Missing runtime:      ${MISSING_RUNTIME}"
+echo "  Invalid runtime:      ${INVALID_RUNTIME}"
 echo ""
 
-# Show agents needing attention
-if [ -n "$NEED_ATTENTION" ]; then
-    echo "🔧 Agents needing attention:$NEED_ATTENTION"
+if [[ ${#NEEDS_ATTENTION[@]} -gt 0 ]]; then
+    echo "Needs attention: ${NEEDS_ATTENTION[*]}"
     echo ""
-    echo "To authorize an agent:"
-    echo "  1. Ensure OAuth app exists in Linear (Settings → API → OAuth Applications)"
-    echo "  2. Run: open 'https://pm.5dlabs.ai/oauth/{agent}/authorize'"
-    echo "  3. Or manually create 1Password item with client_id, client_secret, developer_token"
-    echo ""
+    echo "Preferred repair order:"
+    echo "  1. Ensure 1Password item 'Linear {Agent} OAuth' has client_id + client_secret"
+    echo "  2. Ask PM to mint via POST ${PM_BASE_URL}/oauth/mint/{agent}"
+    echo "  3. Re-run ./setup-linear-oauth.sh --mint"
+    echo "  4. Use browser auth only for true exception apps"
     exit 1
 fi

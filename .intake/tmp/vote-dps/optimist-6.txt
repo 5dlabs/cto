@@ -1,1 +1,1 @@
-TanStack Query polling with a 30-second interval, with optimistic updates on quote builder interactions
+WebSocket with SSE fallback

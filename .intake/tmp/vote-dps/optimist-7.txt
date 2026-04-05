@@ -1,1 +1,1 @@
-Traditional navigation with persistent Morgan chat sidebar (collapsible, defaults open on /quote) — Morgan is always accessible but not forced
+Centralized GDPR orchestrator service that coordinates deletion/export across services via NATS commands

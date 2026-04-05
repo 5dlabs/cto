@@ -27,6 +27,7 @@ interface DesignVariantsResult {
   screens: Array<{
     source_screen_id: string;
     source_target: string;
+    source_provider?: string;
     variants: DesignVariant[];
   }>;
   total_variants: number;
@@ -156,7 +157,8 @@ export async function designReview(args: DesignReviewArgs): Promise<DesignSelect
     }
 
     const reviewId = `${args.sessionId}-design-${screen.source_screen_id}`;
-    const screenContext = `${screen.source_target} (${screen.source_screen_id.slice(0, 8)})`;
+    const provider = screen.source_provider ?? 'stitch';
+    const screenContext = `${screen.source_target}/${provider} (${screen.source_screen_id.slice(0, 8)})`;
 
     const request: DesignReviewRequest = {
       review_id: reviewId,
@@ -176,6 +178,7 @@ export async function designReview(args: DesignReviewArgs): Promise<DesignSelect
       discord_channel_id: args.discordChannelId,
       linear_issue_id: args.linearIssueId,
       metadata: {
+        source_provider: provider,
         ...(args.runId ? { run_id: args.runId } : {}),
       },
     };

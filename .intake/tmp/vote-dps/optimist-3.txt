@@ -1,1 +1,1 @@
-Use an event-driven approach with the existing in-cluster NATS message queue to decouple services and manage asynchronous workflows.
+JWT with RBAC — stateless, service-mesh friendly, with short-lived tokens (15min) and refresh tokens stored in Valkey

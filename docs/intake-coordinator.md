@@ -61,7 +61,7 @@ Assume you are expected to **iterate until blocked**, not until “reasonable ef
 
 When the task allows several **plausible** choices (which 1Password item name, which bridge service in the cluster, which documented env pattern), **do not** ask the human to pick **before** trying anything.
 
-1. **Choose the most reasonable default** using repo docs, naming conventions, `kubectl` / `op item list` / file search, and prior messages (e.g. user said “use Linear Morgan Auth” → resolve to **`op://Automation/Linear Morgan OAuth/developer_token`** via inspection).
+1. **Choose the most reasonable default** using repo docs, naming conventions, `kubectl` / `op item list` / file search, and prior messages (e.g. user said “use Linear Morgan Auth” → resolve to the per-agent item **`Linear Morgan OAuth`** and mint a runtime token from its `client_id` / `client_secret`).
 2. **Execute** that path (edit committed defaults, re-run checkpoints, port-forward the likely Service, etc.).
 3. **Ask the human only after** you have **attempted the default** and **at least one distinct fallback** in the same failure class, and something **still** fails—or you hit a **true** escalation (MFA, irreversible danger, secret unavailable after documented injection). When you ask, **briefly list what you already tried**.
 
@@ -110,7 +110,7 @@ Use these unless docs or safety forbid:
 | Situation | Decide autonomously to… |
 |-----------|-------------------------|
 | Bridge `/health` fails on localhost | Inspect env (`DISCORD_BRIDGE_URL` / `LINEAR_BRIDGE_URL`), discover real services (`kubectl get deploy,svc -A` grepping bridge names), align URL with **reachable** address (Twingate, port-forward, or local process)—see [`intake-local-prereqs.md`](intake-local-prereqs.md). |
-| `LINEAR_API_KEY` / GraphQL 401 | Prefer **`intake/local.env.op.defaults`** (e.g. **Linear Morgan OAuth** / `developer_token`) → auto materializes **`local.env.op`** + **`op run`**. If 401 persists, try one alternate documented item/field via `op item get`, then fix **defaults**; never paste the key into chat. |
+| `LINEAR_API_KEY` / GraphQL 401 | Prefer minting a fresh runtime token from the per-agent 1Password item (for example **`Linear Morgan OAuth`** `client_id` / `client_secret`) via PM, then re-run with the Kubernetes-backed runtime token. If 401 persists, try one alternate documented credential source, then fix **defaults**; never paste the key into chat. |
 | Preflight vs skip | Prefer **fixing** prerequisites. Use **`INTAKE_PREFLIGHT_SKIP`** / **`INTAKE_PREFLIGHT_KUBECTL_SKIP`** only as **documented** dev escape hatches, and note the temporary bypass in your run notes. |
 | Which checkpoint to re-run | **First invalidated checkpoint** in [`intake-discord-feedback-loop.md`](intake-discord-feedback-loop.md); never restart the whole narrative from scratch if a later step still passes. |
 | Observer attention | Prefer **logs + Discord + Linear** correlation in one time window over asking “did you see X?” |

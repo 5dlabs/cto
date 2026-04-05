@@ -31,6 +31,12 @@ yarn-error.log*
 # env files
 .env*
 
+# google drive oauth token
+.gdrive-token.json
+
+# generated exports (PDFs, etc.)
+/exports/*.pdf
+
 # vercel
 .vercel
 

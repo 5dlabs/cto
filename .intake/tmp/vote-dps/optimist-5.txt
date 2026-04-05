@@ -1,1 +1,1 @@
-Leverage an Effect-TS native state management solution to align with the existing Effect-based data fetching and validation patterns.
+Centralized GDPR orchestrator service that coordinates deletion/export across all services via their existing APIs

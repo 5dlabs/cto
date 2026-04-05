@@ -1,1 +1,1 @@
-Each service will manage its own schema migrations independently using a language-specific tool (e.g., `sqlx-cli` for Rust, `golang-migrate` for Go).
+Centralized GDPR orchestrator that fans out to per-service deletion/export endpoints, with unified audit log

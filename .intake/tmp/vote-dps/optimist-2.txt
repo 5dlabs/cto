@@ -1,1 +1,1 @@
-Use a service mesh with mTLS for encrypted and authenticated service-to-service communication, and use JWTs for external API clients.
+Single database, domain schemas (rms, finance, etc.), with org_id/tenant_id columns for row-level filtering

@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "component-library.schema.json",
+  "title": "ComponentLibraryArtifact",
+  "description": "Normalized component library output from intake design processing.",
+  "type": "object",
+  "properties": {
+    "version": { "type": "string" },
+    "projectName": { "type": "string" },
+    "provider_mode": { "type": "string", "enum": ["stitch", "framer", "both", "auto"] },
+    "providers": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["stitch", "framer"] }
+    },
+    "tokens": {
+      "type": "object",
+      "properties": {
+        "color": { "type": "array", "items": { "$ref": "#/$defs/tokenItem" } },
+        "typography": { "type": "array", "items": { "$ref": "#/$defs/tokenItem" } },
+        "spacing": { "type": "array", "items": { "$ref": "#/$defs/tokenItem" } },
+        "radius": { "type": "array", "items": { "$ref": "#/$defs/tokenItem" } }
+      },
+      "required": ["color", "typography", "spacing", "radius"],
+      "additionalProperties": false
+    },
+    "primitives": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/componentItem" }
+    },
+    "patterns": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/componentItem" }
+    },
+    "component_map": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/componentMapItem" }
+    },
+    "framer_code_components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "props": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "type": { "type": "string" },
+                "default": {}
+              },
+              "required": ["name", "type"],
+              "additionalProperties": true
+            }
+          },
+          "property_controls": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "notes": { "type": "string" }
+        },
+        "required": ["name", "props", "property_controls"],
+        "additionalProperties": false
+      }
+    },
+    "generated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": [
+    "version",
+    "projectName",
+    "provider_mode",
+    "providers",
+    "tokens",
+    "primitives",
+    "patterns",
+    "component_map",
+    "framer_code_components",
+    "generated_at"
+  ],
+  "$defs": {
+    "tokenItem": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "value": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["name", "value"],
+      "additionalProperties": false
+    },
+    "componentItem": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "states": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "provider_refs": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["name", "description", "states"],
+      "additionalProperties": false
+    },
+    "componentMapItem": {
+      "type": "object",
+      "properties": {
+        "target": { "type": "string", "enum": ["web", "mobile", "desktop"] },
+        "provider": { "type": "string", "enum": ["stitch", "framer"] },
+        "candidate_id": { "type": "string" },
+        "screen_id": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["target", "provider", "candidate_id"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

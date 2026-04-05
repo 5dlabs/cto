@@ -1,42 +1,61 @@
-## Implement NotifyCore Rust Service (Rex - Rust/Axum)
+## Implement Equipment Catalog Service (Rex - Rust/Axum)
 
 ### Objective
-Build the complete NotifyCore notification routing service in Rust using Axum 0.7 and sqlx 0.7, implementing all five REST endpoints, PostgreSQL persistence, optional Redis caching, structured tracing, graceful shutdown, and a production-ready Dockerfile.
+Build the high-performance Equipment Catalog REST API serving 533+ products across 24 categories with real-time availability checking, barcode/SKU lookup, image serving via R2, a machine-readable equipment API for AI agents, and rate limiting. This is the first service in the shared Rex Cargo workspace.
 
 ### Ownership
 - Agent: rex
-- Stack: Rust/Axum
+- Stack: Rust 1.75+/Axum 0.7
 - Priority: high
 - Status: pending
 - Dependencies: 1
 
 ### Implementation Details
-1. **Project scaffold**: `cargo init notifycore`. Add dependencies in Cargo.toml: axum 0.7, tokio 1 (full features), sqlx 0.7 (postgres, runtime-tokio, tls-rustls, migrate), serde 1 + serde_json, uuid (v4, serde), chrono (serde), tracing 0.1, tracing-subscriber (json, env-filter), redis 0.25 (optional feature), tower-http (trace, cors).
-2. **Data models**: Implement `Notification`, `Channel`, `Priority`, `NotificationStatus`, `CreateNotificationRequest`, `ListNotificationsQuery` as specified in the PRD. Derive `sqlx::Type` for enums or use string mapping.
-3. **Database migrations**: Create `migrations/001_create_notifications.sql` with table: `id UUID PRIMARY KEY, channel VARCHAR NOT NULL, priority VARCHAR NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL, status VARCHAR NOT NULL DEFAULT 'pending', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`. Add index on `(status, created_at DESC)` for list queries.
-4. **App state**: Struct holding `PgPool` and optional `redis::Client`. Initialize from env vars `DATABASE_URL`, `REDIS_URL`, `PORT` (default 8080). Run sqlx migrations on startup.
-5. **Endpoints**:
-   a. `POST /api/v1/notifications` — validate request (title non-empty, body non-empty), insert row with status=Pending, return 201 with Notification JSON.
-   b. `GET /api/v1/notifications/:id` — query by UUID, return 200 or 404 `{"error": "not found"}`.
-   c. `GET /api/v1/notifications` — accept `page` (default 1), `per_page` (default 20, max 100), optional `status` filter. Return `{"data": [...], "page": N, "per_page": N, "total": N}`.
-   d. `DELETE /api/v1/notifications/:id` — if status=Pending, set status=Cancelled and updated_at=NOW(), return 200. If not pending, return 409 `{"error": "only pending notifications can be cancelled"}`. If not found, 404.
-   e. `GET /health` — check pg pool `sqlx::query("SELECT 1")`, return `{"status": "healthy", "database": "connected"}` 200 or `{"status": "degraded", ...}` 503.
-6. **Redis caching** (optional path): On GET by ID, check Redis first (`notification:{id}`). On write/update, invalidate. If Redis unavailable, fall through to Postgres silently.
-7. **Structured logging**: `tracing_subscriber` with JSON formatter, env filter from `RUST_LOG`.
-8. **Graceful shutdown**: `tokio::signal::ctrl_c()` with Axum's `with_graceful_shutdown`.
-9. **Error handling**: Implement `IntoResponse` for a custom `AppError` enum (NotFound, Validation, Conflict, Internal) that returns appropriate status codes and JSON bodies.
-10. **Unit tests**: In `src/` modules, test validation logic, enum serialization, pagination math.
-11. **Integration tests**: In `tests/`, use sqlx test fixtures or testcontainers-rs to spin up Postgres. Test all 5 endpoints end-to-end including error cases (404, 409, 422).
-12. **Dockerfile**: Multi-stage build — `rust:1.75-slim` builder with `cargo build --release`, then `debian:bookworm-slim` runtime. Copy binary, expose PORT, set ENTRYPOINT. Ensure image < 100MB.
-13. **Kubernetes manifest**: Deployment YAML referencing `notifycore-infra-endpoints` ConfigMap via `envFrom`, liveness probe on `/health`, readiness probe on `/health`, resource requests (64Mi/100m) and limits (256Mi/500m).
+1. Initialize Cargo workspace at repo root `services/rust/` with members: `catalog`, `finance`, `vetting`, `shared`. The `shared` crate contains common types (health check handlers, error types, middleware, DB pool setup, ConfigMap env parsing, API key validation middleware).
+2. In `shared` crate:
+   - Database pool setup using `sqlx` with `PgPool` reading `POSTGRES_URL` from env (injected via `sigma1-infra-endpoints` ConfigMap).
+   - Health check handlers: `GET /health/live` (returns 200), `GET /health/ready` (checks DB + Valkey connectivity).
+   - Prometheus metrics middleware using `metrics` + `metrics-exporter-prometheus` crates, exposed at `GET /metrics`.
+   - Rate limiting middleware using Valkey (sliding window, `redis-rs` crate), configurable per-route.
+   - API key validation middleware reading from `sigma1-service-api-keys` secret (for inter-service auth per D7).
+   - Standard JSON error response type.
+3. In `catalog` crate:
+   - SQLx migrations for `catalog` schema: `categories` table, `products` table (with `specs` as JSONB, `image_urls` as TEXT[], `day_rate` as DECIMAL), `availability` table (product_id, date_from, date_to, quantity_total, reserved, booked), `bookings` table.
+   - Implement all REST endpoints per PRD:
+     - `GET /api/v1/catalog/categories` — list with optional `parent_id` filter
+     - `GET /api/v1/catalog/products` — paginated, filterable by category_id, name search (trigram), specs JSONB queries
+     - `GET /api/v1/catalog/products/:id` — full product detail with category join
+     - `GET /api/v1/catalog/products/:id/availability?from=&to=` — real-time availability check against bookings, must respond < 500ms
+     - `POST /api/v1/catalog/products` — admin create (API key auth)
+     - `PATCH /api/v1/catalog/products/:id` — admin update (API key auth)
+     - `GET /api/v1/equipment-api/catalog` — machine-readable JSON (flat structure optimized for AI agent consumption)
+     - `POST /api/v1/equipment-api/checkout` — programmatic booking (creates reservation, decrements availability)
+   - Image URLs stored as R2 presigned URLs or public CDN paths.
+   - Generate OpenAPI spec using `utoipa` crate, served at `/api/v1/catalog/openapi.json`.
+   - GDPR endpoint: `DELETE /api/v1/gdpr/customer/:id` — delete all customer-related booking data, return confirmation.
+4. Dockerfile: multi-stage build (rust:1.75 builder → distroless/cc runtime).
+5. Kubernetes Deployment manifest:
+   - Namespace: `sigma1`
+   - Replicas: 2
+   - `envFrom: [{configMapRef: {name: sigma1-infra-endpoints}}]`
+   - Secret refs for `sigma1-db-credentials`, `sigma1-r2-credentials`, `sigma1-service-api-keys`
+   - Liveness/readiness probes on `/health/live` and `/health/ready`
+   - Resource limits: 256Mi memory, 500m CPU
+   - Service exposing port 8080.
+6. Seed data script: SQL file with 24 categories and sample products for development.
 
 ### Subtasks
-- [ ] Project scaffold with Cargo.toml, app state, and configuration: Initialize the Rust project with all dependencies, create the application state struct, configuration loading from environment variables, and the main entrypoint with Axum server setup, structured logging, and graceful shutdown.
-- [ ] Data models, enum definitions, and database migration: Define all data models (Notification, Channel, Priority, NotificationStatus, CreateNotificationRequest, ListNotificationsQuery) with serde and sqlx derivations, and create the database migration SQL.
-- [ ] Custom AppError enum and error handling middleware: Implement the custom `AppError` enum with variants NotFound, Validation, Conflict, and Internal, implementing `IntoResponse` to return appropriate HTTP status codes and JSON error bodies.
-- [ ] Implement POST and GET /api/v1/notifications/:id endpoints: Implement the POST /api/v1/notifications endpoint for creating notifications with validation, and the GET /api/v1/notifications/:id endpoint for retrieving a single notification by UUID.
-- [ ] Implement GET /api/v1/notifications (list) and DELETE /api/v1/notifications/:id (cancel) endpoints: Implement the paginated list endpoint with optional status filtering and the cancel endpoint with conflict detection for non-pending notifications.
-- [ ] Implement health check endpoint and optional Redis caching layer: Implement the GET /health endpoint with database connectivity check, and the optional Redis caching layer for GET by ID with silent fallthrough on Redis failure.
-- [ ] Unit tests for validation logic, enum serialization, and pagination math: Write unit tests within src/ modules covering validation logic, enum serialization/deserialization to lowercase JSON, and pagination offset calculation.
-- [ ] Integration tests for all five endpoints including error cases: Write integration tests in the `tests/` directory using testcontainers-rs or sqlx test fixtures to test all five endpoints end-to-end, including error paths (404, 409, 422).
-- [ ] Multi-stage Dockerfile and Kubernetes Deployment manifest: Create a multi-stage Dockerfile producing an image under 100MB and a Kubernetes Deployment manifest referencing the notifycore-infra-endpoints ConfigMap with health probes and resource limits.
+- [ ] Initialize Cargo workspace and shared crate with DB pool, error types, and ConfigMap env parsing: Create the Cargo workspace at services/rust/ with members catalog, finance, vetting, and shared. Implement the shared crate foundation: PgPool setup reading POSTGRES_URL from env (sigma1-infra-endpoints ConfigMap), standard JSON error response type, and env/config parsing utilities.
+- [ ] Implement shared health check handlers (liveness and readiness): Add health check route handlers to the shared crate: GET /health/live returns 200 unconditionally, GET /health/ready checks PostgreSQL and Valkey connectivity and returns 200 or 503.
+- [ ] Implement shared Prometheus metrics middleware: Add request metrics middleware to the shared crate using the metrics and metrics-exporter-prometheus crates, exposed at GET /metrics.
+- [ ] Implement shared rate limiting middleware using Valkey: Build a configurable per-route rate limiting middleware in the shared crate using a sliding window algorithm backed by Valkey (redis-rs).
+- [ ] Implement shared API key validation middleware: Build an API key authentication middleware in the shared crate that validates keys from the Authorization header against values in the sigma1-service-api-keys secret.
+- [ ] Create SQLx migrations for catalog schema: Write and validate SQLx migrations for the catalog database schema: categories, products (with JSONB specs, TEXT[] image_urls, DECIMAL day_rate), availability, and bookings tables with appropriate indexes.
+- [ ] Implement category and product CRUD endpoints with pagination and search: Build the core catalog REST endpoints: categories listing with parent_id filter, products listing with pagination/category filter/trigram search/JSONB spec queries, product detail, and admin create/update endpoints.
+- [ ] Implement availability checking and atomic checkout endpoints: Build the real-time availability endpoint (GET /api/v1/catalog/products/:id/availability) and the programmatic checkout endpoint (POST /api/v1/equipment-api/checkout) with atomic inventory decrement.
+- [ ] Implement machine-readable equipment API endpoint and OpenAPI spec generation: Build the GET /api/v1/equipment-api/catalog endpoint returning a flat JSON structure optimized for AI agent consumption, and generate the OpenAPI spec using utoipa served at /api/v1/catalog/openapi.json.
+- [ ] Implement GDPR deletion endpoint: Build the DELETE /api/v1/gdpr/customer/:id endpoint that removes all customer-related booking data and returns a confirmation response.
+- [ ] Create seed data script with 24 categories and sample products: Write a SQL seed data file with 24 equipment rental categories and representative sample products with realistic specs, pricing, and availability data for development.
+- [ ] Build catalog service main entrypoint with router composition: Create the catalog service binary entrypoint that composes all routes, middleware layers, and shared infrastructure (DB pool, Valkey, metrics, rate limiting) into a running Axum server.
+- [ ] Create multi-stage Dockerfile for catalog service: Write a multi-stage Dockerfile using rust:1.75 as builder and gcr.io/distroless/cc as runtime, producing a minimal production image for the catalog service.
+- [ ] Create Kubernetes deployment manifests for catalog service: Write Kubernetes Deployment, Service, and related manifests for the catalog service in the sigma1 namespace with proper ConfigMap/Secret references, probes, and resource limits.

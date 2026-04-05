@@ -225,18 +225,12 @@ const jsonLd = {
         {
           "@type": "ListItem",
           position: 3,
-          name: "Investors",
-          item: "https://5dlabs.ai/investors",
-        },
-        {
-          "@type": "ListItem",
-          position: 4,
           name: "Founder",
           item: "https://5dlabs.ai/founder",
         },
         {
           "@type": "ListItem",
-          position: 5,
+          position: 4,
           name: "Team",
           item: "https://5dlabs.ai/team",
         },

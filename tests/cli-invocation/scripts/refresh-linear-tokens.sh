@@ -1,79 +1,77 @@
-#!/bin/bash
-# Refresh Linear OAuth tokens for all CTO agents using client_credentials flow
-# 
-# Usage: ./refresh-linear-tokens.sh [agent]
-#   No args: refresh all agents
-#   With arg: refresh specific agent (e.g., ./refresh-linear-tokens.sh Rex)
+#!/usr/bin/env bash
+# Mint Linear runtime access tokens for CTO agents via PM.
 #
-# Prerequisites:
-# - 1Password CLI (op) authenticated
-# - Client credentials enabled on each Linear OAuth app
+# Usage: ./refresh-linear-tokens.sh [agent]
+#   No args: mint for every configured PM agent via /oauth/mint-all
+#   With arg: mint for a specific agent (e.g. ./refresh-linear-tokens.sh bolt)
+#
+# Notes:
+# - 1Password is the source of truth for client_id/client_secret only.
+# - PM is the token broker.
+# - Runtime access tokens live in Kubernetes secrets: linear-app-{agent}.
 
-set -e
+set -euo pipefail
 
-AGENTS=(Atlas Blaze Bolt Cipher Cleo Grizz Morgan Nova Rex Spark Stitch Tap Tess Vex)
-SCOPES="read,write,issues:create,comments:create"
+PM_BASE_URL="${PM_BASE_URL:-https://pm.5dlabs.ai}"
 
-refresh_token() {
-  local agent=$1
-  local item_name="Linear $agent OAuth"
-  
-  echo -n "🔄 $agent: "
-  
-  # Get credentials
-  CLIENT_ID=$(op read "op://Automation/$item_name/client_id" 2>/dev/null)
-  CLIENT_SECRET=$(op read "op://Automation/$item_name/client_secret" 2>/dev/null)
-  
-  if [[ -z "$CLIENT_ID" || -z "$CLIENT_SECRET" ]]; then
-    echo "❌ Missing credentials in 1Password"
-    return 1
-  fi
-  
-  # Request new token
-  RESPONSE=$(curl -s -X POST https://api.linear.app/oauth/token \
-    -H "Content-Type: application/x-www-form-urlencoded" \
-    -d "grant_type=client_credentials" \
-    -d "scope=$SCOPES" \
-    -d "client_id=$CLIENT_ID" \
-    -d "client_secret=$CLIENT_SECRET")
-  
-  TOKEN=$(echo "$RESPONSE" | jq -r '.access_token // empty')
-  ERROR=$(echo "$RESPONSE" | jq -r '.error_description // .error // empty')
-  
-  if [[ -n "$TOKEN" ]]; then
-    # Update 1Password
-    op item edit "$item_name" "developer_token=$TOKEN" --vault Automation >/dev/null 2>&1
-    EXPIRES_IN=$(echo "$RESPONSE" | jq -r '.expires_in')
-    DAYS=$((EXPIRES_IN / 86400))
-    echo "✅ Token refreshed (expires in ${DAYS} days)"
+mint_one() {
+  local agent="$1"
+  local response
+  local http_code
+  local body
+
+  response=$(curl -sS -w "\n%{http_code}" -X POST \
+    "${PM_BASE_URL}/oauth/mint/${agent}" 2>/dev/null || echo -e "\n000")
+
+  http_code=$(echo "$response" | tail -1)
+  body=$(echo "$response" | sed '$d')
+
+  if [[ "$http_code" == "200" ]]; then
+    local expires_in
+    local days
+    expires_in=$(echo "$body" | jq -r '.expires_in // 0')
+    days=$((expires_in / 86400))
+    echo "✅ ${agent}: minted via PM (expires in ${days} days)"
     return 0
-  else
-    echo "❌ Failed: $ERROR"
-    return 1
   fi
+
+  local error
+  error=$(echo "$body" | jq -r '.error // "Unknown error"' 2>/dev/null || echo "Unknown error")
+  echo "❌ ${agent}: ${error} (HTTP ${http_code})"
+  return 1
 }
 
-# Main
-if [[ -n "$1" ]]; then
-  # Single agent
-  refresh_token "$1"
-else
-  # All agents
-  echo "Refreshing Linear OAuth tokens for all CTO agents..."
-  echo "Using client_credentials flow (30-day tokens, no user login required)"
-  echo ""
-  
-  SUCCESS=0
-  FAILED=0
-  
-  for agent in "${AGENTS[@]}"; do
-    if refresh_token "$agent"; then
-      ((SUCCESS++))
-    else
-      ((FAILED++))
-    fi
-  done
-  
-  echo ""
-  echo "Done: $SUCCESS succeeded, $FAILED failed"
+if [[ $# -gt 0 ]]; then
+  mint_one "$1"
+  exit $?
 fi
+
+echo "Minting Linear runtime tokens via PM..."
+echo "PM base URL: ${PM_BASE_URL}"
+echo ""
+
+response=$(curl -sS -w "\n%{http_code}" -X POST \
+  "${PM_BASE_URL}/oauth/mint-all" 2>/dev/null || echo -e "\n000")
+
+http_code=$(echo "$response" | tail -1)
+body=$(echo "$response" | sed '$d')
+
+if [[ "$http_code" != "200" ]]; then
+  error=$(echo "$body" | jq -r '.error // "Unknown error"' 2>/dev/null || echo "Unknown error")
+  echo "❌ Bulk mint failed: ${error} (HTTP ${http_code})"
+  exit 1
+fi
+
+echo "$body" | jq -r '
+  .results[]
+  | if .status == "minted" then
+      "✅ \(.agent): minted"
+    elif .status == "skipped" then
+      "⏭️  \(.agent): \(.reason)"
+    else
+      "❌ \(.agent): \(.error // "unknown error")"
+    end
+'
+
+echo ""
+echo "$body" | jq -r '"Summary: minted=\(.counts.minted) skipped=\(.counts.skipped) failed=\(.counts.failed)"'

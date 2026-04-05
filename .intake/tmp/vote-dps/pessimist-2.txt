@@ -1,1 +1,1 @@
-Implement service-to-service authentication using short-lived JWTs issued by a central identity service.
+Agree with Optimist — single database, domain schemas, org_id columns. Flag: cross-schema FK cascades for GDPR deletion require explicit design in Task 10.

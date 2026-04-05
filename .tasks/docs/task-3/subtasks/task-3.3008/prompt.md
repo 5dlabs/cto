@@ -1,24 +1,21 @@
-Implement subtask 3008: Define CI/CD pipeline with lint, test, build, and deploy stages
+Implement subtask 3008: Implement Crew scheduling service with conflict detection
 
 ## Objective
-Create a GitHub Actions (or equivalent) CI/CD pipeline definition with PR checks (fmt, clippy, test, sqlx prepare check), Docker build+push on merge, Helm deploy to staging, and manual approval for production.
+Build the CrewService gRPC implementation with crew listing, assignment, scheduling with overlap conflict detection, and availability queries.
 
 ## Steps
-1. Create `.github/workflows/ci.yaml` for PR checks:
-   - Trigger: on pull_request to main.
-   - Jobs:
-     a. **lint**: `cargo fmt --check`, `cargo clippy -- -D warnings`.
-     b. **test**: Start Postgres service container, set DATABASE_URL, `cargo sqlx prepare --check`, `cargo test`.
-     c. **docker-lint**: `hadolint Dockerfile` (optional but recommended).
-2. Create `.github/workflows/cd.yaml` for deployment:
-   - Trigger: on push to main (after PR merge).
-   - Jobs:
-     a. **build**: Docker build with multi-stage Dockerfile, tag with git SHA and `latest`, push to container registry (parameterized via secrets: REGISTRY_URL, REGISTRY_USER, REGISTRY_PASSWORD).
-     b. **deploy-staging**: Depends on build. Run `helm upgrade --install notifycore infra/notifycore -f values-dev.yaml --set image.tag=$SHA -n notifycore-staging`. Wait for rollout.
-     c. **deploy-production**: Depends on deploy-staging. Uses `environment: production` for manual approval gate. Run `helm upgrade --install notifycore infra/notifycore -f values-prod.yaml --set image.tag=$SHA -n notifycore`.
-3. Include sqlx offline mode: ensure `cargo sqlx prepare --check` step validates that `.sqlx/` query cache is up to date.
-4. Add caching for Cargo registry and target directory to speed up CI.
-5. Set appropriate timeouts (build: 15min, deploy: 10min).
+1. Create `internal/service/crew_svc.go` implementing `CrewServiceServer`.
+2. Implement `ListCrew` RPC: delegate to `crewRepo.List(ctx, orgID)` with optional skill/role filters.
+3. Implement `AssignCrew` RPC:
+   - Accept crew_member_id, project_id, date_start, date_end, role.
+   - Call `crewRepo.GetConflicts(ctx, orgID, crewMemberID, dateStart, dateEnd)` to check for overlapping assignments.
+   - If conflicts exist, return error with details of conflicting assignments (project_id, dates).
+   - If no conflicts, call `crewRepo.CreateAssignment(ctx, orgID, assignment)`.
+4. Implement `ScheduleCrew` RPC: bulk assign multiple crew members to a project, checking conflicts for each. Return summary of successful assignments and any conflicts.
+5. Implement `GetCrewAvailability` RPC:
+   - For a given crew_member_id and date range, query existing assignments and return available time slots.
+   - Return list of `AvailabilitySlot` (date_start, date_end, is_available).
+6. Register service in gRPC server.
 
 ## Validation
-CI pipeline file `.github/workflows/ci.yaml` exists and contains jobs for fmt check, clippy, sqlx prepare check, and cargo test. CD pipeline file `.github/workflows/cd.yaml` exists and contains build, deploy-staging, and deploy-production jobs. Production deploy job uses `environment: production` for manual approval. Pipeline YAML is valid (can be validated with actionlint or similar tool). sqlx prepare check step is present in the test job.
+Integration tests: 1) Create crew member, assign to project A for Jan 1-5, attempt assign to project B for Jan 3-7 → verify conflict error with project A details. 2) Assign to non-overlapping period Jan 6-10 → verify success. 3) GetCrewAvailability for Jan 1-15 → verify slot Jan 1-5 shows unavailable, Jan 6-10 unavailable, Jan 11-15 available. 4) ScheduleCrew bulk: 3 crew members, 1 has conflict → verify 2 succeed and 1 returns conflict.

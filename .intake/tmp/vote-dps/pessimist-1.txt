@@ -1,1 +1,1 @@
-Use a mixed-protocol approach: gRPC for high-throughput services like RMS, and simple HTTP/REST for others like Catalog and Finance.
+gRPC for Go RMS (Task 3, as PRD specifies); REST/Axum for Rust services (Tasks 2, 4, 5); REST for Node.js Social Engine (Task 6). OpenAPI specs generated from code, not protobuf.

@@ -1,27 +1,18 @@
-Implement subtask 3005: Configure HPA, RBAC ServiceAccount, and ResourceQuota
+Implement subtask 3005: Implement database repository layer with pgx
 
 ## Objective
-Create the HorizontalPodAutoscaler (min 2, max 10, 70% CPU), a minimal ServiceAccount with no cluster-wide roles, and a namespace-level ResourceQuota.
+Build the Go repository layer using pgx/v5 for all RMS entities with org_id-scoped queries, providing CRUD operations consumed by gRPC service implementations.
 
 ## Steps
-1. Create `infra/notifycore/templates/hpa.yaml`:
-   - HorizontalPodAutoscaler targeting notifycore Deployment.
-   - spec.minReplicas: 2, spec.maxReplicas: 10.
-   - spec.metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}].
-   - Conditionally render when `hpa.enabled: true`.
-2. Create `infra/notifycore/templates/serviceaccount.yaml`:
-   - ServiceAccount `notifycore-sa` in notifycore namespace.
-   - `automountServiceAccountToken: false` (no need for K8s API access).
-3. Update the Deployment template to use `serviceAccountName: notifycore-sa`.
-4. Create `infra/notifycore/templates/resource-quota.yaml`:
-   - ResourceQuota in notifycore namespace.
-   - spec.hard: requests.cpu: "2", requests.memory: "1Gi", limits.cpu: "4", limits.memory: "2Gi".
-   - Conditionally render when `resourceQuota.enabled: true`.
-5. Create `infra/notifycore/templates/app-pdb.yaml`:
-   - PodDisruptionBudget for the notifycore app Deployment.
-   - maxUnavailable: 1.
-6. In `values-prod.yaml`: hpa.enabled: true, resourceQuota.enabled: true.
-7. In `values-dev.yaml`: hpa.enabled: false, resourceQuota.enabled: false.
+1. Create `internal/repo/` package with one file per entity: `opportunity_repo.go`, `project_repo.go`, `inventory_repo.go`, `crew_repo.go`, `delivery_repo.go`.
+2. Define repository interfaces in `internal/repo/interfaces.go` for each entity (e.g., `OpportunityRepo` with Create, Get, Update, List, UpdateStatus methods).
+3. `opportunity_repo.go`: Implement `Create(ctx, orgID, opp)`, `GetByID(ctx, orgID, id)`, `Update(ctx, orgID, id, opp)`, `List(ctx, orgID, filters, pagination)`, `UpdateStatus(ctx, orgID, id, newStatus)`. All queries filter by `org_id = $orgID`. Use `pgx.CollectRows` for list queries.
+4. `project_repo.go`: Implement `Create`, `GetByID`, `Update`, `List`, `CreateFromOpportunity(ctx, orgID, oppID)` which inserts project and copies line items in a transaction.
+5. `inventory_repo.go`: Implement `GetByID`, `GetByBarcode(ctx, orgID, barcode)`, `GetStockLevel(ctx, orgID, itemID)`, `RecordTransaction(ctx, orgID, txn)` which updates quantity_available atomically in a transaction, `CheckAvailability(ctx, orgID, itemIDs, dateStart, dateEnd)` which queries overlapping transactions.
+6. `crew_repo.go`: Implement `List(ctx, orgID)`, `CreateAssignment(ctx, orgID, assignment)`, `GetConflicts(ctx, orgID, crewMemberID, dateStart, dateEnd)` which queries overlapping crew_assignments.
+7. `delivery_repo.go`: Implement `Create`, `UpdateStatus`, `List`, `SaveRoute`.
+8. Use `pgx.Pool` injected into each repo struct. Use squirrel or raw SQL with parameterized queries.
+9. All methods return domain structs (not protobuf types) defined in `internal/domain/` package.
 
 ## Validation
-`helm template` with values-prod.yaml renders: HPA with min=2/max=10/cpu=70%, ServiceAccount named notifycore-sa, ResourceQuota with specified limits, and app PDB with maxUnavailable=1. Deployment references serviceAccountName: notifycore-sa. `values-dev.yaml` does not render HPA or ResourceQuota but does render the ServiceAccount.
+Integration tests with testcontainers-go PostgreSQL: for each repo, test Create→Get roundtrip, verify org_id filtering (insert with org_id A, query with org_id B returns empty), test List with pagination. For inventory repo, test RecordTransaction atomically updates quantity_available. For crew repo, test GetConflicts returns overlapping assignments.

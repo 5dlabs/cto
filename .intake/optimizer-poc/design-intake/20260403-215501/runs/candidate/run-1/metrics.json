@@ -1,0 +1,13 @@
+{
+  "variant": "candidate",
+  "run_index": 1,
+  "exit_code": 0,
+  "success": true,
+  "duration_s": 113,
+  "generated_providers": 1,
+  "generated_candidates": 1,
+  "failed_candidates": 0,
+  "warnings_count": 1,
+  "declared_artifacts": 2,
+  "score": 120.4
+}

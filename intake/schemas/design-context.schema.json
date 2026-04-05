@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "design-context.schema.json",
+  "title": "DesignContext",
+  "description": "Normalized design intake context with provider-specific generation summaries.",
+  "type": "object",
+  "properties": {
+    "projectName": { "type": "string" },
+    "mode": {
+      "type": "string",
+      "enum": ["ingest_only", "ingest_plus_stitch", "stitch", "framer", "both", "auto"]
+    },
+    "providerMode": {
+      "type": "string",
+      "enum": ["stitch", "framer", "both", "auto"]
+    },
+    "prompt": { "type": "string" },
+    "artifactPath": { "type": "string" },
+    "urls": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "crawledUrls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string" },
+          "status": { "type": "string", "enum": ["ok", "error"] },
+          "title": { "type": "string" },
+          "snippet": { "type": "string" },
+          "error": { "type": "string" }
+        },
+        "required": ["url", "status"],
+        "additionalProperties": false
+      }
+    },
+    "hasFrontend": { "type": "boolean" },
+    "frontendTargets": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["web", "mobile", "desktop"]
+      }
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "providers": {
+      "type": "object",
+      "properties": {
+        "stitch": { "$ref": "#/$defs/providerSummary" },
+        "framer": { "$ref": "#/$defs/providerSummary" }
+      },
+      "additionalProperties": false
+    },
+    "stitch": { "$ref": "#/$defs/providerSummary" },
+    "framer": { "$ref": "#/$defs/providerSummary" },
+    "normalized_candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/normalizedCandidate" }
+    },
+    "component_library": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "format": { "type": "string", "enum": ["json"] },
+        "version": { "type": "string" }
+      },
+      "required": ["path", "format"],
+      "additionalProperties": false
+    },
+    "design_system": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "format": { "type": "string", "enum": ["markdown"] }
+      },
+      "required": ["path", "format"],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "projectName",
+    "mode",
+    "providerMode",
+    "prompt",
+    "artifactPath",
+    "urls",
+    "crawledUrls",
+    "hasFrontend",
+    "frontendTargets",
+    "confidence",
+    "evidence",
+    "providers"
+  ],
+  "$defs": {
+    "providerSummary": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["generated", "skipped", "failed"] },
+        "reason": { "type": "string" },
+        "projectId": { "type": "string" },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "candidates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/providerCandidate" }
+        }
+      },
+      "required": ["status", "warnings", "candidates"],
+      "additionalProperties": false
+    },
+    "providerCandidate": {
+      "type": "object",
+      "properties": {
+        "provider": { "type": "string", "enum": ["stitch", "framer"] },
+        "target": { "type": "string", "enum": ["web", "mobile", "desktop"] },
+        "deviceType": { "type": "string", "enum": ["DESKTOP", "MOBILE", "TABLET", "AGNOSTIC"] },
+        "screenId": { "type": "string" },
+        "htmlUrl": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "rationale": { "type": "string" },
+        "prompt": { "type": "string" },
+        "status": { "type": "string", "enum": ["generated", "failed"] },
+        "error": { "type": "string" }
+      },
+      "required": ["provider", "target", "deviceType", "rationale", "prompt", "status"],
+      "additionalProperties": true
+    },
+    "normalizedCandidate": {
+      "allOf": [
+        { "$ref": "#/$defs/providerCandidate" },
+        {
+          "type": "object",
+          "properties": {
+            "candidate_id": { "type": "string" }
+          },
+          "required": ["candidate_id"]
+        }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

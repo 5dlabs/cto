@@ -1,5 +1,8 @@
 # Project: Sigma-1 — Unified AI Business Platform
 
+- **Website:** https://sigma-1.com
+- **Existing Platform:** https://deployiq.maximinimal.ca
+
 ## Vision
 
 Sigma-1 is a comprehensive AI-powered business platform that replaces fragmented tools, manual processes, and administrative overhead with a single intelligent agent — **Morgan** — accessible through Signal, phone, and web. Built for Sigma-1 / Perception Events, a lighting and visual production company.

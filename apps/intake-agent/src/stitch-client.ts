@@ -6,6 +6,20 @@ const GENERATION_TIMEOUT_MS = 180_000;
 const GENERATION_MAX_RETRIES = 2;
 const GENERATION_TOOLS = new Set(['generate_screen_from_text', 'generate_variants', 'edit_screens']);
 
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
 interface McpResponse {
   jsonrpc: '2.0';
   id: number;
@@ -103,12 +117,19 @@ export class StitchDirectClient {
     }
 
     const isGeneration = GENERATION_TOOLS.has(name);
-    const timeoutMs = isGeneration ? GENERATION_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
-    const maxAttempts = isGeneration ? GENERATION_MAX_RETRIES : 1;
+    const timeoutMs = isGeneration
+      ? readPositiveIntEnv('INTAKE_STITCH_GENERATION_TIMEOUT_MS', GENERATION_TIMEOUT_MS)
+      : readPositiveIntEnv('INTAKE_STITCH_DEFAULT_TIMEOUT_MS', DEFAULT_TIMEOUT_MS);
+    const maxAttempts = isGeneration
+      ? readPositiveIntEnv('INTAKE_STITCH_GENERATION_MAX_RETRIES', GENERATION_MAX_RETRIES)
+      : 1;
     let lastError: Error | undefined;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
+        console.error(
+          `[stitch] ${name} attempt ${attempt}/${maxAttempts} starting (timeout=${Math.round(timeoutMs / 1000)}s)`,
+        );
         const result = (await this.rpc('tools/call', { name, arguments: args }, timeoutMs)) as {
           content?: Array<{ type: string; text?: string }>;
           structuredContent?: unknown;
@@ -136,6 +157,7 @@ export class StitchDirectClient {
         return result;
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
+        console.error(`[stitch] ${name} attempt ${attempt}/${maxAttempts} failed: ${lastError.message}`);
         if (attempt < maxAttempts) {
           const backoff = attempt * 10_000;
           console.error(`[stitch] ${name} attempt ${attempt} failed: ${lastError.message} — retrying in ${backoff / 1000}s`);

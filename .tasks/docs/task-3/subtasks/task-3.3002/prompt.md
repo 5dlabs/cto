@@ -1,21 +1,18 @@
-Implement subtask 3002: Configure Redis HA with Sentinel mode
+Implement subtask 3002: Define opportunity.proto and project.proto with grpc-gateway annotations
 
 ## Objective
-Switch the Redis deployment from standalone to Sentinel mode for production, with 3 nodes and automatic failover, and update the REDIS_URL in the ConfigMap to a sentinel-aware connection string.
+Create protobuf definitions for the Opportunity and Project gRPC services with full REST gateway annotations for all endpoints including approve and convert actions.
 
 ## Steps
-1. In `values-prod.yaml`, update the Bitnami Redis subchart values:
-   - `architecture: replication` (enables master + replicas + sentinel).
-   - `sentinel.enabled: true`
-   - `replica.replicaCount: 2` (1 master + 2 replicas = 3 nodes total).
-   - `sentinel.quorum: 2`
-   - `master.persistence.size: 1Gi`
-   - `replica.persistence.size: 1Gi`
-2. Update `infra/notifycore/templates/configmap-endpoints.yaml` with conditional REDIS_URL:
-   - Dev: `redis://:<password>@notifycore-redis-master.notifycore.svc:6379`
-   - Prod: sentinel-aware URL. Note: the Rust `redis` crate supports sentinel via `redis+sentinel://` scheme or by configuring sentinel nodes directly. Set REDIS_URL to sentinel format or add separate `REDIS_SENTINEL_NODES` and `REDIS_MASTER_NAME` env vars.
-3. Add a PodDisruptionBudget for Redis pods (maxUnavailable: 1).
-4. Ensure `values-dev.yaml` retains standalone architecture.
+1. Create `proto/rms/v1/opportunity.proto`:
+   - Service `OpportunityService` with RPCs: `CreateOpportunity`, `GetOpportunity`, `UpdateOpportunity`, `ListOpportunities`, `ScoreLead`, `ApproveOpportunity`, `ConvertOpportunity`.
+   - Messages: `Opportunity` (id, org_id, customer_id, title, description, event_date_start, event_date_end, status enum [PENDING, QUALIFIED, APPROVED, CONVERTED], lead_score, line_items repeated, created_at, updated_at), `LeadScore` (score enum [GREEN, YELLOW, RED], breakdown map), `OpportunityLineItem`.
+   - grpc-gateway annotations: `POST /api/v1/opportunities`, `GET /api/v1/opportunities/{id}`, `PUT /api/v1/opportunities/{id}`, `GET /api/v1/opportunities`, `POST /api/v1/opportunities/{id}/score`, `POST /api/v1/opportunities/{id}/approve`, `POST /api/v1/opportunities/{id}/convert`.
+2. Create `proto/rms/v1/project.proto`:
+   - Service `ProjectService` with RPCs: `CreateProject`, `GetProject`, `UpdateProject`, `ListProjects`, `CheckOut`, `CheckIn`.
+   - Messages: `Project` (id, org_id, opportunity_id, customer_id, title, status, line_items, checkout_date, checkin_date, created_at, updated_at), `CheckOutRequest` (project_id, item_ids, date_range), `CheckOutResponse` (success, conflicts repeated), `Conflict` (item_id, conflicting_project_id, date_range).
+   - grpc-gateway annotations: `POST /api/v1/projects`, `GET /api/v1/projects/{id}`, `PUT /api/v1/projects/{id}`, `GET /api/v1/projects`, `POST /api/v1/projects/{id}/checkout`, `POST /api/v1/projects/{id}/checkin`.
+3. Run `buf generate` and verify Go stubs compile.
 
 ## Validation
-`helm template` with values-prod.yaml renders Redis with sentinel enabled, 3 total Redis pods. ConfigMap REDIS_URL for prod uses sentinel-aware connection string. `values-dev.yaml` rendering still shows standalone Redis. PDB resource for Redis is present in prod rendering.
+Run `buf lint` with zero errors on both proto files. Run `buf generate` and verify generated Go service interfaces contain all defined RPCs. Verify grpc-gateway reverse proxy code is generated with correct HTTP method/path mappings.

@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. `kubectl get pods -n notifycore` shows notifycore-pg and notifycore-redis pods in Running/Ready state within 120s. 2. A test Job in the namespace successfully connects to PostgreSQL (`SELECT 1` returns 1) using DATABASE_URL from the ConfigMap. 3. The same Job connects to Redis (`PING` returns `PONG`) using REDIS_URL from the ConfigMap. 4. ConfigMap `notifycore-infra-endpoints` exists and contains all four keys (DATABASE_URL, REDIS_URL, PORT, RUST_LOG) with non-empty values.
+- [ ] 1. `kubectl get cluster sigma1-postgres -n sigma1-db` shows READY with 2/2 instances healthy. 2. `kubectl exec` into a sigma1 pod and verify `psql` connection via PgBouncer pooler URL succeeds and `\dn` lists all 6 schemas (catalog, rms, finance, vetting, social, audit). 3. `redis-cli -u $VALKEY_URL PING` returns PONG. 4. ConfigMap `sigma1-infra-endpoints` exists with all 5 expected keys. 5. All Kubernetes Secrets exist with non-empty data keys. 6. Cloudflare Tunnel pod is Running and tunnel status shows CONNECTED. 7. ServiceMonitor CRs are picked up by Prometheus (check Prometheus targets page). 8. PgBouncer stats show active connection pools when queried via `SHOW POOLS`.
 
 ## Verification Notes
 
