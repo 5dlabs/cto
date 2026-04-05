@@ -1522,6 +1522,15 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
         ghProjectNumber = proj.number;
         ghProjectNodeId = proj.id;
         console.error(`github-sync: created GitHub Project #${ghProjectNumber}: ${projectTitle}`);
+        // Link project to the repository
+        try {
+          const repoNodeId = gh(['api', `repos/${repo}`, '--jq', '.node_id']).trim();
+          if (repoNodeId && ghProjectNodeId) {
+            gh(['api', 'graphql', '-f',
+              `query=mutation { linkProjectV2ToRepository(input: { projectId: "${ghProjectNodeId}", repositoryId: "${repoNodeId}" }) { repository { name } } }`]);
+            console.error(`github-sync: linked project to ${repo}`);
+          }
+        } catch { /* non-fatal */ }
       }
     } catch (err) {
       console.error(`github-sync: warning: could not create GitHub Project: ${err}`);
