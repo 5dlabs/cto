@@ -1,25 +1,18 @@
-Implement subtask 6006: Implement approval workflow with Signal integration via Morgan
+Implement subtask 6006: Implement Effect.Services for Instagram publishing
 
 ## Objective
-Build the approval workflow that sends draft content for review via Signal (through Morgan integration) and processes approval/rejection decisions.
+Build an Effect.Service for publishing content to Instagram via the Instagram Graph API, including image upload, caption posting, and status tracking.
 
 ## Steps
-1. Create `src/services/approval.ts` module using Effect.Service pattern.
-2. Define an `ApprovalService` with methods: `requestApproval(draftId: string) -> Effect.Effect<ApprovalRequest, ApprovalError>`, `processDecision(approvalId: string, decision: 'approved' | 'rejected', approvedBy: string) -> Effect.Effect<ApprovalResult, ApprovalError>`.
-3. Implement approval request flow:
-   - Fetch the draft with photos and caption.
-   - Send a message to Morgan's API (or webhook) containing draft preview (image URL, caption text, platform).
-   - Morgan forwards to Signal for human review.
-   - Update draft status to 'pending_approval'.
-   - Store the approval request in the `approvals` table.
-4. Implement approval callback:
-   - POST `/api/v1/social/approvals/:id/decide` — accept decision (approved/rejected) with optional feedback.
-   - Update the `approvals` table with decision and timestamp.
-   - Update the `drafts` table status accordingly.
-   - If approved, optionally auto-trigger publishing.
-5. Implement GET `/api/v1/social/approvals` — list pending approvals.
-6. Implement GET `/api/v1/social/approvals/:id` — get approval details.
-7. Handle Morgan unavailability gracefully — queue the approval request for retry.
+1. Create src/integrations/instagram.ts.
+2. Define Effect.Service `InstagramPublisher` with methods: publish(content: PublishableContent) -> Effect<PublishResult>, getPostStatus(postId: string) -> Effect<PostStatus>.
+3. PublishableContent: image_urls (string[]), caption, hashtags, scheduled_at (optional).
+4. PublishResult: platform_post_id, published_url, status.
+5. Implement Instagram Graph API flow: create media container -> publish media container.
+6. Handle carousel posts (multiple images) via the carousel container API.
+7. Manage Instagram access token refresh.
+8. Handle API errors: rate limits, invalid media, permission errors.
+9. Implement mock for testing.
 
 ## Validation
-Mock Morgan API. Verify requesting approval sends the correct payload to Morgan and updates draft status. Verify approval decision updates both approvals and drafts tables. Verify rejection flow works. Test Morgan unavailability triggers retry logic. List pending approvals and verify filtering.
+Unit tests with mocked Instagram API verify correct API call sequence (container creation then publish); carousel posts send correct media array; token refresh is triggered on 401; errors map to typed Effect failures.

@@ -1,17 +1,19 @@
-Implement subtask 4008: End-to-end finance workflow tests
+Implement subtask 4008: Write integration tests for all finance endpoints and Stripe flows
 
 ## Objective
-Write comprehensive integration tests covering the full invoice lifecycle, Stripe payment flow, currency conversion, AR aging, payroll, and cross-cutting audit trail.
+Create comprehensive integration tests covering invoice lifecycle, payment processing with Stripe mocks, payroll workflows, currency sync, and financial reports.
 
 ## Steps
-1. Create `tests/` integration test directory.
-2. Test 1 — Full invoice lifecycle: create invoice from opportunity → add line items → verify totals → send invoice (status: sent) → create Stripe payment intent → simulate Stripe webhook (payment_intent.succeeded) → verify invoice marked as paid → verify payment record → verify audit trail.
-3. Test 2 — Multi-currency: sync currency rates → create invoice in EUR → convert displayed amount to USD → verify conversion accuracy → create payment in EUR → verify amount matches.
-4. Test 3 — AR aging: create invoices with due dates at 0, 35, 65, and 95 days ago → generate aging report → verify each invoice is in the correct bucket → verify totals per bucket.
-5. Test 4 — Payment reminders: create invoice due in 5 days → run reminder processor → verify reminder created → run again → verify no duplicate. Create overdue invoice → run overdue marking → verify status changed.
-6. Test 5 — Payroll flow: create payroll record → verify calculations → approve → process → mark paid → verify audit trail.
-7. Test 6 — Error handling: attempt to pay a cancelled invoice → verify rejection. Send invalid Stripe webhook signature → verify 400. Create payroll with negative hours → verify validation error.
-8. Use testcontainers-rs or dedicated test database.
+1. Set up test infrastructure: use testcontainers (via testcontainers-rs or docker-compose) to spin up PostgreSQL and Redis for integration tests.
+2. Create a mock Stripe server (using wiremock-rs or similar) that simulates PaymentIntent creation, retrieval, and webhook events.
+3. Write invoice lifecycle test: create draft → add line items → verify totals → send → create payment → webhook succeeded → verify PAID status.
+4. Write payment idempotency test: create payment with same idempotency key twice → verify only one Stripe PaymentIntent created.
+5. Write webhook security test: send webhook with invalid signature → verify 400; send with valid signature → verify 200 and correct state update.
+6. Write refund flow test: successful payment → refund webhook → verify payment REFUNDED and invoice reverted to SENT.
+7. Write payroll lifecycle test: create → approve → pay → verify timestamps.
+8. Write currency sync test: mock external API → trigger sync → verify rates in DB and Redis → verify convert endpoint.
+9. Write financial reports test: create multiple invoices/payments across currencies and periods → verify revenue, payment, and outstanding reports return correct aggregations.
+10. Run coverage analysis and ensure ≥80% coverage across src/routes, src/services, src/db modules.
 
 ## Validation
-All integration tests pass with `cargo test --test integration`. Tests cover happy paths, edge cases, and error conditions. Each test is isolated with its own data. Audit log completeness is verified for every state-changing operation. No test interdependencies.
+All integration test suites pass with containerized PostgreSQL and Redis and mocked Stripe; end-to-end invoice-to-payment flow completes correctly; webhook signature verification works; idempotency prevents duplicates; financial reports aggregate correctly across currencies; coverage report shows ≥80%.

@@ -1,16 +1,18 @@
 Implement subtask 8002: Implement hero landing page (/)
 
 ## Objective
-Build the home page with a hero section, value proposition, featured equipment, and call-to-action sections.
+Build the homepage with hero section, value propositions, featured equipment, CTAs, and SEO metadata. This is the primary entry point for the Sigma-1 website.
 
 ## Steps
-1. Create `app/page.tsx` as the landing page.
-2. Build a Hero section with headline, subheadline, and CTA button (link to /equipment or /quote).
-3. Add a featured equipment section (static initially, can pull from API later).
-4. Add a services overview section highlighting key offerings.
-5. Add a testimonials or trust signals section.
-6. Ensure fully responsive design (mobile, tablet, desktop).
-7. Use shadcn/ui components (Button, Card) and TailwindCSS for styling.
+1. Create app/(marketing)/page.tsx as the landing page.
+2. Implement the hero section with headline, subheadline, and primary CTA (e.g., 'Browse Equipment', 'Get a Quote').
+3. Add a featured equipment section that fetches top items from the Equipment Catalog API using TanStack Query + Effect.
+4. Add value proposition cards (reliability, fleet size, service areas).
+5. Add a testimonials/social proof section.
+6. Implement responsive design for mobile, tablet, desktop.
+7. Add Schema.org Organization structured data.
+8. Configure page metadata (title, description, Open Graph tags).
+9. Ensure all interactive elements are keyboard accessible.
 
 ## Validation
-Home page renders at /. Hero section displays headline and CTA. Page is responsive across breakpoints. CTA button navigates to correct route. No layout shifts or broken styles.
+Homepage renders with all sections visible; featured equipment loads from API; CTA links navigate correctly; Schema.org JSON-LD is present in page source; page metadata is correct; responsive layout works at 320px, 768px, and 1280px breakpoints.

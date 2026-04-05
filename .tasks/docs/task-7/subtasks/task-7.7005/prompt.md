@@ -1,26 +1,22 @@
-Implement subtask 7005: Register all MCP tools with tool-server mapping to backend service endpoints
+Implement subtask 7005: Configure MCP tool-server with Equipment Catalog and RMS backend tools
 
 ## Objective
-Register every MCP tool (sigma1_catalog_search, sigma1_check_availability, sigma1_customer_vet, sigma1_create_quote, sigma1_submit_invoice, sigma1_social_post, etc.) with the tool-server, mapping each to the correct backend service API endpoint.
+Set up the MCP tool-server and register tools for the Equipment Catalog service (search, lookup, availability) and Rental Management System (create rental, check status, manage returns).
 
 ## Steps
-1. Define tool schemas for each MCP tool: name, description, input parameters (JSON Schema), output schema.
-2. Tools to register:
-   - sigma1_catalog_search → Equipment Catalog search endpoint
-   - sigma1_check_availability → Equipment Catalog availability endpoint
-   - sigma1_customer_vet → Customer Vetting service endpoint
-   - sigma1_create_quote → Quoting/Invoicing quote creation endpoint
-   - sigma1_get_quote → Quoting/Invoicing quote retrieval endpoint
-   - sigma1_submit_invoice → Quoting/Invoicing invoice submission endpoint
-   - sigma1_finance_report → Finance service reporting endpoint
-   - sigma1_social_post → Social Media Engine post endpoint
-   - sigma1_social_schedule → Social Media Engine scheduling endpoint
-   - sigma1_rms_create_job → RMS job creation endpoint
-   - sigma1_rms_update_status → RMS status update endpoint
-   - sigma1_admin_users → Admin user management endpoint
-3. Register each tool via tool-server's registration API or configuration file.
-4. Verify each tool is listed in the agent's available tools.
-5. Test each tool invocation with sample parameters to confirm end-to-end connectivity.
+1. Initialize the MCP tool-server configuration within the OpenClaw agent.
+2. Define and register Equipment Catalog tools:
+   - catalog_search: Search equipment by category, specs, availability.
+   - catalog_get_item: Get detailed info for a specific equipment item.
+   - catalog_check_availability: Check rental availability for date range.
+3. Define and register RMS tools:
+   - rms_create_rental: Create a new rental agreement.
+   - rms_get_rental_status: Check status of existing rental.
+   - rms_process_return: Process equipment return.
+   - rms_list_rentals: List rentals for a customer.
+4. Configure each tool's endpoint URL from sigma1-infra-endpoints ConfigMap.
+5. Define input/output schemas for each tool so the LLM can invoke them correctly.
+6. Implement error handling for tool invocation failures (service unavailable, bad input).
 
 ## Validation
-Query tool-server for registered tools; all expected tools are listed. Invoke each tool with sample parameters; verify correct backend endpoint is called and response is returned. No tools return connection errors.
+Agent can invoke each catalog tool and receive valid structured responses; agent can invoke each RMS tool and receive valid responses; tool schemas are correctly defined and the LLM selects appropriate tools for relevant queries; error cases return graceful error messages.

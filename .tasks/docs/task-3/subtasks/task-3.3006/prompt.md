@@ -1,15 +1,17 @@
-Implement subtask 3006: Implement CrewService with scheduling and calendar sync
+Implement subtask 3006: Implement CrewService with scheduling logic
 
 ## Objective
-Build the CrewService for managing crew members, assigning them to projects with date ranges, detecting scheduling conflicts, and syncing assignments to Google Calendar.
+Build the CrewService gRPC handler for crew member management and project scheduling, including availability tracking.
 
 ## Steps
-1. Create `internal/crew/` package with repository, service, and handler layers.
-2. Implement `repository.go`: CreateCrewMember, GetCrewMemberByID, ListCrewMembers, CreateAssignment, DeleteAssignment, ListAssignmentsByProject, ListAssignmentsByCrewMember, FindConflictingAssignments(crew_member_id, start_date, end_date).
-3. Implement assignment logic: before creating an assignment, query for overlapping assignments for the same crew member. If conflicts found, return FailedPrecondition with details of the conflicting assignment.
-4. Integrate with the `internal/calendar/` package (from task 3004): when creating an assignment, create a Google Calendar event for the crew member's schedule. Store calendar_event_id on the crew_assignment record.
-5. Implement availability checking: given a date range, return which crew members have no conflicting assignments.
-6. Wire up gRPC handlers.
+1. Create /internal/service/crew_service.go implementing CrewServiceServer.
+2. Implement CreateMember: persist crew member with role and initial availability.
+3. Implement GetMember, ListMembers: support filtering by role, availability; pagination.
+4. Implement UpdateMember: partial updates for role, contact info, availability.
+5. Implement GetSchedule: accept crew_member_id and date range, query project_crew join table to return all project assignments within the range, along with project details (name, dates).
+6. Implement AssignToProject: validate crew member exists and is available for the project date range (no overlapping assignments), insert into project_crew join table.
+7. Add availability conflict detection: query existing assignments for overlapping date ranges before allowing new assignment.
+8. Register service on gRPC server and grpc-gateway mux.
 
 ## Validation
-Unit tests for conflict detection logic with overlapping date ranges. Integration tests: create crew members, assign to a project for date range, attempt to assign same crew member to overlapping project — verify conflict error. Verify availability endpoint correctly filters out booked crew. Mock calendar client: verify events are created for assignments.
+AssignToProject succeeds when crew member has no conflicts and fails with ALREADY_EXISTS or FAILED_PRECONDITION when date range overlaps; GetSchedule returns correct project assignments for a date range; ListMembers filters by availability correctly.

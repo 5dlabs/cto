@@ -1,17 +1,15 @@
-Implement subtask 1002: Deploy PostgreSQL 16 via CloudNative-PG with multi-schema setup
+Implement subtask 1002: Deploy PostgreSQL 16 via CloudNative-PG operator with multi-schema setup
 
 ## Objective
-Deploy a single-replica PostgreSQL 16 cluster using the CloudNative-PG operator in the databases namespace, and create schemas for rms, crm, finance, audit, and public.
+Deploy a single-replica PostgreSQL 16 cluster in the databases namespace using the CloudNative-PG operator, then create the required schemas (rms, crm, finance, audit, public) and initial roles for each downstream service.
 
 ## Steps
-1. Ensure the CloudNative-PG operator is installed in the cluster (check CRDs: `kubectl get crds | grep cnpg`).
-2. Create a `Cluster` CR YAML in the `databases` namespace specifying PostgreSQL 16, single replica, storage class, resource limits.
-3. Configure the bootstrap section to run an initdb SQL script that creates schemas: rms, crm, finance, audit, public.
-4. Set connection pooling parameters (e.g., PgBouncer sidecar or built-in pooler) appropriate for dev.
-5. Apply the CR: `kubectl apply -f postgres-cluster.yaml`.
-6. Wait for the cluster to become Ready: `kubectl -n databases get cluster`.
-7. Verify schemas exist by exec-ing into the pod and running `\dn` in psql.
-8. Record the resulting POSTGRES_URL (host, port, credentials) for ConfigMap creation.
+1. Ensure the CloudNative-PG operator is installed (reference existing operator or add to Helm dependencies).
+2. Author a CloudNative-PG Cluster CR in infra/postgres/cluster.yaml: single replica, PostgreSQL 16, storage class per cluster default, resource requests (1 CPU / 2Gi RAM), in namespace 'databases'.
+3. Create a post-init SQL ConfigMap containing: CREATE SCHEMA IF NOT EXISTS rms; CREATE SCHEMA IF NOT EXISTS crm; CREATE SCHEMA IF NOT EXISTS finance; CREATE SCHEMA IF NOT EXISTS audit; and grants for dedicated roles (rms_user, crm_user, finance_user, audit_user).
+4. Configure the Cluster CR's bootstrap.initdb.postInitSQL to reference this ConfigMap.
+5. Create Kubernetes Secrets for each role's credentials (auto-generated passwords) so downstream services can consume them.
+6. Verify the cluster reaches 'Cluster in healthy state' status.
 
 ## Validation
-Confirm the CloudNative-PG Cluster CR shows status Ready with 1/1 replicas. Connect via psql and verify all 5 schemas (rms, crm, finance, audit, public) exist. Confirm the superuser and app credentials are stored in the expected Kubernetes secret.
+kubectl get cluster -n databases shows status 'Cluster in healthy state'; connect via psql from a test pod and run '\dn' to confirm schemas rms, crm, finance, audit exist; verify each role can connect and access only its schema.

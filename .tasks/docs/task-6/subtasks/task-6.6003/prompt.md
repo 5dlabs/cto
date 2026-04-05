@@ -1,21 +1,17 @@
-Implement subtask 6003: Implement AI curation pipeline for image selection
+Implement subtask 6003: Implement S3/R2 photo storage integration service
 
 ## Objective
-Build the AI-powered curation pipeline that analyzes uploaded photos and selects the top images for social media posting using OpenAI/Claude vision capabilities.
+Build an Effect.Service for uploading, retrieving, and managing photos in S3/R2 object storage. Handle image upload processing, generate storage keys, and provide CDN-ready URLs.
 
 ## Steps
-1. Create `src/services/curation.ts` module using Effect.Service pattern.
-2. Define a `CurationService` Effect.Service with method: `curateImages(photoIds: string[]) -> Effect.Effect<CuratedResult, CurationError>`.
-3. Implement the curation logic:
-   - Fetch photo records and generate presigned S3 URLs or download images.
-   - Send images to the AI vision API (OpenAI GPT-4V or Claude) with a prompt asking to score each image on composition, lighting, brand-suitability, and engagement potential (1-10 scale).
-   - Parse AI response to extract scores per image.
-   - Update `curation_score` on each photo record.
-   - Mark top N images as `is_curated = true` based on score threshold.
-4. Implement POST `/api/v1/social/curation/run` endpoint that triggers curation for a batch of photo IDs.
-5. Implement GET `/api/v1/social/curation/results` — list curated (top-scored) images.
-6. Handle AI API errors gracefully — retry with backoff, return partial results if some images fail.
-7. Make the AI provider configurable (OpenAI vs Claude) via environment variable.
+1. Create src/services/storage.ts.
+2. Define Effect.Service `StorageService` with methods: uploadImage(file: Buffer, metadata: ImageMetadata) -> Effect<StoredImage>, getImageUrl(fileKey: string) -> Effect<string>, deleteImage(fileKey: string) -> Effect<void>, listImages(prefix: string) -> Effect<StoredImage[]>.
+3. Implement using @aws-sdk/client-s3 configured for R2 compatibility (custom endpoint).
+4. Generate storage keys with pattern: `uploads/{year}/{month}/{uuid}.{ext}`.
+5. On upload: use `sharp` to extract dimensions, generate a thumbnail variant (stored as `thumbnails/{key}`), and return metadata.
+6. CDN URL generation: construct public URL from configured CDN domain + file key.
+7. Implement as Effect Layer with configurable S3 endpoint, bucket, and credentials.
+8. Handle errors: upload failures, invalid image formats, S3 connectivity issues.
 
 ## Validation
-Mock the AI API and verify curation scores are assigned to photos. Verify top images are marked as curated. Test with partial AI failures and verify graceful degradation. Verify the curation endpoint returns curated results.
+Unit tests with mocked S3 client verify correct key generation, thumbnail creation, and URL construction; integration test uploads a real image to a test bucket and verifies it's retrievable; error scenarios (invalid image, S3 down) return typed Effect errors.

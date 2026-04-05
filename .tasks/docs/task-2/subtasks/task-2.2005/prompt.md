@@ -1,17 +1,18 @@
-Implement subtask 2005: Implement S3/R2 signed URL generation for product images
+Implement subtask 2005: Implement rate limiting middleware using Redis
 
 ## Objective
-Add S3-compatible signed URL generation for serving product images securely, and implement the image URL resolution in product API responses.
+Add per-tenant/per-IP rate limiting to all API endpoints using Redis as the backing store, with configurable limits for public vs. machine-readable endpoints.
 
 ## Steps
-1. Add `aws-sdk-s3` or `rust-s3` crate to Cargo.toml.
-2. Initialize an S3 client in AppState using S3_URL, bucket name, and credentials from environment/secrets.
-3. Create a utility function `generate_signed_url(image_key: &str, expiry: Duration) -> String` that generates a pre-signed GET URL for an object in the product images bucket.
-4. Default expiry: 1 hour.
-5. Update the Product response serialization to include a `image_url` field that calls this function using the product's `image_key`.
-6. Handle missing image_key gracefully (return null or a default placeholder URL).
-7. For the equipment-api/catalog endpoint, batch-generate signed URLs for all products in the response.
-8. Ensure signed URL generation does not add significant latency (pre-sign is a local crypto operation, no network call).
+1. Create src/middleware/rate_limit.rs.
+2. Implement a Tower middleware/layer that extracts a rate limit key from the request: use X-Tenant-ID header if present, otherwise fall back to client IP (from X-Forwarded-For or socket addr).
+3. Use Redis INCR + EXPIRE pattern (sliding window counter) for rate limiting: key format 'ratelimit:{endpoint_group}:{tenant_or_ip}', TTL of 60 seconds.
+4. Configure different limits: public catalog endpoints at 60 req/min per IP, equipment-api endpoints at 30 req/min per tenant.
+5. Return HTTP 429 Too Many Requests with a JSON error body and Retry-After header when limit is exceeded.
+6. Include X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset response headers on all requests.
+7. Make limits configurable via environment variables (RATE_LIMIT_CATALOG, RATE_LIMIT_EQUIPMENT_API).
+8. Apply the middleware layer to the appropriate route groups in the Axum router.
+9. Handle Redis connection failures gracefully — if Redis is unavailable, allow the request through (fail-open) and log a warning.
 
 ## Validation
-Verify product responses include a valid `image_url` field. Verify the signed URL is accessible and returns the correct image from S3/R2. Verify products without images return null or a placeholder. Verify URL expiry works (URL becomes inaccessible after expiry period).
+Send 61 requests to a catalog endpoint within 60 seconds from the same IP and verify the 61st returns 429; verify rate limit headers are present on all responses; verify equipment-api has its own separate limit; verify fail-open behavior when Redis is stopped; verify X-Tenant-ID header scoping works.

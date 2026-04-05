@@ -1,17 +1,17 @@
-Implement subtask 3003: Implement OpportunityService with quote workflow
+Implement subtask 3003: Implement PostgreSQL database layer and migrations for RMS schema
 
 ## Objective
-Build the OpportunityService gRPC server implementation including CRUD operations for opportunities/quotes, status transitions (draft → sent → accepted → converted), and line item management.
+Create the database migration files and a shared repository/data-access layer for all five RMS domain tables in the rms PostgreSQL schema.
 
 ## Steps
-1. Create `internal/opportunity/` package with repository, service, and handler layers.
-2. Implement `repository.go` with PostgreSQL queries: CreateOpportunity, GetOpportunityByID, ListOpportunities (with filtering/pagination), UpdateOpportunityStatus, AddLineItem, RemoveLineItem.
-3. Implement `service.go` with business logic: validate status transitions (draft→sent→accepted→rejected, accepted→converted), calculate total amount from line items, enforce required fields per status.
-4. Implement `handler.go` registering the gRPC server interface.
-5. Wire up in main.go server registration.
-6. Ensure all mutations include audit fields (created_by, updated_by, timestamps).
-7. Add input validation using a validation library (e.g., go-playground/validator).
-8. Return proper gRPC status codes (NotFound, InvalidArgument, FailedPrecondition for invalid transitions).
+1. Choose a migration tool (golang-migrate/migrate or pressly/goose) and add it as a dependency.
+2. Create migration files for: opportunities, projects, inventory_items, crew_members, deliveries, plus join tables (project_crew, project_equipment, delivery_equipment).
+3. Each table should include: UUID primary key, created_at/updated_at timestamps, soft-delete (deleted_at nullable) per GDPR decision point.
+4. Add appropriate indexes: opportunities(customer_id, status), inventory_items(barcode) UNIQUE, crew_members(name), deliveries(project_id, status), projects(status).
+5. Implement a db package in /internal/db with: connection pool initialization using pgx/pgxpool, migration runner on startup, and base repository patterns.
+6. Implement repository interfaces and concrete implementations for each domain: OpportunityRepo, ProjectRepo, InventoryRepo, CrewRepo, DeliveryRepo with standard CRUD methods.
+7. Use transactions where needed (e.g., ConvertToProject creates a project and updates opportunity status atomically).
+8. Reference POSTGRES_URL from config package (envFrom sigma1-infra-endpoints).
 
 ## Validation
-Unit tests for status transition validation logic. Integration tests calling gRPC endpoints: create an opportunity, add line items, verify total calculation, transition through statuses. Verify invalid transitions return FailedPrecondition. REST endpoints via grpc-gateway return equivalent JSON responses.
+Migrations run successfully against a test PostgreSQL instance creating all expected tables and indexes; repository CRUD operations work in isolation with test data; transactional operations roll back correctly on failure.

@@ -1,12 +1,12 @@
 ## Decision Points
 
 - Which Redis-compatible engine should be used for caching, rate limiting, and session storage across services?
-- Which PostgreSQL operator should be used for managing the main database cluster?
-- Should the Finance and Customer Vetting services be implemented as separate Rust/Axum services or merged into a single multi-domain service?
+- What API paradigm should be used for inter-service communication between backend services (e.g., Morgan agent, Equipment Catalog, RMS, Finance, Vetting, Social Engine)?
 - How should multi-tenancy and schema separation be handled in the PostgreSQL database?
-- What authentication and authorization mechanism should be used for service-to-service and user-to-service communication?
-- Which external currency exchange rate API should be used for the scheduled rate sync job?
-- How should monetary amounts be stored and computed to ensure financial precision?
+- What authentication and authorization mechanism should be used for service-to-service and user-to-service API calls?
+- Should the Finance and Customer Vetting services be implemented as separate Rust/Axum services, or as modules within a single Rex service binary?
+- What versioning strategy should be used for public and internal APIs?
+- What approach should be used for GDPR compliance regarding data export and customer deletion?
 
 ## Coordination Notes
 

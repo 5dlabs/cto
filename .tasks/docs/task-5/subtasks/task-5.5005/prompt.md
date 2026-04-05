@@ -1,17 +1,17 @@
-Implement subtask 5005: Implement credit API integration module
+Implement subtask 5005: Implement Google Reviews reputation integration module
 
 ## Objective
-Build a Rust module for fetching business credit signals (credit score, payment history, risk indicators) from the selected credit data provider.
+Build a standalone Rust module that integrates with a Google Reviews data source (Google Places API or commercial alternative) to assess a company's reputation based on review count, average rating, and sentiment signals.
 
 ## Steps
-1. Create `src/integrations/credit.rs` module.
-2. Define a `CreditProvider` trait with async methods: `get_credit_report(org_identifier: &str) -> Result<CreditReport>`, `get_credit_score(org_identifier: &str) -> Result<CreditScore>`.
-3. Implement the trait for the chosen credit API provider (pending dp-5-1 resolution). Design the trait so it can be re-implemented for a different provider.
-4. Define domain types: CreditReport { score: Option<u32>, risk_level: RiskLevel, payment_history_rating: Option<PaymentRating>, outstanding_judgments: u32, liens: u32, report_date: DateTime }, CreditScore { score: u32, range_min: u32, range_max: u32 }.
-5. Implement HTTP calls with appropriate authentication (API key or OAuth depending on provider).
-6. Handle provider-specific error codes and map to internal error types.
-7. Add tracing and logging for audit trail of credit checks.
-8. Consider implementing a stub/mock provider for development and testing.
+1. Create src/integrations/google_reviews.rs.
+2. Define a trait `ReputationChecker` with async method `check_reputation(company_name: &str, location: Option<&str>) -> Result<Reputation, VettingError>`.
+3. Reputation struct: found (bool), place_id (Option<String>), average_rating (Option<f64>), total_reviews (Option<i32>), recent_review_count (Option<i32>), reputation_score (f64 0.0-1.0).
+4. Implement `GoogleReviewsClient` struct with reqwest::Client and API key.
+5. Use Google Places API: Text Search to find the business, then Place Details for reviews.
+6. Calculate reputation_score: weighted combination of average_rating normalized to 0-1 (weight 0.5), log-scaled review count (weight 0.3), and recency of reviews (weight 0.2).
+7. Handle API quota limits, no-results, and parsing errors.
+8. Implement `MockReputationChecker` for testing.
 
 ## Validation
-Write unit tests using a mock credit provider implementation. Verify correct deserialization, error handling for unavailable reports, and correct mapping to domain types. Verify the stub provider returns sensible test data.
+Unit tests with mocked Google Places API responses verify correct reputation scoring; businesses with high ratings and many reviews score higher; missing businesses return found=false with score 0.0; mock implementation works as expected.

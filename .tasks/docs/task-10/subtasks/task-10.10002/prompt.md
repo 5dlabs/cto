@@ -1,15 +1,17 @@
-Implement subtask 10002: Automate secret rotation for database credentials
+Implement subtask 10002: Implement automated secret rotation for database credentials
 
 ## Objective
-Implement automated rotation of PostgreSQL and Redis credentials using the External Secrets Operator or equivalent, ensuring services pick up new credentials without downtime.
+Set up automated rotation for PostgreSQL database credentials (application user passwords, replication credentials) so that secrets are periodically rotated without causing application downtime.
 
 ## Steps
-1. Install/configure the External Secrets Operator (external-secrets.io) if not already present, or use the chosen secret management solution per dp-12.
-2. Create ExternalSecret resources for PostgreSQL credentials (username, password, connection string) that sync from the external secret store.
-3. Configure rotation policy with an appropriate interval (e.g., every 30 days).
-4. For PostgreSQL, implement a rotation lambda/CronJob that: creates a new password, updates the user in PostgreSQL, updates the external secret store.
-5. Ensure Deployments reference secrets via `envFrom` or `env[].valueFrom.secretKeyRef` so new pods pick up rotated values.
-6. Test that a rolling restart after rotation causes zero downtime.
+1. Determine the secret rotation mechanism (External Secrets Operator, operator-native rotation, or CronJob-based — per dp-15 decision).
+2. For PostgreSQL:
+   a. Configure the PostgreSQL operator to support credential rotation (if supported natively).
+   b. If not native, create a CronJob that: generates a new password, updates the PostgreSQL user password via SQL, updates the Kubernetes Secret, and triggers a rolling restart of dependent application pods.
+3. Set rotation interval (e.g., every 30 days).
+4. Ensure the rotation process is atomic — old credentials remain valid until all consumers have picked up the new ones.
+5. Store rotation history/metadata as annotations on the Secret or in a ConfigMap for auditability.
+6. Test the rotation flow end-to-end in a staging/dev environment before applying to production.
 
 ## Validation
-Trigger a manual secret rotation. Verify the new credential is propagated to the Kubernetes Secret within the configured sync interval. Restart a service pod and verify it connects successfully with the new credential. Verify the old credential is invalidated.
+Trigger a manual rotation and verify: the PostgreSQL password is changed, the Kubernetes Secret is updated, application pods pick up the new credentials (via restart or dynamic reload), and the application continues serving requests without errors. Verify old credentials no longer work after rotation completes.

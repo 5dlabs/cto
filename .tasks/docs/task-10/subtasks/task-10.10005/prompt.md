@@ -1,14 +1,22 @@
-Implement subtask 10005: Enable application-level audit logging for all services
+Implement subtask 10005: Enable audit logging for managed services (PostgreSQL, Redis)
 
 ## Objective
-Configure all backend services (Equipment Catalog, RMS, Finance, Vetting, Social, Morgan) to emit structured audit logs for API access events, and ship these logs to Loki for centralized analysis.
+Configure audit logging within PostgreSQL and Redis to capture data access, administrative operations, and authentication events for compliance and forensics.
 
 ## Steps
-1. Ensure each service emits structured JSON logs for API requests including: timestamp, user/client identity, action/endpoint, resource affected, result (success/failure), source IP.
-2. If services use a shared logging library, add audit log fields at the middleware level.
-3. Configure Promtail/log agent to scrape application logs and add labels (service, namespace, log_type=audit).
-4. Verify audit log entries from each service appear in Loki with correct labels.
-5. Create a Loki LogQL query template for common audit queries (e.g., all actions by a specific user, all failed requests in the last hour).
+1. **PostgreSQL audit logging**:
+   a. Enable `pgaudit` extension in the PostgreSQL operator CR.
+   b. Configure `pgaudit.log` to capture: `READ`, `WRITE`, `DDL`, `ROLE` events.
+   c. Set `log_connections = on` and `log_disconnections = on`.
+   d. Configure `log_statement = 'ddl'` for DDL statement logging.
+   e. Ensure PostgreSQL logs are collected by the cluster's log aggregation pipeline.
+2. **Redis audit logging**:
+   a. Enable `acllog-max-len` for ACL violation logging.
+   b. Configure Redis slowlog with appropriate threshold.
+   c. If the Redis operator supports it, enable command logging for administrative commands (CONFIG, FLUSHALL, etc.).
+   d. Ensure Redis logs are collected by the log aggregation pipeline.
+3. Verify logs include timestamps, client IPs, usernames, and operations.
+4. Document what events are logged and where they are stored.
 
 ## Validation
-Make an API call to each service and verify a corresponding audit log entry appears in Loki within 60 seconds, containing user identity, endpoint, and result. Verify failed/unauthorized requests are also logged with appropriate error codes.
+Execute test queries against PostgreSQL (SELECT, INSERT, CREATE TABLE, ALTER ROLE) and verify each appears in pgaudit logs with correct metadata. Execute Redis commands (SET, GET, CONFIG, ACL) and verify relevant events appear in Redis logs. Confirm logs are forwarded to the central log aggregation system.

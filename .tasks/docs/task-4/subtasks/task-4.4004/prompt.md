@@ -1,20 +1,19 @@
-Implement subtask 4004: Implement multi-currency support with scheduled rate sync and Redis caching
+Implement subtask 4004: Implement Stripe payment processing integration
 
 ## Objective
-Build the currency rate synchronization job that fetches exchange rates from an external API on a schedule, stores them in PostgreSQL, and caches current rates in Redis for fast lookups during invoice and payment operations.
+Build payment endpoints that integrate with the Stripe API for creating payment intents, processing payments against invoices, and recording payment outcomes.
 
 ## Steps
-1. Create `src/services/currency_service.rs`.
-2. Implement `fetch_rates(base_currency: &str)`: HTTP client call to the chosen exchange rate API (e.g., Open Exchange Rates). Parse response into Vec<CurrencyRate> structs.
-3. Implement `store_rates(rates: Vec<CurrencyRate>)`: batch insert/upsert into currency_rates table with current timestamp.
-4. Implement `cache_rates(rates: Vec<CurrencyRate>)`: store each rate in Redis with key pattern `currency_rate:{base}:{target}` and a TTL of 1 hour.
-5. Implement `get_rate(base: &str, target: &str) -> Result<Decimal>`: first check Redis cache, fallback to PostgreSQL query for most recent rate, return error if no rate found.
-6. Implement `convert_amount(amount: i64, from: &str, to: &str) -> Result<i64>`: use get_rate and perform conversion with proper decimal handling to avoid precision loss.
-7. Create `src/jobs/currency_sync.rs`: implement a tokio::spawn background task that runs the rate sync every configured interval (default: every 6 hours). Use tokio::time::interval.
-8. Create `src/routes/currency.rs`:
-   - GET /api/v1/currency/rates — list current rates
-   - GET /api/v1/currency/convert?amount=X&from=USD&to=EUR — convert amount
-9. Integrate `convert_amount` into invoice service for multi-currency invoice display.
+1. Add stripe-rust crate (or implement raw HTTP client to Stripe API using reqwest if stripe-rust doesn't support 0.7 Axum well).
+2. Create src/services/stripe_service.rs: initialize Stripe client with STRIPE_SECRET_KEY from config. Implement: create_payment_intent(amount, currency, invoice_id metadata), retrieve_payment_intent, confirm_payment_intent.
+3. Create src/db/payments.rs: repository functions for create_payment, get_payment, list_payments_by_invoice, update_payment_status.
+4. Create src/routes/payments.rs with Axum handlers:
+   - POST /api/v1/invoices/:id/payments → create payment: validate invoice is SENT or OVERDUE, create Stripe PaymentIntent, record Payment with PENDING status, return client_secret for frontend.
+   - GET /api/v1/invoices/:id/payments → list payments for invoice.
+   - GET /api/v1/payments/:id → get payment detail.
+5. Implement idempotency: use idempotency_key on payment creation to prevent duplicate charges. Check if payment with same key exists before creating Stripe PaymentIntent.
+6. On successful payment recording, update invoice status to PAID if total payments >= invoice total.
+7. Handle Stripe API errors gracefully: map to appropriate HTTP error responses with user-friendly messages.
 
 ## Validation
-Unit tests: verify rate conversion math with known exchange rates, verify precision is maintained for large amounts. Integration tests: mock external API, run sync job, verify rates stored in DB and cached in Redis. Verify cache fallback: clear Redis, verify DB lookup works. Verify GET /rates returns current rates. Verify GET /convert returns correct converted amount. Verify background job runs on schedule (test with short interval).
+Unit tests with mocked Stripe client verify PaymentIntent creation with correct amount/currency/metadata; idempotency key prevents duplicate payment creation; payment recording updates invoice status to PAID when fully paid; Stripe API errors are mapped to appropriate HTTP 4xx/5xx responses; integration test with Stripe test mode (if keys available) creates and retrieves a PaymentIntent.

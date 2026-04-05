@@ -1,24 +1,17 @@
-Implement subtask 2004: Integrate Redis for rate limiting and response caching
+Implement subtask 2004: Implement machine-readable equipment API endpoints with S3/R2 image URL integration
 
 ## Objective
-Add Redis integration to the Equipment Catalog service for API rate limiting and caching of catalog read responses to meet performance requirements.
+Implement the /equipment-api/catalog and /equipment-api/checkout endpoints designed for machine consumption by the Morgan agent, with full S3/R2 CDN image URL construction.
 
 ## Steps
-1. Add `redis` (or `fred`) crate to Cargo.toml.
-2. Initialize a Redis connection pool from REDIS_URL in AppState.
-3. Implement a rate-limiting middleware for Axum:
-   - Use a sliding window or token bucket algorithm stored in Redis.
-   - Key by client IP (or API key if present).
-   - Default limit: 100 requests/minute for public endpoints.
-   - Return HTTP 429 with Retry-After header when exceeded.
-4. Implement response caching for read endpoints:
-   - Cache `GET /catalog/categories` with a 5-minute TTL.
-   - Cache `GET /catalog/products` keyed by query params with a 2-minute TTL.
-   - Cache `GET /catalog/products/:id` with a 5-minute TTL.
-   - Do NOT cache availability (it changes frequently).
-5. Add cache invalidation: when admin creates/updates a product or category, delete relevant cache keys.
-6. Implement as Axum middleware layers or per-handler logic.
-7. Add Redis health check to the readiness probe.
+1. Create src/handlers/equipment_api.rs.
+2. GET /api/v1/equipment-api/catalog → equipment_catalog: return a complete, denormalized JSON document of all active products grouped by category, with full image CDN URLs, specifications, and pricing. This is optimized for a single fetch by the Morgan agent. Structure: { categories: [{ id, name, products: [{ id, name, description, daily_rate_cents, weekly_rate_cents, specifications, images: [{ url, alt_text }], availability_summary: { next_7_days_available: bool } }] }] }.
+3. Construct image URLs by concatenating AppState.config.s3_cdn_base_url + '/' + image_key from the product_images table.
+4. For availability_summary, query the next 7 days of availability and return a boolean indicating if any quantity is available on all 7 days.
+5. POST /api/v1/equipment-api/checkout → equipment_checkout: accept a JSON body { items: [{ product_id, start_date, end_date, quantity }], customer_info: { name, email, phone } }. Validate all products exist, check availability for each item across the date range, and if all available, return a quote response: { quote_id (UUID), items: [...with pricing], total_cents, valid_until (now + 24h) }. Do NOT actually reserve inventory in v1 — this is a quote only.
+6. Add input validation using serde with custom deserializers for dates and UUIDs.
+7. Register routes under /api/v1/equipment-api prefix.
+8. Add appropriate Content-Type headers and CORS for machine clients.
 
 ## Validation
-Verify rate limiting triggers HTTP 429 after exceeding 100 requests/minute from the same IP. Verify cached responses are served from Redis (check response headers or Redis key existence). Verify cache is invalidated after an admin mutation. Verify Redis connection failure degrades gracefully (service still works without cache).
+equipment_catalog endpoint returns all active products with correct CDN image URLs; equipment_checkout with valid items returns a quote with correct pricing math; checkout with unavailable items returns a clear error; image URLs are well-formed and include the CDN base URL; JSON schema matches the documented structure.

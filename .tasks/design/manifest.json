@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-04-05T03:51:39Z",
+  "generated_at": "2026-04-05T16:01:12Z",
   "project_name": "sigma-1",
   "linear_session_id": "",
   "design_mode": "ingest_plus_stitch",
-  "design_provider": "stitch",
+  "design_provider": "both",
   "stitch_required": true,
   "bundle_dir": "/Users/jonathon/5dlabs/cto/.tasks/design",
   "has_frontend": true,

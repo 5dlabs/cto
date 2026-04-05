@@ -1,19 +1,20 @@
-Implement subtask 9005: Set up Cloudflare Tunnel ingress for Morgan and web frontend
+Implement subtask 9005: Apply Kubernetes network policies to restrict inter-service traffic
 
 ## Objective
-Configure Cloudflare Tunnel (cloudflared) as the ingress mechanism for Morgan backend and the web frontend, replacing or supplementing any existing ingress controller, with secure routing and DNS configuration.
+Define and apply NetworkPolicy resources to enforce least-privilege network access between pods, namespaces, and external endpoints. Only allow traffic paths that are required by the application architecture.
 
 ## Steps
-1. Create a Cloudflare Tunnel via the dashboard or `cloudflared tunnel create`.
-2. Deploy the `cloudflared` connector as a Kubernetes Deployment (2 replicas for HA) in the infra namespace.
-3. Store the tunnel credentials as a Kubernetes Secret.
-4. Configure the tunnel's `config.yaml` (via ConfigMap) with ingress rules:
-   - `morgan.example.com` → `http://morgan-service.<namespace>.svc.cluster.local:<port>`
-   - `app.example.com` → `http://web-frontend-service.<namespace>.svc.cluster.local:<port>`
-   - Catch-all rule returning 404.
-5. Create CNAME DNS records in Cloudflare pointing to the tunnel ID.
-6. Verify connectivity by accessing both URLs externally.
-7. Ensure `cloudflared` has appropriate RBAC (ServiceAccount, Role) in the cluster.
+1. Audit the service communication graph: identify which services talk to PostgreSQL, Redis, each other, and external endpoints.
+2. Create a default-deny-all ingress NetworkPolicy for each namespace to block all traffic by default.
+3. Create granular allow NetworkPolicies for each service:
+   - Allow API services to reach PostgreSQL and Redis on their specific ports.
+   - Allow the web frontend to reach API services.
+   - Allow cloudflared to reach web and Morgan services.
+   - Allow DNS egress (port 53) for all pods.
+   - Allow egress to external APIs (e.g., OpenAI, Cloudflare) as needed.
+4. Label all pods and namespaces consistently for policy selectors.
+5. Apply all NetworkPolicy manifests.
+6. Document the network policy matrix in the infra repo.
 
 ## Validation
-Access `morgan.example.com` and `app.example.com` from outside the cluster and verify correct responses. Verify tunnel is healthy via `cloudflared tunnel info`. Kill one cloudflared pod and verify the other maintains connectivity. Verify no direct NodePort/LoadBalancer exposure exists for these services.
+After applying policies, verify allowed traffic paths work (e.g., API can connect to PostgreSQL, web can reach API). Verify blocked paths fail (e.g., web cannot directly reach PostgreSQL, random pods cannot reach Redis). Use a test pod to attempt unauthorized connections and confirm they are denied. Run `kubectl get networkpolicy -A` to confirm all policies are applied.

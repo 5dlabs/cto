@@ -1,17 +1,16 @@
-Implement subtask 1005: Deploy Signal-CLI as a standalone pod for Morgan agent
+Implement subtask 1005: Deploy Signal-CLI for Morgan agent integration
 
 ## Objective
-Deploy Signal-CLI as a dedicated Kubernetes Deployment in the sigma1 namespace, configured to receive and send Signal messages for the Morgan AI agent.
+Deploy Signal-CLI as a standalone pod in the sigma1 namespace with REST API access, enabling the Morgan agent to send and receive Signal messages.
 
 ## Steps
-1. Create a Deployment YAML for Signal-CLI using the `bbernhard/signal-cli-rest-api` container image (or equivalent).
-2. Deploy in the `sigma1` namespace with resource limits (256Mi RAM, 250m CPU).
-3. Mount a PersistentVolumeClaim for Signal-CLI's data directory (stores registration state).
-4. Expose Signal-CLI via a ClusterIP Service on port 8080 (REST API).
-5. Configure liveness and readiness probes against the Signal-CLI health endpoint.
-6. Store any Signal registration credentials or phone number in a Kubernetes Secret `signal-cli-credentials`.
-7. Apply the manifests and verify the pod is Running.
-8. Record the SIGNAL_CLI_URL (e.g., `http://signal-cli.sigma1.svc.cluster.local:8080`) for ConfigMap creation.
+1. Author a Deployment manifest for signal-cli-rest-api (Docker image: bbernhard/signal-cli-rest-api or equivalent) in the sigma1 namespace.
+2. Configure a PersistentVolumeClaim for Signal-CLI's data directory (~/.local/share/signal-cli) to persist registration state across restarts.
+3. Expose the REST API on port 8080 via a ClusterIP Service 'signal-cli' in the sigma1 namespace.
+4. Create a Secret 'signal-cli-config' containing the Signal phone number and any registration tokens.
+5. Add liveness and readiness probes hitting the /v1/about endpoint.
+6. Set resource requests (128Mi RAM / 100m CPU) and limits (512Mi RAM / 500m CPU).
+7. Document the registration process (manual step: register the phone number via the API after first deploy).
 
 ## Validation
-Confirm the Signal-CLI pod is Running with passing health probes. Curl the REST API endpoint from within the cluster and verify a valid response. Confirm the PVC is bound and the credentials secret exists.
+kubectl get pods -n sigma1 shows signal-cli pod Running and Ready; curl signal-cli.sigma1.svc:8080/v1/about returns version info; verify PVC is bound and data directory is writable.

@@ -1,16 +1,15 @@
 Implement subtask 1003: Deploy Redis/Valkey via opstreelabs operator
 
 ## Objective
-Deploy a single-replica Redis/Valkey instance using the opstreelabs Redis operator in the databases namespace for caching, rate limiting, and session storage.
+Deploy a single-replica Redis/Valkey instance in the databases namespace using the opstreelabs Redis operator, configured for caching, rate limiting, and session storage.
 
 ## Steps
-1. Ensure the opstreelabs Redis operator is installed (check CRD: `kubectl get crds | grep redis.redis.opstreelabs.in`).
-2. Create a `Redis` CR YAML in the `databases` namespace specifying single-replica mode, resource limits, persistence volume.
-3. Configure password authentication via a Kubernetes Secret referenced by the CR.
-4. Apply the CR: `kubectl apply -f redis-cluster.yaml`.
-5. Wait for the Redis pod to be Running and Ready.
-6. Test connectivity: `kubectl -n databases exec -it <redis-pod> -- redis-cli ping` should return PONG.
-7. Record the REDIS_URL (host, port, password) for ConfigMap creation.
+1. Verify the opstreelabs Redis operator (redis.redis.opstreelabs.in) is installed in-cluster; if not, add it as a Helm dependency.
+2. Author a Redis CR in infra/redis/redis.yaml: single replica (standalone mode), namespace 'databases', resource requests (256Mi RAM / 250m CPU), persistence enabled with a small PVC (1Gi).
+3. Set a password via a Kubernetes Secret 'redis-auth' in the databases namespace.
+4. Configure maxmemory-policy as 'allkeys-lru' for cache-friendly behavior.
+5. Expose the Redis service as a ClusterIP service 'redis-sigma1' on port 6379.
+6. Apply and wait for the pod to reach Running/Ready.
 
 ## Validation
-Confirm the Redis CR is in Ready state. Execute `redis-cli ping` from within the pod and verify PONG response. Confirm the password secret exists and matches the CR reference.
+kubectl get pods -n databases shows redis pod Running and Ready; exec into a test pod and run 'redis-cli -h redis-sigma1.databases.svc -a <password> PING' and confirm 'PONG'; verify the Secret 'redis-auth' exists.

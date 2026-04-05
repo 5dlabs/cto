@@ -1,15 +1,18 @@
-Implement subtask 3010: End-to-end workflow validation tests
+Implement subtask 3010: Write integration tests for all RMS gRPC and REST endpoints
 
 ## Objective
-Write comprehensive end-to-end tests covering the full quote-to-project lifecycle, inventory check-in/check-out workflows, and cross-service interactions.
+Create comprehensive integration tests covering all five services end-to-end, including the quote-to-project workflow, barcode scanning, and cross-service interactions.
 
 ## Steps
-1. Create `e2e/` test directory with Go test files using a test database.
-2. Test 1 — Full Quote-to-Project lifecycle: create opportunity with line items → send quote → accept quote → convert to project → verify project has correct dates and items → assign crew → schedule delivery → transition delivery to delivered → check out inventory items → check in inventory items → verify complete audit trail.
-3. Test 2 — Conflict detection: create two projects with overlapping dates → assign same crew member to both → verify conflict on second assignment → assign same inventory item to both → verify conflict detection.
-4. Test 3 — Concurrent operations: simulate concurrent check-out of the same inventory item from two goroutines → verify exactly one succeeds.
-5. Test 4 — REST parity: for each gRPC call in tests 1-3, make the equivalent REST call via grpc-gateway and verify responses match.
-6. All tests should use testcontainers or a dedicated test database with transaction rollback.
+1. Set up test infrastructure: use testcontainers-go or docker-compose to spin up PostgreSQL and Redis for integration tests.
+2. Write test suite for OpportunityService: create → list → update → convert to project. Verify REST endpoints via grpc-gateway return same data as gRPC.
+3. Write test suite for ProjectService: create project → assign crew → assign equipment → update dates. Verify crew and equipment associations.
+4. Write test suite for InventoryService: create item → scan barcode → check out → scan again → check in. Verify status transitions and barcode dedup via Redis.
+5. Write test suite for CrewService: create member → assign to project → verify schedule → attempt conflicting assignment (expect failure). Verify Google Calendar mock is called.
+6. Write test suite for DeliveryService: create delivery → update status through full lifecycle (SCHEDULED→IN_TRANSIT→DELIVERED→RETURNED). Verify equipment status updates on delivery.
+7. Write end-to-end workflow test: Create opportunity → convert to project → assign crew → assign equipment → create delivery → complete delivery → check in equipment. This tests the full quote-to-project-to-delivery pipeline.
+8. Verify all REST endpoints via HTTP client match gRPC responses.
+9. Ensure test coverage report shows ≥80% across all service packages.
 
 ## Validation
-All e2e tests pass with `go test ./e2e/...`. Tests cover the complete happy path lifecycle, conflict scenarios, concurrency edge cases, and REST/gRPC parity. Test output shows no data leakage between test cases.
+All integration test suites pass in CI with containerized PostgreSQL and Redis; end-to-end workflow test completes without errors; REST and gRPC responses are consistent; coverage report shows ≥80% for /internal/service packages.

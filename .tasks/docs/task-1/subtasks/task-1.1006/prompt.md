@@ -1,19 +1,17 @@
-Implement subtask 1006: Create sigma1-infra-endpoints ConfigMap across all namespaces
+Implement subtask 1006: Provision third-party API secrets across namespaces
 
 ## Objective
-Create the `sigma1-infra-endpoints` ConfigMap in each service namespace, aggregating connection strings for PostgreSQL, Redis, S3, Signal-CLI, and all other infrastructure endpoints.
+Create Kubernetes Secrets for all third-party API keys (Stripe, OpenCorporates, LinkedIn, Google, etc.) in their respective namespaces so downstream services can consume them securely.
 
 ## Steps
-1. Gather all endpoint values from completed infrastructure deployments:
-   - POSTGRES_URL: from CloudNative-PG cluster secret
-   - REDIS_URL: from Redis operator secret
-   - S3_URL, S3_BUCKET_PRODUCTS, S3_BUCKET_EVENTS: from S3 provisioning
-   - SIGNAL_CLI_URL: from Signal-CLI service
-2. Create a ConfigMap template `sigma1-infra-endpoints` containing all these keys.
-3. Apply this ConfigMap to every service namespace: sigma1, openclaw, social, web, databases.
-4. Use `kubectl apply -f` with namespace overrides or a Kustomize overlay to deploy across namespaces.
-5. Verify each namespace has the ConfigMap with `kubectl -n <ns> get configmap sigma1-infra-endpoints -o yaml`.
-6. Ensure downstream services can reference it via `envFrom: [configMapRef: {name: sigma1-infra-endpoints}]`.
+1. Define a manifest per secret with placeholder values (to be filled by operators) under infra/secrets/.
+2. Create 'stripe-api-keys' Secret in sigma1 namespace: STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET.
+3. Create 'opencorporates-api' Secret in sigma1 namespace: OPENCORPORATES_API_KEY.
+4. Create 'linkedin-api' Secret in social namespace: LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET.
+5. Create 'google-api' Secret in sigma1 namespace: GOOGLE_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET.
+6. Annotate each secret with 'sigma1.io/managed-by=infra-bootstrap' for lifecycle tracking.
+7. Ensure secrets are of type Opaque and base64-encoded.
+8. Add a README documenting each secret name, namespace, expected keys, and which service consumes it.
 
 ## Validation
-For each namespace (sigma1, openclaw, social, web, databases), verify the ConfigMap `sigma1-infra-endpoints` exists and contains all expected keys (POSTGRES_URL, REDIS_URL, S3_URL, SIGNAL_CLI_URL, bucket names). Validate that the values are non-empty and well-formed URLs/connection strings.
+kubectl get secrets -n sigma1 lists stripe-api-keys, opencorporates-api, google-api; kubectl get secrets -n social lists linkedin-api; each secret contains the expected keys (kubectl get secret <name> -o jsonpath='{.data}' shows all required keys).

@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All endpoints return correct data. Stripe payments are processed and recorded. Currency rates are updated and cached. Automated reminders and AR aging reports are generated. Health and metrics endpoints are available.
+- [ ] All endpoints return correct data; Stripe payments are processed and recorded; currency rates are updated on schedule; tests cover at least 80% of code paths.
 
 ## Verification Notes
 

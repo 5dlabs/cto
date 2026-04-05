@@ -1,15 +1,25 @@
-Implement subtask 7006: Implement skills: sales-qual, customer-vet, quote-gen, upsell
+Implement subtask 7006: Configure MCP tool-server with Finance, Vetting, and Social Media backend tools
 
 ## Objective
-Implement the sales-oriented skill set for Morgan: lead qualification (sales-qual), customer vetting orchestration (customer-vet), quote generation (quote-gen), and upsell recommendation (upsell).
+Register MCP tools for the Finance service (invoicing, payments), Customer Vetting service (credit checks, verification), and Social Media Engine (content publishing, portfolio).
 
 ## Steps
-1. **sales-qual skill**: Define conversation flow for qualifying inbound leads. Extract: company name, project type, equipment needs, timeline, budget range. Use sigma1_catalog_search to validate equipment availability. Score lead and route accordingly.
-2. **customer-vet skill**: Orchestrate customer vetting by calling sigma1_customer_vet with collected information. Parse vetting results and communicate status to the customer.
-3. **quote-gen skill**: Gather quote parameters (equipment list, duration, delivery location). Call sigma1_create_quote. Format and present the quote to the customer with line items and totals.
-4. **upsell skill**: Based on the current equipment selection, recommend complementary items using catalog data. Present upsell suggestions naturally within the conversation.
-5. Each skill should be defined as a structured prompt/instruction set that Morgan can activate based on conversation context.
-6. Implement skill routing logic: detect user intent and activate the appropriate skill.
+1. Define and register Finance tools:
+   - finance_create_invoice: Generate invoice for a quote/rental.
+   - finance_get_invoice_status: Check payment status of an invoice.
+   - finance_process_payment: Record a payment against an invoice.
+   - finance_generate_quote: Create a price quote for equipment rental.
+2. Define and register Vetting tools:
+   - vetting_run_credit_check: Initiate credit check for a customer.
+   - vetting_get_vetting_status: Get result of a vetting process.
+   - vetting_verify_identity: Verify customer identity documents.
+3. Define and register Social Media tools:
+   - social_publish_content: Publish content to social platforms.
+   - social_get_portfolio: Retrieve published portfolio items.
+   - social_schedule_post: Schedule a future social media post.
+4. Configure each tool's endpoint URL from sigma1-infra-endpoints ConfigMap.
+5. Define input/output schemas for each tool.
+6. Implement error handling for each tool category.
 
 ## Validation
-Simulate a lead qualification conversation; verify all required fields are collected and lead is scored. Trigger customer-vet skill; verify sigma1_customer_vet is called. Request a quote; verify sigma1_create_quote is called and quote is presented. Verify upsell suggestions appear when relevant equipment is selected.
+Agent can invoke each finance tool and receive valid structured responses; vetting tools return appropriate check results; social media tools successfully interact with the Social Media Engine; all tool schemas validate correctly; error cases are handled gracefully.

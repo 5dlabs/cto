@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All endpoints return correct data for 533+ products and 24 categories. Rate limiting is enforced. Product images are served via S3/R2. /metrics and health endpoints are accessible. Availability checks complete in <500ms under load.
+- [ ] All endpoints return correct data with valid/invalid inputs; rate limiting is enforced; health and metrics endpoints respond; images are served via CDN; tests cover at least 80% of code paths.
 
 ## Verification Notes
 

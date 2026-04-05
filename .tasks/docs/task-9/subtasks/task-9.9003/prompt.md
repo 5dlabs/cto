@@ -1,15 +1,17 @@
-Implement subtask 9003: Scale backend service replicas for all application services
+Implement subtask 9003: Configure Cloudflare CDN for static assets and SSL termination
 
 ## Objective
-Increase Deployment replica counts for Equipment Catalog, RMS, Finance, Vetting, Social, and Morgan services to at least 2 replicas each, with appropriate PodDisruptionBudgets and anti-affinity rules.
+Set up Cloudflare CDN to cache and serve static assets globally with SSL/TLS termination at the edge. Configure cache rules, page rules, and SSL mode for all public-facing domains.
 
 ## Steps
-1. For each service (Equipment Catalog, RMS, Finance, Vetting, Social, Morgan), update the Deployment or Helm values to set `replicas: 2` (minimum) or higher based on expected load.
-2. Add `topologySpreadConstraints` or pod anti-affinity to distribute replicas across nodes.
-3. Add PodDisruptionBudgets with `minAvailable: 1` for each Deployment.
-4. Ensure readiness and liveness probes are properly configured for rolling updates.
-5. Apply all changes and verify each service has the correct number of running, ready pods.
-6. Confirm rolling update strategy is set to `RollingUpdate` with `maxUnavailable: 0` and `maxSurge: 1`.
+1. Ensure DNS for all public-facing domains is proxied through Cloudflare (orange cloud).
+2. Set SSL/TLS mode to 'Full (Strict)' in Cloudflare dashboard or via API/Terraform.
+3. Configure cache rules for static asset paths (e.g., `/static/*`, `/_next/static/*`, image/font/CSS/JS extensions) with long TTLs.
+4. Set appropriate cache-control headers in application responses for static assets.
+5. Configure page rules or cache rules to bypass cache for API endpoints and dynamic routes.
+6. Enable HSTS via Cloudflare settings.
+7. Enable Brotli compression.
+8. Document the Cloudflare configuration including zone ID, cache rules, and SSL settings in the infra repo.
 
 ## Validation
-Verify each of the 6 services has at least 2 running, ready pods. Perform a rolling restart of one service and confirm zero downtime by continuously hitting its health endpoint. Verify PDBs are created for each service.
+Verify SSL/TLS is enforced by hitting public domains over HTTPS and confirming valid certificates. Confirm HTTP requests are redirected to HTTPS. Verify static assets return `cf-cache-status: HIT` header after first request. Verify API endpoints return `cf-cache-status: DYNAMIC` or `BYPASS`. Run SSL Labs test and confirm A+ rating.

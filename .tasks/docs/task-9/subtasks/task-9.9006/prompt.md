@@ -1,16 +1,18 @@
-Implement subtask 9006: Apply Kubernetes network policies to restrict inter-service traffic
+Implement subtask 9006: Update service manifests with readiness/liveness probes and resource limits
 
 ## Objective
-Define and apply NetworkPolicy resources for all namespaces to enforce least-privilege network access between services, allowing only explicitly required communication paths.
+Add or update readiness probes, liveness probes, startup probes, resource requests, and resource limits for all application Deployments and StatefulSets to ensure production reliability and proper scheduling.
 
 ## Steps
-1. Document the required communication paths: which services need to reach PostgreSQL, Redis, each other, and external endpoints.
-2. Create a default-deny ingress NetworkPolicy for each namespace: `spec.podSelector: {}` with `policyTypes: [Ingress]` and no ingress rules.
-3. For each service, create allow-ingress NetworkPolicies that permit traffic only from known consumers (using namespace and pod label selectors).
-4. Allow ingress from cloudflared pods to Morgan and web frontend services.
-5. Allow egress to DNS (kube-dns on port 53) for all pods.
-6. Apply all policies and verify they don't break existing connectivity.
-7. Store all NetworkPolicy manifests in the infra repo under a `network-policies/` directory.
+1. For each application Deployment/StatefulSet, add or update:
+   - `readinessProbe`: HTTP GET to health endpoint (e.g., `/healthz` or `/ready`) with appropriate `initialDelaySeconds`, `periodSeconds`, and `failureThreshold`.
+   - `livenessProbe`: HTTP GET or TCP check with more generous thresholds than readiness.
+   - `startupProbe` for services with slow initialization (e.g., ML model loading).
+2. Set `resources.requests` for CPU and memory based on observed or estimated usage.
+3. Set `resources.limits` for memory (and optionally CPU) to prevent noisy-neighbor issues.
+4. Ensure all probes use the correct port and path for each service.
+5. Apply updated manifests and verify pods restart cleanly with probes passing.
+6. Confirm resource requests sum does not exceed cluster capacity with headroom.
 
 ## Validation
-After applying policies, verify all services can still communicate with their required dependencies (health checks pass, API calls succeed). Attempt a connection from a service that should be blocked (e.g., web frontend directly to database) and confirm it is denied. Run `kubectl get networkpolicy -A` and verify policies exist in all namespaces.
+Verify all pods show `Running` status with `Ready` condition true. Describe each pod and confirm readiness, liveness, and startup probes are configured. Simulate a health endpoint failure (e.g., kill the app process) and verify Kubernetes restarts the pod. Verify `kubectl top pods` shows resource usage within defined limits.

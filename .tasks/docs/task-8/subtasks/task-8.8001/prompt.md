@@ -1,18 +1,19 @@
-Implement subtask 8001: Initialize Next.js 15 project with App Router, React 19, shadcn/ui, TailwindCSS 4, and Effect 3.x
+Implement subtask 8001: Scaffold Next.js 15 project with App Router, React 19, TailwindCSS 4, shadcn/ui, Effect, and TanStack Query
 
 ## Objective
-Scaffold the Next.js 15 project with all core dependencies, configure the App Router layout structure, global styles, and shared components (header, footer, navigation).
+Initialize the Next.js 15 project with all foundational dependencies configured: App Router, React 19, TailwindCSS 4, shadcn/ui component library, Effect 3.x, and TanStack Query for data fetching.
 
 ## Steps
 1. Run `create-next-app` with Next.js 15 and App Router enabled.
-2. Install and configure TailwindCSS 4 with the project's design tokens (colors, typography, spacing).
-3. Install and initialize shadcn/ui: run `npx shadcn-ui@latest init`, configure components.json.
-4. Install Effect 3.x (`@effect/io`, `@effect/schema`, `@effect/platform`) and configure TypeScript paths.
-5. Create the root layout (`app/layout.tsx`) with html/body, font loading, global CSS.
-6. Build shared layout components: Header (logo, nav links to /equipment, /quote, /portfolio), Footer (company info, links), and mobile-responsive navigation.
-7. Configure `next.config.js` with image domains (for equipment/portfolio images), environment variables for API endpoints.
-8. Set up ESLint and Prettier with the project's conventions.
-9. Verify dev server starts and the home page renders the layout shell.
+2. Install and configure React 19.
+3. Install and configure TailwindCSS 4 with the project's design tokens (colors, typography, spacing for Sigma-1 brand).
+4. Initialize shadcn/ui and install base components (Button, Card, Input, Dialog, Sheet, etc.).
+5. Install Effect 3.x and set up the Effect runtime/layer structure for the app (e.g., src/lib/effect/).
+6. Install and configure TanStack Query provider wrapping the app layout.
+7. Set up the App Router layout structure: root layout with metadata, global providers (QueryClientProvider, ThemeProvider).
+8. Configure TypeScript strict mode, path aliases (@/), and ESLint/Prettier.
+9. Set up environment variables for API endpoints (referencing sigma1-infra-endpoints).
+10. Create a basic health/smoke page to verify the stack works end-to-end.
 
 ## Validation
-Dev server starts without errors. Root layout renders header and footer. TailwindCSS classes apply correctly. shadcn/ui Button component renders. Effect imports resolve without TypeScript errors. Navigation links are present and routable.
+Project builds without errors; dev server starts and renders the root layout; TailwindCSS classes apply correctly; shadcn/ui Button component renders; Effect runtime initializes; TanStack Query devtools appear in dev mode; TypeScript compilation passes with strict mode.

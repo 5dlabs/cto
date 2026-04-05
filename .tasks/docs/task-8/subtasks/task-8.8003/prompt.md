@@ -1,18 +1,19 @@
-Implement subtask 8003: Implement equipment catalog listing page (/equipment) with API integration
+Implement subtask 8003: Implement equipment catalog listing page (/equipment)
 
 ## Objective
-Build the equipment catalog listing page that fetches and displays equipment from the Equipment Catalog API, with search, filtering, and pagination.
+Build the equipment catalog listing page with search, filtering, sorting, and pagination, fetching data from the Equipment Catalog API.
 
 ## Steps
-1. Create `app/equipment/page.tsx` for the catalog listing.
-2. Implement an Effect-based API client service for the Equipment Catalog API (search, list, filter endpoints).
-3. Use Effect for data fetching with proper error handling (loading, error, empty states).
-4. Display equipment as a grid of cards (image, name, category, daily rate, availability badge).
-5. Implement search bar with debounced input.
-6. Implement category filter (dropdown or sidebar with equipment categories).
-7. Implement pagination or infinite scroll.
-8. Add loading skeletons during data fetch.
-9. Handle API errors gracefully with user-friendly messages.
+1. Create app/equipment/page.tsx.
+2. Implement equipment grid/list view with cards showing image, name, category, daily rate, availability status.
+3. Implement search bar with debounced text search.
+4. Implement filter controls: category, availability date range, price range, specifications.
+5. Implement sorting: price (asc/desc), name, popularity.
+6. Implement pagination or infinite scroll.
+7. Use TanStack Query + Effect for data fetching with proper loading, error, and empty states.
+8. Implement Effect Schema validation for API response data.
+9. Add URL-based filter state (searchParams) so filters are shareable/bookmarkable.
+10. Add Schema.org Product structured data for equipment items.
 
 ## Validation
-Page renders at /equipment. Equipment cards display with correct data from API. Search filters results in real-time. Category filter narrows results. Pagination works. Loading state shows skeletons. API error displays friendly message.
+Catalog page renders equipment items from the API; search filters results correctly; category and price filters work; sorting changes item order; pagination loads additional items; URL params reflect current filters; loading and error states display correctly; Schema.org Product data is present.

@@ -1,20 +1,17 @@
-Implement subtask 6007: Implement website portfolio sync via webhook/API
+Implement subtask 6007: Implement Effect.Services for LinkedIn publishing
 
 ## Objective
-Build the webhook/API integration that syncs published social media content to the company website portfolio.
+Build an Effect.Service for publishing content to LinkedIn via the LinkedIn Marketing API, including image upload, article/post creation, and status tracking.
 
 ## Steps
-1. Create `src/services/portfolio-sync.ts` module.
-2. Define a `PortfolioSyncService` Effect.Service with method: `syncPost(publishedPost: PublishedPost) -> Effect.Effect<SyncResult, SyncError>`.
-3. Implement the sync logic:
-   - After successful publishing, prepare a payload with: image URL (S3 presigned or public), caption, platform, published date, external post URL.
-   - Send the payload to the website's portfolio API endpoint (configurable URL from environment).
-   - Alternatively, emit a webhook to a configured URL with the same payload.
-   - Update `published_posts.sync_status` to 'synced' or 'failed'.
-4. Implement a retry mechanism for failed syncs using Effect.Schedule.
-5. Implement GET `/api/v1/social/sync/status` — list sync status of published posts.
-6. Implement POST `/api/v1/social/sync/retry/:postId` — manually retry a failed sync.
-7. Hook the sync into the publishing flow so it triggers automatically after successful publish.
+1. Create src/integrations/linkedin.ts.
+2. Define Effect.Service `LinkedInPublisher` with methods: publish(content: PublishableContent) -> Effect<PublishResult>, getPostStatus(postId: string) -> Effect<PostStatus>.
+3. Implement LinkedIn UGC (User Generated Content) Post API: register image upload -> upload binary -> create post with image URN.
+4. Support organization posts (posting as company page).
+5. Handle LinkedIn OAuth2 token refresh flow.
+6. Map content to LinkedIn's specific format: text with media references.
+7. Handle API errors and rate limits.
+8. Implement mock for testing.
 
 ## Validation
-Mock the website portfolio API. Verify sync is triggered after publishing. Verify sync payload contains correct data. Test retry on failed sync. Verify sync_status is updated correctly. Test manual retry endpoint.
+Unit tests with mocked LinkedIn API verify correct three-step flow (register -> upload -> post); organization vs personal posting uses correct author URN; OAuth refresh triggered appropriately; error mapping works correctly.

@@ -1,17 +1,17 @@
-Implement subtask 5003: Implement LinkedIn data integration module
+Implement subtask 5003: Implement OpenCorporates business verification integration module
 
 ## Objective
-Build a Rust module for retrieving company online presence and profile data from LinkedIn (via selected API or enrichment provider) for organization vetting.
+Build a standalone Rust module that integrates with the OpenCorporates API to verify business registration, retrieve incorporation details, officer information, and filing status. Implement proper error handling, response parsing, and a trait-based interface for testability.
 
 ## Steps
-1. Create `src/integrations/linkedin.rs` module.
-2. Define an `OnlinePresenceProvider` trait with async methods: `get_company_profile(org_name: &str) -> Result<LinkedInProfile>`, `get_employee_count(org_name: &str) -> Result<Option<u32>>`.
-3. Implement the trait for the chosen LinkedIn data source (official API or third-party enrichment like Proxycurl). Use the API key from secrets.
-4. Define internal types: LinkedInProfile { company_name, description, industry, employee_count, headquarters, website, specialties, followers_count, founded_year }.
-5. Implement HTTP client calls with proper authentication headers.
-6. Handle error cases: company not found, partial data, API errors.
-7. Add structured logging and request tracing.
-8. Design the trait so the implementation can be swapped once dp-5-2 is resolved.
+1. Create src/integrations/mod.rs and src/integrations/opencorporates.rs.
+2. Define a trait `BusinessVerifier` with async method `verify_business(company_name: &str, jurisdiction: Option<&str>) -> Result<BusinessVerification, VettingError>`.
+3. BusinessVerification struct: company_number, company_name, jurisdiction_code, incorporation_date, company_type, current_status, registered_address, officers (Vec), inactive (bool).
+4. Implement `OpenCorporatesClient` struct holding reqwest::Client and API key.
+5. Implement the API call to OpenCorporates search endpoint (GET /companies/search) and company details endpoint.
+6. Parse JSON responses using serde, handle rate limiting (429), not-found, and network errors gracefully.
+7. Normalize the output into the BusinessVerification struct.
+8. Implement a `MockBusinessVerifier` for testing.
 
 ## Validation
-Write unit tests with mocked HTTP responses verifying correct parsing, graceful handling of missing fields, and error scenarios. Verify the trait can be implemented with different backends.
+Unit tests with recorded/mocked API responses verify correct parsing of OpenCorporates data; error cases (404, 429, network timeout) are handled and return appropriate VettingError variants; mock implementation satisfies the trait contract.

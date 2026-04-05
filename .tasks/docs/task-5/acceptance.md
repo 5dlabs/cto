@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] Vetting pipeline runs end-to-end, aggregating data from all sources. Final score is computed and stored. Endpoints return correct vetting results. Health and metrics endpoints are available.
+- [ ] Vetting pipeline runs end-to-end and returns correct scores; all external API integrations are functional; tests cover at least 80% of code paths.
 
 ## Verification Notes
 

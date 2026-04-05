@@ -1,24 +1,17 @@
-Implement subtask 6008: Add Prometheus metrics and health endpoints
+Implement subtask 6008: Implement Effect.Services for TikTok publishing
 
 ## Objective
-Implement Prometheus metrics exposition and health/readiness probe endpoints for the social media engine.
+Build an Effect.Service for publishing content to TikTok via the TikTok Content Posting API, including video/image upload and status tracking.
 
 ## Steps
-1. Install prom-client package.
-2. Create `src/observability.ts` module.
-3. Define and register metrics:
-   - `social_requests_total` (counter, labels: endpoint, method, status)
-   - `social_request_duration_seconds` (histogram, labels: endpoint)
-   - `ai_api_calls_total` (counter, labels: provider, operation, status)
-   - `ai_api_call_duration_seconds` (histogram, labels: provider, operation)
-   - `publishing_attempts_total` (counter, labels: platform, status)
-   - `approval_decisions_total` (counter, labels: decision)
-   - `portfolio_syncs_total` (counter, labels: status)
-4. Add Elysia middleware/plugin that records request metrics for all routes.
-5. Instrument AI service calls and publishing service calls to record metrics.
-6. Implement GET `/metrics` endpoint with prom-client default registry.
-7. Implement GET `/healthz` — returns 200 if process is alive.
-8. Implement GET `/readyz` — returns 200 if PostgreSQL and S3 connections are healthy, 503 otherwise.
+1. Create src/integrations/tiktok.ts.
+2. Define Effect.Service `TikTokPublisher` with methods: publish(content: PublishableContent) -> Effect<PublishResult>, getPostStatus(postId: string) -> Effect<PostStatus>.
+3. Implement TikTok Content Posting API: initialize upload -> upload content -> publish.
+4. Support photo posts (TikTok photo mode) since the primary content is event photos.
+5. Handle TikTok OAuth2 token management.
+6. Map captions to TikTok's format (character limits, hashtag style).
+7. Handle API errors, content policy rejections, and rate limits.
+8. Implement mock for testing.
 
 ## Validation
-Verify /healthz returns 200. Verify /readyz returns 200 when DB and S3 are connected, 503 when either is down. Verify /metrics returns valid Prometheus format with expected metric names. Make API calls and verify counters increment.
+Unit tests with mocked TikTok API verify correct upload flow; photo mode posts are correctly formatted; OAuth token refresh works; content policy rejection errors are properly surfaced.

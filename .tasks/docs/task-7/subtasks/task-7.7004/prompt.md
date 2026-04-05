@@ -1,15 +1,16 @@
-Implement subtask 7004: Integrate Twilio for phone and SIP connectivity
+Implement subtask 7004: Implement web chat widget endpoint for website integration
 
 ## Objective
-Configure Twilio for inbound/outbound phone calls and SIP trunking, connecting voice calls to the Morgan agent with ElevenLabs voice output.
+Create the web chat HTTP/WebSocket endpoint that the Sigma-1 website chat widget will connect to, enabling real-time bidirectional messaging with the Morgan agent.
 
 ## Steps
-1. Configure a Twilio phone number and set its webhook URL to point to the Morgan agent's voice endpoint (via ingress or NodePort).
-2. Implement TwiML response handler: on inbound call, stream audio to Morgan, get text response, synthesize via ElevenLabs, stream audio back.
-3. Configure SIP trunk in Twilio for business phone system integration.
-4. Handle call events: answer, hangup, DTMF input, call transfer.
-5. Implement outbound calling capability for Morgan to initiate calls (e.g., follow-up with leads).
-6. Store Twilio Account SID and Auth Token in Kubernetes Secret.
+1. Implement a WebSocket endpoint (e.g., /ws/chat) for real-time bidirectional communication.
+2. Implement a REST fallback endpoint (e.g., POST /api/chat) for environments where WebSocket is unavailable.
+3. Define the message protocol: { type, content, sessionId, timestamp, metadata }.
+4. Implement session creation and management for web chat users (anonymous sessions with optional identification).
+5. Handle message routing: web chat input → agent conversation loop → response back to WebSocket/REST.
+6. Implement CORS configuration to allow requests from the Sigma-1 website domain.
+7. Add rate limiting per session to prevent abuse.
 
 ## Validation
-Place a test call to the Twilio number; verify Morgan answers and responds with voice. Test SIP trunk connectivity. Verify DTMF handling and call transfer. Check outbound call initiation via API.
+Connect to WebSocket endpoint from a test client; send a message and receive a coherent agent response; verify session persistence across multiple messages; verify CORS headers are correctly set; REST fallback returns proper response.

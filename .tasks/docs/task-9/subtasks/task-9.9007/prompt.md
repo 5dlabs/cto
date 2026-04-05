@@ -1,17 +1,16 @@
-Implement subtask 9007: End-to-end verification of HA, CDN, TLS, and ingress
+Implement subtask 9007: Comprehensive failover and recovery testing
 
 ## Objective
-Perform comprehensive end-to-end testing to verify all production hardening changes work together: HA failover, CDN caching, TLS termination, ingress routing, and network policy enforcement.
+Execute end-to-end failover and recovery tests for all HA components (PostgreSQL, Redis, cloudflared, application services) to validate production resilience under failure conditions.
 
 ## Steps
-1. Run a full connectivity matrix test: from external → Cloudflare → Tunnel → services → databases.
-2. Simulate PostgreSQL primary failure and verify application continues serving requests.
-3. Simulate Redis master failure and verify application continues with brief interruption.
-4. Kill one replica of each backend service and verify continued availability.
-5. Verify CDN cache hit ratios for static assets.
-6. Verify TLS certificates are valid for all public-facing endpoints.
-7. Verify network policies block unauthorized cross-namespace traffic using a test pod.
-8. Document any issues found and remediate.
+1. **PostgreSQL failover test**: Delete the primary PostgreSQL pod. Verify automatic failover occurs, application reconnects, and no data is lost. Time the failover duration.
+2. **Redis failover test**: Delete the Redis master pod. Verify Sentinel promotes a replica, application reconnects, and cached data is available from the new master.
+3. **Cloudflare Tunnel failover test**: Delete the cloudflared pod. Verify the Deployment reschedules it and the tunnel reconnects. Measure downtime.
+4. **Application pod disruption test**: Delete one pod of each application Deployment. Verify the ReplicaSet recreates it and traffic is served by remaining pods during recovery.
+5. **Network policy validation under failover**: Confirm network policies remain enforced during and after failover events.
+6. **CDN origin failover**: Temporarily break the origin and confirm Cloudflare serves cached content for static assets.
+7. Document all test results including failover times and any issues discovered.
 
 ## Validation
-All 6 backend services remain available during single-pod failures. PostgreSQL and Redis failover completes within 30 seconds. CDN serves cached assets with HIT status. All public URLs respond with valid TLS. Unauthorized network connections are blocked. Create a test report documenting each scenario's pass/fail status.
+All failover tests pass with services recovering within acceptable SLAs (PostgreSQL <30s, Redis <15s, Tunnel <60s, app pods <30s). No data loss during PostgreSQL failover. Application returns 200 OK within recovery window. CDN serves cached static assets during origin outage. Full test report is generated with pass/fail for each scenario.

@@ -1,19 +1,19 @@
-Implement subtask 8008: Add Schema.org structured data and llms.txt pages for SEO and AI optimization
+Implement subtask 8008: Embed Morgan web chat widget and connect to agent WebSocket endpoint
 
 ## Objective
-Implement Schema.org JSON-LD structured data across relevant pages and create /llms.txt and /llms-full routes for AI crawler optimization.
+Implement the Morgan AI chat widget component that connects to the Morgan agent's web chat endpoint, providing real-time conversational AI support across all pages.
 
 ## Steps
-1. Add Schema.org JSON-LD structured data:
-   - Home page: Organization, LocalBusiness schemas.
-   - Equipment listing: ItemList schema.
-   - Equipment detail: Product schema with offers, availability.
-   - Portfolio: CreativeWork or ImageGallery schema.
-2. Create `app/llms.txt/route.ts` as a Next.js route handler returning plain text with site summary, key pages, and navigation hints for LLM crawlers.
-3. Create `app/llms-full/route.ts` returning a more comprehensive plain text representation of the site's content and capabilities.
-4. Add meta tags (title, description, og:image) to all pages via generateMetadata.
-5. Create a sitemap.xml via `app/sitemap.ts`.
-6. Verify structured data with Google's Rich Results Test or Schema.org validator.
+1. Create a ChatWidget React component (src/components/chat/ChatWidget.tsx).
+2. Implement WebSocket connection to the Morgan agent's /ws/chat endpoint.
+3. Implement chat UI: message list (user + agent messages), text input, send button, typing indicator.
+4. Handle connection lifecycle: connect on widget open, reconnect on disconnect, graceful close.
+5. Implement session management: generate/persist sessionId in localStorage.
+6. Style the widget with shadcn/ui components and TailwindCSS to match Sigma-1 branding.
+7. Implement the widget trigger: floating button in bottom-right corner (or per dp-11 decision).
+8. Add open/close animation and minimize/maximize states.
+9. Render the widget in the root layout so it's available on all pages.
+10. Handle edge cases: agent offline message, message send failure, long messages.
 
 ## Validation
-View page source on each page; JSON-LD script tags contain correct Schema.org data. /llms.txt returns plain text with site description. /llms-full returns comprehensive content. Google Rich Results Test validates structured data without errors. sitemap.xml lists all public routes.
+Chat widget renders on all pages; clicking the trigger opens the widget; sending a message establishes WebSocket connection and receives a response; conversation history persists within a session; widget gracefully handles agent unavailability; widget is keyboard accessible and screen-reader friendly.

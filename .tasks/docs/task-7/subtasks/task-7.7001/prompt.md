@@ -1,16 +1,15 @@
-Implement subtask 7001: Deploy OpenClaw agent in Kubernetes with workspace volume and configuration
+Implement subtask 7001: Deploy OpenClaw agent with base configuration and GPT-5.4-pro model setup
 
 ## Objective
-Create and apply the Kubernetes deployment manifest for the OpenClaw Morgan agent, including AGENT_ID, MODEL env vars, workspace persistent volume, resource requests/limits, and service account.
+Deploy the OpenClaw agent runtime, configure AGENT_ID=morgan with MODEL=openai-api/gpt-5.4-pro, wire up environment variables from the sigma1-infra-endpoints ConfigMap, and verify the agent starts and responds to a basic health check.
 
 ## Steps
-1. Create a Deployment manifest for the OpenClaw agent container image.
-2. Configure environment variables: AGENT_ID, MODEL (referencing the chosen LLM), MCP_TOOL_SERVER_URL, and any API keys via Secret references.
-3. Attach a PersistentVolumeClaim for the agent workspace (conversation state, logs).
-4. Define resource requests (cpu: 500m, memory: 1Gi) and limits (cpu: 2, memory: 4Gi).
-5. Create a ClusterIP Service exposing the agent's HTTP/WebSocket ports.
-6. Create a ConfigMap for agent configuration (system prompt, skill definitions path, tool registry URL).
-7. Apply manifests and verify the pod reaches Running state with readiness probe passing.
+1. Create the OpenClaw agent deployment manifest (Dockerfile or container config) with AGENT_ID=morgan and MODEL=openai-api/gpt-5.4-pro environment variables.
+2. Reference 'sigma1-infra-endpoints' ConfigMap via envFrom for all backend service endpoint URLs.
+3. Mount OpenAI API key and any agent-specific secrets from Kubernetes secrets.
+4. Configure the agent's base system prompt defining Morgan's persona (Sigma-1 sales/operations assistant).
+5. Set up a health endpoint that confirms the agent process is running and can reach the OpenAI API.
+6. Deploy to the cluster namespace and verify pod is running with correct environment.
 
 ## Validation
-Pod is Running and Ready. `kubectl logs` shows successful agent initialization with AGENT_ID logged. Readiness probe endpoint returns 200. Workspace volume is mounted and writable.
+Agent pod starts successfully; health endpoint returns 200; environment variables from ConfigMap are correctly injected; agent can make a test completion call to OpenAI API and return a response.

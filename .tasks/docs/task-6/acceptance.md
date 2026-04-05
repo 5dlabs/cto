@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All endpoints function as described. AI curation selects top images. Captions are generated. Approval and publishing workflows complete end-to-end. Published content syncs to website. API validation is enforced.
+- [ ] All endpoints function as specified; AI curation and captioning produce expected results; approval workflow triggers Signal notifications; published content appears on all platforms; tests cover at least 80% of code paths.
 
 ## Verification Notes
 

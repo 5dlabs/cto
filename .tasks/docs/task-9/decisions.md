@@ -1,7 +1,7 @@
 ## Decision Points
 
-- What authentication and authorization mechanism should be used for service-to-service and user-to-service communication?
-- What approach should be used for secret management and rotation across all services?
+- What authentication and authorization mechanism should be used for service-to-service and user-to-service API calls?
+- Which CDN and TLS termination solution should be used for public-facing services?
 
 ## Coordination Notes
 

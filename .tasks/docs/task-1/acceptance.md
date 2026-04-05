@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] Verify all pods (PostgreSQL, Redis, S3/R2, Signal-CLI) are running and accessible. Confirm ConfigMaps and secrets are present and contain valid connection strings. All services can connect to their dependencies using the provided endpoints.
+- [ ] Verify all pods are running and healthy; ConfigMap 'sigma1-infra-endpoints' is present and contains valid connection strings; all secrets are accessible by their respective service accounts; test connectivity from a test pod to PostgreSQL, Redis, S3/R2, and Signal-CLI endpoints.
 
 ## Verification Notes
 

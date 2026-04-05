@@ -1,16 +1,29 @@
-Implement subtask 7008: Set up web chat endpoint for Morgan agent
+Implement subtask 7008: Implement agent skills: upsell, finance, social-media, and admin
 
 ## Objective
-Expose a WebSocket (or HTTP streaming) endpoint from the Morgan agent for the web chat frontend to connect to, enabling real-time conversational interaction via browser.
+Implement the upselling, finance management, social media, and administrative skill definitions within the Morgan agent.
 
 ## Steps
-1. Implement a WebSocket endpoint on the Morgan agent (e.g., /ws/chat) that accepts browser connections.
-2. Define the message protocol: JSON messages with fields for session_id, message_text, message_type (user/agent), and metadata.
-3. Handle session management: create new sessions, resume existing sessions by session_id.
-4. Stream agent responses token-by-token or chunk-by-chunk for real-time feel.
-5. Implement CORS configuration to allow connections from the frontend domain.
-6. Create an Ingress rule or update the existing Service to expose the WebSocket endpoint externally.
-7. Handle graceful disconnection and reconnection.
+1. Implement upsell skill:
+   - Analyze current rental/quote context for upsell opportunities.
+   - Suggest complementary equipment, extended warranties, delivery services.
+   - Use catalog tools to find related items.
+   - Track upsell acceptance/rejection.
+2. Implement finance skill:
+   - Handle invoice inquiries (finance_get_invoice_status).
+   - Process payment confirmations (finance_process_payment).
+   - Generate and send invoices (finance_create_invoice).
+   - Answer billing questions.
+3. Implement social-media skill:
+   - Publish project showcases via social_publish_content.
+   - Retrieve portfolio items via social_get_portfolio.
+   - Schedule content via social_schedule_post.
+   - Handle content approval workflows.
+4. Implement admin skill:
+   - Provide system status summaries.
+   - Handle internal team queries.
+   - Manage agent configuration queries.
+5. Wire all skills into the agent's routing logic alongside skills from 7007.
 
 ## Validation
-Connect to the WebSocket endpoint using wscat or a browser test page. Send a message and verify a streamed response is received. Disconnect and reconnect with the same session_id; verify session continuity. Verify CORS headers allow frontend origin.
+Upsell skill correctly identifies and presents relevant upsell opportunities; finance skill handles invoice and payment queries accurately; social-media skill successfully orchestrates content publishing; admin skill returns system information; all skills integrate into the routing system without conflicts.

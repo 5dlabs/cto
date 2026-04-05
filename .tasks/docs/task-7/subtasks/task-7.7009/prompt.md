@@ -1,16 +1,30 @@
-Implement subtask 7009: Performance optimization and load testing for 500+ concurrent Signal connections
+Implement subtask 7009: End-to-end integration tests for complete multi-channel flows
 
 ## Objective
-Optimize the Morgan agent and Signal-CLI setup to achieve <10 second response times and handle 500+ concurrent Signal connections, conducting load tests to validate.
+Write and execute comprehensive end-to-end tests covering the full lead-to-invoice lifecycle across Signal, voice, and web chat channels, validating all skills and MCP tool interactions.
 
 ## Steps
-1. Profile the agent's response pipeline: measure time from message receipt to response sent. Identify bottlenecks (LLM inference, tool calls, Signal-CLI).
-2. Optimize: ensure async/non-blocking processing of concurrent messages. Use connection pooling for backend service calls.
-3. Configure horizontal pod autoscaling (HPA) for the agent deployment based on CPU/memory or custom metrics (concurrent connections).
-4. Tune Signal-CLI for concurrent message handling: configure thread pool size, connection limits.
-5. Write a load test script (e.g., using k6 or locust) simulating 500+ concurrent Signal conversations sending messages simultaneously.
-6. Run load tests and capture metrics: p50/p95/p99 response times, error rates, message throughput.
-7. Iterate on configuration until <10s p95 response time at 500 concurrent connections is achieved.
+1. Test: Lead Qualification → Quote Flow (Web Chat)
+   - Simulate a new customer inquiry via web chat.
+   - Verify sales-qual skill activates, collects info, scores lead.
+   - Verify quote-gen skill creates and presents a quote.
+   - Assert all tool calls (catalog_search, finance_generate_quote) execute correctly.
+2. Test: Customer Vetting → Rental Flow (Signal)
+   - Simulate a customer proceeding after quote acceptance via Signal.
+   - Verify customer-vet skill triggers credit check and identity verification.
+   - Verify rental creation via RMS tools after vetting passes.
+   - Assert end-to-end data consistency.
+3. Test: Invoice → Payment Flow (Voice)
+   - Simulate invoice inquiry and payment confirmation via voice channel.
+   - Verify STT/TTS pipeline doesn't corrupt data.
+   - Assert finance tools are called correctly.
+4. Test: Upsell Flow
+   - Verify upsell suggestions appear during quote/rental context.
+5. Test: Social Media Publishing
+   - Verify content publishing flow via social tools.
+6. Test: Cross-channel session continuity (if applicable).
+7. Test: Error handling (backend service down, invalid input, timeout).
+8. Measure response latency across all channels (target: <10s).
 
 ## Validation
-Load test with 500 concurrent simulated Signal conversations. p95 response time is under 10 seconds. Error rate is below 1%. No message loss observed. HPA scales pods appropriately under load.
+All end-to-end flows complete successfully with correct data at each step; response times are under 10 seconds for all channels; error scenarios are handled gracefully without crashes; at least one test per skill and per channel combination passes.

@@ -1,24 +1,18 @@
-Implement subtask 10006: Create Grafana dashboards and Prometheus alerting rules for security monitoring
+Implement subtask 10006: Document access controls, audit log retention, and security policies
 
 ## Objective
-Build Grafana dashboards for RBAC violations, secret rotation status, and audit log analysis. Create Prometheus alerting rules for security-relevant events such as failed auth attempts, secret expiry warnings, and unauthorized access patterns.
+Create comprehensive documentation covering all RBAC policies, secret rotation procedures, audit log retention policies, and security runbooks for operational reference and compliance.
 
 ## Steps
-1. Create a Grafana dashboard 'Security Overview' with panels:
-   - Kubernetes audit event volume by verb and user (from Loki).
-   - Failed authentication attempts over time.
-   - Secret rotation status (last rotation timestamp per secret).
-   - RBAC denial events.
-2. Create a Grafana dashboard 'API Audit Trail' with panels:
-   - Request volume per service and endpoint.
-   - Error rate by service.
-   - Top users/clients by request count.
-3. Create Prometheus alerting rules (PrometheusRule CR):
-   - Alert on >10 failed auth attempts in 5 minutes.
-   - Alert when a secret has not been rotated in >35 days.
-   - Alert on RBAC denied requests from service accounts.
-4. Configure alert routing to the existing notification channel (Slack/email).
-5. Store dashboards as JSON in the repo and provision via Grafana ConfigMap or dashboard provisioner.
+1. Create an RBAC matrix document listing every ServiceAccount, its namespace, assigned Roles/ClusterRoles, and the permissions granted.
+2. Document the secret rotation schedule: which secrets are rotated, how often, what mechanism is used, and the manual rotation procedure for emergencies.
+3. Document audit log retention policies: what is logged, where it's stored, retention periods, and how to query/search logs.
+4. Create a security runbook covering:
+   - How to investigate a security incident using audit logs.
+   - How to revoke a compromised credential immediately.
+   - How to add/modify RBAC for a new service.
+   - How to verify RBAC enforcement.
+5. Store all documentation in the infra repo under `docs/security/`.
 
 ## Validation
-Verify dashboards load in Grafana with data populated. Trigger a test alert by simulating >10 failed auth attempts and verify the alert fires and notification is received. Verify secret rotation age metric is accurate for at least one secret.
+Review documentation for completeness: every ServiceAccount has an RBAC entry, every rotated secret has a documented procedure, retention policies are explicitly stated with durations. Verify runbook steps can be followed by a team member unfamiliar with the system (dry-run the procedures).

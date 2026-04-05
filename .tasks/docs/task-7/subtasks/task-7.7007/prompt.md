@@ -1,15 +1,25 @@
-Implement subtask 7007: Implement skills: finance, social-media, rms-*, admin
+Implement subtask 7007: Implement agent skills: sales-qual, customer-vet, and quote-gen
 
 ## Objective
-Implement the operational skill set for Morgan: finance reporting and invoicing (finance), social media management (social-media), rental management system operations (rms-*), and administrative functions (admin).
+Implement the sales qualification, customer vetting, and quote generation skill definitions within the Morgan agent, including conversation flows, tool orchestration logic, and decision trees.
 
 ## Steps
-1. **finance skill**: Handle invoice generation (sigma1_submit_invoice), payment status queries, and finance report requests (sigma1_finance_report). Format financial data clearly.
-2. **social-media skill**: Allow authorized users to create social media posts (sigma1_social_post) and schedule content (sigma1_social_schedule). Confirm post content before publishing.
-3. **rms-* skills**: Implement rental management operations: create rental jobs (sigma1_rms_create_job), update job status (sigma1_rms_update_status), query job details. Handle multi-step workflows (create → assign → dispatch → complete).
-4. **admin skill**: User management operations (sigma1_admin_users). List users, update roles, manage permissions. Require elevated authorization for admin actions.
-5. Implement permission checks: certain skills (admin, finance) should only be accessible to authorized users.
-6. Define skill activation triggers and conversation context switching.
+1. Implement sales-qual skill:
+   - Define qualifying questions (project type, timeline, budget, equipment needs).
+   - Implement lead scoring logic based on responses.
+   - Configure tool calls to catalog_search for equipment matching.
+   - Define escalation criteria (high-value leads, complex requirements).
+2. Implement customer-vet skill:
+   - Define the vetting conversation flow (collect customer info, explain process).
+   - Orchestrate vetting_run_credit_check and vetting_verify_identity tools.
+   - Handle async vetting results (polling or webhook-based updates).
+   - Communicate vetting outcomes to the customer appropriately.
+3. Implement quote-gen skill:
+   - Collect rental parameters (equipment, duration, delivery location).
+   - Call finance_generate_quote with parameters.
+   - Present quote to customer with line items and totals.
+   - Handle quote acceptance/modification flow.
+4. Wire skills into the agent's routing logic so the LLM selects the appropriate skill based on conversation context.
 
 ## Validation
-Request an invoice; verify sigma1_submit_invoice is called with correct parameters. Request a finance report; verify data is returned and formatted. Create a social media post via conversation; verify sigma1_social_post is called. Create and update a rental job; verify correct RMS tools are called in sequence. Attempt admin action as unauthorized user; verify rejection.
+Sales-qual skill correctly identifies lead quality and recommends equipment; customer-vet skill triggers vetting tools and communicates results; quote-gen skill produces accurate quotes with correct pricing; skill routing selects the correct skill based on user intent.

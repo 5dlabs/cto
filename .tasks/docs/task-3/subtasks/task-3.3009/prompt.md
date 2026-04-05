@@ -1,17 +1,18 @@
-Implement subtask 3009: Add Prometheus metrics and health endpoints
+Implement subtask 3009: Integrate Google Calendar API for crew and project scheduling
 
 ## Objective
-Instrument all RMS services with Prometheus metrics (request counts, latencies, error rates) and expose health/readiness probe endpoints.
+Add Google Calendar API integration so that crew assignments and project schedules are synced bidirectionally with Google Calendar.
 
 ## Steps
-1. Add prometheus/client_golang dependency.
-2. Create `internal/metrics/` package with middleware interceptors for gRPC (UnaryServerInterceptor, StreamServerInterceptor) that record: rms_grpc_requests_total (method, status), rms_grpc_request_duration_seconds (method), rms_grpc_errors_total (method, code).
-3. Add HTTP middleware for grpc-gateway endpoints with equivalent metrics.
-4. Add business metrics: rms_opportunities_created_total, rms_projects_active, rms_inventory_checked_out, rms_deliveries_scheduled.
-5. Expose /metrics endpoint on the HTTP port for Prometheus scraping.
-6. Implement /healthz (liveness) endpoint: returns 200 if process is running.
-7. Implement /readyz (readiness) endpoint: checks PostgreSQL connectivity and Redis connectivity, returns 200 only if both are reachable.
-8. Register interceptors in the gRPC server setup in main.go.
+1. Create /internal/calendar/google.go with Google Calendar API client setup using the official google.golang.org/api/calendar/v3 package.
+2. Implement OAuth2 service account authentication for the Calendar API; read credentials from a mounted secret (referenced via sigma1-infra-endpoints or a dedicated secret).
+3. Implement CreateCalendarEvent: given a project name, crew member email, start/end times, create a calendar event and return the event ID.
+4. Implement UpdateCalendarEvent: update an existing event when project dates change.
+5. Implement DeleteCalendarEvent: remove event when crew is unassigned from a project.
+6. Hook into CrewService.AssignToProject: after successful DB assignment, create a calendar event and store the event_id on the crew-project association.
+7. Hook into ProjectService.UpdateProject: if dates change, update all associated calendar events.
+8. Handle API errors gracefully: if Calendar API fails, log the error but don't fail the core operation; mark calendar sync as pending for retry.
+9. Define a CalendarService interface to allow mocking in tests.
 
 ## Validation
-Verify /healthz returns 200. Verify /readyz returns 200 when DB and Redis are up, and 503 when either is down. Make several gRPC/REST calls and verify /metrics returns Prometheus-formatted output with correct counter increments and histogram buckets.
+Unit tests with mocked Google Calendar client verify event creation, update, and deletion are called with correct parameters; integration test (if credentials available) creates and deletes a test event; core operations succeed even when Calendar API returns errors.

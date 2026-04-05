@@ -1,16 +1,16 @@
-Implement subtask 7002: Integrate Signal-CLI for messaging channel
+Implement subtask 7002: Implement Signal-CLI integration for inbound/outbound messaging
 
 ## Objective
-Deploy and configure Signal-CLI as a sidecar or separate pod, link it to the Morgan agent so inbound Signal messages are forwarded to the agent and responses are sent back via Signal.
+Configure Signal-CLI as a messaging channel adapter for the Morgan agent, enabling inbound message reception and outbound message sending via the Signal protocol.
 
 ## Steps
-1. Deploy Signal-CLI REST API as a sidecar container in the agent pod (or as a separate Deployment if preferred per dp-8 decision).
-2. Register/link the Signal phone number by providing the Signal account credentials or linking device.
-3. Configure Signal-CLI to forward incoming messages to the Morgan agent's ingest endpoint via HTTP webhook.
-4. Implement the outbound path: Morgan agent calls Signal-CLI REST API to send replies.
-5. Handle group messages and direct messages.
+1. Deploy or configure Signal-CLI daemon alongside the agent (or as a sidecar container).
+2. Register/link the Signal phone number using secrets for Signal credentials.
+3. Implement the inbound message handler: receive Signal messages → parse → forward to the OpenClaw agent conversation loop.
+4. Implement the outbound message handler: agent responses → format → send via Signal-CLI.
+5. Handle media attachments (images from equipment catalog, quote PDFs) in Signal messages.
 6. Configure retry logic for message delivery failures.
-7. Store Signal-CLI data directory on a persistent volume so registration survives restarts.
+7. Reference Signal-CLI endpoint from sigma1-infra-endpoints ConfigMap if applicable.
 
 ## Validation
-Send a Signal message to the registered number; verify it appears in agent logs within 5 seconds. Agent responds and the reply is received on the Signal client. Signal-CLI pod restarts without losing registration.
+Send a test Signal message to the registered number; verify the agent receives it, processes it, and sends a coherent response back via Signal within 10 seconds; verify media attachment sending works.

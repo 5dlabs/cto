@@ -1,31 +1,18 @@
-Implement subtask 6005: Implement multi-platform publishing services using Effect.Service
+Implement subtask 6005: Implement AI caption generation service
 
 ## Objective
-Build Effect.Service implementations for publishing content to Instagram, LinkedIn, TikTok, and Facebook, each as a separate service with platform-specific API integration.
+Build an Effect.Service that uses OpenAI/Claude to generate social media captions, hashtags, and platform-specific variations for curated images. Support different tones and styles per platform.
 
 ## Steps
-1. Create `src/services/publishing/` directory with separate files per platform.
-2. Define a common `PublishingService` Effect.Service interface: `publish(draft: Draft) -> Effect.Effect<PublishResult, PublishError>`, `getPostStatus(externalId: string) -> Effect.Effect<PostStatus, PublishError>`.
-3. Implement `InstagramPublishService`:
-   - Use Instagram Graph API / Basic Display API.
-   - Handle media upload (image container creation → publish), caption posting.
-   - Store external_post_id on success.
-4. Implement `LinkedInPublishService`:
-   - Use LinkedIn Marketing API for company page posts.
-   - Handle image upload and ugcPost creation.
-5. Implement `TikTokPublishService`:
-   - Use TikTok Content Posting API.
-   - Handle video/image upload flow.
-6. Implement `FacebookPublishService`:
-   - Use Facebook Graph API for page posts.
-   - Handle photo and text post creation.
-7. Each implementation: authenticate with platform-specific OAuth tokens from secrets, handle rate limits, return structured PublishResult { externalPostId, platform, publishedUrl, publishedAt }.
-8. Implement POST `/api/v1/social/publish` endpoint:
-   - Accept draft_id and target platform(s).
-   - Call the appropriate publishing service(s).
-   - Update `published_posts` table.
-   - Return publish results.
-9. Implement GET `/api/v1/social/posts` — list published posts with platform filter.
+1. Create src/services/caption-generator.ts.
+2. Define Effect.Service `CaptionGeneratorService` with methods: generateCaption(images: StoredImage[], context: CaptionContext) -> Effect<GeneratedCaption>, generatePlatformVariants(baseCaption: string, platforms: Platform[]) -> Effect<PlatformCaptions>.
+3. CaptionContext: event_name, event_type, brand_voice, target_audience, key_messages, platform.
+4. GeneratedCaption: caption_text, hashtags (string[]), call_to_action, emoji_enhanced.
+5. PlatformCaptions: per-platform variations (Instagram: longer + hashtags, LinkedIn: professional tone, TikTok: trendy/short, Facebook: conversational).
+6. Implement using OpenAI Chat Completions API with structured output (JSON mode).
+7. System prompt includes brand voice guidelines, platform best practices, and character limits per platform.
+8. Handle API errors, rate limits, and content moderation flags.
+9. Implement mock for testing.
 
 ## Validation
-Mock each platform API. Verify publishing a draft to each platform creates the correct API calls and persists results. Verify multi-platform publish hits all selected platforms. Test error handling when one platform fails but others succeed. Verify GET /posts returns published content.
+Unit tests with mocked AI API verify correct prompt construction with context; generated captions respect platform character limits; platform variants differ in tone; hashtags are relevant; mock returns testable deterministic captions.

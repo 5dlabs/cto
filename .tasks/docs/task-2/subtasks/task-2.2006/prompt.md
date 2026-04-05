@@ -1,24 +1,21 @@
-Implement subtask 2006: Implement admin CRUD endpoints with RBAC authorization
+Implement subtask 2006: Add Prometheus metrics endpoint and Kubernetes health probes
 
 ## Objective
-Build admin-only endpoints for creating and updating products and categories, protected by role-based access control middleware.
+Implement /metrics endpoint exposing Prometheus-format metrics, and /health/live and /health/ready endpoints for Kubernetes liveness and readiness probes.
 
 ## Steps
-1. Implement `POST /api/v1/catalog/products`:
-   - Accept JSON body with all product fields (name, sku, description, category_id, rates, image_key, specs).
-   - Validate required fields and uniqueness constraints (sku).
-   - Insert into DB and return the created product with 201 status.
-2. Implement `PATCH /api/v1/catalog/products/:id`:
-   - Accept partial JSON body; only update provided fields.
-   - Return the updated product.
-3. Implement `POST /api/v1/catalog/categories` and `PATCH /api/v1/catalog/categories/:id` similarly.
-4. Implement RBAC middleware:
-   - Extract JWT or API key from Authorization header.
-   - Verify the token and extract the user's role.
-   - Admin endpoints require `role: admin`.
-   - Return HTTP 401 for missing auth, 403 for insufficient role.
-5. On successful mutation, invalidate relevant Redis cache keys.
-6. Add request logging for all admin operations (who, what, when).
+1. Add dependencies: prometheus (or metrics + metrics-exporter-prometheus) crate.
+2. Create src/handlers/observability.rs.
+3. GET /metrics: expose Prometheus text format metrics including:
+   - http_requests_total (counter, labels: method, path, status)
+   - http_request_duration_seconds (histogram, labels: method, path)
+   - db_pool_connections_active (gauge)
+   - db_pool_connections_idle (gauge)
+4. Create a Tower middleware that records request count and duration for every request, updating the Prometheus registry.
+5. GET /health/live → liveness: return 200 { status: 'ok' } always (proves the process is running and not deadlocked).
+6. GET /health/ready → readiness: check PostgreSQL connectivity (SELECT 1) and Redis connectivity (PING). Return 200 { status: 'ready', checks: { postgres: 'ok', redis: 'ok' } } if both pass, 503 with details if either fails.
+7. Register /metrics, /health/live, /health/ready routes outside the /api/v1 prefix (at root level).
+8. Ensure /metrics and /health/* endpoints are NOT rate limited.
 
 ## Validation
-Verify admin can create and update products and categories with valid auth. Verify non-admin users receive 403. Verify missing auth returns 401. Verify SKU uniqueness constraint returns 409. Verify Redis cache is invalidated after mutations. Verify audit log entries are created for admin operations.
+GET /metrics returns valid Prometheus text format with all four metric families; GET /health/live returns 200; GET /health/ready returns 200 when infra is healthy and 503 when PostgreSQL or Redis is unreachable; after sending API requests, /metrics shows incremented counters and non-zero histograms.

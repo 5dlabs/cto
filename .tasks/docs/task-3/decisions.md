@@ -1,11 +1,11 @@
 ## Decision Points
 
 - Which Redis-compatible engine should be used for caching, rate limiting, and session storage across services?
-- Which PostgreSQL operator should be used for managing the main database cluster?
-- What API paradigm should be used for the Equipment Catalog and RMS services' public interfaces?
+- What API paradigm should be used for inter-service communication between backend services (e.g., Morgan agent, Equipment Catalog, RMS, Finance, Vetting, Social Engine)?
 - How should multi-tenancy and schema separation be handled in the PostgreSQL database?
-- What authentication and authorization mechanism should be used for service-to-service and user-to-service communication?
-- Which Google Calendar API authentication method should be used for project/crew scheduling integration?
+- What authentication and authorization mechanism should be used for service-to-service and user-to-service API calls?
+- What versioning strategy should be used for public and internal APIs?
+- What approach should be used for GDPR compliance regarding data export and customer deletion?
 
 ## Coordination Notes
 

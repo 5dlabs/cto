@@ -52,7 +52,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-4003
-    depends_on: [validate-subtask-4001]
+    depends_on: [validate-subtask-4002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4003/prompt.md
@@ -64,7 +64,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-4004
-    depends_on: [validate-subtask-4001]
+    depends_on: [validate-subtask-4002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4004/prompt.md
@@ -76,7 +76,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-4005
-    depends_on: [validate-subtask-4002]
+    depends_on: [validate-subtask-4004]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4005/prompt.md
@@ -88,7 +88,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-4006
-    depends_on: [validate-subtask-4001]
+    depends_on: [validate-subtask-4002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4006/prompt.md
@@ -100,7 +100,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-4007
-    depends_on: [validate-subtask-4002, validate-subtask-4003, validate-subtask-4004, validate-subtask-4005, validate-subtask-4006]
+    depends_on: [validate-subtask-4001, validate-subtask-4002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4007/prompt.md
@@ -112,7 +112,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-4008
-    depends_on: [validate-subtask-4007]
+    depends_on: [validate-subtask-4003, validate-subtask-4004, validate-subtask-4005, validate-subtask-4006, validate-subtask-4007]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-4.4008/prompt.md

@@ -1,15 +1,16 @@
-Implement subtask 7003: Integrate ElevenLabs for voice synthesis
+Implement subtask 7003: Implement ElevenLabs voice integration for voice channel
 
 ## Objective
-Configure the Morgan agent to use ElevenLabs API for text-to-speech voice responses, including voice selection, streaming audio output, and error handling.
+Integrate ElevenLabs TTS/STT with the Morgan agent to enable voice-based customer interactions, including speech-to-text input and text-to-speech output.
 
 ## Steps
-1. Store ElevenLabs API key in a Kubernetes Secret and reference it in the agent's environment.
-2. Implement a voice synthesis module that takes agent text responses and calls ElevenLabs text-to-speech API.
-3. Select and configure the appropriate voice ID for the Morgan persona.
-4. Support streaming audio output for low-latency voice responses.
-5. Implement fallback behavior if ElevenLabs is unavailable (e.g., return text-only response with error flag).
-6. Ensure audio format compatibility with Twilio (mulaw/8000 or appropriate codec).
+1. Configure ElevenLabs API credentials from Kubernetes secrets.
+2. Implement the voice input pipeline: receive audio → ElevenLabs STT → text → forward to agent conversation loop.
+3. Implement the voice output pipeline: agent text response → ElevenLabs TTS → audio stream → deliver to caller.
+4. Select and configure the appropriate ElevenLabs voice ID for the Morgan persona.
+5. Implement voice session management (start call, maintain context during call, end call).
+6. Handle telephony integration point (SIP/WebRTC/PSTN gateway) for actual voice calls.
+7. Set up proper audio format handling (sample rate, codec) for streaming.
 
 ## Validation
-Call the voice synthesis module with sample text; verify audio bytes are returned in the expected format. Measure latency is under 3 seconds for a short sentence. Simulate ElevenLabs API failure and verify fallback behavior.
+Initiate a test voice call; verify STT correctly transcribes spoken input; verify TTS generates natural-sounding audio response; round-trip latency from speech input to audio response is under 10 seconds; voice session maintains conversation context across multiple turns.

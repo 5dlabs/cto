@@ -1,19 +1,20 @@
-Implement subtask 4007: Add Prometheus metrics and health endpoints
+Implement subtask 4007: Implement scheduled currency rate sync job with Redis caching
 
 ## Objective
-Instrument the Finance service with Prometheus metrics for request counts, latencies, error rates, and business metrics, plus health and readiness probes.
+Build a background job that periodically fetches exchange rates from an external API, stores them in PostgreSQL, and caches them in Redis for fast lookups.
 
 ## Steps
-1. Add dependencies: metrics, metrics-exporter-prometheus (or axum-prometheus).
-2. Create `src/middleware/metrics.rs`: Axum middleware layer that records for each request: finance_http_requests_total (method, path, status), finance_http_request_duration_seconds (method, path).
-3. Add business metrics counters: finance_invoices_created_total, finance_payments_processed_total, finance_payments_failed_total, finance_stripe_webhook_events_total (event_type), finance_currency_sync_runs_total (status: success/failure), finance_reminders_sent_total.
-4. Instrument each service module to increment relevant counters.
-5. Create `src/routes/health.rs`:
-   - GET /healthz — liveness probe: return 200 if process running
-   - GET /readyz — readiness probe: check PostgreSQL pool (sqlx::query("SELECT 1")), check Redis (PING), return 200 only if both succeed, 503 otherwise
-   - GET /metrics — Prometheus-formatted metrics export
-6. Register metrics middleware in Axum router.
-7. Add tracing spans to key service methods for observability.
+1. Create src/services/currency_service.rs.
+2. Implement external rate fetching: use reqwest to call a free currency rate API (e.g., exchangerate-api.com or open.er-api.com). Parse response into (base, target, rate) tuples for a configured list of currencies (USD, EUR, GBP, CAD, AUD minimum).
+3. Implement rate storage: upsert into currency_rates table with current timestamp.
+4. Implement Redis caching: after DB write, set key `currency:USD:EUR` → rate string with 1-hour TTL. Implement get_rate(base, target) that checks Redis first, falls back to DB.
+5. Create src/routes/currency.rs:
+   - GET /api/v1/currency/rates → list all current rates
+   - GET /api/v1/currency/rates/:base/:target → get specific rate
+   - POST /api/v1/currency/convert → body: {amount, from, to} → returns converted amount using latest rate
+6. Implement the scheduled job: use tokio::spawn with tokio::time::interval to run rate sync every hour (configurable via env var CURRENCY_SYNC_INTERVAL_SECS, default 3600).
+7. Handle external API failures gracefully: log error, keep using last known rates, don't crash the service.
+8. On service startup, trigger an immediate sync before entering the interval loop.
 
 ## Validation
-Verify /healthz returns 200. Verify /readyz returns 200 with healthy dependencies, 503 when PostgreSQL or Redis is unreachable. Make API calls across all endpoints, then verify /metrics contains expected counters with correct labels and incremented values. Verify histogram buckets are populated for request duration.
+Unit tests with mocked HTTP responses verify rate parsing and DB upsert; Redis cache is populated after sync and get_rate returns cached value; convert endpoint returns mathematically correct result using Decimal; rate sync continues working after external API failure (uses stale rates); startup triggers immediate sync.

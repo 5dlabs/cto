@@ -1,21 +1,22 @@
-Implement subtask 5009: End-to-end vetting pipeline integration tests
+Implement subtask 5009: Write comprehensive integration and end-to-end tests for vetting service
 
 ## Objective
-Write comprehensive integration tests that validate the full vetting pipeline from API request through external integrations (mocked), scoring, persistence, and retrieval.
+Create a full test suite covering the vetting service end-to-end, including integration tests against a test PostgreSQL database with mocked external APIs, and ensure at least 80% code path coverage.
 
 ## Steps
-1. Set up a test harness using `tokio::test` with a real PostgreSQL test database (via testcontainers or a test-specific database URL).
-2. Use wiremock to create mock servers for OpenCorporates, LinkedIn, Google Reviews, and credit APIs.
-3. Configure the application to use mock server URLs.
-4. Test scenarios:
-   a. Happy path: all external APIs return valid data → verify GREEN/YELLOW/RED classification is correct.
-   b. Partial data: one or more external APIs return errors → verify graceful degradation, scoring still works with available data.
-   c. All external APIs fail → verify appropriate error response.
-   d. Duplicate vetting run for same org_id → verify new result is created, GET returns latest.
-   e. Credit-specific endpoint returns correct subset of data.
-5. Verify database state after each test scenario.
-6. Verify metrics are recorded correctly during test runs.
-7. Clean up test data between tests.
+1. Create tests/ directory with integration test files.
+2. Set up test fixtures: a test database with migrations applied, mock HTTP servers (using wiremock-rs or similar) for all four external APIs.
+3. Test scenarios:
+   a. Full vetting pipeline with all APIs returning positive data -> expect Hot lead.
+   b. Full pipeline with mixed data -> expect Warm/Cold lead.
+   c. Pipeline with one API failing -> expect partial results with reduced confidence.
+   d. Pipeline with all APIs failing -> expect Disqualified or error.
+   e. Duplicate vetting run for same org -> expect updated results.
+   f. GET endpoints return correct data after POST run.
+   g. GET endpoints return 404 for unknown org.
+4. Verify database state after each test (correct rows in vetting_results and lead_scores tables).
+5. Run `cargo tarpaulin` or similar to verify >= 80% code coverage.
+6. Add CI-friendly test configuration.
 
 ## Validation
-All test scenarios pass. Database contains expected records. Metrics reflect the test activity. Tests are repeatable and isolated from each other.
+All integration tests pass; mock external API servers simulate realistic responses; code coverage report shows >= 80% of code paths exercised; tests are deterministic and can run in CI.

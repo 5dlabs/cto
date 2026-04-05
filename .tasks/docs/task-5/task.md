@@ -1,7 +1,7 @@
 ## Build Customer Vetting Service (Rex - Rust/Axum)
 
 ### Objective
-Develop the customer vetting pipeline for business verification, online presence, reputation, and credit signals, integrating with OpenCorporates, LinkedIn, Google Reviews, and credit APIs.
+Develop the Customer Vetting service to automate background checks, business verification, and risk scoring using OpenCorporates, LinkedIn, Google Reviews, and credit APIs. Supports Morgan's lead qualification.
 
 ### Ownership
 - Agent: rex
@@ -11,15 +11,15 @@ Develop the customer vetting pipeline for business verification, online presence
 - Dependencies: 1
 
 ### Implementation Details
-{"steps":["Initialize Rust 1.75+ project with Axum 0.7, using POSTGRES_URL and API keys from ConfigMap/secrets.","Define VettingResult and LeadScore models as per PRD.","Implement endpoints: /api/v1/vetting/run, /api/v1/vetting/:org_id, /api/v1/vetting/credit/:org_id.","Integrate OpenCorporates, LinkedIn, Google Reviews, and credit APIs for data aggregation.","Implement scoring algorithm for GREEN/YELLOW/RED.","Persist vetting results in PostgreSQL.","Add Prometheus metrics and health endpoints."]}
+{"steps": ["Initialize Rust 1.75+ project with Axum 0.7 and sqlx for PostgreSQL.", "Define VettingResult and LeadScore models as per PRD.", "Implement endpoints: /api/v1/vetting/run, /api/v1/vetting/:org_id, /api/v1/vetting/credit/:org_id.", "Integrate with OpenCorporates, LinkedIn, Google Reviews, and credit APIs using API keys from secrets.", "Implement the full vetting pipeline: business verification, online presence, reputation, credit signals, and scoring.", "Reference connection strings from 'sigma1-infra-endpoints' ConfigMap via envFrom.", "Write unit and integration tests for all endpoints and external API integrations."]}
 
 ### Subtasks
-- [ ] Initialize Rust/Axum project and database schema for vetting models: Scaffold the Rust 1.75+ project with Axum 0.7, configure database connectivity using POSTGRES_URL from ConfigMap, and create SQLx migrations for VettingResult and LeadScore tables in the vetting schema.
-- [ ] Implement OpenCorporates API integration module: Build a dedicated Rust module for querying the OpenCorporates API to retrieve business registration, incorporation status, officers, and filing data for a given organization.
-- [ ] Implement LinkedIn data integration module: Build a Rust module for retrieving company online presence and profile data from LinkedIn (via selected API or enrichment provider) for organization vetting.
-- [ ] Implement Google Reviews API integration module: Build a Rust module for fetching Google Reviews data (ratings, review count, sentiment) for a business using the Google Places API.
-- [ ] Implement credit API integration module: Build a Rust module for fetching business credit signals (credit score, payment history, risk indicators) from the selected credit data provider.
-- [ ] Implement GREEN/YELLOW/RED scoring algorithm with aggregation logic: Build the scoring engine that aggregates data from all four external sources (OpenCorporates, LinkedIn, Google Reviews, credit) and computes a composite vetting score classified as GREEN, YELLOW, or RED.
-- [ ] Implement vetting REST endpoints and orchestration pipeline: Build the Axum REST endpoints (/api/v1/vetting/run, /api/v1/vetting/:org_id, /api/v1/vetting/credit/:org_id) and the orchestration logic that calls all integration modules, runs scoring, and persists results.
-- [ ] Add Prometheus metrics and health endpoints: Implement Prometheus metrics exposition and health/readiness probe endpoints for the vetting service.
-- [ ] End-to-end vetting pipeline integration tests: Write comprehensive integration tests that validate the full vetting pipeline from API request through external integrations (mocked), scoring, persistence, and retrieval.
+- [ ] Scaffold Rust/Axum project with dependencies and infrastructure wiring: Initialize the Rust 1.75+ project with Axum 0.7, sqlx, reqwest (for external HTTP calls), serde, and tokio. Configure Cargo.toml with workspace structure. Set up the Axum router skeleton, health check endpoint, and environment configuration to read connection strings and API keys from the 'sigma1-infra-endpoints' ConfigMap via envFrom and Kubernetes secrets.
+- [ ] Define data models and create PostgreSQL migrations for VettingResult and LeadScore: Design and implement the VettingResult and LeadScore domain models as Rust structs with serde and sqlx derives. Create sqlx migrations for the vetting-related tables in the appropriate schema (e.g., crm schema). Include fields for business verification status, reputation scores, credit signals, composite risk score, and timestamps.
+- [ ] Implement OpenCorporates business verification integration module: Build a standalone Rust module that integrates with the OpenCorporates API to verify business registration, retrieve incorporation details, officer information, and filing status. Implement proper error handling, response parsing, and a trait-based interface for testability.
+- [ ] Implement LinkedIn online presence integration module: Build a standalone Rust module that integrates with the LinkedIn API to assess a company's online presence, including company page existence, follower count, employee count, and recent activity signals.
+- [ ] Implement Google Reviews reputation integration module: Build a standalone Rust module that integrates with a Google Reviews data source (Google Places API or commercial alternative) to assess a company's reputation based on review count, average rating, and sentiment signals.
+- [ ] Implement credit signals integration module: Build a standalone Rust module that integrates with a credit/financial data API to retrieve credit signals for a business, including credit score, payment history indicators, and financial risk level.
+- [ ] Implement vetting pipeline orchestration and composite risk scoring: Build the core vetting pipeline that orchestrates all four integration modules (OpenCorporates, LinkedIn, Google Reviews, Credit) in parallel, aggregates their results, computes a composite risk score, derives a lead qualification tier, and persists VettingResult and LeadScore to the database.
+- [ ] Implement API endpoints for vetting service: Implement the three Axum HTTP endpoints: POST /api/v1/vetting/run (trigger a vetting pipeline run), GET /api/v1/vetting/:org_id (retrieve vetting results for an organization), and GET /api/v1/vetting/credit/:org_id (retrieve credit-specific data for an organization). Wire up the pipeline and database queries to the router.
+- [ ] Write comprehensive integration and end-to-end tests for vetting service: Create a full test suite covering the vetting service end-to-end, including integration tests against a test PostgreSQL database with mocked external APIs, and ensure at least 80% code path coverage.

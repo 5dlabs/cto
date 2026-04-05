@@ -1,25 +1,18 @@
-Implement subtask 5007: Implement vetting REST endpoints and orchestration pipeline
+Implement subtask 5007: Implement vetting pipeline orchestration and composite risk scoring
 
 ## Objective
-Build the Axum REST endpoints (/api/v1/vetting/run, /api/v1/vetting/:org_id, /api/v1/vetting/credit/:org_id) and the orchestration logic that calls all integration modules, runs scoring, and persists results.
+Build the core vetting pipeline that orchestrates all four integration modules (OpenCorporates, LinkedIn, Google Reviews, Credit) in parallel, aggregates their results, computes a composite risk score, derives a lead qualification tier, and persists VettingResult and LeadScore to the database.
 
 ## Steps
-1. Create `src/routes/vetting.rs` module.
-2. Implement POST `/api/v1/vetting/run` endpoint:
-   - Accept JSON body with org_id, org_name, optional jurisdiction and location hints.
-   - Orchestrate parallel calls to OpenCorporates, LinkedIn, Google Reviews, and credit modules using tokio::join! or tokio::JoinSet.
-   - Pass aggregated data to the scoring engine.
-   - Persist VettingResult and LeadScore to PostgreSQL using sqlx.
-   - Return the VettingResult with score and classification in the response.
-3. Implement GET `/api/v1/vetting/:org_id` endpoint:
-   - Query PostgreSQL for the latest VettingResult for the given org_id.
-   - Return 404 if no result found.
-4. Implement GET `/api/v1/vetting/credit/:org_id` endpoint:
-   - Query for credit-specific data from the latest vetting result.
-   - Return structured credit data and score.
-5. Add request validation with proper error responses (400 for bad input, 404 for not found, 500 for internal errors).
-6. Use Axum extractors and State for dependency injection of database pool and API clients.
-7. Wire all routes into the main Axum router.
+1. Create src/pipeline/mod.rs and src/pipeline/vetting_pipeline.rs.
+2. Define `VettingPipeline` struct that holds references to all four integration trait objects (dyn BusinessVerifier, dyn OnlinePresenceChecker, dyn ReputationChecker, dyn CreditChecker) and a PgPool.
+3. Implement `run_vetting(&self, org_id: Uuid, company_name: &str, ...) -> Result<(VettingResult, LeadScore), VettingError>`.
+4. Use tokio::join! to run all four integration checks concurrently.
+5. Composite risk score formula: business_verification (0.25 weight) + linkedin_presence (0.20) + google_reputation (0.25) + credit_signals (0.30). If business verification fails entirely, cap score at 0.3.
+6. Lead qualification tiers: >= 0.75 -> Hot, >= 0.50 -> Warm, >= 0.25 -> Cold, < 0.25 -> Disqualified.
+7. Build scoring_factors JSONB from individual scores and metadata.
+8. Persist VettingResult and LeadScore to database using sqlx transactions.
+9. Handle partial failures gracefully (some APIs may fail; use available data with reduced confidence).
 
 ## Validation
-Write integration tests using a test database and mocked external APIs. Verify POST /vetting/run creates a record and returns correct score. Verify GET /vetting/:org_id retrieves persisted data. Verify GET /vetting/credit/:org_id returns credit-specific data. Test error cases (invalid input, missing org).
+Unit tests with all mock integrations verify correct composite scoring for various scenarios: all-green company scores Hot, mixed signals score Warm/Cold, all-negative scores Disqualified; partial API failures are handled gracefully without panicking; database persistence is verified in integration tests.

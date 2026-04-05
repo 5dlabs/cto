@@ -1,25 +1,23 @@
-Implement subtask 4003: Integrate Stripe for payment processing and webhook handling
+Implement subtask 4003: Implement invoice CRUD endpoints and business logic
 
 ## Objective
-Implement Stripe payment intent creation, confirmation handling, and webhook endpoint for processing asynchronous payment events (succeeded, failed, refunded).
+Build Axum REST endpoints for creating, reading, updating, listing invoices and invoice line items, including status transitions and invoice number generation.
 
 ## Steps
-1. Add `stripe-rust` crate dependency.
-2. Create `src/services/stripe_service.rs`: initialize Stripe client with STRIPE_SECRET_KEY.
-3. Implement `create_payment_intent(invoice_id, amount, currency)`: call Stripe API to create a PaymentIntent, store the payment_intent_id in the payments table with status 'pending', return client_secret for frontend.
-4. Implement `src/routes/payments.rs`:
-   - POST /api/v1/payments/create-intent — create payment intent for an invoice
-   - GET /api/v1/payments/:id — get payment details
-   - GET /api/v1/invoices/:id/payments — list payments for an invoice
-5. Implement `src/routes/webhooks.rs`:
-   - POST /api/v1/webhooks/stripe — Stripe webhook endpoint
-   - Verify webhook signature using Stripe webhook secret from environment
-   - Handle events: `payment_intent.succeeded` → update payment status to 'completed', update invoice status to 'paid', record paid_at timestamp, write audit log
-   - Handle `payment_intent.payment_failed` → update payment status to 'failed', write audit log
-   - Handle `charge.refunded` → create refund record, update payment status, write audit log
-   - Return 200 for all handled events, 400 for signature verification failure
-6. Implement idempotency: check if event has already been processed (store stripe_event_id) before applying changes.
-7. All payment state changes must be transactional with their corresponding invoice updates.
+1. Create src/db/invoices.rs: repository functions using sqlx for create_invoice, get_invoice_by_id, list_invoices (with filters: status, customer_id, date range; pagination), update_invoice, soft_delete_invoice, create_line_item, list_line_items_by_invoice.
+2. Create src/services/invoice_service.rs: business logic layer. Generate sequential invoice numbers (e.g., INV-2024-00001). Validate status transitions: DRAFT→SENT→PAID, DRAFT→CANCELLED, SENT→OVERDUE, SENT→VOID. Calculate subtotal/tax/total from line items.
+3. Create src/routes/invoices.rs with Axum handlers:
+   - POST /api/v1/invoices → create invoice (draft)
+   - GET /api/v1/invoices → list invoices (query params for filters/pagination)
+   - GET /api/v1/invoices/:id → get invoice detail with line items
+   - PUT /api/v1/invoices/:id → update invoice (only DRAFT status)
+   - POST /api/v1/invoices/:id/send → transition to SENT
+   - POST /api/v1/invoices/:id/void → transition to VOID
+   - DELETE /api/v1/invoices/:id → soft delete (only DRAFT)
+   - POST /api/v1/invoices/:id/line-items → add line item
+4. Use Axum extractors for JSON body validation with serde.
+5. Recalculate totals whenever line items change.
+6. Return proper HTTP status codes: 201 for create, 200 for reads, 409 for invalid state transitions.
 
 ## Validation
-Unit tests with mocked Stripe client: verify payment intent creation stores correct data. Integration tests: simulate webhook payloads with valid signatures, verify payment and invoice statuses update correctly. Test idempotency: send same webhook event twice, verify no duplicate processing. Test invalid signature returns 400. Test payment_failed event marks payment as failed without changing invoice to paid.
+Unit tests for invoice number generation and status transition validation; integration tests verify full CRUD cycle: create draft → add line items → verify totals → send → mark paid; invalid transitions return 409; soft delete only works on DRAFT invoices; list endpoint pagination and filtering work correctly.

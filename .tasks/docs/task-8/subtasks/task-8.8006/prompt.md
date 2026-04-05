@@ -1,18 +1,18 @@
-Implement subtask 8006: Implement Morgan web chat widget integration
+Implement subtask 8006: Implement portfolio/gallery page (/portfolio) with Social Media Engine sync
 
 ## Objective
-Build and embed the Morgan web chat widget that connects to the Morgan agent's WebSocket endpoint, supporting real-time conversational interaction.
+Build the portfolio page that displays project showcases and published content synced from the Social Media Engine, with image gallery and filtering capabilities.
 
 ## Steps
-1. Create a ChatWidget React component (floating button + expandable chat panel, or full-page per dp-11 decision).
-2. Implement WebSocket connection to Morgan agent's /ws/chat endpoint.
-3. Handle connection lifecycle: connect on widget open, reconnect on disconnect, close on widget close.
-4. Implement message UI: scrollable message list, user messages (right-aligned), agent messages (left-aligned), typing indicator during agent response.
-5. Stream agent responses token-by-token for real-time feel.
-6. Generate and persist session_id in localStorage for conversation continuity.
-7. Add the widget to the root layout so it appears on all pages (or create a /chat route for full-page).
-8. Style consistently with the site's design system (shadcn/ui components, Tailwind).
-9. Handle error states: connection failure, agent timeout.
+1. Create app/portfolio/page.tsx.
+2. Fetch published portfolio items from the Social Media Engine API using TanStack Query + Effect.
+3. Implement a masonry or grid gallery layout for project images/videos.
+4. Add filtering by project type, equipment used, or date.
+5. Implement a detail modal or expandable card for individual portfolio items showing full description, equipment used, and social media links.
+6. Implement Effect Schema validation for the Social Media Engine API response.
+7. Add lazy loading for images with blur placeholders.
+8. Add Schema.org ImageGallery or CreativeWork structured data.
+9. Ensure images have alt text for accessibility.
 
 ## Validation
-Chat widget appears on all pages (or /chat route is accessible). Clicking opens the chat interface. Sending a message connects via WebSocket and receives a response from Morgan. Messages display correctly with sender alignment. Session persists across page navigations. Connection failure shows a user-friendly error.
+Portfolio page renders items from the Social Media Engine API; gallery layout displays correctly on all screen sizes; filtering reduces displayed items appropriately; detail view shows complete information; images lazy-load with placeholders; alt text is present on all images.

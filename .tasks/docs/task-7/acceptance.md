@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] Morgan responds to Signal, voice, and web chat within 10 seconds. All MCP tools are accessible and functional. End-to-end flows (lead qualification, quote, vetting, invoice) complete successfully. Handles 500+ concurrent Signal connections.
+- [ ] Morgan responds to Signal, voice, and web chat within 10 seconds; can trigger all MCP tools; end-to-end flows (lead → quote → vetting → invoice) complete successfully; tests cover all skills and integrations.
 
 ## Verification Notes
 

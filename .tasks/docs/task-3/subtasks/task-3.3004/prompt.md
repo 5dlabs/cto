@@ -1,17 +1,21 @@
-Implement subtask 3004: Implement ProjectService with quote-to-project conversion and Google Calendar integration
+Implement subtask 3004: Implement OpportunityService and ProjectService gRPC handlers
 
 ## Objective
-Build the ProjectService including atomic quote-to-project conversion (marking opportunity as converted and creating project in a single transaction) and Google Calendar API integration for scheduling.
+Build the gRPC service implementations for OpportunityService and ProjectService with full business logic, including the opportunity-to-project conversion workflow.
 
 ## Steps
-1. Create `internal/project/` package with repository, service, and handler layers.
-2. Implement `repository.go` with PostgreSQL queries: CreateProject, GetProjectByID, ListProjects, UpdateProject.
-3. Implement the ConvertToProject flow as a database transaction: (a) verify opportunity status is 'accepted', (b) update opportunity status to 'converted', (c) insert new project linked to opportunity_id, (d) copy relevant data (line items become project items). Rollback entire transaction on any failure.
-4. Create `internal/calendar/` package wrapping Google Calendar API client.
-5. Implement calendar.CreateEvent, calendar.UpdateEvent, calendar.DeleteEvent methods.
-6. On project creation/update with dates, create/update a Google Calendar event and store the calendar_event_id on the project record.
-7. Handle calendar API failures gracefully: log the error, mark calendar_sync_pending flag, do not fail the project creation.
-8. Wire up gRPC handlers and register service.
+1. Create /internal/service/opportunity_service.go implementing the generated OpportunityServiceServer interface.
+2. Implement CreateOpportunity: validate input, persist via OpportunityRepo, return created opportunity.
+3. Implement GetOpportunity: fetch by ID, return NOT_FOUND if missing.
+4. Implement ListOpportunities: support filtering by status, customer_id; pagination with page_token/page_size.
+5. Implement UpdateOpportunity: field-mask based partial update, optimistic concurrency check.
+6. Implement ConvertToProject: within a DB transaction, create a new Project from the opportunity data, update opportunity status to WON, return the new project. This is the core quote-to-project workflow entry point.
+7. Create /internal/service/project_service.go implementing ProjectServiceServer.
+8. Implement CreateProject, GetProject, ListProjects (filter by status, date range), UpdateProject.
+9. Implement AssignCrew: link crew member IDs to project via project_crew join table.
+10. Implement AssignEquipment: link equipment IDs to project via project_equipment join table, validate equipment availability status.
+11. Register both services on the gRPC server and grpc-gateway mux in main.go.
+12. Add input validation using a validation library or custom validators for required fields.
 
 ## Validation
-Integration test: create an opportunity, accept it, convert to project — verify opportunity is 'converted' and project exists atomically. Verify converting a non-accepted opportunity fails. Mock Google Calendar API client: verify event creation is called with correct dates. Verify calendar failure does not roll back project creation.
+Unit tests for each RPC method with mocked repositories; ConvertToProject correctly creates project and updates opportunity in a single transaction; ListOpportunities pagination returns correct pages; gRPC and REST endpoints both return expected responses via grpc-gateway.

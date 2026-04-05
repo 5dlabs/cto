@@ -1,7 +1,7 @@
 ## Production Hardening: RBAC, Secret Rotation, Audit Logging (Bolt - Kubernetes/Helm)
 
 ### Objective
-Implement RBAC, automate secret rotation, and enable audit logging for all services to ensure security and compliance.
+Implement RBAC, automate secret rotation, and enable audit logging for all critical infrastructure and services. Ensures compliance, security, and traceability.
 
 ### Ownership
 - Agent: bolt
@@ -11,13 +11,13 @@ Implement RBAC, automate secret rotation, and enable audit logging for all servi
 - Dependencies: 9
 
 ### Implementation Details
-{"steps":["Define Kubernetes RBAC roles and role bindings for all namespaces and services.","Automate secret rotation for API keys, database credentials, and service tokens using Kubernetes operators or external secret managers.","Enable audit logging for all service access and API calls.","Integrate with existing observability stack (Grafana, Loki, Prometheus) for monitoring and alerting.","Document RBAC and audit policies for compliance."]}
+{"steps": ["Define Kubernetes RBAC roles and bindings for all service accounts.", "Integrate automated secret rotation for database, API keys, and service credentials.", "Enable audit logging for Kubernetes API and all managed services.", "Document access controls and audit log retention policies.", "Test RBAC enforcement and secret rotation workflows."]}
 
 ### Subtasks
-- [ ] Define Kubernetes RBAC roles and role bindings for all namespaces and services: Create fine-grained RBAC Role, ClusterRole, RoleBinding, and ClusterRoleBinding resources for all namespaces, ensuring each service's ServiceAccount has least-privilege access to only the Kubernetes resources it needs.
-- [ ] Automate secret rotation for database credentials: Implement automated rotation of PostgreSQL and Redis credentials using the External Secrets Operator or equivalent, ensuring services pick up new credentials without downtime.
-- [ ] Automate secret rotation for API keys and service tokens: Implement automated rotation for application-level API keys, inter-service tokens, and third-party API credentials, ensuring all consuming services are updated seamlessly.
-- [ ] Enable Kubernetes API audit logging: Configure the Kubernetes API server audit policy to log all authentication, authorization, and resource mutation events, and ship audit logs to the existing log aggregation stack (Loki).
-- [ ] Enable application-level audit logging for all services: Configure all backend services (Equipment Catalog, RMS, Finance, Vetting, Social, Morgan) to emit structured audit logs for API access events, and ship these logs to Loki for centralized analysis.
-- [ ] Create Grafana dashboards and Prometheus alerting rules for security monitoring: Build Grafana dashboards for RBAC violations, secret rotation status, and audit log analysis. Create Prometheus alerting rules for security-relevant events such as failed auth attempts, secret expiry warnings, and unauthorized access patterns.
-- [ ] Document RBAC policies, audit procedures, and compliance verification: Create comprehensive documentation covering all RBAC policies, secret rotation procedures, audit logging architecture, and compliance verification steps for operational handoff and audit readiness.
+- [ ] Define Kubernetes RBAC roles and bindings for all service accounts: Create least-privilege Role, ClusterRole, RoleBinding, and ClusterRoleBinding resources for every service account across all namespaces. Ensure no service account has more permissions than required for its function.
+- [ ] Implement automated secret rotation for database credentials: Set up automated rotation for PostgreSQL database credentials (application user passwords, replication credentials) so that secrets are periodically rotated without causing application downtime.
+- [ ] Implement automated secret rotation for API keys and service credentials: Set up automated rotation for external API keys (e.g., OpenAI, Cloudflare) and inter-service credentials, ensuring zero-downtime rotation with proper coordination.
+- [ ] Enable Kubernetes API server audit logging with retention policy: Configure the Kubernetes API server audit policy to capture security-relevant events (authentication, authorization, secret access, RBAC changes) and ship logs to the chosen sink with defined retention.
+- [ ] Enable audit logging for managed services (PostgreSQL, Redis): Configure audit logging within PostgreSQL and Redis to capture data access, administrative operations, and authentication events for compliance and forensics.
+- [ ] Document access controls, audit log retention, and security policies: Create comprehensive documentation covering all RBAC policies, secret rotation procedures, audit log retention policies, and security runbooks for operational reference and compliance.
+- [ ] Test RBAC enforcement and secret rotation workflows end-to-end: Execute comprehensive security tests validating that RBAC policies block unauthorized access, secret rotation works without downtime, and audit logs capture all security-relevant events during these operations.

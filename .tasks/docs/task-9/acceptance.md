@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All services run in HA mode. CDN and TLS are active. Ingress routes are secure and functional. Network policies block unauthorized access. Endpoints are accessible via public URLs.
+- [ ] All services remain available during failover; SSL/TLS is enforced; CDN serves static assets globally; ingress routes are correct; network policies block unauthorized access.
 
 ## Verification Notes
 

@@ -52,7 +52,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-2003
-    depends_on: [validate-subtask-2001]
+    depends_on: [validate-subtask-2002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2003/prompt.md
@@ -64,7 +64,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-2004
-    depends_on: [validate-subtask-2001]
+    depends_on: [validate-subtask-2002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2004/prompt.md
@@ -76,7 +76,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-2005
-    depends_on: [validate-subtask-2001]
+    depends_on: [validate-subtask-2001, validate-subtask-2003]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2005/prompt.md
@@ -88,7 +88,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-2006
-    depends_on: [validate-subtask-2002, validate-subtask-2004]
+    depends_on: [validate-subtask-2001]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2006/prompt.md
@@ -100,7 +100,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-2007
-    depends_on: [validate-subtask-2002, validate-subtask-2003, validate-subtask-2004, validate-subtask-2005]
+    depends_on: [validate-subtask-2003, validate-subtask-2004, validate-subtask-2005, validate-subtask-2006]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2007/prompt.md

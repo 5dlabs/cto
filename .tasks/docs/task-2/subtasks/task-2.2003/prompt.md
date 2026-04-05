@@ -1,21 +1,17 @@
-Implement subtask 2003: Implement machine-readable equipment-api endpoints
+Implement subtask 2003: Implement core catalog CRUD endpoints (categories, products, availability)
 
 ## Objective
-Build the machine-readable API endpoints (/equipment-api/catalog and /equipment-api/checkout) designed for AI agent consumption with structured, deterministic response formats.
+Implement the public REST API endpoints for browsing the equipment catalog: list categories, list/filter products, get product by ID, and check product availability.
 
 ## Steps
-1. Implement `GET /api/v1/equipment-api/catalog`:
-   - Return a structured JSON response optimized for machine parsing.
-   - Include all products with their availability status, categories, pricing tiers (daily/weekly/monthly), and specs.
-   - Use a flat, denormalized format: each item includes inline category name and availability summary.
-   - Support query params: category, available_after (date), min_quantity.
-2. Implement `POST /api/v1/equipment-api/checkout`:
-   - Accept a JSON body with: items (array of {product_id, quantity, start_date, end_date}), customer_info (name, email, phone).
-   - Validate all product IDs exist and quantities are available for the requested dates.
-   - Return a quote summary: line items with calculated pricing, total, and a quote_id for reference.
-   - Do NOT actually create an order; this is a quote/validation endpoint.
-3. Use strongly-typed request/response structs with serde.
-4. Return machine-friendly error codes (not just HTTP status) in error responses for agent consumption.
+1. Create src/handlers/catalog.rs with the following Axum handler functions:
+2. GET /api/v1/catalog/categories → list_categories: query rms.categories ordered by display_order, support optional ?parent_id filter, return JSON array.
+3. GET /api/v1/catalog/products → list_products: query rms.products WHERE is_active=true, support query params: ?category_id, ?search (ILIKE on name/description), ?page (default 1), ?per_page (default 20, max 100). Join product_images to include image URLs. Return paginated response with { data: [], pagination: { page, per_page, total, total_pages } }.
+4. GET /api/v1/catalog/products/:id → get_product: query single product by UUID, include all images, category info, and specifications. Return 404 with structured error if not found.
+5. GET /api/v1/catalog/products/:id/availability → get_availability: accept query params ?start_date, ?end_date (required), query rms.availability for the product in the date range, compute available_quantity = total_quantity - reserved_quantity for each date. Return array of { date, available_quantity, total_quantity }.
+6. Create structured error types in src/errors.rs (AppError enum implementing IntoResponse) with consistent JSON error format: { error: { code, message, details } }.
+7. Register all routes on the Axum Router with /api/v1/catalog prefix.
+8. Use tower_http::trace for request logging on all routes.
 
 ## Validation
-Test the catalog endpoint returns all products in the expected flat format with inline category and availability. Test the checkout endpoint with valid items returns a correct quote with pricing math. Test with invalid product IDs, insufficient availability, and malformed dates to verify structured error responses.
+Unit tests for each handler using sqlx::test with a test database; list_categories returns seeded data; list_products supports pagination and filtering; get_product returns 404 for non-existent IDs; get_availability computes correct available quantities; all responses match the expected JSON schema.

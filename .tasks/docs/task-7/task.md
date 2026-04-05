@@ -1,26 +1,25 @@
 ## Implement Morgan AI Agent (Angie - OpenClaw/MCP)
 
 ### Objective
-Deploy and configure the Morgan AI agent to handle Signal, voice, and web chat, orchestrating all backend services via MCP tools.
+Deploy and configure the Morgan AI agent with Signal, voice (ElevenLabs), and web chat integrations. Connects to all backend services via MCP tools for unified customer interaction.
 
 ### Ownership
 - Agent: angie
 - Stack: OpenClaw/MCP
 - Priority: high
 - Status: pending
-- Dependencies: 2, 3, 4, 5, 6
+- Dependencies: 2, 3, 4, 5, 6, 1
 
 ### Implementation Details
-{"steps":["Deploy OpenClaw agent in Kubernetes using the provided deployment manifest, referencing AGENT_ID, MODEL, and workspace volume.","Configure Signal-CLI and ElevenLabs integrations for messaging and voice.","Register all MCP tools (sigma1_catalog_search, sigma1_check_availability, etc.) with tool-server, mapping to backend service endpoints.","Implement skills: sales-qual, customer-vet, quote-gen, upsell, finance, social-media, rms-*, admin.","Integrate with Twilio for phone/SIP.","Ensure Morgan can respond to queries within 10 seconds and handle 500+ concurrent Signal connections.","Test end-to-end flows: Signal message → Morgan → backend action → confirmation."]}
+{"steps": ["Deploy OpenClaw agent as per infra spec, referencing AGENT_ID=morgan and MODEL=openai-api/gpt-5.4-pro.", "Configure Signal-CLI and ElevenLabs voice integration using secrets.", "Implement MCP tool-server access for all backend service tools (catalog, RMS, finance, vetting, social).", "Configure web chat widget endpoint for website integration.", "Implement skills: sales-qual, customer-vet, quote-gen, upsell, finance, social-media, rms-*, admin as per PRD.", "Test all inbound and outbound flows: Signal, voice, web chat.", "Reference all service endpoints from 'sigma1-infra-endpoints' ConfigMap.", "Write end-to-end tests for lead qualification, quote, vetting, and invoice flows."]}
 
 ### Subtasks
-- [ ] Deploy OpenClaw agent in Kubernetes with workspace volume and configuration: Create and apply the Kubernetes deployment manifest for the OpenClaw Morgan agent, including AGENT_ID, MODEL env vars, workspace persistent volume, resource requests/limits, and service account.
-- [ ] Integrate Signal-CLI for messaging channel: Deploy and configure Signal-CLI as a sidecar or separate pod, link it to the Morgan agent so inbound Signal messages are forwarded to the agent and responses are sent back via Signal.
-- [ ] Integrate ElevenLabs for voice synthesis: Configure the Morgan agent to use ElevenLabs API for text-to-speech voice responses, including voice selection, streaming audio output, and error handling.
-- [ ] Integrate Twilio for phone and SIP connectivity: Configure Twilio for inbound/outbound phone calls and SIP trunking, connecting voice calls to the Morgan agent with ElevenLabs voice output.
-- [ ] Register all MCP tools with tool-server mapping to backend service endpoints: Register every MCP tool (sigma1_catalog_search, sigma1_check_availability, sigma1_customer_vet, sigma1_create_quote, sigma1_submit_invoice, sigma1_social_post, etc.) with the tool-server, mapping each to the correct backend service API endpoint.
-- [ ] Implement skills: sales-qual, customer-vet, quote-gen, upsell: Implement the sales-oriented skill set for Morgan: lead qualification (sales-qual), customer vetting orchestration (customer-vet), quote generation (quote-gen), and upsell recommendation (upsell).
-- [ ] Implement skills: finance, social-media, rms-*, admin: Implement the operational skill set for Morgan: finance reporting and invoicing (finance), social media management (social-media), rental management system operations (rms-*), and administrative functions (admin).
-- [ ] Set up web chat endpoint for Morgan agent: Expose a WebSocket (or HTTP streaming) endpoint from the Morgan agent for the web chat frontend to connect to, enabling real-time conversational interaction via browser.
-- [ ] Performance optimization and load testing for 500+ concurrent Signal connections: Optimize the Morgan agent and Signal-CLI setup to achieve <10 second response times and handle 500+ concurrent Signal connections, conducting load tests to validate.
-- [ ] End-to-end conversation flow testing across all channels and skills: Validate complete end-to-end flows across Signal, voice, and web chat channels, covering all skill domains (sales, vetting, quoting, invoicing, social, RMS, admin).
+- [ ] Deploy OpenClaw agent with base configuration and GPT-5.4-pro model setup: Deploy the OpenClaw agent runtime, configure AGENT_ID=morgan with MODEL=openai-api/gpt-5.4-pro, wire up environment variables from the sigma1-infra-endpoints ConfigMap, and verify the agent starts and responds to a basic health check.
+- [ ] Implement Signal-CLI integration for inbound/outbound messaging: Configure Signal-CLI as a messaging channel adapter for the Morgan agent, enabling inbound message reception and outbound message sending via the Signal protocol.
+- [ ] Implement ElevenLabs voice integration for voice channel: Integrate ElevenLabs TTS/STT with the Morgan agent to enable voice-based customer interactions, including speech-to-text input and text-to-speech output.
+- [ ] Implement web chat widget endpoint for website integration: Create the web chat HTTP/WebSocket endpoint that the Sigma-1 website chat widget will connect to, enabling real-time bidirectional messaging with the Morgan agent.
+- [ ] Configure MCP tool-server with Equipment Catalog and RMS backend tools: Set up the MCP tool-server and register tools for the Equipment Catalog service (search, lookup, availability) and Rental Management System (create rental, check status, manage returns).
+- [ ] Configure MCP tool-server with Finance, Vetting, and Social Media backend tools: Register MCP tools for the Finance service (invoicing, payments), Customer Vetting service (credit checks, verification), and Social Media Engine (content publishing, portfolio).
+- [ ] Implement agent skills: sales-qual, customer-vet, and quote-gen: Implement the sales qualification, customer vetting, and quote generation skill definitions within the Morgan agent, including conversation flows, tool orchestration logic, and decision trees.
+- [ ] Implement agent skills: upsell, finance, social-media, and admin: Implement the upselling, finance management, social media, and administrative skill definitions within the Morgan agent.
+- [ ] End-to-end integration tests for complete multi-channel flows: Write and execute comprehensive end-to-end tests covering the full lead-to-invoice lifecycle across Signal, voice, and web chat channels, validating all skills and MCP tool interactions.

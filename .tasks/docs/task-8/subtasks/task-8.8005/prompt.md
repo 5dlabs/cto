@@ -1,20 +1,22 @@
-Implement subtask 8005: Implement self-service quote builder page (/quote) with Effect form validation
+Implement subtask 8005: Implement quote builder page (/quote) with form handling and API integration
 
 ## Objective
-Build the quote builder page allowing users to select equipment, specify rental details, and submit a quote request, using Effect Schema for form validation.
+Build the quote request page with a multi-step form for selecting equipment, specifying rental details, customer information, and submitting the quote request to the backend.
 
 ## Steps
-1. Create `app/quote/page.tsx` for the quote builder.
-2. Define the quote form schema using Effect Schema: equipment selections (array of {equipmentId, quantity, duration}), contact info (name, email, phone, company), project details (location, start date, end date, project description).
-3. Build a multi-step or single-page form:
-   - Step 1: Equipment selection (search and add equipment items, set quantity and duration for each).
-   - Step 2: Project details (location, dates, description).
-   - Step 3: Contact information.
+1. Create app/quote/page.tsx.
+2. Implement a multi-step form:
+   - Step 1: Equipment selection (search/browse, add to quote, specify quantities and date ranges).
+   - Step 2: Delivery/pickup details (address, dates, special requirements).
+   - Step 3: Customer information (name, company, email, phone).
    - Step 4: Review and submit.
-4. Validate each step using Effect Schema with real-time error messages.
-5. On submit, call the quote creation API endpoint. Display success confirmation with quote reference number.
-6. Handle pre-population from /equipment/:id CTA (read query params and pre-fill equipment).
-7. Persist form state in session storage so users don't lose progress on navigation.
+3. Use Effect Schema for form validation at each step.
+4. Pre-populate equipment if navigated from /equipment/:id with query params.
+5. Submit quote request to the Finance/Quote API endpoint.
+6. Display confirmation with quote reference number on success.
+7. Handle submission errors with user-friendly messages.
+8. Implement form state persistence (e.g., sessionStorage) so users don't lose progress on navigation.
+9. Ensure all form fields have proper labels, error messages, and ARIA attributes.
 
 ## Validation
-Form renders at /quote. Equipment can be searched and added. Validation errors display for invalid inputs (empty required fields, invalid email, past dates). Valid submission calls the API and shows confirmation. Pre-population from equipment detail page works. Form state persists across page refreshes.
+Multi-step form navigates correctly between steps; Effect Schema validation catches invalid inputs and displays error messages; equipment pre-population from query params works; form submits successfully and shows confirmation; form state persists across page navigation; all form fields are accessible with screen readers.
