@@ -57,7 +57,7 @@ permissions:
 
 jobs:
   build-runtime:
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
       contents: read
@@ -268,7 +268,7 @@ jobs:
           fi
 
   build-sidecar:
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
@@ -323,7 +323,7 @@ jobs:
   # Build the unified agents image containing ALL CLI tools
   build-agents:
     needs: build-runtime
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
       contents: read
@@ -427,7 +427,7 @@ jobs:
   summary:
     needs: [build-runtime, build-agents, build-sidecar]
     if: always()
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     steps:
       - name: Generate summary header
         run: |
