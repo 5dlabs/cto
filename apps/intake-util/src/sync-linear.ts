@@ -1224,14 +1224,13 @@ function gh(args: string[]): string {
 }
 
 /**
- * Check if a GitHub issue with the exact title already exists in the repo.
+ * Check if an **open** GitHub issue with the exact title already exists in the repo.
  * Returns the issue number if found, undefined otherwise.
  */
 function findExistingGitHubIssue(repo: string, title: string): { number: number; url: string } | undefined {
   try {
-    // Search for issues with the exact title (open or closed)
     const result = gh(
-      ['issue', 'list', '--repo', repo, '--search', `"${title}" in:title`, '--json', 'number,title,url', '--limit', '50'],
+      ['issue', 'list', '--repo', repo, '--state', 'open', '--search', `"${title}" in:title`, '--json', 'number,title,url', '--limit', '50'],
     );
     if (!result) return undefined;
 
@@ -1272,6 +1271,8 @@ function extractAgentFromTitle(title: string): string | undefined {
     const name = match[1].toLowerCase();
     if (AGENT_DISPLAY_NAMES[name]) return name;
   }
+  // PRD issues default to morgan
+  if (title.toLowerCase().startsWith('prd:')) return 'morgan';
   return undefined;
 }
 
