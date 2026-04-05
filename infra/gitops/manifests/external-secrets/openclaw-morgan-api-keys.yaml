@@ -1,0 +1,147 @@
+---
+# Morgan depends on the shared OpenClaw provider bundle, but it runs in the
+# CTO namespace instead of the upstream openclaw namespace. Mirror the
+# canonical openclaw-api-keys ExternalSecret here so Argo owns the source of
+# truth for Morgan's provider keys and OpenAI OAuth material.
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: openclaw-api-keys
+  namespace: cto
+  labels:
+    app.kubernetes.io/managed-by: external-secrets
+    app.kubernetes.io/instance: external-secrets-config
+    app.kubernetes.io/part-of: openclaw
+    app.kubernetes.io/component: api-keys
+  annotations:
+    argocd.argoproj.io/tracking-id: external-secrets-config:external-secrets.io/ExternalSecret:cto/openclaw-api-keys
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: openclaw-api-keys
+    creationPolicy: Owner
+  data:
+    # --- AI Model Provider Keys (secret/openclaw/providers) ---
+    - secretKey: anthropic-api-key
+      remoteRef:
+        key: secret/openclaw/providers
+        property: anthropic-api-key
+    - secretKey: openai-api-key
+      remoteRef:
+        key: secret/openclaw/providers
+        property: openai-api-key
+    - secretKey: openrouter-api-key
+      remoteRef:
+        key: secret/openclaw/providers
+        property: openrouter-api-key
+    - secretKey: minimax-api-key
+      remoteRef:
+        key: secret/openclaw/providers
+        property: minimax-api-key
+    - secretKey: gemini-api-key
+      remoteRef:
+        key: secret/openclaw/providers
+        property: gemini-api-key
+    - secretKey: morph-api-key
+      remoteRef:
+        key: secret/openclaw/providers
+        property: morph-api-key
+    - secretKey: cursor-api-key
+      remoteRef:
+        key: secret/openclaw/providers
+        property: cursor-api-key
+    - secretKey: xai-api-key
+      remoteRef:
+        key: secret/openclaw/providers
+        property: xai-api-key
+    - secretKey: factory-api-key
+      remoteRef:
+        key: secret/openclaw/providers
+        property: factory-api-key
+    - secretKey: elevenlabs-api-key
+      remoteRef:
+        key: secret/openclaw/providers
+        property: elevenlabs-api-key
+    - secretKey: moonshot-api-key
+      remoteRef:
+        key: secret/openclaw/providers
+        property: moonshot-api-key
+    - secretKey: browserless-api-key
+      remoteRef:
+        key: secret/openclaw/providers
+        property: browserless-api-key
+    # --- AWS Credentials (secret/openclaw/aws) ---
+    - secretKey: AWS_ACCESS_KEY_ID
+      remoteRef:
+        key: secret/openclaw/aws
+        property: AWS_ACCESS_KEY_ID
+    - secretKey: AWS_SECRET_ACCESS_KEY
+      remoteRef:
+        key: secret/openclaw/aws
+        property: AWS_SECRET_ACCESS_KEY
+    - secretKey: AWS_DEFAULT_REGION
+      remoteRef:
+        key: secret/openclaw/aws
+        property: AWS_DEFAULT_REGION
+
+    # --- Tool Server Keys (secret/openclaw/tools) ---
+    - secretKey: firecrawl-api-key
+      remoteRef:
+        key: secret/openclaw/tools
+        property: firecrawl-api-key
+    - secretKey: linear-api-key
+      remoteRef:
+        key: secret/openclaw/tools
+        property: linear-api-key
+    - secretKey: brave-api-key
+      remoteRef:
+        key: secret/openclaw/tools
+        property: brave-api-key
+    - secretKey: hooks-token
+      remoteRef:
+        key: secret/openclaw/tools
+        property: hooks-token
+
+    # --- Memory/SuperMemory Keys (secret/openclaw/memory) ---
+    - secretKey: supermemory-openclaw-api-key
+      remoteRef:
+        key: secret/openclaw/memory
+        property: supermemory-openclaw-api-key
+    - secretKey: supermemory-claude-api-key
+      remoteRef:
+        key: secret/openclaw/memory
+        property: supermemory-claude-api-key
+    - secretKey: supermemory-opencode-api-key
+      remoteRef:
+        key: secret/openclaw/memory
+        property: supermemory-opencode-api-key
+    # --- OpenAI OAuth (secret/openclaw/oauth) ---
+    - secretKey: openai-oauth-auth-profiles
+      remoteRef:
+        key: secret/openclaw/oauth
+        property: openai-oauth-auth-profiles
+    - secretKey: openai-oauth-codex-auth
+      remoteRef:
+        key: secret/openclaw/oauth
+        property: openai-oauth-codex-auth
+
+    # --- Cloud/Infra Keys (secret/openclaw/cloud) ---
+    - secretKey: cloudflare-api-key
+      remoteRef:
+        key: secret/openclaw/cloud
+        property: cloudflare-api-key
+    - secretKey: cloudflare-account-id
+      remoteRef:
+        key: secret/openclaw/cloud
+        property: cloudflare-account-id
+    - secretKey: cloudflare-zone-id
+      remoteRef:
+        key: secret/openclaw/cloud
+        property: cloudflare-zone-id
+    - secretKey: op-service-account-token
+      remoteRef:
+        key: secret/openclaw/cloud
+        property: op-service-account-token
