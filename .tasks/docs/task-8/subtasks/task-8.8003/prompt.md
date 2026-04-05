@@ -1,21 +1,26 @@
-Implement subtask 8003: Set up Effect 3.x integration and TanStack Query data fetching layer
+Implement subtask 8003: Build root layout with navigation, footer, responsive shell, and TanStack Query provider
 
 ## Objective
-Configure Effect 3.x for schema validation and data fetching. Integrate TanStack Query with Effect programs for client-side server state management. Create reusable API client utilities and Effect schemas for catalog, availability, and quote payloads.
+Implement the root App Router layout with site-wide navigation header, footer, responsive mobile menu, TanStack Query client provider with Effect integration layer, and error boundary setup.
 
 ## Steps
-1. Install `effect`, `@effect/schema`, `@tanstack/react-query`, `@tanstack/react-query-devtools`.
-2. Create `lib/effect/` directory with:
-   - `api-client.ts`: Effect-based HTTP client wrapping fetch, reading `NEXT_PUBLIC_API_BASE_URL` from env. Handles JSON parsing, error mapping to Effect failures.
-   - `schemas.ts`: Effect Schema definitions for Product, Category, AvailabilitySlot, QuoteRequest, QuoteResponse, matching backend API contracts.
-3. Create `lib/queries/` directory with:
-   - `catalog.ts`: TanStack Query hooks (`useCategories`, `useProducts`, `useProductById`) that internally run Effect programs via `Effect.runPromise`.
-   - `availability.ts`: `useProductAvailability(productId, dateRange)` query hook.
-   - `quote.ts`: `useSubmitQuote()` mutation hook.
-4. Create `providers/query-provider.tsx`: wrap app in `QueryClientProvider` with default stale times, retry config.
-5. Add QueryClientProvider to root layout.
-6. Create `lib/effect/server-fetch.ts`: utility for Server Components to run Effect fetch programs (no hooks, direct `Effect.runPromise` in async server functions).
-7. Export typed error types for API failures (NetworkError, ValidationError, NotFoundError).
+1. Create `app/layout.tsx` as the root layout:
+   - Import Inter font via `next/font/google`.
+   - Wrap children in TanStack QueryClientProvider with a custom query client.
+   - Include a top-level error boundary component.
+2. Configure TanStack Query client in `lib/query-client.ts`:
+   - Default stale times: 1 min for catalog queries, 5 min for category queries.
+   - Default error handler that logs and toasts.
+   - Create an Effect-to-TanStack-Query adapter in `lib/effect-query.ts` that wraps Effect.runPromise for use in queryFn.
+3. Build `components/sigma1/header.tsx`:
+   - Logo (left), nav links: Home, Equipment, Quote Builder, Portfolio (center/right).
+   - Mobile: hamburger menu opening a Sheet (shadcn/ui) with nav links.
+   - Active link highlighting based on current pathname.
+4. Build `components/sigma1/footer.tsx`:
+   - Company info, contact details, social links, copyright.
+   - Links to /llms.txt.
+5. Ensure the layout is fully responsive: mobile-first with breakpoints for tablet (md) and desktop (lg).
+6. The layout must reserve space/portal for the chat widget (implemented separately) — add a div with id `chat-widget-root` at layout level.
 
 ## Validation
-Unit test Effect schemas: validate that valid Product JSON parses successfully and invalid JSON returns decode errors. Unit test API client with mocked fetch: verify correct URL construction, header setting, and error mapping. Test TanStack Query hooks with `renderHook` and mocked query client: verify `useProducts` returns expected data shape.
+Render the layout at mobile (375px), tablet (768px), and desktop (1280px) widths and verify navigation collapses to hamburger on mobile. Verify TanStack QueryClientProvider is present by checking React DevTools. Verify the `chat-widget-root` div is present in the DOM.

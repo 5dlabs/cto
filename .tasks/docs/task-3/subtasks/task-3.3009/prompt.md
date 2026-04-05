@@ -1,22 +1,26 @@
-Implement subtask 3009: Implement Google Calendar integration for crew/project sync
+Implement subtask 3009: Implement CrewService gRPC handlers with scheduling conflict detection
 
 ## Objective
-Build Google Calendar API integration to sync project events and crew assignments to Google Calendar using OAuth2 service account credentials.
+Implement the CrewService gRPC server including crew listing, assignment creation with overlap conflict detection, and bulk scheduling.
 
 ## Steps
-1. Create `internal/gcal/client.go` package.
-2. Initialize Google Calendar API client using service account JSON key from K8s Secret (env var `GOOGLE_CALENDAR_SA_KEY` or file path `GOOGLE_APPLICATION_CREDENTIALS`).
-3. Implement `SyncProjectEvent(ctx, project Project) (eventID string, error)`:
-   - Create/update a Google Calendar event with project title, date range, description, and assigned crew as attendees.
-   - Use calendar ID from config (env var `GOOGLE_CALENDAR_ID`).
-   - Store returned event ID on the project record for future updates.
-4. Implement `SyncCrewAssignment(ctx, assignment CrewAssignment, crewEmail string) error`:
-   - Create a calendar event for the crew member's assignment period.
-   - Include project details in event description.
-5. Implement `DeleteEvent(ctx, eventID string) error` for cleanup on project/assignment deletion.
-6. Add an interface `CalendarSyncer` in `internal/gcal/interface.go` to allow mocking in tests.
-7. Integrate into OpportunityService's `ConvertOpportunity` (create calendar event for new project) and CrewService's `AssignCrew` (create event for assignment).
-8. Handle API errors gracefully: log and continue if Calendar API is unavailable (non-blocking sync).
+1. Create `internal/service/crew.go` implementing CrewServiceServer.
+2. Implement ListCrew:
+   - Paginated list of crew members
+   - Support optional filter by role
+3. Implement AssignCrew:
+   - Accept project_id, crew_member_id, role, start_time, end_time
+   - Validate project exists and is in active status (confirmed or in_progress)
+   - **Conflict detection**: Query crew_assignments for the given crew_member_id where time ranges overlap: `existing.start_time < new.end_time AND existing.end_time > new.start_time`
+   - If overlapping assignment found, return AlreadyExists error with details about the conflicting assignment (project_id, times)
+   - If no conflict, insert assignment
+   - Return created assignment
+4. Implement ScheduleCrew:
+   - Accept project_id and list of assignment requests
+   - Validate all assignments for conflicts (batch check)
+   - Insert all in a single database transaction — if any conflict, roll back all and return error indicating which assignments conflicted
+5. Use SELECT FOR UPDATE or advisory locks to prevent race conditions in concurrent assignment requests for the same crew member.
+6. Register service in gRPC server.
 
 ## Validation
-Unit tests with mock CalendarSyncer: verify ConvertOpportunity calls SyncProjectEvent with correct project data, verify AssignCrew calls SyncCrewAssignment with correct crew email and dates. Test error handling: mock Calendar API failure, verify assignment still succeeds and error is logged. Integration test (optional, requires test calendar): create event, verify it appears, update it, delete it.
+Integration test: assign crew member A to project 1 (10am-2pm), then assign crew member A to project 2 (1pm-5pm) — verify error returned with conflict details. Assign crew member A to project 2 (3pm-6pm after first is 10am-2pm) — verify success (no overlap). Test ScheduleCrew with batch of 3 where 1 conflicts — verify all rolled back. Test concurrent assignment requests for same crew member don't cause double-booking.

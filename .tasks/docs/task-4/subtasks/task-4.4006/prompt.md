@@ -1,32 +1,30 @@
-Implement subtask 4006: Implement invoice send and payment recording endpoints
+Implement subtask 4006: Implement Stripe integration module with invoice creation and webhook handler
 
 ## Objective
-Build the invoice action endpoints: POST send (mark as sent), POST paid (record payment with partial/full tracking and status transitions), and payment CRUD endpoints under `/api/v1/payments`.
+Build the Stripe integration module using stripe-rust crate: create Stripe invoices when an invoice is sent with card/stripe method, and handle payment_intent.succeeded webhooks with idempotency.
 
 ## Steps
-1. `POST /api/v1/invoices/:id/send`:
-   - Validate invoice exists and status allows transition to Sent (use state machine).
-   - Set `issued_at = now()` if not already set.
-   - Transition status to Sent.
-   - Return updated invoice.
-   - (Stripe integration will be added in a separate subtask — this endpoint just does the local state transition for now.)
-2. `POST /api/v1/invoices/:id/paid`:
-   - Accept `PaymentRequest`: amount_cents, currency, method.
-   - Validate invoice exists and is in a payable state (Sent, Viewed, Overdue).
-   - Insert payment record in `payments` table.
-   - Update invoice `paid_amount_cents += amount_cents`.
-   - If `paid_amount_cents >= total_cents`, transition status to Paid.
-   - All in a single DB transaction with row-level locking (`SELECT ... FOR UPDATE`).
-   - Return updated invoice with payment details.
-3. `POST /api/v1/payments`:
-   - Direct payment recording (same logic as above but via payments endpoint).
-4. `GET /api/v1/payments`:
-   - Query params: invoice_id (optional), org_id, offset, limit.
-5. `GET /api/v1/payments/invoice/:invoice_id`:
-   - List all payments for a specific invoice.
-6. Handle partial payments: if amount_cents < remaining, keep invoice in current status but update paid_amount_cents.
-7. Handle overpayment: reject payments where amount_cents would cause paid_amount_cents > total_cents.
-8. Add utoipa annotations.
+1. Create `src/stripe/client.rs`:
+   - Initialize stripe::Client from STRIPE_SECRET_KEY env var.
+   - Add to AppState.
+2. Create `src/stripe/invoices.rs`:
+   - `create_stripe_invoice(client, invoice, line_items)` — creates a Stripe Invoice with line items, returns stripe_invoice_id.
+   - Maps internal line items to Stripe InvoiceItem objects.
+   - Stores the returned stripe_invoice_id on the local invoice record.
+3. Modify `POST /api/v1/invoices/:id/send` handler (from subtask 4004):
+   - After transitioning to 'sent', check if payment method is card/stripe.
+   - If so, call create_stripe_invoice, store stripe_invoice_id, and finalize the Stripe invoice (which triggers Stripe to send the invoice).
+   - If Stripe call fails, roll back the status transition or mark for retry.
+4. Create `src/stripe/webhooks.rs`:
+   - `POST /api/v1/webhooks/stripe` handler.
+   - Extract raw body bytes using a custom Axum extractor (needed for signature verification).
+   - Verify webhook signature using stripe::Webhook::construct_event with STRIPE_WEBHOOK_SECRET.
+   - Handle `payment_intent.succeeded` event: extract payment intent ID, find matching invoice by stripe_invoice_id or metadata, call record_payment with stripe_payment_id for idempotency.
+   - Handle `invoice.payment_failed` event: log warning, optionally update internal status.
+   - Return 200 for handled events, 200 for unhandled events (Stripe expects 2xx).
+5. Idempotency: the record_payment function (from 4005) already checks for duplicate stripe_payment_id. The webhook handler relies on this.
+6. Add STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET to required env vars. In dev/test, these can be Stripe test-mode keys.
+7. Register webhook route WITHOUT auth middleware (Stripe calls this externally; signature verification is the auth).
 
 ## Validation
-Integration tests: (1) Create invoice, send it, verify status=Sent and issued_at set. (2) Record partial payment (50% of total), verify paid_amount_cents updated, status unchanged. (3) Record remaining payment, verify status transitions to Paid. (4) Attempt to pay a Draft invoice, verify 400 error. (5) Attempt overpayment, verify rejection. (6) GET payments by invoice_id returns both payments. (7) Verify DB transaction atomicity: concurrent payments don't cause race conditions (test with row locking).
+Unit test: webhook signature verification rejects invalid signatures and accepts valid ones (use stripe-rust test helpers). Integration test: mock Stripe API, POST /api/v1/invoices/:id/send for a card-method invoice → verify Stripe invoice creation is called and stripe_invoice_id is stored. Integration test: POST /api/v1/webhooks/stripe with a valid payment_intent.succeeded payload and correct signature → verify payment is recorded and invoice status is updated. Integration test: replay the same webhook event → verify no duplicate payment is created (idempotency). Integration test: webhook with invalid signature returns 400.

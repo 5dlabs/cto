@@ -1,15 +1,23 @@
-Implement subtask 9010: Build Profile/Settings tab with user info and notification preferences
+Implement subtask 9010: Tune resource requests and limits for all services
 
 ## Objective
-Implement the Profile tab displaying user information, notification preference toggles, saved quotes list, and sign-out functionality.
+Review Prometheus metrics from the dev deployment and set appropriate production resource requests and limits for all 6 backend services and the frontend.
 
 ## Steps
-1. Build `screens/profile/ProfileScreen.tsx`: Display user avatar, name, email, company from JWT claims or user API endpoint.
-2. **Notification preferences**: Toggle switches for push notifications (Morgan messages, quote updates, equipment alerts). Persist preferences to backend API and locally.
-3. **Saved quotes**: List of user's submitted and draft quotes. Each item shows quote ID, date, status (pending, approved, rejected), total. Tap navigates to quote detail.
-4. **Sign out**: Clear JWT tokens from expo-secure-store, clear AsyncStorage caches, disconnect WebSocket, navigate to auth/login screen.
-5. Add app version display at bottom of profile screen.
-6. Optional: Theme toggle (if supporting light/dark modes), language selector.
+1. Query Prometheus for current resource usage of each service:
+   - `container_memory_working_set_bytes{namespace='sigma1'}` for memory
+   - `rate(container_cpu_usage_seconds_total{namespace='sigma1'}[5m])` for CPU
+2. Set resource requests to approximately the p95 observed usage, limits to 1.5-2x requests:
+   - Equipment Catalog: requests 256Mi/250m, limits 512Mi/500m (adjust based on metrics)
+   - RMS: requests 256Mi/250m, limits 512Mi/500m
+   - Finance: requests 256Mi/250m, limits 512Mi/500m
+   - Social Engine: requests 256Mi/250m, limits 512Mi/500m
+   - Morgan: requests 512Mi/500m, limits 1Gi/1000m (WebSocket connections are memory-intensive)
+   - Customer Vetting: requests 128Mi/125m, limits 256Mi/250m
+   - Website (frontend): requests 256Mi/250m, limits 512Mi/500m
+3. Update each Deployment spec with the tuned values.
+4. Apply changes via rolling update and monitor for OOMKills or CPU throttling.
+5. Document the chosen values and the metrics they were based on.
 
 ## Validation
-Render profile screen with mock user data, verify name/email displayed. Toggle notification preference, verify API call and local persistence. Verify saved quotes list renders mock quotes with correct status badges. Sign out test: verify tokens cleared from secure store, navigation to login screen triggered.
+After applying tuned limits, monitor for 30 minutes: verify no OOMKilled events (`kubectl get events -n sigma1 | grep OOM`), verify no excessive CPU throttling via `container_cpu_cfs_throttled_seconds_total`, verify all pods remain in Running state with no restarts.

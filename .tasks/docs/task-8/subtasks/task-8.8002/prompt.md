@@ -1,20 +1,19 @@
-Implement subtask 8002: Configure shadcn/ui component library and design token system
+Implement subtask 8002: Set up Sigma-1 design system with TailwindCSS 4 brand tokens and shadcn/ui customization
 
 ## Objective
-Install and configure shadcn/ui with Radix UI primitives. Define the dark/moody design token system in tailwind.config.ts reflecting the Sigma-1 lighting/production company brand: dark palette, accent colors, professional typography, generous spacing.
+Define the Sigma-1 brand design tokens in tailwind.config.ts (colors, typography, spacing, shadows for a professional dark theme), initialize shadcn/ui with customized CSS variables, and create the foundational UI component set.
 
 ## Steps
-1. Run `npx shadcn@latest init` — select default style, dark theme, CSS variables.
-2. Install required shadcn/ui components: Button, Card, Dialog, Form, Input, Select, Table, Tabs, Badge, Calendar, Sheet, Popover, Separator, ScrollArea, Skeleton.
-3. Define design tokens in `tailwind.config.ts` / CSS variables:
-   - Colors: dark background (#0a0a0a range), muted surfaces (#1a1a1a), accent (warm amber/gold for lighting brand), destructive, muted foreground.
-   - Border radius: default 0.5rem.
-   - Font family: Inter or similar professional sans-serif via `next/font`.
-   - Spacing scale: generous padding/margins for premium feel.
-4. Create `components/ui/` barrel exports.
-5. Create a `ThemeProvider` if needed (for dark mode toggle future-proofing, but default to dark).
-6. Build a style guide page at `/dev/styleguide` (dev only) showing all shadcn components with design tokens applied.
-7. Verify all installed components render correctly with the custom theme.
+1. Reference https://deployiq.maximinimal.ca for brand baseline direction.
+2. In `tailwind.config.ts`, define custom theme tokens:
+   - Colors: primary (professional dark palette — deep navy/charcoal base, accent color for CTAs), secondary, destructive, muted, background, foreground, card, popover.
+   - Typography: set `fontFamily.sans` to Inter (import via `next/font/google`).
+   - Border radius scale, box shadow tokens.
+3. Run `npx shadcn@latest init` and select the custom theme. Update `globals.css` with CSS custom properties matching the brand tokens.
+4. Install core shadcn/ui components: Button, Card, Input, Select, Dialog, Sheet, Tabs, Badge, Table, Separator, Skeleton, Toast, Tooltip.
+5. Create a `components/sigma1/` directory with placeholder files for custom components: `quote-builder.tsx`, `chat-widget.tsx`, `availability-calendar.tsx`.
+6. Build a `components/sigma1/theme-showcase.tsx` page (dev-only) that renders all shadcn/ui components with brand styling for visual QA.
+7. Ensure all color tokens pass WCAG 2.1 AA contrast ratio (4.5:1 for normal text, 3:1 for large text) against the dark background.
 
 ## Validation
-Render each installed shadcn/ui component in a test and verify it mounts without errors. Visually confirm design tokens apply (dark background, accent colors) on the styleguide page. Verify `next/font` loads correctly.
+Render the theme showcase page and visually confirm all shadcn/ui components render with Sigma-1 brand tokens. Use a contrast checker tool to verify all text/background combinations meet WCAG AA. Verify Inter font loads correctly via Next.js font optimization.

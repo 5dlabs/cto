@@ -1,26 +1,20 @@
-Implement subtask 4009: Implement payroll endpoints and currency rate endpoints
+Implement subtask 4009: Implement payroll endpoints for entry management and period summaries
 
 ## Objective
-Build the payroll entry CRUD endpoints under `/api/v1/payroll` and the currency rate query endpoint under `/api/v1/currency/rates`.
+Build payroll entry creation and period-based summary endpoints including support for employee and contractor types.
 
 ## Steps
-1. Create `services/rust/finance/src/routes/payroll.rs` and `services/rust/finance/src/db/payroll.rs`.
-2. `POST /api/v1/payroll`:
-   - Accept: org_id, employee_id, period_start, period_end, amount_cents, currency, type (employee/contractor), notes.
-   - Validate period_start < period_end, amount_cents > 0.
-   - Insert into `payroll_entries`.
-   - Return 201 with created entry.
-3. `GET /api/v1/payroll`:
-   - Query params: org_id (required), period_start, period_end (for range filtering), employee_id (optional), type (optional), offset, limit.
-   - Return paginated list with total count.
-4. Create `services/rust/finance/src/routes/currency.rs`.
-5. `GET /api/v1/currency/rates`:
-   - Query params: base_currency (default USD).
-   - First check Valkey cache for key `currency_rates:{base_currency}` with JSON payload.
-   - If cache miss, query `currency_rates` table for latest rates by `fetched_at`.
-   - Return {base_currency, rates: [{target_currency, rate, fetched_at}]}.
-6. Add utoipa annotations.
-7. Wire into Axum router.
+1. Define structs in `src/models/payroll.rs`: PayrollEntry, CreatePayrollEntryRequest (employee_id, period_start, period_end, type, hours, rate_cents, currency), PayrollSummary.
+2. Implement `src/db/payroll.rs`:
+   - `create_payroll_entry(pool, req)` — compute total_cents = hours * rate_cents (using rust_decimal for precise multiplication), INSERT and return.
+   - `list_payroll_entries(pool, period_start, period_end, org_id)` — entries within a date range.
+   - `get_payroll_summary(pool, period_start, period_end)` — aggregate: total entries, total_cents by type (employee vs contractor), headcount.
+3. Implement Axum handlers in `src/routes/payroll.rs`:
+   - `POST /api/v1/payroll/entries` → create entry, return 201.
+   - `GET /api/v1/payroll?period_start=&period_end=` → return payroll summary + list of entries for the period.
+4. Validation: period_end must be after period_start, hours must be positive, rate_cents must be positive, type must be 'employee' or 'contractor'.
+5. total_cents computation: use rust_decimal to multiply hours (Decimal) by rate_cents (converted to Decimal), then convert result to i64 cents.
+6. Register routes on the router.
 
 ## Validation
-Integration tests: (1) Create payroll entry, verify 201 and correct fields returned. (2) Create 5 entries across 2 periods, GET with period filter returns correct subset. (3) GET with employee_id filter works. (4) Verify validation: period_start >= period_end returns 400. (5) Currency rates: seed rates in DB, GET returns correct rates. (6) Verify Valkey cache is populated after first DB query. (7) Verify cache hit on second request (mock or check Valkey directly).
+Integration test: POST /api/v1/payroll/entries with valid data returns 201, total_cents is correctly computed (e.g., 40 hours * 5000 cents/hr = 200000 cents). Integration test: GET /api/v1/payroll with period returns summary with correct aggregation. Unit test: total_cents calculation handles fractional hours correctly (e.g., 37.5 hours * 4250 cents = 159375 cents).

@@ -1,20 +1,31 @@
-Implement subtask 8009: Build Portfolio page with filterable gallery and lazy-loaded images
+Implement subtask 8009: Build persistent Morgan Web Chat Widget with WebSocket, streaming text, and session management
 
 ## Objective
-Implement the `/portfolio` route as a statically generated gallery of past events with photos, filterable by event type, with lazy-loaded image grid and Schema.org Event markup.
+Implement the Intercom-style persistent chat widget fixed to bottom-right corner that connects to Morgan's /ws/chat endpoint via WebSocket, supports streaming text display (character-by-character), manages sessions via localStorage, and survives page navigation by lifting state to the root layout.
 
 ## Steps
-1. Create `app/portfolio/page.tsx` — Server Component with static generation (or ISR if content comes from API).
-2. Data source: fetch from social engine published posts endpoint, or use static JSON/MDX content for v1.
-3. Filter bar: horizontal pill buttons for event types (Concerts, Corporate, Festivals, Weddings, etc.). Clicking filters the grid client-side.
-4. Image grid:
-   - Masonry or uniform grid layout using CSS grid.
-   - Each card: event image (lazy loaded via `<Image loading="lazy">`), event name overlay, event type badge, date.
-   - Click opens Dialog/Sheet with larger image, full description, additional photos.
-5. Lazy loading: only load images as they scroll into viewport (native lazy loading + Intersection Observer for animation).
-6. SEO: `generateMetadata` with portfolio description. Schema.org: ItemList of Event entries.
-7. Responsive: 1 col mobile, 2 cols tablet, 3 cols desktop.
-8. Empty state: if no portfolio items match filter, show friendly message.
+1. Create `components/sigma1/chat-widget.tsx` as a client component.
+2. Mount the widget in `app/layout.tsx` (layout-level) so it persists across all page navigations without remounting.
+3. Widget UI:
+   - Collapsed state: floating circular button (bottom-right, fixed position) with Morgan avatar/icon and unread message badge.
+   - Expanded state: chat panel (~350px wide, ~500px tall) with header (Morgan name/avatar, minimize button), message area (scrollable), input bar (text input + send button).
+   - Message bubbles: user messages right-aligned (brand accent), Morgan messages left-aligned (muted background).
+   - Typing indicator: animated dots shown when Morgan is processing.
+   - Streaming text display: Morgan's responses arrive character-by-character via WebSocket; render incrementally using a state buffer that appends each character and triggers re-render.
+4. WebSocket connection management in `lib/ws/chat.ts`:
+   - Connect to `NEXT_PUBLIC_WS_URL/ws/chat` on widget open.
+   - Reconnect with exponential backoff on disconnect (max 5 retries, then show "Connection lost" message).
+   - Send messages as JSON: `{ type: 'message', content: string, sessionToken: string }`.
+   - Receive messages: `{ type: 'chunk', content: string }` for streaming, `{ type: 'done' }` for completion, `{ type: 'typing' }` for typing indicator.
+5. Session management:
+   - On first widget open, generate a UUID session token, store in localStorage key `sigma1_chat_session`.
+   - On subsequent opens, send existing token for session continuity (Morgan/Valkey backend handles session lookup).
+   - Send session token in WebSocket connection URL as query param or in first message.
+6. Chat history: store messages in React state (and optionally localStorage for persistence across browser refreshes).
+7. Accessibility:
+   - ARIA: `role="dialog"`, `aria-label="Chat with Morgan"`, `aria-live="polite"` on message area for screen reader announcements.
+   - Keyboard: Escape to minimize, Tab navigation between input and send button, Enter to send.
+   - Focus trap when expanded (optional, depends on design intent).
 
 ## Validation
-Render portfolio page with mock data (5+ events across 3 types). Verify all events shown initially. Click a filter, verify only matching events shown. Click 'All', verify all events shown again. Verify images have `loading="lazy"` attribute. Open an event detail dialog, verify larger image and description shown. Test responsive layout at 375px, 768px, 1440px.
+Component test: render chat widget, click to expand, verify chat panel appears with input field. Mock WebSocket: send a message, verify it appears as user bubble. Simulate receiving streaming chunks ('H', 'e', 'l', 'l', 'o'), verify characters render incrementally in Morgan's message bubble. Test session management: verify localStorage contains session token after first open. Test navigation persistence: render widget in layout with router navigation to different page, verify widget remains open with message history intact. Test accessibility: verify role='dialog', aria-label present, Escape key minimizes widget.

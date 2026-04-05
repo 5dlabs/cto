@@ -1,59 +1,82 @@
-## Develop Mobile App (Tap - Expo/React Native)
+## Production Hardening: HA, CDN, TLS, Ingress, Network Policies (Bolt - Kubernetes/Helm)
 
 ### Objective
-Build the Sigma-1 mobile app using Expo with equipment catalog browsing, self-service quote builder, dedicated Morgan chat screen, and barcode scanning for equipment check-in/check-out. Maintains visual consistency with the web frontend.
+Scale all infrastructure for production: CloudNative-PG to 3-instance HA with synchronous replication, Valkey sentinel, Cloudflare Tunnel ingress for all services, CDN configuration for R2 assets, network policy enforcement, resource limit tuning, and HPA configuration.
 
 ### Ownership
-- Agent: tap
-- Stack: Expo (React Native)
-- Priority: medium
+- Agent: bolt
+- Stack: Kubernetes/Helm
+- Priority: high
 - Status: pending
-- Dependencies: 2, 7
+- Dependencies: 2, 3, 4, 5, 6, 7, 8
 
 ### Implementation Details
-1. Initialize Expo project (SDK 51+) with TypeScript, Expo Router for file-based navigation.
-2. Design system:
-   - Port design tokens from web (Task 8) to React Native: colors, typography (using expo-font), spacing scale.
-   - Use React Native equivalents of shadcn/ui patterns: NativeWind (TailwindCSS for RN) or styled components matching web aesthetic.
-   - Component library: ProductCard, AvailabilityBadge, QuoteLineItem, ChatBubble, BarcodeScanner.
-3. Navigation structure (Expo Router tabs):
-   - **Equipment tab**: Category list → Product grid → Product detail with availability. Pull-to-refresh. Infinite scroll pagination.
-   - **Quote tab**: Quote builder adapted for mobile. Step-by-step wizard with native date picker, equipment selector (searchable list), venue input, review screen. Submit creates opportunity.
-   - **Chat tab** (dedicated screen per D10): Full-screen Morgan chat. WebSocket connection to Morgan agent. Message history. Support rich messages (product cards as interactive elements). Push notification integration for incoming messages.
-   - **Scan tab**: Camera-based barcode scanner using `expo-camera` or `expo-barcode-scanner`. Scans equipment barcode → calls RMS ScanBarcode → shows equipment details and check-in/check-out actions.
-   - **Profile/Settings tab**: User info, notification preferences, saved quotes.
-4. API integration:
-   - Shared API client module using `fetch` or `axios` with Effect for error handling.
-   - Base URL configurable per environment (dev/staging/prod).
-   - JWT token storage in `expo-secure-store`.
-   - API key auth for service calls (if needed, else JWT from user session).
-5. Morgan Chat (dedicated screen):
-   - WebSocket connection to Morgan agent (same endpoint as web).
-   - Push notifications via Expo Notifications for incoming Morgan messages when app is backgrounded.
-   - Conversation persistence in AsyncStorage with sync to server.
-   - Support photo sending (for social pipeline): use `expo-image-picker`, upload to social engine.
-6. Barcode scanning:
-   - `expo-camera` with barcode detection.
-   - On scan: call RMS `POST /api/v1/inventory/scan` (ScanBarcode via REST gateway).
-   - Display equipment details, current status, option to check-out or check-in.
-   - Haptic feedback on successful scan.
-7. Offline capability:
-   - Cache equipment catalog locally using AsyncStorage or MMKV.
-   - Queue quote submissions if offline, submit when connectivity restored.
-8. Build configuration:
-   - EAS Build profiles for development, preview, production.
-   - iOS and Android builds.
-   - App icons and splash screen matching Sigma-1 branding.
+1. Scale CloudNative-PG cluster to production:
+   - Update `sigma1-postgres` Cluster CR: instances 1 → 3
+   - Enable synchronous replication: `minSyncReplicas: 1, maxSyncReplicas: 2`
+   - Configure automated backups to R2: `barmanObjectStore` with R2 endpoint, schedule `0 */6 * * *` (every 6 hours)
+   - Set resource requests/limits: 1Gi memory, 500m CPU per instance
+   - Enable PodDisruptionBudget: maxUnavailable 1
+   - Configure connection pooling via PgBouncer sidecar (built into CNPG): max_connections 100 per instance
+2. Scale Valkey for production:
+   - Option A: Valkey with sentinel (3 nodes) via Opstree operator
+   - Option B: Single Valkey with persistence (AOF) if sentinel not supported by operator
+   - Enable persistence: appendonly yes, appendfsync everysec
+   - Resource limits: 512Mi memory, 250m CPU
+   - PodDisruptionBudget: maxUnavailable 1
+3. Cloudflare Tunnel ingress configuration:
+   - Create ClusterTunnel CR mapping:
+     - `sigma-1.com` → Website frontend service (port 3000)
+     - `api.sigma-1.com/catalog/*` → equipment-catalog service (port 8080)
+     - `api.sigma-1.com/rms/*` → rms service (port 8080)
+     - `api.sigma-1.com/finance/*` → finance service (port 8080)
+     - `api.sigma-1.com/vetting/*` → customer-vetting service (port 8080)
+     - `api.sigma-1.com/social/*` → social-engine service (port 8080)
+     - `api.sigma-1.com/ws/*` → morgan service (WebSocket, port 8080)
+     - `morgan.sigma-1.com` → Morgan direct access (if needed)
+   - Configure Cloudflare Access policies for admin endpoints
+   - TLS is automatic via Cloudflare (no cert-manager needed)
+4. Cloudflare R2 CDN configuration:
+   - Configure custom domain `assets.sigma-1.com` for R2 bucket
+   - Set cache rules: images immutable (1 year cache), thumbnails 30 days
+   - Enable Cloudflare Polish for image optimization
+5. Network policies (Cilium):
+   - Default deny all ingress to sigma1 namespace
+   - Allow: Cloudflare Tunnel → frontend, backend services
+   - Allow: backend services → sigma1-postgres, sigma1-valkey
+   - Allow: Morgan → all backend services
+   - Allow: frontend (SSR) → backend APIs
+   - Deny: backend services → other backend services (except Morgan→all, RMS↔Equipment Catalog if needed)
+   - Allow: sigma1 → external APIs (Stripe, OpenCorporates, etc.) via egress policy
+6. Horizontal Pod Autoscaler configuration:
+   - Equipment Catalog: min 2, max 5, target CPU 70%
+   - RMS: min 2, max 5, target CPU 70%
+   - Finance: min 2, max 3, target CPU 70%
+   - Social Engine: min 1, max 3, target CPU 70%
+   - Morgan: min 1, max 2 (stateful, scale carefully)
+   - Customer Vetting: min 1, max 2
+7. Resource limit tuning based on observed metrics:
+   - Review Prometheus metrics from dev deployment
+   - Set production requests/limits per service
+8. Update sigma1-infra-endpoints ConfigMap with production hostnames.
+9. Configure Grafana dashboards for Sigma-1:
+   - Service health dashboard (all 6 services)
+   - PostgreSQL dashboard (CNPG metrics)
+   - Valkey dashboard
+   - Request latency dashboard (p50, p95, p99 per endpoint)
+10. ArgoCD Application CR for sigma1 namespace with automated sync and self-heal.
 
 ### Subtasks
-- [ ] Initialize Expo project with TypeScript and Expo Router tab navigation: Scaffold the Expo SDK 51+ project with TypeScript configuration, install Expo Router, and configure file-based tab navigation with all five tab screens (Equipment, Quote, Chat, Scan, Profile).
-- [ ] Port design system tokens and build shared component library: Port the web frontend's design tokens (colors, typography, spacing) to React Native using NativeWind or chosen styling approach. Build the shared component library: ProductCard, AvailabilityBadge, QuoteLineItem, ChatBubble.
-- [ ] Build shared API client with JWT auth and environment configuration: Create a shared API client module with configurable base URL per environment, JWT token storage in expo-secure-store, automatic token refresh, and Effect-based error handling.
-- [ ] Implement Equipment tab with category browsing, product grid, and infinite scroll: Build the Equipment tab screens: category list, product grid with infinite scroll pagination, product detail with availability display, and pull-to-refresh across list screens.
-- [ ] Build Quote Builder tab with step-by-step wizard and submission: Implement the Quote tab as a multi-step wizard: equipment selection (searchable list), date range picker, venue input, review screen, and API submission to create an opportunity.
-- [ ] Implement offline quote queuing and equipment catalog caching: Add offline capability: cache equipment catalog locally for offline browsing and queue quote submissions when offline, auto-submitting when connectivity is restored.
-- [ ] Build Morgan Chat tab with WebSocket connection and message history: Implement the dedicated Morgan chat screen with full-screen WebSocket-based conversation, message history persistence in AsyncStorage, and support for rich messages (interactive product cards).
-- [ ] Integrate push notifications for Morgan chat via Expo Notifications: Set up Expo Notifications to receive push notifications for incoming Morgan messages when the app is backgrounded, including permission handling and notification tap navigation.
-- [ ] Implement Barcode Scan tab with camera scanner and RMS integration: Build the Scan tab with camera-based barcode detection using expo-camera, integration with RMS ScanBarcode API, equipment details display, and check-in/check-out actions with haptic feedback.
-- [ ] Build Profile/Settings tab with user info and notification preferences: Implement the Profile tab displaying user information, notification preference toggles, saved quotes list, and sign-out functionality.
-- [ ] Configure EAS Build profiles, app branding, and production build pipeline: Set up EAS Build with development, preview, and production profiles. Configure app icons, splash screen, and branding assets. Verify builds for both iOS and Android platforms.
+- [ ] Scale CloudNative-PG to 3-instance HA with synchronous replication: Update the sigma1-postgres Cluster CR to run 3 instances with synchronous replication enabled, configure PgBouncer connection pooling, set production resource requests/limits, and add a PodDisruptionBudget.
+- [ ] Configure CloudNative-PG automated backups to R2: Set up automated barman backups from CloudNative-PG to the Cloudflare R2 bucket on a 6-hour schedule, and verify backup/restore functionality.
+- [ ] Scale Valkey for production with persistence and PDB: Configure Valkey for production use: either sentinel mode (3 nodes) or single-instance with AOF persistence, resource limits, and a PodDisruptionBudget.
+- [ ] Configure Cloudflare Tunnel ingress with ClusterTunnel CR: Create the ClusterTunnel CR to route external traffic from sigma-1.com and api.sigma-1.com to all backend services, including WebSocket support for Morgan.
+- [ ] Configure Cloudflare Access policies for admin endpoints: Set up Cloudflare Access policies to protect admin endpoints and sensitive routes behind authentication.
+- [ ] Configure Cloudflare R2 CDN with custom domain and cache rules: Set up the custom domain assets.sigma-1.com for the R2 bucket, configure cache rules for images and thumbnails, and enable Cloudflare Polish for image optimization.
+- [ ] Implement Cilium default-deny and ingress network policies: Create CiliumNetworkPolicy resources to enforce default-deny ingress in the sigma1 namespace, then add allow rules for Cloudflare Tunnel to frontend and backend services, backend to database/cache, Morgan to all backends, and frontend SSR to backend APIs.
+- [ ] Implement Cilium egress network policies for external API access: Create CiliumNetworkPolicy egress rules to allow sigma1 services to reach external APIs (Stripe, OpenCorporates, etc.) while denying other outbound traffic.
+- [ ] Configure Horizontal Pod Autoscalers for all services: Create HPA resources for all 6 backend services with appropriate min/max replicas and CPU target thresholds.
+- [ ] Tune resource requests and limits for all services: Review Prometheus metrics from the dev deployment and set appropriate production resource requests and limits for all 6 backend services and the frontend.
+- [ ] Update sigma1-infra-endpoints ConfigMap with production hostnames: Update the sigma1-infra-endpoints ConfigMap to reflect production hostnames, CDN URLs, and any changed connection strings for production topology.
+- [ ] Create Grafana dashboards for service health, PostgreSQL, Valkey, and latency: Configure 4 Grafana dashboards: service health overview for all 6 services, CloudNative-PG metrics, Valkey metrics, and request latency percentiles.
+- [ ] Create ArgoCD Application CR for sigma1 namespace: Define an ArgoCD Application CR for the sigma1 namespace with automated sync, self-heal, and prune enabled, pointing to the infrastructure Git repository.

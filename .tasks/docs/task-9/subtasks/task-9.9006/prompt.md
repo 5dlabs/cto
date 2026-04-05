@@ -1,16 +1,21 @@
-Implement subtask 9006: Implement offline quote queuing and equipment catalog caching
+Implement subtask 9006: Configure Cloudflare R2 CDN with custom domain and cache rules
 
 ## Objective
-Add offline capability: cache equipment catalog locally for offline browsing and queue quote submissions when offline, auto-submitting when connectivity is restored.
+Set up the custom domain assets.sigma-1.com for the R2 bucket, configure cache rules for images and thumbnails, and enable Cloudflare Polish for image optimization.
 
 ## Steps
-1. Install `@react-native-community/netinfo` for connectivity detection.
-2. Create `lib/offline/connectivityMonitor.ts`: export a `useIsOnline()` hook that reflects current network state.
-3. **Equipment caching**: After successful API fetch of categories and products, persist to AsyncStorage (or MMKV if chosen). On app launch or when offline, read from cache. Display a banner indicating 'Viewing cached data' when offline.
-4. **Quote queue**: Create `lib/offline/quoteQueue.ts`. When submitting a quote and `isOnline === false`, serialize the quote payload and store in AsyncStorage under a queue key. Show user a 'Quote saved — will submit when online' toast.
-5. **Queue processor**: On connectivity restored (NetInfo event), read pending quotes from queue, submit each sequentially, remove from queue on success. Show local notification on successful background submission.
-6. Implement queue status indicator in Quote tab: show count of pending offline quotes.
-7. Handle edge case: if the same quote is queued multiple times, deduplicate by hash of payload.
+1. Configure custom domain for R2 bucket:
+   - In Cloudflare dashboard or via API, bind `assets.sigma-1.com` to the sigma1 R2 bucket
+   - Verify DNS CNAME record is created
+2. Configure cache rules via Cloudflare Page Rules or Cache Rules:
+   - Rule 1: `assets.sigma-1.com/images/*` → Cache-Control: `public, max-age=31536000, immutable` (1 year)
+   - Rule 2: `assets.sigma-1.com/thumbnails/*` → Cache-Control: `public, max-age=2592000` (30 days)
+   - Rule 3: Default for other assets → Cache-Control: `public, max-age=86400` (1 day)
+3. Enable Cloudflare Polish:
+   - Enable Polish in the Cloudflare zone settings (lossy or lossless based on preference)
+   - Enable WebP conversion
+4. Document the Cloudflare configuration steps (these may not be fully expressible as Kubernetes CRs).
+5. Upload a test image to R2 and verify it is served via `assets.sigma-1.com`.
 
 ## Validation
-Mock NetInfo to simulate offline state. Attempt quote submission while offline — verify payload is stored in AsyncStorage queue. Simulate connectivity restored — verify queued quote is submitted via API. Verify equipment catalog renders from cache when offline. Verify 'cached data' banner appears. Deduplicate test: queue same payload twice, verify only one submission.
+Upload a test image to R2. Request it via `curl -I https://assets.sigma-1.com/images/test.jpg` — verify 200 response with correct Cache-Control header. Request again and verify `CF-Cache-Status: HIT`. Verify `cf-polished` header is present indicating Polish is active.

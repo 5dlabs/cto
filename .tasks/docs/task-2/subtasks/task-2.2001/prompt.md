@@ -1,16 +1,16 @@
-Implement subtask 2001: Initialize Cargo workspace and shared crate with DB pool, error types, and ConfigMap env parsing
+Implement subtask 2001: Initialize Cargo workspace root and shared-error crate
 
 ## Objective
-Create the Cargo workspace at services/rust/ with members catalog, finance, vetting, and shared. Implement the shared crate foundation: PgPool setup reading POSTGRES_URL from env (sigma1-infra-endpoints ConfigMap), standard JSON error response type, and env/config parsing utilities.
+Create the sigma1-services Cargo workspace root with workspace-level dependency management and implement the shared-error crate providing unified error types and Axum error response formatting used by all services.
 
 ## Steps
-1. Create `services/rust/Cargo.toml` as a workspace with members `shared`, `catalog`, `finance`, `vetting`.
-2. In `shared/Cargo.toml`, add dependencies: `sqlx` (with postgres, runtime-tokio, tls-rustls features), `serde`, `serde_json`, `axum 0.7`, `tokio`, `thiserror`.
-3. Implement `shared::db` module: `pub async fn create_pool() -> Result<PgPool>` that reads `POSTGRES_URL` from env, configures max connections (default 10), connect timeout (5s), and returns the pool.
-4. Implement `shared::error` module: define `AppError` enum with variants (NotFound, BadRequest, Unauthorized, Internal, Conflict) that implements `IntoResponse` returning JSON `{"error": "...", "code": N}` with appropriate HTTP status codes.
-5. Implement `shared::config` module: struct `InfraConfig` that deserializes from env vars matching the sigma1-infra-endpoints ConfigMap keys (POSTGRES_URL, VALKEY_URL, R2_ENDPOINT, etc.).
-6. Create stub `catalog/Cargo.toml` depending on `shared` via path reference.
-7. Verify workspace compiles with `cargo check --workspace`.
+1. Create `sigma1-services/Cargo.toml` as a workspace root with `[workspace]` members listing `crates/shared-auth`, `crates/shared-db`, `crates/shared-error`, `crates/shared-observability`, and `services/equipment-catalog`. Define `[workspace.dependencies]` for shared deps: axum 0.7, sqlx 0.7 (features: runtime-tokio, tls-rustls, postgres, uuid, chrono, json), serde/serde_json, thiserror, tokio, tracing, uuid, chrono.
+2. Create `crates/shared-error/Cargo.toml` and `src/lib.rs`.
+3. Define `AppError` enum with variants: NotFound, Unauthorized, Forbidden, BadRequest(String), Conflict(String), Internal(String), Database(sqlx::Error), Validation(String).
+4. Implement `IntoResponse` for `AppError` — map each variant to appropriate HTTP status code and JSON body `{ "error": { "code": "...", "message": "..." } }`.
+5. Implement `From<sqlx::Error>` for `AppError` to auto-convert database errors.
+6. Export a `Result<T> = std::result::Result<T, AppError>` type alias.
+7. Ensure `cargo build --workspace` compiles successfully with this crate.
 
 ## Validation
-Run `cargo check --workspace` succeeds. Unit test that `AppError::NotFound` produces a 404 JSON response. Unit test that `InfraConfig` parses from env vars correctly. Test `create_pool` returns error with invalid POSTGRES_URL.
+Unit tests: construct each AppError variant and call `into_response()`, verify HTTP status codes (404, 401, 403, 400, 409, 500) and JSON body structure. Verify `From<sqlx::Error>` conversion maps to Internal variant. Run `cargo build --workspace` from workspace root to confirm workspace structure.

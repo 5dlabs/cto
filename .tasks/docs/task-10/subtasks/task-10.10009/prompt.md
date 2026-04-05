@@ -1,19 +1,23 @@
-Implement subtask 10009: Ingress and TLS: configure Cloudflare Tunnel for all public endpoints
+Implement subtask 10009: Configure container image admission policy with Kyverno or Gatekeeper
 
 ## Objective
-Configure a Cloudflare Tunnel (cloudflared) deployment to expose all sigma1 public endpoints with TLS termination at the Cloudflare edge.
+Deploy an admission controller policy that restricts container images in the sigma1 namespace to approved registries only, and enforce image pull policies.
 
 ## Steps
-Step-by-step:
-1. Create a `cloudflared` Deployment in the `ingress-system` namespace (or sigma1 if preferred).
-2. Create a Kubernetes Secret containing the Cloudflare Tunnel credentials JSON (tunnel ID, account tag, tunnel secret).
-3. Create a ConfigMap `cloudflared-config` with the ingress rules mapping hostnames to sigma1 services:
-   - `api.sigma1.example.com` → `http://equipment-catalog.sigma1.svc.cluster.local:8080`
-   - `rms.sigma1.example.com` → `http://rms.sigma1.svc.cluster.local:8080`
-   - Similar entries for finance, customer-vetting, and the Next.js frontend.
-   - Catch-all `http_status: 404`
-4. TLS is terminated at Cloudflare edge; internal traffic is plain HTTP within the cluster.
-5. Set replicas: 2 for cloudflared with pod anti-affinity for HA.
+1. Choose Kyverno or Gatekeeper (per decision point — default to Kyverno for simplicity if no decision made).
+2. If Kyverno:
+   - Install Kyverno via Helm if not already present.
+   - Create a ClusterPolicy `restrict-image-registries` that:
+     - Applies to sigma1 namespace
+     - Validates that all container images match allowed patterns (e.g., `ghcr.io/sigma1/*`, `docker.io/library/*` for base images)
+     - Action: `enforce` (block non-compliant)
+   - Create a ClusterPolicy `require-image-pull-policy` that enforces `imagePullPolicy: Always` for tags, or `IfNotPresent` for SHA-pinned images.
+3. If Gatekeeper:
+   - Install Gatekeeper via Helm.
+   - Create ConstraintTemplate `K8sAllowedRepos` with Rego policy.
+   - Create Constraint applying the template to sigma1 namespace.
+4. Test by attempting to deploy an image from an unapproved registry.
+5. Document the approved registry list in the ops runbook ConfigMap.
 
 ## Validation
-Deploy cloudflared and verify pods are running. Check Cloudflare dashboard to confirm tunnel is connected. Curl the public hostname (e.g., `curl https://api.sigma1.example.com/health`) from an external machine and verify a valid TLS-terminated response from the correct backend service.
+Attempt to create a pod with an image from an unapproved registry (e.g., `random-registry.io/malicious:latest`) — verify it is rejected. Deploy a pod with an approved registry image — verify it is allowed. Verify the policy is in `enforce` mode. Check policy report/audit for any existing violations.

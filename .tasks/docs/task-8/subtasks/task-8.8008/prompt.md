@@ -1,31 +1,34 @@
-Implement subtask 8008: Build Quote Builder multi-step form
+Implement subtask 8008: Build Quote Builder multi-step form with React Hook Form, dynamic line items, and real-time pricing
 
 ## Objective
-Implement the `/quote` route with a multi-step form: Step 1 — select products with availability check, Step 2 — event details (date range, venue, contact info), Step 3 — review and submit. Form state managed with Effect, submission to backend API.
+Implement the `/quote` page with a 4-step form using React Hook Form v7: Step 1 (event details with date range picker), Step 2 (equipment selection with useFieldArray for dynamic line items), Step 3 (review with pricing and availability conflict highlighting), Step 4 (contact info and submission). Includes real-time price calculation and Effect Schema validation.
 
 ## Steps
-1. Create `app/quote/page.tsx` — Client Component (heavy interactivity).
-2. Step indicator: visual stepper (1-2-3) showing current step, using shadcn Tabs or custom stepper.
-3. Step 1 — Product Selection:
-   - Display products already in quote store (from 'Add to Quote' on product pages).
-   - Allow adding more products via search/browse inline (mini catalog view).
-   - Each QuoteLineItem component: product image, name, quantity selector, date range (from AvailabilityCalendar), day rate, line total.
-   - Real-time availability check for each product + date range combination.
-   - Remove product button.
-4. Step 2 — Event Details:
-   - Form fields: event name, date range (pre-filled from product dates), venue/location, contact name, email, phone.
-   - Effect Schema validation on all fields: email format, phone format, required fields.
-   - shadcn Form components with proper labels, error messages.
-5. Step 3 — Review & Submit:
-   - Summary: product list with quantities, dates, rates, subtotal. Event details summary. Estimated total.
-   - Edit buttons to go back to step 1 or 2.
-   - Submit button: calls `useSubmitQuote()` mutation.
-   - Loading state during submission.
-6. Confirmation:
-   - After successful submit, show confirmation page with opportunity reference number.
-   - 'Chat with Morgan about this quote' CTA.
-7. Form state: manage entire multi-step form state in React state (or Effect Ref), persisted to localStorage so user doesn't lose progress on navigation.
-8. URL state: optionally update URL hash (#step-1, #step-2, #step-3) for browser back/forward support.
+1. Create `app/quote/page.tsx` as a client component.
+2. Set up React Hook Form with a single form instance spanning all 4 steps. Use `@hookform/resolvers` with Effect Schema (or Zod) for per-step validation.
+3. Step navigation component: horizontal stepper UI showing current step, completed steps, and upcoming steps. Validate current step before allowing navigation to next.
+4. **Step 1 — Event Details**:
+   - Fields: event name, date range (start/end date pickers), venue name, venue address, event type (dropdown: concert, corporate, wedding, festival, etc.).
+   - Date range picker: use a shadcn/ui calendar-based date range component.
+5. **Step 2 — Equipment Selection**:
+   - `useFieldArray` for `items[]` where each item = { equipmentId, name, quantity, dayRate, subtotal }.
+   - Equipment search/browse: inline search field that queries Equipment Catalog API, results shown as a dropdown/popover.
+   - Click to add item → appends to useFieldArray.
+   - Each line item: product name, quantity input (number stepper), day rate, subtotal (quantity × dayRate × numberOfDays), remove button.
+   - Running total at bottom, recalculated reactively on any change.
+   - Pre-populated items from QuoteProvider context (items added via 'Add to Quote' on product pages).
+6. **Step 3 — Review**:
+   - Display all line items in a read-only table.
+   - For each item, call availability API for the selected date range. If conflict, highlight row in red/warning with message.
+   - Show total price, number of rental days, item count.
+   - Allow user to go back to Step 2 to modify.
+7. **Step 4 — Contact Info + Submit**:
+   - Fields: full name, email, phone, company (optional), additional notes (textarea).
+   - Submit button: POST to quotes API endpoint with full form payload.
+   - On success: show confirmation message with quote reference number.
+   - On error: show error toast, keep form data.
+8. Effect Schema definitions for each step's validation in `lib/schemas/quote.ts`.
+9. Form state persisted to sessionStorage via QuoteProvider so refreshing doesn't lose data.
 
 ## Validation
-Integration test full flow: pre-populate quote store with 2 products, render `/quote`. Verify Step 1 shows both products with correct info. Fill Step 2 with valid event details, advance to Step 3. Verify review shows all data correctly. Mock submit API, click submit, verify API called with correct payload shape. Verify confirmation page shows reference number. Test validation: leave required fields empty in Step 2, verify error messages shown and cannot advance.
+Component test: render quote builder, fill Step 1 fields, advance to Step 2, add 3 items via useFieldArray, verify line items array has 3 entries with correct subtotals and total price. Test availability conflict: mock one item as unavailable for selected dates, verify Step 3 highlights it. Test form validation: try to advance from Step 1 with empty required fields, verify validation errors shown. Test submission: fill all steps, submit, verify POST request payload matches form data. Test sessionStorage persistence: fill Step 1, refresh page, verify data restored.

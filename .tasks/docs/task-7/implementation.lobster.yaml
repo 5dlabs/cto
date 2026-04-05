@@ -40,7 +40,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7002
-    depends_on: [validate-subtask-7001]
+    depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7002/prompt.md
@@ -52,7 +52,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7003
-    depends_on: [validate-subtask-7002]
+    depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7003/prompt.md
@@ -64,7 +64,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7004
-    depends_on: [validate-subtask-7002]
+    depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7004/prompt.md
@@ -76,7 +76,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7005
-    depends_on: [validate-subtask-7002, validate-subtask-7003]
+    depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7005/prompt.md
@@ -88,7 +88,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7006
-    depends_on: [validate-subtask-7002]
+    depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7006/prompt.md
@@ -100,7 +100,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7007
-    depends_on: [validate-subtask-7001]
+    depends_on: [validate-subtask-7002, validate-subtask-7003, validate-subtask-7004, validate-subtask-7005, validate-subtask-7006]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7007/prompt.md
@@ -124,7 +124,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7009
-    depends_on: [validate-subtask-7001]
+    depends_on: [validate-subtask-7001, validate-subtask-7007]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7009/prompt.md
@@ -136,7 +136,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7010
-    depends_on: [validate-subtask-7001, validate-subtask-7002, validate-subtask-7007, validate-subtask-7008, validate-subtask-7009]
+    depends_on: [validate-subtask-7009]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7010/prompt.md
@@ -148,7 +148,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7011
-    depends_on: [validate-subtask-7007, validate-subtask-7010]
+    depends_on: [validate-subtask-7001, validate-subtask-7007]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7011/prompt.md
@@ -160,7 +160,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7012
-    depends_on: [validate-subtask-7002, validate-subtask-7003, validate-subtask-7005, validate-subtask-7006, validate-subtask-7007, validate-subtask-7008, validate-subtask-7009]
+    depends_on: [validate-subtask-7001, validate-subtask-7007]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7012/prompt.md
@@ -171,8 +171,68 @@ steps:
     command: >
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
+  - name: implement-subtask-7013
+    depends_on: [validate-subtask-7007, validate-subtask-7008, validate-subtask-7012]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7013/prompt.md
+
+  - name: validate-subtask-7013
+    depends_on: [implement-subtask-7013]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - name: implement-subtask-7014
+    depends_on: [validate-subtask-7007, validate-subtask-7008, validate-subtask-7012]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7014/prompt.md
+
+  - name: validate-subtask-7014
+    depends_on: [implement-subtask-7014]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - name: implement-subtask-7015
+    depends_on: [validate-subtask-7001, validate-subtask-7008]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7015/prompt.md
+
+  - name: validate-subtask-7015
+    depends_on: [implement-subtask-7015]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - name: implement-subtask-7016
+    depends_on: [validate-subtask-7007, validate-subtask-7008, validate-subtask-7015]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7016/prompt.md
+
+  - name: validate-subtask-7016
+    depends_on: [implement-subtask-7016]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - name: implement-subtask-7017
+    depends_on: [validate-subtask-7015, validate-subtask-7016]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7017/prompt.md
+
+  - name: validate-subtask-7017
+    depends_on: [implement-subtask-7017]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
   - name: integration-validation
-    depends_on: [validate-subtask-7001, validate-subtask-7002, validate-subtask-7003, validate-subtask-7004, validate-subtask-7005, validate-subtask-7006, validate-subtask-7007, validate-subtask-7008, validate-subtask-7009, validate-subtask-7010, validate-subtask-7011, validate-subtask-7012]
+    depends_on: [validate-subtask-7001, validate-subtask-7002, validate-subtask-7003, validate-subtask-7004, validate-subtask-7005, validate-subtask-7006, validate-subtask-7007, validate-subtask-7008, validate-subtask-7009, validate-subtask-7010, validate-subtask-7011, validate-subtask-7012, validate-subtask-7013, validate-subtask-7014, validate-subtask-7015, validate-subtask-7016, validate-subtask-7017]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

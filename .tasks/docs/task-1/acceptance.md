@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. `kubectl get cluster sigma1-postgres -n sigma1-db` shows READY with 2/2 instances healthy. 2. `kubectl exec` into a sigma1 pod and verify `psql` connection via PgBouncer pooler URL succeeds and `\dn` lists all 6 schemas (catalog, rms, finance, vetting, social, audit). 3. `redis-cli -u $VALKEY_URL PING` returns PONG. 4. ConfigMap `sigma1-infra-endpoints` exists with all 5 expected keys. 5. All Kubernetes Secrets exist with non-empty data keys. 6. Cloudflare Tunnel pod is Running and tunnel status shows CONNECTED. 7. ServiceMonitor CRs are picked up by Prometheus (check Prometheus targets page). 8. PgBouncer stats show active connection pools when queried via `SHOW POOLS`.
+- [ ] 1. `kubectl get cluster sigma1-postgres -n sigma1 -o jsonpath='{.status.phase}'` returns `Cluster in healthy state`. 2. `psql` connection using each per-service credential succeeds and can CREATE TABLE in its own schema but gets permission denied on other schemas. 3. `redis-cli -u $REDIS_SIGMA1_VALKEY_URL PING` returns PONG. 4. ConfigMap `sigma1-infra-endpoints` contains all 4+ keys with non-empty values. 5. ExternalSecret CRs report `SecretSynced` status. 6. Cilium NetworkPolicy audit log confirms deny rules active. 7. ServiceMonitor CR exists and Prometheus targets page shows sigma1 namespace targets.
 
 ## Verification Notes
 

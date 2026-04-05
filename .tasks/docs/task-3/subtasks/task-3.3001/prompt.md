@@ -1,17 +1,17 @@
-Implement subtask 3001: Initialize Go module and buf protobuf toolchain
+Implement subtask 3001: Initialize Go module and configure buf for protobuf code generation
 
 ## Objective
-Set up the Go module, directory structure, and buf configuration for protobuf management and code generation across all 5 services.
+Set up the Go module `github.com/5dlabs/sigma1-rms` with Go 1.22+, configure buf.yaml and buf.gen.yaml for protoc-gen-go, protoc-gen-go-grpc, and protoc-gen-grpc-gateway code generation. Establish the project directory structure including proto/, cmd/, internal/, migrations/, and deploy/ directories.
 
 ## Steps
-1. Run `go mod init github.com/sigma1/rms` with Go 1.22+.
-2. Create directory structure: `proto/`, `internal/`, `cmd/server/`, `db/migrations/`.
-3. Install and configure buf: create `buf.yaml` with `name: buf.build/sigma1/rms` and lint/breaking rules.
-4. Create `buf.gen.yaml` with plugins: `protoc-gen-go`, `protoc-gen-go-grpc`, `protoc-gen-grpc-gateway`, `protoc-gen-openapiv2`.
-5. Add `google/api/annotations.proto` and `google/api/http.proto` dependencies via buf BSR.
-6. Create a minimal `proto/rms/v1/common.proto` with shared message types: `Timestamp`, `Money`, `Address`, `PaginationRequest`, `PaginationResponse`, `OrgId`.
-7. Run `buf generate` to verify toolchain produces Go code in `gen/` directory.
-8. Add Makefile targets: `proto-gen`, `proto-lint`, `proto-breaking`.
+1. Run `go mod init github.com/5dlabs/sigma1-rms` with Go 1.22+.
+2. Create directory structure: `proto/sigma1/rms/v1/`, `cmd/rms-server/`, `internal/service/`, `internal/db/`, `internal/middleware/`, `migrations/`, `deploy/`.
+3. Install buf CLI and create `buf.yaml` at project root with `lint` and `breaking` configuration.
+4. Create `buf.gen.yaml` with plugins: `protoc-gen-go` (paths=source_relative), `protoc-gen-go-grpc` (paths=source_relative), `protoc-gen-grpc-gateway` (paths=source_relative, generate_unbound_methods=true).
+5. Add `go.sum` dependencies: `google.golang.org/grpc`, `google.golang.org/protobuf`, `github.com/grpc-ecosystem/grpc-gateway/v2`.
+6. Add googleapis proto dependencies in `buf.yaml` deps for `google/api/annotations.proto` and `google/api/http.proto`.
+7. Verify `buf build` succeeds with empty proto directory.
+8. Create a basic `cmd/rms-server/main.go` skeleton that imports the generated package paths (placeholder).
 
 ## Validation
-Run `buf lint` with zero errors. Run `buf generate` and verify Go files are generated in the expected output directory. Verify `go build ./...` succeeds with generated code.
+Verify `buf build` completes without errors. Verify `go build ./...` succeeds. Confirm directory structure matches expected layout.

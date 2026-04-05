@@ -1,16 +1,26 @@
-Implement subtask 9004: Implement Equipment tab with category browsing, product grid, and infinite scroll
+Implement subtask 9004: Configure Cloudflare Tunnel ingress with ClusterTunnel CR
 
 ## Objective
-Build the Equipment tab screens: category list, product grid with infinite scroll pagination, product detail with availability display, and pull-to-refresh across list screens.
+Create the ClusterTunnel CR to route external traffic from sigma-1.com and api.sigma-1.com to all backend services, including WebSocket support for Morgan.
 
 ## Steps
-1. **Category List** (`equipment/index.tsx`): Fetch categories from API, render as a scrollable list/grid of category cards with icons/images. Pull-to-refresh using `RefreshControl`.
-2. **Product Grid** (`equipment/[categoryId].tsx`): Fetch products for selected category with cursor-based pagination. Use `FlatList` with `onEndReached` for infinite scroll. Render `ProductCard` components in 2-column grid. Pull-to-refresh. Show loading skeleton while fetching.
-3. **Product Detail** (`equipment/product/[productId].tsx`): Fetch single product details. Display full-size image carousel (use `expo-image` or `react-native-reanimated-carousel`), description, specifications, pricing info, `AvailabilityBadge`. Add 'Add to Quote' button that navigates to Quote tab with product pre-selected.
-4. Implement search bar at the top of category list for filtering equipment by name.
-5. Handle empty states (no products in category) and error states (network failure) with retry option.
-6. Use React Query (`@tanstack/react-query`) or SWR for data fetching with caching, background refetch, and stale-while-revalidate.
-7. Optimize `FlatList` performance: `getItemLayout` for fixed-height items, `keyExtractor`, `windowSize` tuning.
+1. Create or update the ClusterTunnel CR for the cloudflare-tunnel-operator:
+   - `apiVersion: networking.cfargotunnel.com/v1alpha1`, `kind: ClusterTunnel`
+   - Name: `sigma1-tunnel`
+   - Configure the Cloudflare API token secret reference
+2. Define ingress rules in the ClusterTunnel spec or via separate TunnelBinding CRs:
+   - `sigma-1.com` → service `sigma1-website` port 3000 (frontend)
+   - `api.sigma-1.com/catalog/*` → service `equipment-catalog` port 8080
+   - `api.sigma-1.com/rms/*` → service `rms` port 8080
+   - `api.sigma-1.com/finance/*` → service `finance` port 8080
+   - `api.sigma-1.com/vetting/*` → service `customer-vetting` port 8080
+   - `api.sigma-1.com/social/*` → service `social-engine` port 8080
+   - `api.sigma-1.com/ws/*` → service `morgan` port 8080 (ensure WebSocket support is enabled via `originRequest.noTLSVerify: true` and `originRequest.connectTimeout: 30s`)
+3. For WebSocket (Morgan), ensure the tunnel configuration includes:
+   - `originRequest.httpHostHeader: morgan`
+   - Verify WebSocket upgrade headers are passed through
+4. Apply the CR and verify the tunnel is created in the Cloudflare dashboard.
+5. Verify DNS records are created automatically (CNAME to tunnel UUID).
 
 ## Validation
-Component tests: category list renders mock categories; product grid renders 2-column layout with mock products; product detail shows all fields. Integration test: mock paginated API response, verify infinite scroll triggers next page fetch when scrolled to end. Pull-to-refresh test: verify API refetch on refresh gesture. Empty state test: mock empty product response, verify empty state component renders.
+Verify tunnel pod is running: `kubectl get pods -l app=cloudflare-tunnel`. Test each route: `curl -s -o /dev/null -w '%{http_code}' https://sigma-1.com` returns 200; `curl https://api.sigma-1.com/catalog/health/ready` returns 200; repeat for all 6 service paths. Test WebSocket: use wscat to connect to `wss://api.sigma-1.com/ws/` and verify connection is established.

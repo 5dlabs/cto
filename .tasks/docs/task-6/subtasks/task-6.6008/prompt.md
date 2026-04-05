@@ -1,37 +1,21 @@
-Implement subtask 6008: Implement Effect Service clients for Instagram, LinkedIn, Facebook, and TikTok APIs
+Implement subtask 6008: Implement AI curation pipeline orchestrating scoring, cropping, and captioning
 
 ## Objective
-Build four separate Effect.Service implementations for publishing content to each social media platform via their respective APIs, all with exponential backoff retry logic.
+Build the end-to-end AI curation pipeline that is triggered after image upload: score images via ImageCurationService, select top images, generate platform crops via CropService, generate captions via CaptionService, and create a Draft record with status 'pending_approval'.
 
 ## Steps
-1. Create `src/services/platforms/InstagramService.ts`:
-   - Effect.Service tag: InstagramService.
-   - Method `publishPost(imageUrls: string[], caption: string, hashtags: string[])`: Effect<PublishResult, PlatformPublishError>
-     - Use Instagram Graph API: POST /{ig-user-id}/media (for container), then POST /{ig-user-id}/media_publish.
-     - For carousel (multiple images): create child containers, then publish carousel container.
-     - Return { postId: string, postUrl: string }.
-   - Wrap in Effect.retry(Schedule.exponential('1 second').pipe(Schedule.intersect(Schedule.recurs(3)))).
-2. Create `src/services/platforms/LinkedInService.ts`:
-   - Method `publishPost(imageUrls: string[], caption: string)`: Effect<PublishResult, PlatformPublishError>
-     - Use LinkedIn API: Register image upload, upload image, create ugcPost with image.
-     - Return { postId, postUrl }.
-3. Create `src/services/platforms/FacebookService.ts`:
-   - Method `publishPost(pageId: string, imageUrls: string[], caption: string)`: Effect<PublishResult, PlatformPublishError>
-     - Use Facebook Graph API: POST /{page-id}/photos for single, or unpublished photos + POST /{page-id}/feed for multi-photo.
-     - Return { postId, postUrl }.
-4. Create `src/services/platforms/TikTokService.ts`:
-   - Method `publishVideo(videoUrl: string, caption: string, hashtags: string[])`: Effect<PublishResult, PlatformPublishError>
-     - Use TikTok Content Posting API: init upload, upload video, publish.
-     - For photo mode (if supported): use photo post endpoint.
-     - Return { postId, postUrl }.
-5. Each service:
-   - Takes API credentials (access tokens, app IDs) from environment.
-   - Uses `Effect.tryPromise` for all HTTP calls (via fetch or undici).
-   - Tagged error types: InstagramPublishError, LinkedInPublishError, etc.
-   - All have a `.live` layer file.
-6. Create `src/services/platforms/PlatformRouter.ts`:
-   - Method `publishToPlatform(platform: Platform, draft: Draft)`: Effect<PublishResult, PlatformPublishError>
-   - Routes to the correct service based on platform field.
+1. Create `src/pipelines/CurationPipeline.ts`.
+2. Define `runCurationPipeline(uploadIds: string[], eventId?: string, platforms: string[]): Effect.Effect<Draft, CurationPipelineError>`:
+   a. Fetch upload records from database by IDs.
+   b. Call `ImageCurationService.scoreImages()` with all upload image keys.
+   c. Call `ImageCurationService.selectTopImages()` to pick top 5-10.
+   d. For each selected image, call `CropService.generateCrops()` for all target platforms — use `Effect.forEach` with bounded concurrency.
+   e. Call `CaptionService.generateCaption()` with event context and image descriptions from scoring step.
+   f. Insert a `drafts` row: `upload_ids` = selected image IDs, `caption`, `hashtags`, `platforms`, `status = 'pending_approval'`, `platform_crops` = aggregated crops JSON, `ai_score` = average overall score.
+   g. Return the created Draft.
+3. Define `CurationPipelineError` that wraps sub-service errors with context.
+4. Wire the pipeline invocation from the upload endpoint (subtask 6004) — call `Effect.runFork` so it runs asynchronously after upload response is sent.
+5. Handle partial failures gracefully: if cropping fails for one image, continue with others. If captioning fails, create draft without caption (status still pending_approval, caption can be manually added).
 
 ## Validation
-Unit test each service with mocked HTTP responses: (1) InstagramService: mock Graph API container creation and publish, verify correct API calls sequence for single and carousel posts. (2) LinkedInService: mock image registration and ugcPost creation. (3) FacebookService: mock multi-photo publish flow. (4) TikTokService: mock upload init, upload, and publish sequence. (5) Test retry logic: mock 500 response twice then 200, verify 3 attempts made with exponential delay. (6) Test PlatformRouter routes to correct service for each platform string.
+Integration test: upload 10 images → verify pipeline runs and creates a draft with status 'pending_approval', upload_ids containing top 5 scored images, platform_crops populated for all platforms, caption and hashtags populated. Test partial failure: mock CropService to fail for 1 image → verify draft is still created with crops for remaining images.

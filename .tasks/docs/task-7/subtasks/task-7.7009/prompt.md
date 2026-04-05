@@ -1,26 +1,29 @@
-Implement subtask 7009: Implement web chat WebSocket endpoint with conversation persistence
+Implement subtask 7009: Implement ElevenLabs voice integration with WebSocket streaming
 
 ## Objective
-Build the WebSocket endpoint that the Next.js frontend connects to for real-time chat with Morgan, including JSON message protocol and conversation history persistence on the workspace PVC.
+Configure the ElevenLabs Conversational AI agent with Morgan's voice profile and implement the WebSocket-based real-time voice streaming pipeline for phone call interactions.
 
 ## Steps
-1. WebSocket server:
-   a. Expose a WebSocket endpoint at a configurable path (e.g., `/ws/chat`) within the Morgan agent container.
-   b. Handle connection lifecycle: open, message, close, error.
-   c. Authenticate connections: validate a session token or API key on connection handshake.
-2. Message protocol:
-   a. Inbound messages: `{"type": "user_message", "content": "text here", "metadata": {"session_id": "...", "timestamp": "..."}}`
-   b. Outbound messages: `{"type": "agent_message", "content": "response text", "metadata": {"session_id": "...", "timestamp": "...", "tool_calls": [...]}}`
-   c. Typing indicator: `{"type": "typing", "content": "", "metadata": {"active": true}}`
-   d. Error messages: `{"type": "error", "content": "error description", "metadata": {"code": "..."}}`
-3. Conversation persistence:
-   a. Store conversation history per session_id in the morgan-workspace PVC (JSON files or SQLite).
-   b. On reconnect, load previous conversation history so Morgan has context.
-   c. Implement conversation TTL — expire old conversations after configurable period (e.g., 24 hours).
-4. Concurrent connections:
-   a. Support multiple simultaneous WebSocket connections (different customers).
-   b. Isolate conversation state per session.
-5. Forward messages to Morgan's agent pipeline, receive responses, and send back via WebSocket.
+1. Configure ElevenLabs Conversational AI agent:
+   - Create or select voice profile for Morgan (professional, clear, warm tone)
+   - Set up ElevenLabs agent with Morgan's system prompt (aligned with OpenClaw manifest)
+   - Configure the agent to forward tool calls to Morgan's MCP tool server
+2. Implement WebSocket connection to ElevenLabs streaming API:
+   - Establish persistent WebSocket connection for real-time audio streaming
+   - Handle audio chunks: receive PCM/opus audio from ElevenLabs, stream to caller
+   - Send user audio: receive audio from Twilio, forward to ElevenLabs for transcription
+3. Implement voice-to-text pipeline:
+   - ElevenLabs handles STT internally → receive transcribed text
+   - Forward transcribed text to Morgan's conversation handler
+   - Receive Morgan's text response → send to ElevenLabs for TTS
+4. Handle conversation state continuity between voice and text channels:
+   - Voice calls should be able to reference prior text conversations if same phone number
+   - Store voice call session in Valkey with phone number as key
+5. Implement graceful handling of voice-specific scenarios:
+   - Silence detection / timeout → polite prompt
+   - Call disconnect → save conversation state
+   - Audio quality issues → fallback to text summary
+6. Store ElevenLabs API key as Kubernetes secret, reference via sigma1-external-secrets.
 
 ## Validation
-Connect via WebSocket client, send a user_message JSON, verify an agent_message JSON response is received with correct structure within 10 seconds. Disconnect and reconnect with the same session_id, verify conversation history is preserved. Open 5 concurrent WebSocket connections and verify each maintains isolated conversation state.
+Verify ElevenLabs WebSocket connection establishes successfully with valid API key. Send test audio and verify transcription is received. Send test text and verify audio response is generated. Verify conversation state is stored in Valkey keyed by phone number. Test disconnect/reconnect preserves state.

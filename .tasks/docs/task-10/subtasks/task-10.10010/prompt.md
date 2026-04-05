@@ -1,16 +1,28 @@
-Implement subtask 10010: Ingress and CDN: configure CDN caching rules for equipment images vs API responses
+Implement subtask 10010: Create CI/CD security scanning pipeline definitions (Semgrep, Snyk, CodeQL)
 
 ## Objective
-Set up Cloudflare CDN caching rules: 1-year cache for equipment images, no-cache or short TTL for API responses.
+Define CI/CD pipeline step configurations for static analysis (Semgrep), dependency scanning (Snyk/Dependabot), and code scanning (CodeQL) across Rust, Go, and TypeScript codebases, with merge blockers for critical/high findings.
 
 ## Steps
-Step-by-step:
-1. In the Cloudflare dashboard (or via Terraform/API if IaC is used), create Page Rules or Cache Rules:
-   - Rule 1: `*sigma1.example.com/images/*` → Cache Level: Cache Everything, Edge Cache TTL: 1 year (31536000s), Browser Cache TTL: 1 year.
-   - Rule 2: `*sigma1.example.com/api/*` → Cache Level: Bypass (or Standard with `Cache-Control: no-store` respected).
-2. Ensure equipment-catalog service sets appropriate `Cache-Control` headers on image responses: `public, max-age=31536000, immutable`.
-3. Ensure all API endpoints set `Cache-Control: no-store` or `private, no-cache`.
-4. Document the mTLS Phase 2 decision: create `docs/mtls-phase2.md` explaining that internal service-to-service mTLS via cert-manager is deferred, with a brief architecture sketch for future implementation.
+1. Semgrep configuration:
+   - Create `.semgrep.yml` or `semgrep-rules/` directory with rulesets for:
+     - Rust: `p/rust`, custom rules for unsafe blocks, SQL injection patterns
+     - Go: `p/golang`, `p/owasp-top-ten`
+     - TypeScript: `p/typescript`, `p/jwt`, `p/owasp-top-ten`
+   - Create a CI workflow step (GitHub Actions or equivalent) that runs Semgrep on PRs.
+   - Configure to fail on severity >= HIGH.
+2. Snyk/Dependabot configuration:
+   - Create `snyk.yml` or `.github/dependabot.yml` for dependency scanning.
+   - Cover: Cargo.lock (Rust), go.sum (Go), package.json/bun.lockb (TypeScript/Bun).
+   - Configure automatic PR creation for security updates.
+   - Set merge blocker for critical vulnerabilities.
+3. CodeQL configuration:
+   - Create `.github/workflows/codeql-analysis.yml` for Go and TypeScript.
+   - Note: CodeQL does not natively support Rust; Semgrep covers Rust static analysis.
+   - Configure to run on PRs and weekly scheduled scans.
+   - Set merge blocker for high/critical findings.
+4. Store all configuration files in the repository's CI directory.
+5. Document the scanning pipeline in the ops runbook.
 
 ## Validation
-Fetch an equipment image URL via curl with `-I` flag, verify `CF-Cache-Status: HIT` on second request and appropriate cache headers. Fetch an API endpoint, verify `CF-Cache-Status: DYNAMIC` or `BYPASS` and no caching.
+Verify Semgrep config parses without errors by running `semgrep --validate`. Verify Dependabot config is valid YAML with correct ecosystem entries. Verify CodeQL workflow YAML is valid. Run each scanner locally against the codebase and confirm it produces output (even if no findings). Confirm merge blocker rules are configured for critical/high severity.

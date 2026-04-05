@@ -1,26 +1,32 @@
-Implement subtask 7012: Implement tool call parallelization and end-to-end performance validation
+Implement subtask 7012: Implement conversation state management and context window handling in Valkey
 
 ## Objective
-Configure MCP tool call parallelization for independent tool invocations and validate the <10 second end-to-end response time target for simple queries across all channels.
+Build the shared conversation state management layer that stores conversation history in Valkey across all channels (Signal, web chat, voice), manages the 50-message context window, and provides skill routing based on intent detection.
 
 ## Steps
-1. Tool call parallelization:
-   a. In the agent's tool-calling logic, identify when multiple tools are independent (e.g., checking availability for 3 different products simultaneously).
-   b. Configure OpenClaw/MCP to issue parallel HTTP requests for independent tool calls rather than sequential.
-   c. Implement fan-out/fan-in pattern: dispatch parallel tool calls, collect all results, then continue conversation.
-   d. Set per-tool timeouts so a slow tool doesn't block the entire parallel batch.
-2. Performance profiling:
-   a. Measure end-to-end latency for simple queries: user sends 'Do you have LED panels?' → Morgan responds with catalog results.
-   b. Break down latency: message receive time + LLM inference time + tool call time + response send time.
-   c. Target: total < 10 seconds for single-tool simple queries.
-3. Optimization opportunities:
-   a. If LLM inference is the bottleneck, consider streaming responses (send partial text as it's generated).
-   b. If tool calls are slow, verify cluster DNS resolution and service connectivity latency.
-   c. For voice channel: ensure total round-trip (speech-to-text + Morgan + text-to-speech) is conversational (<5 seconds perceived).
-4. Load test:
-   a. Run 10 concurrent simple queries (catalog search) across web chat WebSocket.
-   b. Verify all 10 respond within 10 seconds.
-   c. Monitor pod resource utilization during load test.
+1. Create ConversationManager module:
+   - Unified interface for storing/retrieving conversations regardless of channel
+   - Key scheme: `conv:{channel}:{identifier}` (e.g., conv:signal:+1234567890, conv:web:uuid, conv:voice:+1234567890)
+2. Message storage format:
+   - Each message: { role: 'user'|'assistant'|'system'|'tool', content: string, timestamp: ISO8601, channel: string, tool_name?: string, tool_result?: object }
+   - Store as Valkey list or JSON array
+3. Context window management:
+   - Always include system prompt as first message
+   - Keep last 50 messages in context
+   - When exceeding 50: summarize older messages using LLM → store summary as a system message
+   - Ensure tool call/result pairs are never split across the window boundary
+4. Skill routing logic:
+   - Analyze latest user message for intent signals:
+     - Equipment/rental/event inquiry keywords → `sales-qual` skill
+     - Invoice/payment/billing keywords → `finance` skill
+     - Social media/post/content keywords → `social-media` skill
+     - General question → default conversational mode
+   - Active skill persists across messages until conversation topic changes or user explicitly switches
+   - Skill context: when a skill is active, include skill-specific instructions in the system prompt
+5. Cross-channel session linking:
+   - If a Signal user's phone number matches a web chat session's provided phone, link conversations
+   - Provide conversation continuity: 'I see we were discussing X earlier via text'
+6. Implement cleanup: conversations older than 7 days are archived or purged.
 
 ## Validation
-Run 10 concurrent catalog search queries via WebSocket, verify all complete within 10 seconds. Measure and log individual latency components (LLM inference, tool call, message delivery). Verify parallel tool calls (e.g., 3 simultaneous availability checks) complete faster than sequential would. Verify voice round-trip latency is under 5 seconds for simple queries.
+Store 60 messages in a conversation and verify only the last 50 + system prompt are returned in the context window. Verify summarization triggers when messages exceed 50. Test skill routing: send 'I need to rent some lights for an event' and verify sales-qual skill is activated. Test cross-channel: create a Signal conversation, then query by same phone number from web chat and verify linking works. Verify 7-day TTL cleanup.

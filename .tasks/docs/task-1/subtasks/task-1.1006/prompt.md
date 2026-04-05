@@ -1,19 +1,28 @@
-Implement subtask 1006: Create Kubernetes Secrets for database credentials
+Implement subtask 1006: Create ExternalSecret CRs for third-party API keys
 
 ## Objective
-Create the `sigma1-db-credentials` Secret in the `sigma1` namespace containing PostgreSQL connection strings for each per-service role (catalog_svc, rms_svc, finance_svc, vetting_svc, social_svc) and the sigma1_user superuser.
+Create ExternalSecret custom resources for all third-party service API keys as placeholders, referencing the chosen external secrets backend.
 
 ## Steps
-1. Create an Opaque Secret `sigma1-db-credentials` in `sigma1` namespace with data keys:
-   - `POSTGRES_URL` (sigma1_user connection via pooler)
-   - `CATALOG_SVC_POSTGRES_URL` (catalog_svc role connection via pooler)
-   - `RMS_SVC_POSTGRES_URL` (rms_svc role connection via pooler)
-   - `FINANCE_SVC_POSTGRES_URL` (finance_svc role connection via pooler)
-   - `VETTING_SVC_POSTGRES_URL` (vetting_svc role connection via pooler)
-   - `SOCIAL_SVC_POSTGRES_URL` (social_svc role connection via pooler)
-2. All URLs should point to the PgBouncer pooler endpoint: `sigma1-postgres-pooler.sigma1-db.svc.cluster.local:5432`.
-3. Passwords must match those set in the init SQL step (1003).
-4. Apply the Secret YAML.
+1. Ensure a `ClusterSecretStore` or `SecretStore` CR exists in the sigma1 namespace pointing to the chosen secrets backend (see decision point).
+2. Create the following ExternalSecret CRs in namespace `sigma1`:
+   a. `sigma1-stripe-keys.yaml`:
+      - Secret keys: `STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`
+      - `refreshInterval: 1h`
+   b. `sigma1-opencorporates-key.yaml`:
+      - Secret key: `OPENCORPORATES_API_KEY`
+   c. `sigma1-social-api-keys.yaml`:
+      - Secret keys: `INSTAGRAM_ACCESS_TOKEN`, `LINKEDIN_ACCESS_TOKEN`, `FACEBOOK_ACCESS_TOKEN`
+   d. `sigma1-elevenlabs-key.yaml`:
+      - Secret key: `ELEVENLABS_API_KEY`
+   e. `sigma1-twilio-keys.yaml`:
+      - Secret keys: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
+   f. `sigma1-openai-key.yaml`:
+      - Secret key: `OPENAI_API_KEY`
+   g. `sigma1-google-calendar-creds.yaml`:
+      - Secret keys: `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_CALENDAR_REFRESH_TOKEN`
+3. For dev/bootstrap, seed placeholder values in the external secrets backend so the ExternalSecret CRs can sync successfully.
+4. Apply all ExternalSecret manifests.
 
 ## Validation
-`kubectl get secret sigma1-db-credentials -n sigma1 -o json | jq '.data | keys'` lists all 6 expected keys. Each decoded URL is a valid PostgreSQL connection string. Test at least one role connection from a pod using the secret value.
+All 7 ExternalSecret CRs exist in sigma1 namespace: `kubectl get externalsecrets -n sigma1`. Each reports `SecretSynced` condition as True. Corresponding Kubernetes Secrets are created with the expected keys (values can be placeholders). `kubectl get secret sigma1-stripe-keys -n sigma1 -o jsonpath='{.data}'` shows base64-encoded values for both keys.

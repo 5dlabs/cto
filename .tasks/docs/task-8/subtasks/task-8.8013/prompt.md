@@ -1,29 +1,23 @@
-Implement subtask 8013: Performance optimization and Lighthouse CI targets
+Implement subtask 8013: Configure Cloudflare Pages deployment with environment variables and edge caching
 
 ## Objective
-Optimize all pages for Lighthouse Performance > 90 and Accessibility > 95. Configure Next.js Image with R2 CDN loader, static generation for appropriate pages, code splitting, and bundle analysis.
+Set up the Cloudflare Pages deployment configuration including wrangler.toml or Cloudflare Pages project settings, environment variable configuration for API base URLs, and edge caching settings for static pages.
 
 ## Steps
-1. Image optimization:
-   - Create custom Next.js Image loader for R2 CDN (`lib/image-loader.ts`): construct URLs with width/quality params if R2/Cloudflare supports image transformations, otherwise serve original with size hints.
-   - Ensure all images use `<Image>` component with appropriate `sizes` prop for responsive loading.
-   - Priority loading for above-the-fold images (hero, first few product cards).
-2. Static generation:
-   - Home page: fully static (`force-static` or default).
-   - Portfolio page: static or ISR.
-   - Equipment listing: dynamic (search params driven).
-   - Product detail: consider `generateStaticParams` for top products, fallback dynamic for rest.
-3. Code splitting:
-   - ChatWidget loaded via `next/dynamic` with `ssr: false` (no SSR needed for chat).
-   - AvailabilityCalendar loaded dynamically on product detail page.
-   - TanStack Query DevTools only in dev.
-4. Bundle analysis:
-   - Run `@next/bundle-analyzer` to identify large chunks.
-   - Ensure Effect library is tree-shaken (import from specific submodules).
-5. Font optimization: use `next/font` for Google Fonts or local fonts, preload.
-6. Prefetching: Next.js Link prefetch for likely navigation targets.
-7. Run Lighthouse on: / (home), /equipment, /equipment/:id. Target: Performance > 90, Accessibility > 95, Best Practices > 90.
-8. Set up Lighthouse CI config (`.lighthouserc.js`) for CI pipeline integration.
+1. Create `wrangler.toml` at project root (if using Cloudflare Pages with wrangler):
+   - Set `name`, `compatibility_date`, `pages_build_output_dir = '.vercel/output/static'` or configure for Next.js on Cloudflare Pages adapter.
+   - Or: configure via Cloudflare dashboard and document settings in a `DEPLOYMENT.md`.
+2. Install `@cloudflare/next-on-pages` adapter if needed for Next.js on Cloudflare Pages.
+3. Configure environment variables in Cloudflare Pages dashboard (document in .env.local.example):
+   - `NEXT_PUBLIC_API_BASE_URL`: Equipment/Quote API base URL.
+   - `NEXT_PUBLIC_WS_URL`: Morgan WebSocket URL.
+   - Any other API keys needed.
+4. Configure `next.config.ts`:
+   - Output mode compatible with Cloudflare Pages.
+   - Image optimization: configure `remotePatterns` for R2 CDN image URLs.
+   - Headers: add cache-control headers for static assets (long TTL), dynamic pages (short TTL).
+5. Add build script to `package.json`: `"deploy": "npx @cloudflare/next-on-pages"` or equivalent.
+6. Create a GitHub Actions workflow or document manual deployment steps.
 
 ## Validation
-Run Lighthouse CI on home page: Performance > 90, Accessibility > 95, Best Practices > 90. Run on /equipment page: same targets. Verify bundle analyzer output shows no unexpectedly large chunks (> 200KB gzipped). Verify ChatWidget does not appear in SSR output (dynamic import with ssr:false). Verify images on equipment page use R2 CDN URLs with proper dimensions.
+Run the build command (`next build` + Cloudflare adapter) and verify it completes without errors. Verify the output directory contains expected static assets. Verify environment variables are properly referenced (not hardcoded). Deploy to a preview environment on Cloudflare Pages and confirm the site loads with correct API connections.

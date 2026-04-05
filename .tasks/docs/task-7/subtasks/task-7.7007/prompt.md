@@ -1,27 +1,25 @@
-Implement subtask 7007: Implement Signal messaging integration (inbound/outbound via Signal-CLI REST API)
+Implement subtask 7007: Implement MCP Tool Server HTTP client, JWT auth, and tool registry
 
 ## Objective
-Build the Signal channel adapter that connects Morgan to the Signal-CLI sidecar REST API for receiving and sending messages, handling photos, and distinguishing group vs direct messages.
+Build the shared MCP tool server infrastructure: HTTP client wrapper with JWT injection, tool registry that loads all 11 tool definitions, error handling middleware, and request/response logging.
 
 ## Steps
-1. Implement inbound message listener:
-   a. Poll Signal-CLI REST API at `localhost:8080/v1/receive/{number}` on a configurable interval (1-2 seconds).
-   b. Parse incoming messages: extract sender, timestamp, body text, attachments (photos), group info.
-   c. Determine message type: direct message (1:1 with Morgan) vs group message (only respond when @mentioned or directly addressed).
-   d. For direct messages: forward full message body to Morgan's agent processing pipeline.
-   e. For group messages: detect if Morgan is being addressed, extract relevant content, forward to agent.
-2. Implement outbound message sending:
-   a. Send text responses via `POST /v2/send` with recipient number and message body.
-   b. Support sending photos/attachments (e.g., quote PDFs, curated social media previews) via attachment API.
-   c. Handle message length limits — split long messages if necessary.
-3. Photo handling:
-   a. When photos are received, download attachment from Signal-CLI, store in morgan-workspace PVC.
-   b. Pass file path to social-media skill or other processing pipeline.
-   c. For outbound photos (quote previews), upload to Signal-CLI attachment endpoint first, then reference in send.
-4. Conversation context:
-   a. Map Signal phone numbers to customer identities/conversation threads.
-   b. Maintain conversation continuity across multiple messages from the same sender.
-5. Error handling: retry failed sends (3 attempts with backoff), log failed messages for manual follow-up.
+1. Create a central tool registry module that loads all 11 MCP tool definitions and exposes them via the MCP tool-server protocol (HTTP SSE or stdio, depending on OpenClaw's MCP client implementation).
+2. Implement shared HTTP client wrapper:
+   - Inject `Authorization: Bearer ${MORGAN_SERVICE_JWT}` header on all outbound requests
+   - JWT token: read from environment variable or Kubernetes secret mount
+   - Base URL resolution: read service URLs from sigma1-infra-endpoints ConfigMap environment variables
+   - Timeout: 30 seconds per tool call, configurable
+   - Retry: 1 retry on 502/503 with exponential backoff
+3. Implement request/response logging for all tool calls:
+   - Log: tool_name, input_params (redacted sensitive fields), response_status, latency_ms
+   - Structured JSON logging for observability
+4. Implement tool call error normalization:
+   - HTTP 4xx → structured error with user-friendly message
+   - HTTP 5xx → 'Service temporarily unavailable' with retry suggestion
+   - Network timeout → 'Request timed out, please try again'
+5. Implement tool list endpoint for MCP protocol: returns all 11 tools with names, descriptions, and JSON schemas.
+6. Validate that all service URLs are configured at startup; log warnings for missing endpoints.
 
 ## Validation
-Send a test message via Signal-CLI REST API to Morgan's number, verify it is received and parsed correctly within 2 seconds. Send a response and verify it arrives at the sender. Send a photo attachment and verify it is downloaded and stored in workspace PVC. Send a group message without @mention and verify Morgan ignores it; send with @mention and verify Morgan responds.
+Start the MCP tool server and verify the tool list endpoint returns all 11 tools with correct schemas. Send a tool call through the HTTP client wrapper and verify JWT header is injected. Simulate 502, 503, and timeout responses and verify retry/error normalization behavior. Verify structured logs are emitted for each tool call.

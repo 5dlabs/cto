@@ -1,24 +1,30 @@
-Implement subtask 3007: Implement Inventory service with conflict detection and barcode scanning
+Implement subtask 3007: Implement ProjectService gRPC handlers with opportunity conversion and inventory CheckOut/CheckIn
 
 ## Objective
-Build the InventoryService gRPC implementation with stock level tracking, transaction recording, equipment availability conflict detection, and barcode scanning lookup.
+Implement the ProjectService gRPC server including project creation from approved opportunities, full CRUD, and CheckOut/CheckIn RPCs that record inventory transactions.
 
 ## Steps
-1. Create `internal/service/inventory_svc.go` implementing `InventoryServiceServer`.
-2. Implement `GetStockLevel` RPC: delegate to `inventoryRepo.GetStockLevel()`, return item with quantity_total and quantity_available.
-3. Implement `RecordTransaction` RPC:
-   - Validate transaction type (CHECK_OUT, CHECK_IN, TRANSFER, ADJUSTMENT).
-   - For CHECK_OUT: verify quantity_available >= requested quantity, decrement atomically.
-   - For CHECK_IN: increment quantity_available, update item status.
-   - Delegate to `inventoryRepo.RecordTransaction()` which uses pgx transaction.
-4. Implement conflict detection in `internal/domain/conflict_detector.go`:
-   - `DetectConflicts(ctx, orgID, itemIDs []UUID, dateStart, dateEnd time.Time) ([]Conflict, error)`
-   - Query inventory_transactions joined with projects to find overlapping CHECK_OUT periods for the same items.
-   - Return list of Conflict structs with item_id, conflicting_project_id, conflicting_date_range.
-5. Integrate conflict detection into Project service's `CheckOut` RPC: before recording transactions, call DetectConflicts. If conflicts found, return them in CheckOutResponse with success=false.
-6. Implement `ScanBarcode` RPC: call `inventoryRepo.GetByBarcode(ctx, orgID, barcode)`, return InventoryItem with current_location and status. Return NOT_FOUND if barcode doesn't exist.
-7. Implement `ListInventoryItems` with org_id filtering and pagination.
-8. Register service in gRPC server.
+1. Create `internal/service/project.go` implementing ProjectServiceServer.
+2. Implement CreateProject:
+   - Accept opportunity_id in request
+   - Verify opportunity exists and status is 'approved' (return FailedPrecondition if not)
+   - Create project record copying relevant fields from opportunity (customer_id, event dates, venue)
+   - Update opportunity status to 'converted' in a database transaction
+   - Return created project
+3. Implement GetProject: lookup by ID, return NOT_FOUND if missing.
+4. Implement UpdateProject: support status transitions (confirmed→in_progress→completed; confirmed→cancelled; in_progress→cancelled). Validate transitions.
+5. Implement CheckOut:
+   - Accept project_id, inventory_item_id, quantity
+   - Verify project exists and is in_progress
+   - Check stock level >= requested quantity via InventoryRepo.GetStockLevel
+   - Record inventory_transaction with type=checkout
+   - Return updated stock level
+6. Implement CheckIn:
+   - Accept project_id, inventory_item_id, quantity
+   - Record inventory_transaction with type=checkin
+   - Return updated stock level
+7. Both CheckOut and CheckIn should be wrapped in database transactions to ensure atomicity.
+8. Register the service in the gRPC server.
 
 ## Validation
-Integration tests with testcontainers-go: 1) Create inventory item, RecordTransaction CHECK_OUT, verify quantity_available decremented. RecordTransaction CHECK_IN, verify quantity_available restored. 2) Conflict detection: create item, check out to project A for dates Jan 1-5, attempt checkout to project B for Jan 3-7, verify conflict returned with project A's ID and overlapping range. 3) ScanBarcode: create item with barcode 'ABC123', scan returns correct item; scan non-existent barcode returns NOT_FOUND. 4) Verify CHECK_OUT fails when quantity_available < requested.
+Integration test: full lifecycle CreateOpportunity → approve → CreateProject → verify opportunity status is 'converted'. Test CheckOut reduces stock level and CheckIn restores it. Test CheckOut with insufficient stock returns appropriate error. Test invalid state transitions return FailedPrecondition.

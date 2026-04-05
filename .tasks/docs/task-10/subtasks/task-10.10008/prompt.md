@@ -1,28 +1,21 @@
-Implement subtask 10008: Network policies: allow sigma1 egress to external APIs
+Implement subtask 10008: Apply Pod Security Standards to sigma1 namespace
 
 ## Objective
-Create egress NetworkPolicy allowing sigma1 services to reach external APIs (OpenCorporates, Stripe, Google, etc.) and DNS resolution.
+Enforce the 'restricted' PodSecurity level on the sigma1 namespace and update all Deployment/StatefulSet SecurityContexts to comply: runAsNonRoot, readOnlyRootFilesystem, drop all capabilities, disallow privilege escalation.
 
 ## Steps
-Step-by-step:
-1. Create `netpol-allow-external-egress.yaml`:
-   - Since external API IPs change, use a broad egress allow for HTTPS (port 443) to `0.0.0.0/0` but exclude cluster CIDRs to prevent lateral movement:
-     ```yaml
-     egress:
-       - to:
-           - ipBlock:
-               cidr: 0.0.0.0/0
-               except:
-                 - 10.0.0.0/8
-                 - 172.16.0.0/12
-                 - 192.168.0.0/16
-         ports:
-           - protocol: TCP
-             port: 443
-     ```
-   - Apply to specific pods that need external access: customer-vetting (OpenCorporates), finance (Stripe), social-engine (Signal-CLI outbound if applicable).
-2. Separately ensure DNS egress is allowed (port 53 to kube-dns) — this should be in the db-access policy or a shared DNS policy.
-3. Create a dedicated `netpol-allow-dns.yaml` that allows all sigma1 pods egress to kube-dns on port 53 TCP/UDP.
+1. Label the sigma1 namespace with Pod Security Admission labels:
+   - `pod-security.kubernetes.io/enforce: restricted`
+   - `pod-security.kubernetes.io/audit: restricted`
+   - `pod-security.kubernetes.io/warn: restricted`
+2. Update ALL Deployment and StatefulSet manifests in the sigma1 namespace to include SecurityContext at both pod and container level:
+   - Pod level: `securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }`
+   - Container level for each container:
+     - `securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: ['ALL'] } }`
+   - Add `emptyDir: {}` volumes mounted at `/tmp` (and any other writable paths) for containers that need temp file access.
+3. For any container that needs to bind to low ports (unlikely in Kubernetes), add `capabilities: { add: ['NET_BIND_SERVICE'] }` — but only if strictly necessary.
+4. Verify init containers and Job containers also comply.
+5. Update Helm values or kustomize overlays to enforce these settings as defaults.
 
 ## Validation
-From the customer-vetting pod, run `curl -I https://api.opencorporates.com` and verify a response is received. From the equipment-catalog pod (if it doesn't need external access), verify the same curl times out or is denied. Verify DNS resolution works from all sigma1 pods.
+Apply the namespace labels. Attempt to deploy a test pod with `privileged: true` — verify it is rejected by the admission controller. Attempt to deploy a pod without `runAsNonRoot` — verify it is rejected. Deploy all existing services and verify they start successfully under the restricted policy. Verify no pods are in CrashLoopBackOff due to filesystem permission issues.

@@ -1,27 +1,25 @@
-Implement subtask 5009: Build async pipeline orchestrator with concurrent stage execution
+Implement subtask 5009: Implement async vetting pipeline orchestrator
 
 ## Objective
-Implement the pipeline orchestrator that runs stages 1-4 concurrently via tokio::join!, feeds results into the scoring stage, persists VettingResult to the database, and updates VettingRequest status throughout.
+Build the async pipeline that orchestrates the 5 vetting steps (OpenCorporates, LinkedIn, Google Places, Credit, Scoring), updates request status, stores results, and handles partial failures gracefully.
 
 ## Steps
-1. Create `src/pipeline.rs` module.
-2. Implement `run_vetting_pipeline(org_id: Uuid, company_name: String, domain: String, pool: &PgPool, client: &ResilientClient, credit_provider: &dyn CreditProvider, request_id: Uuid)`.
-3. Update `vetting_requests` row to status='running', started_at=now().
-4. Execute stages 1-4 concurrently using `tokio::join!`:
-   ```rust
-   let (biz, online, reputation, credit) = tokio::join!(
-       run_business_verification(&client, &company_name, &api_key),
-       run_online_presence(&client, &company_name, &domain),
-       run_reputation(&client, &company_name, &api_key),
-       credit_provider.check_credit(&company_name, &domain)
-   );
-   ```
-5. Collect results, build ScoringInput, run scoring algorithm.
-6. Aggregate all raw_responses from each stage into a single JSONB value.
-7. Insert/upsert VettingResult into `vetting_results` table with all fields populated.
-8. Update `vetting_requests` to status='completed', completed_at=now().
-9. On any panic or unrecoverable error, catch with proper error handling and set status='failed' with error_message.
-10. Use tracing spans for each stage for observability.
+1. Create `src/pipeline/mod.rs`.
+2. Define `VettingPipeline` struct holding references to all four clients, PgPool, and Valkey connection.
+3. Implement `pub async fn run(&self, request_id: Uuid, org_id: Uuid, org_name: &str, org_domain: Option<&str>) -> Result<(), VettingError>`:
+   - Update vetting_requests status to 'in_progress'.
+   - Step 1: Call `opencorporates_client.search_company(org_name)`. Handle Ok/Err, store partial result.
+   - Step 2: Call `linkedin_client.lookup_company(org_name, org_domain)`. Handle Ok/Err.
+   - Step 3: Call `google_places_client.search_business(org_name, org_domain)`. Handle Ok/Err.
+   - Step 4: Call `credit_client.get_credit_score(org_name, org_domain)`. Handle Ok/Err.
+   - Step 5: Assemble `VettingSignals` from steps 1-4, call `calculate_score`.
+   - Build `VettingResult` row and insert via repository.
+   - Update vetting_requests status to 'completed', set completed_at.
+   - Cache result in Valkey (separate subtask handles caching logic).
+   - On any unrecoverable error, update status to 'failed'.
+4. Each step catches its own errors and produces default/empty signals so the pipeline always completes (graceful degradation).
+5. Log each step's outcome at info level with org_id context via tracing spans.
+6. This function is called from a `tokio::spawn` in the route handler (next subtask).
 
 ## Validation
-Integration test with wiremock-rs: mock all 4 external APIs, call run_vetting_pipeline, verify VettingResult is persisted with correct fields. Verify VettingRequest transitions pending→running→completed. Test error path: mock all APIs to fail, verify status='completed' (not failed — stages degrade gracefully), score is RED. Test panic recovery: verify status='failed' with error message on unexpected error.
+Integration test: with all mocked clients returning success, pipeline completes, vetting_requests status is 'completed', vetting_results row exists with correct data. Integration test: all clients return errors, pipeline still completes with status 'completed', result has RED score and all risk_flags populated. Test: request status transitions from pending → in_progress → completed (or failed).

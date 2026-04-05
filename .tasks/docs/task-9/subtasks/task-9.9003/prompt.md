@@ -1,18 +1,26 @@
-Implement subtask 9003: Build shared API client with JWT auth and environment configuration
+Implement subtask 9003: Scale Valkey for production with persistence and PDB
 
 ## Objective
-Create a shared API client module with configurable base URL per environment, JWT token storage in expo-secure-store, automatic token refresh, and Effect-based error handling.
+Configure Valkey for production use: either sentinel mode (3 nodes) or single-instance with AOF persistence, resource limits, and a PodDisruptionBudget.
 
 ## Steps
-1. Install dependencies: `npx expo install expo-secure-store` and `npm install effect` (or `@effect/io` depending on version).
-2. Create `lib/api/client.ts`: base HTTP client using `fetch` with interceptors for auth headers.
-3. Implement environment config in `lib/config.ts`: read `EXPO_PUBLIC_API_BASE_URL` from env vars, support dev/staging/prod profiles.
-4. Create `lib/auth/tokenStore.ts`: store JWT access token and refresh token in `expo-secure-store`. Export `getToken()`, `setTokens()`, `clearTokens()`.
-5. Implement automatic `Authorization: Bearer <token>` header injection on every API request.
-6. Implement token refresh logic: if 401 received, attempt refresh using stored refresh token, retry original request.
-7. Create typed API modules: `lib/api/equipment.ts` (getCategories, getProducts, getProductDetail), `lib/api/quotes.ts` (createQuote, getQuotes), `lib/api/inventory.ts` (scanBarcode, checkIn, checkOut).
-8. Wrap API calls in Effect for structured error handling (network errors, auth errors, validation errors).
-9. Create a `useApi` hook or context provider that exposes the client instance to components.
+1. Check Opstree Redis operator documentation for Valkey sentinel support:
+   - If sentinel is supported: create a RedisSentinel CR with 3 sentinel nodes and a RedisReplication CR with 1 master + 2 replicas
+   - If not supported: update existing Valkey CR for single-instance with persistence
+2. For sentinel mode (Option A):
+   - Create RedisSentinel CR: `spec.size: 3`
+   - Create RedisReplication CR: `spec.size: 3` with sentinel reference
+   - Set `spec.redisExporter.enabled: true` for metrics
+3. For single persistent mode (Option B):
+   - Update existing `sigma1-valkey` CR
+   - Enable persistence: add `appendonly yes` and `appendfsync everysec` to Redis config
+   - Ensure PVC is configured for data persistence
+4. Set resource limits on all Valkey pods:
+   - `resources.requests.memory: 512Mi`, `resources.requests.cpu: 250m`
+   - `resources.limits.memory: 512Mi`, `resources.limits.cpu: 250m`
+5. Configure PodDisruptionBudget:
+   - Create a PDB with `maxUnavailable: 1` targeting Valkey pods
+6. Verify all pods are running and persistence is active.
 
 ## Validation
-Unit test the API client: mock `fetch` to verify correct headers (Authorization, Content-Type) are sent. Test token refresh flow: mock a 401 response followed by successful refresh, verify retry succeeds. Test `expo-secure-store` read/write with mocked module. Verify environment config resolves correct base URL per EXPO_PUBLIC_API_BASE_URL value.
+Verify Valkey pods are running with correct resource limits via `kubectl describe pod`. Write a key to Valkey, delete the pod, wait for restart, and verify the key persists (proving AOF persistence). If sentinel mode, kill the master and verify failover occurs within 30 seconds.

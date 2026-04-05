@@ -1,9 +1,9 @@
 name: implement-task-9
 metadata:
   task_id: 9
-  agent: tap
-  stack: Expo (React Native)
-  depends_on_tasks: [2, 7]
+  agent: bolt
+  stack: Kubernetes/Helm
+  depends_on_tasks: [2, 3, 4, 5, 6, 7, 8]
 
 inputs:
   - name: task_dir
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-9/feature-branch"
   - name: agent
-    default: "tap"
+    default: "bolt"
   - name: cli
     default: "claude"
   - name: model
@@ -37,7 +37,7 @@ steps:
     depends_on: [implement-subtask-9001]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-9002
     depends_on: [validate-subtask-9001]
@@ -49,10 +49,10 @@ steps:
     depends_on: [implement-subtask-9002]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-9003
-    depends_on: [validate-subtask-9001]
+    depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9003/prompt.md
@@ -61,10 +61,10 @@ steps:
     depends_on: [implement-subtask-9003]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-9004
-    depends_on: [validate-subtask-9002, validate-subtask-9003]
+    depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9004/prompt.md
@@ -73,10 +73,10 @@ steps:
     depends_on: [implement-subtask-9004]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-9005
-    depends_on: [validate-subtask-9002, validate-subtask-9003]
+    depends_on: [validate-subtask-9004]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9005/prompt.md
@@ -85,10 +85,10 @@ steps:
     depends_on: [implement-subtask-9005]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-9006
-    depends_on: [validate-subtask-9004, validate-subtask-9005]
+    depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9006/prompt.md
@@ -97,10 +97,10 @@ steps:
     depends_on: [implement-subtask-9006]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-9007
-    depends_on: [validate-subtask-9002, validate-subtask-9003]
+    depends_on: [validate-subtask-9004]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9007/prompt.md
@@ -109,7 +109,7 @@ steps:
     depends_on: [implement-subtask-9007]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-9008
     depends_on: [validate-subtask-9007]
@@ -121,10 +121,10 @@ steps:
     depends_on: [implement-subtask-9008]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-9009
-    depends_on: [validate-subtask-9002, validate-subtask-9003]
+    depends_on: [setup]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9009/prompt.md
@@ -133,10 +133,10 @@ steps:
     depends_on: [implement-subtask-9009]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-9010
-    depends_on: [validate-subtask-9002, validate-subtask-9003]
+    depends_on: [validate-subtask-9009]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9010/prompt.md
@@ -145,10 +145,10 @@ steps:
     depends_on: [implement-subtask-9010]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-9011
-    depends_on: [validate-subtask-9001]
+    depends_on: [validate-subtask-9001, validate-subtask-9003, validate-subtask-9004, validate-subtask-9006]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9011/prompt.md
@@ -157,10 +157,34 @@ steps:
     depends_on: [implement-subtask-9011]
     retry: { max: "{{inputs.max_quality_retries}}" }
     command: >
-      cd work && bun tsc --noEmit && bun test && bun lint
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-9012
+    depends_on: [validate-subtask-9001, validate-subtask-9003]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9012/prompt.md
+
+  - name: validate-subtask-9012
+    depends_on: [implement-subtask-9012]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
+
+  - name: implement-subtask-9013
+    depends_on: [validate-subtask-9011]
+    retry: { max: "{{inputs.max_implementation_retries}}" }
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9013/prompt.md
+
+  - name: validate-subtask-9013
+    depends_on: [implement-subtask-9013]
+    retry: { max: "{{inputs.max_quality_retries}}" }
+    command: >
+      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: integration-validation
-    depends_on: [validate-subtask-9001, validate-subtask-9002, validate-subtask-9003, validate-subtask-9004, validate-subtask-9005, validate-subtask-9006, validate-subtask-9007, validate-subtask-9008, validate-subtask-9009, validate-subtask-9010, validate-subtask-9011]
+    depends_on: [validate-subtask-9001, validate-subtask-9002, validate-subtask-9003, validate-subtask-9004, validate-subtask-9005, validate-subtask-9006, validate-subtask-9007, validate-subtask-9008, validate-subtask-9009, validate-subtask-9010, validate-subtask-9011, validate-subtask-9012, validate-subtask-9013]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

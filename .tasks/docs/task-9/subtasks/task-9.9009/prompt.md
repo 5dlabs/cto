@@ -1,18 +1,38 @@
-Implement subtask 9009: Implement Barcode Scan tab with camera scanner and RMS integration
+Implement subtask 9009: Configure Horizontal Pod Autoscalers for all services
 
 ## Objective
-Build the Scan tab with camera-based barcode detection using expo-camera, integration with RMS ScanBarcode API, equipment details display, and check-in/check-out actions with haptic feedback.
+Create HPA resources for all 6 backend services with appropriate min/max replicas and CPU target thresholds.
 
 ## Steps
-1. Install `expo-camera` and `expo-haptics`.
-2. Build `screens/scan/ScanScreen.tsx`: Full-screen camera viewfinder with barcode scanning overlay (targeting area indicator). Request camera permissions on first access.
-3. Configure barcode types to detect: Code128, QR, EAN13 (based on RMS barcode format).
-4. On barcode detected: trigger haptic feedback (`Haptics.notificationAsync(Success)`), pause scanner, call `POST /api/v1/inventory/scan` with scanned barcode value.
-5. Build `screens/scan/EquipmentDetailSheet.tsx`: Bottom sheet or modal displaying scanned equipment details (name, serial number, current status, last location, assigned event).
-6. Add action buttons in detail sheet: 'Check Out' (assign to event/user) and 'Check In' (return to inventory). Each calls respective RMS API endpoint.
-7. Handle scan errors: invalid barcode (not found in RMS) shows 'Equipment not found' state. Network error shows retry option.
-8. Add manual entry option: text input for typing barcode number if camera scan fails.
-9. Handle camera permission denied: show explanation and settings link.
+1. Create HPA for Equipment Catalog:
+   ```yaml
+   apiVersion: autoscaling/v2
+   kind: HorizontalPodAutoscaler
+   metadata:
+     name: equipment-catalog-hpa
+     namespace: sigma1
+   spec:
+     scaleTargetRef:
+       apiVersion: apps/v1
+       kind: Deployment
+       name: equipment-catalog
+     minReplicas: 2
+     maxReplicas: 5
+     metrics:
+     - type: Resource
+       resource:
+         name: cpu
+         target:
+           type: Utilization
+           averageUtilization: 70
+   ```
+2. Create HPA for RMS: min 2, max 5, target CPU 70%
+3. Create HPA for Finance: min 2, max 3, target CPU 70%
+4. Create HPA for Social Engine: min 1, max 3, target CPU 70%
+5. Create HPA for Morgan: min 1, max 2, target CPU 70% (note: Morgan is stateful with WebSocket connections, scale carefully)
+6. Create HPA for Customer Vetting: min 1, max 2, target CPU 70%
+7. Ensure all target Deployments have resource requests set (HPA requires this to calculate utilization).
+8. Apply all HPAs and verify they show `<unknown>` or actual metrics (not errors).
 
 ## Validation
-Mock expo-camera barcode detection event with a test barcode value. Verify RMS scan API is called with the correct barcode. Mock successful API response, verify equipment detail sheet renders with name, status, serial number. Verify 'Check Out' button calls check-out API. Verify haptic feedback triggered on scan. Mock 'not found' API response, verify error state renders. Manual entry test: type barcode, submit, verify same API flow.
+Verify all 6 HPAs are created: `kubectl get hpa -n sigma1` shows all with TARGETS column populated (not `<unknown>/70%` after metrics are available). Generate synthetic load on Equipment Catalog using `hey` or `k6` (50 req/sec for 2 minutes), verify pod count scales from 2 to 3+ and scales back down after load stops.

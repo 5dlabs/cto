@@ -1,7 +1,7 @@
-## Implement Morgan AI Agent (Angie - OpenClaw/MCP)
+## Deploy Morgan AI Agent with MCP Tools (Angie - OpenClaw/MCP)
 
 ### Objective
-Configure and deploy the Morgan AI agent as the central intelligence orchestrating all customer interactions via Signal, voice (ElevenLabs/Twilio), and web chat. Morgan uses MCP tools to call all backend services and implements skills for lead qualification, vetting, quoting, upselling, finance, social media, and admin workflows.
+Deploy and configure the Morgan AI agent using OpenClaw runtime with MCP tool-server connecting to all backend services. Includes Signal-CLI sidecar for messaging, ElevenLabs voice integration, Twilio phone number routing, web chat WebSocket endpoint, and all 11 MCP tools for backend service orchestration.
 
 ### Ownership
 - Agent: angie
@@ -11,69 +11,84 @@ Configure and deploy the Morgan AI agent as the central intelligence orchestrati
 - Dependencies: 2, 3, 4, 5, 6
 
 ### Implementation Details
-1. Create OpenClaw agent configuration for Morgan:
+1. Configure OpenClaw agent manifest for Morgan:
    - Agent ID: `morgan`
-   - Model: `openai-api/gpt-5.4-pro` (or latest available; fallback to gpt-4o)
-   - System prompt: Define Morgan's persona — professional, knowledgeable about lighting/visual production equipment, represents Sigma-1/Perception Events. Tone: helpful but efficient, knows when to escalate to Mike.
-   - Workspace: PVC `morgan-workspace` for conversation state and file handling.
-2. MCP Tool Server configuration — define 10 tools with REST/gRPC endpoint mappings:
-   - `sigma1_catalog_search` → GET `/api/v1/catalog/products?q={query}&category={cat}` on equipment-catalog service
-   - `sigma1_check_availability` → GET `/api/v1/catalog/products/{id}/availability?from={from}&to={to}`
-   - `sigma1_generate_quote` → POST `/api/v1/opportunities` on RMS service (via grpc-gateway REST)
-   - `sigma1_vet_customer` → POST `/api/v1/vetting/run` on vetting service
-   - `sigma1_score_lead` → POST `/api/v1/opportunities/{id}/score` (ScoreLead via RMS REST gateway)
-   - `sigma1_create_invoice` → POST `/api/v1/invoices` on finance service
-   - `sigma1_finance_report` → GET `/api/v1/finance/reports/{type}?period={period}`
-   - `sigma1_social_curate` → POST `/api/v1/social/upload` on social engine
-   - `sigma1_social_publish` → POST `/api/v1/social/drafts/{id}/approve`
-   - `sigma1_equipment_lookup` → GET `/api/v1/equipment-api/catalog` (machine-readable endpoint)
-   Each tool includes JSON Schema for parameters and expected response format.
-3. Skills configuration:
-   - `sales-qual`: Multi-turn conversation flow — identify event type, date, venue, budget, equipment needs. Use catalog_search and check_availability tools. End with quote generation or escalation.
-   - `customer-vet`: Triggered when new customer detected. Calls sigma1_vet_customer, waits for result, interprets GREEN/YELLOW/RED and adjusts behavior (RED: require deposit, escalate to Mike).
-   - `quote-gen`: Assemble line items from catalog, calculate totals, create opportunity via RMS. Send quote summary back to customer.
-   - `upsell`: After quote, suggest insurance, delivery services, additional equipment bundles based on event type.
-   - `finance`: Handle invoice queries, generate invoices from confirmed projects, report on revenue/aging.
-   - `social-media`: Receive event photos, trigger curation, send drafts to Mike for approval via Signal.
-   - `rms-*`: Project status queries, checkout/checkin coordination, crew scheduling requests.
-   - `admin`: Calendar queries (via RMS Google Calendar), email drafting, document references.
-4. Signal integration:
-   - Signal-CLI sidecar (configured in Task 1) exposes REST API at localhost:8080.
-   - Morgan listens for incoming Signal messages via Signal-CLI REST API polling or webhook.
-   - Outbound messages sent via Signal-CLI REST API `POST /v2/send`.
-   - Support: text messages, photo receiving (for social pipeline), photo sending (for quote previews).
-   - Handle group messages vs direct messages.
-5. Voice integration:
-   - ElevenLabs Conversational AI for voice synthesis/recognition.
-   - Twilio SIP trunk for PSTN connectivity.
-   - Voice calls routed: Twilio → ElevenLabs → Morgan (text) → ElevenLabs (speech) → Twilio → caller.
-   - Configure Twilio webhook to forward calls to ElevenLabs endpoint.
-6. Web chat:
-   - Morgan exposes WebSocket endpoint for real-time chat from the Next.js frontend.
-   - Protocol: JSON messages with `{type, content, metadata}` structure.
-   - Support conversation history persistence in morgan-workspace PVC.
-7. Performance:
-   - Simple queries (catalog search, availability) must respond < 10 seconds end-to-end.
-   - Implement tool call parallelization where tools are independent.
-8. Kubernetes Deployment:
-   - Namespace: `openclaw` (existing OpenClaw namespace)
-   - Signal-CLI sidecar container with resource limits (512Mi, 500m CPU), restart policy Always.
-   - Morgan agent container with workspace PVC mount.
-   - Service API keys for all backend services from `sigma1-service-api-keys` secret.
-   - ElevenLabs API key, Twilio credentials from secrets.
-   - Cloudflare Tunnel service for external Signal/voice access.
-9. Account rotation strategy for Signal-CLI (per open question #1): Configure secondary Signal number as fallback. Monitor for account ban signals (HTTP 403/rate limiting from Signal servers). Alert via Grafana if primary account becomes unavailable.
+   - Model: `openai-api/gpt-5.4-pro` (or latest available, configurable via env)
+   - System prompt defining Morgan's persona: professional, knowledgeable about lighting/visual production, Perception Events brand voice, conversational but efficient
+   - Skills configuration: sales-qual, customer-vet, quote-gen, upsell, finance, social-media, rms-*, admin
+2. Implement MCP Tool Server (HTTP-based tool definitions):
+   - `sigma1_catalog_search` — GET /api/v1/catalog/products with query params → Equipment Catalog
+   - `sigma1_check_availability` — GET /api/v1/catalog/products/:id/availability?from=&to= → Equipment Catalog
+   - `sigma1_generate_quote` — POST /api/v1/opportunities → RMS (create opportunity with line items)
+   - `sigma1_vet_customer` — POST /api/v1/vetting/run → Customer Vetting
+   - `sigma1_score_lead` — RPC ScoreLead via RMS REST gateway /api/v1/opportunities/:id (reads lead_score)
+   - `sigma1_create_invoice` — POST /api/v1/invoices → Finance
+   - `sigma1_finance_report` — GET /api/v1/finance/reports/* → Finance
+   - `sigma1_social_curate` — POST /api/v1/social/upload → Social Engine
+   - `sigma1_social_publish` — POST /api/v1/social/drafts/:id/publish → Social Engine
+   - `sigma1_equipment_lookup` — GET /api/v1/equipment-api/catalog → Equipment Catalog (machine-readable)
+   - Each tool definition includes: name, description, input JSON schema, output schema, HTTP method/URL template
+   - All tool calls include Authorization header with morgan-agent JWT service token
+3. Signal-CLI sidecar configuration:
+   - Deploy signal-cli-rest-api as sidecar container in Morgan pod
+   - Mount persistent volume for Signal-CLI data directory (device registration, keys)
+   - Configure webhook: signal-cli → Morgan agent HTTP endpoint for incoming messages
+   - Outbound: Morgan agent → signal-cli REST API for sending messages
+   - Handle message types: text, image (photo attachments from events), location
+4. ElevenLabs voice integration:
+   - Configure ElevenLabs Conversational AI agent with Morgan's voice profile
+   - WebSocket connection for real-time voice streaming
+   - Twilio SIP trunk → ElevenLabs → Morgan agent for phone call routing
+   - Voice-to-text and text-to-voice pipeline
+5. Twilio configuration:
+   - Provision phone number (or configure existing)
+   - SIP trunk pointing to ElevenLabs endpoint
+   - Fallback: Twilio webhook → Morgan text endpoint if voice unavailable
+6. Web chat WebSocket endpoint:
+   - `/ws/chat` — WebSocket endpoint for real-time web chat
+   - Session management: create session on connect, store in Valkey with 24h TTL
+   - Session continuity: accept session token from client, resume conversation
+   - Message format: JSON { type: 'user'|'agent', content: string, timestamp: ISO8601 }
+   - Streaming responses: send agent response tokens as they arrive from LLM
+7. Conversation state management:
+   - Store conversation history in Valkey (keyed by session_id/signal_sender)
+   - Context window management: keep last 50 messages + system prompt
+   - Skill routing: based on intent detection, activate appropriate skill
+8. Lead qualification workflow (sales-qual skill):
+   - Detect inquiry intent → ask qualifying questions (event type, date, budget range, venue)
+   - Check equipment availability via sigma1_check_availability
+   - Trigger vetting via sigma1_vet_customer
+   - Generate quote via sigma1_generate_quote
+   - Send summary to Mike via Signal for approval
+9. Social media approval workflow (social-media skill):
+   - When drafts are created, send preview to Mike via Signal
+   - Parse Mike's response (approve/reject) → call approve/reject endpoint
+10. Kubernetes Deployment:
+    - Namespace: `sigma1` (or `openclaw` per PRD)
+    - Pod with 2 containers: morgan (openclaw-agent), signal-cli (sidecar)
+    - PVC: morgan-workspace (10Gi) for agent workspace + signal-cli data
+    - envFrom: sigma1-infra-endpoints + sigma1-external-secrets
+    - Resource limits: morgan 1Gi memory/500m CPU, signal-cli 512Mi/250m
+11. Morgan-specific canary deployment strategy:
+    - Blue-green deployment with conversation state in Valkey (survives pod restart)
+    - Health check verifies: LLM connectivity, Signal-CLI registered, all MCP tools reachable
+    - Rollback preserves Valkey conversation state
 
 ### Subtasks
-- [ ] Configure OpenClaw agent definition for Morgan (persona, model, system prompt): Create the core OpenClaw agent configuration file defining Morgan's identity, model binding, system prompt with persona instructions, and workspace PVC reference. This is the foundational agent definition that all skills and tools attach to.
-- [ ] Configure MCP Tool Server with all 10 tool definitions and JSON Schema mappings: Define the MCP Tool Server configuration mapping all 10 backend service tools with their REST/gRPC endpoint URLs, parameter JSON Schemas, response schemas, and authentication headers. Each tool must be individually testable.
-- [ ] Implement sales-qual skill (multi-turn lead qualification conversation flow): Build the sales-qual skill that drives multi-turn conversations to qualify leads by identifying event type, date, venue, budget, and equipment needs, using catalog_search and check_availability tools, ending with quote generation or escalation.
-- [ ] Implement customer-vet skill (vetting integration with GREEN/YELLOW/RED interpretation): Build the customer-vet skill that triggers automatically for new customers, calls the vetting service, interprets the GREEN/YELLOW/RED result, and adjusts Morgan's behavior accordingly (deposit requirements, escalation to Mike).
-- [ ] Implement quote-gen and upsell skills: Build the quote-gen skill that assembles line items from catalog data, calculates totals, creates an opportunity via RMS, and sends a quote summary. Build the upsell skill that suggests additional services/equipment after quote generation.
-- [ ] Implement finance, social-media, rms, and admin skills: Build the remaining skills: finance (invoice creation, reports), social-media (photo curation pipeline with Mike approval), rms (project status, checkout/checkin, crew scheduling), and admin (calendar, email, documents).
-- [ ] Implement Signal messaging integration (inbound/outbound via Signal-CLI REST API): Build the Signal channel adapter that connects Morgan to the Signal-CLI sidecar REST API for receiving and sending messages, handling photos, and distinguishing group vs direct messages.
-- [ ] Implement voice integration pipeline (ElevenLabs Conversational AI + Twilio SIP): Configure the voice call pipeline: Twilio receives PSTN calls, forwards to ElevenLabs for speech-to-text, Morgan processes the text and generates a response, ElevenLabs synthesizes speech, and Twilio plays it back to the caller.
-- [ ] Implement web chat WebSocket endpoint with conversation persistence: Build the WebSocket endpoint that the Next.js frontend connects to for real-time chat with Morgan, including JSON message protocol and conversation history persistence on the workspace PVC.
-- [ ] Create Kubernetes deployment manifests for Morgan agent with Signal-CLI sidecar: Write the Kubernetes Deployment, Service, PVC, and related manifests to deploy Morgan in the openclaw namespace with the Signal-CLI sidecar container, workspace PVC, API key secrets, and health probes.
-- [ ] Implement Signal account rotation and health monitoring: Configure secondary Signal number as failover, implement monitoring for account ban signals (HTTP 403/rate limiting), and set up Grafana alerts for Signal-CLI health degradation.
-- [ ] Implement tool call parallelization and end-to-end performance validation: Configure MCP tool call parallelization for independent tool invocations and validate the <10 second end-to-end response time target for simple queries across all channels.
+- [ ] Configure OpenClaw agent manifest with Morgan persona and skills: Create the OpenClaw agent manifest file defining Morgan's identity, LLM model configuration, system prompt with Perception Events brand voice, and skill routing configuration for all agent capabilities (sales-qual, customer-vet, quote-gen, upsell, finance, social-media, rms, admin).
+- [ ] Implement MCP Tool Server — Equipment Catalog tools (catalog_search, check_availability, equipment_lookup): Define and implement MCP tool definitions for the three Equipment Catalog service tools: sigma1_catalog_search, sigma1_check_availability, and sigma1_equipment_lookup, including JSON input/output schemas, HTTP method/URL templates, and authorization header injection.
+- [ ] Implement MCP Tool Server — RMS tools (generate_quote, score_lead): Define and implement MCP tool definitions for the two RMS (Rental Management System) tools: sigma1_generate_quote and sigma1_score_lead, with JSON schemas and HTTP mappings.
+- [ ] Implement MCP Tool Server — Customer Vetting tool (vet_customer): Define and implement the MCP tool definition for sigma1_vet_customer, mapping to the Customer Vetting service POST endpoint.
+- [ ] Implement MCP Tool Server — Finance tools (create_invoice, finance_report): Define and implement MCP tool definitions for the two Finance service tools: sigma1_create_invoice and sigma1_finance_report.
+- [ ] Implement MCP Tool Server — Social Engine tools (social_curate, social_publish): Define and implement MCP tool definitions for the two Social Engine tools: sigma1_social_curate and sigma1_social_publish.
+- [ ] Implement MCP Tool Server HTTP client, JWT auth, and tool registry: Build the shared MCP tool server infrastructure: HTTP client wrapper with JWT injection, tool registry that loads all 11 tool definitions, error handling middleware, and request/response logging.
+- [ ] Deploy Signal-CLI sidecar container with persistent volume and webhook routing: Configure and deploy the signal-cli-rest-api as a sidecar container in the Morgan pod, including persistent volume for device registration data, inbound webhook configuration, and outbound message sending integration.
+- [ ] Implement ElevenLabs voice integration with WebSocket streaming: Configure the ElevenLabs Conversational AI agent with Morgan's voice profile and implement the WebSocket-based real-time voice streaming pipeline for phone call interactions.
+- [ ] Configure Twilio SIP trunk and phone number routing to ElevenLabs: Set up Twilio phone number provisioning, SIP trunk configuration pointing to ElevenLabs voice endpoint, and fallback webhook routing to Morgan's text endpoint.
+- [ ] Implement web chat WebSocket endpoint with session management and streaming responses: Build the /ws/chat WebSocket endpoint for real-time web chat, including Valkey-backed session management with 24h TTL, session continuity via tokens, and streaming LLM response tokens to the client.
+- [ ] Implement conversation state management and context window handling in Valkey: Build the shared conversation state management layer that stores conversation history in Valkey across all channels (Signal, web chat, voice), manages the 50-message context window, and provides skill routing based on intent detection.
+- [ ] Implement lead qualification workflow (sales-qual skill): Build the sales-qual skill workflow: detect inquiry intent, guide the customer through qualifying questions (event type, date, budget, venue), check equipment availability, trigger customer vetting, generate a quote, and send approval summary to Mike via Signal.
+- [ ] Implement social media approval workflow (social-media skill): Build the social-media skill workflow: when social media drafts are created, send previews to Mike via Signal, parse Mike's approve/reject responses, and call the corresponding Social Engine endpoints.
+- [ ] Create Kubernetes deployment manifest for Morgan multi-container pod: Write the Kubernetes Deployment, PVC, Service, and ConfigMap manifests for the Morgan agent pod with OpenClaw agent container and Signal-CLI sidecar, including resource limits, environment variable injection from sigma1-infra-endpoints and sigma1-external-secrets.
+- [ ] Implement health check endpoint with LLM, Signal-CLI, and MCP tool connectivity verification: Build the /health/ready and /health/live endpoints that verify connectivity to the LLM endpoint, Signal-CLI sidecar registration status, and reachability of critical MCP tools.
+- [ ] Implement blue-green deployment strategy with Valkey-persisted conversation state: Configure the Morgan agent deployment for blue-green rollouts where conversation state in Valkey survives pod restarts and version transitions, ensuring zero conversation loss during deployments.

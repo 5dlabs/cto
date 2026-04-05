@@ -1,24 +1,18 @@
-Implement subtask 2013: Create multi-stage Dockerfile for catalog service
+Implement subtask 2013: Create multi-stage Dockerfile and Kubernetes deployment manifest
 
 ## Objective
-Write a multi-stage Dockerfile using rust:1.75 as builder and gcr.io/distroless/cc as runtime, producing a minimal production image for the catalog service.
+Build the multi-stage Dockerfile using rust:1.75-slim builder and distroless runtime, plus the Kubernetes Deployment, Service, and related manifests for the equipment-catalog service.
 
 ## Steps
-1. Create `services/rust/Dockerfile.catalog`:
-   - Stage 1 (builder): `FROM rust:1.75-bookworm AS builder`
-     - Install system dependencies needed for compilation (libssl-dev, pkg-config).
-     - Copy `Cargo.toml`, `Cargo.lock`, and all workspace member `Cargo.toml` files first for dependency caching.
-     - Run `cargo build --release --bin catalog -p catalog` to build dependencies layer.
-     - Copy source code and rebuild.
-   - Stage 2 (runtime): `FROM gcr.io/distroless/cc-debian12`
-     - Copy the compiled binary from builder.
-     - Copy SQLx migrations directory.
-     - Set `EXPOSE 8080`.
-     - Set entrypoint to the binary.
-2. Add `.dockerignore` excluding `target/`, `.git/`, etc.
-3. Optimize for layer caching: separate dependency and source copy steps.
-4. Ensure the binary is statically linked or the distroless image has required shared libs.
-5. Target final image size < 50MB.
+1. Dockerfile at `services/equipment-catalog/Dockerfile`:
+   - Stage 1 (builder): FROM rust:1.75-slim AS builder. Install required system deps (libssl-dev, pkg-config). Copy full workspace (Cargo.toml, Cargo.lock, crates/*, services/equipment-catalog/). Run `cargo build --release --bin equipment-catalog`. Use cargo-chef pattern for layer caching if practical.
+   - Stage 2 (runtime): FROM gcr.io/distroless/cc-debian12. COPY --from=builder the compiled binary. COPY migrations directory. EXPOSE 8080. ENTRYPOINT ["./equipment-catalog"].
+2. Kubernetes manifests in `services/equipment-catalog/k8s/`:
+   - `deployment.yaml`: namespace sigma1, 2 replicas, container image placeholder, envFrom configMapRef sigma1-infra-endpoints, resource requests (128Mi/125m), limits (256Mi/250m), livenessProbe httpGet /health/live port 8080 (initialDelaySeconds 5, periodSeconds 10), readinessProbe httpGet /health/ready port 8080 (initialDelaySeconds 10, periodSeconds 5).
+   - `service.yaml`: ClusterIP service on port 80 targeting container port 8080.
+   - Labels: app=equipment-catalog, part-of=sigma1.
+3. Add `.dockerignore` to exclude target/, .git/, etc.
+4. Verify the Dockerfile builds successfully with `docker build`.
 
 ## Validation
-Run `docker build -f Dockerfile.catalog -t catalog:test .` and verify it completes successfully. Verify image size < 50MB with `docker images`. Run `docker run --rm -e POSTGRES_URL=... catalog:test` and verify it starts and responds to /health/live. Verify /health/ready fails gracefully without DB (expected 503).
+Build the Docker image locally and verify it starts (with mock env vars). Verify the image size is reasonable (<100MB for distroless). Validate Kubernetes manifests with `kubectl apply --dry-run=client`. Verify liveness and readiness probe paths match the implemented health endpoints. Verify envFrom references sigma1-infra-endpoints ConfigMap.

@@ -1,16 +1,24 @@
-Implement subtask 9008: Integrate push notifications for Morgan chat via Expo Notifications
+Implement subtask 9008: Implement Cilium egress network policies for external API access
 
 ## Objective
-Set up Expo Notifications to receive push notifications for incoming Morgan messages when the app is backgrounded, including permission handling and notification tap navigation.
+Create CiliumNetworkPolicy egress rules to allow sigma1 services to reach external APIs (Stripe, OpenCorporates, etc.) while denying other outbound traffic.
 
 ## Steps
-1. Install `expo-notifications` and `expo-device`.
-2. Create `lib/notifications/setup.ts`: request notification permissions on first launch (iOS requires explicit prompt). Store Expo push token and register it with the backend API.
-3. Configure notification handler: when app is in foreground, show in-app notification banner (not system notification). When app is backgrounded, system notification appears.
-4. Implement notification tap handler: tapping a Morgan message notification deep-links to the Chat tab and scrolls to the relevant message.
-5. Configure `app.json` / `app.config.ts` with notification settings: icon, color, sound for Android; category for iOS.
-6. Create `lib/notifications/tokenRefresh.ts`: handle push token refresh and re-register with backend.
-7. Handle permission denied gracefully: show settings prompt if user previously denied.
+1. Identify all external API endpoints that services need to reach:
+   - Stripe API: `api.stripe.com` (finance service)
+   - OpenCorporates API: `api.opencorporates.com` (customer-vetting service)
+   - Cloudflare R2 endpoint: `<account-id>.r2.cloudflarestorage.com` (equipment-catalog, social-engine)
+   - Any AI/LLM API endpoints (Morgan)
+2. Create egress CiliumNetworkPolicy:
+   - Default deny egress (except DNS on port 53 to kube-dns)
+   - Allow finance → `api.stripe.com:443`
+   - Allow customer-vetting → `api.opencorporates.com:443`
+   - Allow relevant services → R2 endpoint on port 443
+   - Allow Morgan → AI API endpoint on port 443
+   - Use `toFQDNs` selector for domain-based egress rules
+3. Ensure DNS egress is allowed for all pods:
+   - Allow egress to `kube-dns.kube-system` on port 53 (UDP and TCP)
+4. Apply policies and verify services can still reach their required external APIs.
 
 ## Validation
-Mock Expo Notifications module. Verify push token is obtained and sent to backend API on first launch. Verify foreground notification renders in-app banner. Verify notification tap handler navigates to Chat tab. Verify permission denied state shows appropriate UI prompt.
+Exec into finance pod, `curl -s -o /dev/null -w '%{http_code}' https://api.stripe.com` — verify 200 or 401 (reachable). Exec into finance pod, `curl -s --connect-timeout 5 https://example.com` — verify timeout (egress denied). Exec into customer-vetting pod, verify OpenCorporates API is reachable. Verify DNS resolution still works from all pods.

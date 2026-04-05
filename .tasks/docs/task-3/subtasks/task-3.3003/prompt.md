@@ -1,22 +1,20 @@
-Implement subtask 3003: Define inventory.proto, crew.proto, and delivery.proto with grpc-gateway annotations
+Implement subtask 3003: Define InventoryService, CrewService, and DeliveryService protobuf schemas with grpc-gateway annotations
 
 ## Objective
-Create protobuf definitions for the Inventory, Crew, and Delivery gRPC services with full REST gateway annotations.
+Author `inventory.proto`, `crew.proto`, and `delivery.proto` in `proto/sigma1/rms/v1/` with all RPCs, messages, and REST annotations.
 
 ## Steps
-1. Create `proto/rms/v1/inventory.proto`:
-   - Service `InventoryService` with RPCs: `GetStockLevel`, `RecordTransaction`, `ScanBarcode`, `ListInventoryItems`.
-   - Messages: `InventoryItem` (id, org_id, name, barcode, category, current_location, status enum [AVAILABLE, CHECKED_OUT, MAINTENANCE, RETIRED], quantity_total, quantity_available), `InventoryTransaction` (id, item_id, project_id, type enum [CHECK_OUT, CHECK_IN, TRANSFER, ADJUSTMENT], quantity, timestamp), `ScanBarcodeResponse` (item with current location and status).
-   - grpc-gateway: `GET /api/v1/inventory/{id}/stock`, `POST /api/v1/inventory/transactions`, `POST /api/v1/inventory/scan`, `GET /api/v1/inventory`.
-2. Create `proto/rms/v1/crew.proto`:
-   - Service `CrewService` with RPCs: `ListCrew`, `AssignCrew`, `ScheduleCrew`, `GetCrewAvailability`.
-   - Messages: `CrewMember` (id, org_id, name, email, role, skills), `CrewAssignment` (id, crew_member_id, project_id, date_start, date_end, role), `AvailabilitySlot`.
-   - grpc-gateway: `GET /api/v1/crew`, `POST /api/v1/crew/assign`, `POST /api/v1/crew/schedule`, `GET /api/v1/crew/{id}/availability`.
-3. Create `proto/rms/v1/delivery.proto`:
-   - Service `DeliveryService` with RPCs: `ScheduleDelivery`, `UpdateDeliveryStatus`, `OptimizeRoute`, `ListDeliveries`.
-   - Messages: `Delivery` (id, org_id, project_id, type enum [DELIVERY, PICKUP], address, scheduled_at, status enum [SCHEDULED, IN_TRANSIT, DELIVERED, CANCELLED]), `DeliveryRoute` (id, delivery_ids, optimized_order, estimated_duration).
-   - grpc-gateway: `POST /api/v1/deliveries`, `PUT /api/v1/deliveries/{id}/status`, `POST /api/v1/deliveries/optimize-route`, `GET /api/v1/deliveries`.
-4. Run `buf generate` and verify all stubs compile.
+1. Create `inventory.proto`:
+   - Messages: StockLevel (inventory_item_id, available, reserved, total), GetStockLevelRequest, GetStockLevelResponse, RecordTransactionRequest (inventory_item_id, type enum CHECKOUT/CHECKIN/TRANSFER, project_id optional, from_store_id, to_store_id, user_id), RecordTransactionResponse, ScanBarcodeRequest (barcode string), ScanBarcodeResponse (resolved inventory_item_id, item details)
+   - RPCs: GetStockLevel (GET /api/v1/inventory/{inventory_item_id}/stock), RecordTransaction (POST /api/v1/inventory/transactions), ScanBarcode (POST /api/v1/inventory/scan)
+2. Create `crew.proto`:
+   - Messages: CrewMember (all DB fields), CrewAssignment (all DB fields), ListCrewRequest (pagination), ListCrewResponse, AssignCrewRequest (project_id, crew_member_id, role, start_time, end_time), AssignCrewResponse, ScheduleCrewRequest (project_id, list of assignments), ScheduleCrewResponse
+   - RPCs: ListCrew (GET /api/v1/crew), AssignCrew (POST /api/v1/crew/assign), ScheduleCrew (POST /api/v1/crew/schedule)
+3. Create `delivery.proto`:
+   - Enums: DeliveryStatus (SCHEDULED, IN_TRANSIT, DELIVERED, CANCELLED)
+   - Messages: Delivery (all DB fields), ScheduleDeliveryRequest, ScheduleDeliveryResponse, UpdateDeliveryStatusRequest, UpdateDeliveryStatusResponse, OptimizeRouteRequest (list of delivery_ids), OptimizeRouteResponse (v1: returns deliveries in original order with a note that optimization is not yet implemented)
+   - RPCs: ScheduleDelivery (POST /api/v1/deliveries), UpdateDeliveryStatus (PATCH /api/v1/deliveries/{id}/status), OptimizeRoute (POST /api/v1/deliveries/optimize)
+4. Run `buf lint` and `buf generate`. Verify all Go code compiles.
 
 ## Validation
-Run `buf lint` with zero errors on all three proto files. Run `buf generate` and verify all Go service interfaces and message types are generated. Confirm grpc-gateway annotations produce correct HTTP paths.
+Run `buf lint` with zero errors across all three proto files. Run `buf generate` and verify all generated Go files compile. Confirm each proto has correct google.api.http annotations by inspecting generated gateway files.

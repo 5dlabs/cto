@@ -1,13 +1,15 @@
-Implement subtask 1001: Create sigma1 and sigma1-db namespaces with labels
+Implement subtask 1001: Create sigma1 Kubernetes namespace
 
 ## Objective
-Create the `sigma1` application namespace and the `sigma1-db` database namespace (or reuse `databases` per cluster convention). Apply standard labels including `app.kubernetes.io/part-of: sigma1` for observability selector matching.
+Create the sigma1 namespace with appropriate labels for network policy selection, monitoring, and resource quota boundaries.
 
 ## Steps
-1. Create namespace manifest for `sigma1` with labels: `app.kubernetes.io/part-of: sigma1`, `purpose: application`.
-2. Create namespace manifest for `sigma1-db` with labels: `app.kubernetes.io/part-of: sigma1`, `purpose: database`.
-3. Apply both namespace YAMLs via `kubectl apply`.
-4. Verify namespaces exist and labels are correctly applied.
+1. Create a namespace manifest `sigma1-namespace.yaml` with:
+   - `metadata.name: sigma1`
+   - Labels: `app.kubernetes.io/part-of: sigma1`, `monitoring: enabled`, `networking: sigma1`
+2. Apply the manifest via `kubectl apply -f sigma1-namespace.yaml`.
+3. Verify the namespace exists and is in Active phase.
+4. This is the prerequisite for every other subtask in this parent task.
 
 ## Validation
-`kubectl get ns sigma1 -o jsonpath='{.metadata.labels}'` returns expected labels. Same for `sigma1-db`. Both namespaces are in Active phase.
+`kubectl get namespace sigma1 -o jsonpath='{.status.phase}'` returns `Active`. Labels `app.kubernetes.io/part-of=sigma1` and `monitoring=enabled` are present.

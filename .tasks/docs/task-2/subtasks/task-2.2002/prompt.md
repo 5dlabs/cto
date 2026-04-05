@@ -1,17 +1,15 @@
-Implement subtask 2002: Implement shared health check handlers (liveness and readiness)
+Implement subtask 2002: Implement shared-db crate with sqlx connection pool and health checks
 
 ## Objective
-Add health check route handlers to the shared crate: GET /health/live returns 200 unconditionally, GET /health/ready checks PostgreSQL and Valkey connectivity and returns 200 or 503.
+Build the shared-db crate providing PostgreSQL connection pool initialization via sqlx, migration runner helper, and database health check function, reading connection details from environment variables (sourced from sigma1-infra-endpoints ConfigMap).
 
 ## Steps
-1. In `shared/src/health.rs`, implement `pub async fn liveness() -> impl IntoResponse` returning `StatusCode::OK` with `{"status": "ok"}`.
-2. Implement `pub async fn readiness(State(pool): State<PgPool>, State(valkey): State<ValkeyCon>) -> impl IntoResponse` that:
-   - Executes `SELECT 1` on PgPool
-   - Executes `PING` on Valkey connection
-   - Returns 200 if both succeed, 503 with `{"status": "degraded", "checks": {"db": "ok/fail", "valkey": "ok/fail"}}` if either fails.
-3. Add `redis-rs` (with `tokio-comp` feature) to shared dependencies for Valkey connectivity.
-4. Implement `shared::valkey` module: `pub async fn create_valkey_client() -> Result<Client>` reading `VALKEY_URL` from env.
-5. Export a `pub fn health_routes() -> Router` that mounts both handlers.
+1. Create `crates/shared-db/Cargo.toml` depending on sqlx (from workspace), shared-error, tracing.
+2. Implement `pub async fn create_pool(database_url: &str) -> Result<PgPool>` — creates an sqlx PgPool with configurable max_connections (env var, default 10), min_connections (2), acquire_timeout (3s), idle_timeout (300s).
+3. Implement `pub async fn run_migrations(pool: &PgPool) -> Result<()>` — wraps `sqlx::migrate!()` macro call.
+4. Implement `pub async fn check_health(pool: &PgPool) -> bool` — executes `SELECT 1` with a 2-second timeout, returns true/false.
+5. Create a `DatabaseConfig` struct that reads `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` from env and constructs the connection URL. These come from the infra-endpoints ConfigMap via `envFrom`.
+6. Re-export PgPool from sqlx for convenience.
 
 ## Validation
-Unit test liveness always returns 200. Integration test with real Postgres and Valkey: readiness returns 200. Test readiness returns 503 with degraded status when Valkey is unavailable (use invalid URL).
+Unit test: DatabaseConfig correctly builds connection URL from env vars. Integration test (requires running PostgreSQL): create_pool connects, run_migrations succeeds, check_health returns true. Test check_health returns false when given an invalid pool/connection.

@@ -1,21 +1,27 @@
-Implement subtask 4004: Implement invoice status state machine
+Implement subtask 4004: Implement invoice status state machine and send endpoint
 
 ## Objective
-Build the invoice status state machine enforcing valid transitions (draft→sent→viewed→paid, draft→sent→overdue, any→cancelled) with rejection of invalid transitions.
+Build the invoice status state machine (draft→sent→viewed→paid→overdue→cancelled) with validation, and implement the POST /api/v1/invoices/:id/send endpoint that marks an invoice as sent.
 
 ## Steps
-1. Create `services/rust/finance/src/models/invoice_status.rs`.
-2. Define `InvoiceStatus` enum matching the DB enum: Draft, Sent, Viewed, Paid, Overdue, Cancelled.
-3. Implement `InvoiceStatus::can_transition_to(&self, target: &InvoiceStatus) -> bool` with allowed transitions:
-   - Draft → Sent, Cancelled
-   - Sent → Viewed, Paid, Overdue, Cancelled
-   - Viewed → Paid, Overdue, Cancelled
-   - Overdue → Paid, Cancelled
-   - Paid → (none, terminal state)
-   - Cancelled → (none, terminal state)
-4. Implement `InvoiceStatus::transition(&self, target: InvoiceStatus) -> Result<InvoiceStatus, FinanceError>` that returns the new status or an error with details about the invalid transition.
-5. Derive `sqlx::Type`, `Serialize`, `Deserialize`, `utoipa::ToSchema` for the enum.
-6. Write comprehensive unit tests for every valid transition and every invalid transition (e.g., Paid→Draft should fail, Cancelled→Sent should fail).
+1. Create `src/services/invoice_state.rs` with an InvoiceStateMachine that defines valid transitions:
+   - draft → sent, cancelled
+   - sent → viewed, paid, overdue, cancelled
+   - viewed → paid, overdue, cancelled
+   - overdue → paid, cancelled
+   - paid → (terminal, no transitions)
+   - cancelled → (terminal, no transitions)
+2. Implement `fn transition(current: InvoiceStatus, target: InvoiceStatus) -> Result<InvoiceStatus, InvalidTransition>` that validates and returns the new status or an error.
+3. Add DB function `update_invoice_status(pool, id, new_status)` that updates status and updated_at, returning the updated invoice. Use a CTE or WHERE clause to ensure the current status allows the transition (optimistic concurrency).
+4. Implement `POST /api/v1/invoices/:id/send` handler:
+   - Fetch invoice, validate current status is 'draft'.
+   - Transition to 'sent', set issued_at = now().
+   - Return 200 with updated invoice.
+   - (Stripe integration for this endpoint will be added in subtask 4006.)
+5. Implement `POST /api/v1/invoices/:id/cancel` handler:
+   - Validate invoice is in a cancellable state.
+   - Transition to 'cancelled'.
+6. Add guards to prevent modification of non-draft invoices (e.g., adding line items to a sent invoice should be rejected).
 
 ## Validation
-Unit tests covering all valid transitions (Draft→Sent, Sent→Viewed, Sent→Paid, Sent→Overdue, Viewed→Paid, Viewed→Overdue, Overdue→Paid, any non-terminal→Cancelled). Unit tests verifying rejection of all invalid transitions (Paid→anything, Cancelled→anything, Draft→Paid, Draft→Overdue, Draft→Viewed). Verify error messages include current and target states.
+Unit test: state machine allows all valid transitions and rejects invalid ones (e.g., paid→draft returns error). Integration test: create invoice (draft) → send → verify status is 'sent' and issued_at is set. Integration test: attempt to send an already-sent invoice returns 400/409. Integration test: cancel a draft invoice succeeds; cancel a paid invoice returns error.

@@ -1,16 +1,15 @@
-Implement subtask 2003: Implement shared Prometheus metrics middleware
+Implement subtask 2003: Implement shared-observability crate with Prometheus metrics and structured logging
 
 ## Objective
-Add request metrics middleware to the shared crate using the metrics and metrics-exporter-prometheus crates, exposed at GET /metrics.
+Build the shared-observability crate providing Prometheus metrics integration for Axum via axum-prometheus and structured JSON logging via tracing + tracing-subscriber.
 
 ## Steps
-1. Add `metrics 0.22`, `metrics-exporter-prometheus 0.13` to shared Cargo.toml.
-2. In `shared/src/metrics.rs`, implement setup function `pub fn init_metrics() -> PrometheusHandle` that installs the Prometheus recorder.
-3. Create an Axum middleware layer `pub fn metrics_layer() -> impl Layer` that records:
-   - `http_requests_total` counter with labels: method, path, status_code
-   - `http_request_duration_seconds` histogram with labels: method, path
-4. Implement `pub async fn metrics_handler(State(handle): State<PrometheusHandle>) -> impl IntoResponse` that renders Prometheus text format.
-5. Export convenience function `pub fn metrics_route(handle: PrometheusHandle) -> Router` mounting at `GET /metrics`.
+1. Create `crates/shared-observability/Cargo.toml` depending on axum-prometheus, tracing, tracing-subscriber (features: json, env-filter), metrics, metrics-exporter-prometheus.
+2. Implement `pub fn init_logging()` — initializes tracing-subscriber with JSON formatter, env-filter reading `RUST_LOG` (default `info`), timestamp in RFC3339.
+3. Implement `pub fn metrics_layer() -> axum_prometheus::PrometheusMetricLayer` — returns the Axum layer that auto-instruments all routes with request_duration_seconds, request_count, etc.
+4. Implement `pub fn metrics_handler() -> impl IntoResponse` — returns the `/metrics` Prometheus text exposition endpoint.
+5. Export a `setup_metrics_route(router: Router) -> Router` helper that adds `GET /metrics` to any Axum router.
+6. Add tracing::instrument re-export for convenient use in services.
 
 ## Validation
-Unit test that metrics_layer records counter increments. Integration test: send a request through a test Axum app with metrics middleware, then GET /metrics and verify http_requests_total and http_request_duration_seconds appear in the response body with expected labels.
+Unit test: init_logging() does not panic, metrics_layer() returns a valid layer. Integration test: create a minimal Axum app with the metrics layer, make a request, then GET /metrics and verify it contains `http_requests_total` or equivalent counter. Verify structured log output contains JSON with timestamp, level, message fields.

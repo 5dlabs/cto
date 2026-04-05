@@ -1,15 +1,24 @@
-Implement subtask 7001: Configure OpenClaw agent definition for Morgan (persona, model, system prompt)
+Implement subtask 7001: Configure OpenClaw agent manifest with Morgan persona and skills
 
 ## Objective
-Create the core OpenClaw agent configuration file defining Morgan's identity, model binding, system prompt with persona instructions, and workspace PVC reference. This is the foundational agent definition that all skills and tools attach to.
+Create the OpenClaw agent manifest file defining Morgan's identity, LLM model configuration, system prompt with Perception Events brand voice, and skill routing configuration for all agent capabilities (sales-qual, customer-vet, quote-gen, upsell, finance, social-media, rms, admin).
 
 ## Steps
-1. Create OpenClaw agent config (YAML or JSON per OpenClaw schema) with agent ID `morgan`.
-2. Set model to `openai-api/gpt-5.4-pro` with explicit fallback to `gpt-4o` if primary is unavailable.
-3. Write the system prompt defining Morgan's persona: professional tone, knowledgeable about lighting/visual production equipment (LED walls, moving heads, hazers, trusses, etc.), represents Sigma-1/Perception Events. Include instructions for when to escalate to Mike (RED vetting, budget >$50k, custom fabrication requests).
-4. Configure the `morgan-workspace` PVC reference for conversation state and file handling.
-5. Set temperature, max_tokens, and other inference parameters appropriate for a business assistant (low temperature ~0.3 for consistency).
-6. Validate the agent config loads successfully in OpenClaw without tools or skills attached.
+1. Create the OpenClaw agent manifest file (e.g., `morgan-agent.yaml` or `agent.json` depending on OpenClaw format).
+2. Set Agent ID to `morgan`.
+3. Configure model endpoint: `openai-api/gpt-5.4-pro` via environment variable `MORGAN_LLM_MODEL` so it's easily swappable.
+4. Write the system prompt:
+   - Professional tone, knowledgeable about lighting, visual production, AV equipment
+   - Perception Events brand voice: conversational but efficient, not overly formal
+   - Include instructions for skill activation triggers (e.g., 'when user asks about equipment availability, use the sales-qual skill')
+   - Include guardrails: don't discuss competitors, don't make promises about pricing without generating a quote, escalate to Mike for custom requests
+5. Define skills configuration array mapping skill names to their tool sets:
+   - `sales-qual`: catalog_search, check_availability, vet_customer, generate_quote, score_lead
+   - `finance`: create_invoice, finance_report
+   - `social-media`: social_curate, social_publish
+   - `admin`: equipment_lookup
+6. Configure LLM parameters: temperature (0.7 for conversational), max_tokens, and any stop sequences.
+7. Set up environment variable references for API keys (OPENAI_API_KEY) and endpoint URLs from sigma1-infra-endpoints ConfigMap.
 
 ## Validation
-Verify the agent config is accepted by OpenClaw without validation errors. Send a simple test prompt and confirm Morgan responds with the correct persona tone and identifies itself appropriately. Confirm workspace PVC is mounted and writable.
+Validate manifest parses without errors using OpenClaw CLI or schema validator. Verify environment variable placeholders resolve correctly. Send a test prompt to the configured LLM endpoint and confirm a coherent response with Morgan's persona characteristics.

@@ -1,39 +1,24 @@
-Implement subtask 6004: Implement draft management REST endpoints with Effect Schema validation
+Implement subtask 6004: Implement upload endpoint and draft listing/detail endpoints
 
 ## Objective
-Build the draft listing, detail, approve, reject, and publish endpoints. Also implement the published posts listing endpoint. All endpoints use Effect Schema for request/response validation.
+Build the Elysia routes for multipart image upload (POST /api/v1/social/upload), draft listing with pagination and status filter (GET /api/v1/social/drafts), and draft detail (GET /api/v1/social/drafts/:id). Integrate R2 for file storage and database for record persistence.
 
 ## Steps
-1. Create `src/routes/drafts.ts` with Elysia route group.
-2. `GET /api/v1/social/drafts`:
-   - Query params: `status` (optional, one of draft/approved/rejected/published/failed), `page` (int, default 1), `limit` (int, default 20, max 100).
-   - Effect Schema validation on query params.
-   - SQL query with optional WHERE status filter, ORDER BY created_at DESC, LIMIT/OFFSET pagination.
-   - Return { drafts: [...], total: number, page, limit }.
-3. `GET /api/v1/social/drafts/:id`:
-   - Fetch draft by UUID with joined photo data (via upload_id → photos).
-   - Return draft with nested photos array including r2_key → CDN URL via R2Service.getPublicUrl.
-   - 404 if not found.
-4. `POST /api/v1/social/drafts/:id/approve`:
-   - Body: { approved_by: string }.
-   - Validate draft exists and status is 'draft'. Return 409 if already approved/rejected/published.
-   - Update status to 'approved', set approved_by, approved_at.
-   - Return updated draft.
-   - Note: NATS publish will be wired in subtask 6008.
-5. `POST /api/v1/social/drafts/:id/reject`:
-   - Body: { rejected_by: string, reason?: string }.
-   - Validate draft exists and status is 'draft'. Return 409 if not in draft status.
-   - Update status to 'rejected'.
-   - Return updated draft.
-6. `POST /api/v1/social/drafts/:id/publish`:
-   - Manual publish trigger. Validate draft status is 'approved'.
-   - Return 202 accepted (actual publishing handled asynchronously via NATS, wired in 6008).
-7. `GET /api/v1/social/published`:
-   - Query params: platform (optional), page, limit.
-   - Join published_posts with drafts for context.
-   - Return { posts: [...], total, page, limit }.
-8. Create Effect Schema definitions in `src/schemas/social.ts` for all request/response types.
-9. Use Elysia's `.onError` hook for standardized error responses with proper HTTP status codes.
+1. Create `src/routes/social.ts` as an Elysia plugin/group under `/api/v1/social`.
+2. `POST /api/v1/social/upload`:
+   - Accept multipart/form-data with multiple image files and optional `event_id`.
+   - For each file: validate it's an image (MIME check), generate a UUID-based R2 key, upload via R2StorageService, create an `uploads` row with original_url = R2 key, metadata (extract dimensions if possible).
+   - Return 201 with array of created upload records.
+   - After response, trigger the AI curation pipeline asynchronously (emit an event or call a pipeline function — wire actual AI logic in subtask 6005/6006/6007).
+3. `GET /api/v1/social/drafts`:
+   - Query params: `status` (optional filter), `page` (default 1), `limit` (default 20).
+   - Query drafts table with optional status filter, ORDER BY created_at DESC, LIMIT/OFFSET pagination.
+   - Return paginated response: `{ data: Draft[], total: number, page: number, limit: number }`.
+4. `GET /api/v1/social/drafts/:id`:
+   - Fetch draft by UUID, include presigned URLs for each upload_id image and each platform crop.
+   - Return 404 if not found.
+5. Define Effect Schema validators for request bodies and query params.
+6. Use Effect.gen for route handler composition, providing all required service layers.
 
 ## Validation
-Test each endpoint: (1) GET /drafts with status filter returns only matching drafts. (2) GET /drafts/:id returns 404 for nonexistent UUID, 200 with photos for valid draft. (3) POST /approve on draft status returns 200 with updated status, POST /approve on already-approved returns 409. (4) POST /reject with reason stores reason. (5) POST /publish on non-approved draft returns 409. (6) GET /published with platform filter. (7) Schema validation: send malformed body to POST /approve, verify 422 response.
+Integration test: POST /api/v1/social/upload with 3 test images → verify 201 response with 3 upload records, each having a valid R2 key. GET /api/v1/social/drafts returns paginated list. GET /api/v1/social/drafts/:id returns draft with image URLs. POST with invalid MIME type returns 422. GET non-existent draft ID returns 404.

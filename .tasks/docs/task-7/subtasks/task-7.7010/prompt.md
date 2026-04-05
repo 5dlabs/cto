@@ -1,32 +1,28 @@
-Implement subtask 7010: Create Kubernetes deployment manifests for Morgan agent with Signal-CLI sidecar
+Implement subtask 7010: Configure Twilio SIP trunk and phone number routing to ElevenLabs
 
 ## Objective
-Write the Kubernetes Deployment, Service, PVC, and related manifests to deploy Morgan in the openclaw namespace with the Signal-CLI sidecar container, workspace PVC, API key secrets, and health probes.
+Set up Twilio phone number provisioning, SIP trunk configuration pointing to ElevenLabs voice endpoint, and fallback webhook routing to Morgan's text endpoint.
 
 ## Steps
-1. Deployment manifest:
-   a. Namespace: `openclaw`
-   b. Main container: Morgan agent image with workspace PVC mounted at `/data/workspace`.
-   c. Sidecar container: Signal-CLI REST API image, resource limits 512Mi memory / 500m CPU, restartPolicy Always.
-   d. Signal-CLI sidecar exposes port 8080 (localhost only, no Service exposure).
-   e. Morgan agent exposes port 8081 for WebSocket chat and port 8082 for voice adapter HTTP endpoint.
-2. PVC:
-   a. `morgan-workspace` PVC: 10Gi, ReadWriteOnce, mounted in Morgan container.
-   b. Signal-CLI data PVC: for Signal-CLI state/keys persistence across restarts.
-3. Secrets:
-   a. Mount `sigma1-service-api-keys` secret as environment variables for backend service authentication.
-   b. Mount ElevenLabs API key secret.
-   c. Mount Twilio credentials secret (account SID, auth token, phone number).
-   d. Mount Signal-CLI registration credentials.
-4. Services:
-   a. ClusterIP Service exposing Morgan's WebSocket port (8081) for frontend access.
-   b. ClusterIP Service exposing voice adapter port (8082) for ElevenLabs callbacks.
-5. Health probes:
-   a. Liveness probe on Morgan agent: HTTP GET /healthz on port 8081.
-   b. Readiness probe: HTTP GET /readyz (checks MCP tool server connectivity).
-   c. Liveness probe on Signal-CLI sidecar: HTTP GET /v1/about on port 8080.
-6. Resource limits: Morgan agent 1Gi memory / 1 CPU (adjust based on model inference location — if inference is remote API, lower limits suffice).
-7. Cloudflare Tunnel annotation or sidecar for external access to voice/Signal endpoints.
+1. Configure Twilio phone number:
+   - Use existing Perception Events business number or provision new one via Twilio API/console
+   - Store phone number SID and auth token as Kubernetes secrets
+2. Configure Twilio SIP trunk:
+   - Create SIP trunk in Twilio console/API
+   - Set origination URI to ElevenLabs SIP endpoint (provided by ElevenLabs Conversational AI setup)
+   - Configure codec preferences: PCMU, PCMA, opus
+   - Set authentication credentials for SIP trunk
+3. Configure call routing:
+   - Incoming calls to Twilio number → SIP trunk → ElevenLabs → Morgan voice pipeline
+   - Set TwiML fallback: if ElevenLabs is unavailable, redirect to Twilio webhook → Morgan text endpoint
+4. Implement Twilio webhook fallback endpoint in Morgan:
+   - `/api/twilio/fallback` — receives Twilio webhook on voice failure
+   - Responds with TwiML: play a message ('Our voice system is temporarily unavailable, please send us a text message at this number')
+   - Or: forward to SMS-based conversation
+5. Configure Twilio SMS webhook:
+   - Incoming SMS → POST to Morgan's `/api/twilio/sms` endpoint
+   - Morgan responds via Twilio SMS API
+6. Store all Twilio credentials (Account SID, Auth Token, Phone Number SID) in sigma1-external-secrets.
 
 ## Validation
-Apply manifests to openclaw namespace, verify pod starts with both containers running. Verify PVCs are bound and writable. Verify secrets are mounted as environment variables. Verify liveness probes pass for both containers. Verify ClusterIP services route traffic correctly to Morgan's ports.
+Verify Twilio phone number is configured with correct SIP trunk. Make a test call and verify it routes through to ElevenLabs (or logs the attempt). Test fallback: disable ElevenLabs endpoint and verify Twilio falls back to webhook. Send test SMS and verify Morgan receives it via /api/twilio/sms webhook.

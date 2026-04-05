@@ -1,22 +1,20 @@
-Implement subtask 9011: Configure EAS Build profiles, app branding, and production build pipeline
+Implement subtask 9011: Update sigma1-infra-endpoints ConfigMap with production hostnames
 
 ## Objective
-Set up EAS Build with development, preview, and production profiles. Configure app icons, splash screen, and branding assets. Verify builds for both iOS and Android platforms.
+Update the sigma1-infra-endpoints ConfigMap to reflect production hostnames, CDN URLs, and any changed connection strings for production topology.
 
 ## Steps
-1. Install EAS CLI: `npm install -g eas-cli`. Run `eas init` to link project.
-2. Create `eas.json` with three build profiles:
-   - `development`: development client build with expo-dev-client, internal distribution.
-   - `preview`: production-like build for testing, internal distribution (Ad Hoc for iOS, APK for Android).
-   - `production`: store-ready build with proper signing.
-3. Configure iOS provisioning: set up App Store Connect API key or Apple Developer credentials in EAS.
-4. Configure Android keystore: generate upload keystore, store in EAS secrets.
-5. Design and export app icon (1024x1024) matching Sigma-1 brand. Configure in `app.json` under `icon`.
-6. Design and export splash screen with Sigma-1 logo. Configure `splash` in `app.json` with background color matching dark theme.
-7. Configure adaptive icon for Android (foreground + background layers).
-8. Set `app.json` metadata: `name`, `slug`, `version`, `ios.bundleIdentifier`, `android.package`, `ios.buildNumber`, `android.versionCode`.
-9. Run `eas build --platform all --profile preview` to verify both platforms build successfully.
-10. Configure OTA updates via `expo-updates` for non-native code changes.
+1. Edit the `sigma1-infra-endpoints` ConfigMap in the sigma1 namespace:
+   - Update `PUBLIC_URL` to `https://sigma-1.com`
+   - Update `API_BASE_URL` to `https://api.sigma-1.com`
+   - Update `ASSETS_CDN_URL` to `https://assets.sigma-1.com`
+   - Update `WS_URL` to `wss://api.sigma-1.com/ws`
+   - Verify PostgreSQL connection string reflects PgBouncer endpoint if using connection pooling
+   - Verify Valkey connection string reflects sentinel endpoint if using sentinel mode
+2. Ensure all services reference this ConfigMap via `envFrom` and will pick up changes on next restart.
+3. Perform a rolling restart of all services to pick up new ConfigMap values:
+   - `kubectl rollout restart deployment -n sigma1`
+4. Verify services are using the new hostnames in their logs and health checks.
 
 ## Validation
-Run `eas build --platform ios --profile preview` and verify it completes without errors and produces a valid .ipa. Run `eas build --platform android --profile preview` and verify it produces a valid .apk. Install preview builds on physical devices and verify app icon, splash screen, and basic navigation work. Verify `eas.json` contains all three profiles with correct distribution settings.
+After updating ConfigMap and restarting services, exec into a backend pod and verify environment variables: `env | grep PUBLIC_URL` shows `https://sigma-1.com`. Verify services respond correctly using the production URLs.

@@ -1,23 +1,25 @@
-Implement subtask 5007: Implement Stage 4: Credit Signals with CreditProvider trait and stub
+Implement subtask 5007: Extract shared circuit breaker module
 
 ## Objective
-Design the CreditProvider trait for pluggable credit API implementations and build the initial stub implementation that returns UNKNOWN/unavailable credit data with appropriate logging.
+Extract the circuit breaker pattern into a shared module `src/clients/circuit_breaker.rs` used by all four external API clients, avoiding code duplication.
 
 ## Steps
-1. Create `src/stages/credit_signals.rs` module.
-2. Define `CreditResult` struct: credit_score (Option<i32>), credit_available (bool), provider_name (String), raw_responses (serde_json::Value).
-3. Define `CreditProvider` trait:
-   ```rust
-   #[async_trait]
-   pub trait CreditProvider: Send + Sync {
-       fn provider_name(&self) -> &str;
-       async fn check_credit(&self, company_name: &str, domain: &str) -> StageResult<CreditResult>;
-   }
-   ```
-4. Implement `StubCreditProvider` that logs a warning ("No credit provider configured, returning UNKNOWN") and returns CreditResult { credit_score: None, credit_available: false, provider_name: "stub" }.
-5. Create a factory function `create_credit_provider(config: &AppConfig) -> Box<dyn CreditProvider>` that returns StubCreditProvider for now, but is designed for easy swap-in of a real provider.
-6. Document the trait contract so future implementations (Dun & Bradstreet, Experian, CreditSafe) can be added by implementing the trait.
-7. The stage runner function accepts `&dyn CreditProvider` and delegates to it.
+1. Create `src/clients/circuit_breaker.rs`.
+2. Define `CircuitBreaker` struct:
+   - state: `CircuitState` enum (Closed, Open, HalfOpen)
+   - consecutive_failures: u32
+   - failure_threshold: u32 (default 5)
+   - cooldown: Duration (default 30s)
+   - last_failure_at: Option<Instant>
+3. Methods:
+   - `pub fn new(failure_threshold: u32, cooldown: Duration) -> Self`
+   - `pub fn is_available(&self) -> bool` — returns true if Closed, or if Open and past cooldown (transition to HalfOpen)
+   - `pub fn record_success(&mut self)` — reset to Closed, zero failures
+   - `pub fn record_failure(&mut self)` — increment failures, transition to Open if threshold reached
+4. Wrap in `Arc<Mutex<CircuitBreaker>>` for async sharing.
+5. Provide a helper: `pub async fn execute_with_circuit_breaker<F, T>(cb: &Arc<Mutex<CircuitBreaker>>, f: F) -> Result<T, VettingError>` that checks availability, runs the future, records success/failure.
+6. Refactor all four clients (OpenCorporates, LinkedIn, GooglePlaces, Credit) to use this shared module.
+7. Unit test the circuit breaker state machine independently: closed → 5 failures → open → wait cooldown → half-open → success → closed.
 
 ## Validation
-Unit test: StubCreditProvider returns credit_available=false and credit_score=None. Verify provider_name is 'stub'. Verify warning is logged (use tracing-test or capture logs). Verify trait is object-safe and can be used as Box<dyn CreditProvider>. Write a mock implementation of CreditProvider that returns a real score to verify the trait works end-to-end.
+Unit test: 5 consecutive record_failure calls transition state to Open. Unit test: in Open state, is_available returns false before cooldown. Unit test: after cooldown, is_available returns true (HalfOpen). Unit test: record_success in HalfOpen transitions to Closed. All four clients compile and pass their existing tests after refactor.

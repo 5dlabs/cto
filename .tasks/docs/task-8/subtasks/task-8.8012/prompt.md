@@ -1,22 +1,21 @@
-Implement subtask 8012: Accessibility audit and WCAG 2.1 AA compliance verification
+Implement subtask 8012: Implement SEO infrastructure: Schema.org structured data, sitemap, Open Graph, and metadata
 
 ## Objective
-Run comprehensive accessibility audit across all pages using axe-core, verify WCAG 2.1 AA compliance including keyboard navigation, screen reader labels, color contrast, and focus management. Fix any violations found.
+Add Schema.org JSON-LD structured data to all pages (Organization on home, Product on equipment detail, Event on portfolio), generate sitemap.xml, configure Open Graph meta tags, and set up the Next.js metadata API for per-page SEO.
 
 ## Steps
-1. Install `@axe-core/react` (dev) and `axe-playwright` for automated testing.
-2. Run axe-core audit on every page: /, /equipment, /equipment/:id, /quote, /portfolio.
-3. Run axe-core on ChatWidget in open state.
-4. Check and fix:
-   - Color contrast: all text meets 4.5:1 ratio against dark backgrounds (especially on dark/moody theme).
-   - Keyboard navigation: Tab through all interactive elements on each page, verify logical order, visible focus indicators.
-   - Screen reader: all images have meaningful alt text, form inputs have labels, buttons have accessible names, dynamic content has aria-live regions.
-   - Focus management: when ChatWidget opens, focus moves to input. When Dialog opens, focus traps inside. When closed, focus returns to trigger.
-   - Skip navigation: 'Skip to main content' link at top of page.
-5. Test with screen reader (VoiceOver or NVDA instructions for manual verification).
-6. Fix all critical and serious axe violations. Document any minor/moderate ones as known issues.
-7. Add `aria-label` to icon-only buttons (chat trigger, close buttons, filter pills).
-8. Ensure responsive zoom: site usable at 200% zoom without horizontal scroll.
+1. Create a shared `lib/seo/structured-data.ts` with helper functions to generate JSON-LD objects:
+   - `organizationSchema()`: Organization type with Sigma-1 details.
+   - `productSchema(product)`: Product type with name, image, description, offers (day rate).
+   - `eventSchema(portfolioItem)`: Event type for portfolio items.
+2. Add JSON-LD script tags to respective pages using a `<JsonLd data={...} />` component.
+3. Create `app/sitemap.ts` using Next.js sitemap generation:
+   - Static routes: /, /equipment, /quote, /portfolio.
+   - Dynamic routes: /equipment/[id] for all products (fetch product IDs from API at build time).
+   - Set changefreq and priority appropriately.
+4. Create `app/robots.ts` with Next.js robots generation: allow all, reference sitemap URL, reference /llms.txt.
+5. Verify each page has proper `metadata` export with unique title, description, and Open Graph image.
+6. Add canonical URLs to prevent duplicate content issues.
 
 ## Validation
-Run automated axe-core scan on all pages — zero critical and zero serious violations. Verify skip navigation link present and functional. Tab through home page and equipment page — verify all interactive elements reachable and focus visible. Verify color contrast tool reports all text meets 4.5:1 ratio. Verify ChatWidget has correct focus trap behavior.
+Test: view page source of / and verify Organization JSON-LD is present and valid. View source of /equipment/[id] and verify Product JSON-LD with correct product data. GET /sitemap.xml returns valid XML with all static routes and at least one dynamic /equipment/[id] route. GET /robots.txt references sitemap and allows all crawlers. Validate structured data using Google's Rich Results Test schema validator.

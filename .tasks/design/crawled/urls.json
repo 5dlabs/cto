@@ -1,9 +1,8 @@
 [
   {
     "url": "https://deployiq.maximinimal.ca",
-    "status": "ok",
-    "title": "FleetAxis — Equipment. On Command.",
-    "snippet": "FleetAxis — Equipment. On Command. Loading… Skip to content FleetAxis Equipment Solutions Services Locations About News Gallery Sign In Equipment. On Command. Premium equipment rental for construction, events, and industrial projects. Browse our catalog, build your estimate, and get to work. Browse Equipment Request Es"
+    "status": "error",
+    "error": "HTTP 502"
   },
   {
     "url": "https://sigma-1.com",

@@ -1,11 +1,12 @@
 ## Decision Points
 
-- WebSocket connection for Morgan chat: connect directly to Morgan agent backend, or route through an API gateway / BFF endpoint? This affects CORS, auth, and deployment topology.
-- Quote builder submission target: submit directly to RMS opportunities API endpoint, or route through Morgan agent for conversational follow-up? The two flows have different UX and integration implications.
-- R2 CDN image loader: use a custom Next.js loader pointing at R2 public bucket URL, or use Cloudflare Image Resizing / Image Transformations for on-the-fly optimization? Impacts performance and cost.
-- Effect 3.x + TanStack Query integration pattern: wrap Effect programs inside TanStack Query's queryFn, or build a custom Effect-native caching/fetching layer? No widely established pattern exists for this combination.
+- Hero section media: should the home page use a looping background video or a static image carousel? Video increases visual impact but significantly impacts LCP and performance scores.
+- Dark theme scope: should the site be dark-theme-only (matching lighting/production industry aesthetic) or support a light/dark toggle? This affects the entire design system token structure.
+- WebSocket reconnection strategy for chat widget: simple exponential backoff vs. a library like `reconnecting-websocket`? Needs alignment with Morgan's /ws/chat endpoint behavior on reconnect (does it replay missed messages or just resume?).
+- Quote builder state persistence: should in-progress quotes be persisted to localStorage so users don't lose work on accidental navigation/refresh, or rely solely on in-memory React state?
+- Availability calendar data granularity: does the 90-day availability view need per-hour slot resolution or just per-day available/unavailable status? This affects API contract and calendar component complexity.
 
 ## Coordination Notes
 
 - Agent owner: blaze
-- Primary stack: React 19/Next.js 15 + Effect 3.x
+- Primary stack: Next.js 15/React 19/Effect

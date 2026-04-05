@@ -1,11 +1,12 @@
 ## Decision Points
 
-- AI model selection: OpenAI Vision API vs Claude for photo scoring and caption generation — cost, latency, and quality trade-offs need evaluation before implementation
-- Postgres client library choice: `@effect/sql-pg` (tighter Effect integration but less mature) vs `postgres` (postgresjs — battle-tested but requires manual Effect wrapping)
-- Instagram publishing: Instagram Graph API requires a Meta App Review process and business account — confirm whether OAuth tokens and app approval are already in place or if a sandbox/mock strategy is needed for v1
-- TikTok publishing: TikTok Content Posting API has restrictive access requirements — confirm whether API access is approved or if TikTok support should be deferred to a later iteration
+- AI model selection for image curation: OpenAI Vision API (gpt-4o) vs. a cheaper model (gpt-4o-mini) — cost vs. quality trade-off for scoring image composition, lighting, subject clarity
+- AI model selection for caption generation: OpenAI (GPT-4o) vs. Anthropic Claude — different tone/style characteristics, pricing, and API availability
+- ORM choice: drizzle-orm vs. kysely for database migrations and query building — both are mentioned as options in the details
+- Draft status state machine: should 'partially_published' be a distinct status separate from 'published' and 'failed', or should per-platform statuses be tracked only at the published_posts level?
+- Instagram publishing approach: Instagram Graph API requires a Facebook Business account and media container flow — confirm whether the client already has Business accounts set up for all 4 platforms with appropriate API access tokens
 
 ## Coordination Notes
 
 - Agent owner: nova
-- Primary stack: Node.js 20+/Elysia 1.x + Effect 3.x
+- Primary stack: Node.js 20+/Elysia + Effect

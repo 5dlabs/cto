@@ -1,16 +1,16 @@
-Implement subtask 4001: Scaffold finance crate in Cargo workspace with shared dependencies
+Implement subtask 4001: Scaffold finance service crate within Cargo workspace
 
 ## Objective
-Add the `finance` crate to the existing Rex Cargo workspace at `services/rust/finance`, configure Cargo.toml with dependencies (axum, sqlx, serde, utoipa, tokio, reqwest), and wire up the shared crate for health checks, metrics, error types, DB pool, and API key auth middleware. Set up the main.rs entrypoint with Axum router skeleton listening on port 8082.
+Create the finance service crate under sigma1-services/services/finance/ with proper Cargo.toml dependencies on shared-auth, shared-db, shared-error, shared-observability crates. Set up the main.rs with Axum 0.7 server bootstrap, router skeleton, graceful shutdown, and health/metrics endpoints via shared crates.
 
 ## Steps
-1. Create `services/rust/finance/` directory with `Cargo.toml` and `src/main.rs`.
-2. Add `finance` to the workspace `members` in the root `Cargo.toml`.
-3. Add dependencies: `axum = "0.7"`, `sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid", "chrono", "rust_decimal"] }`, `serde`, `serde_json`, `utoipa`, `tokio`, `reqwest`, `tracing`, `tracing-subscriber`.
-4. Add workspace-internal dependency on the shared crate (e.g., `common = { path = "../common" }`).
-5. In `main.rs`, initialize tracing, create DB pool via shared crate, build Axum router with health check from shared crate, bind to `0.0.0.0:8082`.
-6. Create module stubs: `mod routes;`, `mod models;`, `mod db;`, `mod services;`, `mod stripe;`, `mod background;`.
-7. Verify `cargo build` succeeds and `cargo test` runs (even if no tests yet).
+1. Create directory `sigma1-services/services/finance/` with `Cargo.toml` and `src/main.rs`.
+2. Add the crate to the workspace `Cargo.toml` members list.
+3. Declare dependencies: axum 0.7, tokio, serde/serde_json, sqlx (postgres), uuid, chrono, rust_decimal, stripe-rust, reqwest, shared-auth, shared-db, shared-error, shared-observability.
+4. In `main.rs`, initialize tracing via shared-observability, create a DB pool via shared-db, build an Axum Router with a `/healthz` and `/readyz` endpoint, bind to `0.0.0.0:PORT` from env.
+5. Set up the module structure: `src/routes/`, `src/models/`, `src/services/`, `src/db/`, `src/stripe/`, `src/background/`, `src/tax/`, `src/currency/`.
+6. Add an AppState struct holding the DB pool, Valkey connection, and Stripe client.
+7. Ensure `cargo build` and `cargo clippy` pass with no errors.
 
 ## Validation
-Verify `cargo build --workspace` succeeds. Verify `cargo run -p finance` starts and responds to GET /health with 200 OK. Verify shared crate health check and metrics middleware are active.
+Verify `cargo build --workspace` succeeds. Verify `cargo test -p finance` runs (even if no tests yet). Verify the service starts and responds 200 on `/healthz`.

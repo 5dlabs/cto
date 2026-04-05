@@ -1,17 +1,21 @@
-Implement subtask 10011: RBAC: create per-service ServiceAccounts with minimal roles
+Implement subtask 10011: Configure Cloudflare WAF rate limiting and bot protection rules
 
 ## Objective
-Create dedicated Kubernetes ServiceAccounts for each sigma1 service with minimal RBAC Roles and RoleBindings scoped to only what each service needs.
+Define Cloudflare WAF rules for rate limiting public API endpoints (100 req/min per IP) and bot protection on the website, expressed as Terraform resources or Cloudflare API configurations.
 
 ## Steps
-Step-by-step:
-1. For each service (equipment-catalog, rms, finance, customer-vetting, social-engine), create:
-   - `ServiceAccount` named `sa-<service-name>` in sigma1 namespace
-   - `Role` with minimal permissions (most services need NO Kubernetes API access; the Role can be empty or omitted)
-   - `RoleBinding` binding the Role to the ServiceAccount
-2. Update each Deployment manifest to set `spec.template.spec.serviceAccountName: sa-<service-name>` and `automountServiceAccountToken: false` (unless the service specifically needs K8s API access).
-3. For the GDPR orchestrator Job (created later), create `sa-gdpr-orchestrator` with permission to read ConfigMaps (for service discovery) but nothing else.
-4. Verify no service uses the `default` ServiceAccount.
+1. Define Cloudflare rate limiting rules (via Terraform `cloudflare_rate_limit` resource or Cloudflare dashboard config-as-code):
+   - Rule 1: Rate limit on `api.sigma-1.com/*` — 100 requests per minute per IP, response 429 with JSON body `{ error: 'rate_limited', retry_after: 60 }`.
+   - Rule 2: Stricter rate limit on authentication endpoints (if any) — 20 requests per minute per IP.
+2. Configure Cloudflare Bot Management or Bot Fight Mode on the website domain:
+   - Enable bot score threshold to challenge suspicious traffic.
+   - Allow known good bots (Googlebot, etc.).
+3. If using Terraform:
+   - Create `cloudflare-waf.tf` with the rate limit resources.
+   - Store Cloudflare API token as ExternalSecret.
+4. If manual/dashboard:
+   - Document the exact rule configurations in the ops runbook ConfigMap.
+5. Ensure rate limit responses include `Retry-After` header.
 
 ## Validation
-For each service, exec into the pod and attempt `curl https://kubernetes.default.svc/api/v1/namespaces/sigma1/secrets -H 'Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)'` — verify 403 Forbidden or confirm token is not mounted. Verify `kubectl get sa -n sigma1` lists all expected ServiceAccounts.
+Send 101 requests from a single IP to `api.sigma-1.com` within 1 minute — verify request 101 receives a 429 response. Verify the 429 response body contains the expected JSON. Verify the `Retry-After` header is present. Verify bot protection is active by checking Cloudflare dashboard status or Terraform state.

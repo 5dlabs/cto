@@ -1,28 +1,23 @@
-Implement subtask 7006: Implement finance, social-media, rms, and admin skills
+Implement subtask 7006: Implement MCP Tool Server — Social Engine tools (social_curate, social_publish)
 
 ## Objective
-Build the remaining skills: finance (invoice creation, reports), social-media (photo curation pipeline with Mike approval), rms (project status, checkout/checkin, crew scheduling), and admin (calendar, email, documents).
+Define and implement MCP tool definitions for the two Social Engine tools: sigma1_social_curate and sigma1_social_publish.
 
 ## Steps
-1. `finance` skill:
-   a. Handle invoice creation: when a project is confirmed, call `sigma1_create_invoice` with opportunity data.
-   b. Handle invoice queries: 'What invoices are outstanding?' — call `sigma1_finance_report` with type=aging.
-   c. Revenue reporting: 'How much revenue this month?' — call `sigma1_finance_report` with type=revenue, period=current_month.
-   d. Format financial data as clean, readable summaries.
-2. `social-media` skill:
-   a. Receive event photos (from Signal or web chat uploads).
-   b. Call `sigma1_social_curate` with the photo and event context to generate curated content.
-   c. Send curated draft to Mike for approval via Signal message with preview.
-   d. When Mike approves (responds with 'approve' or similar), call `sigma1_social_publish` with draft ID.
-   e. Report back published URLs.
-3. `rms-*` skills (project management):
-   a. Project status queries: 'What's the status of the Johnson wedding?' — query RMS for opportunity by name/ID.
-   b. Checkout/checkin coordination: 'Mark the LED panels as checked out for project X' — call appropriate RMS endpoint.
-   c. Crew scheduling: 'Who's available Saturday?' — query RMS crew/calendar endpoints.
-4. `admin` skill:
-   a. Calendar queries: 'What's on the schedule next week?' — query via RMS Google Calendar integration.
-   b. Email drafting: compose professional emails for customer follow-ups (output text, don't actually send).
-   c. Document references: answer questions about company policies, equipment specs from stored documents in workspace.
+1. Create MCP tool definition for `sigma1_social_curate`:
+   - HTTP: POST /api/v1/social/upload
+   - Input schema: { media_url?: string, media_base64?: string, caption?: string, platform: 'instagram'|'tiktok'|'facebook'|'all', tags?: string[] }
+   - Output schema: { draft_id: string, preview_url: string, status: 'draft', platforms: string[], suggested_caption?: string }
+   - Description: 'Upload media content and create a social media draft for review before publishing'
+2. Create MCP tool definition for `sigma1_social_publish`:
+   - HTTP: POST /api/v1/social/drafts/:id/publish
+   - Input schema: { draft_id: string, schedule_time?: string (ISO8601), platforms?: string[] }
+   - Output schema: { draft_id: string, status: 'published'|'scheduled', published_urls: [{ platform, url }], published_at?: string }
+   - Description: 'Publish or schedule a previously created social media draft to specified platforms'
+3. Include Authorization header: `Bearer ${MORGAN_SERVICE_JWT}`
+4. Implement URL path parameter substitution for draft_id in social_publish.
+5. For social_curate, handle multipart/form-data if media_base64 is provided.
+6. Error handling: invalid media format → user-friendly error, draft not found for publish → clear message.
 
 ## Validation
-Finance: verify invoice creation returns valid invoice ID and finance report returns formatted revenue data. Social-media: verify photo upload triggers curation and approval flow sends message to Mike. RMS: verify project status query returns formatted project info. Admin: verify calendar query returns upcoming events.
+Invoke sigma1_social_curate with test media URL and verify correct HTTP POST body. Mock Social Engine and verify draft creation response parsing. Invoke sigma1_social_publish with test draft_id and verify URL path substitution and response parsing. Test with non-existent draft_id and verify 404 handling.

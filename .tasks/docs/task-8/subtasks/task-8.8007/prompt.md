@@ -1,23 +1,21 @@
-Implement subtask 8007: Build AvailabilityCalendar component with date range picker
+Implement subtask 8007: Build Availability Calendar component with 90-day booking view
 
 ## Objective
-Create the AvailabilityCalendar custom component that displays available/unavailable dates for a product and integrates a date range picker. Fetches availability data from the API with Effect Schema validation for date inputs.
+Create a reusable availability calendar component that displays available/booked dates for the next 90 days for a given equipment item. Fetches availability data from the API and visually distinguishes available, booked, and partially-available dates.
 
 ## Steps
-1. Create `components/custom/AvailabilityCalendar.tsx` — Client Component.
-2. Props: `productId: string`, `onDateRangeSelect: (start: Date, end: Date) => void`.
-3. Calendar display:
-   - Use shadcn Calendar (Radix-based) or extend with react-day-picker for range selection.
-   - Fetch availability via `useProductAvailability(productId, { month, year })` TanStack Query hook → `GET /api/v1/catalog/products/:id/availability?start=YYYY-MM-DD&end=YYYY-MM-DD`.
-   - Color-code dates: green (available), red (unavailable/booked), gray (past dates).
-   - Disable selection of unavailable dates.
-4. Date range selection:
-   - User clicks start date, then end date to form a range.
-   - Validate with Effect Schema: start < end, start >= today, range within reasonable bounds (e.g., max 90 days).
-   - Display validation errors inline.
-5. Loading state: skeleton overlay on calendar while fetching availability.
-6. Month navigation: prev/next month buttons trigger new availability fetch.
-7. Integrate into Product Detail page (`/equipment/:id`): place below product info, selected date range feeds into 'Add to Quote' action.
+1. Create `components/sigma1/availability-calendar.tsx` as a client component.
+2. Props: `equipmentId: string`, `onDateRangeSelect?: (start: Date, end: Date) => void`.
+3. UI: 3-month calendar grid (current month + 2 next months), navigable.
+   - Each day cell color-coded: green/default = available, red/muted = booked, yellow/warning = limited.
+   - Legend explaining color coding.
+4. Data fetching: `useEquipmentAvailability(equipmentId)` hook.
+   - Calls availability API endpoint.
+   - TanStack Query with stale time: 0 (no cache — availability is real-time critical).
+   - Effect Schema validation on response (array of { date: string, status: 'available' | 'booked' | 'limited' }).
+5. Interaction: users can select a date range (click start date, click end date) which highlights the range and calls `onDateRangeSelect`. This feeds into the quote builder.
+6. Responsive: on mobile, show one month at a time with swipe/arrow navigation.
+7. Accessible: each date cell has aria-label like "January 15, 2025 - Available" or "January 16, 2025 - Booked". Keyboard navigable with arrow keys.
 
 ## Validation
-Unit test AvailabilityCalendar: mock availability API returning mix of available/unavailable dates. Verify available dates are selectable and unavailable dates are disabled. Test date range selection: click start and end date, verify `onDateRangeSelect` callback fires with correct dates. Test validation: select end date before start date, verify error message shown. Test month navigation: click next month, verify new API call made with updated date range.
+Component test: render calendar with mock availability data (mix of available/booked dates), verify correct color coding on cells. Test date range selection: click two dates, verify onDateRangeSelect callback fires with correct start/end. Test accessibility: each cell has correct aria-label. Test mobile: at 375px width, verify only one month is visible with navigation controls.

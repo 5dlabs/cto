@@ -1,27 +1,22 @@
-Implement subtask 7005: Implement quote-gen and upsell skills
+Implement subtask 7005: Implement MCP Tool Server — Finance tools (create_invoice, finance_report)
 
 ## Objective
-Build the quote-gen skill that assembles line items from catalog data, calculates totals, creates an opportunity via RMS, and sends a quote summary. Build the upsell skill that suggests additional services/equipment after quote generation.
+Define and implement MCP tool definitions for the two Finance service tools: sigma1_create_invoice and sigma1_finance_report.
 
 ## Steps
-1. `quote-gen` skill:
-   a. Accept gathered product/event data from sales-qual conversation state.
-   b. Assemble line items: product name, quantity, daily/weekly rate, rental period calculation.
-   c. Calculate subtotals, delivery fees (if applicable), damage waiver/insurance, tax estimates.
-   d. Call `sigma1_generate_quote` (POST to RMS /api/v1/opportunities) with the assembled quote data.
-   e. Format the quote summary as a readable message: itemized list, totals, rental period, pickup/delivery options.
-   f. Send quote summary back to customer via the active channel (Signal, voice, or web chat).
-   g. Store opportunity ID in conversation state for follow-up.
-2. `upsell` skill:
-   a. Trigger after quote-gen completes successfully.
-   b. Based on event type and selected equipment, suggest complementary items:
-      - Weddings: uplighting add-on, haze machine, photo booth lighting
-      - Corporate: confidence monitors, presentation clickers, podium lighting
-      - Concerts: additional moving heads, fog machines, follow spots
-   c. Suggest insurance/damage waiver if not already included.
-   d. Suggest delivery/setup service if customer selected pickup.
-   e. Use `sigma1_catalog_search` to find upsell products and `sigma1_check_availability` to verify.
-   f. If customer accepts upsell items, regenerate quote via quote-gen with updated line items.
+1. Create MCP tool definition for `sigma1_create_invoice`:
+   - HTTP: POST /api/v1/invoices
+   - Input schema: { opportunity_id: string, customer_email: string, due_date?: string, payment_terms?: string, notes?: string }
+   - Output schema: { invoice_id: string, invoice_number: string, amount_due: number, status: string, pdf_url?: string, payment_link?: string }
+   - Description: 'Create an invoice from an approved opportunity/quote for the customer'
+2. Create MCP tool definition for `sigma1_finance_report`:
+   - HTTP: GET /api/v1/finance/reports/{report_type}
+   - Input schema: { report_type: 'revenue'|'outstanding'|'monthly-summary', date_from?: string, date_to?: string }
+   - Output schema: { report_type: string, period: { from, to }, data: object, generated_at: string }
+   - Description: 'Generate financial reports including revenue summaries, outstanding invoices, and monthly breakdowns'
+3. Include Authorization header: `Bearer ${MORGAN_SERVICE_JWT}`
+4. Implement URL path parameter substitution for report_type in finance_report.
+5. Error handling for create_invoice: validate opportunity_id exists before calling, handle 409 Conflict if invoice already exists for opportunity.
 
 ## Validation
-Verify quote-gen produces a correctly formatted quote with accurate line item calculations by providing known product data and verifying totals. Verify RMS opportunity is created with correct data. Verify upsell suggests relevant items for a wedding event type and can regenerate the quote with accepted additions.
+Invoke sigma1_create_invoice with a test opportunity ID and verify correct HTTP POST body formation. Mock Finance service and verify response parsing. Invoke sigma1_finance_report with each report_type and verify URL path parameter substitution is correct. Test 409 Conflict handling for duplicate invoice creation.

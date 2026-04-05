@@ -1,26 +1,17 @@
-Implement subtask 2008: Implement availability checking and atomic checkout endpoints
+Implement subtask 2008: Implement product CRUD endpoints (list, detail, create, update)
 
 ## Objective
-Build the real-time availability endpoint (GET /api/v1/catalog/products/:id/availability) and the programmatic checkout endpoint (POST /api/v1/equipment-api/checkout) with atomic inventory decrement.
+Build the product listing with pagination/filtering, product detail, admin-only create, and admin-only update endpoints, including image URL resolution to CDN paths.
 
 ## Steps
-1. Implement `GET /api/v1/catalog/products/:id/availability?from=YYYY-MM-DD&to=YYYY-MM-DD`:
-   - Query the `availability` table for the product within the date range.
-   - For each day, return `quantity_total - reserved - booked` as available quantity.
-   - Return JSON: `{"product_id": "...", "availability": [{"date": "2024-01-01", "available": 3, "total": 5}, ...]}`.
-   - If no availability rows exist for requested dates, return 0 available.
-   - Optimize query with index on `(product_id, date)` — target p99 < 500ms.
-2. Implement `POST /api/v1/equipment-api/checkout`:
-   - Request body: `{"product_id": UUID, "customer_id": UUID, "date_from": Date, "date_to": Date, "quantity": u32}`.
-   - In a database transaction:
-     a. `SELECT ... FOR UPDATE` on availability rows for the product and date range.
-     b. Verify all days have sufficient available quantity (total - reserved - booked >= requested quantity).
-     c. If insufficient, rollback and return 409 Conflict with details on which dates are unavailable.
-     d. UPDATE availability SET reserved = reserved + quantity for each day.
-     e. INSERT into bookings table with status 'reserved'.
-     f. Commit and return 201 with booking ID.
-3. Implement the availability domain logic in a separate `catalog/src/domain/availability.rs` module for testability.
-4. Add appropriate error handling for invalid date ranges (from > to), non-existent products, etc.
+1. Define `Product` model struct matching the products table, with `rust_decimal::Decimal` for any price computations but BIGINT cents for storage/API.
+2. Define `ProductListParams` query params: category_id (Option<Uuid>), search (Option<String>), min_price (Option<i64>), max_price (Option<i64>), page (Option<u32>, default 1), per_page (Option<u32>, default 20, max 100).
+3. `GET /api/v1/catalog/products` handler: build dynamic SQL query with sqlx. Filter by category_id if present, ILIKE search on name/description if search present, day_rate BETWEEN for price range. Count total for pagination headers. Return paginated response with `{ data: [...], pagination: { page, per_page, total, total_pages } }`.
+4. Image URL resolution: before returning any product, map `image_urls` array entries from R2 keys to full CDN URLs using `format!("{}/{}", state.cdn_base_url, key)`. Implement as a method on Product or a helper function.
+5. `GET /api/v1/catalog/products/:id` handler: fetch product by UUID, return 404 if not found, include resolved image URLs.
+6. `POST /api/v1/catalog/products` handler: protected with `require_role("admin")`. Accept `CreateProductRequest` body (name, category_id, description, sku, barcode, day_rate, weight_kg, dimensions, image_urls, specs). Validate required fields. INSERT and return created product with 201 status.
+7. `PATCH /api/v1/catalog/products/:id` handler: protected with `require_role("admin")`. Accept `UpdateProductRequest` with all optional fields. Build dynamic UPDATE SET query for only provided fields. Return updated product.
+8. Use `rust_decimal` for any price arithmetic if aggregation is needed in responses.
 
 ## Validation
-Integration tests: 1) Seed availability rows, query availability and verify correct available counts. 2) Checkout reduces available count atomically. 3) Concurrent checkout test: two simultaneous checkouts for the last available unit — one succeeds, one gets 409. 4) Checkout with insufficient availability returns 409. 5) Checkout for non-existent product returns 404. 6) Invalid date range (from > to) returns 400. Unit tests on domain logic: overlapping date ranges, partial bookings, full capacity scenarios. Benchmark: seed 1000 products with 10,000 bookings, run `wrk` against availability endpoint and verify p99 < 500ms.
+Integration tests: (1) POST a product as admin, verify 201 and returned fields. (2) GET the product by ID, verify all fields match including CDN-resolved image URLs. (3) PATCH the product name, verify only name changed, updated_at changed. (4) GET /products with category_id filter returns only matching products. (5) GET /products with search term finds product by name substring. (6) GET /products with pagination returns correct page/total_pages. (7) POST without admin role returns 403. (8) GET non-existent product ID returns 404.

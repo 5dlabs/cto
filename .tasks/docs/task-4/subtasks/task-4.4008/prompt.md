@@ -1,30 +1,30 @@
-Implement subtask 4008: Implement financial reporting endpoints
+Implement subtask 4008: Implement financial reporting endpoints (revenue, AR aging, cashflow, profitability)
 
 ## Objective
-Build the four financial report endpoints: revenue by period, aging buckets, cashflow, and project profitability under `/api/v1/finance/reports/`.
+Build the four financial reporting endpoints: revenue aggregation by period, accounts receivable aging buckets, cash flow by period, and per-project profitability.
 
 ## Steps
-1. Create `services/rust/finance/src/routes/reports.rs` and `services/rust/finance/src/db/reports.rs`.
-2. `GET /api/v1/finance/reports/revenue`:
-   - Query params: org_id, period (month/quarter/year), start_date, end_date.
-   - SQL: aggregate `total_cents` from invoices where `status = 'paid'` grouped by period.
-   - Return array of {period_label, total_revenue_cents, currency, invoice_count}.
+1. Create `src/services/reports.rs` and `src/routes/reports.rs`.
+2. `GET /api/v1/finance/reports/revenue?period=monthly|quarterly|yearly&start=&end=`:
+   - Query: aggregate total_cents from paid invoices grouped by time period using date_trunc.
+   - Return array of { period: string, revenue_cents: i64, currency: string, invoice_count: i64 }.
+   - Filter by org_id from auth context.
 3. `GET /api/v1/finance/reports/aging`:
-   - Query params: org_id.
-   - SQL: select unpaid invoices (status in sent, viewed, overdue), compute days overdue from `due_at`.
-   - Bucket into: current (not yet due), 0-30, 31-60, 61-90, 90+ days overdue.
-   - Return {buckets: [{range, count, total_cents}], total_outstanding_cents}.
-4. `GET /api/v1/finance/reports/cashflow`:
-   - Query params: org_id, period, start_date, end_date.
-   - SQL: sum payments received (from `payments` table) as inflow, sum payroll_entries as outflow, grouped by period.
-   - Return array of {period_label, inflow_cents, outflow_cents, net_cents}.
-5. `GET /api/v1/finance/reports/profitability`:
-   - Query params: org_id, project_id (optional).
-   - SQL: revenue (paid invoices) minus costs (payroll entries) per project_id.
-   - Return array of {project_id, revenue_cents, cost_cents, profit_cents, margin_percent}.
-6. All reports require org_id for multi-tenancy isolation.
-7. Add utoipa annotations for all report endpoints.
-8. Wire into Axum router.
+   - Query: SELECT invoices WHERE status IN ('sent','viewed','overdue'), compute days_outstanding = now() - due_at.
+   - Bucket into: current (not yet due), 1-30 days, 31-60 days, 61-90 days, 90+ days.
+   - Return { buckets: [{ label, count, total_cents }], total_outstanding_cents }.
+   - Use rust_decimal for all arithmetic.
+4. `GET /api/v1/finance/reports/cashflow?period=monthly&start=&end=`:
+   - Inflows: SUM(amount_cents) from payments grouped by period.
+   - Outflows: SUM(total_cents) from payroll_entries WHERE status='paid' grouped by period.
+   - Return array of { period, inflow_cents, outflow_cents, net_cents }.
+5. `GET /api/v1/finance/reports/profitability?project_id=`:
+   - Revenue: SUM(paid_amount_cents) from invoices for project_id.
+   - Costs: (for v1, costs come from payroll entries linked to the project — add optional project_id to payroll_entries or accept it as a limitation).
+   - Return { project_id, revenue_cents, cost_cents, profit_cents, margin_pct }.
+   - Document that project cost tracking is limited in v1.
+6. All queries must be parameterized with org_id for multi-tenancy.
+7. Register all four routes under `/api/v1/finance/reports/`.
 
 ## Validation
-Integration tests: (1) Revenue: seed 5 paid invoices across 3 months, verify monthly aggregation returns correct totals. (2) Aging: seed invoices with due dates at -10, -40, -70, -100 days and one future due date, verify correct bucketing (current, 0-30, 31-60, 61-90, 90+). (3) Cashflow: seed payments and payroll entries across 2 months, verify inflow/outflow/net per month. (4) Profitability: seed invoices and payroll for 2 projects, verify per-project profit and margin calculation. (5) Verify all reports filter by org_id (create data for 2 orgs, query for 1).
+Unit test: AR aging buckets correctly categorize invoices — an invoice due yesterday is in '1-30 days', one due 45 days ago is in '31-60 days', one not yet due is 'current'. Integration test: seed 5 invoices with varying due dates and statuses, call aging endpoint, verify bucket counts and totals match. Integration test: seed paid invoices across 3 months, call revenue endpoint with period=monthly, verify each month's total is correct. Integration test: cashflow endpoint returns correct inflows from payments and outflows from payroll entries.

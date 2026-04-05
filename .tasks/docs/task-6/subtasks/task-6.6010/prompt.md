@@ -1,26 +1,19 @@
-Implement subtask 6010: Implement GDPR deletion endpoint with R2 cleanup
+Implement subtask 6010: Implement LinkedIn publishing service
 
 ## Objective
-Build the DELETE /api/v1/gdpr/customer/:id endpoint that removes all photos, drafts, published posts, and R2 objects associated with a customer's events.
+Create the LinkedInService as an Effect service that publishes images to LinkedIn via the LinkedIn API with Effect.retry and exponential backoff.
 
 ## Steps
-1. Create `src/routes/gdpr.ts` with Elysia route.
-2. `DELETE /api/v1/gdpr/customer/:id`:
-   - Param: customer_id (string, the uploaded_by identifier).
-   - Effect.gen pipeline:
-     a. Find all uploads where uploaded_by = customer_id.
-     b. For each upload: collect all photo r2_keys and all draft image_keys (cropped images).
-     c. Collect all unique R2 keys (originals + crops).
-     d. Call R2Service.deleteBatch(allKeys) to remove from R2.
-     e. Delete published_posts (via draft_id cascade or explicit).
-     f. Delete drafts (via upload_id cascade or explicit).
-     g. Delete photos (via upload_id cascade or explicit).
-     h. Delete uploads.
-   - Use a database transaction (Effect.acquireRelease or sql transaction) to ensure atomicity of DB deletes.
-   - Return { deleted: { uploads: number, photos: number, drafts: number, published_posts: number, r2_objects: number } }.
-3. Handle case where customer has no data: return 200 with all counts = 0.
-4. Log GDPR deletion request for audit trail (log customer_id, timestamp, counts).
-5. Error handling: If R2 deletion partially fails, still proceed with DB deletion and log R2 failures for manual cleanup.
+1. Create `src/services/publishing/LinkedInService.ts` as an Effect.Service.
+2. LinkedIn API publishing flow:
+   a. Register an image upload: `POST /v2/assets?action=registerUpload` with owner URN.
+   b. Upload the image binary to the upload URL returned.
+   c. Create a post: `POST /v2/ugcPosts` (or /v2/posts for new API) with the asset URN, caption text, and visibility settings.
+3. Define service interface:
+   - `publish(input: { imageBuffer: Buffer, caption: string, accessToken: string, organizationUrn: string }): Effect.Effect<{ platformPostId: string }, LinkedInPublishError>`
+4. Wrap with `Effect.retry` — exponential backoff, base 1s, max 30s, 3 attempts.
+5. Define `LinkedInPublishError` as tagged Effect error.
+6. Create `LinkedInServiceLive` layer reading credentials from environment.
 
 ## Validation
-Integration test: (1) Create upload with 5 photos, 4 drafts, 2 published_posts for customer 'test-customer'. Call DELETE /gdpr/customer/test-customer. Verify all DB records removed. Verify R2Service.deleteBatch called with all original + crop keys. (2) Test no-data case: DELETE for nonexistent customer returns 200 with zero counts. (3) Test R2 partial failure: mock one R2 delete failing, verify DB records still deleted and error logged.
+Unit test with mocked LinkedIn API: verify the 3-step flow (register upload, upload binary, create post) executes correctly. Verify platformPostId is extracted from response. Retry test: mock 500 error twice then success — verify retry completes successfully.

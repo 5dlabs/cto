@@ -1,11 +1,9 @@
 ## Decision Points
 
-- Container registry choice: ghcr.io vs Cloudflare Container Registry — impacts CI/CD image push configuration and ArgoCD image pull secrets.
-- Valkey HA strategy: Sentinel mode (if operator supports) vs documented single-instance limitation — affects availability guarantees and manifest complexity.
-- Internal mTLS: implement now with cert-manager or defer to Phase 2 — impacts security posture and operational complexity.
-- GDPR orchestrator trigger model: Morgan-triggered Kubernetes Job vs CronJob polling a queue table — affects architecture and reliability guarantees.
-- Secret rotation strategy: manual documented process vs external-secrets-operator automation — depends on whether ESO is available in the cluster.
-- Alerting destination: PagerDuty vs Signal notification vs both — affects AlertManager receiver configuration.
+- Kyverno vs Gatekeeper for container image admission policy enforcement — Kyverno is Kubernetes-native with simpler policy authoring, Gatekeeper uses OPA/Rego which is more powerful but complex. Decision affects policy maintenance burden.
+- JWT token generation: deploy-time Job vs init container — a dedicated Job runs once and creates all service tokens as Secrets; init containers would generate per-service but add startup latency. Affects deployment workflow.
+- GDPR data export/deletion orchestration language — the Job needs to call multiple service APIs and interact with R2. Should it be a Go binary, a shell script, or a lightweight Node/Bun script? Needs to fit the team's operational tooling.
+- Cloudflare WAF rate limiting thresholds — 100 req/min per IP is proposed but may need tuning per endpoint (e.g., auth endpoints lower, read-heavy catalog endpoints higher). Requires product/ops input on acceptable limits.
 
 ## Coordination Notes
 

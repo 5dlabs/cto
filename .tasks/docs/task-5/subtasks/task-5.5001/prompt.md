@@ -1,16 +1,16 @@
-Implement subtask 5001: Create vetting crate and SQLx database migrations
+Implement subtask 5001: Scaffold customer-vetting service crate in Cargo workspace
 
 ## Objective
-Add the `vetting` crate to the Cargo workspace at `services/rust/vetting` and create SQLx migrations for the `vetting_results` and `vetting_requests` tables with all specified columns, types, and indexes.
+Create the `sigma1-services/services/customer-vetting/` crate with Cargo.toml, main.rs, and module structure. Wire up dependencies on shared-auth, shared-db, shared-error, shared-observability workspace crates. Configure Axum 0.7 application skeleton with health endpoint and tracing initialization.
 
 ## Steps
-1. Create `services/rust/vetting` directory with `Cargo.toml` referencing workspace dependencies (axum 0.7, sqlx with postgres feature, serde, uuid, chrono, tokio, reqwest, utoipa).
-2. Add the crate to the root `Cargo.toml` workspace members list.
-3. Create SQLx migration for `vetting_results` table: org_id UUID PRIMARY KEY, business_verified BOOL NOT NULL DEFAULT false, opencorporates_data JSONB, linkedin_exists BOOL NOT NULL DEFAULT false, linkedin_followers INT DEFAULT 0, google_reviews_rating FLOAT, google_reviews_count INT DEFAULT 0, credit_score INT, risk_flags TEXT[] NOT NULL DEFAULT '{}', final_score VARCHAR(6) NOT NULL, vetted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), raw_responses JSONB NOT NULL DEFAULT '{}'.
-4. Create SQLx migration for `vetting_requests` table: id UUID PRIMARY KEY DEFAULT gen_random_uuid(), org_id UUID NOT NULL, requested_by UUID NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','completed','failed')), started_at TIMESTAMPTZ, completed_at TIMESTAMPTZ, error_message TEXT, FOREIGN KEY org_id REFERENCES vetting_results or allow standalone.
-5. Add indexes: idx_vetting_requests_org_id, idx_vetting_requests_status, idx_vetting_results_final_score.
-6. Define Rust domain structs: VettingResult, VettingRequest with sqlx::FromRow derives and serde Serialize/Deserialize.
-7. Verify migrations run cleanly against the dev PostgreSQL instance.
+1. Create directory `sigma1-services/services/customer-vetting/` with `Cargo.toml`.
+2. Add workspace member entry in root `Cargo.toml`.
+3. Declare dependencies: axum 0.7, tokio (full), serde/serde_json, uuid, chrono, sqlx (postgres+runtime-tokio), reqwest (with rustls-tls), tokio-retry, and workspace crates (shared-auth, shared-db, shared-error, shared-observability).
+4. Create `src/main.rs` with `#[tokio::main]`, initialize tracing from shared-observability, create Axum router with `GET /healthz` returning 200.
+5. Create module stubs: `src/routes/mod.rs`, `src/models/mod.rs`, `src/clients/mod.rs`, `src/pipeline/mod.rs`, `src/scoring/mod.rs`, `src/cache/mod.rs`.
+6. Define `AppState` struct holding: `PgPool`, `ValKeyPool` (redis connection manager), and config struct with API keys/URLs.
+7. Verify `cargo check` passes and health endpoint responds.
 
 ## Validation
-Run `sqlx migrate run` against a test database. Verify both tables are created with correct columns via `\d vetting_results` and `\d vetting_requests`. Insert sample rows and verify constraints (e.g., invalid status value is rejected, UUID generation works).
+Run `cargo check` and `cargo build` for the crate with no errors. `GET /healthz` returns HTTP 200 with body `{"status":"ok"}`.

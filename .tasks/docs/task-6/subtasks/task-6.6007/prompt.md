@@ -1,30 +1,23 @@
-Implement subtask 6007: Implement AI caption generation and draft creation pipeline
+Implement subtask 6007: Implement CaptionService with AI-powered caption generation
 
 ## Objective
-Build the caption generation service using OpenAI/Claude that creates platform-specific captions with appropriate tone, hashtags, and formatting. Wire the full AI curation pipeline (score → select → crop → caption → create drafts) triggered after upload.
+Create the CaptionService as an Effect service that generates platform-specific captions with relevant hashtags using OpenAI/Claude, incorporating event context and equipment details.
 
 ## Steps
-1. Create `src/services/CaptionService.ts` as an Effect.Service:
-   - Method `generateCaption(platform: Platform, eventName: string, photoDescriptions: string[], brandContext?: string)`: Effect<CaptionResult, CaptionError>
-     - Call OpenAI chat completion with platform-specific system prompts:
-       - Instagram: Casual, emoji-rich, 2200 char max, 20-30 hashtags.
-       - LinkedIn: Professional, thought-leadership tone, 3000 char max, 3-5 hashtags.
-       - Facebook: Conversational, community-focused, 500 char max, 5-10 hashtags.
-       - TikTok: Trendy, short, 150 char max, 5-8 trending hashtags.
-     - Return { caption: string, hashtags: string[] }.
-   - Wrap in Effect.retry with Schedule.exponential.
-2. Create `src/pipelines/CurationPipeline.ts` — orchestrates the full flow:
-   - Input: upload_id (triggered after upload completes).
-   - Step 1: Fetch all photos for upload_id from DB.
-   - Step 2: Score photos via AIScoringService.scoreAndSelectPhotos.
-   - Step 3: For each target platform (instagram, linkedin, facebook, tiktok):
-     a. Generate crops via ImageCropService.generateCropsForDrafts.
-     b. Generate caption via CaptionService.generateCaption.
-     c. Insert draft record: upload_id, platform, caption, hashtags, image_keys (cropped R2 keys), status 'draft'.
-   - Step 4: Return { drafts_created: number, platforms: string[] }.
-3. Wire CurationPipeline into the upload endpoint (6003): after successful upload, trigger pipeline asynchronously using Effect.fork (fire-and-forget with error logging).
-4. Add a manual re-trigger endpoint: `POST /api/v1/social/uploads/:id/curate` — re-runs the curation pipeline for an existing upload.
-5. Create `src/services/CaptionService.live.ts` — Effect Layer.
+1. Create `src/services/CaptionService.ts` as an Effect.Service.
+2. Define the service interface:
+   - `generateCaption(input: CaptionInput): Effect.Effect<CaptionOutput, CaptionError>`
+   - `CaptionInput`: `{ eventName?: string, eventDescription?: string, imageDescriptions: string[], platforms: string[], tone?: string }`.
+   - `CaptionOutput`: `{ caption: string, hashtags: string[], platformVariants?: Record<string, string> }` — a base caption plus optional per-platform variants (LinkedIn more professional, Instagram more casual, TikTok more trending).
+3. Construct a prompt that:
+   - Includes event context (name, description) if available.
+   - References what's visible in the images (from image descriptions/AI curation metadata).
+   - Requests hashtags relevant to the industry, event, and equipment.
+   - Asks for platform-specific tone adjustments.
+4. Parse the AI response into structured CaptionOutput.
+5. Define `CaptionError` as a tagged Effect error.
+6. Create `CaptionServiceLive` layer depending on OpenAI API key from environment.
+7. Ensure captions respect platform character limits (Instagram 2200, LinkedIn 3000, TikTok 2200, Facebook 63206).
 
 ## Validation
-Unit test: (1) Mock OpenAI, verify Instagram caption includes emojis and 20+ hashtags. (2) Verify LinkedIn caption is professional tone with 3-5 hashtags. (3) Verify TikTok caption under 150 chars. Integration test: (4) Upload 10 test photos, run CurationPipeline, verify 4 draft records created (one per platform) with correct image_keys and captions. (5) Verify re-trigger endpoint creates new drafts (or updates existing). (6) Test pipeline error handling: if caption generation fails for one platform, other platforms' drafts still created.
+Unit test with mocked OpenAI: verify generateCaption returns a caption containing the event name, at least 3 hashtags, and platform variants for each requested platform. Test that captions respect character limits for each platform. Test CaptionError is raised on malformed AI response.

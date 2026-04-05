@@ -1,17 +1,22 @@
-Implement subtask 5003: Build HTTP client utilities: timeout, retry with backoff, and circuit breaker
+Implement subtask 5003: Implement OpenCorporatesClient with retry and circuit breaker
 
 ## Objective
-Implement a reusable HTTP client wrapper providing per-request 10-second timeouts, 2 retries with exponential backoff, and a circuit breaker that opens after 5 failures in 5 minutes, marking the stage as unavailable instead of failing the pipeline.
+Build the OpenCorporates external API client module with reqwest, exponential backoff retry via tokio-retry, 10-second timeouts, and a circuit breaker that trips after 5 consecutive failures.
 
 ## Steps
-1. Create `src/http_client.rs` module with a `ResilientClient` struct wrapping `reqwest::Client`.
-2. Implement `execute_with_retry` method: accepts a request builder closure, retries up to 2 times on transient errors (5xx, timeout, connection refused) with exponential backoff (1s, 2s).
-3. Set per-request timeout to 10 seconds using `reqwest::ClientBuilder::timeout` or per-request `.timeout(Duration::from_secs(10))`.
-4. Implement `CircuitBreaker` struct: tracks failure count and timestamps in an `Arc<Mutex<CircuitBreakerState>>`. State includes failure_count, last_failure_at, is_open. If 5 failures within 5 minutes, set is_open=true. Half-open check: after 1 minute, allow one request through.
-5. Create a `CircuitBreakerRegistry` keyed by stage name (String) so each external API has its own circuit breaker.
-6. Define `StageResult` enum: `Success(serde_json::Value)`, `Unavailable(String)` — so callers can distinguish between a real result and a gracefully degraded one.
-7. When circuit is open, immediately return `StageResult::Unavailable` without making the HTTP call.
-8. All responses (success or error) should be capturable as raw JSON for the audit trail.
+1. Create `src/clients/opencorporates.rs`.
+2. Define `OpenCorporatesClient` struct with: reqwest::Client (configured with 10s timeout), base_url (String), api_key (Option<String>), and a circuit breaker state (Arc<Mutex<CircuitBreakerState>>).
+3. Implement `CircuitBreakerState` (or use a crate): track consecutive_failures, state (Closed/Open/HalfOpen), last_failure_time. Open after 5 failures, half-open after 30s cooldown.
+4. Implement `pub async fn search_company(&self, org_name: &str) -> Result<Option<OpenCorporatesResult>, VettingError>`:
+   - Check circuit breaker state; if Open and not past cooldown, return Err immediately.
+   - Build GET request to `{base_url}/companies/search?q={org_name}&api_token={api_key}`.
+   - Wrap in tokio-retry with ExponentialBackoff (3 attempts, starting 500ms).
+   - Parse JSON response into `OpenCorporatesSearchResponse` struct.
+   - Extract: company_name, jurisdiction_code, company_status (good_standing), officers.
+   - On success, reset circuit breaker. On failure, increment.
+5. Define response structs: `OpenCorporatesSearchResponse`, `OpenCorporatesCompany`, `OpenCorporatesResult` (domain model).
+6. Constructor `new(base_url, api_key)` with defaults.
+7. Add `#[cfg(test)]` module with unit tests using mockito or wiremock for: successful search, 404 not found, timeout, circuit breaker tripping after 5 failures.
 
 ## Validation
-Unit test: verify retry logic fires exactly 2 retries on 500 responses. Verify timeout triggers after 10s with a mock delayed response (use tokio::time::pause). Circuit breaker test: send 5 failing requests, verify 6th returns Unavailable without HTTP call. Verify half-open behavior after simulated 1-minute wait. Verify successful call resets failure count.
+Unit test: mock returns valid company JSON → parsed correctly with business_verified=true. Unit test: mock returns empty results → returns None. Unit test: mock returns 500 five times → circuit breaker opens, 6th call returns error without network request. Unit test: 10s timeout is configured on the reqwest client.

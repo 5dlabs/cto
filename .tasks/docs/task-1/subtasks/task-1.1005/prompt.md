@@ -1,19 +1,22 @@
-Implement subtask 1005: Deploy Valkey CR via Redis operator
+Implement subtask 1005: Configure Cloudflare R2 bucket and credentials
 
 ## Objective
-Deploy the Valkey 7.2 instance using the existing `redis.redis.opstreelabs.in/v1beta2` operator in the `sigma1-db` namespace.
+Provision the sigma1-assets R2 bucket with the required sub-prefix structure and store R2 API credentials as a Kubernetes Secret (or ExternalSecret).
 
 ## Steps
-1. Create `Redis` CR YAML named `sigma1-valkey` in `sigma1-db` namespace using API version `redis.redis.opstreelabs.in/v1beta2`:
-   - `spec.kubernetesConfig.image: valkey/valkey:7.2-alpine`
-   - `spec.kubernetesConfig.resources.limits.memory: 256Mi`
-   - `spec.kubernetesConfig.resources.limits.cpu: 250m`
-   - `spec.kubernetesConfig.resources.requests.memory: 128Mi`
-   - `spec.kubernetesConfig.resources.requests.cpu: 100m`
-   - Standalone mode (no cluster, no sentinel for dev)
-2. Apply the Redis CR.
-3. Wait for the Valkey pod to reach Running state.
-4. Verify the service `sigma1-valkey.sigma1-db.svc.cluster.local:6379` is reachable.
+1. Determine provisioning method (Cloudflare operator CR or Terraform — see decision point).
+2. If using Terraform:
+   a. Write a Terraform resource `cloudflare_r2_bucket` with name `sigma1-assets`.
+   b. Create R2 API token scoped to this bucket with read/write permissions.
+   c. Output the R2 endpoint URL and credentials.
+3. If using Cloudflare operator:
+   a. Create the appropriate CR for R2 bucket provisioning.
+4. R2 doesn't have native folder concepts, but document the sub-prefix convention: `products/`, `social/`, `portfolio/`.
+5. Store credentials as a Kubernetes Secret `sigma1-r2-credentials` in the `sigma1` namespace with keys:
+   - `R2_ACCESS_KEY_ID`
+   - `R2_SECRET_ACCESS_KEY`
+   - `R2_ENDPOINT` (e.g., `https://<account-id>.r2.cloudflarestorage.com`)
+6. Alternatively, if using ExternalSecrets, create the secret in the external store and reference it via an ExternalSecret CR (covered in subtask 1006).
 
 ## Validation
-`kubectl get redis sigma1-valkey -n sigma1-db` shows the CR in a ready state. From a pod in sigma1 namespace: `redis-cli -h sigma1-valkey.sigma1-db.svc.cluster.local PING` returns PONG. `redis-cli INFO server` shows valkey version 7.2.
+R2 bucket `sigma1-assets` is accessible via the S3-compatible API using the stored credentials. A test `PUT` and `GET` operation to `products/test.txt` succeeds. Secret `sigma1-r2-credentials` exists in `sigma1` namespace with all 3 keys populated.

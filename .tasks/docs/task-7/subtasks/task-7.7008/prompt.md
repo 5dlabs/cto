@@ -1,29 +1,30 @@
-Implement subtask 7008: Implement voice integration pipeline (ElevenLabs Conversational AI + Twilio SIP)
+Implement subtask 7008: Deploy Signal-CLI sidecar container with persistent volume and webhook routing
 
 ## Objective
-Configure the voice call pipeline: Twilio receives PSTN calls, forwards to ElevenLabs for speech-to-text, Morgan processes the text and generates a response, ElevenLabs synthesizes speech, and Twilio plays it back to the caller.
+Configure and deploy the signal-cli-rest-api as a sidecar container in the Morgan pod, including persistent volume for device registration data, inbound webhook configuration, and outbound message sending integration.
 
 ## Steps
-1. Twilio configuration:
-   a. Configure Twilio SIP trunk with a phone number for Morgan.
-   b. Set up Twilio webhook URL pointing to the ElevenLabs Conversational AI endpoint (or an intermediary if needed).
-   c. Configure TwiML or Twilio Studio flow to handle call initiation and forwarding.
-2. ElevenLabs Conversational AI setup:
-   a. Configure an ElevenLabs Conversational AI agent that connects to Morgan's text processing.
-   b. Select appropriate voice (professional, clear) for Morgan's persona.
-   c. Configure the speech-to-text → Morgan text API → text-to-speech pipeline.
-   d. Set latency optimization parameters for real-time conversation.
-3. Morgan voice adapter:
-   a. Expose an HTTP endpoint (or use existing WebSocket) that ElevenLabs can call with transcribed text.
-   b. Process the text through Morgan's normal agent pipeline (skills, tools, etc.).
-   c. Return text response for ElevenLabs to synthesize.
-   d. Handle voice-specific responses: keep answers concise for voice, offer to send details via Signal/text.
-4. Call flow management:
-   a. Handle call start: greeting, ask how Morgan can help.
-   b. Handle mid-call tool usage: when Morgan needs to call tools, use filler phrases ('Let me check that for you...').
-   c. Handle call end: summarize what was discussed, offer follow-up via Signal.
-   d. Handle escalation: transfer call to Mike's direct number via Twilio.
-5. Store Twilio credentials (account SID, auth token) and ElevenLabs API key from Kubernetes secrets.
+1. Add signal-cli-rest-api container to the Morgan pod spec as a sidecar:
+   - Image: `bbernhard/signal-cli-rest-api:latest` (or pinned version)
+   - Ports: 8080 (REST API)
+   - Resource limits: 512Mi memory, 250m CPU
+2. Create PersistentVolumeClaim for Signal-CLI data:
+   - Mount path: `/home/.local/share/signal-cli` (default signal-cli data dir)
+   - Size: 1Gi (stores device registration, keys, message history)
+   - Access mode: ReadWriteOnce
+3. Configure signal-cli webhook for incoming messages:
+   - Set environment variable `SIGNAL_CLI_WEBHOOK_URL=http://localhost:<morgan-port>/api/signal/incoming`
+   - This routes all incoming Signal messages to Morgan's HTTP handler
+4. Implement Morgan-side HTTP endpoint `/api/signal/incoming`:
+   - Parse incoming webhook payload: { envelope: { source, sourceDevice, message: { text, attachments } } }
+   - Extract sender phone number, message text, any attachments
+   - Route to conversation state manager with channel='signal'
+5. Implement outbound message function:
+   - Morgan agent → HTTP POST to `http://localhost:8080/v2/send` on signal-cli sidecar
+   - Payload: { message: string, number: string, attachments?: [base64] }
+   - Handle send failures gracefully (queue for retry)
+6. Configure liveness probe for signal-cli: GET /v1/about should return registration status.
+7. Document the one-time device registration process (requires QR code scan or phone number verification) — this must be done manually before the agent can send/receive messages.
 
 ## Validation
-Make a test call to the Twilio number, verify the call connects and ElevenLabs greeting is played. Speak a test query ('Do you have LED panels available next Saturday?'), verify Morgan processes it and a spoken response is returned within 10 seconds. Verify call transfer to Mike's number works when escalation is triggered.
+Verify signal-cli sidecar starts and /v1/about returns 200 with registration info. Send a test POST to /v2/send and verify it's accepted (or returns expected error if not registered). Simulate incoming webhook to /api/signal/incoming and verify Morgan's handler parses the payload correctly. Verify PVC is mounted and persists across pod restarts.

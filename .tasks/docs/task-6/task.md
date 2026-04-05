@@ -1,62 +1,70 @@
-## Develop Social Media Engine (Nova - Node.js/Elysia+Effect)
+## Build Social Media Engine (Nova - Node.js/Elysia + Effect)
 
 ### Objective
-Build the Social Media Engine for automated content curation, AI caption generation, multi-platform publishing (Instagram, LinkedIn, Facebook, TikTok), and Signal-based approval workflow. Uses NATS for async publish pipeline per D4 resolution.
+Implement the Social Media Engine for automated content curation, AI-powered caption generation, multi-platform publishing (Instagram, LinkedIn, Facebook, TikTok), and Signal-based approval workflows. Uses Effect TypeScript for service composition, error handling, and retry logic.
 
 ### Ownership
 - Agent: nova
-- Stack: Node.js 20+/Elysia 1.x + Effect 3.x
+- Stack: Node.js 20+/Elysia + Effect
 - Priority: medium
 - Status: pending
 - Dependencies: 1
 
 ### Implementation Details
-1. Initialize project with Bun runtime, Elysia 1.x framework, Effect 3.x, TypeScript 5.x.
-2. Database: Use `@effect/sql-pg` or `postgres` (postgresjs) library. Migrations for `social` schema:
-   - `uploads` table: id, event_name, uploaded_by, uploaded_at, photo_count.
-   - `photos` table: id, upload_id, r2_key, original_filename, width, height, ai_score (FLOAT), selected (BOOL).
-   - `drafts` table: id, upload_id, platform (instagram/linkedin/facebook/tiktok), caption, hashtags (TEXT[]), image_keys (TEXT[]), status (draft/approved/rejected/published/failed), approved_by, approved_at, published_at, platform_post_id.
-   - `published_posts` table: id, draft_id, platform, post_url, engagement_data (JSONB), published_at.
-3. Implement REST endpoints with Elysia + Effect Schema validation:
-   - `POST /api/v1/social/upload` — accepts multipart form with photos. Upload to R2, store metadata, trigger AI curation pipeline.
-   - `GET /api/v1/social/drafts` — list drafts with pagination and status filter.
-   - `GET /api/v1/social/drafts/:id` — draft detail with photos and caption.
-   - `POST /api/v1/social/drafts/:id/approve` — mark approved, publish to NATS `social.publish` subject.
-   - `POST /api/v1/social/drafts/:id/reject` — mark rejected with optional reason.
-   - `POST /api/v1/social/drafts/:id/publish` — manual publish trigger (also publishes to NATS).
-   - `GET /api/v1/social/published` — list published posts.
-4. AI Curation Pipeline (triggered after upload):
-   - Use OpenAI Vision API (or Claude) to score each photo for composition, lighting quality, brand relevance.
-   - Select top 5-10 images based on score threshold.
-   - Generate platform-specific crops: Instagram square (1:1) + Story (9:16), LinkedIn landscape (1.91:1), TikTok (9:16).
-   - Use `sharp` library for image processing.
-   - Generate captions using OpenAI/Claude with event context, equipment featured, and platform-specific tone.
-   - Create draft records for each platform with appropriate crop + caption.
-5. Effect Service pattern:
-   - `InstagramService` — Instagram Graph API client (Effect.Service)
-   - `LinkedInService` — LinkedIn API client (Effect.Service)
-   - `FacebookService` — Facebook Graph API client (Effect.Service)
-   - `TikTokService` — TikTok API client (Effect.Service)
-   - All use `Effect.retry` with exponential backoff for API delivery.
-6. NATS integration (per D4 — async only for social publish):
-   - Subscribe to `social.publish` subject using `nats` npm package.
-   - On message: call appropriate platform service to publish, update draft status, create published_posts record.
-   - Dead-letter handling: after 3 failed attempts, mark draft as `failed` with error.
-7. R2 integration: Upload photos to Cloudflare R2 via S3-compatible API (`@aws-sdk/client-s3`). Generate CDN URLs for published content.
-8. Health/metrics: `/health/live`, `/health/ready`, `/metrics` (prom-client).
-9. GDPR endpoint: `DELETE /api/v1/gdpr/customer/:id` — delete photos and drafts associated with customer events, remove from R2, return confirmation.
-10. OpenAPI spec generation via Elysia's built-in Swagger plugin.
-11. Dockerfile: Bun-based image. Kubernetes Deployment: namespace sigma1, replicas 1 (medium priority), envFrom ConfigMap, secrets for R2, OpenAI API key, platform API credentials, NATS URL.
+1. Initialize Node.js project with Bun runtime:
+   - `package.json` with Elysia 1.x, Effect 3.x, TypeScript 5.x
+   - biome.js for linting and formatting
+   - `tsconfig.json` with strict mode and Effect plugin
+2. Database migrations (drizzle-orm or kysely) in `social` schema:
+   - `uploads` table: id (UUID PK), event_id (UUID), original_url (R2 key), thumbnail_url, metadata (JSONB: exif, dimensions), uploaded_at
+   - `drafts` table: id (UUID PK), upload_ids (UUID[]), caption, hashtags (TEXT[]), platforms (TEXT[]: instagram/linkedin/facebook/tiktok), status (draft/pending_approval/approved/rejected/published/failed), platform_crops (JSONB: { instagram: {url, aspect}, linkedin: {url, aspect}, tiktok: {url, aspect} }), ai_score (REAL), created_at, updated_at
+   - `published_posts` table: id (UUID PK), draft_id (FK), platform, platform_post_id, published_at, engagement_data (JSONB nullable)
+   - Indexes: drafts(status), drafts(created_at), published_posts(platform, published_at)
+3. Implement Elysia routes:
+   - `POST /api/v1/social/upload` — multipart upload, store originals in R2 `social/` prefix, create upload records, trigger AI curation pipeline
+   - `GET /api/v1/social/drafts` — list drafts with status filter, paginated
+   - `GET /api/v1/social/drafts/:id` — draft detail with image URLs and caption
+   - `POST /api/v1/social/drafts/:id/approve` — transition status to approved
+   - `POST /api/v1/social/drafts/:id/reject` — transition to rejected with optional reason
+   - `POST /api/v1/social/drafts/:id/publish` — publish to selected platforms
+   - `GET /api/v1/social/published` — list published posts with engagement data
+   - `GET /metrics` — Prometheus metrics (prom-client)
+   - `GET /health/live`, `GET /health/ready`
+4. Effect Service layer:
+   - `ImageCurationService` (Effect.Service): score uploaded images using OpenAI Vision API, select top 5-10 by composition quality, lighting, subject clarity
+   - `CaptionService` (Effect.Service): generate platform-specific captions using OpenAI/Claude — event context, equipment featured, relevant hashtags
+   - `CropService` (Effect.Service): generate platform-specific crops — Instagram (1:1 + 9:16 Story), LinkedIn (1.91:1), TikTok (9:16) — using sharp library
+   - `InstagramService` (Effect.Service): publish via Instagram Graph API
+   - `LinkedInService` (Effect.Service): publish via LinkedIn API
+   - `FacebookService` (Effect.Service): publish via Facebook Graph API
+   - `TikTokService` (Effect.Service): publish via TikTok API
+   - All publish services use `Effect.retry` with exponential backoff (base 1s, max 30s, 3 attempts)
+5. AI Curation Pipeline (triggered on upload):
+   - Receive batch of photos → ImageCurationService scores each (0-100) → select top images → CropService generates platform crops → CaptionService generates captions → create Draft with status 'pending_approval'
+6. Publishing Pipeline:
+   - On approve → publish to each selected platform using respective service
+   - Record platform_post_id on success
+   - On any platform failure, record partial success (some platforms published, others failed)
+7. Effect Schema validation on all request/response types.
+8. R2 integration via @aws-sdk/client-s3 (S3-compatible).
+9. RBAC middleware: validate JWT, check role from sigma1-rbac-roles ConfigMap.
+10. Kubernetes Deployment: namespace `sigma1`, 1 replica, envFrom sigma1-infra-endpoints.
 
 ### Subtasks
-- [ ] Initialize Bun/Elysia/Effect project scaffold and database migrations for social schema: Set up the project structure with Bun runtime, Elysia 1.x, Effect 3.x, and TypeScript 5.x. Create database migrations for the social schema including uploads, photos, drafts, and published_posts tables. Configure the Postgres client library and connection pooling via Effect layers.
-- [ ] Implement Cloudflare R2 integration service with S3-compatible client: Build an Effect Service for Cloudflare R2 using @aws-sdk/client-s3 that handles photo uploads, deletion, and CDN URL generation. This service is used by the upload endpoint, AI pipeline, and GDPR deletion.
-- [ ] Implement photo upload endpoint with multipart handling and R2 storage: Build the POST /api/v1/social/upload endpoint that accepts multipart form data with photos, uploads them to R2, extracts image dimensions, and stores metadata in the uploads and photos tables.
-- [ ] Implement draft management REST endpoints with Effect Schema validation: Build the draft listing, detail, approve, reject, and publish endpoints. Also implement the published posts listing endpoint. All endpoints use Effect Schema for request/response validation.
-- [ ] Implement AI photo scoring pipeline with OpenAI Vision API: Build the AI photo scoring service that uses OpenAI Vision API to evaluate each uploaded photo for composition, lighting quality, and brand relevance, then selects the top photos based on score threshold.
-- [ ] Implement platform-specific image cropping pipeline with sharp: Build the image processing service that generates platform-specific crops from selected photos: Instagram square (1:1) and Story (9:16), LinkedIn landscape (1.91:1), Facebook (1.91:1), and TikTok (9:16).
-- [ ] Implement AI caption generation and draft creation pipeline: Build the caption generation service using OpenAI/Claude that creates platform-specific captions with appropriate tone, hashtags, and formatting. Wire the full AI curation pipeline (score → select → crop → caption → create drafts) triggered after upload.
-- [ ] Implement Effect Service clients for Instagram, LinkedIn, Facebook, and TikTok APIs: Build four separate Effect.Service implementations for publishing content to each social media platform via their respective APIs, all with exponential backoff retry logic.
-- [ ] Implement NATS integration for async publish pipeline with dead-letter handling: Build the NATS subscriber that listens to the social.publish subject, dispatches to platform services, updates draft/published_posts records, and handles dead-letter after 3 failed attempts. Wire the approve and publish endpoints to emit NATS messages.
-- [ ] Implement GDPR deletion endpoint with R2 cleanup: Build the DELETE /api/v1/gdpr/customer/:id endpoint that removes all photos, drafts, published posts, and R2 objects associated with a customer's events.
-- [ ] Implement health/metrics endpoints, OpenAPI spec, Dockerfile, and Kubernetes deployment manifest: Add health check endpoints, Prometheus metrics, OpenAPI documentation via Elysia Swagger plugin, Bun-based Dockerfile, and Kubernetes deployment manifest for the sigma1 namespace.
+- [ ] Initialize Bun/Elysia/Effect project with TypeScript configuration: Scaffold the Social Media Engine project with Bun runtime, Elysia web framework, Effect 3.x, TypeScript 5.x strict mode, and biome.js for linting/formatting. Set up the project structure with standard directories for routes, services, migrations, and tests.
+- [ ] Create database migrations for social schema (uploads, drafts, published_posts): Implement database migrations using drizzle-orm (or kysely) for the `social` schema, defining the uploads, drafts, and published_posts tables with all columns, types, indexes, and foreign key constraints as specified.
+- [ ] Implement R2 storage integration via @aws-sdk/client-s3: Create an R2StorageService as an Effect service that handles uploading files to Cloudflare R2 (S3-compatible) under the `social/` prefix, generating presigned URLs for retrieval, and deleting objects.
+- [ ] Implement upload endpoint and draft listing/detail endpoints: Build the Elysia routes for multipart image upload (POST /api/v1/social/upload), draft listing with pagination and status filter (GET /api/v1/social/drafts), and draft detail (GET /api/v1/social/drafts/:id). Integrate R2 for file storage and database for record persistence.
+- [ ] Implement ImageCurationService with OpenAI Vision API scoring: Create the ImageCurationService as an Effect service that scores uploaded images using OpenAI Vision API on composition quality, lighting, and subject clarity, returning scores 0-100 and selecting the top images from a batch.
+- [ ] Implement CropService with sharp for platform-specific image crops: Create the CropService as an Effect service that generates platform-specific image crops using the sharp library: Instagram square (1:1), Instagram Story (9:16), LinkedIn (1.91:1), and TikTok (9:16).
+- [ ] Implement CaptionService with AI-powered caption generation: Create the CaptionService as an Effect service that generates platform-specific captions with relevant hashtags using OpenAI/Claude, incorporating event context and equipment details.
+- [ ] Implement AI curation pipeline orchestrating scoring, cropping, and captioning: Build the end-to-end AI curation pipeline that is triggered after image upload: score images via ImageCurationService, select top images, generate platform crops via CropService, generate captions via CaptionService, and create a Draft record with status 'pending_approval'.
+- [ ] Implement Instagram publishing service: Create the InstagramService as an Effect service that publishes images to Instagram via the Instagram Graph API, handling the container creation and publish flow with Effect.retry and exponential backoff.
+- [ ] Implement LinkedIn publishing service: Create the LinkedInService as an Effect service that publishes images to LinkedIn via the LinkedIn API with Effect.retry and exponential backoff.
+- [ ] Implement Facebook publishing service: Create the FacebookService as an Effect service that publishes images to Facebook Pages via the Facebook Graph API with Effect.retry and exponential backoff.
+- [ ] Implement TikTok publishing service: Create the TikTokService as an Effect service that publishes content to TikTok via the TikTok API with Effect.retry and exponential backoff.
+- [ ] Implement approval workflow endpoints and multi-platform publishing pipeline: Build the approve, reject, and publish endpoints with draft status state machine transitions, and the publishing pipeline that dispatches to multiple platform services concurrently with partial failure handling.
+- [ ] Implement RBAC middleware with JWT validation: Create Elysia middleware that validates JWT tokens from incoming requests and checks user roles against the sigma1-rbac-roles ConfigMap for authorization on social media endpoints.
+- [ ] Implement Prometheus metrics and health endpoints: Add Prometheus metrics collection (prom-client) and Kubernetes health/readiness endpoints to the Elysia application.
+- [ ] Define Effect Schema validators for all request/response types: Create comprehensive Effect Schema definitions for all API request bodies, query parameters, and response types to ensure type-safe validation across all endpoints.
+- [ ] Create Kubernetes deployment manifest for social-engine: Write the Kubernetes Deployment, Service, and related manifests for the social-engine in the sigma1 namespace with proper resource configuration, environment injection from sigma1-infra-endpoints ConfigMap, and health probes.

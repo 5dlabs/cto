@@ -1,20 +1,24 @@
-Implement subtask 8004: Build Home page with hero section, CTAs, and Schema.org Organization markup
+Implement subtask 8004: Implement Home page with hero section, featured equipment carousel, and CTAs
 
 ## Objective
-Implement the `/` (Home) route as a statically generated page with a video/image hero background showcasing lighting production, value proposition text, CTA buttons ('Browse Equipment', 'Get a Quote', 'Chat with Morgan'), and Schema.org Organization JSON-LD.
+Build the `/` home page with hero section (video/image background showcasing lighting setups), value proposition messaging, CTA buttons (Browse Equipment, Get a Quote, Chat with Morgan), featured equipment carousel, and testimonial section. Server-rendered static content.
 
 ## Steps
-1. Create `app/page.tsx` as a Server Component (static generation).
+1. Create `app/page.tsx` as a Server Component (static rendering).
 2. Hero section:
-   - Full-viewport height with video background (or high-quality image fallback) showing lighting/production work.
-   - Overlay gradient for text readability.
-   - H1 with company tagline, supporting paragraph.
-   - CTA buttons using shadcn Button: 'Browse Equipment' → `/equipment`, 'Get a Quote' → `/quote`, 'Chat with Morgan' → triggers chat widget open.
-3. Below hero: brief sections for Services overview, Featured Equipment (static or fetched at build), Testimonials/social proof.
-4. SEO metadata in `generateMetadata`: title, description, OpenGraph (og:image, og:title, og:description, og:url), Twitter Card.
-5. Schema.org JSON-LD script in head: Organization type with name, url, logo, description, contactPoint.
-6. Use Next.js `<Image>` component for all images with proper alt text, sizes, priority for hero image.
-7. Responsive layout: hero text and CTAs stack vertically on mobile, side-by-side on desktop.
+   - Full-viewport-height section with background media (image or video — use a placeholder optimized image initially).
+   - Overlay with headline: tagline like "One platform, one conversation".
+   - Three CTA buttons: Browse Equipment (→ /equipment), Get a Quote (→ /quote), Chat with Morgan (triggers chat widget open).
+   - The 'Chat with Morgan' CTA needs a client component wrapper to dispatch a custom event or call a context method to open the chat widget.
+3. Featured equipment carousel:
+   - Horizontal scrollable card carousel (use CSS scroll-snap or a lightweight approach — no heavy carousel library).
+   - Each card: product image, name, day rate, category badge.
+   - Data: fetch from Equipment Catalog API at build time (or SSR), limit to ~8 featured/popular items.
+4. Testimonial section:
+   - 2-3 static testimonial cards with quote, author name, company.
+   - Simple grid layout.
+5. Add SEO metadata via Next.js `metadata` export: title, description, Open Graph tags, Schema.org Organization JSON-LD.
+6. Optimize images with `next/image` component, proper sizing, and priority loading for hero image.
 
 ## Validation
-Integration test: render Home page, verify H1 text present, all 3 CTA buttons rendered with correct hrefs. Verify Schema.org JSON-LD script tag contains Organization type with required fields. Verify OpenGraph meta tags present in document head. Responsive test at 375px and 1440px widths.
+Render the home page and verify: hero section is full viewport height, all 3 CTA buttons are present and link to correct routes, featured equipment carousel renders cards with images and prices, Schema.org JSON-LD is present in page source. Lighthouse performance score >= 90.

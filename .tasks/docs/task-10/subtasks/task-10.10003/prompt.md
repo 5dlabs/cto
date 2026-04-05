@@ -1,20 +1,16 @@
-Implement subtask 10003: HA scaling: PostgreSQL and Valkey resource tuning and Valkey Sentinel evaluation
+Implement subtask 10003: Create CronJob for JWT token rotation with graceful rollover
 
 ## Objective
-Tune PostgreSQL resource requests/limits based on observed usage from Task 1 (already 2 instances). Evaluate Valkey operator for Sentinel mode support and either configure it or document the single-instance limitation.
+Implement a Kubernetes CronJob that runs every 60 days (30 days before token expiry) to regenerate all service JWT tokens, update Secrets, and trigger rolling restarts of services to pick up new tokens without downtime.
 
 ## Steps
-Step-by-step:
-1. For PostgreSQL (CloudNativePG cluster CR):
-   - Review current `resources.requests` and `resources.limits` in the cluster CR.
-   - Check observed usage via `kubectl top pods` in `sigma1-db` namespace.
-   - Set requests to ~70% of observed peak, limits to ~150% of observed peak.
-   - Ensure `instances: 2` is set (verify from Task 1).
-2. For Valkey:
-   - Check the Valkey operator CRD documentation for Sentinel/HA support.
-   - If supported: update the Valkey CR to enable Sentinel mode with 3 Sentinel processes and 1 replica.
-   - If not supported: create a `VALKEY_HA_LIMITATION.md` document describing the single-instance limitation, blast radius, and recommended remediation (operator upgrade or Redis Cluster mode in Phase 2).
-   - Set appropriate `resources.requests` and `resources.limits` on the Valkey pod (e.g., 256Mi request, 512Mi limit for memory).
+1. Create a CronJob `jwt-token-rotation` scheduled to run every 60 days (tokens expire at 90 days, rotation at 60 days provides 30-day overlap).
+2. The CronJob runs the same token generation logic as the deploy-time Job (can reuse the same container image).
+3. After updating all 6 token Secrets, the CronJob triggers rolling restarts of all Deployments by patching an annotation (e.g., `kubectl rollout restart deployment/<name>` for each service).
+4. The ServiceAccount for this CronJob needs permissions to: update Secrets, patch Deployments (for rollout restart).
+5. Add a ConfigMap annotation or label with last-rotation-timestamp for observability.
+6. Ensure graceful rollover: during the rolling restart, both old and new tokens should be valid (the old token has 30 more days of validity, and verifiers only check signature + expiry, so this is inherently safe).
+7. Add `concurrencyPolicy: Forbid` and `successfulJobsHistoryLimit: 3`.
 
 ## Validation
-Verify PostgreSQL resource tuning by running `kubectl describe pod` on PG pods and confirming requests/limits are set. For Valkey, either verify Sentinel is running (`kubectl exec` into Valkey pod and run `valkey-cli info sentinel`) or verify the limitation document exists at the expected path.
+Trigger the CronJob manually. Verify all 6 token Secrets are updated (compare token values before and after). Verify all service Deployments perform rolling restarts. Decode new tokens and confirm valid claims. Verify old tokens are still valid (not yet expired). Verify services remain available during rotation (zero-downtime).

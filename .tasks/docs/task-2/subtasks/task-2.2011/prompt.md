@@ -1,20 +1,17 @@
-Implement subtask 2011: Create seed data script with 24 categories and sample products
+Implement subtask 2011: Implement Valkey caching layer for categories and products
 
 ## Objective
-Write a SQL seed data file with 24 equipment rental categories and representative sample products with realistic specs, pricing, and availability data for development.
+Add Valkey-based caching for category list (5-minute TTL) and product detail (1-minute TTL with invalidation on update), keeping availability queries uncached.
 
 ## Steps
-1. Create `catalog/seed/seed_data.sql`.
-2. Insert 24 categories representing equipment rental domains (e.g., Cameras, Lenses, Lighting, Audio, Grip, Drones, Monitors, Tripods, Power, Cable/Connectors, etc.) with appropriate parent-child hierarchy (e.g., 'Cameras' -> 'Cinema Cameras', 'DSLR/Mirrorless').
-3. Insert at least 30 sample products across categories with:
-   - Realistic names (e.g., 'ARRI ALEXA Mini LF', 'Sony FX6')
-   - Populated JSONB specs (sensor size, resolution, weight, etc.)
-   - Realistic day_rates
-   - SKU and barcode values
-   - Placeholder image_urls (e.g., `/images/products/{sku}.jpg`)
-4. Insert availability data for the next 90 days for all products (e.g., quantity_total between 1-5).
-5. Insert a few sample bookings to demonstrate availability reduction.
-6. Add a `Makefile` target or script: `make seed` that runs `psql < seed_data.sql` or `sqlx` equivalent.
+1. Create `cache.rs` module with generic cache helpers.
+2. Implement `async fn get_or_set<T: Serialize + DeserializeOwned>(valkey: &Pool, key: &str, ttl_secs: u64, fetch: impl Future<Output=Result<T>>) -> Result<T>` — check Valkey for key, return deserialized value if present, otherwise call fetch, serialize to JSON, SET with EX ttl, return value.
+3. Category caching: wrap the categories query in the GET /categories handler with `get_or_set("catalog:categories", 300, ...)`. 
+4. Product detail caching: wrap GET /products/:id query with `get_or_set(format!("catalog:product:{id}"), 60, ...)`.
+5. Cache invalidation on PATCH /products/:id: after successful update, DEL `catalog:product:{id}` from Valkey.
+6. Cache invalidation on POST /products: DEL `catalog:categories` key (since product counts change).
+7. Availability queries: explicitly document and verify these bypass the cache entirely.
+8. Add cache hit/miss metrics using shared-observability (counter: `cache_hits_total`, `cache_misses_total` with label `cache_name`).
 
 ## Validation
-Run the seed script against a fresh database (after migrations). Verify 24 categories exist with correct hierarchy. Verify 30+ products exist with non-null specs, day_rates, and SKUs. Verify availability rows cover the next 90 days. Query the availability endpoint for a seeded product and verify realistic data appears.
+Integration tests: (1) GET /categories twice, verify second request is faster (cache hit). (2) Verify Valkey contains `catalog:categories` key after first GET. (3) GET /products/:id, verify product cached in Valkey. (4) PATCH product, verify cache key deleted. (5) Verify availability endpoint does NOT set any cache keys. (6) Verify cache_hits_total metric increments on cache hit via /metrics endpoint.

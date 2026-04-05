@@ -1,27 +1,24 @@
-Implement subtask 3012: Implement health checks, Prometheus metrics, and structured logging
+Implement subtask 3012: Implement RBAC validation and JWT authentication middleware
 
 ## Objective
-Add gRPC health checking protocol, REST health endpoints, Prometheus metrics via grpc-prometheus, and structured logging with slog throughout the service.
+Create gRPC interceptors for JWT token validation from Authorization headers and RBAC role checking against the sigma1-rbac-roles ConfigMap.
 
 ## Steps
-1. Health checks in `internal/health/health.go`:
-   - Implement `grpc.health.v1.Health` service: `Check` and `Watch` RPCs.
-   - Liveness: always SERVING if process is running.
-   - Readiness: check pgx pool connectivity (`pool.Ping(ctx)`), return NOT_SERVING if DB unreachable.
-   - Register on gRPC server.
-2. REST health endpoints on grpc-gateway mux:
-   - `GET /health/live` → 200 if process running.
-   - `GET /health/ready` → 200 if DB connected, 503 otherwise.
-3. Prometheus metrics:
-   - Add `grpc-prometheus` server interceptors (unary + stream) to gRPC server.
-   - Initialize `grpc_prometheus.EnableHandlingTimeHistogram()`.
-   - Mount `/metrics` endpoint on HTTP mux using `promhttp.Handler()`.
-   - Add custom business metrics: `rms_opportunities_converted_total`, `rms_conflict_detections_total`, `rms_gdpr_deletions_total` as Prometheus counters.
-4. Structured logging:
-   - Configure `slog.NewJSONHandler` as default logger in `cmd/server/main.go`.
-   - Add `slog` logging to all service methods: log request start (with org_id, method), log errors, log completion with duration.
-   - Add gRPC logging interceptor using `slog` for request/response metadata.
-   - Include request_id in log context (extract from gRPC metadata or generate UUID).
+1. Create `internal/middleware/auth.go`:
+   - Unary interceptor that extracts JWT from gRPC metadata 'authorization' key
+   - Validate JWT signature (configurable: shared secret via env var or JWKS URL)
+   - Extract claims: user_id, roles, exp
+   - Reject expired tokens with Unauthenticated error
+   - Inject validated claims into context for downstream handlers
+2. Create `internal/middleware/rbac.go`:
+   - Read `sigma1-rbac-roles` ConfigMap JSON on startup (path from env var, e.g., /etc/config/rbac-roles.json)
+   - ConfigMap format: map of role names to arrays of allowed RPC method patterns (e.g., `{"admin": ["*"], "operator": ["/sigma1.rms.v1.OpportunityService/*", "/sigma1.rms.v1.ProjectService/*"]}`)
+   - Unary interceptor that checks if any of the user's roles grant access to the current RPC method
+   - Return PermissionDenied if no matching role
+   - Watch file for changes and reload (fsnotify or periodic)
+3. Create `internal/middleware/chain.go` to compose auth + RBAC interceptors in correct order (auth first, then RBAC).
+4. Allow configurable bypass for health check RPCs.
+5. Create stream interceptor variants for any streaming RPCs (future-proofing).
 
 ## Validation
-1) Health: start server, call gRPC Health.Check → SERVING. Call /health/live → 200. Call /health/ready with DB up → 200. Stop DB container, call /health/ready → 503. 2) Metrics: send 5 gRPC requests, scrape /metrics, verify grpc_server_handled_total counter = 5. Convert an opportunity, verify rms_opportunities_converted_total = 1. 3) Logging: capture log output during a request, verify JSON format with org_id, method, duration fields.
+Unit test: valid JWT passes auth interceptor and claims are in context. Expired JWT returns Unauthenticated. Missing token returns Unauthenticated. RBAC test: user with 'operator' role can access OpportunityService but not admin-only endpoints. User with 'admin' role can access everything. Health check RPCs bypass auth.

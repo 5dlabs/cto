@@ -1,22 +1,41 @@
-Implement subtask 10005: Network policies: allow sigma1 services to sigma1-db namespace (PostgreSQL and Valkey)
+Implement subtask 10005: Create GDPR audit logging database schema and migration
 
 ## Objective
-Create NetworkPolicy allowing sigma1 service pods to reach PostgreSQL on port 5432 and Valkey on port 6379 in the sigma1-db namespace.
+Define the `audit` schema with `audit_log`, `data_export_requests`, and `data_deletion_requests` tables as a CNPG init migration, ensuring all tables have proper indexes and constraints.
 
 ## Steps
-Step-by-step:
-1. Create `netpol-allow-db.yaml` with two NetworkPolicy resources:
-   a. **PostgreSQL egress** from sigma1:
-      - `podSelector: {}` (all sigma1 pods)
-      - `policyTypes: [Egress]`
-      - `egress[0].to[0].namespaceSelector.matchLabels: {name: sigma1-db}`, `egress[0].ports: [{protocol: TCP, port: 5432}]`
-   b. **Valkey egress** from sigma1:
-      - Same structure but port 6379.
-2. Create corresponding **ingress** policies in the `sigma1-db` namespace:
-   a. Allow ingress from `sigma1` namespace pods on port 5432 for PostgreSQL pods.
-   b. Allow ingress from `sigma1` namespace pods on port 6379 for Valkey pods.
-3. Ensure namespaces have labels: `sigma1-db` namespace needs `name: sigma1-db`, `sigma1` namespace needs `name: sigma1`.
-4. Also allow DNS egress (port 53 TCP/UDP to kube-system) so pods can resolve service names.
+1. Create a SQL migration file for CNPG initialization that creates the `audit` schema.
+2. Create `audit.audit_log` table:
+   - `id` UUID PRIMARY KEY DEFAULT gen_random_uuid()
+   - `service_name` VARCHAR(100) NOT NULL
+   - `action` VARCHAR(20) NOT NULL CHECK (action IN ('create', 'read', 'update', 'delete', 'export'))
+   - `entity_type` VARCHAR(100) NOT NULL
+   - `entity_id` VARCHAR(255) NOT NULL
+   - `actor_service` VARCHAR(100) NOT NULL
+   - `actor_user_id` VARCHAR(255) NULLABLE
+   - `timestamp` TIMESTAMPTZ NOT NULL DEFAULT NOW()
+   - `request_metadata` JSONB DEFAULT '{}'
+   - Index on (service_name, timestamp)
+   - Index on (entity_type, entity_id)
+   - Index on (actor_user_id) WHERE actor_user_id IS NOT NULL
+3. Create `audit.data_export_requests` table:
+   - `id` UUID PRIMARY KEY DEFAULT gen_random_uuid()
+   - `customer_id` VARCHAR(255) NOT NULL
+   - `requested_at` TIMESTAMPTZ NOT NULL DEFAULT NOW()
+   - `completed_at` TIMESTAMPTZ NULLABLE
+   - `export_url` TEXT NULLABLE
+   - `expires_at` TIMESTAMPTZ NULLABLE
+   - Index on (customer_id)
+4. Create `audit.data_deletion_requests` table:
+   - `id` UUID PRIMARY KEY DEFAULT gen_random_uuid()
+   - `customer_id` VARCHAR(255) NOT NULL
+   - `requested_at` TIMESTAMPTZ NOT NULL DEFAULT NOW()
+   - `completed_at` TIMESTAMPTZ NULLABLE
+   - `services_purged` TEXT[] DEFAULT '{}'
+   - Index on (customer_id)
+5. Add the migration to the CNPG cluster init SQL ConfigMap or initdb section.
+6. Grant INSERT on audit.audit_log to the application database role used by services.
+7. Grant INSERT/UPDATE on data_export_requests and data_deletion_requests to the orchestration Job role.
 
 ## Validation
-From a test pod in sigma1 namespace, run `nc -zv <postgres-service>.sigma1-db.svc.cluster.local 5432` and verify connection succeeds. Run `nc -zv <valkey-service>.sigma1-db.svc.cluster.local 6379` and verify success. Attempt connection on port 3306 (MySQL) and verify it is denied.
+Apply the migration to a test CNPG instance. Verify all 3 tables exist in the `audit` schema with correct columns and types. Verify indexes are created. Insert test rows into each table and confirm constraints work (e.g., invalid action value rejected). Verify application role can INSERT into audit_log.

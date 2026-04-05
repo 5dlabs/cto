@@ -1,16 +1,25 @@
-Implement subtask 3014: Generate and validate OpenAPI spec from grpc-gateway annotations
+Implement subtask 3014: Create Dockerfile and Kubernetes deployment manifests
 
 ## Objective
-Generate the OpenAPI v2 specification from protobuf grpc-gateway annotations and validate it for correctness and completeness.
+Create multi-stage Dockerfile for the RMS service and Kubernetes Deployment, Service, and ConfigMap reference manifests for the sigma1 namespace.
 
 ## Steps
-1. Ensure `protoc-gen-openapiv2` is configured in `buf.gen.yaml` with output to `api/openapi/`.
-2. Run `buf generate` to produce the OpenAPI spec files.
-3. Merge per-proto OpenAPI files into a single `api/openapi/rms.swagger.json` using `swagger-cli bundle` or a custom merge script.
-4. Add metadata to the spec: title 'Sigma1 RMS API', version 'v1', description, contact info.
-5. Add security definition for Bearer API key auth: `securityDefinitions: {ApiKeyAuth: {type: apiKey, in: header, name: Authorization}}`.
-6. Verify all endpoints are present: count should match all REST paths defined across 5 services plus GDPR endpoint.
-7. Add Makefile target `openapi-gen` and `openapi-validate`.
+1. Create `Dockerfile`:
+   - Stage 1 (builder): `FROM golang:1.22-alpine AS builder`, install ca-certificates, copy go.mod/go.sum, run `go mod download`, copy source, run `CGO_ENABLED=0 GOOS=linux go build -o /rms-server ./cmd/rms-server/`
+   - Stage 2 (runtime): `FROM gcr.io/distroless/static-debian12`, copy binary from builder, copy migration files to /migrations, EXPOSE 8080 8081, ENTRYPOINT ["/rms-server"]
+2. Create `deploy/deployment.yaml`:
+   - Namespace: sigma1
+   - Deployment: rms-server, 2 replicas
+   - Container: image from registry, ports 8080 (http) and 8081 (grpc)
+   - `envFrom: [{configMapRef: {name: sigma1-infra-endpoints}}]`
+   - Resources: requests 128Mi/125m, limits 256Mi/250m
+   - Liveness probe: httpGet /health/live port 8080, initialDelaySeconds 5
+   - Readiness probe: httpGet /health/ready port 8080, initialDelaySeconds 10
+3. Create `deploy/service.yaml`:
+   - Service type ClusterIP, ports: 8080 (http), 8081 (grpc)
+   - Named ports for Istio/service mesh compatibility
+4. Create `deploy/rbac-configmap.yaml`: example `sigma1-rbac-roles` ConfigMap with default role definitions.
+5. Add `.dockerignore` to exclude unnecessary files.
 
 ## Validation
-1) Run `swagger-cli validate api/openapi/rms.swagger.json` → exits 0 with no errors. 2) Parse spec and verify all expected paths exist: /api/v1/opportunities (GET, POST), /api/v1/opportunities/{id} (GET, PUT), /api/v1/opportunities/{id}/approve (POST), /api/v1/opportunities/{id}/convert (POST), etc. — total ~20+ endpoints. 3) Verify request/response schemas reference correct protobuf-generated types.
+Verify Docker build completes successfully and produces an image under 50MB. Verify `kubectl apply --dry-run=client -f deploy/` succeeds for all manifests. Verify container starts and both ports respond (health check on 8080, gRPC reflection on 8081).

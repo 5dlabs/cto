@@ -1,25 +1,21 @@
-Implement subtask 10012: Pod security: apply PodSecurity Standards restricted profile and image scanning policy
+Implement subtask 10012: Create AlertManager rules for service monitoring and alerting
 
 ## Objective
-Enforce PodSecurity Standards restricted profile on the sigma1 namespace (no root, read-only rootfs, drop all capabilities) and configure image scanning to block critical CVEs.
+Define Prometheus AlertManager rules for: service down (0 ready pods), CNPG replica lag, error rate spikes, certificate/token expiry warnings, and PVC disk usage warnings.
 
 ## Steps
-Step-by-step:
-1. Label the sigma1 namespace with PodSecurity admission labels:
-   ```yaml
-   labels:
-     pod-security.kubernetes.io/enforce: restricted
-     pod-security.kubernetes.io/audit: restricted
-     pod-security.kubernetes.io/warn: restricted
-   ```
-2. Verify all service Deployments comply with restricted profile:
-   - `securityContext.runAsNonRoot: true`
-   - `securityContext.readOnlyRootFilesystem: true` (add emptyDir for `/tmp` if needed)
-   - `securityContext.allowPrivilegeEscalation: false`
-   - `securityContext.capabilities.drop: [ALL]`
-   - `securityContext.seccompProfile.type: RuntimeDefault`
-3. Fix any services that fail validation (e.g., add writable emptyDir volumes for temp files).
-4. For image scanning: if a policy engine (Kyverno/OPA Gatekeeper) is available, create a policy that blocks images with critical CVEs. If not, document the recommended approach and add a CI-level Trivy scan as a gate.
+1. Create a PrometheusRule CR (or AlertManager config) `sigma1-alerts` with the following alert rules:
+2. Critical alerts:
+   - `ServiceDown`: `kube_deployment_status_replicas_available == 0` for any deployment in sigma1 namespace. Severity: critical. For: 1m.
+3. Warning alerts:
+   - `CNPGReplicaLag`: `cnpg_pg_replication_lag > 10` for CNPG clusters. Severity: warning. For: 5m.
+   - `HighErrorRate`: `rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05` per service. Severity: warning. For: 5m.
+   - `TokenExpiryWarning`: custom metric or CronJob-based check that fires when JWT tokens or TLS certificates expire within 14 days. Severity: warning.
+   - `PVCDiskUsage`: `kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes > 0.8` for PVCs in sigma1. Severity: warning. For: 10m.
+4. Configure alert routing: critical → PagerDuty/Slack immediate, warning → Slack channel.
+5. Add labels for routing: `team: sigma1`, `environment: production`.
+6. If a PrometheusRule CRD is available (kube-prometheus-stack), use it. Otherwise, create a ConfigMap with AlertManager rule files.
+7. For token/cert expiry, consider a small CronJob that checks expiry dates and pushes a metric to Prometheus Pushgateway.
 
 ## Validation
-Attempt to deploy a pod in sigma1 with `runAsUser: 0` (root) — verify it is rejected by admission controller with a PodSecurity violation message. Deploy all legitimate services and verify they start successfully under the restricted profile. Run `kubectl get events -n sigma1` and confirm no PodSecurity warnings for production pods.
+Apply the PrometheusRule CR. Verify it is picked up by Prometheus (check Prometheus UI /rules). Scale a deployment to 0 replicas and verify the `ServiceDown` alert fires within 1 minute. Verify alert labels and annotations are correct. Check AlertManager UI to confirm alert routing configuration.

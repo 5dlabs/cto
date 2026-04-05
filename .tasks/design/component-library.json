@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "projectName": "sigma-1-20260404-073027",
+  "projectName": "sigma-1",
   "provider_mode": "stitch",
   "providers": [
     "stitch"
@@ -158,5 +158,5 @@
     }
   ],
   "framer_code_components": [],
-  "generated_at": "2026-04-04T14:32:34.213Z"
+  "generated_at": "2026-04-05T01:31:49.201Z"
 }

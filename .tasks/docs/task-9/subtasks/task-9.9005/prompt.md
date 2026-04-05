@@ -1,17 +1,17 @@
-Implement subtask 9005: Build Quote Builder tab with step-by-step wizard and submission
+Implement subtask 9005: Configure Cloudflare Access policies for admin endpoints
 
 ## Objective
-Implement the Quote tab as a multi-step wizard: equipment selection (searchable list), date range picker, venue input, review screen, and API submission to create an opportunity.
+Set up Cloudflare Access policies to protect admin endpoints and sensitive routes behind authentication.
 
 ## Steps
-1. Create wizard state management using React context or zustand: track current step, selected equipment (array of {productId, quantity}), date range, venue, and contact info.
-2. **Step 1 - Equipment Selector**: Searchable equipment list. Each item shows ProductCard with quantity stepper. Selected items shown as chips/badges at top. 'Next' button enabled when ≥1 item selected.
-3. **Step 2 - Date Range**: Use `@react-native-community/datetimepicker` or Expo's native date picker. Select event start and end dates. Validate end > start.
-4. **Step 3 - Venue Input**: Text input for venue name/address. Optional map integration or just free-text. Add any special instructions textarea.
-5. **Step 4 - Review**: Summary screen showing all `QuoteLineItem` components, dates, venue. Edit buttons to jump back to specific steps. Total estimate if pricing is available.
-6. **Submit**: POST to quotes API with full payload (products, dates, venue). Show loading state during submission. On success, navigate to confirmation screen with quote ID. On failure, show error with retry.
-7. Implement progress indicator (step dots or progress bar) at top of wizard.
-8. Support pre-population: if user tapped 'Add to Quote' from Equipment tab product detail, the product should appear pre-selected in Step 1.
+1. Identify admin endpoints that need protection (e.g., Grafana dashboard, ArgoCD UI, any admin API routes).
+2. Create Cloudflare Access Application configurations:
+   - Define the application domain/path patterns
+   - Configure identity provider integration (e.g., GitHub OAuth, Google, or one-time PIN)
+   - Set access policies: allow specific email addresses or email domains
+3. If using the Cloudflare operator, create Access Application CRs; otherwise, document the Cloudflare dashboard configuration needed.
+4. Test that unauthenticated requests to admin endpoints are redirected to the Cloudflare Access login page.
+5. Test that authenticated requests pass through successfully.
 
 ## Validation
-Wizard flow test: complete all steps with mock data, verify final submission payload contains correct product IDs, quantities, dates, and venue. Step validation: verify 'Next' is disabled when no equipment selected. Date validation: verify end-before-start shows error. Pre-population test: navigate from product detail with product context, verify Step 1 has product pre-selected. Review screen test: verify all QuoteLineItems render correctly.
+Attempt to access an admin endpoint without authentication — verify redirect to Cloudflare Access login page. Authenticate with an allowed identity — verify access is granted. Attempt authentication with a non-allowed identity — verify access is denied.
