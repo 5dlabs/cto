@@ -52,7 +52,7 @@ ARGS_JSON="$(jq -nc \
 RUN_START_EPOCH=$(date +%s)
 
 op run --env-file="$ROOT/intake/local.env.op" -- env \
-  OPENCLAW_MAX_RETRIES=1 \
+  OPENCLAW_MAX_RETRIES=3 \
   INTAKE_PREFLIGHT_BRIDGES_SKIP=true \
   INTAKE_AUDIO_MUTE=true \
   INTAKE_FAN_OUT_CONCURRENCY="${INTAKE_FAN_OUT_CONCURRENCY:-4}" \
