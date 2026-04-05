@@ -1,0 +1,402 @@
+---
+# Morgan OpenClaw Agent
+# =============================================================================
+# CTO-owned Morgan rollout for OVH. This keeps Morgan in the CTO GitOps surface
+# while reusing the canonical OpenClaw chart from openclaw-platform.
+#
+# Notes:
+# - Uses inline Helm values so the app can sync immediately without waiting for
+#   openclaw-platform to add a first-party `agents/morgan/values.yaml`.
+# - The Morgan Discord token/App ID are sourced from the dedicated
+#   `openclaw-messaging-morgan` ExternalSecret.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openclaw-morgan
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: openclaw-morgan
+    app.kubernetes.io/part-of: openclaw
+    app.kubernetes.io/component: avatar
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/openclaw-platform
+    targetRevision: codex/openclaw-2026-2-compat
+    path: charts/openclaw
+    helm:
+      releaseName: openclaw-morgan
+      values: |
+        replicaCount: 1
+        deploymentMode: statefulset
+
+        global:
+          namespace: cto
+          createNamespace: false
+
+        openclawCompat:
+          schemaVersion: "2026.2"
+
+        image:
+          repository: "ghcr.io/5dlabs/agents"
+          tag: "latest"
+          pullPolicy: Always
+
+        imagePullSecrets:
+          - name: ghcr-secret
+
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "1Gi"
+          limits:
+            cpu: "1500m"
+            memory: "4Gi"
+
+        nodeOptions: "--max-old-space-size=4096"
+
+        agent:
+          id: "morgan"
+          name: "Morgan"
+          model: "openai-api/gpt-5.4"
+          heartbeat:
+            every: "12h"
+            target: "last"
+            ackMaxChars: 120
+            prompt: >-
+              If there is no active user request, reply HEARTBEAT_OK and do nothing
+              else. Do not start background work or new tasks on your own.
+          sandbox: "off"
+
+        agentDefaults:
+          thinkingDefault: "low"
+          typingMode: "instant"
+
+        modelDefaults:
+          primary: "openai-api/gpt-5.4"
+          fallbacks:
+            - "google/gemini-2.5-pro"
+            - "anthropic/claude-sonnet-4-20250514"
+            - "openai-api/gpt-5.3-codex"
+
+        secrets:
+          external:
+            apiKeysSecret: "openclaw-api-keys"
+            messagingSecret: "openclaw-messaging-morgan"
+            githubSecret: "openclaw-github"
+
+        messaging:
+          discord:
+            enabled: true
+            accountId: "morgan"
+            tokenSecretKey: "DISCORD_TOKEN_MORGAN"
+            allowBots: false
+            dm:
+              policy: "allowlist"
+            allowFrom:
+              - "444519104808878090"
+              - "1467013771548426291"
+              - "1466937419981918220"
+              - "1466938003451674748"
+              - "1466938424790356253"
+              - "1468829684195135592"
+              - "1466930035356078251"
+              - "1466938744593715210"
+            groupPolicy: "allowlist"
+            guilds:
+              "*":
+                requireMention: true
+                users:
+                  - "444519104808878090"
+                  - "1467013771548426291"
+                  - "1466937419981918220"
+                  - "1466938003451674748"
+                  - "1466938424790356253"
+                  - "1468829684195135592"
+                  - "1466930035356078251"
+                  - "1466938744593715210"
+              "1490117571977019524":
+                requireMention: true
+                slug: "cto-5dlabs"
+                users:
+                  - "444519104808878090"
+                  - "1467013771548426291"
+                  - "1466937419981918220"
+                  - "1466938003451674748"
+                  - "1466938424790356253"
+                  - "1468829684195135592"
+                  - "1466930035356078251"
+                  - "1466938744593715210"
+                channels:
+                  "1490117572711026770":
+                    allow: true
+                    requireMention: false
+                    users:
+                      - "444519104808878090"
+                      - "1466928805384945775"
+                      - "1466898696720617509"
+                      - "1466936388162162731"
+                      - "1467013771548426291"
+                      - "1466937419981918220"
+                      - "1466937061079781458"
+                      - "1466938424790356253"
+                      - "1467592725938573353"
+                      - "1468829684195135592"
+                      - "1466937750329757960"
+                      - "1467274765587972258"
+                      - "1466930035356078251"
+                      - "1466930808010051850"
+                      - "1467347075598651636"
+                      - "1466938744593715210"
+                      - "1467592156209483969"
+
+        tools:
+          acp:
+            enabled: false
+          web:
+            search:
+              enabled: true
+              provider: "perplexity"
+              apiKey: "${BRAVE_API_KEY}"
+              maxResults: 8
+              timeoutSeconds: 20
+              cacheTtlMinutes: 5
+              perplexity:
+                apiKey: "${OPENROUTER_API_KEY}"
+                baseUrl: "https://openrouter.ai/api/v1"
+                model: "perplexity/sonar-pro"
+              grok:
+                apiKey: "${XAI_API_KEY}"
+
+        code:
+          clis:
+            claude:
+              mcp:
+                servers:
+                  context7:
+                    type: "sse"
+                    url: "https://mcp.context7.com/mcp"
+                    headers:
+                      CONTEXT7_API_KEY: "ctx7sk-8b294504-6e43-45e2-85a3-26e9b38c4a1c"
+                  firecrawl:
+                    command: "npx"
+                    args: ["-y", "firecrawl-mcp"]
+                    env:
+                      FIRECRAWL_API_KEY: "${FIRECRAWL_API_KEY}"
+                      HOME: "/home/node"
+                  morph:
+                    command: "npx"
+                    args: ["-y", "@morphllm/morphmcp"]
+                    env:
+                      MORPH_API_KEY: "${MORPH_API_KEY}"
+                      ALL_TOOLS: "false"
+            codex:
+              enabled: true
+            kimi:
+              enabled: true
+              provider: moonshot
+              command: /usr/local/bin/kimi
+              args: []
+
+        storage:
+          size: 20Gi
+          storageClass: "local-path"
+
+        gateway:
+          auth:
+            token: "openclaw-internal"
+          controlUi:
+            enabled: false
+          http:
+            endpoints:
+              chatCompletions:
+                enabled: true
+              responses:
+                enabled: false
+
+        probes:
+          readiness:
+            enabled: false
+
+        memorySearch:
+          enabled: false
+
+        openmemory:
+          enabled: false
+
+        mem0:
+          enabled: false
+
+        session:
+          scope: "per-sender"
+          dmScope: "per-channel-peer"
+
+        nats:
+          url: "nats://nats.messaging.svc.cluster.local:4222"
+          subchart:
+            enabled: true
+          role: "intake"
+
+        plugins:
+          nats-messenger:
+            discord:
+              enabled: true
+              token: "${DISCORD_TOKEN_MORGAN}"
+              guildId: "1490117571977019524"
+              channelId: "1490117572711026770"
+
+        workspace:
+          repos:
+            - name: cto
+              url: "https://github.com/5dlabs/cto.git"
+              branch: "main"
+            - name: openclaw-platform
+              url: "https://github.com/5dlabs/openclaw-platform.git"
+              branch: "main"
+            - name: openclaw
+              url: "https://github.com/openclaw/openclaw.git"
+              branch: "main"
+          files:
+            AGENTS.md: |
+              # AGENTS.md -- Morgan
+
+              You are **Morgan**, the technical program manager for CTO.
+
+              This deployment exists for a low-latency talking-avatar proof of concept.
+              Optimize for fast, spoken, high-signal replies.
+
+              ## Default Interaction Style
+
+              - Sound like a sharp technical PM: calm, direct, practical, collaborative.
+              - Lead with the recommendation, then the reason, then the next step.
+              - Prefer short answers that are easy to say out loud.
+              - Ask at most one clarifying question at a time when blocked.
+              - Avoid long preambles, jargon-heavy speeches, and process theater.
+
+              ## Operating Rules
+
+              - Treat the current user request as the priority. Do not start side quests.
+              - Use available tools when the user asks for action; do not self-limit to chat.
+              - For coding and diagnostic tasks, prefer ACP harnesses over generic shell prose.
+              - In avatar or web chat conversations, prefer one-shot ACP runs first.
+              - When the user asks for a plan, call out risks, dependencies, and go/no-go criteria
+                without turning the answer into bureaucracy.
+              - If you are uncertain, say what you know, what is missing, and the fastest next check.
+
+              ## Voice Demo Constraints
+
+              - Keep default responses under five sentences unless the user asks for depth.
+              - Prefer plain language over jargon, but stay technically accurate.
+              - Stay outcome-focused: align people, scope work, remove blockers, and move the decision forward.
+              - When a tool check succeeds or fails, summarize the result directly and name the next step.
+
+            SOUL.md: |
+              # Morgan -- Soul
+
+              You are **Morgan**, a technically fluent program manager helping the team
+              move from ambiguity to execution.
+
+              ## Personality
+
+              You are steady, confident, younger-sounding, and pragmatic. You do not
+              hype. You do not waffle. You translate messy discussions into a clear plan,
+              clear owners, and a clear next step.
+
+              ## What You Optimize For
+
+              - Fast understanding
+              - Clear prioritization
+              - Honest tradeoffs
+              - Delivery confidence
+              - Team alignment without needless process
+
+            IDENTITY.md: |
+              # IDENTITY.md
+
+              - **Name:** Morgan
+              - **Role:** Technical program manager for the avatar proof of concept
+              - **Primary mode:** Fast, spoken-friendly execution guidance
+              - **Model:** GPT-5.4
+
+            TOOLS.md: |
+              # TOOLS.md -- Morgan
+
+              ## Workspace
+
+              - Root workspace: `/workspace`
+              - CTO repo: `/workspace/repos/cto`
+              - OpenClaw platform: `/workspace/repos/openclaw-platform`
+              - OpenClaw core: `/workspace/repos/openclaw`
+
+              ## Operating Principle
+
+              - When the user asks whether a CLI or runtime works, run a real smoke check.
+              - Prefer ACP sessions for coding agents.
+              - In the avatar or web chat path, prefer ACP `mode: run` with an explicit `cwd`.
+              - Do not claim a tool is unavailable until you have checked it.
+
+              ## Available Coding CLIs
+
+              - Claude Code: `claude --version`
+              - Claude ACP harness: `claude-agent-acp --help`
+              - Codex: `codex --version`
+              - Codex ACP harness: `codex-acp --help`
+              - Gemini: `gemini --version`
+              - Kimi: `kimi --version`
+              - Copilot: `copilot --help`
+              - OpenCode: `opencode --help`
+              - Cursor: `cursor-agent --help`
+              - Droid: `droid --help`
+              - Pi ACP runtime: `pi-acp --help`
+
+            HEARTBEAT.md: |
+              # HEARTBEAT.md -- Morgan
+
+              If there is active user work, continue that work first.
+
+              If idle, keep checks lightweight:
+
+              - Verify Discord is connected.
+              - Verify ACP harness commands still resolve on PATH.
+              - Record meaningful findings in `memory/YYYY-MM-DD.md`.
+
+              Do not start unrelated projects on your own.
+
+            MEMORY.md: |
+              # MEMORY.md -- Morgan
+
+              - This Morgan instance backs the CTO desktop avatar and chat experience.
+              - Coding CLI delegation should prefer ACP sessions over generic shell-only claims.
+              - In the avatar flow, one-shot ACP runs are the safest default for coding tasks
+                until persistent thread-bound ACP sessions are proven stable.
+              - When asked whether a CLI works, prove it with a concrete smoke check and
+                report the result plainly.
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 5
