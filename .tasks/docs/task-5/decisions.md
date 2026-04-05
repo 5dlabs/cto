@@ -1,11 +1,13 @@
 ## Decision Points
 
-- LinkedIn data source: should the LinkedInClient use the official LinkedIn Marketing/Company API (requires partner-level access), a third-party enrichment service (e.g., Proxycurl, Apollo), or a scraping proxy? Each has different cost, reliability, and ToS implications.
-- Commercial credit API provider selection: Creditsafe, Dun & Bradstreet, Experian Business, or another provider? Pricing models and data coverage differ significantly by geography.
-- Circuit breaker implementation: use an existing Rust crate (e.g., `recloser`, `failsafe-rs`) or implement a custom lightweight circuit breaker? Existing crates vary in maintenance status.
-- Should the vetting pipeline steps run sequentially or concurrently (tokio::join! on all external calls)? Concurrent is faster but complicates per-step error handling and partial result storage.
+- Which PostgreSQL operator should be used for managing the main database cluster?
+- Should the Finance and Customer Vetting services be implemented as separate Rust/Axum services or merged into a single multi-domain service?
+- How should multi-tenancy and schema separation be handled in the PostgreSQL database?
+- What authentication and authorization mechanism should be used for service-to-service and user-to-service communication?
+- Which specific credit API provider should be used for credit signal checks (e.g., Dun & Bradstreet, Experian Business, CreditSafe)?
+- How should LinkedIn data be accessed — via official LinkedIn API (Marketing/Community Management), a third-party enrichment service (e.g., Proxycurl, People Data Labs), or web scraping?
 
 ## Coordination Notes
 
 - Agent owner: rex
-- Primary stack: Rust 1.75+/Axum 0.7
+- Primary stack: Rust/Axum

@@ -1,31 +1,20 @@
-Implement subtask 8005: Build Equipment Catalog page with TanStack Table v8, filtering, search, and pagination
+Implement subtask 8005: Implement self-service quote builder page (/quote) with Effect form validation
 
 ## Objective
-Implement the `/equipment` catalog page using TanStack Table v8 with category filtering (24 categories), debounced text search, price range filter, pagination (20 items/page), grid/list view toggle, and column visibility controls. Data fetching via Effect + TanStack Query.
+Build the quote builder page allowing users to select equipment, specify rental details, and submit a quote request, using Effect Schema for form validation.
 
 ## Steps
-1. Create `app/equipment/page.tsx` as a Client Component (interactive table).
-2. Define the TanStack Table v8 instance in `components/sigma1/equipment-table.tsx`:
-   - Columns: image thumbnail, name, category (Badge), day rate (formatted currency), availability indicator.
-   - Column visibility toggle dropdown.
-3. Filter sidebar or top-bar:
-   - Category filter: dropdown/multi-select with all 24 equipment categories. Selecting a category adds it as a query param and refetches.
-   - Text search: Input with 300ms debounce (use a custom `useDebouncedValue` hook). Calls the Equipment Catalog API search endpoint.
-   - Price range filter: min/max inputs or a simple range selector.
-4. Pagination:
-   - Server-side pagination, 20 items per page.
-   - TanStack Table pagination controls: previous, next, page number display, total count.
-5. Grid/list view toggle:
-   - List view: traditional table rows.
-   - Grid view: responsive card grid (3 columns desktop, 2 tablet, 1 mobile).
-   - Toggle state stored in URL search params or local component state.
-6. Data fetching layer in `lib/api/equipment.ts`:
-   - Define Effect services/layers for equipment API calls.
-   - Wrap in TanStack Query hooks: `useEquipmentList({ page, category, search, priceMin, priceMax })`.
-   - Stale time: 1 minute.
-7. Loading state: show Skeleton components while data loads.
-8. Empty state: "No equipment found" message with suggestion to clear filters.
-9. Each product row/card links to `/equipment/[id]`.
+1. Create `app/quote/page.tsx` for the quote builder.
+2. Define the quote form schema using Effect Schema: equipment selections (array of {equipmentId, quantity, duration}), contact info (name, email, phone, company), project details (location, start date, end date, project description).
+3. Build a multi-step or single-page form:
+   - Step 1: Equipment selection (search and add equipment items, set quantity and duration for each).
+   - Step 2: Project details (location, dates, description).
+   - Step 3: Contact information.
+   - Step 4: Review and submit.
+4. Validate each step using Effect Schema with real-time error messages.
+5. On submit, call the quote creation API endpoint. Display success confirmation with quote reference number.
+6. Handle pre-population from /equipment/:id CTA (read query params and pre-fill equipment).
+7. Persist form state in session storage so users don't lose progress on navigation.
 
 ## Validation
-Component test: render equipment table with mock data of 40 items, verify 20 items shown on first page, clicking 'next' shows remaining 20. Test category filter: selecting a category triggers API call with category param. Test search: typing in search input waits 300ms then triggers API call. Test grid/list toggle: switching view changes rendered markup from table to card grid. Verify skeleton loading state appears before data resolves.
+Form renders at /quote. Equipment can be searched and added. Validation errors display for invalid inputs (empty required fields, invalid email, past dates). Valid submission calls the API and shows confirmation. Pre-population from equipment detail page works. Form state persists across page refreshes.

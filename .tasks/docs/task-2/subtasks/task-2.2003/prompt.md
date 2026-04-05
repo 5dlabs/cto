@@ -1,15 +1,21 @@
-Implement subtask 2003: Implement shared-observability crate with Prometheus metrics and structured logging
+Implement subtask 2003: Implement machine-readable equipment-api endpoints
 
 ## Objective
-Build the shared-observability crate providing Prometheus metrics integration for Axum via axum-prometheus and structured JSON logging via tracing + tracing-subscriber.
+Build the machine-readable API endpoints (/equipment-api/catalog and /equipment-api/checkout) designed for AI agent consumption with structured, deterministic response formats.
 
 ## Steps
-1. Create `crates/shared-observability/Cargo.toml` depending on axum-prometheus, tracing, tracing-subscriber (features: json, env-filter), metrics, metrics-exporter-prometheus.
-2. Implement `pub fn init_logging()` — initializes tracing-subscriber with JSON formatter, env-filter reading `RUST_LOG` (default `info`), timestamp in RFC3339.
-3. Implement `pub fn metrics_layer() -> axum_prometheus::PrometheusMetricLayer` — returns the Axum layer that auto-instruments all routes with request_duration_seconds, request_count, etc.
-4. Implement `pub fn metrics_handler() -> impl IntoResponse` — returns the `/metrics` Prometheus text exposition endpoint.
-5. Export a `setup_metrics_route(router: Router) -> Router` helper that adds `GET /metrics` to any Axum router.
-6. Add tracing::instrument re-export for convenient use in services.
+1. Implement `GET /api/v1/equipment-api/catalog`:
+   - Return a structured JSON response optimized for machine parsing.
+   - Include all products with their availability status, categories, pricing tiers (daily/weekly/monthly), and specs.
+   - Use a flat, denormalized format: each item includes inline category name and availability summary.
+   - Support query params: category, available_after (date), min_quantity.
+2. Implement `POST /api/v1/equipment-api/checkout`:
+   - Accept a JSON body with: items (array of {product_id, quantity, start_date, end_date}), customer_info (name, email, phone).
+   - Validate all product IDs exist and quantities are available for the requested dates.
+   - Return a quote summary: line items with calculated pricing, total, and a quote_id for reference.
+   - Do NOT actually create an order; this is a quote/validation endpoint.
+3. Use strongly-typed request/response structs with serde.
+4. Return machine-friendly error codes (not just HTTP status) in error responses for agent consumption.
 
 ## Validation
-Unit test: init_logging() does not panic, metrics_layer() returns a valid layer. Integration test: create a minimal Axum app with the metrics layer, make a request, then GET /metrics and verify it contains `http_requests_total` or equivalent counter. Verify structured log output contains JSON with timestamp, level, message fields.
+Test the catalog endpoint returns all products in the expected flat format with inline category and availability. Test the checkout endpoint with valid items returns a correct quote with pricing math. Test with invalid product IDs, insufficient availability, and malformed dates to verify structured error responses.

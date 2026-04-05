@@ -1,14 +1,17 @@
-Implement subtask 10001: Generate RSA-256 key pair and store as ExternalSecret for JWT signing
+Implement subtask 10001: Define Kubernetes RBAC roles and role bindings for all namespaces and services
 
 ## Objective
-Create the RSA-256 key pair that will be used for service-to-service JWT token signing. Store the private key as an ExternalSecret `sigma1-jwt-signing-key` and distribute the public key via ConfigMap `sigma1-jwt-public-key` so all services can verify tokens.
+Create fine-grained RBAC Role, ClusterRole, RoleBinding, and ClusterRoleBinding resources for all namespaces, ensuring each service's ServiceAccount has least-privilege access to only the Kubernetes resources it needs.
 
 ## Steps
-1. Generate a 2048-bit RSA key pair using openssl or a Kubernetes Job manifest.
-2. Define an ExternalSecret CR `sigma1-jwt-signing-key` that syncs the private key from the external secrets backend (e.g., Cloudflare or Vault) into a Kubernetes Secret in the sigma1 namespace.
-3. Create a ConfigMap `sigma1-jwt-public-key` containing the PEM-encoded public key.
-4. Ensure the ConfigMap is referenced by all service Deployments so they can verify JWT signatures.
-5. Add labels and annotations for secret management tracking (e.g., rotation-schedule, managed-by).
+1. Inventory all ServiceAccounts across all namespaces (one per service).
+2. For each service, identify what Kubernetes API access it needs (e.g., read ConfigMaps, read Secrets in own namespace only).
+3. Create namespace-scoped Roles with minimal permissions (e.g., `get`, `list` on specific resource types).
+4. Create RoleBindings linking each ServiceAccount to its Role.
+5. Create ClusterRoles only for cross-namespace needs (e.g., cloudflared reading tunnel secrets).
+6. Remove any overly permissive default bindings (e.g., `default` SA auto-mounted tokens).
+7. Set `automountServiceAccountToken: false` on all pods that don't need Kubernetes API access.
+8. Store all RBAC manifests in `rbac/` directory in the infra repo, organized by namespace.
 
 ## Validation
-Verify the ExternalSecret CR syncs successfully (status condition Ready=True). Verify the `sigma1-jwt-public-key` ConfigMap exists and contains a valid PEM public key. Verify the private key Secret exists and is not empty. Confirm the public key can verify a test signature made with the private key.
+For each service, exec into a pod and attempt to list resources outside its granted scope (e.g., `kubectl auth can-i list pods --namespace=other-ns`) — verify denied. Verify services can still access their required ConfigMaps and Secrets. Run `kubectl auth can-i --list` for each ServiceAccount and confirm minimal permissions.

@@ -1,17 +1,24 @@
-Implement subtask 2006: Implement Axum router scaffold with health endpoints and application bootstrap
+Implement subtask 2006: Implement admin CRUD endpoints with RBAC authorization
 
 ## Objective
-Create the equipment-catalog binary crate with Axum 0.7 application bootstrap, router composition, shared state (DB pool, Valkey connection), health/liveness/readiness endpoints, and middleware wiring.
+Build admin-only endpoints for creating and updating products and categories, protected by role-based access control middleware.
 
 ## Steps
-1. Create `services/equipment-catalog/Cargo.toml` depending on all shared crates, axum 0.7, tokio, serde, serde_json, uuid, chrono, rust_decimal.
-2. Define `AppState` struct (Clone): pg_pool (PgPool), valkey_pool (redis connection manager), cdn_base_url (String). Implement as Axum state with `FromRef` for sub-extractors.
-3. In `main.rs`: read config from env vars, call shared-db `create_pool`, run migrations, initialize Valkey connection (using `redis` crate with `sigma1-infra-endpoints` VALKEY_URL), call `init_logging()`, build router.
-4. Router composition: nest `/api/v1/catalog` routes, nest `/api/v1/equipment-api` routes, add metrics layer from shared-observability, add auth middleware on protected routes only.
-5. `GET /health/live` — returns 200 `{"status": "ok"}` always.
-6. `GET /health/ready` — calls shared-db `check_health` AND pings Valkey with `PING`; returns 200 if both healthy, 503 with details if either fails.
-7. Bind to `0.0.0.0:8080` (configurable via `PORT` env var), graceful shutdown on SIGTERM.
-8. Create `mod routes`, `mod models`, `mod handlers` module structure.
+1. Implement `POST /api/v1/catalog/products`:
+   - Accept JSON body with all product fields (name, sku, description, category_id, rates, image_key, specs).
+   - Validate required fields and uniqueness constraints (sku).
+   - Insert into DB and return the created product with 201 status.
+2. Implement `PATCH /api/v1/catalog/products/:id`:
+   - Accept partial JSON body; only update provided fields.
+   - Return the updated product.
+3. Implement `POST /api/v1/catalog/categories` and `PATCH /api/v1/catalog/categories/:id` similarly.
+4. Implement RBAC middleware:
+   - Extract JWT or API key from Authorization header.
+   - Verify the token and extract the user's role.
+   - Admin endpoints require `role: admin`.
+   - Return HTTP 401 for missing auth, 403 for insufficient role.
+5. On successful mutation, invalidate relevant Redis cache keys.
+6. Add request logging for all admin operations (who, what, when).
 
 ## Validation
-Integration test: start the application, verify GET /health/live returns 200. Verify GET /health/ready returns 200 when DB and Valkey are available. Verify GET /health/ready returns 503 when DB is unavailable. Verify GET /metrics returns Prometheus text format. Verify the server binds and accepts connections on configured port.
+Verify admin can create and update products and categories with valid auth. Verify non-admin users receive 403. Verify missing auth returns 401. Verify SKU uniqueness constraint returns 409. Verify Redis cache is invalidated after mutations. Verify audit log entries are created for admin operations.

@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. `kubectl get cluster sigma1-postgres -n sigma1 -o jsonpath='{.status.phase}'` returns `Cluster in healthy state`. 2. `psql` connection using each per-service credential succeeds and can CREATE TABLE in its own schema but gets permission denied on other schemas. 3. `redis-cli -u $REDIS_SIGMA1_VALKEY_URL PING` returns PONG. 4. ConfigMap `sigma1-infra-endpoints` contains all 4+ keys with non-empty values. 5. ExternalSecret CRs report `SecretSynced` status. 6. Cilium NetworkPolicy audit log confirms deny rules active. 7. ServiceMonitor CR exists and Prometheus targets page shows sigma1 namespace targets.
+- [ ] Verify all pods (PostgreSQL, Redis, S3/R2, Signal-CLI) are running and accessible. Confirm ConfigMaps and secrets are present and contain valid connection strings. All services can connect to their dependencies using the provided endpoints.
 
 ## Verification Notes
 

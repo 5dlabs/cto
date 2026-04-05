@@ -1,27 +1,20 @@
-Implement subtask 4004: Implement invoice status state machine and send endpoint
+Implement subtask 4004: Implement multi-currency support with scheduled rate sync and Redis caching
 
 ## Objective
-Build the invoice status state machine (draft→sent→viewed→paid→overdue→cancelled) with validation, and implement the POST /api/v1/invoices/:id/send endpoint that marks an invoice as sent.
+Build the currency rate synchronization job that fetches exchange rates from an external API on a schedule, stores them in PostgreSQL, and caches current rates in Redis for fast lookups during invoice and payment operations.
 
 ## Steps
-1. Create `src/services/invoice_state.rs` with an InvoiceStateMachine that defines valid transitions:
-   - draft → sent, cancelled
-   - sent → viewed, paid, overdue, cancelled
-   - viewed → paid, overdue, cancelled
-   - overdue → paid, cancelled
-   - paid → (terminal, no transitions)
-   - cancelled → (terminal, no transitions)
-2. Implement `fn transition(current: InvoiceStatus, target: InvoiceStatus) -> Result<InvoiceStatus, InvalidTransition>` that validates and returns the new status or an error.
-3. Add DB function `update_invoice_status(pool, id, new_status)` that updates status and updated_at, returning the updated invoice. Use a CTE or WHERE clause to ensure the current status allows the transition (optimistic concurrency).
-4. Implement `POST /api/v1/invoices/:id/send` handler:
-   - Fetch invoice, validate current status is 'draft'.
-   - Transition to 'sent', set issued_at = now().
-   - Return 200 with updated invoice.
-   - (Stripe integration for this endpoint will be added in subtask 4006.)
-5. Implement `POST /api/v1/invoices/:id/cancel` handler:
-   - Validate invoice is in a cancellable state.
-   - Transition to 'cancelled'.
-6. Add guards to prevent modification of non-draft invoices (e.g., adding line items to a sent invoice should be rejected).
+1. Create `src/services/currency_service.rs`.
+2. Implement `fetch_rates(base_currency: &str)`: HTTP client call to the chosen exchange rate API (e.g., Open Exchange Rates). Parse response into Vec<CurrencyRate> structs.
+3. Implement `store_rates(rates: Vec<CurrencyRate>)`: batch insert/upsert into currency_rates table with current timestamp.
+4. Implement `cache_rates(rates: Vec<CurrencyRate>)`: store each rate in Redis with key pattern `currency_rate:{base}:{target}` and a TTL of 1 hour.
+5. Implement `get_rate(base: &str, target: &str) -> Result<Decimal>`: first check Redis cache, fallback to PostgreSQL query for most recent rate, return error if no rate found.
+6. Implement `convert_amount(amount: i64, from: &str, to: &str) -> Result<i64>`: use get_rate and perform conversion with proper decimal handling to avoid precision loss.
+7. Create `src/jobs/currency_sync.rs`: implement a tokio::spawn background task that runs the rate sync every configured interval (default: every 6 hours). Use tokio::time::interval.
+8. Create `src/routes/currency.rs`:
+   - GET /api/v1/currency/rates — list current rates
+   - GET /api/v1/currency/convert?amount=X&from=USD&to=EUR — convert amount
+9. Integrate `convert_amount` into invoice service for multi-currency invoice display.
 
 ## Validation
-Unit test: state machine allows all valid transitions and rejects invalid ones (e.g., paid→draft returns error). Integration test: create invoice (draft) → send → verify status is 'sent' and issued_at is set. Integration test: attempt to send an already-sent invoice returns 400/409. Integration test: cancel a draft invoice succeeds; cancel a paid invoice returns error.
+Unit tests: verify rate conversion math with known exchange rates, verify precision is maintained for large amounts. Integration tests: mock external API, run sync job, verify rates stored in DB and cached in Redis. Verify cache fallback: clear Redis, verify DB lookup works. Verify GET /rates returns current rates. Verify GET /convert returns correct converted amount. Verify background job runs on schedule (test with short interval).

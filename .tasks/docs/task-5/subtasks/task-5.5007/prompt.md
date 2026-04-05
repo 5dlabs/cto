@@ -1,25 +1,25 @@
-Implement subtask 5007: Extract shared circuit breaker module
+Implement subtask 5007: Implement vetting REST endpoints and orchestration pipeline
 
 ## Objective
-Extract the circuit breaker pattern into a shared module `src/clients/circuit_breaker.rs` used by all four external API clients, avoiding code duplication.
+Build the Axum REST endpoints (/api/v1/vetting/run, /api/v1/vetting/:org_id, /api/v1/vetting/credit/:org_id) and the orchestration logic that calls all integration modules, runs scoring, and persists results.
 
 ## Steps
-1. Create `src/clients/circuit_breaker.rs`.
-2. Define `CircuitBreaker` struct:
-   - state: `CircuitState` enum (Closed, Open, HalfOpen)
-   - consecutive_failures: u32
-   - failure_threshold: u32 (default 5)
-   - cooldown: Duration (default 30s)
-   - last_failure_at: Option<Instant>
-3. Methods:
-   - `pub fn new(failure_threshold: u32, cooldown: Duration) -> Self`
-   - `pub fn is_available(&self) -> bool` — returns true if Closed, or if Open and past cooldown (transition to HalfOpen)
-   - `pub fn record_success(&mut self)` — reset to Closed, zero failures
-   - `pub fn record_failure(&mut self)` — increment failures, transition to Open if threshold reached
-4. Wrap in `Arc<Mutex<CircuitBreaker>>` for async sharing.
-5. Provide a helper: `pub async fn execute_with_circuit_breaker<F, T>(cb: &Arc<Mutex<CircuitBreaker>>, f: F) -> Result<T, VettingError>` that checks availability, runs the future, records success/failure.
-6. Refactor all four clients (OpenCorporates, LinkedIn, GooglePlaces, Credit) to use this shared module.
-7. Unit test the circuit breaker state machine independently: closed → 5 failures → open → wait cooldown → half-open → success → closed.
+1. Create `src/routes/vetting.rs` module.
+2. Implement POST `/api/v1/vetting/run` endpoint:
+   - Accept JSON body with org_id, org_name, optional jurisdiction and location hints.
+   - Orchestrate parallel calls to OpenCorporates, LinkedIn, Google Reviews, and credit modules using tokio::join! or tokio::JoinSet.
+   - Pass aggregated data to the scoring engine.
+   - Persist VettingResult and LeadScore to PostgreSQL using sqlx.
+   - Return the VettingResult with score and classification in the response.
+3. Implement GET `/api/v1/vetting/:org_id` endpoint:
+   - Query PostgreSQL for the latest VettingResult for the given org_id.
+   - Return 404 if no result found.
+4. Implement GET `/api/v1/vetting/credit/:org_id` endpoint:
+   - Query for credit-specific data from the latest vetting result.
+   - Return structured credit data and score.
+5. Add request validation with proper error responses (400 for bad input, 404 for not found, 500 for internal errors).
+6. Use Axum extractors and State for dependency injection of database pool and API clients.
+7. Wire all routes into the main Axum router.
 
 ## Validation
-Unit test: 5 consecutive record_failure calls transition state to Open. Unit test: in Open state, is_available returns false before cooldown. Unit test: after cooldown, is_available returns true (HalfOpen). Unit test: record_success in HalfOpen transitions to Closed. All four clients compile and pass their existing tests after refactor.
+Write integration tests using a test database and mocked external APIs. Verify POST /vetting/run creates a record and returns correct score. Verify GET /vetting/:org_id retrieves persisted data. Verify GET /vetting/credit/:org_id returns credit-specific data. Test error cases (invalid input, missing org).

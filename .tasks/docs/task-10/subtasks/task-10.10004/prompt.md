@@ -1,22 +1,18 @@
-Implement subtask 10004: Configure secret rotation policies for ExternalSecrets, CNPG, and R2
+Implement subtask 10004: Enable Kubernetes API audit logging
 
 ## Objective
-Set up ExternalSecrets refresh intervals, CNPG database password rotation schedule, R2 API key rotation documentation, and create the operational runbook ConfigMap.
+Configure the Kubernetes API server audit policy to log all authentication, authorization, and resource mutation events, and ship audit logs to the existing log aggregation stack (Loki).
 
 ## Steps
-1. Update all ExternalSecret CRs to set `refreshInterval: 1h` to poll the external secret store hourly.
-2. Configure CNPG cluster CR to enable scheduled password rotation every 90 days (if CNPG supports it natively) or create a CronJob that:
-   - Generates a new password
-   - Updates the CNPG user password via SQL
-   - Updates the corresponding Kubernetes Secret
-   - Triggers rolling restarts of services that use the database
-3. For R2 API key rotation: document the manual process (regenerate key in Cloudflare dashboard → update ExternalSecret source → ExternalSecret syncs within 1 hour).
-4. Create ConfigMap `sigma1-ops-runbooks` containing markdown documentation for:
-   - JWT token manual rotation procedure
-   - Database password rotation procedure
-   - R2 API key rotation procedure
-   - Emergency secret revocation steps
-5. Add annotations to all secret-bearing resources indicating rotation schedule and owner.
+1. Create an audit policy file (`audit-policy.yaml`) with rules:
+   - Log all `create`, `update`, `patch`, `delete` at `RequestResponse` level.
+   - Log all `authentication` events at `Metadata` level.
+   - Log `get`, `list`, `watch` on Secrets at `Metadata` level.
+   - Omit high-volume, low-value events (e.g., health checks, leader election).
+2. Configure the API server to use the audit policy with a log backend (file or webhook).
+3. If using a managed Kubernetes provider, enable the provider's audit log feature and configure export.
+4. Deploy a log shipping agent (e.g., Promtail sidecar or Fluentd) to forward audit logs to Loki.
+5. Verify audit logs appear in Loki with appropriate labels (source=k8s-audit).
 
 ## Validation
-Verify all ExternalSecret CRs have `refreshInterval: 1h`. Verify CNPG password rotation mechanism works by triggering it manually and confirming services reconnect successfully. Verify `sigma1-ops-runbooks` ConfigMap exists and contains all 4 runbook sections. Verify ExternalSecret status shows last refresh within expected interval.
+Create a test Secret in a test namespace and verify the creation event appears in Loki audit logs within 60 seconds. Verify failed authentication attempts are logged. Query Loki for `{source="k8s-audit"}` and confirm structured log entries with user, verb, resource, and timestamp fields.

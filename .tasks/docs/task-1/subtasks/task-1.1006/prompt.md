@@ -1,28 +1,19 @@
-Implement subtask 1006: Create ExternalSecret CRs for third-party API keys
+Implement subtask 1006: Create sigma1-infra-endpoints ConfigMap across all namespaces
 
 ## Objective
-Create ExternalSecret custom resources for all third-party service API keys as placeholders, referencing the chosen external secrets backend.
+Create the `sigma1-infra-endpoints` ConfigMap in each service namespace, aggregating connection strings for PostgreSQL, Redis, S3, Signal-CLI, and all other infrastructure endpoints.
 
 ## Steps
-1. Ensure a `ClusterSecretStore` or `SecretStore` CR exists in the sigma1 namespace pointing to the chosen secrets backend (see decision point).
-2. Create the following ExternalSecret CRs in namespace `sigma1`:
-   a. `sigma1-stripe-keys.yaml`:
-      - Secret keys: `STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`
-      - `refreshInterval: 1h`
-   b. `sigma1-opencorporates-key.yaml`:
-      - Secret key: `OPENCORPORATES_API_KEY`
-   c. `sigma1-social-api-keys.yaml`:
-      - Secret keys: `INSTAGRAM_ACCESS_TOKEN`, `LINKEDIN_ACCESS_TOKEN`, `FACEBOOK_ACCESS_TOKEN`
-   d. `sigma1-elevenlabs-key.yaml`:
-      - Secret key: `ELEVENLABS_API_KEY`
-   e. `sigma1-twilio-keys.yaml`:
-      - Secret keys: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
-   f. `sigma1-openai-key.yaml`:
-      - Secret key: `OPENAI_API_KEY`
-   g. `sigma1-google-calendar-creds.yaml`:
-      - Secret keys: `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_CALENDAR_REFRESH_TOKEN`
-3. For dev/bootstrap, seed placeholder values in the external secrets backend so the ExternalSecret CRs can sync successfully.
-4. Apply all ExternalSecret manifests.
+1. Gather all endpoint values from completed infrastructure deployments:
+   - POSTGRES_URL: from CloudNative-PG cluster secret
+   - REDIS_URL: from Redis operator secret
+   - S3_URL, S3_BUCKET_PRODUCTS, S3_BUCKET_EVENTS: from S3 provisioning
+   - SIGNAL_CLI_URL: from Signal-CLI service
+2. Create a ConfigMap template `sigma1-infra-endpoints` containing all these keys.
+3. Apply this ConfigMap to every service namespace: sigma1, openclaw, social, web, databases.
+4. Use `kubectl apply -f` with namespace overrides or a Kustomize overlay to deploy across namespaces.
+5. Verify each namespace has the ConfigMap with `kubectl -n <ns> get configmap sigma1-infra-endpoints -o yaml`.
+6. Ensure downstream services can reference it via `envFrom: [configMapRef: {name: sigma1-infra-endpoints}]`.
 
 ## Validation
-All 7 ExternalSecret CRs exist in sigma1 namespace: `kubectl get externalsecrets -n sigma1`. Each reports `SecretSynced` condition as True. Corresponding Kubernetes Secrets are created with the expected keys (values can be placeholders). `kubectl get secret sigma1-stripe-keys -n sigma1 -o jsonpath='{.data}'` shows base64-encoded values for both keys.
+For each namespace (sigma1, openclaw, social, web, databases), verify the ConfigMap `sigma1-infra-endpoints` exists and contains all expected keys (POSTGRES_URL, REDIS_URL, S3_URL, SIGNAL_CLI_URL, bucket names). Validate that the values are non-empty and well-formed URLs/connection strings.

@@ -1,21 +1,17 @@
-Implement subtask 5005: Implement GooglePlacesClient with retry and circuit breaker
+Implement subtask 5005: Implement credit API integration module
 
 ## Objective
-Build the Google Places API client module to search for a business and extract reviews rating and count, with retry logic, 10-second timeouts, and circuit breaker.
+Build a Rust module for fetching business credit signals (credit score, payment history, risk indicators) from the selected credit data provider.
 
 ## Steps
-1. Create `src/clients/google_places.rs`.
-2. Define `GooglePlacesClient` struct with: reqwest::Client (10s timeout), api_key (String), circuit breaker state.
-3. Implement `pub async fn search_business(&self, org_name: &str, org_domain: Option<&str>) -> Result<GooglePlacesResult, VettingError>`:
-   - Check circuit breaker.
-   - Call Google Places Text Search endpoint: `https://maps.googleapis.com/maps/api/place/textsearch/json?query={org_name}&key={api_key}`.
-   - Parse first result's place_id.
-   - Call Place Details endpoint for rating and user_ratings_total.
-   - Retry with exponential backoff (3 attempts).
-   - Return `GooglePlacesResult { rating: Option<f32>, review_count: i32 }`.
-4. Handle: no results found (rating=None, count=0), API errors, invalid responses.
-5. Define response structs matching Google Places API JSON shape.
-6. Unit tests with mocked endpoints: successful search with 4.5 rating and 25 reviews, no results found, API error triggers circuit breaker.
+1. Create `src/integrations/credit.rs` module.
+2. Define a `CreditProvider` trait with async methods: `get_credit_report(org_identifier: &str) -> Result<CreditReport>`, `get_credit_score(org_identifier: &str) -> Result<CreditScore>`.
+3. Implement the trait for the chosen credit API provider (pending dp-5-1 resolution). Design the trait so it can be re-implemented for a different provider.
+4. Define domain types: CreditReport { score: Option<u32>, risk_level: RiskLevel, payment_history_rating: Option<PaymentRating>, outstanding_judgments: u32, liens: u32, report_date: DateTime }, CreditScore { score: u32, range_min: u32, range_max: u32 }.
+5. Implement HTTP calls with appropriate authentication (API key or OAuth depending on provider).
+6. Handle provider-specific error codes and map to internal error types.
+7. Add tracing and logging for audit trail of credit checks.
+8. Consider implementing a stub/mock provider for development and testing.
 
 ## Validation
-Unit test: mock returns place with rating 4.5, 25 reviews → GooglePlacesResult { rating: Some(4.5), review_count: 25 }. Unit test: mock returns empty results → GooglePlacesResult { rating: None, review_count: 0 }. Unit test: circuit breaker trips after 5 failures.
+Write unit tests using a mock credit provider implementation. Verify correct deserialization, error handling for unavailable reports, and correct mapping to domain types. Verify the stub provider returns sensible test data.

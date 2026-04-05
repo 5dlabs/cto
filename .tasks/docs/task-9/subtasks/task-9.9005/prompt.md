@@ -1,17 +1,19 @@
-Implement subtask 9005: Configure Cloudflare Access policies for admin endpoints
+Implement subtask 9005: Set up Cloudflare Tunnel ingress for Morgan and web frontend
 
 ## Objective
-Set up Cloudflare Access policies to protect admin endpoints and sensitive routes behind authentication.
+Configure Cloudflare Tunnel (cloudflared) as the ingress mechanism for Morgan backend and the web frontend, replacing or supplementing any existing ingress controller, with secure routing and DNS configuration.
 
 ## Steps
-1. Identify admin endpoints that need protection (e.g., Grafana dashboard, ArgoCD UI, any admin API routes).
-2. Create Cloudflare Access Application configurations:
-   - Define the application domain/path patterns
-   - Configure identity provider integration (e.g., GitHub OAuth, Google, or one-time PIN)
-   - Set access policies: allow specific email addresses or email domains
-3. If using the Cloudflare operator, create Access Application CRs; otherwise, document the Cloudflare dashboard configuration needed.
-4. Test that unauthenticated requests to admin endpoints are redirected to the Cloudflare Access login page.
-5. Test that authenticated requests pass through successfully.
+1. Create a Cloudflare Tunnel via the dashboard or `cloudflared tunnel create`.
+2. Deploy the `cloudflared` connector as a Kubernetes Deployment (2 replicas for HA) in the infra namespace.
+3. Store the tunnel credentials as a Kubernetes Secret.
+4. Configure the tunnel's `config.yaml` (via ConfigMap) with ingress rules:
+   - `morgan.example.com` → `http://morgan-service.<namespace>.svc.cluster.local:<port>`
+   - `app.example.com` → `http://web-frontend-service.<namespace>.svc.cluster.local:<port>`
+   - Catch-all rule returning 404.
+5. Create CNAME DNS records in Cloudflare pointing to the tunnel ID.
+6. Verify connectivity by accessing both URLs externally.
+7. Ensure `cloudflared` has appropriate RBAC (ServiceAccount, Role) in the cluster.
 
 ## Validation
-Attempt to access an admin endpoint without authentication — verify redirect to Cloudflare Access login page. Authenticate with an allowed identity — verify access is granted. Attempt authentication with a non-allowed identity — verify access is denied.
+Access `morgan.example.com` and `app.example.com` from outside the cluster and verify correct responses. Verify tunnel is healthy via `cloudflared tunnel info`. Kill one cloudflared pod and verify the other maintains connectivity. Verify no direct NodePort/LoadBalancer exposure exists for these services.

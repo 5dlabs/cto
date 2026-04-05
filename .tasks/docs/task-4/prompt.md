@@ -1,78 +1,29 @@
-Implement task 4: Build Finance Service (Rex - Rust/Axum)
+Implement task 4: Implement Finance Service (Rex - Rust/Axum)
 
 ## Goal
-Implement the Finance Service handling invoicing, payments, payroll, multi-currency support, and Stripe integration. Uses integer cents with explicit currency fields (per D11). Built within the Cargo workspace established by the Equipment Catalog service.
+Create the Finance API for invoicing, payments, payroll, and financial reporting, including Stripe integration and multi-currency support.
 
 ## Task Context
 - Agent owner: rex
-- Stack: Rust 1.75+/Axum 0.7
+- Stack: Rust/Axum
 - Priority: high
-- Dependencies: 1, 2
+- Dependencies: 1
 
 ## Implementation Plan
-1. Add service crate to existing workspace: `sigma1-services/services/finance/`
-   - Depend on shared-auth, shared-db, shared-error, shared-observability crates
-2. Database migrations in `finance` schema:
-   - `invoices` table: id (UUID PK), project_id (UUID, NOT FK — cross-service reference via API), org_id, invoice_number (UNIQUE, auto-generated sequence), status (enum: draft/sent/viewed/paid/overdue/cancelled), issued_at, due_at, currency (VARCHAR(3)), subtotal_cents (BIGINT), tax_cents (BIGINT), total_cents (BIGINT), paid_amount_cents (BIGINT default 0), stripe_invoice_id (nullable), created_at, updated_at
-   - `invoice_line_items` table: id, invoice_id (FK), description, quantity, unit_price_cents, subtotal_cents
-   - `payments` table: id (UUID PK), invoice_id (FK), amount_cents (BIGINT), currency, method (enum: cash/check/wire/card/stripe), stripe_payment_id (nullable), received_at, created_at
-   - `payroll_entries` table: id, employee_id (UUID), period_start, period_end, type (employee/contractor), hours, rate_cents, total_cents, currency, status, created_at
-   - `currency_rates` table: base_currency, target_currency, rate (DECIMAL(20,10)), fetched_at, PRIMARY KEY (base_currency, target_currency)
-   - Indexes: invoices(project_id), invoices(status), invoices(due_at), payments(invoice_id)
-3. Implement Axum 0.7 endpoints:
-   - `POST /api/v1/invoices` — create invoice (accepts project_id, line items, currency, due_at)
-   - `GET /api/v1/invoices` — list with filters (status, date range, overdue), paginated
-   - `GET /api/v1/invoices/:id` — full invoice with line items and payment history
-   - `POST /api/v1/invoices/:id/send` — mark as sent, trigger Stripe invoice creation if payment method is card/stripe
-   - `POST /api/v1/invoices/:id/paid` — record payment, update paid_amount_cents, auto-transition status to Paid if fully paid
-   - `POST /api/v1/payments` — record standalone payment
-   - `GET /api/v1/payments` — list payments with filters
-   - `GET /api/v1/payments/invoice/:id` — payments for specific invoice
-   - `GET /api/v1/finance/reports/revenue?period=` — revenue report (monthly/quarterly/yearly aggregation)
-   - `GET /api/v1/finance/reports/aging` — AR aging buckets (current, 30, 60, 90+ days)
-   - `GET /api/v1/finance/reports/cashflow` — cash inflows/outflows by period
-   - `GET /api/v1/finance/reports/profitability` — per-project profitability (revenue - costs)
-   - `GET /api/v1/payroll?period=` — payroll summary for period
-   - `POST /api/v1/payroll/entries` — add payroll entry
-   - `GET /api/v1/currency/rates` — current cached rates
-   - Health and metrics endpoints via shared crates
-4. Stripe integration module:
-   - Use `stripe-rust` crate
-   - Create Stripe Invoice when invoice is sent with card/stripe method
-   - Webhook handler `POST /api/v1/webhooks/stripe` for payment_intent.succeeded → auto-record payment
-   - Idempotency: store stripe_invoice_id and stripe_payment_id to prevent duplicates
-5. Currency rate sync:
-   - Background tokio task running every 6 hours
-   - Fetch rates from exchangerate.host or similar free API
-   - Store in currency_rates table, cache in Valkey with 6-hour TTL
-   - Support: USD, CAD, AUD, NZD, EUR, GBP
-6. Tax calculation module:
-   - Configurable tax rates per jurisdiction (GST/HST for Canada, sales tax for US)
-   - Store tax config as JSONB in a `tax_configurations` table
-   - Calculate tax_cents on invoice creation based on customer jurisdiction
-7. Automated overdue detection:
-   - Background task checks invoices where due_at < now() AND status = 'sent', transitions to 'overdue'
-   - Runs every hour
-8. All monetary arithmetic uses `rust_decimal` crate, stored as i64 cents in DB (per D11).
-9. Kubernetes Deployment: namespace `sigma1`, 2 replicas, envFrom sigma1-infra-endpoints.
-10. Invoice number generation: sequential per-org prefix (e.g., PE-2024-0001).
+{"steps":["Initialize Rust 1.75+ project with Axum 0.7, using POSTGRES_URL, REDIS_URL, and Stripe API key from ConfigMap/secrets.","Define Invoice, Payment, and related models as per PRD.","Implement endpoints for invoices, payments, finance reports, payroll, and currency rates.","Integrate Stripe for payment processing and webhooks.","Implement scheduled job for currency rate sync, caching rates in Redis.","Add automated payment reminders and AR aging logic.","Ensure quote-to-invoice conversion is atomic and auditable.","Add Prometheus metrics and health endpoints."]}
 
 ## Acceptance Criteria
-1. Unit test: tax calculation for Canadian GST (5%), Ontario HST (13%), and zero-tax jurisdiction produces correct tax_cents values for known subtotals. 2. Unit test: AR aging report correctly buckets invoices into current/30/60/90+ day categories given test data with various due dates. 3. Integration test: create invoice → send (mock Stripe) → record payment → verify status transitions draft→sent→paid and paid_amount_cents equals total_cents. 4. Integration test: partial payment records correctly, status remains 'sent', paid_amount_cents < total_cents. 5. Integration test: create invoice with CAD currency, verify currency field persists through all operations. 6. Stripe webhook test: POST to /api/v1/webhooks/stripe with valid Stripe signature and payment_intent.succeeded event, verify payment recorded and invoice status updated. 7. Currency rate sync test: mock HTTP response, verify rates stored in DB and cached in Valkey. 8. Overdue detection test: create invoice with due_at in the past and status 'sent', trigger background task, verify status changed to 'overdue'. 9. Performance test: invoice generation (create + persist) completes in < 5 seconds.
+All endpoints return correct data. Stripe payments are processed and recorded. Currency rates are updated and cached. Automated reminders and AR aging reports are generated. Health and metrics endpoints are available.
 
 ## Subtasks
-- Scaffold finance service crate within Cargo workspace: Create the finance service crate under sigma1-services/services/finance/ with proper Cargo.toml dependencies on shared-auth, shared-db, shared-error, shared-observability crates. Set up the main.rs with Axum 0.7 server bootstrap, router skeleton, graceful shutdown, and health/metrics endpoints via shared crates.
-- Implement database migrations for all finance schema tables: Create SQLx migrations for the finance schema including invoices, invoice_line_items, payments, payroll_entries, currency_rates, and tax_configurations tables with all specified columns, enums, indexes, and constraints.
-- Implement invoice CRUD endpoints with line items and invoice number generation: Build the invoice domain model, repository layer, and Axum handlers for creating, listing, and retrieving invoices including line items and sequential per-org invoice number generation.
-- Implement invoice status state machine and send endpoint: Build the invoice status state machine (draft→sent→viewed→paid→overdue→cancelled) with validation, and implement the POST /api/v1/invoices/:id/send endpoint that marks an invoice as sent.
-- Implement payment recording endpoints with partial payment support: Build payment CRUD endpoints including standalone payment recording, invoice-linked payments with automatic status transitions on full payment, and partial payment tracking.
-- Implement Stripe integration module with invoice creation and webhook handler: Build the Stripe integration module using stripe-rust crate: create Stripe invoices when an invoice is sent with card/stripe method, and handle payment_intent.succeeded webhooks with idempotency.
-- Implement tax calculation module with configurable jurisdiction rates: Build the tax calculation module supporting configurable per-jurisdiction tax rates (GST/HST for Canada, sales tax for US) stored in the tax_configurations table, and integrate it into invoice creation.
-- Implement financial reporting endpoints (revenue, AR aging, cashflow, profitability): Build the four financial reporting endpoints: revenue aggregation by period, accounts receivable aging buckets, cash flow by period, and per-project profitability.
-- Implement payroll endpoints for entry management and period summaries: Build payroll entry creation and period-based summary endpoints including support for employee and contractor types.
-- Implement currency rate sync background task with Valkey caching: Build the background tokio task that fetches exchange rates every 6 hours from an external API, stores them in the currency_rates table, and caches them in Valkey with a 6-hour TTL.
-- Implement automated overdue invoice detection background task: Build the hourly background task that detects invoices past their due date and transitions them from sent/viewed to overdue status.
-- Implement Kubernetes deployment manifest for finance service: Create the Kubernetes Deployment, Service, and related manifests for the finance service in the sigma1 namespace with 2 replicas and envFrom sigma1-infra-endpoints ConfigMap.
+- Initialize Rust/Axum project with database schema and migrations: Set up the Rust 1.75+ project with Axum 0.7, SQLx for PostgreSQL, Redis client, and create all database migrations for the finance domain (invoices, payments, payroll, currency_rates, audit_log).
+- Implement invoice CRUD endpoints with quote-to-invoice atomic conversion: Build the invoice management endpoints including create, read, update, list with filtering, and the atomic quote-to-invoice conversion flow that marks the source opportunity and creates the invoice in a single database transaction.
+- Integrate Stripe for payment processing and webhook handling: Implement Stripe payment intent creation, confirmation handling, and webhook endpoint for processing asynchronous payment events (succeeded, failed, refunded).
+- Implement multi-currency support with scheduled rate sync and Redis caching: Build the currency rate synchronization job that fetches exchange rates from an external API on a schedule, stores them in PostgreSQL, and caches current rates in Redis for fast lookups during invoice and payment operations.
+- Implement automated payment reminders and AR aging logic: Build the accounts receivable aging report generation and automated payment reminder system that identifies overdue invoices, categorizes them into aging buckets, and triggers reminder notifications.
+- Implement payroll endpoints: Build the payroll management endpoints for creating, reviewing, and processing payroll records linked to crew members and projects.
+- Add Prometheus metrics and health endpoints: Instrument the Finance service with Prometheus metrics for request counts, latencies, error rates, and business metrics, plus health and readiness probes.
+- End-to-end finance workflow tests: Write comprehensive integration tests covering the full invoice lifecycle, Stripe payment flow, currency conversion, AR aging, payroll, and cross-cutting audit trail.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

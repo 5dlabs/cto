@@ -1,18 +1,15 @@
-Implement subtask 7004: Implement MCP Tool Server — Customer Vetting tool (vet_customer)
+Implement subtask 7004: Integrate Twilio for phone and SIP connectivity
 
 ## Objective
-Define and implement the MCP tool definition for sigma1_vet_customer, mapping to the Customer Vetting service POST endpoint.
+Configure Twilio for inbound/outbound phone calls and SIP trunking, connecting voice calls to the Morgan agent with ElevenLabs voice output.
 
 ## Steps
-1. Create MCP tool definition for `sigma1_vet_customer`:
-   - HTTP: POST /api/v1/vetting/run
-   - Input schema: { customer_name: string, customer_email: string, company?: string, event_type?: string, additional_context?: string }
-   - Output schema: { vetting_id: string, status: 'approved'|'flagged'|'pending_review', risk_score: number, findings: [{ source, result, detail }], recommendation: string }
-   - Description: 'Run a background vetting check on a potential customer before proceeding with a rental quote'
-2. Include Authorization header: `Bearer ${MORGAN_SERVICE_JWT}`
-3. Implement async handling: vetting may take several seconds. If the vetting service returns 202 Accepted with a job ID, implement polling or accept webhook callback.
-4. Map vetting results to conversational language Morgan can relay to the customer (e.g., 'approved' → proceed with quote, 'flagged' → escalate to Mike).
-5. Error handling: service unavailable → inform agent to skip vetting and note it for manual review.
+1. Configure a Twilio phone number and set its webhook URL to point to the Morgan agent's voice endpoint (via ingress or NodePort).
+2. Implement TwiML response handler: on inbound call, stream audio to Morgan, get text response, synthesize via ElevenLabs, stream audio back.
+3. Configure SIP trunk in Twilio for business phone system integration.
+4. Handle call events: answer, hangup, DTMF input, call transfer.
+5. Implement outbound calling capability for Morgan to initiate calls (e.g., follow-up with leads).
+6. Store Twilio Account SID and Auth Token in Kubernetes Secret.
 
 ## Validation
-Invoke sigma1_vet_customer with test customer data and verify correct HTTP POST body. Mock vetting service with 'approved', 'flagged', and 'pending_review' responses and verify each maps correctly. Test timeout/unavailable scenario and verify graceful degradation message.
+Place a test call to the Twilio number; verify Morgan answers and responds with voice. Test SIP trunk connectivity. Verify DTMF handling and call transfer. Check outbound call initiation via API.

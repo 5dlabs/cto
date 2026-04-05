@@ -1,27 +1,14 @@
-Implement subtask 3008: Implement InventoryService gRPC handlers with stock aggregation and barcode scan
+Implement subtask 3008: Implement booking conflict detection across all services
 
 ## Objective
-Implement the InventoryService gRPC server including stock level computation from transaction history and barcode-based item lookup.
+Build a cross-cutting conflict detection system that checks for scheduling conflicts across projects, crew assignments, inventory availability, and delivery windows before confirming bookings.
 
 ## Steps
-1. Create `internal/service/inventory.go` implementing InventoryServiceServer.
-2. Implement GetStockLevel:
-   - Query inventory_transactions for given inventory_item_id
-   - Aggregate: available = SUM(checkin quantities) - SUM(checkout quantities) + initial stock
-   - Return StockLevel with available, reserved (checked out to active projects), total
-3. Implement RecordTransaction:
-   - Validate transaction type (checkout, checkin, transfer)
-   - For checkout: verify sufficient stock, record transaction
-   - For checkin: record transaction
-   - For transfer: record with from_store_id and to_store_id, ensure both are set
-   - Return transaction ID and updated stock level
-4. Implement ScanBarcode:
-   - Accept barcode string
-   - Lookup in inventory system (v1: simple table lookup, barcode column on inventory_items or a barcode_mappings table)
-   - Return resolved inventory_item_id with item details (name, category, current stock level)
-   - Return NOT_FOUND if barcode unrecognized
-5. All operations use proper gRPC error codes.
-6. Register service in gRPC server.
+1. Create `internal/conflicts/` package with a ConflictChecker service.
+2. Implement resource conflict detection: given a project with date range, check (a) all required inventory items are available for those dates, (b) all assigned crew members are available, (c) delivery windows don't overlap with other deliveries for the same address/vehicle.
+3. Expose a CheckConflicts RPC that takes a project_id or proposed booking and returns a list of all conflicts grouped by type (inventory, crew, delivery).
+4. Integrate conflict checking into the ProjectService.CreateProject and ProjectService.UpdateProject flows as a pre-validation step (warn or block based on configuration).
+5. Add an `internal/audit/` package: create an audit_log table, write audit entries for all state-changing operations across services (opportunity status changes, project creation, check-in/check-out, crew assignments, delivery status changes). Each entry records: entity_type, entity_id, action, actor, timestamp, old_value, new_value as JSON.
 
 ## Validation
-Unit test stock aggregation logic with various transaction combinations. Integration test: record checkout, verify stock decreases; record checkin, verify stock increases. Barcode scan test: insert a known barcode mapping, scan it, verify correct inventory_item_id is returned. Test ScanBarcode with unknown barcode returns NOT_FOUND.
+Integration test: create a project with crew and inventory, then attempt to create an overlapping project using the same resources — verify conflicts are detected and returned with correct details. Verify audit log entries are created for all major operations across services. Query audit log by entity_type and entity_id to verify completeness.

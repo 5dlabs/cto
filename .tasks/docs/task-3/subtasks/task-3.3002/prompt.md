@@ -1,21 +1,18 @@
-Implement subtask 3002: Define OpportunityService and ProjectService protobuf schemas with grpc-gateway annotations
+Implement subtask 3002: Define protobuf service definitions for all five RMS domains
 
 ## Objective
-Author `opportunity.proto` and `project.proto` in `proto/sigma1/rms/v1/` with all RPCs, request/response messages, enums, and google.api.http annotations for REST mapping.
+Create .proto files for OpportunityService, ProjectService, InventoryService, CrewService, and DeliveryService with all message types, RPC methods, and grpc-gateway HTTP annotations.
 
 ## Steps
-1. Create `opportunity.proto`:
-   - Package `sigma1.rms.v1`
-   - Enums: OpportunityStatus (PENDING, QUALIFIED, APPROVED, CONVERTED), LeadScore (GREEN, YELLOW, RED)
-   - Messages: Opportunity (all fields from DB schema including nested OpportunityLineItem repeated field), CreateOpportunityRequest, CreateOpportunityResponse, GetOpportunityRequest, GetOpportunityResponse, UpdateOpportunityRequest, UpdateOpportunityResponse, ListOpportunitiesRequest (with pagination: page_size, page_token, filter by status), ListOpportunitiesResponse, ScoreLeadRequest, ScoreLeadResponse
-   - RPCs with google.api.http: CreateOpportunity (POST /api/v1/opportunities), GetOpportunity (GET /api/v1/opportunities/{id}), UpdateOpportunity (PATCH /api/v1/opportunities/{id}), ListOpportunities (GET /api/v1/opportunities), ScoreLead (POST /api/v1/opportunities/{id}/score)
-2. Create `project.proto`:
-   - Enums: ProjectStatus (CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED)
-   - Messages: Project (all DB fields), CreateProjectRequest (from opportunity_id), CreateProjectResponse, GetProjectRequest, GetProjectResponse, UpdateProjectRequest, UpdateProjectResponse, CheckOutRequest (project_id, inventory_item_id, quantity), CheckOutResponse, CheckInRequest, CheckInResponse
-   - RPCs: CreateProject (POST /api/v1/projects), GetProject (GET /api/v1/projects/{id}), UpdateProject (PATCH /api/v1/projects/{id}), CheckOut (POST /api/v1/projects/{id}/checkout), CheckIn (POST /api/v1/projects/{id}/checkin)
-3. Use google.protobuf.Timestamp for all date/time fields.
-4. Run `buf lint` and fix any issues.
-5. Run `buf generate` and verify Go code compiles.
+1. Create `proto/rms/v1/` directory structure.
+2. Define `opportunity.proto`: messages for Opportunity, QuoteLineItem, CreateOpportunityRequest/Response, GetOpportunityRequest/Response, ListOpportunitiesRequest/Response, UpdateOpportunityStatusRequest/Response, ConvertToProjectRequest/Response. RPCs: CreateOpportunity, GetOpportunity, ListOpportunities, UpdateOpportunityStatus, ConvertToProject.
+3. Define `project.proto`: messages for Project, ProjectSchedule, CreateProjectRequest/Response, GetProjectRequest/Response, ListProjectsRequest/Response, UpdateProjectRequest/Response. RPCs: CreateProject, GetProject, ListProjects, UpdateProject.
+4. Define `inventory.proto`: messages for InventoryItem, InventoryTransaction, CheckOutRequest/Response, CheckInRequest/Response, GetItemRequest/Response, ListItemsRequest/Response, ScanBarcodeRequest/Response. RPCs: CheckOutItem, CheckInItem, GetItem, ListItems, ScanBarcode.
+5. Define `crew.proto`: messages for CrewMember, CrewAssignment, AssignCrewRequest/Response, GetCrewMemberRequest/Response, ListCrewRequest/Response, ListAssignmentsRequest/Response. RPCs: AssignCrew, UnassignCrew, GetCrewMember, ListCrew, ListAssignments.
+6. Define `delivery.proto`: messages for Delivery, ScheduleDeliveryRequest/Response, UpdateDeliveryStatusRequest/Response, ListDeliveriesRequest/Response. RPCs: ScheduleDelivery, UpdateDeliveryStatus, ListDeliveries.
+7. Add `google.api.http` annotations on all RPCs for grpc-gateway REST mapping.
+8. Create `buf.gen.yaml` or Makefile target for `protoc` code generation.
+9. Generate Go stubs and grpc-gateway reverse proxy code.
 
 ## Validation
-Run `buf lint` with zero errors. Run `buf generate` and verify generated Go files compile with `go build ./...`. Verify HTTP annotations exist by inspecting generated `.pb.gw.go` files for route registrations.
+All .proto files compile without errors via `protoc` or `buf build`. Generated Go code compiles. HTTP annotations are present and produce valid OpenAPI spec via grpc-gateway's swagger generation.

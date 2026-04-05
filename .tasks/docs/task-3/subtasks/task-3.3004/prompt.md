@@ -1,30 +1,17 @@
-Implement subtask 3004: Create database migrations for all 7 RMS schema tables
+Implement subtask 3004: Implement ProjectService with quote-to-project conversion and Google Calendar integration
 
 ## Objective
-Implement golang-migrate migration files for the `rms` schema including all 7 tables (opportunities, opportunity_line_items, projects, inventory_transactions, crew_members, crew_assignments, deliveries) with proper indexes, foreign keys, enums, and constraints.
+Build the ProjectService including atomic quote-to-project conversion (marking opportunity as converted and creating project in a single transaction) and Google Calendar API integration for scheduling.
 
 ## Steps
-1. Install golang-migrate CLI and add `github.com/golang-migrate/migrate/v4` to go.mod.
-2. Create migration `001_create_rms_schema.up.sql`: `CREATE SCHEMA IF NOT EXISTS rms;`
-3. Create migration `002_create_opportunities.up.sql`:
-   - Create enum types: `rms.opportunity_status` (pending, qualified, approved, converted), `rms.lead_score` (green, yellow, red)
-   - `rms.opportunities` table with all columns per details, id as UUID with gen_random_uuid() default, timestamps with defaults
-   - `rms.opportunity_line_items` table with FK to opportunities (ON DELETE CASCADE), subtotal_cents as computed or stored
-   - Indexes: opportunities(status), opportunities(customer_id), opportunities(event_date_start), opportunity_line_items(opportunity_id)
-4. Create migration `003_create_projects.up.sql`:
-   - Create enum: `rms.project_status` (confirmed, in_progress, completed, cancelled)
-   - `rms.projects` table with FK to opportunities (nullable, ON DELETE SET NULL), indexes on status, customer_id, opportunity_id
-5. Create migration `004_create_inventory_transactions.up.sql`:
-   - Create enum: `rms.transaction_type` (checkout, checkin, transfer)
-   - `rms.inventory_transactions` table with nullable project_id FK, indexes on inventory_item_id, project_id, type, timestamp
-6. Create migration `005_create_crew.up.sql`:
-   - `rms.crew_members` table, `rms.crew_assignments` table with FKs to projects and crew_members
-   - Indexes: crew_assignments(project_id), crew_assignments(crew_member_id), composite index on (crew_member_id, start_time, end_time) for conflict detection queries
-7. Create migration `006_create_deliveries.up.sql`:
-   - Create enum: `rms.delivery_status` (scheduled, in_transit, delivered, cancelled)
-   - `rms.deliveries` table with FK to projects, indexes on project_id, status, scheduled_at
-8. Create corresponding `.down.sql` files for each migration.
-9. Create `internal/db/migrate.go` helper function that runs migrations on startup using the database URL from environment.
+1. Create `internal/project/` package with repository, service, and handler layers.
+2. Implement `repository.go` with PostgreSQL queries: CreateProject, GetProjectByID, ListProjects, UpdateProject.
+3. Implement the ConvertToProject flow as a database transaction: (a) verify opportunity status is 'accepted', (b) update opportunity status to 'converted', (c) insert new project linked to opportunity_id, (d) copy relevant data (line items become project items). Rollback entire transaction on any failure.
+4. Create `internal/calendar/` package wrapping Google Calendar API client.
+5. Implement calendar.CreateEvent, calendar.UpdateEvent, calendar.DeleteEvent methods.
+6. On project creation/update with dates, create/update a Google Calendar event and store the calendar_event_id on the project record.
+7. Handle calendar API failures gracefully: log the error, mark calendar_sync_pending flag, do not fail the project creation.
+8. Wire up gRPC handlers and register service.
 
 ## Validation
-Run all up migrations against a clean PostgreSQL database and verify all tables, enums, indexes, and foreign keys are created. Run all down migrations and verify clean rollback. Run up migrations a second time to ensure idempotency. Query pg_catalog to confirm all expected indexes exist.
+Integration test: create an opportunity, accept it, convert to project — verify opportunity is 'converted' and project exists atomically. Verify converting a non-accepted opportunity fails. Mock Google Calendar API client: verify event creation is called with correct dates. Verify calendar failure does not roll back project creation.

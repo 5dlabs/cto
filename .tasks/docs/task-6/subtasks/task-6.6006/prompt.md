@@ -1,24 +1,25 @@
-Implement subtask 6006: Implement CropService with sharp for platform-specific image crops
+Implement subtask 6006: Implement approval workflow with Signal integration via Morgan
 
 ## Objective
-Create the CropService as an Effect service that generates platform-specific image crops using the sharp library: Instagram square (1:1), Instagram Story (9:16), LinkedIn (1.91:1), and TikTok (9:16).
+Build the approval workflow that sends draft content for review via Signal (through Morgan integration) and processes approval/rejection decisions.
 
 ## Steps
-1. Install `sharp`.
-2. Create `src/services/CropService.ts` as an Effect.Service.
-3. Define platform crop specifications:
-   - Instagram square: 1080x1080 (1:1)
-   - Instagram Story: 1080x1920 (9:16)
-   - LinkedIn: 1200x628 (1.91:1)
-   - TikTok: 1080x1920 (9:16)
-4. Implement `generateCrops(imageKey: string, platforms: string[]): Effect.Effect<PlatformCrops, CropError>`:
-   - Download the original image from R2 via R2StorageService.
-   - For each requested platform, use sharp to resize/crop to the target dimensions using `cover` fit with center gravity.
-   - Upload each cropped image to R2 under `social/crops/{platform}/{originalId}_{platform}.jpg`.
-   - Return `PlatformCrops` object: `{ instagram?: { square: { url, width, height }, story: { url, width, height } }, linkedin?: { url, width, height }, tiktok?: { url, width, height } }`.
-5. Define `CropError` as a tagged Effect error.
-6. Create `CropServiceLive` layer depending on R2StorageService.
-7. Handle edge cases: very small images (upscale with sharp), images with unusual aspect ratios.
+1. Create `src/services/approval.ts` module using Effect.Service pattern.
+2. Define an `ApprovalService` with methods: `requestApproval(draftId: string) -> Effect.Effect<ApprovalRequest, ApprovalError>`, `processDecision(approvalId: string, decision: 'approved' | 'rejected', approvedBy: string) -> Effect.Effect<ApprovalResult, ApprovalError>`.
+3. Implement approval request flow:
+   - Fetch the draft with photos and caption.
+   - Send a message to Morgan's API (or webhook) containing draft preview (image URL, caption text, platform).
+   - Morgan forwards to Signal for human review.
+   - Update draft status to 'pending_approval'.
+   - Store the approval request in the `approvals` table.
+4. Implement approval callback:
+   - POST `/api/v1/social/approvals/:id/decide` — accept decision (approved/rejected) with optional feedback.
+   - Update the `approvals` table with decision and timestamp.
+   - Update the `drafts` table status accordingly.
+   - If approved, optionally auto-trigger publishing.
+5. Implement GET `/api/v1/social/approvals` — list pending approvals.
+6. Implement GET `/api/v1/social/approvals/:id` — get approval details.
+7. Handle Morgan unavailability gracefully — queue the approval request for retry.
 
 ## Validation
-Given a 4000x3000 test image, verify CropService produces: Instagram square at 1080x1080, Instagram Story at 1080x1920, LinkedIn at 1200x628, TikTok at 1080x1920. Verify each crop is uploaded to R2 with correct key pattern. Test with a portrait-oriented image (3000x4000) to verify correct cropping behavior.
+Mock Morgan API. Verify requesting approval sends the correct payload to Morgan and updates draft status. Verify approval decision updates both approvals and drafts tables. Verify rejection flow works. Test Morgan unavailability triggers retry logic. List pending approvals and verify filtering.

@@ -1,23 +1,20 @@
-Implement subtask 6007: Implement CaptionService with AI-powered caption generation
+Implement subtask 6007: Implement website portfolio sync via webhook/API
 
 ## Objective
-Create the CaptionService as an Effect service that generates platform-specific captions with relevant hashtags using OpenAI/Claude, incorporating event context and equipment details.
+Build the webhook/API integration that syncs published social media content to the company website portfolio.
 
 ## Steps
-1. Create `src/services/CaptionService.ts` as an Effect.Service.
-2. Define the service interface:
-   - `generateCaption(input: CaptionInput): Effect.Effect<CaptionOutput, CaptionError>`
-   - `CaptionInput`: `{ eventName?: string, eventDescription?: string, imageDescriptions: string[], platforms: string[], tone?: string }`.
-   - `CaptionOutput`: `{ caption: string, hashtags: string[], platformVariants?: Record<string, string> }` — a base caption plus optional per-platform variants (LinkedIn more professional, Instagram more casual, TikTok more trending).
-3. Construct a prompt that:
-   - Includes event context (name, description) if available.
-   - References what's visible in the images (from image descriptions/AI curation metadata).
-   - Requests hashtags relevant to the industry, event, and equipment.
-   - Asks for platform-specific tone adjustments.
-4. Parse the AI response into structured CaptionOutput.
-5. Define `CaptionError` as a tagged Effect error.
-6. Create `CaptionServiceLive` layer depending on OpenAI API key from environment.
-7. Ensure captions respect platform character limits (Instagram 2200, LinkedIn 3000, TikTok 2200, Facebook 63206).
+1. Create `src/services/portfolio-sync.ts` module.
+2. Define a `PortfolioSyncService` Effect.Service with method: `syncPost(publishedPost: PublishedPost) -> Effect.Effect<SyncResult, SyncError>`.
+3. Implement the sync logic:
+   - After successful publishing, prepare a payload with: image URL (S3 presigned or public), caption, platform, published date, external post URL.
+   - Send the payload to the website's portfolio API endpoint (configurable URL from environment).
+   - Alternatively, emit a webhook to a configured URL with the same payload.
+   - Update `published_posts.sync_status` to 'synced' or 'failed'.
+4. Implement a retry mechanism for failed syncs using Effect.Schedule.
+5. Implement GET `/api/v1/social/sync/status` — list sync status of published posts.
+6. Implement POST `/api/v1/social/sync/retry/:postId` — manually retry a failed sync.
+7. Hook the sync into the publishing flow so it triggers automatically after successful publish.
 
 ## Validation
-Unit test with mocked OpenAI: verify generateCaption returns a caption containing the event name, at least 3 hashtags, and platform variants for each requested platform. Test that captions respect character limits for each platform. Test CaptionError is raised on malformed AI response.
+Mock the website portfolio API. Verify sync is triggered after publishing. Verify sync payload contains correct data. Test retry on failed sync. Verify sync_status is updated correctly. Test manual retry endpoint.

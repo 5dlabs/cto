@@ -1,26 +1,15 @@
-Implement subtask 9003: Scale Valkey for production with persistence and PDB
+Implement subtask 9003: Scale backend service replicas for all application services
 
 ## Objective
-Configure Valkey for production use: either sentinel mode (3 nodes) or single-instance with AOF persistence, resource limits, and a PodDisruptionBudget.
+Increase Deployment replica counts for Equipment Catalog, RMS, Finance, Vetting, Social, and Morgan services to at least 2 replicas each, with appropriate PodDisruptionBudgets and anti-affinity rules.
 
 ## Steps
-1. Check Opstree Redis operator documentation for Valkey sentinel support:
-   - If sentinel is supported: create a RedisSentinel CR with 3 sentinel nodes and a RedisReplication CR with 1 master + 2 replicas
-   - If not supported: update existing Valkey CR for single-instance with persistence
-2. For sentinel mode (Option A):
-   - Create RedisSentinel CR: `spec.size: 3`
-   - Create RedisReplication CR: `spec.size: 3` with sentinel reference
-   - Set `spec.redisExporter.enabled: true` for metrics
-3. For single persistent mode (Option B):
-   - Update existing `sigma1-valkey` CR
-   - Enable persistence: add `appendonly yes` and `appendfsync everysec` to Redis config
-   - Ensure PVC is configured for data persistence
-4. Set resource limits on all Valkey pods:
-   - `resources.requests.memory: 512Mi`, `resources.requests.cpu: 250m`
-   - `resources.limits.memory: 512Mi`, `resources.limits.cpu: 250m`
-5. Configure PodDisruptionBudget:
-   - Create a PDB with `maxUnavailable: 1` targeting Valkey pods
-6. Verify all pods are running and persistence is active.
+1. For each service (Equipment Catalog, RMS, Finance, Vetting, Social, Morgan), update the Deployment or Helm values to set `replicas: 2` (minimum) or higher based on expected load.
+2. Add `topologySpreadConstraints` or pod anti-affinity to distribute replicas across nodes.
+3. Add PodDisruptionBudgets with `minAvailable: 1` for each Deployment.
+4. Ensure readiness and liveness probes are properly configured for rolling updates.
+5. Apply all changes and verify each service has the correct number of running, ready pods.
+6. Confirm rolling update strategy is set to `RollingUpdate` with `maxUnavailable: 0` and `maxSurge: 1`.
 
 ## Validation
-Verify Valkey pods are running with correct resource limits via `kubectl describe pod`. Write a key to Valkey, delete the pod, wait for restart, and verify the key persists (proving AOF persistence). If sentinel mode, kill the master and verify failover occurs within 30 seconds.
+Verify each of the 6 services has at least 2 running, ready pods. Perform a rolling restart of one service and confirm zero downtime by continuously hitting its health endpoint. Verify PDBs are created for each service.

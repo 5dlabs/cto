@@ -1,30 +1,16 @@
-Implement subtask 3007: Implement ProjectService gRPC handlers with opportunity conversion and inventory CheckOut/CheckIn
+Implement subtask 3007: Implement DeliveryService with logistics tracking
 
 ## Objective
-Implement the ProjectService gRPC server including project creation from approved opportunities, full CRUD, and CheckOut/CheckIn RPCs that record inventory transactions.
+Build the DeliveryService for scheduling equipment deliveries and pickups linked to projects, with status tracking through the delivery lifecycle.
 
 ## Steps
-1. Create `internal/service/project.go` implementing ProjectServiceServer.
-2. Implement CreateProject:
-   - Accept opportunity_id in request
-   - Verify opportunity exists and status is 'approved' (return FailedPrecondition if not)
-   - Create project record copying relevant fields from opportunity (customer_id, event dates, venue)
-   - Update opportunity status to 'converted' in a database transaction
-   - Return created project
-3. Implement GetProject: lookup by ID, return NOT_FOUND if missing.
-4. Implement UpdateProject: support status transitions (confirmed→in_progress→completed; confirmed→cancelled; in_progress→cancelled). Validate transitions.
-5. Implement CheckOut:
-   - Accept project_id, inventory_item_id, quantity
-   - Verify project exists and is in_progress
-   - Check stock level >= requested quantity via InventoryRepo.GetStockLevel
-   - Record inventory_transaction with type=checkout
-   - Return updated stock level
-6. Implement CheckIn:
-   - Accept project_id, inventory_item_id, quantity
-   - Record inventory_transaction with type=checkin
-   - Return updated stock level
-7. Both CheckOut and CheckIn should be wrapped in database transactions to ensure atomicity.
-8. Register the service in the gRPC server.
+1. Create `internal/delivery/` package with repository, service, and handler layers.
+2. Implement `repository.go`: CreateDelivery, GetDeliveryByID, ListDeliveries (filter by project, status, date range), UpdateDeliveryStatus.
+3. Define delivery status flow: scheduled → in_transit → delivered (for deliveries) and scheduled → in_transit → picked_up (for pickups). Validate transitions.
+4. Implement ScheduleDelivery: create a delivery or pickup record linked to a project_id, with address, scheduled_at, and optional notes.
+5. Implement UpdateDeliveryStatus: validate status transition, record timestamp of each status change.
+6. Implement ListDeliveries with filtering by project_id, type (delivery/pickup), status, and date range.
+7. Wire up gRPC handlers.
 
 ## Validation
-Integration test: full lifecycle CreateOpportunity → approve → CreateProject → verify opportunity status is 'converted'. Test CheckOut reduces stock level and CheckIn restores it. Test CheckOut with insufficient stock returns appropriate error. Test invalid state transitions return FailedPrecondition.
+Integration tests: schedule a delivery for a project, transition through statuses, verify each transition is recorded with timestamps. Verify invalid transitions are rejected. List deliveries filtered by project and status returns correct results. REST endpoints via grpc-gateway return proper JSON.

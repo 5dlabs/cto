@@ -1,16 +1,15 @@
-Implement subtask 10003: Create CronJob for JWT token rotation with graceful rollover
+Implement subtask 10003: Automate secret rotation for API keys and service tokens
 
 ## Objective
-Implement a Kubernetes CronJob that runs every 60 days (30 days before token expiry) to regenerate all service JWT tokens, update Secrets, and trigger rolling restarts of services to pick up new tokens without downtime.
+Implement automated rotation for application-level API keys, inter-service tokens, and third-party API credentials, ensuring all consuming services are updated seamlessly.
 
 ## Steps
-1. Create a CronJob `jwt-token-rotation` scheduled to run every 60 days (tokens expire at 90 days, rotation at 60 days provides 30-day overlap).
-2. The CronJob runs the same token generation logic as the deploy-time Job (can reuse the same container image).
-3. After updating all 6 token Secrets, the CronJob triggers rolling restarts of all Deployments by patching an annotation (e.g., `kubectl rollout restart deployment/<name>` for each service).
-4. The ServiceAccount for this CronJob needs permissions to: update Secrets, patch Deployments (for rollout restart).
-5. Add a ConfigMap annotation or label with last-rotation-timestamp for observability.
-6. Ensure graceful rollover: during the rolling restart, both old and new tokens should be valid (the old token has 30 more days of validity, and verifiers only check signature + expiry, so this is inherently safe).
-7. Add `concurrencyPolicy: Forbid` and `successfulJobsHistoryLimit: 3`.
+1. Inventory all API keys and service tokens used across services (e.g., OpenAI API key, inter-service auth tokens, external API keys).
+2. Create ExternalSecret resources for each, syncing from the external secret store.
+3. For inter-service tokens (e.g., JWT signing keys), implement a dual-key rotation strategy: both old and new keys are valid during a transition period.
+4. Create a CronJob or operator-triggered rotation workflow for each key type.
+5. For third-party API keys that can't be auto-rotated, create alerting when manual rotation is due.
+6. Ensure all services reference these secrets via Kubernetes Secret mounts, not hardcoded values.
 
 ## Validation
-Trigger the CronJob manually. Verify all 6 token Secrets are updated (compare token values before and after). Verify all service Deployments perform rolling restarts. Decode new tokens and confirm valid claims. Verify old tokens are still valid (not yet expired). Verify services remain available during rotation (zero-downtime).
+Trigger rotation of an inter-service token. Verify both old and new tokens are accepted during the transition window. After transition, verify only the new token works. Verify third-party key rotation alerts fire at the configured interval.

@@ -1,30 +1,17 @@
-Implement subtask 4008: Implement financial reporting endpoints (revenue, AR aging, cashflow, profitability)
+Implement subtask 4008: End-to-end finance workflow tests
 
 ## Objective
-Build the four financial reporting endpoints: revenue aggregation by period, accounts receivable aging buckets, cash flow by period, and per-project profitability.
+Write comprehensive integration tests covering the full invoice lifecycle, Stripe payment flow, currency conversion, AR aging, payroll, and cross-cutting audit trail.
 
 ## Steps
-1. Create `src/services/reports.rs` and `src/routes/reports.rs`.
-2. `GET /api/v1/finance/reports/revenue?period=monthly|quarterly|yearly&start=&end=`:
-   - Query: aggregate total_cents from paid invoices grouped by time period using date_trunc.
-   - Return array of { period: string, revenue_cents: i64, currency: string, invoice_count: i64 }.
-   - Filter by org_id from auth context.
-3. `GET /api/v1/finance/reports/aging`:
-   - Query: SELECT invoices WHERE status IN ('sent','viewed','overdue'), compute days_outstanding = now() - due_at.
-   - Bucket into: current (not yet due), 1-30 days, 31-60 days, 61-90 days, 90+ days.
-   - Return { buckets: [{ label, count, total_cents }], total_outstanding_cents }.
-   - Use rust_decimal for all arithmetic.
-4. `GET /api/v1/finance/reports/cashflow?period=monthly&start=&end=`:
-   - Inflows: SUM(amount_cents) from payments grouped by period.
-   - Outflows: SUM(total_cents) from payroll_entries WHERE status='paid' grouped by period.
-   - Return array of { period, inflow_cents, outflow_cents, net_cents }.
-5. `GET /api/v1/finance/reports/profitability?project_id=`:
-   - Revenue: SUM(paid_amount_cents) from invoices for project_id.
-   - Costs: (for v1, costs come from payroll entries linked to the project — add optional project_id to payroll_entries or accept it as a limitation).
-   - Return { project_id, revenue_cents, cost_cents, profit_cents, margin_pct }.
-   - Document that project cost tracking is limited in v1.
-6. All queries must be parameterized with org_id for multi-tenancy.
-7. Register all four routes under `/api/v1/finance/reports/`.
+1. Create `tests/` integration test directory.
+2. Test 1 — Full invoice lifecycle: create invoice from opportunity → add line items → verify totals → send invoice (status: sent) → create Stripe payment intent → simulate Stripe webhook (payment_intent.succeeded) → verify invoice marked as paid → verify payment record → verify audit trail.
+3. Test 2 — Multi-currency: sync currency rates → create invoice in EUR → convert displayed amount to USD → verify conversion accuracy → create payment in EUR → verify amount matches.
+4. Test 3 — AR aging: create invoices with due dates at 0, 35, 65, and 95 days ago → generate aging report → verify each invoice is in the correct bucket → verify totals per bucket.
+5. Test 4 — Payment reminders: create invoice due in 5 days → run reminder processor → verify reminder created → run again → verify no duplicate. Create overdue invoice → run overdue marking → verify status changed.
+6. Test 5 — Payroll flow: create payroll record → verify calculations → approve → process → mark paid → verify audit trail.
+7. Test 6 — Error handling: attempt to pay a cancelled invoice → verify rejection. Send invalid Stripe webhook signature → verify 400. Create payroll with negative hours → verify validation error.
+8. Use testcontainers-rs or dedicated test database.
 
 ## Validation
-Unit test: AR aging buckets correctly categorize invoices — an invoice due yesterday is in '1-30 days', one due 45 days ago is in '31-60 days', one not yet due is 'current'. Integration test: seed 5 invoices with varying due dates and statuses, call aging endpoint, verify bucket counts and totals match. Integration test: seed paid invoices across 3 months, call revenue endpoint with period=monthly, verify each month's total is correct. Integration test: cashflow endpoint returns correct inflows from payments and outflows from payroll entries.
+All integration tests pass with `cargo test --test integration`. Tests cover happy paths, edge cases, and error conditions. Each test is isolated with its own data. Audit log completeness is verified for every state-changing operation. No test interdependencies.

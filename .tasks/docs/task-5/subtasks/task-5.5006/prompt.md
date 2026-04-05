@@ -1,21 +1,21 @@
-Implement subtask 5006: Implement CreditClient with feature flag gating
+Implement subtask 5006: Implement GREEN/YELLOW/RED scoring algorithm with aggregation logic
 
 ## Objective
-Build the commercial credit API client module that is feature-flagged and returns None when not configured, with retry and circuit breaker when active.
+Build the scoring engine that aggregates data from all four external sources (OpenCorporates, LinkedIn, Google Reviews, credit) and computes a composite vetting score classified as GREEN, YELLOW, or RED.
 
 ## Steps
-1. Create `src/clients/credit.rs`.
-2. Define `CreditClient` struct with: reqwest::Client (10s timeout), base_url (Option<String>), api_key (Option<String>), enabled (bool from config/env var `CREDIT_API_ENABLED`), circuit breaker state.
-3. Implement `pub async fn get_credit_score(&self, org_name: &str, org_domain: Option<&str>) -> Result<Option<i32>, VettingError>`:
-   - If !enabled or api_key.is_none(), log `tracing::warn!("Credit API not configured, skipping")` and return Ok(None).
-   - Check circuit breaker.
-   - Make API call to credit provider endpoint.
-   - Parse credit score integer from response.
-   - Retry with exponential backoff (3 attempts).
-   - Return Ok(Some(score)) on success.
-4. Define `CreditResult` struct for internal use.
-5. Ensure the feature flag is read from environment variable at startup and stored in AppState config.
-6. Unit tests: disabled flag → returns None without network call, enabled + success → returns Some(score), enabled + failures → circuit breaker trips.
+1. Create `src/scoring.rs` module.
+2. Define scoring dimensions with weights: business_verification (e.g., 30%), online_presence (e.g., 20%), reputation (e.g., 25%), credit (e.g., 25%). Make weights configurable.
+3. Implement per-dimension scoring functions:
+   - `score_business_verification(data: &BusinessVerificationData) -> DimensionScore` — considers registration status, age, officer count, filing recency.
+   - `score_online_presence(data: &LinkedInProfile) -> DimensionScore` — considers employee count, follower count, description completeness.
+   - `score_reputation(data: &ReputationData) -> DimensionScore` — considers average rating, review count, sentiment.
+   - `score_credit(data: &CreditReport) -> DimensionScore` — considers credit score, risk level, payment history, judgments.
+4. Each DimensionScore contains a normalized 0.0-1.0 score and a confidence level.
+5. Implement `compute_composite_score(dimensions: &[DimensionScore]) -> CompositeScore` that applies weights and produces a final 0.0-1.0 score.
+6. Implement classification: GREEN (>= 0.7), YELLOW (0.4-0.69), RED (< 0.4). Thresholds should be configurable.
+7. Handle missing dimensions gracefully — redistribute weight proportionally among available dimensions.
+8. Return a LeadScore struct with all dimension scores, composite score, and classification.
 
 ## Validation
-Unit test: CREDIT_API_ENABLED=false → returns Ok(None) with no HTTP calls. Unit test: enabled + mock returns score 720 → returns Ok(Some(720)). Unit test: enabled + 5 failures → circuit breaker opens → returns error.
+Write comprehensive unit tests covering: all-green scenario, all-red scenario, mixed scenario, missing dimensions, edge cases at threshold boundaries. Verify weight redistribution works correctly when one or more data sources are unavailable.

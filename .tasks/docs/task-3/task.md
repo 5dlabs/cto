@@ -1,71 +1,26 @@
-## Build Rental Management System Service (Grizz - Go/gRPC)
+## Develop Rental Management System (Grizz - Go/gRPC)
 
 ### Objective
-Implement the full Rental Management System replacing Current RMS — opportunities (quotes), projects, inventory transactions, crew scheduling, and delivery management. Exposes gRPC services natively with grpc-gateway REST for external consumers including Morgan's MCP tools.
+Build the RMS backend for opportunity, project, inventory, crew, and delivery management, exposing both gRPC and REST (grpc-gateway) APIs.
 
 ### Ownership
 - Agent: grizz
-- Stack: Go 1.22+/gRPC
+- Stack: Go/gRPC
 - Priority: high
 - Status: pending
 - Dependencies: 1
 
 ### Implementation Details
-1. Initialize Go module `github.com/5dlabs/sigma1-rms` with Go 1.22+.
-2. Define protobuf files in `proto/sigma1/rms/v1/`:
-   - `opportunity.proto`: CreateOpportunity, GetOpportunity, UpdateOpportunity, ListOpportunities, ScoreLead RPCs with full request/response messages per PRD
-   - `project.proto`: CreateProject, GetProject, UpdateProject, CheckOut, CheckIn RPCs
-   - `inventory.proto`: GetStockLevel, RecordTransaction, ScanBarcode RPCs
-   - `crew.proto`: ListCrew, AssignCrew, ScheduleCrew RPCs
-   - `delivery.proto`: ScheduleDelivery, UpdateDeliveryStatus, OptimizeRoute RPCs
-   - Include grpc-gateway annotations for all RPCs mapping to REST endpoints per PRD
-   - Include google.api.http options for each RPC
-3. Generate Go code with `buf generate` (protoc-gen-go, protoc-gen-go-grpc, protoc-gen-grpc-gateway).
-4. Database migrations (golang-migrate) in `rms` schema:
-   - `opportunities` table: id, customer_id, status (enum: pending/qualified/approved/converted), event_date_start, event_date_end, venue, total_estimate_cents, lead_score (GREEN/YELLOW/RED), notes, created_at, updated_at
-   - `opportunity_line_items` table: id, opportunity_id (FK), product_id, quantity, day_rate_cents, days, subtotal_cents
-   - `projects` table: id, opportunity_id (FK), customer_id, status (confirmed/in_progress/completed/cancelled), confirmed_at, event_date_start, event_date_end, venue_address, crew_notes, created_at
-   - `inventory_transactions` table: id, inventory_item_id, type (checkout/checkin/transfer), project_id (FK nullable), from_store_id, to_store_id, timestamp, user_id
-   - `crew_members` table: id, name, role, phone, email, hourly_rate_cents
-   - `crew_assignments` table: id, project_id (FK), crew_member_id (FK), role, start_time, end_time
-   - `deliveries` table: id, project_id (FK), status, scheduled_at, vehicle_id, driver_id, pickup_address, delivery_address, notes
-   - Indexes on foreign keys and status columns
-5. Implement gRPC service handlers:
-   - OpportunityService: full CRUD, ScoreLead computes GREEN/YELLOW/RED based on vetting data + opportunity value
-   - ProjectService: CreateProject converts an approved opportunity, CheckOut/CheckIn record inventory transactions
-   - InventoryService: stock level aggregation from transactions, barcode scan lookup
-   - CrewService: assignment with conflict detection (double-booking check)
-   - DeliveryService: schedule with basic route info (v1: no optimization, store address fields)
-6. Implement grpc-gateway HTTP server on separate port (8081 for gRPC, 8080 for REST).
-7. Middleware:
-   - RBAC validation reading `sigma1-rbac-roles` ConfigMap JSON, validating JWT service tokens in Authorization header
-   - Request logging with structured JSON (zerolog)
-   - Prometheus metrics via `grpc_prometheus` interceptors + custom HTTP metrics
-   - Health checks: gRPC health service + HTTP /health/live and /health/ready
-8. Conflict detection for crew scheduling: query overlapping assignments before INSERT, return error if conflict.
-9. Google Calendar integration (optional, behind feature flag): on project creation, create calendar event via Google Calendar API.
-10. Kubernetes Deployment manifest:
-    - Namespace: `sigma1`, 2 replicas
-    - `envFrom: configMapRef: sigma1-infra-endpoints`
-    - Ports: 8080 (REST), 8081 (gRPC)
-    - Resource limits: 256Mi memory, 250m CPU
-11. Dockerfile: multi-stage (golang:1.22-alpine builder, distroless runtime).
-12. Connection pooling via pgxpool for PostgreSQL, go-redis/v9 for Valkey.
+{"steps":["Initialize Go 1.22+ project with gRPC and grpc-gateway, using POSTGRES_URL and REDIS_URL from ConfigMap.","Define protobuf services: OpportunityService, ProjectService, InventoryService, CrewService, DeliveryService as per PRD.","Implement REST endpoints via grpc-gateway for all core workflows (quote, project, inventory, crew, delivery).","Integrate Google Calendar API for project/crew scheduling.","Implement barcode scanning and inventory transaction logic.","Add conflict detection for bookings.","Expose Prometheus metrics and health endpoints.","Ensure quote-to-project and check-in/check-out flows are atomic and auditable."]}
 
 ### Subtasks
-- [ ] Initialize Go module and configure buf for protobuf code generation: Set up the Go module `github.com/5dlabs/sigma1-rms` with Go 1.22+, configure buf.yaml and buf.gen.yaml for protoc-gen-go, protoc-gen-go-grpc, and protoc-gen-grpc-gateway code generation. Establish the project directory structure including proto/, cmd/, internal/, migrations/, and deploy/ directories.
-- [ ] Define OpportunityService and ProjectService protobuf schemas with grpc-gateway annotations: Author `opportunity.proto` and `project.proto` in `proto/sigma1/rms/v1/` with all RPCs, request/response messages, enums, and google.api.http annotations for REST mapping.
-- [ ] Define InventoryService, CrewService, and DeliveryService protobuf schemas with grpc-gateway annotations: Author `inventory.proto`, `crew.proto`, and `delivery.proto` in `proto/sigma1/rms/v1/` with all RPCs, messages, and REST annotations.
-- [ ] Create database migrations for all 7 RMS schema tables: Implement golang-migrate migration files for the `rms` schema including all 7 tables (opportunities, opportunity_line_items, projects, inventory_transactions, crew_members, crew_assignments, deliveries) with proper indexes, foreign keys, enums, and constraints.
-- [ ] Implement database access layer with pgxpool connection management: Create the database access layer using pgxpool for connection pooling, including repository interfaces and implementations for all 7 tables with standard CRUD operations and query helpers.
-- [ ] Implement OpportunityService gRPC handlers with ScoreLead logic: Implement the OpportunityService gRPC server with full CRUD operations for opportunities and line items, plus the ScoreLead RPC that computes GREEN/YELLOW/RED based on vetting data and opportunity value.
-- [ ] Implement ProjectService gRPC handlers with opportunity conversion and inventory CheckOut/CheckIn: Implement the ProjectService gRPC server including project creation from approved opportunities, full CRUD, and CheckOut/CheckIn RPCs that record inventory transactions.
-- [ ] Implement InventoryService gRPC handlers with stock aggregation and barcode scan: Implement the InventoryService gRPC server including stock level computation from transaction history and barcode-based item lookup.
-- [ ] Implement CrewService gRPC handlers with scheduling conflict detection: Implement the CrewService gRPC server including crew listing, assignment creation with overlap conflict detection, and bulk scheduling.
-- [ ] Implement DeliveryService gRPC handlers: Implement the DeliveryService gRPC server with delivery scheduling, status updates, and a stub OptimizeRoute endpoint for v1.
-- [ ] Configure grpc-gateway HTTP server with REST endpoint mapping: Set up the grpc-gateway reverse proxy HTTP server on port 8080 that translates REST calls to gRPC calls on port 8081, with proper JSON serialization options.
-- [ ] Implement RBAC validation and JWT authentication middleware: Create gRPC interceptors for JWT token validation from Authorization headers and RBAC role checking against the sigma1-rbac-roles ConfigMap.
-- [ ] Implement structured logging, Prometheus metrics, and health check endpoints: Add zerolog structured JSON logging interceptor, grpc_prometheus metrics interceptors, custom HTTP metrics, and gRPC+HTTP health check endpoints.
-- [ ] Create Dockerfile and Kubernetes deployment manifests: Create multi-stage Dockerfile for the RMS service and Kubernetes Deployment, Service, and ConfigMap reference manifests for the sigma1 namespace.
-- [ ] Implement Valkey (Redis) integration for caching and session support: Add go-redis/v9 client initialization for Valkey connection pooling, reading connection details from the sigma1-infra-endpoints ConfigMap.
-- [ ] Write end-to-end integration tests for full RMS service lifecycle: Create comprehensive integration tests covering the full opportunity-to-project lifecycle, crew conflict detection, inventory tracking, and both gRPC and REST interfaces.
+- [ ] Initialize Go project with gRPC, grpc-gateway, and database migrations: Set up the Go 1.22+ module structure with gRPC server, grpc-gateway reverse proxy, database connection pooling via POSTGRES_URL and REDIS_URL from ConfigMap, and initial database schema migrations for all RMS domain tables (opportunities, projects, inventory_items, inventory_transactions, crew_members, crew_assignments, deliveries).
+- [ ] Define protobuf service definitions for all five RMS domains: Create .proto files for OpportunityService, ProjectService, InventoryService, CrewService, and DeliveryService with all message types, RPC methods, and grpc-gateway HTTP annotations.
+- [ ] Implement OpportunityService with quote workflow: Build the OpportunityService gRPC server implementation including CRUD operations for opportunities/quotes, status transitions (draft → sent → accepted → converted), and line item management.
+- [ ] Implement ProjectService with quote-to-project conversion and Google Calendar integration: Build the ProjectService including atomic quote-to-project conversion (marking opportunity as converted and creating project in a single transaction) and Google Calendar API integration for scheduling.
+- [ ] Implement InventoryService with barcode scanning and check-in/check-out logic: Build the InventoryService with barcode-based item lookup, atomic check-out/check-in transactions linked to projects and crew members, and inventory status tracking.
+- [ ] Implement CrewService with scheduling and calendar sync: Build the CrewService for managing crew members, assigning them to projects with date ranges, detecting scheduling conflicts, and syncing assignments to Google Calendar.
+- [ ] Implement DeliveryService with logistics tracking: Build the DeliveryService for scheduling equipment deliveries and pickups linked to projects, with status tracking through the delivery lifecycle.
+- [ ] Implement booking conflict detection across all services: Build a cross-cutting conflict detection system that checks for scheduling conflicts across projects, crew assignments, inventory availability, and delivery windows before confirming bookings.
+- [ ] Add Prometheus metrics and health endpoints: Instrument all RMS services with Prometheus metrics (request counts, latencies, error rates) and expose health/readiness probe endpoints.
+- [ ] End-to-end workflow validation tests: Write comprehensive end-to-end tests covering the full quote-to-project lifecycle, inventory check-in/check-out workflows, and cross-service interactions.

@@ -1,15 +1,14 @@
-Implement subtask 1001: Create sigma1 Kubernetes namespace
+Implement subtask 1001: Create Kubernetes namespaces for all Sigma-1 service domains
 
 ## Objective
-Create the sigma1 namespace with appropriate labels for network policy selection, monitoring, and resource quota boundaries.
+Create all required Kubernetes namespaces (databases, sigma1, openclaw, social, web, and any others referenced by the architecture) with appropriate labels and annotations for service discovery and RBAC scoping.
 
 ## Steps
-1. Create a namespace manifest `sigma1-namespace.yaml` with:
-   - `metadata.name: sigma1`
-   - Labels: `app.kubernetes.io/part-of: sigma1`, `monitoring: enabled`, `networking: sigma1`
-2. Apply the manifest via `kubectl apply -f sigma1-namespace.yaml`.
-3. Verify the namespace exists and is in Active phase.
-4. This is the prerequisite for every other subtask in this parent task.
+1. Define a YAML manifest (namespaces.yaml) declaring each namespace: databases, sigma1, openclaw, social, web.
+2. Add labels such as `app.kubernetes.io/part-of: sigma1` and `team: <owner>` for each namespace.
+3. Apply the manifest via `kubectl apply -f namespaces.yaml`.
+4. Verify all namespaces exist with `kubectl get namespaces` and confirm labels are correct.
+5. Ensure no naming conflicts with existing cluster namespaces.
 
 ## Validation
-`kubectl get namespace sigma1 -o jsonpath='{.status.phase}'` returns `Active`. Labels `app.kubernetes.io/part-of=sigma1` and `monitoring=enabled` are present.
+Run `kubectl get namespaces` and confirm all expected namespaces (databases, sigma1, openclaw, social, web) exist with correct labels and annotations.

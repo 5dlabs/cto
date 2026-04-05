@@ -1,15 +1,26 @@
-Implement subtask 2002: Implement shared-db crate with sqlx connection pool and health checks
+Implement subtask 2002: Implement public catalog read endpoints
 
 ## Objective
-Build the shared-db crate providing PostgreSQL connection pool initialization via sqlx, migration runner helper, and database health check function, reading connection details from environment variables (sourced from sigma1-infra-endpoints ConfigMap).
+Build the public read-only REST endpoints for browsing the equipment catalog: list categories, list products (with filtering/pagination), get product by ID, and check product availability.
 
 ## Steps
-1. Create `crates/shared-db/Cargo.toml` depending on sqlx (from workspace), shared-error, tracing.
-2. Implement `pub async fn create_pool(database_url: &str) -> Result<PgPool>` — creates an sqlx PgPool with configurable max_connections (env var, default 10), min_connections (2), acquire_timeout (3s), idle_timeout (300s).
-3. Implement `pub async fn run_migrations(pool: &PgPool) -> Result<()>` — wraps `sqlx::migrate!()` macro call.
-4. Implement `pub async fn check_health(pool: &PgPool) -> bool` — executes `SELECT 1` with a 2-second timeout, returns true/false.
-5. Create a `DatabaseConfig` struct that reads `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` from env and constructs the connection URL. These come from the infra-endpoints ConfigMap via `envFrom`.
-6. Re-export PgPool from sqlx for convenience.
+1. Implement `GET /api/v1/catalog/categories`:
+   - Query all categories from DB, return as JSON array.
+   - Support optional `parent_id` query param for sub-category filtering.
+2. Implement `GET /api/v1/catalog/products`:
+   - Support query params: category_id, search (name/sku), page, per_page (default 20, max 100).
+   - Return paginated JSON with items array and total count.
+   - Include product image URL (placeholder; actual signed URL logic in a later subtask).
+3. Implement `GET /api/v1/catalog/products/:id`:
+   - Fetch single product by UUID, return 404 if not found.
+   - Include full product details with specs JSONB.
+4. Implement `GET /api/v1/catalog/products/:id/availability`:
+   - Accept query params: start_date, end_date (required).
+   - Query availability table for the date range.
+   - Return array of {date, available_quantity, total_quantity}.
+5. Use Axum extractors (Query, Path, State) idiomatically.
+6. Implement proper error handling with consistent JSON error responses (status, message).
+7. Add request validation (date format, UUID format, pagination bounds).
 
 ## Validation
-Unit test: DatabaseConfig correctly builds connection URL from env vars. Integration test (requires running PostgreSQL): create_pool connects, run_migrations succeeds, check_health returns true. Test check_health returns false when given an invalid pool/connection.
+Write integration tests seeding 24 categories and 50+ products. Verify: categories endpoint returns all categories; products endpoint supports pagination and filtering; single product endpoint returns correct data or 404; availability endpoint returns correct date-range data. All responses are valid JSON with correct HTTP status codes.

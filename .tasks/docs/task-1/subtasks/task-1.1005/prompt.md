@@ -1,22 +1,17 @@
-Implement subtask 1005: Configure Cloudflare R2 bucket and credentials
+Implement subtask 1005: Deploy Signal-CLI as a standalone pod for Morgan agent
 
 ## Objective
-Provision the sigma1-assets R2 bucket with the required sub-prefix structure and store R2 API credentials as a Kubernetes Secret (or ExternalSecret).
+Deploy Signal-CLI as a dedicated Kubernetes Deployment in the sigma1 namespace, configured to receive and send Signal messages for the Morgan AI agent.
 
 ## Steps
-1. Determine provisioning method (Cloudflare operator CR or Terraform — see decision point).
-2. If using Terraform:
-   a. Write a Terraform resource `cloudflare_r2_bucket` with name `sigma1-assets`.
-   b. Create R2 API token scoped to this bucket with read/write permissions.
-   c. Output the R2 endpoint URL and credentials.
-3. If using Cloudflare operator:
-   a. Create the appropriate CR for R2 bucket provisioning.
-4. R2 doesn't have native folder concepts, but document the sub-prefix convention: `products/`, `social/`, `portfolio/`.
-5. Store credentials as a Kubernetes Secret `sigma1-r2-credentials` in the `sigma1` namespace with keys:
-   - `R2_ACCESS_KEY_ID`
-   - `R2_SECRET_ACCESS_KEY`
-   - `R2_ENDPOINT` (e.g., `https://<account-id>.r2.cloudflarestorage.com`)
-6. Alternatively, if using ExternalSecrets, create the secret in the external store and reference it via an ExternalSecret CR (covered in subtask 1006).
+1. Create a Deployment YAML for Signal-CLI using the `bbernhard/signal-cli-rest-api` container image (or equivalent).
+2. Deploy in the `sigma1` namespace with resource limits (256Mi RAM, 250m CPU).
+3. Mount a PersistentVolumeClaim for Signal-CLI's data directory (stores registration state).
+4. Expose Signal-CLI via a ClusterIP Service on port 8080 (REST API).
+5. Configure liveness and readiness probes against the Signal-CLI health endpoint.
+6. Store any Signal registration credentials or phone number in a Kubernetes Secret `signal-cli-credentials`.
+7. Apply the manifests and verify the pod is Running.
+8. Record the SIGNAL_CLI_URL (e.g., `http://signal-cli.sigma1.svc.cluster.local:8080`) for ConfigMap creation.
 
 ## Validation
-R2 bucket `sigma1-assets` is accessible via the S3-compatible API using the stored credentials. A test `PUT` and `GET` operation to `products/test.txt` succeeds. Secret `sigma1-r2-credentials` exists in `sigma1` namespace with all 3 keys populated.
+Confirm the Signal-CLI pod is Running with passing health probes. Curl the REST API endpoint from within the cluster and verify a valid response. Confirm the PVC is bound and the credentials secret exists.

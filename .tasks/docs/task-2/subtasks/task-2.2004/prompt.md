@@ -1,16 +1,24 @@
-Implement subtask 2004: Implement shared-auth crate with JWT validation and RBAC middleware
+Implement subtask 2004: Integrate Redis for rate limiting and response caching
 
 ## Objective
-Build the shared-auth crate providing JWT token validation middleware and RBAC role-checking for Axum, reading role definitions from the sigma1-rbac-roles ConfigMap.
+Add Redis integration to the Equipment Catalog service for API rate limiting and caching of catalog read responses to meet performance requirements.
 
 ## Steps
-1. Create `crates/shared-auth/Cargo.toml` depending on jsonwebtoken, axum (from workspace), axum-extra (for TypedHeader), serde, shared-error, tracing.
-2. Define `AuthConfig` struct: jwt_secret (String), read from `JWT_SECRET` env var.
-3. Define `Claims` struct matching JWT payload: sub (String), email (Option<String>), roles (Vec<String>), exp (usize), iat (usize).
-4. Implement `pub async fn auth_middleware(request: Request, next: Next) -> Result<Response>` — extracts Bearer token from Authorization header, validates JWT signature and expiry, injects Claims into request extensions. Returns 401 on missing/invalid token.
-5. Implement `pub fn require_role(role: &'static str) -> impl Fn(Request, Next) -> ... ` — an Axum middleware factory that checks if Claims in request extensions contains the specified role, returns 403 if not.
-6. Load RBAC role mappings from `RBAC_ROLES_JSON` env var (mounted from ConfigMap). Parse into a HashMap<String, Vec<String>> mapping role names to permitted endpoints/actions. Use this in require_role checks.
-7. Export extractors: `AuthUser` extractor that pulls Claims from request extensions for use in handlers.
+1. Add `redis` (or `fred`) crate to Cargo.toml.
+2. Initialize a Redis connection pool from REDIS_URL in AppState.
+3. Implement a rate-limiting middleware for Axum:
+   - Use a sliding window or token bucket algorithm stored in Redis.
+   - Key by client IP (or API key if present).
+   - Default limit: 100 requests/minute for public endpoints.
+   - Return HTTP 429 with Retry-After header when exceeded.
+4. Implement response caching for read endpoints:
+   - Cache `GET /catalog/categories` with a 5-minute TTL.
+   - Cache `GET /catalog/products` keyed by query params with a 2-minute TTL.
+   - Cache `GET /catalog/products/:id` with a 5-minute TTL.
+   - Do NOT cache availability (it changes frequently).
+5. Add cache invalidation: when admin creates/updates a product or category, delete relevant cache keys.
+6. Implement as Axum middleware layers or per-handler logic.
+7. Add Redis health check to the readiness probe.
 
 ## Validation
-Unit tests: (1) Valid JWT decodes to correct Claims. (2) Expired JWT returns 401. (3) Missing Authorization header returns 401. (4) Claims with 'admin' role passes require_role('admin'). (5) Claims without 'admin' role returns 403 from require_role('admin'). (6) AuthUser extractor correctly pulls Claims from extensions.
+Verify rate limiting triggers HTTP 429 after exceeding 100 requests/minute from the same IP. Verify cached responses are served from Redis (check response headers or Redis key existence). Verify cache is invalidated after an admin mutation. Verify Redis connection failure degrades gracefully (service still works without cache).

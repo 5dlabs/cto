@@ -1,30 +1,20 @@
-Implement subtask 4006: Implement Stripe integration module with invoice creation and webhook handler
+Implement subtask 4006: Implement payroll endpoints
 
 ## Objective
-Build the Stripe integration module using stripe-rust crate: create Stripe invoices when an invoice is sent with card/stripe method, and handle payment_intent.succeeded webhooks with idempotency.
+Build the payroll management endpoints for creating, reviewing, and processing payroll records linked to crew members and projects.
 
 ## Steps
-1. Create `src/stripe/client.rs`:
-   - Initialize stripe::Client from STRIPE_SECRET_KEY env var.
-   - Add to AppState.
-2. Create `src/stripe/invoices.rs`:
-   - `create_stripe_invoice(client, invoice, line_items)` — creates a Stripe Invoice with line items, returns stripe_invoice_id.
-   - Maps internal line items to Stripe InvoiceItem objects.
-   - Stores the returned stripe_invoice_id on the local invoice record.
-3. Modify `POST /api/v1/invoices/:id/send` handler (from subtask 4004):
-   - After transitioning to 'sent', check if payment method is card/stripe.
-   - If so, call create_stripe_invoice, store stripe_invoice_id, and finalize the Stripe invoice (which triggers Stripe to send the invoice).
-   - If Stripe call fails, roll back the status transition or mark for retry.
-4. Create `src/stripe/webhooks.rs`:
-   - `POST /api/v1/webhooks/stripe` handler.
-   - Extract raw body bytes using a custom Axum extractor (needed for signature verification).
-   - Verify webhook signature using stripe::Webhook::construct_event with STRIPE_WEBHOOK_SECRET.
-   - Handle `payment_intent.succeeded` event: extract payment intent ID, find matching invoice by stripe_invoice_id or metadata, call record_payment with stripe_payment_id for idempotency.
-   - Handle `invoice.payment_failed` event: log warning, optionally update internal status.
-   - Return 200 for handled events, 200 for unhandled events (Stripe expects 2xx).
-5. Idempotency: the record_payment function (from 4005) already checks for duplicate stripe_payment_id. The webhook handler relies on this.
-6. Add STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET to required env vars. In dev/test, these can be Stripe test-mode keys.
-7. Register webhook route WITHOUT auth middleware (Stripe calls this externally; signature verification is the auth).
+1. Create `src/models/payroll.rs`: PayrollRecord, CreatePayrollRequest, PayrollListQuery (filter by crew_member, period, status), PayrollResponse.
+2. Create `src/repositories/payroll_repo.rs`: create_payroll_record, get_payroll_by_id, list_payroll_records, update_payroll_status, calculate_period_totals.
+3. Create `src/services/payroll_service.rs`: validate payroll record (hours >= 0, rate > 0), calculate gross_amount = hours × rate, apply standard deductions (configurable percentage), calculate net_amount. Status flow: draft → approved → processed → paid.
+4. Create `src/routes/payroll.rs`:
+   - POST /api/v1/payroll — create payroll record
+   - GET /api/v1/payroll/:id — get payroll record
+   - GET /api/v1/payroll — list payroll records with filters
+   - PATCH /api/v1/payroll/:id/status — approve/process/mark paid
+   - GET /api/v1/payroll/summary?period_start=X&period_end=Y — payroll summary for period
+5. Write audit log entries for all payroll state changes.
+6. Ensure all monetary calculations use consistent precision (matching the chosen approach from dp-10).
 
 ## Validation
-Unit test: webhook signature verification rejects invalid signatures and accepts valid ones (use stripe-rust test helpers). Integration test: mock Stripe API, POST /api/v1/invoices/:id/send for a card-method invoice → verify Stripe invoice creation is called and stripe_invoice_id is stored. Integration test: POST /api/v1/webhooks/stripe with a valid payment_intent.succeeded payload and correct signature → verify payment is recorded and invoice status is updated. Integration test: replay the same webhook event → verify no duplicate payment is created (idempotency). Integration test: webhook with invalid signature returns 400.
+Integration tests: create payroll record, verify gross/net calculations. Test status transitions (valid and invalid). List with filters by crew member and period. Verify payroll summary aggregates correctly across multiple records. Verify audit log entries for each status change.

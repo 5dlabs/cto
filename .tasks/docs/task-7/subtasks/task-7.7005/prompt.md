@@ -1,22 +1,26 @@
-Implement subtask 7005: Implement MCP Tool Server — Finance tools (create_invoice, finance_report)
+Implement subtask 7005: Register all MCP tools with tool-server mapping to backend service endpoints
 
 ## Objective
-Define and implement MCP tool definitions for the two Finance service tools: sigma1_create_invoice and sigma1_finance_report.
+Register every MCP tool (sigma1_catalog_search, sigma1_check_availability, sigma1_customer_vet, sigma1_create_quote, sigma1_submit_invoice, sigma1_social_post, etc.) with the tool-server, mapping each to the correct backend service API endpoint.
 
 ## Steps
-1. Create MCP tool definition for `sigma1_create_invoice`:
-   - HTTP: POST /api/v1/invoices
-   - Input schema: { opportunity_id: string, customer_email: string, due_date?: string, payment_terms?: string, notes?: string }
-   - Output schema: { invoice_id: string, invoice_number: string, amount_due: number, status: string, pdf_url?: string, payment_link?: string }
-   - Description: 'Create an invoice from an approved opportunity/quote for the customer'
-2. Create MCP tool definition for `sigma1_finance_report`:
-   - HTTP: GET /api/v1/finance/reports/{report_type}
-   - Input schema: { report_type: 'revenue'|'outstanding'|'monthly-summary', date_from?: string, date_to?: string }
-   - Output schema: { report_type: string, period: { from, to }, data: object, generated_at: string }
-   - Description: 'Generate financial reports including revenue summaries, outstanding invoices, and monthly breakdowns'
-3. Include Authorization header: `Bearer ${MORGAN_SERVICE_JWT}`
-4. Implement URL path parameter substitution for report_type in finance_report.
-5. Error handling for create_invoice: validate opportunity_id exists before calling, handle 409 Conflict if invoice already exists for opportunity.
+1. Define tool schemas for each MCP tool: name, description, input parameters (JSON Schema), output schema.
+2. Tools to register:
+   - sigma1_catalog_search → Equipment Catalog search endpoint
+   - sigma1_check_availability → Equipment Catalog availability endpoint
+   - sigma1_customer_vet → Customer Vetting service endpoint
+   - sigma1_create_quote → Quoting/Invoicing quote creation endpoint
+   - sigma1_get_quote → Quoting/Invoicing quote retrieval endpoint
+   - sigma1_submit_invoice → Quoting/Invoicing invoice submission endpoint
+   - sigma1_finance_report → Finance service reporting endpoint
+   - sigma1_social_post → Social Media Engine post endpoint
+   - sigma1_social_schedule → Social Media Engine scheduling endpoint
+   - sigma1_rms_create_job → RMS job creation endpoint
+   - sigma1_rms_update_status → RMS status update endpoint
+   - sigma1_admin_users → Admin user management endpoint
+3. Register each tool via tool-server's registration API or configuration file.
+4. Verify each tool is listed in the agent's available tools.
+5. Test each tool invocation with sample parameters to confirm end-to-end connectivity.
 
 ## Validation
-Invoke sigma1_create_invoice with a test opportunity ID and verify correct HTTP POST body formation. Mock Finance service and verify response parsing. Invoke sigma1_finance_report with each report_type and verify URL path parameter substitution is correct. Test 409 Conflict handling for duplicate invoice creation.
+Query tool-server for registered tools; all expected tools are listed. Invoke each tool with sample parameters; verify correct backend endpoint is called and response is returned. No tools return connection errors.

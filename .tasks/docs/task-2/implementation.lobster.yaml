@@ -2,7 +2,7 @@ name: implement-task-2
 metadata:
   task_id: 2
   agent: rex
-  stack: Rust 1.75+/Axum 0.7
+  stack: Rust/Axum
   depends_on_tasks: [1]
 
 inputs:
@@ -76,7 +76,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-2005
-    depends_on: [validate-subtask-2002]
+    depends_on: [validate-subtask-2001]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2005/prompt.md
@@ -88,7 +88,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-2006
-    depends_on: [validate-subtask-2002, validate-subtask-2003, validate-subtask-2004]
+    depends_on: [validate-subtask-2002, validate-subtask-2004]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2006/prompt.md
@@ -100,7 +100,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-2007
-    depends_on: [validate-subtask-2005, validate-subtask-2006]
+    depends_on: [validate-subtask-2002, validate-subtask-2003, validate-subtask-2004, validate-subtask-2005]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2007/prompt.md
@@ -111,80 +111,8 @@ steps:
     command: >
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
-  - name: implement-subtask-2008
-    depends_on: [validate-subtask-2005, validate-subtask-2006]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2008/prompt.md
-
-  - name: validate-subtask-2008
-    depends_on: [implement-subtask-2008]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && cargo check && cargo test && cargo clippy -- -D warnings
-
-  - name: implement-subtask-2009
-    depends_on: [validate-subtask-2005, validate-subtask-2006]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2009/prompt.md
-
-  - name: validate-subtask-2009
-    depends_on: [implement-subtask-2009]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && cargo check && cargo test && cargo clippy -- -D warnings
-
-  - name: implement-subtask-2010
-    depends_on: [validate-subtask-2006]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2010/prompt.md
-
-  - name: validate-subtask-2010
-    depends_on: [implement-subtask-2010]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && cargo check && cargo test && cargo clippy -- -D warnings
-
-  - name: implement-subtask-2011
-    depends_on: [validate-subtask-2007, validate-subtask-2008]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2011/prompt.md
-
-  - name: validate-subtask-2011
-    depends_on: [implement-subtask-2011]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && cargo check && cargo test && cargo clippy -- -D warnings
-
-  - name: implement-subtask-2012
-    depends_on: [validate-subtask-2008, validate-subtask-2009]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2012/prompt.md
-
-  - name: validate-subtask-2012
-    depends_on: [implement-subtask-2012]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && cargo check && cargo test && cargo clippy -- -D warnings
-
-  - name: implement-subtask-2013
-    depends_on: [validate-subtask-2006]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-2.2013/prompt.md
-
-  - name: validate-subtask-2013
-    depends_on: [implement-subtask-2013]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && cargo check && cargo test && cargo clippy -- -D warnings
-
   - name: integration-validation
-    depends_on: [validate-subtask-2001, validate-subtask-2002, validate-subtask-2003, validate-subtask-2004, validate-subtask-2005, validate-subtask-2006, validate-subtask-2007, validate-subtask-2008, validate-subtask-2009, validate-subtask-2010, validate-subtask-2011, validate-subtask-2012, validate-subtask-2013]
+    depends_on: [validate-subtask-2001, validate-subtask-2002, validate-subtask-2003, validate-subtask-2004, validate-subtask-2005, validate-subtask-2006, validate-subtask-2007]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

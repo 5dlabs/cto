@@ -1,26 +1,18 @@
-Implement subtask 8003: Build root layout with navigation, footer, responsive shell, and TanStack Query provider
+Implement subtask 8003: Implement equipment catalog listing page (/equipment) with API integration
 
 ## Objective
-Implement the root App Router layout with site-wide navigation header, footer, responsive mobile menu, TanStack Query client provider with Effect integration layer, and error boundary setup.
+Build the equipment catalog listing page that fetches and displays equipment from the Equipment Catalog API, with search, filtering, and pagination.
 
 ## Steps
-1. Create `app/layout.tsx` as the root layout:
-   - Import Inter font via `next/font/google`.
-   - Wrap children in TanStack QueryClientProvider with a custom query client.
-   - Include a top-level error boundary component.
-2. Configure TanStack Query client in `lib/query-client.ts`:
-   - Default stale times: 1 min for catalog queries, 5 min for category queries.
-   - Default error handler that logs and toasts.
-   - Create an Effect-to-TanStack-Query adapter in `lib/effect-query.ts` that wraps Effect.runPromise for use in queryFn.
-3. Build `components/sigma1/header.tsx`:
-   - Logo (left), nav links: Home, Equipment, Quote Builder, Portfolio (center/right).
-   - Mobile: hamburger menu opening a Sheet (shadcn/ui) with nav links.
-   - Active link highlighting based on current pathname.
-4. Build `components/sigma1/footer.tsx`:
-   - Company info, contact details, social links, copyright.
-   - Links to /llms.txt.
-5. Ensure the layout is fully responsive: mobile-first with breakpoints for tablet (md) and desktop (lg).
-6. The layout must reserve space/portal for the chat widget (implemented separately) — add a div with id `chat-widget-root` at layout level.
+1. Create `app/equipment/page.tsx` for the catalog listing.
+2. Implement an Effect-based API client service for the Equipment Catalog API (search, list, filter endpoints).
+3. Use Effect for data fetching with proper error handling (loading, error, empty states).
+4. Display equipment as a grid of cards (image, name, category, daily rate, availability badge).
+5. Implement search bar with debounced input.
+6. Implement category filter (dropdown or sidebar with equipment categories).
+7. Implement pagination or infinite scroll.
+8. Add loading skeletons during data fetch.
+9. Handle API errors gracefully with user-friendly messages.
 
 ## Validation
-Render the layout at mobile (375px), tablet (768px), and desktop (1280px) widths and verify navigation collapses to hamburger on mobile. Verify TanStack QueryClientProvider is present by checking React DevTools. Verify the `chat-widget-root` div is present in the DOM.
+Page renders at /equipment. Equipment cards display with correct data from API. Search filters results in real-time. Category filter narrows results. Pagination works. Loading state shows skeletons. API error displays friendly message.

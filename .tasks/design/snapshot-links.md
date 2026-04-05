@@ -1,13 +1,13 @@
 ### Design snapshots
 
 #### Current site snapshots
-- `https://deployiq.maximinimal.ca` — [Image](https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/96959011-a51a-4220-8dd1-21a560a869ec/233676cf-0d1b-4190-9451-c7c58c54ea11)
+- `https://deployiq.maximinimal.ca` — [Image](https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/1a8770b7-1c94-40a8-b3c5-1f682792bd7f/3fc41d5c-fced-4908-b230-a3146316620d)
 
-![Current site](https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/96959011-a51a-4220-8dd1-21a560a869ec/233676cf-0d1b-4190-9451-c7c58c54ea11)
+![Current site](https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/1a8770b7-1c94-40a8-b3c5-1f682792bd7f/3fc41d5c-fced-4908-b230-a3146316620d)
 
-- `https://sigma-1.com` — [Image](https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/3b7620b5-22d2-47da-a5bd-37c342f3340b/0d689002-632c-4a76-b820-ec585f6cddc6)
+- `https://sigma-1.com` — [Image](https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/d90c9b56-55b0-4779-898c-fe99e682e9d9/9bc51542-5d68-46f0-8f74-f010a15dfafe)
 
-![Current site](https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/3b7620b5-22d2-47da-a5bd-37c342f3340b/0d689002-632c-4a76-b820-ec585f6cddc6)
+![Current site](https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/d90c9b56-55b0-4779-898c-fe99e682e9d9/9bc51542-5d68-46f0-8f74-f010a15dfafe)
 
 
 #### Generated variants

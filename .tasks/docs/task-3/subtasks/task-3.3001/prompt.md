@@ -1,17 +1,17 @@
-Implement subtask 3001: Initialize Go module and configure buf for protobuf code generation
+Implement subtask 3001: Initialize Go project with gRPC, grpc-gateway, and database migrations
 
 ## Objective
-Set up the Go module `github.com/5dlabs/sigma1-rms` with Go 1.22+, configure buf.yaml and buf.gen.yaml for protoc-gen-go, protoc-gen-go-grpc, and protoc-gen-grpc-gateway code generation. Establish the project directory structure including proto/, cmd/, internal/, migrations/, and deploy/ directories.
+Set up the Go 1.22+ module structure with gRPC server, grpc-gateway reverse proxy, database connection pooling via POSTGRES_URL and REDIS_URL from ConfigMap, and initial database schema migrations for all RMS domain tables (opportunities, projects, inventory_items, inventory_transactions, crew_members, crew_assignments, deliveries).
 
 ## Steps
-1. Run `go mod init github.com/5dlabs/sigma1-rms` with Go 1.22+.
-2. Create directory structure: `proto/sigma1/rms/v1/`, `cmd/rms-server/`, `internal/service/`, `internal/db/`, `internal/middleware/`, `migrations/`, `deploy/`.
-3. Install buf CLI and create `buf.yaml` at project root with `lint` and `breaking` configuration.
-4. Create `buf.gen.yaml` with plugins: `protoc-gen-go` (paths=source_relative), `protoc-gen-go-grpc` (paths=source_relative), `protoc-gen-grpc-gateway` (paths=source_relative, generate_unbound_methods=true).
-5. Add `go.sum` dependencies: `google.golang.org/grpc`, `google.golang.org/protobuf`, `github.com/grpc-ecosystem/grpc-gateway/v2`.
-6. Add googleapis proto dependencies in `buf.yaml` deps for `google/api/annotations.proto` and `google/api/http.proto`.
-7. Verify `buf build` succeeds with empty proto directory.
-8. Create a basic `cmd/rms-server/main.go` skeleton that imports the generated package paths (placeholder).
+1. Initialize Go module with `go mod init` for the RMS service.
+2. Add dependencies: google.golang.org/grpc, grpc-ecosystem/grpc-gateway/v2, jackc/pgx/v5 for PostgreSQL, redis/go-redis/v9.
+3. Create `cmd/server/main.go` with dual listener: gRPC on one port, HTTP/grpc-gateway on another.
+4. Load POSTGRES_URL and REDIS_URL from environment (populated via `envFrom` referencing the infra ConfigMap).
+5. Set up connection pool for PostgreSQL using pgxpool.
+6. Create `migrations/` directory with SQL migration files for all domain tables: opportunities (id, customer_id, title, status, total_amount, created_at, updated_at), projects (id, opportunity_id, start_date, end_date, status, calendar_event_id), inventory_items (id, name, barcode, category, status, location), inventory_transactions (id, item_id, project_id, type [check_out/check_in], timestamp, crew_member_id), crew_members (id, name, role, availability_status), crew_assignments (id, crew_member_id, project_id, start_date, end_date, calendar_event_id), deliveries (id, project_id, type [delivery/pickup], scheduled_at, status, address, notes).
+7. Use golang-migrate or similar for migration runner integrated into startup.
+8. Create a basic `internal/config/config.go` for centralized configuration loading.
 
 ## Validation
-Verify `buf build` completes without errors. Verify `go build ./...` succeeds. Confirm directory structure matches expected layout.
+Server starts successfully and binds to both gRPC and HTTP ports. Database migrations run without errors. PostgreSQL and Redis connections are established. `go build ./...` succeeds with no errors.

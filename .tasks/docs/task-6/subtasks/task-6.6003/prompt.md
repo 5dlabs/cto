@@ -1,19 +1,21 @@
-Implement subtask 6003: Implement R2 storage integration via @aws-sdk/client-s3
+Implement subtask 6003: Implement AI curation pipeline for image selection
 
 ## Objective
-Create an R2StorageService as an Effect service that handles uploading files to Cloudflare R2 (S3-compatible) under the `social/` prefix, generating presigned URLs for retrieval, and deleting objects.
+Build the AI-powered curation pipeline that analyzes uploaded photos and selects the top images for social media posting using OpenAI/Claude vision capabilities.
 
 ## Steps
-1. Install `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner`.
-2. Create `src/services/R2StorageService.ts` as an Effect.Service.
-3. Configure S3Client with R2 endpoint, access key, secret key, and bucket name from environment variables (R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET).
-4. Implement methods:
-   - `upload(key: string, body: Buffer | ReadableStream, contentType: string): Effect.Effect<string, R2Error>` — uploads to `social/{key}`, returns the full R2 key.
-   - `getPresignedUrl(key: string, expiresIn?: number): Effect.Effect<string, R2Error>` — returns a presigned GET URL, default 1 hour expiry.
-   - `delete(key: string): Effect.Effect<void, R2Error>` — deletes the object.
-5. Define `R2Error` as a tagged Effect error with context.
-6. Create the Effect Layer `R2StorageServiceLive` that provides the S3Client configuration.
-7. Export the service tag and layer for dependency injection.
+1. Create `src/services/curation.ts` module using Effect.Service pattern.
+2. Define a `CurationService` Effect.Service with method: `curateImages(photoIds: string[]) -> Effect.Effect<CuratedResult, CurationError>`.
+3. Implement the curation logic:
+   - Fetch photo records and generate presigned S3 URLs or download images.
+   - Send images to the AI vision API (OpenAI GPT-4V or Claude) with a prompt asking to score each image on composition, lighting, brand-suitability, and engagement potential (1-10 scale).
+   - Parse AI response to extract scores per image.
+   - Update `curation_score` on each photo record.
+   - Mark top N images as `is_curated = true` based on score threshold.
+4. Implement POST `/api/v1/social/curation/run` endpoint that triggers curation for a batch of photo IDs.
+5. Implement GET `/api/v1/social/curation/results` — list curated (top-scored) images.
+6. Handle AI API errors gracefully — retry with backoff, return partial results if some images fail.
+7. Make the AI provider configurable (OpenAI vs Claude) via environment variable.
 
 ## Validation
-Unit test with mocked S3Client: verify `upload` calls PutObjectCommand with correct bucket and key prefix. Verify `getPresignedUrl` returns a URL string. Verify `delete` calls DeleteObjectCommand. Test that R2Error is properly tagged on S3 SDK failures.
+Mock the AI API and verify curation scores are assigned to photos. Verify top images are marked as curated. Test with partial AI failures and verify graceful degradation. Verify the curation endpoint returns curated results.

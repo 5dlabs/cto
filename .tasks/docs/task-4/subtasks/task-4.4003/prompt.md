@@ -1,22 +1,25 @@
-Implement subtask 4003: Implement invoice CRUD endpoints with line items and invoice number generation
+Implement subtask 4003: Integrate Stripe for payment processing and webhook handling
 
 ## Objective
-Build the invoice domain model, repository layer, and Axum handlers for creating, listing, and retrieving invoices including line items and sequential per-org invoice number generation.
+Implement Stripe payment intent creation, confirmation handling, and webhook endpoint for processing asynchronous payment events (succeeded, failed, refunded).
 
 ## Steps
-1. Define Rust structs in `src/models/invoice.rs`: Invoice, InvoiceLine, CreateInvoiceRequest (with Vec<CreateLineItem>), InvoiceListFilters (status, date range, overdue flag, pagination), InvoiceResponse (with line items and payment summary).
-2. All monetary fields use `rust_decimal::Decimal` in the application layer, converting to/from i64 cents at the DB boundary. Create helper functions `cents_to_decimal(i64) -> Decimal` and `decimal_to_cents(Decimal) -> i64` in a `src/models/money.rs` module.
-3. Implement `src/db/invoices.rs` with:
-   - `create_invoice(pool, org_id, req)` — within a transaction: (a) SELECT FOR UPDATE on invoice_number_counters to get and increment the next number for (org_id, year), INSERT if not exists; (b) format invoice_number as `{ORG_PREFIX}-{YEAR}-{PADDED_NUMBER}`; (c) compute line item subtotals (quantity * unit_price_cents); (d) sum line subtotals for invoice subtotal_cents; (e) INSERT invoice row; (f) INSERT all line items; (g) COMMIT and return the full invoice.
-   - `list_invoices(pool, org_id, filters)` — paginated query with optional WHERE clauses for status, date range, overdue (due_at < now() AND status IN ('sent','viewed')). Return Vec<Invoice> with total count for pagination.
-   - `get_invoice(pool, id)` — fetch invoice with LEFT JOIN on line items and a subquery for payment summary (count, total paid).
-4. Implement Axum handlers in `src/routes/invoices.rs`:
-   - `POST /api/v1/invoices` → calls create_invoice, returns 201 with invoice JSON.
-   - `GET /api/v1/invoices` → parses query params into InvoiceListFilters, calls list_invoices, returns paginated response.
-   - `GET /api/v1/invoices/:id` → calls get_invoice, returns 200 or 404.
-5. Register routes on the router. Apply shared-auth middleware for org_id extraction from JWT.
-6. Validate inputs: currency must be one of supported currencies, due_at must be in the future, at least one line item required.
-7. Use shared-error for consistent error responses (400, 404, 500).
+1. Add `stripe-rust` crate dependency.
+2. Create `src/services/stripe_service.rs`: initialize Stripe client with STRIPE_SECRET_KEY.
+3. Implement `create_payment_intent(invoice_id, amount, currency)`: call Stripe API to create a PaymentIntent, store the payment_intent_id in the payments table with status 'pending', return client_secret for frontend.
+4. Implement `src/routes/payments.rs`:
+   - POST /api/v1/payments/create-intent — create payment intent for an invoice
+   - GET /api/v1/payments/:id — get payment details
+   - GET /api/v1/invoices/:id/payments — list payments for an invoice
+5. Implement `src/routes/webhooks.rs`:
+   - POST /api/v1/webhooks/stripe — Stripe webhook endpoint
+   - Verify webhook signature using Stripe webhook secret from environment
+   - Handle events: `payment_intent.succeeded` → update payment status to 'completed', update invoice status to 'paid', record paid_at timestamp, write audit log
+   - Handle `payment_intent.payment_failed` → update payment status to 'failed', write audit log
+   - Handle `charge.refunded` → create refund record, update payment status, write audit log
+   - Return 200 for all handled events, 400 for signature verification failure
+6. Implement idempotency: check if event has already been processed (store stripe_event_id) before applying changes.
+7. All payment state changes must be transactional with their corresponding invoice updates.
 
 ## Validation
-Unit test: money conversion helpers round-trip correctly (cents→decimal→cents). Unit test: invoice number formatting produces expected pattern. Integration test: POST /api/v1/invoices with valid payload returns 201, response has correct invoice_number format, subtotal_cents equals sum of line items. Integration test: GET /api/v1/invoices returns paginated list, filters by status correctly. Integration test: GET /api/v1/invoices/:id returns full invoice with line items. Integration test: concurrent invoice creation for same org produces sequential, non-duplicate invoice numbers.
+Unit tests with mocked Stripe client: verify payment intent creation stores correct data. Integration tests: simulate webhook payloads with valid signatures, verify payment and invoice statuses update correctly. Test idempotency: send same webhook event twice, verify no duplicate processing. Test invalid signature returns 400. Test payment_failed event marks payment as failed without changing invoice to paid.

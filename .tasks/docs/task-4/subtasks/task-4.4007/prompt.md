@@ -1,31 +1,19 @@
-Implement subtask 4007: Implement tax calculation module with configurable jurisdiction rates
+Implement subtask 4007: Add Prometheus metrics and health endpoints
 
 ## Objective
-Build the tax calculation module supporting configurable per-jurisdiction tax rates (GST/HST for Canada, sales tax for US) stored in the tax_configurations table, and integrate it into invoice creation.
+Instrument the Finance service with Prometheus metrics for request counts, latencies, error rates, and business metrics, plus health and readiness probes.
 
 ## Steps
-1. Create `src/tax/mod.rs` and `src/tax/calculator.rs`.
-2. Define `TaxConfiguration` model matching the tax_configurations table: jurisdiction_code, jurisdiction_name, tax_type (GST, HST, PST, SALES_TAX), rate (Decimal), active flag, config JSONB for additional rules.
-3. Implement `src/db/tax.rs`:
-   - `get_tax_config(pool, jurisdiction_code)` → returns TaxConfiguration or None.
-   - `list_tax_configs(pool)` → all active configurations.
-   - `upsert_tax_config(pool, config)` → create or update a tax configuration.
-4. Implement `TaxCalculator` in `src/tax/calculator.rs`:
-   - `calculate_tax(subtotal_cents: i64, jurisdiction_code: &str, pool) -> Result<TaxResult>` where TaxResult = { tax_cents: i64, tax_rate: Decimal, jurisdiction: String }.
-   - Uses rust_decimal for precise calculation: tax_cents = (subtotal_cents as Decimal * rate).round_dp(0) as i64.
-   - If jurisdiction not found or inactive, return tax_cents = 0 (zero-tax jurisdiction).
-5. Integrate into invoice creation (subtask 4003's create_invoice):
-   - Add optional `jurisdiction_code` field to CreateInvoiceRequest.
-   - After computing subtotal_cents, call calculate_tax to get tax_cents.
-   - total_cents = subtotal_cents + tax_cents.
-   - Store tax_cents on the invoice.
-6. Seed initial tax configurations via a migration or seed script:
-   - CA-GST: 5% (federal GST)
-   - CA-ON: 13% (Ontario HST)
-   - CA-BC: 12% (BC GST+PST)
-   - CA-AB: 5% (Alberta, GST only)
-   - US-ZERO: 0% (placeholder, US sales tax varies by state)
-7. No API endpoints for tax config management in v1 — manage via DB seeds. Add a GET /api/v1/tax/configurations endpoint for read-only listing.
+1. Add dependencies: metrics, metrics-exporter-prometheus (or axum-prometheus).
+2. Create `src/middleware/metrics.rs`: Axum middleware layer that records for each request: finance_http_requests_total (method, path, status), finance_http_request_duration_seconds (method, path).
+3. Add business metrics counters: finance_invoices_created_total, finance_payments_processed_total, finance_payments_failed_total, finance_stripe_webhook_events_total (event_type), finance_currency_sync_runs_total (status: success/failure), finance_reminders_sent_total.
+4. Instrument each service module to increment relevant counters.
+5. Create `src/routes/health.rs`:
+   - GET /healthz — liveness probe: return 200 if process running
+   - GET /readyz — readiness probe: check PostgreSQL pool (sqlx::query("SELECT 1")), check Redis (PING), return 200 only if both succeed, 503 otherwise
+   - GET /metrics — Prometheus-formatted metrics export
+6. Register metrics middleware in Axum router.
+7. Add tracing spans to key service methods for observability.
 
 ## Validation
-Unit test: calculate_tax with CA-GST (5%) on subtotal of 10000 cents returns tax_cents = 500. Unit test: calculate_tax with CA-ON (13%) on subtotal of 10000 returns tax_cents = 1300. Unit test: calculate_tax with unknown jurisdiction returns tax_cents = 0. Unit test: rust_decimal rounding is correct for edge cases (e.g., subtotal 333 cents at 13% = 43 cents, not 43.29). Integration test: create invoice with jurisdiction_code='CA-ON', verify tax_cents and total_cents are computed correctly.
+Verify /healthz returns 200. Verify /readyz returns 200 with healthy dependencies, 503 when PostgreSQL or Redis is unreachable. Make API calls across all endpoints, then verify /metrics contains expected counters with correct labels and incremented values. Verify histogram buckets are populated for request duration.

@@ -1,26 +1,17 @@
-Implement subtask 3009: Implement CrewService gRPC handlers with scheduling conflict detection
+Implement subtask 3009: Add Prometheus metrics and health endpoints
 
 ## Objective
-Implement the CrewService gRPC server including crew listing, assignment creation with overlap conflict detection, and bulk scheduling.
+Instrument all RMS services with Prometheus metrics (request counts, latencies, error rates) and expose health/readiness probe endpoints.
 
 ## Steps
-1. Create `internal/service/crew.go` implementing CrewServiceServer.
-2. Implement ListCrew:
-   - Paginated list of crew members
-   - Support optional filter by role
-3. Implement AssignCrew:
-   - Accept project_id, crew_member_id, role, start_time, end_time
-   - Validate project exists and is in active status (confirmed or in_progress)
-   - **Conflict detection**: Query crew_assignments for the given crew_member_id where time ranges overlap: `existing.start_time < new.end_time AND existing.end_time > new.start_time`
-   - If overlapping assignment found, return AlreadyExists error with details about the conflicting assignment (project_id, times)
-   - If no conflict, insert assignment
-   - Return created assignment
-4. Implement ScheduleCrew:
-   - Accept project_id and list of assignment requests
-   - Validate all assignments for conflicts (batch check)
-   - Insert all in a single database transaction — if any conflict, roll back all and return error indicating which assignments conflicted
-5. Use SELECT FOR UPDATE or advisory locks to prevent race conditions in concurrent assignment requests for the same crew member.
-6. Register service in gRPC server.
+1. Add prometheus/client_golang dependency.
+2. Create `internal/metrics/` package with middleware interceptors for gRPC (UnaryServerInterceptor, StreamServerInterceptor) that record: rms_grpc_requests_total (method, status), rms_grpc_request_duration_seconds (method), rms_grpc_errors_total (method, code).
+3. Add HTTP middleware for grpc-gateway endpoints with equivalent metrics.
+4. Add business metrics: rms_opportunities_created_total, rms_projects_active, rms_inventory_checked_out, rms_deliveries_scheduled.
+5. Expose /metrics endpoint on the HTTP port for Prometheus scraping.
+6. Implement /healthz (liveness) endpoint: returns 200 if process is running.
+7. Implement /readyz (readiness) endpoint: checks PostgreSQL connectivity and Redis connectivity, returns 200 only if both are reachable.
+8. Register interceptors in the gRPC server setup in main.go.
 
 ## Validation
-Integration test: assign crew member A to project 1 (10am-2pm), then assign crew member A to project 2 (1pm-5pm) — verify error returned with conflict details. Assign crew member A to project 2 (3pm-6pm after first is 10am-2pm) — verify success (no overlap). Test ScheduleCrew with batch of 3 where 1 conflicts — verify all rolled back. Test concurrent assignment requests for same crew member don't cause double-booking.
+Verify /healthz returns 200. Verify /readyz returns 200 when DB and Redis are up, and 503 when either is down. Make several gRPC/REST calls and verify /metrics returns Prometheus-formatted output with correct counter increments and histogram buckets.

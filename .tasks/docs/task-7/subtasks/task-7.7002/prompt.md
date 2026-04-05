@@ -1,27 +1,16 @@
-Implement subtask 7002: Implement MCP Tool Server — Equipment Catalog tools (catalog_search, check_availability, equipment_lookup)
+Implement subtask 7002: Integrate Signal-CLI for messaging channel
 
 ## Objective
-Define and implement MCP tool definitions for the three Equipment Catalog service tools: sigma1_catalog_search, sigma1_check_availability, and sigma1_equipment_lookup, including JSON input/output schemas, HTTP method/URL templates, and authorization header injection.
+Deploy and configure Signal-CLI as a sidecar or separate pod, link it to the Morgan agent so inbound Signal messages are forwarded to the agent and responses are sent back via Signal.
 
 ## Steps
-1. Create MCP tool definition for `sigma1_catalog_search`:
-   - HTTP: GET /api/v1/catalog/products
-   - Input schema: { query: string, category?: string, limit?: number, offset?: number }
-   - Output schema: { products: [{ id, name, description, daily_rate, category, image_url }], total: number }
-   - Description for LLM: 'Search the equipment catalog by keyword, category, or browse all available rental equipment'
-2. Create MCP tool definition for `sigma1_check_availability`:
-   - HTTP: GET /api/v1/catalog/products/:id/availability?from={ISO8601}&to={ISO8601}
-   - Input schema: { product_id: string, from_date: string (ISO8601), to_date: string (ISO8601) }
-   - Output schema: { available: boolean, quantity_available: number, conflicts: [{ date, reason }] }
-   - Description: 'Check if a specific piece of equipment is available for a given date range'
-3. Create MCP tool definition for `sigma1_equipment_lookup`:
-   - HTTP: GET /api/v1/equipment-api/catalog
-   - Input schema: { filter?: string, format?: 'detailed'|'summary' }
-   - Output schema: { equipment: [{ id, name, specs, category, condition, serial_number }] }
-   - Description: 'Machine-readable equipment catalog lookup for detailed specs and inventory management'
-4. Each tool definition must include Authorization header template: `Bearer ${MORGAN_SERVICE_JWT}`
-5. Implement HTTP client wrapper that maps MCP tool calls to actual HTTP requests against Equipment Catalog service URL from sigma1-infra-endpoints.
-6. Handle error responses: 404 → 'Equipment not found', 503 → 'Catalog service temporarily unavailable', map to user-friendly messages.
+1. Deploy Signal-CLI REST API as a sidecar container in the agent pod (or as a separate Deployment if preferred per dp-8 decision).
+2. Register/link the Signal phone number by providing the Signal account credentials or linking device.
+3. Configure Signal-CLI to forward incoming messages to the Morgan agent's ingest endpoint via HTTP webhook.
+4. Implement the outbound path: Morgan agent calls Signal-CLI REST API to send replies.
+5. Handle group messages and direct messages.
+6. Configure retry logic for message delivery failures.
+7. Store Signal-CLI data directory on a persistent volume so registration survives restarts.
 
 ## Validation
-For each tool: invoke with valid test parameters and verify correct HTTP request is formed (method, URL, headers). Mock the Equipment Catalog service and verify response parsing matches output schema. Test error handling for 404, 500, and timeout scenarios.
+Send a Signal message to the registered number; verify it appears in agent logs within 5 seconds. Agent responds and the reply is received on the Signal client. Signal-CLI pod restarts without losing registration.

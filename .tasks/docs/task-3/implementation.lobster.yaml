@@ -2,7 +2,7 @@ name: implement-task-3
 metadata:
   task_id: 3
   agent: grizz
-  stack: Go 1.22+/gRPC
+  stack: Go/gRPC
   depends_on_tasks: [1]
 
 inputs:
@@ -52,7 +52,7 @@ steps:
       cd work && go vet ./... && go test ./... && golangci-lint run
 
   - name: implement-subtask-3003
-    depends_on: [validate-subtask-3001]
+    depends_on: [validate-subtask-3002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3003/prompt.md
@@ -64,7 +64,7 @@ steps:
       cd work && go vet ./... && go test ./... && golangci-lint run
 
   - name: implement-subtask-3004
-    depends_on: [validate-subtask-3001]
+    depends_on: [validate-subtask-3002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3004/prompt.md
@@ -76,7 +76,7 @@ steps:
       cd work && go vet ./... && go test ./... && golangci-lint run
 
   - name: implement-subtask-3005
-    depends_on: [validate-subtask-3004]
+    depends_on: [validate-subtask-3002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3005/prompt.md
@@ -88,7 +88,7 @@ steps:
       cd work && go vet ./... && go test ./... && golangci-lint run
 
   - name: implement-subtask-3006
-    depends_on: [validate-subtask-3002, validate-subtask-3005]
+    depends_on: [validate-subtask-3002, validate-subtask-3004]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3006/prompt.md
@@ -100,7 +100,7 @@ steps:
       cd work && go vet ./... && go test ./... && golangci-lint run
 
   - name: implement-subtask-3007
-    depends_on: [validate-subtask-3002, validate-subtask-3005]
+    depends_on: [validate-subtask-3002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3007/prompt.md
@@ -112,7 +112,7 @@ steps:
       cd work && go vet ./... && go test ./... && golangci-lint run
 
   - name: implement-subtask-3008
-    depends_on: [validate-subtask-3003, validate-subtask-3005]
+    depends_on: [validate-subtask-3003, validate-subtask-3004, validate-subtask-3005, validate-subtask-3006, validate-subtask-3007]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3008/prompt.md
@@ -124,7 +124,7 @@ steps:
       cd work && go vet ./... && go test ./... && golangci-lint run
 
   - name: implement-subtask-3009
-    depends_on: [validate-subtask-3003, validate-subtask-3005]
+    depends_on: [validate-subtask-3003, validate-subtask-3004, validate-subtask-3005, validate-subtask-3006, validate-subtask-3007]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3009/prompt.md
@@ -136,7 +136,7 @@ steps:
       cd work && go vet ./... && go test ./... && golangci-lint run
 
   - name: implement-subtask-3010
-    depends_on: [validate-subtask-3003, validate-subtask-3005]
+    depends_on: [validate-subtask-3008, validate-subtask-3009]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3010/prompt.md
@@ -147,80 +147,8 @@ steps:
     command: >
       cd work && go vet ./... && go test ./... && golangci-lint run
 
-  - name: implement-subtask-3011
-    depends_on: [validate-subtask-3002, validate-subtask-3003]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3011/prompt.md
-
-  - name: validate-subtask-3011
-    depends_on: [implement-subtask-3011]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && go vet ./... && go test ./... && golangci-lint run
-
-  - name: implement-subtask-3012
-    depends_on: [validate-subtask-3005]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3012/prompt.md
-
-  - name: validate-subtask-3012
-    depends_on: [implement-subtask-3012]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && go vet ./... && go test ./... && golangci-lint run
-
-  - name: implement-subtask-3013
-    depends_on: [validate-subtask-3005]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3013/prompt.md
-
-  - name: validate-subtask-3013
-    depends_on: [implement-subtask-3013]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && go vet ./... && go test ./... && golangci-lint run
-
-  - name: implement-subtask-3014
-    depends_on: [validate-subtask-3011]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3014/prompt.md
-
-  - name: validate-subtask-3014
-    depends_on: [implement-subtask-3014]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && go vet ./... && go test ./... && golangci-lint run
-
-  - name: implement-subtask-3015
-    depends_on: [validate-subtask-3005]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3015/prompt.md
-
-  - name: validate-subtask-3015
-    depends_on: [implement-subtask-3015]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && go vet ./... && go test ./... && golangci-lint run
-
-  - name: implement-subtask-3016
-    depends_on: [validate-subtask-3006, validate-subtask-3007, validate-subtask-3008, validate-subtask-3009, validate-subtask-3010, validate-subtask-3011, validate-subtask-3012, validate-subtask-3013]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-3.3016/prompt.md
-
-  - name: validate-subtask-3016
-    depends_on: [implement-subtask-3016]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && go vet ./... && go test ./... && golangci-lint run
-
   - name: integration-validation
-    depends_on: [validate-subtask-3001, validate-subtask-3002, validate-subtask-3003, validate-subtask-3004, validate-subtask-3005, validate-subtask-3006, validate-subtask-3007, validate-subtask-3008, validate-subtask-3009, validate-subtask-3010, validate-subtask-3011, validate-subtask-3012, validate-subtask-3013, validate-subtask-3014, validate-subtask-3015, validate-subtask-3016]
+    depends_on: [validate-subtask-3001, validate-subtask-3002, validate-subtask-3003, validate-subtask-3004, validate-subtask-3005, validate-subtask-3006, validate-subtask-3007, validate-subtask-3008, validate-subtask-3009, validate-subtask-3010]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

@@ -1,28 +1,21 @@
-Implement subtask 7010: Configure Twilio SIP trunk and phone number routing to ElevenLabs
+Implement subtask 7010: End-to-end conversation flow testing across all channels and skills
 
 ## Objective
-Set up Twilio phone number provisioning, SIP trunk configuration pointing to ElevenLabs voice endpoint, and fallback webhook routing to Morgan's text endpoint.
+Validate complete end-to-end flows across Signal, voice, and web chat channels, covering all skill domains (sales, vetting, quoting, invoicing, social, RMS, admin).
 
 ## Steps
-1. Configure Twilio phone number:
-   - Use existing Perception Events business number or provision new one via Twilio API/console
-   - Store phone number SID and auth token as Kubernetes secrets
-2. Configure Twilio SIP trunk:
-   - Create SIP trunk in Twilio console/API
-   - Set origination URI to ElevenLabs SIP endpoint (provided by ElevenLabs Conversational AI setup)
-   - Configure codec preferences: PCMU, PCMA, opus
-   - Set authentication credentials for SIP trunk
-3. Configure call routing:
-   - Incoming calls to Twilio number → SIP trunk → ElevenLabs → Morgan voice pipeline
-   - Set TwiML fallback: if ElevenLabs is unavailable, redirect to Twilio webhook → Morgan text endpoint
-4. Implement Twilio webhook fallback endpoint in Morgan:
-   - `/api/twilio/fallback` — receives Twilio webhook on voice failure
-   - Responds with TwiML: play a message ('Our voice system is temporarily unavailable, please send us a text message at this number')
-   - Or: forward to SMS-based conversation
-5. Configure Twilio SMS webhook:
-   - Incoming SMS → POST to Morgan's `/api/twilio/sms` endpoint
-   - Morgan responds via Twilio SMS API
-6. Store all Twilio credentials (Account SID, Auth Token, Phone Number SID) in sigma1-external-secrets.
+1. Define test scenarios for each skill across each channel:
+   - Signal: lead qualification → customer vetting → quote generation → invoice
+   - Voice (Twilio): equipment inquiry → availability check → quote request
+   - Web chat: catalog search → quote builder assist → upsell
+   - Signal: social media post creation → scheduling
+   - Signal: RMS job creation → status update → completion
+   - Web chat: admin user management (authorized and unauthorized)
+2. Execute each scenario manually and record results.
+3. Verify that conversation context is maintained throughout multi-step flows.
+4. Verify that tool calls produce correct side effects in backend services (e.g., quote actually created in quoting service).
+5. Verify graceful error handling when backend services are unavailable.
+6. Document any failures and required fixes.
 
 ## Validation
-Verify Twilio phone number is configured with correct SIP trunk. Make a test call and verify it routes through to ElevenLabs (or logs the attempt). Test fallback: disable ElevenLabs endpoint and verify Twilio falls back to webhook. Send test SMS and verify Morgan receives it via /api/twilio/sms webhook.
+All defined test scenarios pass. Each channel (Signal, voice, web chat) successfully completes at least one multi-step flow. Backend side effects are verified (quotes, invoices, jobs created). Error scenarios produce user-friendly messages, not stack traces.

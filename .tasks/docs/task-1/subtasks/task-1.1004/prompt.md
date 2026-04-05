@@ -1,20 +1,16 @@
-Implement subtask 1004: Create Valkey instance via Opstree Redis operator CR
+Implement subtask 1004: Provision S3/R2 buckets for product images and event photos
 
 ## Objective
-Deploy a Valkey 7.2 instance using the existing Opstree Redis operator by creating a Redis custom resource in the sigma1 namespace.
+Create and configure S3-compatible object storage buckets (Cloudflare R2 or AWS S3) for product images and event photos, including access credentials and CORS policies.
 
 ## Steps
-1. Create `sigma1-valkey.yaml` with an Opstree `Redis` CR:
-   - `metadata.name: sigma1-valkey`, `metadata.namespace: sigma1`
-   - `spec.kubernetesConfig.image: valkey/valkey:7.2-alpine`
-   - `spec.kubernetesConfig.imagePullPolicy: IfNotPresent`
-   - `spec.redisExporter.enabled: true` (for Prometheus scraping)
-   - Single replica configuration (standalone mode, not cluster or sentinel)
-   - Resource requests: 128Mi memory, 100m CPU (dev sizing)
-2. Apply the manifest: `kubectl apply -f sigma1-valkey.yaml`.
-3. Wait for the Valkey pod to reach Running state.
-4. Verify connectivity: `kubectl exec` into a temporary pod and run `redis-cli -h sigma1-valkey -p 6379 PING`.
-5. Note the service DNS name: `sigma1-valkey.sigma1.svc.cluster.local:6379` for the ConfigMap.
+1. Decide on provider (R2 or S3) per dp-2 decision.
+2. Create two buckets: `sigma1-product-images` and `sigma1-event-photos`.
+3. Configure CORS policies to allow GET from the web domain and PUT from admin endpoints.
+4. Create an access key pair (or R2 API token) with scoped permissions (read/write to these buckets only).
+5. Store the access key ID, secret key, bucket names, and endpoint URL in a Kubernetes Secret named `sigma1-s3-credentials` in the `databases` namespace.
+6. Record the S3_URL and bucket names for ConfigMap creation.
+7. Upload a test object and verify retrieval via the endpoint URL.
 
 ## Validation
-`kubectl get redis sigma1-valkey -n sigma1` shows the CR in a ready state. `kubectl get pods -n sigma1 -l app=sigma1-valkey` shows 1/1 Running. `kubectl run --rm -it --image=valkey/valkey:7.2-alpine test-valkey -- redis-cli -h sigma1-valkey.sigma1.svc.cluster.local PING` returns `PONG`.
+Verify both buckets exist and are accessible. Upload a test file and retrieve it via the S3-compatible endpoint. Confirm the Kubernetes Secret `sigma1-s3-credentials` contains valid access keys, endpoint URL, and bucket names.

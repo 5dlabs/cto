@@ -1,23 +1,15 @@
-Implement subtask 3006: Implement OpportunityService gRPC handlers with ScoreLead logic
+Implement subtask 3006: Implement CrewService with scheduling and calendar sync
 
 ## Objective
-Implement the OpportunityService gRPC server with full CRUD operations for opportunities and line items, plus the ScoreLead RPC that computes GREEN/YELLOW/RED based on vetting data and opportunity value.
+Build the CrewService for managing crew members, assigning them to projects with date ranges, detecting scheduling conflicts, and syncing assignments to Google Calendar.
 
 ## Steps
-1. Create `internal/service/opportunity.go` implementing the generated OpportunityServiceServer interface.
-2. Implement CreateOpportunity: validate required fields (customer_id, event dates), insert opportunity, return created resource.
-3. Implement GetOpportunity: lookup by ID, include nested line items, return NOT_FOUND if missing.
-4. Implement UpdateOpportunity: support partial updates via field mask or by checking non-zero values, enforce valid status transitions (pending→qualified→approved→converted; no skipping, no backward).
-5. Implement ListOpportunities: support pagination (page_size default 20, max 100, page_token as opaque cursor), optional status filter.
-6. Implement ScoreLead:
-   - GREEN: customer has verified vetting data AND opportunity total > $5000
-   - YELLOW: customer has partial vetting data OR opportunity total between $1000-$5000
-   - RED: customer has no vetting data AND opportunity total > $5000 (high risk)
-   - Store computed lead_score on the opportunity record
-   - Return the score in the response
-7. Implement CreateOpportunity with line items: accept repeated line items in the create request, compute subtotal_cents = quantity * day_rate_cents * days, compute total_estimate_cents as sum of all line item subtotals.
-8. Input validation: use `google.golang.org/grpc/codes` and `status` for proper gRPC error codes (InvalidArgument, NotFound, FailedPrecondition for invalid state transitions).
-9. Register the service in the gRPC server in main.go.
+1. Create `internal/crew/` package with repository, service, and handler layers.
+2. Implement `repository.go`: CreateCrewMember, GetCrewMemberByID, ListCrewMembers, CreateAssignment, DeleteAssignment, ListAssignmentsByProject, ListAssignmentsByCrewMember, FindConflictingAssignments(crew_member_id, start_date, end_date).
+3. Implement assignment logic: before creating an assignment, query for overlapping assignments for the same crew member. If conflicts found, return FailedPrecondition with details of the conflicting assignment.
+4. Integrate with the `internal/calendar/` package (from task 3004): when creating an assignment, create a Google Calendar event for the crew member's schedule. Store calendar_event_id on the crew_assignment record.
+5. Implement availability checking: given a date range, return which crew members have no conflicting assignments.
+6. Wire up gRPC handlers.
 
 ## Validation
-Unit test ScoreLead: GREEN for verified+>$5000, YELLOW for partial vetting, RED for no vetting+high value (minimum 3 scenarios as specified). Unit test status transition validation: verify approved→converted succeeds, pending→converted fails. Integration test: CreateOpportunity with line items and verify total_estimate_cents is computed correctly.
+Unit tests for conflict detection logic with overlapping date ranges. Integration tests: create crew members, assign to a project for date range, attempt to assign same crew member to overlapping project — verify conflict error. Verify availability endpoint correctly filters out booked crew. Mock calendar client: verify events are created for assignments.

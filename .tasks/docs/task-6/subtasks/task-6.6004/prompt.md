@@ -1,24 +1,25 @@
-Implement subtask 6004: Implement upload endpoint and draft listing/detail endpoints
+Implement subtask 6004: Implement AI caption generation service
 
 ## Objective
-Build the Elysia routes for multipart image upload (POST /api/v1/social/upload), draft listing with pagination and status filter (GET /api/v1/social/drafts), and draft detail (GET /api/v1/social/drafts/:id). Integrate R2 for file storage and database for record persistence.
+Build the AI-powered caption generation service that creates platform-specific captions for curated images using OpenAI/Claude.
 
 ## Steps
-1. Create `src/routes/social.ts` as an Elysia plugin/group under `/api/v1/social`.
-2. `POST /api/v1/social/upload`:
-   - Accept multipart/form-data with multiple image files and optional `event_id`.
-   - For each file: validate it's an image (MIME check), generate a UUID-based R2 key, upload via R2StorageService, create an `uploads` row with original_url = R2 key, metadata (extract dimensions if possible).
-   - Return 201 with array of created upload records.
-   - After response, trigger the AI curation pipeline asynchronously (emit an event or call a pipeline function — wire actual AI logic in subtask 6005/6006/6007).
-3. `GET /api/v1/social/drafts`:
-   - Query params: `status` (optional filter), `page` (default 1), `limit` (default 20).
-   - Query drafts table with optional status filter, ORDER BY created_at DESC, LIMIT/OFFSET pagination.
-   - Return paginated response: `{ data: Draft[], total: number, page: number, limit: number }`.
-4. `GET /api/v1/social/drafts/:id`:
-   - Fetch draft by UUID, include presigned URLs for each upload_id image and each platform crop.
-   - Return 404 if not found.
-5. Define Effect Schema validators for request bodies and query params.
-6. Use Effect.gen for route handler composition, providing all required service layers.
+1. Create `src/services/caption.ts` module using Effect.Service pattern.
+2. Define a `CaptionService` Effect.Service with method: `generateCaption(photoId: string, platform: Platform, context?: CaptionContext) -> Effect.Effect<GeneratedCaption, CaptionError>`.
+3. Implement caption generation:
+   - Fetch the photo and any associated metadata.
+   - Construct a platform-specific prompt (Instagram: hashtags and emojis, LinkedIn: professional tone, TikTok: trending/casual, Facebook: engaging/shareable).
+   - Call OpenAI/Claude text API with the prompt and optional image context.
+   - Parse and validate the generated caption (length limits per platform, appropriate formatting).
+4. Implement POST `/api/v1/social/captions/generate` endpoint:
+   - Accept photo_id, platform, optional tone/context parameters.
+   - Return generated caption text with platform-specific metadata (hashtag suggestions, character count).
+5. Implement POST `/api/v1/social/drafts` endpoint:
+   - Create a draft combining selected photo(s) with generated caption.
+   - Persist to `drafts` table with status 'draft'.
+6. Implement GET `/api/v1/social/drafts` — list drafts with filtering by status.
+7. Implement PUT `/api/v1/social/drafts/:id` — edit draft caption or photos.
+8. Make AI provider configurable via environment variable.
 
 ## Validation
-Integration test: POST /api/v1/social/upload with 3 test images → verify 201 response with 3 upload records, each having a valid R2 key. GET /api/v1/social/drafts returns paginated list. GET /api/v1/social/drafts/:id returns draft with image URLs. POST with invalid MIME type returns 422. GET non-existent draft ID returns 404.
+Mock the AI API and verify captions are generated with correct platform-specific formatting. Create a draft and verify it persists correctly. Edit a draft and verify changes are saved. List drafts with status filter and verify results.

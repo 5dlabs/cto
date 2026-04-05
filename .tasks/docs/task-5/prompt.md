@@ -1,81 +1,30 @@
 Implement task 5: Build Customer Vetting Service (Rex - Rust/Axum)
 
 ## Goal
-Implement the Customer Vetting Service providing automated background research on prospects via OpenCorporates, LinkedIn, Google Reviews, and credit signal APIs. Produces a weighted GREEN/YELLOW/RED lead score. Built within the shared Cargo workspace.
+Develop the customer vetting pipeline for business verification, online presence, reputation, and credit signals, integrating with OpenCorporates, LinkedIn, Google Reviews, and credit APIs.
 
 ## Task Context
 - Agent owner: rex
-- Stack: Rust 1.75+/Axum 0.7
+- Stack: Rust/Axum
 - Priority: high
-- Dependencies: 1, 2
+- Dependencies: 1
 
 ## Implementation Plan
-1. Add service crate: `sigma1-services/services/customer-vetting/`
-   - Depend on shared-auth, shared-db, shared-error, shared-observability crates
-2. Database migrations in `vetting` schema:
-   - `vetting_results` table: id (UUID PK), org_id (UUID), business_verified (BOOL), opencorporates_data (JSONB nullable), linkedin_exists (BOOL), linkedin_followers (INT default 0), google_reviews_rating (REAL nullable), google_reviews_count (INT default 0), credit_score (INT nullable), risk_flags (TEXT[]), final_score (VARCHAR(6): GREEN/YELLOW/RED), vetted_at (TIMESTAMPTZ), created_at
-   - `vetting_requests` table: id (UUID PK), org_id, org_name, org_domain (nullable), status (pending/in_progress/completed/failed), requested_at, completed_at
-   - Indexes: vetting_results(org_id), vetting_requests(org_id, status)
-3. Implement Axum 0.7 endpoints:
-   - `POST /api/v1/vetting/run` — accepts { org_id, org_name, org_domain? }, kicks off async vetting pipeline, returns request ID + 202 Accepted
-   - `GET /api/v1/vetting/:org_id` — returns latest VettingResult for org
-   - `GET /api/v1/vetting/credit/:org_id` — returns credit signals subset
-   - Health and metrics endpoints
-4. Vetting pipeline (async background task via tokio::spawn):
-   - Step 1 — Business Verification:
-     - Call OpenCorporates API `/companies/search?q={org_name}`
-     - Parse response: company exists, jurisdiction, good_standing, directors
-     - Store in opencorporates_data JSONB
-     - Set business_verified = true if company found and in good standing
-   - Step 2 — Online Presence:
-     - LinkedIn company lookup via API or scraping proxy
-     - Check if company page exists, follower count
-     - Set linkedin_exists, linkedin_followers
-   - Step 3 — Reputation:
-     - Google Places API search for business, extract reviews rating and count
-     - Store google_reviews_rating, google_reviews_count
-   - Step 4 — Credit Signals:
-     - Integration point for commercial credit API (e.g., Creditsafe)
-     - Behind feature flag — if not configured, skip and log warning
-     - Store credit_score if available
-   - Step 5 — Final Score calculation:
-     - Weighted algorithm:
-       - business_verified: 30 points
-       - linkedin_exists && followers > 50: 20 points
-       - google_reviews_rating >= 4.0: 20 points
-       - google_reviews_count >= 10: 10 points
-       - credit_score >= 600: 20 points (or 10 points if unavailable but other signals positive)
-     - GREEN: >= 70 points
-     - YELLOW: 40-69 points
-     - RED: < 40 points
-     - risk_flags populated for each failed check
-5. External API client modules with retry logic (tokio-retry, exponential backoff):
-   - `OpenCorporatesClient` — configurable base URL, API key from ExternalSecret
-   - `LinkedInClient` — configurable, gracefully degrades if API unavailable
-   - `GooglePlacesClient` — uses Google Places API key
-   - `CreditClient` — feature-flagged, returns None if not configured
-6. All external API calls have 10-second timeouts and circuit breaker pattern (track consecutive failures, back off after 5).
-7. Cache vetting results in Valkey for 24 hours (keyed by org_id) to avoid re-running expensive pipeline.
-8. GDPR: implement `DELETE /api/v1/vetting/:org_id` to purge all vetting data for an organization.
-9. Kubernetes Deployment: namespace `sigma1`, 1 replica (lower traffic), envFrom sigma1-infra-endpoints.
+{"steps":["Initialize Rust 1.75+ project with Axum 0.7, using POSTGRES_URL and API keys from ConfigMap/secrets.","Define VettingResult and LeadScore models as per PRD.","Implement endpoints: /api/v1/vetting/run, /api/v1/vetting/:org_id, /api/v1/vetting/credit/:org_id.","Integrate OpenCorporates, LinkedIn, Google Reviews, and credit APIs for data aggregation.","Implement scoring algorithm for GREEN/YELLOW/RED.","Persist vetting results in PostgreSQL.","Add Prometheus metrics and health endpoints."]}
 
 ## Acceptance Criteria
-1. Unit test: scoring algorithm produces GREEN (>= 70) for fully verified company with good reviews, YELLOW (40-69) for partially verified, RED (< 40) for unverified with no online presence — at least 5 test vectors. 2. Unit test: risk_flags correctly populated (e.g., 'business_not_verified', 'no_linkedin_presence', 'low_review_rating'). 3. Integration test: POST /api/v1/vetting/run with mock external APIs returning positive data → poll GET /api/v1/vetting/:org_id until completed → verify GREEN score and all fields populated. 4. Integration test: all external APIs return errors/timeouts → verify pipeline completes with RED score and appropriate risk_flags. 5. Cache test: second GET for same org_id returns cached result without external API calls (verify via mock call counts). 6. GDPR test: DELETE /api/v1/vetting/:org_id removes all records, subsequent GET returns 404. 7. Circuit breaker test: simulate 5 consecutive OpenCorporates failures, verify 6th call is short-circuited without network request.
+Vetting pipeline runs end-to-end, aggregating data from all sources. Final score is computed and stored. Endpoints return correct vetting results. Health and metrics endpoints are available.
 
 ## Subtasks
-- Scaffold customer-vetting service crate in Cargo workspace: Create the `sigma1-services/services/customer-vetting/` crate with Cargo.toml, main.rs, and module structure. Wire up dependencies on shared-auth, shared-db, shared-error, shared-observability workspace crates. Configure Axum 0.7 application skeleton with health endpoint and tracing initialization.
-- Create database migrations for vetting schema: Write SQLx migrations to create the `vetting` schema with `vetting_results` and `vetting_requests` tables including all specified columns, types, defaults, and indexes.
-- Implement OpenCorporatesClient with retry and circuit breaker: Build the OpenCorporates external API client module with reqwest, exponential backoff retry via tokio-retry, 10-second timeouts, and a circuit breaker that trips after 5 consecutive failures.
-- Implement LinkedInClient with graceful degradation: Build the LinkedIn company lookup client module with retry logic, 10-second timeouts, circuit breaker, and graceful degradation when the API is unavailable or unconfigured.
-- Implement GooglePlacesClient with retry and circuit breaker: Build the Google Places API client module to search for a business and extract reviews rating and count, with retry logic, 10-second timeouts, and circuit breaker.
-- Implement CreditClient with feature flag gating: Build the commercial credit API client module that is feature-flagged and returns None when not configured, with retry and circuit breaker when active.
-- Extract shared circuit breaker module: Extract the circuit breaker pattern into a shared module `src/clients/circuit_breaker.rs` used by all four external API clients, avoiding code duplication.
-- Implement weighted scoring algorithm and risk_flags population: Build the scoring module that takes raw vetting data from all pipeline steps and computes the weighted GREEN/YELLOW/RED score with risk_flags array.
-- Implement async vetting pipeline orchestrator: Build the async pipeline that orchestrates the 5 vetting steps (OpenCorporates, LinkedIn, Google Places, Credit, Scoring), updates request status, stores results, and handles partial failures gracefully.
-- Implement Valkey caching layer for vetting results: Add a caching layer using Valkey (Redis-compatible) to cache vetting results for 24 hours per org_id, avoiding redundant external API calls.
-- Implement API endpoints (POST run, GET result, GET credit, DELETE GDPR): Build all Axum 0.7 route handlers: POST /api/v1/vetting/run (202 Accepted with async pipeline), GET /api/v1/vetting/:org_id, GET /api/v1/vetting/credit/:org_id, DELETE /api/v1/vetting/:org_id for GDPR.
-- Write comprehensive unit and integration tests: Create the full test suite covering scoring algorithm test vectors, pipeline integration with mocked APIs, cache behavior, GDPR deletion, and circuit breaker verification.
-- Create Kubernetes deployment manifest for customer-vetting service: Write the Kubernetes Deployment, Service, and related manifests for the customer-vetting service in the sigma1 namespace with 1 replica and envFrom sigma1-infra-endpoints ConfigMap.
+- Initialize Rust/Axum project and database schema for vetting models: Scaffold the Rust 1.75+ project with Axum 0.7, configure database connectivity using POSTGRES_URL from ConfigMap, and create SQLx migrations for VettingResult and LeadScore tables in the vetting schema.
+- Implement OpenCorporates API integration module: Build a dedicated Rust module for querying the OpenCorporates API to retrieve business registration, incorporation status, officers, and filing data for a given organization.
+- Implement LinkedIn data integration module: Build a Rust module for retrieving company online presence and profile data from LinkedIn (via selected API or enrichment provider) for organization vetting.
+- Implement Google Reviews API integration module: Build a Rust module for fetching Google Reviews data (ratings, review count, sentiment) for a business using the Google Places API.
+- Implement credit API integration module: Build a Rust module for fetching business credit signals (credit score, payment history, risk indicators) from the selected credit data provider.
+- Implement GREEN/YELLOW/RED scoring algorithm with aggregation logic: Build the scoring engine that aggregates data from all four external sources (OpenCorporates, LinkedIn, Google Reviews, credit) and computes a composite vetting score classified as GREEN, YELLOW, or RED.
+- Implement vetting REST endpoints and orchestration pipeline: Build the Axum REST endpoints (/api/v1/vetting/run, /api/v1/vetting/:org_id, /api/v1/vetting/credit/:org_id) and the orchestration logic that calls all integration modules, runs scoring, and persists results.
+- Add Prometheus metrics and health endpoints: Implement Prometheus metrics exposition and health/readiness probe endpoints for the vetting service.
+- End-to-end vetting pipeline integration tests: Write comprehensive integration tests that validate the full vetting pipeline from API request through external integrations (mocked), scoring, persistence, and retrieval.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

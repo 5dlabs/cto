@@ -1,34 +1,19 @@
-Implement subtask 1008: Create sigma1-rbac-roles ConfigMap
+Implement subtask 1008: Validate end-to-end infrastructure connectivity from all namespaces
 
 ## Objective
-Create the shared RBAC role definitions ConfigMap that defines the application-level role/permission matrix for all services to consume.
+Run connectivity tests from each service namespace to verify that all infrastructure components (PostgreSQL, Redis, S3, Signal-CLI) are reachable using the ConfigMap and Secret values.
 
 ## Steps
-1. Create `sigma1-rbac-roles.yaml` ConfigMap in namespace `sigma1` with a `roles.json` data key containing:
-   ```json
-   {
-     "roles": {
-       "admin": {
-         "description": "Full platform access",
-         "permissions": ["*"]
-       },
-       "operator": {
-         "description": "Day-to-day operations, no system config",
-         "permissions": ["catalog:read", "catalog:write", "rms:read", "rms:write", "finance:read", "finance:write", "crm:read", "crm:write", "vetting:read", "vetting:write", "social:read", "social:write"]
-       },
-       "morgan-agent": {
-         "description": "AI agent with scoped access",
-         "permissions": ["catalog:read", "rms:read", "finance:read", "crm:read", "vetting:read", "social:read", "social:write", "audit:write"]
-       },
-       "readonly": {
-         "description": "Read-only dashboard access",
-         "permissions": ["catalog:read", "rms:read", "finance:read", "crm:read"]
-       }
-     }
-   }
-   ```
-2. Apply the ConfigMap.
-3. This is a shared schema; each service will implement permission checks against this matrix.
+1. Deploy a temporary debug pod (e.g., `curlimages/curl` or `busybox` with psql/redis-cli) in each service namespace (sigma1, openclaw, social, web).
+2. From each pod, test:
+   - PostgreSQL: `psql $POSTGRES_URL -c 'SELECT 1'`
+   - Redis: `redis-cli -u $REDIS_URL ping`
+   - S3: `curl $S3_URL` or attempt a ListBuckets call with credentials
+   - Signal-CLI: `curl $SIGNAL_CLI_URL/v1/about`
+3. Verify all connections succeed from every namespace.
+4. Check that secrets are mountable and contain non-empty values.
+5. Clean up debug pods after verification.
+6. Document results and any connectivity issues.
 
 ## Validation
-`kubectl get configmap sigma1-rbac-roles -n sigma1 -o jsonpath='{.data.roles\.json}'` returns valid JSON. Parsing the JSON confirms 4 roles exist with the correct permission arrays. The `admin` role has `["*"]` permissions.
+All connectivity tests pass from every service namespace: PostgreSQL returns SELECT 1, Redis returns PONG, S3 endpoint responds, Signal-CLI returns a valid /about response. Zero connection failures across all namespaces.

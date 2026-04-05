@@ -1,24 +1,16 @@
-Implement subtask 7001: Configure OpenClaw agent manifest with Morgan persona and skills
+Implement subtask 7001: Deploy OpenClaw agent in Kubernetes with workspace volume and configuration
 
 ## Objective
-Create the OpenClaw agent manifest file defining Morgan's identity, LLM model configuration, system prompt with Perception Events brand voice, and skill routing configuration for all agent capabilities (sales-qual, customer-vet, quote-gen, upsell, finance, social-media, rms, admin).
+Create and apply the Kubernetes deployment manifest for the OpenClaw Morgan agent, including AGENT_ID, MODEL env vars, workspace persistent volume, resource requests/limits, and service account.
 
 ## Steps
-1. Create the OpenClaw agent manifest file (e.g., `morgan-agent.yaml` or `agent.json` depending on OpenClaw format).
-2. Set Agent ID to `morgan`.
-3. Configure model endpoint: `openai-api/gpt-5.4-pro` via environment variable `MORGAN_LLM_MODEL` so it's easily swappable.
-4. Write the system prompt:
-   - Professional tone, knowledgeable about lighting, visual production, AV equipment
-   - Perception Events brand voice: conversational but efficient, not overly formal
-   - Include instructions for skill activation triggers (e.g., 'when user asks about equipment availability, use the sales-qual skill')
-   - Include guardrails: don't discuss competitors, don't make promises about pricing without generating a quote, escalate to Mike for custom requests
-5. Define skills configuration array mapping skill names to their tool sets:
-   - `sales-qual`: catalog_search, check_availability, vet_customer, generate_quote, score_lead
-   - `finance`: create_invoice, finance_report
-   - `social-media`: social_curate, social_publish
-   - `admin`: equipment_lookup
-6. Configure LLM parameters: temperature (0.7 for conversational), max_tokens, and any stop sequences.
-7. Set up environment variable references for API keys (OPENAI_API_KEY) and endpoint URLs from sigma1-infra-endpoints ConfigMap.
+1. Create a Deployment manifest for the OpenClaw agent container image.
+2. Configure environment variables: AGENT_ID, MODEL (referencing the chosen LLM), MCP_TOOL_SERVER_URL, and any API keys via Secret references.
+3. Attach a PersistentVolumeClaim for the agent workspace (conversation state, logs).
+4. Define resource requests (cpu: 500m, memory: 1Gi) and limits (cpu: 2, memory: 4Gi).
+5. Create a ClusterIP Service exposing the agent's HTTP/WebSocket ports.
+6. Create a ConfigMap for agent configuration (system prompt, skill definitions path, tool registry URL).
+7. Apply manifests and verify the pod reaches Running state with readiness probe passing.
 
 ## Validation
-Validate manifest parses without errors using OpenClaw CLI or schema validator. Verify environment variable placeholders resolve correctly. Send a test prompt to the configured LLM endpoint and confirm a coherent response with Morgan's persona characteristics.
+Pod is Running and Ready. `kubectl logs` shows successful agent initialization with AGENT_ID logged. Readiness probe endpoint returns 200. Workspace volume is mounted and writable.

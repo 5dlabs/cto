@@ -1,22 +1,17 @@
-Implement subtask 5003: Implement OpenCorporatesClient with retry and circuit breaker
+Implement subtask 5003: Implement LinkedIn data integration module
 
 ## Objective
-Build the OpenCorporates external API client module with reqwest, exponential backoff retry via tokio-retry, 10-second timeouts, and a circuit breaker that trips after 5 consecutive failures.
+Build a Rust module for retrieving company online presence and profile data from LinkedIn (via selected API or enrichment provider) for organization vetting.
 
 ## Steps
-1. Create `src/clients/opencorporates.rs`.
-2. Define `OpenCorporatesClient` struct with: reqwest::Client (configured with 10s timeout), base_url (String), api_key (Option<String>), and a circuit breaker state (Arc<Mutex<CircuitBreakerState>>).
-3. Implement `CircuitBreakerState` (or use a crate): track consecutive_failures, state (Closed/Open/HalfOpen), last_failure_time. Open after 5 failures, half-open after 30s cooldown.
-4. Implement `pub async fn search_company(&self, org_name: &str) -> Result<Option<OpenCorporatesResult>, VettingError>`:
-   - Check circuit breaker state; if Open and not past cooldown, return Err immediately.
-   - Build GET request to `{base_url}/companies/search?q={org_name}&api_token={api_key}`.
-   - Wrap in tokio-retry with ExponentialBackoff (3 attempts, starting 500ms).
-   - Parse JSON response into `OpenCorporatesSearchResponse` struct.
-   - Extract: company_name, jurisdiction_code, company_status (good_standing), officers.
-   - On success, reset circuit breaker. On failure, increment.
-5. Define response structs: `OpenCorporatesSearchResponse`, `OpenCorporatesCompany`, `OpenCorporatesResult` (domain model).
-6. Constructor `new(base_url, api_key)` with defaults.
-7. Add `#[cfg(test)]` module with unit tests using mockito or wiremock for: successful search, 404 not found, timeout, circuit breaker tripping after 5 failures.
+1. Create `src/integrations/linkedin.rs` module.
+2. Define an `OnlinePresenceProvider` trait with async methods: `get_company_profile(org_name: &str) -> Result<LinkedInProfile>`, `get_employee_count(org_name: &str) -> Result<Option<u32>>`.
+3. Implement the trait for the chosen LinkedIn data source (official API or third-party enrichment like Proxycurl). Use the API key from secrets.
+4. Define internal types: LinkedInProfile { company_name, description, industry, employee_count, headquarters, website, specialties, followers_count, founded_year }.
+5. Implement HTTP client calls with proper authentication headers.
+6. Handle error cases: company not found, partial data, API errors.
+7. Add structured logging and request tracing.
+8. Design the trait so the implementation can be swapped once dp-5-2 is resolved.
 
 ## Validation
-Unit test: mock returns valid company JSON → parsed correctly with business_verified=true. Unit test: mock returns empty results → returns None. Unit test: mock returns 500 five times → circuit breaker opens, 6th call returns error without network request. Unit test: 10s timeout is configured on the reqwest client.
+Write unit tests with mocked HTTP responses verifying correct parsing, graceful handling of missing fields, and error scenarios. Verify the trait can be implemented with different backends.

@@ -1,29 +1,16 @@
-Implement subtask 7009: Implement ElevenLabs voice integration with WebSocket streaming
+Implement subtask 7009: Performance optimization and load testing for 500+ concurrent Signal connections
 
 ## Objective
-Configure the ElevenLabs Conversational AI agent with Morgan's voice profile and implement the WebSocket-based real-time voice streaming pipeline for phone call interactions.
+Optimize the Morgan agent and Signal-CLI setup to achieve <10 second response times and handle 500+ concurrent Signal connections, conducting load tests to validate.
 
 ## Steps
-1. Configure ElevenLabs Conversational AI agent:
-   - Create or select voice profile for Morgan (professional, clear, warm tone)
-   - Set up ElevenLabs agent with Morgan's system prompt (aligned with OpenClaw manifest)
-   - Configure the agent to forward tool calls to Morgan's MCP tool server
-2. Implement WebSocket connection to ElevenLabs streaming API:
-   - Establish persistent WebSocket connection for real-time audio streaming
-   - Handle audio chunks: receive PCM/opus audio from ElevenLabs, stream to caller
-   - Send user audio: receive audio from Twilio, forward to ElevenLabs for transcription
-3. Implement voice-to-text pipeline:
-   - ElevenLabs handles STT internally → receive transcribed text
-   - Forward transcribed text to Morgan's conversation handler
-   - Receive Morgan's text response → send to ElevenLabs for TTS
-4. Handle conversation state continuity between voice and text channels:
-   - Voice calls should be able to reference prior text conversations if same phone number
-   - Store voice call session in Valkey with phone number as key
-5. Implement graceful handling of voice-specific scenarios:
-   - Silence detection / timeout → polite prompt
-   - Call disconnect → save conversation state
-   - Audio quality issues → fallback to text summary
-6. Store ElevenLabs API key as Kubernetes secret, reference via sigma1-external-secrets.
+1. Profile the agent's response pipeline: measure time from message receipt to response sent. Identify bottlenecks (LLM inference, tool calls, Signal-CLI).
+2. Optimize: ensure async/non-blocking processing of concurrent messages. Use connection pooling for backend service calls.
+3. Configure horizontal pod autoscaling (HPA) for the agent deployment based on CPU/memory or custom metrics (concurrent connections).
+4. Tune Signal-CLI for concurrent message handling: configure thread pool size, connection limits.
+5. Write a load test script (e.g., using k6 or locust) simulating 500+ concurrent Signal conversations sending messages simultaneously.
+6. Run load tests and capture metrics: p50/p95/p99 response times, error rates, message throughput.
+7. Iterate on configuration until <10s p95 response time at 500 concurrent connections is achieved.
 
 ## Validation
-Verify ElevenLabs WebSocket connection establishes successfully with valid API key. Send test audio and verify transcription is received. Send test text and verify audio response is generated. Verify conversation state is stored in Valkey keyed by phone number. Test disconnect/reconnect preserves state.
+Load test with 500 concurrent simulated Signal conversations. p95 response time is under 10 seconds. Error rate is below 1%. No message loss observed. HPA scales pods appropriately under load.
