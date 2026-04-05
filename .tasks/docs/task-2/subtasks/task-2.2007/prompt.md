@@ -1,27 +1,10 @@
-Implement subtask 2007: Write comprehensive integration and unit tests for all endpoints
+Implement subtask 2007: Implement machine-readable equipment-api endpoints for Morgan agent
 
 ## Objective
-Create a full test suite covering all catalog and equipment-api endpoints, error cases, pagination, rate limiting, and health probes to achieve at least 80% code coverage.
+Implement the /api/v1/equipment-api/catalog and /api/v1/equipment-api/checkout endpoints designed for consumption by the Morgan AI agent and other automated systems.
 
 ## Steps
-1. Create tests/ directory with integration test files: tests/catalog_test.rs, tests/equipment_api_test.rs, tests/health_test.rs, tests/rate_limit_test.rs.
-2. Use sqlx::test macro with a test database that runs migrations automatically.
-3. Write a test helper module (tests/common/mod.rs) that creates an AppState with test database, spawns the Axum app on a random port, and provides an HTTP client.
-4. Catalog tests:
-   - List categories returns seeded data, respects parent_id filter.
-   - List products returns paginated results, search filter works, category_id filter works.
-   - Get product by valid ID returns full product with images.
-   - Get product by invalid UUID returns 400, by non-existent UUID returns 404.
-   - Availability endpoint returns correct computed available quantities.
-   - Availability endpoint returns 400 when dates are missing or invalid.
-5. Equipment API tests:
-   - Catalog endpoint returns denormalized structure with CDN image URLs.
-   - Checkout with valid items returns a quote with correct totals.
-   - Checkout with insufficient availability returns appropriate error.
-   - Checkout with invalid product_id returns 404.
-6. Health tests: /health/live returns 200, /health/ready returns 200 with connected infra.
-7. Rate limit tests: verify 429 is returned after exceeding limit.
-8. Add cargo-tarpaulin to CI for coverage reporting, targeting ≥80%.
+1. Create src/handlers/equipment_api.rs module. 2. Implement GET /api/v1/equipment-api/catalog: return a simplified, machine-optimized JSON format with product IDs, names, categories, rates, and current availability in a flat structure suitable for LLM consumption. Include metadata like total_products, last_updated. 3. Implement POST /api/v1/equipment-api/checkout: accept a JSON body with { product_id, quantity, rental_start, rental_end, customer_info: { name, email, phone } }. Validate availability, create a reservation (INSERT into a rms.reservations table — add migration if needed), decrement available quantity, and return a confirmation with reservation_id. 4. Implement idempotency for checkout using an idempotency_key header. 5. Both endpoints should include structured error responses with error codes that agents can parse programmatically. 6. Register routes in the main router.
 
 ## Validation
-cargo test --all runs all tests and they pass; cargo tarpaulin reports ≥80% line coverage; each test file covers both happy-path and error scenarios; tests are isolated and can run in parallel without interference.
+GET /equipment-api/catalog returns valid JSON with all products and availability; POST /equipment-api/checkout with valid data creates a reservation and returns a reservation_id; duplicate checkout with same idempotency_key returns the same result; checkout with insufficient availability returns a structured error.

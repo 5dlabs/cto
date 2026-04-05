@@ -1,11 +1,10 @@
 ## Decision Points
 
-- What authentication and authorization mechanism should be used for service-to-service and user-to-service API calls?
-- What approach should be used for GDPR compliance regarding data export and customer deletion?
-- Which secret management and rotation mechanism should be used?
-- What audit log sink and retention strategy should be used?
+- What authentication and authorization mechanism should be used for internal service-to-service API calls?
+- What access control model should be used for admin endpoints (e.g., product add/update, finance, vetting)?
+- Which secret management approach should be used for external credential rotation (Stripe, LinkedIn, etc.)?
 
 ## Coordination Notes
 
-- Agent owner: bolt
+- Agent owner: Bolt
 - Primary stack: Kubernetes/Helm

@@ -1,16 +1,10 @@
-Implement subtask 3007: Implement DeliveryService with delivery tracking logic
+Implement subtask 3007: Implement CrewService and DeliveryService
 
 ## Objective
-Build the DeliveryService gRPC handler for scheduling, tracking, and managing equipment deliveries tied to projects.
+Build the CrewService and DeliveryService gRPC handlers for crew assignment, availability management, delivery scheduling, and status tracking.
 
 ## Steps
-1. Create /internal/service/delivery_service.go implementing DeliveryServiceServer.
-2. Implement CreateDelivery: accept project_id, equipment_ids, driver_id, scheduled times; validate project exists and equipment items are in RESERVED or CHECKED_OUT status; persist delivery with SCHEDULED status; link equipment via delivery_equipment join table.
-3. Implement GetDelivery and ListDeliveries: support filtering by project_id, status, driver_id, date range; pagination.
-4. Implement UpdateDeliveryStatus: enforce valid status transitions (SCHEDULED→IN_TRANSIT→DELIVERED, DELIVERED→RETURNED). On transition to DELIVERED, update linked equipment items' location. On RETURNED, trigger check-in logic for equipment.
-5. Implement TrackDelivery: return current delivery status, driver info, tracking notes, and ETA based on scheduled times.
-6. Add tracking notes append functionality: allow adding timestamped notes to a delivery record for driver updates.
-7. Register service on gRPC server and grpc-gateway mux.
+1. Implement CrewService gRPC server in /internal/crew/. Wire up ListCrew, AssignCrew, GetAvailability, UpdateAvailability RPCs. AssignCrew should validate crew member availability for the given date range before creating assignment. GetAvailability should check existing assignments to compute open slots. 2. Implement DeliveryService gRPC server in /internal/delivery/. Wire up ScheduleDelivery, UpdateDeliveryStatus, ListDeliveries RPCs. ScheduleDelivery should validate equipment availability and create a delivery record with pickup/dropoff details. UpdateDeliveryStatus supports transitions: scheduled → in_transit → delivered → picked_up. 3. Register both services with gRPC server and verify grpc-gateway routes.
 
 ## Validation
-CreateDelivery fails if project doesn't exist or equipment is unavailable; UpdateDeliveryStatus enforces valid transitions and rejects invalid ones (e.g., SCHEDULED→RETURNED); DELIVERED transition updates equipment location; TrackDelivery returns current status and notes.
+Crew assignment respects availability constraints; double-booking a crew member for overlapping dates is rejected; delivery scheduling creates valid records; delivery status transitions follow the defined state machine; REST endpoints mirror gRPC behavior.

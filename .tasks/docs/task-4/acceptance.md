@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All endpoints return correct data; Stripe payments are processed and recorded; currency rates are updated on schedule; tests cover at least 80% of code paths.
+- [ ] All endpoints return correct data as per OpenAPI spec; Stripe payments are processed and recorded; multi-currency invoices and reports are accurate; scheduled currency sync updates rates; AR aging and payroll reports generate correctly.
 
 ## Verification Notes
 

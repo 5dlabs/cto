@@ -1,29 +1,30 @@
 Implement task 2: Implement Equipment Catalog Service API (Rex - Rust/Axum)
 
 ## Goal
-Develop the Equipment Catalog service with all specified endpoints for product/category listing, availability, and machine-readable APIs. Enables Morgan and the website to access real-time inventory and quoting.
+Develop the Equipment Catalog Service with endpoints for product/category listing, product details, availability checks, and machine-readable APIs for Morgan and other agents.
 
 ## Task Context
-- Agent owner: rex
+- Agent owner: Rex
 - Stack: Rust/Axum
 - Priority: high
 - Dependencies: 1
 
 ## Implementation Plan
-{"steps": ["Initialize Rust 1.75+ project with Axum 0.7, sqlx for PostgreSQL, and redis-rs for Redis integration.", "Define data models for Product, Category, and Availability as per PRD.", "Implement endpoints: /api/v1/catalog/categories, /api/v1/catalog/products, /api/v1/catalog/products/:id, /api/v1/catalog/products/:id/availability, /api/v1/equipment-api/catalog, /api/v1/equipment-api/checkout, /metrics, /health/live, /health/ready.", "Integrate S3/R2 for image URLs and serve via CDN.", "Implement rate limiting per tenant using Redis.", "Add Prometheus metrics and health probes.", "Reference connection strings from 'sigma1-infra-endpoints' ConfigMap via envFrom.", "Write integration and unit tests for all endpoints."]}
-
+{"steps": ["Initialize Rust 1.75+ Axum 0.7 project with Effect integration for schema validation.", "Define Product, Category, and Availability models as per PRD.", "Implement endpoints: /api/v1/catalog/categories, /api/v1/catalog/products, /api/v1/catalog/products/:id, /api/v1/catalog/products/:id/availability, /api/v1/equipment-api/catalog, /api/v1/equipment-api/checkout.", "Integrate with PostgreSQL for catalog and availability data (use connection string from ConfigMap).", "Integrate Redis for rate limiting and caching.", "Implement S3/R2 image serving for product images.", "Add Prometheus metrics and health endpoints.", "Enforce <500ms response time for availability checks.", "Add tenant-based rate limiting.", "Document OpenAPI spec for endpoints."]}
 
 ## Acceptance Criteria
-All endpoints return correct data with valid/invalid inputs; rate limiting is enforced; health and metrics endpoints respond; images are served via CDN; tests cover at least 80% of code paths.
+All endpoints return correct data as per OpenAPI spec; availability check returns in <500ms for 95th percentile; rate limiting enforced; product images load from S3/R2; Prometheus metrics and health endpoints respond as expected.
 
 ## Subtasks
-- Scaffold Rust project with Axum 0.7, sqlx, redis-rs, and configuration layer: Initialize the equipment-catalog Rust project with all required dependencies, project structure, configuration loading from environment variables (sigma1-infra-endpoints ConfigMap via envFrom), database connection pool, Redis connection, and application entrypoint.
-- Define data models and create database migrations for Product, Category, and Availability: Create sqlx migrations for the rms schema defining categories, products, product_images, and availability tables, along with Rust struct definitions with serde serialization for API responses.
-- Implement core catalog CRUD endpoints (categories, products, availability): Implement the public REST API endpoints for browsing the equipment catalog: list categories, list/filter products, get product by ID, and check product availability.
-- Implement machine-readable equipment API endpoints with S3/R2 image URL integration: Implement the /equipment-api/catalog and /equipment-api/checkout endpoints designed for machine consumption by the Morgan agent, with full S3/R2 CDN image URL construction.
-- Implement rate limiting middleware using Redis: Add per-tenant/per-IP rate limiting to all API endpoints using Redis as the backing store, with configurable limits for public vs. machine-readable endpoints.
-- Add Prometheus metrics endpoint and Kubernetes health probes: Implement /metrics endpoint exposing Prometheus-format metrics, and /health/live and /health/ready endpoints for Kubernetes liveness and readiness probes.
-- Write comprehensive integration and unit tests for all endpoints: Create a full test suite covering all catalog and equipment-api endpoints, error cases, pagination, rate limiting, and health probes to achieve at least 80% code coverage.
+- Initialize Rust/Axum project with database connection pooling and configuration: Scaffold the Rust 1.75+ Axum 0.7 project with Cargo workspace structure, configure environment-based settings loading from the sigma1-infra-endpoints ConfigMap, and set up PostgreSQL connection pooling using sqlx or deadpool-postgres.
+- Define database schema and domain models for Product, Category, and Availability: Create SQL migration files for the catalog schema (products, categories, availability tables) and corresponding Rust struct models with sqlx FromRow derives and serde serialization.
+- Implement category and product listing/detail CRUD endpoints: Implement the core REST endpoints for categories listing, products listing with filtering/pagination, and product detail retrieval.
+- Implement availability check endpoint with performance optimization: Implement the GET /api/v1/catalog/products/:id/availability endpoint with a strict <500ms p95 response time requirement, using optimized queries and Redis caching.
+- Implement S3/R2 image URL generation for product images: Implement image URL construction and optional pre-signed URL generation for product images stored in S3/R2, integrated into product detail responses.
+- Integrate Redis client for caching and rate limiting infrastructure: Set up the Redis connection pool and create reusable caching and rate limiting utility modules that other handlers will consume.
+- Implement machine-readable equipment-api endpoints for Morgan agent: Implement the /api/v1/equipment-api/catalog and /api/v1/equipment-api/checkout endpoints designed for consumption by the Morgan AI agent and other automated systems.
+- Add Prometheus metrics and health check endpoints: Implement /health, /ready, and /metrics endpoints for Kubernetes probes and Prometheus scraping.
+- Generate OpenAPI specification and integration tests: Generate an OpenAPI 3.0 specification for all catalog endpoints and write integration tests verifying endpoint behavior against the spec.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

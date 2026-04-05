@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All endpoints function as specified; AI curation and captioning produce expected results; approval workflow triggers Signal notifications; published content appears on all platforms; tests cover at least 80% of code paths.
+- [ ] Uploading event photos creates drafts; AI curation selects top images; caption generation produces relevant captions; approval workflow triggers Signal message; publishing posts to at least one platform succeeds; all endpoints validate requests/responses with Effect.Schema.
 
 ## Verification Notes
 

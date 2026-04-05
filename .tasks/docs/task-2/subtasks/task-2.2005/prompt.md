@@ -1,18 +1,10 @@
-Implement subtask 2005: Implement rate limiting middleware using Redis
+Implement subtask 2005: Implement S3/R2 image URL generation for product images
 
 ## Objective
-Add per-tenant/per-IP rate limiting to all API endpoints using Redis as the backing store, with configurable limits for public vs. machine-readable endpoints.
+Implement image URL construction and optional pre-signed URL generation for product images stored in S3/R2, integrated into product detail responses.
 
 ## Steps
-1. Create src/middleware/rate_limit.rs.
-2. Implement a Tower middleware/layer that extracts a rate limit key from the request: use X-Tenant-ID header if present, otherwise fall back to client IP (from X-Forwarded-For or socket addr).
-3. Use Redis INCR + EXPIRE pattern (sliding window counter) for rate limiting: key format 'ratelimit:{endpoint_group}:{tenant_or_ip}', TTL of 60 seconds.
-4. Configure different limits: public catalog endpoints at 60 req/min per IP, equipment-api endpoints at 30 req/min per tenant.
-5. Return HTTP 429 Too Many Requests with a JSON error body and Retry-After header when limit is exceeded.
-6. Include X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset response headers on all requests.
-7. Make limits configurable via environment variables (RATE_LIMIT_CATALOG, RATE_LIMIT_EQUIPMENT_API).
-8. Apply the middleware layer to the appropriate route groups in the Axum router.
-9. Handle Redis connection failures gracefully — if Redis is unavailable, allow the request through (fail-open) and log a warning.
+1. Add the aws-sdk-s3 or rust-s3 crate to Cargo.toml. 2. Create src/services/s3.rs module. 3. Initialize an S3 client using S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY from environment/secrets. 4. Implement a function to construct public image URLs: '{S3_ENDPOINT}/{S3_PRODUCT_BUCKET}/{image_key}'. 5. Optionally implement pre-signed URL generation for private images with configurable expiry (e.g., 1 hour). 6. Integrate into the product detail endpoint (2003): when returning product data, resolve image_key to a full image URL. 7. Add error handling for missing images (return a default placeholder URL).
 
 ## Validation
-Send 61 requests to a catalog endpoint within 60 seconds from the same IP and verify the 61st returns 429; verify rate limit headers are present on all responses; verify equipment-api has its own separate limit; verify fail-open behavior when Redis is stopped; verify X-Tenant-ID header scoping works.
+Product detail responses include a valid, resolvable image_url field; the URL correctly points to the S3/R2 bucket; accessing the URL returns the image (or placeholder if image_key is null).

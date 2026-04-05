@@ -1,18 +1,10 @@
-Implement subtask 6005: Implement AI caption generation service
+Implement subtask 6005: Implement approval workflow with Signal/Morgan integration
 
 ## Objective
-Build an Effect.Service that uses OpenAI/Claude to generate social media captions, hashtags, and platform-specific variations for curated images. Support different tones and styles per platform.
+Build the approval workflow that sends draft posts for human review via Signal (through Morgan integration), handles approve/reject responses, and manages the draft lifecycle endpoints.
 
 ## Steps
-1. Create src/services/caption-generator.ts.
-2. Define Effect.Service `CaptionGeneratorService` with methods: generateCaption(images: StoredImage[], context: CaptionContext) -> Effect<GeneratedCaption>, generatePlatformVariants(baseCaption: string, platforms: Platform[]) -> Effect<PlatformCaptions>.
-3. CaptionContext: event_name, event_type, brand_voice, target_audience, key_messages, platform.
-4. GeneratedCaption: caption_text, hashtags (string[]), call_to_action, emoji_enhanced.
-5. PlatformCaptions: per-platform variations (Instagram: longer + hashtags, LinkedIn: professional tone, TikTok: trendy/short, Facebook: conversational).
-6. Implement using OpenAI Chat Completions API with structured output (JSON mode).
-7. System prompt includes brand voice guidelines, platform best practices, and character limits per platform.
-8. Handle API errors, rate limits, and content moderation flags.
-9. Implement mock for testing.
+1. Create a `services/approval.ts` module. 2. Implement the notification flow (pending dp-16): send an approval request to Morgan/Signal with draft summary (caption preview, photo thumbnails, target platforms). Include approve/reject action links or commands. 3. Implement the draft management endpoints: a) GET /api/v1/social/drafts — list all drafts, filterable by status. b) GET /api/v1/social/drafts/:id — get single draft with full details. c) POST /api/v1/social/drafts/:id/approve — transition status to 'approved', record approver. d) POST /api/v1/social/drafts/:id/reject — transition status to 'rejected', accept optional rejection_reason. 4. Validate state transitions: only 'pending_approval' drafts can be approved/rejected. Return 409 Conflict for invalid transitions. 5. On approval, emit an event or flag the draft as ready for publishing. 6. Add Effect.Schema validation on all draft endpoints for request parameters and bodies.
 
 ## Validation
-Unit tests with mocked AI API verify correct prompt construction with context; generated captions respect platform character limits; platform variants differ in tone; hashtags are relevant; mock returns testable deterministic captions.
+Creating a draft in 'pending_approval' status triggers a notification to Morgan/Signal. Approve endpoint transitions draft to 'approved'. Reject endpoint transitions to 'rejected' with reason. Invalid state transitions (e.g., approving an already published draft) return 409. GET /drafts returns filtered lists. GET /drafts/:id returns full draft details. Effect.Schema rejects invalid request bodies.

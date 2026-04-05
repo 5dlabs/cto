@@ -1,57 +1,21 @@
 {
   "current_urls": [
-    "https://deployiq.maximinimal.ca",
     "https://sigma-1.com"
   ],
   "current_site_snapshots": [
     {
-      "source_url": "https://deployiq.maximinimal.ca",
-      "asset_url": "https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/9b5f4c10-89b5-453b-91e9-b4e507a39e45/1ffc9b41-d510-4f68-9d94-f892956643c2",
-      "success": true,
-      "error": ""
-    },
-    {
       "source_url": "https://sigma-1.com",
-      "asset_url": "https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/e864c9d2-8267-4ead-8eaa-9c6133292c6f/15aa7681-a2b6-458b-9667-37cb9ce8ecff",
+      "asset_url": "https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/9a380ac3-8836-4066-a1a3-37c24051c61a/537366c2-cbec-49f9-9da9-2360022cd653",
       "success": true,
       "error": ""
     }
   ],
-  "generated_variants": [
-    {
-      "screen_id": "40b8b541e631423db20aa5f99d06e4d4",
-      "screen_target": "web",
-      "variant_id": "40b8b541e631423db20aa5f99d06e4d4-v1",
-      "label": "Layout Focus",
-      "selected": true,
-      "image_url": "https://lh3.googleusercontent.com/aida/ADBb0uhSvawurJhwR0A9_okK3AqoxboUb5ogLs7ZewZ5h4GzIq55GGIWp2-KvWhaV18qKl6wTMKr9NlAgmCtcjrdgiMYUQhNdDzjVK4eGIY-GLwtQfEejLn8LdQ2T6tccl91fBsRxZbuL22CBxhGXq_TXa2tnGhrEQRekGCylKPyQM0J5JyNu3B8gz5NCCQUYPDu7VLeSsf4YDVBI8QJmX9vCZN7De4PxGgUukVwrNxOcgBAVunCSMREKTwrXQc=w1920",
-      "html_url": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzJhNmUzYzZiMDUwZjRhMTliNDY0NDIwNGIxYmQzNmNhEgsSBxD0x7nTwxwYAZIBIwoKcHJvamVjdF9pZBIVQhM3MzcwNzQ3NjE0MjU4MTM2OTgw&filename=&opi=96797242"
-    },
-    {
-      "screen_id": "40b8b541e631423db20aa5f99d06e4d4",
-      "screen_target": "web",
-      "variant_id": "40b8b541e631423db20aa5f99d06e4d4-v3",
-      "label": "Typography & Spacing",
-      "selected": false,
-      "image_url": "https://lh3.googleusercontent.com/aida/ADBb0uji7pL7Be2qHPWJ9ytjq93wEqpEv-dJURqeki4ei8stouz5KzpYeiA7O4I2gXcwBqMk-GUNfB-6_auQOnmGnNXVP_lZUEvcEALbaT5Fp3-Yo8cYcdpjIdKLG_RVmH5SZryozOoqWZqNtMVcdzkpvB0YA6Ni9pzAlh3Fk2euLHUGYZHaWPd1wcbPNmLpXAOYmHKI7_dfp4hXmBCcDwWH5EFRk536Ife1XbJSyQuC1zUEYyM-UkSL2QkHgsg=w1920",
-      "html_url": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sX2JhZDUwZDU1MmNlZjQ3ODE5ZThlMzc3YjNiM2NhNzA5EgsSBxD0x7nTwxwYAZIBIwoKcHJvamVjdF9pZBIVQhM3MzcwNzQ3NjE0MjU4MTM2OTgw&filename=&opi=96797242"
-    }
-  ],
-  "selected_variants": [
-    {
-      "screen_id": "40b8b541e631423db20aa5f99d06e4d4",
-      "screen_target": "web",
-      "variant_id": "40b8b541e631423db20aa5f99d06e4d4-v1",
-      "label": "Layout Focus",
-      "selected": true,
-      "image_url": "https://lh3.googleusercontent.com/aida/ADBb0uhSvawurJhwR0A9_okK3AqoxboUb5ogLs7ZewZ5h4GzIq55GGIWp2-KvWhaV18qKl6wTMKr9NlAgmCtcjrdgiMYUQhNdDzjVK4eGIY-GLwtQfEejLn8LdQ2T6tccl91fBsRxZbuL22CBxhGXq_TXa2tnGhrEQRekGCylKPyQM0J5JyNu3B8gz5NCCQUYPDu7VLeSsf4YDVBI8QJmX9vCZN7De4PxGgUukVwrNxOcgBAVunCSMREKTwrXQc=w1920",
-      "html_url": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzJhNmUzYzZiMDUwZjRhMTliNDY0NDIwNGIxYmQzNmNhEgsSBxD0x7nTwxwYAZIBIwoKcHJvamVjdF9pZBIVQhM3MzcwNzQ3NjE0MjU4MTM2OTgw&filename=&opi=96797242"
-    }
-  ],
+  "generated_variants": [],
+  "selected_variants": [],
   "counts": {
-    "current_urls": 2,
-    "current_site_snapshots": 2,
-    "generated_variants": 2,
-    "selected_variants": 1
+    "current_urls": 1,
+    "current_site_snapshots": 1,
+    "generated_variants": 0,
+    "selected_variants": 0
   }
 }

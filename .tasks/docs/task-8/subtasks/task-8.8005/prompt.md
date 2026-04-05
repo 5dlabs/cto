@@ -1,22 +1,10 @@
-Implement subtask 8005: Implement quote builder page (/quote) with form handling and API integration
+Implement subtask 8005: Implement portfolio gallery with event photos and testimonials
 
 ## Objective
-Build the quote request page with a multi-step form for selecting equipment, specifying rental details, customer information, and submitting the quote request to the backend.
+Build the /portfolio page displaying a gallery of past event photos and customer testimonials, with filtering by event type and a lightbox view for images.
 
 ## Steps
-1. Create app/quote/page.tsx.
-2. Implement a multi-step form:
-   - Step 1: Equipment selection (search/browse, add to quote, specify quantities and date ranges).
-   - Step 2: Delivery/pickup details (address, dates, special requirements).
-   - Step 3: Customer information (name, company, email, phone).
-   - Step 4: Review and submit.
-3. Use Effect Schema for form validation at each step.
-4. Pre-populate equipment if navigated from /equipment/:id with query params.
-5. Submit quote request to the Finance/Quote API endpoint.
-6. Display confirmation with quote reference number on success.
-7. Handle submission errors with user-friendly messages.
-8. Implement form state persistence (e.g., sessionStorage) so users don't lose progress on navigation.
-9. Ensure all form fields have proper labels, error messages, and ARIA attributes.
+Step 1: Create the /portfolio route with a server component that fetches portfolio data (event photos and testimonials) from the backend API or static data source. Step 2: Implement the photo gallery UI: masonry or grid layout with responsive columns, lazy-loaded images via Next.js Image component (optimized from object storage). Step 3: Implement event type filtering (weddings, corporate, festivals, etc.) with animated transitions between filter states. Step 4: Implement a lightbox/modal view for full-size image viewing with next/previous navigation. Step 5: Implement the testimonials section: customer quotes with name, event type, and star rating, displayed as cards or a carousel. Step 6: Add Schema.org Review structured data for testimonials. Step 7: Implement loading skeletons for the gallery while images load.
 
 ## Validation
-Multi-step form navigates correctly between steps; Effect Schema validation catches invalid inputs and displays error messages; equipment pre-population from query params works; form submits successfully and shows confirmation; form state persists across page navigation; all form fields are accessible with screen readers.
+Portfolio page loads and displays event photos in a responsive grid; filters correctly show/hide photos by event type; lightbox opens on image click with navigation; testimonials display with customer info; images are lazy-loaded and optimized via Next.js Image; Schema.org Review data is present.

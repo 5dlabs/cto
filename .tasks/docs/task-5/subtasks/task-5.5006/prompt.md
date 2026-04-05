@@ -1,17 +1,10 @@
-Implement subtask 5006: Implement credit signals integration module
+Implement subtask 5006: Build aggregation pipeline and scoring engine (GREEN/YELLOW/RED)
 
 ## Objective
-Build a standalone Rust module that integrates with a credit/financial data API to retrieve credit signals for a business, including credit score, payment history indicators, and financial risk level.
+Implement the vetting pipeline that orchestrates all data source integrations concurrently, aggregates results, and computes the final GREEN/YELLOW/RED lead score.
 
 ## Steps
-1. Create src/integrations/credit.rs.
-2. Define a trait `CreditChecker` with async method `check_credit(org_id: &str, company_name: &str, registration_number: Option<&str>) -> Result<CreditSignals, VettingError>`.
-3. CreditSignals struct: found (bool), credit_score (Option<f64>), credit_limit (Option<f64>), payment_performance (Option<String>), risk_level (CreditRiskLevel enum: Low/Medium/High/Unknown), days_beyond_terms (Option<i32>), ccjs_count (Option<i32>), credit_signal_score (f64 0.0-1.0).
-4. Implement `CreditApiClient` struct with reqwest::Client and API credentials.
-5. Make API call to the configured credit data provider, parse the response.
-6. Normalize credit_signal_score: map credit score ranges to 0-1, factor in payment performance and CCJs.
-7. Handle cases where credit data is unavailable (return Unknown risk level).
-8. Implement `MockCreditChecker` for testing.
+1. Create a `pipeline.rs` module. 2. Implement `run_vetting_pipeline(org_identifier: &str) -> Result<VettingResult, VettingError>` that: a) Spawns all four source fetches concurrently using `tokio::join!` or `futures::join_all`. b) Collects results, handling partial failures gracefully (if one source fails, still compute a partial score with a confidence flag). 3. Implement the scoring algorithm (pending dp-13 decision, default to configurable weighted average): a) Business verification: active company = +30 points, dissolved = -50, not found = -20. b) Online presence: scale LinkedIn followers/employees to 0-20 point range. c) Reputation: avg_rating >= 4.0 = +25, 3.0-3.9 = +10, <3.0 = -10. d) Credit: map credit score to 0-25 point range. e) Total score: GREEN >= 60, YELLOW 30-59, RED < 30. 4. Store the computed VettingResult in PostgreSQL via the repository. 5. Wire up the /api/v1/vetting/run POST endpoint to trigger the pipeline. 6. Wire up the /api/v1/vetting/:org_id GET endpoint to retrieve stored results. 7. Handle concurrent pipeline requests for the same org (dedup or queue).
 
 ## Validation
-Unit tests with mocked credit API responses verify correct credit signal parsing and score normalization; companies with good credit score high, those with CCJs score low; unavailable data returns Unknown risk level; mock implementation is functional.
+Integration test: run pipeline with all four sources mocked, verify VettingResult is correctly aggregated and stored in PostgreSQL. Test partial failure: one source fails but pipeline still returns a result with reduced confidence. Test scoring thresholds: verify GREEN/YELLOW/RED classification for known input combinations. Endpoint tests: POST /run returns 200 with result, GET /:org_id retrieves stored result.

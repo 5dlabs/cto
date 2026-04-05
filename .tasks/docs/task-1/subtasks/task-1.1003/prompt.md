@@ -1,15 +1,10 @@
-Implement subtask 1003: Deploy Redis/Valkey via opstreelabs operator
+Implement subtask 1003: Deploy Redis/Valkey using Opstree operator
 
 ## Objective
-Deploy a single-replica Redis/Valkey instance in the databases namespace using the opstreelabs Redis operator, configured for caching, rate limiting, and session storage.
+Deploy a single-instance Redis/Valkey cache using the Opstree Redis operator in the databases namespace, configured with 7.2-alpine image.
 
 ## Steps
-1. Verify the opstreelabs Redis operator (redis.redis.opstreelabs.in) is installed in-cluster; if not, add it as a Helm dependency.
-2. Author a Redis CR in infra/redis/redis.yaml: single replica (standalone mode), namespace 'databases', resource requests (256Mi RAM / 250m CPU), persistence enabled with a small PVC (1Gi).
-3. Set a password via a Kubernetes Secret 'redis-auth' in the databases namespace.
-4. Configure maxmemory-policy as 'allkeys-lru' for cache-friendly behavior.
-5. Expose the Redis service as a ClusterIP service 'redis-sigma1' on port 6379.
-6. Apply and wait for the pod to reach Running/Ready.
+1. Ensure the Opstree Redis operator is installed in the cluster (install via Helm if not present). 2. Write a Redis CR YAML: standalone mode, single replica, image tag 7.2-alpine, in 'databases' namespace. 3. Configure persistence if needed (small PVC for AOF/RDB). 4. Set resource requests/limits for dev (128Mi-256Mi RAM, 250m CPU). 5. Optionally set a requirepass via a Kubernetes Secret. 6. Apply the CR and wait for the Redis pod to become Ready. 7. Record the Redis connection URL (redis://<host>:<port>) for the aggregated ConfigMap.
 
 ## Validation
-kubectl get pods -n databases shows redis pod Running and Ready; exec into a test pod and run 'redis-cli -h redis-sigma1.databases.svc -a <password> PING' and confirm 'PONG'; verify the Secret 'redis-auth' exists.
+Redis pod is Running and Ready; connect via redis-cli PING and receive PONG; verify SET/GET operations succeed.

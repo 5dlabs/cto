@@ -1,19 +1,10 @@
-Implement subtask 4004: Implement Stripe payment processing integration
+Implement subtask 4004: Implement multi-currency support with scheduled exchange rate sync
 
 ## Objective
-Build payment endpoints that integrate with the Stripe API for creating payment intents, processing payments against invoices, and recording payment outcomes.
+Build the currency rate sync scheduled job, Redis caching layer for rates, and multi-currency conversion utilities used across invoice and payment operations.
 
 ## Steps
-1. Add stripe-rust crate (or implement raw HTTP client to Stripe API using reqwest if stripe-rust doesn't support 0.7 Axum well).
-2. Create src/services/stripe_service.rs: initialize Stripe client with STRIPE_SECRET_KEY from config. Implement: create_payment_intent(amount, currency, invoice_id metadata), retrieve_payment_intent, confirm_payment_intent.
-3. Create src/db/payments.rs: repository functions for create_payment, get_payment, list_payments_by_invoice, update_payment_status.
-4. Create src/routes/payments.rs with Axum handlers:
-   - POST /api/v1/invoices/:id/payments → create payment: validate invoice is SENT or OVERDUE, create Stripe PaymentIntent, record Payment with PENDING status, return client_secret for frontend.
-   - GET /api/v1/invoices/:id/payments → list payments for invoice.
-   - GET /api/v1/payments/:id → get payment detail.
-5. Implement idempotency: use idempotency_key on payment creation to prevent duplicate charges. Check if payment with same key exists before creating Stripe PaymentIntent.
-6. On successful payment recording, update invoice status to PAID if total payments >= invoice total.
-7. Handle Stripe API errors gracefully: map to appropriate HTTP error responses with user-friendly messages.
+1. Add redis crate (or deadpool-redis) for Redis connectivity. Initialize Redis client from ConfigMap URL. 2. Implement /src/services/currency.rs: define CurrencyRate struct (from_currency, to_currency, rate, fetched_at). 3. Implement rate fetching function that calls an external exchange rate API (e.g., exchangerate.host or configured provider). Parse the response and store rates in both PostgreSQL (currency_rates table for history) and Redis (with TTL for fast lookups). 4. Implement a scheduled task using tokio::spawn with tokio::time::interval that runs the rate sync (e.g., every 4 hours). 5. Implement currency conversion helper: convert_amount(amount, from_currency, to_currency) that looks up the rate from Redis first, falls back to PostgreSQL. 6. Implement GET /api/v1/currency/rates endpoint that returns current rates. 7. Ensure all invoice and payment operations use these conversion utilities when dealing with non-base currencies.
 
 ## Validation
-Unit tests with mocked Stripe client verify PaymentIntent creation with correct amount/currency/metadata; idempotency key prevents duplicate payment creation; payment recording updates invoice status to PAID when fully paid; Stripe API errors are mapped to appropriate HTTP 4xx/5xx responses; integration test with Stripe test mode (if keys available) creates and retrieves a PaymentIntent.
+Rate sync job fetches and stores rates correctly; Redis cache is populated with current rates; convert_amount produces accurate conversions (verified against known rate pairs); /api/v1/currency/rates returns current data; fallback to PostgreSQL works when Redis is unavailable; scheduled job runs at configured interval.

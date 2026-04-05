@@ -1,16 +1,10 @@
-Implement subtask 7002: Implement Signal-CLI integration for inbound/outbound messaging
+Implement subtask 7002: Integrate Signal-CLI for inbound/outbound messaging
 
 ## Objective
-Configure Signal-CLI as a messaging channel adapter for the Morgan agent, enabling inbound message reception and outbound message sending via the Signal protocol.
+Implement the Signal messaging channel for Morgan, connecting to Signal-CLI for receiving and sending messages, handling message parsing, conversation threading, and session management for concurrent users.
 
 ## Steps
-1. Deploy or configure Signal-CLI daemon alongside the agent (or as a sidecar container).
-2. Register/link the Signal phone number using secrets for Signal credentials.
-3. Implement the inbound message handler: receive Signal messages → parse → forward to the OpenClaw agent conversation loop.
-4. Implement the outbound message handler: agent responses → format → send via Signal-CLI.
-5. Handle media attachments (images from equipment catalog, quote PDFs) in Signal messages.
-6. Configure retry logic for message delivery failures.
-7. Reference Signal-CLI endpoint from sigma1-infra-endpoints ConfigMap if applicable.
+Step 1: Set up the Signal-CLI client connection (REST API or JSON-RPC interface to the Signal-CLI pod/sidecar). Step 2: Implement an inbound message handler that receives Signal messages, extracts sender identity, message body, and any attachments. Step 3: Implement conversation session management — map Signal phone numbers to active conversation contexts. Step 4: Implement outbound message sending — format agent responses and send via Signal-CLI, supporting text, links, and basic formatting. Step 5: Handle Signal-specific edge cases: group messages (ignore or respond), delivery receipts, read receipts, typing indicators. Step 6: Implement connection pooling and reconnection logic to support 500+ concurrent Signal connections. Step 7: Add structured logging for all inbound/outbound Signal messages.
 
 ## Validation
-Send a test Signal message to the registered number; verify the agent receives it, processes it, and sends a coherent response back via Signal within 10 seconds; verify media attachment sending works.
+Send a test Signal message to Morgan's number and receive a coherent response; verify conversation threading with multiple concurrent senders; confirm reconnection after Signal-CLI restart; log entries appear for each message exchange.

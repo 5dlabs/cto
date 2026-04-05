@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All services remain available during failover; SSL/TLS is enforced; CDN serves static assets globally; ingress routes are correct; network policies block unauthorized access.
+- [ ] All services remain available during failover tests; static assets served via CDN with valid TLS; ingress routes traffic to correct services; network policies block unauthorized access; HA failover verified for PostgreSQL and Redis.
 
 ## Verification Notes
 

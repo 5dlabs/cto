@@ -1,17 +1,10 @@
-Implement subtask 6009: Implement Effect.Services for Facebook publishing
+Implement subtask 6009: Build publishing orchestrator and published posts endpoint
 
 ## Objective
-Build an Effect.Service for publishing content to Facebook via the Facebook Graph API, including photo upload, post creation on a page, and status tracking.
+Implement the publishing orchestrator that dispatches approved drafts to all target platforms concurrently, handles partial failures, and exposes the publish and published-posts endpoints.
 
 ## Steps
-1. Create src/integrations/facebook.ts.
-2. Define Effect.Service `FacebookPublisher` with methods: publish(content: PublishableContent) -> Effect<PublishResult>, getPostStatus(postId: string) -> Effect<PostStatus>.
-3. Implement Facebook Graph API: upload photos to page -> create post with photo IDs.
-4. Support multi-photo posts.
-5. Post as page (using page access token, not user token).
-6. Handle Facebook page token management and refresh.
-7. Handle API errors, rate limits, and content moderation rejections.
-8. Implement mock for testing.
+1. Create a `services/publish-orchestrator.ts` module. 2. Implement `publishDraft(draftId: string): Effect.Effect<PublishSummary, PublishError>` that: a) Validates draft status is 'approved'. b) Resolves target platforms from draft.platform_targets. c) Dispatches to all target platform publishers concurrently using Effect.all with { concurrency: 'unbounded' }. d) Collects results: track per-platform success/failure. e) If all succeed: transition draft to 'published'. If partial: transition to 'published' with warnings stored. If all fail: keep as 'approved' with error details. 3. Wire up POST /api/v1/social/drafts/:id/publish to trigger the orchestrator. 4. Wire up GET /api/v1/social/published to list all published posts, filterable by platform and date range. 5. Return a PublishSummary with per-platform status, post IDs, and any errors. 6. Add Effect.Schema validation on all endpoints.
 
 ## Validation
-Unit tests with mocked Facebook API verify correct photo upload and post creation flow; multi-photo posts aggregate correctly; page token is used instead of user token; error handling covers common Facebook API error codes.
+Publishing an approved draft targeting all three platforms dispatches concurrently and returns a summary. Partial failure (e.g., Instagram succeeds, LinkedIn fails) still marks the draft with appropriate status and stores error details. GET /published returns published posts filterable by platform. Invalid publish attempts (non-approved drafts) return 409. Effect.Schema validates all request/response shapes.

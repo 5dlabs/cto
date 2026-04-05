@@ -1,22 +1,27 @@
-Implement subtask 10005: Enable audit logging for managed services (PostgreSQL, Redis)
+Implement subtask 10005: Test RBAC enforcement, secret rotation workflows, and document security posture
 
 ## Objective
-Configure audit logging within PostgreSQL and Redis to capture data access, administrative operations, and authentication events for compliance and forensics.
+Perform comprehensive validation of RBAC policies, secret rotation zero-downtime guarantees, audit log completeness, and produce a security/compliance documentation package.
 
 ## Steps
-1. **PostgreSQL audit logging**:
-   a. Enable `pgaudit` extension in the PostgreSQL operator CR.
-   b. Configure `pgaudit.log` to capture: `READ`, `WRITE`, `DDL`, `ROLE` events.
-   c. Set `log_connections = on` and `log_disconnections = on`.
-   d. Configure `log_statement = 'ddl'` for DDL statement logging.
-   e. Ensure PostgreSQL logs are collected by the cluster's log aggregation pipeline.
-2. **Redis audit logging**:
-   a. Enable `acllog-max-len` for ACL violation logging.
-   b. Configure Redis slowlog with appropriate threshold.
-   c. If the Redis operator supports it, enable command logging for administrative commands (CONFIG, FLUSHALL, etc.).
-   d. Ensure Redis logs are collected by the log aggregation pipeline.
-3. Verify logs include timestamps, client IPs, usernames, and operations.
-4. Document what events are logged and where they are stored.
+1. RBAC enforcement tests:
+   - Attempt cross-namespace secret read with a restricted service account → expect 403.
+   - Attempt pod exec with developer role → expect 403.
+   - Attempt RBAC modification with non-admin role → expect 403.
+   - Verify operators can still manage their CRDs.
+2. Secret rotation zero-downtime test:
+   - Start a continuous request loop to an application endpoint.
+   - Trigger a secret rotation for a critical credential (e.g., database password).
+   - Verify zero failed requests during rotation window.
+3. Audit log completeness test:
+   - Perform 10 distinct security-relevant actions and verify all 10 appear in Loki.
+4. Document:
+   - RBAC policy matrix (service account → permissions).
+   - Secret rotation schedule and procedures.
+   - Audit log retention policy.
+   - Incident response procedures for security alerts.
+   - Compliance checklist covering all controls.
+5. Store documentation in the repository under `docs/security/`.
 
 ## Validation
-Execute test queries against PostgreSQL (SELECT, INSERT, CREATE TABLE, ALTER ROLE) and verify each appears in pgaudit logs with correct metadata. Execute Redis commands (SET, GET, CONFIG, ACL) and verify relevant events appear in Redis logs. Confirm logs are forwarded to the central log aggregation system.
+All RBAC negative tests return 403 Forbidden; secret rotation completes with 0 failed requests in continuous load test; all 10 audit test events found in Loki; security documentation passes peer review and covers all services; compliance checklist has no unchecked items.

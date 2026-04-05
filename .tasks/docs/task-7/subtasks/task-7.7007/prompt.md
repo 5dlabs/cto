@@ -1,25 +1,10 @@
-Implement subtask 7007: Implement agent skills: sales-qual, customer-vet, and quote-gen
+Implement subtask 7007: Implement social media and admin skills with approval workflows
 
 ## Objective
-Implement the sales qualification, customer vetting, and quote generation skill definitions within the Morgan agent, including conversation flows, tool orchestration logic, and decision trees.
+Implement Morgan's social media skills (social-media) and admin skill using sigma1_social_curate, sigma1_social_publish MCP tools, including content curation, human approval workflows, and administrative command handling.
 
 ## Steps
-1. Implement sales-qual skill:
-   - Define qualifying questions (project type, timeline, budget, equipment needs).
-   - Implement lead scoring logic based on responses.
-   - Configure tool calls to catalog_search for equipment matching.
-   - Define escalation criteria (high-value leads, complex requirements).
-2. Implement customer-vet skill:
-   - Define the vetting conversation flow (collect customer info, explain process).
-   - Orchestrate vetting_run_credit_check and vetting_verify_identity tools.
-   - Handle async vetting results (polling or webhook-based updates).
-   - Communicate vetting outcomes to the customer appropriately.
-3. Implement quote-gen skill:
-   - Collect rental parameters (equipment, duration, delivery location).
-   - Call finance_generate_quote with parameters.
-   - Present quote to customer with line items and totals.
-   - Handle quote acceptance/modification flow.
-4. Wire skills into the agent's routing logic so the LLM selects the appropriate skill based on conversation context.
+Step 1: Implement the social-media skill — Morgan curates social media content (event photos, testimonials, promotional posts) via sigma1_social_curate, which suggests content from recent events and portfolio. Step 2: Implement the approval workflow — curated content is staged for human review before publishing; Morgan notifies admins via Signal with content previews and approve/reject options. Step 3: Implement publishing via sigma1_social_publish — once approved, Morgan triggers publishing to configured social media platforms. Step 4: Implement the admin skill — Morgan handles administrative commands (system status, configuration updates, user management queries) accessible only to authenticated admin users. Step 5: Implement approval state management — track pending approvals, send reminders, handle approval expiry.
 
 ## Validation
-Sales-qual skill correctly identifies lead quality and recommends equipment; customer-vet skill triggers vetting tools and communicates results; quote-gen skill produces accurate quotes with correct pricing; skill routing selects the correct skill based on user intent.
+Trigger content curation and verify sigma1_social_curate returns content suggestions; verify approval notification is sent to admin via Signal; simulate admin approval and confirm sigma1_social_publish is invoked; admin commands are rejected for non-admin users.

@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All endpoints return correct data with valid/invalid inputs; rate limiting is enforced; health and metrics endpoints respond; images are served via CDN; tests cover at least 80% of code paths.
+- [ ] All endpoints return correct data as per OpenAPI spec; availability check returns in <500ms for 95th percentile; rate limiting enforced; product images load from S3/R2; Prometheus metrics and health endpoints respond as expected.
 
 ## Verification Notes
 

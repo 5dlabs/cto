@@ -1,16 +1,16 @@
-Implement subtask 9002: Scale Redis to HA multi-replica mode via operator CR
+Implement subtask 9002: Scale Redis/Valkey to HA with replica and sentinel/cluster configuration
 
 ## Objective
-Update the Redis operator custom resource to enable high-availability with Sentinel or Redis Cluster mode, ensuring automatic failover and read replica distribution across nodes.
+Update the Redis/Valkey operator CR to enable HA mode with multiple replicas and sentinel-based or cluster-based failover for production cache resilience.
 
 ## Steps
-1. Edit the Redis operator CR to enable HA mode (e.g., Redis Sentinel with 3 sentinels and 1+ replicas, or Redis Cluster depending on operator).
-2. Set `replicas` for Redis data nodes and sentinel nodes.
-3. Add pod anti-affinity rules to distribute Redis and Sentinel pods across nodes.
-4. Configure persistence (AOF/RDB) with appropriate storage class.
-5. Set memory limits and maxmemory-policy for production.
-6. Apply the updated CR and wait for all replicas and sentinels to become ready.
-7. Verify Sentinel quorum is established and replicas are synchronized.
+1. Update the Valkey (or Redis) operator CR to configure at least 3 nodes (1 primary + 2 replicas) with sentinel mode enabled.
+2. Configure sentinel to monitor the primary and trigger automatic failover.
+3. Set resource requests/limits appropriate for production workloads.
+4. Configure `podAntiAffinity` to distribute replicas across nodes.
+5. Enable persistence (AOF or RDB) if required for session durability.
+6. Update the `{project}-infra-endpoints` ConfigMap with the sentinel-aware Redis endpoint (sentinel service address and port).
+7. Apply and verify all replicas are connected and sentinel is monitoring.
 
 ## Validation
-Verify Redis master, replicas, and sentinels are all running on distinct nodes. Confirm replication is active via `INFO replication`. Kill the Redis master pod and verify Sentinel promotes a replica within expected timeframe. Confirm application clients reconnect to new master.
+Verify 3 Redis/Valkey pods running with sentinel; simulate primary pod kill and confirm sentinel promotes a replica within 15s; verify client libraries reconnect via sentinel; confirm no data loss for persisted keys.

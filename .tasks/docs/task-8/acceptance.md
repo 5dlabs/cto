@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All pages render and fetch data correctly; quote builder submits and receives responses; Morgan chat widget is functional; portfolio syncs with published content; accessibility and performance metrics meet targets; tests cover at least 80% of code paths.
+- [ ] All pages render and load data from backend APIs; quote builder submits and receives confirmation; Morgan web chat is functional; portfolio gallery displays event photos; accessibility checks pass; site deploys to Cloudflare Pages and is reachable.
 
 ## Verification Notes
 

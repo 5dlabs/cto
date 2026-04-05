@@ -1,26 +1,26 @@
-## Develop RMS Service (Grizz - Go/gRPC)
+## Develop Rental Management System (Grizz - Go/gRPC)
 
 ### Objective
-Build the Rental Management System (RMS) with gRPC and grpc-gateway REST endpoints for opportunity, project, inventory, crew, and delivery management. This is the backbone for quote-to-project workflows.
+Build the RMS backend with gRPC and grpc-gateway REST endpoints for opportunity, project, inventory, crew, and delivery management, supporting quote-to-project workflow and barcode scanning.
 
 ### Ownership
-- Agent: grizz
+- Agent: Grizz
 - Stack: Go/gRPC
 - Priority: high
 - Status: pending
 - Dependencies: 1
 
 ### Implementation Details
-{"steps": ["Initialize Go 1.22+ project with gRPC and grpc-gateway.", "Define protobufs for OpportunityService, ProjectService, InventoryService, CrewService, DeliveryService as per PRD.", "Implement REST endpoints via grpc-gateway for all specified routes.", "Integrate with PostgreSQL for all RMS data and Redis for session cache.", "Implement barcode scanning, crew scheduling, and delivery tracking logic.", "Add Google Calendar API integration for project/crew scheduling.", "Reference connection strings from 'sigma1-infra-endpoints' ConfigMap via envFrom.", "Write unit and integration tests for all gRPC and REST endpoints."]}
+{"steps": ["Initialize Go 1.22+ project with gRPC and grpc-gateway setup.", "Define protobufs for OpportunityService, ProjectService, InventoryService, CrewService, DeliveryService as per PRD.", "Implement REST endpoints via grpc-gateway.", "Integrate with PostgreSQL for all RMS data (use connection string from ConfigMap).", "Use Redis for session cache.", "Implement barcode scanning logic and inventory transaction recording.", "Integrate with Google Calendar API for project scheduling.", "Implement lead scoring and conflict detection logic.", "Add health and metrics endpoints.", "Document gRPC and REST API usage."]}
 
 ### Subtasks
-- [ ] Scaffold Go project with gRPC, grpc-gateway, and infrastructure config: Initialize a Go 1.22+ module with gRPC server, grpc-gateway HTTP proxy, project directory structure, and infrastructure configuration referencing the sigma1-infra-endpoints ConfigMap.
-- [ ] Define protobuf schemas for all five RMS services and generate Go code: Author .proto files for OpportunityService, ProjectService, InventoryService, CrewService, and DeliveryService with all message types, enums, and grpc-gateway HTTP annotations as per the PRD.
-- [ ] Implement PostgreSQL database layer and migrations for RMS schema: Create the database migration files and a shared repository/data-access layer for all five RMS domain tables in the rms PostgreSQL schema.
-- [ ] Implement OpportunityService and ProjectService gRPC handlers: Build the gRPC service implementations for OpportunityService and ProjectService with full business logic, including the opportunity-to-project conversion workflow.
-- [ ] Implement InventoryService with barcode scanning logic: Build the InventoryService gRPC handler with barcode scanning, check-out/check-in workflows, and inventory status management.
-- [ ] Implement CrewService with scheduling logic: Build the CrewService gRPC handler for crew member management and project scheduling, including availability tracking.
-- [ ] Implement DeliveryService with delivery tracking logic: Build the DeliveryService gRPC handler for scheduling, tracking, and managing equipment deliveries tied to projects.
-- [ ] Integrate Redis for session cache and ephemeral state: Add Redis (Valkey) integration for session caching, barcode scan deduplication, and ephemeral operational state in the RMS service.
-- [ ] Integrate Google Calendar API for crew and project scheduling: Add Google Calendar API integration so that crew assignments and project schedules are synced bidirectionally with Google Calendar.
-- [ ] Write integration tests for all RMS gRPC and REST endpoints: Create comprehensive integration tests covering all five services end-to-end, including the quote-to-project workflow, barcode scanning, and cross-service interactions.
+- [ ] Initialize Go project with gRPC and grpc-gateway scaffolding: Set up the Go 1.22+ module with gRPC server, grpc-gateway reverse proxy, project directory structure, build tooling, and base configuration loading from ConfigMap environment variables.
+- [ ] Define protobuf schemas for all five RMS services: Author .proto files for OpportunityService, ProjectService, InventoryService, CrewService, and DeliveryService with all message types, RPC methods, and grpc-gateway HTTP annotations.
+- [ ] Implement PostgreSQL schema migrations and repository layer: Create SQL migration files for all RMS domain tables and implement a Go repository layer for database access using the PostgreSQL connection from ConfigMap.
+- [ ] Implement OpportunityService with lead scoring and conflict detection: Build the OpportunityService gRPC handler with full CRUD, lead scoring algorithm (GREEN/YELLOW/RED), date/equipment conflict detection, and ConvertToProject RPC.
+- [ ] Implement ProjectService with quote-to-project workflow: Build the ProjectService gRPC handler supporting project lifecycle, quote generation, quote approval, and status transitions.
+- [ ] Implement InventoryService with barcode scanning and transaction recording: Build the InventoryService gRPC handler supporting barcode scanning, check-in/check-out workflows, and inventory transaction history.
+- [ ] Implement CrewService and DeliveryService: Build the CrewService and DeliveryService gRPC handlers for crew assignment, availability management, delivery scheduling, and status tracking.
+- [ ] Integrate Google Calendar API for project scheduling: Implement Google Calendar integration to sync project schedules, crew assignments, and delivery events to a shared calendar.
+- [ ] Integrate Redis session cache: Set up Redis client connection using the ConfigMap URL and implement session caching for the RMS service.
+- [ ] Add health, metrics, and API documentation endpoints: Implement Prometheus metrics collection, health/readiness probes, and generate API documentation for the RMS gRPC and REST endpoints.

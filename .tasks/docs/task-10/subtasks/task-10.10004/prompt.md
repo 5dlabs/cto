@@ -1,20 +1,20 @@
-Implement subtask 10004: Enable Kubernetes API server audit logging with retention policy
+Implement subtask 10004: Integrate audit logs and service logs with centralized Loki/Grafana logging
 
 ## Objective
-Configure the Kubernetes API server audit policy to capture security-relevant events (authentication, authorization, secret access, RBAC changes) and ship logs to the chosen sink with defined retention.
+Ship Kubernetes API audit logs and managed service logs (PostgreSQL, Redis, operators) into the Loki centralized logging stack and create Grafana dashboards for security monitoring.
 
 ## Steps
-1. Create a Kubernetes audit policy file (`audit-policy.yaml`) with rules:
-   - Log all `authentication` and `authorization` events at `Metadata` level.
-   - Log `Secret`, `ConfigMap`, `Role`, `ClusterRole`, `RoleBinding`, `ClusterRoleBinding` operations at `RequestResponse` level.
-   - Log pod `exec`, `attach`, `portforward` at `RequestResponse` level.
-   - Log all `delete` operations at `Metadata` level.
-   - Set a catch-all rule at `Metadata` level for everything else.
-2. Configure the API server to use the audit policy with the chosen backend (log file, webhook, or dynamic — per dp-16 decision).
-3. If using log files: configure log rotation (max size, max age, max backups).
-4. If using a webhook backend: deploy the log collector (Fluentd/Fluent Bit/Vector) and configure it to forward to the chosen sink.
-5. Set retention policy (e.g., 90 days hot, 1 year cold storage).
-6. Apply the configuration and verify audit logs are being generated.
+1. Deploy or configure Promtail/Grafana Agent to scrape Kubernetes audit log files (or receive them via webhook/fluentd).
+2. Configure Promtail with pipeline stages to parse audit log JSON, extracting labels: `verb`, `user`, `resource`, `namespace`, `responseStatus`.
+3. Add scrape targets for PostgreSQL operator logs, Redis/Valkey operator logs, and cloudflared logs.
+4. Create Loki log queries for common security events:
+   - Failed authentication attempts
+   - Secret access events
+   - RBAC changes (Role/ClusterRole/Binding modifications)
+   - Pod exec events
+5. Create a Grafana dashboard with panels for: audit event volume over time, failed auth attempts, RBAC change log, secret access log.
+6. Create Grafana alerting rules for suspicious patterns (e.g., > 10 failed auth attempts in 5 minutes, unexpected secret access).
+7. Verify end-to-end log flow from event to Grafana dashboard.
 
 ## Validation
-Perform several auditable actions (create a Secret, delete a pod, exec into a pod, modify an RBAC role). Verify each action appears in the audit logs with correct metadata (user, verb, resource, timestamp). Verify log rotation is working by checking log file sizes. Confirm logs are forwarded to the configured sink.
+Trigger a known audit event and verify it appears in Loki within 60s; verify Grafana dashboard panels populate with real data; trigger a simulated suspicious pattern and confirm Grafana alert fires; verify all managed service logs (PG, Redis, cloudflared) are queryable in Loki.

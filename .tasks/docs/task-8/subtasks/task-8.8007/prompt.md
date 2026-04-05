@@ -1,15 +1,10 @@
-Implement subtask 8007: Implement llms.txt and llms-full SEO pages
+Implement subtask 8007: Implement AI-native features: llms.txt, llms-full, and Schema.org structured data
 
 ## Objective
-Create the /llms.txt and /llms-full routes that serve structured information about Sigma-1 optimized for LLM consumption, following the llms.txt specification.
+Create the /llms.txt and /llms-full routes serving machine-readable site descriptions for AI crawlers, and ensure comprehensive Schema.org structured data is present across all pages.
 
 ## Steps
-1. Create app/llms.txt/route.ts as a route handler returning plain text.
-2. Define the llms.txt content: company name, description, services, equipment categories, contact info, and links to key pages.
-3. Create app/llms-full/route.ts (or page.tsx if HTML) with expanded information including full equipment catalog summary, service descriptions, pricing tiers, and operational details.
-4. Ensure content is kept in sync with actual business data (can be statically defined for v1).
-5. Set correct Content-Type headers (text/plain for llms.txt).
-6. Add link to llms.txt in the site's HTML head and robots.txt.
+Step 1: Create the /llms.txt route as a plain text response describing the Sigma-1 site's purpose, equipment catalog structure, and key capabilities in the llms.txt format. Step 2: Create the /llms-full route with a comprehensive machine-readable description including all equipment categories, pricing structures, service areas, and contact methods. Step 3: Audit and enhance Schema.org structured data across pages: Organization (home page), Product (equipment detail), ItemList (equipment listing), Review (portfolio testimonials), LocalBusiness (contact info). Step 4: Add JSON-LD script tags to the head of relevant pages via Next.js metadata API. Step 5: Validate structured data using Google's Rich Results Test or Schema.org validator.
 
 ## Validation
-/llms.txt returns valid plain text with correct Content-Type header; /llms-full returns expanded content; both routes are accessible and contain accurate Sigma-1 business information; llms.txt link is present in HTML head.
+/llms.txt returns plain text with accurate site description; /llms-full returns comprehensive machine-readable content; Schema.org validation passes for all page types with no errors; JSON-LD is present in page source for equipment, portfolio, and home pages.

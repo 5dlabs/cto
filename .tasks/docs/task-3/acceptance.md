@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All gRPC and REST endpoints are reachable and return correct data; barcode scanning and crew scheduling work as specified; Google Calendar integration is functional; tests cover at least 80% of code paths.
+- [ ] All gRPC and REST endpoints are reachable and return correct data; quote-to-project workflow completes successfully; barcode scanning updates inventory; Google Calendar integration works; lead scoring returns GREEN/YELLOW/RED; health and metrics endpoints respond.
 
 ## Verification Notes
 

@@ -3,20 +3,24 @@
     "provider": "stitch",
     "target": "web",
     "deviceType": "DESKTOP",
-    "rationale": "Failed to generate web candidate.",
-    "prompt": "Improve and modernize this web interface for project sigma-1. Reference URLs: https://deployiq.maximinimal.ca, https://sigma-1.com Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
-    "status": "failed",
-    "error": "Stitch MCP call \"tools/call\" timed out after 60s",
+    "screenId": "d9d13f217f4e43c8acc11dfee7cbde29",
+    "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sX2ZhM2E5YmRjZjJiNzRjN2RhOWIxNTQyZmNhNzBkYzAzEgsSBxD0x7nTwxwYAZIBIwoKcHJvamVjdF9pZBIVQhMxMjk3NjMwNTY5NDkzNjQ0NTY4&filename=&opi=96797242",
+    "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0uhRFT015kvMugVhUDcSNggXaHT2aRNFnVPGJ_hyiVbEz3t9tnVSmiC9Q5JvIMT56p2yU9wxlcHoMdYJiqp8rXO5BXmNlyn14fclYcqWTas9HQlMqoEfkbxEuiwDbraB-b3EzYpBgIcmDfhTK5M1GzWmu84Utt693im0TGLxLHExVSqKNmDySkIICX_bHz-xZbtGBMZ5L9R2Muw1bVJmsw6iQAYwBMWt_uhpb0OUQrvX6a6ipA5ircPggis",
+    "rationale": "Generated web modernization candidate from intake design context.",
+    "prompt": "Improve and modernize this web interface for project sigma-1. Reference URLs: https://sigma-1.com Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
+    "status": "generated",
     "candidate_id": "stitch-web-1"
   },
   {
     "provider": "stitch",
     "target": "mobile",
     "deviceType": "MOBILE",
-    "rationale": "Failed to generate mobile candidate.",
-    "prompt": "Improve and modernize this mobile interface for project sigma-1. Reference URLs: https://deployiq.maximinimal.ca, https://sigma-1.com Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
-    "status": "failed",
-    "error": "Stitch MCP call \"tools/call\" timed out after 60s",
+    "screenId": "f03fcb7e12cf4c1d8ef02eed51e3a5cb",
+    "htmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzhiNzQxNDViZjliNzRiM2NhMGE4NThmZjdlMzUxZWEyEgsSBxD0x7nTwxwYAZIBIwoKcHJvamVjdF9pZBIVQhMxMjk3NjMwNTY5NDkzNjQ0NTY4&filename=&opi=96797242",
+    "imageUrl": "https://lh3.googleusercontent.com/aida/ADBb0ugaeHq1KahEe8kwQcRJXBs5VqTr082ir4EafpbA7TIHlXQglhfQsMlot32AQZHWGMWwrQ4bebqqQ4O7hCATnCZb1Z5qNL7xXiJDjolodrCdBdMnpd2jEuJ2skSXVMLZXBtJ7N7uqUob1mDqVWB9wJ-56vQZZxE3LXm5NrGaZD6JrH_ull3qdB4DmxYGcWiSOCas_OKGjodpvHaw_7bEEcCDW84Pbpt3PU7_K-zjM9pHBVVOQ_uHfnzr7lo",
+    "rationale": "Generated mobile modernization candidate from intake design context.",
+    "prompt": "Improve and modernize this mobile interface for project sigma-1. Reference URLs: https://sigma-1.com Return production-ready UI structure with clear hierarchy, accessibility, and conversion-focused layout.",
+    "status": "generated",
     "candidate_id": "stitch-mobile-2"
   }
 ]

@@ -1,15 +1,10 @@
-Implement subtask 1002: Deploy PostgreSQL 16 via CloudNative-PG operator with multi-schema setup
+Implement subtask 1002: Deploy CloudNative-PG PostgreSQL cluster with multi-schema setup
 
 ## Objective
-Deploy a single-replica PostgreSQL 16 cluster in the databases namespace using the CloudNative-PG operator, then create the required schemas (rms, crm, finance, audit, public) and initial roles for each downstream service.
+Deploy a single-instance CloudNative-PG PostgreSQL cluster in the databases namespace with 50Gi storage, and initialize the required schemas: rms, crm, finance, audit, and public.
 
 ## Steps
-1. Ensure the CloudNative-PG operator is installed (reference existing operator or add to Helm dependencies).
-2. Author a CloudNative-PG Cluster CR in infra/postgres/cluster.yaml: single replica, PostgreSQL 16, storage class per cluster default, resource requests (1 CPU / 2Gi RAM), in namespace 'databases'.
-3. Create a post-init SQL ConfigMap containing: CREATE SCHEMA IF NOT EXISTS rms; CREATE SCHEMA IF NOT EXISTS crm; CREATE SCHEMA IF NOT EXISTS finance; CREATE SCHEMA IF NOT EXISTS audit; and grants for dedicated roles (rms_user, crm_user, finance_user, audit_user).
-4. Configure the Cluster CR's bootstrap.initdb.postInitSQL to reference this ConfigMap.
-5. Create Kubernetes Secrets for each role's credentials (auto-generated passwords) so downstream services can consume them.
-6. Verify the cluster reaches 'Cluster in healthy state' status.
+1. Write a CloudNative-PG Cluster CR YAML: single instance, 50Gi PVC, PostgreSQL 16+, in 'databases' namespace. 2. Configure the CR with an initdb section or a bootstrap SQL ConfigMap that creates schemas: rms, crm, finance, audit, public. 3. Create a dedicated database user per schema or a shared superuser (depending on dp-5 resolution). 4. Set resource requests/limits appropriate for dev (e.g., 512Mi-1Gi RAM, 500m CPU). 5. Apply the CR and wait for the cluster to reach 'Running' phase. 6. Record the resulting connection string (host, port, credentials) for inclusion in the aggregated ConfigMap.
 
 ## Validation
-kubectl get cluster -n databases shows status 'Cluster in healthy state'; connect via psql from a test pod and run '\dn' to confirm schemas rms, crm, finance, audit exist; verify each role can connect and access only its schema.
+CloudNative-PG cluster pod is Running; connect via psql and verify all five schemas exist; run a simple CREATE TABLE / INSERT / SELECT in each schema to confirm write access.

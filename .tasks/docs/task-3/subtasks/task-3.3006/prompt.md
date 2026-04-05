@@ -1,17 +1,10 @@
-Implement subtask 3006: Implement CrewService with scheduling logic
+Implement subtask 3006: Implement InventoryService with barcode scanning and transaction recording
 
 ## Objective
-Build the CrewService gRPC handler for crew member management and project scheduling, including availability tracking.
+Build the InventoryService gRPC handler supporting barcode scanning, check-in/check-out workflows, and inventory transaction history.
 
 ## Steps
-1. Create /internal/service/crew_service.go implementing CrewServiceServer.
-2. Implement CreateMember: persist crew member with role and initial availability.
-3. Implement GetMember, ListMembers: support filtering by role, availability; pagination.
-4. Implement UpdateMember: partial updates for role, contact info, availability.
-5. Implement GetSchedule: accept crew_member_id and date range, query project_crew join table to return all project assignments within the range, along with project details (name, dates).
-6. Implement AssignToProject: validate crew member exists and is available for the project date range (no overlapping assignments), insert into project_crew join table.
-7. Add availability conflict detection: query existing assignments for overlapping date ranges before allowing new assignment.
-8. Register service on gRPC server and grpc-gateway mux.
+1. Implement InventoryService gRPC server in /internal/inventory/. 2. Wire up ListInventory, GetItem RPCs for inventory browsing. 3. Implement ScanBarcode RPC: accept a barcode string, look up the inventory item, return current status and details. 4. Implement CheckOut RPC: validate item is available, associate with a project, record an inventory_transaction (type: checkout, timestamp, project_id, user_id), update item status to 'checked_out'. 5. Implement CheckIn RPC: validate item is checked out, update status to 'available', record inventory_transaction (type: checkin), optionally record condition notes. 6. Implement RecordTransaction RPC for manual transaction entries (damage, maintenance, etc.). 7. Register service and verify REST routes.
 
 ## Validation
-AssignToProject succeeds when crew member has no conflicts and fails with ALREADY_EXISTS or FAILED_PRECONDITION when date range overlaps; GetSchedule returns correct project assignments for a date range; ListMembers filters by availability correctly.
+Barcode scan returns correct item details; check-out changes item status and creates transaction record; check-in restores availability; attempting to check out an already-checked-out item returns an error; transaction history is accurate and ordered.

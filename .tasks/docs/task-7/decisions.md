@@ -1,12 +1,10 @@
 ## Decision Points
 
-- What API paradigm should be used for inter-service communication between backend services (e.g., Morgan agent, Equipment Catalog, RMS, Finance, Vetting, Social Engine)?
-- What authentication and authorization mechanism should be used for service-to-service and user-to-service API calls?
-- Should the Morgan AI agent (OpenClaw) interact with backend services directly via APIs, or exclusively through MCP tool-server abstraction?
-- How should the Morgan agent manage conversation state and context across channels (Signal, voice, web chat)? Should there be a unified session store or per-channel state management?
-- How should the agent's system prompt and skill definitions be managed — hardcoded in config, stored in a database, or dynamically loaded?
+- What API paradigm should be used for inter-service communication between Morgan (OpenClaw) and backend services?
+- What authentication and authorization mechanism should be used for internal service-to-service API calls?
+- Should the Signal integration for Morgan be self-hosted (Signal-CLI) or use a third-party Signal gateway service?
 
 ## Coordination Notes
 
-- Agent owner: angie
+- Agent owner: Angie
 - Primary stack: OpenClaw/MCP

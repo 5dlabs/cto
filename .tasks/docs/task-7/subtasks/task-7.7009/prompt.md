@@ -1,30 +1,10 @@
-Implement subtask 7009: End-to-end integration tests for complete multi-channel flows
+Implement subtask 7009: Add observability hooks for Prometheus, Loki, and Grafana
 
 ## Objective
-Write and execute comprehensive end-to-end tests covering the full lead-to-invoice lifecycle across Signal, voice, and web chat channels, validating all skills and MCP tool interactions.
+Instrument the Morgan agent with Prometheus metrics, structured logging for Loki, and create Grafana dashboards for monitoring agent health, performance, and usage patterns.
 
 ## Steps
-1. Test: Lead Qualification → Quote Flow (Web Chat)
-   - Simulate a new customer inquiry via web chat.
-   - Verify sales-qual skill activates, collects info, scores lead.
-   - Verify quote-gen skill creates and presents a quote.
-   - Assert all tool calls (catalog_search, finance_generate_quote) execute correctly.
-2. Test: Customer Vetting → Rental Flow (Signal)
-   - Simulate a customer proceeding after quote acceptance via Signal.
-   - Verify customer-vet skill triggers credit check and identity verification.
-   - Verify rental creation via RMS tools after vetting passes.
-   - Assert end-to-end data consistency.
-3. Test: Invoice → Payment Flow (Voice)
-   - Simulate invoice inquiry and payment confirmation via voice channel.
-   - Verify STT/TTS pipeline doesn't corrupt data.
-   - Assert finance tools are called correctly.
-4. Test: Upsell Flow
-   - Verify upsell suggestions appear during quote/rental context.
-5. Test: Social Media Publishing
-   - Verify content publishing flow via social tools.
-6. Test: Cross-channel session continuity (if applicable).
-7. Test: Error handling (backend service down, invalid input, timeout).
-8. Measure response latency across all channels (target: <10s).
+Step 1: Implement Prometheus metrics: request_count (by channel, skill), response_latency_seconds (histogram by channel, skill), active_connections (gauge by channel), mcp_tool_invocation_count (by tool, status), mcp_tool_latency_seconds (histogram by tool), error_count (by channel, error_type). Step 2: Expose a /metrics endpoint in Prometheus exposition format. Step 3: Implement structured JSON logging for Loki ingestion: include correlation IDs, channel type, session ID, skill invoked, MCP tools called, latency, and error details. Step 4: Create a Grafana dashboard with panels: active connections by channel, request rate, response latency heatmap, MCP tool invocation rates, error rates, and top skills by usage. Step 5: Configure alerting rules: response time >10s, error rate >5%, connection count approaching limits.
 
 ## Validation
-All end-to-end flows complete successfully with correct data at each step; response times are under 10 seconds for all channels; error scenarios are handled gracefully without crashes; at least one test per skill and per channel combination passes.
+Prometheus /metrics endpoint returns valid metrics after agent processes requests; Loki receives structured log entries with correlation IDs; Grafana dashboard renders with live data; alert rules fire when thresholds are artificially breached.

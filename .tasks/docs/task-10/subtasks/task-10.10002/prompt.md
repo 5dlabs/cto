@@ -1,17 +1,16 @@
-Implement subtask 10002: Implement automated secret rotation for database credentials
+Implement subtask 10002: Automate secret rotation for all external service credentials
 
 ## Objective
-Set up automated rotation for PostgreSQL database credentials (application user passwords, replication credentials) so that secrets are periodically rotated without causing application downtime.
+Set up automated secret rotation for external API credentials (Stripe, LinkedIn, Cloudflare, etc.) using a Kubernetes secret management operator, ensuring zero-downtime rotation.
 
 ## Steps
-1. Determine the secret rotation mechanism (External Secrets Operator, operator-native rotation, or CronJob-based — per dp-15 decision).
-2. For PostgreSQL:
-   a. Configure the PostgreSQL operator to support credential rotation (if supported natively).
-   b. If not native, create a CronJob that: generates a new password, updates the PostgreSQL user password via SQL, updates the Kubernetes Secret, and triggers a rolling restart of dependent application pods.
-3. Set rotation interval (e.g., every 30 days).
-4. Ensure the rotation process is atomic — old credentials remain valid until all consumers have picked up the new ones.
-5. Store rotation history/metadata as annotations on the Secret or in a ConfigMap for auditability.
-6. Test the rotation flow end-to-end in a staging/dev environment before applying to production.
+1. Choose and deploy the secret management solution (e.g., External Secrets Operator with a backing store, or Sealed Secrets with rotation pipeline).
+2. Inventory all external credentials that need rotation: Stripe API keys, LinkedIn API credentials, Cloudflare API tokens, Signal-CLI credentials, any OAuth tokens.
+3. For each credential, create an ExternalSecret (or equivalent) CR that syncs from the external store to a Kubernetes Secret.
+4. Configure rotation schedules (e.g., refreshInterval in ESO) appropriate to each credential type.
+5. Ensure application deployments reference secrets via `envFrom` or volume mounts so rotated secrets are picked up (may require pod restart strategy or file-watch).
+6. Implement a rolling restart annotation or signal mechanism so pods pick up rotated secrets without full downtime.
+7. Test rotation by manually rotating a credential in the backing store and verifying the Kubernetes Secret updates and the application continues operating.
 
 ## Validation
-Trigger a manual rotation and verify: the PostgreSQL password is changed, the Kubernetes Secret is updated, application pods pick up the new credentials (via restart or dynamic reload), and the application continues serving requests without errors. Verify old credentials no longer work after rotation completes.
+Rotate a test credential in the external store; verify the Kubernetes Secret updates within the configured refresh interval; verify the application pod picks up the new credential (via restart or file watch) without service interruption; confirm old credential is no longer present in the Secret.

@@ -1,23 +1,10 @@
-Implement subtask 1007: Create sigma1-infra-endpoints ConfigMap aggregating all connection strings
+Implement subtask 1007: Deploy Cloudflare Tunnel for Morgan agent ingress
 
 ## Objective
-Create the central 'sigma1-infra-endpoints' ConfigMap in the sigma1 namespace that aggregates all infrastructure connection strings and endpoints, enabling downstream services to consume them via envFrom.
+Deploy a Cloudflare Tunnel (cloudflared) in the cluster to provide secure external ingress for the Morgan agent without exposing a public IP.
 
 ## Steps
-1. Author a ConfigMap 'sigma1-infra-endpoints' in the sigma1 namespace under infra/configmap/sigma1-infra-endpoints.yaml.
-2. Include the following keys:
-   - POSTGRES_URL: postgresql://<role>:<password-ref>@<cluster-service>.databases.svc:5432/<dbname>
-   - POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB (individual components)
-   - REDIS_URL: redis://:<password>@redis-sigma1.databases.svc:6379/0
-   - REDIS_HOST, REDIS_PORT
-   - S3_ENDPOINT: the R2/S3 endpoint URL
-   - S3_BUCKET_IMAGES: sigma1-product-images
-   - S3_BUCKET_EVENTS: sigma1-event-photos
-   - S3_CDN_BASE_URL: public CDN URL for image reads
-   - SIGNAL_CLI_URL: http://signal-cli.sigma1.svc:8080
-3. For secrets referenced in URLs, use a pattern where the ConfigMap provides the template and services combine it with Secret values at runtime (do NOT embed passwords in the ConfigMap).
-4. Add labels: app.kubernetes.io/part-of=sigma1, sigma1.io/type=infra-endpoints.
-5. Replicate or mirror the ConfigMap to other namespaces (databases, social, web, openclaw) using a kustomize overlay or manual copy so each namespace can use envFrom locally.
+1. Create a Cloudflare Tunnel via the Cloudflare dashboard or API, and obtain the tunnel token. 2. Store the tunnel credentials/token as a Kubernetes Secret 'sigma1-cloudflare-tunnel' in the 'sigma1' namespace. 3. Create a Deployment for cloudflared in the 'sigma1' namespace, mounting the tunnel credentials. 4. Configure the cloudflared config to route the desired hostnames to internal services (e.g., morgan.sigma1.svc.cluster.local). 5. Expose the tunnel as a ClusterIP Service if needed for health checks. 6. Verify DNS records in Cloudflare point to the tunnel. 7. Record the public ingress URL for the aggregated ConfigMap.
 
 ## Validation
-kubectl get configmap sigma1-infra-endpoints -n sigma1 -o yaml contains all expected keys; verify the ConfigMap exists in all required namespaces; deploy a test pod with envFrom referencing the ConfigMap and verify all env vars are populated.
+cloudflared pod is Running; the configured public hostname resolves and returns a response from the target internal service; Cloudflare dashboard shows the tunnel as healthy.

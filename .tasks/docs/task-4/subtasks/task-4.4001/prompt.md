@@ -1,17 +1,10 @@
-Implement subtask 4001: Scaffold Rust/Axum project with dependencies and infrastructure config
+Implement subtask 4001: Initialize Rust/Axum project with finance data models and PostgreSQL schema
 
 ## Objective
-Initialize a Rust 1.75+ project with Axum 0.7 web framework, sqlx for PostgreSQL, redis-rs for caching, and configuration loading from the sigma1-infra-endpoints ConfigMap.
+Set up the Rust 1.75+ Axum 0.7 project structure, define domain models for Invoice, Payment, and Payroll, and create PostgreSQL migrations for the finance schema.
 
 ## Steps
-1. Run `cargo init` for the finance service crate.
-2. Add dependencies to Cargo.toml: axum 0.7, tokio (full features), sqlx (postgres, runtime-tokio, tls-rustls, migrate, uuid, chrono, rust_decimal), redis-rs (tokio-comp), serde/serde_json, tower-http (cors, trace), tracing/tracing-subscriber, dotenvy for local dev.
-3. Create project structure: src/main.rs, src/config.rs, src/routes/ (mod.rs), src/models/, src/db/, src/services/, src/error.rs.
-4. Implement src/config.rs: read POSTGRES_URL, REDIS_URL, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET from environment variables (injected via envFrom from sigma1-infra-endpoints ConfigMap and secrets).
-5. Implement src/main.rs: initialize tracing, load config, create sqlx PgPool, create Redis connection, build Axum router with health check at GET /healthz, start server.
-6. Implement shared error types in src/error.rs with proper Axum IntoResponse implementations for 400, 404, 409, 500 responses.
-7. Add sqlx migrations directory at migrations/.
-8. Verify the project compiles and the server starts with `cargo run`.
+1. Initialize Cargo workspace with `cargo init`. Add dependencies: axum 0.7, tokio, serde, sqlx (with postgres feature), tower, tower-http. 2. Create project structure: /src/main.rs (entrypoint), /src/routes/ (endpoint handlers), /src/models/ (domain types), /src/db/ (repository layer), /src/services/ (business logic), /src/config.rs (env/ConfigMap loading). 3. Define models: Invoice (id, customer_id, line_items, currency, subtotal, tax, total, status, due_date, created_at), Payment (id, invoice_id, amount, currency, stripe_payment_intent_id, status, method, paid_at), Payroll (id, employee_id, period_start, period_end, gross_amount, deductions, net_amount, currency, status). 4. Create SQL migrations using sqlx-cli: invoices, invoice_line_items, payments, payroll_records, currency_rates tables. Use NUMERIC type for monetary columns. 5. Implement database connection pool initialization from ConfigMap PostgreSQL connection string. 6. Implement repository traits and implementations for each domain.
 
 ## Validation
-Project compiles with zero warnings; server starts and GET /healthz returns 200 with {"status":"ok"}; config correctly reads all expected environment variables and panics with clear messages when required vars are missing.
+Project compiles with `cargo build`; migrations run against test PostgreSQL; all tables created with correct column types (NUMERIC for money); repository CRUD operations pass integration tests; connection pool initializes from environment variables.

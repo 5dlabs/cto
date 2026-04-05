@@ -1,18 +1,10 @@
-Implement subtask 3005: Implement InventoryService with barcode scanning logic
+Implement subtask 3005: Implement ProjectService with quote-to-project workflow
 
 ## Objective
-Build the InventoryService gRPC handler with barcode scanning, check-out/check-in workflows, and inventory status management.
+Build the ProjectService gRPC handler supporting project lifecycle, quote generation, quote approval, and status transitions.
 
 ## Steps
-1. Create /internal/service/inventory_service.go implementing InventoryServiceServer.
-2. Implement CreateItem: validate barcode uniqueness, persist new inventory item with AVAILABLE status.
-3. Implement GetItem and ListItems: support filtering by category, status, location; pagination.
-4. Implement ScanBarcode: accept a barcode string, look up the item, update last_scanned_at timestamp, return item details and current status. This is the core barcode scanning endpoint.
-5. Implement UpdateItemStatus: transition item status with validation (e.g., can't go from MAINTENANCE directly to CHECKED_OUT).
-6. Implement CheckOut: accept item_id and project_id, validate item is AVAILABLE or RESERVED, update status to CHECKED_OUT, record association with project via project_equipment.
-7. Implement CheckIn: accept item_id, validate item is CHECKED_OUT, update status back to AVAILABLE, remove project association, update last_scanned_at.
-8. Add status transition validation as a state machine helper to enforce valid inventory state transitions.
-9. Register service on gRPC server and grpc-gateway mux.
+1. Implement ProjectService gRPC server in /internal/project/. 2. Wire up CreateProject, GetProject, ListProjects, UpdateProjectStatus RPCs to ProjectRepo. 3. Implement GenerateQuote RPC: calculate quote based on equipment list, rental duration, crew costs, delivery fees. Store quote with line items in the quotes table. 4. Implement ApproveQuote RPC: transition quote status to approved, update project status to 'confirmed', trigger any downstream effects (crew reservation, equipment hold). 5. Implement project status state machine: draft → quoted → confirmed → in_progress → completed → archived. Validate transitions. 6. Register service and verify grpc-gateway REST routes.
 
 ## Validation
-ScanBarcode returns correct item for a known barcode and 404 for unknown; CheckOut transitions item to CHECKED_OUT and fails if item is in MAINTENANCE; CheckIn returns item to AVAILABLE; status transition state machine rejects invalid transitions; barcode uniqueness constraint is enforced on creation.
+Quote generation produces correct line items and totals for sample equipment lists; quote approval transitions project to confirmed status; invalid status transitions are rejected with appropriate errors; full quote-to-project workflow completes end-to-end.

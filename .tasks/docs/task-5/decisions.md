@@ -1,14 +1,17 @@
 ## Decision Points
 
-- What API paradigm should be used for inter-service communication between backend services (e.g., Morgan agent, Equipment Catalog, RMS, Finance, Vetting, Social Engine)?
+- Which Redis-compatible cache should be used for rate limiting, session storage, and caching across services?
+- Should the Finance and Customer Vetting services be implemented as separate Rust/Axum services or merged into a single multi-domain service?
+- What API paradigm should be used for inter-service communication between Morgan (OpenClaw) and backend services?
 - How should multi-tenancy and schema separation be handled in the PostgreSQL database?
-- What authentication and authorization mechanism should be used for service-to-service and user-to-service API calls?
-- Should the Finance and Customer Vetting services be implemented as separate Rust/Axum services, or as modules within a single Rex service binary?
-- How should the Google Reviews and credit signal data be accessed for customer vetting?
-- What versioning strategy should be used for public and internal APIs?
-- What approach should be used for GDPR compliance regarding data export and customer deletion?
+- What authentication and authorization mechanism should be used for internal service-to-service API calls?
+- How should the public-facing API endpoints (e.g., Equipment Catalog, RMS REST, Finance) be versioned and exposed?
+- What access control model should be used for admin endpoints (e.g., product add/update, finance, vetting)?
+- Which specific credit data API provider should be integrated for credit scoring (e.g., Experian, Equifax, Dun & Bradstreet, CreditSafe)?
+- What weighting algorithm should be used to aggregate OpenCorporates, LinkedIn, Google Reviews, and credit scores into the final GREEN/YELLOW/RED classification?
+- Should Google Reviews data be obtained via official Google Places API (paid, reliable) or web scraping (free, fragile)?
 
 ## Coordination Notes
 
-- Agent owner: rex
+- Agent owner: Rex
 - Primary stack: Rust/Axum

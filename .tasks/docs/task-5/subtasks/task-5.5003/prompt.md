@@ -1,17 +1,10 @@
-Implement subtask 5003: Implement OpenCorporates business verification integration module
+Implement subtask 5003: Implement LinkedIn API integration for online presence analysis
 
 ## Objective
-Build a standalone Rust module that integrates with the OpenCorporates API to verify business registration, retrieve incorporation details, officer information, and filing status. Implement proper error handling, response parsing, and a trait-based interface for testability.
+Build the LinkedIn API client module to retrieve company profile data including follower count, employee count, and company description for online presence scoring.
 
 ## Steps
-1. Create src/integrations/mod.rs and src/integrations/opencorporates.rs.
-2. Define a trait `BusinessVerifier` with async method `verify_business(company_name: &str, jurisdiction: Option<&str>) -> Result<BusinessVerification, VettingError>`.
-3. BusinessVerification struct: company_number, company_name, jurisdiction_code, incorporation_date, company_type, current_status, registered_address, officers (Vec), inactive (bool).
-4. Implement `OpenCorporatesClient` struct holding reqwest::Client and API key.
-5. Implement the API call to OpenCorporates search endpoint (GET /companies/search) and company details endpoint.
-6. Parse JSON responses using serde, handle rate limiting (429), not-found, and network errors gracefully.
-7. Normalize the output into the BusinessVerification struct.
-8. Implement a `MockBusinessVerifier` for testing.
+1. Create a `sources/linkedin.rs` module implementing the `VettingSource` trait. 2. Implement OAuth 2.0 token management for LinkedIn API access (client credentials flow). Store client_id/client_secret in Kubernetes secrets. 3. Call LinkedIn Company API endpoints to retrieve: company name, description, follower_count, employee_count, industry, website_url, logo_url. 4. Parse responses into an `OnlinePresence` struct. 5. Handle LinkedIn-specific errors: expired tokens (auto-refresh), rate limits, private/unavailable profiles. 6. If the LinkedIn API requires specific partnership/approval, implement a fallback stub that returns partial data with a warning flag. 7. Write unit tests with mocked LinkedIn API responses.
 
 ## Validation
-Unit tests with recorded/mocked API responses verify correct parsing of OpenCorporates data; error cases (404, 429, network timeout) are handled and return appropriate VettingError variants; mock implementation satisfies the trait contract.
+Unit tests pass for: successful company profile retrieval, token refresh on 401, rate limit handling, private profile graceful degradation. OnlinePresence struct correctly populated from mock data.

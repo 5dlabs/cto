@@ -1,28 +1,10 @@
-Implement subtask 4006: Implement payroll and financial reporting endpoints
+Implement subtask 4006: Implement payroll endpoints and financial reporting
 
 ## Objective
-Build REST endpoints for payroll management and financial reporting including revenue summaries, payment reports, and outstanding invoice tracking.
+Build the payroll management endpoints and financial reporting endpoints including revenue, expense, and payroll summary reports.
 
 ## Steps
-1. Create src/db/payroll.rs: repository functions for create_payroll_record, get_payroll, list_payroll (filter by employee_id, period, status), update_payroll_status, approve_payroll, mark_paid.
-2. Create src/routes/payroll.rs with handlers:
-   - POST /api/v1/payroll → create payroll record (DRAFT)
-   - GET /api/v1/payroll → list payroll records (filters: employee_id, period, status)
-   - GET /api/v1/payroll/:id → get payroll detail
-   - POST /api/v1/payroll/:id/approve → transition DRAFT→APPROVED
-   - POST /api/v1/payroll/:id/pay → transition APPROVED→PAID, record paid_at timestamp
-3. Create src/services/reports_service.rs with aggregation queries:
-   - Revenue summary: total invoiced, total paid, total outstanding by period (month/quarter/year) and currency.
-   - Payment report: payments by status, method, date range.
-   - Outstanding invoices: overdue invoices with aging (30/60/90 days).
-   - Payroll summary: total payroll by period and status.
-4. Create src/routes/reports.rs:
-   - GET /api/v1/reports/revenue?period=monthly&start=2024-01&end=2024-12
-   - GET /api/v1/reports/payments?start=...&end=...
-   - GET /api/v1/reports/outstanding
-   - GET /api/v1/reports/payroll?period=...
-5. All monetary calculations must use Decimal type to avoid floating-point issues.
-6. Multi-currency: reports should group by currency; do NOT convert between currencies for aggregation.
+1. Implement payroll routes in /src/routes/payroll.rs: POST /api/v1/payroll (create payroll record), GET /api/v1/payroll (list with filters: employee, period, status), GET /api/v1/payroll/:id, PUT /api/v1/payroll/:id/approve (approve for payment), PUT /api/v1/payroll/:id/process (mark as processed/paid). 2. Payroll record includes: employee_id, period, gross_amount, deductions (tax, benefits), net_amount, currency. 3. Implement financial reporting endpoints in /src/routes/reports.rs: GET /api/v1/finance/reports/revenue (revenue summary by period with currency breakdown), GET /api/v1/finance/reports/expenses (expense summary), GET /api/v1/finance/reports/payroll-summary (total payroll costs by period), GET /api/v1/finance/reports/profit-loss (revenue minus expenses and payroll). 4. Reports should accept query parameters for date range and currency. Use the currency conversion service for multi-currency aggregation. 5. Implement proper pagination on list endpoints.
 
 ## Validation
-Payroll status transitions enforce DRAFT→APPROVED→PAID flow; revenue report correctly sums invoiced/paid/outstanding amounts grouped by period and currency; outstanding report correctly calculates aging buckets; all monetary values use Decimal with no floating-point precision loss; payroll list filters work correctly.
+Payroll CRUD operates correctly with proper status transitions; payroll approval workflow enforces valid state changes; revenue report accurately sums paid invoices by period; payroll summary matches sum of processed payroll records; profit-loss calculation is correct; multi-currency reports convert to requested base currency.

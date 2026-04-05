@@ -1,17 +1,10 @@
-Implement subtask 6008: Implement Effect.Services for TikTok publishing
+Implement subtask 6008: Implement Facebook API publishing integration
 
 ## Objective
-Build an Effect.Service for publishing content to TikTok via the TikTok Content Posting API, including video/image upload and status tracking.
+Build the Facebook publishing module to post approved content to a Facebook page using the Facebook Graph API.
 
 ## Steps
-1. Create src/integrations/tiktok.ts.
-2. Define Effect.Service `TikTokPublisher` with methods: publish(content: PublishableContent) -> Effect<PublishResult>, getPostStatus(postId: string) -> Effect<PostStatus>.
-3. Implement TikTok Content Posting API: initialize upload -> upload content -> publish.
-4. Support photo posts (TikTok photo mode) since the primary content is event photos.
-5. Handle TikTok OAuth2 token management.
-6. Map captions to TikTok's format (character limits, hashtag style).
-7. Handle API errors, content policy rejections, and rate limits.
-8. Implement mock for testing.
+1. Create a `services/publishers/facebook.ts` module implementing the `Publisher` interface. 2. Implement Facebook Graph API integration: a) For single photo: POST /{page-id}/photos with source (image URL) and caption. b) For multiple photos: upload each photo unpublished, then create a multi-photo post. 3. Manage Facebook Page access token (long-lived page token that doesn't expire, obtained from user token exchange). 4. Handle: rate limits, content moderation flags, image format restrictions. 5. On success, create a `PublishedPost` record with platform='facebook' and the Facebook post ID. 6. Use Effect.retry for transient failures.
 
 ## Validation
-Unit tests with mocked TikTok API verify correct upload flow; photo mode posts are correctly formatted; OAuth token refresh works; content policy rejection errors are properly surfaced.
+With valid Facebook page token and an approved draft, the publisher posts photos with caption to the page. Multi-photo posts work correctly. PublishedPost record is created with Facebook post ID. Rate limits trigger retry. Content moderation errors are surfaced.

@@ -1,20 +1,10 @@
-Implement subtask 1008: Validate end-to-end infrastructure connectivity from a test pod
+Implement subtask 1008: Create aggregated 'sigma1-infra-endpoints' ConfigMap
 
 ## Objective
-Deploy a temporary test pod that loads connection details from the sigma1-infra-endpoints ConfigMap and validates connectivity to PostgreSQL, Redis, S3/R2, and Signal-CLI.
+Create the 'sigma1-infra-endpoints' ConfigMap that aggregates all service connection strings and API URLs, and make it available across all namespaces.
 
 ## Steps
-1. Author a Job manifest 'infra-connectivity-test' in the sigma1 namespace.
-2. Use a lightweight image (e.g., alpine with curl, psql, redis-cli installed, or a custom test image).
-3. Mount the sigma1-infra-endpoints ConfigMap via envFrom and relevant secrets.
-4. The job script should:
-   a. Connect to PostgreSQL and run 'SELECT 1' and '\dn' to verify schemas.
-   b. Connect to Redis and run PING.
-   c. Use curl to list S3 buckets or PUT/GET a test object.
-   d. curl Signal-CLI /v1/about endpoint.
-5. Each check should output PASS/FAIL with details.
-6. The Job should exit 0 only if all checks pass.
-7. Document the test job so it can be re-run during CI or after infra changes.
+1. Create a ConfigMap 'sigma1-infra-endpoints' in the 'sigma1' namespace containing all endpoint data: POSTGRES_URL (from CloudNative-PG service), REDIS_URL (from Redis/Valkey service), S3_ENDPOINT + S3_PRODUCT_BUCKET + S3_EVENT_BUCKET, SIGNAL_CLI_URL (from Signal-CLI service), CLOUDFLARE_TUNNEL_URL, ELEVENLABS_API_URL, TWILIO_API_URL, STRIPE_API_URL, OPENCORPORATES_API_URL. 2. For cross-namespace access, either: (a) replicate the ConfigMap into each namespace (databases, openclaw, social, web) using a script or tool like kubed/reflector, or (b) use fully-qualified service DNS names so the ConfigMap only needs to exist once. 3. Document all key names and their expected formats. 4. Create a validation script that reads the ConfigMap and attempts a basic connection check to each endpoint.
 
 ## Validation
-kubectl get job infra-connectivity-test -n sigma1 shows Completed with exit code 0; kubectl logs job/infra-connectivity-test shows PASS for all four connectivity checks (PostgreSQL, Redis, S3, Signal-CLI).
+ConfigMap exists and contains all documented keys with non-empty values; a validation pod can mount the ConfigMap via envFrom and successfully resolve/connect to PostgreSQL, Redis, S3, and Signal-CLI endpoints.

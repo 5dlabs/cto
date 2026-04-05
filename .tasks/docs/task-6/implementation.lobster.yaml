@@ -1,7 +1,7 @@
 name: implement-task-6
 metadata:
   task_id: 6
-  agent: nova
+  agent: Nova
   stack: Node.js/Elysia
   depends_on_tasks: [1]
 
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-6/feature-branch"
   - name: agent
-    default: "nova"
+    default: "Nova"
   - name: cli
     default: "claude"
   - name: model
@@ -52,7 +52,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-6003
-    depends_on: [validate-subtask-6001]
+    depends_on: [validate-subtask-6002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6003/prompt.md
@@ -64,7 +64,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-6004
-    depends_on: [validate-subtask-6001, validate-subtask-6003]
+    depends_on: [validate-subtask-6003]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6004/prompt.md
@@ -76,7 +76,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-6005
-    depends_on: [validate-subtask-6001]
+    depends_on: [validate-subtask-6004]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6005/prompt.md
@@ -124,7 +124,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-6009
-    depends_on: [validate-subtask-6001]
+    depends_on: [validate-subtask-6005, validate-subtask-6006, validate-subtask-6007, validate-subtask-6008]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6009/prompt.md
@@ -135,44 +135,8 @@ steps:
     command: >
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
-  - name: implement-subtask-6010
-    depends_on: [validate-subtask-6001, validate-subtask-6002]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6010/prompt.md
-
-  - name: validate-subtask-6010
-    depends_on: [implement-subtask-6010]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
-
-  - name: implement-subtask-6011
-    depends_on: [validate-subtask-6002, validate-subtask-6003, validate-subtask-6004, validate-subtask-6005, validate-subtask-6006, validate-subtask-6007, validate-subtask-6008, validate-subtask-6009, validate-subtask-6010]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6011/prompt.md
-
-  - name: validate-subtask-6011
-    depends_on: [implement-subtask-6011]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
-
-  - name: implement-subtask-6012
-    depends_on: [validate-subtask-6011]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-6.6012/prompt.md
-
-  - name: validate-subtask-6012
-    depends_on: [implement-subtask-6012]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
-
   - name: integration-validation
-    depends_on: [validate-subtask-6001, validate-subtask-6002, validate-subtask-6003, validate-subtask-6004, validate-subtask-6005, validate-subtask-6006, validate-subtask-6007, validate-subtask-6008, validate-subtask-6009, validate-subtask-6010, validate-subtask-6011, validate-subtask-6012]
+    depends_on: [validate-subtask-6001, validate-subtask-6002, validate-subtask-6003, validate-subtask-6004, validate-subtask-6005, validate-subtask-6006, validate-subtask-6007, validate-subtask-6008, validate-subtask-6009]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 

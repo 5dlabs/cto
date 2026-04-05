@@ -1,18 +1,10 @@
-Implement subtask 6006: Implement Effect.Services for Instagram publishing
+Implement subtask 6006: Implement Instagram API publishing integration
 
 ## Objective
-Build an Effect.Service for publishing content to Instagram via the Instagram Graph API, including image upload, caption posting, and status tracking.
+Build the Instagram publishing module to post approved content (photos + captions) to Instagram using the Instagram Graph API.
 
 ## Steps
-1. Create src/integrations/instagram.ts.
-2. Define Effect.Service `InstagramPublisher` with methods: publish(content: PublishableContent) -> Effect<PublishResult>, getPostStatus(postId: string) -> Effect<PostStatus>.
-3. PublishableContent: image_urls (string[]), caption, hashtags, scheduled_at (optional).
-4. PublishResult: platform_post_id, published_url, status.
-5. Implement Instagram Graph API flow: create media container -> publish media container.
-6. Handle carousel posts (multiple images) via the carousel container API.
-7. Manage Instagram access token refresh.
-8. Handle API errors: rate limits, invalid media, permission errors.
-9. Implement mock for testing.
+1. Create a `services/publishers/instagram.ts` module implementing a `Publisher` interface: `publish(draft: Draft): Effect.Effect<PublishResult, PublishError>`. 2. Implement Instagram Graph API integration: a) Use the Content Publishing API: create media container (POST /{ig-user-id}/media with image_url and caption), then publish (POST /{ig-user-id}/media_publish). b) Handle carousel posts for multiple selected photos. 3. Manage Instagram OAuth token: store long-lived token, implement token refresh before expiry. 4. Handle: rate limits (200 calls/hour), content policy errors, media upload failures. 5. On success, create a `PublishedPost` record with platform='instagram' and the Instagram post ID. 6. Use Effect.retry for transient failures, Effect error channels for permanent failures (e.g., content policy violation).
 
 ## Validation
-Unit tests with mocked Instagram API verify correct API call sequence (container creation then publish); carousel posts send correct media array; token refresh is triggered on 401; errors map to typed Effect failures.
+With a valid Instagram token and an approved draft, the publisher creates a media container and publishes successfully. PublishedPost record is created with Instagram post ID. Carousel posts work for multiple photos. Token refresh is triggered when token is near expiry. Rate limit errors trigger retry with backoff. Content policy violations are surfaced as permanent errors.

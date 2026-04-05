@@ -1,17 +1,10 @@
-Implement subtask 5004: Implement LinkedIn online presence integration module
+Implement subtask 5004: Implement Google Reviews integration for reputation analysis
 
 ## Objective
-Build a standalone Rust module that integrates with the LinkedIn API to assess a company's online presence, including company page existence, follower count, employee count, and recent activity signals.
+Build the Google Reviews client module to fetch review data, average ratings, and review counts for an organization, and compute a reputation summary.
 
 ## Steps
-1. Create src/integrations/linkedin.rs.
-2. Define a trait `OnlinePresenceChecker` with async method `check_presence(company_name: &str, domain: Option<&str>) -> Result<OnlinePresence, VettingError>`.
-3. OnlinePresence struct: found (bool), profile_url (Option<String>), follower_count (Option<i64>), employee_count_range (Option<String>), description (Option<String>), presence_score (f64 0.0-1.0).
-4. Implement `LinkedInClient` struct with reqwest::Client and API credentials.
-5. Use LinkedIn Marketing/Company API to search for company profiles and retrieve organization details.
-6. Calculate a presence_score based on: profile exists (0.3), has description (0.1), follower_count tiers (0.3), employee_count tiers (0.3).
-7. Handle OAuth2 token refresh, rate limits, and API errors.
-8. Implement `MockOnlinePresenceChecker` for testing.
+1. Create a `sources/google_reviews.rs` module implementing the `VettingSource` trait. 2. Implement the Google Places API client (or scraping fallback, pending dp-14 decision). For the API path: use Google Places Text Search to find the business, then Place Details to get reviews. 3. Extract: average_rating, total_review_count, individual reviews (text, rating, date). 4. Compute a basic sentiment summary: count of 1-2 star reviews, 3 star reviews, 4-5 star reviews, and a simple sentiment_score. 5. Parse into a `ReputationAnalysis` struct with avg_rating, review_count, sentiment_score, sentiment_summary, recent_reviews (last 5). 6. Handle API key authentication, quota limits, and businesses with no reviews (return neutral score). 7. Write unit tests with mocked responses.
 
 ## Validation
-Unit tests with mocked LinkedIn API responses verify correct presence scoring algorithm; edge cases (no profile found, incomplete data) produce appropriate scores; mock implementation returns configurable test data.
+Unit tests pass for: successful review retrieval, business with no reviews (neutral score returned), API quota exceeded handling, correct sentiment calculation from mock review data. ReputationAnalysis struct populated correctly.

@@ -1,19 +1,10 @@
-Implement subtask 6004: Implement AI curation pipeline for image selection and quality assessment
+Implement subtask 6004: Implement AI caption generation service
 
 ## Objective
-Build an Effect.Service that uses OpenAI's vision API (or Claude) to analyze uploaded images, assess quality, select the best images for social media posting, and suggest cropping/composition improvements.
+Build the AI caption generation module that creates platform-appropriate captions for curated social media posts using OpenAI or Claude.
 
 ## Steps
-1. Create src/pipelines/ai-curation.ts.
-2. Define Effect.Service `AICurationService` with methods: curateImages(images: StoredImage[], context: CurationContext) -> Effect<CurationResult>, assessImageQuality(image: StoredImage) -> Effect<QualityAssessment>.
-3. CurationContext: event_type, brand_guidelines, target_platforms, max_selections.
-4. CurationResult: selected_images (ranked), quality_scores, crop_suggestions, rejection_reasons for unselected images.
-5. QualityAssessment: overall_score (0-1), sharpness, composition, lighting, relevance_to_brand.
-6. Implement using OpenAI GPT-4 Vision API: send image URLs with a structured prompt asking for quality assessment and selection rationale.
-7. Parse structured JSON responses from the AI model.
-8. Handle API rate limits with Effect.retry and exponential backoff.
-9. Implement batch processing: if many images, process in groups of 4-5 per API call.
-10. Provide a mock implementation for testing that returns deterministic scores.
+1. Create a `services/ai-caption.ts` module. 2. Implement `generateCaption(draft: Draft): Effect.Effect<CaptionResult, AIError>` that: a) Takes the curated photos and event context. b) Generates platform-specific captions: Instagram (casual, hashtags, emoji), LinkedIn (professional, industry-relevant), Facebook (conversational, engagement-focused). c) Returns a `CaptionResult` with per-platform captions. 3. Use a system prompt that includes brand voice guidelines, event context, and platform-specific formatting rules. 4. Update the draft with generated captions and transition status to 'pending_approval'. 5. Implement caption regeneration: allow re-calling the endpoint to get alternative captions. 6. Use Effect.retry for API resilience. 7. Validate caption length against platform limits (Instagram: 2200 chars, LinkedIn: 3000 chars, Facebook: 63206 chars).
 
 ## Validation
-Unit tests with mocked OpenAI API verify correct prompt construction and response parsing; curation selects top-scored images; batch processing correctly groups images; retry logic handles rate limits; mock implementation returns consistent test data.
+Given a draft with curated photos and event context, caption generation returns platform-specific captions within character limits. Draft status transitions to 'pending_approval'. Captions contain appropriate formatting per platform (hashtags for Instagram, professional tone for LinkedIn). Effect.retry handles API failures. Caption regeneration produces different output on subsequent calls.

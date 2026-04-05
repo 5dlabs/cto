@@ -1,17 +1,10 @@
-Implement subtask 6007: Implement Effect.Services for LinkedIn publishing
+Implement subtask 6007: Implement LinkedIn API publishing integration
 
 ## Objective
-Build an Effect.Service for publishing content to LinkedIn via the LinkedIn Marketing API, including image upload, article/post creation, and status tracking.
+Build the LinkedIn publishing module to post approved content to a LinkedIn company page using the LinkedIn Marketing API.
 
 ## Steps
-1. Create src/integrations/linkedin.ts.
-2. Define Effect.Service `LinkedInPublisher` with methods: publish(content: PublishableContent) -> Effect<PublishResult>, getPostStatus(postId: string) -> Effect<PostStatus>.
-3. Implement LinkedIn UGC (User Generated Content) Post API: register image upload -> upload binary -> create post with image URN.
-4. Support organization posts (posting as company page).
-5. Handle LinkedIn OAuth2 token refresh flow.
-6. Map content to LinkedIn's specific format: text with media references.
-7. Handle API errors and rate limits.
-8. Implement mock for testing.
+1. Create a `services/publishers/linkedin.ts` module implementing the `Publisher` interface. 2. Implement LinkedIn Marketing API integration: a) Register image assets (POST /assets?action=registerUpload), upload binary, then create a share (POST /ugcPosts) with the uploaded asset and LinkedIn-specific caption. b) Handle multi-image shares if supported. 3. Manage LinkedIn OAuth 2.0 token: handle token refresh (LinkedIn tokens expire in 60 days for long-lived). 4. Target the company page (organization URN) rather than personal profile. 5. Handle: rate limits, permission errors, image format restrictions. 6. On success, create a `PublishedPost` record with platform='linkedin' and the LinkedIn post URN. 7. Use Effect.retry for transient failures.
 
 ## Validation
-Unit tests with mocked LinkedIn API verify correct three-step flow (register -> upload -> post); organization vs personal posting uses correct author URN; OAuth refresh triggered appropriately; error mapping works correctly.
+With valid LinkedIn credentials and an approved draft, the publisher registers an image asset, uploads it, and creates a share on the company page. PublishedPost record is created with LinkedIn URN. Token refresh works when needed. Permission errors are surfaced clearly. Rate limits trigger retry.

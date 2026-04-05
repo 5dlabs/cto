@@ -1,15 +1,8 @@
 [
   {
-    "source_url": "https://deployiq.maximinimal.ca",
-    "success": true,
-    "asset_url": "https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/9b5f4c10-89b5-453b-91e9-b4e507a39e45/1ffc9b41-d510-4f68-9d94-f892956643c2",
-    "local_path": "/Users/jonathon/5dlabs/cto/.intake/design/stitch/screenshots/deployiq.maximinimal.ca-ccf901c1.png",
-    "error": ""
-  },
-  {
     "source_url": "https://sigma-1.com",
     "success": true,
-    "asset_url": "https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/e864c9d2-8267-4ead-8eaa-9c6133292c6f/15aa7681-a2b6-458b-9667-37cb9ce8ecff",
+    "asset_url": "https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/9a380ac3-8836-4066-a1a3-37c24051c61a/537366c2-cbec-49f9-9da9-2360022cd653",
     "local_path": "/Users/jonathon/5dlabs/cto/.intake/design/stitch/screenshots/sigma-1.com-20442cf4.png",
     "error": ""
   }

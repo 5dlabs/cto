@@ -1,17 +1,10 @@
-Implement subtask 6003: Implement S3/R2 photo storage integration service
+Implement subtask 6003: Implement AI curation pipeline for selecting top images
 
 ## Objective
-Build an Effect.Service for uploading, retrieving, and managing photos in S3/R2 object storage. Handle image upload processing, generate storage keys, and provide CDN-ready URLs.
+Build the AI image curation module that analyzes uploaded event photos using a vision-capable AI model and selects the top images based on quality, composition, and relevance.
 
 ## Steps
-1. Create src/services/storage.ts.
-2. Define Effect.Service `StorageService` with methods: uploadImage(file: Buffer, metadata: ImageMetadata) -> Effect<StoredImage>, getImageUrl(fileKey: string) -> Effect<string>, deleteImage(fileKey: string) -> Effect<void>, listImages(prefix: string) -> Effect<StoredImage[]>.
-3. Implement using @aws-sdk/client-s3 configured for R2 compatibility (custom endpoint).
-4. Generate storage keys with pattern: `uploads/{year}/{month}/{uuid}.{ext}`.
-5. On upload: use `sharp` to extract dimensions, generate a thumbnail variant (stored as `thumbnails/{key}`), and return metadata.
-6. CDN URL generation: construct public URL from configured CDN domain + file key.
-7. Implement as Effect Layer with configurable S3 endpoint, bucket, and credentials.
-8. Handle errors: upload failures, invalid image formats, S3 connectivity issues.
+1. Create a `services/ai-curation.ts` module. 2. Implement a provider-agnostic AI client interface (pending dp-15). For v1, implement against OpenAI GPT-4o vision API. 3. Implement `curateImages(draft: Draft): Effect.Effect<CurationResult, AIError>` that: a) Downloads or generates signed URLs for all photos in the draft. b) Sends photos in batches to the vision API with a prompt: 'Analyze these event photos. Score each 1-10 for quality, composition, lighting, and relevance to a business event. Return the top 3-5 images ranked by score with brief reasoning.' c) Parses the AI response into structured rankings. d) Updates the draft's selected_photos array and transitions status to 'pending_caption'. 4. Use Effect.retry for AI API calls with backoff. 5. Handle: API rate limits, oversized payloads (resize/compress before sending), model token limits. 6. Store curation scores/reasoning in a metadata field on the draft for transparency.
 
 ## Validation
-Unit tests with mocked S3 client verify correct key generation, thumbnail creation, and URL construction; integration test uploads a real image to a test bucket and verifies it's retrievable; error scenarios (invalid image, S3 down) return typed Effect errors.
+Given a draft with 10 mock photo references, the curation pipeline calls the AI API and returns a ranked selection of 3-5 photos. Draft status transitions to 'pending_caption'. Curation metadata (scores, reasoning) is stored. Effect.retry handles transient API failures. Malformed AI responses are handled gracefully with a fallback (select first N photos).

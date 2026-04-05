@@ -1,15 +1,10 @@
-Implement subtask 3008: Integrate Redis for session cache and ephemeral state
+Implement subtask 3008: Integrate Google Calendar API for project scheduling
 
 ## Objective
-Add Redis (Valkey) integration for session caching, barcode scan deduplication, and ephemeral operational state in the RMS service.
+Implement Google Calendar integration to sync project schedules, crew assignments, and delivery events to a shared calendar.
 
 ## Steps
-1. Create /internal/cache/redis.go with Redis client initialization using go-redis, reading REDIS_URL from config (sigma1-infra-endpoints ConfigMap).
-2. Implement session cache helpers: SetSession(sessionID, data, TTL), GetSession(sessionID), DeleteSession(sessionID).
-3. Implement barcode scan deduplication: cache recent scan results with short TTL (e.g., 5 seconds) to prevent duplicate scans from triggering multiple state changes.
-4. Implement crew schedule cache: cache computed schedules with configurable TTL, invalidate on assignment changes.
-5. Export a Cache interface that services can use for their caching needs.
-6. Add connection health check to the /healthz endpoint.
+1. Add Google Calendar API Go client dependency. 2. Implement a calendar package in /internal/calendar/ that authenticates using a service account key (stored as a Kubernetes secret). 3. Implement CreateCalendarEvent: given a project with dates, crew, and equipment, create a Google Calendar event with relevant details in the description. 4. Implement UpdateCalendarEvent and DeleteCalendarEvent for schedule changes. 5. Hook into ProjectService (on project confirmation) and DeliveryService (on delivery scheduling) to automatically create/update calendar events. 6. Handle API errors gracefully — calendar sync failures should log warnings but not block the primary operation.
 
 ## Validation
-Redis client connects successfully using REDIS_URL; session set/get/delete round-trips correctly; barcode dedup prevents duplicate processing within TTL window; health check reports Redis status; graceful handling when Redis is unavailable (fallback to no-cache).
+Calendar events are created when a project is confirmed (verified via mock or test calendar); events update when project schedule changes; calendar API failures are logged but do not cause RPC errors; service account authentication works correctly.

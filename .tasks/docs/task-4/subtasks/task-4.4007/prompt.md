@@ -1,20 +1,10 @@
-Implement subtask 4007: Implement scheduled currency rate sync job with Redis caching
+Implement subtask 4007: Add Prometheus metrics, health endpoints, and OpenAPI documentation
 
 ## Objective
-Build a background job that periodically fetches exchange rates from an external API, stores them in PostgreSQL, and caches them in Redis for fast lookups.
+Implement observability with Prometheus metrics, health/readiness probes, and generate OpenAPI documentation for all finance endpoints.
 
 ## Steps
-1. Create src/services/currency_service.rs.
-2. Implement external rate fetching: use reqwest to call a free currency rate API (e.g., exchangerate-api.com or open.er-api.com). Parse response into (base, target, rate) tuples for a configured list of currencies (USD, EUR, GBP, CAD, AUD minimum).
-3. Implement rate storage: upsert into currency_rates table with current timestamp.
-4. Implement Redis caching: after DB write, set key `currency:USD:EUR` → rate string with 1-hour TTL. Implement get_rate(base, target) that checks Redis first, falls back to DB.
-5. Create src/routes/currency.rs:
-   - GET /api/v1/currency/rates → list all current rates
-   - GET /api/v1/currency/rates/:base/:target → get specific rate
-   - POST /api/v1/currency/convert → body: {amount, from, to} → returns converted amount using latest rate
-6. Implement the scheduled job: use tokio::spawn with tokio::time::interval to run rate sync every hour (configurable via env var CURRENCY_SYNC_INTERVAL_SECS, default 3600).
-7. Handle external API failures gracefully: log error, keep using last known rates, don't crash the service.
-8. On service startup, trigger an immediate sync before entering the interval loop.
+1. Add metrics dependencies: metrics, metrics-exporter-prometheus, axum-prometheus or custom tower layer. 2. Implement a metrics middleware layer that records: request_count (by method, path, status), request_duration_seconds histogram, active_connections gauge. Add custom finance metrics: invoices_created_total, payments_processed_total, payment_failures_total. 3. Expose GET /metrics endpoint with Prometheus text format. 4. Implement GET /healthz (liveness): returns 200 if service is running. 5. Implement GET /readyz (readiness): checks PostgreSQL connection pool and Redis connectivity, returns 200 if both healthy, 503 otherwise. 6. Generate OpenAPI spec: use utoipa crate to annotate all route handlers with OpenAPI metadata. Generate and serve /api/v1/finance/openapi.json. Optionally serve Swagger UI at /api/v1/finance/docs. 7. Verify all endpoints are documented with request/response schemas, status codes, and descriptions.
 
 ## Validation
-Unit tests with mocked HTTP responses verify rate parsing and DB upsert; Redis cache is populated after sync and get_rate returns cached value; convert endpoint returns mathematically correct result using Decimal; rate sync continues working after external API failure (uses stale rates); startup triggers immediate sync.
+GET /metrics returns valid Prometheus format with expected metric names; /healthz returns 200; /readyz returns 503 when PostgreSQL is down; OpenAPI JSON is valid and documents all endpoints with correct schemas; Swagger UI (if served) renders without errors.

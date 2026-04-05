@@ -1,19 +1,10 @@
-Implement subtask 8008: Embed Morgan web chat widget and connect to agent WebSocket endpoint
+Implement subtask 8008: Accessibility audit, responsive design polish, and Cloudflare Pages deployment
 
 ## Objective
-Implement the Morgan AI chat widget component that connects to the Morgan agent's web chat endpoint, providing real-time conversational AI support across all pages.
+Conduct an accessibility audit (WCAG 2.1 AA) across all pages, polish responsive design for all breakpoints, and configure deployment to Cloudflare Pages with environment variables and build settings.
 
 ## Steps
-1. Create a ChatWidget React component (src/components/chat/ChatWidget.tsx).
-2. Implement WebSocket connection to the Morgan agent's /ws/chat endpoint.
-3. Implement chat UI: message list (user + agent messages), text input, send button, typing indicator.
-4. Handle connection lifecycle: connect on widget open, reconnect on disconnect, graceful close.
-5. Implement session management: generate/persist sessionId in localStorage.
-6. Style the widget with shadcn/ui components and TailwindCSS to match Sigma-1 branding.
-7. Implement the widget trigger: floating button in bottom-right corner (or per dp-11 decision).
-8. Add open/close animation and minimize/maximize states.
-9. Render the widget in the root layout so it's available on all pages.
-10. Handle edge cases: agent offline message, message send failure, long messages.
+Step 1: Run automated accessibility audit tools (axe-core, Lighthouse) across all pages; document violations. Step 2: Fix accessibility issues: missing alt text, insufficient color contrast, keyboard navigation gaps, missing ARIA labels, focus management in modals (chat widget, lightbox). Step 3: Test with screen readers (VoiceOver/NVDA) on key flows: home → catalog → detail → quote builder → submit. Step 4: Verify responsive design across breakpoints: 320px (small mobile), 375px (iPhone), 768px (tablet), 1024px (laptop), 1440px (desktop). Fix layout issues, overflow, touch targets. Step 5: Configure Cloudflare Pages project: connect Git repo, set build command (`next build`), output directory, Node.js version, and environment variables (API URLs, etc.). Step 6: Configure the `@cloudflare/next-on-pages` adapter for Next.js 15 compatibility. Step 7: Deploy to Cloudflare Pages and verify all pages are reachable, API calls work through the production domain, and assets load from Cloudflare CDN.
 
 ## Validation
-Chat widget renders on all pages; clicking the trigger opens the widget; sending a message establishes WebSocket connection and receives a response; conversation history persists within a session; widget gracefully handles agent unavailability; widget is keyboard accessible and screen-reader friendly.
+Lighthouse accessibility score ≥90 on all pages; no critical WCAG 2.1 AA violations; responsive layout is correct across all tested breakpoints; Cloudflare Pages deployment succeeds; production site loads all pages, API calls return data, chat widget connects, and images load via CDN.

@@ -1,16 +1,10 @@
-Implement subtask 7003: Implement ElevenLabs voice integration for voice channel
+Implement subtask 7003: Integrate ElevenLabs for voice interactions
 
 ## Objective
-Integrate ElevenLabs TTS/STT with the Morgan agent to enable voice-based customer interactions, including speech-to-text input and text-to-speech output.
+Implement the voice channel for Morgan using ElevenLabs text-to-speech and speech-to-text APIs, enabling voice-based customer interactions with natural-sounding responses.
 
 ## Steps
-1. Configure ElevenLabs API credentials from Kubernetes secrets.
-2. Implement the voice input pipeline: receive audio → ElevenLabs STT → text → forward to agent conversation loop.
-3. Implement the voice output pipeline: agent text response → ElevenLabs TTS → audio stream → deliver to caller.
-4. Select and configure the appropriate ElevenLabs voice ID for the Morgan persona.
-5. Implement voice session management (start call, maintain context during call, end call).
-6. Handle telephony integration point (SIP/WebRTC/PSTN gateway) for actual voice calls.
-7. Set up proper audio format handling (sample rate, codec) for streaming.
+Step 1: Configure ElevenLabs API credentials and select a voice profile for Morgan. Step 2: Implement the speech-to-text pipeline — receive audio input (from phone/VoIP integration or web), send to ElevenLabs STT, receive transcript. Step 3: Implement the text-to-speech pipeline — take agent text responses, send to ElevenLabs TTS, receive audio stream. Step 4: Implement audio streaming for low-latency voice responses (chunked transfer). Step 5: Handle voice-specific conversation flow: greeting, interruption handling, silence detection, end-of-conversation. Step 6: Wire the voice channel into the OpenClaw agent runtime as an input/output channel alongside Signal and web chat. Step 7: Add latency tracking for voice round-trips to ensure <10s total response time.
 
 ## Validation
-Initiate a test voice call; verify STT correctly transcribes spoken input; verify TTS generates natural-sounding audio response; round-trip latency from speech input to audio response is under 10 seconds; voice session maintains conversation context across multiple turns.
+Speak a test query to the voice endpoint and receive an audible response from Morgan; verify transcript accuracy matches intent; measure round-trip latency is under 10 seconds for simple queries; voice profile sounds natural and consistent.

@@ -1,18 +1,10 @@
-Implement subtask 3010: Write integration tests for all RMS gRPC and REST endpoints
+Implement subtask 3010: Add health, metrics, and API documentation endpoints
 
 ## Objective
-Create comprehensive integration tests covering all five services end-to-end, including the quote-to-project workflow, barcode scanning, and cross-service interactions.
+Implement Prometheus metrics collection, health/readiness probes, and generate API documentation for the RMS gRPC and REST endpoints.
 
 ## Steps
-1. Set up test infrastructure: use testcontainers-go or docker-compose to spin up PostgreSQL and Redis for integration tests.
-2. Write test suite for OpportunityService: create → list → update → convert to project. Verify REST endpoints via grpc-gateway return same data as gRPC.
-3. Write test suite for ProjectService: create project → assign crew → assign equipment → update dates. Verify crew and equipment associations.
-4. Write test suite for InventoryService: create item → scan barcode → check out → scan again → check in. Verify status transitions and barcode dedup via Redis.
-5. Write test suite for CrewService: create member → assign to project → verify schedule → attempt conflicting assignment (expect failure). Verify Google Calendar mock is called.
-6. Write test suite for DeliveryService: create delivery → update status through full lifecycle (SCHEDULED→IN_TRANSIT→DELIVERED→RETURNED). Verify equipment status updates on delivery.
-7. Write end-to-end workflow test: Create opportunity → convert to project → assign crew → assign equipment → create delivery → complete delivery → check in equipment. This tests the full quote-to-project-to-delivery pipeline.
-8. Verify all REST endpoints via HTTP client match gRPC responses.
-9. Ensure test coverage report shows ≥80% across all service packages.
+1. Add Prometheus Go client dependency. 2. Implement /healthz (liveness) and /readyz (readiness) endpoints that check PostgreSQL and Redis connectivity. 3. Register Prometheus metrics: request count, request duration histogram, error count — broken down by service and method. Add a /metrics endpoint. 4. Generate API documentation: use protoc-gen-openapiv2 to produce Swagger/OpenAPI spec from proto files with grpc-gateway annotations. 5. Optionally serve the Swagger JSON at /swagger.json or embed Swagger UI. 6. Verify all endpoints are accessible through both gRPC reflection and REST.
 
 ## Validation
-All integration test suites pass in CI with containerized PostgreSQL and Redis; end-to-end workflow test completes without errors; REST and gRPC responses are consistent; coverage report shows ≥80% for /internal/service packages.
+GET /healthz returns 200 when dependencies are up; GET /readyz returns 503 when PostgreSQL is unreachable; GET /metrics returns Prometheus-formatted metrics with expected labels; OpenAPI spec is valid JSON and documents all REST endpoints.

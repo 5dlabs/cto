@@ -1,18 +1,16 @@
-Implement subtask 9006: Update service manifests with readiness/liveness probes and resource limits
+Implement subtask 9006: Failover testing and ConfigMap endpoint updates for HA services
 
 ## Objective
-Add or update readiness probes, liveness probes, startup probes, resource requests, and resource limits for all application Deployments and StatefulSets to ensure production reliability and proper scheduling.
+Perform comprehensive failover testing for all HA stateful services (PostgreSQL, Redis/Valkey) and update ConfigMap endpoints to reflect HA-aware service addresses. Document all production configurations.
 
 ## Steps
-1. For each application Deployment/StatefulSet, add or update:
-   - `readinessProbe`: HTTP GET to health endpoint (e.g., `/healthz` or `/ready`) with appropriate `initialDelaySeconds`, `periodSeconds`, and `failureThreshold`.
-   - `livenessProbe`: HTTP GET or TCP check with more generous thresholds than readiness.
-   - `startupProbe` for services with slow initialization (e.g., ML model loading).
-2. Set `resources.requests` for CPU and memory based on observed or estimated usage.
-3. Set `resources.limits` for memory (and optionally CPU) to prevent noisy-neighbor issues.
-4. Ensure all probes use the correct port and path for each service.
-5. Apply updated manifests and verify pods restart cleanly with probes passing.
-6. Confirm resource requests sum does not exceed cluster capacity with headroom.
+1. Validate the `{project}-infra-endpoints` ConfigMap contains HA-aware endpoints for PostgreSQL (read-write and read-only services) and Redis/Valkey (sentinel endpoint).
+2. Perform PostgreSQL failover test: delete the primary pod, verify automatic promotion, verify application connectivity resumes, verify no data loss via a test write/read cycle.
+3. Perform Redis/Valkey failover test: delete the primary pod, verify sentinel-triggered promotion, verify cache operations resume.
+4. Test simultaneous failure of one PG replica and one Redis replica — verify no service degradation.
+5. Measure and record Recovery Time Objective (RTO) for each failover scenario.
+6. Document all production ingress routes, CDN config, HA topology, and failover procedures in a runbook.
+7. Verify all application services reconnect automatically after failover without restart.
 
 ## Validation
-Verify all pods show `Running` status with `Ready` condition true. Describe each pod and confirm readiness, liveness, and startup probes are configured. Simulate a health endpoint failure (e.g., kill the app process) and verify Kubernetes restarts the pod. Verify `kubectl top pods` shows resource usage within defined limits.
+All failover tests complete with RTO < 60s for PostgreSQL and < 30s for Redis; no data loss confirmed via test record integrity; all application services recover without manual pod restarts; runbook document is complete and reviewed.

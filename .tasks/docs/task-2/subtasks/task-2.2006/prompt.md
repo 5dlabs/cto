@@ -1,21 +1,10 @@
-Implement subtask 2006: Add Prometheus metrics endpoint and Kubernetes health probes
+Implement subtask 2006: Integrate Redis client for caching and rate limiting infrastructure
 
 ## Objective
-Implement /metrics endpoint exposing Prometheus-format metrics, and /health/live and /health/ready endpoints for Kubernetes liveness and readiness probes.
+Set up the Redis connection pool and create reusable caching and rate limiting utility modules that other handlers will consume.
 
 ## Steps
-1. Add dependencies: prometheus (or metrics + metrics-exporter-prometheus) crate.
-2. Create src/handlers/observability.rs.
-3. GET /metrics: expose Prometheus text format metrics including:
-   - http_requests_total (counter, labels: method, path, status)
-   - http_request_duration_seconds (histogram, labels: method, path)
-   - db_pool_connections_active (gauge)
-   - db_pool_connections_idle (gauge)
-4. Create a Tower middleware that records request count and duration for every request, updating the Prometheus registry.
-5. GET /health/live → liveness: return 200 { status: 'ok' } always (proves the process is running and not deadlocked).
-6. GET /health/ready → readiness: check PostgreSQL connectivity (SELECT 1) and Redis connectivity (PING). Return 200 { status: 'ready', checks: { postgres: 'ok', redis: 'ok' } } if both pass, 503 with details if either fails.
-7. Register /metrics, /health/live, /health/ready routes outside the /api/v1 prefix (at root level).
-8. Ensure /metrics and /health/* endpoints are NOT rate limited.
+1. Add the redis crate (with tokio-comp feature) or deadpool-redis to Cargo.toml. 2. Create src/services/redis.rs module. 3. Initialize a Redis connection pool from REDIS_URL environment variable, add to AppState. 4. Implement a generic cache helper: async fn cache_get<T: DeserializeOwned>(pool, key) -> Option<T> and async fn cache_set<T: Serialize>(pool, key, value, ttl_seconds). 5. Implement a rate limiting module src/middleware/rate_limit.rs: use a sliding window counter pattern with Redis INCR + EXPIRE. Key pattern: 'ratelimit:{tenant_id}:{endpoint}:{window}'. 6. Create an Axum middleware layer that extracts tenant_id from headers or API key and applies per-tenant rate limits (configurable: e.g., 100 req/min default). 7. Return 429 Too Many Requests with Retry-After header when limit exceeded.
 
 ## Validation
-GET /metrics returns valid Prometheus text format with all four metric families; GET /health/live returns 200; GET /health/ready returns 200 when infra is healthy and 503 when PostgreSQL or Redis is unreachable; after sending API requests, /metrics shows incremented counters and non-zero histograms.
+Redis pool connects successfully; cache_set followed by cache_get returns the stored value; cache entries expire after TTL; rate limiter returns 429 after exceeding the configured limit; rate limit counters reset after the window expires.

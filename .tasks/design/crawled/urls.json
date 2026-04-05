@@ -1,10 +1,5 @@
 [
   {
-    "url": "https://deployiq.maximinimal.ca",
-    "status": "error",
-    "error": "HTTP 502"
-  },
-  {
     "url": "https://sigma-1.com",
     "status": "ok",
     "title": "Sigma&#x2d;1 &#x2d; Lighting &amp; Visual Production, Design, and Rentals",

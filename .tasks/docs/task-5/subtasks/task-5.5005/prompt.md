@@ -1,17 +1,10 @@
-Implement subtask 5005: Implement Google Reviews reputation integration module
+Implement subtask 5005: Implement credit scoring API integration
 
 ## Objective
-Build a standalone Rust module that integrates with a Google Reviews data source (Google Places API or commercial alternative) to assess a company's reputation based on review count, average rating, and sentiment signals.
+Build the credit data API client module to retrieve business credit scores and risk assessments for organizations.
 
 ## Steps
-1. Create src/integrations/google_reviews.rs.
-2. Define a trait `ReputationChecker` with async method `check_reputation(company_name: &str, location: Option<&str>) -> Result<Reputation, VettingError>`.
-3. Reputation struct: found (bool), place_id (Option<String>), average_rating (Option<f64>), total_reviews (Option<i32>), recent_review_count (Option<i32>), reputation_score (f64 0.0-1.0).
-4. Implement `GoogleReviewsClient` struct with reqwest::Client and API key.
-5. Use Google Places API: Text Search to find the business, then Place Details for reviews.
-6. Calculate reputation_score: weighted combination of average_rating normalized to 0-1 (weight 0.5), log-scaled review count (weight 0.3), and recency of reviews (weight 0.2).
-7. Handle API quota limits, no-results, and parsing errors.
-8. Implement `MockReputationChecker` for testing.
+1. Create a `sources/credit.rs` module implementing the `VettingSource` trait. 2. Implement the credit API client (provider pending dp-12 decision). Design behind a `CreditProvider` trait so the provider can be swapped. 3. For v1, implement against the chosen provider's REST API: authenticate, submit company identifier (DUNS number, company registration number, etc.), retrieve credit report. 4. Parse into a `CreditScore` struct: provider_name, credit_score (numeric), risk_level (low/medium/high), payment_history_summary, credit_limit_recommendation, report_date. 5. Handle: company not found in credit database, expired/stale reports, API authentication failures. 6. Implement the /api/v1/vetting/credit/:org_id endpoint that returns just the credit portion independently. 7. Write unit tests with mocked credit API responses.
 
 ## Validation
-Unit tests with mocked Google Places API responses verify correct reputation scoring; businesses with high ratings and many reviews score higher; missing businesses return found=false with score 0.0; mock implementation works as expected.
+Unit tests pass for: successful credit report retrieval, company not found in credit DB, authentication failure handling. CreditScore struct correctly populated. The /api/v1/vetting/credit/:org_id endpoint returns credit data for a mocked org.
