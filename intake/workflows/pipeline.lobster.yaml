@@ -170,9 +170,12 @@ steps:
         echo "materialize-design-inputs: intake-agent binary not found. Set INTAKE_AGENT_BIN or build apps/intake-agent." >&2
         exit 1
       fi
-      MODE="${design_mode:-ingest_plus_stitch}"
-      PROVIDER_MODE="${design_provider:-}"
-      FRAMER_PROJECT_TARGET="${design_framer_project:-${FRAMER_PROJECT_URL:-${FRAMER_PROJECT_ID:-}}}"
+      MODE="${design_mode}"
+      PROVIDER_MODE="${design_provider}"
+      FRAMER_PROJECT_TARGET="${design_framer_project}"
+      if [ -z "$FRAMER_PROJECT_TARGET" ]; then
+        FRAMER_PROJECT_TARGET="${FRAMER_PROJECT_URL:-${FRAMER_PROJECT_ID:-}}"
+      fi
       if [ -z "$PROVIDER_MODE" ]; then
         case "$MODE" in
           stitch|framer|both|auto) PROVIDER_MODE="$MODE" ;;
