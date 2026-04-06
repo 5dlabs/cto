@@ -1934,7 +1934,7 @@ steps:
       echo "sync-github-issues: syncing Linear project $PROJECT_ID → $REPO (branch: $BRANCH)" >&2
       intake-util sync-linear github-sync \
         --project-id "$PROJECT_ID" \
-        --project-name "{{project_name}}" \
+        --project-name "${project_name}" \
         --repo "$REPO" \
         --branch "$BRANCH"
 
