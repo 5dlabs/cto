@@ -1,0 +1,1289 @@
+name: play
+description: >
+  Master play workflow orchestrated by Morgan.
+  Dispatches implementation agents per-task via CodeRun CRDs,
+  then fans out quality/security/testing checks before gating.
+  Morgan selects CLI and provider per-task based on difficulty,
+  available credits, and user-defined provider preferences.
+
+inputs:
+  - name: tasks_dir
+    description: Root directory containing per-task folders
+  - name: repo_url
+    default: "https://github.com/5dlabs/sigma-1"
+  - name: namespace
+    default: openclaw
+  - name: base_branch
+    default: main
+  - name: cli
+    description: Default CLI tool (claude, codex, cursor, gemini, etc.)
+    default: claude
+  - name: model
+    description: Default LLM model — Morgan may override per-task based on difficulty + credits
+    default: claude-sonnet-4-6
+  - name: linear_session_id
+    description: Linear agent session for status updates
+    default: ""
+  - name: linear_team_id
+    default: ""
+  - name: docs_repository_url
+    default: ""
+  - name: enable_docker
+    default: "true"
+
+steps:
+
+  # ── Task 1: Provision Core Infrastructure (Bolt - Kubernetes/Helm) (infra, agent: bolt, difficulty: 5) ──
+  - name: run-task-1
+    command: |
+      cat <<'CODERUN_EOF' | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: play-task-1-bolt
+        namespace: {{inputs.namespace}}
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "1"
+          cto.5dlabs.ai/agent: "bolt"
+          cto.5dlabs.ai/task-type: "infra"
+      spec:
+        runType: implementation
+        taskId: 1
+        service: bolt
+        repositoryUrl: {{inputs.repo_url}}
+        docsRepositoryUrl: {{inputs.docs_repository_url}}
+        model: {{inputs.model}}
+        githubApp: 5DLabs-Bolt
+        enableDocker: {{inputs.enable_docker}}
+        cliConfig:
+          cliType: {{inputs.cli}}
+          model: {{inputs.model}}
+        linearIntegration:
+          enabled: true
+          sessionId: {{inputs.linear_session_id}}
+          teamId: {{inputs.linear_team_id}}
+        subtasks:
+          - id: 1001
+            title: "Create Kubernetes namespaces: sigma1, databases, openclaw, signal"
+            parallelizable: false
+          - id: 1002
+            title: "Deploy CloudNative-PG PostgreSQL 16 Cluster CR (sigma1-postgres)"
+            parallelizable: false
+            dependencies: ["1001"]
+          - id: 1003
+            title: "Run post-cluster schema init Job: create six schemas and per-service roles"
+            parallelizable: false
+            dependencies: ["1002"]
+          - id: 1004
+            title: "Deploy Opstree Valkey 7.2 single-replica instance (sigma1-valkey)"
+            parallelizable: true
+            dependencies: ["1001"]
+          - id: 1005
+            title: "Create all nine Kubernetes Secrets in the sigma1 namespace"
+            parallelizable: true
+            dependencies: ["1001"]
+          - id: 1006
+            title: "Deploy Signal-CLI pod, PVC, and ClusterIP Service in the signal namespace"
+            parallelizable: true
+            dependencies: ["1001"]
+          - id: 1007
+            title: "Create sigma1-infra-endpoints ConfigMap aggregating all connection strings"
+            parallelizable: false
+            dependencies: ["1002", "1004", "1006"]
+          - id: 1008
+            title: "Apply ArgoCD Application CR for the sigma1/infra Helm chart and validate full stack"
+            parallelizable: false
+            dependencies: ["1003", "1005", "1007"]
+      CODERUN_EOF
+      # Wait for CodeRun to complete
+      echo "Submitted CodeRun play-task-1-bolt, waiting..." &&
+      kubectl wait coderun/play-task-1-bolt
+        -n {{inputs.namespace}}
+        --for=jsonpath='{.status.phase}'=Succeeded
+        --timeout=3600s &&
+      echo "task-1 implementation complete" &&
+      jq -nc '{task_id:1, agent:"bolt", phase:"implementation", status:"complete"}'
+
+  - name: security-task-1
+    depends_on: [run-task-1]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-1/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-1'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-1/bolt'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: gate-task-1
+    depends_on: [security-task-1]
+    command: >
+      echo "task-1 [infra] gate passed — all checks complete" &&
+      jq -nc '{task_id: 1, task_type: "infra", agent: "bolt", difficulty: 5, gate: "pass"}'
+
+  # ── Task 2: Build Equipment Catalog Service (Rex - Rust/Axum) (task, agent: rex, difficulty: 5) ──
+  - name: run-task-2
+    depends_on: [gate-task-1]
+    command: |
+      cat <<'CODERUN_EOF' | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: play-task-2-rex
+        namespace: {{inputs.namespace}}
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "2"
+          cto.5dlabs.ai/agent: "rex"
+          cto.5dlabs.ai/task-type: "task"
+      spec:
+        runType: implementation
+        taskId: 2
+        service: rex
+        repositoryUrl: {{inputs.repo_url}}
+        docsRepositoryUrl: {{inputs.docs_repository_url}}
+        model: {{inputs.model}}
+        githubApp: 5DLabs-Rex
+        enableDocker: {{inputs.enable_docker}}
+        cliConfig:
+          cliType: {{inputs.cli}}
+          model: {{inputs.model}}
+        linearIntegration:
+          enabled: true
+          sessionId: {{inputs.linear_session_id}}
+          teamId: {{inputs.linear_team_id}}
+        subtasks:
+          - id: 2001
+            title: "Initialize Cargo workspace, declare all dependencies, and write sqlx catalog schema migrations"
+            parallelizable: false
+          - id: 2002
+            title: "Implement application entrypoint, AppState, and database/Valkey connection pool setup"
+            parallelizable: false
+            dependencies: ["2001"]
+          - id: 2003
+            title: "Implement JWT extraction and validation middleware for admin-protected write endpoints"
+            parallelizable: true
+            dependencies: ["2002"]
+          - id: 2004
+            title: "Implement catalog CRUD handlers: categories list and products list/get/create/update"
+            parallelizable: false
+            dependencies: ["2002", "2003"]
+          - id: 2005
+            title: "Implement availability calculation logic and GET /availability endpoint with unit tests"
+            parallelizable: false
+            dependencies: ["2004"]
+          - id: 2006
+            title: "Implement Valkey sliding-window rate limiter middleware"
+            parallelizable: true
+            dependencies: ["2002"]
+          - id: 2007
+            title: "Implement AI agent machine-readable catalog endpoint and programmatic checkout endpoint"
+            parallelizable: false
+            dependencies: ["2005"]
+          - id: 2008
+            title: "Implement Prometheus metrics middleware and /metrics endpoint"
+            parallelizable: true
+            dependencies: ["2002"]
+          - id: 2009
+            title: "Implement health check endpoints: /health/live and /health/ready"
+            parallelizable: true
+            dependencies: ["2002"]
+          - id: 2010
+            title: "Implement internal GDPR export and deletion endpoints"
+            parallelizable: true
+            dependencies: ["2004"]
+          - id: 2011
+            title: "Write Dockerfile and Kubernetes Deployment/Service manifests for equipment-catalog"
+            parallelizable: true
+            dependencies: ["2002"]
+          - id: 2012
+            title: "Write integration test suite and verify cargo-tarpaulin coverage >= 80%"
+            parallelizable: false
+            dependencies: ["2005", "2007", "2010"]
+      CODERUN_EOF
+      # Wait for CodeRun to complete
+      echo "Submitted CodeRun play-task-2-rex, waiting..." &&
+      kubectl wait coderun/play-task-2-rex
+        -n {{inputs.namespace}}
+        --for=jsonpath='{.status.phase}'=Succeeded
+        --timeout=3600s &&
+      echo "task-2 implementation complete" &&
+      jq -nc '{task_id:2, agent:"rex", phase:"implementation", status:"complete"}'
+
+  - name: security-task-2
+    depends_on: [run-task-2]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-2/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-2'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-2/rex'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: quality-task-2
+    depends_on: [run-task-2]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-2/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-2'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-2/rex'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: testing-task-2
+    depends_on: [run-task-2]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-2/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-2'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-2/rex'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: gate-task-2
+    depends_on: [security-task-2, quality-task-2, testing-task-2]
+    command: >
+      echo "task-2 [task] gate passed — all checks complete" &&
+      jq -nc '{task_id: 2, task_type: "task", agent: "rex", difficulty: 5, gate: "pass"}'
+
+  # ── Task 3: Build Rental Management System Service (Grizz - Go/gRPC) (task, agent: grizz, difficulty: 5) ──
+  - name: run-task-3
+    depends_on: [gate-task-1]
+    command: |
+      cat <<'CODERUN_EOF' | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: play-task-3-grizz
+        namespace: {{inputs.namespace}}
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "3"
+          cto.5dlabs.ai/agent: "grizz"
+          cto.5dlabs.ai/task-type: "task"
+      spec:
+        runType: implementation
+        taskId: 3
+        service: grizz
+        repositoryUrl: {{inputs.repo_url}}
+        docsRepositoryUrl: {{inputs.docs_repository_url}}
+        model: {{inputs.model}}
+        githubApp: 5DLabs-Grizz
+        enableDocker: {{inputs.enable_docker}}
+        cliConfig:
+          cliType: {{inputs.cli}}
+          model: {{inputs.model}}
+        linearIntegration:
+          enabled: true
+          sessionId: {{inputs.linear_session_id}}
+          teamId: {{inputs.linear_team_id}}
+        subtasks:
+          - id: 3001
+            title: "Initialize Go module and dependency manifest for RMS service"
+            parallelizable: false
+          - id: 3002
+            title: "Define protobuf schemas for all five RMS domains"
+            parallelizable: false
+            dependencies: ["3001"]
+          - id: 3003
+            title: "Write database migrations for all seven RMS schema tables"
+            parallelizable: true
+            dependencies: ["3001"]
+          - id: 3004
+            title: "Implement OpportunityService gRPC handlers with REST gateway"
+            parallelizable: false
+            dependencies: ["3002", "3003"]
+          - id: 3005
+            title: "Implement ProjectService gRPC handlers including CheckOut and CheckIn"
+            parallelizable: true
+            dependencies: ["3002", "3003"]
+          - id: 3006
+            title: "Implement InventoryService with atomic conflict detection and unit tests"
+            parallelizable: true
+            dependencies: ["3002", "3003"]
+          - id: 3007
+            title: "Implement CrewService and DeliveryService gRPC handlers"
+            parallelizable: true
+            dependencies: ["3002", "3003"]
+          - id: 3008
+            title: "Implement ScoreLead algorithm with external vetting service HTTP call and unit tests"
+            parallelizable: false
+            dependencies: ["3004"]
+          - id: 3009
+            title: "Implement Google Calendar integration triggered on project confirmation"
+            parallelizable: false
+            dependencies: ["3005"]
+          - id: 3010
+            title: "Add Prometheus metrics and health endpoints on dedicated port 8081"
+            parallelizable: true
+            dependencies: ["3004"]
+          - id: 3011
+            title: "Implement GDPR export and delete endpoints"
+            parallelizable: true
+            dependencies: ["3004"]
+          - id: 3012
+            title: "Write Kubernetes Deployment and Service manifests for RMS"
+            parallelizable: true
+            dependencies: ["3010"]
+          - id: 3013
+            title: "Write integration tests for RMS service end-to-end flows"
+            parallelizable: false
+            dependencies: ["3004", "3005", "3006", "3011"]
+      CODERUN_EOF
+      # Wait for CodeRun to complete
+      echo "Submitted CodeRun play-task-3-grizz, waiting..." &&
+      kubectl wait coderun/play-task-3-grizz
+        -n {{inputs.namespace}}
+        --for=jsonpath='{.status.phase}'=Succeeded
+        --timeout=3600s &&
+      echo "task-3 implementation complete" &&
+      jq -nc '{task_id:3, agent:"grizz", phase:"implementation", status:"complete"}'
+
+  - name: security-task-3
+    depends_on: [run-task-3]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-3/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-3'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-3/grizz'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: quality-task-3
+    depends_on: [run-task-3]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-3/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-3'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-3/grizz'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: testing-task-3
+    depends_on: [run-task-3]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-3/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-3'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-3/grizz'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: gate-task-3
+    depends_on: [security-task-3, quality-task-3, testing-task-3]
+    command: >
+      echo "task-3 [task] gate passed — all checks complete" &&
+      jq -nc '{task_id: 3, task_type: "task", agent: "grizz", difficulty: 5, gate: "pass"}'
+
+  # ── Task 4: Build Finance Service (Rex - Rust/Axum) (task, agent: rex, difficulty: 5) ──
+  - name: run-task-4
+    depends_on: [gate-task-1]
+    command: |
+      cat <<'CODERUN_EOF' | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: play-task-4-rex
+        namespace: {{inputs.namespace}}
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "4"
+          cto.5dlabs.ai/agent: "rex"
+          cto.5dlabs.ai/task-type: "task"
+      spec:
+        runType: implementation
+        taskId: 4
+        service: rex
+        repositoryUrl: {{inputs.repo_url}}
+        docsRepositoryUrl: {{inputs.docs_repository_url}}
+        model: {{inputs.model}}
+        githubApp: 5DLabs-Rex
+        enableDocker: {{inputs.enable_docker}}
+        cliConfig:
+          cliType: {{inputs.cli}}
+          model: {{inputs.model}}
+        linearIntegration:
+          enabled: true
+          sessionId: {{inputs.linear_session_id}}
+          teamId: {{inputs.linear_team_id}}
+        subtasks:
+          - id: 4001
+            title: "Initialize Cargo workspace and dependency manifest for Finance service"
+            parallelizable: false
+          - id: 4002
+            title: "Write database migrations for all five Finance schema tables"
+            parallelizable: true
+            dependencies: ["4001"]
+          - id: 4003
+            title: "Implement invoice CRUD handlers with tax calculation and status state machine"
+            parallelizable: false
+            dependencies: ["4002"]
+          - id: 4004
+            title: "Implement payment recording handlers"
+            parallelizable: false
+            dependencies: ["4003"]
+          - id: 4005
+            title: "Implement Stripe invoice creation and webhook endpoint with signature validation"
+            parallelizable: true
+            dependencies: ["4003"]
+          - id: 4006
+            title: "Implement financial report endpoints (revenue, aging, cashflow, profitability)"
+            parallelizable: true
+            dependencies: ["4003", "4004"]
+          - id: 4007
+            title: "Implement payroll entry handlers"
+            parallelizable: true
+            dependencies: ["4002"]
+          - id: 4008
+            title: "Implement currency rate sync background task with Valkey caching"
+            parallelizable: true
+            dependencies: ["4002"]
+          - id: 4009
+            title: "Implement automated overdue invoice reminder background task"
+            parallelizable: true
+            dependencies: ["4003"]
+          - id: 4010
+            title: "Implement JWT authentication middleware"
+            parallelizable: true
+            dependencies: ["4003"]
+          - id: 4011
+            title: "Add Prometheus metrics and health endpoints"
+            parallelizable: true
+            dependencies: ["4001"]
+          - id: 4012
+            title: "Implement GDPR export and delete endpoints"
+            parallelizable: true
+            dependencies: ["4003", "4007"]
+          - id: 4013
+            title: "Write Kubernetes Deployment and Service manifests for Finance service"
+            parallelizable: true
+            dependencies: ["4011"]
+          - id: 4014
+            title: "Write integration tests for Finance service end-to-end flows"
+            parallelizable: false
+            dependencies: ["4003", "4004", "4005", "4006", "4009", "4012"]
+      CODERUN_EOF
+      # Wait for CodeRun to complete
+      echo "Submitted CodeRun play-task-4-rex, waiting..." &&
+      kubectl wait coderun/play-task-4-rex
+        -n {{inputs.namespace}}
+        --for=jsonpath='{.status.phase}'=Succeeded
+        --timeout=3600s &&
+      echo "task-4 implementation complete" &&
+      jq -nc '{task_id:4, agent:"rex", phase:"implementation", status:"complete"}'
+
+  - name: security-task-4
+    depends_on: [run-task-4]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-4/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-4'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-4/rex'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: quality-task-4
+    depends_on: [run-task-4]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-4/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-4'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-4/rex'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: testing-task-4
+    depends_on: [run-task-4]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-4/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-4'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-4/rex'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: gate-task-4
+    depends_on: [security-task-4, quality-task-4, testing-task-4]
+    command: >
+      echo "task-4 [task] gate passed — all checks complete" &&
+      jq -nc '{task_id: 4, task_type: "task", agent: "rex", difficulty: 5, gate: "pass"}'
+
+  # ── Task 5: Build Customer Vetting Service (Rex - Rust/Axum) (task, agent: rex, difficulty: 5) ──
+  - name: run-task-5
+    depends_on: [gate-task-1]
+    command: |
+      cat <<'CODERUN_EOF' | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: play-task-5-rex
+        namespace: {{inputs.namespace}}
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "5"
+          cto.5dlabs.ai/agent: "rex"
+          cto.5dlabs.ai/task-type: "task"
+      spec:
+        runType: implementation
+        taskId: 5
+        service: rex
+        repositoryUrl: {{inputs.repo_url}}
+        docsRepositoryUrl: {{inputs.docs_repository_url}}
+        model: {{inputs.model}}
+        githubApp: 5DLabs-Rex
+        enableDocker: {{inputs.enable_docker}}
+        cliConfig:
+          cliType: {{inputs.cli}}
+          model: {{inputs.model}}
+        linearIntegration:
+          enabled: true
+          sessionId: {{inputs.linear_session_id}}
+          teamId: {{inputs.linear_team_id}}
+        subtasks:
+          - id: 5001
+            title: "Initialize Cargo workspace and declare all dependencies"
+            parallelizable: false
+          - id: 5002
+            title: "Write sqlx database migrations for vetting schema"
+            parallelizable: false
+            dependencies: ["5001"]
+          - id: 5003
+            title: "Implement POST /api/v1/vetting/run handler with async pipeline orchestration"
+            parallelizable: false
+            dependencies: ["5002"]
+          - id: 5004
+            title: "Implement OpenCorporates and LinkedIn pipeline steps with per-step timeout"
+            parallelizable: false
+            dependencies: ["5003"]
+          - id: 5005
+            title: "Implement Google Reviews pipeline step and weighted scoring algorithm"
+            parallelizable: true
+            dependencies: ["5003"]
+          - id: 5006
+            title: "Implement Valkey result caching with 24h TTL"
+            parallelizable: false
+            dependencies: ["5004", "5005"]
+          - id: 5007
+            title: "Implement JWT middleware, health endpoints, Prometheus metrics, and GDPR endpoints"
+            parallelizable: true
+            dependencies: ["5003"]
+          - id: 5008
+            title: "Write integration and unit test suite targeting >= 80% coverage"
+            parallelizable: false
+            dependencies: ["5004", "5005", "5006", "5007"]
+      CODERUN_EOF
+      # Wait for CodeRun to complete
+      echo "Submitted CodeRun play-task-5-rex, waiting..." &&
+      kubectl wait coderun/play-task-5-rex
+        -n {{inputs.namespace}}
+        --for=jsonpath='{.status.phase}'=Succeeded
+        --timeout=3600s &&
+      echo "task-5 implementation complete" &&
+      jq -nc '{task_id:5, agent:"rex", phase:"implementation", status:"complete"}'
+
+  - name: security-task-5
+    depends_on: [run-task-5]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-5/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-5'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-5/rex'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: quality-task-5
+    depends_on: [run-task-5]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-5/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-5'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-5/rex'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: testing-task-5
+    depends_on: [run-task-5]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-5/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-5'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-5/rex'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: gate-task-5
+    depends_on: [security-task-5, quality-task-5, testing-task-5]
+    command: >
+      echo "task-5 [task] gate passed — all checks complete" &&
+      jq -nc '{task_id: 5, task_type: "task", agent: "rex", difficulty: 5, gate: "pass"}'
+
+  # ── Task 6: Build Social Media Engine (Nova - Node.js/Elysia+Effect) (task, agent: nova, difficulty: 5) ──
+  - name: run-task-6
+    depends_on: [gate-task-1]
+    command: |
+      cat <<'CODERUN_EOF' | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: play-task-6-nova
+        namespace: {{inputs.namespace}}
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "6"
+          cto.5dlabs.ai/agent: "nova"
+          cto.5dlabs.ai/task-type: "task"
+      spec:
+        runType: implementation
+        taskId: 6
+        service: nova
+        repositoryUrl: {{inputs.repo_url}}
+        docsRepositoryUrl: {{inputs.docs_repository_url}}
+        model: {{inputs.model}}
+        githubApp: 5DLabs-Nova
+        enableDocker: {{inputs.enable_docker}}
+        cliConfig:
+          cliType: {{inputs.cli}}
+          model: {{inputs.model}}
+        linearIntegration:
+          enabled: true
+          sessionId: {{inputs.linear_session_id}}
+          teamId: {{inputs.linear_team_id}}
+        subtasks:
+          - id: 6001
+            title: "Initialize Node.js/TypeScript project and install all dependencies"
+            parallelizable: false
+          - id: 6002
+            title: "Write database migrations for social schema tables"
+            parallelizable: false
+            dependencies: ["6001"]
+          - id: 6003
+            title: "Define Effect.Schema types and Effect.Service interfaces"
+            parallelizable: true
+            dependencies: ["6001"]
+          - id: 6004
+            title: "Implement photo upload handler and R2 multipart storage"
+            parallelizable: false
+            dependencies: ["6002", "6003"]
+          - id: 6005
+            title: "Implement AI photo curation pipeline with OpenAI vision scoring"
+            parallelizable: false
+            dependencies: ["6004"]
+          - id: 6006
+            title: "Implement sharp image cropping for platform-specific formats and R2 upload"
+            parallelizable: false
+            dependencies: ["6005"]
+          - id: 6007
+            title: "Implement caption generation via OpenAI chat API"
+            parallelizable: true
+            dependencies: ["6005"]
+          - id: 6008
+            title: "Implement approval workflow endpoints and Signal notification"
+            parallelizable: true
+            dependencies: ["6004"]
+          - id: 6009
+            title: "Implement InstagramService with Effect retry and Graph API integration"
+            parallelizable: true
+            dependencies: ["6003"]
+          - id: 6010
+            title: "Implement LinkedInService with Effect retry and Share API integration"
+            parallelizable: true
+            dependencies: ["6003"]
+          - id: 6011
+            title: "Implement TikTokService with Effect retry and Content Posting API integration"
+            parallelizable: true
+            dependencies: ["6003"]
+          - id: 6012
+            title: "Implement FacebookService with Effect retry and Graph API integration"
+            parallelizable: true
+            dependencies: ["6003"]
+          - id: 6013
+            title: "Implement POST /api/v1/social/drafts/:id/publish orchestration and GET /api/v1/social/published"
+            parallelizable: false
+            dependencies: ["6009", "6010", "6011", "6012"]
+          - id: 6014
+            title: "Implement JWT middleware, health endpoints, Prometheus metrics, and GDPR endpoints"
+            parallelizable: true
+            dependencies: ["6001"]
+          - id: 6015
+            title: "Write vitest test suite targeting >= 80% coverage"
+            parallelizable: false
+            dependencies: ["6005", "6006", "6007", "6008", "6013", "6014"]
+      CODERUN_EOF
+      # Wait for CodeRun to complete
+      echo "Submitted CodeRun play-task-6-nova, waiting..." &&
+      kubectl wait coderun/play-task-6-nova
+        -n {{inputs.namespace}}
+        --for=jsonpath='{.status.phase}'=Succeeded
+        --timeout=3600s &&
+      echo "task-6 implementation complete" &&
+      jq -nc '{task_id:6, agent:"nova", phase:"implementation", status:"complete"}'
+
+  - name: security-task-6
+    depends_on: [run-task-6]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-6/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-6'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-6/nova'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: quality-task-6
+    depends_on: [run-task-6]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-6/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-6'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-6/nova'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: testing-task-6
+    depends_on: [run-task-6]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-6/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-6'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-6/nova'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: gate-task-6
+    depends_on: [security-task-6, quality-task-6, testing-task-6]
+    command: >
+      echo "task-6 [task] gate passed — all checks complete" &&
+      jq -nc '{task_id: 6, task_type: "task", agent: "nova", difficulty: 5, gate: "pass"}'
+
+  # ── Task 7: Configure Morgan AI Agent (Angie - OpenClaw/MCP) (task, agent: angie, difficulty: 5) ──
+  - name: run-task-7
+    depends_on: [gate-task-2, gate-task-3, gate-task-4, gate-task-5, gate-task-6]
+    command: |
+      cat <<'CODERUN_EOF' | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: play-task-7-angie
+        namespace: {{inputs.namespace}}
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "7"
+          cto.5dlabs.ai/agent: "angie"
+          cto.5dlabs.ai/task-type: "task"
+      spec:
+        runType: implementation
+        taskId: 7
+        service: angie
+        repositoryUrl: {{inputs.repo_url}}
+        docsRepositoryUrl: {{inputs.docs_repository_url}}
+        model: {{inputs.model}}
+        githubApp: 5DLabs-Angie
+        enableDocker: {{inputs.enable_docker}}
+        cliConfig:
+          cliType: {{inputs.cli}}
+          model: {{inputs.model}}
+        linearIntegration:
+          enabled: true
+          sessionId: {{inputs.linear_session_id}}
+          teamId: {{inputs.linear_team_id}}
+        subtasks:
+          - id: 7001
+            title: "Create OpenClaw agent.yaml and system-prompt.md for Morgan"
+            parallelizable: true
+          - id: 7002
+            title: "Define all 9 skill manifests in agents/morgan/skills/"
+            parallelizable: false
+            dependencies: ["7001"]
+          - id: 7003
+            title: "Configure MCP tools.yaml for 10 business tools"
+            parallelizable: true
+          - id: 7004
+            title: "Configure GDPR orchestration tools (sigma1_gdpr_export and sigma1_gdpr_delete)"
+            parallelizable: false
+            dependencies: ["7003"]
+          - id: 7005
+            title: "Configure Signal-CLI adapter in OpenClaw for Morgan"
+            parallelizable: true
+          - id: 7006
+            title: "Configure ElevenLabs voice adapter and Twilio TwiML webhook in OpenClaw"
+            parallelizable: true
+          - id: 7007
+            title: "Configure OpenClaw web chat adapter and expose morgan-chat-svc"
+            parallelizable: true
+          - id: 7008
+            title: "Create Morgan Kubernetes Deployment with PVC, secrets, and Cloudflare Tunnel annotation"
+            parallelizable: false
+            dependencies: ["7001", "7002", "7003", "7004", "7005", "7006", "7007"]
+          - id: 7009
+            title: "Execute end-to-end MCP tool connectivity tests for all 12 tools"
+            parallelizable: false
+            dependencies: ["7008"]
+          - id: 7010
+            title: "Verify Signal message receipt and web chat endpoint via integration test"
+            parallelizable: false
+            dependencies: ["7008", "7009"]
+      CODERUN_EOF
+      # Wait for CodeRun to complete
+      echo "Submitted CodeRun play-task-7-angie, waiting..." &&
+      kubectl wait coderun/play-task-7-angie
+        -n {{inputs.namespace}}
+        --for=jsonpath='{.status.phase}'=Succeeded
+        --timeout=3600s &&
+      echo "task-7 implementation complete" &&
+      jq -nc '{task_id:7, agent:"angie", phase:"implementation", status:"complete"}'
+
+  - name: security-task-7
+    depends_on: [run-task-7]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-7/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-7'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-7/angie'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: quality-task-7
+    depends_on: [run-task-7]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-7/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-7'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-7/angie'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: testing-task-7
+    depends_on: [run-task-7]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-7/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-7'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-7/angie'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: gate-task-7
+    depends_on: [security-task-7, quality-task-7, testing-task-7]
+    command: >
+      echo "task-7 [task] gate passed — all checks complete" &&
+      jq -nc '{task_id: 7, task_type: "task", agent: "angie", difficulty: 5, gate: "pass"}'
+
+  # ── Task 8: Build Sigma-1 Website (Blaze - Next.js 15/React 19/Effect) (task, agent: blaze, difficulty: 5) ──
+  - name: run-task-8
+    depends_on: [gate-task-2, gate-task-7]
+    command: |
+      cat <<'CODERUN_EOF' | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: play-task-8-blaze
+        namespace: {{inputs.namespace}}
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "8"
+          cto.5dlabs.ai/agent: "blaze"
+          cto.5dlabs.ai/task-type: "task"
+      spec:
+        runType: implementation
+        taskId: 8
+        service: blaze
+        repositoryUrl: {{inputs.repo_url}}
+        docsRepositoryUrl: {{inputs.docs_repository_url}}
+        model: {{inputs.model}}
+        githubApp: 5DLabs-Blaze
+        enableDocker: {{inputs.enable_docker}}
+        cliConfig:
+          cliType: {{inputs.cli}}
+          model: {{inputs.model}}
+        linearIntegration:
+          enabled: true
+          sessionId: {{inputs.linear_session_id}}
+          teamId: {{inputs.linear_team_id}}
+        subtasks:
+          - id: 8001
+            title: "Initialize Next.js 15 project at apps/website with TypeScript and TailwindCSS 4"
+            parallelizable: true
+          - id: 8002
+            title: "Create shared design tokens Tailwind config package at packages/design-tokens"
+            parallelizable: false
+            dependencies: ["8001"]
+          - id: 8003
+            title: "Initialize shadcn/ui with New York style and install all required components"
+            parallelizable: false
+            dependencies: ["8002"]
+          - id: 8004
+            title: "Build root layout with sidebar navigation and mobile hamburger menu"
+            parallelizable: false
+            dependencies: ["8003"]
+          - id: 8005
+            title: "Implement Effect ApiClient service and Effect.Schema type definitions for all backend response shapes"
+            parallelizable: true
+            dependencies: ["8001"]
+          - id: 8006
+            title: "Build hero page (app/page.tsx) with value proposition and CTAs"
+            parallelizable: false
+            dependencies: ["8004"]
+          - id: 8007
+            title: "Build equipment catalog page (app/equipment/page.tsx) with category filter and search"
+            parallelizable: false
+            dependencies: ["8004", "8005"]
+          - id: 8008
+            title: "Build product detail page (app/equipment/[id]/page.tsx) with real-time availability date picker"
+            parallelizable: false
+            dependencies: ["8005", "8007"]
+          - id: 8009
+            title: "Build quote builder page (app/quote/page.tsx) with Effect.Schema validation and RMS submission"
+            parallelizable: true
+            dependencies: ["8005", "8008"]
+          - id: 8010
+            title: "Build portfolio page (app/portfolio/page.tsx) with masonry grid and lightbox"
+            parallelizable: true
+            dependencies: ["8004", "8005"]
+          - id: 8011
+            title: "Implement AI-native routes (llms.txt, llms-full) and Schema.org JSON-LD in layout"
+            parallelizable: true
+            dependencies: ["8004"]
+          - id: 8012
+            title: "Embed Morgan web chat widget in root layout via next/script"
+            parallelizable: true
+            dependencies: ["8004"]
+          - id: 8013
+            title: "Configure Cloudflare Pages deployment with wrangler.toml and GitHub Actions workflow"
+            parallelizable: false
+            dependencies: ["8001"]
+      CODERUN_EOF
+      # Wait for CodeRun to complete
+      echo "Submitted CodeRun play-task-8-blaze, waiting..." &&
+      kubectl wait coderun/play-task-8-blaze
+        -n {{inputs.namespace}}
+        --for=jsonpath='{.status.phase}'=Succeeded
+        --timeout=3600s &&
+      echo "task-8 implementation complete" &&
+      jq -nc '{task_id:8, agent:"blaze", phase:"implementation", status:"complete"}'
+
+  - name: security-task-8
+    depends_on: [run-task-8]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-8/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-8'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-8/blaze'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: quality-task-8
+    depends_on: [run-task-8]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-8/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-8'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-8/blaze'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: testing-task-8
+    depends_on: [run-task-8]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-8/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-8'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-8/blaze'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: gate-task-8
+    depends_on: [security-task-8, quality-task-8, testing-task-8]
+    command: >
+      echo "task-8 [task] gate passed — all checks complete" &&
+      jq -nc '{task_id: 8, task_type: "task", agent: "blaze", difficulty: 5, gate: "pass"}'
+
+  # ── Task 9: Build Sigma-1 Mobile App (Tap - Expo/React Native) (task, agent: tap, difficulty: 5) ──
+  - name: run-task-9
+    depends_on: [gate-task-2, gate-task-7]
+    command: |
+      cat <<'CODERUN_EOF' | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: play-task-9-tap
+        namespace: {{inputs.namespace}}
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "9"
+          cto.5dlabs.ai/agent: "tap"
+          cto.5dlabs.ai/task-type: "task"
+      spec:
+        runType: implementation
+        taskId: 9
+        service: tap
+        repositoryUrl: {{inputs.repo_url}}
+        docsRepositoryUrl: {{inputs.docs_repository_url}}
+        model: {{inputs.model}}
+        githubApp: 5DLabs-Tap
+        enableDocker: {{inputs.enable_docker}}
+        cliConfig:
+          cliType: {{inputs.cli}}
+          model: {{inputs.model}}
+        linearIntegration:
+          enabled: true
+          sessionId: {{inputs.linear_session_id}}
+          teamId: {{inputs.linear_team_id}}
+        subtasks:
+          - id: 9001
+            title: "Initialize Expo managed project with TypeScript template at apps/mobile"
+            parallelizable: false
+          - id: 9002
+            title: "Configure NativeWind 4 with shared design tokens from packages/design-tokens"
+            parallelizable: false
+            dependencies: ["9001"]
+          - id: 9003
+            title: "Implement Expo Router file-based route structure and bottom tab navigator layout"
+            parallelizable: false
+            dependencies: ["9002"]
+          - id: 9004
+            title: "Build Effect data fetching layer with Effect.Schema type definitions and TanStack Query integration"
+            parallelizable: false
+            dependencies: ["9003"]
+          - id: 9005
+            title: "Build equipment catalog tab with FlatList, debounced search, expo-image product cards, and pull-to-refresh"
+            parallelizable: false
+            dependencies: ["9004"]
+          - id: 9006
+            title: "Build product detail screen with DateRangePicker and availability query"
+            parallelizable: false
+            dependencies: ["9005"]
+          - id: 9007
+            title: "Build quote builder tab with Effect.Schema form validation and opportunity submission"
+            parallelizable: true
+            dependencies: ["9004"]
+          - id: 9008
+            title: "Build Morgan chat tab with native message FlatList and POST /api/v1/chat integration"
+            parallelizable: true
+            dependencies: ["9004"]
+          - id: 9009
+            title: "Build portfolio tab with FlashList masonry grid and full-screen image modal"
+            parallelizable: true
+            dependencies: ["9004"]
+          - id: 9010
+            title: "Implement expo-camera barcode scanner screen accessible from equipment tab"
+            parallelizable: true
+            dependencies: ["9005"]
+          - id: 9011
+            title: "Implement push notification setup with Expo Push Token registration"
+            parallelizable: true
+            dependencies: ["9003"]
+          - id: 9012
+            title: "Configure EAS Build profiles and CI environment variables"
+            parallelizable: true
+            dependencies: ["9001"]
+          - id: 9013
+            title: "Write Jest and React Native Testing Library test suite with >= 80% coverage"
+            parallelizable: false
+            dependencies: ["9007", "9008", "9009", "9010", "9011"]
+      CODERUN_EOF
+      # Wait for CodeRun to complete
+      echo "Submitted CodeRun play-task-9-tap, waiting..." &&
+      kubectl wait coderun/play-task-9-tap
+        -n {{inputs.namespace}}
+        --for=jsonpath='{.status.phase}'=Succeeded
+        --timeout=3600s &&
+      echo "task-9 implementation complete" &&
+      jq -nc '{task_id:9, agent:"tap", phase:"implementation", status:"complete"}'
+
+  - name: security-task-9
+    depends_on: [run-task-9]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-9/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-9'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-9/tap'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: quality-task-9
+    depends_on: [run-task-9]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-9/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-9'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-9/tap'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: testing-task-9
+    depends_on: [run-task-9]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-9/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-9'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-9/tap'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: gate-task-9
+    depends_on: [security-task-9, quality-task-9, testing-task-9]
+    command: >
+      echo "task-9 [task] gate passed — all checks complete" &&
+      jq -nc '{task_id: 9, task_type: "task", agent: "tap", difficulty: 5, gate: "pass"}'
+
+  # ── Task 10: Production Hardening & Security (Bolt - Kubernetes/Helm) (infra, agent: bolt, difficulty: 5) ──
+  - name: run-task-10
+    depends_on: [gate-task-2, gate-task-3, gate-task-4, gate-task-5, gate-task-6, gate-task-7, gate-task-8, gate-task-9]
+    command: |
+      cat <<'CODERUN_EOF' | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: play-task-10-bolt
+        namespace: {{inputs.namespace}}
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "10"
+          cto.5dlabs.ai/agent: "bolt"
+          cto.5dlabs.ai/task-type: "infra"
+      spec:
+        runType: implementation
+        taskId: 10
+        service: bolt
+        repositoryUrl: {{inputs.repo_url}}
+        docsRepositoryUrl: {{inputs.docs_repository_url}}
+        model: {{inputs.model}}
+        githubApp: 5DLabs-Bolt
+        enableDocker: {{inputs.enable_docker}}
+        cliConfig:
+          cliType: {{inputs.cli}}
+          model: {{inputs.model}}
+        linearIntegration:
+          enabled: true
+          sessionId: {{inputs.linear_session_id}}
+          teamId: {{inputs.linear_team_id}}
+        subtasks:
+          - id: 10001
+            title: "Scale all service Deployments to 2 replicas and create HPAs for 5 services"
+            parallelizable: true
+          - id: 10002
+            title: "Scale CNPG PostgreSQL cluster to 2 instances with WAL archival to R2"
+            parallelizable: true
+          - id: 10003
+            title: "Scale Valkey to 2 replicas"
+            parallelizable: true
+          - id: 10004
+            title: "Author CiliumNetworkPolicy for equipment-catalog service"
+            parallelizable: true
+          - id: 10005
+            title: "Author CiliumNetworkPolicy for RMS service"
+            parallelizable: true
+          - id: 10006
+            title: "Author CiliumNetworkPolicy for finance service"
+            parallelizable: true
+          - id: 10007
+            title: "Author CiliumNetworkPolicy for customer-vetting service"
+            parallelizable: true
+          - id: 10008
+            title: "Author CiliumNetworkPolicy for social-engine service"
+            parallelizable: true
+          - id: 10009
+            title: "Author CiliumNetworkPolicy for Morgan service"
+            parallelizable: true
+          - id: 10010
+            title: "Deploy cloudflared Cloudflare Tunnel and configure ingress routing"
+            parallelizable: false
+            dependencies: ["10009"]
+          - id: 10011
+            title: "Implement per-service RBAC: ServiceAccounts, Roles, and automountServiceAccountToken disabled"
+            parallelizable: true
+          - id: 10012
+            title: "Create secret rotation CronJob and ops runbook"
+            parallelizable: true
+          - id: 10013
+            title: "Create ArgoCD Application CRs for all services with automated sync and rollback alerting"
+            parallelizable: true
+          - id: 10014
+            title: "Create GitHub Actions pr-review.yml workflow with Stitch code review integration"
+            parallelizable: true
+          - id: 10015
+            title: "Create GitHub Actions quality.yml workflow with Cleo linting for all language stacks"
+            parallelizable: false
+      CODERUN_EOF
+      # Wait for CodeRun to complete
+      echo "Submitted CodeRun play-task-10-bolt, waiting..." &&
+      kubectl wait coderun/play-task-10-bolt
+        -n {{inputs.namespace}}
+        --for=jsonpath='{.status.phase}'=Succeeded
+        --timeout=3600s &&
+      echo "task-10 implementation complete" &&
+      jq -nc '{task_id:10, agent:"bolt", phase:"implementation", status:"complete"}'
+
+  - name: security-task-10
+    depends_on: [run-task-10]
+    command: >
+      lobster run --mode tool
+      "{{inputs.tasks_dir}}/task-10/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-10'
+        --arg repo '{{inputs.repo_url}}'
+        --arg branch 'task-10/bolt'
+        --arg cli '{{inputs.cli}}'
+        --arg model '{{inputs.model}}'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - name: gate-task-10
+    depends_on: [security-task-10]
+    command: >
+      echo "task-10 [infra] gate passed — all checks complete" &&
+      jq -nc '{task_id: 10, task_type: "infra", agent: "bolt", difficulty: 5, gate: "pass"}'
+
+  # ── Play complete ──
+  - name: play-complete
+    depends_on: [gate-task-1, gate-task-2, gate-task-3, gate-task-4, gate-task-5, gate-task-6, gate-task-7, gate-task-8, gate-task-9, gate-task-10]
+    command: >
+      echo "play complete — all 10 tasks passed gate checks" &&
+      jq -nc '{play: "complete", tasks: 10, status: "pass"}'

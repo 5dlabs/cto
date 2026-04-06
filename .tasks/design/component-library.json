@@ -148,17 +148,17 @@
       "target": "web",
       "provider": "stitch",
       "candidate_id": "stitch-web-1",
-      "screen_id": "6a1ebbef43e54b29bc719342a23b7775",
+      "screen_id": "76efd04574374a53b0c26305dc18fb57",
       "notes": "Generated web modernization candidate from intake design context."
     },
     {
       "target": "mobile",
       "provider": "stitch",
       "candidate_id": "stitch-mobile-2",
-      "screen_id": "735ea2adedd3405b917ba0542b9d0642",
+      "screen_id": "ae4c6d48d61c49658522adbc57b14bb7",
       "notes": "Generated mobile modernization candidate from intake design context."
     }
   ],
   "framer_code_components": [],
-  "generated_at": "2026-04-06T22:59:43.369Z"
+  "generated_at": "2026-04-06T23:43:20.507Z"
 }

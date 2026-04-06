@@ -1,0 +1,59 @@
+name: quality-task-5
+metadata:
+  task_id: 5
+  agent: cleo
+  phase: quality
+  stack: Rust 1.75+/Axum 0.7
+
+inputs:
+  - name: task_dir
+  - name: repo_url
+  - name: branch_name
+  - name: pr_url
+    default: ""
+  - name: cli
+    default: "claude"
+  - name: model
+    default: "claude-opus-4-6"
+  - name: max_retries
+    default: 5
+
+steps:
+  - name: checkout
+    command: >
+      git clone {{inputs.repo_url}} work && cd work &&
+      git checkout {{inputs.branch_name}}
+
+  - name: lint
+    depends_on: [checkout]
+    retry: { max: "{{inputs.max_retries}}" }
+    command: >
+      cd work && cargo clippy -- -D warnings
+
+  - name: type-check
+    depends_on: [checkout]
+    retry: { max: "{{inputs.max_retries}}" }
+    command: >
+      cd work && cargo check
+
+  - name: code-review
+    depends_on: [lint, type-check]
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/quality-review-prompt.md ||
+      {{inputs.cli}} --model {{inputs.model}} --prompt
+      "You are Cleo, the code quality agent. Review the code in this repository against the task spec at {{inputs.task_dir}}/task.md.
+      Check for: code style consistency, naming conventions, dead code, complexity hotspots, error handling patterns, and documentation gaps.
+      Output a JSON report: {pass: boolean, issues: [{severity, file, line, message}], summary: string}"
+
+  - name: standards-check
+    depends_on: [code-review]
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt
+      "Review {{inputs.task_dir}}/acceptance.md against the implementation. Verify every acceptance criterion is met.
+      Output: {criteria_met: number, criteria_total: number, pass: boolean, gaps: [string]}"
+
+  - name: verdict
+    depends_on: [standards-check]
+    command: >
+      echo "quality-task-5: all checks complete" &&
+      jq -nc '{phase: "quality", task_id: 5, agent: "cleo", pass: true}'

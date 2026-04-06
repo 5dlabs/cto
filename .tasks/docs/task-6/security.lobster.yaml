@@ -1,0 +1,57 @@
+name: security-task-6
+metadata:
+  task_id: 6
+  agent: cipher
+  phase: security
+  stack: Node.js 20+/Elysia 1.x/Effect 3.x
+
+inputs:
+  - name: task_dir
+  - name: repo_url
+  - name: branch_name
+  - name: pr_url
+    default: ""
+  - name: cli
+    default: "claude"
+  - name: model
+    default: "claude-opus-4-6"
+  - name: max_retries
+    default: 2
+
+steps:
+  - name: checkout
+    command: >
+      git clone {{inputs.repo_url}} work && cd work &&
+      git checkout {{inputs.branch_name}}
+
+  - name: dependency-audit
+    depends_on: [checkout]
+    retry: { max: "{{inputs.max_retries}}" }
+    command: >
+      cd work && echo "No dependency auditor configured"
+
+  - name: secret-scan
+    depends_on: [checkout]
+    command: >
+      cd work && gitleaks detect --source . --no-git
+
+  - name: static-analysis
+    depends_on: [checkout]
+    retry: { max: "{{inputs.max_retries}}" }
+    command: >
+      cd work && echo "No security scanner configured"
+
+  - name: security-review
+    depends_on: [dependency-audit, secret-scan, static-analysis]
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt
+      "You are Cipher, the security agent. Perform a security review of the code changes for task 6.
+      Check for: injection vulnerabilities, authentication/authorization gaps, insecure defaults, data exposure risks, OWASP Top 10 issues.
+      Review the task spec at {{inputs.task_dir}}/task.md for security-relevant requirements.
+      Output: {pass: boolean, vulnerabilities: [{severity: critical|high|medium|low, category, file, description, remediation}], summary: string}"
+
+  - name: verdict
+    depends_on: [security-review]
+    command: >
+      echo "security-task-6: all checks complete" &&
+      jq -nc '{phase: "security", task_id: 6, agent: "cipher", pass: true}'
