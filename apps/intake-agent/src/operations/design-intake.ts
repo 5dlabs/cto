@@ -514,6 +514,170 @@ async function generateStitchCandidates(
   };
 }
 
+/**
+ * Build a Framer DSL string that creates a landing page from the PRD context.
+ * The DSL uses project-update syntax: +NodeType id parent="X" position="N"; SET id attrs;
+ */
+function buildLandingPageDsl(
+  parentFrameId: string,
+  projectName: string,
+  prdSummary: string,
+): string {
+  // Extract a tagline from the PRD (first ~80 chars of meaningful text)
+  const prdLines = prdSummary.split('\n').filter((l) => l.trim().length > 10);
+  const tagline =
+    prdLines.find(
+      (l) =>
+        !l.startsWith('#') &&
+        !l.startsWith('-') &&
+        !l.startsWith('*') &&
+        l.length > 20 &&
+        l.length < 120,
+    ) || `Welcome to ${projectName}`;
+
+  // Extract service/feature keywords from PRD bullet points
+  const bullets = prdLines
+    .filter((l) => /^[\s]*[-*•]/.test(l))
+    .map((l) => l.replace(/^[\s]*[-*•]\s*/, '').trim())
+    .filter((l) => l.length > 5 && l.length < 80)
+    .slice(0, 6);
+
+  // Build up to 3 service cards from bullets
+  const cards = bullets.slice(0, 3).map((b, i) => {
+    const title = b.split(/[.,:;]/).at(0)?.trim().substring(0, 40) || `Feature ${i + 1}`;
+    const desc = b.length > title.length ? b : `${title} — professional solutions tailored to your needs.`;
+    return { title, desc, idx: i };
+  });
+  // Fallback cards if PRD had no bullets
+  if (cards.length === 0) {
+    cards.push(
+      { title: 'Services', desc: 'Explore our full range of professional services.', idx: 0 },
+      { title: 'Portfolio', desc: 'See our work across events and productions.', idx: 1 },
+      { title: 'Contact', desc: 'Get in touch for a custom quote.', idx: 2 },
+    );
+  }
+
+  const cmds: string[] = [];
+  const p = parentFrameId;
+
+  // Configure parent as vertical stack
+  cmds.push(
+    `SET ${p} layout="stack" stackDirection="vertical" stackAlignment="center" gap="0" overflow="clip";`,
+  );
+
+  // ── Hero section ──
+  cmds.push(`+FrameNode _hero parent="${p}" position="0";`);
+  cmds.push(
+    `SET _hero name="Hero" layout="stack" stackDirection="vertical" stackAlignment="center" stackDistribution="center" gap="24" padding="120px 40px" width="1fr" height="auto" background="rgb(10,10,10)" position="relative" overflow="clip";`,
+  );
+  // Heading
+  cmds.push(`+RichTextNode _heroH parent="_hero" position="0";`);
+  cmds.push(`SET _heroH name="Heading" width="auto" height="auto" position="relative";`);
+  cmds.push(`+TextBlock _heroHB parent="_heroH" position="0";`);
+  cmds.push(`SET _heroHB textAlignment="center";`);
+  cmds.push(`+TextRun _heroHR parent="_heroHB" position="0";`);
+  cmds.push(
+    `SET _heroHR content="${escDsl(projectName)}" fontFamily="Geist" fontWeight="700" fontSize="72px" lineHeight="1.1" textColor="rgb(255,255,255)";`,
+  );
+  // Subtitle
+  cmds.push(`+RichTextNode _heroS parent="_hero" position="1";`);
+  cmds.push(`SET _heroS name="Subtitle" width="600px" height="auto" position="relative";`);
+  cmds.push(`+TextBlock _heroSB parent="_heroS" position="0";`);
+  cmds.push(`SET _heroSB textAlignment="center";`);
+  cmds.push(`+TextRun _heroSR parent="_heroSB" position="0";`);
+  cmds.push(
+    `SET _heroSR content="${escDsl(tagline)}" fontFamily="Geist" fontWeight="400" fontSize="20px" lineHeight="1.6" textColor="rgb(153,153,153)";`,
+  );
+  // CTA row
+  cmds.push(`+FrameNode _ctaR parent="_hero" position="2";`);
+  cmds.push(
+    `SET _ctaR name="CTA" layout="stack" stackDirection="horizontal" stackAlignment="center" gap="16" width="auto" height="auto" position="relative";`,
+  );
+  cmds.push(`+FrameNode _ctaP parent="_ctaR" position="0";`);
+  cmds.push(
+    `SET _ctaP name="Primary CTA" layout="stack" stackDirection="horizontal" stackAlignment="center" stackDistribution="center" padding="16px 32px" width="auto" height="auto" background="rgb(255,255,255)" borderRadius="8" position="relative" overflow="clip";`,
+  );
+  cmds.push(`+RichTextNode _ctaPT parent="_ctaP" position="0";`);
+  cmds.push(`SET _ctaPT width="auto" height="auto" position="relative";`);
+  cmds.push(`+TextBlock _ctaPTB parent="_ctaPT" position="0";`);
+  cmds.push(`+TextRun _ctaPTR parent="_ctaPTB" position="0";`);
+  cmds.push(
+    `SET _ctaPTR content="Get Started" fontFamily="Geist" fontWeight="600" fontSize="16px" textColor="rgb(10,10,10)";`,
+  );
+  cmds.push(`+FrameNode _ctaS parent="_ctaR" position="1";`);
+  cmds.push(
+    `SET _ctaS name="Secondary CTA" layout="stack" stackDirection="horizontal" stackAlignment="center" stackDistribution="center" padding="16px 32px" width="auto" height="auto" background="transparent" borderRadius="8" border="1px solid rgb(51,51,51)" position="relative" overflow="clip";`,
+  );
+  cmds.push(`+RichTextNode _ctaST parent="_ctaS" position="0";`);
+  cmds.push(`SET _ctaST width="auto" height="auto" position="relative";`);
+  cmds.push(`+TextBlock _ctaSTB parent="_ctaST" position="0";`);
+  cmds.push(`+TextRun _ctaSTR parent="_ctaSTB" position="0";`);
+  cmds.push(
+    `SET _ctaSTR content="Learn More" fontFamily="Geist" fontWeight="600" fontSize="16px" textColor="rgb(255,255,255)";`,
+  );
+
+  // ── Services section ──
+  cmds.push(`+FrameNode _svc parent="${p}" position="1";`);
+  cmds.push(
+    `SET _svc name="Services" layout="stack" stackDirection="vertical" stackAlignment="center" gap="40" padding="80px 40px" width="1fr" height="auto" background="rgb(255,255,255)" position="relative" overflow="clip";`,
+  );
+  cmds.push(`+RichTextNode _svcH parent="_svc" position="0";`);
+  cmds.push(`SET _svcH name="Services Heading" width="auto" height="auto" position="relative";`);
+  cmds.push(`+TextBlock _svcHB parent="_svcH" position="0";`);
+  cmds.push(`SET _svcHB textAlignment="center";`);
+  cmds.push(`+TextRun _svcHR parent="_svcHB" position="0";`);
+  cmds.push(
+    `SET _svcHR content="What We Do" fontFamily="Geist" fontWeight="700" fontSize="48px" lineHeight="1.2" textColor="rgb(10,10,10)";`,
+  );
+  // Grid
+  cmds.push(`+FrameNode _svcG parent="_svc" position="1";`);
+  cmds.push(
+    `SET _svcG name="Grid" layout="grid" gridColumnCount="${Math.min(cards.length, 3)}" gridRowHeightType="auto" gap="24" width="1fr" height="auto" position="relative";`,
+  );
+  for (const card of cards) {
+    const ci = card.idx;
+    cmds.push(`+FrameNode _cd${ci} parent="_svcG" position="${ci}";`);
+    cmds.push(
+      `SET _cd${ci} name="${escDsl(card.title)}" layout="stack" stackDirection="vertical" gap="12" padding="32px" width="1fr" height="auto" background="rgb(245,245,245)" borderRadius="12" position="relative" overflow="clip";`,
+    );
+    cmds.push(`+RichTextNode _cd${ci}T parent="_cd${ci}" position="0";`);
+    cmds.push(`SET _cd${ci}T width="auto" height="auto" position="relative";`);
+    cmds.push(`+TextBlock _cd${ci}TB parent="_cd${ci}T" position="0";`);
+    cmds.push(`+TextRun _cd${ci}TR parent="_cd${ci}TB" position="0";`);
+    cmds.push(
+      `SET _cd${ci}TR content="${escDsl(card.title)}" fontFamily="Geist" fontWeight="600" fontSize="20px" textColor="rgb(10,10,10)";`,
+    );
+    cmds.push(`+RichTextNode _cd${ci}D parent="_cd${ci}" position="1";`);
+    cmds.push(`SET _cd${ci}D width="auto" height="auto" position="relative";`);
+    cmds.push(`+TextBlock _cd${ci}DB parent="_cd${ci}D" position="0";`);
+    cmds.push(`+TextRun _cd${ci}DR parent="_cd${ci}DB" position="0";`);
+    cmds.push(
+      `SET _cd${ci}DR content="${escDsl(card.desc)}" fontFamily="Geist" fontWeight="400" fontSize="16px" lineHeight="1.6" textColor="rgb(100,100,100)";`,
+    );
+  }
+
+  // ── Footer section ──
+  cmds.push(`+FrameNode _ftr parent="${p}" position="2";`);
+  cmds.push(
+    `SET _ftr name="Footer" layout="stack" stackDirection="vertical" stackAlignment="center" stackDistribution="center" gap="8" padding="40px" width="1fr" height="auto" background="rgb(10,10,10)" position="relative" overflow="clip";`,
+  );
+  cmds.push(`+RichTextNode _ftrT parent="_ftr" position="0";`);
+  cmds.push(`SET _ftrT width="auto" height="auto" position="relative";`);
+  cmds.push(`+TextBlock _ftrTB parent="_ftrT" position="0";`);
+  cmds.push(`SET _ftrTB textAlignment="center";`);
+  cmds.push(`+TextRun _ftrTR parent="_ftrTB" position="0";`);
+  cmds.push(
+    `SET _ftrTR content="© ${new Date().getFullYear()} ${escDsl(projectName)}" fontFamily="Geist" fontWeight="400" fontSize="14px" textColor="rgb(100,100,100)";`,
+  );
+
+  return cmds.join(' ');
+}
+
+/** Escape double-quotes for the Framer DSL attribute values. */
+function escDsl(s: string): string {
+  return s.replace(/"/g, '\\"').replace(/\n/g, ' ');
+}
+
 async function generateFramerCandidates(
   context: ProviderExecutionContext,
   outputDir: string,
@@ -544,6 +708,7 @@ async function generateFramerCandidates(
   let changedPaths: { added: string[]; removed: string[]; modified: string[] } | undefined;
   let contributorCount: number | undefined;
   let sdkAvailable = false;
+  let dslApplied = false;
 
   try {
     const framerApiMod = framerApiModule;
@@ -552,16 +717,52 @@ async function generateFramerCandidates(
       sdkAvailable = true;
       const framer = await connect(projectUrl, apiKey);
       try {
-        const publishResult = await framer.publish?.();
-        publishId = publishResult?.deployment?.id;
-        if (publishId && framer.getPublishInfo) {
-          const publishInfo = await framer.getPublishInfo();
-          publishUrl =
-            publishInfo?.previewUrl ||
-            publishInfo?.preview_url ||
-            publishInfo?.stagingUrl ||
-            publishInfo?.staging_url ||
-            publishUrl;
+        // 1. Read page structure to find the Desktop breakpoint frame
+        const webPages = await framer.getNodesWithType?.('WebPageNode');
+        const pageId = webPages?.[0]?.id;
+        let parentFrameId = pageId; // fallback to page root
+
+        if (pageId) {
+          const children = await framer.getChildren?.(pageId);
+          // Find the Desktop breakpoint (main content container)
+          const desktop = children?.find(
+            (c: { name?: string; __class?: string }) =>
+              c.__class === 'FrameNode' && /desktop/i.test(c.name || ''),
+          );
+          if (desktop) parentFrameId = desktop.id;
+        }
+
+        // 2. Build landing page DSL from PRD context
+        if (parentFrameId) {
+          const dsl = buildLandingPageDsl(parentFrameId, context.projectName, context.prompt);
+          await writeFile(join(framerDir, 'applied-dsl.txt'), dsl);
+          await framer.applyAgentChanges(dsl, { pagePath: '/' });
+          dslApplied = true;
+        }
+
+        // 3. Publish (retry with backoff — tree may need time to settle after changes)
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            if (attempt > 0) await new Promise((r) => setTimeout(r, 2000 * attempt));
+            const publishResult = await framer.publish?.();
+            publishId = publishResult?.deployment?.id;
+            if (publishId && framer.getPublishInfo) {
+              const publishInfo = await framer.getPublishInfo();
+              publishUrl =
+                publishInfo?.staging?.url ||
+                publishInfo?.production?.url ||
+                publishInfo?.previewUrl ||
+                publishInfo?.preview_url ||
+                publishInfo?.stagingUrl ||
+                publishInfo?.staging_url ||
+                publishUrl;
+            }
+            break; // success
+          } catch (pubErr) {
+            if (attempt === 2) {
+              warnings.push(`Framer publish failed after ${attempt + 1} attempts: ${pubErr instanceof Error ? pubErr.message : String(pubErr)}`);
+            }
+          }
         }
         if (framer.getChangedPaths) {
           changedPaths = await framer.getChangedPaths();
@@ -602,6 +803,8 @@ async function generateFramerCandidates(
         status: 'generated' as const,
         meta: {
           publish_id: publishId,
+          publish_url: publishUrl,
+          dsl_applied: dslApplied,
           sdk_available: sdkAvailable,
           changed_paths: changedPaths,
           contributor_count: contributorCount,
