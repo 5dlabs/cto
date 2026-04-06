@@ -39,6 +39,7 @@ interface TaskWorkflowSet {
 
 interface WorkflowOutput {
   task_workflows: TaskWorkflowSet[];
+  play_yaml: string;
 }
 
 function indent(text: string, spaces: number): string {
@@ -453,6 +454,147 @@ steps:
       jq -nc '{phase: "testing", task_id: ${taskId}, agent: "tess", pass: true}'`;
 }
 
+// =============================================================================
+// Master play.lobster.yaml — Morgan's orchestration workflow
+// =============================================================================
+
+function generatePlayWorkflow(
+  tasks: GeneratedTask[],
+  config: PlayConfig,
+  repositoryUrl: string,
+): string {
+  const lines: string[] = [];
+
+  lines.push(`name: play`);
+  lines.push(`description: >`);
+  lines.push(`  Master play workflow orchestrated by Morgan.`);
+  lines.push(`  Dispatches implementation agents per-task in dependency order,`);
+  lines.push(`  then fans out quality/security/testing checks before gating.`);
+  lines.push(``);
+
+  // -- inputs --
+  lines.push(`inputs:`);
+  lines.push(`  - name: tasks_dir`);
+  lines.push(`    description: Root directory containing per-task folders (task-1/, task-2/, ...)`);
+  lines.push(`  - name: repo_url`);
+  if (repositoryUrl) {
+    lines.push(`    default: "${repositoryUrl}"`);
+  }
+  lines.push(`  - name: base_branch`);
+  lines.push(`    default: main`);
+  lines.push(`  - name: cli`);
+  lines.push(`    default: claude`);
+  lines.push(`  - name: model`);
+  lines.push(`    default: claude-opus-4-6`);
+  lines.push(``);
+
+  // Build a lookup for dependency resolution
+  const taskTypeMap = new Map<number, TaskType>();
+  for (const t of tasks) {
+    taskTypeMap.set(t.id, resolveTaskType(t));
+  }
+
+  lines.push(`steps:`);
+
+  for (const task of tasks) {
+    const tid = task.id;
+    const agent = task.agent ?? 'nova';
+    const taskType = taskTypeMap.get(tid)!;
+    const isCoding = taskType === 'task';
+
+    // Determine depends_on for this task's implementation step
+    const implDeps: string[] = [];
+    if (task.dependencies.length > 0) {
+      for (const depId of task.dependencies) {
+        implDeps.push(`gate-task-${depId}`);
+      }
+    }
+
+    // --- Implementation step ---
+    lines.push(``);
+    lines.push(`  # ── Task ${tid}: ${task.title} (${taskType}, agent: ${agent}) ──`);
+    lines.push(`  - name: run-task-${tid}`);
+    if (implDeps.length > 0) {
+      lines.push(`    depends_on: [${implDeps.join(', ')}]`);
+    }
+    lines.push(`    command: >`);
+    lines.push(`      lobster run --mode tool`);
+    lines.push(`      "{{inputs.tasks_dir}}/task-${tid}/implementation.lobster.yaml"`);
+    lines.push(`      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-${tid}'`);
+    lines.push(`        --arg repo '{{inputs.repo_url}}'`);
+    lines.push(`        --arg branch 'task-${tid}/${agent}'`);
+    lines.push(`        --arg agent '${agent}'`);
+    lines.push(`        --arg cli '{{inputs.cli}}'`);
+    lines.push(`        --arg model '{{inputs.model}}'`);
+    lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch, agent:$agent, cli:$cli, model:$model}')"`);
+
+    // --- Post-implementation checks ---
+    const checkDeps = [`run-task-${tid}`];
+    const gateSteps: string[] = [];
+
+    // Security — always runs (both task and infra)
+    lines.push(``);
+    lines.push(`  - name: security-task-${tid}`);
+    lines.push(`    depends_on: [${checkDeps.join(', ')}]`);
+    lines.push(`    command: >`);
+    lines.push(`      lobster run --mode tool`);
+    lines.push(`      "{{inputs.tasks_dir}}/task-${tid}/security.lobster.yaml"`);
+    lines.push(`      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-${tid}'`);
+    lines.push(`        --arg repo '{{inputs.repo_url}}'`);
+    lines.push(`        --arg branch 'task-${tid}/${agent}'`);
+    lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch}')"`);
+    gateSteps.push(`security-task-${tid}`);
+
+    if (isCoding) {
+      // Quality — coding tasks only
+      lines.push(``);
+      lines.push(`  - name: quality-task-${tid}`);
+      lines.push(`    depends_on: [${checkDeps.join(', ')}]`);
+      lines.push(`    command: >`);
+      lines.push(`      lobster run --mode tool`);
+      lines.push(`      "{{inputs.tasks_dir}}/task-${tid}/quality.lobster.yaml"`);
+      lines.push(`      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-${tid}'`);
+      lines.push(`        --arg repo '{{inputs.repo_url}}'`);
+      lines.push(`        --arg branch 'task-${tid}/${agent}'`);
+      lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch}')"`);
+      gateSteps.push(`quality-task-${tid}`);
+
+      // Testing — coding tasks only
+      lines.push(``);
+      lines.push(`  - name: testing-task-${tid}`);
+      lines.push(`    depends_on: [${checkDeps.join(', ')}]`);
+      lines.push(`    command: >`);
+      lines.push(`      lobster run --mode tool`);
+      lines.push(`      "{{inputs.tasks_dir}}/task-${tid}/testing.lobster.yaml"`);
+      lines.push(`      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-${tid}'`);
+      lines.push(`        --arg repo '{{inputs.repo_url}}'`);
+      lines.push(`        --arg branch 'task-${tid}/${agent}'`);
+      lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch}')"`);
+      gateSteps.push(`testing-task-${tid}`);
+    }
+
+    // --- Gate step: fan-in all checks before downstream tasks proceed ---
+    lines.push(``);
+    lines.push(`  - name: gate-task-${tid}`);
+    lines.push(`    depends_on: [${gateSteps.join(', ')}]`);
+    lines.push(`    command: >`);
+    lines.push(`      echo "task-${tid} [${taskType}] gate passed — all checks complete" &&`);
+    lines.push(`      jq -nc '{task_id: ${tid}, task_type: "${taskType}", agent: "${agent}", gate: "pass"}'`);
+  }
+
+  // --- Final play-complete step ---
+  const allGates = tasks.map((t) => `gate-task-${t.id}`);
+  lines.push(``);
+  lines.push(`  # ── Play complete ──`);
+  lines.push(`  - name: play-complete`);
+  lines.push(`    depends_on: [${allGates.join(', ')}]`);
+  lines.push(`    command: >`);
+  lines.push(`      echo "play complete — all ${tasks.length} tasks passed gate checks" &&`);
+  lines.push(`      jq -nc '{play: "complete", tasks: ${tasks.length}, status: "pass"}'`);
+
+  return lines.join('\n') + '\n';
+}
+
 const INFRA_AGENTS = new Set(['bolt', 'keeper']);
 const INFRA_STACKS = new Set(['kubernetes', 'kubernetes/helm', 'helm', 'terraform', 'pulumi', 'docker', 'ansible']);
 
@@ -512,5 +654,7 @@ export function generateWorkflows(input: WorkflowInput): WorkflowOutput {
     }
   }
 
-  return { task_workflows: taskWorkflows };
+  const playYaml = generatePlayWorkflow(expanded_tasks, playConfig, repoUrl);
+
+  return { task_workflows: taskWorkflows, play_yaml: playYaml };
 }

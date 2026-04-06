@@ -101,6 +101,14 @@ export async function writeFiles(
         paths.push(tPath);
       }
     }
+
+    // Write master play.lobster.yaml at the tasks root
+    const obj = input as Record<string, unknown>;
+    if (typeof obj.play_yaml === 'string') {
+      const playPath = path.join(basePath, 'play.lobster.yaml');
+      await fs.writeFile(playPath, obj.play_yaml);
+      paths.push(playPath);
+    }
   } else if (type === 'docs') {
     const docs = asArray<DocEntry>(input, ['task_docs', 'docs']);
     if (!docs) {
