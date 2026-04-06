@@ -458,6 +458,27 @@ steps:
 // Master play.lobster.yaml — Morgan's orchestration workflow
 // =============================================================================
 
+/** Map agent short name to GitHub App name. */
+function agentToGitHubApp(agent: string): string {
+  const map: Record<string, string> = {
+    rex: '5DLabs-Rex',
+    grizz: '5DLabs-Grizz',
+    nova: '5DLabs-Nova',
+    blaze: '5DLabs-Blaze',
+    bolt: '5DLabs-Bolt',
+    tap: '5DLabs-Tap',
+    spark: '5DLabs-Spark',
+    vex: '5DLabs-Vex',
+    cleo: '5DLabs-Cleo',
+    cipher: '5DLabs-Cipher',
+    tess: '5DLabs-Tess',
+    angie: '5DLabs-Angie',
+    keeper: '5DLabs-Keeper',
+    morgan: '5DLabs-Morgan',
+  };
+  return map[agent.toLowerCase()] ?? `5DLabs-${agent.charAt(0).toUpperCase() + agent.slice(1)}`;
+}
+
 function generatePlayWorkflow(
   tasks: GeneratedTask[],
   config: PlayConfig,
@@ -468,24 +489,39 @@ function generatePlayWorkflow(
   lines.push(`name: play`);
   lines.push(`description: >`);
   lines.push(`  Master play workflow orchestrated by Morgan.`);
-  lines.push(`  Dispatches implementation agents per-task in dependency order,`);
+  lines.push(`  Dispatches implementation agents per-task via CodeRun CRDs,`);
   lines.push(`  then fans out quality/security/testing checks before gating.`);
+  lines.push(`  Morgan selects CLI and provider per-task based on difficulty,`);
+  lines.push(`  available credits, and user-defined provider preferences.`);
   lines.push(``);
 
   // -- inputs --
   lines.push(`inputs:`);
   lines.push(`  - name: tasks_dir`);
-  lines.push(`    description: Root directory containing per-task folders (task-1/, task-2/, ...)`);
+  lines.push(`    description: Root directory containing per-task folders`);
   lines.push(`  - name: repo_url`);
   if (repositoryUrl) {
     lines.push(`    default: "${repositoryUrl}"`);
   }
+  lines.push(`  - name: namespace`);
+  lines.push(`    default: openclaw`);
   lines.push(`  - name: base_branch`);
   lines.push(`    default: main`);
   lines.push(`  - name: cli`);
+  lines.push(`    description: Default CLI tool (claude, codex, cursor, gemini, etc.)`);
   lines.push(`    default: claude`);
   lines.push(`  - name: model`);
-  lines.push(`    default: claude-opus-4-6`);
+  lines.push(`    description: Default LLM model — Morgan may override per-task based on difficulty + credits`);
+  lines.push(`    default: claude-sonnet-4-6`);
+  lines.push(`  - name: linear_session_id`);
+  lines.push(`    description: Linear agent session for status updates`);
+  lines.push(`    default: ""`);
+  lines.push(`  - name: linear_team_id`);
+  lines.push(`    default: ""`);
+  lines.push(`  - name: docs_repository_url`);
+  lines.push(`    default: ""`);
+  lines.push(`  - name: enable_docker`);
+  lines.push(`    default: "true"`);
   lines.push(``);
 
   // Build a lookup for dependency resolution
@@ -499,8 +535,11 @@ function generatePlayWorkflow(
   for (const task of tasks) {
     const tid = task.id;
     const agent = task.agent ?? 'nova';
+    const ghApp = agentToGitHubApp(agent);
     const taskType = taskTypeMap.get(tid)!;
     const isCoding = taskType === 'task';
+    const difficulty = task.difficulty_score ?? task.difficultyScore ?? 5;
+    const branchName = `task-${tid}/${agent}`;
 
     // Determine depends_on for this task's implementation step
     const implDeps: string[] = [];
@@ -510,29 +549,67 @@ function generatePlayWorkflow(
       }
     }
 
-    // --- Implementation step ---
+    // --- Submit CodeRun CRD for implementation ---
     lines.push(``);
-    lines.push(`  # ── Task ${tid}: ${task.title} (${taskType}, agent: ${agent}) ──`);
+    lines.push(`  # ── Task ${tid}: ${task.title} (${taskType}, agent: ${agent}, difficulty: ${difficulty}) ──`);
     lines.push(`  - name: run-task-${tid}`);
     if (implDeps.length > 0) {
       lines.push(`    depends_on: [${implDeps.join(', ')}]`);
     }
-    lines.push(`    command: >`);
-    lines.push(`      lobster run --mode tool`);
-    lines.push(`      "{{inputs.tasks_dir}}/task-${tid}/implementation.lobster.yaml"`);
-    lines.push(`      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-${tid}'`);
-    lines.push(`        --arg repo '{{inputs.repo_url}}'`);
-    lines.push(`        --arg branch 'task-${tid}/${agent}'`);
-    lines.push(`        --arg agent '${agent}'`);
-    lines.push(`        --arg cli '{{inputs.cli}}'`);
-    lines.push(`        --arg model '{{inputs.model}}'`);
-    lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch, agent:$agent, cli:$cli, model:$model}')"`);
+    lines.push(`    command: |`);
+    lines.push(`      cat <<'CODERUN_EOF' | envsubst | kubectl apply -f -`);
+    lines.push(`      apiVersion: agents.platform/v1`);
+    lines.push(`      kind: CodeRun`);
+    lines.push(`      metadata:`);
+    lines.push(`        name: play-task-${tid}-${agent}`);
+    lines.push(`        namespace: {{inputs.namespace}}`);
+    lines.push(`        labels:`);
+    lines.push(`          cto.5dlabs.ai/play: "true"`);
+    lines.push(`          cto.5dlabs.ai/task-id: "${tid}"`);
+    lines.push(`          cto.5dlabs.ai/agent: "${agent}"`);
+    lines.push(`          cto.5dlabs.ai/task-type: "${taskType}"`);
+    lines.push(`      spec:`);
+    lines.push(`        runType: implementation`);
+    lines.push(`        taskId: ${tid}`);
+    lines.push(`        service: ${agent}`);
+    lines.push(`        repositoryUrl: {{inputs.repo_url}}`);
+    lines.push(`        docsRepositoryUrl: {{inputs.docs_repository_url}}`);
+    lines.push(`        model: {{inputs.model}}`);
+    lines.push(`        githubApp: ${ghApp}`);
+    lines.push(`        enableDocker: {{inputs.enable_docker}}`);
+    lines.push(`        cliConfig:`);
+    lines.push(`          cliType: {{inputs.cli}}`);
+    lines.push(`          model: {{inputs.model}}`);
+    lines.push(`        linearIntegration:`);
+    lines.push(`          enabled: true`);
+    lines.push(`          sessionId: {{inputs.linear_session_id}}`);
+    lines.push(`          teamId: {{inputs.linear_team_id}}`);
+    if (task.subtasks && task.subtasks.length > 0) {
+      lines.push(`        subtasks:`);
+      for (const st of task.subtasks) {
+        lines.push(`          - id: ${st.id}`);
+        lines.push(`            title: "${st.title.replace(/"/g, '\\"')}"`);
+        lines.push(`            parallelizable: ${st.parallelizable ?? false}`);
+        if (st.dependencies && st.dependencies.length > 0) {
+          lines.push(`            dependencies: [${st.dependencies.map((d) => `"${d}"`).join(', ')}]`);
+        }
+      }
+    }
+    lines.push(`      CODERUN_EOF`);
+    lines.push(`      # Wait for CodeRun to complete`);
+    lines.push(`      echo "Submitted CodeRun play-task-${tid}-${agent}, waiting..." &&`);
+    lines.push(`      kubectl wait coderun/play-task-${tid}-${agent}`);
+    lines.push(`        -n {{inputs.namespace}}`);
+    lines.push(`        --for=jsonpath='{.status.phase}'=Succeeded`);
+    lines.push(`        --timeout=3600s &&`);
+    lines.push(`      echo "task-${tid} implementation complete" &&`);
+    lines.push(`      jq -nc '{task_id:${tid}, agent:"${agent}", phase:"implementation", status:"complete"}'`);
 
-    // --- Post-implementation checks ---
+    // --- Post-implementation checks (quality/security/testing via lobster sub-workflows) ---
     const checkDeps = [`run-task-${tid}`];
     const gateSteps: string[] = [];
 
-    // Security — always runs (both task and infra)
+    // Security — always runs
     lines.push(``);
     lines.push(`  - name: security-task-${tid}`);
     lines.push(`    depends_on: [${checkDeps.join(', ')}]`);
@@ -541,8 +618,10 @@ function generatePlayWorkflow(
     lines.push(`      "{{inputs.tasks_dir}}/task-${tid}/security.lobster.yaml"`);
     lines.push(`      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-${tid}'`);
     lines.push(`        --arg repo '{{inputs.repo_url}}'`);
-    lines.push(`        --arg branch 'task-${tid}/${agent}'`);
-    lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch}')"`);
+    lines.push(`        --arg branch '${branchName}'`);
+    lines.push(`        --arg cli '{{inputs.cli}}'`);
+    lines.push(`        --arg model '{{inputs.model}}'`);
+    lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"`);
     gateSteps.push(`security-task-${tid}`);
 
     if (isCoding) {
@@ -555,8 +634,10 @@ function generatePlayWorkflow(
       lines.push(`      "{{inputs.tasks_dir}}/task-${tid}/quality.lobster.yaml"`);
       lines.push(`      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-${tid}'`);
       lines.push(`        --arg repo '{{inputs.repo_url}}'`);
-      lines.push(`        --arg branch 'task-${tid}/${agent}'`);
-      lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch}')"`);
+      lines.push(`        --arg branch '${branchName}'`);
+      lines.push(`        --arg cli '{{inputs.cli}}'`);
+      lines.push(`        --arg model '{{inputs.model}}'`);
+      lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"`);
       gateSteps.push(`quality-task-${tid}`);
 
       // Testing — coding tasks only
@@ -568,18 +649,20 @@ function generatePlayWorkflow(
       lines.push(`      "{{inputs.tasks_dir}}/task-${tid}/testing.lobster.yaml"`);
       lines.push(`      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-${tid}'`);
       lines.push(`        --arg repo '{{inputs.repo_url}}'`);
-      lines.push(`        --arg branch 'task-${tid}/${agent}'`);
-      lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch}')"`);
+      lines.push(`        --arg branch '${branchName}'`);
+      lines.push(`        --arg cli '{{inputs.cli}}'`);
+      lines.push(`        --arg model '{{inputs.model}}'`);
+      lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"`);
       gateSteps.push(`testing-task-${tid}`);
     }
 
-    // --- Gate step: fan-in all checks before downstream tasks proceed ---
+    // --- Gate step ---
     lines.push(``);
     lines.push(`  - name: gate-task-${tid}`);
     lines.push(`    depends_on: [${gateSteps.join(', ')}]`);
     lines.push(`    command: >`);
     lines.push(`      echo "task-${tid} [${taskType}] gate passed — all checks complete" &&`);
-    lines.push(`      jq -nc '{task_id: ${tid}, task_type: "${taskType}", agent: "${agent}", gate: "pass"}'`);
+    lines.push(`      jq -nc '{task_id: ${tid}, task_type: "${taskType}", agent: "${agent}", difficulty: ${difficulty}, gate: "pass"}'`);
   }
 
   // --- Final play-complete step ---
