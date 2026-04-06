@@ -2,6 +2,15 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { StitchDirectClient } from '../stitch-client';
 
+// Static import so Bun's bundler includes framer-api in the compiled binary.
+// The try/catch at call sites handles the case where it's unavailable.
+let framerApiModule: { connect?: (url: string, key: string) => Promise<any> } | null = null;
+try {
+  framerApiModule = await import('framer-api');
+} catch {
+  // framer-api not available — offline mode
+}
+
 export type DesignProvider = 'stitch' | 'framer';
 export type DesignProviderMode = 'stitch' | 'framer' | 'both' | 'auto';
 export type LegacyDesignMode = 'ingest_only' | 'ingest_plus_stitch';
@@ -537,8 +546,8 @@ async function generateFramerCandidates(
   let sdkAvailable = false;
 
   try {
-    const framerApiMod = await dynamicImport('framer-api');
-    const connect = (framerApiMod as { connect?: (url: string, key: string) => Promise<any> }).connect;
+    const framerApiMod = framerApiModule;
+    const connect = framerApiMod?.connect;
     if (typeof connect === 'function') {
       sdkAvailable = true;
       const framer = await connect(projectUrl, apiKey);
