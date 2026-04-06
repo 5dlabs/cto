@@ -1,10 +1,17 @@
-Implement subtask 3003: Define protobuf schemas for all five RMS services
+Implement subtask 3003: Define protobuf schemas for InventoryService
 
 ## Objective
-Write .proto files for OpportunityService, ProjectService, InventoryService, CrewService, and DeliveryService, including all request/response messages, enums, and grpc-gateway HTTP annotations.
+Author .proto files for InventoryService covering equipment items, availability tracking, barcode associations, and check-in/check-out operations.
 
 ## Steps
-1. Create proto/rms/v1/opportunity.proto: Define OpportunityService with RPCs: CreateOpportunity, GetOpportunity, ListOpportunities, UpdateOpportunity, ConvertToProject. Include message types for Opportunity, CreateOpportunityRequest/Response, etc. Add google.api.http annotations for REST mapping (e.g., POST /api/v1/opportunities). 2. Create proto/rms/v1/project.proto: Define ProjectService with RPCs: GetProject, ListProjects, UpdateProject, AssignInventory, AssignCrew, GetProjectTimeline. 3. Create proto/rms/v1/inventory.proto: Define InventoryService with RPCs: CreateItem, GetItem, ListItems, UpdateItem, ScanBarcode (takes barcode string, returns item), CheckoutItems, ReturnItems. 4. Create proto/rms/v1/crew.proto: Define CrewService with RPCs: CreateCrewMember, GetCrewMember, ListCrewMembers, UpdateCrewMember, GetAvailability, ScheduleCrewMember. 5. Create proto/rms/v1/delivery.proto: Define DeliveryService with RPCs: CreateDelivery, GetDelivery, ListDeliveries, UpdateDeliveryStatus, TrackDelivery. 6. Use shared proto for common types (Timestamp, Pagination, Money). 7. Ensure all RPCs have grpc-gateway HTTP annotations.
+1. Create proto/rms/v1/inventory.proto with:
+   - InventoryItem message (id, name, category, barcode, serial_number, status, location, condition, last_checked_at)
+   - CheckInRequest/CheckOutRequest messages (item_id or barcode, project_id, crew_member_id, timestamp, notes)
+   - AvailabilityQuery message (date_range, category, location)
+   - RPCs: CreateItem, GetItem, ListItems, UpdateItem, CheckIn, CheckOut, QueryAvailability, GetItemByBarcode
+   - google.api.http annotations for all RPCs
+2. Run code generation and verify compilation.
+3. Register generated service in grpc-gateway mux.
 
 ## Validation
-All .proto files pass `protoc --lint` or buf lint without errors; grpc-gateway annotations are present on every RPC; message types cover all fields from the database schema.
+Generated Go code compiles; all RPC signatures and message fields match PRD inventory requirements; barcode-based lookup RPC is present; HTTP route annotations are correct.

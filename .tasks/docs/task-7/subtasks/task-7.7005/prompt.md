@@ -1,15 +1,16 @@
-Implement subtask 7005: Implement sales and customer skills: sales-qual, customer-vet, quote-gen, upsell
+Implement subtask 7005: Register MCP tools for Finance, Vetting, and Social Media backend services
 
 ## Objective
-Develop the core customer-facing skills that handle lead qualification, customer vetting, quote generation, and upselling, wired to the corresponding MCP tools.
+Define and register MCP tool definitions for the Finance/Invoicing, Customer Vetting, and Social Media Engine APIs.
 
 ## Steps
-1. Implement the sales-qual skill: define the conversation flow for qualifying leads (budget, timeline, equipment needs), invoke sigma1_score_lead tool, and store qualification results.
-2. Implement the customer-vet skill: gather customer information, invoke sigma1_vet_customer tool to run background/credit checks, and present results to the conversation flow.
-3. Implement the quote-gen skill: collect equipment selections and rental parameters, invoke sigma1_catalog_search and sigma1_check_availability for validation, then call sigma1_generate_quote to produce a quote. Present the quote to the customer and handle acceptance/modification.
-4. Implement the upsell skill: after quote generation, analyze the quote context and suggest complementary equipment or extended rental periods using sigma1_equipment_lookup and sigma1_catalog_search.
-5. For each skill, define clear entry/exit conditions, required tool calls, and conversation prompts.
-6. Ensure skills can be composed (e.g., sales-qual → customer-vet → quote-gen → upsell as a single flow).
+1. For the Finance service, define MCP tools: create-quote, finalize-quote, generate-invoice, get-invoice-status, process-payment, list-invoices.
+2. For the Vetting service, define MCP tools: submit-vet-request, get-vet-status, approve-customer, flag-customer.
+3. For the Social Media Engine, define MCP tools: create-post-draft, submit-for-approval, get-approval-status, publish-post, list-portfolio-items.
+4. Each tool must include name, description, input/output JSON schemas, and endpoint mapping.
+5. Configure service URL resolution from sigma1-infra-endpoints environment variables.
+6. Register all tools with the OpenClaw agent's tool registry.
+7. Implement error mapping for each service's error codes.
 
 ## Validation
-Each skill can be triggered independently and produces correct tool calls; sales-qual invokes sigma1_score_lead and returns a qualification score; customer-vet invokes sigma1_vet_customer and returns a vet result; quote-gen produces a valid quote via sigma1_generate_quote; upsell suggests relevant items; the composed flow (qual → vet → quote → upsell) completes without errors.
+Invoke each MCP tool via the agent's tool execution endpoint with sample inputs; verify correct HTTP calls to backend services; verify response schema conformance; test error cases return meaningful messages.

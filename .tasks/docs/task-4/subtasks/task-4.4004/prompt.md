@@ -1,10 +1,26 @@
-Implement subtask 4004: Implement invoice and payment CRUD endpoints
+Implement subtask 4004: Integrate Stripe for payment processing and webhook handling
 
 ## Objective
-Build Axum route handlers for invoice creation, retrieval, listing, status updates, and payment recording endpoints with proper validation and error handling.
+Implement Stripe payment intent creation, payment processing, and webhook handling to record Stripe payment events against invoices.
 
 ## Steps
-1. In src/routes/invoices.rs: POST /api/v1/invoices (create invoice with line items, validate currency code, calculate totals), GET /api/v1/invoices/:id (return invoice with line items), GET /api/v1/invoices (list with query params: status, page, per_page), PATCH /api/v1/invoices/:id (update status, e.g., send, void), DELETE /api/v1/invoices/:id (soft-delete/void only if draft). 2. In src/routes/payments.rs: POST /api/v1/payments (record a payment against an invoice, validate amount doesn't exceed remaining balance), GET /api/v1/invoices/:id/payments (list payments for an invoice). 3. Add input validation using a validator crate or custom extractors. 4. Implement proper error responses: 400 for validation errors, 404 for not found, 409 for invalid state transitions. 5. When a payment is recorded and total payments >= invoice total, automatically update invoice status to 'paid'. 6. Register all routes on the Axum router in main.rs.
+1. Add stripe-rust crate dependency.
+2. Read STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET from environment/secrets.
+3. Create src/stripe_client.rs with a StripeService:
+   - create_payment_intent(invoice_id, amount, currency) → creates a Stripe PaymentIntent, returns client_secret and payment_intent_id
+   - retrieve_payment_intent(payment_intent_id) → fetches status from Stripe
+4. Add endpoint POST /v1/invoices/:id/pay:
+   - Create a Stripe PaymentIntent for the invoice amount
+   - Store payment_intent_id in a pending payment record
+   - Return client_secret to the frontend for Stripe.js confirmation
+5. Implement POST /v1/webhooks/stripe:
+   - Verify webhook signature using STRIPE_WEBHOOK_SECRET
+   - Handle events: payment_intent.succeeded → mark payment as succeeded, update invoice status to paid
+   - Handle payment_intent.payment_failed → mark payment as failed
+   - Handle charge.refunded → record refund, update invoice status
+   - Return 200 to Stripe for all handled events
+6. Ensure idempotency: check if payment already recorded before creating duplicate.
+7. Create a mock Stripe client for testing.
 
 ## Validation
-Integration tests: create invoice → verify GET returns it → record partial payment → verify invoice still 'sent' → record remaining payment → verify invoice auto-transitions to 'paid'; attempt to void a paid invoice returns 409; validation errors return 400 with descriptive messages; >80% coverage.
+POST /v1/invoices/:id/pay returns a client_secret and creates a pending payment; webhook with valid signature for payment_intent.succeeded marks payment as succeeded and invoice as paid; webhook with invalid signature returns 401; duplicate webhook delivery doesn't create duplicate payments; refund webhook updates payment and invoice status correctly.

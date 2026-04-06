@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All endpoints return correct data as per OpenAPI spec; rate limiting enforced; product images load from S3/R2; health and metrics endpoints respond; integration tests cover all endpoints with >80% code coverage.
+- [ ] Call each endpoint and verify correct data structure, filtering, and pagination; check rate limiting is enforced; confirm Prometheus metrics and health endpoints respond as expected; verify image URLs resolve to S3/R2 objects.
 
 ## Verification Notes
 

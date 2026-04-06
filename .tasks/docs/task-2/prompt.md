@@ -1,31 +1,26 @@
 Implement task 2: Implement Equipment Catalog Service API (Rex - Rust/Axum)
 
 ## Goal
-Develop the Equipment Catalog Service with endpoints for product/category listing, product details, availability checks, and machine-readable APIs for Morgan and other agents.
+Develop the Equipment Catalog backend service to provide product listings, availability checks, and machine-readable APIs for Morgan and the website.
 
 ## Task Context
-- Agent owner: Rex
+- Agent owner: rex
 - Stack: Rust 1.75+/Axum 0.7
 - Priority: high
 - Dependencies: 1
 
 ## Implementation Plan
-{"steps": ["Initialize Rust project with Axum 0.7, connect to PostgreSQL and Redis using endpoints from ConfigMap.", "Define Product, Category, and Availability models as per PRD.", "Implement endpoints: /api/v1/catalog/categories, /api/v1/catalog/products, /api/v1/catalog/products/:id, /api/v1/catalog/products/:id/availability, /api/v1/equipment-api/catalog, /api/v1/equipment-api/checkout.", "Integrate S3/R2 for image URLs in product responses.", "Add rate limiting middleware using Redis.", "Implement Prometheus metrics and health endpoints.", "Write migrations for initial schema.", "Document OpenAPI spec for all endpoints."]}
+{"steps": ["Initialize Rust Axum project with PostgreSQL and Redis clients using connection strings from 'sigma1-infra-endpoints' ConfigMap", "Define Product, Category, and Availability models as per PRD", "Implement endpoints: /api/v1/catalog/categories, /api/v1/catalog/products, /api/v1/catalog/products/:id, /api/v1/catalog/products/:id/availability, /api/v1/equipment-api/catalog, /api/v1/equipment-api/checkout, /metrics, /health/live, /health/ready", "Integrate S3/R2 for image URLs in product responses", "Add rate limiting middleware using Redis", "Ensure endpoints are filterable and support pagination", "Write Prometheus metrics and health probes", "Document OpenAPI spec for all endpoints"]}
 
 ## Acceptance Criteria
-All endpoints return correct data as per OpenAPI spec; rate limiting enforced; product images load from S3/R2; health and metrics endpoints respond; integration tests cover all endpoints with >80% code coverage.
+Call each endpoint and verify correct data structure, filtering, and pagination; check rate limiting is enforced; confirm Prometheus metrics and health endpoints respond as expected; verify image URLs resolve to S3/R2 objects.
 
 ## Subtasks
-- Initialize Rust/Axum project with PostgreSQL and Redis connection pools: Scaffold the Rust project with Axum 0.7, configure connection pools for PostgreSQL (via sqlx) and Redis, reading endpoints from environment variables sourced from the sigma1-infra-endpoints ConfigMap.
-- Define data models and create database migrations for catalog schema: Define Rust structs for Product, Category, and Availability domain models, and create sqlx migrations to set up the corresponding tables in the public (or rms) PostgreSQL schema.
-- Implement category listing endpoint: Implement the GET /api/v1/catalog/categories endpoint that returns all equipment categories with optional tree structure support.
-- Implement product listing and product detail endpoints: Implement GET /api/v1/catalog/products (with filtering and pagination) and GET /api/v1/catalog/products/:id for individual product details.
-- Implement product availability endpoint: Implement GET /api/v1/catalog/products/:id/availability that returns availability data for a specific product within a date range.
-- Implement machine-readable API endpoints for Morgan agent: Implement GET /api/v1/equipment-api/catalog and POST /api/v1/equipment-api/checkout endpoints designed for programmatic consumption by the Morgan AI agent.
-- Implement rate limiting middleware using Redis: Add a rate limiting middleware layer to the Axum router using Redis as the backing store, applying configurable limits per IP or API key.
-- Implement health check and Prometheus metrics endpoints: Add /healthz, /readyz, and /metrics endpoints for Kubernetes probes and Prometheus scraping.
-- Generate OpenAPI specification and documentation: Generate a comprehensive OpenAPI 3.0 specification documenting all Equipment Catalog Service endpoints, request/response schemas, and error codes.
-- Write integration tests for all catalog endpoints: Create comprehensive integration tests covering all Equipment Catalog Service endpoints with database seeding, happy paths, and error cases.
+- Scaffold Rust/Axum project with infrastructure client setup and health endpoints: Initialize the Equipment Catalog Rust project with Axum 0.7 scaffolding, PostgreSQL (sqlx) and Redis client pools configured from the sigma1-infra-endpoints ConfigMap, and implement /health/live, /health/ready, and /metrics endpoints.
+- Define data models and create database migrations: Define Product, Category, and Availability domain models in Rust and create sqlx database migrations for the catalog schema tables in the rms PostgreSQL schema.
+- Implement public catalog CRUD endpoints with filtering and pagination: Implement the public-facing catalog API endpoints: GET /api/v1/catalog/categories, GET /api/v1/catalog/products (with filtering and pagination), GET /api/v1/catalog/products/:id, and GET /api/v1/catalog/products/:id/availability.
+- Implement machine-readable Morgan API endpoints with rate limiting: Implement the machine-readable API endpoints for the Morgan AI agent (/api/v1/equipment-api/catalog and /api/v1/equipment-api/checkout) and add Redis-based rate limiting middleware.
+- Generate OpenAPI specification and write integration tests: Document all Equipment Catalog API endpoints with an OpenAPI 3.0 specification and write comprehensive integration tests covering all endpoints, filtering, pagination, error cases, and rate limiting.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

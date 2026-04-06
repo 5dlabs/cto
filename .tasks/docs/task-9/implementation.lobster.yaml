@@ -1,7 +1,7 @@
 name: implement-task-9
 metadata:
   task_id: 9
-  agent: Bolt
+  agent: bolt
   stack: Kubernetes/Helm
   depends_on_tasks: [2, 3, 4, 5, 6, 7, 8]
 
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-9/feature-branch"
   - name: agent
-    default: "Bolt"
+    default: "bolt"
   - name: cli
     default: "claude"
   - name: model
@@ -100,7 +100,7 @@ steps:
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
   - name: implement-subtask-9007
-    depends_on: [validate-subtask-9006]
+    depends_on: [validate-subtask-9001, validate-subtask-9002, validate-subtask-9003, validate-subtask-9005, validate-subtask-9006]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9007/prompt.md

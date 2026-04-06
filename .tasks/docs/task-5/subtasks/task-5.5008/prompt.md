@@ -1,10 +1,10 @@
-Implement subtask 5008: Add Prometheus metrics and OpenAPI documentation
+Implement subtask 5008: Implement API endpoints for vetting operations
 
 ## Objective
-Instrument the vetting service with Prometheus metrics for observability and generate an OpenAPI specification documenting all endpoints.
+Build the three Axum HTTP endpoints: POST /api/v1/vetting/run, GET /api/v1/vetting/:org_id, GET /api/v1/vetting/credit/:org_id with request validation and proper error responses.
 
 ## Steps
-1. Add prometheus and metrics crate dependencies. 2. Define metrics: vetting_pipeline_duration_seconds (histogram, labels: status), vetting_integration_duration_seconds (histogram, labels: provider, status), vetting_requests_total (counter, labels: endpoint, status_code), vetting_integration_errors_total (counter, labels: provider, error_type). 3. Instrument the pipeline and each integration call with timing and error metrics. 4. Expose GET /metrics endpoint in Prometheus exposition format. 5. Use utoipa or aide to generate OpenAPI 3.0 spec from the handler signatures and model structs. 6. Serve the OpenAPI spec at GET /api/v1/vetting/openapi.json. 7. Ensure all request/response models are documented with examples in the spec.
+1. In `handlers/vetting.rs`, implement: a) `POST /api/v1/vetting/run` — accepts JSON body with org_id and org_name, triggers the vetting pipeline, returns 202 Accepted with a vetting_result_id (or 200 with full result if synchronous). b) `GET /api/v1/vetting/:org_id` — retrieves the latest VettingResult for the given org_id from PostgreSQL, returns 200 with full result or 404 if not found. c) `GET /api/v1/vetting/credit/:org_id` — retrieves credit-specific signals for the org_id, returns 200 with CreditSignals or 404. 2. Define request/response DTOs with serde. 3. Add input validation (valid UUID for org_id, non-empty org_name). 4. Return proper HTTP error codes: 400 for validation errors, 404 for not found, 500 for internal errors. 5. Wire all routes into the Axum router in main.rs with shared state (PgPool, pipeline service).
 
 ## Validation
-Verify /metrics endpoint returns valid Prometheus format with all defined metrics after running a vetting pipeline. Verify /openapi.json returns valid OpenAPI 3.0 spec that passes swagger-cli validation. Check that all three endpoints are documented with request/response schemas.
+Integration tests: POST /vetting/run with valid payload returns 200/202 and stores result in DB; GET /vetting/:org_id returns stored result; GET /vetting/credit/:org_id returns credit data; invalid org_id returns 400; non-existent org_id returns 404.

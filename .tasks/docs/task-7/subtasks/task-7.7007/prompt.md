@@ -1,14 +1,15 @@
-Implement subtask 7007: Implement social media skills: social-curate and social-publish
+Implement subtask 7007: Implement finance, social-media, RMS, and admin skills
 
 ## Objective
-Develop skills for Morgan to curate and publish social media content using the sigma1_social_curate and sigma1_social_publish MCP tools.
+Implement the remaining agent skills for finance operations, social media management, rental management, and administrative tasks.
 
 ## Steps
-1. Implement the social-curate skill: accept content curation requests (topic, event, equipment showcase), invoke sigma1_social_curate to generate content suggestions (captions, image selections, hashtags), and present options for approval.
-2. Implement the social-publish skill: after content approval, invoke sigma1_social_publish with finalized content, target platforms, and scheduling parameters. Confirm publication status.
-3. Handle multi-platform publishing (e.g., Instagram, Facebook) if supported by the backend.
-4. Implement approval workflow: curated content is presented for human approval before publishing.
-5. Add logging for all social media operations (content type, platform, publish status, scheduling time).
+1. Implement 'finance' skill: handle invoice generation from accepted quotes (quote → invoice via finance tools), payment status inquiries, and payment reminders.
+2. Implement 'social-media' skill: allow authorized users to draft social media posts via conversation, submit them for approval, check approval status, and trigger publishing.
+3. Implement 'rms-*' skills: rental lifecycle management — create rentals, check rental status, schedule deliveries/pickups, handle rental modifications and cancellations.
+4. Implement 'admin' skill: provide admin users with system status, reporting summaries, and ability to manage customer records or override vetting decisions.
+5. Add role-based access control to skills: admin skills should only be available to authenticated admin users (identify via Signal number or web chat auth).
+6. Ensure each skill has clear entry/exit conditions in the agent's routing logic.
 
 ## Validation
-Social-curate skill invokes sigma1_social_curate and returns content suggestions; social-publish skill invokes sigma1_social_publish and confirms publication; approval workflow correctly gates publishing; logs capture all social media operations with correct metadata.
+Test each skill independently: finance skill generates an invoice from an existing quote; social-media skill creates and submits a draft; RMS skill creates a rental and schedules delivery; admin skill returns system status. Verify role gating prevents non-admin access to admin skills.

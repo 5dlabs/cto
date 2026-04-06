@@ -1,10 +1,24 @@
-Implement subtask 4008: Implement financial reporting endpoints
+Implement subtask 4008: Implement tax calculation engine for GST/HST, US sales tax, and international
 
 ## Objective
-Build reporting endpoints for revenue summaries, outstanding invoices, payment history, and payroll cost reports with date range filtering.
+Build a modular tax calculation service that computes applicable taxes based on jurisdiction, integrating into invoice creation and reporting.
 
 ## Steps
-1. In src/routes/reports.rs: GET /api/v1/reports/revenue?start_date=&end_date=&currency= — aggregate paid invoice totals by month within date range, optionally convert to target currency using latest rates. 2. GET /api/v1/reports/outstanding — list all invoices with status 'sent' or 'overdue', with total outstanding amount. 3. GET /api/v1/reports/payments?start_date=&end_date= — aggregate payments by payment_method and status within date range. 4. GET /api/v1/reports/payroll?start_date=&end_date= — aggregate payroll costs by currency and status within date range, show approved vs paid totals. 5. All report endpoints return JSON with summary totals and optional breakdown arrays. 6. Use SQL aggregate queries (SUM, GROUP BY) for performance rather than loading all records into memory. 7. Add date validation: start_date must be before end_date, dates must be valid ISO 8601.
+1. Create src/services/tax.rs with a TaxCalculator trait and implementations.
+2. Define tax jurisdiction types: Canadian (GST/HST by province), US (state sales tax), International (VAT or exempt).
+3. Implement CanadianTaxCalculator:
+   - Lookup table: province → GST rate, HST rate (e.g., ON=13% HST, AB=5% GST, BC=5% GST+7% PST)
+   - calculate_tax(subtotal, province) → returns tax breakdown (gst_amount, hst_amount or pst_amount, total_tax)
+4. Implement USTaxCalculator:
+   - Lookup table: state → sales tax rate (can be simplified to major states for v1)
+   - calculate_tax(subtotal, state) → returns (sales_tax_amount, total_tax)
+5. Implement InternationalTaxCalculator:
+   - Default to 0% or configurable country-based VAT rate
+6. Create a TaxService that determines jurisdiction from client address/location and dispatches to the correct calculator.
+7. Integrate into invoice creation: when creating/updating an invoice, call TaxService to compute tax_amount based on client location.
+8. Add tax_breakdown JSONB field to invoices (or extend existing tax_amount) to store itemized tax details.
+9. Add migration if needed for tax_breakdown field.
+10. Expose GET /v1/tax/calculate?subtotal=1000&jurisdiction=ON for ad-hoc tax calculation.
 
 ## Validation
-Seed database with known invoices, payments, and payroll entries across multiple months and currencies; verify revenue report totals match expected sums; outstanding report only includes unpaid invoices; payroll report correctly separates by status; currency conversion in revenue report produces correct results; empty date ranges return zero totals, not errors.
+Canadian tax: Ontario invoice at $1000 returns $130 HST; Alberta returns $50 GST; BC returns $50 GST + $70 PST. US tax: California at $1000 returns correct state sales tax. International: default 0% for unknown jurisdiction. Invoice creation with client in Ontario auto-calculates correct tax. Tax breakdown is stored and retrievable on invoice. Ad-hoc calculate endpoint returns correct amounts.

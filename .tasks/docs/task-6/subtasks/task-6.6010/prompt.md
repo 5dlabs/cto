@@ -1,10 +1,10 @@
-Implement subtask 6010: Write integration tests for all Social Media Engine endpoints
+Implement subtask 6010: Implement Facebook publishing Effect.Service
 
 ## Objective
-Create comprehensive integration tests covering the full lifecycle: upload → curate → approve → publish, including error scenarios and edge cases.
+Build the Effect.Service implementation for publishing posts to Facebook, including the Facebook Graph API integration for page posts.
 
 ## Steps
-1. Set up test infrastructure: test database with migrations, mocked S3, mocked AI provider, mocked social platform APIs, mocked Signal client. 2. Test full happy path: upload images → AI curation creates drafts → approve via endpoint → publish to all platforms → verify in published list → verify portfolio manifest. 3. Test Signal approval flow: verify Signal message sent on draft creation, approve via Signal message, reject via Signal message. 4. Test error scenarios: upload invalid file types, approve already-rejected draft, publish unapproved draft, AI service unavailable, all platforms fail during publish. 5. Test pagination on GET /drafts and GET /published endpoints. 6. Test Effect.Schema validation: malformed requests return proper 400 errors with field-level details. 7. Verify >80% code coverage across all modules. 8. Test concurrent operations: multiple publishes in parallel don't create duplicate published_posts records.
+1. In `src/services/publishers/facebook.ts`, create an Effect.Service `FacebookPublisher` implementing the `Publisher` interface. 2. Implement `publish(draft: Draft, images: Upload[]) -> Effect<PublishResult>`: a) Upload photos to Facebook page via Graph API /{page-id}/photos. b) Create a post with uploaded photos and caption via /{page-id}/feed. c) For multiple images, create an album post or multi-photo post. d) Return PublishResult with platform_post_id and post_url. 3. Handle Facebook page access token management. 4. Handle Facebook API rate limits and error responses. 5. Format captions appropriately for Facebook.
 
 ## Validation
-All tests pass with >80% code coverage. Full lifecycle test completes without errors. Error scenarios return appropriate HTTP status codes. No duplicate records created under concurrent access.
+Unit tests with mocked Facebook API verify correct photo upload and post creation; multi-image posts work correctly; captions are included; API errors are handled; page token is used correctly.

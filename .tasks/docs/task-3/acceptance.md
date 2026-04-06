@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] gRPC and REST endpoints are accessible and return correct data; quote-to-project flow works end-to-end; barcode scan and crew assignment tested; Google Calendar integration creates events; >80% code coverage on service logic.
+- [ ] gRPC and REST endpoints return correct data and status codes; barcode scanning updates inventory; Google Calendar integration creates events; conflict detection prevents double-booking; all endpoints covered by tests with >80% code coverage.
 
 ## Verification Notes
 

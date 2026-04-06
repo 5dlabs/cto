@@ -1,26 +1,25 @@
 ## Implement Morgan AI Agent (Angie - OpenClaw/MCP)
 
 ### Objective
-Develop the Morgan AI agent to handle all customer interactions via Signal, voice, and web chat, orchestrating backend services via MCP tools.
+Deploy and configure the Morgan AI agent to handle all customer interactions via Signal, voice, and web chat, orchestrating backend services through MCP tools.
 
 ### Ownership
-- Agent: Angie
+- Agent: angie
 - Stack: OpenClaw/MCP
 - Priority: high
 - Status: pending
 - Dependencies: 2, 3, 4, 5, 6
 
 ### Implementation Details
-{"steps": ["Configure OpenClaw agent runtime with MCP tool-server access.", "Integrate Signal-CLI for messaging, ElevenLabs for voice, and Twilio for phone/SIP.", "Implement skills: sales-qual, customer-vet, quote-gen, upsell, finance, social-media, rms-*, admin.", "Wire up MCP tools: sigma1_catalog_search, sigma1_check_availability, sigma1_generate_quote, sigma1_vet_customer, sigma1_score_lead, sigma1_create_invoice, sigma1_finance_report, sigma1_social_curate, sigma1_social_publish, sigma1_equipment_lookup.", "Implement web chat widget integration for website.", "Ensure Morgan can respond to simple queries in <10s and orchestrate full lead-to-invoice flows.", "Add logging and observability hooks for monitoring."]}
+{"steps": ["Deploy OpenClaw agent using Kubernetes deployment, referencing 'sigma1-infra-endpoints' for all service URLs and credentials", "Configure Signal-CLI, ElevenLabs, and Twilio integrations for messaging and voice", "Register MCP tools for all backend services (catalog, RMS, finance, vetting, social)", "Implement skills: sales-qual, customer-vet, quote-gen, upsell, finance, social-media, rms-*, admin", "Set up web chat widget endpoint for website integration", "Ensure Morgan responds within 10 seconds for simple queries and orchestrates quote-to-invoice workflows", "Write integration tests for all major flows (lead qualification, quote, vetting, invoice, social approval)"]}
 
 ### Subtasks
-- [ ] Configure OpenClaw agent runtime and MCP tool-server connection: Set up the OpenClaw agent runtime environment, configure the MCP tool-server endpoint, register all tool definitions (sigma1_catalog_search, sigma1_check_availability, sigma1_generate_quote, sigma1_vet_customer, sigma1_score_lead, sigma1_create_invoice, sigma1_finance_report, sigma1_social_curate, sigma1_social_publish, sigma1_equipment_lookup), and verify the agent can discover and invoke tools.
-- [ ] Integrate Signal-CLI for bidirectional messaging: Set up Signal-CLI for Morgan to receive and send messages via Signal, including message parsing, response routing, and conversation state management.
-- [ ] Integrate ElevenLabs voice synthesis for voice responses: Implement ElevenLabs TTS integration so Morgan can generate spoken audio responses for voice channel interactions.
-- [ ] Integrate Twilio for phone/SIP voice channel: Set up Twilio integration for inbound/outbound voice calls and SIP, routing voice interactions through Morgan's agent runtime with ElevenLabs TTS output.
-- [ ] Implement sales and customer skills: sales-qual, customer-vet, quote-gen, upsell: Develop the core customer-facing skills that handle lead qualification, customer vetting, quote generation, and upselling, wired to the corresponding MCP tools.
-- [ ] Implement finance skill: invoicing and finance reporting: Develop the finance skill for Morgan to create invoices and generate financial reports using the sigma1_create_invoice and sigma1_finance_report MCP tools.
-- [ ] Implement social media skills: social-curate and social-publish: Develop skills for Morgan to curate and publish social media content using the sigma1_social_curate and sigma1_social_publish MCP tools.
-- [ ] Implement RMS and admin skills: Develop skills for rental management system operations (equipment lookup, availability, status) and administrative functions.
-- [ ] Implement web chat widget integration: Build the web chat widget interface and backend WebSocket/HTTP endpoint that connects website visitors to Morgan's agent runtime.
-- [ ] Implement end-to-end lead-to-invoice flow and observability: Wire together all skills into the complete lead-to-invoice orchestration flow, add comprehensive logging and observability hooks, and validate the full flow end-to-end.
+- [ ] Deploy OpenClaw agent on Kubernetes with sigma1-infra-endpoints configuration: Create the Kubernetes Deployment, Service, and ConfigMap references for the OpenClaw Morgan agent, pulling all service URLs and credentials from the sigma1-infra-endpoints ConfigMap and associated Secrets.
+- [ ] Integrate Signal-CLI for bidirectional messaging: Configure Signal-CLI as a sidecar or companion pod to enable Morgan to send and receive Signal messages from customers.
+- [ ] Integrate ElevenLabs voice synthesis and Twilio phone channel: Set up ElevenLabs for text-to-speech and Twilio for inbound/outbound phone calls so Morgan can handle voice interactions.
+- [ ] Register MCP tools for Equipment Catalog and RMS backend services: Define and register MCP tool definitions for the Equipment Catalog API and the Rental Management System (RMS) API, mapping request/response schemas.
+- [ ] Register MCP tools for Finance, Vetting, and Social Media backend services: Define and register MCP tool definitions for the Finance/Invoicing, Customer Vetting, and Social Media Engine APIs.
+- [ ] Implement sales flow skills: sales-qual, customer-vet, quote-gen, and upsell: Implement the core sales-oriented agent skills that handle the lead qualification → vetting → quote generation → upsell pipeline.
+- [ ] Implement finance, social-media, RMS, and admin skills: Implement the remaining agent skills for finance operations, social media management, rental management, and administrative tasks.
+- [ ] Implement web chat widget WebSocket endpoint: Create the WebSocket/HTTP endpoint that the website frontend will use to embed Morgan as a real-time chat widget.
+- [ ] Write end-to-end integration tests for complete workflows: Create integration tests covering the full lead → vet → quote → invoice flow and other major multi-skill workflows across all communication channels.

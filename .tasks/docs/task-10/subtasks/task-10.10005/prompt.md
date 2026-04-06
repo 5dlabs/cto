@@ -1,10 +1,10 @@
-Implement subtask 10005: Enable audit logging for managed services (PostgreSQL, Redis)
+Implement subtask 10005: Configure log shipping from audit logs to Grafana/Loki stack
 
 ## Objective
-Configure application-level audit logging for PostgreSQL and Redis to capture data access and administrative operations.
+Set up log collection agents to ship Kubernetes audit logs and critical service logs to the existing Loki instance, and create Grafana dashboards for audit visibility.
 
 ## Steps
-1. For PostgreSQL (CloudNative-PG): a) Enable `pgaudit` extension by adding it to the Cluster CR `postgresql.shared_preload_libraries`. b) Configure `pgaudit.log` parameter to capture DDL, ROLE, and WRITE operations at minimum. c) Set `pgaudit.log_catalog = off` to reduce noise. d) Verify audit entries appear in PostgreSQL logs. 2. For Redis: a) Enable `slowlog` with an appropriate threshold (e.g., 10ms) to capture slow operations. b) If the Redis operator supports it, enable `ACL LOG` to capture authentication failures and unauthorized command attempts. c) Configure Redis `loglevel` to `notice` or `verbose` for production monitoring. 3. Ensure all managed service logs are captured by the cluster's log shipping infrastructure (Fluent Bit or similar). 4. Create a dashboard or saved queries for common audit queries (e.g., 'show all DDL operations in last 24h').
+1. Deploy Promtail (or Grafana Alloy/Agent) as a DaemonSet to collect logs from all nodes if not already present. 2. Configure Promtail to scrape the Kubernetes audit log file path and label logs with `job=kube-audit`. 3. Add Promtail pipeline stages to parse the JSON audit log format and extract fields: user, verb, resource, namespace, responseStatus. 4. Configure additional Promtail scrape configs for critical service stdout/stderr logs with appropriate labels. 5. Verify logs appear in Loki by querying `{job="kube-audit"}` in Grafana Explore. 6. Create a Grafana dashboard with panels: a) Audit events over time (grouped by verb). b) Failed authentication/authorization attempts. c) Secret access events. d) Pod exec/attach events. e) RBAC change events. 7. Set up Grafana alerts for critical audit events (e.g., unauthorized access attempts > threshold).
 
 ## Validation
-Execute a DDL statement (e.g., `ALTER TABLE`) in PostgreSQL and verify it appears in pgaudit logs. Execute a `CONFIG SET` command in Redis and verify it's logged. Confirm both service logs are forwarded to the centralized logging backend. Query the logging backend for PostgreSQL audit events and verify results are returned.
+Query Loki via Grafana for `{job="kube-audit"}` and confirm audit events from the last hour are present. Verify the dashboard renders all panels with real data. Trigger a test alert condition (e.g., multiple failed auth attempts) and confirm the alert fires. Verify log latency: perform an action and confirm it appears in Loki within 60 seconds.

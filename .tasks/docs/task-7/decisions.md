@@ -1,12 +1,11 @@
 ## Decision Points
 
-- What API paradigm should be used for inter-service communication between backend services (e.g., Equipment Catalog, RMS, Finance, Vetting)?
+- How should service-to-service communication be handled between backend services (e.g., Morgan agent, RMS, Catalog, Finance, Vetting, Social Engine)?
 - What authentication and authorization mechanism should be used for internal service-to-service and external API access?
-- Should the Signal integration for Morgan be self-hosted via Signal-CLI or use a third-party Signal gateway service?
-- How should the Morgan AI agent orchestrate backend service calls: via direct API calls or through a tool-server abstraction?
-- How should API versioning be handled for public and internal APIs?
+- How should the Signal integration for Morgan be implemented?
+- How should the Morgan agent orchestrate backend service actions: via direct API calls or through a tool-server abstraction?
 
 ## Coordination Notes
 
-- Agent owner: Angie
+- Agent owner: angie
 - Primary stack: OpenClaw/MCP

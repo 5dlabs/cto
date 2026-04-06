@@ -1,10 +1,20 @@
-Implement subtask 3004: Generate Go code from protobuf definitions
+Implement subtask 3004: Define protobuf schemas for CrewService and DeliveryService
 
 ## Objective
-Configure protoc/buf for Go code generation including gRPC stubs, grpc-gateway reverse proxies, and OpenAPI specs from the .proto files.
+Author .proto files for CrewService (crew member management, assignments, availability) and DeliveryService (delivery scheduling, tracking, status updates).
 
 ## Steps
-1. Create a buf.gen.yaml (or Makefile with protoc commands) that generates: Go protobuf messages (protoc-gen-go), gRPC service stubs (protoc-gen-go-grpc), grpc-gateway reverse proxy (protoc-gen-grpc-gateway), and optionally OpenAPI v2 spec (protoc-gen-openapiv2). 2. Run code generation and verify output lands in /internal/gen or /pkg/pb. 3. Ensure generated gateway code registers all five services on the gateway mux. 4. Add a `go generate` or Makefile target for repeatable generation. 5. Verify generated Go code compiles with `go build ./...`.
+1. Create proto/rms/v1/crew.proto with:
+   - CrewMember message (id, name, role, skills, availability_schedule, contact_info)
+   - Assignment message (crew_member_id, project_id, date_range, role)
+   - RPCs: CreateCrewMember, GetCrewMember, ListCrewMembers, UpdateCrewMember, AssignToProject, UnassignFromProject, CheckAvailability
+   - HTTP annotations
+2. Create proto/rms/v1/delivery.proto with:
+   - Delivery message (id, project_id, items, origin, destination, scheduled_at, status, driver_id, tracking_notes)
+   - RPCs: CreateDelivery, GetDelivery, ListDeliveries, UpdateDeliveryStatus, AssignDriver
+   - HTTP annotations
+3. Run code generation and verify compilation.
+4. Register both services in grpc-gateway mux.
 
 ## Validation
-Running `make proto` or `buf generate` produces Go files for all 5 services; `go build ./...` succeeds with generated code; gateway registration code exists for all services.
+Generated Go code compiles; CrewService and DeliveryService RPCs match PRD specifications; HTTP annotations produce correct REST routes; all message fields are present.

@@ -1,10 +1,23 @@
-Implement subtask 3009: Implement DeliveryService with tracking
+Implement subtask 3009: Integrate Google Calendar API for project scheduling
 
 ## Objective
-Implement gRPC handlers for DeliveryService including delivery CRUD, status tracking, and delivery state machine transitions.
+Implement Google Calendar API integration within ProjectService to create, update, and delete calendar events when projects are created or modified.
 
 ## Steps
-1. Implement DeliveryService handlers in /internal/delivery/service.go: CreateDelivery (link to project, set initial status to 'pending', validate pickup/delivery addresses). 2. GetDelivery, ListDeliveries (filter by project_id, status, date range). 3. Implement UpdateDeliveryStatus RPC with state machine validation: pending→in_transit→delivered, or pending→in_transit→returned. Invalid transitions return FailedPrecondition. When status changes to 'delivered', set actual_date to now. 4. Implement TrackDelivery RPC: return current status, scheduled vs actual dates, and driver notes for a given delivery. 5. Use proper gRPC error codes for invalid transitions and not-found cases.
+1. Add google.golang.org/api/calendar/v3 and golang.org/x/oauth2 dependencies.
+2. Create internal/calendar/google_calendar.go with a CalendarClient interface and Google implementation:
+   - CreateEvent(project) → creates a Google Calendar event with project name, dates, crew info, returns event ID
+   - UpdateEvent(eventID, project) → updates existing event
+   - DeleteEvent(eventID) → removes event
+3. Read Google Calendar credentials (service account JSON or OAuth tokens) from secrets mounted via sigma1-infra-endpoints.
+4. Configure the target calendar ID from environment/ConfigMap.
+5. Integrate into ProjectService:
+   - On CreateProject, call CalendarClient.CreateEvent and store returned event ID in project record
+   - On UpdateProject (date/crew changes), call CalendarClient.UpdateEvent
+   - On DeleteProject, call CalendarClient.DeleteEvent
+6. Handle API errors gracefully: log and continue if calendar sync fails (don't block project CRUD).
+7. Implement SyncCalendar RPC for manual re-sync of a project's calendar event.
+8. Create a mock CalendarClient for testing.
 
 ## Validation
-Unit tests verify valid and invalid state transitions; CreateDelivery links to project; TrackDelivery returns correct current state; integration test runs full pending→in_transit→delivered flow; >80% coverage.
+Unit tests with mock CalendarClient verify that CreateProject calls CreateEvent and stores event ID; UpdateProject calls UpdateEvent; DeleteProject calls DeleteEvent; calendar API failures are logged but don't cause project operations to fail; SyncCalendar RPC triggers event update; integration test against Google Calendar sandbox (if available) creates and retrieves an event.

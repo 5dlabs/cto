@@ -1,10 +1,23 @@
-Implement subtask 3008: Integrate Google Calendar API for crew scheduling events
+Implement subtask 3008: Implement CrewService and DeliveryService gRPC handlers with conflict detection
 
 ## Objective
-Add Google Calendar integration to CrewService so that when crew members are scheduled to projects, calendar events are created/updated/deleted on their linked Google Calendar.
+Implement CrewService and DeliveryService handlers including crew assignment conflict detection that prevents double-booking crew members for overlapping date ranges.
 
 ## Steps
-1. Create /internal/calendar/google.go with a Google Calendar API client. 2. Set up authentication (service account or OAuth2 depending on decision point resolution) using credentials from Kubernetes secrets. 3. Implement CreateEvent: given crew_member google_calendar_id, project name, start/end dates, create a Google Calendar event. Return the event ID and store it in the crew_assignment record. 4. Implement UpdateEvent: when a crew assignment date range changes, update the corresponding calendar event. 5. Implement DeleteEvent: when a crew assignment is removed, delete the calendar event. 6. Call calendar functions from ScheduleCrewMember RPC after successful DB write. Use a best-effort pattern: if Calendar API fails, log the error but don't fail the scheduling operation (the assignment is still valid). 7. Add a reconciliation function that can be called to sync DB assignments with calendar events.
+1. Create internal/service/crew_service.go implementing CrewServiceServer.
+2. Implement CRUD RPCs for crew members.
+3. Implement AssignToProject RPC with conflict detection:
+   - Before assigning, query existing assignments for the crew member that overlap the requested date range
+   - Use PostgreSQL range overlap check (daterange && daterange) or exclusion constraint
+   - If conflict found, return FailedPrecondition with details of conflicting assignment
+   - On success, create assignment record
+4. Implement UnassignFromProject RPC.
+5. Implement CheckAvailability RPC that returns crew members available for a given date range and optional skill filter.
+6. Create internal/service/delivery_service.go implementing DeliveryServiceServer.
+7. Implement CRUD RPCs for deliveries.
+8. Implement UpdateDeliveryStatus with valid state transitions (scheduled → in_transit → delivered, or scheduled → cancelled).
+9. Implement AssignDriver RPC with conflict detection (driver can't have overlapping deliveries).
+10. Register both services with gRPC server.
 
 ## Validation
-Unit tests with mocked Google Calendar client verify events are created with correct data; integration test with Google Calendar sandbox verifies event creation and deletion; scheduling still succeeds if Calendar API returns an error (best-effort).
+AssignToProject with non-overlapping dates succeeds; AssignToProject with overlapping dates for same crew member returns conflict error; CheckAvailability excludes already-assigned crew for the requested range; UpdateDeliveryStatus enforces valid state transitions; AssignDriver detects scheduling conflicts; all RPCs return appropriate gRPC status codes.

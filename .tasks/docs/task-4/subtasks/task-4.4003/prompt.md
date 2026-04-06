@@ -1,10 +1,24 @@
-Implement subtask 4003: Define data models and repository layer for finance entities
+Implement subtask 4003: Implement invoice and payment CRUD endpoints
 
 ## Objective
-Implement Rust structs for all finance domain entities (Invoice, Payment, PayrollEntry, CurrencyRate) with serde and sqlx derives, plus repository functions for database CRUD operations.
+Build Axum route handlers for creating, reading, updating, listing, and deleting invoices and payments, with proper validation, error handling, and JSON serialization.
 
 ## Steps
-1. In src/models/invoice.rs: Define Invoice, InvoiceLine, CreateInvoiceRequest, UpdateInvoiceRequest structs with serde Serialize/Deserialize and sqlx::FromRow derives. Define InvoiceStatus enum with sqlx::Type. 2. In src/models/payment.rs: Define Payment, CreatePaymentRequest structs and PaymentStatus, PaymentMethod enums. 3. In src/models/payroll.rs: Define PayrollEntry, CreatePayrollRequest and PayrollStatus enum. 4. In src/models/currency.rs: Define CurrencyRate struct. 5. In src/services/invoice_repo.rs: Implement async functions: create_invoice (with line items in a transaction), get_invoice_by_id, list_invoices (with pagination, status filter), update_invoice_status, void_invoice. 6. In src/services/payment_repo.rs: create_payment, get_payments_for_invoice, update_payment_status. 7. In src/services/payroll_repo.rs: create_payroll_entry, list_payroll_entries (filter by period, status), approve_payroll, mark_payroll_paid. 8. In src/services/currency_repo.rs: upsert_rate, get_latest_rate, get_all_latest_rates. 9. All repository functions use sqlx::PgPool and return Result<T, AppError>.
+1. Create src/routes/invoices.rs with Axum handlers:
+   - POST /v1/invoices: create invoice with line items, calculate subtotal/tax/total, validate required fields
+   - GET /v1/invoices/:id: return invoice by ID with 404 if not found
+   - GET /v1/invoices: list invoices with pagination (limit/offset), filtering by status, client_id, date range
+   - PUT /v1/invoices/:id: update invoice (only if status is draft), recalculate totals
+   - DELETE /v1/invoices/:id: soft delete or cancel invoice
+   - POST /v1/invoices/:id/send: transition status from draft to sent, record issued_date
+2. Create src/routes/payments.rs with handlers:
+   - POST /v1/payments: record a payment against an invoice (manual, non-Stripe)
+   - GET /v1/payments/:id: return payment details
+   - GET /v1/invoices/:id/payments: list payments for an invoice
+3. Add request/response DTOs with serde Serialize/Deserialize.
+4. Implement input validation (required fields, valid enums, positive amounts).
+5. Map repository errors to appropriate HTTP status codes (400, 404, 409, 500).
+6. Wire routes into the main Axum router with shared AppState.
 
 ## Validation
-Unit tests verify struct serialization/deserialization; repository integration tests using sqlx::test with a real PostgreSQL instance verify CRUD operations for each entity; create_invoice correctly inserts invoice + line items in a single transaction.
+POST /v1/invoices creates an invoice and returns 201 with calculated totals; GET returns the invoice; list endpoint supports pagination and filtering; updating a sent invoice returns 409; payment recording links to invoice correctly; invalid inputs return 400 with descriptive error messages; all endpoints return proper JSON.

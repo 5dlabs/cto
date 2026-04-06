@@ -1,17 +1,28 @@
-Implement subtask 2005: Implement product availability endpoint
+Implement subtask 2005: Generate OpenAPI specification and write integration tests
 
 ## Objective
-Implement GET /api/v1/catalog/products/:id/availability that returns availability data for a specific product within a date range.
+Document all Equipment Catalog API endpoints with an OpenAPI 3.0 specification and write comprehensive integration tests covering all endpoints, filtering, pagination, error cases, and rate limiting.
 
 ## Steps
-1. Create a handlers/availability.rs module.
-2. Implement `get_availability` handler:
-   - Accept path param product_id and query params: start_date, end_date (default to next 30 days if not provided).
-   - Query the availability table for the product within the date range.
-   - Return an array of date/availability pairs.
-   - Return 404 if product_id doesn't exist.
-3. Create AvailabilityResponse DTO with fields: product_id, dates (array of {date, is_available, reserved_by?}).
-4. Register route: GET /api/v1/catalog/products/:id/availability.
+1. Add the `utoipa` crate (or equivalent) to auto-generate OpenAPI specs from Axum handler annotations.
+2. Annotate all endpoint handlers with OpenAPI metadata: path, method, query params, request/response bodies, status codes, descriptions.
+3. Serve the OpenAPI JSON at `GET /api/v1/catalog/openapi.json`.
+4. Create an `tests/` directory with integration test files.
+5. Write integration tests using reqwest or axum::test:
+   - test_categories_list: verify categories are returned
+   - test_products_list_pagination: verify page, per_page, total_pages
+   - test_products_filter_by_category: verify filtering works
+   - test_products_search: verify ILIKE search
+   - test_product_detail: verify single product with image URLs
+   - test_product_not_found: verify 404
+   - test_availability_query: verify date range filtering
+   - test_equipment_api_catalog: verify simplified agent format
+   - test_equipment_api_checkout_success: verify reservation creation
+   - test_equipment_api_checkout_conflict: verify 409 on double booking
+   - test_rate_limiting: verify 429 after threshold
+   - test_health_endpoints: verify live/ready/metrics
+6. Ensure tests use a test database (or transactions that roll back).
+7. Add a CI-ready test command in Cargo.toml or Makefile.
 
 ## Validation
-GET /api/v1/catalog/products/:id/availability returns 200 with date-availability array. With seeded availability data, verify correct available/unavailable dates. Invalid product ID returns 404. Date range filtering works correctly.
+All integration tests pass (`cargo test`); OpenAPI spec at /api/v1/catalog/openapi.json is valid (passes openapi-spec-validator); spec documents all 8+ endpoints with correct schemas, parameters, and response codes; test coverage includes happy paths, error cases, pagination edge cases, and rate limiting.

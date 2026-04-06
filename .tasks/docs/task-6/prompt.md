@@ -1,31 +1,34 @@
-Implement task 6: Develop Social Media Engine (Nova - Node.js/Elysia)
+Implement task 6: Develop Social Media Engine (Nova - Node.js/Elysia + Effect)
 
 ## Goal
-Implement the Social Media Engine for AI curation, caption generation, approval workflow, and multi-platform publishing.
+Create the Social Media Engine for AI curation, caption generation, approval workflow, and multi-platform publishing.
 
 ## Task Context
-- Agent owner: Nova
-- Stack: Node.js 20+/Elysia 1.x + Effect
+- Agent owner: nova
+- Stack: Node.js 20+/Elysia + Effect
 - Priority: medium
 - Dependencies: 1
 
 ## Implementation Plan
-{"steps": ["Initialize Node.js project with Elysia 1.x and Effect 3.x, connect to PostgreSQL and S3/R2 using ConfigMap.", "Define endpoints: /api/v1/social/upload, /api/v1/social/drafts, /api/v1/social/drafts/:id, /api/v1/social/drafts/:id/approve, /api/v1/social/drafts/:id/reject, /api/v1/social/drafts/:id/publish, /api/v1/social/published.", "Implement AI curation pipeline using OpenAI/Claude for image scoring and caption generation.", "Integrate Instagram, LinkedIn, Facebook APIs for publishing.", "Implement approval workflow: send drafts to Morgan via Signal, handle approval/rejection.", "Sync published content to website portfolio.", "Add Effect.Schema for request/response validation.", "Write integration tests for all endpoints."]}
+{"steps": ["Initialize Node.js Elysia project with Effect 3.x, connect to PostgreSQL and S3/R2 via 'sigma1-infra-endpoints'", "Implement endpoints: /api/v1/social/upload, /api/v1/social/drafts, /api/v1/social/drafts/:id, /api/v1/social/drafts/:id/approve, /api/v1/social/drafts/:id/reject, /api/v1/social/drafts/:id/publish, /api/v1/social/published", "Integrate OpenAI/Claude for caption generation and image curation", "Implement Effect.Service for Instagram, LinkedIn, TikTok, Facebook publishing", "Add approval workflow: send draft to Morgan for Signal approval", "Ensure platform-specific cropping and portfolio sync to website", "Validate all requests/responses with Effect.Schema"]}
 
 ## Acceptance Criteria
-All endpoints function as described; AI curation selects top images and generates captions; approval workflow sends and receives Signal messages; posts publish to at least two platforms in test; >80% code coverage.
+Upload, curation, and draft endpoints work end-to-end; approval triggers Signal message; publish posts to all platforms; captions are AI-generated; portfolio sync updates website; all endpoints validated by Effect.Schema.
 
 ## Subtasks
-- Initialize Elysia/Effect project with PostgreSQL and S3/R2 connectivity: Scaffold the Node.js service with Elysia 1.x and Effect 3.x, configure PostgreSQL connection pool and S3-compatible object storage client using infra ConfigMap values.
-- Implement image upload endpoint with S3/R2 storage: Build the POST /api/v1/social/upload endpoint that accepts image files, stores them in S3/R2, and returns the stored URLs.
-- Implement AI curation pipeline for image scoring and caption generation: Build the AI curation pipeline that uses OpenAI/Claude to score uploaded images for social media suitability and generate platform-appropriate captions.
-- Implement draft management REST endpoints with Effect.Schema validation: Build the CRUD endpoints for draft management: list drafts, get draft by ID, approve, reject — with full Effect.Schema request/response validation.
-- Implement Signal-based approval workflow for Morgan: Build the approval notification system that sends curated drafts to Morgan via Signal and processes approval/rejection responses.
-- Implement Instagram API publishing integration: Build the Instagram publishing module using the Instagram Graph API to publish approved images with captions.
-- Implement LinkedIn API publishing integration: Build the LinkedIn publishing module using the LinkedIn Marketing API to publish approved images with professional captions to the company page.
-- Implement Facebook API publishing integration: Build the Facebook publishing module using the Facebook Graph API to publish approved images with captions to the business page.
-- Implement publish endpoint and portfolio sync: Build the POST /api/v1/social/drafts/:id/publish endpoint that orchestrates multi-platform publishing and the GET /api/v1/social/published endpoint, plus website portfolio synchronization.
-- Write integration tests for all Social Media Engine endpoints: Create comprehensive integration tests covering the full lifecycle: upload → curate → approve → publish, including error scenarios and edge cases.
+- Initialize Elysia project with Effect 3.x, PostgreSQL, and S3/R2 connectivity: Scaffold the Node.js Elysia project with Effect 3.x integration, establish PostgreSQL connection pool and S3/R2 object storage client, reading all configuration from the 'sigma1-infra-endpoints' ConfigMap.
+- Define Effect.Schema models and database migrations for social media entities: Create Effect.Schema definitions for all domain entities (Upload, Draft, PublishedPost) and write PostgreSQL migrations for the corresponding tables.
+- Implement image upload endpoint with S3/R2 storage: Build the POST /api/v1/social/upload endpoint that accepts image files, stores them in S3/R2, and creates upload records in PostgreSQL.
+- Integrate AI service for caption generation and image curation: Build an Effect.Service that interfaces with OpenAI or Claude to generate social media captions and curate/analyze uploaded images for suitability.
+- Implement draft management CRUD endpoints: Build the draft management endpoints: GET /api/v1/social/drafts, GET /api/v1/social/drafts/:id, and draft creation flow that combines uploads with AI-generated captions into reviewable drafts.
+- Implement approval workflow with Signal notification to Morgan: Build the approve/reject endpoints and integrate Signal messaging to notify Morgan when drafts need review and when approval decisions are made.
+- Implement Instagram publishing Effect.Service: Build the Effect.Service implementation for publishing posts to Instagram, including platform-specific image cropping and the Instagram Graph API integration.
+- Implement LinkedIn publishing Effect.Service: Build the Effect.Service implementation for publishing posts to LinkedIn, including the LinkedIn Marketing API integration for company page posts.
+- Implement TikTok publishing Effect.Service: Build the Effect.Service implementation for publishing content to TikTok, including the TikTok Content Posting API integration.
+- Implement Facebook publishing Effect.Service: Build the Effect.Service implementation for publishing posts to Facebook, including the Facebook Graph API integration for page posts.
+- Implement publish endpoint with multi-platform orchestration: Build the POST /api/v1/social/drafts/:id/publish endpoint that orchestrates publishing an approved draft to all target platforms and the GET /api/v1/social/published endpoint.
+- Implement portfolio sync to website: Build the service that syncs published social media posts to the company website portfolio, ensuring published content is reflected on the website gallery.
+- Write end-to-end integration tests for full social media workflow: Create comprehensive integration tests covering the complete flow: upload → AI curation → draft creation → approval → publish → portfolio sync, with mocked external services.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

@@ -1,17 +1,15 @@
-Implement subtask 7004: Integrate Twilio for phone/SIP voice channel
+Implement subtask 7004: Register MCP tools for Equipment Catalog and RMS backend services
 
 ## Objective
-Set up Twilio integration for inbound/outbound voice calls and SIP, routing voice interactions through Morgan's agent runtime with ElevenLabs TTS output.
+Define and register MCP tool definitions for the Equipment Catalog API and the Rental Management System (RMS) API, mapping request/response schemas.
 
 ## Steps
-1. Configure a Twilio phone number and set up webhook endpoints for incoming calls.
-2. Implement a Twilio voice webhook handler that receives inbound call events and initiates a conversation with the OpenClaw agent.
-3. Implement speech-to-text processing for caller audio (using Twilio's built-in STT or a separate service).
-4. Route transcribed text to the agent runtime, receive text responses, and pipe them through the ElevenLabs voice synthesis module (7003).
-5. Stream or play synthesized audio back to the caller via Twilio's TwiML or Media Streams API.
-6. Handle call lifecycle events: ringing, connected, on-hold, transfer, hangup.
-7. Implement SIP endpoint configuration if required for business phone system integration.
-8. Add logging for call metadata (duration, caller ID, transcript summary, latency).
+1. For the Equipment Catalog service, define MCP tools: search-equipment, get-equipment-details, check-availability, get-pricing.
+2. For the RMS service, define MCP tools: create-rental, update-rental, cancel-rental, get-rental-status, list-rentals, schedule-delivery, schedule-pickup.
+3. Each tool definition must include: name, description (for LLM context), input JSON schema, output JSON schema, and the HTTP endpoint/method it maps to.
+4. Configure the tool server to resolve service URLs from environment variables (injected from sigma1-infra-endpoints).
+5. Register all tools with the OpenClaw agent's tool registry.
+6. Implement error mapping: backend HTTP errors → meaningful tool error responses the LLM can interpret.
 
 ## Validation
-Place a test call to the Twilio number; Morgan answers, transcribes speech, generates a response, and plays audio back; round-trip latency for a simple query is <10s; call lifecycle events are logged; SIP endpoint is reachable if configured.
+Invoke each MCP tool via the agent's tool execution endpoint with sample inputs; verify correct HTTP calls are made to the backend services (use mock/stub if services aren't live); verify response schemas match expectations.

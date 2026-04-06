@@ -1,18 +1,17 @@
-Implement subtask 2001: Initialize Rust/Axum project with PostgreSQL and Redis connection pools
+Implement subtask 2001: Scaffold Rust/Axum project with infrastructure client setup and health endpoints
 
 ## Objective
-Scaffold the Rust project with Axum 0.7, configure connection pools for PostgreSQL (via sqlx) and Redis, reading endpoints from environment variables sourced from the sigma1-infra-endpoints ConfigMap.
+Initialize the Equipment Catalog Rust project with Axum 0.7 scaffolding, PostgreSQL (sqlx) and Redis client pools configured from the sigma1-infra-endpoints ConfigMap, and implement /health/live, /health/ready, and /metrics endpoints.
 
 ## Steps
-1. Create a new Rust project with `cargo init equipment-catalog`.
-2. Add dependencies: axum 0.7, tokio, sqlx (with postgres and runtime-tokio features), redis (or deadpool-redis), serde, serde_json, dotenvy.
-3. Create a config module that reads POSTGRES_URL, REDIS_URL, S3_ENDPOINT, S3_PRODUCT_IMAGES_BUCKET from environment variables (populated via envFrom: sigma1-infra-endpoints ConfigMap).
-4. Initialize a sqlx::PgPool with the POSTGRES_URL.
-5. Initialize a Redis connection pool with the REDIS_URL.
-6. Create an AppState struct holding both pools and config, and pass it into Axum's Router as state.
-7. Create a basic main.rs that starts the Axum server on 0.0.0.0:8080.
-8. Add a Dockerfile for the service (multi-stage build with cargo-chef for caching).
-9. Add a Kubernetes Deployment manifest referencing the sigma1-infra-endpoints ConfigMap via envFrom.
+1. Run `cargo init equipment-catalog` and add dependencies: axum 0.7, tokio, sqlx (postgres, runtime-tokio), redis (or deadpool-redis), serde, serde_json, tracing, tracing-subscriber, prometheus (or metrics crate).
+2. Create a `config.rs` module that reads environment variables from the sigma1-infra-endpoints ConfigMap (POSTGRES_HOST, POSTGRES_PORT, REDIS_HOST, REDIS_PORT, S3_ENDPOINT, etc.).
+3. Create an `AppState` struct holding a sqlx::PgPool and a Redis connection pool.
+4. Initialize both pools in main.rs using the config values.
+5. Implement `GET /health/live` (returns 200 if server is up), `GET /health/ready` (checks DB and Redis connectivity), and `GET /metrics` (Prometheus text format with basic request counters and latency histograms).
+6. Set up tracing/logging with structured JSON output.
+7. Add a Dockerfile for the service.
+8. Verify the service starts and all three endpoints respond correctly.
 
 ## Validation
-Cargo build succeeds with no errors. The application starts and binds to port 8080. With valid POSTGRES_URL and REDIS_URL env vars, connection pools initialize without error. A curl to the root path returns a response (even if 404).
+Compile and run the service; curl /health/live returns 200; /health/ready returns 200 when DB and Redis are reachable (503 otherwise); /metrics returns valid Prometheus text format; logs are structured JSON.

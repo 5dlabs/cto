@@ -1,17 +1,16 @@
-Implement subtask 8005: Implement self-service quote builder page (/quote) with Effect.Schema validation
+Implement subtask 8005: Build portfolio page (/portfolio) synced from Social Media Engine
 
 ## Objective
-Build the interactive quote builder page where customers can select equipment, specify rental dates, enter contact information, and submit a quote request with full Effect.Schema validation.
+Implement the portfolio page that displays published project content fetched from the Social Media Engine API.
 
 ## Steps
-1. Create `app/quote/page.tsx` for the quote builder.
-2. Define the quote request schema using Effect.Schema: equipment selections (array of { equipmentId, quantity, startDate, endDate }), customer contact info (name, email, phone, company), optional notes.
-3. Build a multi-step form or single-page form: Step 1 - Equipment Selection (search/browse and add items with quantities and dates), Step 2 - Contact Information, Step 3 - Review & Submit.
-4. Implement equipment search within the builder using the catalog API (reuse TanStack Query hooks from 8003).
-5. Implement real-time validation using Effect.Schema on each field and the overall form.
-6. Submit the quote request to the backend API (sigma1_generate_quote endpoint or equivalent REST endpoint).
-7. Display a confirmation view with quote reference number on successful submission.
-8. Handle submission errors gracefully with retry options.
+1. Create the /portfolio page with a grid/masonry layout for showcasing project photos and content.
+2. Fetch published portfolio items from the Social Media Engine API using TanStack Query + Effect.
+3. Display each portfolio item with image(s), title, description, date, and any relevant tags/categories.
+4. Implement filtering by category or project type if the API supports it.
+5. Add lightbox or modal view for full-size image viewing.
+6. Handle loading, empty, and error states.
+7. Ensure images are optimized using Next.js Image component with proper sizing and lazy loading.
 
 ## Validation
-Quote builder renders at `/quote`; users can search and add equipment items; date pickers work and validate date ranges; contact form validates all required fields via Effect.Schema; form submission sends correct payload to the API; confirmation view displays on success; validation errors display inline; submission errors show retry options.
+Portfolio page renders published items from the Social Media Engine API; images display correctly with lazy loading; filtering works if implemented; lightbox opens full-size images; empty state displays when no items exist; loading state shows during fetch.

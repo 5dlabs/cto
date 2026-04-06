@@ -1,16 +1,16 @@
-Implement subtask 7001: Configure OpenClaw agent runtime and MCP tool-server connection
+Implement subtask 7001: Deploy OpenClaw agent on Kubernetes with sigma1-infra-endpoints configuration
 
 ## Objective
-Set up the OpenClaw agent runtime environment, configure the MCP tool-server endpoint, register all tool definitions (sigma1_catalog_search, sigma1_check_availability, sigma1_generate_quote, sigma1_vet_customer, sigma1_score_lead, sigma1_create_invoice, sigma1_finance_report, sigma1_social_curate, sigma1_social_publish, sigma1_equipment_lookup), and verify the agent can discover and invoke tools.
+Create the Kubernetes Deployment, Service, and ConfigMap references for the OpenClaw Morgan agent, pulling all service URLs and credentials from the sigma1-infra-endpoints ConfigMap and associated Secrets.
 
 ## Steps
-1. Initialize the OpenClaw agent project and configure the runtime entry point.
-2. Define the MCP tool-server connection (endpoint URL, auth credentials from infra ConfigMap).
-3. Register all 10 MCP tool definitions with their input/output schemas: sigma1_catalog_search, sigma1_check_availability, sigma1_generate_quote, sigma1_vet_customer, sigma1_score_lead, sigma1_create_invoice, sigma1_finance_report, sigma1_social_curate, sigma1_social_publish, sigma1_equipment_lookup.
-4. Implement the tool invocation adapter that translates agent intents to MCP tool calls and parses responses.
-5. Configure Morgan's system prompt with personality, role boundaries, and tool usage instructions.
-6. Add structured logging for all tool invocations (tool name, latency, success/failure).
-7. Verify the agent can list available tools and execute a basic tool call (e.g., sigma1_catalog_search) against a mock or live backend.
+1. Create a Deployment manifest for the OpenClaw agent container image with resource requests/limits appropriate for an LLM-orchestrating agent.
+2. Reference 'sigma1-infra-endpoints' ConfigMap via envFrom to inject service URLs for catalog, RMS, finance, vetting, and social services.
+3. Mount any required Secrets (API keys for ElevenLabs, Twilio, Signal credentials) as environment variables or volume mounts.
+4. Create a ClusterIP Service exposing the agent's HTTP/WebSocket port for internal communication.
+5. Configure liveness and readiness probes (e.g., /healthz endpoint).
+6. Set up the OpenClaw agent configuration file (system prompt, model selection, temperature, max tokens) as a ConfigMap.
+7. Verify the pod starts, passes readiness checks, and can resolve all service URLs from the injected environment.
 
 ## Validation
-Agent runtime starts without errors; all 10 tools are discoverable via MCP; a test tool call to sigma1_catalog_search returns a valid response; tool invocation logs are emitted with correct structure.
+Pod reaches Running/Ready state; readiness probe passes; environment variables from sigma1-infra-endpoints are correctly injected (exec into pod and verify); agent /healthz endpoint returns 200.

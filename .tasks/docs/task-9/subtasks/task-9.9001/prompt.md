@@ -1,10 +1,10 @@
-Implement subtask 9001: Scale PostgreSQL to HA multi-replica mode with CloudNative-PG
+Implement subtask 9001: Scale PostgreSQL to HA mode with CloudNative-PG
 
 ## Objective
-Update the CloudNative-PG Cluster CR to enable multi-replica HA with synchronous replication and automatic failover for the production PostgreSQL instance.
+Update the CloudNative-PG Cluster CR to run multiple instances (primary + replicas) with streaming replication, configure automatic failover, and validate data consistency across replicas.
 
 ## Steps
-1. Edit the CloudNative-PG Cluster CR YAML to set `instances: 3` (1 primary + 2 replicas). 2. Configure `postgresql.synchronous` settings for synchronous replication to at least one replica. 3. Ensure `failover.enabled: true` and set appropriate promotion criteria. 4. Configure anti-affinity rules (`topologyKey: kubernetes.io/hostname`) so replicas spread across nodes. 5. Update PVC storage class and size if needed for production workload. 6. Apply the updated CR and verify all three instances reach streaming replication state. 7. Validate that `kubectl cnpg status <cluster-name>` shows healthy primary and replicas.
+1. Edit the CloudNative-PG Cluster CR to set `instances: 3` (1 primary, 2 replicas). 2. Configure `postgresql.synchronous` settings for synchronous replication if data durability requires it, otherwise async. 3. Set resource requests/limits appropriate for production workloads. 4. Configure PodDisruptionBudgets (minAvailable: 2) to ensure quorum during rolling updates. 5. Set anti-affinity rules to spread instances across nodes. 6. Apply the updated CR and verify all replicas reach streaming state. 7. Test a manual switchover using `kubectl cnpg promote` to validate failover readiness.
 
 ## Validation
-Verify `kubectl cnpg status` shows 3 healthy instances with streaming replication. Delete the primary pod and confirm automatic failover completes within 30 seconds with a new primary elected. Confirm application connections recover without manual intervention.
+Verify 3 PostgreSQL pods are running and healthy. Confirm replication lag is near zero. Perform a manual switchover: promote a replica, verify the old primary becomes a replica, and confirm the application reconnects without errors. Run a data consistency check across instances.

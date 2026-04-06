@@ -1,16 +1,17 @@
-Implement subtask 2003: Implement category listing endpoint
+Implement subtask 2003: Implement public catalog CRUD endpoints with filtering and pagination
 
 ## Objective
-Implement the GET /api/v1/catalog/categories endpoint that returns all equipment categories with optional tree structure support.
+Implement the public-facing catalog API endpoints: GET /api/v1/catalog/categories, GET /api/v1/catalog/products (with filtering and pagination), GET /api/v1/catalog/products/:id, and GET /api/v1/catalog/products/:id/availability.
 
 ## Steps
-1. Create a handlers/categories.rs module.
-2. Implement `list_categories` handler: query all categories from PostgreSQL, return as JSON array.
-3. Support optional query parameter `?tree=true` to return nested parent-child structure.
-4. Include image_url fields pointing to S3/R2 URLs.
-5. Register the route on the Axum router under /api/v1/catalog/categories.
-6. Add appropriate error handling (500 for DB errors, return empty array if no categories).
-7. Create a CategoryResponse DTO (separate from the DB model) with serde Serialize.
+1. Create a `routes/catalog.rs` module with an Axum Router.
+2. Implement `GET /api/v1/catalog/categories`: query all categories from rms.categories, return JSON array. Support optional `parent_id` query param for hierarchical filtering.
+3. Implement `GET /api/v1/catalog/products`: query rms.products with support for query params: category_id, search (name ILIKE), min_price, max_price, page (default 1), per_page (default 20, max 100). Return paginated response with { data: [...], total, page, per_page, total_pages }.
+4. Implement `GET /api/v1/catalog/products/:id`: fetch single product by ID, return 404 if not found. Include full image URLs constructed from S3 endpoint + bucket + stored keys.
+5. Implement `GET /api/v1/catalog/products/:id/availability`: query rms.availability for given product_id, support date_from and date_to query params, return array of availability slots.
+6. Add proper error handling with consistent JSON error responses (400, 404, 500).
+7. Wire all routes into the main Axum router under the /api/v1/catalog prefix.
+8. Instrument all handlers with Prometheus request count and latency metrics.
 
 ## Validation
-GET /api/v1/catalog/categories returns 200 with a JSON array. With seeded data, verify categories appear with correct fields. With ?tree=true, verify nested structure. With empty DB, returns empty array.
+Call each endpoint with seed data and verify correct JSON structures; test filtering by category_id and search term returns filtered results; test pagination returns correct page/total metadata; verify 404 for non-existent product ID; confirm S3 image URLs are properly constructed in product responses.

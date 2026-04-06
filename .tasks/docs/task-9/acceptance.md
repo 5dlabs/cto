@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All services remain available during failover; public endpoints serve via Cloudflare with valid TLS; Morgan and website accessible via Cloudflare Tunnel; network policies block unauthorized access; simulate pod/node failure and verify recovery.
+- [ ] All services remain available during failover; CDN serves static assets with valid SSL; ingress routes traffic correctly; network policies block unauthorized access; simulate pod/node failure and verify recovery.
 
 ## Verification Notes
 

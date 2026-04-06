@@ -1,10 +1,10 @@
-Implement subtask 6009: Implement publish endpoint and portfolio sync
+Implement subtask 6009: Implement TikTok publishing Effect.Service
 
 ## Objective
-Build the POST /api/v1/social/drafts/:id/publish endpoint that orchestrates multi-platform publishing and the GET /api/v1/social/published endpoint, plus website portfolio synchronization.
+Build the Effect.Service implementation for publishing content to TikTok, including the TikTok Content Posting API integration.
 
 ## Steps
-1. POST /api/v1/social/drafts/:id/publish: Validate draft is in 'approved' status. Read platform_targets from the draft (array of 'instagram', 'linkedin', 'facebook'). 2. Invoke each platform's PublishingProvider concurrently using Effect.all with concurrency control. 3. For each successful publish, insert a record into published_posts table with platform, platform_post_id, url, published_at. 4. Update draft status to 'published' only if at least one platform succeeds. Store partial failure details in the draft's metadata. 5. GET /api/v1/social/published: Return paginated list of published posts with platform details, optionally filtered by platform or date range. 6. Implement portfolio sync: after successful publish, call an internal webhook or write to a sync queue that the website can consume to update the portfolio gallery. For v1, write a JSON manifest to S3 at a known key (e.g., portfolio/manifest.json) containing all published posts with image URLs and captions. 7. Return detailed publish results including per-platform success/failure status.
+1. In `src/services/publishers/tiktok.ts`, create an Effect.Service `TikTokPublisher` implementing the `Publisher` interface. 2. Implement `publish(draft: Draft, images: Upload[]) -> Effect<PublishResult>`: a) Initialize video/photo upload via TikTok Content Posting API. b) Upload media content (TikTok supports photo mode for images). c) Set caption, hashtags, and privacy settings. d) Return PublishResult with platform_post_id and post_url. 3. Handle TikTok OAuth2 token management. 4. Handle TikTok-specific requirements (caption length limits, hashtag formatting). 5. Handle rate limits and API error codes.
 
 ## Validation
-Integration test: publish an approved draft to mocked platforms, verify published_posts records are created, draft status transitions to 'published'. Test partial failure: one platform fails, others succeed — verify draft is still marked published with failure details. GET /published returns correct records. Verify portfolio manifest is written to S3.
+Unit tests with mocked TikTok API verify correct upload and publish flow; captions respect TikTok character limits; photo mode is used for image posts; API errors are handled; OAuth token refresh works.

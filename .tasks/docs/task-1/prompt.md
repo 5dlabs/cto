@@ -1,29 +1,29 @@
 Implement task 1: Provision Core Infrastructure (Bolt - Kubernetes/Helm)
 
 ## Goal
-Provision all foundational infrastructure for Sigma-1, including PostgreSQL, Redis/Valkey, S3/R2, Signal-CLI, ElevenLabs, Twilio, and create a ConfigMap aggregating all service endpoints for downstream consumption.
+Set up the foundational infrastructure for Sigma-1, including PostgreSQL, Redis/Valkey, S3/R2, Signal-CLI, ElevenLabs, Twilio, and required namespaces. Aggregate all service endpoints and credentials into a ConfigMap for downstream consumption.
 
 ## Task Context
-- Agent owner: Bolt
+- Agent owner: bolt
 - Stack: Kubernetes/Helm
 - Priority: high
 - Dependencies: None
 
 ## Implementation Plan
-{"steps": ["Create Kubernetes namespaces: databases, sigma1, openclaw, social, web, etc.", "Deploy CloudNative-PG PostgreSQL cluster (single instance, 50Gi, schemas: rms, crm, finance, audit, public)", "Deploy Redis/Valkey using Opstree operator (single instance)", "Provision S3/R2 buckets for product images and event photos, expose endpoints via ConfigMap", "Deploy Signal-CLI as a sidecar or separate pod in openclaw namespace", "Configure external service secrets for ElevenLabs, Twilio, Stripe, OpenCorporates, LinkedIn, Google Reviews, and store in Kubernetes secrets", "Create a ConfigMap named sigma1-infra-endpoints with connection strings and API URLs for all services (POSTGRES_URL, REDIS_URL, S3_URL, SIGNAL_CLI_URL, etc.)", "Document all endpoints and secret keys for downstream service consumption."]}
+{"steps": ["Create Kubernetes namespaces: databases, sigma1, openclaw, etc.", "Deploy CloudNative-PG PostgreSQL cluster (single instance, 50Gi, schemas: rms, crm, finance, audit, public)", "Deploy Redis/Valkey using operator (v7.2-alpine)", "Provision S3/R2 buckets for product images and event photos", "Deploy Signal-CLI as a sidecar or separate pod for Morgan agent", "Configure external service secrets for ElevenLabs, Twilio, Stripe, OpenCorporates, LinkedIn, Google Reviews, and credit APIs", "Create a ConfigMap named sigma1-infra-endpoints with connection strings and service URLs for all provisioned resources", "Document all endpoints and credentials for use by backend and frontend services"]}
 
 ## Acceptance Criteria
-Verify all pods are running and healthy; ConfigMap sigma1-infra-endpoints contains valid connection strings for each service; all secrets are present; test connectivity to PostgreSQL, Redis, S3/R2, and external APIs from a test pod.
+Verify all pods are running and healthy; confirm ConfigMap 'sigma1-infra-endpoints' contains valid connection strings for PostgreSQL, Redis, S3/R2, Signal-CLI, ElevenLabs, Twilio, and all external APIs; test connectivity from a test pod to each service endpoint.
 
 ## Subtasks
-- Create Kubernetes namespaces and RBAC foundations: Create all required Kubernetes namespaces (databases, sigma1, openclaw, social, web) and apply baseline RBAC roles and service accounts for each namespace to enable subsequent deployments.
-- Deploy CloudNative-PG PostgreSQL cluster with schema initialization: Deploy a single-instance CloudNative-PG PostgreSQL cluster in the databases namespace with 50Gi storage and initialize all required schemas (rms, crm, finance, audit, public).
-- Deploy Redis/Valkey via Opstree operator: Deploy a single-instance Redis/Valkey instance using the Opstree Redis operator in the databases namespace for caching, rate limiting, and session storage.
-- Provision S3/R2 buckets and configure access credentials: Provision S3-compatible object storage buckets for product images and event photos, and store access credentials and endpoint URLs as Kubernetes Secrets.
-- Deploy Signal-CLI pod in openclaw namespace: Deploy Signal-CLI as a standalone pod (or deployment) in the openclaw namespace, configured for REST API access by downstream services.
-- Create external service Kubernetes Secrets: Create Kubernetes Secrets for all external third-party API credentials: ElevenLabs, Twilio, Stripe, OpenCorporates, LinkedIn, and Google Reviews.
-- Create sigma1-infra-endpoints ConfigMap aggregating all service endpoints: Create the central ConfigMap named sigma1-infra-endpoints in the sigma1 namespace, containing connection strings and API URLs for all provisioned services.
-- Validate end-to-end infrastructure connectivity: Run a comprehensive connectivity test from a test pod to verify all provisioned infrastructure services are reachable and functional, and that the ConfigMap provides correct endpoints.
+- Create Kubernetes namespaces and RBAC foundations: Create all required Kubernetes namespaces (databases, sigma1, openclaw, etc.) and set up basic RBAC ServiceAccounts for each namespace so downstream deployments have appropriate permissions.
+- Deploy CloudNative-PG PostgreSQL cluster with schema initialization: Deploy a single-instance CloudNative-PG PostgreSQL cluster in the databases namespace with 50Gi storage and initialize schemas: rms, crm, finance, audit, public.
+- Deploy Redis/Valkey instance via operator: Deploy a single-replica Redis-compatible instance (Valkey v7.2-alpine) using the Redis operator in the databases namespace.
+- Provision S3/R2 buckets and access credentials: Create S3-compatible object storage buckets for product images and event photos, and store access credentials as Kubernetes Secrets.
+- Deploy Signal-CLI pod for Morgan agent: Deploy Signal-CLI as a standalone pod (or sidecar-ready deployment) in the sigma1 namespace, configured with a registered Signal account for the Morgan agent.
+- Create external service secrets for third-party APIs: Create Kubernetes Secrets in the sigma1 namespace for all external API credentials: ElevenLabs, Twilio, Stripe, OpenCorporates, LinkedIn, Google Reviews, and credit bureau APIs.
+- Assemble sigma1-infra-endpoints ConfigMap: Create the sigma1-infra-endpoints ConfigMap aggregating all connection strings, service URLs, bucket names, and secret references from all provisioned infrastructure components.
+- Validate end-to-end connectivity from test pod to all services: Deploy a test pod in the sigma1 namespace and validate connectivity to every provisioned service: PostgreSQL, Redis, S3/R2, Signal-CLI, and verify external API secret availability.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

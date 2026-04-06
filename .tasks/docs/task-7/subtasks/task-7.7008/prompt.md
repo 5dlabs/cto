@@ -1,14 +1,16 @@
-Implement subtask 7008: Implement RMS and admin skills
+Implement subtask 7008: Implement web chat widget WebSocket endpoint
 
 ## Objective
-Develop skills for rental management system operations (equipment lookup, availability, status) and administrative functions.
+Create the WebSocket/HTTP endpoint that the website frontend will use to embed Morgan as a real-time chat widget.
 
 ## Steps
-1. Implement RMS skills (rms-*): equipment lookup via sigma1_equipment_lookup, availability checks via sigma1_check_availability, and catalog search via sigma1_catalog_search for operational queries (e.g., 'What excavators are available next week?').
-2. Implement the admin skill: handle administrative commands such as system status checks, user management queries, and configuration updates as supported by backend tools.
-3. Define conversation patterns for RMS queries: natural language equipment searches, availability date range queries, equipment detail requests.
-4. Ensure RMS skills are accessible from all channels (Signal, voice, web chat).
-5. Add logging for all RMS and admin operations.
+1. Implement a WebSocket endpoint (e.g., /ws/chat) on the Morgan agent's HTTP server for real-time bidirectional messaging.
+2. Support session management: each connecting client gets a unique session ID, with conversation history maintained for the session duration.
+3. Implement a fallback HTTP polling endpoint (POST /chat) for environments where WebSocket is blocked.
+4. Define the message protocol: JSON messages with fields for type (user_message, agent_response, typing_indicator, error), content, timestamp, and session_id.
+5. Add CORS headers to allow connections from the website frontend domain.
+6. Implement connection lifecycle: on connect, send a greeting; on disconnect, persist session state for potential reconnection.
+7. Expose the endpoint via a Kubernetes Service (and eventually Ingress) for frontend access.
 
 ## Validation
-Equipment lookup skill returns correct data via sigma1_equipment_lookup; availability skill returns accurate availability for date ranges; admin skill handles system status queries; all skills produce correct tool invocations and parse responses; logs capture operations across channels.
+Connect to the WebSocket endpoint using wscat or a test client; send a message and verify a response is received; verify session persistence across multiple messages; test CORS headers; test HTTP polling fallback.

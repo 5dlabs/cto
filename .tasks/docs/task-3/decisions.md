@@ -1,14 +1,14 @@
 ## Decision Points
 
 - Which Redis-compatible engine should be used for caching, rate limiting, and session storage across services?
-- Which PostgreSQL operator should be used for managing the main transactional database?
-- What API paradigm should be used for inter-service communication between backend services (e.g., Equipment Catalog, RMS, Finance, Vetting)?
-- How should multi-tenancy and schema separation be handled in the PostgreSQL database?
+- How should service-to-service communication be handled between backend services (e.g., Morgan agent, RMS, Catalog, Finance, Vetting, Social Engine)?
+- What API paradigm should be used for the public-facing Equipment Catalog and RMS APIs?
+- Should all services share a single PostgreSQL cluster with multiple schemas, or should each service have its own isolated database instance?
 - What authentication and authorization mechanism should be used for internal service-to-service and external API access?
-- How should API versioning be handled for public and internal APIs?
-- Which Google Calendar API client library and authentication method should be used for project event integration?
+- Which Google Calendar API authentication method should be used for project scheduling — OAuth 2.0 user-delegated access or a service account with domain-wide delegation?
+- How should barcode formats be handled for inventory check-in/check-out — should the system generate its own barcodes or support scanning of pre-existing manufacturer/rental-house barcodes?
 
 ## Coordination Notes
 
-- Agent owner: Grizz
+- Agent owner: grizz
 - Primary stack: Go 1.22+/gRPC

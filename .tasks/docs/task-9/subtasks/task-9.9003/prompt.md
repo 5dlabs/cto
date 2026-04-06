@@ -1,10 +1,10 @@
-Implement subtask 9003: Increase backend service replicas for production concurrency
+Implement subtask 9003: Increase replicas for backend services and Morgan agent with HPA
 
 ## Objective
-Scale all backend service Deployments to multiple replicas with appropriate resource requests, HPA configuration, and pod disruption budgets.
+Scale all backend service Deployments to multiple replicas and configure Horizontal Pod Autoscalers (HPA) for CPU/memory-based autoscaling.
 
 ## Steps
-1. For each backend Deployment (API services, workers, etc.), set `replicas: 2` minimum as baseline. 2. Create HorizontalPodAutoscaler (HPA) resources targeting 70% CPU utilization with `minReplicas: 2` and `maxReplicas` based on expected load. 3. Add PodDisruptionBudget (PDB) resources with `minAvailable: 1` for each Deployment to ensure availability during node drains. 4. Configure pod anti-affinity with `preferredDuringSchedulingIgnoredDuringExecution` on `kubernetes.io/hostname` to spread replicas. 5. Set appropriate resource `requests` and `limits` for CPU and memory based on observed usage. 6. Apply all manifests and verify pods are scheduled across multiple nodes.
+1. For each backend Deployment (API services, Morgan agent, web frontend), set `spec.replicas` to at least 2 for baseline availability. 2. Create HPA resources targeting 70% CPU utilization with min=2, max=5 replicas (adjust per service based on expected load). 3. Ensure metrics-server is installed and functioning in the cluster. 4. Set PodDisruptionBudgets (minAvailable: 1) for each Deployment to protect availability during rolling updates. 5. Configure anti-affinity (preferredDuringSchedulingIgnoredDuringExecution) to spread pods across nodes. 6. Apply all manifests and verify HPA status shows current metrics.
 
 ## Validation
-Verify each Deployment has at least 2 ready replicas with `kubectl get deployments`. Trigger a node drain and confirm PDBs prevent full service disruption. Simulate CPU load and verify HPA scales up within 2 minutes.
+Verify each service has at least 2 running pods. Check `kubectl get hpa` shows valid current/target metrics. Simulate CPU load on one service and confirm HPA scales up within 2 minutes. Verify PDB prevents simultaneous eviction of all pods during a drain.

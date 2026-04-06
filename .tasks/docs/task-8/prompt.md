@@ -1,29 +1,28 @@
-Implement task 8: Develop Sigma-1 Website (Blaze - Next.js 15/React 19)
+Implement task 8: Develop Website Frontend (Blaze - Next.js 15/React 19/Effect)
 
 ## Goal
-Build the Sigma-1 website with equipment catalog, self-service quote builder, Morgan web chat, and portfolio gallery, optimized for AI-native features.
+Build the Sigma-1 website with equipment catalog, self-service quote builder, portfolio, and embedded Morgan web chat, optimized for AI and SEO.
 
 ## Task Context
-- Agent owner: Blaze
+- Agent owner: blaze
 - Stack: Next.js 15/React 19/Effect
 - Priority: high
-- Dependencies: 2, 6, 7
+- Dependencies: 2, 7
 
 ## Implementation Plan
-{"steps": ["Initialize Next.js 15 project with App Router, React 19, shadcn/ui, TailwindCSS 4, and Effect 3.x.", "Implement pages: / (hero), /equipment (catalog), /equipment/:id (details), /quote (builder), /portfolio (gallery), /llms.txt, /llms-full.", "Integrate with Equipment Catalog API for real-time data.", "Implement Effect.Schema for validation and TanStack Query for data fetching.", "Embed Morgan web chat widget.", "Display published social content in portfolio.", "Add Schema.org structured data and llms.txt for AI optimization.", "Deploy to Cloudflare Pages."]}
+{"steps": ["Initialize Next.js 15 project with App Router, React 19, shadcn/ui, TailwindCSS 4, and Effect 3.x", "Implement pages: /, /equipment, /equipment/:id, /quote, /portfolio, /llms.txt, /llms-full", "Integrate with Equipment Catalog API for product and availability data using TanStack Query + Effect", "Build self-service quote builder with Effect form validation", "Embed Morgan web chat widget and ensure real-time communication", "Display portfolio synced from Social Media Engine", "Add Schema.org structured data and llms.txt for AI optimization", "Ensure accessibility, responsive design, and performance best practices"]}
 
 ## Acceptance Criteria
-All pages render and fetch data as described; quote builder submits and receives confirmation; Morgan chat widget functional; portfolio syncs with social engine; Lighthouse score >90; >80% code coverage on components and data logic.
+All pages render and fetch data correctly; quote builder submits and receives confirmation; Morgan chat widget works; portfolio displays published content; llms.txt and structured data are present; Lighthouse score >90; passes accessibility checks.
 
 ## Subtasks
-- Initialize Next.js 15 project with App Router, React 19, shadcn/ui, TailwindCSS 4, Effect 3.x, and Cloudflare Pages deployment: Bootstrap the Next.js 15 project with all required dependencies, configure the App Router, set up the design system foundation (shadcn/ui + TailwindCSS 4), integrate Effect 3.x, configure TanStack Query, and establish the Cloudflare Pages deployment pipeline.
-- Implement hero landing page (/): Build the hero landing page at the root route with the company value proposition, call-to-action sections, and responsive layout.
-- Implement equipment catalog listing page (/equipment) with API integration: Build the equipment catalog listing page that fetches equipment data from the Equipment Catalog API using TanStack Query and displays it in a filterable, paginated view.
-- Implement equipment detail page (/equipment/:id) with API integration: Build the individual equipment detail page that fetches a single equipment item from the API and displays full details, specifications, availability calendar, and a CTA to add to quote.
-- Implement self-service quote builder page (/quote) with Effect.Schema validation: Build the interactive quote builder page where customers can select equipment, specify rental dates, enter contact information, and submit a quote request with full Effect.Schema validation.
-- Embed Morgan web chat widget on the website: Integrate the Morgan AI web chat widget into the website, connecting it to the Morgan agent's WebSocket/HTTP chat endpoint.
-- Implement portfolio gallery page (/portfolio) with social engine sync: Build the portfolio gallery page that displays published social media content fetched from the social engine backend, showcasing project photos and event content.
-- Implement SEO optimization: Schema.org structured data, llms.txt, and llms-full pages: Add comprehensive Schema.org structured data across all pages, create the /llms.txt and /llms-full routes for AI discoverability, and optimize for Lighthouse score >90.
+- Initialize Next.js 15 project with App Router, React 19, TailwindCSS 4, shadcn/ui, Effect 3.x, and TanStack Query: Scaffold the Next.js 15 project with all core dependencies, configure the design system foundation, and set up the API data-fetching layer.
+- Implement home page and equipment catalog pages (/, /equipment, /equipment/:id): Build the landing page, equipment listing page with filtering/search, and individual equipment detail page, all integrated with the Equipment Catalog API.
+- Build self-service quote builder page (/quote) with Effect form validation: Implement the quote builder allowing customers to select equipment, specify rental dates and location, and submit a quote request with full form validation using Effect.
+- Embed Morgan web chat widget with real-time WebSocket communication: Integrate the Morgan AI chat widget into the website as a floating component that communicates with the Morgan agent's WebSocket endpoint in real-time.
+- Build portfolio page (/portfolio) synced from Social Media Engine: Implement the portfolio page that displays published project content fetched from the Social Media Engine API.
+- Add Schema.org structured data, llms.txt routes, and SEO metadata: Implement Schema.org JSON-LD structured data across all pages, create /llms.txt and /llms-full routes for AI optimization, and configure comprehensive SEO metadata.
+- Accessibility audit, responsive design QA, and Lighthouse performance optimization: Ensure the entire site passes accessibility checks, is fully responsive across devices, and achieves a Lighthouse score above 90 in all categories.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

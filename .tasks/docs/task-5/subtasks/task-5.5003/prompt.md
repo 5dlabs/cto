@@ -1,10 +1,10 @@
-Implement subtask 5003: Implement LinkedIn online presence integration
+Implement subtask 5003: Implement OpenCorporates business verification integration
 
 ## Objective
-Build the integration module for LinkedIn API to assess a company's online presence including company page data, follower count, and activity signals.
+Build the HTTP client integration for the OpenCorporates API to perform business entity verification, including company search, registration status, and officer lookups.
 
 ## Steps
-1. Create a `vetting::integrations::linkedin` module. 2. Define a trait `OnlinePresenceProvider` with method: `assess_presence(company_name: &str, domain: Option<&str>) -> Result<OnlinePresenceResult>`. 3. Implement LinkedIn API integration using OAuth2 client credentials flow; store client_id and client_secret in Kubernetes secrets. 4. Fetch company page data: follower count, post frequency, employee count range, company description completeness. 5. Compute an online_presence_score (0.0-1.0) based on: has_linkedin_page (0.2), follower_count > threshold (0.3), recent_activity within 30 days (0.3), profile_completeness (0.2). 6. Define OnlinePresenceResult struct with score, follower_count, last_activity_date, profile_completeness_pct. 7. Handle LinkedIn API pagination and rate limiting.
+1. In `integrations/opencorporates.rs`, create an OpenCorporatesClient struct holding a reqwest::Client and API key. 2. Implement methods: `search_company(name: &str, jurisdiction: Option<&str>) -> Result<CompanySearchResult>`, `get_company(company_number: &str, jurisdiction: &str) -> Result<CompanyDetails>`, `verify_registration(org_name: &str) -> Result<BusinessVerification>`. 3. Define response DTOs matching OpenCorporates API JSON structure. 4. Map API responses into a `BusinessVerification` domain struct with fields: is_registered (bool), registration_date, status, jurisdiction, officers, confidence_score. 5. Handle API errors, rate limits (429), and timeouts gracefully with proper error types. 6. Use trait `BusinessVerifier` so the client can be mocked in tests.
 
 ## Validation
-Unit tests with mocked LinkedIn API responses for: complete profile, sparse profile, no page found, expired OAuth token refresh. Verify scoring algorithm produces expected scores for known input combinations.
+Unit tests with mocked HTTP responses verify correct parsing of OpenCorporates data; error cases (404, 429, timeout) return appropriate error variants; BusinessVerification struct is correctly populated from mock data.

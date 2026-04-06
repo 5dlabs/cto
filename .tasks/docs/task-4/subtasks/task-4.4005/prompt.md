@@ -1,10 +1,21 @@
-Implement subtask 4005: Integrate Stripe API for payment processing and webhook handling
+Implement subtask 4005: Implement currency rate sync job with Redis caching
 
 ## Objective
-Implement Stripe PaymentIntent creation for invoices, payment confirmation flow, and Stripe webhook endpoint to handle asynchronous payment events.
+Build a scheduled background job that fetches current exchange rates from an external API, stores them in PostgreSQL, and caches them in Redis for fast multi-currency conversions.
 
 ## Steps
-1. Add stripe-rust crate as a dependency. 2. Create src/services/stripe.rs: Initialize Stripe client with STRIPE_SECRET_KEY from config. 3. Implement create_payment_intent: given an invoice, create a Stripe PaymentIntent with amount (in smallest currency unit), currency, metadata (invoice_id). Return client_secret for frontend and store stripe_payment_intent_id on the invoice. 4. Implement POST /api/v1/invoices/:id/pay endpoint that creates a PaymentIntent and returns the client_secret. 5. Implement POST /api/v1/webhooks/stripe endpoint: verify webhook signature using STRIPE_WEBHOOK_SECRET, parse event type. Handle 'payment_intent.succeeded': look up invoice by payment_intent metadata, create Payment record with status 'succeeded', update invoice status if fully paid. Handle 'payment_intent.payment_failed': create Payment record with status 'failed', log details. 6. Make webhook handler idempotent: check if a payment with the same stripe_payment_intent_id already exists before creating a duplicate. 7. Add error handling for Stripe API failures (network errors, invalid requests).
+1. Create src/jobs/currency_sync.rs with a CurrencyRateSyncer.
+2. Implement fetch_rates() that calls the configured exchange rate API (abstracted behind a trait for swappability):
+   - Parse JSON response into rate entries (base_currency, target_currency, rate)
+   - Insert/upsert rates into currency_rates table with fetched_at timestamp
+   - Cache rates in Redis with key pattern 'currency:USD:CAD' and TTL of 24 hours
+3. Create a tokio::spawn background task that runs fetch_rates() on a configurable interval (default: every 6 hours).
+4. Implement src/services/currency.rs with:
+   - get_rate(from, to) → check Redis first, fallback to DB, return rate
+   - convert(amount, from, to) → get_rate and multiply
+5. Add endpoint GET /v1/currency/rates?base=USD to return current cached rates.
+6. Add endpoint GET /v1/currency/convert?amount=100&from=USD&to=CAD to perform conversion.
+7. Ensure graceful handling if rate is unavailable (return error, don't silently use stale data beyond threshold).
 
 ## Validation
-Unit tests with mocked Stripe client verify PaymentIntent creation with correct parameters; webhook handler correctly parses and verifies signatures; idempotency test: sending the same webhook event twice creates only one payment record; integration test with Stripe test mode: create PaymentIntent, simulate success webhook, verify invoice marked as paid.
+Sync job fetches rates and stores them in DB and Redis; GET /v1/currency/rates returns cached rates; GET /v1/currency/convert returns correct conversion with proper decimal precision; Redis cache hit returns rate without DB query; stale rate beyond threshold returns appropriate error; mock external API to test sync job logic.

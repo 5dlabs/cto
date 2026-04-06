@@ -1,10 +1,10 @@
-Implement subtask 6005: Implement Signal-based approval workflow for Morgan
+Implement subtask 6005: Implement draft management CRUD endpoints
 
 ## Objective
-Build the approval notification system that sends curated drafts to Morgan via Signal and processes approval/rejection responses.
+Build the draft management endpoints: GET /api/v1/social/drafts, GET /api/v1/social/drafts/:id, and draft creation flow that combines uploads with AI-generated captions into reviewable drafts.
 
 ## Steps
-1. Create a `services/signal` module. 2. Integrate with the chosen Signal interface (signal-cli REST API or subprocess). Configure the Signal phone number and Morgan's contact number from Kubernetes secrets. 3. When new drafts are created by the AI curation pipeline, send a Signal message to Morgan containing: thumbnail image(s), AI-generated caption, AI score, and instructions (reply 'approve <id>' or 'reject <id> <reason>'). 4. Implement a polling mechanism or webhook listener to receive incoming Signal messages from Morgan. 5. Parse incoming messages: match 'approve <id>' pattern → call approve endpoint logic, match 'reject <id> <reason>' → call reject endpoint logic. 6. Send confirmation messages back to Morgan after processing (e.g., 'Draft #123 approved and queued for publishing'). 7. Handle error cases: unknown draft ID, draft already processed, malformed message (reply with help text). 8. Wrap all Signal operations in Effect for error handling and retries.
+1. In `src/routes/drafts.ts`, implement: a) `POST /api/v1/social/drafts` — accepts upload_ids and optional manual caption, triggers AI caption generation for each target platform, creates a Draft record with status PENDING_REVIEW, returns 201 with draft details including AI captions. b) `GET /api/v1/social/drafts` — lists all drafts with pagination and optional status filter, returns 200 with array. c) `GET /api/v1/social/drafts/:id` — returns single draft with full details including uploads and captions, returns 200 or 404. 2. Validate all requests/responses with Effect.Schema. 3. Draft creation should call AICaptionService.generateCaption for each target platform. 4. Include presigned URLs for images in draft responses so reviewers can preview.
 
 ## Validation
-Unit test message formatting and parsing with mocked Signal client. Verify approve/reject commands are correctly parsed and executed. Test error handling: unknown ID, already-processed draft, malformed message. Integration test: send a test message and verify delivery (requires Signal test setup).
+POST /drafts with valid upload_ids creates draft with AI-generated captions and PENDING_REVIEW status; GET /drafts returns paginated list; GET /drafts/:id returns correct draft; 404 for non-existent draft; Effect.Schema validates all inputs/outputs.

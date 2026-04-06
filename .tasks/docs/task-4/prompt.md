@@ -1,31 +1,31 @@
 Implement task 4: Implement Finance Service (Rex - Rust/Axum)
 
 ## Goal
-Create the Finance Service for invoicing, payments, payroll, and financial reporting, with Stripe integration and multi-currency support.
+Create the Finance backend for invoicing, payments, payroll, and financial reporting, with Stripe integration and multi-currency support.
 
 ## Task Context
-- Agent owner: Rex
+- Agent owner: rex
 - Stack: Rust 1.75+/Axum 0.7
 - Priority: high
 - Dependencies: 1
 
 ## Implementation Plan
-{"steps": ["Initialize Rust project with Axum 0.7, connect to PostgreSQL, Redis, and Stripe using ConfigMap.", "Define Invoice, Payment, and related models as per PRD.", "Implement endpoints for invoices, payments, finance reports, payroll, and currency rates.", "Integrate Stripe API for payment processing and webhooks.", "Implement scheduled job for currency rate sync.", "Add Prometheus metrics and health endpoints.", "Write database migrations for finance schema.", "Document OpenAPI spec for all endpoints."]}
+{"steps": ["Set up Rust Axum service with PostgreSQL, Redis, and Stripe API keys from 'sigma1-infra-endpoints'", "Define Invoice, Payment, and Payroll models as per PRD", "Implement endpoints for invoices, payments, finance reports, payroll, and currency rates", "Integrate Stripe for payment processing and webhooks", "Schedule currency rate sync job and cache rates in Redis", "Implement automated payment reminders and AR aging logic", "Add tax calculation for GST/HST, US sales tax, and international", "Write OpenAPI spec and ensure endpoints are Effect-compatible for frontend consumption"]}
 
 ## Acceptance Criteria
-All endpoints return correct data as per OpenAPI spec; Stripe payments can be created and reconciled; currency rates update on schedule; health and metrics endpoints respond; >80% code coverage on business logic.
+Endpoints return correct invoice/payment/report data; Stripe payments are processed and recorded; currency rates update on schedule; AR aging and payroll reports are accurate; automated reminders are sent; >80% test coverage.
 
 ## Subtasks
-- Initialize Rust/Axum project with PostgreSQL and Redis connectivity: Set up the Rust project with Axum 0.7 framework, configure database connection pools for PostgreSQL (via sqlx) and Redis, and establish the module structure for the finance service.
-- Write database migrations for finance schema: Create SQL migration files for all finance domain tables: invoices, invoice_line_items, payments, payroll_entries, currency_rates, and supporting tables.
-- Define data models and repository layer for finance entities: Implement Rust structs for all finance domain entities (Invoice, Payment, PayrollEntry, CurrencyRate) with serde and sqlx derives, plus repository functions for database CRUD operations.
-- Implement invoice and payment CRUD endpoints: Build Axum route handlers for invoice creation, retrieval, listing, status updates, and payment recording endpoints with proper validation and error handling.
-- Integrate Stripe API for payment processing and webhook handling: Implement Stripe PaymentIntent creation for invoices, payment confirmation flow, and Stripe webhook endpoint to handle asynchronous payment events.
-- Implement payroll endpoints with multi-currency support: Build Axum route handlers for payroll entry creation, approval workflow, and payment recording, with amounts stored and displayed in the crew member's configured currency.
-- Implement scheduled currency rate sync job: Create a background task that periodically fetches current exchange rates from an external API and stores them in the currency_rates table.
-- Implement financial reporting endpoints: Build reporting endpoints for revenue summaries, outstanding invoices, payment history, and payroll cost reports with date range filtering.
-- Add Prometheus metrics, health endpoints, and OpenAPI documentation: Instrument the service with Prometheus metrics, implement readiness/liveness probes, and generate/document the OpenAPI specification for all endpoints.
-- Write integration tests for end-to-end finance workflows: Create comprehensive integration tests covering the full invoice-to-payment lifecycle, Stripe webhook processing, payroll workflow, and financial reporting accuracy.
+- Scaffold Rust/Axum service with PostgreSQL and Redis connectivity: Initialize the Rust project with Axum 0.7, set up PostgreSQL connection pool via sqlx, Redis client, and health check endpoints, reading all connection details from the sigma1-infra-endpoints ConfigMap.
+- Define database models and migrations for Invoice, Payment, and Payroll: Create PostgreSQL schema migrations for invoices, payments, payroll records, and currency rates using sqlx migrations, with multi-currency support built into the data model.
+- Implement invoice and payment CRUD endpoints: Build Axum route handlers for creating, reading, updating, listing, and deleting invoices and payments, with proper validation, error handling, and JSON serialization.
+- Integrate Stripe for payment processing and webhook handling: Implement Stripe payment intent creation, payment processing, and webhook handling to record Stripe payment events against invoices.
+- Implement currency rate sync job with Redis caching: Build a scheduled background job that fetches current exchange rates from an external API, stores them in PostgreSQL, and caches them in Redis for fast multi-currency conversions.
+- Implement financial reporting endpoints and AR aging logic: Build endpoints for accounts receivable aging reports, revenue reports, and payroll summary reports with configurable date ranges and grouping.
+- Implement payroll processing endpoints: Build endpoints for creating, approving, and processing payroll records, with support for hourly rates, deductions, and batch processing.
+- Implement tax calculation engine for GST/HST, US sales tax, and international: Build a modular tax calculation service that computes applicable taxes based on jurisdiction, integrating into invoice creation and reporting.
+- Implement automated payment reminder scheduling: Build a background job that identifies invoices approaching or past their due date and triggers payment reminder notifications.
+- Generate OpenAPI specification and write integration tests: Generate an OpenAPI 3.0 spec for all Finance service endpoints using utoipa, and write comprehensive integration tests covering all routes with >80% code coverage.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

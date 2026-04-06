@@ -1,10 +1,26 @@
-Implement subtask 4006: Implement payroll endpoints with multi-currency support
+Implement subtask 4006: Implement financial reporting endpoints and AR aging logic
 
 ## Objective
-Build Axum route handlers for payroll entry creation, approval workflow, and payment recording, with amounts stored and displayed in the crew member's configured currency.
+Build endpoints for accounts receivable aging reports, revenue reports, and payroll summary reports with configurable date ranges and grouping.
 
 ## Steps
-1. In src/routes/payroll.rs: POST /api/v1/payroll (create payroll entry: crew_member_id, pay_period_start, pay_period_end, hours_worked, hourly_rate, currency; calculate gross_amount = hours * rate), GET /api/v1/payroll (list with filters: crew_member_id, pay_period, status, page/per_page), GET /api/v1/payroll/:id, PATCH /api/v1/payroll/:id/approve (transition from draft→approved, validate caller has admin role placeholder), PATCH /api/v1/payroll/:id/pay (transition from approved→paid, set paid_date). 2. Add validation: pay_period_end must be after pay_period_start, hours_worked > 0, hourly_rate > 0. 3. Implement currency conversion helper in src/services/currency.rs: given an amount and source/target currencies, look up the latest rate from currency_rates table and return converted amount. 4. Add GET /api/v1/payroll/summary endpoint: aggregate total payroll by currency for a given period. 5. Invalid state transitions (e.g., paying a draft entry) return 409.
+1. Create src/routes/reports.rs with Axum handlers.
+2. GET /v1/reports/ar-aging:
+   - Query invoices with status 'sent' or 'overdue'
+   - Group by aging buckets: current (0-30 days), 31-60, 61-90, 91+ days past due
+   - Return per-client and aggregate totals with currency
+   - Support filtering by client_id
+3. GET /v1/reports/revenue:
+   - Query paid invoices within a date range
+   - Group by month, client, or project (configurable via query param)
+   - Return total revenue, payment count, average invoice value
+   - Support multi-currency: convert to a base currency using currency service or show per-currency
+4. GET /v1/reports/payroll:
+   - Query payroll records within a period
+   - Return per-crew-member summary: total hours, gross pay, deductions, net pay
+   - Return aggregate totals
+5. Implement a background check/cron that transitions invoices from 'sent' to 'overdue' when due_date has passed.
+6. Wire all report routes into the router.
 
 ## Validation
-Integration tests: create payroll entry → approve → mark paid; attempt to pay draft entry returns 409; currency conversion returns correct amount based on stored rates; payroll summary aggregates correctly across multiple entries and currencies; >80% coverage.
+AR aging report correctly buckets invoices by days past due; invoices paid before due date don't appear in AR aging; revenue report totals match sum of paid invoices for the period; payroll report correctly aggregates per-crew-member; overdue transition job changes invoice status when due_date passes; date range filtering works correctly on all reports.

@@ -1,10 +1,10 @@
-Implement subtask 6008: Implement Facebook API publishing integration
+Implement subtask 6008: Implement LinkedIn publishing Effect.Service
 
 ## Objective
-Build the Facebook publishing module using the Facebook Graph API to publish approved images with captions to the business page.
+Build the Effect.Service implementation for publishing posts to LinkedIn, including the LinkedIn Marketing API integration for company page posts.
 
 ## Steps
-1. Create a `services/publishing/facebook` module implementing the PublishingProvider interface. 2. Implement Facebook Graph API integration: POST to /{page-id}/photos with image URL and caption. 3. Use Page Access Token stored in Kubernetes secrets. Implement token validation and refresh. 4. Return PublishResult with platform_post_id (post_id), permalink_url, published_at. 5. Handle Facebook-specific errors: invalid page token, image format issues, posting rate limits. 6. Support both photo posts and link posts with image previews.
+1. In `src/services/publishers/linkedin.ts`, create an Effect.Service `LinkedInPublisher` implementing the `Publisher` interface. 2. Implement `publish(draft: Draft, images: Upload[]) -> Effect<PublishResult>`: a) Register image upload with LinkedIn API. b) Upload image binary to the provided upload URL. c) Create a share/post on the company page with image asset, caption text, and LinkedIn-appropriate formatting. d) Return PublishResult with platform_post_id and post_url. 3. Handle LinkedIn OAuth2 token management. 4. Handle LinkedIn API rate limits and error responses. 5. Format captions appropriately for LinkedIn (professional tone, no hashtag overload).
 
 ## Validation
-Unit test with mocked Facebook Graph API: verify photo post creation, token validation, error handling for invalid tokens. Verify returned post_id format is valid. Integration test with Facebook test page if available.
+Unit tests with mocked LinkedIn API verify correct three-step upload flow (register → upload → share); post is created on correct company page; captions are LinkedIn-formatted; API errors are handled; OAuth token refresh works.

@@ -1,10 +1,10 @@
-Implement subtask 6002: Implement image upload endpoint with S3/R2 storage
+Implement subtask 6002: Define Effect.Schema models and database migrations for social media entities
 
 ## Objective
-Build the POST /api/v1/social/upload endpoint that accepts image files, stores them in S3/R2, and returns the stored URLs.
+Create Effect.Schema definitions for all domain entities (Upload, Draft, PublishedPost) and write PostgreSQL migrations for the corresponding tables.
 
 ## Steps
-1. Implement POST /api/v1/social/upload as a multipart form handler in Elysia. 2. Accept one or more image files (JPEG, PNG, WebP) with a max size of 10MB per file. 3. Validate file types and sizes using Effect.Schema. 4. Generate unique S3 keys using format: social/{year}/{month}/{uuid}.{ext}. 5. Upload each file to S3/R2 using the configured client with appropriate content-type headers. 6. Return a JSON response with an array of { url, key, size, content_type } for each uploaded file. 7. Handle upload failures gracefully — if one file in a batch fails, report which succeeded and which failed. 8. Wrap all S3 operations in Effect for structured error handling.
+1. In `src/schemas/upload.ts`, define Upload schema: id (UUID), file_key (S3 key), original_filename, mime_type, file_size, uploaded_at, metadata (JSON). 2. In `src/schemas/draft.ts`, define Draft schema: id (UUID), upload_ids (UUID[]), caption (string), ai_generated_caption (string), platform_targets (array of INSTAGRAM/LINKEDIN/TIKTOK/FACEBOOK), status (enum: PENDING_REVIEW/APPROVED/REJECTED/PUBLISHED), reviewer_notes (optional string), created_at, updated_at. 3. In `src/schemas/published_post.ts`, define PublishedPost schema: id (UUID), draft_id (UUID), platform, platform_post_id, published_at, post_url. 4. Create request/response schemas for each endpoint using Effect.Schema. 5. Write SQL migrations: CREATE TABLE uploads, drafts, published_posts with proper indexes and foreign keys. 6. Add enum types for draft_status and platform.
 
 ## Validation
-Upload single and multiple images; verify files are accessible in S3/R2; reject oversized files (>10MB); reject non-image MIME types; verify returned URLs are valid and accessible.
+Migrations run successfully; Effect.Schema encode/decode roundtrips work for all entities; validation rejects invalid data (e.g., empty caption, invalid platform); schema types are correctly inferred by TypeScript.

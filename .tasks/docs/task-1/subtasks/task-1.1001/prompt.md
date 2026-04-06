@@ -1,14 +1,15 @@
 Implement subtask 1001: Create Kubernetes namespaces and RBAC foundations
 
 ## Objective
-Create all required Kubernetes namespaces (databases, sigma1, openclaw, social, web) and apply baseline RBAC roles and service accounts for each namespace to enable subsequent deployments.
+Create all required Kubernetes namespaces (databases, sigma1, openclaw, etc.) and set up basic RBAC ServiceAccounts for each namespace so downstream deployments have appropriate permissions.
 
 ## Steps
-1. Define namespace manifests for: databases, sigma1, openclaw, social, web.
-2. Apply each namespace via kubectl/Helm.
-3. Create a ServiceAccount in each namespace for workloads to use.
-4. Apply baseline RBAC RoleBindings granting the service accounts read access to ConfigMaps and Secrets within their namespace.
-5. Label all namespaces with project=sigma1 for easy identification.
+1. Create namespace manifests for: databases, sigma1, openclaw (and any others referenced in the PRD).
+2. Apply namespace labels for organization (e.g., app.kubernetes.io/part-of: sigma1).
+3. Create ServiceAccount resources in each namespace for pod identity.
+4. Apply ResourceQuota and LimitRange on the sigma1 namespace to prevent runaway resource usage in dev.
+5. Use `kubectl apply -f` or Helm to deploy all namespace manifests.
+6. Verify namespaces exist with `kubectl get ns`.
 
 ## Validation
-Run `kubectl get namespaces` and verify all five namespaces exist with correct labels. Verify ServiceAccounts exist in each namespace. Verify RoleBindings are applied and functional by attempting a permitted and a denied operation from a test pod.
+Run `kubectl get ns` and confirm all expected namespaces exist; verify ServiceAccounts are present in each namespace with `kubectl get sa -n <ns>`; confirm ResourceQuota is applied.

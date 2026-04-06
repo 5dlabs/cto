@@ -1,17 +1,19 @@
-Implement subtask 8007: Implement portfolio gallery page (/portfolio) with social engine sync
+Implement subtask 8007: Accessibility audit, responsive design QA, and Lighthouse performance optimization
 
 ## Objective
-Build the portfolio gallery page that displays published social media content fetched from the social engine backend, showcasing project photos and event content.
+Ensure the entire site passes accessibility checks, is fully responsive across devices, and achieves a Lighthouse score above 90 in all categories.
 
 ## Steps
-1. Create `app/portfolio/page.tsx` for the portfolio gallery.
-2. Define the social content API client: fetch published social posts from the social engine backend endpoint.
-3. Implement a TanStack Query hook (`usePortfolioContent`) to fetch and cache published content.
-4. Build the gallery UI: masonry or grid layout displaying images/videos with captions, dates, and platform badges.
-5. Implement filtering by content type or tag if the API supports it.
-6. Add lightbox or modal view for full-size image/video viewing.
-7. Implement loading skeletons and empty state ('No content yet').
-8. Add Schema.org ImageGallery structured data.
+1. Run axe-core or similar automated accessibility tool across all pages; fix all critical and serious violations.
+2. Verify keyboard navigation works on all interactive elements (chat widget, forms, navigation, filters).
+3. Ensure proper ARIA labels, roles, and landmarks on all custom components.
+4. Verify color contrast ratios meet WCAG AA standards.
+5. Test responsive design on mobile (375px), tablet (768px), and desktop (1280px+) breakpoints.
+6. Run Lighthouse CI on all pages; identify and fix performance bottlenecks (image optimization, bundle splitting, font loading, unused CSS).
+7. Implement lazy loading for below-fold content and optimize LCP (Largest Contentful Paint).
+8. Minimize CLS (Cumulative Layout Shift) by setting explicit dimensions on images and dynamic content.
+9. Ensure all pages achieve Lighthouse scores >90 for Performance, Accessibility, Best Practices, and SEO.
+10. Document any known accessibility limitations.
 
 ## Validation
-Portfolio page renders at `/portfolio`; content is fetched from the social engine API; gallery displays images with captions; lightbox opens for full-size viewing; filtering works if supported; loading and empty states render correctly; Schema.org structured data is present.
+axe-core reports zero critical/serious violations; keyboard-only navigation completes all major user flows; Lighthouse CI scores >90 in all categories on all pages; responsive layout renders correctly at 375px, 768px, and 1280px+ breakpoints; no horizontal scrolling on mobile.

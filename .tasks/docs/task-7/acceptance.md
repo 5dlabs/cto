@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] Morgan responds to Signal, voice, and web chat within 10s for simple queries; can complete lead qualification, vetting, quote, and invoice flows end-to-end; logs all actions; >80% code coverage on skills and tool integrations.
+- [ ] Morgan responds to Signal, voice, and web chat within SLA; can trigger all MCP tools; end-to-end flows (lead → vet → quote → invoice) complete successfully; integration tests pass for all skills.
 
 ## Verification Notes
 

@@ -1,10 +1,10 @@
-Implement subtask 5007: Implement REST endpoints for vetting operations
+Implement subtask 5007: Implement vetting pipeline orchestration and scoring algorithm
 
 ## Objective
-Build the Axum route handlers for POST /api/v1/vetting/run, GET /api/v1/vetting/:org_id, and GET /api/v1/vetting/credit/:org_id with request validation and error handling.
+Build the vetting pipeline that orchestrates all four verification stages (business verification, online presence, reputation, credit) and combines their results into a final GREEN/YELLOW/RED lead score.
 
 ## Steps
-1. Create `vetting::handlers` module with Axum handlers. 2. POST /api/v1/vetting/run: Accept JSON body with org_id, org_name, jurisdiction, domain (optional). Validate input using serde with custom validation. Invoke the vetting pipeline. Return 202 Accepted with a vetting_run_id if async, or 200 with full VettingResult if synchronous. 3. GET /api/v1/vetting/:org_id: Query PostgreSQL for the latest VettingResult for the given org_id. Return 200 with the result or 404 if no vetting has been performed. 4. GET /api/v1/vetting/credit/:org_id: Query PostgreSQL for the credit-specific portion of the latest VettingResult. Return 200 with CreditResult or 404. 5. Implement consistent error response format: { error: string, code: string, details: Option<Value> }. 6. Add request ID middleware (X-Request-Id header) for traceability. 7. Register all routes on the Axum router under the /api/v1/vetting prefix.
+1. In `services/vetting_pipeline.rs`, create a VettingPipeline struct that holds references to all four integration clients (via trait objects). 2. Implement `run_vetting(org_id: UUID, org_name: &str) -> Result<VettingResult>` that: a) Executes all four stages (consider parallel execution with tokio::join! or sequential based on dp-5-2 decision), b) Collects results from each stage, c) Passes all results to the scoring algorithm. 3. In `services/scoring.rs`, implement the scoring algorithm: a) Assign weights to each component (e.g., business_verification: 30%, online_presence: 15%, reputation: 25%, credit: 30%), b) Normalize each component score to 0-100, c) Calculate weighted total, d) Map to classification: GREEN (>=70), YELLOW (40-69), RED (<40). 4. Store the VettingResult and LeadScore in PostgreSQL using sqlx. 5. Handle partial failures (e.g., one API is down) gracefully — score with available data and flag incomplete components.
 
 ## Validation
-Integration tests: POST /vetting/run with valid payload returns vetting result; GET /:org_id returns stored result; GET /credit/:org_id returns credit data; 404 for unknown org_id; 400 for invalid input. Verify request ID propagation.
+Unit tests verify scoring algorithm with known inputs produce correct GREEN/YELLOW/RED classifications; pipeline handles partial failures (one integration returns error) and still produces a result with degraded flag; weights sum to 100%; boundary values (69.5, 39.5) are tested.

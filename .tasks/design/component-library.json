@@ -1,9 +1,10 @@
 {
   "version": "1.0.0",
   "projectName": "sigma-1",
-  "provider_mode": "stitch",
+  "provider_mode": "both",
   "providers": [
-    "stitch"
+    "stitch",
+    "framer"
   ],
   "tokens": {
     "color": [
@@ -77,7 +78,8 @@
         "loading"
       ],
       "provider_refs": [
-        "stitch"
+        "stitch",
+        "framer"
       ]
     },
     {
@@ -90,7 +92,8 @@
         "success"
       ],
       "provider_refs": [
-        "stitch"
+        "stitch",
+        "framer"
       ]
     },
     {
@@ -102,7 +105,8 @@
         "selected"
       ],
       "provider_refs": [
-        "stitch"
+        "stitch",
+        "framer"
       ]
     }
   ],
@@ -115,7 +119,8 @@
         "with-secondary-cta"
       ],
       "provider_refs": [
-        "stitch"
+        "stitch",
+        "framer"
       ]
     },
     {
@@ -127,7 +132,8 @@
         "mobile-stack"
       ],
       "provider_refs": [
-        "stitch"
+        "stitch",
+        "framer"
       ]
     },
     {
@@ -139,7 +145,8 @@
         "enterprise"
       ],
       "provider_refs": [
-        "stitch"
+        "stitch",
+        "framer"
       ]
     }
   ],
@@ -148,17 +155,82 @@
       "target": "web",
       "provider": "stitch",
       "candidate_id": "stitch-web-1",
-      "screen_id": "9d1ca7992a394f78a830ec82ee375aec",
-      "notes": "Generated web modernization candidate from intake design context."
+      "notes": "Failed to generate web candidate."
     },
     {
       "target": "mobile",
       "provider": "stitch",
       "candidate_id": "stitch-mobile-2",
-      "screen_id": "65e7aff093db4965afd904e969bb1146",
+      "screen_id": "b86dce7e21a14956aac0073a752802f3",
       "notes": "Generated mobile modernization candidate from intake design context."
+    },
+    {
+      "target": "web",
+      "provider": "framer",
+      "candidate_id": "framer-web-1",
+      "screen_id": "framer-web-1775439320901",
+      "notes": "Prepared web Framer candidate with component-library oriented guidance."
+    },
+    {
+      "target": "mobile",
+      "provider": "framer",
+      "candidate_id": "framer-mobile-2",
+      "screen_id": "framer-mobile-1775439320902",
+      "notes": "Prepared mobile Framer candidate with component-library oriented guidance."
     }
   ],
-  "framer_code_components": [],
-  "generated_at": "2026-04-05T20:23:59.974Z"
+  "framer_code_components": [
+    {
+      "name": "HeroCta",
+      "props": [
+        {
+          "name": "headline",
+          "type": "string",
+          "default": "Design systems that ship faster"
+        },
+        {
+          "name": "subcopy",
+          "type": "string",
+          "default": "From intake signal to implementation-ready components."
+        },
+        {
+          "name": "ctaLabel",
+          "type": "string",
+          "default": "Get started"
+        }
+      ],
+      "property_controls": [
+        "headline",
+        "subcopy",
+        "ctaLabel"
+      ],
+      "notes": "Use Framer property controls for copy and variant tuning."
+    },
+    {
+      "name": "FeatureCard",
+      "props": [
+        {
+          "name": "title",
+          "type": "string",
+          "default": "Reusable component primitives"
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "default": "Define once, compose everywhere."
+        },
+        {
+          "name": "icon",
+          "type": "string",
+          "default": "sparkles"
+        }
+      ],
+      "property_controls": [
+        "title",
+        "description",
+        "icon"
+      ]
+    }
+  ],
+  "generated_at": "2026-04-06T01:35:20.903Z"
 }

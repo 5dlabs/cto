@@ -1,21 +1,15 @@
-Implement subtask 2004: Implement product listing and product detail endpoints
+Implement subtask 2004: Implement machine-readable Morgan API endpoints with rate limiting
 
 ## Objective
-Implement GET /api/v1/catalog/products (with filtering and pagination) and GET /api/v1/catalog/products/:id for individual product details.
+Implement the machine-readable API endpoints for the Morgan AI agent (/api/v1/equipment-api/catalog and /api/v1/equipment-api/checkout) and add Redis-based rate limiting middleware.
 
 ## Steps
-1. Create a handlers/products.rs module.
-2. Implement `list_products` handler:
-   - Query products from PostgreSQL with pagination (limit/offset or cursor-based).
-   - Support query parameters: category_id, status, search (ILIKE on name/description), sort_by, order.
-   - Return paginated response with items, total_count, page, page_size.
-   - Map image_urls to full S3/R2 URLs using the S3_ENDPOINT and S3_PRODUCT_IMAGES_BUCKET from config.
-3. Implement `get_product` handler:
-   - Query a single product by ID (UUID or integer).
-   - Return full product details including category info (JOIN or nested query).
-   - Return 404 if product not found.
-4. Create ProductListResponse and ProductDetailResponse DTOs.
-5. Register routes: GET /api/v1/catalog/products and GET /api/v1/catalog/products/:id.
+1. Create a `routes/equipment_api.rs` module.
+2. Implement `GET /api/v1/equipment-api/catalog`: return a simplified, structured JSON response optimized for LLM/agent consumption. Include fields: product_id, name, category, daily_rate, weekly_rate, monthly_rate, availability_summary (available_now: bool, next_available_date), image_url (primary). Support filtering by category and availability date range.
+3. Implement `POST /api/v1/equipment-api/checkout`: accept a JSON body with { product_id, customer_name, customer_phone, rental_start, rental_end, notes }. Validate input, check availability for the date range, create a reservation record in rms.availability (mark dates as reserved), return confirmation with reservation_id. This is a simplified checkout for Morgan's use—no payment processing yet.
+4. Create a `middleware/rate_limit.rs` module: implement a tower middleware or Axum layer that uses Redis INCR with TTL for sliding window rate limiting. Key by IP or API key. Default: 60 requests/minute for equipment-api endpoints.
+5. Apply the rate limiting middleware to the /api/v1/equipment-api/* routes.
+6. Wire routes into the main router.
 
 ## Validation
-GET /api/v1/catalog/products returns 200 with paginated JSON. Filtering by category_id returns only matching products. GET /api/v1/catalog/products/:id returns correct product with full details. Non-existent ID returns 404. Image URLs contain the correct S3 endpoint prefix.
+Call /equipment-api/catalog and verify simplified JSON structure suitable for agent consumption; POST to /equipment-api/checkout with valid data and verify reservation is created and availability is updated; POST with conflicting dates returns 409 Conflict; exceed 60 requests in 1 minute and verify 429 Too Many Requests response with Retry-After header.

@@ -1,10 +1,16 @@
-Implement subtask 3006: Implement InventoryService with barcode scanning logic
+Implement subtask 3006: Implement OpportunityService and ProjectService gRPC handlers
 
 ## Objective
-Implement gRPC handlers for InventoryService including CRUD operations, barcode-based lookup, and checkout/return workflows that track inventory assignment to projects.
+Implement the gRPC server handlers for OpportunityService and ProjectService, wiring protobuf RPCs to the repository layer with proper validation and error handling.
 
 ## Steps
-1. Implement InventoryService handlers in /internal/inventory/service.go: CreateItem (generate or accept barcode, validate uniqueness), GetItem, ListItems (filter by status, category, availability). 2. Implement ScanBarcode RPC: look up inventory_items by barcode field, return item details and current assignment status (which project it's checked out to, if any). 3. Implement CheckoutItems RPC: accept project_id and list of item_ids, validate all items have status 'available', begin transaction, insert project_inventory records, update item status to 'rented', commit. 4. Implement ReturnItems RPC: accept project_id and list of item_ids, validate items are assigned to that project, begin transaction, update project_inventory return_date, set item status back to 'available', commit. 5. Use proper gRPC error codes for items not found, already checked out, or not assigned to the specified project.
+1. Create internal/service/opportunity_service.go implementing the generated OpportunityServiceServer interface.
+2. Wire each RPC to the repository layer: CreateOpportunity validates input, calls repo.Create, returns created entity; GetOpportunity calls repo.Get; ListOpportunities supports pagination/filtering; UpdateOpportunity validates and calls repo.Update; DeleteOpportunity calls repo.Delete (soft delete).
+3. Create internal/service/project_service.go implementing ProjectServiceServer.
+4. Implement all Project RPCs similarly, ensuring project creation validates the linked opportunity exists.
+5. Add input validation using protovalidate or manual checks (required fields, valid enums, date ranges).
+6. Map repository errors to appropriate gRPC status codes (NotFound, InvalidArgument, AlreadyExists, Internal).
+7. Register both services with the gRPC server in main.go.
 
 ## Validation
-Unit tests verify barcode lookup returns correct item; CheckoutItems fails if item is already rented; ReturnItems fails if item not assigned to specified project; integration test runs full checkout→scan→return cycle against real database; >80% coverage.
+Unit tests with mocked repositories verify correct behavior for each RPC; gRPC client calls return expected responses for happy paths; invalid inputs return InvalidArgument; missing entities return NotFound; all RPCs are accessible via both gRPC and REST (grpc-gateway).

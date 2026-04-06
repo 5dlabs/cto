@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] Verify all pods are running and healthy; ConfigMap sigma1-infra-endpoints contains valid connection strings for each service; all secrets are present; test connectivity to PostgreSQL, Redis, S3/R2, and external APIs from a test pod.
+- [ ] Verify all pods are running and healthy; confirm ConfigMap 'sigma1-infra-endpoints' contains valid connection strings for PostgreSQL, Redis, S3/R2, Signal-CLI, ElevenLabs, Twilio, and all external APIs; test connectivity from a test pod to each service endpoint.
 
 ## Verification Notes
 

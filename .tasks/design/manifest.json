@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-05T20:24:00Z",
+  "generated_at": "2026-04-06T01:35:20Z",
   "project_name": "sigma-1",
   "linear_session_id": "",
   "design_mode": "both",
@@ -8,7 +8,7 @@
   "bundle_dir": "/Users/jonathon/5dlabs/cto/.tasks/design",
   "has_frontend": true,
   "stitch_status": "generated",
-  "framer_status": "skipped",
+  "framer_status": "generated",
   "files": {
     "design_context": "/Users/jonathon/5dlabs/cto/.tasks/design/design-context.json",
     "crawled_urls": "/Users/jonathon/5dlabs/cto/.tasks/design/crawled/urls.json",

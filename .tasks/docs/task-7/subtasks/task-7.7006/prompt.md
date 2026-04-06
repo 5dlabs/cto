@@ -1,14 +1,15 @@
-Implement subtask 7006: Implement finance skill: invoicing and finance reporting
+Implement subtask 7006: Implement sales flow skills: sales-qual, customer-vet, quote-gen, and upsell
 
 ## Objective
-Develop the finance skill for Morgan to create invoices and generate financial reports using the sigma1_create_invoice and sigma1_finance_report MCP tools.
+Implement the core sales-oriented agent skills that handle the lead qualification → vetting → quote generation → upsell pipeline.
 
 ## Steps
-1. Implement the invoice creation skill: after a quote is accepted, invoke sigma1_create_invoice with quote data and customer details. Handle invoice confirmation and present the invoice ID/link to the customer.
-2. Implement the finance reporting skill: handle admin requests for financial summaries by invoking sigma1_finance_report with date ranges and report types. Format report data for conversational presentation.
-3. Define role-based access: invoice creation is available in customer flows, finance reporting is restricted to admin/internal users.
-4. Handle error cases: failed invoice creation, incomplete data, report generation timeouts.
-5. Add logging for all finance operations (invoice ID, amount, report type, generation time).
+1. Implement 'sales-qual' skill: when a new lead contacts Morgan, gather requirements (equipment type, rental dates, location, budget), assess fit, and classify lead quality (hot/warm/cold).
+2. Implement 'customer-vet' skill: after qualification, trigger the vetting MCP tool to run background/credit checks, wait for results, and communicate approval/denial to the customer.
+3. Implement 'quote-gen' skill: based on qualified requirements and equipment availability (via catalog tools), generate a detailed rental quote using the finance create-quote tool, present it to the customer, and handle negotiation.
+4. Implement 'upsell' skill: after quote acceptance, suggest complementary equipment, extended rental periods, or premium services based on the customer's requirements and catalog data.
+5. Define skill routing logic: the agent's system prompt and tool-use instructions should naturally chain these skills in sequence.
+6. Handle edge cases: customer abandonment mid-flow, re-engagement, quote expiry.
 
 ## Validation
-Invoice creation skill invokes sigma1_create_invoice with correct parameters and returns an invoice ID; finance report skill invokes sigma1_finance_report and returns formatted data; role restrictions prevent customer-facing conversations from accessing finance reports; error handling triggers on simulated failures.
+Simulate a full sales conversation via Signal or chat; verify the agent asks qualifying questions, triggers vetting, generates a quote with correct pricing, and suggests upsells; verify the flow completes end-to-end with correct MCP tool invocations.

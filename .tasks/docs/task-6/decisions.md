@@ -1,13 +1,13 @@
 ## Decision Points
 
-- Which object storage provider should be used for product images, event photos, and other media assets?
-- Which PostgreSQL operator should be used for managing the main transactional database?
+- Which object storage provider should be used for product images and social media photos?
+- How should service-to-service communication be handled between backend services (e.g., Morgan agent, RMS, Catalog, Finance, Vetting, Social Engine)?
+- Should all services share a single PostgreSQL cluster with multiple schemas, or should each service have its own isolated database instance?
 - What authentication and authorization mechanism should be used for internal service-to-service and external API access?
-- How should API versioning be handled for public and internal APIs?
-- Which AI model provider should be used for image scoring and caption generation — OpenAI (GPT-4 Vision) or Anthropic (Claude)?
-- How should the Signal messaging integration for the approval workflow be implemented?
+- Which AI model should be used for caption generation and image curation — OpenAI (GPT-4o/DALL-E) or Anthropic Claude? Each has different strengths for creative text generation and image understanding.
+- How should the approval workflow notify Morgan via Signal? Direct Signal API integration, or through an intermediary bot framework?
 
 ## Coordination Notes
 
-- Agent owner: Nova
-- Primary stack: Node.js 20+/Elysia 1.x + Effect
+- Agent owner: nova
+- Primary stack: Node.js 20+/Elysia + Effect

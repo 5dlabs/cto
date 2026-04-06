@@ -1,10 +1,10 @@
-Implement subtask 6006: Implement Instagram API publishing integration
+Implement subtask 6006: Implement approval workflow with Signal notification to Morgan
 
 ## Objective
-Build the Instagram publishing module using the Instagram Graph API to publish approved images with captions.
+Build the approve/reject endpoints and integrate Signal messaging to notify Morgan when drafts need review and when approval decisions are made.
 
 ## Steps
-1. Create a `services/publishing/instagram` module. 2. Define a PublishingProvider interface with Effect: `publish(imageUrl: string, caption: string) -> Effect<PublishResult, PublishError>`. 3. Implement Instagram Graph API integration: use the Content Publishing API (requires Facebook Page linked to Instagram Professional account). 4. Flow: POST image URL to /media endpoint to create a container → POST container ID to /media_publish endpoint to publish. 5. Store Instagram access token (long-lived) in Kubernetes secrets. Implement token refresh logic (tokens expire every 60 days). 6. Return PublishResult with platform_post_id, permalink, published_at. 7. Handle API errors: rate limits (respect X-Business-Use-Case-Usage headers), invalid media, expired token.
+1. In `src/routes/drafts.ts`, add: a) `POST /api/v1/social/drafts/:id/approve` — validates draft exists and is PENDING_REVIEW, updates status to APPROVED, stores reviewer_notes, returns 200. b) `POST /api/v1/social/drafts/:id/reject` — validates draft exists and is PENDING_REVIEW, updates status to REJECTED, stores rejection reason, returns 200. 2. In `src/services/signal-notify.ts`, create an Effect.Service `SignalNotificationService` with: a) `notifyDraftReady(draft: Draft) -> Effect<void>` — sends Signal message to Morgan with draft preview (caption text, image count, target platforms) and approval link. b) `notifyApprovalDecision(draft: Draft, decision: 'approved' | 'rejected') -> Effect<void>` — confirms decision. 3. Trigger `notifyDraftReady` when a new draft is created (from 6005). 4. Trigger `notifyApprovalDecision` after approve/reject. 5. Validate state transitions (can only approve/reject PENDING_REVIEW drafts). 6. Handle Signal API failures gracefully (log and continue, don't block approval flow).
 
 ## Validation
-Unit test with mocked Instagram API: verify two-step publish flow, token refresh logic, rate limit handling. Integration test with Instagram sandbox/test account if available. Verify PublishResult contains valid permalink.
+POST /approve on PENDING_REVIEW draft changes status to APPROVED; POST /reject changes to REJECTED; attempting to approve an already-approved draft returns 409; Signal notification is sent on draft creation and approval (verified via mock); Signal failure does not block the approval flow.

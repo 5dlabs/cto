@@ -1,10 +1,26 @@
-Implement subtask 3007: Implement CrewService with scheduling logic
+Implement subtask 3007: Implement InventoryService gRPC handlers with barcode scanning logic
 
 ## Objective
-Implement gRPC handlers for CrewService including crew member CRUD, availability checking, and crew-to-project scheduling with conflict detection.
+Implement InventoryService gRPC handlers including barcode-based lookup, check-in/check-out workflows that update item status and create audit records.
 
 ## Steps
-1. Implement CrewService handlers in /internal/crew/service.go: CreateCrewMember, GetCrewMember, ListCrewMembers (filter by role, availability_status). 2. Implement GetAvailability RPC: given a crew_member_id and date range, query crew_assignments to find conflicts, return available time slots. 3. Implement ScheduleCrewMember RPC: accept crew_member_id, project_id, start_date, end_date, role_on_project. Check for overlapping assignments in the date range. If no conflicts, insert crew_assignment record. If conflict exists, return FailedPrecondition with details of the conflicting assignment. 4. Add UpdateCrewMember for profile/rate changes. 5. Use proper gRPC error codes throughout.
+1. Create internal/service/inventory_service.go implementing InventoryServiceServer.
+2. Implement CRUD RPCs (CreateItem, GetItem, ListItems, UpdateItem) wired to the repository.
+3. Implement GetItemByBarcode RPC that looks up items by barcode string.
+4. Implement CheckOut RPC:
+   - Validate item exists and is in 'available' status
+   - Validate project_id exists
+   - Update item status to 'checked_out' with project_id and crew_member_id
+   - Record check-out timestamp and notes in an audit log table
+   - Return updated item
+5. Implement CheckIn RPC:
+   - Validate item exists and is in 'checked_out' status
+   - Update item status to 'available', clear project assignment
+   - Allow condition update (e.g., damaged, needs_repair)
+   - Record check-in audit entry
+6. Implement QueryAvailability RPC that returns items available for a given date range, category, and location.
+7. Add migration for inventory_audit_log table (item_id, action, project_id, crew_member_id, timestamp, notes).
+8. Register service with gRPC server.
 
 ## Validation
-Unit tests cover availability checking with overlapping and non-overlapping assignments; ScheduleCrewMember rejects double-booking; integration test assigns crew to project and verifies availability is reduced; >80% coverage.
+CheckOut transitions item from 'available' to 'checked_out' and creates audit record; CheckOut on already-checked-out item returns error; CheckIn transitions item back to 'available'; GetItemByBarcode returns correct item; QueryAvailability excludes checked-out items for requested date range; audit log entries are created for all check-in/check-out operations.

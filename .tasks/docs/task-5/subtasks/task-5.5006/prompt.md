@@ -1,10 +1,10 @@
-Implement subtask 5006: Implement vetting pipeline orchestration and composite scoring algorithm
+Implement subtask 5006: Implement credit API integration for credit signal retrieval
 
 ## Objective
-Build the vetting pipeline that orchestrates all four integration modules (business verification, online presence, reputation, credit signals) and computes the composite LeadScore.
+Build the HTTP client integration for the selected credit scoring API to retrieve business credit signals and financial health indicators.
 
 ## Steps
-1. Create a `vetting::pipeline` module that accepts an org_id and org metadata (name, jurisdiction, domain). 2. Execute all four checks concurrently using tokio::join! or futures::join_all for parallel execution. 3. Collect results from: BusinessVerificationProvider, OnlinePresenceProvider, ReputationProvider, CreditProvider. 4. Implement the composite scoring algorithm: composite_score = (business_verification_weight * bv_score) + (online_presence_weight * op_score) + (reputation_weight * rep_score) + (credit_weight * credit_score). Default weights: bv=0.25, op=0.20, rep=0.25, credit=0.30 (make configurable via environment variables). 5. Build a VettingResult containing all individual results plus the composite score and scoring breakdown. 6. Persist the VettingResult and LeadScore to PostgreSQL within a transaction. 7. Handle partial failures: if one integration fails, still compute a partial score with reduced weights and flag which checks failed. 8. Return the completed VettingResult.
+1. In `integrations/credit_api.rs`, create a CreditApiClient struct with reqwest::Client and API credentials. 2. Implement methods: `get_credit_report(org_id: &str, org_name: &str) -> Result<CreditReport>`, `get_credit_score(org_id: &str) -> Result<CreditSignals>`. 3. Define DTOs for the credit API response format (design to be adaptable since the specific provider is a decision point). 4. Map into `CreditSignals` domain struct with fields: credit_score (Option<u32>), payment_history_rating, outstanding_judgments (u32), bankruptcy_flag (bool), years_in_business (Option<u32>), credit_risk_level (LOW/MEDIUM/HIGH). 5. Handle cases where credit data is unavailable (new businesses). 6. Use trait `CreditChecker` for mockability.
 
 ## Validation
-Integration test with all mock providers: verify pipeline runs all checks concurrently, computes correct composite score, persists to DB. Test partial failure scenarios: one provider fails, two providers fail. Verify weight recalculation on partial failure.
+Unit tests with mocked credit API responses verify correct parsing of credit signals; missing data scenarios (new business, no credit history) return sensible defaults; credit_risk_level mapping is validated against known inputs.

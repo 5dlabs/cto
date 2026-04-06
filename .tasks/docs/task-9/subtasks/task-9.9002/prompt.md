@@ -1,10 +1,10 @@
-Implement subtask 9002: Scale Redis/Valkey to HA multi-replica mode
+Implement subtask 9002: Scale Redis/Valkey to HA mode
 
 ## Objective
-Update the Redis/Valkey operator CR to enable HA with sentinel or cluster mode, providing automatic failover for the production cache layer.
+Update the Redis/Valkey deployment to run in HA mode with sentinel or replication, configure automatic failover, and validate session/cache continuity during failover.
 
 ## Steps
-1. Update the Redis operator CR to enable sentinel-based HA with at least 3 sentinel instances and 1 primary + 2 replicas. 2. Configure `redis.replicas: 2` and `sentinel.replicas: 3`. 3. Set anti-affinity rules to distribute pods across nodes. 4. Update resource requests/limits for production workload. 5. Ensure the connection string in the `{project}-infra-endpoints` ConfigMap is updated to point to the sentinel endpoint. 6. Apply the CR and verify sentinel quorum is established. 7. Confirm all application services using Redis reconnect via the sentinel endpoint.
+1. Update the Redis/Valkey CR or Helm values to enable HA with at least 1 primary and 2 replicas plus sentinel instances (or use Redis Cluster mode depending on operator). 2. Configure PodDisruptionBudgets (minAvailable for quorum). 3. Set anti-affinity rules to spread across nodes. 4. Update the `{project}-infra-endpoints` ConfigMap with the sentinel/cluster endpoint so application services connect to the HA endpoint rather than a single instance. 5. Apply and verify all Redis pods reach Ready state. 6. Confirm sentinel correctly identifies master and replicas.
 
 ## Validation
-Verify sentinel quorum with `redis-cli -p 26379 sentinel masters`. Kill the Redis primary pod and confirm sentinel promotes a replica within 15 seconds. Verify application services continue operating without errors after failover.
+Verify Redis sentinel/cluster pods are running. Kill the primary Redis pod and confirm sentinel promotes a replica within the expected timeout. Verify application services reconnect transparently. Confirm no cache data loss for persistent keys.

@@ -4,20 +4,20 @@
 Scale infrastructure for production: enable HA for databases and services, configure Cloudflare CDN, TLS, ingress, and network policies.
 
 ### Ownership
-- Agent: Bolt
+- Agent: bolt
 - Stack: Kubernetes/Helm
 - Priority: high
 - Status: pending
 - Dependencies: 2, 3, 4, 5, 6, 7, 8
 
 ### Implementation Details
-{"steps": ["Scale PostgreSQL and Redis to HA (multi-replica) mode.", "Increase backend service replicas to meet concurrency targets.", "Configure Cloudflare CDN and TLS for all public endpoints.", "Set up Cloudflare Tunnel ingress for Morgan and web.", "Apply Kubernetes network policies to restrict inter-service access.", "Test failover and rollback procedures."]}
+{"steps": ["Scale PostgreSQL and Redis to HA mode (multi-instance)", "Increase replicas for backend services and Morgan agent", "Configure Cloudflare CDN for static assets and SSL termination", "Set up Cloudflare Tunnel ingress for Morgan and web frontend", "Apply Kubernetes network policies to restrict inter-service traffic", "Test failover and recovery for all critical services"]}
 
 ### Subtasks
-- [ ] Scale PostgreSQL to HA multi-replica mode with CloudNative-PG: Update the CloudNative-PG Cluster CR to enable multi-replica HA with synchronous replication and automatic failover for the production PostgreSQL instance.
-- [ ] Scale Redis/Valkey to HA multi-replica mode: Update the Redis/Valkey operator CR to enable HA with sentinel or cluster mode, providing automatic failover for the production cache layer.
-- [ ] Increase backend service replicas for production concurrency: Scale all backend service Deployments to multiple replicas with appropriate resource requests, HPA configuration, and pod disruption budgets.
-- [ ] Configure Cloudflare CDN and TLS for all public endpoints: Set up Cloudflare DNS, CDN caching rules, and TLS certificates for all public-facing domains and subdomains.
-- [ ] Set up Cloudflare Tunnel ingress for Morgan and website: Deploy Cloudflare Tunnel (cloudflared) as a Kubernetes Deployment to expose Morgan (Discord bot dashboard) and the public website without opening inbound ports.
-- [ ] Apply Kubernetes NetworkPolicies for inter-service access restriction: Define and apply NetworkPolicy resources to enforce least-privilege network access between all services, databases, and external egress.
-- [ ] Validate failover and rollback procedures with chaos testing: Perform structured chaos testing to validate HA failover for PostgreSQL, Redis, backend services, and Cloudflare Tunnel, and document rollback procedures.
+- [ ] Scale PostgreSQL to HA mode with CloudNative-PG: Update the CloudNative-PG Cluster CR to run multiple instances (primary + replicas) with streaming replication, configure automatic failover, and validate data consistency across replicas.
+- [ ] Scale Redis/Valkey to HA mode: Update the Redis/Valkey deployment to run in HA mode with sentinel or replication, configure automatic failover, and validate session/cache continuity during failover.
+- [ ] Increase replicas for backend services and Morgan agent with HPA: Scale all backend service Deployments to multiple replicas and configure Horizontal Pod Autoscalers (HPA) for CPU/memory-based autoscaling.
+- [ ] Configure Cloudflare CDN for static assets and SSL termination: Set up Cloudflare CDN to cache and serve static assets from the web frontend, configure SSL/TLS termination at Cloudflare edge, and set appropriate cache rules.
+- [ ] Set up Cloudflare Tunnel ingress for Morgan and web frontend: Deploy and configure a Cloudflare Tunnel (cloudflared) in the cluster to expose Morgan agent and web frontend services to the internet without opening inbound ports.
+- [ ] Define and apply Kubernetes NetworkPolicies for inter-service traffic restriction: Map all legitimate inter-service communication flows and create NetworkPolicy resources to enforce least-privilege network access between pods.
+- [ ] Full failover and recovery simulation testing: Execute comprehensive failover tests for all critical services (PostgreSQL, Redis, backend, cloudflared) to validate HA configurations and document recovery procedures.
