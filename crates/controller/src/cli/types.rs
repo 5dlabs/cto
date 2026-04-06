@@ -10,6 +10,7 @@ const CLI_TYPE_VARIANTS: &[&str] = &[
     "codex",
     "dexter",
     "opencode",
+    "openclaw",
     "cursor",
     "factory",
     "openhands",
@@ -47,6 +48,8 @@ pub enum CLIType {
     Qwen,
     /// MiniMax AI CLI (M2 text, Hailuo video, Speech, Music)
     MiniMax,
+    /// OpenClaw Agent Harness (provider-agnostic, local one-shot)
+    OpenClaw,
 }
 
 impl std::fmt::Display for CLIType {
@@ -64,6 +67,7 @@ impl std::fmt::Display for CLIType {
             CLIType::Gemini => write!(f, "gemini"),
             CLIType::Qwen => write!(f, "qwen"),
             CLIType::MiniMax => write!(f, "minimax"),
+            CLIType::OpenClaw => write!(f, "openclaw"),
         }
     }
 }
@@ -87,6 +91,7 @@ impl CLIType {
             "gemini" => Some(CLIType::Gemini),
             "qwen" => Some(CLIType::Qwen),
             "minimax" | "mini-max" => Some(CLIType::MiniMax),
+            "openclaw" | "open-claw" => Some(CLIType::OpenClaw),
             _ => None,
         }
     }

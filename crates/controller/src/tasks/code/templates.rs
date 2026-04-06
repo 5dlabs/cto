@@ -173,6 +173,7 @@ impl CodeTemplateGenerator {
                     CLIType::Factory => Self::generate_factory_templates(code_run, config)?,
                     CLIType::OpenCode => Self::generate_opencode_templates(code_run, config)?,
                     CLIType::Gemini => Self::generate_gemini_templates(code_run, config)?,
+                    CLIType::OpenClaw => Self::generate_openclaw_templates(code_run, config)?,
                     _ => Self::generate_claude_templates(code_run, config)?,
                 }
             }
@@ -223,7 +224,11 @@ impl CodeTemplateGenerator {
     fn cli_supports_native_skills(cli_type: CLIType) -> bool {
         matches!(
             cli_type,
-            CLIType::Claude | CLIType::Factory | CLIType::OpenCode | CLIType::Codex
+            CLIType::Claude
+                | CLIType::Factory
+                | CLIType::OpenCode
+                | CLIType::Codex
+                | CLIType::OpenClaw
         )
     }
 
@@ -489,6 +494,215 @@ impl CodeTemplateGenerator {
         );
 
         Ok(templates)
+    }
+
+    fn generate_openclaw_templates(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Result<BTreeMap<String, String>> {
+        let mut templates = BTreeMap::new();
+
+        let cli_config_value = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| serde_json::to_value(cfg).ok())
+            .unwrap_or_else(|| json!({}));
+
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
+        let client_config = Self::generate_client_config(code_run, config)?;
+        let client_config_value: Value = serde_json::from_str(&client_config)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        let remote_tools = Self::extract_remote_tools(&client_config_value);
+
+        templates.insert("client-config.json".to_string(), client_config);
+
+        let openclaw_config = Self::generate_openclaw_config(code_run, &enriched_cli_config)?;
+        templates.insert("openclaw.json".to_string(), openclaw_config);
+
+        templates.insert(
+            "container.sh".to_string(),
+            Self::generate_container_script(code_run, &enriched_cli_config, config)?,
+        );
+
+        templates.insert(
+            "CLAUDE.md".to_string(),
+            Self::generate_claude_memory(code_run, &enriched_cli_config, &remote_tools)?,
+        );
+
+        templates.insert(
+            "coding-guidelines.md".to_string(),
+            Self::generate_coding_guidelines(code_run)?,
+        );
+        templates.insert(
+            "github-guidelines.md".to_string(),
+            Self::generate_github_guidelines(code_run)?,
+        );
+
+        for (filename, content) in Self::generate_hook_scripts(code_run) {
+            templates.insert(format!("hooks-{filename}"), content);
+        }
+
+        Ok(templates)
+    }
+
+    fn generate_openclaw_config(code_run: &CodeRun, cli_config: &Value) -> Result<String> {
+        let github_app = Self::get_github_app_or_default(code_run);
+        let agent_id = Self::extract_agent_name_from_github_app(&github_app)?;
+        let openclaw_state_dir = "/workspace/.openclaw";
+        let workspace_dir = "/workspace";
+        let agent_dir = format!("{openclaw_state_dir}/agents/{agent_id}/agent");
+        let session_store = format!("{openclaw_state_dir}/agents/{agent_id}/sessions/sessions.json");
+
+        let model = cli_config
+            .get("model")
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| {
+                if code_run.spec.model.is_empty() {
+                    "claude-sonnet-4-20250514"
+                } else {
+                    &code_run.spec.model
+                }
+            });
+        let (
+            provider_id,
+            provider_api,
+            provider_api_key_env,
+            provider_base_url,
+            provider_builtin,
+            provider_model_id,
+            provider_model_alias,
+        ) = if let Some(provider_model_id) = model.strip_prefix("openai-codex/") {
+            (
+                "openai-codex",
+                "",
+                "",
+                "",
+                true,
+                provider_model_id.to_string(),
+                Some(model.to_string()),
+            )
+        } else if let Some(provider_model_id) = model.strip_prefix("openai/") {
+                (
+                    "openai",
+                    "openai-responses",
+                    "OPENAI_API_KEY",
+                    "https://api.openai.com/v1",
+                    false,
+                    provider_model_id.to_string(),
+                    Some(model.to_string()),
+                )
+            } else if let Some(provider_model_id) = model.strip_prefix("anthropic/") {
+                (
+                    "anthropic",
+                    "anthropic-messages",
+                    "ANTHROPIC_API_KEY",
+                    "https://api.anthropic.com",
+                    false,
+                    provider_model_id.to_string(),
+                    Some(model.to_string()),
+                )
+            } else if model.starts_with("gpt-")
+                || model.starts_with("o1")
+                || model.starts_with("o3")
+                || model.starts_with("o4")
+                || model.starts_with("text-embedding-")
+            {
+                (
+                    "openai",
+                    "openai-responses",
+                    "OPENAI_API_KEY",
+                    "https://api.openai.com/v1",
+                    false,
+                    model.to_string(),
+                    None,
+                )
+            } else {
+                (
+                    "anthropic",
+                    "anthropic-messages",
+                    "ANTHROPIC_API_KEY",
+                    "https://api.anthropic.com",
+                    false,
+                    model.to_string(),
+                    None,
+                )
+            };
+        let mut provider_models = vec![json!({
+            "id": provider_model_id,
+            "name": model
+        })];
+
+        if let Some(alias) = provider_model_alias {
+            if alias != provider_model_id {
+                provider_models.push(json!({
+                    "id": alias,
+                    "name": model
+                }));
+            }
+        }
+
+        let providers = if provider_builtin {
+            json!({})
+        } else {
+            json!({
+                (provider_id): {
+                    "api": provider_api,
+                    "apiKey": format!("${{{}}}", provider_api_key_env),
+                    "baseUrl": provider_base_url,
+                    "auth": "api-key",
+                    "authHeader": true,
+                    "headers": {},
+                    "models": provider_models
+                }
+            })
+        };
+
+        let config = json!({
+            "agents": {
+                "defaults": {
+                    "workspace": workspace_dir,
+                    "model": {
+                        "primary": model,
+                        "fallbacks": []
+                    }
+                },
+                "list": [{
+                    "agentDir": agent_dir,
+                    "id": agent_id,
+                    "name": github_app,
+                    "model": model,
+                    "sandbox": {
+                        "mode": "off"
+                    },
+                    "workspace": workspace_dir
+                }]
+            },
+            "models": {
+                "providers": providers
+            },
+            "gateway": {
+                "mode": "local"
+            },
+            "commands": {
+                "native": "auto",
+                "nativeSkills": "auto"
+            },
+            "messages": {
+                "ackReactionScope": "group-mentions"
+            },
+            "session": {
+                "store": session_store
+            }
+        });
+
+        serde_json::to_string_pretty(&config).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to serialize openclaw.json: {e}"
+            ))
+        })
     }
 
     fn generate_gemini_settings(_code_run: &CodeRun, cli_config: &Value) -> Result<String> {
@@ -4167,6 +4381,7 @@ Be constructive and explain the "why" behind your suggestions.
             "5DLabs-Stitch" => "stitch",
             "5DLabs-Angie" => "angie",
             "5DLabs-Vex" => "vex",
+            "5DLabs-Pixel" => "pixel",
             // Rex variants and unknown agents default to rex
             _ => "rex",
         };
@@ -4335,8 +4550,14 @@ Be constructive and explain the "why" behind your suggestions.
             "5DLabs-Tess" => "tess",
             "5DLabs-Atlas" => "atlas",
             "5DLabs-Bolt" => "bolt",
+            "5DLabs-Grizz" => "grizz",
+            "5DLabs-Nova" => "nova",
+            "5DLabs-Tap" => "tap",
+            "5DLabs-Spark" => "spark",
+            "5DLabs-Stitch" => "stitch",
             "5DLabs-Angie" => "angie",
             "5DLabs-Vex" => "vex",
+            "5DLabs-Pixel" => "pixel",
             _ => {
                 return Err(crate::tasks::types::Error::ConfigError(format!(
                     "Unknown GitHub app '{github_app}' - no corresponding agent found"
@@ -4702,6 +4923,7 @@ Be constructive and explain the "why" behind your suggestions.
             CLIType::Factory => "factory",
             CLIType::Gemini => "gemini",
             CLIType::OpenCode => "opencode",
+            CLIType::OpenClaw => "openclaw",
             // Claude and types without dedicated invoke templates fall back to claude
             CLIType::Claude
             | CLIType::OpenHands
@@ -5229,6 +5451,13 @@ mod tests {
     }
 
     #[test]
+    fn test_system_prompt_template_pixel_coder() {
+        let code_run = create_test_code_run(Some("5DLabs-Pixel".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
+        assert_eq!(template_path, "agents/pixel/coder.md.hbs");
+    }
+
+    #[test]
     fn test_extract_agent_name_from_github_app() {
         let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
         let agent_name = CodeTemplateGenerator::extract_agent_name_from_github_app(
@@ -5236,6 +5465,13 @@ mod tests {
         )
         .unwrap();
         assert_eq!(agent_name, "rex");
+    }
+
+    #[test]
+    fn test_extract_agent_name_from_github_app_pixel() {
+        let agent_name =
+            CodeTemplateGenerator::extract_agent_name_from_github_app("5DLabs-Pixel").unwrap();
+        assert_eq!(agent_name, "pixel");
     }
 
     #[test]

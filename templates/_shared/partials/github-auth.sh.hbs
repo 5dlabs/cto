@@ -5,6 +5,14 @@
 GITHUB_APP="{{github_app}}"
 GH_HOST="${GH_HOST:-github.com}"
 
+# Keep Git config job-local so containers do not depend on a writable home directory.
+if [ -z "${GIT_CONFIG_GLOBAL:-}" ]; then
+  export GIT_CONFIG_GLOBAL="${WORK_DIR:-/workspace}/.gitconfig-job"
+  mkdir -p "$(dirname "$GIT_CONFIG_GLOBAL")"
+  touch "$GIT_CONFIG_GLOBAL"
+  echo "📝 Using job-local git config: $GIT_CONFIG_GLOBAL"
+fi
+
 # Generate GITHUB_TOKEN from app credentials if not already set
 if [ -z "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
   echo "🔐 Generating GitHub token from app credentials..."
@@ -131,4 +139,3 @@ export GIT_AUTHOR_EMAIL
 export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
 export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
 export GIT_TERMINAL_PROMPT=0
-

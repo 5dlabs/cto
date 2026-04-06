@@ -10,6 +10,7 @@ pub mod dexter;
 pub mod factory;
 pub mod gemini;
 pub mod opencode;
+pub mod openclaw;
 
 // Re-export adapter implementations
 pub use claude::ClaudeAdapter;
@@ -20,3 +21,4 @@ pub use dexter::DexterAdapter;
 pub use factory::FactoryAdapter;
 pub use gemini::GeminiAdapter;
 pub use opencode::OpenCodeAdapter;
+pub use openclaw::OpenClawAdapter;

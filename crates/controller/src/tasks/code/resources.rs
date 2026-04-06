@@ -568,6 +568,14 @@ impl<'a> CodeResourceManager<'a> {
             data.insert(filename, content);
         }
 
+        if let Some(openclaw_config) = data.get("openclaw.json") {
+            info!(
+                coderun = %code_run.name_any(),
+                openclaw_config = %openclaw_config,
+                "Generated task openclaw.json"
+            );
+        }
+
         let labels = Self::create_task_labels(code_run);
         let mut metadata = ObjectMeta {
             name: Some(name.to_string()),
@@ -818,28 +826,9 @@ impl<'a> CodeResourceManager<'a> {
             "mountPath": "/templates-integration"
         }));
 
-        // Blaze agent scripts ConfigMap volume for frontend workflows
-        // Only mount for Blaze agent to avoid unnecessary volumes on other agents
-        let is_blaze_agent = code_run
-            .spec
-            .github_app
-            .as_ref()
-            .is_some_and(|app| app.to_lowercase().contains("blaze"));
-
-        if is_blaze_agent {
-            let blaze_scripts_cm_name = format!("{cm_prefix}-agent-scripts-blaze");
-            volumes.push(json!({
-                "name": "blaze-scripts",
-                "configMap": {
-                    "name": blaze_scripts_cm_name,
-                    "defaultMode": 0o755
-                }
-            }));
-            volume_mounts.push(json!({
-                "name": "blaze-scripts",
-                "mountPath": "/workspace/scripts/blaze"
-            }));
-        }
+        // Blaze-specific script mounts are intentionally disabled here.
+        // The controller used to reference a per-run ConfigMap that is never created,
+        // which leaves Blaze pods stuck in FailedMount before OpenClaw can start.
 
         // Intake ConfigMap volume for intake workflows
         // When run_type is "intake" and INTAKE_CONFIGMAP env is set, mount the intake files
@@ -1247,6 +1236,29 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "cto-secrets"
             }
         }));
+
+        // OpenClaw OAuth material for the built-in openai-codex provider.
+        final_env_vars.push(json!({
+            "name": "OPENAI_OAUTH_AUTH_PROFILES",
+            "valueFrom": {
+                "secretKeyRef": {
+                    "name": "openclaw-api-keys",
+                    "key": "openai-oauth-auth-profiles",
+                    "optional": true
+                }
+            }
+        }));
+        final_env_vars.push(json!({
+            "name": "OPENAI_OAUTH_CODEX_AUTH",
+            "valueFrom": {
+                "secretKeyRef": {
+                    "name": "openclaw-api-keys",
+                    "key": "openai-oauth-codex-auth",
+                    "optional": true
+                }
+            }
+        }));
+        container_spec["env"] = json!(final_env_vars);
 
         // Mount intake-api-keys for Tavily and Gemini API keys
         // This secret is NOT ArgoCD-managed (won't be reverted by Helm syncs)

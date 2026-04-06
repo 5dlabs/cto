@@ -6,7 +6,7 @@
 use crate::cli::adapter::{AdapterError, AdapterResult, CliAdapter, HealthState, HealthStatus};
 use crate::cli::adapters::{
     ClaudeAdapter, CodeAdapter, CodexAdapter, CursorAdapter, DexterAdapter, FactoryAdapter,
-    GeminiAdapter, OpenCodeAdapter,
+    GeminiAdapter, OpenClawAdapter, OpenCodeAdapter,
 };
 use crate::cli::base_adapter::AdapterConfig;
 use crate::cli::types::CLIType;
@@ -205,6 +205,10 @@ impl AdapterFactory {
 
         let opencode_adapter = Arc::new(OpenCodeAdapter::new()?);
         self.register_adapter(CLIType::OpenCode, opencode_adapter)
+            .await?;
+
+        let openclaw_adapter = Arc::new(OpenClawAdapter::new()?);
+        self.register_adapter(CLIType::OpenClaw, openclaw_adapter)
             .await?;
 
         Ok(())
@@ -619,7 +623,7 @@ mod tests {
     #[tokio::test]
     async fn test_factory_creation() {
         let factory = AdapterFactory::new().await.unwrap();
-        assert_eq!(factory.get_supported_clis().len(), 8);
+        assert_eq!(factory.get_supported_clis().len(), 9);
         assert!(factory.supports_cli(CLIType::Claude));
         assert!(factory.supports_cli(CLIType::Code));
         assert!(factory.supports_cli(CLIType::Codex));
@@ -628,6 +632,7 @@ mod tests {
         assert!(factory.supports_cli(CLIType::Factory));
         assert!(factory.supports_cli(CLIType::Gemini));
         assert!(factory.supports_cli(CLIType::OpenCode));
+        assert!(factory.supports_cli(CLIType::OpenClaw));
     }
 
     #[tokio::test]
@@ -644,7 +649,7 @@ mod tests {
             .unwrap();
 
         assert!(factory.supports_cli(CLIType::Claude));
-        assert_eq!(factory.get_supported_clis().len(), 8);
+        assert_eq!(factory.get_supported_clis().len(), 9);
     }
 
     #[tokio::test]
@@ -702,7 +707,7 @@ mod tests {
 
         let health_summary = factory.get_health_summary().await;
 
-        assert_eq!(health_summary.len(), 8);
+        assert_eq!(health_summary.len(), 9);
         assert_eq!(
             health_summary[&CLIType::Claude].status,
             HealthState::Healthy
@@ -733,7 +738,7 @@ mod tests {
 
         let stats = factory.get_factory_stats().await;
 
-        assert_eq!(stats.total_adapters, 8);
+        assert_eq!(stats.total_adapters, 9);
         // Note: Dexter adapter may report warning status when no API key is found
         // so we check total instead of exact healthy count
         assert!(stats.healthy_adapters + stats.warning_adapters >= 7);

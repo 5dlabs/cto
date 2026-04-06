@@ -220,6 +220,7 @@ impl DiscoveryService {
             CLIType::Gemini => ("gemini-cli", vec!["--version"]),
             CLIType::Qwen => ("qwen-cli", vec!["--version"]),
             CLIType::MiniMax => ("minimax-cli", vec!["--version"]),
+            CLIType::OpenClaw => ("openclaw", vec!["--version"]),
         }
     }
 

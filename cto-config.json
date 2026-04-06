@@ -28,7 +28,8 @@
           "gemini": "gemini-3.1-pro-preview",
           "factory": "gpt-5.2",
           "opencode": "gpt-5.2",
-          "dexter": "claude-opus-4-6-20260205"
+          "dexter": "claude-opus-4-6-20260205",
+          "openclaw": "claude-sonnet-4-20250514"
         }
       }
     },

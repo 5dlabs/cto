@@ -1,0 +1,206 @@
+# =========================================================================
+# OpenClaw Agent Harness Invocation Partial
+# =========================================================================
+
+echo "==================================================================="
+echo "               OPENCLAW AGENT INVOCATION                            "
+echo "==================================================================="
+
+{{> skills-setup skills_target="/workspace/.openclaw/skills" skills_label="OpenClaw" }}
+
+AGENT_ID="$(printf '%s' '{{github_app}}' | tr '[:upper:]' '[:lower:]' | sed 's/^5dlabs-//')"
+OPENCLAW_DIR="/workspace/.openclaw"
+MODEL_ID="{{model}}"
+mkdir -p "$OPENCLAW_DIR/agents/$AGENT_ID/agent" \
+         "$OPENCLAW_DIR/agents/$AGENT_ID/memory" \
+         "$OPENCLAW_DIR/agents/$AGENT_ID/sessions"
+echo "  OpenClaw workspace: $OPENCLAW_DIR"
+
+if [ -f "$WORK_DIR/task/openclaw.json" ]; then
+cp "$WORK_DIR/task/openclaw.json" "$OPENCLAW_DIR/openclaw.task.json"
+echo "  Preserved task/openclaw.json at $OPENCLAW_DIR/openclaw.task.json for debugging"
+fi
+
+OPENCLAW_PROVIDER_ID="anthropic"
+OPENCLAW_PROVIDER_API="anthropic-messages"
+OPENCLAW_PROVIDER_API_KEY='${ANTHROPIC_API_KEY}'
+OPENCLAW_PROVIDER_BASE_URL="https://api.anthropic.com"
+OPENCLAW_PROVIDER_BUILTIN="0"
+OPENCLAW_PROVIDER_MODEL_ID="$MODEL_ID"
+OPENCLAW_PROVIDER_MODEL_ALIAS=""
+
+case "$MODEL_ID" in
+  openai-codex/*)
+    OPENCLAW_PROVIDER_ID="openai-codex"
+    OPENCLAW_PROVIDER_BUILTIN="1"
+    OPENCLAW_PROVIDER_MODEL_ID="${MODEL_ID#openai-codex/}"
+    OPENCLAW_PROVIDER_MODEL_ALIAS="$MODEL_ID"
+    ;;
+  openai/*)
+    OPENCLAW_PROVIDER_ID="openai"
+    OPENCLAW_PROVIDER_API="openai-responses"
+    OPENCLAW_PROVIDER_API_KEY='${OPENAI_API_KEY}'
+    OPENCLAW_PROVIDER_BASE_URL="https://api.openai.com/v1"
+    OPENCLAW_PROVIDER_MODEL_ID="${MODEL_ID#openai/}"
+    OPENCLAW_PROVIDER_MODEL_ALIAS="$MODEL_ID"
+    ;;
+  anthropic/*)
+    OPENCLAW_PROVIDER_MODEL_ID="${MODEL_ID#anthropic/}"
+    OPENCLAW_PROVIDER_MODEL_ALIAS="$MODEL_ID"
+    ;;
+  gpt-*|o1*|o3*|o4*|text-embedding-*)
+    OPENCLAW_PROVIDER_ID="openai"
+    OPENCLAW_PROVIDER_API="openai-responses"
+    OPENCLAW_PROVIDER_API_KEY='${OPENAI_API_KEY}'
+    OPENCLAW_PROVIDER_BASE_URL="https://api.openai.com/v1"
+    ;;
+esac
+
+if [ -n "${OPENAI_OAUTH_AUTH_PROFILES:-}" ]; then
+  OAUTH_DIR="$OPENCLAW_DIR/agents/$AGENT_ID/agent"
+  printf '%s\n' "$OPENAI_OAUTH_AUTH_PROFILES" > "$OAUTH_DIR/auth-profiles.json"
+  chmod 600 "$OAUTH_DIR/auth-profiles.json"
+  echo "  OpenClaw auth-profiles.json written to $OAUTH_DIR"
+fi
+
+if [ -n "${OPENAI_OAUTH_CODEX_AUTH:-}" ]; then
+  mkdir -p /workspace/.codex
+  printf '%s\n' "$OPENAI_OAUTH_CODEX_AUTH" > /workspace/.codex/auth.json
+  chmod 600 /workspace/.codex/auth.json
+  echo "  Codex auth.json written to /workspace/.codex"
+fi
+
+jq -n \
+  --arg workspace "/workspace" \
+  --arg agent_id "$AGENT_ID" \
+  --arg agent_dir "/workspace/.openclaw/agents/$AGENT_ID/agent" \
+  --arg agent_name "{{github_app}}" \
+  --arg model "$MODEL_ID" \
+  --arg provider_id "$OPENCLAW_PROVIDER_ID" \
+  --arg provider_api "$OPENCLAW_PROVIDER_API" \
+  --arg provider_api_key "$OPENCLAW_PROVIDER_API_KEY" \
+  --arg provider_base_url "$OPENCLAW_PROVIDER_BASE_URL" \
+  --arg provider_builtin "$OPENCLAW_PROVIDER_BUILTIN" \
+  --arg provider_model_id "$OPENCLAW_PROVIDER_MODEL_ID" \
+  --arg provider_model_alias "$OPENCLAW_PROVIDER_MODEL_ALIAS" \
+  --arg session_store "/workspace/.openclaw/agents/$AGENT_ID/sessions/sessions.json" \
+  '
+  def provider_models:
+    if $provider_model_alias != "" and $provider_model_alias != $provider_model_id then
+      [
+        { id: $provider_model_id, name: $model },
+        { id: $provider_model_alias, name: $model }
+      ]
+    else
+      [
+        { id: $provider_model_id, name: $model }
+      ]
+    end;
+  {
+    agents: {
+      defaults: {
+        workspace: $workspace,
+        model: {
+          primary: $model,
+          fallbacks: []
+        }
+      },
+      list: [
+        {
+          agentDir: $agent_dir,
+          id: $agent_id,
+          name: $agent_name,
+          model: $model,
+          sandbox: { mode: "off" },
+          workspace: $workspace
+        }
+      ]
+    },
+    models: {
+      providers: (
+        if $provider_builtin == "1" then
+          {}
+        else
+          {
+            ($provider_id): {
+              api: $provider_api,
+              apiKey: $provider_api_key,
+              baseUrl: $provider_base_url,
+              auth: "api-key",
+              authHeader: true,
+              headers: {},
+              models: provider_models
+            }
+          }
+        end
+      )
+    },
+    gateway: {
+      mode: "local"
+    },
+    commands: {
+      native: "auto",
+      nativeSkills: "auto"
+    },
+    messages: {
+      ackReactionScope: "group-mentions"
+    },
+    session: {
+      store: $session_store
+    }
+  }
+  ' > "$OPENCLAW_DIR/openclaw.json"
+echo "  OpenClaw config written from inline template"
+
+export OPENCLAW_CONFIG="$OPENCLAW_DIR/openclaw.json"
+export OPENCLAW_CONFIG_PATH="$OPENCLAW_DIR/openclaw.json"
+echo "  OPENCLAW_CONFIG_PATH: $OPENCLAW_CONFIG_PATH"
+
+if [ -n "${PROMPT_CONTENT:-}" ]; then
+    USER_PROMPT="$PROMPT_CONTENT"
+    echo "  Using prompt from PROMPT_CONTENT env var"
+elif [ -f "$WORK_DIR/task/prompt.xml" ]; then
+    USER_PROMPT=$(cat "$WORK_DIR/task/prompt.xml")
+    echo "  Using XML prompt from task/prompt.xml"
+elif [ -f "$WORK_DIR/task/prompt.md" ]; then
+    USER_PROMPT=$(cat "$WORK_DIR/task/prompt.md")
+    echo "  Using prompt from task/prompt.md"
+else
+    echo "ERROR: No prompt content available"
+    echo "   Checked: $PROMPT_CONTENT, task/prompt.xml, task/prompt.md"
+    exit 1
+fi
+
+AGENT_LOG="${LOG_FILE_PATH:-/workspace/agent.log}"
+rm -f "$AGENT_LOG" 2>/dev/null || true
+touch "$AGENT_LOG"
+chmod 666 "$AGENT_LOG" || true
+echo "  Agent log file: $AGENT_LOG"
+
+OPENCLAW_TIMEOUT="${OPENCLAW_TIMEOUT:-600}"
+
+echo ""
+echo "  OpenClaw Command: openclaw agent --local --agent $AGENT_ID --json --timeout $OPENCLAW_TIMEOUT"
+echo "  Prompt loaded ($(echo "$USER_PROMPT" | wc -c) bytes)"
+echo ""
+
+openclaw agent --local \
+    --agent "$AGENT_ID" \
+    --message "$USER_PROMPT" \
+    --json \
+    --timeout "$OPENCLAW_TIMEOUT" \
+    2>&1 | tee "$AGENT_LOG"
+OPENCLAW_EXIT_CODE=${PIPESTATUS[0]}
+
+if [ "$OPENCLAW_EXIT_CODE" -eq 0 ] && grep -Eq 'LLM request rejected:|You have hit your ChatGPT usage limit|Your credit balance is too low|You exceeded your current quota' "$AGENT_LOG"; then
+    echo ""
+    echo "  OpenClaw reported a provider-side rejection despite exit code 0"
+    OPENCLAW_EXIT_CODE=1
+fi
+
+if [ "${SKIP_MCP_SHUTDOWN:-0}" != "1" ]; then
+    curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1 || true
+fi
+
+echo ""
+echo "  OpenClaw execution completed (exit code: $OPENCLAW_EXIT_CODE)"

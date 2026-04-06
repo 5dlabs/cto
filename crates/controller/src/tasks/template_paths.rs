@@ -66,6 +66,7 @@ pub const CLI_DEXTER_INVOKE: &str = "clis/dexter.sh.hbs";
 pub const CLI_FACTORY_INVOKE: &str = "clis/factory.sh.hbs";
 pub const CLI_GEMINI_INVOKE: &str = "clis/gemini.sh.hbs";
 pub const CLI_OPENCODE_INVOKE: &str = "clis/opencode.sh.hbs";
+pub const CLI_OPENCLAW_INVOKE: &str = "clis/openclaw.sh.hbs";
 
 // ============================================================================
 // Agent identity templates

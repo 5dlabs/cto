@@ -102,6 +102,7 @@ verify_cli() {
     opencode)     command -v opencode >/dev/null 2>&1 ;;
     gemini)       command -v gemini >/dev/null 2>&1 ;;
     code)         command -v code >/dev/null 2>&1 ;;
+    openclaw)     command -v openclaw >/dev/null 2>&1 ;;
     *)            echo "[agent-entrypoint] Warning: Unknown CLI '$cli'"; return 1 ;;
   esac
 }
