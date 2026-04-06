@@ -1,18 +1,16 @@
-Implement subtask 8006: Implement portfolio gallery page with Social Media Engine integration
+Implement subtask 8006: Build hero page (app/page.tsx) with value proposition and CTAs
 
 ## Objective
-Build the portfolio page at `/portfolio` that fetches published content (project photos, case studies) from the Social Media Engine API and displays them in an attractive gallery layout.
+Implement the homepage with a hero section, Sigma-1 value proposition copy, and CTA buttons linking to /equipment and /quote.
 
 ## Steps
-1. Create `app/portfolio/page.tsx`.
-2. Fetch portfolio/published content from the Social Media Engine API using RSC.
-3. Build a responsive gallery grid layout (masonry or standard grid).
-4. Each gallery item shows: image, project title, brief description, date.
-5. Implement a lightbox or modal for full-size image viewing.
-6. Add category/tag filtering if the API provides categorized content.
-7. Handle empty state (no portfolio items yet) with a friendly message.
-8. Handle API errors gracefully.
-9. Use Next.js `<Image>` with proper optimization for gallery images.
+1. Create app/page.tsx as a Server Component.
+2. Hero section: full-width dark background, centered content. H1: 'Illuminate Every Event' (or approved brand copy). Subheadline: 2-line description of Sigma-1's lighting and visual production services.
+3. CTA buttons: primary Button linking to /equipment ('Browse Equipment'), secondary outline Button linking to /quote ('Get a Quote').
+4. Value props section below hero: 3-column grid of Card components, each with an icon (lucide-react), title, and 1-sentence description. Topics: Equipment Range, Real-Time Availability, Instant Quotes.
+5. Contact anchor section (#contact): email address, phone, and location. Keep minimal for v1.
+6. Apply sigma1 brand colors from design tokens (background, accent electric blue for CTA).
+7. Add og:image meta tag referencing a static placeholder image for social sharing.
 
 ## Validation
-Portfolio page renders at `/portfolio`; gallery items are fetched from Social Media Engine API and displayed; responsive grid layout works at all breakpoints; lightbox opens on item click; empty state renders when no items are returned; API error state shows fallback UI; images load with proper optimization.
+Playwright: GET / on 1280px viewport — h1 is visible, two CTA buttons present with correct href attributes. GET / on 375px viewport — h1 and CTAs are visible without horizontal scroll. `next build` produces no TypeScript errors for this file.

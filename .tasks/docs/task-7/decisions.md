@@ -1,10 +1,11 @@
 ## Decision Points
 
-- What API paradigm should be used for inter-service communication between backend services and the Morgan agent?
-- What authentication and authorization mechanism should be used for API access between services and for the frontend?
-- How should the Signal messenger integration for Morgan be implemented?
+- Decision
+- Decision
+- Decision
+- Decision
 
 ## Coordination Notes
 
-- Agent owner: Angie
+- Agent owner: angie
 - Primary stack: OpenClaw/MCP

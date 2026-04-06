@@ -1,22 +1,10 @@
-Implement subtask 2003: Implement core CRUD API endpoints for categories and products
+Implement subtask 2003: Implement JWT extraction and validation middleware for admin-protected write endpoints
 
 ## Objective
-Implement the category listing, product listing with filtering/pagination, and single product detail endpoints with input validation and JSON serialization.
+Write a reusable Axum middleware (or extractor) that extracts Bearer tokens from Authorization headers, validates them against JWT_SECRET, and enforces an 'admin' role claim for write endpoints.
 
 ## Steps
-1. Create src/handlers/categories.rs:
-   - GET /api/v1/catalog/categories: List all categories with optional tree structure (parent_id). Return Vec<Category> as JSON. Support ?parent_id= filter.
-2. Create src/handlers/products.rs:
-   - GET /api/v1/catalog/products: List products with pagination (limit, offset query params), filtering by category_id, tenant_id (from auth context or header), search by name. Return paginated response {items: Vec<Product>, total: i64, limit: i32, offset: i32}.
-   - GET /api/v1/catalog/products/:id: Return single product by UUID. Return 404 if not found.
-3. Create request/response DTOs in src/dto/:
-   - ProductListQuery: category_id, limit (default 20, max 100), offset (default 0), search
-   - ProductResponse: Product fields + computed image_url (S3 URL prefix + image_key)
-   - CategoryResponse: Category fields
-4. Add input validation using axum-extra or custom extractors: validate UUID format, limit/offset bounds.
-5. Wire routes into the Axum Router in main.rs.
-6. Implement the /api/v1/equipment-api/catalog endpoint as an alias or aggregation of categories + featured products for the equipment API consumer.
-7. Add structured error responses with consistent JSON error format: {error: string, code: string, details: optional}.
+Create src/middleware/auth.rs. Use jsonwebtoken crate (add to Cargo.toml: jsonwebtoken = '9'). Define Claims struct: { sub: String, role: String, exp: usize }. Implement AuthExtractor as an axum::extract::FromRequestParts<Arc<AppState>> that: (1) reads Authorization header, (2) strips 'Bearer ' prefix, (3) decodes JWT with Validation::new(Algorithm::HS256) and JWT_SECRET from AppState, (4) returns 401 if missing or invalid, (5) returns extracted Claims. Implement AdminClaims newtype wrapping Claims that additionally checks role == 'admin', returning 403 if not. Add unit tests in src/middleware/auth.rs using #[cfg(test)] mod tests: create a valid token with jsonwebtoken::encode, pass it through AuthExtractor logic, verify Claims are returned. Test invalid token returns 401 error type.
 
 ## Validation
-Integration tests: GET /api/v1/catalog/categories returns 200 with valid JSON array. GET /api/v1/catalog/products returns 200 with paginated response. GET /api/v1/catalog/products/:id returns 200 for existing product, 404 for non-existent UUID, 400 for invalid UUID format. Pagination params are respected (limit, offset). Category filter works correctly.
+cargo test middleware::auth passes. Integration: POST /api/v1/catalog/products with no Authorization header returns HTTP 401. POST with valid non-admin token returns HTTP 403. POST with valid admin token proceeds to handler (returns 400 if body is invalid JSON, not 401/403).

@@ -1,26 +1,10 @@
-Implement subtask 6004: Implement draft management endpoints and approval workflow
+Implement subtask 6004: Implement photo upload handler and R2 multipart storage
 
 ## Objective
-Build the draft CRUD endpoints and the approval/rejection workflow including Signal notification integration with Morgan.
+Implement POST /api/v1/social/upload as a multipart Elysia route that accepts JPEG/PNG files, uploads them to Cloudflare R2 via the S3-compatible SDK, creates a social_drafts row with status=pending_curation, and triggers the async curation pipeline.
 
 ## Steps
-1. Implement GET `/api/v1/social/drafts` — list all drafts with filtering by status, pagination.
-2. Implement GET `/api/v1/social/drafts/:id` — get single draft with full details.
-3. Implement POST endpoint or internal function to create a draft:
-   - Accept image_urls (from upload), run AI curation to select best images, generate captions per target platform.
-   - Store draft in PostgreSQL with status 'pending_review'.
-4. Implement POST `/api/v1/social/drafts/:id/approve`:
-   - Validate draft exists and is in 'pending_review' status.
-   - Update status to 'approved'.
-5. Implement POST `/api/v1/social/drafts/:id/reject`:
-   - Accept optional rejection reason.
-   - Update status to 'rejected'.
-6. Implement Signal/Morgan notification integration:
-   - Create `src/notifications/signal.ts` module.
-   - When a draft is created, send a Signal message to the configured approval contact with draft preview and approve/reject links.
-   - Read SIGNAL_API_ENDPOINT and MORGAN_WEBHOOK_URL from environment.
-7. Validate all request/response schemas with Effect.Schema.
-8. Add proper state machine validation (can't approve an already published draft, etc.).
+Add Elysia multipart body parsing. In the handler: validate content-type is multipart/form-data, extract files array and event_id. For each file: use @aws-sdk/client-s3 PutObjectCommand with bucket=R2_BUCKET_NAME, key=`events/{event_id}/source/{uuid}.jpg`, endpoint=R2_ENDPOINT, credentials from R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY. Collect uploaded URLs. Insert social_drafts row with source_photo_urls=[...urls], status='pending_curation'. Call `void runCurationPipeline(draft_id, urls)` as a fire-and-forget async call (do not await). Return 202 {draft_id, status:'pending_curation'}. Implement GET /api/v1/social/drafts and GET /api/v1/social/drafts/:id querying the social_drafts table.
 
 ## Validation
-Integration tests: create a draft triggers AI curation and persists with 'pending_review' status; GET /drafts returns paginated list; approve transitions to 'approved'; reject transitions to 'rejected'; invalid state transitions return 409; Signal notification is sent on draft creation (verified via mock).
+POST /api/v1/social/upload with 3 JPEG files returns 202 with a valid UUID draft_id and status=pending_curation within 2 seconds. Verify the 3 source files exist in R2 bucket under the correct key prefix. GET /api/v1/social/drafts/:id returns the draft row with source_photo_urls containing 3 URLs.

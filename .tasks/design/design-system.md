@@ -1,8 +1,8 @@
 # Design System
 
 Project: sigma-1
-Provider mode: both
-Providers generated: stitch, framer
+Provider mode: stitch
+Providers generated: stitch
 
 ## Scope
 - Output includes token foundations, reusable primitives, and interaction patterns.

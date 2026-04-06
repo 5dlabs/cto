@@ -1,53 +1,38 @@
 {
   "screens": [
     {
-      "source_screen_id": "b5349621136748c78a734f1e988559e5",
-      "source_target": "mobile",
+      "source_screen_id": "6a1ebbef43e54b29bc719342a23b7775",
+      "source_target": "web",
       "variants": [
         {
-          "variant_id": "b5349621136748c78a734f1e988559e5-v1",
-          "source_screen_id": "b5349621136748c78a734f1e988559e5",
-          "source_target": "mobile",
+          "variant_id": "6a1ebbef43e54b29bc719342a23b7775-v1",
+          "source_screen_id": "6a1ebbef43e54b29bc719342a23b7775",
+          "source_target": "web",
           "label": "Original (fallback)",
           "description": "Variant generation failed; using original.",
           "aspects_changed": [],
-          "screen_id": "b5349621136748c78a734f1e988559e5",
-          "html_url": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzUwZDNhZTNhNDliNzQyMjVhNGU1MGYzYmFiNTc2MGMxEgsSBxD0x7nTwxwYAZIBJAoKcHJvamVjdF9pZBIWQhQxNzcyODMwMDQxMjY5NzYwMzk2Ng&filename=&opi=96797242",
-          "image_url": "https://lh3.googleusercontent.com/aida/ADBb0uhBqg9kMK-Yncb642BnpJsQ_KL2dS7Uh4KJoaMNM2UK8j1itN7IJHoja3yu7Rc0r5fQea0Hg2w_AAKOmrQuEeBFsXFq5Ot31eouXzCCrH8tyO3eNpLU8IopOVMHc-wl5uzicMF8YL8jfbBEItc5V_owNmvAKZSKOVHLsoLc0l321NCKbzA5_NBr58pvpwnjNH_XGgdcZJS8IJck8LPVFlQ496x3LDVCxVZxet9EpCYGA-zUE4eWeVx1lQ8=w1920",
+          "screen_id": "6a1ebbef43e54b29bc719342a23b7775",
+          "html_url": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzlkZmE1MTkwYTc4MzQzODhiNTQ5NDQyODM3ZjgwNmU2EgsSBxD0x7nTwxwYAZIBIwoKcHJvamVjdF9pZBIVQhM2MDI1MjA4NTA5MDYyNzMzODM3&filename=&opi=96797242",
+          "image_url": "https://lh3.googleusercontent.com/aida/ADBb0ugMmJNrSlZSJncbTlAzHp8_wuHioEpuL-LkzJ8uJ6LZ90UEroAPGtFx0W6J6MVdX8ZjVGLXGV1rz6I2gFDL9It09LJ7GsiS4TW6mtG65sfR1LizjCBZL1Vswuz6pzkEB8Hj9zUvg0FHi0EuWCjKQ5gfEkiIsGjbFve86jEGZew-YvYkxbjbij8SoY6PkaNm2gYbvM8EUM2nzAWKng_tvmqnz8c8tbS64oSZ1S8d8y8b3vu-cheuBQfZ8N4=w1920",
           "status": "failed",
           "error": "Stitch tool \"generate_variants\" failed: Requested entity was not found."
         }
       ]
     },
     {
-      "source_screen_id": "framer-web-1775453438543",
-      "source_target": "web",
-      "variants": [
-        {
-          "variant_id": "framer-web-1775453438543-v1",
-          "source_screen_id": "framer-web-1775453438543",
-          "source_target": "web",
-          "label": "Original (fallback)",
-          "description": "Variant generation failed; using original.",
-          "aspects_changed": [],
-          "screen_id": "framer-web-1775453438543",
-          "status": "failed",
-          "error": "The operation was aborted."
-        }
-      ]
-    },
-    {
-      "source_screen_id": "framer-mobile-1775453438544",
+      "source_screen_id": "735ea2adedd3405b917ba0542b9d0642",
       "source_target": "mobile",
       "variants": [
         {
-          "variant_id": "framer-mobile-1775453438544-v1",
-          "source_screen_id": "framer-mobile-1775453438544",
+          "variant_id": "735ea2adedd3405b917ba0542b9d0642-v1",
+          "source_screen_id": "735ea2adedd3405b917ba0542b9d0642",
           "source_target": "mobile",
           "label": "Original (fallback)",
           "description": "Variant generation failed; using original.",
           "aspects_changed": [],
-          "screen_id": "framer-mobile-1775453438544",
+          "screen_id": "735ea2adedd3405b917ba0542b9d0642",
+          "html_url": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sX2Q4MTQwNmUxMWE0YzQ4NmVhZTEyYjhhODFlNDAwOTcyEgsSBxD0x7nTwxwYAZIBIwoKcHJvamVjdF9pZBIVQhM2MDI1MjA4NTA5MDYyNzMzODM3&filename=&opi=96797242",
+          "image_url": "https://lh3.googleusercontent.com/aida/ADBb0ugnUehzLj0AFDchaLyaVp5t628o2f9A0YsaAl9ECtXBEj2WKam31Qsw_g1nQK9n8XwpfJr3daa3u6UfNaBZIG0Iqtlry-jiE-_o2AEOJ8tSyWo3muMMkDXw0JW6PfHQt9ixRIypXIKegxfdx7ifKme3s3KOKU8om2sdFm1ufRzwMN8ujpvgM-QoiHmv_TkQBRLnt9jr5pme9o0WUOAoqXJD3fscdUwkGtqyPUHCTYcmKpC5O79wP613O9U=w1920",
           "status": "failed",
           "error": "The operation was aborted."
         }
@@ -55,5 +40,5 @@
     }
   ],
   "total_variants": 0,
-  "timestamp": "2026-04-06T05:31:01.565Z"
+  "timestamp": "2026-04-06T22:59:55.212Z"
 }

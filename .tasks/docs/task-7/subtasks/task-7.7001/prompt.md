@@ -1,16 +1,13 @@
-Implement subtask 7001: Deploy OpenClaw agent base in openclaw namespace
+Implement subtask 7001: Create OpenClaw agent.yaml and system-prompt.md for Morgan
 
 ## Objective
-Deploy the OpenClaw agent using the provided deployment manifest into the openclaw namespace. Configure base environment variables, resource limits, and wire up the sigma1-infra-endpoints ConfigMap via envFrom so all backend service URLs are available to the agent runtime.
+Author the core OpenClaw agent configuration file at agents/morgan/agent.yaml and the system prompt at agents/morgan/system-prompt.md defining Morgan's persona, responsibilities, and decision trees.
 
 ## Steps
-1. Create or verify the `openclaw` namespace exists.
-2. Apply the provided OpenClaw deployment manifest (Deployment, Service, ServiceAccount).
-3. Attach the `sigma1-infra-endpoints` ConfigMap via `envFrom` on the agent container.
-4. Configure base agent settings: system prompt skeleton, model endpoint, temperature, max tokens.
-5. Set resource requests/limits appropriate for a single-replica dev deployment.
-6. Verify the agent pod reaches Running state and the health endpoint responds.
-7. Confirm all ConfigMap environment variables are injected correctly by exec-ing into the pod and printing env.
+1. Create agents/morgan/agent.yaml with fields: agent_id: morgan, model: openai-api/gpt-4o, namespace: openclaw, description, and references to tools.yaml and skills/ directory.
+2. Create agents/morgan/system-prompt.md. Content must cover: (a) company context — Sigma-1/Perception Events, lighting and visual production; (b) persona — professional, efficient, friendly; (c) core responsibilities: lead qualification, quote generation, customer vetting, invoicing, social media content approval; (d) decision trees for each responsibility as numbered flowcharts in markdown; (e) tone guidelines and escalation rules.
+3. Validate agent.yaml against OpenClaw schema using `openclaw validate agents/morgan/agent.yaml`.
+4. Ensure system prompt fits within the model's context window — keep under 4000 tokens.
 
 ## Validation
-Pod is in Running state; `kubectl exec` into the pod and verify all sigma1-infra-endpoints env vars are present; agent health endpoint returns 200; logs show successful startup with no configuration errors.
+`openclaw validate agents/morgan/agent.yaml` exits 0 with no errors. Character count of system-prompt.md is below 16000 chars. Manual review confirms all 5 responsibility areas have explicit decision tree branches.

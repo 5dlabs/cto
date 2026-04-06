@@ -1,21 +1,10 @@
-Implement subtask 6002: Implement S3/R2 photo upload and storage integration
+Implement subtask 6002: Write database migrations for social schema tables
 
 ## Objective
-Build the photo upload endpoint and S3/R2 storage integration for the /api/v1/social/upload endpoint, handling multipart file uploads and returning stored image URLs.
+Create SQL migration files for the social schema: social_drafts and social_posts tables with all columns, constraints, foreign keys, and indexes.
 
 ## Steps
-1. Add @aws-sdk/client-s3 dependency (compatible with both S3 and R2 via S3-compatible API).
-2. Create `src/storage/s3-client.ts` module:
-   - Configure S3Client reading S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY from environment (Kubernetes secrets).
-   - Implement `uploadImage(file: Buffer, filename: string, contentType: string) -> Effect<string>` returning the public/signed URL.
-   - Implement `deleteImage(key: string) -> Effect<void>` for cleanup.
-3. Implement POST `/api/v1/social/upload` Elysia handler:
-   - Accept multipart/form-data with one or more image files.
-   - Validate file types (JPEG, PNG, WebP only) and size limits (10MB per file).
-   - Upload each file to S3/R2 with a unique key (e.g., `social/{uuid}/{filename}`).
-   - Return array of uploaded image URLs.
-4. Validate request/response with Effect.Schema.
-5. Add error handling for storage failures.
+Use a migration tool compatible with postgres.js (e.g., node-postgres-migrate or raw SQL files run at startup). Migration 001_social_drafts.sql: id UUID PK DEFAULT gen_random_uuid(), event_id UUID NOT NULL, source_photo_urls TEXT[] NOT NULL DEFAULT '{}', selected_photo_urls TEXT[] NOT NULL DEFAULT '{}', instagram_crop_url TEXT, linkedin_crop_url TEXT, tiktok_crop_url TEXT, caption TEXT, hashtags TEXT[] NOT NULL DEFAULT '{}', status TEXT NOT NULL CHECK (status IN ('pending_curation','ready_for_approval','approved','rejected','published')), approved_by TEXT, approved_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT now(). Migration 002_social_posts.sql: id UUID PK DEFAULT gen_random_uuid(), draft_id UUID NOT NULL REFERENCES social.social_drafts(id), platform TEXT NOT NULL CHECK (platform IN ('instagram','linkedin','tiktok','facebook')), external_post_id TEXT, published_at TIMESTAMPTZ, status TEXT NOT NULL CHECK (status IN ('pending','published','failed')), error_text TEXT. Add index on social_drafts(event_id) and social_posts(draft_id). Run migrations at application startup before Elysia listens.
 
 ## Validation
-Unit tests with mocked S3 client verify upload/delete operations; integration test uploads a test image and receives a valid URL; invalid file types are rejected with 400; oversized files are rejected; multiple files upload concurrently.
+Run migrations against a local Postgres instance; verify via `\d social.social_drafts` and `\d social.social_posts` that all columns exist with correct types. Run migrations twice and confirm idempotency. Insert a test draft and post row to confirm FK constraint works.

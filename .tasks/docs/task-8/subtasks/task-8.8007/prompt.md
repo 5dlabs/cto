@@ -1,18 +1,19 @@
-Implement subtask 8007: Embed Morgan web chat widget
+Implement subtask 8007: Build equipment catalog page (app/equipment/page.tsx) with category filter and search
 
 ## Objective
-Integrate the Morgan AI web chat widget into the website as a persistent floating component that connects to Morgan's WebSocket endpoint for real-time customer conversations.
+Implement the equipment catalog browser as a server-rendered page with client-side category filtering, debounced search, and product cards displaying image, name, day rate, and availability badge.
 
 ## Steps
-1. Create a `ChatWidget` client component (`'use client'`) that renders a floating chat bubble in the bottom-right corner.
-2. On click, expand to a chat panel with message history, input field, and send button.
-3. Establish a WebSocket connection to Morgan's web chat endpoint (URL from environment variable).
-4. Implement the message protocol: send JSON messages with text and session ID; receive and display agent responses.
-5. Implement session persistence: store session ID in localStorage so returning visitors resume conversations.
-6. Show typing indicator while waiting for agent response.
-7. Handle connection errors and reconnection logic.
-8. Add the ChatWidget to the root layout so it appears on all pages.
-9. Ensure the widget is accessible: keyboard navigable, aria labels, screen reader announcements for new messages.
+1. Create app/equipment/page.tsx as a Server Component. Fetch categories and initial product list server-side using runApiEffect(getCategories()) and runApiEffect(getProducts()).
+2. Pass initial data to a client component EquipmentCatalog via props.
+3. Create components/equipment/EquipmentCatalog.tsx as 'use client' component:
+   - State: selectedCategory (string | null), searchQuery (string).
+   - Category filter: horizontally scrollable row of Badge buttons. Click sets selectedCategory, triggers client-side re-fetch via TanStack Query: useQuery({ queryKey: ['products', category, search], queryFn: () => runApiEffect(getProducts(search)) }).
+   - Search input: Input component, onChange with 300ms debounce using setTimeout/clearTimeout.
+   - Product grid: responsive grid (2 cols mobile, 3 cols md, 4 cols lg).
+4. Create components/equipment/ProductCard.tsx: next/image for product image (objectFit: cover, aspect-ratio: 4/3), product name (h3), day_rate formatted as currency, availability badge (green Sold or In Stock — static for catalog view).
+5. Loading state: 8 Skeleton cards while TanStack Query is fetching.
+6. Link product card to /equipment/[id].
 
 ## Validation
-Chat bubble appears on all pages; clicking opens the chat panel; sending a message establishes WebSocket connection and delivers the message; agent response appears in the chat; session persists across page navigations; typing indicator shows during agent processing; widget is keyboard accessible; connection loss shows error state and attempts reconnection.
+Playwright: GET /equipment shows product grid with >= 1 card. Click 'Lighting' category badge — URL or state updates, only lighting products visible. Type 'truss' in search — product list updates to matching items within 500ms. Network tab shows GET /api/v1/catalog/products with search and category query params.

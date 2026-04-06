@@ -1,19 +1,10 @@
-Implement subtask 1005: Deploy Signal-CLI pod in openclaw namespace
+Implement subtask 1005: Create all nine Kubernetes Secrets in the sigma1 namespace
 
 ## Objective
-Deploy Signal-CLI as a standalone pod (or Deployment) in the openclaw namespace to serve as the Signal messaging relay for the Morgan agent.
+Define Helm secret templates (or ExternalSecrets if using ESO) for all nine external API secrets required by the platform in the sigma1 namespace.
 
 ## Steps
-1. Create a Deployment manifest in the openclaw namespace:
-   - name: signal-cli
-   - image: bbernhard/signal-cli-rest-api:latest (or equivalent)
-   - replicas: 1
-   - env: MODE=json-rpc or MODE=native (depending on integration needs)
-   - volume: PersistentVolumeClaim for Signal-CLI data directory (~1Gi) to store registration state
-2. Create a Service: signal-cli.openclaw.svc.cluster.local:8080.
-3. Create a Secret sigma1-signal-cli-config for the Signal phone number and registration data if pre-registered.
-4. Apply the manifests and wait for the pod to be Running.
-5. Record the service URL: http://signal-cli.openclaw.svc.cluster.local:8080 for the ConfigMap.
+Create sigma1/infra/templates/secrets.yaml. Use Helm's --set or values file with base64-encoded placeholders; document that real values must be injected via CI/CD or a sealed-secrets workflow before production use. Create the following Secret resources in namespace sigma1: (1) sigma1-stripe-secret: keys STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET. (2) sigma1-opencorporates-secret: key OPENCORPORATES_API_KEY. (3) sigma1-linkedin-secret: keys LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET. (4) sigma1-google-secret: keys GOOGLE_REVIEWS_API_KEY, GOOGLE_CALENDAR_CLIENT_ID, GOOGLE_CALENDAR_CLIENT_SECRET. (5) sigma1-elevenlabs-secret: key ELEVENLABS_API_KEY. (6) sigma1-twilio-secret: keys TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER. (7) sigma1-openai-secret: key OPENAI_API_KEY. (8) sigma1-cloudflare-secret: keys CF_R2_ACCESS_KEY_ID, CF_R2_SECRET_ACCESS_KEY, CF_R2_ENDPOINT, CF_R2_BUCKET_NAME. (9) sigma1-jwt-secret: key JWT_SECRET. Set type: Opaque for all. Use helm values placeholders (e.g., {{ .Values.secrets.stripe.secretKey | b64enc }}) with a values-secrets.yaml.example file committed showing required keys.
 
 ## Validation
-Verify the signal-cli pod is Running in openclaw namespace. Curl http://signal-cli.openclaw.svc.cluster.local:8080/v1/about from a debug pod and confirm a valid JSON response with version info.
+kubectl get secret -n sigma1 lists all 9 secrets by name. kubectl get secret sigma1-stripe-secret -n sigma1 -o jsonpath='{.data}' shows both expected keys. Repeat spot-check for sigma1-cloudflare-secret (4 keys) and sigma1-google-secret (3 keys). kubectl describe secret sigma1-jwt-secret -n sigma1 shows key JWT_SECRET with non-zero bytes.

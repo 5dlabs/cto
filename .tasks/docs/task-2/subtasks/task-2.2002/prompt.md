@@ -1,22 +1,10 @@
-Implement subtask 2002: Define database models and create sqlx migrations for rms schema
+Implement subtask 2002: Implement application entrypoint, AppState, and database/Valkey connection pool setup
 
 ## Objective
-Define the Product, Category, and Availability domain models in Rust and create sqlx migrations for the corresponding tables in the PostgreSQL rms schema.
+Write src/main.rs and src/state.rs establishing the Axum application entry point, shared AppState struct containing PgPool and Redis ConnectionManager, and configuration loading from environment variables.
 
 ## Steps
-1. Create migrations directory: migrations/
-2. Create migration 001_create_rms_tables.sql:
-   - SET search_path TO rms;
-   - CREATE TABLE categories (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name VARCHAR(255) NOT NULL, slug VARCHAR(255) UNIQUE NOT NULL, description TEXT, parent_id UUID REFERENCES categories(id), display_order INT DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW());
-   - CREATE TABLE products (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID NOT NULL, category_id UUID NOT NULL REFERENCES categories(id), name VARCHAR(500) NOT NULL, slug VARCHAR(500) NOT NULL, description TEXT, daily_rate_cents BIGINT NOT NULL, weekly_rate_cents BIGINT, monthly_rate_cents BIGINT, image_key VARCHAR(1024), specifications JSONB DEFAULT '{}', is_active BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(tenant_id, slug));
-   - CREATE TABLE availability (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), product_id UUID NOT NULL REFERENCES products(id), date DATE NOT NULL, quantity_available INT NOT NULL DEFAULT 0, quantity_reserved INT NOT NULL DEFAULT 0, updated_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(product_id, date));
-   - Add indexes on products(category_id), products(tenant_id), availability(product_id, date).
-3. Define Rust structs in src/models/:
-   - src/models/category.rs: Category struct with sqlx::FromRow
-   - src/models/product.rs: Product struct with sqlx::FromRow, include image_url computed field
-   - src/models/availability.rs: Availability struct with sqlx::FromRow
-4. Run migrations in main.rs startup: sqlx::migrate!().run(&pool).await
-5. Add compile-time query checking with sqlx prepare if feasible.
+Create src/main.rs: initialize tracing_subscriber with EnvFilter from RUST_LOG env var. Load config from env: DATABASE_URL (from CNPG_SIGMA1_URL + PGPASSWORD), VALKEY_URL (from VALKEY_SIGMA1_URL), JWT_SECRET. Create sqlx::PgPool via PgPoolOptions with max_connections: 10, connect_lazy: false. Create redis::aio::ConnectionManager from VALKEY_URL. Construct AppState { db: PgPool, redis: ConnectionManager, jwt_secret: String }. Wrap in Arc<AppState>. Build Axum Router (routes added in later subtasks), attach tower-http layers: TraceLayer, CompressionLayer, CorsLayer (permissive for dev). Bind to 0.0.0.0:8080. Create src/state.rs defining pub struct AppState and impl AppState with db(), redis(), jwt_secret() accessors. Create src/config.rs reading all env vars with descriptive errors on missing values.
 
 ## Validation
-Migrations run successfully against a test PostgreSQL instance. All tables exist in the rms schema with correct columns and constraints. Rust model structs can be deserialized from query results (integration test inserting and selecting a row for each table).
+cargo build succeeds. Running the binary with valid DATABASE_URL and VALKEY_URL env vars starts without panic and logs 'listening on 0.0.0.0:8080'. curl http://localhost:8080/ returns 404 (router not yet populated — confirming server is alive).

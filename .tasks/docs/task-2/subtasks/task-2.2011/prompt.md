@@ -1,0 +1,10 @@
+Implement subtask 2011: Write Dockerfile and Kubernetes Deployment/Service manifests for equipment-catalog
+
+## Objective
+Create a multi-stage Dockerfile for the Rust service and Kubernetes Deployment (2 replicas) and Service manifests with envFrom referencing sigma1-infra-endpoints and required secrets, plus liveness/readiness probes.
+
+## Steps
+Create services/equipment-catalog/Dockerfile: Stage 1 (builder): FROM rust:1.75-slim as builder, WORKDIR /app, COPY Cargo.toml Cargo.lock ./, COPY src ./src, COPY migrations ./migrations, RUN cargo build --release. Stage 2 (runtime): FROM debian:bookworm-slim, COPY --from=builder /app/target/release/equipment-catalog /usr/local/bin/, COPY --from=builder /app/migrations /migrations, EXPOSE 8080, CMD ["equipment-catalog"]. Create k8s/deployment.yaml in the service directory: apiVersion: apps/v1, kind: Deployment, name: equipment-catalog, namespace: sigma1, replicas: 2. containers[0]: image: ghcr.io/sigma1/equipment-catalog:latest, envFrom: [{configMapRef: sigma1-infra-endpoints}, {secretRef: sigma1-postgres-app}, {secretRef: sigma1-jwt-secret}, {secretRef: sigma1-cloudflare-secret}]. resources: limits: {memory: 256Mi, cpu: 250m}, requests: {memory: 128Mi, cpu: 100m}. livenessProbe: httpGet path /health/live port 8080 initialDelaySeconds 10. readinessProbe: httpGet path /health/ready port 8080 initialDelaySeconds 15. Create k8s/service.yaml: ClusterIP Service port 80 → targetPort 8080.
+
+## Validation
+docker build -t equipment-catalog:test . completes without error. docker run with env vars set starts and curl http://localhost:8080/health/live returns 200. kubectl apply -f k8s/ -n sigma1 creates Deployment and Service. kubectl get pods -n sigma1 -l app=equipment-catalog shows 2/2 Running within 2 minutes. kubectl get endpoints equipment-catalog -n sigma1 shows 2 endpoint IPs.

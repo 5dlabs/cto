@@ -1,18 +1,10 @@
-Implement subtask 6005: Implement Instagram API publishing integration
+Implement subtask 6005: Implement AI photo curation pipeline with OpenAI vision scoring
 
 ## Objective
-Build the Instagram publishing client that posts approved content to Instagram via the Instagram Graph API.
+Implement the async curation pipeline that scores each uploaded photo using OpenAI gpt-4o vision API, selects the top 5-10 photos, and updates the draft's selected_photo_urls.
 
 ## Steps
-1. Create `src/publishing/instagram.ts` module.
-2. Implement Instagram Graph API integration:
-   - Use the Content Publishing API flow: create media container → publish media.
-   - Handle single image and carousel posts.
-   - Read INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_BUSINESS_ACCOUNT_ID from Kubernetes secrets.
-3. Implement `publishToInstagram(imageUrl: string, caption: string) -> Effect<PublishResult>` returning the platform post ID and URL.
-4. Handle API rate limits (200 calls/hour), token expiration, and error responses.
-5. Define Effect.Schema types for PublishResult.
-6. Add unit tests with mocked Instagram API responses.
+Create src/pipelines/curation.ts. Function runCurationPipeline(draft_id, source_urls): for each source URL, call OpenAI chat.completions.create with model='gpt-4o', messages containing image_url content blocks and a scoring prompt: 'Score this photo on composition (0-10), lighting (0-10), and subject clarity (0-10). Return JSON {composition, lighting, clarity}.' Parse response JSON. Compute total = composition+lighting+clarity. Sort photos by total descending. Select top min(10, all) where total >= 15 (threshold for quality gate); ensure at least 1 photo is selected regardless of threshold. Update social_drafts SET selected_photo_urls=$1, status='ready_for_approval' WHERE id=$2. Wrap entire pipeline in try/catch; on error set status='pending_curation' with error logged via pino. Use OPENAI_API_KEY from environment.
 
 ## Validation
-Unit tests with mocked Instagram API verify: successful publish returns post ID; rate limit error is handled with appropriate retry/backoff; expired token returns a clear error; caption with hashtags is properly formatted.
+Integration test with mocked OpenAI API (vitest mock): supply 5 photos with mock scores [28, 22, 15, 10, 5]. Verify selected_photo_urls contains the top 3 (scores >= 15) and draft status transitions to 'ready_for_approval'. Test error path: OpenAI throws → draft status remains 'pending_curation' and error is logged.

@@ -1,10 +1,10 @@
-Implement subtask 9002: Configure Cloudflare CDN and TLS for all public-facing endpoints
+Implement subtask 9002: Configure NativeWind 4 with shared design tokens from packages/design-tokens
 
 ## Objective
-Set up Cloudflare DNS records, enable CDN caching for static assets, and configure TLS (Full Strict mode) for all public-facing domains and subdomains.
+Set up NativeWind 4 / Tailwind CSS 3.4 integration. Import the shared tailwind.config.ts from packages/design-tokens as the base preset. Extend in apps/mobile/tailwind.config.ts with NativeWind-specific settings (content paths covering .tsx files). Configure postcss.config.js required by NativeWind 4's build step. Add global.css entry point and import it in the root _layout.tsx.
 
 ## Steps
-1) Create or update Cloudflare DNS records (A/CNAME) for each public endpoint (frontend app domain, API domain, any webhook endpoints). 2) Enable Cloudflare proxy (orange cloud) on each record to activate CDN. 3) Set SSL/TLS mode to 'Full (Strict)' in Cloudflare dashboard or via API. 4) Generate a Cloudflare Origin CA certificate and install it as a Kubernetes TLS Secret for backend services to present to Cloudflare. 5) Configure Cloudflare Page Rules or Cache Rules: cache static assets (JS, CSS, images) with long TTLs, bypass cache for API routes. 6) Enable 'Always Use HTTPS' and HSTS headers in Cloudflare. 7) Store Cloudflare API tokens as Kubernetes Secrets for any automation. 8) Document the DNS records and Cloudflare settings in the project's infrastructure README.
+Create apps/mobile/tailwind.config.ts: `import baseConfig from '../../packages/design-tokens/tailwind.config'; export default { presets: [require('nativewind/preset'), baseConfig], content: ['./app/**/*.tsx', './components/**/*.tsx'], };`. Create postcss.config.js: `module.exports = { plugins: { tailwindcss: {}, autoprefixer: {} } };`. Create app/global.css with `@tailwind base; @tailwind components; @tailwind utilities;`. Import `./global.css` in app/_layout.tsx. Verify brand accent color token is available via `className='text-brand-accent'` on a test Text component.
 
 ## Validation
-Verify all public domains resolve correctly via `dig` or `nslookup`. Confirm HTTPS works end-to-end by curling each endpoint and checking for valid TLS certificate (Cloudflare-issued edge cert + origin cert chain). Verify CDN is active by checking `cf-cache-status` response header on static asset requests (should be HIT after first request). Confirm HTTP requests redirect to HTTPS. Run SSL Labs test against public domains and verify A/A+ rating.
+Render a Text component with a design-token-derived className (e.g., `className='bg-brand-accent'`). Confirm the correct color appears in Expo Go on iOS simulator. Run `npx tailwindcss --config tailwind.config.ts --content './app/**/*.tsx' --dry-run` — outputs CSS without error.

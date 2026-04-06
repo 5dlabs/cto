@@ -1,10 +1,10 @@
-Implement subtask 3010: Implement Redis session cache integration
+Implement subtask 3010: Add Prometheus metrics and health endpoints on dedicated port 8081
 
 ## Objective
-Add Redis client initialization and session caching logic to the RMS service for caching frequently accessed data and session state.
+Expose /metrics, /health/live, and /health/ready endpoints on a separate net/http mux listening on :8081 to avoid conflicts with the grpc-gateway mux on :8080.
 
 ## Steps
-1. Create `internal/cache/redis.go` with a Redis client wrapper using go-redis/redis. 2. Initialize Redis connection from ConfigMap environment variables (REDIS_HOST, REDIS_PORT). 3. Implement a generic cache layer: Get, Set, Delete with TTL support. 4. Cache frequently accessed entities (e.g., crew availability, inventory counts) with appropriate TTLs. 5. Implement session storage helpers if session-based auth is chosen (store/retrieve/delete session by token). 6. Add connection health check for Redis to the service health endpoint. 7. Ensure graceful degradation: if Redis is unavailable, fall back to direct DB queries (cache-aside pattern).
+Create internal/health/server.go. Instantiate a new http.NewServeMux() (NOT the default mux). Register /health/live handler returning 200 OK with body {status: live}. Register /health/ready handler that pings the pgx pool (pool.Ping(ctx)) and the Redis client (client.Ping(ctx)); return 200 if both succeed, 503 otherwise with JSON indicating which dependency is down. Register /metrics handler using promhttp.Handler() from prometheus/client_golang. In main.go, spawn this mux in a separate goroutine on :8081. Define at least two custom Prometheus counters: rms_grpc_requests_total (labeled by method) and rms_inventory_conflicts_total. Increment rms_inventory_conflicts_total in the conflict detection path.
 
 ## Validation
-Redis client connects successfully using ConfigMap values; cache set/get/delete operations work correctly; cache miss falls through to DB; Redis health check reports status accurately; service starts and operates even if Redis is temporarily unavailable.
+GET http://localhost:8081/health/live returns 200. GET http://localhost:8081/health/ready returns 200 when postgres and redis are reachable, 503 when postgres is stopped. GET http://localhost:8081/metrics returns text/plain with rms_grpc_requests_total and rms_inventory_conflicts_total metric lines.

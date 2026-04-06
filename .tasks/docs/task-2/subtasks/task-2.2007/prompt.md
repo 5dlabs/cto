@@ -1,19 +1,10 @@
-Implement subtask 2007: Implement Prometheus metrics and health probe endpoints
+Implement subtask 2007: Implement AI agent machine-readable catalog endpoint and programmatic checkout endpoint
 
 ## Objective
-Add /metrics endpoint exposing Prometheus-compatible metrics and /health/live, /health/ready endpoints for Kubernetes probes.
+Write GET /api/v1/equipment-api/catalog returning full catalog JSON with specs and availability windows, and POST /api/v1/equipment-api/checkout atomically validating availability and creating an availability_block row.
 
 ## Steps
-1. Create src/handlers/health.rs:
-   - GET /health/live: Return 200 {status: "ok"} unconditionally (liveness probe).
-   - GET /health/ready: Check PostgreSQL connectivity (SELECT 1) and Redis connectivity (PING). Return 200 if both pass, 503 with details if either fails.
-2. Create src/handlers/metrics.rs:
-   - GET /metrics: Return Prometheus text format metrics.
-   - Track: http_requests_total (counter, labels: method, path, status), http_request_duration_seconds (histogram, labels: method, path), active_connections (gauge), db_query_duration_seconds (histogram), rate_limit_hits_total (counter, labels: tenant_id).
-3. Use prometheus-client or metrics + metrics-exporter-prometheus crate.
-4. Create an Axum middleware layer that records request count and duration for every request.
-5. Wire /metrics, /health/live, /health/ready routes (outside the rate-limited route group).
-6. Update the Kubernetes Deployment manifest with liveness and readiness probe configurations pointing to these endpoints.
+Create src/handlers/equipment_api.rs. GET /api/v1/equipment-api/catalog: query all products with category JOIN, include all fields (specs JSONB, image_urls, dimensions). For each product, compute a 30-day availability window (today to today+30) by fetching availability_blocks and calling compute_availability. Return structured JSON array: [{ id, name, category, specs, day_rate, availability_windows: [{ date, quantity_available }] }]. Use parallel queries per product or a single JOIN query with aggregation for performance — prefer single query with LEFT JOIN and GROUP BY. POST /api/v1/equipment-api/checkout: accept body { product_id: Uuid, date_from: NaiveDate, date_to: NaiveDate, quantity: i32, customer_id: Uuid }. Within a sqlx transaction: SELECT stock_quantity FROM products WHERE id = $1 FOR UPDATE. SELECT SUM(quantity_reserved + quantity_booked) FROM availability_blocks WHERE product_id = $1 AND date_from <= $3 AND date_to >= $2. If quantity_available < requested quantity return 409 Conflict with message. Otherwise INSERT INTO availability_blocks (product_id, date_from, date_to, quantity_reserved) VALUES ($1, $2, $3, $4). Commit transaction. Return 201 with the created block id. Wire routes in main.rs.
 
 ## Validation
-GET /health/live returns 200. GET /health/ready returns 200 when DB and Redis are up, 503 when either is down. GET /metrics returns valid Prometheus text format. After sending several API requests, metrics show incremented counters and histogram observations. Kubernetes probes configured in the Deployment manifest point to correct paths and ports.
+GET /api/v1/equipment-api/catalog returns HTTP 200 JSON array where each item contains specs and availability_windows fields. POST /api/v1/equipment-api/checkout with valid product and available dates returns HTTP 201 with block id. POST checkout for same product/dates where quantity would exceed stock returns HTTP 409. POST checkout with two concurrent requests for the last available unit — exactly one succeeds (201) and one returns 409, verifying FOR UPDATE locking.

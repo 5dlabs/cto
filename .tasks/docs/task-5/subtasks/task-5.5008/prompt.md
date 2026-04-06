@@ -1,21 +1,10 @@
-Implement subtask 5008: Add Prometheus metrics and request/response schema validation
+Implement subtask 5008: Write integration and unit test suite targeting >= 80% coverage
 
 ## Objective
-Instrument the service with Prometheus metrics for vetting pipeline observability and ensure all input/output schemas are validated.
+Write the full cargo test suite covering the scoring algorithm unit tests, async pipeline integration tests with mocked HTTP, cache hit/miss behavior, GDPR deletion flow, and async 202 polling convergence.
 
 ## Steps
-1. Add prometheus and metrics dependencies (e.g., metrics, metrics-exporter-prometheus).
-2. Define metrics:
-   - `vetting_requests_total` (counter, labels: endpoint, status)
-   - `vetting_duration_seconds` (histogram, labels: endpoint)
-   - `vetting_external_api_duration_seconds` (histogram, labels: api_name)
-   - `vetting_score_distribution` (histogram, labels: rating)
-3. Add middleware to record request count and latency for all endpoints.
-4. Instrument each external API call with timing metrics.
-5. Expose GET `/metrics` endpoint in Prometheus text format.
-6. Validate request bodies using serde with strict deserialization (deny_unknown_fields where appropriate).
-7. Validate response bodies match expected schemas before sending.
-8. Add structured logging with tracing crate for each vetting pipeline step.
+Use wiremock-rs or httpmock for HTTP mocking. Test cases required: (1) Scoring unit tests as defined in test_strategy — all three score bands. (2) POST /api/v1/vetting/run returns 202 within 1s. (3) Poll GET /api/v1/vetting/:org_id every 2s up to 30s until status=completed; assert final_score is GREEN/YELLOW/RED and vetted_at is set. (4) OpenCorporates 404 mock → risk_flags contains 'business_not_found'. (5) Cache hit: second POST for same org_id returns immediately with cached=true and no new vetting_request row. (6) GDPR delete → subsequent GET returns 404. (7) All four pipeline steps timing out → final_score=YELLOW, risk_flags contains all four timeout flags. Use tokio::test for async tests. Measure coverage with cargo-llvm-cov; fail CI if < 80%.
 
 ## Validation
-GET /metrics returns valid Prometheus text format with all defined metrics present; after running a vetting request, counters and histograms show non-zero values; malformed request bodies are rejected with 400 and descriptive error messages.
+`cargo test` exits 0 with all tests passing. `cargo llvm-cov --summary-only` reports >= 80% line coverage. CI pipeline runs `cargo test` and coverage check as a required gate.

@@ -1,10 +1,10 @@
-Implement subtask 4004: Integrate Stripe API for payment processing
+Implement subtask 4004: Implement payment recording handlers
 
 ## Objective
-Implement a Stripe client module and wire it into the payment flow for creating payment intents, handling webhooks, and recording Stripe payment outcomes.
+Implement POST /api/v1/payments, GET /api/v1/payments, and GET /api/v1/payments/invoice/:id handlers for recording and retrieving payment records.
 
 ## Steps
-1. Create `src/stripe/client.rs`: implement StripeClient wrapping the Stripe REST API using reqwest. Load STRIPE_API_KEY from config. 2. Implement create_payment_intent(amount, currency, metadata) → PaymentIntent. 3. Implement retrieve_payment_intent(id) → PaymentIntent. 4. Implement refund_payment(payment_intent_id, amount) → Refund. 5. Create `src/handlers/stripe_webhook.rs`: POST /api/v1/payments/stripe/webhook — verify Stripe webhook signature using STRIPE_WEBHOOK_SECRET, parse event. Handle events: payment_intent.succeeded (update payment status to SUCCEEDED, update invoice if fully paid), payment_intent.payment_failed (update payment status to FAILED), charge.refunded (update payment status to REFUNDED, revert invoice status). 6. Modify POST /api/v1/payments: when method is STRIPE, create a Stripe PaymentIntent, return the client_secret to the caller, store the payment record with status PENDING and stripe_payment_intent_id. The actual success/failure comes via webhook. 7. Implement idempotency: use invoice_id + amount as idempotency key for Stripe calls. 8. Handle Stripe API errors gracefully: rate limits (retry with backoff), authentication errors, invalid requests.
+Create src/handlers/payments.rs. POST /api/v1/payments: accept invoice_id, amount_cents, currency, method, optional stripe_payment_id, received_at. INSERT into finance.payments. Call the same paid_amount_cents update logic as POST /api/v1/invoices/:id/paid (extract shared logic into src/services/invoice_payment.rs). Return 201 with created payment. GET /api/v1/payments: SELECT all payments with optional invoice_id filter query param. GET /api/v1/payments/invoice/:id: SELECT payments WHERE invoice_id = $1, return array. Register routes on the Axum router.
 
 ## Validation
-Unit tests with mocked Stripe API: payment intent creation returns client_secret; webhook signature verification rejects invalid signatures; payment_intent.succeeded event updates payment and invoice correctly. Integration test with Stripe test mode: create payment intent, simulate webhook, verify end state. Idempotent calls don't create duplicate intents.
+POST /api/v1/payments with valid invoice_id and method=cash returns 201 with id. GET /api/v1/payments/invoice/:id returns the payment in an array. Partial payment does not change invoice status to paid; second payment completing the total does.

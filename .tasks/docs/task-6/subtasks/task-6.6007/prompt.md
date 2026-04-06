@@ -1,18 +1,10 @@
-Implement subtask 6007: Implement Facebook API publishing integration
+Implement subtask 6007: Implement caption generation via OpenAI chat API
 
 ## Objective
-Build the Facebook publishing client that posts approved content to a Facebook page via the Graph API.
+Implement the caption generation step that assembles event context and calls the OpenAI chat API to generate a caption and hashtags, storing results on the social_drafts row.
 
 ## Steps
-1. Create `src/publishing/facebook.ts` module.
-2. Implement Facebook Graph API integration:
-   - Upload photo to page → create post with photo and message.
-   - Handle Page Access Token authentication.
-   - Read FACEBOOK_PAGE_ACCESS_TOKEN and FACEBOOK_PAGE_ID from Kubernetes secrets.
-3. Implement `publishToFacebook(imageUrl: string, caption: string) -> Effect<PublishResult>` returning the post ID and URL.
-4. Handle API rate limits, token expiration, and error responses.
-5. Define Effect.Schema types for PublishResult.
-6. Add unit tests with mocked Facebook API responses.
+Create src/pipelines/caption.ts. Function generateCaption(draft_id, event_id): fetch event context from the catalog service (GET {CATALOG_SERVICE_URL}/api/v1/events/{event_id} — use CATALOG_SERVICE_URL env var). Assemble prompt: 'Write a social media caption for a photography event. Event name: {name}. Venue: {venue}. Equipment used: {equipment}. Generate a caption (max 200 words) and 10 relevant hashtags. Return JSON {caption: string, hashtags: string[]}.' Call openai.chat.completions.create with model='gpt-4o', temperature=0.7. Parse response JSON. UPDATE social_drafts SET caption=$1, hashtags=$2 WHERE id=$3. Call generateCaption at end of runCurationPipeline before setting status='ready_for_approval'. On catalog service fetch failure, use fallback context {name:'Photography Event', venue:'', equipment:[]}.
 
 ## Validation
-Unit tests with mocked Facebook Graph API verify: successful photo post returns post ID; page token errors are handled; rate limits produce appropriate retry behavior; caption is properly formatted for Facebook.
+Unit test with mocked OpenAI and mocked catalog service: verify caption and hashtags are non-empty strings after pipeline run. Verify caption is stored in the social_drafts row. Test catalog service failure fallback: still produces a caption using fallback context. Verify hashtags array contains exactly 10 items.

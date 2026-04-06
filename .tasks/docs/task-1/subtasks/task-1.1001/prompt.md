@@ -1,15 +1,10 @@
-Implement subtask 1001: Create Kubernetes namespaces and RBAC foundation
+Implement subtask 1001: Create Kubernetes namespaces: sigma1, databases, openclaw, signal
 
 ## Objective
-Create all required Kubernetes namespaces (databases, sigma1, openclaw, social, web) and configure basic RBAC service accounts so that downstream resources can be deployed into the correct namespace with appropriate permissions.
+Define and apply Namespace manifests for all four namespaces required by the Sigma-1 platform. These namespaces gate every subsequent resource deployment.
 
 ## Steps
-1. Create namespace manifests for: databases, sigma1, openclaw, social, web.
-2. Apply each namespace via kubectl or Helm.
-3. Create a ServiceAccount in each namespace for workloads to use (e.g., sigma1-sa, openclaw-sa).
-4. Create RoleBindings granting each ServiceAccount read access to secrets and configmaps within its own namespace.
-5. Create a ClusterRole that allows the sigma1 namespace SA to read the sigma1-infra-endpoints ConfigMap from the databases namespace (cross-namespace read).
-6. Label all namespaces with project=sigma1 for easy identification.
+Create a Helm chart at sigma1/infra/templates/namespaces.yaml (or equivalent). Define four Namespace resources: sigma1, databases, openclaw, signal. Apply labels: app.kubernetes.io/part-of=sigma1, managed-by=helm. Ensure the chart includes this template first in render order so dependent resources in the same chart do not fail. Add a Helm hook weight or ordering note if necessary. Apply with: helm upgrade --install sigma1-infra sigma1/infra --namespace sigma1 --create-namespace.
 
 ## Validation
-Run `kubectl get namespaces -l project=sigma1` and verify all 5 namespaces exist. Verify each ServiceAccount exists via `kubectl get sa -n <namespace>`. Verify RoleBindings are active and the cross-namespace read works by running `kubectl auth can-i get configmaps --as=system:serviceaccount:sigma1:sigma1-sa -n databases`.
+Run: kubectl get namespaces sigma1 databases openclaw signal — all four must show STATUS=Active. Verify labels with: kubectl get ns sigma1 --show-labels.

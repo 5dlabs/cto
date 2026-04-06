@@ -1,17 +1,10 @@
-Implement subtask 5001: Scaffold Rust/Axum project with sqlx, models, and database migrations
+Implement subtask 5001: Initialize Cargo workspace and declare all dependencies
 
 ## Objective
-Initialize the Customer Vetting Rust project with Axum 0.7 and sqlx. Define VettingResult and LeadScore domain models as per PRD. Create PostgreSQL migrations for vetting_results and lead_scores tables. Connect to infra via envFrom: sigma1-infra-endpoints ConfigMap.
+Create the Cargo workspace at services/customer-vetting with a single crate. Add all required dependencies to Cargo.toml: axum 0.7, tokio 1.x (full features), sqlx 0.7 (postgres, uuid, chrono, migrate), reqwest 0.11 (json, tls), serde/serde_json, redis 0.24 (tokio-comp), uuid (v4), chrono, anyhow, tracing, tracing-subscriber, prometheus 0.13.
 
 ## Steps
-1. `cargo init customer-vetting` with workspace layout.
-2. Add dependencies: axum 0.7, sqlx (with postgres and runtime-tokio features), serde, serde_json, tokio, tower-http.
-3. Define `VettingResult` struct with fields: id (UUID), org_id, opencorporates_data (JSONB), linkedin_data (JSONB), google_reviews_data (JSONB), credit_data (JSONB), overall_score (enum GREEN/YELLOW/RED), created_at, updated_at.
-4. Define `LeadScore` struct with fields: id, org_id, dimension scores (financial_score, reputation_score, legal_score), composite_score, rating (GREEN/YELLOW/RED).
-5. Write sqlx migrations in `migrations/` directory for both tables with appropriate indexes on org_id.
-6. Configure database connection pool using DATABASE_URL from sigma1-infra-endpoints ConfigMap.
-7. Set up Axum router skeleton with placeholder routes.
-8. Add health endpoint GET /healthz that checks DB connectivity.
+Run `cargo new --lib services/customer-vetting` then convert to a [[bin]] crate with main.rs. Set edition = '2021'. Pin exact minor versions in Cargo.toml. Verify `cargo build` succeeds with no warnings on a clean checkout. Add a .cargo/config.toml with build.target-dir pointing outside the service directory to speed up CI. Confirm tokio rt-multi-thread is enabled.
 
 ## Validation
-Project compiles without errors; `sqlx migrate run` succeeds against a test PostgreSQL instance; health endpoint returns 200 with DB connection confirmed; models serialize/deserialize correctly via unit tests.
+`cargo build` exits 0 with no compilation errors. `cargo check` also exits 0. All declared crate features resolve without conflict (run `cargo tree` to verify no duplicate major versions of core crates).

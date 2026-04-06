@@ -1,17 +1,22 @@
-Implement subtask 7005: Implement MCP tools for customer vetting, scoring, invoicing, and finance reporting
+Implement subtask 7005: Configure Signal-CLI adapter in OpenClaw for Morgan
 
 ## Objective
-Build MCP tool-server tools for customer vetting/scoring via the Vetting Engine, invoice generation/lookup via Invoice/Billing, and finance report retrieval for admin queries.
+Set up the OpenClaw Signal messaging adapter pointing to the signal-cli-svc JSON-RPC endpoint, with phone number from secret and receive loop enabled.
 
 ## Steps
-1. Define `customer_vet` MCP tool: accepts customer details (name, company, references), calls Vetting Engine API to initiate vetting, returns vetting status/result.
-2. Define `customer_score` MCP tool: accepts customer ID, calls Vetting Engine scoring endpoint, returns risk score and recommendation.
-3. Define `invoice_create` MCP tool: accepts quote ID or order details, calls Invoice/Billing API to generate an invoice, returns invoice details.
-4. Define `invoice_lookup` MCP tool: accepts invoice ID or customer ID, calls Invoice/Billing API, returns invoice status and payment info.
-5. Define `finance_report` MCP tool: accepts report type (revenue, outstanding, etc.) and date range, calls Finance API, returns formatted report data.
-6. Use endpoint URLs from sigma1-infra-endpoints ConfigMap env vars.
-7. Implement input validation and error handling for each tool.
-8. Register all tools with the OpenClaw agent's tool registry.
+1. In agents/morgan/agent.yaml (or a separate adapters/signal.yaml referenced from agent.yaml), add the signal adapter block:
+   adapters:
+     signal:
+       enabled: true
+       json_rpc_url: http://signal-cli-svc.signal.svc.cluster.local:7583
+       phone_number: ${SIGNAL_PHONE_NUMBER}  # sourced from secret
+       receive_loop: true
+       reconnect_on_failure: true
+       reconnect_interval_seconds: 10
+2. Map the SIGNAL_PHONE_NUMBER env var from the existing Kubernetes secret (likely the same secret holding TWILIO_PHONE_NUMBER — confirm secret key name from Task 2 infra endpoints).
+3. Configure message routing: all incoming Signal messages route to Morgan's main conversation handler.
+4. Set max_message_length: 1500 to stay within Signal limits.
+5. Document the adapter config in agents/morgan/README.md under 'Signal Integration'.
 
 ## Validation
-Invoke each tool with valid sample data; `customer_vet` triggers a vetting process and returns status; `customer_score` returns a numeric score; `invoice_create` returns a valid invoice; `invoice_lookup` retrieves existing invoices; `finance_report` returns structured report data; invalid inputs produce clear error messages.
+After Morgan pod is running: send a test Signal message to the configured phone number from a registered Signal account. Verify `kubectl logs -n openclaw deployment/morgan` shows 'Signal message received' log line within 30 seconds. Verify Morgan's reply appears in the Signal conversation.

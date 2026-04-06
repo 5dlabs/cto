@@ -1,19 +1,36 @@
-Implement subtask 8005: Implement self-service quote builder with Effect form validation
+Implement subtask 8005: Implement Effect ApiClient service and Effect.Schema type definitions for all backend response shapes
 
 ## Objective
-Build the interactive quote builder page at `/quote` where users can select equipment, specify rental dates, enter delivery details, and submit a quote request. Use Effect Schema for robust form validation.
+Create lib/api.ts with an Effect.Service-based ApiClient and define Effect.Schema schemas for all backend data types used across the site.
 
 ## Steps
-1. Create `app/quote/page.tsx` with a multi-step or single-page quote form.
-2. Implement equipment selection: search/select from catalog (fetch from API), add multiple items with quantities.
-3. Implement date range picker for rental period (start date, end date).
-4. Implement delivery details fields: delivery address, site contact, special instructions.
-5. Implement customer information fields: name, company, email, phone.
-6. Use Effect `Schema` for form validation: define schemas for each section, validate on submit.
-7. Display inline validation errors with clear messages.
-8. On valid submission, POST to the Quote Engine API; display confirmation with quote number and summary.
-9. Handle submission errors gracefully (API down, validation failures from backend).
-10. Show a quote summary section that updates in real-time as items and dates are selected (calculate estimated pricing client-side if rate data is available).
+1. Create apps/website/lib/api.ts.
+2. Define ApiClient using Effect.Service pattern:
+   ```ts
+   import { Effect, Layer } from 'effect'
+   import * as S from '@effect/schema/Schema'
+   
+   class ApiClient extends Effect.Service<ApiClient>()('ApiClient', {
+     effect: Effect.sync(() => ({
+       baseUrl: process.env.NEXT_PUBLIC_API_URL ?? ''
+     }))
+   }) {}
+   ```
+3. Define Effect.Schema types for all response shapes:
+   - Product: { product_id: S.String, name: S.String, day_rate: S.Number, category: S.String, image_url: S.optionalWith(S.String, {default: () => ''}) }
+   - Category: { category_id: S.String, name: S.String }
+   - Availability: { product_id: S.String, quantity_available: S.Number, from: S.String, to: S.String }
+   - Opportunity: { opportunity_id: S.String, status: S.String, total_cents: S.Number }
+   - PublishedPost: { post_id: S.String, image_url: S.String, caption: S.String, hashtags: S.Array(S.String), published_at: S.String }
+4. Define typed fetch helpers using Effect.tryPromise with schema decoding:
+   - getCategories(): Effect.Effect<Category[]>
+   - getProducts(search?: string): Effect.Effect<Product[]>
+   - getProductById(id: string): Effect.Effect<Product>
+   - getAvailability(id: string, from: string, to: string): Effect.Effect<Availability>
+   - createOpportunity(body: OpportunityCreate): Effect.Effect<Opportunity>
+   - getPublishedPosts(): Effect.Effect<PublishedPost[]>
+5. Export runApiEffect helper: wraps Effect.runPromise with ApiClient.Default layer.
+6. For client components needing TanStack Query: export queryFn wrappers that call runApiEffect.
 
 ## Validation
-Quote builder renders at `/quote`; equipment can be searched and added; date picker selects valid ranges; form validation prevents submission with missing/invalid fields and shows inline errors; valid submission calls the Quote Engine API and displays confirmation; estimated pricing updates as items are added; submission error from API displays user-friendly message.
+`tsc --noEmit` on lib/api.ts exits 0. Unit test: mock fetch returning valid Product JSON, call getProducts() via runApiEffect, assert decoded array has correct types. Unit test: mock fetch returning invalid JSON (missing day_rate), assert Effect fails with ParseError.

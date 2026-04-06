@@ -1,19 +1,10 @@
-Implement subtask 2004: Implement real-time availability endpoint
+Implement subtask 2004: Implement catalog CRUD handlers: categories list and products list/get/create/update
 
 ## Objective
-Implement the product availability checking endpoint that queries current availability data and returns date-range availability for a given product.
+Write Axum handlers for GET /api/v1/catalog/categories, GET /api/v1/catalog/products (with pagination and search), GET /api/v1/catalog/products/:id, POST /api/v1/catalog/products, and PATCH /api/v1/catalog/products/:id.
 
 ## Steps
-1. Create src/handlers/availability.rs:
-   - GET /api/v1/catalog/products/:id/availability: Accept query params: start_date (required, YYYY-MM-DD), end_date (required, YYYY-MM-DD), quantity (optional, default 1).
-   - Query the availability table for the product_id within the date range.
-   - Return: {product_id, start_date, end_date, dates: [{date, quantity_available, quantity_reserved, is_available: bool}], fully_available: bool}.
-   - is_available = (quantity_available - quantity_reserved) >= requested quantity.
-   - fully_available = all dates in range have is_available = true.
-2. Validate: start_date <= end_date, date range <= 365 days, product_id exists.
-3. Use a single SQL query with generate_series to fill in missing dates with default availability.
-4. Wire route into Router.
-5. Implement the /api/v1/equipment-api/checkout endpoint that accepts a checkout request body (product_id, start_date, end_date, quantity, customer info) and creates a reservation by decrementing quantity_available in a transaction. Return success/failure with reservation_id.
+Create src/handlers/catalog.rs. Define request/response types with serde Serialize/Deserialize. GET /api/v1/catalog/categories: SELECT id, name, parent_id, icon, sort_order FROM catalog.categories ORDER BY sort_order — return Vec<Category>. GET /api/v1/catalog/products: accept Query params { category_id: Option<Uuid>, search: Option<String>, page: u32, limit: u32 (max 100) }. Build dynamic sqlx query using QueryBuilder: WHERE category_id = $1 if provided, AND (name ILIKE $2 OR description ILIKE $2) if search provided, LIMIT $n OFFSET $m. GET /api/v1/catalog/products/:id: SELECT by PK, return 404 if not found. POST /api/v1/catalog/products: extract AdminClaims, deserialize CreateProduct body, INSERT INTO catalog.products, return 201 with created resource. PATCH /api/v1/catalog/products/:id: extract AdminClaims, deserialize PatchProduct (all fields Optional), build UPDATE SET ... WHERE id = $1, return 200. Wire all routes onto the Router in main.rs under /api/v1/catalog. Write integration tests using sqlx::test transactions: insert a test category and product, call handler logic, assert response.
 
 ## Validation
-GET /api/v1/catalog/products/:id/availability returns correct availability for seeded data. Date range validation rejects invalid ranges (end < start, > 365 days). Missing dates in DB are filled with defaults. Checkout endpoint creates a reservation and decrements availability atomically (verified by re-querying availability). Response time for availability check < 500ms with seeded data for 30-day range.
+GET /api/v1/catalog/categories returns HTTP 200 JSON array. GET /api/v1/catalog/products?limit=10 returns HTTP 200 JSON array with pagination metadata. GET /api/v1/catalog/products/:nonexistent-uuid returns HTTP 404. POST /api/v1/catalog/products with admin JWT and valid body returns HTTP 201 with id field. PATCH /api/v1/catalog/products/:id updates name field — subsequent GET returns updated name.

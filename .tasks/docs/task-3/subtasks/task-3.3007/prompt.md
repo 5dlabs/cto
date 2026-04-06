@@ -1,10 +1,10 @@
-Implement subtask 3007: Implement DeliveryService gRPC handlers with PostgreSQL integration
+Implement subtask 3007: Implement CrewService and DeliveryService gRPC handlers
 
 ## Objective
-Implement the DeliveryService server with CRUD and status tracking, backed by PostgreSQL.
+Implement CrewService (ListCrew, AssignCrew, ScheduleCrew) and DeliveryService (ScheduleDelivery, UpdateDeliveryStatus, OptimizeRoute) as gRPC handlers backed by pgx.
 
 ## Steps
-1. Create `internal/service/delivery/service.go` implementing DeliveryServiceServer. 2. Implement CreateDelivery: validate project exists, insert into `rms.deliveries`, insert associated items into `rms.delivery_items`. 3. Implement GetDelivery: query by ID with joined delivery items. 4. Implement ListDeliveries: pagination, filtering by project_id, status, date range. 5. Implement UpdateDeliveryStatus: validate status transitions (PENDING→IN_TRANSIT→DELIVERED or RETURNED), update actual_date on delivery/return. 6. Create `internal/repository/delivery_repo.go`. 7. Register service.
+Create internal/crew/handler.go: ListCrew queries crew_members. AssignCrew inserts a crew_assignments row linking crew_member_id to project_id with role. ScheduleCrew updates crew_assignment notes/role. Create internal/delivery/handler.go: ScheduleDelivery inserts deliveries row with status=scheduled and scheduled_at. UpdateDeliveryStatus updates status and completed_at. OptimizeRoute accepts a list of delivery IDs and returns them in a stub-ordered sequence (sort by scheduled_at ascending); store order in route_data JSONB. Register both service servers on the shared gRPC instance. Wire grpc-gateway HTTP routes.
 
 ## Validation
-Unit tests cover all RPCs and status transition validation; integration tests: create delivery with items, update status through lifecycle, verify delivery_items join table; invalid transitions return proper error codes.
+POST /api/v1/crew/assign creates crew_assignments row retrievable by project_id. POST /api/v1/deliveries schedules a delivery. PATCH /api/v1/deliveries/:id/status updates status to completed. POST /api/v1/deliveries/optimize returns ordered array of delivery IDs.

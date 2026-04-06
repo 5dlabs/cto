@@ -1,10 +1,10 @@
-Implement subtask 3003: Create PostgreSQL schema migrations for the RMS schema
+Implement subtask 3003: Write database migrations for all seven RMS schema tables
 
 ## Objective
-Write SQL migration files for all RMS tables in the `rms` PostgreSQL schema, including opportunities, projects, inventory_items, crew_members, deliveries, and join tables.
+Create numbered SQL migration files in services/rms/migrations/ targeting the rms schema. Cover all seven tables: opportunities, opportunity_line_items, projects, inventory_transactions, crew_members, crew_assignments, deliveries.
 
 ## Steps
-1. Use golang-migrate or goose for migration management. 2. Create migration 001: `CREATE SCHEMA IF NOT EXISTS rms;` 3. Migration 002: Create `rms.opportunities` table with columns matching the Opportunity proto message, plus tenant_id, timestamps, and soft delete. 4. Migration 003: Create `rms.projects` table with FK to opportunities, calendar_event_id, budget fields, timestamps. 5. Migration 004: Create `rms.inventory_items` table with SKU uniqueness constraint, quantity fields, location. 6. Migration 005: Create `rms.crew_members` table with skills as JSONB or text array, calendar_id, availability_status. 7. Migration 006: Create `rms.deliveries` table with FK to projects, status enum, scheduled/actual dates. 8. Migration 007: Create `rms.delivery_items` join table (delivery_id, inventory_item_id, quantity). 9. Migration 008: Create `rms.project_crew` join table (project_id, crew_member_id, role, assigned_at). 10. Add indexes on foreign keys, status columns, and tenant_id. 11. Integrate migration runner into the server startup or as a separate CLI command.
+Each migration file uses `SET search_path=rms;` at the top. Migration 001: CREATE SCHEMA IF NOT EXISTS rms. Migration 002: opportunities table with all columns, constraints, and CHECK constraints for status and lead_score enums. Migration 003: opportunity_line_items with FK to opportunities. Migration 004: projects with FK to opportunities. Migration 005: inventory_transactions with CHECK constraint on type. Migration 006: crew_members. Migration 007: crew_assignments with FKs to projects and crew_members. Migration 008: deliveries with FK to projects and JSONB route_data column. Add indexes on foreign keys and frequently filtered columns (status, customer_id, inventory_id, project_id). Use golang-migrate UP/DOWN pairs for all migrations.
 
 ## Validation
-Migrations run successfully against a clean PostgreSQL instance; all tables are created in the `rms` schema; rollback migrations work without errors; schema matches the protobuf message definitions.
+Run `migrate -path migrations -database $DATABASE_URL up` against a fresh rms schema; all 8 migrations apply without error. Run `migrate down` to 0; all tables are dropped cleanly. `psql -c '\dt rms.*'` lists all 7 tables after UP.

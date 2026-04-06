@@ -1,18 +1,23 @@
-Implement subtask 7009: End-to-end integration testing across all channels and skills
+Implement subtask 7009: Execute end-to-end MCP tool connectivity tests for all 12 tools
 
 ## Objective
-Perform comprehensive end-to-end testing of the Morgan agent across all three communication channels (Signal, voice, web chat) and all configured skills, validating response times and autonomous handling rates.
+Run one interactive CLI test request per MCP tool to verify every tool correctly reaches its backend service, receives a valid response, and is correctly parsed by Morgan.
 
 ## Steps
-1. Create a test plan covering each channel × each skill combination (prioritize high-frequency paths).
-2. Test Signal channel: send messages exercising sales-qual, quote-gen, and customer-vet skills; verify correct tool invocations and responses.
-3. Test voice channel: place calls exercising quote and availability queries; verify STT→agent→TTS pipeline.
-4. Test web chat channel: use WebSocket client to exercise all skills.
-5. Measure response times for simple queries across all channels; verify <10 seconds.
-6. Test error scenarios: backend service down, invalid inputs, timeout handling.
-7. Test conversation continuity: multi-turn conversations maintain context.
-8. Validate that 80%+ of representative customer inquiry scenarios are handled autonomously without human escalation.
-9. Document any failures, edge cases, or performance issues.
+1. For each of the 12 tools, run `kubectl exec -n openclaw deployment/morgan -- morgan tool-test <tool_id> [params]` and capture output.
+2. sigma1_catalog_search: query=lights → expect array with name and day_rate fields.
+3. sigma1_check_availability: product_id=<known_id> from={today} to={today+7} → expect {quantity_available: integer}.
+4. sigma1_generate_quote: customer_id=test-cust-001, line_items=[{product_id: <id>, quantity: 1, days: 2}] → expect opportunity_id in response; verify via GET /api/v1/opportunities/:id returns status=pending.
+5. sigma1_vet_customer: org_name='Test Co', contact_email='test@example.com', event_description='Corporate event' → expect {vetting_id, status}; poll until final_score appears within 60s.
+6. sigma1_score_lead: id=<opportunity_id from step 4> → expect {score: number, tier: string}.
+7. sigma1_create_invoice: use opportunity from step 4 → expect {invoice_id, total_cents > 0}; verify via GET /api/v1/invoices/:id.
+8. sigma1_finance_report: period=2025-Q1 → expect {total_revenue_cents, invoice_count}.
+9. sigma1_social_curate: upload test image file → expect {draft_id}.
+10. sigma1_social_publish: draft_id=<from step 9> → expect {published_url}.
+11. sigma1_equipment_lookup: no params → expect array of catalog items.
+12. sigma1_gdpr_export: customer_id=test-cust-001 → expect aggregated JSON with keys from at least 3 services.
+13. sigma1_gdpr_delete: customer_id=test-cust-gdpr-del-001 (dedicated test customer) → expect per-service status map; verify audit log entry via OpenClaw audit API.
+14. Record pass/fail per tool in a test report file at agents/morgan/test-results/tool-connectivity.json.
 
 ## Validation
-All three channels deliver correct agent responses; simple query response time <10 seconds across 95% of test cases; all MCP tools are invoked correctly per skill; error scenarios produce graceful fallback responses; multi-turn conversations maintain context; 80%+ of a representative sample of 20 customer inquiry scenarios are resolved autonomously.
+All 12 tool tests return exit code 0 from morgan tool-test. tool-connectivity.json shows 12 entries all with status: pass. No tool times out (default 30s timeout). GDPR delete audit log entry is present and contains customer_id and per-service statuses.

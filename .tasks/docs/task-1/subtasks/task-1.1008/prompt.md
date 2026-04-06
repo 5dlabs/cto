@@ -1,19 +1,10 @@
-Implement subtask 1008: Validate end-to-end infrastructure connectivity
+Implement subtask 1008: Apply ArgoCD Application CR for the sigma1/infra Helm chart and validate full stack
 
 ## Objective
-Run a comprehensive validation suite to ensure all provisioned infrastructure components are reachable, secrets are accessible, and the ConfigMap is correctly populated and consumable by downstream services.
+Create the ArgoCD Application custom resource pointing to the sigma1/infra Helm chart in the GitOps repo, sync it, and run the full validation suite confirming all pods, secrets, schemas, and the ConfigMap are healthy.
 
 ## Steps
-1. Deploy a temporary debug pod in the sigma1 namespace with envFrom referencing sigma1-infra-endpoints ConfigMap.
-2. From the debug pod, test connectivity to:
-   - PostgreSQL: psql to $POSTGRES_HOST and verify schemas exist (\dn)
-   - Redis: redis-cli PING to $REDIS_HOST
-   - S3/R2: aws s3 ls with credentials from sigma1-s3-credentials secret
-   - Signal-CLI: curl $SIGNALCLI_URL/v1/about
-3. Verify all external API secrets are mounted and readable.
-4. Check that all secrets have non-empty values for their expected keys.
-5. Document any issues found and confirm all checks pass.
-6. Clean up the debug pod after validation.
+Create sigma1/infra/argocd-application.yaml (applied outside the chart itself, or in an argocd/ directory). Spec: apiVersion: argoproj.io/v1alpha1, kind: Application, metadata.name: sigma1-infra, metadata.namespace: argocd. spec.source.repoURL: <GitOps repo URL>, spec.source.path: sigma1/infra, spec.source.targetRevision: HEAD. spec.destination.server: https://kubernetes.default.svc, spec.destination.namespace: sigma1. spec.syncPolicy.automated: {prune: true, selfHeal: true}. Apply: kubectl apply -f sigma1/infra/argocd-application.yaml -n argocd. Wait for sync: argocd app wait sigma1-infra --health --timeout 300. Run validation checklist: (a) kubectl get pods -n databases — sigma1-postgres-1 Running, sigma1-valkey-0 Running. (b) kubectl exec job/schema-init -n databases — confirm completed. (c) kubectl get secret -n sigma1 — 9 secrets present. (d) kubectl get pod -n signal — signal-cli Running. (e) kubectl get configmap sigma1-infra-endpoints -n sigma1 — 5 keys present. (f) ArgoCD UI or CLI shows Synced + Healthy.
 
 ## Validation
-All connectivity checks from the debug pod succeed: PostgreSQL schemas are queryable, Redis responds to PING, S3 bucket listing returns success, Signal-CLI returns version info. All 6 external API secrets have non-empty values for expected keys. Debug pod is cleaned up after validation.
+argocd app get sigma1-infra shows Health Status: Healthy and Sync Status: Synced. All 7 test_strategy checks from the parent task pass sequentially. CI pipeline step running kubectl get pods --all-namespaces | grep -E 'sigma1|databases|signal' shows no pods in CrashLoopBackOff or Error state.

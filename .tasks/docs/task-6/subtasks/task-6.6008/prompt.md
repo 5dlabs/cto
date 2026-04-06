@@ -1,25 +1,10 @@
-Implement subtask 6008: Wire up publish endpoint, published posts listing, metrics, and schema validation
+Implement subtask 6008: Implement approval workflow endpoints and Signal notification
 
 ## Objective
-Implement the publish and published-posts endpoints that orchestrate multi-platform publishing, record results, and add Prometheus metrics and health probes.
+Implement POST /api/v1/social/drafts/:id/approve, POST /api/v1/social/drafts/:id/reject, and the Signal notification trigger that sends a preview link to the configured phone number when a draft reaches ready_for_approval.
 
 ## Steps
-1. Implement POST `/api/v1/social/drafts/:id/publish` handler:
-   - Validate draft is in 'approved' status.
-   - Publish to all target platforms concurrently using the platform-specific clients (Instagram, LinkedIn, Facebook).
-   - Record each platform's publish result in `published_posts` table.
-   - Update draft status to 'published'.
-   - Handle partial failures (some platforms succeed, some fail) — store successes, report failures in response.
-2. Implement GET `/api/v1/social/published` handler:
-   - List all published posts with pagination, filterable by platform.
-   - Join with drafts table to include original caption and images.
-3. Add Prometheus metrics:
-   - `social_requests_total` (counter, labels: endpoint, status)
-   - `social_publish_total` (counter, labels: platform, success/failure)
-   - `social_ai_curation_duration_seconds` (histogram)
-   - Expose GET `/metrics` endpoint.
-4. Validate all endpoint request/response schemas with Effect.Schema.
-5. Ensure all error responses follow consistent JSON structure.
+POST /api/v1/social/drafts/:id/approve: check current status; if 'ready_for_approval', transition to 'approved', set approved_by from JWT claims sub field, approved_at=now(). Return 200 {status:'approved'}. If status is not 'ready_for_approval', return 409 with message. POST /api/v1/social/drafts/:id/reject: set status='rejected', store optional reason in a new rejected_reason column (add migration). Return 200. Signal notification: triggered when curation pipeline sets status='ready_for_approval'. Use signal-cli REST API (POST {SIGNAL_CLI_URL}/v2/send, body: {message: 'New draft ready for approval: {APP_URL}/drafts/{draft_id}', recipients:[SIGNAL_PHONE_NUMBER]}). Wrap in try/catch — Signal failure must not block pipeline. Read SIGNAL_CLI_URL, SIGNAL_PHONE_NUMBER, APP_URL from env vars.
 
 ## Validation
-Integration tests: publish an approved draft posts to all target platforms and records results in published_posts; partial failure (one platform fails) still publishes to others and returns partial success; GET /published returns paginated list with platform details; GET /metrics returns valid Prometheus format; publishing a non-approved draft returns 409.
+POST approve on a ready_for_approval draft → 200, status=approved, approved_by=JWT sub, approved_at set. POST approve on an already-approved draft → 409. POST reject on any non-published draft → 200, status=rejected. Signal mock: verify POST to signal-cli is called with correct recipient and draft URL when curation completes. Signal mock returns 500 → pipeline still completes successfully.

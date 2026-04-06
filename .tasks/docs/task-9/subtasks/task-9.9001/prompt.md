@@ -1,10 +1,10 @@
-Implement subtask 9001: Scale all backend and frontend deployments to minimum 2 replicas with PodDisruptionBudgets
+Implement subtask 9001: Initialize Expo managed project with TypeScript template at apps/mobile
 
 ## Objective
-Update every service Deployment to run at least 2 replicas with appropriate resource requests/limits and create PodDisruptionBudgets to guarantee availability during rolling updates and node maintenance.
+Scaffold the Expo SDK 51+ project with TypeScript template at apps/mobile. Install all required dependencies: nativewind@4.x, tailwindcss@3.4, effect@3.x, @effect/schema, @tanstack/react-query v5, expo-router@3.x, expo-notifications, expo-camera, expo-image, @expo/vector-icons, react-native-reanimated, react-native-gesture-handler. Configure babel.config.js for NativeWind and reanimated plugins. Configure metro.config.js for monorepo symlink resolution.
 
 ## Steps
-For each service deployment (backend services and frontend): 1) Set `spec.replicas: 2` (or more based on expected load). 2) Define `resources.requests` and `resources.limits` for CPU and memory based on observed dev usage with a safety margin. 3) Set `spec.strategy.rollingUpdate.maxUnavailable: 0` and `maxSurge: 1` to ensure zero-downtime deploys. 4) Create a PodDisruptionBudget for each Deployment with `minAvailable: 1` to protect against voluntary disruptions. 5) Add anti-affinity rules (`podAntiAffinity` with `preferredDuringSchedulingIgnoredDuringExecution`) to spread replicas across nodes. 6) Ensure readiness and liveness probes are configured on every container so the scheduler only routes traffic to healthy pods.
+Run `npx create-expo-app@latest apps/mobile --template expo-template-blank-typescript`. Then install all listed packages. In babel.config.js add `plugins: ['nativewind/babel', 'react-native-reanimated/plugin']`. In metro.config.js use `getDefaultConfig` with `resolver.unstable_enablePackageExports: true` and watchFolders pointing to the monorepo root so packages/design-tokens is resolvable. Set `main: 'expo-router/entry'` in package.json. Verify `npx expo start` launches without errors.
 
 ## Validation
-Verify each Deployment has >=2 ready replicas via `kubectl get deployments`. Confirm PDBs exist for every Deployment via `kubectl get pdb`. Perform a `kubectl drain` on a node and verify no service goes fully unavailable. Trigger a rolling update and confirm zero-downtime by continuously curling service endpoints during rollout.
+Run `npx expo start --no-dev` — CLI exits without module-not-found or TypeScript errors. Run `npx tsc --noEmit` — zero type errors on the empty scaffold.

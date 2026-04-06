@@ -1,12 +1,11 @@
 ## Decision Points
 
-- Which Redis-compatible engine should be used for caching, rate limiting, and session storage across services?
-- How should multi-tenancy be handled in the PostgreSQL schema for all backend services?
-- What API paradigm should be used for inter-service communication between backend services and the Morgan agent?
-- What authentication and authorization mechanism should be used for API access between services and for the frontend?
-- How should the public API endpoints be versioned and documented for external and internal consumers?
+- ScoreLead weighting formula: the relative weights for event size, venue history, customer vetting score, and lead age are not specified — a product owner or business analyst must define the numeric weights before implementation.
+- Vetting service transport: the ScoreLead implementation calls the vetting service via HTTP GET. If the vetting service is not yet deployed or uses a different protocol, the RMS team needs a confirmed base URL and fallback behavior (treat as unvetted vs. fail open/closed).
+- Google Calendar OAuth2 flow: the details spec uses GOOGLE_CALENDAR_CLIENT_ID/SECRET which implies a service-account or OAuth2 client credential flow — the exact credential type (service account JSON vs. OAuth2 client ID + refresh token) must be confirmed before implementation.
+- DeliveryService OptimizeRoute algorithm: no routing algorithm or third-party API (e.g., Google Maps Routes API, OSRM, custom) is specified — this must be decided before the DeliveryService handler is implemented.
 
 ## Coordination Notes
 
-- Agent owner: Grizz
-- Primary stack: Go 1.22+/gRPC
+- Agent owner: grizz
+- Primary stack: Go 1.22+/gRPC/grpc-gateway

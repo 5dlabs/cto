@@ -1,16 +1,10 @@
-Implement subtask 5004: Implement Google Reviews API integration client
+Implement subtask 5004: Implement OpenCorporates and LinkedIn pipeline steps with per-step timeout
 
 ## Objective
-Build an async HTTP client module for querying Google Places/Reviews API to retrieve business reviews, ratings, and reputation signals.
+Implement the first two steps of the vetting background pipeline: OpenCorporates company search and LinkedIn company presence check. Each step must complete within a 10-second timeout; on timeout or HTTP error, set the corresponding risk_flag and continue to the next step.
 
 ## Steps
-1. Create `src/integrations/google_reviews.rs` module.
-2. Define request/response types for Google Places API (Place Search, Place Details with reviews).
-3. Use reqwest with API key authentication. Read GOOGLE_PLACES_API_KEY from Kubernetes secrets.
-4. Implement `fetch_business_reviews(business_name: &str, location: Option<&str>) -> Result<GoogleReviewsData, VettingError>` returning average rating, review count, recent review summaries.
-5. Handle pagination if needed, rate limiting, and error responses.
-6. Parse and structure review data for downstream scoring.
-7. Add unit tests with mocked responses.
+Step 1 — OpenCorporates: build reqwest GET to https://api.opencorporates.com/v0.4/companies/search?q={name}&jurisdiction_code={code}&api_token={OPENCORPORATES_API_KEY}. Deserialize response into OpenCorporatesResult struct. If company found and status='active', set business_verified=true and store opencorporates_data JSONB. Wrap call in tokio::time::timeout(Duration::from_secs(10), ...). On Err or non-200, push 'business_not_found' into risk_flags and set business_verified=false. Step 2 — LinkedIn: obtain OAuth2 access token via POST https://www.linkedin.com/oauth/v2/accessToken with grant_type=client_credentials, LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET. Then GET /v2/companies?q=universalName&universalName={slug} with Bearer token. Parse followerCount and employeeCount. Wrap in 10s timeout. On failure push 'linkedin_unavailable' into risk_flags and set linkedin_exists=false, linkedin_followers=0. Read all secrets from environment variables.
 
 ## Validation
-Unit tests pass with mocked Google Places responses covering: successful reviews fetch, no results found, API key invalid, rate limit exceeded. Parsed data correctly extracts average rating and review count.
+Unit test with mockito (or wiremock-rs): mock OpenCorporates returning a 200 active company → business_verified=true, opencorporates_data populated. Mock returning 404 → risk_flags contains 'business_not_found'. Mock hanging response → timeout fires within ~11 seconds and risk_flag is set. Same pattern for LinkedIn mock.

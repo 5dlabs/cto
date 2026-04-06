@@ -1,10 +1,10 @@
-Implement subtask 3012: Write end-to-end integration tests for quote-to-project workflow
+Implement subtask 3012: Write Kubernetes Deployment and Service manifests for RMS
 
 ## Objective
-Create integration tests that exercise the full quote-to-project lifecycle spanning OpportunityService, ProjectService, CrewService, InventoryService, and DeliveryService.
+Create Kubernetes Deployment (2 replicas) and ClusterIP Service manifests for the RMS service with correct port configuration, envFrom references, and health probes.
 
 ## Steps
-1. Create `test/integration/workflow_test.go`. 2. Test Case 1 — Quote to Project: Create opportunity → update to QUOTED → ConvertToProject → verify project created with correct opportunity_id. 3. Test Case 2 — Project Staffing: Create crew members → AssignCrew to project → CheckAvailability shows them as assigned. 4. Test Case 3 — Inventory Reservation: Create inventory items → ReserveItems for a project → verify quantities updated → CreateDelivery with reserved items. 5. Test Case 4 — Delivery Lifecycle: CreateDelivery → UpdateDeliveryStatus through PENDING→IN_TRANSIT→DELIVERED → verify final state. 6. Test Case 5 — Full Workflow: Chain all above steps into a single end-to-end test measuring total time (must complete in <2 minutes per PRD). 7. Use testcontainers-go or docker-compose for PostgreSQL and Redis test dependencies. 8. Test both gRPC and REST endpoints for the workflow.
+Create k8s/rms/deployment.yaml: apiVersion apps/v1, kind Deployment, replicas: 2, image: placeholder (to be set by CI), envFrom: [{configMapRef: {name: sigma1-infra-endpoints}}, {secretRef: {name: sigma1-google-secret}}, {secretRef: {name: sigma1-rms-secret}}]. Container ports: 8080 (rest), 9090 (grpc), 8081 (health). LivenessProbe: httpGet /health/live :8081 initialDelaySeconds 10. ReadinessProbe: httpGet /health/ready :8081 initialDelaySeconds 15. Create k8s/rms/service.yaml: ClusterIP Service exposing port 8080 (name: rest) and port 9090 (name: grpc); health port 8081 not exposed externally. Add resource requests/limits: requests cpu 100m memory 128Mi, limits cpu 500m memory 512Mi.
 
 ## Validation
-All 5 test cases pass; full workflow completes in <2 minutes; tests run against real PostgreSQL and Redis instances (via testcontainers); both gRPC and REST paths produce identical results; test output includes timing information.
+kubectl apply -f k8s/rms/ --dry-run=client exits 0 with no errors. kubectl apply against a dev cluster shows 2/2 pods Ready within 60 seconds. kubectl describe service rms shows ClusterIP with ports 8080 and 9090.

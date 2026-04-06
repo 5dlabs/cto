@@ -1,18 +1,10 @@
-Implement subtask 1004: Provision S3/R2 buckets and create access key secrets
+Implement subtask 1004: Deploy Opstree Valkey 7.2 single-replica instance (sigma1-valkey)
 
 ## Objective
-Provision S3/R2 object storage buckets for product images and social photos, and store the access keys as Kubernetes secrets in the databases namespace.
+Define and apply the Opstree Redis/Valkey operator CR for sigma1-valkey in the databases namespace using valkey/valkey:7.2-alpine, single replica.
 
 ## Steps
-1. Provision two buckets (via Cloudflare R2 dashboard/API or AWS S3 CLI depending on dp-5 decision):
-   - sigma1-product-images: for equipment catalog product images
-   - sigma1-social-photos: for social media event photos
-2. Create IAM/API tokens with read-write access scoped to these two buckets.
-3. Create Kubernetes Secret in databases namespace:
-   - name: sigma1-s3-credentials
-   - data: S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_ENDPOINT_URL, S3_PRODUCT_IMAGES_BUCKET=sigma1-product-images, S3_SOCIAL_PHOTOS_BUCKET=sigma1-social-photos, S3_REGION
-4. If using R2, the endpoint will be https://<account-id>.r2.cloudflarestorage.com.
-5. Record the S3 endpoint URL for the ConfigMap.
+Create sigma1/infra/templates/valkey.yaml. Use the Opstree Redis operator CR (apiVersion: redis.redis.opstreelabs.in/v1beta2, kind: Redis or RedisCluster — use standalone Redis kind for single replica). metadata.name: sigma1-valkey, metadata.namespace: databases. spec.kubernetesConfig.image: valkey/valkey:7.2-alpine. spec.redisConfig or equivalent: no auth for dev (document production auth requirement). spec.storage: use default ephemeral or 5Gi PVC depending on operator defaults. Ensure the Opstree Redis operator is installed (document as prerequisite). Apply via Helm. Wait: kubectl wait redis/sigma1-valkey -n databases --for=condition=Ready --timeout=120s (or equivalent operator status condition).
 
 ## Validation
-Verify secret sigma1-s3-credentials exists in databases namespace with all expected keys. From a debug pod, use AWS CLI with the credentials to `aws s3 ls s3://sigma1-product-images --endpoint-url <endpoint>` and confirm bucket access.
+kubectl get pods -n databases shows sigma1-valkey-0 in Running state. redis-cli -h sigma1-valkey.databases.svc.cluster.local -p 6379 ping returns PONG from within the cluster (run via kubectl exec into a temporary pod).

@@ -1,24 +1,10 @@
-Implement subtask 5007: Wire up API endpoints and orchestrate vetting pipeline
+Implement subtask 5007: Implement JWT middleware, health endpoints, Prometheus metrics, and GDPR endpoints
 
 ## Objective
-Implement the three REST endpoints (/api/v1/vetting/run, /api/v1/vetting/:org_id, /api/v1/vetting/credit/:org_id) that orchestrate the full vetting pipeline, persist results, and serve stored vetting data.
+Wire up JWT authentication middleware for all non-internal routes, implement /health/live, /health/ready, /metrics, and the GDPR export/delete internal endpoints. Configure Kubernetes Deployment manifest for 2 replicas.
 
 ## Steps
-1. Implement POST `/api/v1/vetting/run` handler:
-   - Accept JSON body with org_id, company_name, optional jurisdiction/location.
-   - Call all four integration clients concurrently using tokio::join! or futures::join_all.
-   - Pass collected data through the scoring algorithm.
-   - Persist VettingResult and LeadScore to PostgreSQL via sqlx.
-   - Return the VettingResult with score in the response.
-2. Implement GET `/api/v1/vetting/:org_id` handler:
-   - Query PostgreSQL for the latest VettingResult for the given org_id.
-   - Return 404 if not found.
-3. Implement GET `/api/v1/vetting/credit/:org_id` handler:
-   - Query PostgreSQL for the credit-specific portion of the vetting result.
-   - Return structured credit data and score.
-4. Add input validation on all endpoints (validate org_id format, required fields).
-5. Add proper error handling with structured JSON error responses.
-6. Register all routes in the Axum router with appropriate middleware (tracing, CORS).
+JWT middleware: use axum::middleware::from_fn with a layer that extracts Authorization: Bearer token, validates with jsonwebtoken crate using the JWT_SECRET env var (HS256), returns 401 on failure. Apply to all /api/v1/* routes. Health: GET /health/live returns 200 {status:'ok'} unconditionally. GET /health/ready pings postgres (SELECT 1) and redis (PING); returns 200 if both succeed, 503 with failing deps listed otherwise. Metrics: initialize prometheus::Registry, register http_requests_total (Counter, labels: method, path, status) and http_request_duration_seconds (Histogram). Expose GET /metrics in text format. GDPR: GET /internal/gdpr/export/:org_id — query vetting_results WHERE org_id=$1, return JSON row or 404. DELETE /internal/gdpr/delete/:org_id — DELETE FROM vetting_results WHERE org_id=$1, DELETE FROM vetting_requests WHERE org_id=$1, INSERT INTO audit.deletion_log (entity='vetting', org_id, deleted_at=now()), return 200. Kubernetes: write k8s/deployment.yaml with 2 replicas, resource limits (256Mi/500m), envFrom referencing customer-vetting-config ConfigMap and customer-vetting-secret Secret, liveness/readiness probes on /health/live and /health/ready.
 
 ## Validation
-Integration tests: POST /vetting/run with valid data returns 200 with VettingResult containing a valid GREEN/YELLOW/RED score; GET /vetting/:org_id returns persisted result; GET /vetting/credit/:org_id returns credit data; invalid input returns 400; non-existent org returns 404. End-to-end vetting completes within 10 seconds with mocked external APIs.
+Request without JWT to /api/v1/vetting/run returns 401. Request with valid JWT returns 202. GET /health/ready with postgres and redis running returns 200; with redis stopped returns 503 with 'redis' in body. GET /metrics contains http_requests_total in prometheus text format. DELETE /internal/gdpr/delete/:org_id returns 200; subsequent GET /api/v1/vetting/:org_id returns 404; audit.deletion_log contains one row for that org_id. `kubectl apply -f k8s/deployment.yaml` dry-run succeeds.

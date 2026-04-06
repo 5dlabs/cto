@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-04-06T05:30:38.539Z",
+  "timestamp": "2026-04-06T22:59:43.367Z",
   "provider": "stitch",
-  "projectId": "17728300412697603966",
-  "mode": "both",
-  "providerMode": "both",
+  "projectId": "6025208509062733837",
+  "mode": "stitch",
+  "providerMode": "stitch",
   "targets": [
     "web",
     "mobile"

@@ -1,18 +1,15 @@
-Implement subtask 8003: Implement equipment catalog page with API integration
+Implement subtask 8003: Initialize shadcn/ui with New York style and install all required components
 
 ## Objective
-Build the equipment catalog listing page at `/equipment` that fetches equipment data from the Equipment Catalog API, displays filterable/searchable results, and links to individual product detail pages.
+Run shadcn/ui initialization configured for New York style and TailwindCSS 4, then install all component primitives needed across the site.
 
 ## Steps
-1. Create `app/equipment/page.tsx` for the catalog listing.
-2. Implement server-side data fetching (RSC) from the Equipment Catalog API search endpoint using the Effect-based API client.
-3. Build an EquipmentCard component displaying: image, name, category, daily rate, availability indicator.
-4. Implement search input with debounced client-side filtering or server-side search param.
-5. Implement category filter sidebar/dropdown.
-6. Handle loading states (skeleton cards) and error states (API unavailable).
-7. Implement pagination or infinite scroll for large catalogs.
-8. Add Schema.org Product structured data for each listed item.
-9. Ensure images use Next.js `<Image>` component with proper sizing and lazy loading.
+1. `cd apps/website && npx shadcn-ui@latest init` — select: New York style, TailwindCSS 4, CSS variables yes, TypeScript yes.
+2. Install components one by one (shadcn installs into components/ui/):
+   `npx shadcn-ui@latest add button card badge sheet sidebar dialog select input skeleton avatar table tabs`
+3. Verify each component file exists in apps/website/components/ui/.
+4. Ensure globals.css has shadcn CSS variable definitions and they map correctly to the design token colors (update --background, --foreground, --primary, --accent to match sigma1 palette from design-tokens package).
+5. Test render: create a throwaway page that uses Button, Card, Badge to confirm no runtime errors.
 
 ## Validation
-Catalog page renders at `/equipment`; equipment items are fetched from the API and displayed as cards; search filters results correctly; category filter narrows listings; loading skeleton appears during fetch; error state renders when API is mocked as unavailable; pagination works; each card links to `/equipment/:id`.
+All 12 component files exist in components/ui/. `bun run build` exits 0. A test page importing Button, Card, Badge, Sheet, Sidebar, Dialog, Select, Input, Skeleton, Avatar, Table, Tabs renders without TypeScript errors.

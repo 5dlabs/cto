@@ -1,12 +1,10 @@
 ## Decision Points
 
-- How should multi-tenancy be handled in the PostgreSQL schema for all backend services?
-- What API paradigm should be used for inter-service communication between backend services and the Morgan agent?
-- What authentication and authorization mechanism should be used for API access between services and for the frontend?
-- How should the public API endpoints be versioned and documented for external and internal consumers?
-- Should the Finance and Customer Vetting services be implemented as separate microservices or merged into a single Rust/Axum service?
+- Credit signal provider for Phase 2: Equifax vs. Dun & Bradstreet — affects data model fields, API contract, and cost. Should be decided before the stub is replaced so the schema does not need a breaking migration.
+- LinkedIn OAuth2 client_credentials flow availability: LinkedIn's API may require a partner program or specific product access for company lookup. Confirm API access tier and whether a fallback scraping approach is acceptable if partner access is unavailable.
+- Valkey vs. Redis for caching layer: the details mention both 'redis 0.24' crate and 'Valkey'. Confirm which backing store is provisioned by the bolt infra task so the connection string and crate choice are consistent.
 
 ## Coordination Notes
 
-- Agent owner: Rex
+- Agent owner: rex
 - Primary stack: Rust 1.75+/Axum 0.7

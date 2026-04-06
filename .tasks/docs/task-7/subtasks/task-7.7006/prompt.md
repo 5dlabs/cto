@@ -1,16 +1,27 @@
-Implement subtask 7006: Implement MCP tools for social media curation/publishing and RMS equipment lookup
+Implement subtask 7006: Configure ElevenLabs voice adapter and Twilio TwiML webhook in OpenClaw
 
 ## Objective
-Build MCP tool-server tools for social media content curation and publishing via the Social Media Engine, and equipment data lookup via the RMS integration layer.
+Set up ElevenLabs TTS voice configuration using the eleven_turbo_v2 model and define the Twilio inbound call TwiML webhook handler so Morgan can receive and respond to phone calls.
 
 ## Steps
-1. Define `social_curate` MCP tool: accepts content theme or prompt, calls Social Media Engine curation endpoint, returns curated content suggestions.
-2. Define `social_publish` MCP tool: accepts content (text, image refs, platform targets), calls Social Media Engine publish endpoint, returns publish confirmation and post URLs.
-3. Define `equipment_rms_lookup` MCP tool: accepts equipment ID or search criteria, calls the RMS integration endpoint to retrieve detailed equipment data (specs, maintenance history, location).
-4. Define `equipment_rms_status` MCP tool: accepts equipment ID, returns current RMS status (rented, available, maintenance).
-5. Use endpoint URLs from sigma1-infra-endpoints ConfigMap env vars.
-6. Handle authentication to each backend service as required.
-7. Register all tools with the OpenClaw agent's tool registry.
+1. In agents/morgan/agent.yaml, add voice adapter block:
+   adapters:
+     voice:
+       provider: elevenlabs
+       api_key: ${ELEVENLABS_API_KEY}
+       voice_id: ${ELEVENLABS_VOICE_ID}
+       model: eleven_turbo_v2
+       output_format: ulaw_8000  # compatible with Twilio
+2. Add Twilio webhook adapter block:
+   adapters:
+     twilio_voice:
+       enabled: true
+       inbound_webhook_path: /voice/inbound
+       twiml_response: true
+       sip_domain: ${TWILIO_SIP_DOMAIN}
+3. The /voice/inbound endpoint must return TwiML that: (a) greets the caller with a synthesized ElevenLabs message via <Play> or <Say> with voice attribute, (b) captures speech input with <Gather>, (c) POSTs transcription back to Morgan for processing.
+4. Map ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID from Kubernetes secrets in the Deployment (handled in subtask 7008).
+5. Document call flow in agents/morgan/README.md under 'Voice Integration'.
 
 ## Validation
-Invoke `social_curate` and verify content suggestions are returned; `social_publish` with test content confirms publishing; `equipment_rms_lookup` returns detailed equipment data; `equipment_rms_status` returns correct status; verify tools handle backend unavailability gracefully.
+POST to Morgan's /voice/inbound webhook (via port-forward or Cloudflare Tunnel URL) with a mock Twilio inbound call payload. Response must be valid TwiML XML (Content-Type: application/xml) containing <Response> root element. ElevenLabs API key validation: `openclaw agent test-voice morgan --text 'hello'` returns an audio file.

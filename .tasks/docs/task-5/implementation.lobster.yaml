@@ -1,7 +1,7 @@
 name: implement-task-5
 metadata:
   task_id: 5
-  agent: Rex
+  agent: rex
   stack: Rust 1.75+/Axum 0.7
   depends_on_tasks: [1]
 
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-5/feature-branch"
   - name: agent
-    default: "Rex"
+    default: "rex"
   - name: cli
     default: "claude"
   - name: model
@@ -52,7 +52,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-5003
-    depends_on: [validate-subtask-5001]
+    depends_on: [validate-subtask-5002]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5003/prompt.md
@@ -64,7 +64,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-5004
-    depends_on: [validate-subtask-5001]
+    depends_on: [validate-subtask-5003]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5004/prompt.md
@@ -76,7 +76,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-5005
-    depends_on: [validate-subtask-5001]
+    depends_on: [validate-subtask-5003]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5005/prompt.md
@@ -88,7 +88,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-5006
-    depends_on: [validate-subtask-5002, validate-subtask-5003, validate-subtask-5004, validate-subtask-5005]
+    depends_on: [validate-subtask-5004, validate-subtask-5005]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5006/prompt.md
@@ -100,7 +100,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-5007
-    depends_on: [validate-subtask-5006]
+    depends_on: [validate-subtask-5003]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5007/prompt.md
@@ -112,7 +112,7 @@ steps:
       cd work && cargo check && cargo test && cargo clippy -- -D warnings
 
   - name: implement-subtask-5008
-    depends_on: [validate-subtask-5007]
+    depends_on: [validate-subtask-5004, validate-subtask-5005, validate-subtask-5006, validate-subtask-5007]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-5.5008/prompt.md

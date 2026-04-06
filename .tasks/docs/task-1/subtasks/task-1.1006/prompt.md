@@ -1,19 +1,10 @@
-Implement subtask 1006: Create external API credential secrets
+Implement subtask 1006: Deploy Signal-CLI pod, PVC, and ClusterIP Service in the signal namespace
 
 ## Objective
-Create Kubernetes secrets for all external API credentials: Stripe, OpenCorporates, LinkedIn, Google Reviews, Instagram, and Facebook.
+Create a PersistentVolumeClaim, Pod (or Deployment), and ClusterIP Service for Signal-CLI in the signal namespace with a 5Gi RWO volume mounted at the Signal data path.
 
 ## Steps
-1. Create individual Kubernetes Secrets in the databases namespace (centralized, referenced by downstream services):
-   - sigma1-stripe-credentials: STRIPE_API_KEY, STRIPE_WEBHOOK_SECRET
-   - sigma1-opencorporates-credentials: OPENCORPORATES_API_KEY
-   - sigma1-linkedin-credentials: LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, LINKEDIN_ACCESS_TOKEN
-   - sigma1-google-reviews-credentials: GOOGLE_REVIEWS_API_KEY, GOOGLE_PLACES_ID
-   - sigma1-instagram-credentials: INSTAGRAM_ACCESS_TOKEN, INSTAGRAM_BUSINESS_ID
-   - sigma1-facebook-credentials: FACEBOOK_PAGE_ACCESS_TOKEN, FACEBOOK_PAGE_ID
-2. Use placeholder values for now (to be replaced with real credentials before production).
-3. Label all secrets with app.kubernetes.io/part-of=sigma1-infra for easy discovery.
-4. Document each secret's expected keys in a README or annotation.
+Create sigma1/infra/templates/signal-cli.yaml. PersistentVolumeClaim: name signal-cli-data, namespace signal, accessModes: [ReadWriteOnce], storage: 5Gi, storageClassName: default (or parameterize). Deployment (single replica): name signal-cli, namespace signal, image: signalapp/signal-cli:latest, volumeMounts: [{name: data, mountPath: /home/signal-cli/.local/share/signal-cli}], volumes: [{name: data, persistentVolumeClaim: {claimName: signal-cli-data}}]. Resources: limits 256Mi/250m for dev. ClusterIP Service: name signal-cli-svc, namespace signal, port 7583 targeting container port 7583 (JSON-RPC mode). Add a NOTE in a NOTES.txt or README: 'Manual step required before first use: kubectl exec -n signal deploy/signal-cli -- signal-cli -u +<PHONE> register && signal-cli -u +<PHONE> verify <CODE>'. Ensure the pod starts in daemon/JSON-RPC mode: args: ['-u', '$(SIGNAL_NUMBER)', 'daemon', '--tcp', '0.0.0.0:7583'] with SIGNAL_NUMBER as an env var (placeholder secret or configmap key).
 
 ## Validation
-Run `kubectl get secrets -n databases -l app.kubernetes.io/part-of=sigma1-infra` and confirm all 6 secrets are listed. For each secret, verify expected keys are present via `kubectl get secret <name> -n databases -o jsonpath='{.data}' | jq 'keys'`.
+kubectl get pvc signal-cli-data -n signal shows STATUS=Bound. kubectl get pods -n signal shows signal-cli pod in Running state. kubectl get svc signal-cli-svc -n signal shows ClusterIP with port 7583. curl from within cluster: kubectl run test --rm -it --image=curlimages/curl --restart=Never -- curl -s http://signal-cli-svc.signal.svc.cluster.local:7583 returns a response (even an error JSON is acceptable, confirming the port is reachable).

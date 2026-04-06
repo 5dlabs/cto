@@ -1,10 +1,10 @@
-Implement subtask 3005: Implement ProjectService gRPC handlers with PostgreSQL integration
+Implement subtask 3005: Implement ProjectService gRPC handlers including CheckOut and CheckIn
 
 ## Objective
-Implement the ProjectService server with CRUD operations and crew assignment, backed by PostgreSQL.
+Implement all five ProjectService methods (CreateProject, GetProject, UpdateProject, CheckOut, CheckIn) as gRPC handlers. CheckOut must write an inventory_transaction row; CheckIn must record a checkin transaction.
 
 ## Steps
-1. Create `internal/service/project/service.go` implementing ProjectServiceServer. 2. Implement CreateProject: validate input, insert into `rms.projects`, return created record. 3. Implement GetProject: query by ID, include related opportunity data if needed. 4. Implement ListProjects: support pagination, filtering by status, date range. 5. Implement UpdateProject: partial updates, status transitions with validation (e.g., cannot go from COMPLETED back to PLANNING). 6. Implement AssignCrew: insert into `rms.project_crew` join table, validate crew member exists and is available. 7. Create `internal/repository/project_repo.go` with repository pattern. 8. Register service with gRPC server.
+Create internal/project/handler.go. CreateProject: INSERT projects row, set status=active, return created. GetProject: SELECT by id. UpdateProject: UPDATE fields including confirmed_at when status transitions to confirmed. CheckOut: within a single pgx transaction, INSERT inventory_transaction with type=checkout; conflict detection is handled by the InventoryService (subtask 3006) — CheckOut in ProjectService calls internal conflict check before inserting. CheckIn: INSERT inventory_transaction with type=checkin. Register ProjectServiceServer on the same gRPC server as OpportunityService. Wire grpc-gateway routes.
 
 ## Validation
-Unit tests with mocked repository cover all RPCs and status transition validation; integration tests: create project, assign crew, verify join table entries; invalid status transitions return appropriate gRPC error codes.
+POST /api/v1/projects creates a project linked to an opportunity. POST /api/v1/projects/:id/checkout creates an inventory_transaction row of type=checkout. POST /api/v1/projects/:id/checkin creates a checkin row. GET /api/v1/projects/:id reflects updated status after UpdateProject.

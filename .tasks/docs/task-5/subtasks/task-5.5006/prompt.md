@@ -1,20 +1,10 @@
-Implement subtask 5006: Implement GREEN/YELLOW/RED scoring algorithm
+Implement subtask 5006: Implement Valkey result caching with 24h TTL
 
 ## Objective
-Build the scoring algorithm that combines signals from all four external API sources (OpenCorporates, LinkedIn, Google Reviews, credit) into a composite LeadScore with a GREEN/YELLOW/RED rating.
+After the pipeline completes and writes to vetting_results, serialize the result and store it in Valkey under key vetting:org:{org_id} with a 24-hour TTL. On POST /api/v1/vetting/run, check the cache first; if a cached result exists and is not stale, skip the pipeline and return the cached request_id.
 
 ## Steps
-1. Create `src/scoring.rs` module.
-2. Define scoring dimensions: financial_score (from credit data), reputation_score (from Google Reviews + LinkedIn), legal_score (from OpenCorporates company status and filings).
-3. Implement per-dimension scoring functions:
-   - `score_financial(credit: &CreditReport) -> f64` — map credit score ranges to 0.0–1.0.
-   - `score_reputation(reviews: &GoogleReviewsData, linkedin: &LinkedInProfile) -> f64` — weighted combination of average rating, review count, employee count, company age.
-   - `score_legal(corp: &OpenCorporatesResponse) -> f64` — penalize inactive/dissolved status, recent adverse filings.
-4. Implement composite scoring: weighted average of dimensions (configurable weights via env vars or defaults: financial=0.4, reputation=0.3, legal=0.3).
-5. Map composite score to rating: GREEN >= 0.7, YELLOW >= 0.4, RED < 0.4.
-6. Handle missing data gracefully — if an API returned no data, skip that dimension and re-weight.
-7. Return `LeadScore` struct with all dimension scores and composite rating.
-8. Add comprehensive unit tests covering edge cases: all green, all red, mixed signals, missing dimensions.
+In run_pipeline, after successful sqlx upsert of vetting_results, serialize the VettingResult struct to JSON using serde_json::to_string. Call redis SET vetting:org:{org_id} {json} EX 86400 using the redis::aio::ConnectionManager. In the POST /api/v1/vetting/run handler, before inserting a new vetting_request, call redis GET vetting:org:{org_id}. If Some(cached), deserialize and return 202 with a synthetic request_id noting cache hit (include 'cached': true in response body). Use ConnectionManager for multiplexed async access. Handle redis errors as non-fatal: log warning and fall through to full pipeline.
 
 ## Validation
-Unit tests validate: a company with strong financials/reviews/legal status scores GREEN; a company with poor credit and no reviews scores RED; missing data for one dimension still produces a valid score; boundary cases at 0.4 and 0.7 thresholds are correct.
+Integration test: call POST /api/v1/vetting/run for org_id A, let pipeline complete, then call POST again for same org_id. Verify via `redis-cli GET vetting:org:{id}` that the key exists with a TTL near 86400. Verify second POST completes immediately (< 200ms) without spawning a new pipeline (check vetting_requests table has only one row). Test redis unavailability: bring down redis, verify POST still returns 202 and pipeline runs.

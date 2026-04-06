@@ -1,19 +1,17 @@
-Implement subtask 8008: Add Schema.org structured data and llms.txt endpoints
+Implement subtask 8008: Build product detail page (app/equipment/[id]/page.tsx) with real-time availability date picker
 
 ## Objective
-Implement Schema.org JSON-LD structured data across all pages and create the /llms.txt and /llms-full.txt endpoints for AI crawler optimization.
+Implement the individual product detail page with server-side product data fetch and client-side date range picker that updates the availability badge in real time via TanStack Query.
 
 ## Steps
-1. Audit and consolidate Schema.org structured data across all pages:
-   - Organization schema on home page
-   - Product schema on catalog and detail pages
-   - LocalBusiness schema in root layout
-   - BreadcrumbList on all interior pages
-2. Create `app/llms.txt/route.ts` — a Route Handler that returns a plain text file describing the site's content structure, purpose, and key pages for LLM crawlers.
-3. Create `app/llms-full.txt/route.ts` (or `app/llms-full/route.ts`) — a more detailed version with full content descriptions, equipment categories, and service explanations.
-4. Set appropriate `Content-Type: text/plain` headers.
-5. Add `<link>` tags in the root layout pointing to llms.txt.
-6. Validate all structured data with Google's Rich Results Test or Schema.org validator.
+1. Create app/equipment/[id]/page.tsx as a Server Component. Call runApiEffect(getProductById(params.id)) for initial render. generateMetadata export for product name in page title.
+2. Create components/equipment/ProductDetail.tsx as 'use client':
+   - Props: product (Product), initialAvailability (Availability | null).
+   - Display: product name (h1), day_rate as currency/day, large next/image.
+   - Date picker: import DayPicker from react-day-picker. Allow range selection (from/to). On range change: invalidate and refetch TanStack Query: useQuery({ queryKey: ['availability', product.product_id, from, to], queryFn: () => runApiEffect(getAvailability(id, from, to)), enabled: !!from && !!to }).
+   - Availability badge: renders quantity_available from query data. Green badge if > 0, red if === 0. Shows Skeleton while loading.
+   - 'Add to Quote' button: on click, stores {product_id, quantity: 1, days: diffDays(from, to)} to localStorage key sigma1_quote_items and navigates to /quote.
+3. Handle 404: if getProductById throws, call notFound() to render Next.js 404 page.
 
 ## Validation
-/llms.txt returns a valid plain text response with site description; /llms-full.txt returns detailed content; Schema.org JSON-LD validates without errors on Google's Rich Results Test for home, catalog, and detail pages; BreadcrumbList renders correctly on interior pages.
+Playwright: GET /equipment/<valid_id> shows product name and day_rate. Click date range picker, select dates 3 days apart — availability badge updates without full page reload (assert badge text changes, no network navigation). GET /equipment/nonexistent-id returns 404 page. TanStack Query devtools (in dev mode) shows availability query with correct params.

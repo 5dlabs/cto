@@ -1,19 +1,10 @@
-Implement subtask 6001: Scaffold Elysia/Effect project with PostgreSQL models and migrations
+Implement subtask 6001: Initialize Node.js/TypeScript project and install all dependencies
 
 ## Objective
-Initialize the Social Media Engine Node.js project with Elysia 1.x, Effect 3.x, and PostgreSQL integration. Define draft and published post data models and create database migrations.
+Scaffold the services/social-engine project with TypeScript 5.x configuration, install all required packages, and configure tsconfig, pino logging, and the Elysia app entry point.
 
 ## Steps
-1. Initialize project with `bun init` and add dependencies: elysia, @elysiajs/cors, effect, @effect/schema, drizzle-orm (or kysely) with pg driver.
-2. Configure TypeScript with strict mode.
-3. Define database models:
-   - `drafts` table: id (UUID), title, image_urls (text[]), caption, platform_targets (text[]), ai_curation_metadata (JSONB), status (enum: pending_review, approved, rejected, published), created_at, updated_at.
-   - `published_posts` table: id (UUID), draft_id (FK), platform, platform_post_id, published_at, engagement_metrics (JSONB).
-4. Write migrations for both tables with indexes on status and created_at.
-5. Set up database connection pool reading DATABASE_URL from sigma1-infra-endpoints ConfigMap via envFrom.
-6. Define Effect.Schema types mirroring the DB models for runtime validation.
-7. Create Elysia app skeleton with health endpoint GET /healthz checking DB connectivity.
-8. Add structured logging setup.
+Run `npm init -y` (or `bun init`) in services/social-engine. Install production deps: elysia@1.x, @elysiajs/swagger, effect@3.x, @aws-sdk/client-s3, postgres (postgres.js), ioredis, sharp, openai, @anthropic-ai/sdk, zod, pino, pino-pretty, prom-client. Install dev deps: typescript@5.x, @types/node, vitest, @vitest/coverage-v8. Create tsconfig.json with strict:true, target:ES2022, moduleResolution:bundler, paths for internal modules. Create src/index.ts with a minimal Elysia app that starts on PORT env var. Verify `npm run build` and `npm start` succeed with no TypeScript errors.
 
 ## Validation
-Project builds and starts without errors; migrations run successfully against test PostgreSQL; health endpoint returns 200 with DB status; Effect.Schema types encode/decode correctly in unit tests.
+`npx tsc --noEmit` exits 0. `npm start` starts the server and GET /health/live returns 200. All declared packages resolvable with `npm ls --depth=0` showing no missing peer dependencies.

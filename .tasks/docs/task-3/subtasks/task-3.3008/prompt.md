@@ -1,10 +1,10 @@
-Implement subtask 3008: Implement CrewService gRPC handlers with PostgreSQL integration
+Implement subtask 3008: Implement ScoreLead algorithm with external vetting service HTTP call and unit tests
 
 ## Objective
-Implement the CrewService server with CRUD and availability checking, backed by PostgreSQL. This subtask covers only the database-backed operations, not the Google Calendar integration.
+Replace the ScoreLead stub with the full weighted scoring algorithm that calls the vetting service HTTP endpoint, computes a composite score from event size, venue history, customer vetting score, and lead age, and returns GREEN/YELLOW/RED.
 
 ## Steps
-1. Create `internal/service/crew/service.go` implementing CrewServiceServer. 2. Implement CreateCrewMember: validate input, insert into `rms.crew_members`. 3. Implement GetCrewMember: query by ID. 4. Implement ListCrewMembers: pagination, filtering by role, skills, availability_status. 5. Implement UpdateCrewMember: partial updates for details, skills, availability. 6. Implement CheckAvailability: query crew member's current project assignments from `rms.project_crew`, return availability windows (database-only, Calendar integration comes separately). 7. Stub ScheduleCrew to accept the request and persist a placeholder — the Google Calendar call will be wired in the next subtask. 8. Create `internal/repository/crew_repo.go`. 9. Register service.
+Create internal/opportunity/score.go. Define a ScoreInput struct populated from the opportunity row (event_date_start/end for size proxy, venue for history lookup, notes for flags, created_at for lead age). Make an HTTP GET to $VETTING_SERVICE_URL/api/v1/vetting/:org_id using net/http with a 2-second timeout; parse the JSON response for a numeric vetting_score field. Weights (to be confirmed via decision point): event_duration_days * 2 + vetting_score * 5 - lead_age_days * 0.1. Thresholds: >= 20 → GREEN, 10-19 → YELLOW, < 10 → RED. On vetting service HTTP error, treat vetting_score=0 and log a warning. Update the ScoreLead handler to call this function and persist the result to lead_score column. Unit tests in score_test.go: table-driven tests covering GREEN, YELLOW, RED cases with mocked HTTP responses using httptest.NewServer.
 
 ## Validation
-Unit tests cover all RPCs; integration tests: create crew members, check availability against project assignments, verify skill filtering works; ScheduleCrew persists the assignment in the DB even without Calendar integration.
+Unit tests: ScoreLead with mocked vetting_score=10 and high event size returns GREEN; vetting_score=5 returns YELLOW; vetting_score=0 and old lead returns RED. Integration: POST /api/v1/opportunities/:id/score with seeded vetting stub returns correct color. GET opportunity after scoring shows updated lead_score.

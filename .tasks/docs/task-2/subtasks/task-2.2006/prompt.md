@@ -1,21 +1,10 @@
-Implement subtask 2006: Implement Redis-based rate limiting per tenant
+Implement subtask 2006: Implement Valkey sliding-window rate limiter middleware
 
 ## Objective
-Implement rate limiting middleware using Redis sliding window counters, keyed by tenant ID, to protect all API endpoints.
+Write an Axum middleware layer that enforces a 100 requests/minute sliding-window rate limit per client IP (or tenant_id claim), using the Redis ConnectionManager.
 
 ## Steps
-1. Create src/middleware/rate_limit.rs:
-   - Implement an Axum middleware (using axum::middleware::from_fn_with_state or tower layer).
-   - Extract tenant_id from request (from JWT claims, API key header, or X-Tenant-Id header depending on dp-4 decision).
-   - Use Redis INCR + EXPIRE pattern or sliding window log algorithm:
-     Key: `rate_limit:{tenant_id}:{window_timestamp}`
-     Window: 60 seconds
-     Limit: 100 requests per tenant per minute (configurable via env var RATE_LIMIT_PER_MINUTE)
-   - If limit exceeded, return 429 Too Many Requests with Retry-After header.
-   - Add rate limit headers to all responses: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset.
-2. Use redis-rs async commands.
-3. Add the middleware to the router for /api/v1/ routes (not for /health/ or /metrics).
-4. Handle Redis connection failures gracefully: if Redis is unavailable, allow the request through (fail-open) and log a warning.
+Create src/middleware/rate_limit.rs. Use the redis::aio::ConnectionManager from AppState. Sliding window algorithm with Redis sorted sets: key = rate_limit:{identifier} where identifier = tenant_id from JWT claims if present, else client IP from ConnectInfo. Use MULTI/EXEC (pipeline): ZREMRANGEBYSCORE key 0 (now_ms - 60000); ZADD key now_ms now_ms (using timestamp as both score and member, append a unique suffix to member to avoid deduplication); ZCARD key; EXPIRE key 61. If ZCARD > 100 return HTTP 429 with Retry-After header set to (60 - seconds_since_oldest_entry). Implement as tower::Layer wrapping the inner service. Extract client IP via axum::extract::ConnectInfo<SocketAddr>. Add unit tests: simulate 100 calls increment count, 101st triggers 429 logic. Wire the RateLimitLayer onto the Router in main.rs, applied to /api/v1/* routes only (exclude /health and /metrics from rate limiting).
 
 ## Validation
-Integration test: Send 100 requests within a minute from the same tenant and verify all succeed. Send request 101 and verify 429 response with correct Retry-After header. Verify rate limit headers are present on all API responses. Test fail-open behavior when Redis is down (mock or stop Redis, verify requests still pass).
+cargo test middleware::rate_limit passes. Integration test: send 101 sequential requests from the same IP to GET /api/v1/catalog/products — the 101st returns HTTP 429 with Retry-After header present. After 60 seconds (or mocking time), requests succeed again. /health/live and /metrics are not subject to rate limiting (101 requests to /health/live all return 200).

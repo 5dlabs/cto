@@ -1,18 +1,20 @@
-Implement subtask 7003: Integrate ElevenLabs and Twilio for voice channel
+Implement subtask 7003: Configure MCP tools.yaml for 10 business tools
 
 ## Objective
-Configure the voice pipeline: Twilio receives inbound calls and streams audio, ElevenLabs handles text-to-speech for agent responses, and a speech-to-text service transcribes caller input. Wire this pipeline into the OpenClaw agent's conversation flow.
+Author agents/morgan/tools.yaml defining all 10 business MCP tools with correct in-cluster service URLs, HTTP methods, parameter schemas, and response field descriptions.
 
 ## Steps
-1. Set up Twilio webhook endpoint in the agent (or a small adapter service) to receive inbound voice calls.
-2. Configure Twilio to stream audio / use TwiML to gather speech input.
-3. Implement speech-to-text transcription of caller audio (using Twilio's built-in STT or a separate provider).
-4. Route transcribed text to the OpenClaw agent conversation endpoint.
-5. Take agent text responses and send them to ElevenLabs TTS API to generate audio.
-6. Stream synthesized audio back to the caller via Twilio.
-7. Store Twilio Account SID, Auth Token, and ElevenLabs API key as Kubernetes Secrets; mount into the pod.
-8. Configure ElevenLabs voice ID, model, and latency settings for <10s response target.
-9. Handle call lifecycle: greeting, conversation turns, hangup/timeout.
+1. Create agents/morgan/tools.yaml. For each tool define: tool_id, display_name, description, http_method, url_template (with {param} placeholders), request_schema (JSON Schema for body or query params), response_schema (JSON Schema describing expected response shape), and timeout_seconds.
+2. sigma1_catalog_search: GET http://equipment-catalog-svc.sigma1.svc.cluster.local:8080/api/v1/catalog/products?search={query}. Response schema: array of {name: string, product_id: string, day_rate: number}.
+3. sigma1_check_availability: GET .../products/{product_id}/availability?from={from}&to={to}. Params: product_id (path), from/to (ISO8601 query). Response: {quantity_available: integer}.
+4. sigma1_generate_quote: POST http://rms-svc.sigma1.svc.cluster.local:8080/api/v1/opportunities. Body schema: {customer_id, line_items: [{product_id, quantity, days}], event_date}.
+5. sigma1_vet_customer: POST http://customer-vetting-svc.sigma1.svc.cluster.local:8080/api/v1/vetting/run. Body: {org_name, contact_email, event_description}. Response: {vetting_id: string, status: string}.
+6. sigma1_score_lead: GET http://rms-svc.sigma1.svc.cluster.local:8080/api/v1/opportunities/{id}/score. Path param: id. Response: {score: number, tier: string}.
+7. sigma1_create_invoice: POST http://finance-svc.sigma1.svc.cluster.local:8080/api/v1/invoices. Body: {opportunity_id, customer_id, line_items}. Response: {invoice_id, total_cents}.
+8. sigma1_finance_report: GET http://finance-svc.sigma1.svc.cluster.local:8080/api/v1/finance/reports/revenue?period={period}. Param: period (e.g. 2025-Q1). Response: {total_revenue_cents, invoice_count}.
+9. sigma1_social_curate: POST http://social-engine-svc.sigma1.svc.cluster.local:8080/api/v1/social/upload. Multipart body: file + metadata JSON. Response: {draft_id}.
+10. sigma1_social_publish: POST .../social/drafts/{draft_id}/publish. Path param: draft_id. Response: {published_url}.
+11. sigma1_equipment_lookup: GET http://equipment-catalog-svc.sigma1.svc.cluster.local:8080/api/v1/equipment-api/catalog. Response: array of catalog items.
 
 ## Validation
-Place an inbound call to the Twilio number; verify the caller hears a greeting; speak a simple query and verify the agent responds with synthesized speech; end-to-end voice round-trip completes; Twilio webhook logs show successful call handling; ElevenLabs API calls return 200.
+`openclaw validate agents/morgan/tools.yaml` exits 0. Tool count in file equals 10 (excluding GDPR tools which are in separate file). Each tool entry has non-empty url_template, http_method, request_schema, and response_schema.

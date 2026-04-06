@@ -1,10 +1,10 @@
-Implement subtask 3011: Expose REST endpoints via grpc-gateway and implement health/metrics
+Implement subtask 3011: Implement GDPR export and delete endpoints
 
 ## Objective
-Configure grpc-gateway to serve all five RMS services as REST endpoints, add Prometheus metrics instrumentation, and implement health/readiness endpoints.
+Implement GET /internal/gdpr/export/:customer_id and DELETE /internal/gdpr/delete/:customer_id on the grpc-gateway mux. Export returns all customer data; delete anonymizes customer_id fields and logs to audit schema.
 
 ## Steps
-1. In main.go, register all five services' gRPC-gateway handlers on the HTTP mux. 2. Configure JSON marshaling with google.golang.org/protobuf/encoding/protojson (use snake_case, emit defaults). 3. Add Swagger/OpenAPI endpoint serving generated swagger.json from proto annotations. 4. Implement `/healthz` endpoint: check PostgreSQL connectivity, Redis connectivity, return overall health. 5. Implement `/readyz` endpoint: return ready only when all dependencies are connected and migrations are applied. 6. Add Prometheus metrics endpoint `/metrics` using prometheus/client_golang. 7. Add gRPC interceptors for: request logging (structured JSON), latency histogram, error rate counter. 8. Add HTTP middleware on the gateway for: request ID propagation, CORS headers, request logging. 9. Verify all REST routes match the PRD-specified paths (e.g., /api/v1/opportunities, /api/v1/projects, etc.).
+Create internal/gdpr/handler.go with a plain net/http handler (not gRPC, registered directly on the gateway mux or a separate internal mux). GET /internal/gdpr/export/:customer_id: query opportunities, projects, and inventory_transactions WHERE customer_id = $1; serialize to JSON response. DELETE /internal/gdpr/delete/:customer_id: within a pgx transaction, UPDATE rms.opportunities SET customer_id = NULL WHERE customer_id = $1; UPDATE rms.projects SET customer_id = NULL WHERE customer_id = $1; INSERT INTO audit.gdpr_deletions (entity='rms', deleted_customer_id=$1, deleted_at=NOW()). Return 204 on success. Ensure audit schema and gdpr_deletions table exist (add migration if needed). Protect endpoints with a simple internal API key header check (X-Internal-Key must match INTERNAL_API_KEY env var).
 
 ## Validation
-All REST endpoints are reachable via HTTP and return correct JSON responses; /healthz returns 200 when all deps are up; /readyz returns 503 until migrations complete; /metrics returns Prometheus-formatted metrics; Swagger JSON is served and valid; request IDs propagate through logs.
+GET /internal/gdpr/export/:id with valid X-Internal-Key returns JSON containing opportunities and projects arrays. DELETE /internal/gdpr/delete/:id returns 204; subsequent GET /api/v1/opportunities?customer_id=:id returns empty list; audit.gdpr_deletions has one row for the deleted id. Request without X-Internal-Key returns 401.
