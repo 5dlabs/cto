@@ -1,30 +1,29 @@
 Implement task 5: Build Customer Vetting Service (Rex - Rust/Axum)
 
 ## Goal
-Develop the Customer Vetting backend to automate business verification, online presence checks, reputation analysis, and credit scoring.
+Create the Customer Vetting service to automate background checks using OpenCorporates, LinkedIn, Google Reviews, and credit APIs. Store results in PostgreSQL.
 
 ## Task Context
-- Agent owner: rex
+- Agent owner: Rex
 - Stack: Rust 1.75+/Axum 0.7
 - Priority: high
 - Dependencies: 1
 
 ## Implementation Plan
-{"steps": ["Initialize Rust Axum service with PostgreSQL and external API keys from 'sigma1-infra-endpoints'", "Define VettingResult and LeadScore models as per PRD", "Implement endpoints: /api/v1/vetting/run, /api/v1/vetting/:org_id, /api/v1/vetting/credit/:org_id", "Integrate OpenCorporates, LinkedIn, Google Reviews, and credit APIs for data aggregation", "Implement pipeline: business verification, online presence, reputation, credit signals, scoring", "Store results in PostgreSQL and expose via API", "Write unit and integration tests for all pipeline stages"]}
+{"steps": ["Initialize Rust project with Axum 0.7, sqlx for PostgreSQL.", "Define VettingResult and LeadScore models as per PRD.", "Implement endpoints: /api/v1/vetting/run, /api/v1/vetting/:org_id, /api/v1/vetting/credit/:org_id.", "Integrate with OpenCorporates, LinkedIn, Google Reviews, and credit APIs using stored secrets.", "Implement scoring algorithm for GREEN/YELLOW/RED.", "Connect to infra via envFrom: sigma1-infra-endpoints ConfigMap.", "Implement Prometheus metrics and health endpoints.", "Validate all input and output schemas."]}
 
 ## Acceptance Criteria
-POST /api/v1/vetting/run triggers all pipeline stages and stores results; GET endpoints return correct vetting data; scoring algorithm produces GREEN/YELLOW/RED as per input; all integrations are covered by tests.
+Vetting pipeline completes and stores results; integrations with all external APIs succeed; scoring is correct; endpoints return expected data; vetting completes within 10 seconds for simple cases.
 
 ## Subtasks
-- Initialize Rust/Axum project with PostgreSQL connectivity and configuration: Scaffold the Rust Axum 0.7 service, configure connection to PostgreSQL and load external API keys from the 'sigma1-infra-endpoints' ConfigMap via envFrom. Set up project structure with modules for models, handlers, services, and integrations.
-- Define VettingResult and LeadScore data models and database migrations: Create the VettingResult and LeadScore domain models as Rust structs with serde and sqlx derives, and write SQL migrations to create the corresponding PostgreSQL tables.
-- Implement OpenCorporates business verification integration: Build the HTTP client integration for the OpenCorporates API to perform business entity verification, including company search, registration status, and officer lookups.
-- Implement LinkedIn online presence check integration: Build the HTTP client integration for LinkedIn API to assess the online presence and legitimacy of a business entity.
-- Implement Google Reviews reputation analysis integration: Build the HTTP client integration for Google Reviews/Places API to analyze business reputation based on review data.
-- Implement credit API integration for credit signal retrieval: Build the HTTP client integration for the selected credit scoring API to retrieve business credit signals and financial health indicators.
-- Implement vetting pipeline orchestration and scoring algorithm: Build the vetting pipeline that orchestrates all four verification stages (business verification, online presence, reputation, credit) and combines their results into a final GREEN/YELLOW/RED lead score.
-- Implement API endpoints for vetting operations: Build the three Axum HTTP endpoints: POST /api/v1/vetting/run, GET /api/v1/vetting/:org_id, GET /api/v1/vetting/credit/:org_id with request validation and proper error responses.
-- Write comprehensive integration tests with mocked external APIs: Create end-to-end integration tests that exercise the full vetting pipeline using mocked external API responses, verifying correct data flow from request through pipeline to database storage.
+- Scaffold Rust/Axum project with sqlx, models, and database migrations: Initialize the Customer Vetting Rust project with Axum 0.7 and sqlx. Define VettingResult and LeadScore domain models as per PRD. Create PostgreSQL migrations for vetting_results and lead_scores tables. Connect to infra via envFrom: sigma1-infra-endpoints ConfigMap.
+- Implement OpenCorporates API integration client: Build an async HTTP client module for querying the OpenCorporates API to retrieve company registration data, officer information, and filings for a given organization.
+- Implement LinkedIn API integration client: Build an async HTTP client module for querying LinkedIn data to retrieve company profile information and employee signals for vetting purposes.
+- Implement Google Reviews API integration client: Build an async HTTP client module for querying Google Places/Reviews API to retrieve business reviews, ratings, and reputation signals.
+- Implement credit check API integration client: Build an async HTTP client module for querying a credit/financial data API to retrieve credit scores and financial health indicators for organizations.
+- Implement GREEN/YELLOW/RED scoring algorithm: Build the scoring algorithm that combines signals from all four external API sources (OpenCorporates, LinkedIn, Google Reviews, credit) into a composite LeadScore with a GREEN/YELLOW/RED rating.
+- Wire up API endpoints and orchestrate vetting pipeline: Implement the three REST endpoints (/api/v1/vetting/run, /api/v1/vetting/:org_id, /api/v1/vetting/credit/:org_id) that orchestrate the full vetting pipeline, persist results, and serve stored vetting data.
+- Add Prometheus metrics and request/response schema validation: Instrument the service with Prometheus metrics for vetting pipeline observability and ensure all input/output schemas are validated.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

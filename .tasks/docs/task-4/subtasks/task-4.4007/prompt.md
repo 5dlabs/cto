@@ -1,22 +1,10 @@
-Implement subtask 4007: Implement payroll processing endpoints
+Implement subtask 4007: Implement currency rate sync scheduled job with Redis caching
 
 ## Objective
-Build endpoints for creating, approving, and processing payroll records, with support for hourly rates, deductions, and batch processing.
+Build a background job that periodically fetches currency exchange rates from an external API, stores them in PostgreSQL, and caches them in Redis.
 
 ## Steps
-1. Create src/routes/payroll.rs with Axum handlers.
-2. POST /v1/payroll: create a payroll record for a crew member and period:
-   - Accept crew_member_id, period_start, period_end, hours_worked, rate, deductions
-   - Calculate gross_pay = hours_worked * rate
-   - Calculate net_pay = gross_pay - sum(deductions)
-   - Validate no duplicate payroll for same crew_member + period
-   - Return created record with status 'draft'
-3. GET /v1/payroll/:id: return payroll record.
-4. GET /v1/payroll: list payroll records with filters (crew_member_id, period, status).
-5. POST /v1/payroll/:id/approve: transition from draft to approved.
-6. POST /v1/payroll/:id/pay: transition from approved to paid, record paid_at timestamp.
-7. POST /v1/payroll/batch: create payroll records for multiple crew members at once for a given period.
-8. Add validation for state transitions (draft → approved → paid only).
+1. Create `src/currency/fetcher.rs`: implement a currency rate fetcher that calls an external API (e.g., exchangerate-api.com, Open Exchange Rates, or ECB). Accept API URL and key from config. 2. Create `src/currency/sync_job.rs`: implement a tokio-based scheduled task using tokio::time::interval (e.g., every 1 hour). On each tick: fetch latest rates, upsert into `finance.currency_rates` table, push to Redis with key pattern `currency:USD:EUR` and TTL of 2 hours. 3. Create `src/handlers/currency.rs`: GET /api/v1/currency/rates — first check Redis cache, fall back to PostgreSQL if cache miss, return rates. Accept query params: base_currency, target_currency (optional, return all if omitted). 4. Create `src/cache/redis.rs`: initialize redis-rs async connection from REDIS_URL env var. Implement get/set/delete helpers with TTL. 5. Start the sync job as a background tokio::spawn in main.rs. 6. Handle external API failures: log error, retain stale rates, retry on next interval. 7. Wire the /api/v1/currency/rates route into main router.
 
 ## Validation
-POST /v1/payroll creates record with correct gross/net calculations; duplicate payroll for same crew+period returns 409; approval transitions status correctly; paying unapproved payroll returns error; batch creation creates records for all specified crew members; list filtering works correctly by status and period.
+Unit tests with mocked external API: sync job correctly parses response and stores rates; Redis cache is populated with correct TTL. Integration tests: sync job runs and populates both PostgreSQL and Redis; GET /api/v1/currency/rates returns cached data; cache miss falls through to PostgreSQL; stale rates are retained when external API is unavailable.

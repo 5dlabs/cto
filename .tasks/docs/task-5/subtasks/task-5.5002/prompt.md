@@ -1,10 +1,17 @@
-Implement subtask 5002: Define VettingResult and LeadScore data models and database migrations
+Implement subtask 5002: Implement OpenCorporates API integration client
 
 ## Objective
-Create the VettingResult and LeadScore domain models as Rust structs with serde and sqlx derives, and write SQL migrations to create the corresponding PostgreSQL tables.
+Build an async HTTP client module for querying the OpenCorporates API to retrieve company registration data, officer information, and filings for a given organization.
 
 ## Steps
-1. In `models/vetting_result.rs`, define VettingResult struct with fields: id (UUID), org_id (UUID), business_verification (JSON/struct), online_presence (JSON/struct), reputation_analysis (JSON/struct), credit_signals (JSON/struct), overall_score (enum GREEN/YELLOW/RED), created_at, updated_at. 2. In `models/lead_score.rs`, define LeadScore struct with fields: id (UUID), org_id (UUID), score (f64), classification (GREEN/YELLOW/RED), component_scores (JSON), created_at. 3. Define the ScoreClassification enum (GREEN, YELLOW, RED) with sqlx::Type and serde derives. 4. Create sqlx migrations: `CREATE TABLE vetting_results (...)` and `CREATE TABLE lead_scores (...)` with proper indexes on org_id. 5. Add a migration for any enum types needed in PostgreSQL. 6. Implement From/Into conversions and validation methods on the models.
+1. Create `src/integrations/opencorporates.rs` module.
+2. Define request/response types matching the OpenCorporates REST API (company search, company details endpoints).
+3. Use reqwest with async/await for HTTP calls.
+4. Read API key from secrets (environment variable OPENCORPORATES_API_KEY sourced from Kubernetes secret).
+5. Implement `fetch_company_details(company_name: &str, jurisdiction: Option<&str>) -> Result<OpenCorporatesResponse, VettingError>`.
+6. Handle rate limiting (respect Retry-After headers), timeouts (5s default), and error mapping to domain VettingError enum.
+7. Parse response into structured data: company status, incorporation date, officers, recent filings.
+8. Add unit tests with mock HTTP responses using wiremock or similar.
 
 ## Validation
-Migrations run successfully against a test database; models serialize/deserialize correctly to/from JSON; sqlx compile-time checks pass; round-trip insert and select of VettingResult and LeadScore works.
+Unit tests pass with mocked OpenCorporates responses covering: successful lookup, company not found, rate-limited response, malformed response. Integration test against real API (gated behind feature flag) returns valid company data.

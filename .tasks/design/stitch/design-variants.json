@@ -1,59 +1,59 @@
 {
   "screens": [
     {
-      "source_screen_id": "b86dce7e21a14956aac0073a752802f3",
+      "source_screen_id": "b5349621136748c78a734f1e988559e5",
       "source_target": "mobile",
       "variants": [
         {
-          "variant_id": "b86dce7e21a14956aac0073a752802f3-v1",
-          "source_screen_id": "b86dce7e21a14956aac0073a752802f3",
+          "variant_id": "b5349621136748c78a734f1e988559e5-v1",
+          "source_screen_id": "b5349621136748c78a734f1e988559e5",
           "source_target": "mobile",
           "label": "Original (fallback)",
           "description": "Variant generation failed; using original.",
           "aspects_changed": [],
-          "screen_id": "b86dce7e21a14956aac0073a752802f3",
-          "html_url": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzJjZjg4MjFjOTI5MjQ2MzQ5ZjY4ZGI1YTAwZWE5MzBkEgsSBxD0x7nTwxwYAZIBJAoKcHJvamVjdF9pZBIWQhQxMTI4NzU1NjcyODY2NDg1NjQ0Mg&filename=&opi=96797242",
-          "image_url": "https://lh3.googleusercontent.com/aida/ADBb0uiCtJgiKM_el3tLhM3waCggJihW1R0cIU0hxuZJFsU4KGz-m93Yc798HpCYOPm_M7Q7OGAHebUtH3_x3ZZ7dHrCQuMY1UnNsY_k_WDxVOLPYwBs9IIIOC6HnAnNy4TP4Z5hr6lFPi_oDlzLmVr4OG_-zs3HGk7O9t48g7vLZIh28fU-90SGzn2R4hgKEooX8pdSaSr1YFRURBNB4TORsTfYhu36b7vUxHWtcdpHFtmaWfKbPSypyUYvcJ-1=w1920",
+          "screen_id": "b5349621136748c78a734f1e988559e5",
+          "html_url": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzUwZDNhZTNhNDliNzQyMjVhNGU1MGYzYmFiNTc2MGMxEgsSBxD0x7nTwxwYAZIBJAoKcHJvamVjdF9pZBIWQhQxNzcyODMwMDQxMjY5NzYwMzk2Ng&filename=&opi=96797242",
+          "image_url": "https://lh3.googleusercontent.com/aida/ADBb0uhBqg9kMK-Yncb642BnpJsQ_KL2dS7Uh4KJoaMNM2UK8j1itN7IJHoja3yu7Rc0r5fQea0Hg2w_AAKOmrQuEeBFsXFq5Ot31eouXzCCrH8tyO3eNpLU8IopOVMHc-wl5uzicMF8YL8jfbBEItc5V_owNmvAKZSKOVHLsoLc0l321NCKbzA5_NBr58pvpwnjNH_XGgdcZJS8IJck8LPVFlQ496x3LDVCxVZxet9EpCYGA-zUE4eWeVx1lQ8=w1920",
+          "status": "failed",
+          "error": "Stitch tool \"generate_variants\" failed: Requested entity was not found."
+        }
+      ]
+    },
+    {
+      "source_screen_id": "framer-web-1775453438543",
+      "source_target": "web",
+      "variants": [
+        {
+          "variant_id": "framer-web-1775453438543-v1",
+          "source_screen_id": "framer-web-1775453438543",
+          "source_target": "web",
+          "label": "Original (fallback)",
+          "description": "Variant generation failed; using original.",
+          "aspects_changed": [],
+          "screen_id": "framer-web-1775453438543",
           "status": "failed",
           "error": "The operation was aborted."
         }
       ]
     },
     {
-      "source_screen_id": "framer-web-1775439320901",
-      "source_target": "web",
-      "variants": [
-        {
-          "variant_id": "framer-web-1775439320901-v1",
-          "source_screen_id": "framer-web-1775439320901",
-          "source_target": "web",
-          "label": "Original (fallback)",
-          "description": "Variant generation failed; using original.",
-          "aspects_changed": [],
-          "screen_id": "framer-web-1775439320901",
-          "status": "failed",
-          "error": "Stitch tool \"generate_variants\" failed: Requested entity was not found."
-        }
-      ]
-    },
-    {
-      "source_screen_id": "framer-mobile-1775439320902",
+      "source_screen_id": "framer-mobile-1775453438544",
       "source_target": "mobile",
       "variants": [
         {
-          "variant_id": "framer-mobile-1775439320902-v1",
-          "source_screen_id": "framer-mobile-1775439320902",
+          "variant_id": "framer-mobile-1775453438544-v1",
+          "source_screen_id": "framer-mobile-1775453438544",
           "source_target": "mobile",
           "label": "Original (fallback)",
           "description": "Variant generation failed; using original.",
           "aspects_changed": [],
-          "screen_id": "framer-mobile-1775439320902",
+          "screen_id": "framer-mobile-1775453438544",
           "status": "failed",
-          "error": "Stitch tool \"generate_variants\" failed: Requested entity was not found."
+          "error": "The operation was aborted."
         }
       ]
     }
   ],
   "total_variants": 0,
-  "timestamp": "2026-04-06T01:35:55.000Z"
+  "timestamp": "2026-04-06T05:31:01.565Z"
 }

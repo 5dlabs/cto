@@ -1,28 +1,30 @@
-Implement task 8: Develop Website Frontend (Blaze - Next.js 15/React 19/Effect)
+Implement task 8: Develop Website Frontend (Blaze - React/Next.js)
 
 ## Goal
-Build the Sigma-1 website with equipment catalog, self-service quote builder, portfolio, and embedded Morgan web chat, optimized for AI and SEO.
+Build the Sigma-1 website with equipment catalog, self-service quote builder, portfolio, and Morgan web chat. Use Next.js 15 App Router, shadcn/ui, TailwindCSS 4, and Effect for type safety.
 
 ## Task Context
-- Agent owner: blaze
+- Agent owner: Blaze
 - Stack: Next.js 15/React 19/Effect
 - Priority: high
 - Dependencies: 2, 7
 
 ## Implementation Plan
-{"steps": ["Initialize Next.js 15 project with App Router, React 19, shadcn/ui, TailwindCSS 4, and Effect 3.x", "Implement pages: /, /equipment, /equipment/:id, /quote, /portfolio, /llms.txt, /llms-full", "Integrate with Equipment Catalog API for product and availability data using TanStack Query + Effect", "Build self-service quote builder with Effect form validation", "Embed Morgan web chat widget and ensure real-time communication", "Display portfolio synced from Social Media Engine", "Add Schema.org structured data and llms.txt for AI optimization", "Ensure accessibility, responsive design, and performance best practices"]}
+{"steps": ["Initialize Next.js 15 project with App Router, React 19, shadcn/ui, TailwindCSS 4, and Effect 3.x.", "Implement pages: / (hero, CTA), /equipment (catalog), /equipment/:id (product detail), /quote (quote builder), /portfolio (gallery), /llms.txt, /llms-full.", "Integrate with Equipment Catalog API for real-time data.", "Implement self-service quote builder with Effect form validation.", "Embed Morgan web chat widget.", "Fetch portfolio data from Social Media Engine.", "Add Schema.org structured data and llms.txt for AI optimization.", "Deploy to Cloudflare Pages."]}
 
 ## Acceptance Criteria
-All pages render and fetch data correctly; quote builder submits and receives confirmation; Morgan chat widget works; portfolio displays published content; llms.txt and structured data are present; Lighthouse score >90; passes accessibility checks.
+All pages render and fetch data correctly; quote builder submits and receives confirmation; Morgan web chat is functional; portfolio displays published content; accessibility and performance scores >90.
 
 ## Subtasks
-- Initialize Next.js 15 project with App Router, React 19, TailwindCSS 4, shadcn/ui, Effect 3.x, and TanStack Query: Scaffold the Next.js 15 project with all core dependencies, configure the design system foundation, and set up the API data-fetching layer.
-- Implement home page and equipment catalog pages (/, /equipment, /equipment/:id): Build the landing page, equipment listing page with filtering/search, and individual equipment detail page, all integrated with the Equipment Catalog API.
-- Build self-service quote builder page (/quote) with Effect form validation: Implement the quote builder allowing customers to select equipment, specify rental dates and location, and submit a quote request with full form validation using Effect.
-- Embed Morgan web chat widget with real-time WebSocket communication: Integrate the Morgan AI chat widget into the website as a floating component that communicates with the Morgan agent's WebSocket endpoint in real-time.
-- Build portfolio page (/portfolio) synced from Social Media Engine: Implement the portfolio page that displays published project content fetched from the Social Media Engine API.
-- Add Schema.org structured data, llms.txt routes, and SEO metadata: Implement Schema.org JSON-LD structured data across all pages, create /llms.txt and /llms-full routes for AI optimization, and configure comprehensive SEO metadata.
-- Accessibility audit, responsive design QA, and Lighthouse performance optimization: Ensure the entire site passes accessibility checks, is fully responsive across devices, and achieves a Lighthouse score above 90 in all categories.
+- Scaffold Next.js 15 project with App Router, React 19, shadcn/ui, TailwindCSS 4, and Effect: Initialize the Next.js 15 project with all foundational dependencies, configure App Router, set up TailwindCSS 4, install and configure shadcn/ui components, integrate Effect 3.x, and establish the project's folder structure and shared layout.
+- Implement home page with hero section and CTA: Build the marketing home page at `/` with a hero section, value propositions, featured equipment highlights, and call-to-action buttons directing users to the catalog and quote builder.
+- Implement equipment catalog page with API integration: Build the equipment catalog listing page at `/equipment` that fetches equipment data from the Equipment Catalog API, displays filterable/searchable results, and links to individual product detail pages.
+- Implement equipment product detail page: Build the individual equipment detail page at `/equipment/:id` that fetches and displays full product information, availability calendar, specifications, and a CTA to add the item to a quote.
+- Implement self-service quote builder with Effect form validation: Build the interactive quote builder page at `/quote` where users can select equipment, specify rental dates, enter delivery details, and submit a quote request. Use Effect Schema for robust form validation.
+- Implement portfolio gallery page with Social Media Engine integration: Build the portfolio page at `/portfolio` that fetches published content (project photos, case studies) from the Social Media Engine API and displays them in an attractive gallery layout.
+- Embed Morgan web chat widget: Integrate the Morgan AI web chat widget into the website as a persistent floating component that connects to Morgan's WebSocket endpoint for real-time customer conversations.
+- Add Schema.org structured data and llms.txt endpoints: Implement Schema.org JSON-LD structured data across all pages and create the /llms.txt and /llms-full.txt endpoints for AI crawler optimization.
+- Configure and deploy to Cloudflare Pages: Set up the Cloudflare Pages project, configure build settings for Next.js 15, set environment variables for backend API endpoints, and deploy the production build.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

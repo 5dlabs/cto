@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] gRPC and REST endpoints return correct data and status codes; barcode scanning updates inventory; Google Calendar integration creates events; conflict detection prevents double-booking; all endpoints covered by tests with >80% code coverage.
+- [ ] All gRPC and REST endpoints are reachable and return correct data; Google Calendar integration works for scheduling; health and metrics endpoints are available; quote-to-project workflow completes in <2 minutes.
 
 ## Verification Notes
 

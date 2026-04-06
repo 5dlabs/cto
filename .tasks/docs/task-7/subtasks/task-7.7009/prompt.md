@@ -1,16 +1,18 @@
-Implement subtask 7009: Write end-to-end integration tests for complete workflows
+Implement subtask 7009: End-to-end integration testing across all channels and skills
 
 ## Objective
-Create integration tests covering the full lead → vet → quote → invoice flow and other major multi-skill workflows across all communication channels.
+Perform comprehensive end-to-end testing of the Morgan agent across all three communication channels (Signal, voice, web chat) and all configured skills, validating response times and autonomous handling rates.
 
 ## Steps
-1. Write an integration test for the complete sales flow: lead contacts Morgan via chat → sales qualification → vetting → quote generation → quote acceptance → invoice generation. Verify all MCP tools are called in the correct sequence with correct parameters.
-2. Write an integration test for the rental management flow: customer requests rental → availability check → rental creation → delivery scheduling → pickup scheduling.
-3. Write an integration test for the social media flow: admin drafts post → submission for approval → approval → publishing.
-4. Write a multi-channel test: initiate a conversation via Signal, verify it can also be continued via web chat (if session linking is supported).
-5. Write SLA tests: measure and assert that simple query responses complete within 10 seconds.
-6. Write error/edge case tests: backend service unavailable, invalid customer input, vetting denial mid-flow.
-7. Use test fixtures and mock backends where necessary, but prefer real service integration for CI.
+1. Create a test plan covering each channel × each skill combination (prioritize high-frequency paths).
+2. Test Signal channel: send messages exercising sales-qual, quote-gen, and customer-vet skills; verify correct tool invocations and responses.
+3. Test voice channel: place calls exercising quote and availability queries; verify STT→agent→TTS pipeline.
+4. Test web chat channel: use WebSocket client to exercise all skills.
+5. Measure response times for simple queries across all channels; verify <10 seconds.
+6. Test error scenarios: backend service down, invalid inputs, timeout handling.
+7. Test conversation continuity: multi-turn conversations maintain context.
+8. Validate that 80%+ of representative customer inquiry scenarios are handled autonomously without human escalation.
+9. Document any failures, edge cases, or performance issues.
 
 ## Validation
-All integration tests pass in CI; the lead-to-invoice flow completes end-to-end; SLA assertion for 10-second response time passes; error scenarios are handled gracefully without agent crashes.
+All three channels deliver correct agent responses; simple query response time <10 seconds across 95% of test cases; all MCP tools are invoked correctly per skill; error scenarios produce graceful fallback responses; multi-turn conversations maintain context; 80%+ of a representative sample of 20 customer inquiry scenarios are resolved autonomously.

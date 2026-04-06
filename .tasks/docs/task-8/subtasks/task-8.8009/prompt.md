@@ -1,20 +1,19 @@
-Implement subtask 8009: Build Portfolio page with filterable gallery and lazy-loaded images
+Implement subtask 8009: Configure and deploy to Cloudflare Pages
 
 ## Objective
-Implement the `/portfolio` route as a statically generated gallery of past events with photos, filterable by event type, with lazy-loaded image grid and Schema.org Event markup.
+Set up the Cloudflare Pages project, configure build settings for Next.js 15, set environment variables for backend API endpoints, and deploy the production build.
 
 ## Steps
-1. Create `app/portfolio/page.tsx` — Server Component with static generation (or ISR if content comes from API).
-2. Data source: fetch from social engine published posts endpoint, or use static JSON/MDX content for v1.
-3. Filter bar: horizontal pill buttons for event types (Concerts, Corporate, Festivals, Weddings, etc.). Clicking filters the grid client-side.
-4. Image grid:
-   - Masonry or uniform grid layout using CSS grid.
-   - Each card: event image (lazy loaded via `<Image loading="lazy">`), event name overlay, event type badge, date.
-   - Click opens Dialog/Sheet with larger image, full description, additional photos.
-5. Lazy loading: only load images as they scroll into viewport (native lazy loading + Intersection Observer for animation).
-6. SEO: `generateMetadata` with portfolio description. Schema.org: ItemList of Event entries.
-7. Responsive: 1 col mobile, 2 cols tablet, 3 cols desktop.
-8. Empty state: if no portfolio items match filter, show friendly message.
+1. Create a Cloudflare Pages project linked to the repository.
+2. Configure the build command (`next build`) and output directory.
+3. Set up the `@cloudflare/next-on-pages` adapter if needed for edge runtime compatibility.
+4. Configure environment variables in Cloudflare Pages dashboard: all backend API URLs (matching sigma1-infra-endpoints), Morgan WebSocket URL, and any public keys.
+5. Configure custom domain and DNS if applicable.
+6. Run a production build locally first to catch any build errors.
+7. Deploy via Cloudflare Pages (git push trigger or wrangler CLI).
+8. Verify all pages load correctly on the deployed URL.
+9. Test that API integrations work from the deployed environment (CORS, network connectivity).
+10. Verify Lighthouse performance score >90 on the deployed site.
 
 ## Validation
-Render portfolio page with mock data (5+ events across 3 types). Verify all events shown initially. Click a filter, verify only matching events shown. Click 'All', verify all events shown again. Verify images have `loading="lazy"` attribute. Open an event detail dialog, verify larger image and description shown. Test responsive layout at 375px, 768px, 1440px.
+Cloudflare Pages build succeeds; deployed site is accessible at the configured URL; all pages render correctly; API calls to backend services succeed (no CORS or network errors); Morgan chat widget connects; Lighthouse performance score >90; Lighthouse accessibility score >90.

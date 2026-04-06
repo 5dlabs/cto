@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] Upload, curation, and draft endpoints work end-to-end; approval triggers Signal message; publish posts to all platforms; captions are AI-generated; portfolio sync updates website; all endpoints validated by Effect.Schema.
+- [ ] All endpoints function as specified; AI curation selects top images; captions are generated; approval workflow triggers Signal notifications; posts are published to at least two platforms; portfolio sync updates website.
 
 ## Verification Notes
 

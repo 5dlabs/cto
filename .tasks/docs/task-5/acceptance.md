@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] POST /api/v1/vetting/run triggers all pipeline stages and stores results; GET endpoints return correct vetting data; scoring algorithm produces GREEN/YELLOW/RED as per input; all integrations are covered by tests.
+- [ ] Vetting pipeline completes and stores results; integrations with all external APIs succeed; scoring is correct; endpoints return expected data; vetting completes within 10 seconds for simple cases.
 
 ## Verification Notes
 

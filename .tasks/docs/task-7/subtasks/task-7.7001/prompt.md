@@ -1,16 +1,16 @@
-Implement subtask 7001: Deploy OpenClaw agent on Kubernetes with sigma1-infra-endpoints configuration
+Implement subtask 7001: Deploy OpenClaw agent base in openclaw namespace
 
 ## Objective
-Create the Kubernetes Deployment, Service, and ConfigMap references for the OpenClaw Morgan agent, pulling all service URLs and credentials from the sigma1-infra-endpoints ConfigMap and associated Secrets.
+Deploy the OpenClaw agent using the provided deployment manifest into the openclaw namespace. Configure base environment variables, resource limits, and wire up the sigma1-infra-endpoints ConfigMap via envFrom so all backend service URLs are available to the agent runtime.
 
 ## Steps
-1. Create a Deployment manifest for the OpenClaw agent container image with resource requests/limits appropriate for an LLM-orchestrating agent.
-2. Reference 'sigma1-infra-endpoints' ConfigMap via envFrom to inject service URLs for catalog, RMS, finance, vetting, and social services.
-3. Mount any required Secrets (API keys for ElevenLabs, Twilio, Signal credentials) as environment variables or volume mounts.
-4. Create a ClusterIP Service exposing the agent's HTTP/WebSocket port for internal communication.
-5. Configure liveness and readiness probes (e.g., /healthz endpoint).
-6. Set up the OpenClaw agent configuration file (system prompt, model selection, temperature, max tokens) as a ConfigMap.
-7. Verify the pod starts, passes readiness checks, and can resolve all service URLs from the injected environment.
+1. Create or verify the `openclaw` namespace exists.
+2. Apply the provided OpenClaw deployment manifest (Deployment, Service, ServiceAccount).
+3. Attach the `sigma1-infra-endpoints` ConfigMap via `envFrom` on the agent container.
+4. Configure base agent settings: system prompt skeleton, model endpoint, temperature, max tokens.
+5. Set resource requests/limits appropriate for a single-replica dev deployment.
+6. Verify the agent pod reaches Running state and the health endpoint responds.
+7. Confirm all ConfigMap environment variables are injected correctly by exec-ing into the pod and printing env.
 
 ## Validation
-Pod reaches Running/Ready state; readiness probe passes; environment variables from sigma1-infra-endpoints are correctly injected (exec into pod and verify); agent /healthz endpoint returns 200.
+Pod is in Running state; `kubectl exec` into the pod and verify all sigma1-infra-endpoints env vars are present; agent health endpoint returns 200; logs show successful startup with no configuration errors.

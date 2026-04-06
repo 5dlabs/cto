@@ -1,26 +1,10 @@
-Implement subtask 4004: Integrate Stripe for payment processing and webhook handling
+Implement subtask 4004: Integrate Stripe API for payment processing
 
 ## Objective
-Implement Stripe payment intent creation, payment processing, and webhook handling to record Stripe payment events against invoices.
+Implement a Stripe client module and wire it into the payment flow for creating payment intents, handling webhooks, and recording Stripe payment outcomes.
 
 ## Steps
-1. Add stripe-rust crate dependency.
-2. Read STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET from environment/secrets.
-3. Create src/stripe_client.rs with a StripeService:
-   - create_payment_intent(invoice_id, amount, currency) → creates a Stripe PaymentIntent, returns client_secret and payment_intent_id
-   - retrieve_payment_intent(payment_intent_id) → fetches status from Stripe
-4. Add endpoint POST /v1/invoices/:id/pay:
-   - Create a Stripe PaymentIntent for the invoice amount
-   - Store payment_intent_id in a pending payment record
-   - Return client_secret to the frontend for Stripe.js confirmation
-5. Implement POST /v1/webhooks/stripe:
-   - Verify webhook signature using STRIPE_WEBHOOK_SECRET
-   - Handle events: payment_intent.succeeded → mark payment as succeeded, update invoice status to paid
-   - Handle payment_intent.payment_failed → mark payment as failed
-   - Handle charge.refunded → record refund, update invoice status
-   - Return 200 to Stripe for all handled events
-6. Ensure idempotency: check if payment already recorded before creating duplicate.
-7. Create a mock Stripe client for testing.
+1. Create `src/stripe/client.rs`: implement StripeClient wrapping the Stripe REST API using reqwest. Load STRIPE_API_KEY from config. 2. Implement create_payment_intent(amount, currency, metadata) → PaymentIntent. 3. Implement retrieve_payment_intent(id) → PaymentIntent. 4. Implement refund_payment(payment_intent_id, amount) → Refund. 5. Create `src/handlers/stripe_webhook.rs`: POST /api/v1/payments/stripe/webhook — verify Stripe webhook signature using STRIPE_WEBHOOK_SECRET, parse event. Handle events: payment_intent.succeeded (update payment status to SUCCEEDED, update invoice if fully paid), payment_intent.payment_failed (update payment status to FAILED), charge.refunded (update payment status to REFUNDED, revert invoice status). 6. Modify POST /api/v1/payments: when method is STRIPE, create a Stripe PaymentIntent, return the client_secret to the caller, store the payment record with status PENDING and stripe_payment_intent_id. The actual success/failure comes via webhook. 7. Implement idempotency: use invoice_id + amount as idempotency key for Stripe calls. 8. Handle Stripe API errors gracefully: rate limits (retry with backoff), authentication errors, invalid requests.
 
 ## Validation
-POST /v1/invoices/:id/pay returns a client_secret and creates a pending payment; webhook with valid signature for payment_intent.succeeded marks payment as succeeded and invoice as paid; webhook with invalid signature returns 401; duplicate webhook delivery doesn't create duplicate payments; refund webhook updates payment and invoice status correctly.
+Unit tests with mocked Stripe API: payment intent creation returns client_secret; webhook signature verification rejects invalid signatures; payment_intent.succeeded event updates payment and invoice correctly. Integration test with Stripe test mode: create payment intent, simulate webhook, verify end state. Idempotent calls don't create duplicate intents.

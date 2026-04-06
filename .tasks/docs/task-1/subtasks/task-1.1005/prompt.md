@@ -1,16 +1,19 @@
-Implement subtask 1005: Deploy Signal-CLI pod for Morgan agent
+Implement subtask 1005: Deploy Signal-CLI pod in openclaw namespace
 
 ## Objective
-Deploy Signal-CLI as a standalone pod (or sidecar-ready deployment) in the sigma1 namespace, configured with a registered Signal account for the Morgan agent.
+Deploy Signal-CLI as a standalone pod (or Deployment) in the openclaw namespace to serve as the Signal messaging relay for the Morgan agent.
 
 ## Steps
-1. Create a Deployment manifest for Signal-CLI using the official signal-cli-rest-api image (bbernhard/signal-cli-rest-api or equivalent).
-2. Mount a PersistentVolumeClaim for Signal-CLI data directory (~/.local/share/signal-cli) to persist registration state.
-3. Expose the Signal-CLI REST API on an internal ClusterIP Service (port 8080).
-4. Create a Kubernetes Secret for any Signal account registration data (phone number, verification).
-5. Apply the Deployment and Service to the sigma1 namespace.
-6. Verify the pod starts and the REST API is reachable.
-7. Record the internal service URL (e.g., http://signal-cli.sigma1.svc.cluster.local:8080) for the ConfigMap.
+1. Create a Deployment manifest in the openclaw namespace:
+   - name: signal-cli
+   - image: bbernhard/signal-cli-rest-api:latest (or equivalent)
+   - replicas: 1
+   - env: MODE=json-rpc or MODE=native (depending on integration needs)
+   - volume: PersistentVolumeClaim for Signal-CLI data directory (~1Gi) to store registration state
+2. Create a Service: signal-cli.openclaw.svc.cluster.local:8080.
+3. Create a Secret sigma1-signal-cli-config for the Signal phone number and registration data if pre-registered.
+4. Apply the manifests and wait for the pod to be Running.
+5. Record the service URL: http://signal-cli.openclaw.svc.cluster.local:8080 for the ConfigMap.
 
 ## Validation
-Confirm the Signal-CLI pod is Running and Ready; curl the health/about endpoint from a test pod and verify a valid JSON response; confirm the PVC is bound and the ClusterIP Service resolves correctly.
+Verify the signal-cli pod is Running in openclaw namespace. Curl http://signal-cli.openclaw.svc.cluster.local:8080/v1/about from a debug pod and confirm a valid JSON response with version info.

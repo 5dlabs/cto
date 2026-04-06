@@ -161,21 +161,21 @@
       "target": "mobile",
       "provider": "stitch",
       "candidate_id": "stitch-mobile-2",
-      "screen_id": "b86dce7e21a14956aac0073a752802f3",
+      "screen_id": "b5349621136748c78a734f1e988559e5",
       "notes": "Generated mobile modernization candidate from intake design context."
     },
     {
       "target": "web",
       "provider": "framer",
       "candidate_id": "framer-web-1",
-      "screen_id": "framer-web-1775439320901",
+      "screen_id": "framer-web-1775453438543",
       "notes": "Prepared web Framer candidate with component-library oriented guidance."
     },
     {
       "target": "mobile",
       "provider": "framer",
       "candidate_id": "framer-mobile-2",
-      "screen_id": "framer-mobile-1775439320902",
+      "screen_id": "framer-mobile-1775453438544",
       "notes": "Prepared mobile Framer candidate with component-library oriented guidance."
     }
   ],
@@ -232,5 +232,5 @@
       ]
     }
   ],
-  "generated_at": "2026-04-06T01:35:20.903Z"
+  "generated_at": "2026-04-06T05:30:38.544Z"
 }

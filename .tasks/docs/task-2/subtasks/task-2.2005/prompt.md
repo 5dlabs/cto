@@ -1,28 +1,17 @@
-Implement subtask 2005: Generate OpenAPI specification and write integration tests
+Implement subtask 2005: Implement S3/R2 image URL generation and CDN integration
 
 ## Objective
-Document all Equipment Catalog API endpoints with an OpenAPI 3.0 specification and write comprehensive integration tests covering all endpoints, filtering, pagination, error cases, and rate limiting.
+Implement the logic to generate public CDN-backed URLs for product images stored in S3/R2, including pre-signed URL generation if needed for uploads.
 
 ## Steps
-1. Add the `utoipa` crate (or equivalent) to auto-generate OpenAPI specs from Axum handler annotations.
-2. Annotate all endpoint handlers with OpenAPI metadata: path, method, query params, request/response bodies, status codes, descriptions.
-3. Serve the OpenAPI JSON at `GET /api/v1/catalog/openapi.json`.
-4. Create an `tests/` directory with integration test files.
-5. Write integration tests using reqwest or axum::test:
-   - test_categories_list: verify categories are returned
-   - test_products_list_pagination: verify page, per_page, total_pages
-   - test_products_filter_by_category: verify filtering works
-   - test_products_search: verify ILIKE search
-   - test_product_detail: verify single product with image URLs
-   - test_product_not_found: verify 404
-   - test_availability_query: verify date range filtering
-   - test_equipment_api_catalog: verify simplified agent format
-   - test_equipment_api_checkout_success: verify reservation creation
-   - test_equipment_api_checkout_conflict: verify 409 on double booking
-   - test_rate_limiting: verify 429 after threshold
-   - test_health_endpoints: verify live/ready/metrics
-6. Ensure tests use a test database (or transactions that roll back).
-7. Add a CI-ready test command in Cargo.toml or Makefile.
+1. Create src/services/storage.rs:
+   - Define a StorageService struct holding the S3 endpoint, bucket name, access credentials, and optional CDN base URL.
+   - Implement `pub fn public_image_url(&self, image_key: &str) -> String` that returns the CDN URL for a product image. If CDN is configured (CDN_BASE_URL env var), return `{CDN_BASE_URL}/{image_key}`. Otherwise fall back to `{S3_ENDPOINT_URL}/{bucket}/{image_key}`.
+   - Implement `pub async fn generate_upload_url(&self, image_key: &str) -> Result<String>` for pre-signed PUT URLs (for admin image uploads) using the aws-sdk-s3 crate or rusoto.
+2. Add aws-sdk-s3 to Cargo.toml (or s3 crate for lighter dependency).
+3. Integrate StorageService into AppState.
+4. Modify ProductResponse DTO to compute image_url from image_key using StorageService.
+5. Ensure the image_key stored in DB is a relative path (e.g., `products/{product_id}/main.webp`) and the full URL is computed at response time.
 
 ## Validation
-All integration tests pass (`cargo test`); OpenAPI spec at /api/v1/catalog/openapi.json is valid (passes openapi-spec-validator); spec documents all 8+ endpoints with correct schemas, parameters, and response codes; test coverage includes happy paths, error cases, pagination edge cases, and rate limiting.
+Unit test: public_image_url correctly constructs CDN URL when CDN_BASE_URL is set and S3 fallback URL when it's not. Integration test: generate_upload_url returns a valid pre-signed URL (verify by attempting a HEAD request or checking URL structure). Product API responses include correctly formed image_url fields.

@@ -1,7 +1,7 @@
 name: implement-task-7
 metadata:
   task_id: 7
-  agent: angie
+  agent: Angie
   stack: OpenClaw/MCP
   depends_on_tasks: [2, 3, 4, 5, 6]
 
@@ -11,7 +11,7 @@ inputs:
   - name: branch_name
     default: "task-7/feature-branch"
   - name: agent
-    default: "angie"
+    default: "Angie"
   - name: cli
     default: "claude"
   - name: model
@@ -88,7 +88,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7006
-    depends_on: [validate-subtask-7004, validate-subtask-7005]
+    depends_on: [validate-subtask-7001]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7006/prompt.md
@@ -100,7 +100,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7007
-    depends_on: [validate-subtask-7004, validate-subtask-7005]
+    depends_on: [validate-subtask-7004, validate-subtask-7005, validate-subtask-7006]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7007/prompt.md
@@ -124,7 +124,7 @@ steps:
       cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
 
   - name: implement-subtask-7009
-    depends_on: [validate-subtask-7002, validate-subtask-7003, validate-subtask-7006, validate-subtask-7007, validate-subtask-7008]
+    depends_on: [validate-subtask-7002, validate-subtask-7003, validate-subtask-7007, validate-subtask-7008]
     retry: { max: "{{inputs.max_implementation_retries}}" }
     command: >
       {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-7.7009/prompt.md

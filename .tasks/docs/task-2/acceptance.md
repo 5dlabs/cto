@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] Call each endpoint and verify correct data structure, filtering, and pagination; check rate limiting is enforced; confirm Prometheus metrics and health endpoints respond as expected; verify image URLs resolve to S3/R2 objects.
+- [ ] All endpoints return correct data and status codes; product images are served via CDN; rate limiting is enforced; health and metrics endpoints are Prometheus-compatible; response times for availability check < 500ms.
 
 ## Verification Notes
 

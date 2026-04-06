@@ -1,21 +1,10 @@
-Implement subtask 4005: Implement currency rate sync job with Redis caching
+Implement subtask 4005: Implement payroll endpoints
 
 ## Objective
-Build a scheduled background job that fetches current exchange rates from an external API, stores them in PostgreSQL, and caches them in Redis for fast multi-currency conversions.
+Build the /api/v1/payroll endpoints for creating, approving, and managing payroll records.
 
 ## Steps
-1. Create src/jobs/currency_sync.rs with a CurrencyRateSyncer.
-2. Implement fetch_rates() that calls the configured exchange rate API (abstracted behind a trait for swappability):
-   - Parse JSON response into rate entries (base_currency, target_currency, rate)
-   - Insert/upsert rates into currency_rates table with fetched_at timestamp
-   - Cache rates in Redis with key pattern 'currency:USD:CAD' and TTL of 24 hours
-3. Create a tokio::spawn background task that runs fetch_rates() on a configurable interval (default: every 6 hours).
-4. Implement src/services/currency.rs with:
-   - get_rate(from, to) → check Redis first, fallback to DB, return rate
-   - convert(amount, from, to) → get_rate and multiply
-5. Add endpoint GET /v1/currency/rates?base=USD to return current cached rates.
-6. Add endpoint GET /v1/currency/convert?amount=100&from=USD&to=CAD to perform conversion.
-7. Ensure graceful handling if rate is unavailable (return error, don't silently use stale data beyond threshold).
+1. Create `src/models/payroll.rs`: define PayrollRecord struct, CreatePayrollRequest (employee_id, period_start, period_end, gross_amount, deductions), PayrollStatus enum, PayrollListQuery DTO. Deductions should be a structured JSONB field (e.g., [{type: 'tax', amount: 500}, {type: 'insurance', amount: 200}]). 2. Create `src/repository/payroll_repo.rs`: implement PayrollRepository — create, get_by_id, list (with filtering by employee, period, status), update_status, calculate_net (gross - sum of deductions). 3. Create `src/handlers/payroll.rs`: POST /api/v1/payroll (create draft), GET /api/v1/payroll/:id, GET /api/v1/payroll (list), PUT /api/v1/payroll/:id/approve (transition DRAFT→APPROVED), PUT /api/v1/payroll/:id/pay (transition APPROVED→PAID, set paid_at). 4. Validate: period_start < period_end, no overlapping periods for same employee, gross_amount > 0, net_amount (gross - deductions) > 0. 5. Wire routes into main router.
 
 ## Validation
-Sync job fetches rates and stores them in DB and Redis; GET /v1/currency/rates returns cached rates; GET /v1/currency/convert returns correct conversion with proper decimal precision; Redis cache hit returns rate without DB query; stale rate beyond threshold returns appropriate error; mock external API to test sync job logic.
+Unit tests for net amount calculation and period overlap detection; integration tests: create payroll record, approve it, pay it; invalid status transitions (e.g., DRAFT→PAID) return 422; overlapping periods for same employee return 409; deductions are correctly stored and retrieved as structured JSON.

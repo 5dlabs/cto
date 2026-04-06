@@ -1,10 +1,18 @@
-Implement subtask 6005: Implement draft management CRUD endpoints
+Implement subtask 6005: Implement Instagram API publishing integration
 
 ## Objective
-Build the draft management endpoints: GET /api/v1/social/drafts, GET /api/v1/social/drafts/:id, and draft creation flow that combines uploads with AI-generated captions into reviewable drafts.
+Build the Instagram publishing client that posts approved content to Instagram via the Instagram Graph API.
 
 ## Steps
-1. In `src/routes/drafts.ts`, implement: a) `POST /api/v1/social/drafts` — accepts upload_ids and optional manual caption, triggers AI caption generation for each target platform, creates a Draft record with status PENDING_REVIEW, returns 201 with draft details including AI captions. b) `GET /api/v1/social/drafts` — lists all drafts with pagination and optional status filter, returns 200 with array. c) `GET /api/v1/social/drafts/:id` — returns single draft with full details including uploads and captions, returns 200 or 404. 2. Validate all requests/responses with Effect.Schema. 3. Draft creation should call AICaptionService.generateCaption for each target platform. 4. Include presigned URLs for images in draft responses so reviewers can preview.
+1. Create `src/publishing/instagram.ts` module.
+2. Implement Instagram Graph API integration:
+   - Use the Content Publishing API flow: create media container → publish media.
+   - Handle single image and carousel posts.
+   - Read INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_BUSINESS_ACCOUNT_ID from Kubernetes secrets.
+3. Implement `publishToInstagram(imageUrl: string, caption: string) -> Effect<PublishResult>` returning the platform post ID and URL.
+4. Handle API rate limits (200 calls/hour), token expiration, and error responses.
+5. Define Effect.Schema types for PublishResult.
+6. Add unit tests with mocked Instagram API responses.
 
 ## Validation
-POST /drafts with valid upload_ids creates draft with AI-generated captions and PENDING_REVIEW status; GET /drafts returns paginated list; GET /drafts/:id returns correct draft; 404 for non-existent draft; Effect.Schema validates all inputs/outputs.
+Unit tests with mocked Instagram API verify: successful publish returns post ID; rate limit error is handled with appropriate retry/backoff; expired token returns a clear error; caption with hashtags is properly formatted.

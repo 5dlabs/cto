@@ -1,16 +1,10 @@
-Implement subtask 4002: Define database models and migrations for Invoice, Payment, and Payroll
+Implement subtask 4002: Implement Invoice model and CRUD endpoints
 
 ## Objective
-Create PostgreSQL schema migrations for invoices, payments, payroll records, and currency rates using sqlx migrations, with multi-currency support built into the data model.
+Define the Invoice domain model, repository layer, and implement /api/v1/invoices endpoints (create, get, list, update, delete).
 
 ## Steps
-1. Create migrations directory and use sqlx-cli for migration management.
-2. Migration 001_create_invoices: invoices table with fields (id UUID PK, client_id, project_id, invoice_number unique, status enum (draft/sent/paid/overdue/cancelled), line_items JSONB, subtotal DECIMAL(19,4), tax_amount DECIMAL(19,4), total DECIMAL(19,4), currency VARCHAR(3), due_date DATE, issued_date DATE, paid_date DATE nullable, notes TEXT, created_at, updated_at). Add indexes on status, client_id, due_date.
-3. Migration 002_create_payments: payments table (id UUID PK, invoice_id FK, amount DECIMAL(19,4), currency VARCHAR(3), stripe_payment_intent_id, stripe_charge_id, status enum (pending/succeeded/failed/refunded), method enum (card/bank_transfer/check), paid_at TIMESTAMP, created_at). Index on invoice_id, stripe_payment_intent_id.
-4. Migration 003_create_payroll: payroll_records table (id UUID PK, crew_member_id, period_start DATE, period_end DATE, hours_worked DECIMAL(8,2), rate DECIMAL(10,2), gross_pay DECIMAL(19,4), deductions JSONB, net_pay DECIMAL(19,4), currency VARCHAR(3), status enum (draft/approved/paid), paid_at, created_at). Index on crew_member_id, period.
-5. Migration 004_create_currency_rates: currency_rates table (id, base_currency, target_currency, rate DECIMAL(18,8), fetched_at TIMESTAMP, PRIMARY KEY (base_currency, target_currency, fetched_at)).
-6. Define Rust structs (models) for each entity using sqlx::FromRow.
-7. Implement repository trait and impl for each model with CRUD operations.
+1. Create `src/models/invoice.rs`: define Invoice struct with serde Serialize/Deserialize and sqlx::FromRow. Define CreateInvoiceRequest, UpdateInvoiceRequest, InvoiceListQuery (pagination, status filter, date range) DTOs. Define InvoiceStatus enum. 2. Create `src/repository/invoice_repo.rs`: implement InvoiceRepository with methods — create(CreateInvoiceRequest) → Invoice, get_by_id(id, tenant_id) → Option<Invoice>, list(query) → PaginatedResult<Invoice>, update(id, UpdateInvoiceRequest) → Invoice, soft_delete(id) → (). Use sqlx queries against `finance.invoices`. 3. Create `src/handlers/invoice.rs`: implement Axum handlers — POST /api/v1/invoices (create), GET /api/v1/invoices/:id (get), GET /api/v1/invoices (list with query params), PUT /api/v1/invoices/:id (update), DELETE /api/v1/invoices/:id (soft delete). 4. Implement input validation using validator crate or manual checks: required fields, valid currency codes, positive amounts, valid status transitions. 5. Implement auto-generation of invoice_number (e.g., INV-2024-00001 sequential). 6. Create `src/routes/invoice.rs`: define Axum Router with all invoice routes. 7. Wire into main app router. 8. Implement proper error responses with appropriate HTTP status codes (400, 404, 422, 500).
 
 ## Validation
-Migrations run forward and backward cleanly against a test PostgreSQL instance; Rust model structs deserialize correctly from database rows; repository CRUD operations (create, get by ID, list with pagination, update, delete) work correctly; DECIMAL precision is preserved; currency fields accept valid ISO 4217 codes.
+Unit tests for invoice model validation and status transitions; integration tests: create invoice returns 201 with generated invoice_number; get by ID returns 200; list with pagination returns correct page; update status transitions work; invalid input returns 400/422; not-found returns 404; invoice generation completes in <5 seconds.

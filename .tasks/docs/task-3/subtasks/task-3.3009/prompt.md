@@ -1,23 +1,10 @@
-Implement subtask 3009: Integrate Google Calendar API for project scheduling
+Implement subtask 3009: Integrate Google Calendar API for crew and project scheduling
 
 ## Objective
-Implement Google Calendar API integration within ProjectService to create, update, and delete calendar events when projects are created or modified.
+Implement the Google Calendar API client and wire it into CrewService.ScheduleCrew and ProjectService for calendar event creation and availability checking.
 
 ## Steps
-1. Add google.golang.org/api/calendar/v3 and golang.org/x/oauth2 dependencies.
-2. Create internal/calendar/google_calendar.go with a CalendarClient interface and Google implementation:
-   - CreateEvent(project) → creates a Google Calendar event with project name, dates, crew info, returns event ID
-   - UpdateEvent(eventID, project) → updates existing event
-   - DeleteEvent(eventID) → removes event
-3. Read Google Calendar credentials (service account JSON or OAuth tokens) from secrets mounted via sigma1-infra-endpoints.
-4. Configure the target calendar ID from environment/ConfigMap.
-5. Integrate into ProjectService:
-   - On CreateProject, call CalendarClient.CreateEvent and store returned event ID in project record
-   - On UpdateProject (date/crew changes), call CalendarClient.UpdateEvent
-   - On DeleteProject, call CalendarClient.DeleteEvent
-6. Handle API errors gracefully: log and continue if calendar sync fails (don't block project CRUD).
-7. Implement SyncCalendar RPC for manual re-sync of a project's calendar event.
-8. Create a mock CalendarClient for testing.
+1. Create `internal/calendar/google_calendar.go` with a CalendarClient interface and Google Calendar API v3 implementation. 2. Implement authentication using a service account (credentials from environment/secret). 3. Implement CreateEvent(calendarId, summary, startTime, endTime, attendees) → eventId. 4. Implement ListEvents(calendarId, timeMin, timeMax) for availability checks. 5. Implement UpdateEvent and DeleteEvent for schedule changes. 6. Wire into CrewService.ScheduleCrew: when scheduling a crew member, create a calendar event on their calendar_id and store the event ID. 7. Wire into CrewService.CheckAvailability: query Google Calendar for free/busy information alongside DB assignments. 8. Wire into ProjectService.CreateProject/UpdateProject: optionally create/update a project calendar event. 9. Handle Google API errors gracefully (rate limits, auth failures) with retries and meaningful gRPC error responses. 10. Make Calendar integration optional via feature flag so the service works without Calendar credentials in dev/test.
 
 ## Validation
-Unit tests with mock CalendarClient verify that CreateProject calls CreateEvent and stores event ID; UpdateProject calls UpdateEvent; DeleteProject calls DeleteEvent; calendar API failures are logged but don't cause project operations to fail; SyncCalendar RPC triggers event update; integration test against Google Calendar sandbox (if available) creates and retrieves an event.
+Unit tests with mocked CalendarClient verify correct API calls are made; integration test with Google Calendar sandbox: create event, query free/busy, update event; ScheduleCrew creates a calendar event and stores the event ID; feature flag disables Calendar calls gracefully.

@@ -1,20 +1,10 @@
-Implement subtask 3002: Define protobuf schemas for OpportunityService and ProjectService
+Implement subtask 3002: Define protobuf schemas for all five RMS services
 
 ## Objective
-Author .proto files for OpportunityService and ProjectService with all RPC methods, request/response messages, and grpc-gateway HTTP annotations as specified in the PRD.
+Author .proto files for OpportunityService, ProjectService, InventoryService, CrewService, and DeliveryService including all message types, enums, and gRPC method definitions with grpc-gateway HTTP annotations.
 
 ## Steps
-1. Create proto/rms/v1/opportunity.proto with:
-   - Opportunity message (id, client info, project name, status, dates, notes, equipment list)
-   - CreateOpportunity, GetOpportunity, ListOpportunities, UpdateOpportunity, DeleteOpportunity RPCs
-   - google.api.http annotations for REST mapping (POST /v1/opportunities, GET /v1/opportunities/{id}, etc.)
-2. Create proto/rms/v1/project.proto with:
-   - Project message (id, opportunity_id, name, status, schedule, crew assignments, calendar_event_id)
-   - CreateProject, GetProject, ListProjects, UpdateProject, DeleteProject, SyncCalendar RPCs
-   - HTTP annotations for grpc-gateway
-3. Define shared messages in proto/rms/v1/common.proto (pagination, timestamps, status enums).
-4. Run buf generate or protoc to generate Go stubs and grpc-gateway code.
-5. Verify generated code compiles and integrates with the gRPC server scaffold.
+1. Create `proto/rms/opportunity/v1/opportunity.proto` — define Opportunity message (id, customer_id, title, description, status enum [LEAD, QUOTED, WON, LOST], estimated_value, created_at, updated_at). Define OpportunityService with RPCs: CreateOpportunity, GetOpportunity, ListOpportunities, UpdateOpportunity, ConvertToProject. Add google.api.http annotations for REST mapping. 2. Create `proto/rms/project/v1/project.proto` — define Project message (id, opportunity_id, name, status enum [PLANNING, ACTIVE, ON_HOLD, COMPLETED], start_date, end_date, budget, calendar_event_id). RPCs: CreateProject, GetProject, ListProjects, UpdateProject, AssignCrew. 3. Create `proto/rms/inventory/v1/inventory.proto` — define InventoryItem message (id, name, category, sku, quantity_available, quantity_reserved, unit_cost, location). RPCs: CreateItem, GetItem, ListItems, UpdateItem, ReserveItems, ReleaseItems. 4. Create `proto/rms/crew/v1/crew.proto` — define CrewMember message (id, name, role, skills, availability_status, calendar_id). RPCs: CreateCrewMember, GetCrewMember, ListCrewMembers, UpdateCrewMember, CheckAvailability, ScheduleCrew. 5. Create `proto/rms/delivery/v1/delivery.proto` — define Delivery message (id, project_id, items, status enum [PENDING, IN_TRANSIT, DELIVERED, RETURNED], scheduled_date, actual_date, notes). RPCs: CreateDelivery, GetDelivery, ListDeliveries, UpdateDeliveryStatus. 6. Run `make proto-gen` and verify generated Go code compiles.
 
 ## Validation
-protoc/buf generates Go code without errors; generated stubs compile; RPC method signatures match PRD requirements; HTTP annotations produce correct REST routes when registered with grpc-gateway.
+All .proto files pass `buf lint` or `protoc` without errors; generated Go stubs compile; HTTP annotations are present and valid for every RPC; all message fields match the PRD data model.

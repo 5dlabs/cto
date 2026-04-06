@@ -1,10 +1,18 @@
-Implement subtask 6007: Implement Instagram publishing Effect.Service
+Implement subtask 6007: Implement Facebook API publishing integration
 
 ## Objective
-Build the Effect.Service implementation for publishing posts to Instagram, including platform-specific image cropping and the Instagram Graph API integration.
+Build the Facebook publishing client that posts approved content to a Facebook page via the Graph API.
 
 ## Steps
-1. In `src/services/publishers/instagram.ts`, create an Effect.Service `InstagramPublisher` implementing a `Publisher` interface. 2. Implement `publish(draft: Draft, images: Upload[]) -> Effect<PublishResult>`: a) Crop/resize images to Instagram-compatible dimensions (1080x1080 square, 1080x1350 portrait, 1080x566 landscape) using sharp. b) Upload media to Instagram via Graph API container creation. c) Create the media publish request with caption and hashtags. d) Return PublishResult with platform_post_id and post_url. 3. Handle Instagram API rate limits and error codes. 4. Implement token refresh for long-lived Instagram tokens. 5. Add `sharp` as a dependency for image processing.
+1. Create `src/publishing/facebook.ts` module.
+2. Implement Facebook Graph API integration:
+   - Upload photo to page → create post with photo and message.
+   - Handle Page Access Token authentication.
+   - Read FACEBOOK_PAGE_ACCESS_TOKEN and FACEBOOK_PAGE_ID from Kubernetes secrets.
+3. Implement `publishToFacebook(imageUrl: string, caption: string) -> Effect<PublishResult>` returning the post ID and URL.
+4. Handle API rate limits, token expiration, and error responses.
+5. Define Effect.Schema types for PublishResult.
+6. Add unit tests with mocked Facebook API responses.
 
 ## Validation
-Unit tests with mocked Instagram API verify correct API call sequence (container create → publish); images are resized to correct dimensions; captions and hashtags are included; API errors return proper error types; token refresh is triggered on 401.
+Unit tests with mocked Facebook Graph API verify: successful photo post returns post ID; page token errors are handled; rate limits produce appropriate retry behavior; caption is properly formatted for Facebook.

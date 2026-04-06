@@ -1,20 +1,10 @@
-Implement subtask 3005: Implement database migrations and repository layer for all RMS entities
+Implement subtask 3005: Implement ProjectService gRPC handlers with PostgreSQL integration
 
 ## Objective
-Create PostgreSQL schema migrations for opportunities, projects, inventory items, crew members, assignments, and deliveries. Implement a repository layer with CRUD operations using pgx.
+Implement the ProjectService server with CRUD operations and crew assignment, backed by PostgreSQL.
 
 ## Steps
-1. Use golang-migrate or goose for migration management.
-2. Create migration files:
-   - 001_create_opportunities.up.sql: opportunities table with all PRD fields, indexes on status and client
-   - 002_create_projects.up.sql: projects table with FK to opportunities, indexes on status and schedule dates
-   - 003_create_inventory_items.up.sql: inventory_items table with barcode (unique index), serial_number, status, category index
-   - 004_create_crew_members.up.sql: crew_members table with skills (jsonb), availability
-   - 005_create_assignments.up.sql: assignments table with FKs to crew_members and projects, unique constraint on (crew_member_id, project_id, date_range) using exclusion constraint
-   - 006_create_deliveries.up.sql: deliveries table with FK to projects, status enum, items (jsonb or junction table)
-3. Implement repository interfaces and pgx-based implementations for each entity with Create, Get, List (with pagination), Update, Delete methods.
-4. Add corresponding .down.sql migrations for rollback.
-5. Run migrations on startup or via CLI flag.
+1. Create `internal/service/project/service.go` implementing ProjectServiceServer. 2. Implement CreateProject: validate input, insert into `rms.projects`, return created record. 3. Implement GetProject: query by ID, include related opportunity data if needed. 4. Implement ListProjects: support pagination, filtering by status, date range. 5. Implement UpdateProject: partial updates, status transitions with validation (e.g., cannot go from COMPLETED back to PLANNING). 6. Implement AssignCrew: insert into `rms.project_crew` join table, validate crew member exists and is available. 7. Create `internal/repository/project_repo.go` with repository pattern. 8. Register service with gRPC server.
 
 ## Validation
-Migrations run forward and backward without errors on a clean database; repository CRUD operations work correctly against a test PostgreSQL instance; unique constraints and foreign keys are enforced; pagination returns correct subsets.
+Unit tests with mocked repository cover all RPCs and status transition validation; integration tests: create project, assign crew, verify join table entries; invalid status transitions return appropriate gRPC error codes.

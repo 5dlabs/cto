@@ -1,16 +1,18 @@
-Implement subtask 7003: Integrate ElevenLabs voice synthesis and Twilio phone channel
+Implement subtask 7003: Integrate ElevenLabs and Twilio for voice channel
 
 ## Objective
-Set up ElevenLabs for text-to-speech and Twilio for inbound/outbound phone calls so Morgan can handle voice interactions.
+Configure the voice pipeline: Twilio receives inbound calls and streams audio, ElevenLabs handles text-to-speech for agent responses, and a speech-to-text service transcribes caller input. Wire this pipeline into the OpenClaw agent's conversation flow.
 
 ## Steps
-1. Configure the ElevenLabs API client within the agent, using API key from Secrets, selecting an appropriate voice ID for Morgan's persona.
-2. Implement a text-to-speech adapter that converts agent text responses to audio streams via ElevenLabs API.
-3. Set up a Twilio phone number and configure the webhook URL to point to Morgan's voice endpoint (via ingress or NodePort).
-4. Implement a Twilio webhook handler that receives inbound calls, streams audio to a speech-to-text service, and passes transcribed text to the agent.
-5. Implement the response path: agent text response → ElevenLabs TTS → Twilio TwiML <Play> or <Stream> back to caller.
-6. Handle call lifecycle events: call start, end, transfer, voicemail.
-7. Ensure voice round-trip latency meets the 10-second SLA for simple queries.
+1. Set up Twilio webhook endpoint in the agent (or a small adapter service) to receive inbound voice calls.
+2. Configure Twilio to stream audio / use TwiML to gather speech input.
+3. Implement speech-to-text transcription of caller audio (using Twilio's built-in STT or a separate provider).
+4. Route transcribed text to the OpenClaw agent conversation endpoint.
+5. Take agent text responses and send them to ElevenLabs TTS API to generate audio.
+6. Stream synthesized audio back to the caller via Twilio.
+7. Store Twilio Account SID, Auth Token, and ElevenLabs API key as Kubernetes Secrets; mount into the pod.
+8. Configure ElevenLabs voice ID, model, and latency settings for <10s response target.
+9. Handle call lifecycle: greeting, conversation turns, hangup/timeout.
 
 ## Validation
-Place a test call to the Twilio number; verify Morgan answers and responds with synthesized voice; measure round-trip latency is under 10 seconds for a simple greeting; verify call end is handled gracefully.
+Place an inbound call to the Twilio number; verify the caller hears a greeting; speak a simple query and verify the agent responds with synthesized speech; end-to-end voice round-trip completes; Twilio webhook logs show successful call handling; ElevenLabs API calls return 200.

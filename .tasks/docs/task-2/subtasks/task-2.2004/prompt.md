@@ -1,15 +1,19 @@
-Implement subtask 2004: Implement machine-readable Morgan API endpoints with rate limiting
+Implement subtask 2004: Implement real-time availability endpoint
 
 ## Objective
-Implement the machine-readable API endpoints for the Morgan AI agent (/api/v1/equipment-api/catalog and /api/v1/equipment-api/checkout) and add Redis-based rate limiting middleware.
+Implement the product availability checking endpoint that queries current availability data and returns date-range availability for a given product.
 
 ## Steps
-1. Create a `routes/equipment_api.rs` module.
-2. Implement `GET /api/v1/equipment-api/catalog`: return a simplified, structured JSON response optimized for LLM/agent consumption. Include fields: product_id, name, category, daily_rate, weekly_rate, monthly_rate, availability_summary (available_now: bool, next_available_date), image_url (primary). Support filtering by category and availability date range.
-3. Implement `POST /api/v1/equipment-api/checkout`: accept a JSON body with { product_id, customer_name, customer_phone, rental_start, rental_end, notes }. Validate input, check availability for the date range, create a reservation record in rms.availability (mark dates as reserved), return confirmation with reservation_id. This is a simplified checkout for Morgan's use—no payment processing yet.
-4. Create a `middleware/rate_limit.rs` module: implement a tower middleware or Axum layer that uses Redis INCR with TTL for sliding window rate limiting. Key by IP or API key. Default: 60 requests/minute for equipment-api endpoints.
-5. Apply the rate limiting middleware to the /api/v1/equipment-api/* routes.
-6. Wire routes into the main router.
+1. Create src/handlers/availability.rs:
+   - GET /api/v1/catalog/products/:id/availability: Accept query params: start_date (required, YYYY-MM-DD), end_date (required, YYYY-MM-DD), quantity (optional, default 1).
+   - Query the availability table for the product_id within the date range.
+   - Return: {product_id, start_date, end_date, dates: [{date, quantity_available, quantity_reserved, is_available: bool}], fully_available: bool}.
+   - is_available = (quantity_available - quantity_reserved) >= requested quantity.
+   - fully_available = all dates in range have is_available = true.
+2. Validate: start_date <= end_date, date range <= 365 days, product_id exists.
+3. Use a single SQL query with generate_series to fill in missing dates with default availability.
+4. Wire route into Router.
+5. Implement the /api/v1/equipment-api/checkout endpoint that accepts a checkout request body (product_id, start_date, end_date, quantity, customer info) and creates a reservation by decrementing quantity_available in a transaction. Return success/failure with reservation_id.
 
 ## Validation
-Call /equipment-api/catalog and verify simplified JSON structure suitable for agent consumption; POST to /equipment-api/checkout with valid data and verify reservation is created and availability is updated; POST with conflicting dates returns 409 Conflict; exceed 60 requests in 1 minute and verify 429 Too Many Requests response with Retry-After header.
+GET /api/v1/catalog/products/:id/availability returns correct availability for seeded data. Date range validation rejects invalid ranges (end < start, > 365 days). Missing dates in DB are filled with defaults. Checkout endpoint creates a reservation and decrements availability atomically (verified by re-querying availability). Response time for availability check < 500ms with seeded data for 30-day range.

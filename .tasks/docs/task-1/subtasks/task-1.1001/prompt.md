@@ -1,15 +1,15 @@
-Implement subtask 1001: Create Kubernetes namespaces and RBAC foundations
+Implement subtask 1001: Create Kubernetes namespaces and RBAC foundation
 
 ## Objective
-Create all required Kubernetes namespaces (databases, sigma1, openclaw, etc.) and set up basic RBAC ServiceAccounts for each namespace so downstream deployments have appropriate permissions.
+Create all required Kubernetes namespaces (databases, sigma1, openclaw, social, web) and configure basic RBAC service accounts so that downstream resources can be deployed into the correct namespace with appropriate permissions.
 
 ## Steps
-1. Create namespace manifests for: databases, sigma1, openclaw (and any others referenced in the PRD).
-2. Apply namespace labels for organization (e.g., app.kubernetes.io/part-of: sigma1).
-3. Create ServiceAccount resources in each namespace for pod identity.
-4. Apply ResourceQuota and LimitRange on the sigma1 namespace to prevent runaway resource usage in dev.
-5. Use `kubectl apply -f` or Helm to deploy all namespace manifests.
-6. Verify namespaces exist with `kubectl get ns`.
+1. Create namespace manifests for: databases, sigma1, openclaw, social, web.
+2. Apply each namespace via kubectl or Helm.
+3. Create a ServiceAccount in each namespace for workloads to use (e.g., sigma1-sa, openclaw-sa).
+4. Create RoleBindings granting each ServiceAccount read access to secrets and configmaps within its own namespace.
+5. Create a ClusterRole that allows the sigma1 namespace SA to read the sigma1-infra-endpoints ConfigMap from the databases namespace (cross-namespace read).
+6. Label all namespaces with project=sigma1 for easy identification.
 
 ## Validation
-Run `kubectl get ns` and confirm all expected namespaces exist; verify ServiceAccounts are present in each namespace with `kubectl get sa -n <ns>`; confirm ResourceQuota is applied.
+Run `kubectl get namespaces -l project=sigma1` and verify all 5 namespaces exist. Verify each ServiceAccount exists via `kubectl get sa -n <namespace>`. Verify RoleBindings are active and the cross-namespace read works by running `kubectl auth can-i get configmaps --as=system:serviceaccount:sigma1:sigma1-sa -n databases`.

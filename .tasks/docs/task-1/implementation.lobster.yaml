@@ -1,7 +1,7 @@
 name: implement-task-1
 metadata:
   task_id: 1
-  agent: bolt
+  agent: Bolt
   stack: Kubernetes/Helm
 
 inputs:
@@ -10,7 +10,7 @@ inputs:
   - name: branch_name
     default: "task-1/feature-branch"
   - name: agent
-    default: "bolt"
+    default: "Bolt"
   - name: cli
     default: "claude"
   - name: model
@@ -29,7 +29,7 @@ steps:
   - name: scaffold-files
     depends_on: [setup]
     command: >
-      cd work && mkdir -p k8s/namespaces k8s/rbac k8s/postgres k8s/redis k8s/s3 k8s/signal k8s/external-secrets k8s/configmaps k8s/test
+      cd work && mkdir -p k8s/namespaces k8s/rbac k8s/postgres k8s/redis k8s/s3 k8s/signal k8s/external-apis k8s/configmaps k8s/validation
 
   - name: implement-subtask-1001
     depends_on: [scaffold-files]

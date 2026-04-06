@@ -1,10 +1,21 @@
-Implement subtask 6002: Define Effect.Schema models and database migrations for social media entities
+Implement subtask 6002: Implement S3/R2 photo upload and storage integration
 
 ## Objective
-Create Effect.Schema definitions for all domain entities (Upload, Draft, PublishedPost) and write PostgreSQL migrations for the corresponding tables.
+Build the photo upload endpoint and S3/R2 storage integration for the /api/v1/social/upload endpoint, handling multipart file uploads and returning stored image URLs.
 
 ## Steps
-1. In `src/schemas/upload.ts`, define Upload schema: id (UUID), file_key (S3 key), original_filename, mime_type, file_size, uploaded_at, metadata (JSON). 2. In `src/schemas/draft.ts`, define Draft schema: id (UUID), upload_ids (UUID[]), caption (string), ai_generated_caption (string), platform_targets (array of INSTAGRAM/LINKEDIN/TIKTOK/FACEBOOK), status (enum: PENDING_REVIEW/APPROVED/REJECTED/PUBLISHED), reviewer_notes (optional string), created_at, updated_at. 3. In `src/schemas/published_post.ts`, define PublishedPost schema: id (UUID), draft_id (UUID), platform, platform_post_id, published_at, post_url. 4. Create request/response schemas for each endpoint using Effect.Schema. 5. Write SQL migrations: CREATE TABLE uploads, drafts, published_posts with proper indexes and foreign keys. 6. Add enum types for draft_status and platform.
+1. Add @aws-sdk/client-s3 dependency (compatible with both S3 and R2 via S3-compatible API).
+2. Create `src/storage/s3-client.ts` module:
+   - Configure S3Client reading S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY from environment (Kubernetes secrets).
+   - Implement `uploadImage(file: Buffer, filename: string, contentType: string) -> Effect<string>` returning the public/signed URL.
+   - Implement `deleteImage(key: string) -> Effect<void>` for cleanup.
+3. Implement POST `/api/v1/social/upload` Elysia handler:
+   - Accept multipart/form-data with one or more image files.
+   - Validate file types (JPEG, PNG, WebP only) and size limits (10MB per file).
+   - Upload each file to S3/R2 with a unique key (e.g., `social/{uuid}/{filename}`).
+   - Return array of uploaded image URLs.
+4. Validate request/response with Effect.Schema.
+5. Add error handling for storage failures.
 
 ## Validation
-Migrations run successfully; Effect.Schema encode/decode roundtrips work for all entities; validation rejects invalid data (e.g., empty caption, invalid platform); schema types are correctly inferred by TypeScript.
+Unit tests with mocked S3 client verify upload/delete operations; integration test uploads a test image and receives a valid URL; invalid file types are rejected with 400; oversized files are rejected; multiple files upload concurrently.

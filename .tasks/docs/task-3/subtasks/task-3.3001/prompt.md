@@ -1,18 +1,10 @@
-Implement subtask 3001: Scaffold Go project with gRPC, grpc-gateway, and infrastructure connectivity
+Implement subtask 3001: Initialize Go project with gRPC and grpc-gateway scaffolding
 
 ## Objective
-Initialize the Go module with gRPC server, grpc-gateway HTTP proxy, PostgreSQL connection pool, and Redis client, all reading connection strings from the sigma1-infra-endpoints ConfigMap. Include health check and readiness endpoints.
+Set up the Go module, directory structure, gRPC server bootstrap, grpc-gateway reverse proxy, and ConfigMap-based configuration loading for the RMS service.
 
 ## Steps
-1. Create Go module (go mod init) with Go 1.22+.
-2. Add dependencies: google.golang.org/grpc, grpc-ecosystem/grpc-gateway/v2, pgx/v5 for PostgreSQL, go-redis/redis/v9.
-3. Set up main.go with a gRPC server on one port and grpc-gateway HTTP reverse proxy on another.
-4. Read POSTGRES_URL and REDIS_URL from environment variables injected via envFrom referencing 'sigma1-infra-endpoints' ConfigMap.
-5. Initialize a pgxpool.Pool for PostgreSQL and redis.Client for Redis at startup, with connection validation.
-6. Register /healthz (liveness) and /readyz (readiness) HTTP endpoints that verify DB and Redis connectivity.
-7. Set up structured logging (slog or zerolog).
-8. Create a Dockerfile with multi-stage build for minimal production image.
-9. Add a Makefile with targets: proto-gen, build, test, lint.
+1. Initialize Go module (e.g., `go mod init sigma1/rms`). 2. Set up directory structure: `/cmd/rms-server/`, `/internal/`, `/proto/`, `/pkg/`. 3. Add dependencies: google.golang.org/grpc, grpc-ecosystem/grpc-gateway/v2, lib/pq or pgx for PostgreSQL, go-redis/redis for Redis. 4. Create `cmd/rms-server/main.go` that boots a gRPC server and a grpc-gateway HTTP mux on separate ports. 5. Implement config loading from environment variables, expecting values injected via `envFrom: sigma1-infra-endpoints` ConfigMap (POSTGRES_HOST, POSTGRES_PORT, REDIS_HOST, etc.). 6. Add a Makefile with targets: `proto-gen`, `build`, `run`, `test`. 7. Set up `buf.yaml` or direct protoc invocation for proto generation.
 
 ## Validation
-Application starts successfully, /healthz returns 200, /readyz returns 200 when DB and Redis are reachable and 503 when either is down. go build completes without errors. Docker image builds successfully.
+The server binary compiles without errors; `make build` succeeds; the gRPC server starts and listens on the configured port; the HTTP gateway starts and returns 404 for undefined routes; config values are read from environment variables.

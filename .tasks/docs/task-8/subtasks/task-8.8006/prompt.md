@@ -1,17 +1,18 @@
-Implement subtask 8006: Add Schema.org structured data, llms.txt routes, and SEO metadata
+Implement subtask 8006: Implement portfolio gallery page with Social Media Engine integration
 
 ## Objective
-Implement Schema.org JSON-LD structured data across all pages, create /llms.txt and /llms-full routes for AI optimization, and configure comprehensive SEO metadata.
+Build the portfolio page at `/portfolio` that fetches published content (project photos, case studies) from the Social Media Engine API and displays them in an attractive gallery layout.
 
 ## Steps
-1. Add Schema.org JSON-LD structured data to the home page (LocalBusiness, Organization).
-2. Add Schema.org Product structured data to /equipment/:id pages (name, description, image, price, availability).
-3. Add Schema.org structured data to /portfolio items (CreativeWork or ImageObject).
-4. Create /llms.txt route (app/llms.txt/route.ts) that returns a plain-text summary of the site's purpose, capabilities, and API endpoints for AI crawlers.
-5. Create /llms-full route with comprehensive structured content about all equipment categories, services, and business information.
-6. Configure Next.js metadata API in each page's layout/page.tsx: title, description, Open Graph tags, Twitter cards, canonical URLs.
-7. Add robots.txt and sitemap.xml generation (using next-sitemap or custom route handlers).
-8. Verify all structured data passes Google's Rich Results Test validator.
+1. Create `app/portfolio/page.tsx`.
+2. Fetch portfolio/published content from the Social Media Engine API using RSC.
+3. Build a responsive gallery grid layout (masonry or standard grid).
+4. Each gallery item shows: image, project title, brief description, date.
+5. Implement a lightbox or modal for full-size image viewing.
+6. Add category/tag filtering if the API provides categorized content.
+7. Handle empty state (no portfolio items yet) with a friendly message.
+8. Handle API errors gracefully.
+9. Use Next.js `<Image>` with proper optimization for gallery images.
 
 ## Validation
-Schema.org JSON-LD is present in page source for home, equipment detail, and portfolio pages; /llms.txt returns valid plain-text content; /llms-full returns comprehensive site info; Open Graph tags render correctly in social sharing preview tools; Google Rich Results Test validates structured data without errors; sitemap.xml lists all public routes.
+Portfolio page renders at `/portfolio`; gallery items are fetched from Social Media Engine API and displayed; responsive grid layout works at all breakpoints; lightbox opens on item click; empty state renders when no items are returned; API error state shows fallback UI; images load with proper optimization.

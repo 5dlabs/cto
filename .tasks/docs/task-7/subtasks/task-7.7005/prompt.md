@@ -1,16 +1,17 @@
-Implement subtask 7005: Register MCP tools for Finance, Vetting, and Social Media backend services
+Implement subtask 7005: Implement MCP tools for customer vetting, scoring, invoicing, and finance reporting
 
 ## Objective
-Define and register MCP tool definitions for the Finance/Invoicing, Customer Vetting, and Social Media Engine APIs.
+Build MCP tool-server tools for customer vetting/scoring via the Vetting Engine, invoice generation/lookup via Invoice/Billing, and finance report retrieval for admin queries.
 
 ## Steps
-1. For the Finance service, define MCP tools: create-quote, finalize-quote, generate-invoice, get-invoice-status, process-payment, list-invoices.
-2. For the Vetting service, define MCP tools: submit-vet-request, get-vet-status, approve-customer, flag-customer.
-3. For the Social Media Engine, define MCP tools: create-post-draft, submit-for-approval, get-approval-status, publish-post, list-portfolio-items.
-4. Each tool must include name, description, input/output JSON schemas, and endpoint mapping.
-5. Configure service URL resolution from sigma1-infra-endpoints environment variables.
-6. Register all tools with the OpenClaw agent's tool registry.
-7. Implement error mapping for each service's error codes.
+1. Define `customer_vet` MCP tool: accepts customer details (name, company, references), calls Vetting Engine API to initiate vetting, returns vetting status/result.
+2. Define `customer_score` MCP tool: accepts customer ID, calls Vetting Engine scoring endpoint, returns risk score and recommendation.
+3. Define `invoice_create` MCP tool: accepts quote ID or order details, calls Invoice/Billing API to generate an invoice, returns invoice details.
+4. Define `invoice_lookup` MCP tool: accepts invoice ID or customer ID, calls Invoice/Billing API, returns invoice status and payment info.
+5. Define `finance_report` MCP tool: accepts report type (revenue, outstanding, etc.) and date range, calls Finance API, returns formatted report data.
+6. Use endpoint URLs from sigma1-infra-endpoints ConfigMap env vars.
+7. Implement input validation and error handling for each tool.
+8. Register all tools with the OpenClaw agent's tool registry.
 
 ## Validation
-Invoke each MCP tool via the agent's tool execution endpoint with sample inputs; verify correct HTTP calls to backend services; verify response schema conformance; test error cases return meaningful messages.
+Invoke each tool with valid sample data; `customer_vet` triggers a vetting process and returns status; `customer_score` returns a numeric score; `invoice_create` returns a valid invoice; `invoice_lookup` retrieves existing invoices; `finance_report` returns structured report data; invalid inputs produce clear error messages.

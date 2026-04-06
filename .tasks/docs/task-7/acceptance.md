@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] Morgan responds to Signal, voice, and web chat within SLA; can trigger all MCP tools; end-to-end flows (lead → vet → quote → invoice) complete successfully; integration tests pass for all skills.
+- [ ] Morgan can receive and respond to Signal, voice, and web chat messages; all MCP tools invoke backend services correctly; response time for simple queries <10 seconds; 80%+ of customer inquiries handled autonomously.
 
 ## Verification Notes
 

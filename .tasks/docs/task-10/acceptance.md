@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] RBAC restricts access as intended; secrets rotate without downtime; audit logs capture all admin and sensitive actions; logs are visible in Grafana/Loki; simulate secret rotation and verify service continuity.
+- [ ] RBAC policies prevent unauthorized access; secrets are rotated and services reload without downtime; audit logs capture all access events; compliance documentation is complete.
 
 ## Verification Notes
 

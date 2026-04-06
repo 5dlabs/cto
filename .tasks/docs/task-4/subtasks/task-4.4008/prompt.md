@@ -1,24 +1,10 @@
-Implement subtask 4008: Implement tax calculation engine for GST/HST, US sales tax, and international
+Implement subtask 4008: Implement Prometheus metrics and health/readiness endpoints
 
 ## Objective
-Build a modular tax calculation service that computes applicable taxes based on jurisdiction, integrating into invoice creation and reporting.
+Add Prometheus metrics instrumentation to all endpoints and implement /healthz and /readyz endpoints for the Finance service.
 
 ## Steps
-1. Create src/services/tax.rs with a TaxCalculator trait and implementations.
-2. Define tax jurisdiction types: Canadian (GST/HST by province), US (state sales tax), International (VAT or exempt).
-3. Implement CanadianTaxCalculator:
-   - Lookup table: province → GST rate, HST rate (e.g., ON=13% HST, AB=5% GST, BC=5% GST+7% PST)
-   - calculate_tax(subtotal, province) → returns tax breakdown (gst_amount, hst_amount or pst_amount, total_tax)
-4. Implement USTaxCalculator:
-   - Lookup table: state → sales tax rate (can be simplified to major states for v1)
-   - calculate_tax(subtotal, state) → returns (sales_tax_amount, total_tax)
-5. Implement InternationalTaxCalculator:
-   - Default to 0% or configurable country-based VAT rate
-6. Create a TaxService that determines jurisdiction from client address/location and dispatches to the correct calculator.
-7. Integrate into invoice creation: when creating/updating an invoice, call TaxService to compute tax_amount based on client location.
-8. Add tax_breakdown JSONB field to invoices (or extend existing tax_amount) to store itemized tax details.
-9. Add migration if needed for tax_breakdown field.
-10. Expose GET /v1/tax/calculate?subtotal=1000&jurisdiction=ON for ad-hoc tax calculation.
+1. Add prometheus and metrics crate dependencies. 2. Create `src/metrics.rs`: define metrics — http_requests_total (counter, labels: method, path, status), http_request_duration_seconds (histogram, labels: method, path), stripe_api_calls_total (counter, labels: operation, status), currency_sync_runs_total (counter, labels: status), active_db_connections (gauge). 3. Implement Axum middleware layer that records request count and duration for every request. 4. Add metrics increment calls in Stripe client and currency sync job. 5. Implement GET /metrics endpoint exposing Prometheus text format. 6. Implement GET /healthz: check PostgreSQL connection (SELECT 1), check Redis PING, return JSON {status: 'healthy'} or {status: 'unhealthy', details: [...]}. 7. Implement GET /readyz: same as healthz plus verify migrations are applied (query sqlx migration table), return 200 or 503. 8. Wire all observability routes into main router outside of /api/v1 prefix.
 
 ## Validation
-Canadian tax: Ontario invoice at $1000 returns $130 HST; Alberta returns $50 GST; BC returns $50 GST + $70 PST. US tax: California at $1000 returns correct state sales tax. International: default 0% for unknown jurisdiction. Invoice creation with client in Ontario auto-calculates correct tax. Tax breakdown is stored and retrievable on invoice. Ad-hoc calculate endpoint returns correct amounts.
+/metrics returns valid Prometheus text format with all defined metrics; /healthz returns 200 when PostgreSQL and Redis are up, returns 503 with details when a dependency is down; /readyz returns 503 before migrations and 200 after; http_requests_total increments correctly after API calls; histogram buckets capture request latencies.

@@ -1,18 +1,18 @@
-Implement subtask 8003: Build self-service quote builder page (/quote) with Effect form validation
+Implement subtask 8003: Implement equipment catalog page with API integration
 
 ## Objective
-Implement the quote builder allowing customers to select equipment, specify rental dates and location, and submit a quote request with full form validation using Effect.
+Build the equipment catalog listing page at `/equipment` that fetches equipment data from the Equipment Catalog API, displays filterable/searchable results, and links to individual product detail pages.
 
 ## Steps
-1. Create the /quote page with the chosen interaction pattern (multi-step wizard or single-page form, per dp-12 decision).
-2. Implement equipment selection: allow users to search/browse and add equipment items to the quote, with quantity selectors.
-3. Implement date range selection: rental start date, end date, with calendar UI component.
-4. Implement location/delivery details: address input, delivery preferences.
-5. Implement customer contact information fields: name, email, phone, company.
-6. Build form validation using Effect schemas: validate all fields with typed errors, display inline validation messages.
-7. Implement form submission: POST the quote request to the backend (Catalog or Finance API), show a loading state, and display confirmation or error.
-8. Support pre-filling from /equipment/:id 'Add to Quote' navigation (read equipment from URL params or state).
-9. Add a quote summary sidebar/section showing selected items, estimated pricing, and rental duration.
+1. Create `app/equipment/page.tsx` for the catalog listing.
+2. Implement server-side data fetching (RSC) from the Equipment Catalog API search endpoint using the Effect-based API client.
+3. Build an EquipmentCard component displaying: image, name, category, daily rate, availability indicator.
+4. Implement search input with debounced client-side filtering or server-side search param.
+5. Implement category filter sidebar/dropdown.
+6. Handle loading states (skeleton cards) and error states (API unavailable).
+7. Implement pagination or infinite scroll for large catalogs.
+8. Add Schema.org Product structured data for each listed item.
+9. Ensure images use Next.js `<Image>` component with proper sizing and lazy loading.
 
 ## Validation
-Quote form renders all fields; validation prevents submission with missing/invalid data and shows inline errors; pre-filling from equipment page works; submission sends correct payload to API; confirmation displays on success; error state displays on failure.
+Catalog page renders at `/equipment`; equipment items are fetched from the API and displayed as cards; search filters results correctly; category filter narrows listings; loading skeleton appears during fetch; error state renders when API is mocked as unavailable; pagination works; each card links to `/equipment/:id`.

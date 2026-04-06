@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All pages render and fetch data correctly; quote builder submits and receives confirmation; Morgan chat widget works; portfolio displays published content; llms.txt and structured data are present; Lighthouse score >90; passes accessibility checks.
+- [ ] All pages render and fetch data correctly; quote builder submits and receives confirmation; Morgan web chat is functional; portfolio displays published content; accessibility and performance scores >90.
 
 ## Verification Notes
 

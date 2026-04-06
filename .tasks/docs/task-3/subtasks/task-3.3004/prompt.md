@@ -1,20 +1,10 @@
-Implement subtask 3004: Define protobuf schemas for CrewService and DeliveryService
+Implement subtask 3004: Implement OpportunityService gRPC handlers with PostgreSQL integration
 
 ## Objective
-Author .proto files for CrewService (crew member management, assignments, availability) and DeliveryService (delivery scheduling, tracking, status updates).
+Implement the OpportunityService server including all CRUD operations and the ConvertToProject workflow, backed by PostgreSQL queries.
 
 ## Steps
-1. Create proto/rms/v1/crew.proto with:
-   - CrewMember message (id, name, role, skills, availability_schedule, contact_info)
-   - Assignment message (crew_member_id, project_id, date_range, role)
-   - RPCs: CreateCrewMember, GetCrewMember, ListCrewMembers, UpdateCrewMember, AssignToProject, UnassignFromProject, CheckAvailability
-   - HTTP annotations
-2. Create proto/rms/v1/delivery.proto with:
-   - Delivery message (id, project_id, items, origin, destination, scheduled_at, status, driver_id, tracking_notes)
-   - RPCs: CreateDelivery, GetDelivery, ListDeliveries, UpdateDeliveryStatus, AssignDriver
-   - HTTP annotations
-3. Run code generation and verify compilation.
-4. Register both services in grpc-gateway mux.
+1. Create `internal/service/opportunity/service.go` implementing the generated OpportunityServiceServer interface. 2. Implement CreateOpportunity: validate input, insert into `rms.opportunities`, return created record. 3. Implement GetOpportunity: query by ID with tenant_id filter, return 404 if not found. 4. Implement ListOpportunities: support pagination (page_size, page_token), filtering by status, and sorting. 5. Implement UpdateOpportunity: partial update using field masks or explicit fields, optimistic concurrency via updated_at. 6. Implement ConvertToProject: transactionally update opportunity status to WON and insert a new project record linked to the opportunity; return the new project. 7. Create `internal/repository/opportunity_repo.go` with a clean repository interface for DB operations using sqlx or pgx. 8. Register the service with the gRPC server in main.go.
 
 ## Validation
-Generated Go code compiles; CrewService and DeliveryService RPCs match PRD specifications; HTTP annotations produce correct REST routes; all message fields are present.
+Unit tests with mocked repository pass for all RPCs; integration test against real PostgreSQL: create, read, update, list, and convert-to-project all succeed; ConvertToProject is atomic (opportunity status + project creation in one transaction); gRPC error codes are correct for not-found and validation failures.

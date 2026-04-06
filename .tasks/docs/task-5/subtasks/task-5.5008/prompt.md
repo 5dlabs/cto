@@ -1,10 +1,21 @@
-Implement subtask 5008: Implement API endpoints for vetting operations
+Implement subtask 5008: Add Prometheus metrics and request/response schema validation
 
 ## Objective
-Build the three Axum HTTP endpoints: POST /api/v1/vetting/run, GET /api/v1/vetting/:org_id, GET /api/v1/vetting/credit/:org_id with request validation and proper error responses.
+Instrument the service with Prometheus metrics for vetting pipeline observability and ensure all input/output schemas are validated.
 
 ## Steps
-1. In `handlers/vetting.rs`, implement: a) `POST /api/v1/vetting/run` — accepts JSON body with org_id and org_name, triggers the vetting pipeline, returns 202 Accepted with a vetting_result_id (or 200 with full result if synchronous). b) `GET /api/v1/vetting/:org_id` — retrieves the latest VettingResult for the given org_id from PostgreSQL, returns 200 with full result or 404 if not found. c) `GET /api/v1/vetting/credit/:org_id` — retrieves credit-specific signals for the org_id, returns 200 with CreditSignals or 404. 2. Define request/response DTOs with serde. 3. Add input validation (valid UUID for org_id, non-empty org_name). 4. Return proper HTTP error codes: 400 for validation errors, 404 for not found, 500 for internal errors. 5. Wire all routes into the Axum router in main.rs with shared state (PgPool, pipeline service).
+1. Add prometheus and metrics dependencies (e.g., metrics, metrics-exporter-prometheus).
+2. Define metrics:
+   - `vetting_requests_total` (counter, labels: endpoint, status)
+   - `vetting_duration_seconds` (histogram, labels: endpoint)
+   - `vetting_external_api_duration_seconds` (histogram, labels: api_name)
+   - `vetting_score_distribution` (histogram, labels: rating)
+3. Add middleware to record request count and latency for all endpoints.
+4. Instrument each external API call with timing metrics.
+5. Expose GET `/metrics` endpoint in Prometheus text format.
+6. Validate request bodies using serde with strict deserialization (deny_unknown_fields where appropriate).
+7. Validate response bodies match expected schemas before sending.
+8. Add structured logging with tracing crate for each vetting pipeline step.
 
 ## Validation
-Integration tests: POST /vetting/run with valid payload returns 200/202 and stores result in DB; GET /vetting/:org_id returns stored result; GET /vetting/credit/:org_id returns credit data; invalid org_id returns 400; non-existent org_id returns 404.
+GET /metrics returns valid Prometheus text format with all defined metrics present; after running a vetting request, counters and histograms show non-zero values; malformed request bodies are rejected with 400 and descriptive error messages.

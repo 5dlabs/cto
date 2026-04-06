@@ -1,16 +1,19 @@
-Implement subtask 8005: Build portfolio page (/portfolio) synced from Social Media Engine
+Implement subtask 8005: Implement self-service quote builder with Effect form validation
 
 ## Objective
-Implement the portfolio page that displays published project content fetched from the Social Media Engine API.
+Build the interactive quote builder page at `/quote` where users can select equipment, specify rental dates, enter delivery details, and submit a quote request. Use Effect Schema for robust form validation.
 
 ## Steps
-1. Create the /portfolio page with a grid/masonry layout for showcasing project photos and content.
-2. Fetch published portfolio items from the Social Media Engine API using TanStack Query + Effect.
-3. Display each portfolio item with image(s), title, description, date, and any relevant tags/categories.
-4. Implement filtering by category or project type if the API supports it.
-5. Add lightbox or modal view for full-size image viewing.
-6. Handle loading, empty, and error states.
-7. Ensure images are optimized using Next.js Image component with proper sizing and lazy loading.
+1. Create `app/quote/page.tsx` with a multi-step or single-page quote form.
+2. Implement equipment selection: search/select from catalog (fetch from API), add multiple items with quantities.
+3. Implement date range picker for rental period (start date, end date).
+4. Implement delivery details fields: delivery address, site contact, special instructions.
+5. Implement customer information fields: name, company, email, phone.
+6. Use Effect `Schema` for form validation: define schemas for each section, validate on submit.
+7. Display inline validation errors with clear messages.
+8. On valid submission, POST to the Quote Engine API; display confirmation with quote number and summary.
+9. Handle submission errors gracefully (API down, validation failures from backend).
+10. Show a quote summary section that updates in real-time as items and dates are selected (calculate estimated pricing client-side if rate data is available).
 
 ## Validation
-Portfolio page renders published items from the Social Media Engine API; images display correctly with lazy loading; filtering works if implemented; lightbox opens full-size images; empty state displays when no items exist; loading state shows during fetch.
+Quote builder renders at `/quote`; equipment can be searched and added; date picker selects valid ranges; form validation prevents submission with missing/invalid fields and shows inline errors; valid submission calls the Quote Engine API and displays confirmation; estimated pricing updates as items are added; submission error from API displays user-friendly message.

@@ -1,10 +1,15 @@
-Implement subtask 5005: Implement Google Reviews reputation analysis integration
+Implement subtask 5005: Implement credit check API integration client
 
 ## Objective
-Build the HTTP client integration for Google Reviews/Places API to analyze business reputation based on review data.
+Build an async HTTP client module for querying a credit/financial data API to retrieve credit scores and financial health indicators for organizations.
 
 ## Steps
-1. In `integrations/google_reviews.rs`, create a GoogleReviewsClient struct with reqwest::Client and API key. 2. Implement methods: `search_place(business_name: &str, location: Option<&str>) -> Result<PlaceSearchResult>`, `get_reviews(place_id: &str) -> Result<Vec<Review>>`, `analyze_reputation(org_name: &str) -> Result<ReputationAnalysis>`. 3. Define DTOs matching Google Places API JSON. 4. Map into `ReputationAnalysis` domain struct with fields: average_rating (f64), total_reviews (u32), recent_review_sentiment (POSITIVE/NEUTRAL/NEGATIVE), review_trend (IMPROVING/STABLE/DECLINING), reputation_score (0-100). 5. Implement simple sentiment trend analysis from review timestamps and ratings. 6. Handle API errors and missing data gracefully. 7. Use trait `ReputationAnalyzer` for mockability.
+1. Create `src/integrations/credit.rs` module.
+2. Define request/response types for the credit check API (e.g., Dun & Bradstreet, Experian Business, or similar).
+3. Use reqwest with appropriate authentication (API key or OAuth). Read CREDIT_API_KEY and CREDIT_API_URL from Kubernetes secrets/ConfigMap.
+4. Implement `fetch_credit_report(org_id: &str, company_name: &str) -> Result<CreditReport, VettingError>` returning credit score, payment history indicators, risk rating, outstanding judgments.
+5. Handle timeouts (credit APIs can be slow — 10s timeout), retries (1 retry on transient failure), and error mapping.
+6. Add unit tests with mocked responses.
 
 ## Validation
-Unit tests with mocked Google Places responses verify correct reputation scoring; edge cases (no reviews, single review, many reviews) produce expected scores; sentiment trend calculation is verified with known datasets.
+Unit tests pass with mocked credit API responses covering: successful report, org not found, API timeout, authentication failure. CreditReport struct correctly populated with score and risk indicators.

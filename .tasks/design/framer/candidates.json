@@ -3,9 +3,9 @@
     "provider": "framer",
     "target": "web",
     "deviceType": "DESKTOP",
-    "screenId": "framer-web-1775439320901",
+    "screenId": "framer-web-1775453438543",
     "rationale": "Prepared web Framer candidate with component-library oriented guidance.",
-    "prompt": "Create a web Framer implementation direction for sigma-1. Reference URLs: https://sigma-1.com Favor reusable components with clear property controls for Framer code components.",
+    "prompt": "Create a web Framer implementation direction for sigma-1. Reference URLs: https://deployiq.maximinimal.ca, https://sigma-1.com Favor reusable components with clear property controls for Framer code components.",
     "status": "generated",
     "meta": {
       "sdk_available": false,
@@ -18,9 +18,9 @@
     "provider": "framer",
     "target": "mobile",
     "deviceType": "MOBILE",
-    "screenId": "framer-mobile-1775439320902",
+    "screenId": "framer-mobile-1775453438544",
     "rationale": "Prepared mobile Framer candidate with component-library oriented guidance.",
-    "prompt": "Create a mobile Framer implementation direction for sigma-1. Reference URLs: https://sigma-1.com Favor reusable components with clear property controls for Framer code components.",
+    "prompt": "Create a mobile Framer implementation direction for sigma-1. Reference URLs: https://deployiq.maximinimal.ca, https://sigma-1.com Favor reusable components with clear property controls for Framer code components.",
     "status": "generated",
     "meta": {
       "sdk_available": false,

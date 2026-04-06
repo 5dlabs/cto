@@ -1,10 +1,10 @@
-Implement subtask 9001: Scale PostgreSQL to HA mode with CloudNative-PG
+Implement subtask 9001: Scale all backend and frontend deployments to minimum 2 replicas with PodDisruptionBudgets
 
 ## Objective
-Update the CloudNative-PG Cluster CR to run multiple instances (primary + replicas) with streaming replication, configure automatic failover, and validate data consistency across replicas.
+Update every service Deployment to run at least 2 replicas with appropriate resource requests/limits and create PodDisruptionBudgets to guarantee availability during rolling updates and node maintenance.
 
 ## Steps
-1. Edit the CloudNative-PG Cluster CR to set `instances: 3` (1 primary, 2 replicas). 2. Configure `postgresql.synchronous` settings for synchronous replication if data durability requires it, otherwise async. 3. Set resource requests/limits appropriate for production workloads. 4. Configure PodDisruptionBudgets (minAvailable: 2) to ensure quorum during rolling updates. 5. Set anti-affinity rules to spread instances across nodes. 6. Apply the updated CR and verify all replicas reach streaming state. 7. Test a manual switchover using `kubectl cnpg promote` to validate failover readiness.
+For each service deployment (backend services and frontend): 1) Set `spec.replicas: 2` (or more based on expected load). 2) Define `resources.requests` and `resources.limits` for CPU and memory based on observed dev usage with a safety margin. 3) Set `spec.strategy.rollingUpdate.maxUnavailable: 0` and `maxSurge: 1` to ensure zero-downtime deploys. 4) Create a PodDisruptionBudget for each Deployment with `minAvailable: 1` to protect against voluntary disruptions. 5) Add anti-affinity rules (`podAntiAffinity` with `preferredDuringSchedulingIgnoredDuringExecution`) to spread replicas across nodes. 6) Ensure readiness and liveness probes are configured on every container so the scheduler only routes traffic to healthy pods.
 
 ## Validation
-Verify 3 PostgreSQL pods are running and healthy. Confirm replication lag is near zero. Perform a manual switchover: promote a replica, verify the old primary becomes a replica, and confirm the application reconnects without errors. Run a data consistency check across instances.
+Verify each Deployment has >=2 ready replicas via `kubectl get deployments`. Confirm PDBs exist for every Deployment via `kubectl get pdb`. Perform a `kubectl drain` on a node and verify no service goes fully unavailable. Trigger a rolling update and confirm zero-downtime by continuously curling service endpoints during rollout.

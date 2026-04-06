@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] Endpoints return correct invoice/payment/report data; Stripe payments are processed and recorded; currency rates update on schedule; AR aging and payroll reports are accurate; automated reminders are sent; >80% test coverage.
+- [ ] All endpoints return correct data and status codes; Stripe payments are processed and recorded; currency rates are updated and cached; invoice generation completes in <5 seconds.
 
 ## Verification Notes
 

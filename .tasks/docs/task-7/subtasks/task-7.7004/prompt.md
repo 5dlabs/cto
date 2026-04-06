@@ -1,15 +1,16 @@
-Implement subtask 7004: Register MCP tools for Equipment Catalog and RMS backend services
+Implement subtask 7004: Implement MCP tools for catalog search, availability check, and quote generation
 
 ## Objective
-Define and register MCP tool definitions for the Equipment Catalog API and the Rental Management System (RMS) API, mapping request/response schemas.
+Build MCP tool-server tools that allow the Morgan agent to search the equipment catalog, check item availability, and generate/submit rental quotes by calling the appropriate backend APIs.
 
 ## Steps
-1. For the Equipment Catalog service, define MCP tools: search-equipment, get-equipment-details, check-availability, get-pricing.
-2. For the RMS service, define MCP tools: create-rental, update-rental, cancel-rental, get-rental-status, list-rentals, schedule-delivery, schedule-pickup.
-3. Each tool definition must include: name, description (for LLM context), input JSON schema, output JSON schema, and the HTTP endpoint/method it maps to.
-4. Configure the tool server to resolve service URLs from environment variables (injected from sigma1-infra-endpoints).
-5. Register all tools with the OpenClaw agent's tool registry.
-6. Implement error mapping: backend HTTP errors → meaningful tool error responses the LLM can interpret.
+1. In the tool-server, define the `catalog_search` MCP tool: accepts search query/filters, calls Equipment Catalog API search endpoint, returns formatted results.
+2. Define the `availability_check` MCP tool: accepts equipment ID and date range, calls Equipment Catalog API availability endpoint, returns availability status.
+3. Define the `quote_generate` MCP tool: accepts customer info, equipment list, dates, and delivery details; calls Quote Engine API to create a quote; returns quote summary with pricing.
+4. Define the `quote_submit` MCP tool: accepts quote ID and customer confirmation; calls Quote Engine API to finalize the quote.
+5. Use endpoint URLs from sigma1-infra-endpoints ConfigMap env vars.
+6. Implement proper error handling and timeout for each tool (fail gracefully with user-friendly messages).
+7. Register all tools with the OpenClaw agent's tool registry.
 
 ## Validation
-Invoke each MCP tool via the agent's tool execution endpoint with sample inputs; verify correct HTTP calls are made to the backend services (use mock/stub if services aren't live); verify response schemas match expectations.
+Invoke each MCP tool individually with sample inputs; verify `catalog_search` returns equipment results from the backend; `availability_check` returns correct status; `quote_generate` returns a valid quote object; `quote_submit` finalizes the quote; error cases (invalid ID, service down) return graceful error messages.

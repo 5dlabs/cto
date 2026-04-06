@@ -1,21 +1,19 @@
-Implement subtask 1006: Create external service secrets for third-party APIs
+Implement subtask 1006: Create external API credential secrets
 
 ## Objective
-Create Kubernetes Secrets in the sigma1 namespace for all external API credentials: ElevenLabs, Twilio, Stripe, OpenCorporates, LinkedIn, Google Reviews, and credit bureau APIs.
+Create Kubernetes secrets for all external API credentials: Stripe, OpenCorporates, LinkedIn, Google Reviews, Instagram, and Facebook.
 
 ## Steps
-1. Define a Secret manifest for each external service with appropriate keys:
-   - elevenlabs-api: ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID
-   - twilio-api: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER
-   - stripe-api: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PUBLISHABLE_KEY
-   - opencorporates-api: OPENCORPORATES_API_KEY
-   - linkedin-api: LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET
-   - google-reviews-api: GOOGLE_API_KEY, GOOGLE_PLACE_ID
-   - credit-api: CREDIT_API_KEY, CREDIT_API_ENDPOINT
+1. Create individual Kubernetes Secrets in the databases namespace (centralized, referenced by downstream services):
+   - sigma1-stripe-credentials: STRIPE_API_KEY, STRIPE_WEBHOOK_SECRET
+   - sigma1-opencorporates-credentials: OPENCORPORATES_API_KEY
+   - sigma1-linkedin-credentials: LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, LINKEDIN_ACCESS_TOKEN
+   - sigma1-google-reviews-credentials: GOOGLE_REVIEWS_API_KEY, GOOGLE_PLACES_ID
+   - sigma1-instagram-credentials: INSTAGRAM_ACCESS_TOKEN, INSTAGRAM_BUSINESS_ID
+   - sigma1-facebook-credentials: FACEBOOK_PAGE_ACCESS_TOKEN, FACEBOOK_PAGE_ID
 2. Use placeholder values for now (to be replaced with real credentials before production).
-3. Apply all Secrets to the sigma1 namespace.
-4. Verify each Secret exists and contains the expected keys.
-5. Record each secret name and its keys for the ConfigMap references.
+3. Label all secrets with app.kubernetes.io/part-of=sigma1-infra for easy discovery.
+4. Document each secret's expected keys in a README or annotation.
 
 ## Validation
-Run `kubectl get secrets -n sigma1` and confirm all 7 external service secrets exist; for each secret, verify the expected keys are present using `kubectl get secret <name> -n sigma1 -o jsonpath='{.data}' | jq keys`.
+Run `kubectl get secrets -n databases -l app.kubernetes.io/part-of=sigma1-infra` and confirm all 6 secrets are listed. For each secret, verify expected keys are present via `kubectl get secret <name> -n databases -o jsonpath='{.data}' | jq 'keys'`.

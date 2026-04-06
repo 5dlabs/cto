@@ -1,10 +1,16 @@
-Implement subtask 5004: Implement LinkedIn online presence check integration
+Implement subtask 5004: Implement Google Reviews API integration client
 
 ## Objective
-Build the HTTP client integration for LinkedIn API to assess the online presence and legitimacy of a business entity.
+Build an async HTTP client module for querying Google Places/Reviews API to retrieve business reviews, ratings, and reputation signals.
 
 ## Steps
-1. In `integrations/linkedin.rs`, create a LinkedInClient struct with reqwest::Client and API credentials. 2. Implement methods: `search_company(name: &str) -> Result<LinkedInCompanyResult>`, `get_company_profile(company_id: &str) -> Result<LinkedInProfile>`, `assess_presence(org_name: &str) -> Result<OnlinePresence>`. 3. Define response DTOs for LinkedIn API responses. 4. Map API data into an `OnlinePresence` domain struct with fields: has_linkedin (bool), follower_count, employee_count_range, profile_completeness_score, last_activity_date, presence_score (0-100). 5. Handle OAuth2 token refresh if needed, and API errors/rate limits. 6. Use trait `OnlinePresenceChecker` for mockability.
+1. Create `src/integrations/google_reviews.rs` module.
+2. Define request/response types for Google Places API (Place Search, Place Details with reviews).
+3. Use reqwest with API key authentication. Read GOOGLE_PLACES_API_KEY from Kubernetes secrets.
+4. Implement `fetch_business_reviews(business_name: &str, location: Option<&str>) -> Result<GoogleReviewsData, VettingError>` returning average rating, review count, recent review summaries.
+5. Handle pagination if needed, rate limiting, and error responses.
+6. Parse and structure review data for downstream scoring.
+7. Add unit tests with mocked responses.
 
 ## Validation
-Unit tests with mocked LinkedIn responses verify correct parsing; presence_score calculation is validated against known inputs; error handling for auth failures and rate limits works correctly.
+Unit tests pass with mocked Google Places responses covering: successful reviews fetch, no results found, API key invalid, rate limit exceeded. Parsed data correctly extracts average rating and review count.

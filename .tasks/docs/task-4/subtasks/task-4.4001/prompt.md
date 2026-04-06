@@ -1,19 +1,10 @@
-Implement subtask 4001: Scaffold Rust/Axum service with PostgreSQL and Redis connectivity
+Implement subtask 4001: Initialize Rust/Axum project scaffolding with sqlx and finance schema migrations
 
 ## Objective
-Initialize the Rust project with Axum 0.7, set up PostgreSQL connection pool via sqlx, Redis client, and health check endpoints, reading all connection details from the sigma1-infra-endpoints ConfigMap.
+Set up the Rust project with Axum 0.7, sqlx for PostgreSQL, redis-rs, and create the `finance` schema migrations for all finance-related tables.
 
 ## Steps
-1. cargo init with workspace structure if needed.
-2. Add dependencies: axum 0.7, tokio, sqlx (with postgres and runtime-tokio features), redis (or deadpool-redis), serde, serde_json, tracing, tracing-subscriber, tower-http.
-3. Create src/main.rs with Axum router setup, binding to configurable host:port.
-4. Read DATABASE_URL and REDIS_URL from environment (injected via envFrom from sigma1-infra-endpoints ConfigMap).
-5. Initialize sqlx::PgPool with connection pool settings and redis::Client.
-6. Create AppState struct holding PgPool, Redis connection pool, and config.
-7. Implement GET /healthz (liveness) and GET /readyz (readiness) that check DB and Redis connectivity.
-8. Set up tracing with structured JSON logging.
-9. Create Dockerfile with multi-stage build (builder with rust:1.75, runtime with debian-slim).
-10. Add a Makefile or justfile with targets: build, test, lint (clippy), fmt-check.
+1. Create new Rust project: `cargo init sigma1-finance`. 2. Add dependencies to Cargo.toml: axum 0.7, tokio (full features), sqlx (postgres, runtime-tokio, tls-rustls), redis-rs (tokio-comp), serde/serde_json, tower, tower-http (cors, trace), uuid, chrono, thiserror, tracing/tracing-subscriber. 3. Set up directory structure: `src/main.rs`, `src/config.rs`, `src/routes/`, `src/models/`, `src/handlers/`, `src/repository/`, `src/errors.rs`. 4. Implement `config.rs`: load from environment variables (POSTGRES_URL, REDIS_URL, STRIPE_API_KEY, etc.) expected from `envFrom: sigma1-infra-endpoints` ConfigMap. 5. Implement `main.rs`: initialize tracing, build Axum app with shared state (PgPool, Redis connection, config), bind to configured port. 6. Create sqlx migrations directory. Migration 001: `CREATE SCHEMA IF NOT EXISTS finance;`. 7. Migration 002: Create `finance.invoices` table (id UUID PK, tenant_id, customer_id, project_id, invoice_number UNIQUE, status ENUM [DRAFT, SENT, PAID, OVERDUE, CANCELLED], line_items JSONB, subtotal NUMERIC(12,2), tax NUMERIC(12,2), total NUMERIC(12,2), currency VARCHAR(3), issued_at TIMESTAMPTZ, due_at TIMESTAMPTZ, paid_at TIMESTAMPTZ, created_at, updated_at). 8. Migration 003: Create `finance.payments` table (id UUID PK, tenant_id, invoice_id FK, amount NUMERIC(12,2), currency, method ENUM [STRIPE, BANK_TRANSFER, CHECK, CASH], stripe_payment_intent_id, status ENUM [PENDING, SUCCEEDED, FAILED, REFUNDED], processed_at, created_at). 9. Migration 004: Create `finance.payroll_records` table (id UUID PK, tenant_id, employee_id, period_start DATE, period_end DATE, gross_amount, deductions JSONB, net_amount, status ENUM [DRAFT, APPROVED, PAID], paid_at, created_at). 10. Migration 005: Create `finance.currency_rates` table (id UUID PK, base_currency, target_currency, rate NUMERIC(18,8), fetched_at TIMESTAMPTZ, UNIQUE(base_currency, target_currency)). 11. Add indexes on tenant_id, invoice status, payment status, and currency pair columns. 12. Implement sqlx migration runner on startup.
 
 ## Validation
-cargo build succeeds; cargo clippy reports no warnings; application starts and /healthz returns 200; /readyz returns 200 when DB and Redis are reachable, 503 otherwise; Docker image builds and runs correctly.
+Project compiles with `cargo build`; server starts and binds to port; migrations run against a clean PostgreSQL instance creating all tables in the `finance` schema; environment variables are loaded correctly; sqlx compile-time query checking passes.

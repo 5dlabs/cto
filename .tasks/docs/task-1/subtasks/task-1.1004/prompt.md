@@ -1,15 +1,18 @@
-Implement subtask 1004: Provision S3/R2 buckets and access credentials
+Implement subtask 1004: Provision S3/R2 buckets and create access key secrets
 
 ## Objective
-Create S3-compatible object storage buckets for product images and event photos, and store access credentials as Kubernetes Secrets.
+Provision S3/R2 object storage buckets for product images and social photos, and store the access keys as Kubernetes secrets in the databases namespace.
 
 ## Steps
-1. Create two buckets: sigma1-product-images and sigma1-event-photos (via Cloudflare R2 API, Terraform, or manual setup depending on the chosen provider).
-2. Configure CORS policies on each bucket to allow frontend access (GET from allowed origins).
-3. Generate an API token / access key + secret key pair with read/write access to both buckets.
-4. Create a Kubernetes Secret in the sigma1 namespace containing: S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_PRODUCT_IMAGES_BUCKET, S3_EVENT_PHOTOS_BUCKET.
-5. Verify bucket accessibility by uploading and retrieving a test object using the AWS CLI (with --endpoint-url for R2).
-6. Record the endpoint URL and bucket names for the ConfigMap.
+1. Provision two buckets (via Cloudflare R2 dashboard/API or AWS S3 CLI depending on dp-5 decision):
+   - sigma1-product-images: for equipment catalog product images
+   - sigma1-social-photos: for social media event photos
+2. Create IAM/API tokens with read-write access scoped to these two buckets.
+3. Create Kubernetes Secret in databases namespace:
+   - name: sigma1-s3-credentials
+   - data: S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_ENDPOINT_URL, S3_PRODUCT_IMAGES_BUCKET=sigma1-product-images, S3_SOCIAL_PHOTOS_BUCKET=sigma1-social-photos, S3_REGION
+4. If using R2, the endpoint will be https://<account-id>.r2.cloudflarestorage.com.
+5. Record the S3 endpoint URL for the ConfigMap.
 
 ## Validation
-Upload a test file to each bucket and retrieve it successfully; verify the Kubernetes Secret contains all expected keys (endpoint, access key, secret key, bucket names); confirm CORS headers are returned on a preflight request.
+Verify secret sigma1-s3-credentials exists in databases namespace with all expected keys. From a debug pod, use AWS CLI with the credentials to `aws s3 ls s3://sigma1-product-images --endpoint-url <endpoint>` and confirm bucket access.

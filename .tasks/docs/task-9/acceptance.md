@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] All services remain available during failover; CDN serves static assets with valid SSL; ingress routes traffic correctly; network policies block unauthorized access; simulate pod/node failure and verify recovery.
+- [ ] All services are reachable via secure endpoints; failover works without downtime; CDN and TLS are active; network policies block unauthorized access; observability dashboards show all services.
 
 ## Verification Notes
 

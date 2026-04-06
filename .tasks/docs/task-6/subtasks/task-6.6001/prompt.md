@@ -1,10 +1,19 @@
-Implement subtask 6001: Initialize Elysia project with Effect 3.x, PostgreSQL, and S3/R2 connectivity
+Implement subtask 6001: Scaffold Elysia/Effect project with PostgreSQL models and migrations
 
 ## Objective
-Scaffold the Node.js Elysia project with Effect 3.x integration, establish PostgreSQL connection pool and S3/R2 object storage client, reading all configuration from the 'sigma1-infra-endpoints' ConfigMap.
+Initialize the Social Media Engine Node.js project with Elysia 1.x, Effect 3.x, and PostgreSQL integration. Define draft and published post data models and create database migrations.
 
 ## Steps
-1. Initialize project with `bun init`, add dependencies: elysia, effect (3.x), @effect/schema, @effect/sql, @effect/sql-pg, @aws-sdk/client-s3 (for R2/S3 compatibility). 2. Create project structure: src/config/, src/routes/, src/services/, src/models/, src/integrations/, src/schemas/. 3. In `src/config/index.ts`, read DATABASE_URL, S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY, OPENAI_API_KEY (or ANTHROPIC_API_KEY), and platform API keys from environment (sourced from sigma1-infra-endpoints). 4. Create `src/services/database.ts` — an Effect.Layer providing a PostgreSQL connection pool via @effect/sql-pg. 5. Create `src/services/storage.ts` — an Effect.Layer providing an S3Client configured for R2/S3 with upload/download/delete methods. 6. Set up the Elysia app in `src/index.ts` with health check endpoint. 7. Create a Dockerfile. 8. Run database migrations for social media tables (drafts, published_posts, uploads).
+1. Initialize project with `bun init` and add dependencies: elysia, @elysiajs/cors, effect, @effect/schema, drizzle-orm (or kysely) with pg driver.
+2. Configure TypeScript with strict mode.
+3. Define database models:
+   - `drafts` table: id (UUID), title, image_urls (text[]), caption, platform_targets (text[]), ai_curation_metadata (JSONB), status (enum: pending_review, approved, rejected, published), created_at, updated_at.
+   - `published_posts` table: id (UUID), draft_id (FK), platform, platform_post_id, published_at, engagement_metrics (JSONB).
+4. Write migrations for both tables with indexes on status and created_at.
+5. Set up database connection pool reading DATABASE_URL from sigma1-infra-endpoints ConfigMap via envFrom.
+6. Define Effect.Schema types mirroring the DB models for runtime validation.
+7. Create Elysia app skeleton with health endpoint GET /healthz checking DB connectivity.
+8. Add structured logging setup.
 
 ## Validation
-Service starts on configured port; GET /health returns 200; PostgreSQL connection pool initializes; S3 client connects to configured endpoint; all environment variables are loaded; `bun run build` succeeds.
+Project builds and starts without errors; migrations run successfully against test PostgreSQL; health endpoint returns 200 with DB status; Effect.Schema types encode/decode correctly in unit tests.
