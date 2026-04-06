@@ -29,6 +29,8 @@ args:
     default: ''
   linear_agent_map:
     default: '{}'
+  linear_milestone_map:
+    default: '{}'
   pm_url:
     default: ''
   repository_url:
@@ -1790,6 +1792,7 @@ steps:
       AGENT_MAP_VAL='${linear_agent_map}'
       AGENT_MAP_LEN="$(printf '%s' "$AGENT_MAP_VAL" | wc -c | tr -d ' ')"
       echo "sync-linear-issues-post-push: agent-map length=${AGENT_MAP_LEN} preview=$(printf '%s' "$AGENT_MAP_VAL" | head -c 120)" >&2
+      MILESTONE_MAP_VAL='${linear_milestone_map}'
       TASK_COUNT="$(printf '%s' "$EXP" | jq 'length' 2>/dev/null || echo '?')"
       echo "sync-linear-issues-post-push: syncing ${TASK_COUNT} tasks to project=${linear_project_id}" >&2
       SYNC_ERR_LOG="$(mktemp)"
@@ -1805,6 +1808,7 @@ steps:
         --base-url "$BASE_URL" \
         --pr-url "$PR_URL" \
         --agent-map "$AGENT_MAP_VAL" \
+        --milestone-map "$MILESTONE_MAP_VAL" \
         $PM_URL_ARG 2>"$SYNC_ERR_LOG")" || {
         echo "sync-linear-issues-post-push: Linear sync failed (non-fatal)" >&2
         cat "$SYNC_ERR_LOG" >&2

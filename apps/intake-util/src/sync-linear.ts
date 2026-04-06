@@ -57,6 +57,7 @@ export interface InitResult {
   prdIdentifier: string;
   teamId: string;
   agentMap: Record<string, string>;
+  milestoneMap: Record<string, string>;
 }
 
 export interface SyncIssueEntry {
@@ -365,7 +366,7 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
     console.error(`Created new Linear project: ${project.name} (${project.id})`);
   }
 
-  // 1b. Create custom views scoped to this project
+  // 1b. Create single board view with pipeline stage milestones
   interface CustomViewResponse {
     customViewCreate: { success: boolean; customView?: { id: string; name: string } };
   }
@@ -396,65 +397,14 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
 
   const viewFilter = { project: { id: { eq: project.id } } };
 
-  // Helper: create a custom view and set its board preferences
-  async function createProjectView(
-    viewName: string,
-    grouping: string,
-  ): Promise<void> {
-    if (existingViews.has(viewName)) {
-      console.error(`View exists: ${viewName} — skipping`);
-      return;
-    }
-    const viewData = await execute<CustomViewResponse>(apiKey, VIEW_MUTATION, {
-      input: {
-        name: viewName,
-        teamId,
-        projectId: project.id,
-        filterData: viewFilter,
-        shared: true,
-      },
-    });
-    if (viewData.customViewCreate.success && viewData.customViewCreate.customView) {
-      const viewId = viewData.customViewCreate.customView.id;
-      console.error(`Created view: ${viewData.customViewCreate.customView.name} (${viewId})`);
-      await execute(apiKey, PREFS_MUTATION, {
-        input: {
-          customViewId: viewId,
-          type: 'organization',
-          viewType: 'customView',
-          preferences: {
-            layout: 'board',
-            issueGrouping: grouping,
-            showSubIssues: true,
-          },
-        },
-      });
-    }
-  }
-
-  // Board view (Kanban grouped by status)
-  try {
-    await createProjectView(`${projectName} — Board`, 'status');
-  } catch (err) {
-    console.error(`Warning: failed to create project board view: ${err}`);
-  }
-
-  // Agent view (board grouped by assignee)
-  try {
-    await createProjectView(`${projectName} — By Agent`, 'assignee');
-  } catch (err) {
-    console.error(`Warning: failed to create project agent view: ${err}`);
-  }
-
-  // Play Pipeline milestones (ordered by workflow stage)
-  const PLAY_STAGES = [
-    { name: 'Infrastructure', sortOrder: 0 },
-    { name: 'Backend', sortOrder: 1 },
-    { name: 'Frontend', sortOrder: 2 },
-    { name: 'Testing', sortOrder: 3 },
-    { name: 'Quality', sortOrder: 4 },
-    { name: 'Security', sortOrder: 5 },
-    { name: 'Deploy', sortOrder: 6 },
+  // Pipeline stage milestones — these become the board columns
+  const PIPELINE_STAGES = [
+    { name: 'Backlog', sortOrder: 0 },
+    { name: 'Implementation', sortOrder: 1 },
+    { name: 'Quality', sortOrder: 2 },
+    { name: 'Security', sortOrder: 3 },
+    { name: 'Testing', sortOrder: 4 },
+    { name: 'Deployment', sortOrder: 5 },
   ] as const;
 
   interface MilestoneResponse {
@@ -478,7 +428,7 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
     // ignore — will create fresh
   }
 
-  for (const stage of PLAY_STAGES) {
+  for (const stage of PIPELINE_STAGES) {
     if (milestoneMap[stage.name.toLowerCase()]) {
       console.error(`Milestone exists: ${stage.name} (${milestoneMap[stage.name.toLowerCase()]})`);
       continue;
@@ -499,11 +449,40 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
     }
   }
 
-  // Play Pipeline view (grouped by milestone)
-  try {
-    await createProjectView(`${projectName} — Play Pipeline`, 'projectMilestone');
-  } catch (err) {
-    console.error(`Warning: failed to create play pipeline view: ${err}`);
+  // Single board view grouped by pipeline milestone
+  const viewName = `${projectName} — Pipeline`;
+  if (!existingViews.has(viewName)) {
+    try {
+      const viewData = await execute<CustomViewResponse>(apiKey, VIEW_MUTATION, {
+        input: {
+          name: viewName,
+          teamId,
+          projectId: project.id,
+          filterData: viewFilter,
+          shared: true,
+        },
+      });
+      if (viewData.customViewCreate.success && viewData.customViewCreate.customView) {
+        const viewId = viewData.customViewCreate.customView.id;
+        console.error(`Created view: ${viewData.customViewCreate.customView.name} (${viewId})`);
+        await execute(apiKey, PREFS_MUTATION, {
+          input: {
+            customViewId: viewId,
+            type: 'organization',
+            viewType: 'customView',
+            preferences: {
+              layout: 'board',
+              issueGrouping: 'projectMilestone',
+              showSubIssues: true,
+            },
+          },
+        });
+      }
+    } catch (err) {
+      console.error(`Warning: failed to create pipeline view: ${err}`);
+    }
+  } else {
+    console.error(`View exists: ${viewName} — skipping`);
   }
 
   // 2. Get/create labels
@@ -557,6 +536,7 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
     prdIdentifier: prdIssue.identifier,
     teamId,
     agentMap,
+    milestoneMap,
   };
 }
 
@@ -577,6 +557,8 @@ export interface SyncIssuesOptions {
   personalApiKey?: string;
   /** PM server URL for per-agent OAuth tokens (enables self-assignment). */
   pmUrl?: string;
+  /** Milestone ID map (lowercase name → id) from init phase. */
+  milestoneMap?: Record<string, string>;
 }
 
 /**
@@ -854,7 +836,8 @@ const PRIORITY_MAP: Record<string, number> = {
 };
 
 export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssuesResult> {
-  const { tasks, projectId, prdIssueId, baseUrl, prUrl, agentMap, apiKey, personalApiKey, pmUrl } = opts;
+  const { tasks, projectId, prdIssueId, baseUrl, prUrl, agentMap, apiKey, personalApiKey, pmUrl, milestoneMap } = opts;
+  const backlogMilestoneId = milestoneMap?.['backlog'] || undefined;
 
   // ── Agent Delegation Model ──
   // Linear's agent model uses "delegate" (not "assignee") for app users:
@@ -981,6 +964,7 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
     };
     if (labelIds.length > 0) issueInput.labelIds = labelIds;
     if (assigneeId) issueInput.assigneeId = assigneeId;
+    if (backlogMilestoneId) issueInput.projectMilestoneId = backlogMilestoneId;
     if (task.priority && PRIORITY_MAP[task.priority]) {
       issueInput.priority = PRIORITY_MAP[task.priority];
     }
