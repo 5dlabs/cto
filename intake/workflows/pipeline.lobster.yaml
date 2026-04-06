@@ -1753,6 +1753,12 @@ steps:
       git pull --ff-only origin main 2>/dev/null || true
       rm -rf "$TARGET/.tasks"
       rsync -a "$root/.tasks/" "$TARGET/.tasks/"
+      # Generate DESIGN.md from design artifacts
+      if [ -x "$root/intake/scripts/generate-design-md.sh" ]; then
+        "$root/intake/scripts/generate-design-md.sh" "$root" "${project_name}" > "$TARGET/.tasks/design/DESIGN.md" 2>/dev/null || true
+      fi
+      # Remove CTO-platform-internal docs that don't belong in customer repos
+      rm -f "$TARGET/.tasks/docs/bridge-consolidation.md"
       BRANCH_NAME="intake/${project_name}-$(date +%Y%m%d-%H%M%S)"
       git checkout -b "$BRANCH_NAME" 2>/dev/null || {
         echo "sync-to-target-repo: branch $BRANCH_NAME exists — using current branch" >&2

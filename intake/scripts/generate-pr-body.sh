@@ -8,15 +8,38 @@ ROOT="${1:-.}"
 PROJECT="${2:-intake}"
 TASKS_JSON="$ROOT/.tasks/tasks/tasks.json"
 DESIGN_BRIEF="$ROOT/.tasks/docs/design-brief.md"
+ARCH_AUDIO="$ROOT/.tasks/audio/architecture-deliberation.mp3"
+ARCH_TRANSCRIPT="$ROOT/.tasks/audio/architecture-deliberation.transcript.json"
+ARCH_STATUS="$ROOT/.intake/audio/architecture-deliberation.status.json"
+DESIGN_AUDIO="$ROOT/.tasks/audio/design-deliberation.mp3"
+DESIGN_TRANSCRIPT="$ROOT/.tasks/audio/design-deliberation.transcript.json"
+DESIGN_STATUS="$ROOT/.intake/audio/design-deliberation.status.json"
 
 TASK_COUNT=0
 SUBTASK_COUNT=0
 PROMPT_COUNT=0
 
+audio_status() {
+  local mp3="$1"
+  local status_file="$2"
+  if [ -f "$mp3" ]; then
+    printf 'ready'
+    return
+  fi
+  if [ -f "$status_file" ]; then
+    jq -r '.status // "pending"' "$status_file" 2>/dev/null || printf 'pending'
+    return
+  fi
+  printf 'not started'
+}
+
 if [ -f "$TASKS_JSON" ]; then
   TASK_COUNT=$(jq 'length' "$TASKS_JSON" 2>/dev/null || echo 0)
   SUBTASK_COUNT=$(jq '[.[].subtasks | length] | add' "$TASKS_JSON" 2>/dev/null || echo 0)
 fi
+
+ARCH_AUDIO_STATUS="$(audio_status "$ARCH_AUDIO" "$ARCH_STATUS")"
+DESIGN_AUDIO_STATUS="$(audio_status "$DESIGN_AUDIO" "$DESIGN_STATUS")"
 if [ -d "$ROOT/.tasks" ]; then
   PROMPT_COUNT=$(find "$ROOT/.tasks/docs" -name "prompt.md" 2>/dev/null | wc -l | tr -d ' ')
 fi
@@ -68,6 +91,90 @@ DECEOF
     printf '\n'
   fi
 fi
+
+# --- Design section ---
+COMPONENT_LIB="$ROOT/.tasks/design/component-library.json"
+CANDIDATES_JSON="$ROOT/.tasks/design/candidates.normalized.json"
+SOURCE_SCREENSHOTS="$ROOT/.tasks/design/source-screenshots.json"
+DESIGN_CONTEXT="$ROOT/.tasks/design/design-context.json"
+FRAMER_RUN="$ROOT/.tasks/design/framer/framer-run.json"
+
+if [ -f "$CANDIDATES_JSON" ] || [ -f "$COMPONENT_LIB" ]; then
+  cat <<'DEOF'
+---
+
+### 🎨 Design System
+
+DEOF
+
+  # Screenshot
+  if [ -f "$SOURCE_SCREENSHOTS" ]; then
+    SCREENSHOT_MD=$(jq -r '.[] | select(.asset_url != null and .asset_url != "") | "<a href=\"\(.source_url)\"><img src=\"\(.asset_url)\" alt=\"\(.source_url)\" width=\"600\" /></a>"' "$SOURCE_SCREENSHOTS" 2>/dev/null || true)
+    if [ -n "$SCREENSHOT_MD" ]; then
+      printf '%s\n\n' "$SCREENSHOT_MD"
+    fi
+  fi
+
+  # Provider status
+  if [ -f "$CANDIDATES_JSON" ]; then
+    printf '| Provider | Target | Status |\n'
+    printf '|----------|--------|--------|\n'
+    jq -r '.[] | "| \(.provider) | \(.target) | \(if .status == "generated" then "✅ generated" elif .status == "failed" then "❌ failed" else .status end) |"' "$CANDIDATES_JSON" 2>/dev/null
+    printf '\n'
+  fi
+
+  # Design tokens (compact)
+  if [ -f "$COMPONENT_LIB" ]; then
+    HAS_TOKENS=$(jq '.tokens | keys | length' "$COMPONENT_LIB" 2>/dev/null || echo 0)
+    if [ "$HAS_TOKENS" -gt 0 ]; then
+      COLORS=$(jq -r '.tokens.color // [] | map("`\(.value)` \(.description // .name)") | join(" · ")' "$COMPONENT_LIB" 2>/dev/null)
+      FONT=$(jq -r '.tokens.typography // [] | map("\(.value)") | join(", ")' "$COMPONENT_LIB" 2>/dev/null)
+      if [ -n "$COLORS" ] || [ -n "$FONT" ]; then
+        printf '**Tokens:** %s\n' "$COLORS"
+        printf '**Typography:** %s\n\n' "$FONT"
+      fi
+    fi
+
+    # Components summary
+    PRIMS=$(jq -r '[.primitives[].name] | join(", ")' "$COMPONENT_LIB" 2>/dev/null)
+    PATS=$(jq -r '[.patterns[].name] | join(", ")' "$COMPONENT_LIB" 2>/dev/null)
+    if [ -n "$PRIMS" ] || [ -n "$PATS" ]; then
+      printf '**Primitives:** %s\n' "${PRIMS:-none}"
+      printf '**Patterns:** %s\n\n' "${PATS:-none}"
+    fi
+  fi
+
+  # Framer link
+  if [ -f "$FRAMER_RUN" ]; then
+    FRAMER_URL=$(jq -r '.projectUrl // empty' "$FRAMER_RUN" 2>/dev/null)
+    if [ -n "$FRAMER_URL" ]; then
+      FRAMER_COMPONENTS=$(jq -r '[.framer_code_components[].name] | join(", ")' "$COMPONENT_LIB" 2>/dev/null || true)
+      printf '🔗 **Framer Project:** [%s](%s)\n' "$FRAMER_URL" "$FRAMER_URL"
+      if [ -n "$FRAMER_COMPONENTS" ]; then
+        printf '**Framer Components:** %s\n' "$FRAMER_COMPONENTS"
+      fi
+      printf '\n'
+    fi
+  fi
+
+  printf '<details><summary>Full design spec → <code>.tasks/design/DESIGN.md</code></summary>\n\n'
+  printf 'See `DESIGN.md` in the `.tasks/design/` directory for the complete design system reference including tokens, component inventory, Framer code components with property controls, and variant details.\n\n'
+  printf '</details>\n\n'
+fi
+
+cat <<EOF
+---
+
+### Deliberation Audio
+
+- Architecture audio: **${ARCH_AUDIO_STATUS}**
+  - MP3: \`.tasks/audio/architecture-deliberation.mp3\`
+  - Transcript: \`.tasks/audio/architecture-deliberation.transcript.json\`
+- Design audio: **${DESIGN_AUDIO_STATUS}**
+  - MP3: \`.tasks/audio/design-deliberation.mp3\`
+  - Transcript: \`.tasks/audio/design-deliberation.transcript.json\`
+
+EOF
 
 # --- Task breakdown grouped by agent ---
 cat <<'EOF'
