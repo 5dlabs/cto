@@ -42,7 +42,7 @@ ARGS_JSON="$(jq -nc \
   --arg repository_url "$REPO_URL" \
   --arg github_org "5dlabs" \
   --arg deliberate "true" \
-  --arg audio_debug "false" \
+  --arg audio_debug "true" \
   --arg design_mode "both" \
   --arg design_provider "both" \
   --arg num_tasks "$NUM_TASKS" \
@@ -54,7 +54,7 @@ RUN_START_EPOCH=$(date +%s)
 op run --env-file="$ROOT/intake/local.env.op" -- env \
   OPENCLAW_MAX_RETRIES=3 \
   INTAKE_PREFLIGHT_BRIDGES_SKIP=true \
-  INTAKE_AUDIO_MUTE=true \
+  INTAKE_AUDIO_MUTE=false \
   INTAKE_FAN_OUT_CONCURRENCY="${INTAKE_FAN_OUT_CONCURRENCY:-4}" \
   INTAKE_RUN_ID="$INTAKE_RUN_ID" \
   WORKSPACE="$PWD" \
