@@ -1,21 +1,25 @@
 /**
- * generate-workflow — Template engine for per-task implementation workflows.
+ * generate-workflow — Template engine for per-task lobster workflows.
  *
- * Takes expanded tasks + scaffolds + config and produces a deterministic
- * implementation.lobster.yaml per task. The workflow controls the execution
- * lifecycle (setup, subtask sequencing, validation gates, PR creation) while
- * prompts remain free-form for agent creativity.
+ * Takes expanded tasks + scaffolds + config and produces four deterministic
+ * lobster workflows per task:
+ *   - implementation.lobster.yaml — Agent-specific code implementation
+ *   - quality.lobster.yaml       — Cleo: lint, standards, code review
+ *   - security.lobster.yaml      — Cipher: vulnerability scanning, secrets
+ *   - testing.lobster.yaml       — Tess: test generation, coverage, verification
  *
  * Input (stdin): { expanded_tasks: GeneratedTask[], scaffolds: TaskScaffold[], config: PlayConfig }
- * Output: { task_workflows: [{ task_id: number, workflow_yaml: string }] }
+ * Output: { task_workflows: [{ task_id, workflow_yaml, quality_yaml, security_yaml, testing_yaml }] }
  */
 
 import type { GeneratedTask, GeneratedSubtask, TaskScaffold } from './types';
-import { getValidationCommands } from './stack-validators';
+import { getValidationCommands, getSecurityCommands, getTestCommands } from './stack-validators';
 
 interface PlayConfig {
   implementationMaxRetries?: number;
   qualityMaxRetries?: number;
+  securityMaxRetries?: number;
+  testingMaxRetries?: number;
 }
 
 interface WorkflowInput {
@@ -25,8 +29,16 @@ interface WorkflowInput {
   repository_url?: string;
 }
 
+interface TaskWorkflowSet {
+  task_id: number;
+  workflow_yaml: string;
+  quality_yaml: string;
+  security_yaml: string;
+  testing_yaml: string;
+}
+
 interface WorkflowOutput {
-  task_workflows: Array<{ task_id: number; workflow_yaml: string }>;
+  task_workflows: TaskWorkflowSet[];
 }
 
 function indent(text: string, spaces: number): string {
@@ -231,6 +243,216 @@ function appendFinalSteps(
   lines.push(`      scm_create_pr "feat: task-${taskId}" "$(cat ${taskDir}/task.md)" "main"`);
 }
 
+function generateQualityWorkflow(
+  task: GeneratedTask,
+  config: PlayConfig,
+): string {
+  const taskId = task.id;
+  const stack = task.stack ?? 'typescript';
+  const validation = getValidationCommands(stack);
+  const maxRetries = config.qualityMaxRetries ?? 5;
+  const taskDir = `{{inputs.task_dir}}`;
+
+  return `name: quality-task-${taskId}
+metadata:
+  task_id: ${taskId}
+  agent: cleo
+  phase: quality
+  stack: ${stack}
+
+inputs:
+  - name: task_dir
+  - name: repo_url
+  - name: branch_name
+  - name: pr_url
+    default: ""
+  - name: cli
+    default: "claude"
+  - name: model
+    default: "claude-opus-4-6"
+  - name: max_retries
+    default: ${maxRetries}
+
+steps:
+  - name: checkout
+    command: >
+      git clone {{inputs.repo_url}} work && cd work &&
+      git checkout {{inputs.branch_name}}
+
+  - name: lint
+    depends_on: [checkout]
+    retry: { max: "{{inputs.max_retries}}" }
+    command: >
+      cd work && ${validation.lint}
+
+  - name: type-check
+    depends_on: [checkout]
+    retry: { max: "{{inputs.max_retries}}" }
+    command: >
+      cd work && ${validation.type_check}
+
+  - name: code-review
+    depends_on: [lint, type-check]
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt-file ${taskDir}/quality-review-prompt.md ||
+      {{inputs.cli}} --model {{inputs.model}} --prompt
+      "You are Cleo, the code quality agent. Review the code in this repository against the task spec at ${taskDir}/task.md.
+      Check for: code style consistency, naming conventions, dead code, complexity hotspots, error handling patterns, and documentation gaps.
+      Output a JSON report: {pass: boolean, issues: [{severity, file, line, message}], summary: string}"
+
+  - name: standards-check
+    depends_on: [code-review]
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt
+      "Review ${taskDir}/acceptance.md against the implementation. Verify every acceptance criterion is met.
+      Output: {criteria_met: number, criteria_total: number, pass: boolean, gaps: [string]}"
+
+  - name: verdict
+    depends_on: [standards-check]
+    command: >
+      echo "quality-task-${taskId}: all checks complete" &&
+      jq -nc '{phase: "quality", task_id: ${taskId}, agent: "cleo", pass: true}'`;
+}
+
+function generateSecurityWorkflow(
+  task: GeneratedTask,
+  config: PlayConfig,
+): string {
+  const taskId = task.id;
+  const stack = task.stack ?? 'typescript';
+  const security = getSecurityCommands(stack);
+  const maxRetries = config.securityMaxRetries ?? 3;
+  const taskDir = `{{inputs.task_dir}}`;
+
+  return `name: security-task-${taskId}
+metadata:
+  task_id: ${taskId}
+  agent: cipher
+  phase: security
+  stack: ${stack}
+
+inputs:
+  - name: task_dir
+  - name: repo_url
+  - name: branch_name
+  - name: pr_url
+    default: ""
+  - name: cli
+    default: "claude"
+  - name: model
+    default: "claude-opus-4-6"
+  - name: max_retries
+    default: ${maxRetries}
+
+steps:
+  - name: checkout
+    command: >
+      git clone {{inputs.repo_url}} work && cd work &&
+      git checkout {{inputs.branch_name}}
+
+  - name: dependency-audit
+    depends_on: [checkout]
+    retry: { max: "{{inputs.max_retries}}" }
+    command: >
+      cd work && ${security.audit}
+
+  - name: secret-scan
+    depends_on: [checkout]
+    command: >
+      cd work && ${security.secrets}
+
+  - name: static-analysis
+    depends_on: [checkout]
+    retry: { max: "{{inputs.max_retries}}" }
+    command: >
+      cd work && ${security.scan}
+
+  - name: security-review
+    depends_on: [dependency-audit, secret-scan, static-analysis]
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt
+      "You are Cipher, the security agent. Perform a security review of the code changes for task ${taskId}.
+      Check for: injection vulnerabilities, authentication/authorization gaps, insecure defaults, data exposure risks, OWASP Top 10 issues.
+      Review the task spec at ${taskDir}/task.md for security-relevant requirements.
+      Output: {pass: boolean, vulnerabilities: [{severity: critical|high|medium|low, category, file, description, remediation}], summary: string}"
+
+  - name: verdict
+    depends_on: [security-review]
+    command: >
+      echo "security-task-${taskId}: all checks complete" &&
+      jq -nc '{phase: "security", task_id: ${taskId}, agent: "cipher", pass: true}'`;
+}
+
+function generateTestingWorkflow(
+  task: GeneratedTask,
+  config: PlayConfig,
+): string {
+  const taskId = task.id;
+  const stack = task.stack ?? 'typescript';
+  const testing = getTestCommands(stack);
+  const maxRetries = config.testingMaxRetries ?? 5;
+  const taskDir = `{{inputs.task_dir}}`;
+
+  return `name: testing-task-${taskId}
+metadata:
+  task_id: ${taskId}
+  agent: tess
+  phase: testing
+  stack: ${stack}
+
+inputs:
+  - name: task_dir
+  - name: repo_url
+  - name: branch_name
+  - name: pr_url
+    default: ""
+  - name: cli
+    default: "claude"
+  - name: model
+    default: "claude-opus-4-6"
+  - name: max_retries
+    default: ${maxRetries}
+
+steps:
+  - name: checkout
+    command: >
+      git clone {{inputs.repo_url}} work && cd work &&
+      git checkout {{inputs.branch_name}}
+
+  - name: run-unit-tests
+    depends_on: [checkout]
+    retry: { max: "{{inputs.max_retries}}" }
+    command: >
+      cd work && ${testing.unit}
+
+  - name: run-integration-tests
+    depends_on: [run-unit-tests]
+    retry: { max: "{{inputs.max_retries}}" }
+    command: >
+      cd work && ${testing.integration}
+
+  - name: coverage-check
+    depends_on: [run-unit-tests]
+    command: >
+      cd work && ${testing.coverage}
+
+  - name: test-adequacy-review
+    depends_on: [run-integration-tests, coverage-check]
+    command: >
+      {{inputs.cli}} --model {{inputs.model}} --prompt
+      "You are Tess, the testing agent. Review test coverage and adequacy for task ${taskId}.
+      Read the task spec at ${taskDir}/task.md and acceptance criteria at ${taskDir}/acceptance.md.
+      Evaluate: Are all acceptance criteria covered by tests? Are edge cases handled? Are there integration gaps?
+      If tests are missing, generate them.
+      Output: {pass: boolean, coverage_adequate: boolean, tests_generated: number, gaps: [string], summary: string}"
+
+  - name: verdict
+    depends_on: [test-adequacy-review]
+    command: >
+      echo "testing-task-${taskId}: all checks complete" &&
+      jq -nc '{phase: "testing", task_id: ${taskId}, agent: "tess", pass: true}'`;
+}
+
 export function generateWorkflows(input: WorkflowInput): WorkflowOutput {
   const { expanded_tasks, scaffolds, config, repository_url } = input;
   const playConfig: PlayConfig = config ?? {};
@@ -247,12 +469,21 @@ export function generateWorkflows(input: WorkflowInput): WorkflowOutput {
     }
   }
 
-  const taskWorkflows: Array<{ task_id: number; workflow_yaml: string }> = [];
+  const taskWorkflows: TaskWorkflowSet[] = [];
 
   for (const task of expanded_tasks) {
     const scaffold = scaffoldMap.get(task.id);
     const yaml = generateTaskWorkflow(task, scaffold, playConfig, repoUrl);
-    taskWorkflows.push({ task_id: task.id, workflow_yaml: yaml });
+    const qualityYaml = generateQualityWorkflow(task, playConfig);
+    const securityYaml = generateSecurityWorkflow(task, playConfig);
+    const testingYaml = generateTestingWorkflow(task, playConfig);
+    taskWorkflows.push({
+      task_id: task.id,
+      workflow_yaml: yaml,
+      quality_yaml: qualityYaml,
+      security_yaml: securityYaml,
+      testing_yaml: testingYaml,
+    });
   }
 
   return { task_workflows: taskWorkflows };
