@@ -1,18 +1,17 @@
 /**
  * generate-workflow — Template engine for per-task lobster workflows.
  *
- * Takes expanded tasks + scaffolds + config and produces four deterministic
- * lobster workflows per task:
- *   - implementation.lobster.yaml — Agent-specific code implementation
- *   - quality.lobster.yaml       — Cleo: lint, standards, code review
- *   - security.lobster.yaml      — Cipher: vulnerability scanning, secrets
- *   - testing.lobster.yaml       — Tess: test generation, coverage, verification
+ * Takes expanded tasks + scaffolds + config and produces lobster workflows per task.
+ *
+ * Task types determine which workflows are generated:
+ *   - task (coding):  implementation + quality + security + testing  (4 files)
+ *   - infra (devops):  implementation + security                     (2 files)
  *
  * Input (stdin): { expanded_tasks: GeneratedTask[], scaffolds: TaskScaffold[], config: PlayConfig }
- * Output: { task_workflows: [{ task_id, workflow_yaml, quality_yaml, security_yaml, testing_yaml }] }
+ * Output: { task_workflows: [{ task_id, task_type, workflow_yaml, quality_yaml?, security_yaml, testing_yaml? }] }
  */
 
-import type { GeneratedTask, GeneratedSubtask, TaskScaffold } from './types';
+import type { GeneratedTask, GeneratedSubtask, TaskScaffold, TaskType } from './types';
 import { getValidationCommands, getSecurityCommands, getTestCommands } from './stack-validators';
 
 interface PlayConfig {
@@ -31,10 +30,11 @@ interface WorkflowInput {
 
 interface TaskWorkflowSet {
   task_id: number;
+  task_type: 'task' | 'infra';
   workflow_yaml: string;
-  quality_yaml: string;
+  quality_yaml?: string;
   security_yaml: string;
-  testing_yaml: string;
+  testing_yaml?: string;
 }
 
 interface WorkflowOutput {
@@ -453,6 +453,20 @@ steps:
       jq -nc '{phase: "testing", task_id: ${taskId}, agent: "tess", pass: true}'`;
 }
 
+const INFRA_AGENTS = new Set(['bolt', 'keeper']);
+const INFRA_STACKS = new Set(['kubernetes', 'kubernetes/helm', 'helm', 'terraform', 'pulumi', 'docker', 'ansible']);
+
+/** Resolve task type from explicit field or infer from agent/stack. */
+function resolveTaskType(task: GeneratedTask): TaskType {
+  if (task.task_type) return task.task_type;
+  if (task.taskType) return task.taskType;
+  const agent = (task.agent ?? '').toLowerCase();
+  const stack = (task.stack ?? '').toLowerCase();
+  if (INFRA_AGENTS.has(agent)) return 'infra';
+  if (INFRA_STACKS.has(stack)) return 'infra';
+  return 'task';
+}
+
 export function generateWorkflows(input: WorkflowInput): WorkflowOutput {
   const { expanded_tasks, scaffolds, config, repository_url } = input;
   const playConfig: PlayConfig = config ?? {};
@@ -473,17 +487,29 @@ export function generateWorkflows(input: WorkflowInput): WorkflowOutput {
 
   for (const task of expanded_tasks) {
     const scaffold = scaffoldMap.get(task.id);
+    const taskType = resolveTaskType(task);
     const yaml = generateTaskWorkflow(task, scaffold, playConfig, repoUrl);
-    const qualityYaml = generateQualityWorkflow(task, playConfig);
     const securityYaml = generateSecurityWorkflow(task, playConfig);
-    const testingYaml = generateTestingWorkflow(task, playConfig);
-    taskWorkflows.push({
-      task_id: task.id,
-      workflow_yaml: yaml,
-      quality_yaml: qualityYaml,
-      security_yaml: securityYaml,
-      testing_yaml: testingYaml,
-    });
+
+    if (taskType === 'infra') {
+      // Infra/DevOps: implementation (Bolt) + security (Cipher) only
+      taskWorkflows.push({
+        task_id: task.id,
+        task_type: taskType,
+        workflow_yaml: yaml,
+        security_yaml: securityYaml,
+      });
+    } else {
+      // Coding tasks: all four workflows
+      taskWorkflows.push({
+        task_id: task.id,
+        task_type: taskType,
+        workflow_yaml: yaml,
+        quality_yaml: generateQualityWorkflow(task, playConfig),
+        security_yaml: securityYaml,
+        testing_yaml: generateTestingWorkflow(task, playConfig),
+      });
+    }
   }
 
   return { task_workflows: taskWorkflows };
