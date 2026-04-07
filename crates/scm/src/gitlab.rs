@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use base64::Engine;
@@ -13,6 +15,7 @@ pub struct GitLabClient {
 }
 
 impl GitLabClient {
+    #[must_use]
     pub fn new(config: &ScmClientConfig) -> Self {
         Self {
             http: reqwest::Client::new(),
@@ -109,7 +112,7 @@ impl ScmClient for GitLabClient {
             self.api_base
         );
         if let Some(branch) = head_branch {
-            url.push_str(&format!("&source_branch={branch}"));
+            let _ = write!(url, "&source_branch={branch}");
         }
         let resp = self
             .http
@@ -188,7 +191,7 @@ impl ScmClient for GitLabClient {
         }
         let file: GlFile = resp.json().await?;
         if file.encoding == "base64" {
-            let cleaned = file.content.replace('\n', "").replace('\r', "");
+            let cleaned = file.content.replace(['\n', '\r'], "");
             let decoded = base64::engine::general_purpose::STANDARD
                 .decode(cleaned)
                 .context("failed to decode base64 file content")?;
