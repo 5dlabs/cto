@@ -1265,6 +1265,15 @@ impl<'a> CodeResourceManager<'a> {
             }
         }));
 
+        // Mount discord-agent-bots for per-agent Discord tokens and channels
+        // (DISCORD_TOKEN_<AGENT>, DISCORD_CHANNEL_<AGENT>)
+        env_from.push(json!({
+            "secretRef": {
+                "name": "discord-agent-bots",
+                "optional": serde_json::Value::Bool(true)
+            }
+        }));
+
         // Add envFrom if we have secrets to mount
         if !env_from.is_empty() {
             container_spec["envFrom"] = json!(env_from);
