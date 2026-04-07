@@ -24,26 +24,31 @@ DOCS_REPO="https://github.com/5dlabs/sigma-1.git"
 SERVICE="sigma-1"
 RUN_ID="smoke-$(date +%Y%m%d-%H%M%S)"
 
-# ── CLI definitions ──────────────────────────────────────────────────────────
-declare -A CLI_MODELS=(
-  [claude]="claude-sonnet-4-6"
-  [codex]="gpt-5.4"
-  [cursor]="composer-2"
-  [factory]="claude-opus-4-5-20251101"
-)
+# ── Lookup helpers (bash 3.2 compatible — no associative arrays) ─────────────
+get_model() {
+  case "$1" in
+    claude)  echo "claude-sonnet-4-6" ;;
+    codex)   echo "gpt-5.4" ;;
+    cursor)  echo "composer-2" ;;
+    factory) echo "claude-opus-4-5-20251101" ;;
+    *)       echo "unknown"; return 1 ;;
+  esac
+}
+
+get_github_app() {
+  case "$1" in
+    rex)   echo "5DLabs-Rex" ;;
+    blaze) echo "5DLabs-Blaze" ;;
+    grizz) echo "5DLabs-Grizz" ;;
+    nova)  echo "5DLabs-Nova" ;;
+    tap)   echo "5DLabs-Tap" ;;
+    spark) echo "5DLabs-Spark" ;;
+    *)     echo "5DLabs-${1^}" ;;
+  esac
+}
 
 # Agents that support all 4 CLIs (from matrix.yaml)
-ALL_CLI_AGENTS=(rex blaze grizz nova)
-
-# GitHub App names
-declare -A GITHUB_APPS=(
-  [rex]="5DLabs-Rex"
-  [blaze]="5DLabs-Blaze"
-  [grizz]="5DLabs-Grizz"
-  [nova]="5DLabs-Nova"
-  [tap]="5DLabs-Tap"
-  [spark]="5DLabs-Spark"
-)
+ALL_CLI_AGENTS="rex blaze grizz nova"
 
 # ── Parse args ───────────────────────────────────────────────────────────────
 DRY_RUN=false
@@ -52,7 +57,7 @@ FILTER_CLI=""
 BATCH_SIZE=4
 CLEAN=false
 
-while [[ $# -gt 0 ]]; do
+while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run)   DRY_RUN=true; shift ;;
     --agent)     FILTER_AGENT="$2"; shift 2 ;;
@@ -67,45 +72,26 @@ done
 if $CLEAN; then
   echo "🧹 Cleaning up smoke test CodeRuns..."
   kubectl get coderun -n "$NAMESPACE" -l "smoke-test=true" --no-headers 2>/dev/null | \
-    awk '{print $1}' | xargs -r kubectl delete coderun -n "$NAMESPACE" || true
+    awk '{print $1}' | xargs kubectl delete coderun -n "$NAMESPACE" 2>/dev/null || true
   echo "✓ Cleaned"
   exit 0
 fi
 
 # ── Generate CRDs ────────────────────────────────────────────────────────────
 mkdir -p "$OUTPUT_DIR"
-CRDS=()
+CRD_FILES=""
+CRD_COUNT=0
 
 generate_crd() {
   local agent="$1"
   local cli="$2"
-  local model="${CLI_MODELS[$cli]}"
-  local github_app="${GITHUB_APPS[$agent]}"
-  local task_id=9000  # Smoke test task range
+  local model
+  model="$(get_model "$cli")"
+  local github_app
+  github_app="$(get_github_app "$agent")"
+  local task_id=9000
   local crd_name="smoke-${agent}-${cli}-${RUN_ID##*-}"
   local file="$OUTPUT_DIR/${crd_name}.yaml"
-
-  # Smoke test prompt — asks agent to create an identifying file + PR
-  local prompt="SMOKE TEST — CLI Verification
-
-You are ${agent} running via the ${cli} CLI with model ${model}.
-
-Your task:
-1. Create a file 'smoke-test/${agent}-${cli}.md' with this content:
-   - Agent: ${agent}
-   - CLI: ${cli}
-   - Model: ${model}
-   - Timestamp: (current UTC time)
-   - A one-line description of your agent role
-2. Commit with message: 'smoke(${agent}): verify ${cli} CLI [model: ${model}]'
-3. Create a PR with title: '[Smoke] ${agent} via ${cli} (${model})'
-4. In the PR body, include:
-   - CLI type: ${cli}
-   - Model: ${model}
-   - Agent: ${agent}
-   - Run ID: ${RUN_ID}
-
-Keep it simple — this is just verifying the CLI harness works end-to-end."
 
   cat > "$file" << YAML
 apiVersion: agents.platform/v1
@@ -137,10 +123,30 @@ spec:
     CTO_CLI_TYPE: "${cli}"
     CTO_CLI_MODEL: "${model}"
   promptModification: |
-$(echo "$prompt" | sed 's/^/    /')
+    SMOKE TEST — CLI Verification
+
+    You are ${agent} running via the ${cli} CLI with model ${model}.
+
+    Your task:
+    1. Create a file 'smoke-test/${agent}-${cli}.md' with this content:
+       - Agent: ${agent}
+       - CLI: ${cli}
+       - Model: ${model}
+       - Timestamp: (current UTC time)
+       - A one-line description of your agent role
+    2. Commit with message: 'smoke(${agent}): verify ${cli} CLI [model: ${model}]'
+    3. Create a PR with title: '[Smoke] ${agent} via ${cli} (${model})'
+    4. In the PR body, include:
+       - CLI type: ${cli}
+       - Model: ${model}
+       - Agent: ${agent}
+       - Run ID: ${RUN_ID}
+
+    Keep it simple — this is just verifying the CLI harness works end-to-end.
 YAML
 
-  CRDS+=("$file")
+  CRD_FILES="$CRD_FILES $file"
+  CRD_COUNT=$((CRD_COUNT + 1))
   echo "  ✓ ${crd_name} → ${file##*/}"
 }
 
@@ -152,30 +158,28 @@ echo "════════════════════════�
 echo ""
 
 # Determine which agents and CLIs to test
-AGENTS=("${ALL_CLI_AGENTS[@]}")
-CLIS=(claude codex cursor factory)
+AGENTS="${FILTER_AGENT:-$ALL_CLI_AGENTS}"
+CLIS="${FILTER_CLI:-claude codex cursor factory}"
 
-if [[ -n "$FILTER_AGENT" ]]; then
-  AGENTS=("$FILTER_AGENT")
-fi
-if [[ -n "$FILTER_CLI" ]]; then
-  CLIS=("$FILTER_CLI")
-fi
+AGENT_COUNT=0
+for _ in $AGENTS; do AGENT_COUNT=$((AGENT_COUNT + 1)); done
+CLI_COUNT=0
+for _ in $CLIS; do CLI_COUNT=$((CLI_COUNT + 1)); done
 
-echo "Agents: ${AGENTS[*]}"
-echo "CLIs:   ${CLIS[*]}"
-echo "Total:  $((${#AGENTS[@]} * ${#CLIS[@]})) CodeRuns"
+echo "Agents: ${AGENTS}"
+echo "CLIs:   ${CLIS}"
+echo "Total:  $((AGENT_COUNT * CLI_COUNT)) CodeRuns"
 echo ""
 
 echo "Generating CRDs..."
-for agent in "${AGENTS[@]}"; do
-  for cli in "${CLIS[@]}"; do
+for agent in $AGENTS; do
+  for cli in $CLIS; do
     generate_crd "$agent" "$cli"
   done
 done
 
 echo ""
-echo "Generated ${#CRDS[@]} CRDs in $OUTPUT_DIR/"
+echo "Generated ${CRD_COUNT} CRDs in $OUTPUT_DIR/"
 
 # ── Apply CRDs ──────────────────────────────────────────────────────────────
 if $DRY_RUN; then
@@ -189,20 +193,21 @@ fi
 echo ""
 echo "Applying CRDs in batches of $BATCH_SIZE..."
 APPLIED=0
-for file in "${CRDS[@]}"; do
+for file in $CRD_FILES; do
   kubectl apply -f "$file" 2>&1
   APPLIED=$((APPLIED + 1))
 
-  if (( APPLIED % BATCH_SIZE == 0 )) && (( APPLIED < ${#CRDS[@]} )); then
+  remainder=$((APPLIED % BATCH_SIZE))
+  if [ "$remainder" -eq 0 ] && [ "$APPLIED" -lt "$CRD_COUNT" ]; then
     echo ""
-    echo "⏳ Batch $((APPLIED / BATCH_SIZE)) applied ($APPLIED/${#CRDS[@]}). Waiting 30s..."
+    echo "⏳ Batch $((APPLIED / BATCH_SIZE)) applied ($APPLIED/${CRD_COUNT}). Waiting 30s..."
     sleep 30
   fi
 done
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
-echo "║ ✅ Applied ${#CRDS[@]} CodeRuns"
+echo "║ ✅ Applied ${CRD_COUNT} CodeRuns"
 echo "║ Monitor: kubectl get coderun -n ${NAMESPACE} -l smoke-run-id=${RUN_ID}"
 echo "║ Logs:    kubectl logs -n ${NAMESPACE} -l smoke-run-id=${RUN_ID} -f"
 echo "║ Clean:   $0 --clean"
