@@ -4731,24 +4731,12 @@ Be constructive and explain the "why" behind your suggestions.
     /// Register CLI-specific invoke template as the `cli_execute` partial.
     /// This allows the container.sh.hbs template to use {{> cli_execute}} to include
     /// the CLI-specific invocation logic.
-    fn register_cli_invoke_partial(handlebars: &mut Handlebars, cli_type: CLIType) -> Result<()> {
-        let cli_name = match cli_type {
-            CLIType::Code => "code",
-            CLIType::Codex => "codex",
-            CLIType::Cursor => "cursor",
-            CLIType::Dexter => "dexter",
-            CLIType::Factory => "factory",
-            CLIType::Gemini => "gemini",
-            CLIType::OpenCode => "opencode",
-            // Claude and types without dedicated invoke templates fall back to claude
-            CLIType::Claude
-            | CLIType::OpenHands
-            | CLIType::Grok
-            | CLIType::Qwen
-            | CLIType::MiniMax => "claude",
-        };
-
-        let invoke_template_path = format!("clis/{cli_name}.sh.hbs");
+    fn register_cli_invoke_partial(handlebars: &mut Handlebars, _cli_type: CLIType) -> Result<()> {
+        // All CLI types route through the unified ACP dispatch template (openclaw.sh.hbs).
+        // CLI-specific behavior (auth, flags, autonomy) is handled inside the template
+        // via the cli_type context variable and acpx agent mapping.
+        // Legacy per-CLI templates are archived in templates/clis/_archived/.
+        let invoke_template_path = "clis/openclaw.sh.hbs".to_string();
 
         match Self::load_template(&invoke_template_path) {
             Ok(content) => {
@@ -4756,36 +4744,17 @@ Be constructive and explain the "why" behind your suggestions.
                     .register_partial("cli_execute", content)
                     .map_err(|e| {
                         crate::tasks::types::Error::ConfigError(format!(
-                            "Failed to register CLI invoke partial for {cli_name}: {e}"
+                            "Failed to register ACP dispatch partial: {e}"
                         ))
                     })?;
-                debug!(
-                    "Successfully registered CLI invoke partial for {}",
-                    cli_name
-                );
+                debug!("Registered unified ACP dispatch partial (openclaw.sh.hbs)");
                 Ok(())
             }
             Err(e) => {
-                // If the CLI-specific invoke template is not found, fall back to a simple echo
-                warn!(
-                    "CLI invoke template not found for {cli_name} (path: {invoke_template_path}): {e}. \
-                    Registering a fallback placeholder."
-                );
-
-                // Register a fallback that just echoes the CLI type
-                let fallback = format!(
-                    r#"echo "⚠️ No invoke template found for {cli_name} CLI"
-echo "CLI invocation should be handled by the adapter."
-"#
-                );
-                handlebars
-                    .register_partial("cli_execute", fallback)
-                    .map_err(|e| {
-                        crate::tasks::types::Error::ConfigError(format!(
-                            "Failed to register fallback CLI invoke partial: {e}"
-                        ))
-                    })?;
-                Ok(())
+                Err(crate::tasks::types::Error::ConfigError(format!(
+                    "ACP dispatch template not found ({invoke_template_path}): {e}. \
+                    Ensure templates/clis/openclaw.sh.hbs exists in the controller image."
+                )))
             }
         }
     }
