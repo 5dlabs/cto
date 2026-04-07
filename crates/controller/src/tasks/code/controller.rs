@@ -897,11 +897,17 @@ async fn update_code_status_with_completion(
         .as_ref()
         .and_then(|s| s.work_completed)
         .unwrap_or(false);
+    let current_retry = code_run
+        .status
+        .as_ref()
+        .and_then(|s| s.retry_count)
+        .unwrap_or(0);
+    let new_retry = retry_count_override.unwrap_or(current_retry);
 
-    if current_phase == new_phase && current_work_completed == work_completed {
+    if current_phase == new_phase && current_work_completed == work_completed && current_retry == new_retry {
         debug!(
-            "Status already '{}' with work_completed={}, skipping update to prevent reconciliation",
-            new_phase, work_completed
+            "Status already '{}' with work_completed={}, retry_count={}, skipping update to prevent reconciliation",
+            new_phase, work_completed, new_retry
         );
         return Ok(());
     }
