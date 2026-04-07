@@ -1281,6 +1281,7 @@ impl<'a> CodeResourceManager<'a> {
 
         // Build containers array
         let mut containers = vec![container_spec];
+        let mut promtail_init_config: Option<String> = None;
 
         // Add Docker daemon if enabled (kept as-is for DIND workflows)
         if enable_docker {
@@ -1532,6 +1533,173 @@ impl<'a> CodeResourceManager<'a> {
             }
         }
 
+        // Add promtail sidecar for shipping CLI logs to Loki
+        // Mirrors Morgan's promtail config — scrapes CLI-specific log paths
+        // and ships them to the in-cluster Loki gateway via the OTLP pipeline
+        {
+            let agent_name = code_run
+                .spec
+                .github_app
+                .as_deref()
+                .unwrap_or("unknown")
+                .replace("5DLabs-", "")
+                .to_lowercase();
+
+            let loki_url = std::env::var("LOKI_PUSH_URL").unwrap_or_else(|_| {
+                "http://openclaw-observability-loki-gateway.openclaw.svc.cluster.local/loki/api/v1/push".to_string()
+            });
+
+            let workspace_path = format!("/workspace/{workspace_subdir}");
+
+            let promtail_config = format!(
+                r#"server:
+  http_listen_port: 0
+  grpc_listen_port: 0
+positions:
+  filename: /run/promtail/positions.yaml
+clients:
+  - url: {loki_url}
+    tenant_id: openclaw
+scrape_configs:
+  - job_name: acp-cli
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-claude
+          cli_name: claude
+          __path__: {workspace_path}/.claude/logs/*.log
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-droid
+          cli_name: droid
+          __path__: {workspace_path}/.factory/logs/*.log
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-codex
+          cli_name: codex
+          __path__: {workspace_path}/.codex/logs/*.log
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-gemini
+          cli_name: gemini
+          __path__: {workspace_path}/.gemini/logs/*.log
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-cursor
+          cli_name: cursor
+          __path__: {workspace_path}/.cursor-agent/logs/*.log
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-kimi
+          cli_name: kimi
+          __path__: {workspace_path}/.kimi/logs/*.log
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-opencode
+          cli_name: opencode
+          __path__: {workspace_path}/.local/share/opencode/log/*.log
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-copilot
+          cli_name: copilot
+          __path__: {workspace_path}/.copilot/logs/*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: time
+            level: level
+            message: message
+      - regex:
+          source: message
+          expression: '^(?P<timestamp>\d{{4}}-\d{{2}}-\d{{2}}[T ]\d{{2}}:\d{{2}}:\d{{2}}[^\s]*)\s*(?:\[(?P<level>[A-Z]+)\])?\s*(?P<content>.*)$'
+      - template:
+          source: level
+          template: '{{{{ if .level }}}}{{{{ .level | ToLower }}}}{{{{ else }}}}info{{{{ end }}}}'
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+          fallback_formats:
+            - "2006-01-02T150405"
+            - "2006-01-02 15:04:05"
+      - drop:
+          older_than: 6h
+          drop_counter_reason: stale_cli_entry
+"#,
+                loki_url = loki_url,
+                agent_name = agent_name,
+                coderun_name = coderun_name,
+                workspace_path = workspace_path,
+            );
+
+            // Store the promtail YAML config — write via init container to emptyDir
+            // This avoids needing a separate ConfigMap resource
+            volumes.push(json!({
+                "name": "promtail-config",
+                "emptyDir": {}
+            }));
+
+            volumes.push(json!({
+                "name": "promtail-positions",
+                "emptyDir": {}
+            }));
+
+            let promtail_container = json!({
+                "name": "promtail",
+                "image": "grafana/promtail:latest",
+                "args": ["-config.file=/etc/promtail/promtail.yaml"],
+                "resources": {
+                    "requests": { "cpu": "10m", "memory": "32Mi" },
+                    "limits": { "cpu": "100m", "memory": "64Mi" }
+                },
+                "volumeMounts": [
+                    { "name": "workspace", "mountPath": "/workspace", "readOnly": true },
+                    { "name": "promtail-config", "mountPath": "/etc/promtail" },
+                    { "name": "promtail-positions", "mountPath": "/run/promtail" }
+                ]
+            });
+
+            containers.push(promtail_container);
+
+            // Store config for init container to write
+            promtail_init_config = Some(promtail_config);
+
+            info!("Added promtail sidecar for CodeRun {} (agent: {}, Loki: {})", coderun_name, agent_name, loki_url);
+        }
+
         // Build init containers array
         // Always include the workspace setup init container that:
         // 1. Creates a unique subdirectory per CodeRun to prevent git lock conflicts
@@ -1581,6 +1749,20 @@ impl<'a> CodeResourceManager<'a> {
                 ]
             }));
             info!("Added coordination copy init container for watcher CodeRun");
+        }
+
+        // Add promtail config writer init container
+        if let Some(config_yaml) = promtail_init_config {
+            let escaped = config_yaml.replace('\'', "'\\''");
+            init_containers.push(json!({
+                "name": "write-promtail-config",
+                "image": "busybox:1.36",
+                "command": ["/bin/sh", "-c", format!("printf '%s' '{}' > /etc/promtail/promtail.yaml", escaped)],
+                "volumeMounts": [
+                    {"name": "promtail-config", "mountPath": "/etc/promtail"}
+                ]
+            }));
+            info!("Added promtail config init container for CodeRun {}", coderun_name);
         }
 
         // Build Pod spec and set ServiceAccountName (required by CRD)

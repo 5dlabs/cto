@@ -1020,6 +1020,10 @@ impl CodeTemplateGenerator {
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
+            // Telemetry configuration
+            "telemetry_enabled": Self::is_telemetry_enabled(code_run, config),
+            "otel_endpoint": Self::get_otel_endpoint(),
+            "datadog_enabled": Self::is_datadog_enabled(config),
             // Watch-specific context
             "iteration": iteration,
             "max_iterations": max_iterations,
@@ -3934,6 +3938,37 @@ Be constructive and explain the "why" behind your suggestions.
             .get("FRESH_START_THRESHOLD")
             .and_then(|v| v.parse::<u32>().ok())
             .unwrap_or(3) // Platform default - same as cto-config default
+    }
+
+    /// Check if telemetry (OTEL metrics/logs) is enabled for this CodeRun.
+    fn is_telemetry_enabled(code_run: &CodeRun, config: &ControllerConfig) -> bool {
+        // CodeRun env override takes precedence
+        if let Some(val) = code_run.spec.env.get("TELEMETRY_ENABLED") {
+            return val == "true" || val == "1";
+        }
+        // Fall back to controller config or env var
+        std::env::var("TELEMETRY_ENABLED")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or_else(|_| {
+                // Default to true when observability stack is available
+                config.agent.service_account_name.is_some()
+            })
+    }
+
+    /// Get the OTLP gRPC endpoint for telemetry export.
+    fn get_otel_endpoint() -> String {
+        std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").unwrap_or_else(|_| {
+            "otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317"
+                .to_string()
+        })
+    }
+
+    /// Check if Datadog APM is enabled.
+    fn is_datadog_enabled(_config: &ControllerConfig) -> bool {
+        std::env::var("DATADOG_ENABLED")
+            .or_else(|_| std::env::var("DD_TRACE_ENABLED"))
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false)
     }
 
     /// Get default MCP tools for an agent based on github_app and run_type.

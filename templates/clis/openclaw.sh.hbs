@@ -109,6 +109,92 @@ case "$CLI_TYPE" in
 esac
 
 # =========================================================================
+# Telemetry & Logging Configuration
+#
+# Enable metrics/logging for CLIs that support OTEL or native telemetry.
+# Logs are written to well-known paths so promtail sidecar can ship them
+# to Loki. Metrics go to the OTel Collector via OTLP gRPC.
+#
+# Context variables:
+#   - telemetry_enabled: "true"/"false" (from controller config)
+#   - otel_endpoint:     OTLP gRPC endpoint (defaults to in-cluster collector)
+#   - datadog_enabled:   "true"/"false" (from controller config)
+# =========================================================================
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               TELEMETRY & LOGGING                            ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+TELEMETRY_ENABLED="{{telemetry_enabled}}"
+TELEMETRY_ENABLED="${TELEMETRY_ENABLED:-true}"
+OTEL_ENDPOINT="{{otel_endpoint}}"
+OTEL_ENDPOINT="${OTEL_ENDPOINT:-otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317}"
+DATADOG_ENABLED="{{datadog_enabled}}"
+DATADOG_ENABLED="${DATADOG_ENABLED:-false}"
+
+if [ "$TELEMETRY_ENABLED" = "true" ]; then
+  echo "✓ Telemetry: ENABLED"
+  echo "  → OTEL endpoint: $OTEL_ENDPOINT"
+
+  # --- OTEL environment (shared across CLIs that support it) ---
+  export OTEL_METRICS_EXPORTER="otlp"
+  export OTEL_LOGS_EXPORTER="otlp"
+  export OTEL_EXPORTER_OTLP_METRICS_ENDPOINT="$OTEL_ENDPOINT"
+  export OTEL_EXPORTER_OTLP_METRICS_PROTOCOL="grpc"
+  export OTEL_EXPORTER_OTLP_LOGS_ENDPOINT="$OTEL_ENDPOINT"
+  export OTEL_EXPORTER_OTLP_LOGS_PROTOCOL="grpc"
+  export OTEL_SERVICE_NAME="cto-acp-${CLI_TYPE}"
+  export OTEL_RESOURCE_ATTRIBUTES="agent.cli=${CLI_TYPE},agent.name=${GITHUB_APP:-unknown}"
+
+  # --- Per-CLI telemetry flags ---
+  case "$CLI_TYPE" in
+    claude)
+      export CLAUDE_CODE_ENABLE_TELEMETRY="1"
+      echo "  ✓ Claude Code: OTEL metrics + logs enabled"
+      ;;
+    factory)
+      # Droid supports OTEL when FACTORY_DISABLE_TELEMETRY is unset
+      unset FACTORY_DISABLE_TELEMETRY
+      echo "  ✓ Factory/Droid: telemetry enabled"
+      ;;
+    codex)
+      # Codex respects standard OTEL env vars
+      echo "  ✓ Codex: OTEL env vars set"
+      ;;
+    gemini)
+      # Gemini CLI respects OTEL env vars
+      echo "  ✓ Gemini: OTEL env vars set"
+      ;;
+    *)
+      echo "  ℹ️ $CLI_TYPE: standard OTEL env vars set (CLI-specific support varies)"
+      ;;
+  esac
+else
+  echo "✗ Telemetry: DISABLED"
+  export CLAUDE_CODE_ENABLE_TELEMETRY="0"
+  export FACTORY_DISABLE_TELEMETRY="1"
+fi
+
+# --- Datadog APM (when enabled alongside or instead of Grafana stack) ---
+if [ "$DATADOG_ENABLED" = "true" ]; then
+  echo "  ✓ Datadog: APM tracing enabled"
+  export DD_TRACE_ENABLED="true"
+  export DD_SERVICE="cto-acp-${CLI_TYPE}"
+  export DD_ENV="${DD_ENV:-production}"
+  export DD_AGENT_HOST="${DD_AGENT_HOST:-datadog-agent.datadog.svc.cluster.local}"
+fi
+
+# --- Ensure CLI log directories exist (for promtail sidecar scraping) ---
+mkdir -p "$WORK_DIR/.openclaw/logs" 2>/dev/null || true
+mkdir -p "$WORK_DIR/.claude/logs" 2>/dev/null || true
+mkdir -p "$WORK_DIR/.factory/logs" 2>/dev/null || true
+mkdir -p "$WORK_DIR/.codex/logs" 2>/dev/null || true
+mkdir -p "$WORK_DIR/.cursor-agent/logs" 2>/dev/null || true
+mkdir -p "$WORK_DIR/.gemini/logs" 2>/dev/null || true
+mkdir -p "$WORK_DIR/.kimi/logs" 2>/dev/null || true
+echo "✓ Log directories created for promtail sidecar"
+
+# =========================================================================
 # Write .acpxrc.json — ACP runtime configuration
 #
 # - defaultPermissions / nonInteractivePermissions: harness-level permissions
