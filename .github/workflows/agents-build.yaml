@@ -235,7 +235,7 @@ jobs:
           context: .
           file: ./infra/images/runtime/Dockerfile
           target: production
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           pull: true
           push: true
           provenance: false
@@ -300,7 +300,7 @@ jobs:
           context: .
           file: ./infra/images/linear-sidecar/Dockerfile
           target: local
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           provenance: false
           sbom: false
@@ -388,7 +388,7 @@ jobs:
         with:
           context: ./infra/images/agents
           file: ./infra/images/agents/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           pull: true
           push: true
           provenance: false
