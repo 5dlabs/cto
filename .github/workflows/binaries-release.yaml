@@ -122,9 +122,6 @@ jobs:
           - name: utils
             binary: utils
             dir: crates/utils
-          - name: cto-cli
-            binary: cto
-            dir: crates/controller/installer
         target:
           - os: ubuntu-22.04
             triple: x86_64-unknown-linux-gnu
@@ -155,10 +152,6 @@ jobs:
               os: windows-latest
           - package:
               name: utils
-            target:
-              os: windows-latest
-          - package:
-              name: cto-cli
             target:
               os: windows-latest
           - package:
