@@ -34,16 +34,12 @@ CLI_TYPE="{{cli_type}}"
 CRD_MODEL="{{model}}"
 
 # Map CLI type → OpenClaw model provider
-# openai-api = standard OpenAI API (OPENAI_API_KEY)
-# openai-codex = ChatGPT OAuth backend (needs OAuth token, not API key)
+# All agents use openai-codex (ChatGPT Team OAuth) — no API credits available
+# The codex-oauth secret is mounted at /root/.codex/auth.json with OAuth tokens
 case "$CLI_TYPE" in
-  codex)     PROVIDER="openai-api" ;;
-  cursor)    PROVIDER="openai-api" ;;
-  factory)   PROVIDER="openai-api" ;;
   claude)    PROVIDER="anthropic" ;;
   gemini)    PROVIDER="gemini" ;;
-  opencode)  PROVIDER="openrouter" ;;
-  *)         PROVIDER="openai-api" ;;
+  *)         PROVIDER="openai-codex" ;;
 esac
 
 OPENCLAW_MODEL="${PROVIDER}/${CRD_MODEL}"
@@ -73,11 +69,9 @@ cat > "$OPENCLAW_HOME/openclaw.json" << OPENCLAW_CFG
   },
   "models": {
     "providers": {
-      "openai-api": {
-        "baseUrl": "https://api.openai.com/v1",
-        "api": "openai-responses",
-        "auth": "token",
-        "authHeader": true,
+      "openai-codex": {
+        "baseUrl": "https://chatgpt.com/backend-api",
+        "api": "openai-codex-responses",
         "models": [
           { "id": "gpt-5.4", "name": "GPT-5.4", "reasoning": true, "input": ["text","image"], "contextWindow": 1000000, "maxTokens": 65536 },
           { "id": "gpt-5.4-pro", "name": "GPT-5.4 Pro", "reasoning": true, "input": ["text","image"], "contextWindow": 1000000, "maxTokens": 65536 },
@@ -102,30 +96,48 @@ OPENCLAW_CFG
 echo "✓ Wrote $OPENCLAW_HOME/openclaw.json (model: $OPENCLAW_MODEL, no fallbacks)"
 
 # =========================================================================
-# Write auth-profiles.json directly (workaround for openclaw/openclaw#8481)
-# 'openclaw onboard' doesn't persist API keys to auth-profiles.json in
-# non-interactive/container environments. Write the file manually.
+# Write auth-profiles.json from mounted Codex CLI OAuth tokens
+# The codex-oauth K8s secret is mounted at /root/.codex/auth.json with
+# ChatGPT Team OAuth tokens. Extract and write to OpenClaw's auth store.
+# Falls back to API key if no OAuth tokens available.
 # =========================================================================
 AGENT_DIR="$OPENCLAW_HOME/agents/main/agent"
 mkdir -p "$AGENT_DIR"
 
-# Build profiles JSON from available env vars
-AUTH_PROFILES='{ "version": 1, "profiles": {'
-NEED_COMMA=""
-
-if [ -n "${OPENAI_API_KEY:-}" ]; then
-  AUTH_PROFILES="${AUTH_PROFILES}${NEED_COMMA} \"openai-api:default\": { \"type\": \"api_key\", \"provider\": \"openai-api\", \"key\": \"${OPENAI_API_KEY}\" }"
-  NEED_COMMA=","
-  echo "✓ Auth: openai-api (API key)"
+CODEX_AUTH="/root/.codex/auth.json"
+if [ -f "$CODEX_AUTH" ]; then
+  # Extract OAuth tokens from Codex CLI auth file using python (available in pod)
+  python3 -c "
+import json, sys
+with open('$CODEX_AUTH') as f:
+    d = json.load(f)
+tokens = d.get('tokens', {})
+access = tokens.get('access_token', '')
+refresh = tokens.get('refresh_token', '')
+account = tokens.get('account_id', '')
+if not access:
+    sys.exit(1)
+profiles = {
+    'version': 1,
+    'profiles': {
+        'openai-codex:default': {
+            'type': 'oauth',
+            'provider': 'openai-codex',
+            'access': access,
+            'refresh': refresh,
+            'accountId': account
+        }
+    }
+}
+with open('$AGENT_DIR/auth-profiles.json', 'w') as f:
+    json.dump(profiles, f, indent=2)
+" && echo "✓ Auth: openai-codex OAuth (ChatGPT Team)" || echo "⚠️ Failed to extract Codex OAuth tokens"
+elif [ -n "${OPENAI_API_KEY:-}" ]; then
+  echo '{ "version": 1, "profiles": { "openai-api:default": { "type": "api_key", "provider": "openai-api", "key": "'"${OPENAI_API_KEY}"'" } } }' > "$AGENT_DIR/auth-profiles.json"
+  echo "✓ Auth: openai-api (API key fallback)"
+else
+  echo "⚠️ No auth credentials available"
 fi
-if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-  AUTH_PROFILES="${AUTH_PROFILES}${NEED_COMMA} \"anthropic:default\": { \"type\": \"api_key\", \"provider\": \"anthropic\", \"key\": \"${ANTHROPIC_API_KEY}\" }"
-  NEED_COMMA=","
-  echo "✓ Auth: anthropic (API key)"
-fi
-
-AUTH_PROFILES="${AUTH_PROFILES} } }"
-echo "$AUTH_PROFILES" > "$AGENT_DIR/auth-profiles.json"
 echo "✓ Wrote $AGENT_DIR/auth-profiles.json"
 
 # =========================================================================
