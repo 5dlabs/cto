@@ -29,8 +29,8 @@ get_model() {
   case "$1" in
     claude)  echo "claude-sonnet-4-6" ;;
     codex)   echo "gpt-5.4" ;;
-    cursor)  echo "composer-2" ;;
-    factory) echo "claude-opus-4-5-20251101" ;;
+    cursor)  echo "auto" ;;
+    factory) echo "claude-opus-4-6" ;;
     *)       echo "unknown"; return 1 ;;
   esac
 }
