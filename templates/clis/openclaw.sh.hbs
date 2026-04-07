@@ -26,24 +26,25 @@ echo "✓ Work dir:  $WORK_DIR"
 echo "✓ Backend:   $AGENT_BACKEND"
 
 # =========================================================================
-# Resolve OpenClaw model from CodeRun CRD parameters
-# The controller passes {{cli_type}} and {{model}} from the CRD spec.
-# We map cli_type → OpenClaw provider that has valid auth in the pod.
+# Resolve OpenClaw reasoning model from CodeRun CRD parameters
+# Each CLI type maps to its own provider. The CRD model field is the
+# model name within that provider.
 # =========================================================================
 CLI_TYPE="{{cli_type}}"
 CRD_MODEL="{{model}}"
 
-# Map CLI type → OpenClaw model provider
-# All agents use openai-codex (ChatGPT Team OAuth) — no API credits available
-# The codex-oauth secret is mounted at /root/.codex/auth.json with OAuth tokens
+# Map CLI type → OpenClaw provider for the reasoning model
 case "$CLI_TYPE" in
+  codex)     PROVIDER="openai-codex" ;;
+  factory)   PROVIDER="factory" ;;
+  cursor)    PROVIDER="cursor" ;;
   claude)    PROVIDER="anthropic" ;;
   gemini)    PROVIDER="gemini" ;;
-  *)         PROVIDER="openai-codex" ;;
+  *)         PROVIDER="openai-api" ;;
 esac
 
 OPENCLAW_MODEL="${PROVIDER}/${CRD_MODEL}"
-echo "✓ Agent model: $OPENCLAW_MODEL (cli=$CLI_TYPE, model=$CRD_MODEL)"
+echo "✓ Agent model: $OPENCLAW_MODEL (cli=$CLI_TYPE)"
 
 # =========================================================================
 # Skills Setup
@@ -78,6 +79,16 @@ cat > "$OPENCLAW_HOME/openclaw.json" << OPENCLAW_CFG
           { "id": "gpt-4.1", "name": "GPT-4.1", "reasoning": false, "input": ["text","image"], "contextWindow": 1000000, "maxTokens": 32768 }
         ]
       },
+      "openai-api": {
+        "baseUrl": "https://api.openai.com/v1",
+        "api": "openai-responses",
+        "auth": "token",
+        "authHeader": true,
+        "models": [
+          { "id": "gpt-5.4", "name": "GPT-5.4", "reasoning": true, "input": ["text","image"], "contextWindow": 1000000, "maxTokens": 65536 },
+          { "id": "gpt-4.1", "name": "GPT-4.1", "reasoning": false, "input": ["text","image"], "contextWindow": 1000000, "maxTokens": 32768 }
+        ]
+      },
       "anthropic": {
         "baseUrl": "https://api.anthropic.com",
         "api": "anthropic-messages",
@@ -85,7 +96,18 @@ cat > "$OPENCLAW_HOME/openclaw.json" << OPENCLAW_CFG
         "authHeader": true,
         "models": [
           { "id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "reasoning": true, "input": ["text","image"], "contextWindow": 200000, "maxTokens": 64000 },
-          { "id": "claude-opus-4-6", "name": "Claude Opus 4.6", "reasoning": true, "input": ["text","image"], "contextWindow": 200000, "maxTokens": 64000 }
+          { "id": "claude-opus-4-6", "name": "Claude Opus 4.6", "reasoning": true, "input": ["text","image"], "contextWindow": 200000, "maxTokens": 64000 },
+          { "id": "claude-opus-4-5-20251101", "name": "Claude Opus 4.5", "reasoning": true, "input": ["text","image"], "contextWindow": 200000, "maxTokens": 64000 }
+        ]
+      },
+      "factory": {
+        "baseUrl": "https://api.factory.ai/v1",
+        "api": "openai-responses",
+        "auth": "token",
+        "authHeader": true,
+        "models": [
+          { "id": "claude-opus-4-5-20251101", "name": "Claude Opus 4.5 (Factory)", "reasoning": true, "input": ["text","image"], "contextWindow": 200000, "maxTokens": 64000 },
+          { "id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6 (Factory)", "reasoning": true, "input": ["text","image"], "contextWindow": 200000, "maxTokens": 64000 }
         ]
       }
     }
@@ -96,48 +118,60 @@ OPENCLAW_CFG
 echo "✓ Wrote $OPENCLAW_HOME/openclaw.json (model: $OPENCLAW_MODEL, no fallbacks)"
 
 # =========================================================================
-# Write auth-profiles.json from mounted Codex CLI OAuth tokens
-# The codex-oauth K8s secret is mounted at /root/.codex/auth.json with
-# ChatGPT Team OAuth tokens. Extract and write to OpenClaw's auth store.
-# Falls back to API key if no OAuth tokens available.
+# Write auth-profiles.json — register credentials per CLI type
+# Codex: extract OAuth tokens from mounted /root/.codex/auth.json
+# Others: use their API key env var directly
 # =========================================================================
 AGENT_DIR="$OPENCLAW_HOME/agents/main/agent"
 mkdir -p "$AGENT_DIR"
 
 CODEX_AUTH="/root/.codex/auth.json"
-if [ -f "$CODEX_AUTH" ]; then
-  # Extract OAuth tokens from Codex CLI auth file using python (available in pod)
-  python3 -c "
-import json, sys
-with open('$CODEX_AUTH') as f:
-    d = json.load(f)
-tokens = d.get('tokens', {})
-access = tokens.get('access_token', '')
-refresh = tokens.get('refresh_token', '')
-account = tokens.get('account_id', '')
-if not access:
-    sys.exit(1)
-profiles = {
-    'version': 1,
-    'profiles': {
-        'openai-codex:default': {
+
+python3 -c "
+import json, os, sys
+
+profiles = {}
+
+# Codex OAuth (ChatGPT Team subscription)
+codex_auth = '$CODEX_AUTH'
+if os.path.isfile(codex_auth):
+    with open(codex_auth) as f:
+        d = json.load(f)
+    tokens = d.get('tokens', {})
+    if tokens.get('access_token'):
+        profiles['openai-codex:default'] = {
             'type': 'oauth',
             'provider': 'openai-codex',
-            'access': access,
-            'refresh': refresh,
-            'accountId': account
+            'access': tokens['access_token'],
+            'refresh': tokens.get('refresh_token', ''),
+            'accountId': tokens.get('account_id', '')
         }
-    }
-}
-with open('$AGENT_DIR/auth-profiles.json', 'w') as f:
-    json.dump(profiles, f, indent=2)
-" && echo "✓ Auth: openai-codex OAuth (ChatGPT Team)" || echo "⚠️ Failed to extract Codex OAuth tokens"
-elif [ -n "${OPENAI_API_KEY:-}" ]; then
-  echo '{ "version": 1, "profiles": { "openai-api:default": { "type": "api_key", "provider": "openai-api", "key": "'"${OPENAI_API_KEY}"'" } } }' > "$AGENT_DIR/auth-profiles.json"
-  echo "✓ Auth: openai-api (API key fallback)"
-else
-  echo "⚠️ No auth credentials available"
-fi
+
+# API key providers — read from env vars
+for env_var, profile_id, provider in [
+    ('FACTORY_API_KEY', 'factory:default', 'factory'),
+    ('ANTHROPIC_API_KEY', 'anthropic:default', 'anthropic'),
+    ('OPENAI_API_KEY', 'openai-api:default', 'openai-api'),
+    ('GEMINI_API_KEY', 'gemini:default', 'gemini'),
+    ('CURSOR_API_KEY', 'cursor:default', 'cursor'),
+]:
+    key = os.environ.get(env_var, '')
+    if key:
+        profiles[profile_id] = {
+            'type': 'api_key',
+            'provider': provider,
+            'key': key
+        }
+
+out = {'version': 1, 'profiles': profiles}
+agent_dir = '$AGENT_DIR'
+with open(os.path.join(agent_dir, 'auth-profiles.json'), 'w') as f:
+    json.dump(out, f, indent=2)
+
+for name in profiles:
+    ptype = profiles[name]['type']
+    print(f'  ✓ Auth: {name} ({ptype})')
+" || echo "⚠️ Failed to write auth-profiles.json"
 echo "✓ Wrote $AGENT_DIR/auth-profiles.json"
 
 # =========================================================================
