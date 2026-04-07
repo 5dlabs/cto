@@ -56,7 +56,7 @@ impl RuntimeClient {
     fn take_notifications(&self) -> Vec<SessionNotification> {
         self.notifications
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
     }
 }
@@ -77,12 +77,11 @@ impl Client for RuntimeClient {
                         PermissionOptionKind::AllowOnce | PermissionOptionKind::AllowAlways
                     )
                 })
-                .map(|option| {
+                .map_or(RequestPermissionOutcome::Cancelled, |option| {
                     RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(
                         option.option_id.clone(),
                     ))
-                })
-                .unwrap_or(RequestPermissionOutcome::Cancelled),
+                }),
             AcpPermissionPolicy::DenyAll => RequestPermissionOutcome::Cancelled,
         };
 
@@ -95,7 +94,7 @@ impl Client for RuntimeClient {
     ) -> agent_client_protocol::Result<()> {
         self.notifications
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(args);
         Ok(())
     }
@@ -106,6 +105,13 @@ impl Client for RuntimeClient {
 /// The runtime process is started, initialized, prompted, and then terminated
 /// once the prompt completes. The returned session ID can be reused by callers
 /// if the underlying runtime supports later `load_session` operations.
+///
+/// # Errors
+///
+/// Returns an error if the runtime transport is not stdio, if the runtime
+/// process fails to spawn, or if any step of the ACP protocol handshake
+/// (initialize, session, prompt) fails.
+#[allow(clippy::too_many_lines)]
 pub async fn run_oneshot_prompt(
     runtime: &AcpRuntimeConfig,
     request: AcpPromptRequest,
