@@ -224,30 +224,29 @@ describe('generateWorkflows', () => {
   });
 
   describe('play workflow CodeRun CRDs', () => {
-    test('CodeRun CRD uses per-task harness, not global input', () => {
+    test('CodeRun CRD uses per-task harness via shell variables', () => {
       const out = gen([infraTask, codingTask]);
       const play = out.play_yaml;
 
-      // bolt → codex
-      expect(play).toContain('cliType: codex');
-      expect(play).toContain('model: gpt-5.2-codex');
+      // bolt → codex: PRIMARY_CLI should be set to codex
+      expect(play).toContain('PRIMARY_CLI="codex"');
+      expect(play).toContain('PRIMARY_MODEL="gpt-5.2-codex"');
 
-      // rex → claude
-      expect(play).toContain('cliType: claude');
-      expect(play).toContain('model: claude-opus-4-6');
+      // rex → claude: PRIMARY_CLI should be set to claude
+      expect(play).toContain('PRIMARY_CLI="claude"');
+      expect(play).toContain('PRIMARY_MODEL="claude-opus-4-6"');
     });
 
     test('CodeRun CRD does not use {{inputs.cli}} for cliType', () => {
       const out = gen([infraTask, codingTask]);
       const play = out.play_yaml;
-      // cliType should be hardcoded per-task, not templated
       expect(play).not.toContain('cliType: {{inputs.cli}}');
     });
 
-    test('CodeRun labels include cli harness', () => {
+    test('CodeRun labels include cli variable reference', () => {
       const out = gen([infraTask]);
       const play = out.play_yaml;
-      expect(play).toContain('cto.5dlabs.ai/cli: "codex"');
+      expect(play).toContain('cto.5dlabs.ai/cli:');
     });
 
     test('CodeRun includes subtasks', () => {
@@ -461,7 +460,6 @@ describe('generateWorkflows', () => {
 
   describe('multi-task mixed harness play', () => {
     test('10-task play dispatches 3 different harnesses', () => {
-      // Simulate a realistic mix: bolt, rex, grizz, blaze
       const tasks: GeneratedTask[] = [
         { ...infraTask, id: 1, agent: 'bolt' },
         { ...codingTask, id: 2, agent: 'rex', dependencies: [1] },
@@ -471,12 +469,66 @@ describe('generateWorkflows', () => {
       const out = gen(tasks);
 
       expect(out.task_workflows).toHaveLength(4);
-      expect(out.play_yaml).toContain('cliType: codex');   // bolt, grizz
-      expect(out.play_yaml).toContain('cliType: claude');  // rex
-      expect(out.play_yaml).toContain('cliType: cursor');  // blaze
+      // Check PRIMARY_CLI assignments for each harness type
+      expect(out.play_yaml).toContain('PRIMARY_CLI="codex"');   // bolt, grizz
+      expect(out.play_yaml).toContain('PRIMARY_CLI="claude"');  // rex
+      expect(out.play_yaml).toContain('PRIMARY_CLI="cursor"');  // blaze
 
       // Harness table in play-start should mention 3 harnesses
       expect(out.play_yaml).toContain('3 harnesses');
+    });
+  });
+
+  describe('fallback cascade', () => {
+    test('run-task contains apply_coderun and wait_coderun functions', () => {
+      const out = gen([codingTask]);
+      const play = out.play_yaml;
+      expect(play).toContain('apply_coderun()');
+      expect(play).toContain('wait_coderun()');
+    });
+
+    test('primary and fallback CLI/model are defined', () => {
+      const out = gen([codingTask]);
+      const play = out.play_yaml;
+      // rex → primary claude, fallback codex
+      expect(play).toContain('PRIMARY_CLI="claude"');
+      expect(play).toContain('PRIMARY_MODEL="claude-opus-4-6"');
+      expect(play).toContain('FALLBACK_CLI="codex"');
+      expect(play).toContain('FALLBACK_MODEL="gpt-5.2-codex"');
+    });
+
+    test('fallback attempt triggers on primary failure', () => {
+      const out = gen([codingTask]);
+      const play = out.play_yaml;
+      expect(play).toContain('Primary $PRIMARY_CLI failed');
+      expect(play).toContain('falling back to');
+      expect(play).toContain('fallback-trigger');
+    });
+
+    test('fallback CodeRun has -fallback suffix', () => {
+      const out = gen([codingTask]);
+      const play = out.play_yaml;
+      expect(play).toContain(`play-task-2-rex-fallback`);
+    });
+
+    test('fallback deletes failed primary CodeRun', () => {
+      const out = gen([codingTask]);
+      const play = out.play_yaml;
+      expect(play).toContain('kubectl delete "coderun/$RUN_NAME"');
+      expect(play).toContain('--ignore-not-found=true');
+    });
+
+    test('fallback sends Discord notification', () => {
+      const out = gen([infraTask]);
+      const play = out.play_yaml;
+      expect(play).toContain('primary codex failed, falling back to claude');
+    });
+
+    test('output JSON uses USED_CLI variable for actual harness used', () => {
+      const out = gen([codingTask]);
+      const play = out.play_yaml;
+      expect(play).toContain('--arg cli "$USED_CLI"');
+      expect(play).toContain('--arg model "$USED_MODEL"');
     });
   });
 });

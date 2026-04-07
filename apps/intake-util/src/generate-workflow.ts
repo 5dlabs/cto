@@ -651,35 +651,52 @@ function generatePlayWorkflow(
     lines.push(`      ${notifyLinear('$LINEAR_SID', 'action',
       `## 🚀 Task ${tid} Dispatched\\n\\n**${task.title}**\\n- Agent: \`${agent}\`\\n- CLI: \`${taskCli}\` / Model: \`${taskModel}\`\\n- Type: ${taskType} | Difficulty: ${difficulty}\\n- Subtasks: ${(task.subtasks ?? []).length}`)}`);
 
-    // --- Submit CodeRun CRD for implementation ---
+    const fallbackCli = harness.fallback ?? 'codex';
+    const fallbackModel = harness.fallbackModel ?? 'gpt-5.2-codex';
+
+    // --- Submit CodeRun CRD for implementation (with fallback cascade) ---
     lines.push(``);
     lines.push(`  - name: run-task-${tid}`);
     lines.push(`    depends_on: [notify-task-${tid}-start]`);
     lines.push(`    command: |`);
-    lines.push(`      cat <<'CODERUN_EOF' | envsubst | kubectl apply -f -`);
+    lines.push(`      # --- Primary attempt: ${taskCli}/${taskModel} ---`);
+    lines.push(`      PRIMARY_CLI="${taskCli}"`);
+    lines.push(`      PRIMARY_MODEL="${taskModel}"`);
+    lines.push(`      FALLBACK_CLI="${fallbackCli}"`);
+    lines.push(`      FALLBACK_MODEL="${fallbackModel}"`);
+    lines.push(`      TASK_ID=${tid}`);
+    lines.push(`      AGENT="${agent}"`);
+    lines.push(`      NS="{{inputs.namespace}}"`);
+    lines.push(`      RUN_NAME="play-task-${tid}-${agent}"`);
+    lines.push(`      USED_CLI="$PRIMARY_CLI"`);
+    lines.push(`      USED_MODEL="$PRIMARY_MODEL"`);
+    lines.push(``);
+    lines.push(`      apply_coderun() {`);
+    lines.push(`        local cli="$1" model="$2" run_name="$3"`);
+    lines.push(`        cat <<CODERUN_EOF | envsubst | kubectl apply -f -`);
     lines.push(`      apiVersion: agents.platform/v1`);
     lines.push(`      kind: CodeRun`);
     lines.push(`      metadata:`);
-    lines.push(`        name: play-task-${tid}-${agent}`);
-    lines.push(`        namespace: {{inputs.namespace}}`);
+    lines.push(`        name: $run_name`);
+    lines.push(`        namespace: $NS`);
     lines.push(`        labels:`);
     lines.push(`          cto.5dlabs.ai/play: "true"`);
     lines.push(`          cto.5dlabs.ai/task-id: "${tid}"`);
     lines.push(`          cto.5dlabs.ai/agent: "${agent}"`);
     lines.push(`          cto.5dlabs.ai/task-type: "${taskType}"`);
-    lines.push(`          cto.5dlabs.ai/cli: "${taskCli}"`);
+    lines.push(`          cto.5dlabs.ai/cli: "$cli"`);
     lines.push(`      spec:`);
     lines.push(`        runType: implementation`);
     lines.push(`        taskId: ${tid}`);
     lines.push(`        service: ${agent}`);
     lines.push(`        repositoryUrl: {{inputs.repo_url}}`);
     lines.push(`        docsRepositoryUrl: {{inputs.docs_repository_url}}`);
-    lines.push(`        model: ${taskModel}`);
+    lines.push(`        model: $model`);
     lines.push(`        githubApp: ${ghApp}`);
     lines.push(`        enableDocker: {{inputs.enable_docker}}`);
     lines.push(`        cliConfig:`);
-    lines.push(`          cliType: ${taskCli}`);
-    lines.push(`          model: ${taskModel}`);
+    lines.push(`          cliType: $cli`);
+    lines.push(`          model: $model`);
     lines.push(`        linearIntegration:`);
     lines.push(`          enabled: true`);
     lines.push(`          sessionId: {{inputs.linear_session_id}}`);
@@ -696,14 +713,36 @@ function generatePlayWorkflow(
       }
     }
     lines.push(`      CODERUN_EOF`);
-    lines.push(`      # Wait for CodeRun to complete`);
-    lines.push(`      echo "Submitted CodeRun play-task-${tid}-${agent} (${taskCli}/${taskModel}), waiting..." &&`);
-    lines.push(`      kubectl wait coderun/play-task-${tid}-${agent}`);
-    lines.push(`        -n {{inputs.namespace}}`);
-    lines.push(`        --for=jsonpath='{.status.phase}'=Succeeded`);
-    lines.push(`        --timeout=3600s &&`);
-    lines.push(`      echo "task-${tid} implementation complete" &&`);
-    lines.push(`      jq -nc '{task_id:${tid}, agent:"${agent}", cli:"${taskCli}", model:"${taskModel}", phase:"implementation", status:"complete"}'`);
+    lines.push(`      }`);
+    lines.push(``);
+    lines.push(`      wait_coderun() {`);
+    lines.push(`        local run_name="$1"`);
+    lines.push(`        kubectl wait "coderun/$run_name" -n "$NS" \\`);
+    lines.push(`          --for=jsonpath='{.status.phase}'=Succeeded \\`);
+    lines.push(`          --timeout=3600s`);
+    lines.push(`      }`);
+    lines.push(``);
+    lines.push(`      # Primary attempt`);
+    lines.push(`      echo "Submitting CodeRun $RUN_NAME ($PRIMARY_CLI/$PRIMARY_MODEL)..." &&`);
+    lines.push(`      apply_coderun "$PRIMARY_CLI" "$PRIMARY_MODEL" "$RUN_NAME" &&`);
+    lines.push(`      if wait_coderun "$RUN_NAME"; then`);
+    lines.push(`        echo "task-${tid} implementation complete ($PRIMARY_CLI/$PRIMARY_MODEL)"`);
+    lines.push(`      else`);
+    lines.push(`        # --- Fallback attempt: ${fallbackCli}/${fallbackModel} ---`);
+    lines.push(`        FALLBACK_RUN="play-task-${tid}-${agent}-fallback"`);
+    lines.push(`        USED_CLI="$FALLBACK_CLI"`);
+    lines.push(`        USED_MODEL="$FALLBACK_MODEL"`);
+    lines.push(`        echo "⚠️ Primary $PRIMARY_CLI failed for task-${tid}, falling back to $FALLBACK_CLI/$FALLBACK_MODEL..." &&`);
+    lines.push(`        ${notifyDiscord(agent, '{{inputs.discord_channel}}',
+      `⚠️ Task ${tid}: primary ${taskCli} failed, falling back to ${fallbackCli}/${fallbackModel}`,
+      { step: 'fallback-trigger', task_id: tid, agent, primary_cli: taskCli, fallback_cli: fallbackCli })}`);
+    lines.push(`        kubectl delete "coderun/$RUN_NAME" -n "$NS" --ignore-not-found=true &&`);
+    lines.push(`        apply_coderun "$FALLBACK_CLI" "$FALLBACK_MODEL" "$FALLBACK_RUN" &&`);
+    lines.push(`        wait_coderun "$FALLBACK_RUN" &&`);
+    lines.push(`        echo "task-${tid} implementation complete via fallback ($FALLBACK_CLI/$FALLBACK_MODEL)"`);
+    lines.push(`      fi &&`);
+    lines.push(`      jq -nc --arg cli "$USED_CLI" --arg model "$USED_MODEL" \\`);
+    lines.push(`        '{task_id:${tid}, agent:"${agent}", cli:$cli, model:$model, phase:"implementation", status:"complete"}'`);
 
     // --- Post-implementation checks (quality/security/testing via lobster sub-workflows) ---
     // These use the check-specific agent harnesses (cipher for security, cleo for quality, tess for testing)
