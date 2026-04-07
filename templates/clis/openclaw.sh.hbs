@@ -102,6 +102,19 @@ OPENCLAW_CFG
 echo "✓ Wrote $OPENCLAW_HOME/openclaw.json (model: $OPENCLAW_MODEL, no fallbacks)"
 
 # =========================================================================
+# Onboard auth — register API keys with OpenClaw's auth store
+# openclaw onboard writes auth-profiles.json so the agent can use the key.
+# =========================================================================
+if [ -n "${OPENAI_API_KEY:-}" ]; then
+  openclaw onboard --openai-api-key "$OPENAI_API_KEY" 2>/dev/null && \
+    echo "✓ Onboarded OpenAI API key" || echo "⚠️ OpenAI onboard failed (non-fatal)"
+fi
+if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+  openclaw onboard --anthropic-api-key "$ANTHROPIC_API_KEY" 2>/dev/null && \
+    echo "✓ Onboarded Anthropic API key" || echo "⚠️ Anthropic onboard failed (non-fatal)"
+fi
+
+# =========================================================================
 # Determine prompt
 # =========================================================================
 if [ -n "${PROMPT_CONTENT:-}" ]; then
