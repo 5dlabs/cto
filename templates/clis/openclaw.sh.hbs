@@ -28,20 +28,22 @@ echo "✓ Backend:   $AGENT_BACKEND"
 # =========================================================================
 # Resolve OpenClaw model from CodeRun CRD parameters
 # The controller passes {{cli_type}} and {{model}} from the CRD spec.
-# We map cli_type → OpenClaw provider prefix, then combine with model.
+# We map cli_type → OpenClaw provider that has valid auth in the pod.
 # =========================================================================
 CLI_TYPE="{{cli_type}}"
 CRD_MODEL="{{model}}"
 
-# Map CLI type → OpenClaw provider id
+# Map CLI type → OpenClaw model provider
+# openai-api = standard OpenAI API (OPENAI_API_KEY)
+# openai-codex = ChatGPT OAuth backend (needs OAuth token, not API key)
 case "$CLI_TYPE" in
-  codex)     PROVIDER="openai-codex" ;;
-  cursor)    PROVIDER="cursor" ;;
-  factory)   PROVIDER="factory" ;;
+  codex)     PROVIDER="openai-api" ;;
+  cursor)    PROVIDER="openai-api" ;;
+  factory)   PROVIDER="openai-api" ;;
   claude)    PROVIDER="anthropic" ;;
   gemini)    PROVIDER="gemini" ;;
   opencode)  PROVIDER="openrouter" ;;
-  *)         PROVIDER="openai-codex" ;;
+  *)         PROVIDER="openai-api" ;;
 esac
 
 OPENCLAW_MODEL="${PROVIDER}/${CRD_MODEL}"
@@ -54,8 +56,7 @@ echo "✓ Agent model: $OPENCLAW_MODEL (cli=$CLI_TYPE, model=$CRD_MODEL)"
 
 # =========================================================================
 # Write openclaw.json — OpenClaw reads config from ~/.openclaw/openclaw.json
-# Keep config minimal: only agents model. ACP/plugins set via CLI after.
-# Pod image may be older OpenClaw — avoid keys it doesn't recognize.
+# Include model provider definitions so older OpenClaw versions work.
 # =========================================================================
 OPENCLAW_HOME="${HOME}/.openclaw"
 mkdir -p "$OPENCLAW_HOME"
@@ -67,6 +68,43 @@ cat > "$OPENCLAW_HOME/openclaw.json" << OPENCLAW_CFG
       "model": {
         "primary": "$OPENCLAW_MODEL",
         "fallbacks": []
+      }
+    }
+  },
+  "models": {
+    "providers": {
+      "openai-api": {
+        "baseUrl": "https://api.openai.com/v1",
+        "api": "openai-responses",
+        "auth": "token",
+        "authHeader": true,
+        "models": [
+          { "id": "gpt-5.4" },
+          { "id": "gpt-5.4-pro" },
+          { "id": "gpt-5.3-codex" },
+          { "id": "gpt-5.2-codex" },
+          { "id": "gpt-4.1" }
+        ]
+      },
+      "anthropic": {
+        "baseUrl": "https://api.anthropic.com",
+        "api": "anthropic-messages",
+        "auth": "token",
+        "authHeader": true,
+        "models": [
+          { "id": "claude-sonnet-4-6" },
+          { "id": "claude-opus-4-6" }
+        ]
+      },
+      "openrouter": {
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "api": "openai-responses",
+        "auth": "token",
+        "authHeader": true,
+        "models": [
+          { "id": "anthropic/claude-sonnet-4-6" },
+          { "id": "anthropic/claude-opus-4-6" }
+        ]
       }
     }
   }
