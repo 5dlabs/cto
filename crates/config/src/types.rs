@@ -182,12 +182,12 @@ impl SubagentConfig {
 
 /// Agent communication mode for Play workflow delegations.
 ///
-/// `a2a` is the HTTP JSON-RPC path used by OpenClaw today. `acp` remains a
+/// `a2a` is the HTTP JSON-RPC path used by `OpenClaw` today. `acp` remains a
 /// deprecated config alias for backward compatibility when deserializing.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum AgentCommunicationMode {
-    /// Native OpenClaw subagent hook invocation.
+    /// Native `OpenClaw` subagent hook invocation.
     #[default]
     Subagent,
     /// HTTP A2A JSON-RPC transport.
@@ -267,7 +267,7 @@ impl Default for AcpRuntimeConfig {
 }
 
 /// ACP service-level configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcpServiceConfig {
     /// Whether ACP delegation is enabled for this service.
     #[serde(default)]
@@ -284,17 +284,6 @@ pub struct AcpServiceConfig {
     /// Internal-only caller allowlist for ACP server surfaces.
     #[serde(default, rename = "allowedCallers")]
     pub allowed_callers: Vec<String>,
-}
-
-impl Default for AcpServiceConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            runtime_ids: Vec::new(),
-            default_runtime: None,
-            allowed_callers: Vec::new(),
-        }
-    }
 }
 
 impl AcpServiceConfig {

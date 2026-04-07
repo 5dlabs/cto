@@ -383,6 +383,7 @@ impl Default for CodeRunSpec {
 
 /// Status of the `CodeRun`
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CodeRunStatus {
     /// Current phase of the code implementation
     pub phase: String,

@@ -109,24 +109,6 @@ RUN if [ "${TOOLS_VERSION:-skip}" != "skip" ] && [ -n "${TOOLS_VERSION:-}" ] && 
       chmod +x /usr/local/bin/tools; \
     fi
 
-ARG PLAY_MONITOR_VERSION=skip
-RUN if [ "${PLAY_MONITOR_VERSION:-skip}" != "skip" ] && [ -n "${PLAY_MONITOR_VERSION:-}" ] && [ -f /tmp/binaries/play-monitor-linux-x86_64 ]; then \
-      mv /tmp/binaries/play-monitor-linux-x86_64 /usr/local/bin/play-monitor && \
-      chmod +x /usr/local/bin/play-monitor; \
-    fi
-
-ARG TASKS_VERSION=0.2.12
-RUN if [ "${TASKS_VERSION:-skip}" != "skip" ] && [ -n "${TASKS_VERSION:-}" ] && [ -f /tmp/binaries/intake-linux-x86_64 ]; then \
-      mv /tmp/binaries/intake-linux-x86_64 /usr/local/bin/intake && \
-      chmod +x /usr/local/bin/intake; \
-    fi
-
-ARG INTAKE_AGENT_VERSION=skip
-RUN if [ "${INTAKE_AGENT_VERSION:-skip}" != "skip" ] && [ -n "${INTAKE_AGENT_VERSION:-}" ] && [ -f /tmp/binaries/intake-agent-linux-x86_64 ]; then \
-      mv /tmp/binaries/intake-agent-linux-x86_64 /usr/local/bin/intake-agent && \
-      chmod +x /usr/local/bin/intake-agent; \
-    fi
-
 RUN rm -rf /tmp/binaries
 
 # Configure git defaults
@@ -574,29 +556,12 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
 # This avoids authentication issues with private repos during Docker build
 COPY .docker-binaries/ /tmp/binaries/
 ARG TOOLS_VERSION=skip
-ARG PLAY_MONITOR_VERSION=skip
-ARG TASKS_VERSION=0.2.12
-ARG INTAKE_AGENT_VERSION=skip
 RUN set -e && \
-    # tools client
+    # tools client (MCP bridge for agent pods)
     if [ "${TOOLS_VERSION:-skip}" != "skip" ] && [ -n "${TOOLS_VERSION:-}" ] && [ -f /tmp/binaries/tools-client-linux-x86_64 ]; then \
       mv /tmp/binaries/tools-client-linux-x86_64 /usr/local/bin/tools && chmod +x /usr/local/bin/tools; \
     fi && \
-    # play-monitor
-    if [ "${PLAY_MONITOR_VERSION:-skip}" != "skip" ] && [ -n "${PLAY_MONITOR_VERSION:-}" ] && [ -f /tmp/binaries/play-monitor-linux-x86_64 ]; then \
-      mv /tmp/binaries/play-monitor-linux-x86_64 /usr/local/bin/play-monitor && chmod +x /usr/local/bin/play-monitor; \
-    fi && \
-    # intake CLI
-    if [ "${TASKS_VERSION:-skip}" != "skip" ] && [ -n "${TASKS_VERSION:-}" ] && [ -f /tmp/binaries/intake-linux-x86_64 ]; then \
-      mv /tmp/binaries/intake-linux-x86_64 /usr/local/bin/intake && chmod +x /usr/local/bin/intake; \
-    fi && \
-    # intake-agent (TypeScript/Bun compiled)
-    if [ "${INTAKE_AGENT_VERSION:-skip}" != "skip" ] && [ -n "${INTAKE_AGENT_VERSION:-}" ] && [ -f /tmp/binaries/intake-agent-linux-x86_64 ]; then \
-      mv /tmp/binaries/intake-agent-linux-x86_64 /usr/local/bin/intake-agent && chmod +x /usr/local/bin/intake-agent; \
-    fi && \
     rm -rf /tmp/binaries
-
-# TaskMaster removed - using Rust intake CLI instead (see TASKS_VERSION above)
 
 # Install git-delta
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \

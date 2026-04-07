@@ -36,7 +36,11 @@ pub fn caller_from_meta(meta: Option<&Meta>) -> CallerContext {
 /// Enforce a caller allowlist using ACP metadata.
 ///
 /// Services can call this from `new_session`/`load_session` handlers to keep
-/// internal-only ACP servers scoped to known callers such as OpenClaw.
+/// internal-only ACP servers scoped to known callers such as `OpenClaw`.
+///
+/// # Errors
+///
+/// Returns an ACP auth-required error if the caller is not in the allowlist.
 pub fn ensure_allowed_caller(
     meta: Option<&Meta>,
     allowed_callers: &[String],
@@ -65,6 +69,10 @@ pub fn ensure_allowed_caller(
 ///
 /// This is the standard hosting mode for harness-managed ACP agents such as
 /// OpenClaw-spawned helpers.
+///
+/// # Errors
+///
+/// Returns an error if the IO task encounters a transport failure.
 pub async fn serve_stdio_agent(agent: impl Agent + 'static) -> anyhow::Result<()> {
     let local = tokio::task::LocalSet::new();
     local

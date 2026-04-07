@@ -12,17 +12,9 @@ pub struct RuntimeSelection {
 }
 
 /// Runtime registry backed by CTO config ACP defaults.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AcpRuntimeRegistry {
     defaults: AcpDefaults,
-}
-
-impl Default for AcpRuntimeRegistry {
-    fn default() -> Self {
-        Self {
-            defaults: AcpDefaults::default(),
-        }
-    }
 }
 
 impl AcpRuntimeRegistry {

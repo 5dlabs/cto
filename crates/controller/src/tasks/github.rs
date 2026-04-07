@@ -2,7 +2,7 @@
 
 use anyhow::{Context as AnyhowContext, Result};
 use octocrab::{models::pulls::PullRequest, Octocrab};
-use scm::{create_scm_client, ScmClient, ScmClientConfig, ScmProvider};
+use scm::ScmClient;
 use tracing::{info, warn};
 
 use crate::crds::coderun::CodeRun;

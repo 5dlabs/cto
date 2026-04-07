@@ -897,11 +897,17 @@ async fn update_code_status_with_completion(
         .as_ref()
         .and_then(|s| s.work_completed)
         .unwrap_or(false);
+    let current_retry = code_run
+        .status
+        .as_ref()
+        .and_then(|s| s.retry_count)
+        .unwrap_or(0);
+    let new_retry = retry_count_override.unwrap_or(current_retry);
 
-    if current_phase == new_phase && current_work_completed == work_completed {
+    if current_phase == new_phase && current_work_completed == work_completed && current_retry == new_retry {
         debug!(
-            "Status already '{}' with work_completed={}, skipping update to prevent reconciliation",
-            new_phase, work_completed
+            "Status already '{}' with work_completed={}, retry_count={}, skipping update to prevent reconciliation",
+            new_phase, work_completed, new_retry
         );
         return Ok(());
     }
@@ -1405,6 +1411,33 @@ async fn schedule_retry(
         info!("Deleted job {} to prepare for retry", job_name);
     }
 
+    let next_attempt = current_retry_count + 1;
+    let allowed_display = if max_retries == 0 {
+        "∞".to_string()
+    } else {
+        max_retries.to_string()
+    };
+
+    // CRITICAL: Update status (retryCount) BEFORE patching spec (contextVersion).
+    // Patching the spec triggers a new reconciliation via the informer. If that
+    // reconciliation fires before retryCount is persisted, the controller sees
+    // retryCount=0 and schedules yet another retry, creating a runaway loop
+    // (v1 → v2 → v3 → ... → v20+).
+    update_code_status_with_completion(
+        code_run,
+        ctx,
+        "Running",
+        &format!("Retry attempt {next_attempt} scheduled (max {allowed_display}): {reason}"),
+        false,
+        Some(next_attempt), // Pass the incremented retry count
+        None,
+        ExpireAtUpdate::Clear,
+    )
+    .await?;
+
+    // Now increment contextVersion to generate a new job name for the retry.
+    // By this point retryCount is already persisted, so any reconciliation
+    // triggered by this spec change will see the correct retry count.
     let coderuns_api: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
     let new_context_version = code_run.spec.context_version + 1;
 
@@ -1422,28 +1455,6 @@ async fn schedule_retry(
             &Patch::Merge(&spec_patch),
         )
         .await?;
-
-    let next_attempt = current_retry_count + 1;
-    let allowed_display = if max_retries == 0 {
-        "∞".to_string()
-    } else {
-        max_retries.to_string()
-    };
-
-    // Update status with incremented retry count in a single atomic operation
-    // This fixes a race condition where increment_retry_count and update_code_status_with_completion
-    // would overwrite each other's changes
-    update_code_status_with_completion(
-        code_run,
-        ctx,
-        "Running",
-        &format!("Retry attempt {next_attempt} scheduled (max {allowed_display}): {reason}"),
-        false,
-        Some(next_attempt), // Pass the incremented retry count
-        None,
-        ExpireAtUpdate::Clear,
-    )
-    .await?;
 
     Ok(())
 }

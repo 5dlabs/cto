@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use base64::Engine;
@@ -13,6 +15,7 @@ pub struct GitHubClient {
 }
 
 impl GitHubClient {
+    #[must_use]
     pub fn new(config: &ScmClientConfig) -> Self {
         Self {
             http: reqwest::Client::new(),
@@ -122,7 +125,7 @@ impl ScmClient for GitHubClient {
     ) -> Result<Vec<MergeRequest>> {
         let mut url = format!("{}/repos/{owner}/{repo}/pulls?state=open", self.api_base);
         if let Some(branch) = head_branch {
-            url.push_str(&format!("&head={owner}:{branch}"));
+            let _ = write!(url, "&head={owner}:{branch}");
         }
         let resp = self
             .http
@@ -199,7 +202,7 @@ impl ScmClient for GitHubClient {
         let content: GhContent = resp.json().await?;
         match (content.content, content.encoding.as_deref()) {
             (Some(b64), Some("base64")) => {
-                let cleaned = b64.replace('\n', "").replace('\r', "");
+                let cleaned = b64.replace(['\n', '\r'], "");
                 let decoded = base64::engine::general_purpose::STANDARD
                     .decode(cleaned)
                     .context("failed to decode base64 file content")?;

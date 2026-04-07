@@ -100,6 +100,21 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     echo "acpx installed" && \
     acpx --version
 
+# Patch acpx: enable shell mode for terminal/create on all platforms.
+# Without this, agents that send full command strings (e.g. "git status")
+# in terminal/create requests fail with ENOENT on Linux/macOS because
+# Node.js spawn() without shell:true treats the string as a literal binary.
+# Upstream: https://github.com/openclaw/acpx/issues/169 (fixed only for Windows)
+RUN ACPX_PROMPT_TURN=$(find "$(npm root -g)/acpx/dist" -name 'prompt-turn-*.js' ! -name '*.map' -type f | head -1) && \
+    if [ -n "$ACPX_PROMPT_TURN" ]; then \
+      LINE=$(grep -n 'shouldUseWindowsBatchShell(command, platform, env)) return options' "$ACPX_PROMPT_TURN" | head -1 | cut -d: -f1) && \
+      sed -i "${LINE}s/.*/\t\/\/ PATCHED: always use shell for terminal commands/" "$ACPX_PROMPT_TURN" && \
+      echo "acpx patched line $LINE in $ACPX_PROMPT_TURN" && \
+      sed -n "${LINE}p" "$ACPX_PROMPT_TURN"; \
+    else \
+      echo "WARNING: acpx prompt-turn file not found, patch skipped"; \
+    fi
+
 # =============================================================================
 # ClawHub CLI — skill registry search and installation
 # =============================================================================
@@ -131,13 +146,16 @@ RUN set -eux; \
     VERSION_DIR="$(cd "$CURSOR_SHARE/versions" && ls -1 | sort | tail -n1)"; \
     install -d /usr/local/lib/cursor-agent; \
     cp -r "$CURSOR_SHARE/versions/$VERSION_DIR"/. /usr/local/lib/cursor-agent/; \
-    ln -sf /usr/bin/node /usr/local/lib/cursor-agent/node; \
-    printf '#!/bin/bash\nexec /usr/local/lib/cursor-agent/cursor-agent "$@"\n' > /usr/local/bin/cursor-agent; \
-    chmod +x /usr/local/bin/cursor-agent; \
-    ln -sf cursor-agent /usr/local/bin/cursor; \
+    rm -f /usr/local/lib/cursor-agent/node; \
+    ln -sf "$(which node)" /usr/local/lib/cursor-agent/node; \
+    cp "$HOME/.local/bin/agent" /usr/local/bin/agent; \
+    chmod +x /usr/local/bin/agent; \
+    sed -i 's|SCRIPT_DIR=.*|SCRIPT_DIR="/usr/local/lib/cursor-agent"|' /usr/local/bin/agent; \
+    ln -sf agent /usr/local/bin/cursor-agent; \
+    ln -sf agent /usr/local/bin/cursor; \
     chown -R 1000:1000 /usr/local/lib/cursor-agent; \
     rm -rf "$CURSOR_SHARE"; \
-    cursor-agent --version || echo "Warning: cursor-agent version check failed"
+    agent --version
 
 # =============================================================================
 # Factory Droid CLI
@@ -249,12 +267,9 @@ RUN chmod +x /usr/local/bin/agent-entrypoint
 
 ENV HOME=/home/node
 
-# Drop privileges back to non-root user
-USER node
-WORKDIR /workspace
-
 # =============================================================================
 # Version manifest — bake every CLI version into the image
+# (Must run before USER node since /etc/cto requires root or explicit chown)
 # =============================================================================
 RUN set -e; \
     V_OPENCLAW=$(openclaw --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
@@ -264,7 +279,7 @@ RUN set -e; \
     V_CODEX=$(codex --version 2>&1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 || echo "unknown"); \
     V_CODE=$(code --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_GEMINI=$(timeout 10 gemini --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
-    V_CURSOR=$(cursor-agent --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_CURSOR=$(agent --version 2>&1 | head -1 | sed 's/^[[:space:]]*//' || echo "unknown"); \
     V_DROID=$(FACTORY_DISABLE_TELEMETRY=1 droid --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_KIMI=$(kimi --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_OPENCODE=$(opencode --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
@@ -300,6 +315,10 @@ RUN set -e; \
     echo "node           $V_NODE"; \
     echo "bun            $V_BUN"; \
     intake-util --help >/dev/null 2>&1 && echo "intake-util    OK" || true
+
+# Drop privileges back to non-root user
+USER node
+WORKDIR /workspace
 
 # Health check — confirms the openclaw gateway process is running
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

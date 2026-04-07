@@ -6,17 +6,12 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 /// Which SCM platform is active.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ScmProvider {
+    #[default]
     GitHub,
     GitLab,
-}
-
-impl Default for ScmProvider {
-    fn default() -> Self {
-        Self::GitHub
-    }
 }
 
 impl std::fmt::Display for ScmProvider {
@@ -148,6 +143,10 @@ pub trait ScmClient: Send + Sync {
     fn clone_url(&self, owner: &str, repo: &str, token: Option<&str>) -> String;
 
     /// Parse owner and repo from a full URL (HTTPS or SSH).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the URL cannot be parsed into owner/repo components.
     fn parse_repo_from_url(&self, url: &str) -> Result<(String, String)>;
 
     /// The provider type.
@@ -155,6 +154,7 @@ pub trait ScmClient: Send + Sync {
 }
 
 /// Build the appropriate SCM client from config.
+#[must_use]
 pub fn create_scm_client(config: &ScmClientConfig) -> Box<dyn ScmClient> {
     match config.provider {
         ScmProvider::GitHub => Box::new(github::GitHubClient::new(config)),
