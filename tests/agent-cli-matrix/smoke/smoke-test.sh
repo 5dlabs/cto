@@ -18,7 +18,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 OUTPUT_DIR="$SCRIPT_DIR/generated"
-NAMESPACE="openclaw"
+NAMESPACE="cto"
 TARGET_REPO="https://github.com/5dlabs/sigma-1.git"
 DOCS_REPO="https://github.com/5dlabs/sigma-1.git"
 SERVICE="sigma-1"
