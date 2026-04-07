@@ -83,6 +83,98 @@
         "checkIntervalSecs": 120,
         "template": "watcher/base",
         "circuitBreakerThreshold": 3
+      },
+      "agentHarness": {
+        "rex": {
+          "primary": "claude",
+          "model": "claude-opus-4-6",
+          "fallback": "codex",
+          "fallbackModel": "gpt-5.2-codex"
+        },
+        "grizz": {
+          "primary": "codex",
+          "model": "gpt-5.2-codex",
+          "fallback": "claude",
+          "fallbackModel": "claude-opus-4-6"
+        },
+        "blaze": {
+          "primary": "cursor",
+          "model": "opus-4.6",
+          "fallback": "claude",
+          "fallbackModel": "claude-opus-4-6"
+        },
+        "bolt": {
+          "primary": "codex",
+          "model": "gpt-5.2-codex",
+          "fallback": "claude",
+          "fallbackModel": "claude-opus-4-6"
+        },
+        "nova": {
+          "primary": "claude",
+          "model": "claude-opus-4-6",
+          "fallback": "codex",
+          "fallbackModel": "gpt-5.2-codex"
+        },
+        "angie": {
+          "primary": "claude",
+          "model": "claude-opus-4-6",
+          "fallback": "codex",
+          "fallbackModel": "gpt-5.2-codex"
+        },
+        "tap": {
+          "primary": "cursor",
+          "model": "opus-4.6",
+          "fallback": "claude",
+          "fallbackModel": "claude-opus-4-6"
+        },
+        "cipher": {
+          "primary": "claude",
+          "model": "claude-opus-4-6",
+          "fallback": "codex",
+          "fallbackModel": "gpt-5.2-codex"
+        },
+        "tess": {
+          "primary": "codex",
+          "model": "gpt-5.2-codex",
+          "fallback": "claude",
+          "fallbackModel": "claude-opus-4-6"
+        },
+        "cleo": {
+          "primary": "claude",
+          "model": "claude-opus-4-6",
+          "fallback": "codex",
+          "fallbackModel": "gpt-5.2-codex"
+        },
+        "spark": {
+          "primary": "codex",
+          "model": "gpt-5.2-codex",
+          "fallback": "claude",
+          "fallbackModel": "claude-opus-4-6"
+        },
+        "stitch": {
+          "primary": "claude",
+          "model": "claude-opus-4-6",
+          "fallback": "codex",
+          "fallbackModel": "gpt-5.2-codex"
+        },
+        "vex": {
+          "primary": "claude",
+          "model": "claude-opus-4-6",
+          "fallback": "codex",
+          "fallbackModel": "gpt-5.2-codex"
+        },
+        "pixel": {
+          "primary": "cursor",
+          "model": "opus-4.6",
+          "fallback": "claude",
+          "fallbackModel": "claude-opus-4-6"
+        },
+        "_default": {
+          "primary": "claude",
+          "model": "claude-opus-4-6",
+          "fallback": "codex",
+          "fallbackModel": "gpt-5.2-codex"
+        }
       }
     },
     "remediation": {

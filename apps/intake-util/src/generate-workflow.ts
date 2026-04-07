@@ -14,11 +14,19 @@
 import type { GeneratedTask, GeneratedSubtask, TaskScaffold, TaskType } from './types';
 import { getValidationCommands, getSecurityCommands, getTestCommands } from './stack-validators';
 
+interface AgentHarness {
+  primary: string;
+  model: string;
+  fallback?: string;
+  fallbackModel?: string;
+}
+
 interface PlayConfig {
   implementationMaxRetries?: number;
   qualityMaxRetries?: number;
   securityMaxRetries?: number;
   testingMaxRetries?: number;
+  agentHarness?: Record<string, AgentHarness>;
 }
 
 interface WorkflowInput {
@@ -50,6 +58,19 @@ function indent(text: string, spaces: number): string {
     .join('\n');
 }
 
+const DEFAULT_HARNESS: AgentHarness = {
+  primary: 'claude',
+  model: 'claude-opus-4-6',
+  fallback: 'codex',
+  fallbackModel: 'gpt-5.2-codex',
+};
+
+function getAgentHarness(agent: string, config: PlayConfig): AgentHarness {
+  const map = config.agentHarness;
+  if (!map) return DEFAULT_HARNESS;
+  return map[agent] ?? map['_default'] ?? DEFAULT_HARNESS;
+}
+
 function generateTaskWorkflow(
   task: GeneratedTask,
   scaffold: TaskScaffold | undefined,
@@ -59,6 +80,7 @@ function generateTaskWorkflow(
   const taskId = task.id;
   const agent = task.agent ?? 'nova';
   const stack = task.stack ?? 'typescript';
+  const harness = getAgentHarness(agent, config);
   const validation = getValidationCommands(stack);
   const maxImplRetries = config.implementationMaxRetries ?? 10;
   const maxQualRetries = config.qualityMaxRetries ?? 5;
@@ -74,6 +96,8 @@ function generateTaskWorkflow(
   lines.push(`  task_id: ${taskId}`);
   lines.push(`  agent: ${agent}`);
   lines.push(`  stack: ${stack}`);
+  lines.push(`  cli: ${harness.primary}`);
+  lines.push(`  model: ${harness.model}`);
   if (task.dependencies.length > 0) {
     lines.push(`  depends_on_tasks: [${task.dependencies.join(', ')}]`);
   }
@@ -88,9 +112,13 @@ function generateTaskWorkflow(
   lines.push('  - name: agent');
   lines.push(`    default: "${agent}"`);
   lines.push('  - name: cli');
-  lines.push('    default: "claude"');
+  lines.push(`    default: "${harness.primary}"`);
   lines.push('  - name: model');
-  lines.push('    default: "claude-opus-4-6"');
+  lines.push(`    default: "${harness.model}"`);
+  lines.push('  - name: fallback_cli');
+  lines.push(`    default: "${harness.fallback ?? 'codex'}"`);
+  lines.push('  - name: fallback_model');
+  lines.push(`    default: "${harness.fallbackModel ?? 'gpt-5.2-codex'}"`);
   lines.push('  - name: max_implementation_retries');
   lines.push(`    default: ${maxImplRetries}`);
   lines.push('  - name: max_quality_retries');
@@ -253,6 +281,7 @@ function generateQualityWorkflow(
   const validation = getValidationCommands(stack);
   const maxRetries = config.qualityMaxRetries ?? 5;
   const taskDir = `{{inputs.task_dir}}`;
+  const harness = getAgentHarness('cleo', config);
 
   return `name: quality-task-${taskId}
 metadata:
@@ -260,6 +289,8 @@ metadata:
   agent: cleo
   phase: quality
   stack: ${stack}
+  cli: ${harness.primary}
+  model: ${harness.model}
 
 inputs:
   - name: task_dir
@@ -268,9 +299,9 @@ inputs:
   - name: pr_url
     default: ""
   - name: cli
-    default: "claude"
+    default: "${harness.primary}"
   - name: model
-    default: "claude-opus-4-6"
+    default: "${harness.model}"
   - name: max_retries
     default: ${maxRetries}
 
@@ -324,6 +355,7 @@ function generateSecurityWorkflow(
   const security = getSecurityCommands(stack);
   const maxRetries = config.securityMaxRetries ?? 3;
   const taskDir = `{{inputs.task_dir}}`;
+  const harness = getAgentHarness('cipher', config);
 
   return `name: security-task-${taskId}
 metadata:
@@ -331,6 +363,8 @@ metadata:
   agent: cipher
   phase: security
   stack: ${stack}
+  cli: ${harness.primary}
+  model: ${harness.model}
 
 inputs:
   - name: task_dir
@@ -339,9 +373,9 @@ inputs:
   - name: pr_url
     default: ""
   - name: cli
-    default: "claude"
+    default: "${harness.primary}"
   - name: model
-    default: "claude-opus-4-6"
+    default: "${harness.model}"
   - name: max_retries
     default: ${maxRetries}
 
@@ -393,6 +427,7 @@ function generateTestingWorkflow(
   const testing = getTestCommands(stack);
   const maxRetries = config.testingMaxRetries ?? 5;
   const taskDir = `{{inputs.task_dir}}`;
+  const harness = getAgentHarness('tess', config);
 
   return `name: testing-task-${taskId}
 metadata:
@@ -400,6 +435,8 @@ metadata:
   agent: tess
   phase: testing
   stack: ${stack}
+  cli: ${harness.primary}
+  model: ${harness.model}
 
 inputs:
   - name: task_dir
@@ -408,9 +445,9 @@ inputs:
   - name: pr_url
     default: ""
   - name: cli
-    default: "claude"
+    default: "${harness.primary}"
   - name: model
-    default: "claude-opus-4-6"
+    default: "${harness.model}"
   - name: max_retries
     default: ${maxRetries}
 
@@ -540,6 +577,11 @@ function generatePlayWorkflow(
     const isCoding = taskType === 'task';
     const difficulty = task.difficulty_score ?? task.difficultyScore ?? 5;
     const branchName = `task-${tid}/${agent}`;
+    const harness = getAgentHarness(agent, config);
+
+    // Per-task CLI/model — used in CodeRun CRD and sub-workflow calls
+    const taskCli = harness.primary;
+    const taskModel = harness.model;
 
     // Determine depends_on for this task's implementation step
     const implDeps: string[] = [];
@@ -551,7 +593,7 @@ function generatePlayWorkflow(
 
     // --- Submit CodeRun CRD for implementation ---
     lines.push(``);
-    lines.push(`  # ── Task ${tid}: ${task.title} (${taskType}, agent: ${agent}, difficulty: ${difficulty}) ──`);
+    lines.push(`  # ── Task ${tid}: ${task.title} (${taskType}, agent: ${agent}, cli: ${taskCli}, model: ${taskModel}, difficulty: ${difficulty}) ──`);
     lines.push(`  - name: run-task-${tid}`);
     if (implDeps.length > 0) {
       lines.push(`    depends_on: [${implDeps.join(', ')}]`);
@@ -568,18 +610,19 @@ function generatePlayWorkflow(
     lines.push(`          cto.5dlabs.ai/task-id: "${tid}"`);
     lines.push(`          cto.5dlabs.ai/agent: "${agent}"`);
     lines.push(`          cto.5dlabs.ai/task-type: "${taskType}"`);
+    lines.push(`          cto.5dlabs.ai/cli: "${taskCli}"`);
     lines.push(`      spec:`);
     lines.push(`        runType: implementation`);
     lines.push(`        taskId: ${tid}`);
     lines.push(`        service: ${agent}`);
     lines.push(`        repositoryUrl: {{inputs.repo_url}}`);
     lines.push(`        docsRepositoryUrl: {{inputs.docs_repository_url}}`);
-    lines.push(`        model: {{inputs.model}}`);
+    lines.push(`        model: ${taskModel}`);
     lines.push(`        githubApp: ${ghApp}`);
     lines.push(`        enableDocker: {{inputs.enable_docker}}`);
     lines.push(`        cliConfig:`);
-    lines.push(`          cliType: {{inputs.cli}}`);
-    lines.push(`          model: {{inputs.model}}`);
+    lines.push(`          cliType: ${taskCli}`);
+    lines.push(`          model: ${taskModel}`);
     lines.push(`        linearIntegration:`);
     lines.push(`          enabled: true`);
     lines.push(`          sessionId: {{inputs.linear_session_id}}`);
@@ -597,15 +640,17 @@ function generatePlayWorkflow(
     }
     lines.push(`      CODERUN_EOF`);
     lines.push(`      # Wait for CodeRun to complete`);
-    lines.push(`      echo "Submitted CodeRun play-task-${tid}-${agent}, waiting..." &&`);
+    lines.push(`      echo "Submitted CodeRun play-task-${tid}-${agent} (${taskCli}/${taskModel}), waiting..." &&`);
     lines.push(`      kubectl wait coderun/play-task-${tid}-${agent}`);
     lines.push(`        -n {{inputs.namespace}}`);
     lines.push(`        --for=jsonpath='{.status.phase}'=Succeeded`);
     lines.push(`        --timeout=3600s &&`);
     lines.push(`      echo "task-${tid} implementation complete" &&`);
-    lines.push(`      jq -nc '{task_id:${tid}, agent:"${agent}", phase:"implementation", status:"complete"}'`);
+    lines.push(`      jq -nc '{task_id:${tid}, agent:"${agent}", cli:"${taskCli}", model:"${taskModel}", phase:"implementation", status:"complete"}'`);
 
     // --- Post-implementation checks (quality/security/testing via lobster sub-workflows) ---
+    // These use the check-specific agent harnesses (cipher for security, cleo for quality, tess for testing)
+    const secHarness = getAgentHarness('cipher', config);
     const checkDeps = [`run-task-${tid}`];
     const gateSteps: string[] = [];
 
@@ -619,12 +664,15 @@ function generatePlayWorkflow(
     lines.push(`      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-${tid}'`);
     lines.push(`        --arg repo '{{inputs.repo_url}}'`);
     lines.push(`        --arg branch '${branchName}'`);
-    lines.push(`        --arg cli '{{inputs.cli}}'`);
-    lines.push(`        --arg model '{{inputs.model}}'`);
+    lines.push(`        --arg cli '${secHarness.primary}'`);
+    lines.push(`        --arg model '${secHarness.model}'`);
     lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"`);
     gateSteps.push(`security-task-${tid}`);
 
     if (isCoding) {
+      const qualHarness = getAgentHarness('cleo', config);
+      const testHarness = getAgentHarness('tess', config);
+
       // Quality — coding tasks only
       lines.push(``);
       lines.push(`  - name: quality-task-${tid}`);
@@ -635,8 +683,8 @@ function generatePlayWorkflow(
       lines.push(`      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-${tid}'`);
       lines.push(`        --arg repo '{{inputs.repo_url}}'`);
       lines.push(`        --arg branch '${branchName}'`);
-      lines.push(`        --arg cli '{{inputs.cli}}'`);
-      lines.push(`        --arg model '{{inputs.model}}'`);
+      lines.push(`        --arg cli '${qualHarness.primary}'`);
+      lines.push(`        --arg model '${qualHarness.model}'`);
       lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"`);
       gateSteps.push(`quality-task-${tid}`);
 
@@ -650,8 +698,8 @@ function generatePlayWorkflow(
       lines.push(`      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-${tid}'`);
       lines.push(`        --arg repo '{{inputs.repo_url}}'`);
       lines.push(`        --arg branch '${branchName}'`);
-      lines.push(`        --arg cli '{{inputs.cli}}'`);
-      lines.push(`        --arg model '{{inputs.model}}'`);
+      lines.push(`        --arg cli '${testHarness.primary}'`);
+      lines.push(`        --arg model '${testHarness.model}'`);
       lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"`);
       gateSteps.push(`testing-task-${tid}`);
     }
@@ -661,18 +709,24 @@ function generatePlayWorkflow(
     lines.push(`  - name: gate-task-${tid}`);
     lines.push(`    depends_on: [${gateSteps.join(', ')}]`);
     lines.push(`    command: >`);
-    lines.push(`      echo "task-${tid} [${taskType}] gate passed — all checks complete" &&`);
-    lines.push(`      jq -nc '{task_id: ${tid}, task_type: "${taskType}", agent: "${agent}", difficulty: ${difficulty}, gate: "pass"}'`);
+    lines.push(`      echo "task-${tid} [${taskType}] gate passed — ${taskCli}/${taskModel} — all checks complete" &&`);
+    lines.push(`      jq -nc '{task_id: ${tid}, task_type: "${taskType}", agent: "${agent}", cli: "${taskCli}", model: "${taskModel}", difficulty: ${difficulty}, gate: "pass"}'`);
   }
 
-  // --- Final play-complete step ---
+  // --- Final play-complete step with harness summary ---
   const allGates = tasks.map((t) => `gate-task-${t.id}`);
+  const harnessSummary = tasks.map((t) => {
+    const a = t.agent ?? 'nova';
+    const h = getAgentHarness(a, config);
+    return `task-${t.id}(${a}):${h.primary}`;
+  }).join(', ');
   lines.push(``);
   lines.push(`  # ── Play complete ──`);
   lines.push(`  - name: play-complete`);
   lines.push(`    depends_on: [${allGates.join(', ')}]`);
   lines.push(`    command: >`);
   lines.push(`      echo "play complete — all ${tasks.length} tasks passed gate checks" &&`);
+  lines.push(`      echo "harness summary: ${harnessSummary}" &&`);
   lines.push(`      jq -nc '{play: "complete", tasks: ${tasks.length}, status: "pass"}'`);
 
   return lines.join('\n') + '\n';
