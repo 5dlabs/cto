@@ -102,17 +102,31 @@ OPENCLAW_CFG
 echo "✓ Wrote $OPENCLAW_HOME/openclaw.json (model: $OPENCLAW_MODEL, no fallbacks)"
 
 # =========================================================================
-# Onboard auth — register API keys with OpenClaw's auth store
-# openclaw onboard writes auth-profiles.json so the agent can use the key.
+# Write auth-profiles.json directly (workaround for openclaw/openclaw#8481)
+# 'openclaw onboard' doesn't persist API keys to auth-profiles.json in
+# non-interactive/container environments. Write the file manually.
 # =========================================================================
+AGENT_DIR="$OPENCLAW_HOME/agents/main/agent"
+mkdir -p "$AGENT_DIR"
+
+# Build profiles JSON from available env vars
+AUTH_PROFILES='{ "version": 1, "profiles": {'
+NEED_COMMA=""
+
 if [ -n "${OPENAI_API_KEY:-}" ]; then
-  openclaw onboard --openai-api-key "$OPENAI_API_KEY" 2>/dev/null && \
-    echo "✓ Onboarded OpenAI API key" || echo "⚠️ OpenAI onboard failed (non-fatal)"
+  AUTH_PROFILES="${AUTH_PROFILES}${NEED_COMMA} \"openai-api:default\": { \"type\": \"api_key\", \"provider\": \"openai-api\", \"key\": \"${OPENAI_API_KEY}\" }"
+  NEED_COMMA=","
+  echo "✓ Auth: openai-api (API key)"
 fi
 if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-  openclaw onboard --anthropic-api-key "$ANTHROPIC_API_KEY" 2>/dev/null && \
-    echo "✓ Onboarded Anthropic API key" || echo "⚠️ Anthropic onboard failed (non-fatal)"
+  AUTH_PROFILES="${AUTH_PROFILES}${NEED_COMMA} \"anthropic:default\": { \"type\": \"api_key\", \"provider\": \"anthropic\", \"key\": \"${ANTHROPIC_API_KEY}\" }"
+  NEED_COMMA=","
+  echo "✓ Auth: anthropic (API key)"
 fi
+
+AUTH_PROFILES="${AUTH_PROFILES} } }"
+echo "$AUTH_PROFILES" > "$AGENT_DIR/auth-profiles.json"
+echo "✓ Wrote $AGENT_DIR/auth-profiles.json"
 
 # =========================================================================
 # Determine prompt
