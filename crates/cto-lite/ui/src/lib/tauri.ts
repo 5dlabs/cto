@@ -686,11 +686,28 @@ export async function openclawExecCli(
 // ============================================================================
 
 export async function studioGetState(): Promise<StudioState> {
-  return invoke<StudioState>('studio_get_state');
+  try {
+    return await invoke<StudioState>('studio_get_state');
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      const { getDemoStudioState } = await import('@/lib/demo-studio-state');
+      console.warn('[cto-ui] studio_get_state failed — using demo studio state (browser dev)', error);
+      return getDemoStudioState();
+    }
+    throw error;
+  }
 }
 
 export async function studioSaveState(state: StudioState): Promise<StudioState> {
-  return invoke<StudioState>('studio_save_state', { state });
+  try {
+    return await invoke<StudioState>('studio_save_state', { state });
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn('[cto-ui] studio_save_state skipped (no Tauri in this session)', error);
+      return state;
+    }
+    throw error;
+  }
 }
 
 export async function studioRenderAgentConfig(

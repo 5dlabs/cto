@@ -1,1 +1,1 @@
-gRPC (tonic for Rust, native for Go) for internal service-to-service; REST via grpc-gateway/tonic-web for public APIs. No GraphQL.
+Separate schemas within a single PostgreSQL database (rms, finance, catalog, vetting, social, audit)

@@ -6,6 +6,41 @@ use tauri::{AppHandle, Manager, State};
 
 const STUDIO_STATE_KEY: &str = "studio_state_v1";
 
+/// Default PRD body for new installs — real markdown so the in-app preview has structure to render.
+const DEFAULT_SIGMA_PRD: &str = r#"# Sigma 1 — CTO Lite PRD (sample)
+
+## Product goal
+
+Ship a **single** Morgan workspace where chat, voice, video, and project context stay aligned.
+
+## User stories
+
+- As a builder, I open **Projects** and edit a PRD with live markdown preview.
+- As a user, I switch between Split, Markdown, and Preview without losing state.
+
+## Technical notes
+
+| Area        | Choice              |
+|------------|---------------------|
+| Shell      | Tauri + React       |
+| Editor     | CodeMirror (GFM)    |
+| Preview    | react-markdown      |
+
+## Snippet
+
+```text
+session → LiveKit room → Morgan + agents
+```
+
+## Links
+
+- [CTO repo](https://github.com/5dlabs/cto)
+
+---
+
+_This block is seeded for UI preview; replace with your real PRD._
+"#;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectRecord {
@@ -74,7 +109,7 @@ fn default_projects() -> Vec<ProjectRecord> {
             summary: "Primary product workspace for the live Morgan experience.".to_string(),
             repository: Some("/Users/jonathon/5dlabs/cto".to_string()),
             prd_title: "Sigma 1".to_string(),
-            prd_content: "Unify chat, voice, video, agents, and projects around one local Morgan experience.".to_string(),
+            prd_content: DEFAULT_SIGMA_PRD.to_string(),
             workflow_summary: "Morgan intake -> agent execution -> review -> apply.".to_string(),
             workflow_notes: "Track PRD decomposition, workflow steps, and local runtime checkpoints here.".to_string(),
             config_notes: "Kind-backed local OpenClaw stack with deterministic desktop-owned config.".to_string(),

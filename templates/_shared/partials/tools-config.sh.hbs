@@ -8,8 +8,9 @@ echo ""
 echo "🔧 MCP Tools Configuration:"
 
 # The tool server reads config from MCP_CLIENT_CONFIG env var
-# Use CLI_WORK_DIR (set by git-setup) as it's guaranteed writable
-TOOLS_CONFIG_DEST="${MCP_CLIENT_CONFIG:-${CLI_WORK_DIR:-/workspace}/client-config.json}"
+# Use CLAUDE_WORK_DIR (set by git-setup) or /tmp as fallback (always writable)
+TOOLS_CONFIG_DEST="${MCP_CLIENT_CONFIG:-${CLAUDE_WORK_DIR:-/tmp}/client-config.json}"
+export MCP_CLIENT_CONFIG="$TOOLS_CONFIG_DEST"
 
 # Project-specific CTO config location (synced from Linear document)
 PROJECT_CONFIG="/config/project/cto-config.json"

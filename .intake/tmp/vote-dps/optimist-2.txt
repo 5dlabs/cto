@@ -1,1 +1,1 @@
-Single database, domain schemas (rms, finance, etc.), with org_id/tenant_id columns for row-level filtering
+mTLS between services (leveraging Cilium's built-in mutual TLS) + JWT for external client authentication

@@ -1,1 +1,1 @@
-JWT for web/mobile sessions (issued by API gateway), pre-shared API keys for service-to-service auth in Phase 1. Defer auth service to Phase 2.
+URI-based versioning (/api/v1/...)

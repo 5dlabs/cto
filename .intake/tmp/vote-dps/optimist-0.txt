@@ -1,1 +1,1 @@
-Hybrid — gRPC for synchronous request/response paths, NATS (already in-cluster) for event-driven async workflows
+gRPC for internal service-to-service calls, with REST gateways for external clients (web, mobile, Morgan MCP tools)

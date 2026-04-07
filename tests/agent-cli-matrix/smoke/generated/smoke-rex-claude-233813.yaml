@@ -1,0 +1,49 @@
+apiVersion: agents.platform/v1
+kind: CodeRun
+metadata:
+  name: smoke-rex-claude-233813
+  namespace: cto
+  labels:
+    smoke-test: "true"
+    smoke-run-id: "smoke-20260406-233813"
+    agent: "rex"
+    cli-type: "claude"
+spec:
+  runType: implementation
+  taskId: 9000
+  service: sigma-1
+  repositoryUrl: https://github.com/5dlabs/sigma-1.git
+  docsRepositoryUrl: https://github.com/5dlabs/sigma-1.git
+  workingDirectory: /workspace
+  model: claude-sonnet-4-6
+  githubApp: 5DLabs-Rex
+  cliConfig:
+    cliType: claude
+    model: claude-sonnet-4-6
+    settings: {}
+  env:
+    SMOKE_TEST: "true"
+    SMOKE_RUN_ID: "smoke-20260406-233813"
+    CTO_CLI_TYPE: "claude"
+    CTO_CLI_MODEL: "claude-sonnet-4-6"
+  promptModification: |
+    SMOKE TEST — CLI Verification
+
+    You are rex running via the claude CLI with model claude-sonnet-4-6.
+
+    Your task:
+    1. Create a file 'smoke-test/rex-claude.md' with this content:
+       - Agent: rex
+       - CLI: claude
+       - Model: claude-sonnet-4-6
+       - Timestamp: (current UTC time)
+       - A one-line description of your agent role
+    2. Commit with message: 'smoke(rex): verify claude CLI [model: claude-sonnet-4-6]'
+    3. Create a PR with title: '[Smoke] rex via claude (claude-sonnet-4-6)'
+    4. In the PR body, include:
+       - CLI type: claude
+       - Model: claude-sonnet-4-6
+       - Agent: rex
+       - Run ID: smoke-20260406-233813
+
+    Keep it simple — this is just verifying the CLI harness works end-to-end.

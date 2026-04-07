@@ -1,1 +1,1 @@
-JWT with RBAC — stateless, service-mesh friendly, with short-lived tokens (15min) and refresh tokens stored in Valkey
+URI-based versioning (/api/v1/...) for all REST endpoints

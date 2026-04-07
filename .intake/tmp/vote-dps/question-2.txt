@@ -1,1 +1,1 @@
-Row-level tenant isolation within shared schemas, or separate databases per tenant?
+What authentication mechanism for backend service APIs?

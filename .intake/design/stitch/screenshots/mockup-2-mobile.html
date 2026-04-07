@@ -1,82 +1,92 @@
 <!DOCTYPE html>
 
-<html class="light" lang="en"><head>
+<html class="dark" lang="en"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Sigma-1 | Project Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&amp;family=Manrope:wght@300;400;500;600;700;800&amp;family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "surface-dim": "#d9d9e7",
-                        "inverse-surface": "#2e303a",
-                        "surface-container-high": "#e7e7f5",
-                        "on-secondary-fixed-variant": "#2b418f",
-                        "surface-container": "#ededfb",
-                        "surface-tint": "#004ced",
-                        "tertiary-fixed-dim": "#ffb4a1",
-                        "secondary-fixed": "#dde1ff",
-                        "surface-container-low": "#f3f2ff",
-                        "secondary-container": "#95aafe",
-                        "secondary": "#4459a8",
-                        "surface-bright": "#fbf8ff",
-                        "on-primary": "#ffffff",
-                        "primary-fixed-dim": "#b7c4ff",
-                        "primary": "#003ec7",
-                        "on-tertiary-fixed": "#3c0800",
-                        "on-error": "#ffffff",
-                        "inverse-primary": "#b7c4ff",
-                        "surface-container-highest": "#e1e1ef",
-                        "inverse-on-surface": "#f0effe",
-                        "outline-variant": "#c3c5d9",
-                        "on-tertiary": "#ffffff",
-                        "on-surface": "#191b25",
-                        "on-secondary": "#ffffff",
-                        "on-primary-fixed": "#001452",
-                        "on-surface-variant": "#434656",
-                        "surface-variant": "#e1e1ef",
-                        "primary-fixed": "#dde1ff",
-                        "on-primary-container": "#dfe3ff",
-                        "tertiary-fixed": "#ffdbd2",
-                        "primary-container": "#0052ff",
-                        "outline": "#737688",
-                        "tertiary-container": "#bf3003",
-                        "surface-container-lowest": "#ffffff",
-                        "tertiary": "#952200",
-                        "error": "#ba1a1a",
-                        "on-secondary-fixed": "#001452",
-                        "on-secondary-container": "#253b89",
-                        "on-tertiary-container": "#ffddd5",
-                        "on-primary-fixed-variant": "#0038b6",
-                        "background": "#fbf8ff",
-                        "surface": "#fbf8ff",
-                        "on-error-container": "#93000a",
-                        "secondary-fixed-dim": "#b7c4ff",
-                        "on-tertiary-fixed-variant": "#891e00",
-                        "on-background": "#191b25",
-                        "error-container": "#ffdad6"
-                    },
-                    fontFamily: {
-                        "headline": ["Manrope"],
-                        "body": ["Manrope"],
-                        "label": ["Manrope"]
-                    },
-                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
-                },
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-fixed": "#1c1b1b",
+                    "surface-container-low": "#1c1b1b",
+                    "on-surface": "#e5e2e1",
+                    "surface-dim": "#131313",
+                    "error-container": "#93000a",
+                    "on-surface-variant": "#bac9cc",
+                    "surface-tint": "#00daf3",
+                    "on-secondary-fixed-variant": "#474646",
+                    "on-tertiary-fixed": "#3c0700",
+                    "on-primary": "#00363d",
+                    "inverse-primary": "#006875",
+                    "inverse-surface": "#e5e2e1",
+                    "surface-container-lowest": "#0e0e0e",
+                    "tertiary-container": "#ffc2b3",
+                    "on-secondary": "#313030",
+                    "primary-fixed-dim": "#00daf3",
+                    "inverse-on-surface": "#313030",
+                    "on-tertiary": "#621100",
+                    "on-secondary-container": "#b7b4b4",
+                    "background": "#131313",
+                    "surface-variant": "#353534",
+                    "on-background": "#e5e2e1",
+                    "tertiary-fixed-dim": "#ffb4a2",
+                    "surface-bright": "#3a3939",
+                    "on-tertiary-container": "#aa2600",
+                    "outline-variant": "#3b494c",
+                    "surface-container-highest": "#353534",
+                    "primary-container": "#00e5ff",
+                    "error": "#ffb4ab",
+                    "on-tertiary-fixed-variant": "#8a1d00",
+                    "on-primary-container": "#00626e",
+                    "on-primary-fixed-variant": "#004f58",
+                    "on-error": "#690005",
+                    "outline": "#849396",
+                    "on-primary-fixed": "#001f24",
+                    "surface-container": "#201f1f",
+                    "primary-fixed": "#9cf0ff",
+                    "secondary-container": "#474646",
+                    "secondary-fixed-dim": "#c9c6c5",
+                    "tertiary": "#ffe7e2",
+                    "primary": "#c3f5ff",
+                    "surface-container-high": "#2a2a2a",
+                    "secondary-fixed": "#e5e2e1",
+                    "surface": "#131313",
+                    "secondary": "#c9c6c5",
+                    "tertiary-fixed": "#ffdad2",
+                    "on-error-container": "#ffdad6"
             },
-        }
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Manrope"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
     </script>
 <style>
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
         }
-        body { font-family: 'Manrope', sans-serif; }
+        .hud-scanline {
+            background: linear-gradient(to bottom, transparent 50%, rgba(0, 229, 255, 0.02) 50%);
+            background-size: 100% 4px;
+        }
+        .glow-pulse {
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
+        }
     </style>
 <style>
     body {
@@ -84,173 +94,169 @@
     }
   </style>
   </head>
-<body class="bg-background text-on-surface antialiased pb-32">
+<body class="bg-surface-container-lowest text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container overflow-x-hidden">
 <!-- TopAppBar -->
-<header class="w-full sticky top-0 z-50 bg-[#fbf8ff] dark:bg-slate-950 flex justify-between items-center px-6 py-4 w-full">
-<div class="flex items-center gap-4">
-<button class="text-[#0052FF] active:scale-95 duration-200">
-<span class="material-symbols-outlined" data-icon="menu">menu</span>
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#0E0E0E] border-b border-[#353534]/15 shadow-[0_0_15px_rgba(0,229,255,0.06)]">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#00E5FF]" data-icon="sensors">sensors</span>
+<span class="text-2xl font-black text-[#00E5FF] tracking-tighter font-['Space_Grotesk'] uppercase">SIGMA-1</span>
+</div>
+<button class="text-[#353534] hover:text-[#C3F5FF] transition-colors duration-200 active:scale-95 active:duration-100">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
 </button>
-<h1 class="text-2xl font-black tracking-tighter text-[#191b25] dark:text-white font-['Manrope']">Sigma-1</h1>
-</div>
-<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-fixed-dim active:scale-95 duration-200">
-<img alt="User profile avatar" data-alt="Close-up professional headshot of a smiling creative director in a bright modern studio with soft bokeh background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDv0SM0-i32BTkJwYvG3X561O2gi2SgjDZiFP0EmipYPMLobi_u_q5PknXb7yr9Q3wNy2tF7qdgUtQ3Vui5OC4GlTt0rByqDjBROI5HMZzKpo5PsAOWqwLSfnv9AhGjAlkrRRMRfP0E7bEiNfS8ftCkRrlvz8633Ej0xqGufsGARhe1CRveJ3gWbrb_wiw7Ni_f1c4F9WcEKI7q8OSSQ4CcivI0oKy2hZV-TH4HNvomwpiFUfhItIxMOGJFkVtEjI01LM3mTasVwoIR"/>
-</div>
 </header>
-<main class="px-6 space-y-12 mt-6">
-<!-- User Greeting & Hero Stats -->
-<section class="space-y-8">
-<div class="space-y-1">
-<span class="font-label text-sm uppercase tracking-[0.05em] font-semibold text-on-surface-variant">Welcome Back, Alex</span>
-<h2 class="font-headline text-4xl font-extrabold tracking-tight text-on-surface leading-tight">Your architectural vision is taking shape.</h2>
+<main class="pt-20 pb-28 px-4 flex flex-col gap-8 hud-scanline min-h-screen">
+<!-- Hero: Real-time System Uptime -->
+<section class="relative flex flex-col items-center justify-center py-12 bg-surface-container-low border-l-2 border-primary-container">
+<div class="absolute top-4 right-4 flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></div>
+<span class="font-label text-[10px] tracking-[0.2em] text-primary-container uppercase">System Live</span>
 </div>
-<!-- Bento Stats Grid -->
-<div class="grid grid-cols-2 gap-4">
-<div class="col-span-1 p-6 bg-primary-container rounded-[2rem] text-on-primary flex flex-col justify-between aspect-square relative overflow-hidden">
-<div class="z-10">
-<span class="material-symbols-outlined text-3xl mb-4" data-icon="dashboard">dashboard</span>
-<p class="font-label text-xs uppercase tracking-widest opacity-80">Active Projects</p>
+<div class="relative flex items-center justify-center w-48 h-48">
+<!-- Circular Pulse -->
+<div class="absolute inset-0 border border-primary-container/20 rounded-full scale-110"></div>
+<div class="absolute inset-0 border border-primary-container/10 rounded-full scale-125"></div>
+<div class="absolute inset-0 border-2 border-primary-container rounded-full flex flex-col items-center justify-center bg-surface-container-lowest glow-pulse">
+<span class="font-headline text-4xl font-bold tracking-tighter text-primary">99.98%</span>
+<span class="font-label text-[10px] tracking-widest text-on-surface-variant uppercase mt-1">Uptime</span>
 </div>
-<p class="text-5xl font-black z-10">12</p>
-<div class="absolute -bottom-4 -right-4 w-24 h-24 bg-primary opacity-20 rounded-full blur-2xl"></div>
 </div>
-<div class="col-span-1 p-6 bg-surface-container-highest rounded-[2rem] flex flex-col justify-between aspect-square">
+<div class="mt-8 text-center">
+<h1 class="font-headline text-lg uppercase tracking-tight font-bold mb-1">Command Core Alpha</h1>
+<p class="font-label text-xs text-on-surface-variant tracking-widest uppercase">Telemetry Protocol Active</p>
+</div>
+</section>
+<!-- CTA: Execute Command -->
+<section class="px-2">
+<button class="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-on-primary font-headline font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 active:scale-[0.98] transition-transform">
+<span>EXECUTE COMMAND</span>
+<span class="material-symbols-outlined font-bold" data-icon="terminal">terminal</span>
+</button>
+</section>
+<!-- Section 1: Active Clusters & Neural Nodes -->
+<section class="grid grid-cols-2 gap-4">
+<!-- Active Clusters -->
+<div class="bg-surface-container p-4 flex flex-col gap-4 border-t border-outline-variant/15">
+<div class="flex justify-between items-start">
+<span class="font-label text-[10px] tracking-widest text-on-surface-variant uppercase">Active Clusters</span>
+<span class="material-symbols-outlined text-primary-container text-lg" data-icon="hub">hub</span>
+</div>
 <div>
-<span class="material-symbols-outlined text-3xl text-primary mb-4" data-icon="bolt">bolt</span>
-<p class="font-label text-xs uppercase tracking-widest text-on-surface-variant">Completion</p>
+<div class="font-headline text-2xl font-bold text-primary tracking-tighter">42</div>
+<div class="font-label text-[10px] text-primary-container uppercase tracking-tighter">REDUNDANT</div>
+</div>
+<!-- Mini Chart -->
+<div class="flex items-end gap-1 h-8 mt-2">
+<div class="flex-1 bg-primary-container/20 h-[40%]"></div>
+<div class="flex-1 bg-primary-container/40 h-[60%]"></div>
+<div class="flex-1 bg-primary-container/30 h-[50%]"></div>
+<div class="flex-1 bg-primary-container/80 h-[90%]"></div>
+<div class="flex-1 bg-primary-container h-full"></div>
+</div>
+</div>
+<!-- Neural Nodes -->
+<div class="bg-surface-container p-4 flex flex-col gap-4 border-t border-outline-variant/15">
+<div class="flex justify-between items-start">
+<span class="font-label text-[10px] tracking-widest text-on-surface-variant uppercase">Neural Nodes</span>
+<span class="material-symbols-outlined text-primary-container text-lg" data-icon="psychology">psychology</span>
 </div>
 <div>
-<p class="text-5xl font-black text-on-surface tracking-tighter">84<span class="text-2xl font-bold text-primary">%</span></p>
-<div class="w-full h-1.5 bg-surface-dim rounded-full mt-2 overflow-hidden">
-<div class="w-[84%] h-full bg-primary rounded-full"></div>
+<div class="font-headline text-2xl font-bold text-primary tracking-tighter">1,240</div>
+<div class="font-label text-[10px] text-on-surface-variant uppercase tracking-tighter">Nodes Online</div>
 </div>
+<!-- Mini Chart -->
+<div class="flex items-end gap-1 h-8 mt-2">
+<div class="flex-1 bg-primary-container/60 h-[70%]"></div>
+<div class="flex-1 bg-primary-container/30 h-[40%]"></div>
+<div class="flex-1 bg-primary-container/90 h-[95%]"></div>
+<div class="flex-1 bg-primary-container/50 h-[60%]"></div>
+<div class="flex-1 bg-primary-container/20 h-[30%]"></div>
+</div>
+</div>
+</section>
+<!-- Section 2: Event Log -->
+<section class="flex flex-col gap-4">
+<div class="flex items-center justify-between px-2">
+<h2 class="font-headline text-sm font-bold uppercase tracking-widest text-primary">Event Log</h2>
+<span class="font-label text-[10px] text-on-surface-variant tracking-tighter uppercase">Live Feed</span>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant/10 max-h-80 overflow-y-auto custom-scrollbar">
+<!-- Timeline Item 1 -->
+<div class="flex gap-4 p-4 border-b border-outline-variant/5">
+<div class="flex flex-col items-center">
+<div class="w-2 h-2 bg-primary-container mt-1.5"></div>
+<div class="w-px flex-grow bg-outline-variant/20 mt-2"></div>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label text-[10px] text-on-surface-variant uppercase tracking-tighter">14:02:11</span>
+<p class="font-body text-sm font-medium">Deployment success</p>
+<p class="font-label text-[10px] text-primary-container uppercase tracking-widest">Node cluster 7-A</p>
+</div>
+</div>
+<!-- Timeline Item 2 -->
+<div class="flex gap-4 p-4 border-b border-outline-variant/5">
+<div class="flex flex-col items-center">
+<div class="w-2 h-2 bg-primary-container mt-1.5"></div>
+<div class="w-px flex-grow bg-outline-variant/20 mt-2"></div>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label text-[10px] text-on-surface-variant uppercase tracking-tighter">13:45:59</span>
+<p class="font-body text-sm font-medium">Access granted</p>
+<p class="font-label text-[10px] text-on-surface-variant uppercase tracking-widest">User ID: ADMIN_01</p>
+</div>
+</div>
+<!-- Timeline Item 3 -->
+<div class="flex gap-4 p-4 border-b border-outline-variant/5 bg-error-container/5">
+<div class="flex flex-col items-center">
+<div class="w-2 h-2 bg-error mt-1.5"></div>
+<div class="w-px flex-grow bg-outline-variant/20 mt-2"></div>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label text-[10px] text-error uppercase tracking-tighter">13:12:04</span>
+<p class="font-body text-sm font-medium text-error">Resource warning</p>
+<p class="font-label text-[10px] text-on-error-container/60 uppercase tracking-widest">Memory leak detected</p>
+</div>
+</div>
+<!-- Timeline Item 4 -->
+<div class="flex gap-4 p-4">
+<div class="flex flex-col items-center">
+<div class="w-2 h-2 bg-primary-container mt-1.5"></div>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label text-[10px] text-on-surface-variant uppercase tracking-tighter">12:50:33</span>
+<p class="font-body text-sm font-medium">Protocol sequence started</p>
+<p class="font-label text-[10px] text-on-surface-variant uppercase tracking-widest">Sigma Sync Initiated</p>
 </div>
 </div>
 </div>
 </section>
-<!-- Critical Projects -->
-<section class="space-y-6">
-<div class="flex justify-between items-end">
-<h3 class="font-headline text-2xl font-bold tracking-tight">Critical Projects</h3>
-<span class="font-label text-xs font-bold text-primary uppercase tracking-widest">View All</span>
+<!-- Footer -->
+<footer class="w-full py-8 px-6 flex flex-col items-center gap-4 mb-20">
+<div class="flex gap-6">
+<a class="font-['Inter'] uppercase text-[10px] tracking-[0.2em] font-medium text-[#353534] hover:text-[#C3F5FF] transition-opacity opacity-80 hover:opacity-100" href="#">LEGAL</a>
+<a class="font-['Inter'] uppercase text-[10px] tracking-[0.2em] font-medium text-[#353534] hover:text-[#C3F5FF] transition-opacity opacity-80 hover:opacity-100" href="#">PROTOCOL</a>
 </div>
-<div class="space-y-3">
-<!-- Project Card 1 -->
-<div class="p-5 bg-surface-container-lowest rounded-[1.5rem] flex items-center justify-between shadow-[0_8px_24px_rgba(25,27,37,0.04)]">
-<div class="flex items-center gap-4">
-<div class="w-12 h-12 rounded-2xl bg-surface-container flex items-center justify-center">
-<span class="material-symbols-outlined text-primary" data-icon="apartment">apartment</span>
-</div>
-<div>
-<h4 class="font-bold text-on-surface">Neo-Brutalist Hub</h4>
-<p class="text-sm text-on-surface-variant">Phase: Foundation</p>
-</div>
-</div>
-<div class="flex -space-x-3">
-<img alt="Team member" class="w-8 h-8 rounded-full border-2 border-white" data-alt="Portrait of a young male designer wearing glasses in a clean professional environment" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCo9dB50s-ndht5EtUsrd3tnCi3Eg39KH_OOW6y6ym4zikhFnNkIEdnNptKY4QX0T5lQR-2yhTDZpqihVN7Y248teXrdFi5gxtYt0JSayQnVq6zdtOCno2qHYNSNrMcgcz-rTGzuH4DY13XpP2qJJ-VGzu77-8zS2as8QS2QuCfyDF-0O_hTU1nG4039__TvvUP9GYGV8rEpb9Defgkimc459rQsa5JIpkXJG5qluJkoyO3zumvItvjGrqYzPPCrh0_TUlomImCSXAC"/>
-<img alt="Team member" class="w-8 h-8 rounded-full border-2 border-white" data-alt="Smiling young woman with professional attire in front of a white background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbL5oGhpJxHEEttZPTh6fFkM13Qbw2XSGidRYoBXh8sVxtKMVFBk9MEYff42Bxh8rrhlnxTH5cLDoNJvrYIQ_F6XrdNxS9XXTlLeMaK0gYclZTBWb6f9OPc6E6lS1qacxX4BkHnGzVEHnbdedzKlow-mBBLiOXT1zm7JbOejJOMDWxRjtKSA80g97dWxqGN5nvozKaAWdbwUh-sGjWvwWZhUdi6hty8vyL_-TLF38nIJMIDrymabH6PV9ALwpdIYf1TKc2z5pSAZxT"/>
-<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center border-2 border-white text-[10px] font-bold text-on-primary-fixed">+3</div>
-</div>
-</div>
-<!-- Project Card 2 -->
-<div class="p-5 bg-surface-container-low rounded-[1.5rem] flex items-center justify-between">
-<div class="flex items-center gap-4">
-<div class="w-12 h-12 rounded-2xl bg-surface-container-high flex items-center justify-center">
-<span class="material-symbols-outlined text-on-surface-variant" data-icon="landscape">landscape</span>
-</div>
-<div>
-<h4 class="font-bold text-on-surface">Echo Valley Resort</h4>
-<p class="text-sm text-on-surface-variant">Phase: Blueprint</p>
-</div>
-</div>
-<div class="flex items-center gap-2">
-<span class="w-2 h-2 rounded-full bg-error"></span>
-<span class="font-label text-[10px] uppercase font-bold text-error">Delayed</span>
-</div>
-</div>
-<!-- Project Card 3 -->
-<div class="p-5 bg-surface-container-low rounded-[1.5rem] flex items-center justify-between">
-<div class="flex items-center gap-4">
-<div class="w-12 h-12 rounded-2xl bg-surface-container-high flex items-center justify-center">
-<span class="material-symbols-outlined text-on-surface-variant" data-icon="precision_manufacturing">precision_manufacturing</span>
-</div>
-<div>
-<h4 class="font-bold text-on-surface">Sigma Factory 01</h4>
-<p class="text-sm text-on-surface-variant">Phase: Assembly</p>
-</div>
-</div>
-<div class="flex items-center gap-2">
-<span class="w-2 h-2 rounded-full bg-primary"></span>
-<span class="font-label text-[10px] uppercase font-bold text-primary">On Track</span>
-</div>
-</div>
-</div>
-</section>
-<!-- Quick Tasks -->
-<section class="space-y-6">
-<h3 class="font-headline text-2xl font-bold tracking-tight">Quick Tasks</h3>
-<div class="space-y-2">
-<!-- Task Item 1 -->
-<label class="flex items-center gap-4 p-5 bg-surface-container-lowest rounded-[1.5rem] cursor-pointer group active:scale-[0.98] transition-all">
-<input checked="" class="w-6 h-6 rounded-full border-outline-variant text-primary focus:ring-primary focus:ring-offset-0 transition-all" type="checkbox"/>
-<div class="flex-1">
-<span class="block font-bold text-on-surface line-through opacity-40">Review architectural renders</span>
-<span class="text-xs text-on-surface-variant">Due Today, 4:00 PM</span>
-</div>
-<span class="material-symbols-outlined text-on-surface-variant opacity-40" data-icon="drag_indicator">drag_indicator</span>
-</label>
-<!-- Task Item 2 -->
-<label class="flex items-center gap-4 p-5 bg-surface-container-lowest rounded-[1.5rem] cursor-pointer group active:scale-[0.98] transition-all">
-<input class="w-6 h-6 rounded-full border-outline text-primary focus:ring-primary focus:ring-offset-0 transition-all" type="checkbox"/>
-<div class="flex-1">
-<span class="block font-bold text-on-surface">Client meeting: Sigma Alpha</span>
-<span class="text-xs text-primary font-bold">In 2 hours</span>
-</div>
-<span class="material-symbols-outlined text-on-surface-variant" data-icon="chevron_right">chevron_right</span>
-</label>
-<!-- Task Item 3 -->
-<label class="flex items-center gap-4 p-5 bg-surface-container-lowest rounded-[1.5rem] cursor-pointer group active:scale-[0.98] transition-all">
-<input class="w-6 h-6 rounded-full border-outline text-primary focus:ring-primary focus:ring-offset-0 transition-all" type="checkbox"/>
-<div class="flex-1">
-<span class="block font-bold text-on-surface">Budget approval: Q3 Logistics</span>
-<span class="text-xs text-on-surface-variant">Due Tomorrow</span>
-</div>
-<span class="material-symbols-outlined text-on-surface-variant" data-icon="chevron_right">chevron_right</span>
-</label>
-</div>
-</section>
-<!-- High-Conversion CTA Section -->
-<section class="relative h-48 rounded-[2.5rem] overflow-hidden flex items-center p-8 text-on-primary">
-<div class="absolute inset-0 bg-gradient-to-br from-primary-container to-primary z-0"></div>
-<div class="absolute inset-0 z-0 opacity-40 bg-[url('https://images.unsplash.com/photo-1541888946425-d81bb19480c5?auto=format&amp;fit=crop&amp;q=80&amp;w=800')] mix-blend-overlay" data-alt="High-detail architectural construction site with steel beams and golden hour sunlight filtering through"></div>
-<div class="relative z-10 space-y-3">
-<h4 class="text-2xl font-black tracking-tight leading-tight">Scale Your Impact.</h4>
-<p class="text-sm opacity-90 max-w-[200px]">Upgrade to Sigma Pro for advanced analytics and global team sync.</p>
-<button class="bg-surface-container-lowest text-primary font-bold px-6 py-2 rounded-full text-sm active:scale-95 transition-transform">Get Started</button>
-</div>
-</section>
+<p class="font-['Inter'] uppercase text-[10px] tracking-[0.2em] font-medium text-[#353534]">© 2024 SIGMA-1 COMMAND. v1.0.4-STABLE</p>
+</footer>
 </main>
 <!-- BottomNavBar -->
-<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-[#ffffff]/70 dark:bg-slate-900/80 backdrop-blur-xl z-50 rounded-t-[2rem] border-t border-[#c3c5d9]/15 shadow-[0_-8px_24px_rgba(25,27,37,0.04)]">
-<a class="flex flex-col items-center justify-center bg-[#0052ff] text-white rounded-full px-5 py-2 scale-110 shadow-lg shadow-blue-500/20 active:scale-90 transition-transform duration-300 ease-out" href="#">
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center h-20 px-4 pb-safe bg-[#0E0E0E] border-t border-[#353534]/15 shadow-[0_-4px_20px_rgba(0,229,255,0.05)]">
+<!-- Dashboard Active -->
+<button class="flex flex-col items-center justify-center text-[#00E5FF] scale-110 drop-shadow-[0_0_8px_rgba(0,229,255,0.5)] transition-all duration-300 ease-out">
 <span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
-<span class="font-['Manrope'] text-[10px] uppercase tracking-[0.05em] font-semibold mt-0.5">Dashboard</span>
-</a>
-<a class="flex flex-col items-center justify-center text-[#434656] dark:text-slate-400 px-4 py-2 hover:text-[#003ec7] dark:hover:text-blue-300 active:scale-90 transition-transform duration-300 ease-out" href="#">
-<span class="material-symbols-outlined" data-icon="folder_copy">folder_copy</span>
-<span class="font-['Manrope'] text-[10px] uppercase tracking-[0.05em] font-semibold mt-0.5">Projects</span>
-</a>
-<a class="flex flex-col items-center justify-center text-[#434656] dark:text-slate-400 px-4 py-2 hover:text-[#003ec7] dark:hover:text-blue-300 active:scale-90 transition-transform duration-300 ease-out" href="#">
-<span class="material-symbols-outlined" data-icon="assignment_turned_in">assignment_turned_in</span>
-<span class="font-['Manrope'] text-[10px] uppercase tracking-[0.05em] font-semibold mt-0.5">Tasks</span>
-</a>
-<a class="flex flex-col items-center justify-center text-[#434656] dark:text-slate-400 px-4 py-2 hover:text-[#003ec7] dark:hover:text-blue-300 active:scale-90 transition-transform duration-300 ease-out" href="#">
-<span class="material-symbols-outlined" data-icon="settings">settings</span>
-<span class="font-['Manrope'] text-[10px] uppercase tracking-[0.05em] font-semibold mt-0.5">Settings</span>
-</a>
-</nav>
-<!-- FAB (Suppressed on details, shown on Home/Dashboard) -->
-<button class="fixed bottom-32 right-6 w-14 h-14 bg-primary text-on-primary rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-all z-40 border-t border-white/20">
-<span class="material-symbols-outlined text-3xl" data-icon="add">add</span>
+<span class="font-['Inter'] uppercase tracking-[0.1em] text-[10px] mt-1">Status</span>
 </button>
+<button class="flex flex-col items-center justify-center text-[#353534] hover:text-[#C3F5FF] transition-all duration-300 ease-out">
+<span class="material-symbols-outlined" data-icon="extension">extension</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#353534] hover:text-[#C3F5FF] transition-all duration-300 ease-out">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#353534] hover:text-[#C3F5FF] transition-all duration-300 ease-out">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#353534] hover:text-[#C3F5FF] transition-all duration-300 ease-out">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+</button>
+</nav>
 </body></html>

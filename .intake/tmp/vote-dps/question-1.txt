@@ -1,1 +1,1 @@
-What API paradigm for internal and external service communication?
+How should multi-tenancy and schema separation be handled?

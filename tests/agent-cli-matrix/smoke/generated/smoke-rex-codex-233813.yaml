@@ -1,0 +1,49 @@
+apiVersion: agents.platform/v1
+kind: CodeRun
+metadata:
+  name: smoke-rex-codex-233813
+  namespace: cto
+  labels:
+    smoke-test: "true"
+    smoke-run-id: "smoke-20260406-233813"
+    agent: "rex"
+    cli-type: "codex"
+spec:
+  runType: implementation
+  taskId: 9000
+  service: sigma-1
+  repositoryUrl: https://github.com/5dlabs/sigma-1.git
+  docsRepositoryUrl: https://github.com/5dlabs/sigma-1.git
+  workingDirectory: /workspace
+  model: gpt-5.4
+  githubApp: 5DLabs-Rex
+  cliConfig:
+    cliType: codex
+    model: gpt-5.4
+    settings: {}
+  env:
+    SMOKE_TEST: "true"
+    SMOKE_RUN_ID: "smoke-20260406-233813"
+    CTO_CLI_TYPE: "codex"
+    CTO_CLI_MODEL: "gpt-5.4"
+  promptModification: |
+    SMOKE TEST — CLI Verification
+
+    You are rex running via the codex CLI with model gpt-5.4.
+
+    Your task:
+    1. Create a file 'smoke-test/rex-codex.md' with this content:
+       - Agent: rex
+       - CLI: codex
+       - Model: gpt-5.4
+       - Timestamp: (current UTC time)
+       - A one-line description of your agent role
+    2. Commit with message: 'smoke(rex): verify codex CLI [model: gpt-5.4]'
+    3. Create a PR with title: '[Smoke] rex via codex (gpt-5.4)'
+    4. In the PR body, include:
+       - CLI type: codex
+       - Model: gpt-5.4
+       - Agent: rex
+       - Run ID: smoke-20260406-233813
+
+    Keep it simple — this is just verifying the CLI harness works end-to-end.

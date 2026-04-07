@@ -1,4 +1,4 @@
-project=sigma-1-e2e-delegation
+project=sigma-1
 deliberate=true
 
 deliberation_stdout:
@@ -14,183 +14,183 @@ deliberation_stdout:
 
 
 design_brief_excerpt:
-
-
 # Enhanced PRD
 
 ## 1. Original Requirements
 
-> # Project: Sigma-1 Agent Delegation E2E
+> # Project: Sigma-1 — Unified AI Business Platform
 >
-> ## Goal
-> Validate the full intake pipeline end-to-end with agent delegation enabled, confirming:
-> 1. Linear issues are created with the correct agent assignee (delegate_id)
-> 2. Hermes research integration produces content in the deliberation path
-> 3. Design snapshot PR surfacing works
-> 4. Discord and Linear bridge notifications fire correctly
+> - **Website:** https://sigma-1.com
+> - **Existing Platform:** https://deployiq.maximinimal.ca
 >
-> ## Context
-> The PM server now resolves agent hints to Linear user IDs at issue creation time via `resolve_agent_delegates()`. Previously all issues were created unassigned. This run validates the full delegation flow from PRD → deliberation → task generation → issue creation with assigned agents.
+> ## Vision
 >
-> ## Requirements
-> - Pipeline completes through all stages (deliberation, task generation, issue creation)
-> - At least 5 tasks generated with agent assignments
-> - Linear issues show assigned agents (not just "agent:pending" labels)
-> - Research memos include Hermes-sourced content where NOUS_API_KEY is available
-> - PR created in target repo with task scaffolds
+> Sigma-1 is a comprehensive AI-powered business platform that replaces fragmented tools, manual processes, and administrative overhead with a single intelligent agent — **Morgan** — accessible through Signal, phone, and web. Built for Sigma-1 / Perception Events, a lighting and visual production company.
 >
-> ## Target Repository
-> - Organization: 5dlabs
-> - Repository: sigma-1
-> - Visibility: private
+> Instead of juggling rental software, spreadsheets, phone calls, accounting tools, and social media apps, everything runs through one interface: send Morgan a message, and it handles the rest.
 >
-> ## Acceptance Criteria
-> - [ ] Pipeline completes without fatal errors
-> - [ ] Linear session created with issues
-> - [ ] Issues have delegate_id set (visible as assignee in Linear)
-> - [ ] PR created in sigma-1 with generated artifacts
-> - [ ] Discord notification posted for pipeline start/complete
-
-## 2. Project Scope
-
-The initial task decomposition identified **10 tasks** across two agents and two technology stacks.
-
-### Task Summary
-
-| ID | Title | Agent | Stack | Priority | Dependencies |
-|----|-------|-------|-------|----------|--------------|
-| 1 | Provision Dev Infrastructure for Sigma-1 E2E Pipeline | Bolt | Kubernetes/Helm | High | — |
-| 2 | Extend PM Server for Agent Delegation in Linear Issues | Nova | Bun/Elysia | High | 1 |
-| 3 | Integrate Hermes Research Content in Deliberation Path | Nova | Bun/Elysia | High | 1 |
-| 4 | Implement Design Snapshot PR Surfacing | Nova | Bun/Elysia | Medium | 1 |
-| 5 | Enable Discord and Linear Bridge Notifications | Nova | Bun/Elysia | Medium | 1 |
-| 6 | Modernize Web Frontend for Agent Assignment Visualization | Blaze | React/Next.js | Medium | 2 |
-| 7 | Add Research Memo Display to Web Frontend | Blaze | React/Next.js | Medium | 3, 6 |
-| 8 | Display Design Snapshot PRs in Web Frontend | Blaze | React/Next.js | Low | 4, 6 |
-| 9 | Show Pipeline Status Notifications in Web Frontend | Blaze | React/Next.js | Low | 5, 6 |
-| 10 | Production Hardening: HA, Ingress, and Security | Bolt | Kubernetes/Helm | High | 2–9 |
-
-### Key Services and Components
-
-- **PM Server** (Bun/Elysia) — existing service with `resolve_agent_delegates()`; extended for delegation, Hermes integration, PR surfacing, and notifications
-- **Hermes Research API** — external service accessed via NOUS_API_KEY for research memo content
-- **Bridge Services** — `bots/discord-bridge-http` and `bots/linear-bridge` already deployed in-cluster
-- **Cloudflare Operator** — `cloudflare-operator-system` with accesstunnels/clustertunnels CRDs for ingress
-- **Web Frontend** (React/Next.js) — Tasks 6–9 add visualization for assignments, memos, PRs, and notifications
-
-### Agent Assignments
-
-- **Bolt** (Kubernetes/Helm): Infrastructure provisioning (Task 1) and production hardening (Task 10)
-- **Nova** (Bun/Elysia): All backend pipeline work (Tasks 2–5)
-- **Blaze** (React/Next.js): All frontend visualization work (Tasks 6–9)
-
-### Cross-Cutting Concerns
-
-- Secret management via Kubernetes secrets and external-secrets operator
-- Service discovery via `sigma-1-infra-endpoints` ConfigMap
-- 8 unique decision points spanning service-topology, api-design, platform-choice, data-model, ux-behavior, component-library, security, and ingress
-
-## 3. Resolved Decisions
-
-### [D1] Should agent delegation and Hermes research integration be separate microservices or extensions to the existing PM server?
-
-**Status:** Accepted
-
-**Task Context:** Task 2 (Extend PM Server for Agent Delegation), Task 3 (Integrate Hermes Research Content)
-
-**Context:** Both debaters agreed unanimously. The PM server already contains `resolve_agent_delegates()`. Extracting this into microservices for a validation pipeline adds deployment coordination and network hops with no functional benefit at current scale.
-
-**Decision:** Extend the existing PM server (Bun/Elysia) with both agent delegation and Hermes research integration as internal modules with clean interface boundaries, extractable later if needed.
-
-**Consensus:** 2/2 (100%)
-
-**Consequences:**
-- *Positive:* Zero new services to deploy, no inter-service network hops, no deployment coordination overhead. Module boundaries provide separation of concerns within the codebase.
-- *Negative:* PM server grows in responsibility. If Hermes integration becomes complex, extraction will require a later migration.
-- *Caveats:* The Hermes integration should be implemented as a pluggable module with a clean interface so it can be extracted into its own service if the research pipeline grows significantly.
-
----
-
-### [D3] Use existing in-cluster bridge services or integrate directly with Discord/Linear APIs?
-
-**Status:** Accepted
-
-**Task Context:** Task 5 (Enable Discord and Linear Bridge Notifications), Task 9 (Show Pipeline Status Notifications)
-
-**Context:** Both debaters agreed unanimously. `bots/discord-bridge-http` and `bots/linear-bridge` are already deployed and operational in-cluster. Reimplementing their functionality inside the PM server duplicates tested infrastructure and couples the PM server to notification concerns (token management, rate limiting, webhook formatting).
-
-**Decision:** Use the existing `bots/discord-bridge-http` and `bots/linear-bridge` services for all notification delivery.
-
-**Consensus:** 2/2 (100%)
-
-**Consequences:**
-- *Positive:* Reuses tested, deployed infrastructure. Avoids managing Discord bot tokens, Linear API keys, and rate limiting inside the PM server. Aligns with organizational preference for self-hosted in-cluster services.
-- *Negative:* PM server depends on bridge service availability. If bridge services are down, notifications fail silently unless error handling is implemented.
-- *Caveats:* None raised — both speakers strongly aligned.
-
----
-
-### [D4] How should delegate_id and research memos be represented in the data model?
-
-**Status:** Accepted
-
-**Task Context:** Task 2 (PM Server Delegation), Task 3 (Hermes Integration), Task 6 (Frontend Assignment Visualization), Task 7 (Frontend Memo Display)
-
-**Context:** Both debaters agreed unanimously. The PRD specifies 1:1 assignment (one delegate per task). Creating separate entities for a 1:1 relationship adds join complexity with no normalization benefit.
-
-**Decision:** Extend the existing task schema with `delegate_id` (string) and `research_memo` (embedded object with `content`, `source`, and `timestamp` fields) directly on the task entity.
-
-**Consensus:** 2/2 (100%)
-
-**Consequences:**
-- *Positive:* Single task fetch returns everything the frontend needs. No joins, simple API surface. Appropriate for the 1:1 cardinality in this validation pipeline.
-- *Negative:* If multi-assignment becomes a requirement later, a schema migration will be needed.
-- *Caveats:* None — both speakers considered this straightforward given the cardinality.
-
----
-
-### [D8] Which ingress/CDN solution for Sigma-1?
-
-**Status:** Accepted
-
-**Task Context:** Task 1 (Provision Dev Infrastructure), Task 10 (Production Hardening)
-
-**Context:** Both debaters agreed unanimously. The `cloudflare-operator-system` is deployed with webhook and metrics services active. Cloudflare Tunnel CRDs (`accesstunnels.networking.cfargotunnel.com`, `clustertunnels.networking.cfargotunnel.com`) are registered and operational.
-
-**Decision:** Use the existing Cloudflare operator with networking CRDs (accesstunnels, clustertunnels) for ingress, CDN, and TLS termination. Do not deploy a separate ingress controller.
-
-**Consensus:** 2/2 (100%)
-
-**Consequences:**
-- *Positive:* Zero-trust ingress, automatic TLS, and CDN without deploying additional infrastructure. Task 10 benefits directly from existing CRDs.
-- *Negative:* Dependency on Cloudflare ecosystem. Debugging tunnel issues requires Cloudflare-specific knowledge.
-- *Caveats:* Deploying NGINX alongside the Cloudflare operator would create dual-ingress complexity — explicitly ruled out.
-
----
-
-### [D6] Which component library for new frontend UI elements?
-
-**Status:** Accepted (conditional — contingent on frontend tasks remaining in scope per D5)
-
-**Task Context:** Tasks 6, 7, 8, 9 (all frontend visualization tasks)
-
-**Context:** Both debaters agreed on the choice itself. The Pessimist noted this decision is moot if frontend tasks are deferred (per dp-5) but conceded that if frontend work proceeds, shadcn/ui is the obvious choice. The existing `cto/tweakcn` service deployed in-cluster indicates the team is already in the shadcn/ui ecosystem.
-
-**Decision:** Use shadcn/ui (built on Radix UI primitives) for all new components in Tasks 6–9.
-
-**Consensus:** 2/2 (100%) — conditional on frontend tasks being in scope
-
-**Consequences:**
-- *Positive:* Components are copy-paste-owned, not imported — no version lock-in. Radix primitives provide accessibility compliance. Most adopted component approach in the Next.js ecosystem. `tweakcn` in-cluster confirms existing team familiarity.
-- *Negative:* Copy-paste-own model means the team is responsible for component maintenance and updates.
-- *Caveats:* This decision only applies if Tasks 6–9 remain in scope. See [D5] for the scope question.
-
-## 4. Escalated Decisions
-
-### [D2] What API paradigm should be used for PM server integrations? — ESCALATED
-
-**Status:** Pending human decision
-
-**Task Context:** Task 2 (PM Server Delegation), Task 3 (Hermes Integration), Task 5 (Discord/Linear Notifications)
-
-**Options:**
+> This is a microservices architecture demonstrating full CTO platform agent utilization across multiple tech stacks, similar to the AlertHub pattern.
+>
+> ---
+>
+> ## Architecture Overview
+>
+> ```
+> ┌─────────────────────────────────────────────────────────────────────┐
+> │                     Sigma-1 Platform                                 │
+> ├─────────────────────────────────────────────────────────────────────┤
+> │  Clients                                                             │
+> │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
+> │  │  Signal  │  │   Voice  │  │   Web    │  │  Mobile  │        │
+> │  │  (Morgan)│  │ (ElevenLabs│ │ (Next.js)│  │  (Expo)  │        │
+> │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘        │
+> │       │             │             │             │                 │
+> ├───────┴─────────────┴─────────────┴─────────────┴─────────────────┤
+> │  Backend Services                                                    │
+> │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐      │
+> │  │   Equipment    │  │     RMS        │  │    Finance     │      │
+> │  │   Catalog      │  │   Service      │  │    Service     │      │
+> │  │   (Rust/Axum)  │  │   (Go/gRPC)    │  │   (Rust/Axum)  │      │
+> │  │     Rex        │  │     Grizz      │  │     Rex        │      │
+> │  └───────┬────────┘  └───────┬────────┘  └───────┬────────┘      │
+> │          │                    │                    │                 │
+> │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐      │
+> │  │   (Out of      │  │     Social     │  │    Customer    │      │
+> │  │    Scope)      │  │    Engine      │  │    Vetting     │      │
+> │  │  (Phase 2)    │  │(Node/Elysia)  │  │  (Rust/Axum)   │      │
+> │  │                │  │     Nova       │  │     Rex        │      │
+> │  └───────┬────────┘  └───────┬────────┘  └───────┬────────┘      │
+> │          │                    │                    │                 │
+> ├──────────┴────────────────────┴────────────────────┴─────────────────┤
+> │  Infrastructure                                                      │
+> │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐     │
+> │  │PostgreSQL│ │  Redis  │ │  S3/R2  │ │ ElevenLabs│ │ Twilio  │     │
+> │  │         │ │         │ │         │ │          │ │         │     │
+> │  └─────────┘ └─────────┘ └─────────┘ └──────────┘ └─────────┘     │
+> │  ┌─────────┐ ┌─────────┐                                             │
+> │  │SignalCLI│ │OpenCorporates│                                         │
+> │  └─────────┘ └─────────┘                                             │
+> └─────────────────────────────────────────────────────────────────────┘
+> ```
+>
+> ---
+>
+> ## Services (Workstreams)
+>
+> ### 1. Morgan AI Agent (OpenClaw)
+>
+> **Agent**: Morgan (OpenClaw agent)
+> **Priority**: Critical
+> **Runtime**: OpenClaw with MCP tools
+>
+> The central AI agent that handles all customer interactions via Signal, voice, and web chat.
+>
+> **Core Features**:
+> - Signal messenger integration (receive/send messages, photos)
+> - Voice calls via ElevenLabs (SIP/PSTN, natural conversation)
+> - Web chat widget for website
+> - Lead qualification and customer vetting
+> - Quote generation coordination
+> - Social media approval workflow
+> - Natural language queries to all backend services
+>
+> **MCP Tools** (accesses via tool-server):
+> ```
+> sigma1_catalog_search     — search products by name/category/specs
+> sigma1_check_availability — check date range availability for items
+> sigma1_generate_quote     — create opportunity with line items
+> sigma1_vet_customer       — run background check pipeline
+> sigma1_score_lead         — compute GREEN/YELLOW/RED score
+> sigma1_create_invoice     — generate invoice from project
+> sigma1_finance_report     — pull financial summaries
+> sigma1_social_curate      — trigger photo curation pipeline
+> sigma1_social_publish     — publish approved draft
+> sigma1_equipment_lookup   — search secondary markets for arbitrage
+> ```
+>
+> **Skills**:
+> - `sales-qual` — Lead qualification workflow
+> - `customer-vet` — Background research (OpenCorporates, LinkedIn, Google Reviews)
+> - `quote-gen` — Equipment quote generation
+> - `upsell` — Insurance, services, packages recommendations
+> - `finance` — Invoice generation, financial summaries
+> - `social-media` — Photo curation, caption generation
+> - `rms-*` — Rental management operations
+> - `admin` — Calendar, email drafting, document management
+>
+> **Infrastructure Dependencies**:
+> - Signal-CLI (sidecar or separate pod)
+> - ElevenLabs (voice)
+> - Twilio (phone numbers, SIP/PSTN)
+> - All backend service APIs
+>
+> ---
+>
+> ### 2. Equipment Catalog Service (Rust/Axum)
+>
+> **Agent**: Rex
+> **Priority**: High
+> **Language**: Rust 1.75+
+> **Framework**: Axum 0.7
+>
+> High-performance API for equipment inventory, availability checking, and self-service quoting.
+>
+> **Endpoints**:
+> ```
+> GET    /api/v1/catalog/categories           — List categories
+> GET    /api/v1/catalog/products             — List products (filterable)
+> GET    /api/v1/catalog/products/:id        — Get product details
+> GET    /api/v1/catalog/products/:id/availability?from=&to= — Check availability
+> POST   /api/v1/catalog/products             — Add product (admin)
+> PATCH  /api/v1/catalog/products/:id         — Update product (admin)
+> GET    /api/v1/equipment-api/catalog       — Machine-readable (for AI agents)
+> POST   /api/v1/equipment-api/checkout      — Programmatic booking
+> GET    /metrics                             — Prometheus metrics
+> GET    /health/live                          — Liveness probe
+> GET    /health/ready                        — Readiness probe
+> ```
+>
+> **Core Features**:
+> - 533+ products across 24 categories
+> - Real-time availability checking
+> - Barcode/SKU lookup
+> - Image serving (S3/R2 CDN)
+> - Machine-readable equipment API for other AI agents
+> - Rate limiting per tenant
+>
+> **Data Models**:
+> ```rust
+> struct Product {
+>     id: Uuid,
+>     name: String,
+>     category_id: Uuid,
+>     description: String,
+>     day_rate: Decimal,
+>     weight_kg: Option<f32>,
+>     dimensions: Option<Dimensions>,
+>     image_urls: Vec<String>,
+>     specs: JsonB,
+>     created_at: DateTime<Utc>,
+> }
+>
+> struct Category {
+>     id: Uuid,
+>     name: String,
+>     parent_id: Option<Uuid>,
+>     icon: String,
+>     sort_order: i32,
+> }
+>
+> struct Availability {
+>     product_id: Uuid,
+>     date_from: NaiveDate,
+>     date_to: NaiveDate,
+>     quantity_available: i32,
+>     reserved: i32,
+>     booked: i32,
+> }
+> ```
+>
+> **Infrastructure Dependencies**:
+> - PostgreSQL (product catalog, availability)
+> - Redis (rate limiting, caching)

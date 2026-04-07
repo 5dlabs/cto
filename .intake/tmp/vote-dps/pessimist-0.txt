@@ -1,1 +1,1 @@
-Synchronous gRPC for all service-to-service calls orchestrated by Morgan; NATS only for social media publish pipeline (Task 6) and optional audit event streaming
+REST (HTTP/JSON) for all services, with RMS exposing gRPC+grpc-gateway as the PRD specifies — other services consume RMS via its REST gateway
