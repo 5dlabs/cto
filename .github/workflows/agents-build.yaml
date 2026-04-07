@@ -69,6 +69,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Free disk space
+        run: |
+          echo "=== Before cleanup ==="
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/share/swift \
+            /usr/local/share/powershell /usr/local/share/chromium /usr/local/lib/heroku 2>/dev/null || true
+          sudo docker image prune -af 2>/dev/null || true
+          echo "=== After cleanup ==="
+          df -h /
+
       - name: Setup Node.js (for npm version discovery)
         uses: actions/setup-node@v6
         with:
@@ -331,6 +341,13 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v6
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/share/swift \
+            /usr/local/share/powershell /usr/local/share/chromium /usr/local/lib/heroku 2>/dev/null || true
+          sudo docker image prune -af 2>/dev/null || true
+          df -h /
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
