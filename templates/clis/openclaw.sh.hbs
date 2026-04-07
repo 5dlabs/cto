@@ -89,6 +89,7 @@ echo ""
 cd "$WORK_DIR"
 openclaw agent \
     --local \
+    --agent "{{agent_name}}" \
     --message "$PROMPT_TEXT"
 
 OPENCLAW_EXIT=$?
