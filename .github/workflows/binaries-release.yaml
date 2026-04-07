@@ -125,12 +125,6 @@ jobs:
           - name: cto-cli
             binary: cto
             dir: crates/controller/installer
-          - name: intake
-            binary: intake
-            dir: crates/intake
-          - name: healer
-            binary: play-monitor
-            dir: crates/healer
         target:
           - os: ubuntu-22.04
             triple: x86_64-unknown-linux-gnu
@@ -165,10 +159,6 @@ jobs:
               os: windows-latest
           - package:
               name: cto-cli
-            target:
-              os: windows-latest
-          - package:
-              name: intake
             target:
               os: windows-latest
           - package:
