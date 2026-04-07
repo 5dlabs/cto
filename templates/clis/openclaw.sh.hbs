@@ -54,7 +54,8 @@ echo "✓ Agent model: $OPENCLAW_MODEL (cli=$CLI_TYPE, model=$CRD_MODEL)"
 
 # =========================================================================
 # Write openclaw.json — OpenClaw reads config from ~/.openclaw/openclaw.json
-# (NOT from CWD). Only write schema-safe keys; use `config set` for the rest.
+# Keep config minimal: only agents model. ACP/plugins set via CLI after.
+# Pod image may be older OpenClaw — avoid keys it doesn't recognize.
 # =========================================================================
 OPENCLAW_HOME="${HOME}/.openclaw"
 mkdir -p "$OPENCLAW_HOME"
@@ -68,28 +69,11 @@ cat > "$OPENCLAW_HOME/openclaw.json" << OPENCLAW_CFG
         "fallbacks": []
       }
     }
-  },
-  "plugins": {
-    "entries": {
-      "acpx": {
-        "config": {
-          "permissionMode": "approve-all",
-          "nonInteractivePermissions": "fail"
-        }
-      }
-    }
   }
 }
 OPENCLAW_CFG
 
-echo "✓ Wrote $OPENCLAW_HOME/openclaw.json (model: $OPENCLAW_MODEL)"
-
-# Set ACP config via CLI (avoids schema-validation issues across versions)
-openclaw config set acp.enabled true 2>/dev/null || true
-openclaw config set acp.backend acpx 2>/dev/null || true
-openclaw config set acp.defaultAgent "$AGENT_BACKEND" 2>/dev/null || true
-openclaw config set acp.dispatch.enabled true 2>/dev/null || true
-echo "✓ ACP configured (backend: acpx, defaultAgent: $AGENT_BACKEND)"
+echo "✓ Wrote $OPENCLAW_HOME/openclaw.json (model: $OPENCLAW_MODEL, no fallbacks)"
 
 # =========================================================================
 # Determine prompt

@@ -82,7 +82,7 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
 # =============================================================================
 # OpenClaw (agent CLI) - orchestrator that delegates to claude/codex/cursor/etc.
 # =============================================================================
-ARG OPENCLAW_VERSION=2026.2.12
+ARG OPENCLAW_VERSION=2026.3.24
 RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     if [ "$OPENCLAW_VERSION" = "latest" ]; then \
         npm install -g --no-audit --no-fund --ignore-scripts openclaw; \
