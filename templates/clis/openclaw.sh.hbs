@@ -79,7 +79,7 @@ else
 fi
 
 echo ""
-echo "🚀 Launching: openclaw agent --local --message <prompt>"
+echo "🚀 Launching: openclaw agent --local --session-id coderun-{{task_id}}-{{agent_name}}-{{cli_type}} --message <prompt>"
 echo ""
 
 # =========================================================================
@@ -89,7 +89,7 @@ echo ""
 cd "$WORK_DIR"
 openclaw agent \
     --local \
-    --agent "{{agent_name}}" \
+    --session-id "coderun-{{task_id}}-{{agent_name}}-{{cli_type}}" \
     --message "$PROMPT_TEXT"
 
 OPENCLAW_EXIT=$?
