@@ -144,13 +144,16 @@ RUN set -eux; \
     VERSION_DIR="$(cd "$CURSOR_SHARE/versions" && ls -1 | sort | tail -n1)"; \
     install -d /usr/local/lib/cursor-agent; \
     cp -r "$CURSOR_SHARE/versions/$VERSION_DIR"/. /usr/local/lib/cursor-agent/; \
-    ln -sf /usr/bin/node /usr/local/lib/cursor-agent/node; \
-    printf '#!/bin/bash\nexec /usr/local/lib/cursor-agent/cursor-agent "$@"\n' > /usr/local/bin/cursor-agent; \
-    chmod +x /usr/local/bin/cursor-agent; \
-    ln -sf cursor-agent /usr/local/bin/cursor; \
+    rm -f /usr/local/lib/cursor-agent/node; \
+    ln -sf "$(which node)" /usr/local/lib/cursor-agent/node; \
+    cp "$HOME/.local/bin/agent" /usr/local/bin/agent; \
+    chmod +x /usr/local/bin/agent; \
+    sed -i 's|SCRIPT_DIR=.*|SCRIPT_DIR="/usr/local/lib/cursor-agent"|' /usr/local/bin/agent; \
+    ln -sf agent /usr/local/bin/cursor-agent; \
+    ln -sf agent /usr/local/bin/cursor; \
     chown -R 1000:1000 /usr/local/lib/cursor-agent; \
     rm -rf "$CURSOR_SHARE"; \
-    cursor-agent --version || echo "Warning: cursor-agent version check failed"
+    agent --version
 
 # =============================================================================
 # Factory Droid CLI
@@ -274,7 +277,7 @@ RUN set -e; \
     V_CODEX=$(codex --version 2>&1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 || echo "unknown"); \
     V_CODE=$(code --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_GEMINI=$(timeout 10 gemini --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
-    V_CURSOR=$(cursor-agent --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_CURSOR=$(agent --version 2>&1 | head -1 | sed 's/^[[:space:]]*//' || echo "unknown"); \
     V_DROID=$(FACTORY_DISABLE_TELEMETRY=1 droid --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_KIMI=$(kimi --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_OPENCODE=$(opencode --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
