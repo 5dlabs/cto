@@ -10,13 +10,19 @@ echo "🔧 MCP Tools Configuration:"
 # The tool server reads config from MCP_CLIENT_CONFIG env var
 # Use CLAUDE_WORK_DIR (set by git-setup) or /tmp as fallback (always writable)
 TOOLS_CONFIG_DEST="${MCP_CLIENT_CONFIG:-${CLAUDE_WORK_DIR:-/tmp}/client-config.json}"
+mkdir -p "$(dirname "$TOOLS_CONFIG_DEST")" 2>/dev/null || TOOLS_CONFIG_DEST="/tmp/client-config.json"
 export MCP_CLIENT_CONFIG="$TOOLS_CONFIG_DEST"
 
 # Project-specific CTO config location (synced from Linear document)
 PROJECT_CONFIG="/config/project/cto-config.json"
 
 if [ -f /task-files/client-config.json ]; then
-    cp /task-files/client-config.json "$TOOLS_CONFIG_DEST"
+    cp /task-files/client-config.json "$TOOLS_CONFIG_DEST" || {
+        echo "  ⚠️ Cannot write to $TOOLS_CONFIG_DEST, falling back to /tmp"
+        TOOLS_CONFIG_DEST="/tmp/client-config.json"
+        export MCP_CLIENT_CONFIG="$TOOLS_CONFIG_DEST"
+        cp /task-files/client-config.json "$TOOLS_CONFIG_DEST"
+    }
     echo "  ✓ client-config.json → $TOOLS_CONFIG_DEST"
     
     # Check if project-specific config exists and merge if available
