@@ -1,185 +1,114 @@
 # =========================================================================
-# OpenClaw ACP Agent Invocation
+# ACP Agent Dispatch
 #
-# Universal entrypoint — OpenClaw dispatches to the correct CLI harness
-# (codex-acp, claude-agent-acp, opencode, cursor, etc.) via the acpx plugin.
+# Dispatches coding tasks to external CLI harnesses (droid, codex, claude,
+# cursor, gemini, etc.) via acpx — the ACP runtime.
 #
-# All CLI-specific logic lives in OpenClaw config, not in this template.
+# Each CLI handles its own reasoning and coding. acpx manages the ACP
+# protocol. No separate OpenClaw reasoning provider is needed.
 #
 # Required context variables:
 #   - CLAUDE_WORK_DIR: Working directory
 #   - PROMPT_CONTENT: Task prompt (or read from task/prompt.md)
 #
 # Optional context variables:
-#   - cli_type: Backend harness to use (codex, claude, opencode, cursor, ...)
+#   - cli_type: Backend harness (droid, codex, claude, cursor, gemini, ...)
 #               defaults to "codex"
-#   - model:    Model hint passed to the harness (optional)
+#   - model:    Model override passed to the CLI (optional)
 # =========================================================================
 
 echo "═══════════════════════════════════════════════════════════════"
-echo "║               OPENCLAW ACP AGENT INVOCATION                  ║"
+echo "║               ACP AGENT DISPATCH (acpx)                      ║"
 echo "═══════════════════════════════════════════════════════════════"
 
 WORK_DIR="${CLAUDE_WORK_DIR:-/workspace}"
-AGENT_BACKEND="{{#if cli_type}}{{cli_type}}{{else}}codex{{/if}}"
-echo "✓ Work dir:  $WORK_DIR"
-echo "✓ Backend:   $AGENT_BACKEND"
-
-# =========================================================================
-# Resolve OpenClaw reasoning model from CodeRun CRD parameters
-# Each CLI type maps to its own provider. The CRD model field is the
-# model name within that provider.
-# =========================================================================
 CLI_TYPE="{{cli_type}}"
+CLI_TYPE="${CLI_TYPE:-codex}"
 CRD_MODEL="{{model}}"
 
-# Map CLI type → OpenClaw provider for the reasoning model
-case "$CLI_TYPE" in
-  codex)     PROVIDER="openai-codex" ;;
-  factory)   PROVIDER="factory" ;;
-  cursor)    PROVIDER="cursor" ;;
-  claude)    PROVIDER="anthropic" ;;
-  gemini)    PROVIDER="gemini" ;;
-  *)         PROVIDER="openai-api" ;;
-esac
+echo "✓ Work dir:  $WORK_DIR"
+echo "✓ CLI:       $CLI_TYPE"
+echo "✓ Model:     ${CRD_MODEL:-default}"
 
-OPENCLAW_MODEL="${PROVIDER}/${CRD_MODEL}"
-echo "✓ Agent model: $OPENCLAW_MODEL (cli=$CLI_TYPE)"
+# Map CRD cli_type to acpx agent name
+case "$CLI_TYPE" in
+  factory)  ACPX_AGENT="droid" ;;
+  *)        ACPX_AGENT="$CLI_TYPE" ;;
+esac
+echo "✓ acpx agent: $ACPX_AGENT"
+
+# =========================================================================
+# CLI-specific auth setup
+# Each CLI reads its own credentials — we just ensure they're discoverable
+# =========================================================================
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               CLI AUTH SETUP                                  ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+case "$CLI_TYPE" in
+  factory)
+    # Droid reads FACTORY_API_KEY from env (already mounted from cto-secrets)
+    if [ -n "${FACTORY_API_KEY:-}" ]; then
+      echo "  ✓ FACTORY_API_KEY present (${#FACTORY_API_KEY} chars)"
+    else
+      echo "  ❌ FACTORY_API_KEY not set"
+      exit 1
+    fi
+    ;;
+  codex)
+    # Codex reads auth from ~/.codex/auth.json (mounted from codex-oauth secret)
+    CODEX_AUTH="${HOME}/.codex/auth.json"
+    if [ ! -f "$CODEX_AUTH" ]; then
+      CODEX_AUTH="/root/.codex/auth.json"
+    fi
+    if [ -f "$CODEX_AUTH" ]; then
+      echo "  ✓ Codex OAuth found at $CODEX_AUTH"
+    elif [ -n "${OPENAI_API_KEY:-}" ]; then
+      echo "  ✓ OPENAI_API_KEY present (fallback)"
+    else
+      echo "  ❌ No Codex auth (need ~/.codex/auth.json or OPENAI_API_KEY)"
+      exit 1
+    fi
+    ;;
+  claude)
+    # Claude Code reads ANTHROPIC_API_KEY from env
+    if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+      echo "  ✓ ANTHROPIC_API_KEY present (${#ANTHROPIC_API_KEY} chars)"
+    else
+      echo "  ❌ ANTHROPIC_API_KEY not set"
+      exit 1
+    fi
+    ;;
+  cursor)
+    # Cursor reads CURSOR_API_KEY from env
+    if [ -n "${CURSOR_API_KEY:-}" ]; then
+      echo "  ✓ CURSOR_API_KEY present (${#CURSOR_API_KEY} chars)"
+    else
+      echo "  ❌ CURSOR_API_KEY not set"
+      exit 1
+    fi
+    ;;
+  gemini)
+    # Gemini CLI reads GEMINI_API_KEY or GOOGLE_API_KEY from env
+    if [ -n "${GEMINI_API_KEY:-}" ]; then
+      echo "  ✓ GEMINI_API_KEY present"
+    elif [ -n "${GOOGLE_API_KEY:-}" ]; then
+      echo "  ✓ GOOGLE_API_KEY present (fallback)"
+    else
+      echo "  ❌ GEMINI_API_KEY not set"
+      exit 1
+    fi
+    ;;
+  *)
+    echo "  ⚠️ No specific auth check for CLI type: $CLI_TYPE"
+    ;;
+esac
 
 # =========================================================================
 # Skills Setup
 # =========================================================================
-{{> skills-setup skills_target="$WORK_DIR/.openclaw/skills" skills_label="OpenClaw ACP" }}
-
-# =========================================================================
-# Write openclaw.json — OpenClaw reads config from ~/.openclaw/openclaw.json
-# Generate dynamically: only include the provider this CLI actually needs
-# to avoid old OpenClaw rejecting unknown API types (e.g. openai-codex-responses).
-# =========================================================================
-OPENCLAW_HOME="${HOME}/.openclaw"
-mkdir -p "$OPENCLAW_HOME"
-
-python3 -c "
-import json
-
-provider = '$PROVIDER'
-model = '$OPENCLAW_MODEL'
-
-# Provider definitions — only the one we need goes into config
-PROVIDERS = {
-    'openai-codex': {
-        'baseUrl': 'https://chatgpt.com/backend-api',
-        'api': 'openai-codex-responses',
-        'models': [
-            {'id': 'gpt-5.4', 'name': 'GPT-5.4', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 1000000, 'maxTokens': 65536},
-            {'id': 'gpt-5.4-pro', 'name': 'GPT-5.4 Pro', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 1000000, 'maxTokens': 65536},
-            {'id': 'gpt-4.1', 'name': 'GPT-4.1', 'reasoning': False, 'input': ['text','image'], 'contextWindow': 1000000, 'maxTokens': 32768},
-        ]
-    },
-    'openai-api': {
-        'baseUrl': 'https://api.openai.com/v1',
-        'api': 'openai-responses',
-        'auth': 'token', 'authHeader': True,
-        'models': [
-            {'id': 'gpt-5.4', 'name': 'GPT-5.4', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 1000000, 'maxTokens': 65536},
-            {'id': 'gpt-4.1', 'name': 'GPT-4.1', 'reasoning': False, 'input': ['text','image'], 'contextWindow': 1000000, 'maxTokens': 32768},
-        ]
-    },
-    'anthropic': {
-        'baseUrl': 'https://api.anthropic.com',
-        'api': 'anthropic-messages',
-        'auth': 'token', 'authHeader': True,
-        'models': [
-            {'id': 'claude-sonnet-4-6', 'name': 'Claude Sonnet 4.6', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 200000, 'maxTokens': 64000},
-            {'id': 'claude-opus-4-6', 'name': 'Claude Opus 4.6', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 200000, 'maxTokens': 64000},
-            {'id': 'claude-opus-4-5-20251101', 'name': 'Claude Opus 4.5', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 200000, 'maxTokens': 64000},
-        ]
-    },
-    'factory': {
-        'baseUrl': 'https://api.factory.ai/v1',
-        'api': 'openai-responses',
-        'auth': 'token', 'authHeader': True,
-        'models': [
-            {'id': 'claude-opus-4-5-20251101', 'name': 'Claude Opus 4.5 (Factory)', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 200000, 'maxTokens': 64000},
-            {'id': 'claude-sonnet-4-6', 'name': 'Claude Sonnet 4.6 (Factory)', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 200000, 'maxTokens': 64000},
-        ]
-    },
-}
-
-# Only include the provider we actually need
-providers = {}
-if provider in PROVIDERS:
-    providers[provider] = PROVIDERS[provider]
-
-config = {
-    'agents': {'defaults': {'model': {'primary': model, 'fallbacks': []}}},
-    'models': {'providers': providers},
-}
-
-with open('$OPENCLAW_HOME/openclaw.json', 'w') as f:
-    json.dump(config, f, indent=2)
-"
-
-echo "✓ Wrote $OPENCLAW_HOME/openclaw.json (model: $OPENCLAW_MODEL, provider: $PROVIDER only)"
-
-echo "✓ Wrote $OPENCLAW_HOME/openclaw.json (model: $OPENCLAW_MODEL, no fallbacks)"
-
-# =========================================================================
-# Write auth-profiles.json — register credentials per CLI type
-# Codex: extract OAuth tokens from mounted /root/.codex/auth.json
-# Others: use their API key env var directly
-# =========================================================================
-AGENT_DIR="$OPENCLAW_HOME/agents/main/agent"
-mkdir -p "$AGENT_DIR"
-
-CODEX_AUTH="/root/.codex/auth.json"
-
-python3 -c "
-import json, os, sys
-
-profiles = {}
-
-# Codex OAuth (ChatGPT Team subscription)
-codex_auth = '$CODEX_AUTH'
-if os.path.isfile(codex_auth):
-    with open(codex_auth) as f:
-        d = json.load(f)
-    tokens = d.get('tokens', {})
-    if tokens.get('access_token'):
-        profiles['openai-codex:default'] = {
-            'type': 'oauth',
-            'provider': 'openai-codex',
-            'access': tokens['access_token'],
-            'refresh': tokens.get('refresh_token', ''),
-            'accountId': tokens.get('account_id', '')
-        }
-
-# API key providers — read from env vars
-for env_var, profile_id, provider in [
-    ('FACTORY_API_KEY', 'factory:default', 'factory'),
-    ('ANTHROPIC_API_KEY', 'anthropic:default', 'anthropic'),
-    ('OPENAI_API_KEY', 'openai-api:default', 'openai-api'),
-    ('GEMINI_API_KEY', 'gemini:default', 'gemini'),
-    ('CURSOR_API_KEY', 'cursor:default', 'cursor'),
-]:
-    key = os.environ.get(env_var, '')
-    if key:
-        profiles[profile_id] = {
-            'type': 'api_key',
-            'provider': provider,
-            'key': key
-        }
-
-out = {'version': 1, 'profiles': profiles}
-agent_dir = '$AGENT_DIR'
-with open(os.path.join(agent_dir, 'auth-profiles.json'), 'w') as f:
-    json.dump(out, f, indent=2)
-
-for name in profiles:
-    ptype = profiles[name]['type']
-    print(f'  ✓ Auth: {name} ({ptype})')
-" || echo "⚠️ Failed to write auth-profiles.json"
-echo "✓ Wrote $AGENT_DIR/auth-profiles.json"
+{{> skills-setup skills_target="$WORK_DIR/.openclaw/skills" skills_label="ACP" }}
 
 # =========================================================================
 # Determine prompt
@@ -194,20 +123,46 @@ else
     exit 1
 fi
 
+# Write prompt to file for acpx -f (avoids shell quoting issues)
+PROMPT_FILE="$WORK_DIR/.acpx-prompt.md"
+printf '%s' "$PROMPT_TEXT" > "$PROMPT_FILE"
+echo "✓ Wrote prompt to $PROMPT_FILE ($(wc -c < "$PROMPT_FILE") bytes)"
+
+# =========================================================================
+# Build acpx command
+# =========================================================================
+ACPX_CMD="acpx"
+ACPX_CMD="$ACPX_CMD --cwd $WORK_DIR"
+ACPX_CMD="$ACPX_CMD --approve-all"
+ACPX_CMD="$ACPX_CMD --non-interactive-permissions deny"
+ACPX_CMD="$ACPX_CMD --timeout 1800"
+ACPX_CMD="$ACPX_CMD --format text"
+
+# Model override from CRD spec (if provided)
+if [ -n "$CRD_MODEL" ]; then
+    ACPX_CMD="$ACPX_CMD --model $CRD_MODEL"
+fi
+
 echo ""
-echo "🚀 Launching: openclaw agent --local --session-id coderun-{{task_id}}-{{agent_name}}-{{cli_type}} --message <prompt>"
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               LAUNCHING ACP SESSION                          ║"
+echo "═══════════════════════════════════════════════════════════════"
+echo "🚀 $ACPX_CMD $ACPX_AGENT exec -f $PROMPT_FILE"
 echo ""
 
 # =========================================================================
-# Execute — OpenClaw runs locally, dispatches to the ACP harness
-# cd into work dir so OpenClaw picks up .openclaw/openclaw.json from CWD
+# Execute via acpx — dispatches to the target CLI via ACP protocol
 # =========================================================================
 cd "$WORK_DIR"
-openclaw agent \
-    --local \
-    --session-id "coderun-{{task_id}}-{{agent_name}}-{{cli_type}}" \
-    --message "$PROMPT_TEXT"
+$ACPX_CMD "$ACPX_AGENT" exec -f "$PROMPT_FILE"
 
-OPENCLAW_EXIT=$?
+ACPX_EXIT=$?
+rm -f "$PROMPT_FILE"
 echo ""
-echo "✓ OpenClaw ACP execution completed (exit code: $OPENCLAW_EXIT)"
+echo "✓ ACP execution completed (exit code: $ACPX_EXIT)"
+
+if [ "$ACPX_EXIT" -ne 0 ]; then
+    echo "❌ acpx $ACPX_AGENT exited with error code $ACPX_EXIT"
+fi
+
+exit $ACPX_EXIT
