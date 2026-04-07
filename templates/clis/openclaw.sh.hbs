@@ -1,0 +1,96 @@
+# =========================================================================
+# OpenClaw ACP Agent Invocation
+#
+# Universal entrypoint — OpenClaw dispatches to the correct CLI harness
+# (codex-acp, claude-agent-acp, opencode, cursor, etc.) via the acpx plugin.
+#
+# All CLI-specific logic lives in OpenClaw config, not in this template.
+#
+# Required context variables:
+#   - CLAUDE_WORK_DIR: Working directory
+#   - PROMPT_CONTENT: Task prompt (or read from task/prompt.md)
+#
+# Optional context variables:
+#   - cli_type: Backend harness to use (codex, claude, opencode, cursor, ...)
+#               defaults to "codex"
+#   - model:    Model hint passed to the harness (optional)
+# =========================================================================
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               OPENCLAW ACP AGENT INVOCATION                  ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+WORK_DIR="${CLAUDE_WORK_DIR:-/workspace}"
+AGENT_BACKEND="{{#if cli_type}}{{cli_type}}{{else}}codex{{/if}}"
+echo "✓ Work dir:  $WORK_DIR"
+echo "✓ Backend:   $AGENT_BACKEND"
+
+# =========================================================================
+# Skills Setup
+# =========================================================================
+{{> skills-setup skills_target="$WORK_DIR/.openclaw/skills" skills_label="OpenClaw ACP" }}
+
+# =========================================================================
+# Write openclaw.json — ACP harness config for this task run
+# =========================================================================
+mkdir -p "$WORK_DIR/.openclaw"
+
+cat > "$WORK_DIR/.openclaw/openclaw.json" << OPENCLAW_CFG
+{
+  "acp": {
+    "enabled": true,
+    "dispatch": { "enabled": true },
+    "backend": "acpx",
+    "defaultAgent": "$AGENT_BACKEND",
+    "allowedAgents": ["codex", "claude", "opencode", "cursor", "pi", "gemini", "kimi", "droid"],
+    "maxConcurrentSessions": 1,
+    "agentOverrides": {
+      "codex":  { "command": "codex-acp" },
+      "claude": { "command": "claude-agent-acp" }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "acpx": {
+        "config": {
+          "permissionMode": "approve-all",
+          "nonInteractivePermissions": "fail"
+        }
+      }
+    }
+  },
+  "sandbox": { "mode": "off" }
+}
+OPENCLAW_CFG
+
+echo "✓ Wrote .openclaw/openclaw.json (backend: $AGENT_BACKEND)"
+
+# =========================================================================
+# Determine prompt
+# =========================================================================
+if [ -n "${PROMPT_CONTENT:-}" ]; then
+    PROMPT_TEXT="$PROMPT_CONTENT"
+elif [ -f "$WORK_DIR/task/prompt.md" ]; then
+    PROMPT_TEXT=$(cat "$WORK_DIR/task/prompt.md")
+    echo "✓ Using prompt from task/prompt.md"
+else
+    echo "❌ ERROR: No prompt content available"
+    exit 1
+fi
+
+echo ""
+echo "🚀 Launching: openclaw agent --local --message <prompt>"
+echo ""
+
+# =========================================================================
+# Execute — OpenClaw runs locally, dispatches to the ACP harness
+# cd into work dir so OpenClaw picks up .openclaw/openclaw.json from CWD
+# =========================================================================
+cd "$WORK_DIR"
+openclaw agent \
+    --local \
+    --message "$PROMPT_TEXT"
+
+OPENCLAW_EXIT=$?
+echo ""
+echo "✓ OpenClaw ACP execution completed (exit code: $OPENCLAW_EXIT)"

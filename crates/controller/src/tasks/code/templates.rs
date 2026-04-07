@@ -985,7 +985,7 @@ impl CodeTemplateGenerator {
         let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         // Get skills for agent (Factory supports native skill loading)
-        let skills = Self::get_agent_skills(code_run, config);
+        let skills = Self::get_agent_skills_enriched(code_run, config);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
@@ -1296,7 +1296,7 @@ impl CodeTemplateGenerator {
         let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         // Get skills for agent (used by Claude Code and Factory for native skill loading)
-        let skills = Self::get_agent_skills(code_run, config);
+        let skills = Self::get_agent_skills_enriched(code_run, config);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
@@ -1684,7 +1684,7 @@ impl CodeTemplateGenerator {
         let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         // Get skills for agent (Codex supports native skill loading)
-        let skills = Self::get_agent_skills(code_run, config);
+        let skills = Self::get_agent_skills_enriched(code_run, config);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
@@ -3166,7 +3166,7 @@ Be constructive and explain the "why" behind your suggestions.
         let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         // Get skills for agent (OpenCode supports native skill loading)
-        let skills = Self::get_agent_skills(code_run, config);
+        let skills = Self::get_agent_skills_enriched(code_run, config);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
@@ -3982,6 +3982,42 @@ Be constructive and explain the "why" behind your suggestions.
         }
     }
 
+    /// Resolve the content of a skill file by searching category subdirectories.
+    /// Returns the SKILL.md content if found, None otherwise.
+    fn resolve_skill_content(skill_name: &str, templates_path: &str) -> Option<String> {
+        let categories = [
+            "stacks", "auth", "context", "design", "documents", "languages",
+            "llm-docs", "platforms", "quality", "security", "workflow",
+            "animations", "tools",
+        ];
+        for category in &categories {
+            let path = format!("{templates_path}/skills/{category}/{skill_name}/SKILL.md");
+            if let Ok(content) = fs::read_to_string(&path) {
+                return Some(content);
+            }
+        }
+        None
+    }
+
+    /// Get skills enriched with inline content for embedding in container scripts.
+    /// Returns JSON array of {name, content} objects. Content is empty string if skill not found.
+    fn get_agent_skills_enriched(code_run: &CodeRun, config: &ControllerConfig) -> Vec<serde_json::Value> {
+        let templates_path = get_templates_path();
+        Self::get_agent_skills(code_run, config)
+            .into_iter()
+            .map(|name| {
+                let content = Self::resolve_skill_content(&name, &templates_path)
+                    .unwrap_or_default();
+                if content.is_empty() {
+                    debug!("Skill content not found for '{}' in templates", name);
+                } else {
+                    debug!("Loaded inline skill content for '{}'", name);
+                }
+                json!({ "name": name, "content": content })
+            })
+            .collect()
+    }
+
     /// Get the skills for an agent based on agent name and job type.
     /// Returns a list of skill names that should be loaded for the agent.
     /// For Claude Code, Factory, OpenCode, Codex: skills are copied to native skill directories.
@@ -4167,6 +4203,7 @@ Be constructive and explain the "why" behind your suggestions.
             "5DLabs-Stitch" => "stitch",
             "5DLabs-Angie" => "angie",
             "5DLabs-Vex" => "vex",
+            "5DLabs-Pixel" => "pixel",
             // Rex variants and unknown agents default to rex
             _ => "rex",
         };
@@ -4337,6 +4374,7 @@ Be constructive and explain the "why" behind your suggestions.
             "5DLabs-Bolt" => "bolt",
             "5DLabs-Angie" => "angie",
             "5DLabs-Vex" => "vex",
+            "5DLabs-Pixel" => "pixel",
             _ => {
                 return Err(crate::tasks::types::Error::ConfigError(format!(
                     "Unknown GitHub app '{github_app}' - no corresponding agent found"
@@ -5229,6 +5267,13 @@ mod tests {
     }
 
     #[test]
+    fn test_system_prompt_template_pixel_coder() {
+        let code_run = create_test_code_run(Some("5DLabs-Pixel".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
+        assert_eq!(template_path, "agents/pixel/coder.md.hbs");
+    }
+
+    #[test]
     fn test_extract_agent_name_from_github_app() {
         let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
         let agent_name = CodeTemplateGenerator::extract_agent_name_from_github_app(
@@ -5236,6 +5281,13 @@ mod tests {
         )
         .unwrap();
         assert_eq!(agent_name, "rex");
+    }
+
+    #[test]
+    fn test_extract_agent_name_from_github_app_pixel() {
+        let agent_name =
+            CodeTemplateGenerator::extract_agent_name_from_github_app("5DLabs-Pixel").unwrap();
+        assert_eq!(agent_name, "pixel");
     }
 
     #[test]

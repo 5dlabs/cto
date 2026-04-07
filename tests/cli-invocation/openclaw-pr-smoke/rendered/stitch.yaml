@@ -1,0 +1,95 @@
+apiVersion: agents.platform/v1
+kind: CodeRun
+metadata:
+  name: openclaw-pr-smoke-stitch-v1
+  namespace: cto
+  labels:
+    smoke-wave: openclaw-pr
+    smoke-kind: coderun
+    smoke-agent: stitch
+spec:
+  cliConfig:
+    cliType: openclaw
+    model: openai-codex/gpt-5.3-codex
+  contextVersion: 1
+  continueSession: false
+  docsBranch: main
+  docsRepositoryUrl: https://github.com/5dlabs/test-sandbox
+  enableDocker: false
+  githubApp: 5DLabs-Stitch
+  linearIntegration:
+    enabled: false
+  model: openai-codex/gpt-5.3-codex
+  overwriteMemory: false
+  promptModification: |
+    OpenClaw smoke test for Stitch — produce a real pull request.
+
+    You are running as the Stitch agent inside a CodeRun pod targeting
+    the repository https://github.com/5dlabs/test-sandbox. Authentication for
+    both git push and `gh` is already configured via the 5DLabs-Stitch
+    GitHub App — use `gh` and `git` directly; do not reconfigure credentials.
+
+    ## Task
+
+    1. From the workspace root (already a clone of test-sandbox on `main`),
+       create a new branch named exactly:
+           smoke/openclaw-stitch-20260406
+       Base it on the current `main`.
+
+    2. Create the file `docs/stitch-capabilities.md` (Markdown). Model it
+       on `docs/morgan-capabilities.md` in the same repo — same tone, same
+       sectioning, but describe Stitch's actual environment. Include,
+       honestly and concisely:
+         - Agent name, CLI, and model you are running as (check env/process)
+         - Your GitHub App identity (`5DLabs-Stitch`)
+         - The workspace path and current working directory
+         - A short list of the tools available to you in this runtime
+           (what's on PATH, what MCP servers you can see — keep it under 25
+           bullet points total, no fabrications)
+         - UTC timestamp of when the smoke run executed (`date -u`)
+       Do not copy Morgan's file verbatim — write what is actually true for you.
+
+    3. `git add docs/stitch-capabilities.md`, commit with a conventional
+       message like:
+           smoke(stitch): openclaw capabilities inventory
+       and push the branch to origin.
+
+    4. Open a pull request against `5dlabs/test-sandbox:main` using:
+           gh pr create \
+             --repo 5dlabs/test-sandbox \
+             --base main \
+             --head smoke/openclaw-stitch-20260406 \
+             --title "smoke(stitch): openclaw capabilities inventory" \
+             --body "OpenClaw smoke wave — verifies Stitch can branch, commit, push, open a PR via its GitHub App, and notify its dedicated Discord channel. See docs/stitch-capabilities.md."
+       Capture the PR URL that `gh` prints on stdout.
+
+    5. Post the PR URL to Stitch's dedicated Discord channel using
+       the bot token and channel id that are already in env as
+       `DISCORD_TOKEN_STITCH` and `DISCORD_CHANNEL_STITCH`.
+       Use the Discord REST API directly — do NOT go through any bridge:
+
+           curl -sS -X POST \
+             "https://discord.com/api/v10/channels/${DISCORD_CHANNEL_STITCH}/messages" \
+             -H "Authorization: Bot ${DISCORD_TOKEN_STITCH}" \
+             -H "Content-Type: application/json" \
+             -d "{\"content\":\"[smoke] OpenClaw PR from Stitch: <PR_URL>\"}"
+
+       Replace `<PR_URL>` with the URL you captured. If the HTTP status is not
+       2xx, print the response body and exit non-zero.
+
+    6. Reply with a short completion message only after the PR has been opened
+       AND the Discord POST has returned a 2xx status. Include the PR URL in
+       your final message so it appears in pod logs.
+
+    ## Constraints
+
+    - Do NOT install packages.
+    - Do NOT modify any file other than `docs/stitch-capabilities.md`.
+    - Do NOT make broad repository changes.
+    - Do NOT invent tools or capabilities you cannot verify.
+    - Keep the PR small and focused on the smoke marker doc.
+  repositoryUrl: https://github.com/5dlabs/test-sandbox
+  runType: implementation
+  service: test-sandbox
+  taskId: 1
+  workingDirectory: .
