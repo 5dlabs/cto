@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "bun build src/index.ts --compile --outfile intake-util",
+    "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {},
