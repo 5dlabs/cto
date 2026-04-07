@@ -26,31 +26,26 @@ echo "✓ Work dir:  $WORK_DIR"
 echo "✓ Backend:   $AGENT_BACKEND"
 
 # =========================================================================
-# Determine the OpenClaw agent model based on available API keys
-# OpenClaw --local needs a model provider with valid credentials.
-# Prefer Codex OAuth (ChatGPT Team subscription) since it's mounted
-# at /root/.codex/auth.json and OpenClaw auto-syncs from it.
+# Resolve OpenClaw model from CodeRun CRD parameters
+# The controller passes {{cli_type}} and {{model}} from the CRD spec.
+# We map cli_type → OpenClaw provider prefix, then combine with model.
 # =========================================================================
-OPENCLAW_MODEL=""
-if [ -f /root/.codex/auth.json ] || [ -f "$HOME/.codex/auth.json" ]; then
-  OPENCLAW_MODEL="openai-codex/gpt-5.4"
-  echo "✓ Agent model: $OPENCLAW_MODEL (from Codex CLI OAuth)"
-elif [ -n "${OPENAI_API_KEY:-}" ]; then
-  OPENCLAW_MODEL="openai-codex/gpt-5.4"
-  echo "✓ Agent model: $OPENCLAW_MODEL (from OPENAI_API_KEY)"
-elif [ -n "${FACTORY_API_KEY:-}" ]; then
-  OPENCLAW_MODEL="factory/claude-opus-4-5-20251101"
-  echo "✓ Agent model: $OPENCLAW_MODEL (from FACTORY_API_KEY)"
-elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-  OPENCLAW_MODEL="anthropic/claude-sonnet-4-6"
-  echo "✓ Agent model: $OPENCLAW_MODEL (from ANTHROPIC_API_KEY)"
-elif [ -n "${CURSOR_API_KEY:-}" ]; then
-  OPENCLAW_MODEL="cursor/composer-2"
-  echo "✓ Agent model: $OPENCLAW_MODEL (from CURSOR_API_KEY)"
-else
-  OPENCLAW_MODEL="openai-codex/gpt-5.4"
-  echo "⚠️ No credentials detected, defaulting to: $OPENCLAW_MODEL"
-fi
+CLI_TYPE="{{cli_type}}"
+CRD_MODEL="{{model}}"
+
+# Map CLI type → OpenClaw provider id
+case "$CLI_TYPE" in
+  codex)     PROVIDER="openai-codex" ;;
+  cursor)    PROVIDER="cursor" ;;
+  factory)   PROVIDER="factory" ;;
+  claude)    PROVIDER="anthropic" ;;
+  gemini)    PROVIDER="gemini" ;;
+  opencode)  PROVIDER="openrouter" ;;
+  *)         PROVIDER="openai-codex" ;;
+esac
+
+OPENCLAW_MODEL="${PROVIDER}/${CRD_MODEL}"
+echo "✓ Agent model: $OPENCLAW_MODEL (cli=$CLI_TYPE, model=$CRD_MODEL)"
 
 # =========================================================================
 # Skills Setup
@@ -58,16 +53,19 @@ fi
 {{> skills-setup skills_target="$WORK_DIR/.openclaw/skills" skills_label="OpenClaw ACP" }}
 
 # =========================================================================
-# Write openclaw.json — ACP harness config for this task run
+# Write openclaw.json — OpenClaw reads config from ~/.openclaw/openclaw.json
+# (NOT from CWD). We write there so model + ACP settings take effect.
 # =========================================================================
-mkdir -p "$WORK_DIR/.openclaw"
+OPENCLAW_HOME="${HOME}/.openclaw"
+mkdir -p "$OPENCLAW_HOME"
 
-cat > "$WORK_DIR/.openclaw/openclaw.json" << OPENCLAW_CFG
+cat > "$OPENCLAW_HOME/openclaw.json" << OPENCLAW_CFG
 {
   "agents": {
     "defaults": {
       "model": {
-        "primary": "$OPENCLAW_MODEL"
+        "primary": "$OPENCLAW_MODEL",
+        "fallbacks": []
       }
     }
   },
@@ -97,7 +95,12 @@ cat > "$WORK_DIR/.openclaw/openclaw.json" << OPENCLAW_CFG
 }
 OPENCLAW_CFG
 
-echo "✓ Wrote .openclaw/openclaw.json (backend: $AGENT_BACKEND, model: $OPENCLAW_MODEL)"
+echo "✓ Wrote $OPENCLAW_HOME/openclaw.json (backend: $AGENT_BACKEND, model: $OPENCLAW_MODEL)"
+
+# Also set via CLI to be sure (belt and suspenders)
+openclaw config set agents.defaults.model.primary "$OPENCLAW_MODEL" 2>/dev/null || true
+openclaw config set agents.defaults.model.fallbacks '[]' --strict-json 2>/dev/null || true
+echo "✓ Model configured: $OPENCLAW_MODEL (no fallbacks — fail fast, don't cascade to Anthropic)"
 
 # =========================================================================
 # Determine prompt
