@@ -53,67 +53,74 @@ echo "✓ Agent model: $OPENCLAW_MODEL (cli=$CLI_TYPE)"
 
 # =========================================================================
 # Write openclaw.json — OpenClaw reads config from ~/.openclaw/openclaw.json
-# Include model provider definitions so older OpenClaw versions work.
+# Generate dynamically: only include the provider this CLI actually needs
+# to avoid old OpenClaw rejecting unknown API types (e.g. openai-codex-responses).
 # =========================================================================
 OPENCLAW_HOME="${HOME}/.openclaw"
 mkdir -p "$OPENCLAW_HOME"
 
-cat > "$OPENCLAW_HOME/openclaw.json" << OPENCLAW_CFG
-{
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "$OPENCLAW_MODEL",
-        "fallbacks": []
-      }
-    }
-  },
-  "models": {
-    "providers": {
-      "openai-codex": {
-        "baseUrl": "https://chatgpt.com/backend-api",
-        "api": "openai-codex-responses",
-        "models": [
-          { "id": "gpt-5.4", "name": "GPT-5.4", "reasoning": true, "input": ["text","image"], "contextWindow": 1000000, "maxTokens": 65536 },
-          { "id": "gpt-5.4-pro", "name": "GPT-5.4 Pro", "reasoning": true, "input": ["text","image"], "contextWindow": 1000000, "maxTokens": 65536 },
-          { "id": "gpt-4.1", "name": "GPT-4.1", "reasoning": false, "input": ["text","image"], "contextWindow": 1000000, "maxTokens": 32768 }
+python3 -c "
+import json
+
+provider = '$PROVIDER'
+model = '$OPENCLAW_MODEL'
+
+# Provider definitions — only the one we need goes into config
+PROVIDERS = {
+    'openai-codex': {
+        'baseUrl': 'https://chatgpt.com/backend-api',
+        'api': 'openai-codex-responses',
+        'models': [
+            {'id': 'gpt-5.4', 'name': 'GPT-5.4', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 1000000, 'maxTokens': 65536},
+            {'id': 'gpt-5.4-pro', 'name': 'GPT-5.4 Pro', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 1000000, 'maxTokens': 65536},
+            {'id': 'gpt-4.1', 'name': 'GPT-4.1', 'reasoning': False, 'input': ['text','image'], 'contextWindow': 1000000, 'maxTokens': 32768},
         ]
-      },
-      "openai-api": {
-        "baseUrl": "https://api.openai.com/v1",
-        "api": "openai-responses",
-        "auth": "token",
-        "authHeader": true,
-        "models": [
-          { "id": "gpt-5.4", "name": "GPT-5.4", "reasoning": true, "input": ["text","image"], "contextWindow": 1000000, "maxTokens": 65536 },
-          { "id": "gpt-4.1", "name": "GPT-4.1", "reasoning": false, "input": ["text","image"], "contextWindow": 1000000, "maxTokens": 32768 }
+    },
+    'openai-api': {
+        'baseUrl': 'https://api.openai.com/v1',
+        'api': 'openai-responses',
+        'auth': 'token', 'authHeader': True,
+        'models': [
+            {'id': 'gpt-5.4', 'name': 'GPT-5.4', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 1000000, 'maxTokens': 65536},
+            {'id': 'gpt-4.1', 'name': 'GPT-4.1', 'reasoning': False, 'input': ['text','image'], 'contextWindow': 1000000, 'maxTokens': 32768},
         ]
-      },
-      "anthropic": {
-        "baseUrl": "https://api.anthropic.com",
-        "api": "anthropic-messages",
-        "auth": "token",
-        "authHeader": true,
-        "models": [
-          { "id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "reasoning": true, "input": ["text","image"], "contextWindow": 200000, "maxTokens": 64000 },
-          { "id": "claude-opus-4-6", "name": "Claude Opus 4.6", "reasoning": true, "input": ["text","image"], "contextWindow": 200000, "maxTokens": 64000 },
-          { "id": "claude-opus-4-5-20251101", "name": "Claude Opus 4.5", "reasoning": true, "input": ["text","image"], "contextWindow": 200000, "maxTokens": 64000 }
+    },
+    'anthropic': {
+        'baseUrl': 'https://api.anthropic.com',
+        'api': 'anthropic-messages',
+        'auth': 'token', 'authHeader': True,
+        'models': [
+            {'id': 'claude-sonnet-4-6', 'name': 'Claude Sonnet 4.6', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 200000, 'maxTokens': 64000},
+            {'id': 'claude-opus-4-6', 'name': 'Claude Opus 4.6', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 200000, 'maxTokens': 64000},
+            {'id': 'claude-opus-4-5-20251101', 'name': 'Claude Opus 4.5', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 200000, 'maxTokens': 64000},
         ]
-      },
-      "factory": {
-        "baseUrl": "https://api.factory.ai/v1",
-        "api": "openai-responses",
-        "auth": "token",
-        "authHeader": true,
-        "models": [
-          { "id": "claude-opus-4-5-20251101", "name": "Claude Opus 4.5 (Factory)", "reasoning": true, "input": ["text","image"], "contextWindow": 200000, "maxTokens": 64000 },
-          { "id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6 (Factory)", "reasoning": true, "input": ["text","image"], "contextWindow": 200000, "maxTokens": 64000 }
+    },
+    'factory': {
+        'baseUrl': 'https://api.factory.ai/v1',
+        'api': 'openai-responses',
+        'auth': 'token', 'authHeader': True,
+        'models': [
+            {'id': 'claude-opus-4-5-20251101', 'name': 'Claude Opus 4.5 (Factory)', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 200000, 'maxTokens': 64000},
+            {'id': 'claude-sonnet-4-6', 'name': 'Claude Sonnet 4.6 (Factory)', 'reasoning': True, 'input': ['text','image'], 'contextWindow': 200000, 'maxTokens': 64000},
         ]
-      }
-    }
-  }
+    },
 }
-OPENCLAW_CFG
+
+# Only include the provider we actually need
+providers = {}
+if provider in PROVIDERS:
+    providers[provider] = PROVIDERS[provider]
+
+config = {
+    'agents': {'defaults': {'model': {'primary': model, 'fallbacks': []}}},
+    'models': {'providers': providers},
+}
+
+with open('$OPENCLAW_HOME/openclaw.json', 'w') as f:
+    json.dump(config, f, indent=2)
+"
+
+echo "✓ Wrote $OPENCLAW_HOME/openclaw.json (model: $OPENCLAW_MODEL, provider: $PROVIDER only)"
 
 echo "✓ Wrote $OPENCLAW_HOME/openclaw.json (model: $OPENCLAW_MODEL, no fallbacks)"
 
