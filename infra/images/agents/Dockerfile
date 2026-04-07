@@ -100,6 +100,19 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     echo "acpx installed" && \
     acpx --version
 
+# Patch acpx: enable shell mode for terminal/create on all platforms.
+# Without this, agents that send full command strings (e.g. "git status")
+# in terminal/create requests fail with ENOENT on Linux/macOS because
+# Node.js spawn() without shell:true treats the string as a literal binary.
+# Upstream: https://github.com/openclaw/acpx/issues/169 (fixed only for Windows)
+RUN ACPX_PROMPT_TURN=$(find "$(npm root -g)/acpx/dist" -name 'prompt-turn-*' -type f | head -1) && \
+    if [ -n "$ACPX_PROMPT_TURN" ]; then \
+      sed -i 's/if (!shouldUseWindowsBatchShell(command, platform, env)) return options;/\/\/ PATCHED: always use shell for terminal commands/' "$ACPX_PROMPT_TURN" && \
+      echo "acpx patched: shell:true for all platforms in $ACPX_PROMPT_TURN"; \
+    else \
+      echo "WARNING: acpx prompt-turn file not found, patch skipped"; \
+    fi
+
 # =============================================================================
 # ClawHub CLI — skill registry search and installation
 # =============================================================================
