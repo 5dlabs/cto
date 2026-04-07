@@ -1,20 +1,16 @@
-Implement subtask 8004: Build Home page with hero section, CTAs, and Schema.org Organization markup
+Implement subtask 8004: Build root layout with sidebar navigation and mobile hamburger menu
 
 ## Objective
-Implement the `/` (Home) route as a statically generated page with a video/image hero background showcasing lighting production, value proposition text, CTA buttons ('Browse Equipment', 'Get a Quote', 'Chat with Morgan'), and Schema.org Organization JSON-LD.
+Implement app/layout.tsx with the shadcn/ui Sidebar for desktop and Sheet-based hamburger menu for mobile, plus nav links to all pages.
 
 ## Steps
-1. Create `app/page.tsx` as a Server Component (static generation).
-2. Hero section:
-   - Full-viewport height with video background (or high-quality image fallback) showing lighting/production work.
-   - Overlay gradient for text readability.
-   - H1 with company tagline, supporting paragraph.
-   - CTA buttons using shadcn Button: 'Browse Equipment' → `/equipment`, 'Get a Quote' → `/quote`, 'Chat with Morgan' → triggers chat widget open.
-3. Below hero: brief sections for Services overview, Featured Equipment (static or fetched at build), Testimonials/social proof.
-4. SEO metadata in `generateMetadata`: title, description, OpenGraph (og:image, og:title, og:description, og:url), Twitter Card.
-5. Schema.org JSON-LD script in head: Organization type with name, url, logo, description, contactPoint.
-6. Use Next.js `<Image>` component for all images with proper alt text, sizes, priority for hero image.
-7. Responsive layout: hero text and CTAs stack vertically on mobile, side-by-side on desktop.
+1. Create app/layout.tsx as a Server Component. Import Sidebar from components/ui/sidebar, Sheet from components/ui/sheet.
+2. Desktop sidebar (>= md breakpoint): fixed left sidebar 240px wide. Logo at top (Sigma-1 wordmark or SVG). Nav items: Home (/), Equipment (/equipment), Quote (/quote), Portfolio (/portfolio), Contact (/#contact). Each nav item uses Next.js Link. Active state via usePathname() in a client sub-component.
+3. Mobile (< md breakpoint): hamburger icon button (Menu icon from lucide-react) in sticky top bar. On click: open Sheet from left with same nav links. Sheet closes on nav item click.
+4. Main content area: ml-[240px] on desktop, ml-0 on mobile. Padding: px-6 py-8 on desktop, px-4 py-6 on mobile.
+5. Add metadata export: title: 'Sigma-1 – Event Lighting & Visual Production', description for SEO.
+6. Morgan web chat script placeholder (next/script tag for widget — implemented in subtask 8010).
+7. Schema.org JSON-LD script tag (implemented in subtask 8010).
 
 ## Validation
-Integration test: render Home page, verify H1 text present, all 3 CTA buttons rendered with correct hrefs. Verify Schema.org JSON-LD script tag contains Organization type with required fields. Verify OpenGraph meta tags present in document head. Responsive test at 375px and 1440px widths.
+Playwright: navigate to / on 1280px viewport — sidebar is visible with 5 nav links. Navigate to / on 375px viewport — sidebar is hidden, hamburger button is visible. Click hamburger — Sheet opens with nav links. Click 'Equipment' link in Sheet — navigates to /equipment and Sheet closes.

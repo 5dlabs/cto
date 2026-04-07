@@ -1,15 +1,10 @@
-Implement subtask 9010: Build Profile/Settings tab with user info and notification preferences
+Implement subtask 9010: Implement expo-camera barcode scanner screen accessible from equipment tab
 
 ## Objective
-Implement the Profile tab displaying user information, notification preference toggles, saved quotes list, and sign-out functionality.
+Create app/equipment/scan.tsx as a barcode scanner screen using expo-camera. Request camera permissions on mount. Render a CameraView with onBarcodeScanned handler. On scan, call GET /api/v1/catalog/products?barcode={code} and navigate to app/equipment/[id].tsx with the matched product ID. Show error if no product found for barcode. Add a 'Scan Barcode' button in the equipment catalog tab header.
 
 ## Steps
-1. Build `screens/profile/ProfileScreen.tsx`: Display user avatar, name, email, company from JWT claims or user API endpoint.
-2. **Notification preferences**: Toggle switches for push notifications (Morgan messages, quote updates, equipment alerts). Persist preferences to backend API and locally.
-3. **Saved quotes**: List of user's submitted and draft quotes. Each item shows quote ID, date, status (pending, approved, rejected), total. Tap navigates to quote detail.
-4. **Sign out**: Clear JWT tokens from expo-secure-store, clear AsyncStorage caches, disconnect WebSocket, navigate to auth/login screen.
-5. Add app version display at bottom of profile screen.
-6. Optional: Theme toggle (if supporting light/dark modes), language selector.
+In scan.tsx: `const [permission, requestPermission] = useCameraPermissions()`. If no permission, show request prompt. `<CameraView style={styles.camera} onBarcodeScanned={handleScan} barcodeScannerSettings={{ barcodeTypes: ['qr', 'code128', 'ean13'] }}>`. In handleScan: debounce to prevent double-fire (scanned ref). Call `runEffect(fetchProductByBarcode(data))` — on success `router.replace('/equipment/' + product.id)`. On no-result show a toast/alert 'Product not found'. Add header right button in index.tsx: `<Stack.Screen options={{ headerRight: () => <Pressable onPress={() => router.push('/equipment/scan')}>` with barcode-outline icon.
 
 ## Validation
-Render profile screen with mock user data, verify name/email displayed. Toggle notification preference, verify API call and local persistence. Verify saved quotes list renders mock quotes with correct status badges. Sign out test: verify tokens cleared from secure store, navigation to login screen triggered.
+Jest: mock expo-camera useCameraPermissions returning granted. Mock runEffect returning a product. Call handleScan with barcode data — assert router.replace called with '/equipment/p1'. Mock runEffect returning empty — assert alert shown. Verify 'Scan Barcode' button present in equipment tab header via RNTL.

@@ -1,32 +1,10 @@
-Implement subtask 4006: Implement invoice send and payment recording endpoints
+Implement subtask 4006: Implement financial report endpoints (revenue, aging, cashflow, profitability)
 
 ## Objective
-Build the invoice action endpoints: POST send (mark as sent), POST paid (record payment with partial/full tracking and status transitions), and payment CRUD endpoints under `/api/v1/payments`.
+Implement GET /api/v1/finance/reports/revenue, /aging, /cashflow, and /profitability query handlers returning aggregated financial data.
 
 ## Steps
-1. `POST /api/v1/invoices/:id/send`:
-   - Validate invoice exists and status allows transition to Sent (use state machine).
-   - Set `issued_at = now()` if not already set.
-   - Transition status to Sent.
-   - Return updated invoice.
-   - (Stripe integration will be added in a separate subtask — this endpoint just does the local state transition for now.)
-2. `POST /api/v1/invoices/:id/paid`:
-   - Accept `PaymentRequest`: amount_cents, currency, method.
-   - Validate invoice exists and is in a payable state (Sent, Viewed, Overdue).
-   - Insert payment record in `payments` table.
-   - Update invoice `paid_amount_cents += amount_cents`.
-   - If `paid_amount_cents >= total_cents`, transition status to Paid.
-   - All in a single DB transaction with row-level locking (`SELECT ... FOR UPDATE`).
-   - Return updated invoice with payment details.
-3. `POST /api/v1/payments`:
-   - Direct payment recording (same logic as above but via payments endpoint).
-4. `GET /api/v1/payments`:
-   - Query params: invoice_id (optional), org_id, offset, limit.
-5. `GET /api/v1/payments/invoice/:invoice_id`:
-   - List all payments for a specific invoice.
-6. Handle partial payments: if amount_cents < remaining, keep invoice in current status but update paid_amount_cents.
-7. Handle overpayment: reject payments where amount_cents would cause paid_amount_cents > total_cents.
-8. Add utoipa annotations.
+Create src/handlers/reports.rs. GET /api/v1/finance/reports/revenue?period=YYYY-MM: SELECT SUM(total_cents) FROM finance.invoices WHERE status='paid' AND DATE_TRUNC('month', issued_at) = $1. GET /api/v1/finance/reports/aging: SELECT COUNT(*), SUM(total_cents - paid_amount_cents) FROM finance.invoices WHERE status IN ('sent','viewed','overdue') GROUP BY CASE WHEN NOW()-issued_at <= 30 THEN '0-30' WHEN NOW()-issued_at <= 60 THEN '31-60' WHEN NOW()-issued_at <= 90 THEN '61-90' ELSE '90+' END. Return JSON with bucket keys and count + amount fields. GET /api/v1/finance/reports/cashflow: monthly in (paid invoices) and out (payroll entries) for the trailing 12 months. GET /api/v1/finance/reports/profitability: per project_id, SUM(paid invoices total_cents) - SUM(payroll_entries amount_cents). All queries use sqlx::query_as with typed result structs.
 
 ## Validation
-Integration tests: (1) Create invoice, send it, verify status=Sent and issued_at set. (2) Record partial payment (50% of total), verify paid_amount_cents updated, status unchanged. (3) Record remaining payment, verify status transitions to Paid. (4) Attempt to pay a Draft invoice, verify 400 error. (5) Attempt overpayment, verify rejection. (6) GET payments by invoice_id returns both payments. (7) Verify DB transaction atomicity: concurrent payments don't cause race conditions (test with row locking).
+Seed one invoice issued 35 days ago with status=sent; GET /aging shows it in 31-60 bucket with count=1. Seed paid invoices for two months; GET /revenue?period=YYYY-MM returns correct sum for each month. GET /cashflow returns array with at least the current month. GET /profitability returns per-project rows.

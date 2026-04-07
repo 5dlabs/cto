@@ -1,22 +1,10 @@
-Implement subtask 4010: Implement currency rate sync background task
+Implement subtask 4010: Implement JWT authentication middleware
 
 ## Objective
-Build the background tokio task that fetches currency exchange rates hourly from an external API and stores them in the database and Valkey cache.
+Add Tower/Axum middleware that validates JWT Bearer tokens on all /api/v1/* routes, rejecting requests without a valid token with HTTP 401.
 
 ## Steps
-1. Create `services/rust/finance/src/background/currency_sync.rs`.
-2. Define `CurrencyRateSyncer` struct with DB pool, Valkey connection, and reqwest client.
-3. Implement `sync_rates(&self) -> Result<()>`:
-   - Fetch rates from the configured exchange rate API (e.g., `https://api.exchangerate.host/latest?base=USD&symbols=CAD,AUD,NZD`).
-   - Parse JSON response into rate structs.
-   - Upsert into `currency_rates` table (ON CONFLICT (base_currency, target_currency) DO UPDATE SET rate = EXCLUDED.rate, fetched_at = now()).
-   - Cache in Valkey with key `currency_rates:USD` as JSON, TTL 3600 seconds.
-   - Log success/failure with rate values.
-4. Implement `run_sync_loop(&self)` that calls `sync_rates()` every hour using `tokio::time::interval`.
-5. Spawn the sync loop in `main.rs` as a background tokio task alongside the Axum server.
-6. Handle errors gracefully: if API is down, log error and retry next interval; don't crash the service.
-7. Support configurable interval via environment variable `CURRENCY_SYNC_INTERVAL_SECS` (default 3600).
-8. Fetch supported currency pairs: USD↔CAD, USD↔AUD, USD↔NZD, CAD↔USD.
+Create src/middleware/auth.rs using tower::Layer and axum::middleware::from_fn. Extract the Authorization: Bearer <token> header. Validate the JWT using the jsonwebtoken crate (add to Cargo.toml) against a secret loaded from JWT_SECRET env var (or a JWKS endpoint — confirm via decision point). Decode claims into a struct with sub (user/org id) and exp fields. Reject expired tokens with 401. On success, insert the decoded claims into Axum's request Extensions for use by handlers. Apply the middleware to the /api/v1 router group only; exclude /health, /metrics, and /api/v1/webhooks/stripe (Stripe webhook uses its own HMAC auth). Apply middleware to /internal/gdpr routes with a separate internal key check instead of JWT.
 
 ## Validation
-Unit test: mock exchange rate API response, verify rates are parsed correctly and upserted into DB. Verify Valkey cache is set with correct key, value, and TTL. Test API error handling: mock 500 response, verify error is logged but task continues. Test with invalid JSON response, verify graceful error handling. Integration test: run sync once against test DB, verify currency_rates table populated with expected currency pairs.
+GET /api/v1/invoices without Authorization header returns 401. GET with expired JWT returns 401. GET with valid JWT returns 200. POST /api/v1/webhooks/stripe without JWT but with valid Stripe-Signature returns 200 (not blocked by JWT middleware). GET /health/live returns 200 without auth.

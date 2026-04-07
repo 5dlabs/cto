@@ -19,9 +19,9 @@ args:
   design_urls:
     default: ""
   design_mode:
-    default: ingest_plus_stitch
+    default: both
   design_provider:
-    default: stitch
+    default: both
   design_framer_project:
     default: ""
   project_name:
@@ -127,6 +127,24 @@ steps:
       fi
       printf '%s\n' "$OUT"
 
+  - id: reset-audio-artifacts
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "reset-audio-artifacts" "${audio_debug}" "project ${project_name}"
+      mkdir -p "$WS/.intake/audio" "$WS/.tasks/audio"
+      rm -f \
+        "$WS/.intake/audio/architecture-deliberation.status.json" \
+        "$WS/.intake/audio/architecture-deliberation.log" \
+        "$WS/.intake/audio/design-deliberation.status.json" \
+        "$WS/.intake/audio/design-deliberation.log" \
+        "$WS/.tasks/audio/architecture-deliberation.mp3" \
+        "$WS/.tasks/audio/architecture-deliberation.transcript.json" \
+        "$WS/.tasks/audio/design-deliberation.mp3" \
+        "$WS/.tasks/audio/design-deliberation.transcript.json"
+      jq -nc '{"cleared":true}'
+
   - id: materialize-design-inputs
     env:
       INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
@@ -135,6 +153,7 @@ steps:
       "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "materialize-design-inputs" "${audio_debug}" "project ${project_name}"
       DESIGN_DIR="$WS/.intake/design"
       ASSETS_DIR="$DESIGN_DIR/assets"
+      rm -rf "$DESIGN_DIR"
       mkdir -p "$ASSETS_DIR"
       INTAKE_AGENT_BIN="${INTAKE_AGENT_BIN:-}"
       if [ -z "$INTAKE_AGENT_BIN" ]; then
@@ -151,9 +170,12 @@ steps:
         echo "materialize-design-inputs: intake-agent binary not found. Set INTAKE_AGENT_BIN or build apps/intake-agent." >&2
         exit 1
       fi
-      MODE="${design_mode:-ingest_plus_stitch}"
-      PROVIDER_MODE="${design_provider:-}"
-      FRAMER_PROJECT_TARGET="${design_framer_project:-${FRAMER_PROJECT_URL:-${FRAMER_PROJECT_ID:-}}}"
+      MODE="${design_mode}"
+      PROVIDER_MODE="${design_provider}"
+      FRAMER_PROJECT_TARGET="${design_framer_project}"
+      if [ -z "$FRAMER_PROJECT_TARGET" ]; then
+        FRAMER_PROJECT_TARGET="${FRAMER_PROJECT_URL:-${FRAMER_PROJECT_ID:-}}"
+      fi
       if [ -z "$PROVIDER_MODE" ]; then
         case "$MODE" in
           stitch|framer|both|auto) PROVIDER_MODE="$MODE" ;;
@@ -161,8 +183,8 @@ steps:
           *) PROVIDER_MODE="stitch" ;;
         esac
       fi
-      export INTAKE_STITCH_GENERATION_TIMEOUT_MS="${INTAKE_STITCH_GENERATION_TIMEOUT_MS:-60000}"
-      export INTAKE_STITCH_GENERATION_MAX_RETRIES="${INTAKE_STITCH_GENERATION_MAX_RETRIES:-1}"
+      export INTAKE_STITCH_GENERATION_TIMEOUT_MS="${INTAKE_STITCH_GENERATION_TIMEOUT_MS:-300000}"
+      export INTAKE_STITCH_GENERATION_MAX_RETRIES="${INTAKE_STITCH_GENERATION_MAX_RETRIES:-3}"
       STITCH_KEY_STATE="missing"
       if [ -n "${STITCH_API_KEY:-}" ]; then
         STITCH_KEY_STATE="present"
@@ -1572,6 +1594,7 @@ steps:
         --arg linear_prd_issue_id "$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.prdIssueId')" \
         --arg linear_team_id "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.linear_team_id')" \
         --arg linear_agent_map "$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -c '.agentMap')" \
+        --arg linear_milestone_map "$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -c '.milestoneMap // {}')" \
         --arg pm_url "${PM_URL:-}" \
         --arg repository_url "$(printf '%s' "$CTO_SETUP_REPO_JSON" | jq -r '.repository_url')" \
         --arg verify "${verify}" \
@@ -1592,7 +1615,7 @@ steps:
         --arg voter_3_provider "$(printf '%s' "$LOAD_CFG" | jq -r '.voter_3_provider')" \
         --arg voter_3_model "$(printf '%s' "$LOAD_CFG" | jq -r '.voter_3_model')" \
         --arg audio_debug "${audio_debug}" \
-        '{prd_path: $prd_path, num_tasks: ($num_tasks_raw | tonumber), project_name: $project_name, intake_metadata: $intake_metadata, pr_base_branch: $pr_base_branch, linear_project_id: $linear_project_id, linear_prd_issue_id: $linear_prd_issue_id, linear_team_id: $linear_team_id, linear_agent_map: $linear_agent_map, pm_url: $pm_url, repository_url: $repository_url, verify: $verify, breakpoints: $breakpoints, linear_session_id: $linear_session_id, linear_issue_id: $linear_issue_id, run_id: $run_id, model_primary_provider: $model_primary_provider, model_primary: $model_primary, model_fast_provider: $model_fast_provider, model_fast: $model_fast, model_frontier_provider: $model_frontier_provider, model_frontier: $model_frontier, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, audio_debug: $audio_debug}') &&
+        '{prd_path: $prd_path, num_tasks: ($num_tasks_raw | tonumber), project_name: $project_name, intake_metadata: $intake_metadata, pr_base_branch: $pr_base_branch, linear_project_id: $linear_project_id, linear_prd_issue_id: $linear_prd_issue_id, linear_team_id: $linear_team_id, linear_agent_map: $linear_agent_map, linear_milestone_map: $linear_milestone_map, pm_url: $pm_url, repository_url: $repository_url, verify: $verify, breakpoints: $breakpoints, linear_session_id: $linear_session_id, linear_issue_id: $linear_issue_id, run_id: $run_id, model_primary_provider: $model_primary_provider, model_primary: $model_primary, model_fast_provider: $model_fast_provider, model_fast: $model_fast, model_frontier_provider: $model_frontier_provider, model_frontier: $model_frontier, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, audio_debug: $audio_debug}') &&
       INTAKE_LOG="$WS/.intake/intake-sub-workflow.log"
       lobster run --mode tool "$WS/intake/workflows/intake.lobster.yaml" --args-json "$ARGS" >"$INTAKE_LOG" 2>&1 || {
         echo "intake sub-workflow failed — detailed log:" >&2
@@ -1691,9 +1714,16 @@ steps:
       "$root/intake/scripts/quality-gate.sh" --stage "pipeline-intake-output" --input-file "$GATE_IN" --provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" --model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')"
 
   - id: sync-to-target-repo
+    env:
+      CTO_SETUP_REPO_JSON: $setup-repo.stdout
     command: |
       root="$(cd "${WORKSPACE:-.}" && pwd)"
       "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "sync-to-target-repo" "${audio_debug}" "project ${project_name}"
+      # Resolve repository_url: prefer pipeline param, fall back to setup-repo output
+      RESOLVED_REPO_URL="${repository_url}"
+      if [ -z "$RESOLVED_REPO_URL" ]; then
+        RESOLVED_REPO_URL="$(printf '%s' "$CTO_SETUP_REPO_JSON" | jq -r '.repository_url // empty' 2>/dev/null || true)"
+      fi
       TARGET="${target_repo_local_path}"
       if [ -z "$TARGET" ]; then
         echo "sync-to-target-repo: target_repo_local_path not set — skipping" >&2
@@ -1705,7 +1735,7 @@ steps:
         jq -nc --arg path "$TARGET" '{"synced":false,"reason":"not a git repo","path":$path}'
         exit 0
       fi
-      EXPECTED_URL="${repository_url}"
+      EXPECTED_URL="$RESOLVED_REPO_URL"
       if [ -n "$EXPECTED_URL" ]; then
         ACTUAL_URL="$(git -C "$TARGET" remote get-url origin 2>/dev/null || true)"
         ACTUAL_NORM="$(printf '%s' "$ACTUAL_URL" | sed 's/\.git$//')"
@@ -1724,6 +1754,12 @@ steps:
       git pull --ff-only origin main 2>/dev/null || true
       rm -rf "$TARGET/.tasks"
       rsync -a "$root/.tasks/" "$TARGET/.tasks/"
+      # Generate DESIGN.md from design artifacts
+      if [ -x "$root/intake/scripts/generate-design-md.sh" ]; then
+        "$root/intake/scripts/generate-design-md.sh" "$root" "${project_name}" > "$TARGET/.tasks/design/DESIGN.md" 2>/dev/null || true
+      fi
+      # Remove CTO-platform-internal docs that don't belong in customer repos
+      rm -f "$TARGET/.tasks/docs/bridge-consolidation.md"
       BRANCH_NAME="intake/${project_name}-$(date +%Y%m%d-%H%M%S)"
       git checkout -b "$BRANCH_NAME" 2>/dev/null || {
         echo "sync-to-target-repo: branch $BRANCH_NAME exists — using current branch" >&2
@@ -1738,16 +1774,16 @@ steps:
         exit 0
       fi
       TASK_COUNT="$(jq -r '.artifact_counts.task_count // 0' "$root/.intake/intake-summary.json" 2>/dev/null || echo 0)"
-      git diff --staged --stat
+      git diff --staged --stat >&2
       git commit \
         -m "feat(intake): generated ${TASK_COUNT} tasks for ${project_name}" \
         -m "Generated by Morgan intake pipeline." \
-        -m "Contains docs/design-brief.md, docs/research-prd.json when available, docs/, tasks/, and design/ artifacts." || {
+        -m "Contains docs/design-brief.md, docs/research-prd.json when available, docs/, tasks/, design/, and audio/ artifacts." >&2 || {
         echo "sync-to-target-repo: git commit failed" >&2
         jq -nc '{"synced":false,"reason":"commit failed"}'
         exit 1
       }
-      git push origin "$BRANCH_NAME" 2>&1 || {
+      git push origin "$BRANCH_NAME" >&2 2>&1 || {
         echo "sync-to-target-repo: git push failed" >&2
         jq -nc --arg branch "$BRANCH_NAME" '{"synced":false,"reason":"push failed","branch":$branch}'
         exit 1
@@ -1782,23 +1818,35 @@ steps:
         echo "sync-to-target-repo: gh CLI not available — PR not created" >&2
         PR_URL="none"
       fi
-      jq -nc --arg pr_url "$PR_URL" --arg branch "$BRANCH_NAME" --arg target "$TARGET" \
-        '{"synced":true,"pr_url":$pr_url,"branch":$branch,"target_repo":$target}'
+      # Derive repository_url from the target repo's git remote if not already set
+      DERIVED_REPO_URL="$RESOLVED_REPO_URL"
+      if [ -z "$DERIVED_REPO_URL" ]; then
+        DERIVED_REPO_URL="$(git -C "$TARGET" remote get-url origin 2>/dev/null | sed 's/\.git$//' || true)"
+        if [ -n "$DERIVED_REPO_URL" ]; then
+          echo "sync-to-target-repo: derived repository_url from target remote: $DERIVED_REPO_URL" >&2
+        fi
+      fi
+      jq -nc --arg pr_url "$PR_URL" --arg branch "$BRANCH_NAME" --arg target "$TARGET" --arg repo_url "$DERIVED_REPO_URL" \
+        '{"synced":true,"pr_url":$pr_url,"branch":$branch,"target_repo":$target,"repository_url":$repo_url}'
 
   - id: fix-linear-urls-for-target
     env:
       CTO_SYNC_TARGET_REPO_JSON: $sync-to-target-repo.stdout
       CTO_CREATE_LINEAR_JSON: $create-linear-project.stdout
       CTO_INTAKE_OUT: $intake.stdout
+      CTO_SETUP_REPO_JSON: $setup-repo.stdout
     command: |
       root="${WORKSPACE:-.}"
-      TARGET_SYNCED="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | jq -r '.synced // false' 2>/dev/null || echo false)"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "fix-linear-urls-for-target" "${audio_debug}" "project ${project_name}"
+      # Extract last valid JSON line (resilient to stray git/shell output in stdout)
+      _SYNC_JSON="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | grep -E '^\{' | tail -1)"
+      TARGET_SYNCED="$(printf '%s' "$_SYNC_JSON" | jq -r '.synced // false' 2>/dev/null || echo false)"
       if [ "$TARGET_SYNCED" != "true" ]; then
         echo "fix-linear-urls-for-target: target repo not synced — skipping" >&2
         jq -nc '{"skipped":true,"reason":"target not synced"}'
         exit 0
       fi
-      TARGET_BRANCH="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | jq -r '.branch // empty' 2>/dev/null || true)"
+      TARGET_BRANCH="$(printf '%s' "$_SYNC_JSON" | jq -r '.branch // empty' 2>/dev/null || true)"
       if [ -z "$TARGET_BRANCH" ]; then
         echo "fix-linear-urls-for-target: no target branch — skipping" >&2
         jq -nc '{"skipped":true,"reason":"no target branch"}'
@@ -1815,7 +1863,20 @@ steps:
         jq -nc '{"skipped":true,"reason":"no CTO branch found"}'
         exit 0
       fi
-      REPO_WEB="$(printf '%s' "${repository_url}" | sed -E 's#\.git$##')"
+      # Resolve repository_url: prefer pipeline param, fall back to setup-repo output, then sync-to-target-repo
+      REPO_WEB="${repository_url}"
+      if [ -z "$REPO_WEB" ]; then
+        REPO_WEB="$(printf '%s' "$CTO_SETUP_REPO_JSON" | jq -r '.repository_url // empty' 2>/dev/null || true)"
+      fi
+      if [ -z "$REPO_WEB" ]; then
+        REPO_WEB="$(printf '%s' "$_SYNC_JSON" | jq -r '.repository_url // empty' 2>/dev/null || true)"
+      fi
+      REPO_WEB="$(printf '%s' "$REPO_WEB" | sed -E 's#\.git$##')"
+      if [ -z "$REPO_WEB" ]; then
+        echo "fix-linear-urls-for-target: no repository URL resolved — skipping" >&2
+        jq -nc '{"skipped":true,"reason":"no repository URL"}'
+        exit 0
+      fi
       OLD_BASE="${REPO_WEB}/blob/${CTO_BRANCH}"
       NEW_BASE="${REPO_WEB}/blob/${TARGET_BRANCH}"
       if [ "$OLD_BASE" = "$NEW_BASE" ]; then
@@ -1839,16 +1900,33 @@ steps:
     env:
       CTO_CREATE_LINEAR_JSON: $create-linear-project.stdout
       CTO_SYNC_TARGET_REPO_JSON: $sync-to-target-repo.stdout
+      CTO_SETUP_REPO_JSON: $setup-repo.stdout
     command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "sync-github-issues" "${audio_debug}" "project ${project_name}"
+      # Extract last valid JSON line (resilient to stray git/shell output in stdout)
+      _SYNC_JSON="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | grep -E '^\{' | tail -1)"
       # Only sync if target repo was synced
-      TARGET_SYNCED="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | jq -r '.synced // false' 2>/dev/null || echo false)"
+      TARGET_SYNCED="$(printf '%s' "$_SYNC_JSON" | jq -r '.synced // false' 2>/dev/null || echo false)"
       if [ "$TARGET_SYNCED" != "true" ]; then
         echo "sync-github-issues: target repo not synced — skipping" >&2
         jq -nc '{"skipped":true,"reason":"target not synced"}'
         exit 0
       fi
+      # Resolve repo slug: pipeline param → setup-repo output → sync-to-target-repo derived URL
       REPO="$(printf '%s' "${repository_url}" | sed -E 's#https://github.com/##; s#\.git$##')"
-      BRANCH="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | jq -r '.branch // empty' 2>/dev/null || true)"
+      if [ -z "$REPO" ]; then
+        REPO="$(printf '%s' "$CTO_SETUP_REPO_JSON" | jq -r '.repository_url // empty' 2>/dev/null | sed -E 's#https://github.com/##; s#\.git$##')"
+      fi
+      if [ -z "$REPO" ]; then
+        REPO="$(printf '%s' "$_SYNC_JSON" | jq -r '.repository_url // empty' 2>/dev/null | sed -E 's#https://github.com/##; s#\.git$##')"
+      fi
+      if [ -z "$REPO" ]; then
+        echo "sync-github-issues: no repository URL resolved from param, setup-repo, or target sync — skipping" >&2
+        jq -nc '{"skipped":true,"reason":"no repository URL"}'
+        exit 0
+      fi
+      BRANCH="$(printf '%s' "$_SYNC_JSON" | jq -r '.branch // empty' 2>/dev/null || true)"
       if [ -z "$BRANCH" ]; then
         echo "sync-github-issues: no branch — skipping" >&2
         jq -nc '{"skipped":true,"reason":"no branch"}'
@@ -1863,6 +1941,7 @@ steps:
       echo "sync-github-issues: syncing Linear project $PROJECT_ID → $REPO (branch: $BRANCH)" >&2
       intake-util sync-linear github-sync \
         --project-id "$PROJECT_ID" \
+        --project-name "${project_name}" \
         --repo "$REPO" \
         --branch "$BRANCH"
 
@@ -1873,8 +1952,9 @@ steps:
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "notify-pipeline-complete" "${audio_debug}" "project ${project_name}"
-      TARGET_PR="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | jq -r '.pr_url // empty' 2>/dev/null || true)"
-      TARGET_SYNCED="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | jq -r '.synced // false' 2>/dev/null || echo false)"
+      _SYNC_JSON="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | grep -E '^\{' | tail -1)"
+      TARGET_PR="$(printf '%s' "$_SYNC_JSON" | jq -r '.pr_url // empty' 2>/dev/null || true)"
+      TARGET_SYNCED="$(printf '%s' "$_SYNC_JSON" | jq -r '.synced // false' 2>/dev/null || echo false)"
       RUN_ID="$(printf '%s' "$CTO_REGISTER_RUN_JSON" | jq -r '.run_id // empty')"
       if [ -n "$RUN_ID" ]; then
         ACTIVE_COUNT="$(sqlite3 "$root/.intake/bridge-state.db" "select count(*) from runs where run_id = '$RUN_ID';" 2>/dev/null || printf '0')"
@@ -1925,6 +2005,8 @@ steps:
         "📝 Docs: " + (($summary.artifact_counts.doc_count // 0) | tostring)
           + "  •  Prompts: " + (($summary.artifact_counts.prompt_count // 0) | tostring)
           + "  •  Workflows: " + (($summary.artifact_counts.workflow_count // 0) | tostring) + "\n" +
+        "🎧 Architecture audio: " + (($summary.audio.architecture.status // "not_started") | tostring)
+          + "  •  Design audio: " + (($summary.audio.design.status // "not_started") | tostring) + "\n" +
         "🧩 Linear issues: " + (($summary.delivery.issue_count // 0) | tostring) + "\n" +
         (if (($summary.delivery.pr_url // "") | length) > 0
           then "🔗 PR: " + ($summary.delivery.pr_url // "") + "\n"

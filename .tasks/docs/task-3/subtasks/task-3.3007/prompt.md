@@ -1,24 +1,10 @@
-Implement subtask 3007: Implement Inventory service with conflict detection and barcode scanning
+Implement subtask 3007: Implement CrewService and DeliveryService gRPC handlers
 
 ## Objective
-Build the InventoryService gRPC implementation with stock level tracking, transaction recording, equipment availability conflict detection, and barcode scanning lookup.
+Implement CrewService (ListCrew, AssignCrew, ScheduleCrew) and DeliveryService (ScheduleDelivery, UpdateDeliveryStatus, OptimizeRoute) as gRPC handlers backed by pgx.
 
 ## Steps
-1. Create `internal/service/inventory_svc.go` implementing `InventoryServiceServer`.
-2. Implement `GetStockLevel` RPC: delegate to `inventoryRepo.GetStockLevel()`, return item with quantity_total and quantity_available.
-3. Implement `RecordTransaction` RPC:
-   - Validate transaction type (CHECK_OUT, CHECK_IN, TRANSFER, ADJUSTMENT).
-   - For CHECK_OUT: verify quantity_available >= requested quantity, decrement atomically.
-   - For CHECK_IN: increment quantity_available, update item status.
-   - Delegate to `inventoryRepo.RecordTransaction()` which uses pgx transaction.
-4. Implement conflict detection in `internal/domain/conflict_detector.go`:
-   - `DetectConflicts(ctx, orgID, itemIDs []UUID, dateStart, dateEnd time.Time) ([]Conflict, error)`
-   - Query inventory_transactions joined with projects to find overlapping CHECK_OUT periods for the same items.
-   - Return list of Conflict structs with item_id, conflicting_project_id, conflicting_date_range.
-5. Integrate conflict detection into Project service's `CheckOut` RPC: before recording transactions, call DetectConflicts. If conflicts found, return them in CheckOutResponse with success=false.
-6. Implement `ScanBarcode` RPC: call `inventoryRepo.GetByBarcode(ctx, orgID, barcode)`, return InventoryItem with current_location and status. Return NOT_FOUND if barcode doesn't exist.
-7. Implement `ListInventoryItems` with org_id filtering and pagination.
-8. Register service in gRPC server.
+Create internal/crew/handler.go: ListCrew queries crew_members. AssignCrew inserts a crew_assignments row linking crew_member_id to project_id with role. ScheduleCrew updates crew_assignment notes/role. Create internal/delivery/handler.go: ScheduleDelivery inserts deliveries row with status=scheduled and scheduled_at. UpdateDeliveryStatus updates status and completed_at. OptimizeRoute accepts a list of delivery IDs and returns them in a stub-ordered sequence (sort by scheduled_at ascending); store order in route_data JSONB. Register both service servers on the shared gRPC instance. Wire grpc-gateway HTTP routes.
 
 ## Validation
-Integration tests with testcontainers-go: 1) Create inventory item, RecordTransaction CHECK_OUT, verify quantity_available decremented. RecordTransaction CHECK_IN, verify quantity_available restored. 2) Conflict detection: create item, check out to project A for dates Jan 1-5, attempt checkout to project B for Jan 3-7, verify conflict returned with project A's ID and overlapping range. 3) ScanBarcode: create item with barcode 'ABC123', scan returns correct item; scan non-existent barcode returns NOT_FOUND. 4) Verify CHECK_OUT fails when quantity_available < requested.
+POST /api/v1/crew/assign creates crew_assignments row retrievable by project_id. POST /api/v1/deliveries schedules a delivery. PATCH /api/v1/deliveries/:id/status updates status to completed. POST /api/v1/deliveries/optimize returns ordered array of delivery IDs.

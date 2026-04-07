@@ -1,1 +1,1 @@
-Per-service GDPR endpoints vs centralized compliance service?
+What approach for GDPR data export and customer deletion?

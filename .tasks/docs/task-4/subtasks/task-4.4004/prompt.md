@@ -1,21 +1,10 @@
-Implement subtask 4004: Implement invoice status state machine
+Implement subtask 4004: Implement payment recording handlers
 
 ## Objective
-Build the invoice status state machine enforcing valid transitions (draft→sent→viewed→paid, draft→sent→overdue, any→cancelled) with rejection of invalid transitions.
+Implement POST /api/v1/payments, GET /api/v1/payments, and GET /api/v1/payments/invoice/:id handlers for recording and retrieving payment records.
 
 ## Steps
-1. Create `services/rust/finance/src/models/invoice_status.rs`.
-2. Define `InvoiceStatus` enum matching the DB enum: Draft, Sent, Viewed, Paid, Overdue, Cancelled.
-3. Implement `InvoiceStatus::can_transition_to(&self, target: &InvoiceStatus) -> bool` with allowed transitions:
-   - Draft → Sent, Cancelled
-   - Sent → Viewed, Paid, Overdue, Cancelled
-   - Viewed → Paid, Overdue, Cancelled
-   - Overdue → Paid, Cancelled
-   - Paid → (none, terminal state)
-   - Cancelled → (none, terminal state)
-4. Implement `InvoiceStatus::transition(&self, target: InvoiceStatus) -> Result<InvoiceStatus, FinanceError>` that returns the new status or an error with details about the invalid transition.
-5. Derive `sqlx::Type`, `Serialize`, `Deserialize`, `utoipa::ToSchema` for the enum.
-6. Write comprehensive unit tests for every valid transition and every invalid transition (e.g., Paid→Draft should fail, Cancelled→Sent should fail).
+Create src/handlers/payments.rs. POST /api/v1/payments: accept invoice_id, amount_cents, currency, method, optional stripe_payment_id, received_at. INSERT into finance.payments. Call the same paid_amount_cents update logic as POST /api/v1/invoices/:id/paid (extract shared logic into src/services/invoice_payment.rs). Return 201 with created payment. GET /api/v1/payments: SELECT all payments with optional invoice_id filter query param. GET /api/v1/payments/invoice/:id: SELECT payments WHERE invoice_id = $1, return array. Register routes on the Axum router.
 
 ## Validation
-Unit tests covering all valid transitions (Draft→Sent, Sent→Viewed, Sent→Paid, Sent→Overdue, Viewed→Paid, Viewed→Overdue, Overdue→Paid, any non-terminal→Cancelled). Unit tests verifying rejection of all invalid transitions (Paid→anything, Cancelled→anything, Draft→Paid, Draft→Overdue, Draft→Viewed). Verify error messages include current and target states.
+POST /api/v1/payments with valid invoice_id and method=cash returns 201 with id. GET /api/v1/payments/invoice/:id returns the payment in an array. Partial payment does not change invoice status to paid; second payment completing the total does.

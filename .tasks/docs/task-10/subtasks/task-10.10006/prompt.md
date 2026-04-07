@@ -1,18 +1,10 @@
-Implement subtask 10006: Network policies: allow sigma1 social-engine to NATS in openclaw namespace
+Implement subtask 10006: Author CiliumNetworkPolicy for finance service
 
 ## Objective
-Create NetworkPolicy allowing only the social-engine pod in sigma1 to reach NATS on port 4222 in the openclaw namespace.
+Create a CiliumNetworkPolicy for the finance pod selector. Allow ingress only from morgan and rms pods. Allow egress only to postgres, valkey, and Stripe API FQDN.
 
 ## Steps
-Step-by-step:
-1. Create `netpol-allow-nats.yaml`:
-   - Egress policy in sigma1 namespace:
-     - `podSelector.matchLabels: {app: social-engine}` (only social-engine)
-     - `egress[0].to[0].namespaceSelector.matchLabels: {name: openclaw}`
-     - `egress[0].ports: [{protocol: TCP, port: 4222}]`
-2. Create ingress policy in openclaw namespace:
-   - Allow ingress from sigma1 namespace, pod label `app: social-engine`, on port 4222 for NATS pods.
-3. Ensure `openclaw` namespace has label `name: openclaw`.
+Create helm/sigma1/templates/cnp-finance.yaml with `spec.endpointSelector: { matchLabels: { app: finance } }`. Ingress from morgan and rms. Egress to postgres and valkey endpoints, plus `toFQDNs: [{ matchName: 'api.stripe.com' }]` on port 443. Default deny all else.
 
 ## Validation
-From the social-engine pod, run `nc -zv <nats-service>.openclaw.svc.cluster.local 4222` and verify success. From a different sigma1 pod (e.g., equipment-catalog), run the same command and verify it is denied.
+`kubectl exec <finance-pod> -- curl -s http://social-engine-svc:8080/` connection refused (blocked). `kubectl exec <rms-pod> -- curl -s http://finance-svc:8080/health` returns 200. `kubectl exec <finance-pod> -- curl -s https://api.stripe.com` returns response (not ETIMEDOUT).

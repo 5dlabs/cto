@@ -2,178 +2,208 @@ name: implement-task-9
 metadata:
   task_id: 9
   agent: tap
-  stack: Expo (React Native)
+  stack: Expo/React Native/NativeWind 4/Effect 3.x
+  cli: cursor
+  model: opus-4.6
   depends_on_tasks: [2, 7]
 
-inputs:
-  - name: task_dir
-  - name: repo_url
-  - name: branch_name
+args:
+  task_dir: {}
+  repo_url: {}
+  branch_name:
     default: "task-9/feature-branch"
-  - name: agent
+  agent:
     default: "tap"
-  - name: cli
+  cli:
+    default: "cursor"
+  model:
+    default: "opus-4.6"
+  fallback_cli:
     default: "claude"
-  - name: model
+  fallback_model:
     default: "claude-opus-4-6"
-  - name: max_implementation_retries
+  max_implementation_retries:
     default: 10
-  - name: max_quality_retries
+  max_quality_retries:
     default: 5
 
 steps:
-  - name: setup
+  - id: setup
     command: >
-      git clone {{inputs.repo_url}} work && cd work &&
-      git checkout -b {{inputs.branch_name}}
+      git clone ${repo_url} work && cd work &&
+      git checkout -b ${branch_name}
 
-  - name: implement-subtask-9001
+  - id: implement-subtask-9001
     depends_on: [setup]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9001/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9001/prompt.md)" --model ${model}
 
-  - name: validate-subtask-9001
+  - id: validate-subtask-9001
     depends_on: [implement-subtask-9001]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
-  - name: implement-subtask-9002
+  - id: implement-subtask-9002
     depends_on: [validate-subtask-9001]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9002/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9002/prompt.md)" --model ${model}
 
-  - name: validate-subtask-9002
+  - id: validate-subtask-9002
     depends_on: [implement-subtask-9002]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
-  - name: implement-subtask-9003
-    depends_on: [validate-subtask-9001]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-9003
+    depends_on: [validate-subtask-9002]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9003/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9003/prompt.md)" --model ${model}
 
-  - name: validate-subtask-9003
+  - id: validate-subtask-9003
     depends_on: [implement-subtask-9003]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
-  - name: implement-subtask-9004
-    depends_on: [validate-subtask-9002, validate-subtask-9003]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-9004
+    depends_on: [validate-subtask-9003]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9004/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9004/prompt.md)" --model ${model}
 
-  - name: validate-subtask-9004
+  - id: validate-subtask-9004
     depends_on: [implement-subtask-9004]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
-  - name: implement-subtask-9005
-    depends_on: [validate-subtask-9002, validate-subtask-9003]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-9005
+    depends_on: [validate-subtask-9004]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9005/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9005/prompt.md)" --model ${model}
 
-  - name: validate-subtask-9005
+  - id: validate-subtask-9005
     depends_on: [implement-subtask-9005]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
-  - name: implement-subtask-9006
-    depends_on: [validate-subtask-9004, validate-subtask-9005]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-9006
+    depends_on: [validate-subtask-9005]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9006/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9006/prompt.md)" --model ${model}
 
-  - name: validate-subtask-9006
+  - id: validate-subtask-9006
     depends_on: [implement-subtask-9006]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
-  - name: implement-subtask-9007
-    depends_on: [validate-subtask-9002, validate-subtask-9003]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-9007
+    depends_on: [validate-subtask-9004]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9007/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9007/prompt.md)" --model ${model}
 
-  - name: validate-subtask-9007
+  - id: validate-subtask-9007
     depends_on: [implement-subtask-9007]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
-  - name: implement-subtask-9008
-    depends_on: [validate-subtask-9007]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-9008
+    depends_on: [validate-subtask-9004]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9008/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9008/prompt.md)" --model ${model}
 
-  - name: validate-subtask-9008
+  - id: validate-subtask-9008
     depends_on: [implement-subtask-9008]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
-  - name: implement-subtask-9009
-    depends_on: [validate-subtask-9002, validate-subtask-9003]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-9009
+    depends_on: [validate-subtask-9004]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9009/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9009/prompt.md)" --model ${model}
 
-  - name: validate-subtask-9009
+  - id: validate-subtask-9009
     depends_on: [implement-subtask-9009]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
-  - name: implement-subtask-9010
-    depends_on: [validate-subtask-9002, validate-subtask-9003]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-9010
+    depends_on: [validate-subtask-9005]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9010/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9010/prompt.md)" --model ${model}
 
-  - name: validate-subtask-9010
+  - id: validate-subtask-9010
     depends_on: [implement-subtask-9010]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
-  - name: implement-subtask-9011
-    depends_on: [validate-subtask-9001]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-9011
+    depends_on: [validate-subtask-9003]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-9.9011/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9011/prompt.md)" --model ${model}
 
-  - name: validate-subtask-9011
+  - id: validate-subtask-9011
     depends_on: [implement-subtask-9011]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && bun tsc --noEmit && bun test && bun lint
 
-  - name: integration-validation
-    depends_on: [validate-subtask-9001, validate-subtask-9002, validate-subtask-9003, validate-subtask-9004, validate-subtask-9005, validate-subtask-9006, validate-subtask-9007, validate-subtask-9008, validate-subtask-9009, validate-subtask-9010, validate-subtask-9011]
+  - id: implement-subtask-9012
+    depends_on: [validate-subtask-9001]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9012/prompt.md)" --model ${model}
+
+  - id: validate-subtask-9012
+    depends_on: [implement-subtask-9012]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
+  - id: implement-subtask-9013
+    depends_on: [validate-subtask-9007, validate-subtask-9008, validate-subtask-9009, validate-subtask-9010, validate-subtask-9011]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9013/prompt.md)" --model ${model}
+
+  - id: validate-subtask-9013
+    depends_on: [implement-subtask-9013]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && bun tsc --noEmit && bun test && bun lint
+
+  - id: integration-validation
+    depends_on: [validate-subtask-9001, validate-subtask-9002, validate-subtask-9003, validate-subtask-9004, validate-subtask-9005, validate-subtask-9006, validate-subtask-9007, validate-subtask-9008, validate-subtask-9009, validate-subtask-9010, validate-subtask-9011, validate-subtask-9012, validate-subtask-9013]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 
-  - name: acceptance-check
+  - id: acceptance-check
     depends_on: [integration-validation]
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt "Review changes against {{inputs.task_dir}}/acceptance.md. Output PASS or FAIL."
+      ${cli} -p "Review changes against ${task_dir}/acceptance.md. Output PASS or FAIL." --model ${model}
 
-  - name: create-pr
+  - id: create-pr
     depends_on: [acceptance-check]
     command: >
       cd work && git add -A &&
       git commit -m "feat: task-9" &&
-      git push origin {{inputs.branch_name}} &&
+      git push origin ${branch_name} &&
       source "${WORKSPACE:-.}/scripts/scm-dispatch.sh" &&
-      scm_create_pr "feat: task-9" "$(cat {{inputs.task_dir}}/task.md)" "main"
+      scm_create_pr "feat: task-9" "$(cat ${task_dir}/task.md)" "main"

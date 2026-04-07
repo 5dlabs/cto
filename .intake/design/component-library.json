@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "projectName": "sigma-1-20260404-073027",
+  "projectName": "sigma-1",
   "provider_mode": "stitch",
   "providers": [
     "stitch"
@@ -148,15 +148,17 @@
       "target": "web",
       "provider": "stitch",
       "candidate_id": "stitch-web-1",
-      "notes": "Failed to generate web candidate."
+      "screen_id": "76efd04574374a53b0c26305dc18fb57",
+      "notes": "Generated web modernization candidate from intake design context."
     },
     {
       "target": "mobile",
       "provider": "stitch",
       "candidate_id": "stitch-mobile-2",
-      "notes": "Failed to generate mobile candidate."
+      "screen_id": "ae4c6d48d61c49658522adbc57b14bb7",
+      "notes": "Generated mobile modernization candidate from intake design context."
     }
   ],
   "framer_code_components": [],
-  "generated_at": "2026-04-04T14:32:34.213Z"
+  "generated_at": "2026-04-06T23:43:20.507Z"
 }

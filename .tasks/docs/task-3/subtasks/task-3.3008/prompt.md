@@ -1,21 +1,10 @@
-Implement subtask 3008: Implement Crew scheduling service with conflict detection
+Implement subtask 3008: Implement ScoreLead algorithm with external vetting service HTTP call and unit tests
 
 ## Objective
-Build the CrewService gRPC implementation with crew listing, assignment, scheduling with overlap conflict detection, and availability queries.
+Replace the ScoreLead stub with the full weighted scoring algorithm that calls the vetting service HTTP endpoint, computes a composite score from event size, venue history, customer vetting score, and lead age, and returns GREEN/YELLOW/RED.
 
 ## Steps
-1. Create `internal/service/crew_svc.go` implementing `CrewServiceServer`.
-2. Implement `ListCrew` RPC: delegate to `crewRepo.List(ctx, orgID)` with optional skill/role filters.
-3. Implement `AssignCrew` RPC:
-   - Accept crew_member_id, project_id, date_start, date_end, role.
-   - Call `crewRepo.GetConflicts(ctx, orgID, crewMemberID, dateStart, dateEnd)` to check for overlapping assignments.
-   - If conflicts exist, return error with details of conflicting assignments (project_id, dates).
-   - If no conflicts, call `crewRepo.CreateAssignment(ctx, orgID, assignment)`.
-4. Implement `ScheduleCrew` RPC: bulk assign multiple crew members to a project, checking conflicts for each. Return summary of successful assignments and any conflicts.
-5. Implement `GetCrewAvailability` RPC:
-   - For a given crew_member_id and date range, query existing assignments and return available time slots.
-   - Return list of `AvailabilitySlot` (date_start, date_end, is_available).
-6. Register service in gRPC server.
+Create internal/opportunity/score.go. Define a ScoreInput struct populated from the opportunity row (event_date_start/end for size proxy, venue for history lookup, notes for flags, created_at for lead age). Make an HTTP GET to $VETTING_SERVICE_URL/api/v1/vetting/:org_id using net/http with a 2-second timeout; parse the JSON response for a numeric vetting_score field. Weights (to be confirmed via decision point): event_duration_days * 2 + vetting_score * 5 - lead_age_days * 0.1. Thresholds: >= 20 → GREEN, 10-19 → YELLOW, < 10 → RED. On vetting service HTTP error, treat vetting_score=0 and log a warning. Update the ScoreLead handler to call this function and persist the result to lead_score column. Unit tests in score_test.go: table-driven tests covering GREEN, YELLOW, RED cases with mocked HTTP responses using httptest.NewServer.
 
 ## Validation
-Integration tests: 1) Create crew member, assign to project A for Jan 1-5, attempt assign to project B for Jan 3-7 → verify conflict error with project A details. 2) Assign to non-overlapping period Jan 6-10 → verify success. 3) GetCrewAvailability for Jan 1-15 → verify slot Jan 1-5 shows unavailable, Jan 6-10 unavailable, Jan 11-15 available. 4) ScheduleCrew bulk: 3 crew members, 1 has conflict → verify 2 succeed and 1 returns conflict.
+Unit tests: ScoreLead with mocked vetting_score=10 and high event size returns GREEN; vetting_score=5 returns YELLOW; vetting_score=0 and old lead returns RED. Integration: POST /api/v1/opportunities/:id/score with seeded vetting stub returns correct color. GET opportunity after scoring shows updated lead_score.

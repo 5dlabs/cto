@@ -4,6 +4,7 @@ export type SpeakerId =
   | "narrator"
   | "optimist"
   | "pessimist"
+  | "designer"
   | "voter-1"
   | "voter-2"
   | "voter-3"
@@ -19,15 +20,19 @@ export interface SpeakerConfig {
   voice: VoiceConfig;
 }
 
+// All speakers use ElevenLabs exclusively (eleven_flash_v2_5).
+// Each speaker has a distinct ElevenLabs voice for variety.
 const SPEAKERS: Record<SpeakerId, SpeakerConfig> = {
   narrator: {
     id: "narrator",
-    label: "Narrator (Nova — OpenAI)",
+    label: "Narrator (Rachel — ElevenLabs)",
     voice: {
-      provider: "openai",
-      voiceId: "nova",
-      model: "tts-1-hd",
-      speed: 1.0,
+      provider: "elevenlabs",
+      voiceId: "21m00Tcm4TlvDq8ikWAM",   // Rachel — calm, clear narration
+      model: "eleven_flash_v2_5",
+      stability: 0.7,
+      similarityBoost: 0.75,
+      style: 0.2,
     },
   },
   optimist: {
@@ -35,7 +40,7 @@ const SPEAKERS: Record<SpeakerId, SpeakerConfig> = {
     label: "Optimist (Charlie — ElevenLabs)",
     voice: {
       provider: "elevenlabs",
-      voiceId: "IKne3meq5aSn9XLyUdCD",
+      voiceId: "IKne3meq5aSn9XLyUdCD",   // Charlie
       model: "eleven_flash_v2_5",
       stability: 0.5,
       similarityBoost: 0.8,
@@ -44,11 +49,26 @@ const SPEAKERS: Record<SpeakerId, SpeakerConfig> = {
   },
   pessimist: {
     id: "pessimist",
-    label: "Pessimist (Ara — xAI)",
+    label: "Pessimist (Clyde — ElevenLabs)",
     voice: {
-      provider: "xai",
-      voiceId: "ara",
-      language: "en",
+      provider: "elevenlabs",
+      voiceId: "2EiwWnXFnvU5JabPnv8n",   // Clyde — gruff, skeptical tone
+      model: "eleven_flash_v2_5",
+      stability: 0.6,
+      similarityBoost: 0.75,
+      style: 0.3,
+    },
+  },
+  designer: {
+    id: "designer",
+    label: "Designer (Bella — ElevenLabs)",
+    voice: {
+      provider: "elevenlabs",
+      voiceId: "EXAVITQu4vr4xnSDxMaL",   // Bella — soft, creative
+      model: "eleven_flash_v2_5",
+      stability: 0.55,
+      similarityBoost: 0.8,
+      style: 0.35,
     },
   },
   "voter-1": {
@@ -56,7 +76,7 @@ const SPEAKERS: Record<SpeakerId, SpeakerConfig> = {
     label: "Architect (Daniel — ElevenLabs)",
     voice: {
       provider: "elevenlabs",
-      voiceId: "onwK4e9ZLuTAKqWW03F9",
+      voiceId: "onwK4e9ZLuTAKqWW03F9",   // Daniel
       model: "eleven_flash_v2_5",
       stability: 0.65,
       similarityBoost: 0.75,
@@ -65,21 +85,26 @@ const SPEAKERS: Record<SpeakerId, SpeakerConfig> = {
   },
   "voter-2": {
     id: "voter-2",
-    label: "Pragmatist (Shimmer — OpenAI)",
+    label: "Pragmatist (Domi — ElevenLabs)",
     voice: {
-      provider: "openai",
-      voiceId: "shimmer",
-      model: "tts-1-hd",
-      speed: 1.0,
+      provider: "elevenlabs",
+      voiceId: "AZnzlk1XvdvUeBnXmlld",   // Domi
+      model: "eleven_flash_v2_5",
+      stability: 0.55,
+      similarityBoost: 0.75,
+      style: 0.3,
     },
   },
   "voter-3": {
     id: "voter-3",
-    label: "Minimalist (Sal — xAI)",
+    label: "Minimalist (Fin — ElevenLabs)",
     voice: {
-      provider: "xai",
-      voiceId: "sal",
-      language: "en",
+      provider: "elevenlabs",
+      voiceId: "D38z5RcWu1voky8WS1ja",   // Fin
+      model: "eleven_flash_v2_5",
+      stability: 0.65,
+      similarityBoost: 0.7,
+      style: 0.2,
     },
   },
   "voter-4": {
@@ -87,7 +112,7 @@ const SPEAKERS: Record<SpeakerId, SpeakerConfig> = {
     label: "Operator (Matilda — ElevenLabs)",
     voice: {
       provider: "elevenlabs",
-      voiceId: "XrExE9yKIg1WjnnlVkGX",
+      voiceId: "XrExE9yKIg1WjnnlVkGX",   // Matilda
       model: "eleven_flash_v2_5",
       stability: 0.5,
       similarityBoost: 0.8,
@@ -96,30 +121,38 @@ const SPEAKERS: Record<SpeakerId, SpeakerConfig> = {
   },
   "voter-5": {
     id: "voter-5",
-    label: "Strategist (Leo — xAI)",
+    label: "Strategist (Josh — ElevenLabs)",
     voice: {
-      provider: "xai",
-      voiceId: "leo",
-      language: "en",
+      provider: "elevenlabs",
+      voiceId: "TxGEqnHWrfWFTfGW9XjX",   // Josh
+      model: "eleven_flash_v2_5",
+      stability: 0.55,
+      similarityBoost: 0.75,
+      style: 0.3,
     },
   },
   alert: {
     id: "alert",
-    label: "Alert (Rex — xAI)",
+    label: "Alert (Antoni — ElevenLabs)",
     voice: {
-      provider: "xai",
-      voiceId: "rex",
-      language: "en",
+      provider: "elevenlabs",
+      voiceId: "ErXwobaYiN019PkySvjV",   // Antoni — sharp, urgent
+      model: "eleven_flash_v2_5",
+      stability: 0.45,
+      similarityBoost: 0.8,
+      style: 0.5,
     },
   },
   system: {
     id: "system",
-    label: "System (Alloy — OpenAI)",
+    label: "System (Elli — ElevenLabs)",
     voice: {
-      provider: "openai",
-      voiceId: "alloy",
-      model: "tts-1",
-      speed: 1.0,
+      provider: "elevenlabs",
+      voiceId: "MF3mGyEYCl7XYWbV9V6O",   // Elli — neutral, system-like
+      model: "eleven_flash_v2_5",
+      stability: 0.7,
+      similarityBoost: 0.7,
+      style: 0.15,
     },
   },
   compiler: {
@@ -127,7 +160,7 @@ const SPEAKERS: Record<SpeakerId, SpeakerConfig> = {
     label: "Compiler (Adam — ElevenLabs)",
     voice: {
       provider: "elevenlabs",
-      voiceId: "pNInz6obpgDQGcFmaJgB",
+      voiceId: "pNInz6obpgDQGcFmaJgB",   // Adam
       model: "eleven_flash_v2_5",
       stability: 0.6,
       similarityBoost: 0.75,

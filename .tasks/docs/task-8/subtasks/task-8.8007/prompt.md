@@ -1,23 +1,19 @@
-Implement subtask 8007: Build AvailabilityCalendar component with date range picker
+Implement subtask 8007: Build equipment catalog page (app/equipment/page.tsx) with category filter and search
 
 ## Objective
-Create the AvailabilityCalendar custom component that displays available/unavailable dates for a product and integrates a date range picker. Fetches availability data from the API with Effect Schema validation for date inputs.
+Implement the equipment catalog browser as a server-rendered page with client-side category filtering, debounced search, and product cards displaying image, name, day rate, and availability badge.
 
 ## Steps
-1. Create `components/custom/AvailabilityCalendar.tsx` — Client Component.
-2. Props: `productId: string`, `onDateRangeSelect: (start: Date, end: Date) => void`.
-3. Calendar display:
-   - Use shadcn Calendar (Radix-based) or extend with react-day-picker for range selection.
-   - Fetch availability via `useProductAvailability(productId, { month, year })` TanStack Query hook → `GET /api/v1/catalog/products/:id/availability?start=YYYY-MM-DD&end=YYYY-MM-DD`.
-   - Color-code dates: green (available), red (unavailable/booked), gray (past dates).
-   - Disable selection of unavailable dates.
-4. Date range selection:
-   - User clicks start date, then end date to form a range.
-   - Validate with Effect Schema: start < end, start >= today, range within reasonable bounds (e.g., max 90 days).
-   - Display validation errors inline.
-5. Loading state: skeleton overlay on calendar while fetching availability.
-6. Month navigation: prev/next month buttons trigger new availability fetch.
-7. Integrate into Product Detail page (`/equipment/:id`): place below product info, selected date range feeds into 'Add to Quote' action.
+1. Create app/equipment/page.tsx as a Server Component. Fetch categories and initial product list server-side using runApiEffect(getCategories()) and runApiEffect(getProducts()).
+2. Pass initial data to a client component EquipmentCatalog via props.
+3. Create components/equipment/EquipmentCatalog.tsx as 'use client' component:
+   - State: selectedCategory (string | null), searchQuery (string).
+   - Category filter: horizontally scrollable row of Badge buttons. Click sets selectedCategory, triggers client-side re-fetch via TanStack Query: useQuery({ queryKey: ['products', category, search], queryFn: () => runApiEffect(getProducts(search)) }).
+   - Search input: Input component, onChange with 300ms debounce using setTimeout/clearTimeout.
+   - Product grid: responsive grid (2 cols mobile, 3 cols md, 4 cols lg).
+4. Create components/equipment/ProductCard.tsx: next/image for product image (objectFit: cover, aspect-ratio: 4/3), product name (h3), day_rate formatted as currency, availability badge (green Sold or In Stock — static for catalog view).
+5. Loading state: 8 Skeleton cards while TanStack Query is fetching.
+6. Link product card to /equipment/[id].
 
 ## Validation
-Unit test AvailabilityCalendar: mock availability API returning mix of available/unavailable dates. Verify available dates are selectable and unavailable dates are disabled. Test date range selection: click start and end date, verify `onDateRangeSelect` callback fires with correct dates. Test validation: select end date before start date, verify error message shown. Test month navigation: click next month, verify new API call made with updated date range.
+Playwright: GET /equipment shows product grid with >= 1 card. Click 'Lighting' category badge — URL or state updates, only lighting products visible. Type 'truss' in search — product list updates to matching items within 500ms. Network tab shows GET /api/v1/catalog/products with search and category query params.

@@ -1,1 +1,1 @@
-Centralized GDPR orchestrator that fans out to per-service deletion/export endpoints, with unified audit log
+Tab-based navigation for mobile, sidebar for web (responsive hybrid)

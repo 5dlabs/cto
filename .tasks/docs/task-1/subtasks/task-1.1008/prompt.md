@@ -1,18 +1,10 @@
-Implement subtask 1008: Create sigma1-infra-endpoints ConfigMap
+Implement subtask 1008: Apply ArgoCD Application CR for the sigma1/infra Helm chart and validate full stack
 
 ## Objective
-Create the `sigma1-infra-endpoints` ConfigMap in the `sigma1` namespace aggregating all non-secret connection strings and endpoint URLs for consumption via `envFrom` by downstream services.
+Create the ArgoCD Application custom resource pointing to the sigma1/infra Helm chart in the GitOps repo, sync it, and run the full validation suite confirming all pods, secrets, schemas, and the ConfigMap are healthy.
 
 ## Steps
-1. Create ConfigMap `sigma1-infra-endpoints` in `sigma1` namespace with data:
-   - `POSTGRES_URL=postgresql://sigma1_user:$(password_ref)@sigma1-postgres-pooler.sigma1-db.svc.cluster.local:5432/sigma1` (Note: actual password should come from secret; this ConfigMap holds the host/port/db template)
-   - `VALKEY_URL=redis://sigma1-valkey.sigma1-db.svc.cluster.local:6379`
-   - `R2_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com`
-   - `R2_BUCKET=sigma1-media`
-   - `NATS_URL=nats://openclaw-nats.openclaw.svc.cluster.local:4222`
-2. Decide: POSTGRES_URL in ConfigMap should be the template without password (password injected separately from secret) or the full URL. Recommendation: put host/port/db in ConfigMap, password in secret, let app construct URL.
-3. Apply ConfigMap YAML.
-4. Verify all 5 keys are present.
+Create sigma1/infra/argocd-application.yaml (applied outside the chart itself, or in an argocd/ directory). Spec: apiVersion: argoproj.io/v1alpha1, kind: Application, metadata.name: sigma1-infra, metadata.namespace: argocd. spec.source.repoURL: <GitOps repo URL>, spec.source.path: sigma1/infra, spec.source.targetRevision: HEAD. spec.destination.server: https://kubernetes.default.svc, spec.destination.namespace: sigma1. spec.syncPolicy.automated: {prune: true, selfHeal: true}. Apply: kubectl apply -f sigma1/infra/argocd-application.yaml -n argocd. Wait for sync: argocd app wait sigma1-infra --health --timeout 300. Run validation checklist: (a) kubectl get pods -n databases — sigma1-postgres-1 Running, sigma1-valkey-0 Running. (b) kubectl exec job/schema-init -n databases — confirm completed. (c) kubectl get secret -n sigma1 — 9 secrets present. (d) kubectl get pod -n signal — signal-cli Running. (e) kubectl get configmap sigma1-infra-endpoints -n sigma1 — 5 keys present. (f) ArgoCD UI or CLI shows Synced + Healthy.
 
 ## Validation
-`kubectl get configmap sigma1-infra-endpoints -n sigma1 -o json | jq '.data | keys'` returns exactly 5 keys: POSTGRES_URL, VALKEY_URL, R2_ENDPOINT, R2_BUCKET, NATS_URL. Each value is non-empty and contains the correct service DNS name.
+argocd app get sigma1-infra shows Health Status: Healthy and Sync Status: Synced. All 7 test_strategy checks from the parent task pass sequentially. CI pipeline step running kubectl get pods --all-namespaces | grep -E 'sigma1|databases|signal' shows no pods in CrashLoopBackOff or Error state.

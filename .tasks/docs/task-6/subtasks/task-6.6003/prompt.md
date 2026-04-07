@@ -1,25 +1,10 @@
-Implement subtask 6003: Implement photo upload endpoint with multipart handling and R2 storage
+Implement subtask 6003: Define Effect.Schema types and Effect.Service interfaces
 
 ## Objective
-Build the POST /api/v1/social/upload endpoint that accepts multipart form data with photos, uploads them to R2, extracts image dimensions, and stores metadata in the uploads and photos tables.
+Define all Effect.Schema request/response types (UploadEventPhotosRequest, DraftResponse, PublishRequest) and the Effect.Service interfaces for InstagramService, LinkedInService, TikTokService, and FacebookService with retry and timeout configuration.
 
 ## Steps
-1. Create `src/routes/upload.ts` with Elysia route group.
-2. `POST /api/v1/social/upload`:
-   - Accept multipart form: `event_name` (string, required), `uploaded_by` (string, required), `photos` (File[], required, max 50 files).
-   - Validate with Effect Schema: reject if no photos, if event_name is empty, if files exceed 20MB each.
-   - Use Effect.gen to orchestrate the pipeline:
-     a. Insert record into `uploads` table with event_name, uploaded_by, photo_count = files.length.
-     b. For each photo file in parallel (Effect.forEach with concurrency: 5):
-        - Read file buffer.
-        - Use `sharp` to extract width/height metadata.
-        - Generate R2 key via R2Service.generateKey.
-        - Upload to R2 via R2Service.upload.
-        - Insert record into `photos` table with upload_id, r2_key, original_filename, width, height.
-     c. Return { upload_id, photo_count, photos: [{id, r2_key, width, height}] }.
-3. Install `sharp` for image metadata extraction.
-4. Error handling: If any photo upload fails, use Effect.catchTag to log the error and continue with remaining photos. Return partial success with list of failed filenames.
-5. Response schema validation with Effect Schema for type-safe responses.
+Create src/schemas.ts: use Schema.Struct from effect/Schema to define UploadEventPhotosRequest {event_id: Schema.UUID, photo_count: Schema.Number}, DraftResponse {id, event_id, status, selected_photo_urls, caption, hashtags, created_at}, PublishRequest {draft_id, platforms: Schema.Array(Schema.Literal('instagram','linkedin','tiktok','facebook'))}. Create src/services/platform-services.ts: define Effect.Service classes for each platform. Each service method signature: publishPost(draft: DraftResponse): Effect.Effect<{external_post_id: string}, PlatformError>. Add Schedule.exponential('1 second') with Schedule.recurs(5) as the retry policy. Add Effect.timeout('30 seconds') wrapping each service call. Export a PlatformServiceLayer combining all four services for use in the Elysia routes.
 
 ## Validation
-Integration test: POST multipart form with 3 test JPEG images. Verify upload record created in DB with correct photo_count. Verify 3 photo records with correct dimensions, r2_keys. Mock R2Service to verify upload called 3 times. Test error case: one file is corrupted, verify partial success response with 2 photos and 1 failure listed.
+TypeScript compilation with `tsc --noEmit` exits 0 with all schema and service types resolving. Unit test: instantiate each Effect.Service with a mock implementation and verify the service tag resolves via Effect.runPromise with a test layer.

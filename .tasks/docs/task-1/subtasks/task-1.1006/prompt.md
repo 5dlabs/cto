@@ -1,19 +1,10 @@
-Implement subtask 1006: Create Kubernetes Secrets for database credentials
+Implement subtask 1006: Deploy Signal-CLI pod, PVC, and ClusterIP Service in the signal namespace
 
 ## Objective
-Create the `sigma1-db-credentials` Secret in the `sigma1` namespace containing PostgreSQL connection strings for each per-service role (catalog_svc, rms_svc, finance_svc, vetting_svc, social_svc) and the sigma1_user superuser.
+Create a PersistentVolumeClaim, Pod (or Deployment), and ClusterIP Service for Signal-CLI in the signal namespace with a 5Gi RWO volume mounted at the Signal data path.
 
 ## Steps
-1. Create an Opaque Secret `sigma1-db-credentials` in `sigma1` namespace with data keys:
-   - `POSTGRES_URL` (sigma1_user connection via pooler)
-   - `CATALOG_SVC_POSTGRES_URL` (catalog_svc role connection via pooler)
-   - `RMS_SVC_POSTGRES_URL` (rms_svc role connection via pooler)
-   - `FINANCE_SVC_POSTGRES_URL` (finance_svc role connection via pooler)
-   - `VETTING_SVC_POSTGRES_URL` (vetting_svc role connection via pooler)
-   - `SOCIAL_SVC_POSTGRES_URL` (social_svc role connection via pooler)
-2. All URLs should point to the PgBouncer pooler endpoint: `sigma1-postgres-pooler.sigma1-db.svc.cluster.local:5432`.
-3. Passwords must match those set in the init SQL step (1003).
-4. Apply the Secret YAML.
+Create sigma1/infra/templates/signal-cli.yaml. PersistentVolumeClaim: name signal-cli-data, namespace signal, accessModes: [ReadWriteOnce], storage: 5Gi, storageClassName: default (or parameterize). Deployment (single replica): name signal-cli, namespace signal, image: signalapp/signal-cli:latest, volumeMounts: [{name: data, mountPath: /home/signal-cli/.local/share/signal-cli}], volumes: [{name: data, persistentVolumeClaim: {claimName: signal-cli-data}}]. Resources: limits 256Mi/250m for dev. ClusterIP Service: name signal-cli-svc, namespace signal, port 7583 targeting container port 7583 (JSON-RPC mode). Add a NOTE in a NOTES.txt or README: 'Manual step required before first use: kubectl exec -n signal deploy/signal-cli -- signal-cli -u +<PHONE> register && signal-cli -u +<PHONE> verify <CODE>'. Ensure the pod starts in daemon/JSON-RPC mode: args: ['-u', '$(SIGNAL_NUMBER)', 'daemon', '--tcp', '0.0.0.0:7583'] with SIGNAL_NUMBER as an env var (placeholder secret or configmap key).
 
 ## Validation
-`kubectl get secret sigma1-db-credentials -n sigma1 -o json | jq '.data | keys'` lists all 6 expected keys. Each decoded URL is a valid PostgreSQL connection string. Test at least one role connection from a pod using the secret value.
+kubectl get pvc signal-cli-data -n signal shows STATUS=Bound. kubectl get pods -n signal shows signal-cli pod in Running state. kubectl get svc signal-cli-svc -n signal shows ClusterIP with port 7583. curl from within cluster: kubectl run test --rm -it --image=curlimages/curl --restart=Never -- curl -s http://signal-cli-svc.signal.svc.cluster.local:7583 returns a response (even an error JSON is acceptable, confirming the port is reachable).

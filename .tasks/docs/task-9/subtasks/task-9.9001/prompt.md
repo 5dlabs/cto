@@ -1,18 +1,10 @@
-Implement subtask 9001: Initialize Expo project with TypeScript and Expo Router tab navigation
+Implement subtask 9001: Initialize Expo managed project with TypeScript template at apps/mobile
 
 ## Objective
-Scaffold the Expo SDK 51+ project with TypeScript configuration, install Expo Router, and configure file-based tab navigation with all five tab screens (Equipment, Quote, Chat, Scan, Profile).
+Scaffold the Expo SDK 51+ project with TypeScript template at apps/mobile. Install all required dependencies: nativewind@4.x, tailwindcss@3.4, effect@3.x, @effect/schema, @tanstack/react-query v5, expo-router@3.x, expo-notifications, expo-camera, expo-image, @expo/vector-icons, react-native-reanimated, react-native-gesture-handler. Configure babel.config.js for NativeWind and reanimated plugins. Configure metro.config.js for monorepo symlink resolution.
 
 ## Steps
-1. Run `npx create-expo-app sigma1-mobile --template expo-template-blank-typescript` or equivalent SDK 51+ template.
-2. Install Expo Router: `npx expo install expo-router react-native-safe-area-context react-native-screens expo-linking expo-constants expo-status-bar`.
-3. Configure `app.json` / `app.config.ts` with scheme, bundleIdentifier, and package name for Sigma-1.
-4. Create the `app/` directory with `_layout.tsx` as root layout using `<Tabs>` from Expo Router.
-5. Create five tab files: `app/(tabs)/equipment.tsx`, `app/(tabs)/quote.tsx`, `app/(tabs)/chat.tsx`, `app/(tabs)/scan.tsx`, `app/(tabs)/profile.tsx`.
-6. Configure tab bar icons (use `@expo/vector-icons` or custom SVGs) and labels.
-7. Add nested routes for Equipment tab: `app/(tabs)/equipment/index.tsx` (category list), `app/(tabs)/equipment/[categoryId].tsx` (product grid), `app/(tabs)/equipment/product/[productId].tsx` (product detail).
-8. Verify TypeScript strict mode is enabled in `tsconfig.json`.
-9. Configure path aliases (`@/components`, `@/lib`, `@/hooks`) in `tsconfig.json`.
+Run `npx create-expo-app@latest apps/mobile --template expo-template-blank-typescript`. Then install all listed packages. In babel.config.js add `plugins: ['nativewind/babel', 'react-native-reanimated/plugin']`. In metro.config.js use `getDefaultConfig` with `resolver.unstable_enablePackageExports: true` and watchFolders pointing to the monorepo root so packages/design-tokens is resolvable. Set `main: 'expo-router/entry'` in package.json. Verify `npx expo start` launches without errors.
 
 ## Validation
-Run `npx expo start` and verify the app launches in iOS Simulator and Android Emulator with all five tabs visible. Tapping each tab renders its placeholder screen. Deep navigation in Equipment tab (index → category → product) works via Expo Router links.
+Run `npx expo start --no-dev` — CLI exits without module-not-found or TypeScript errors. Run `npx tsc --noEmit` — zero type errors on the empty scaffold.

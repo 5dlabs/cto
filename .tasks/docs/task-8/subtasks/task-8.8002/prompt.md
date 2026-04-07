@@ -1,20 +1,18 @@
-Implement subtask 8002: Configure shadcn/ui component library and design token system
+Implement subtask 8002: Create shared design tokens Tailwind config package at packages/design-tokens
 
 ## Objective
-Install and configure shadcn/ui with Radix UI primitives. Define the dark/moody design token system in tailwind.config.ts reflecting the Sigma-1 lighting/production company brand: dark palette, accent colors, professional typography, generous spacing.
+Build the shared Tailwind configuration package defining the Sigma-1 brand palette, typography, spacing, and border radius tokens, importable by apps/website.
 
 ## Steps
-1. Run `npx shadcn@latest init` — select default style, dark theme, CSS variables.
-2. Install required shadcn/ui components: Button, Card, Dialog, Form, Input, Select, Table, Tabs, Badge, Calendar, Sheet, Popover, Separator, ScrollArea, Skeleton.
-3. Define design tokens in `tailwind.config.ts` / CSS variables:
-   - Colors: dark background (#0a0a0a range), muted surfaces (#1a1a1a), accent (warm amber/gold for lighting brand), destructive, muted foreground.
-   - Border radius: default 0.5rem.
-   - Font family: Inter or similar professional sans-serif via `next/font`.
-   - Spacing scale: generous padding/margins for premium feel.
-4. Create `components/ui/` barrel exports.
-5. Create a `ThemeProvider` if needed (for dark mode toggle future-proofing, but default to dark).
-6. Build a style guide page at `/dev/styleguide` (dev only) showing all shadcn components with design tokens applied.
-7. Verify all installed components render correctly with the custom theme.
+1. Create packages/design-tokens/ with package.json: name @sigma1/design-tokens, type module, main: tailwind.config.ts.
+2. Create packages/design-tokens/tailwind.config.ts exporting a Tailwind preset object:
+   - colors: sigma1 palette — background: '#0A0A0F', surface: '#12121A', accent: '#00D4FF' (electric cyan), accent-secondary: '#7B2FFF' (purple), text-primary: '#F0F0F5', text-muted: '#8888AA'.
+   - fontFamily: { sans: ['Geist', 'Inter', 'sans-serif'] }.
+   - borderRadius: { card: '12px', button: '8px', badge: '4px' }.
+   - spacing scale: extend with custom values 18, 22, 26 for layout.
+3. Add @sigma1/design-tokens as workspace dependency in apps/website/package.json.
+4. Update apps/website/tailwind.config.ts to import and spread the preset: `presets: [require('@sigma1/design-tokens')]`.
+5. Create packages/design-tokens/tokens.css exporting CSS custom properties matching the token values (for non-Tailwind usage).
 
 ## Validation
-Render each installed shadcn/ui component in a test and verify it mounts without errors. Visually confirm design tokens apply (dark background, accent colors) on the styleguide page. Verify `next/font` loads correctly.
+`cd apps/website && bun run build` succeeds with no Tailwind config errors. Inspect generated CSS: confirm `#00D4FF` appears as a utility class (e.g., `text-accent`). `import preset from '@sigma1/design-tokens'` in a test script resolves without error.

@@ -29,25 +29,25 @@ CODEX_CMD=("codex" "exec")
 CODEX_WORK_DIR="${CLAUDE_WORK_DIR:-/workspace}"
 CODEX_CMD+=("--cd" "$CODEX_WORK_DIR")
 
-# Full auto mode (shortcut for unattended work)
-{{#if full_auto}}
-CODEX_CMD+=("--full-auto")
-echo "✓ Full auto mode enabled (workspace-write sandbox, approvals on-failure)"
-{{else}}
-# Manual sandbox and approval configuration
-SANDBOX_MODE="{{#if sandbox_mode}}{{sandbox_mode}}{{else}}workspace-write{{/if}}"
+# Sandbox mode — use danger-full-access in Kubernetes (bwrap unavailable without SYS_ADMIN)
+SANDBOX_MODE="{{#if sandbox_mode}}{{sandbox_mode}}{{else}}danger-full-access{{/if}}"
 CODEX_CMD+=("--sandbox" "$SANDBOX_MODE")
 echo "✓ Sandbox mode: $SANDBOX_MODE"
 
-APPROVAL_MODE="{{#if approval_mode}}{{approval_mode}}{{else}}on-failure{{/if}}"
-CODEX_CMD+=("--ask-for-approval" "$APPROVAL_MODE")
-echo "✓ Approval mode: $APPROVAL_MODE"
-{{/if}}
-
-# Model override
+# Model override — strip provider prefix (e.g. "openai-codex/o4-mini" → "o4-mini")
+# Skip model flag if using ChatGPT OAuth (auth_mode=chatgpt); let the plan default apply.
+# Only pass explicit --model for known short model ids without a provider prefix.
 {{#if model}}
-CODEX_CMD+=("--model" "{{model}}")
-echo "✓ Model: {{model}}"
+MODEL_RAW="{{model}}"
+MODEL_NAME="${MODEL_RAW##*/}"
+# If the raw value had a provider prefix, use the stripped name only if it's a known model id
+# (no slashes, not an internal codename like gpt-5.3-codex)
+if echo "$MODEL_NAME" | grep -qE '^(o3|o4-mini|o3-mini|codex-mini-latest)$'; then
+    CODEX_CMD+=("--model" "$MODEL_NAME")
+    echo "✓ Model: $MODEL_NAME"
+else
+    echo "✓ Model: chatgpt plan default (skipping internal id: {{model}})"
+fi
 {{/if}}
 
 # JSON output for streaming

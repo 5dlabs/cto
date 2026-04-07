@@ -2,298 +2,232 @@ name: implement-task-10
 metadata:
   task_id: 10
   agent: bolt
-  stack: Kubernetes/Helm
+  stack: Kubernetes/Helm/Cilium
+  cli: codex
+  model: gpt-5.2-codex
   depends_on_tasks: [2, 3, 4, 5, 6, 7, 8, 9]
 
-inputs:
-  - name: task_dir
-  - name: repo_url
-  - name: branch_name
+args:
+  task_dir: {}
+  repo_url: {}
+  branch_name:
     default: "task-10/feature-branch"
-  - name: agent
+  agent:
     default: "bolt"
-  - name: cli
+  cli:
+    default: "codex"
+  model:
+    default: "gpt-5.2-codex"
+  fallback_cli:
     default: "claude"
-  - name: model
+  fallback_model:
     default: "claude-opus-4-6"
-  - name: max_implementation_retries
+  max_implementation_retries:
     default: 10
-  - name: max_quality_retries
+  max_quality_retries:
     default: 5
 
 steps:
-  - name: setup
+  - id: setup
     command: >
-      git clone {{inputs.repo_url}} work && cd work &&
-      git checkout -b {{inputs.branch_name}}
+      git clone ${repo_url} work && cd work &&
+      git checkout -b ${branch_name}
 
-  - name: implement-subtask-10001
+  - id: implement-subtask-10001
     depends_on: [setup]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10001/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10001/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10001
+  - id: validate-subtask-10001
     depends_on: [implement-subtask-10001]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10002
-    depends_on: [validate-subtask-10001]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-10002
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10002/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10002/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10002
+  - id: validate-subtask-10002
     depends_on: [implement-subtask-10002]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10003
+  - id: implement-subtask-10003
     depends_on: [setup]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10003/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10003/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10003
+  - id: validate-subtask-10003
     depends_on: [implement-subtask-10003]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10004
+  - id: implement-subtask-10004
     depends_on: [setup]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10004/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10004/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10004
+  - id: validate-subtask-10004
     depends_on: [implement-subtask-10004]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10005
-    depends_on: [validate-subtask-10004]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-10005
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10005/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10005/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10005
+  - id: validate-subtask-10005
     depends_on: [implement-subtask-10005]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10006
-    depends_on: [validate-subtask-10004]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-10006
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10006/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10006/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10006
+  - id: validate-subtask-10006
     depends_on: [implement-subtask-10006]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10007
-    depends_on: [validate-subtask-10004]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-10007
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10007/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10007/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10007
+  - id: validate-subtask-10007
     depends_on: [implement-subtask-10007]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10008
-    depends_on: [validate-subtask-10004]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-10008
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10008/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10008/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10008
+  - id: validate-subtask-10008
     depends_on: [implement-subtask-10008]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10009
+  - id: implement-subtask-10009
     depends_on: [setup]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10009/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10009/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10009
+  - id: validate-subtask-10009
     depends_on: [implement-subtask-10009]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10010
+  - id: implement-subtask-10010
     depends_on: [validate-subtask-10009]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10010/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10010/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10010
+  - id: validate-subtask-10010
     depends_on: [implement-subtask-10010]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10011
+  - id: implement-subtask-10011
     depends_on: [setup]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10011/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10011/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10011
+  - id: validate-subtask-10011
     depends_on: [implement-subtask-10011]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10012
-    depends_on: [validate-subtask-10011]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-10012
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10012/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10012/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10012
+  - id: validate-subtask-10012
     depends_on: [implement-subtask-10012]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10013
+  - id: implement-subtask-10013
     depends_on: [setup]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10013/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10013/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10013
+  - id: validate-subtask-10013
     depends_on: [implement-subtask-10013]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10014
+  - id: implement-subtask-10014
     depends_on: [setup]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10014/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10014/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10014
+  - id: validate-subtask-10014
     depends_on: [implement-subtask-10014]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10015
-    depends_on: [validate-subtask-10014]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
+  - id: implement-subtask-10015
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10015/prompt.md
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10015/prompt.md)" --model ${model}
 
-  - name: validate-subtask-10015
+  - id: validate-subtask-10015
     depends_on: [implement-subtask-10015]
-    retry: { max: "{{inputs.max_quality_retries}}" }
+    retry: { max: "${max_quality_retries}" }
     command: >
       cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
 
-  - name: implement-subtask-10016
-    depends_on: [setup]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10016/prompt.md
-
-  - name: validate-subtask-10016
-    depends_on: [implement-subtask-10016]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
-
-  - name: implement-subtask-10017
-    depends_on: [validate-subtask-10016]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10017/prompt.md
-
-  - name: validate-subtask-10017
-    depends_on: [implement-subtask-10017]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
-
-  - name: implement-subtask-10018
-    depends_on: [validate-subtask-10017]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10018/prompt.md
-
-  - name: validate-subtask-10018
-    depends_on: [implement-subtask-10018]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
-
-  - name: implement-subtask-10019
-    depends_on: [setup]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10019/prompt.md
-
-  - name: validate-subtask-10019
-    depends_on: [implement-subtask-10019]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
-
-  - name: implement-subtask-10020
-    depends_on: [setup]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10020/prompt.md
-
-  - name: validate-subtask-10020
-    depends_on: [implement-subtask-10020]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
-
-  - name: implement-subtask-10021
-    depends_on: [setup]
-    retry: { max: "{{inputs.max_implementation_retries}}" }
-    command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/subtasks/task-10.10021/prompt.md
-
-  - name: validate-subtask-10021
-    depends_on: [implement-subtask-10021]
-    retry: { max: "{{inputs.max_quality_retries}}" }
-    command: >
-      cd work && kubectl apply --dry-run=client -f . && helm template . | kubeval && yamllint .
-
-  - name: integration-validation
-    depends_on: [validate-subtask-10001, validate-subtask-10002, validate-subtask-10003, validate-subtask-10004, validate-subtask-10005, validate-subtask-10006, validate-subtask-10007, validate-subtask-10008, validate-subtask-10009, validate-subtask-10010, validate-subtask-10011, validate-subtask-10012, validate-subtask-10013, validate-subtask-10014, validate-subtask-10015, validate-subtask-10016, validate-subtask-10017, validate-subtask-10018, validate-subtask-10019, validate-subtask-10020, validate-subtask-10021]
+  - id: integration-validation
+    depends_on: [validate-subtask-10001, validate-subtask-10002, validate-subtask-10003, validate-subtask-10004, validate-subtask-10005, validate-subtask-10006, validate-subtask-10007, validate-subtask-10008, validate-subtask-10009, validate-subtask-10010, validate-subtask-10011, validate-subtask-10012, validate-subtask-10013, validate-subtask-10014, validate-subtask-10015]
     command: >
       cd work && bun tsc --noEmit && bun test --run && bun lint
 
-  - name: acceptance-check
+  - id: acceptance-check
     depends_on: [integration-validation]
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt "Review changes against {{inputs.task_dir}}/acceptance.md. Output PASS or FAIL."
+      ${cli} -p "Review changes against ${task_dir}/acceptance.md. Output PASS or FAIL." --model ${model}
 
-  - name: create-pr
+  - id: create-pr
     depends_on: [acceptance-check]
     command: >
       cd work && git add -A &&
       git commit -m "feat: task-10" &&
-      git push origin {{inputs.branch_name}} &&
+      git push origin ${branch_name} &&
       source "${WORKSPACE:-.}/scripts/scm-dispatch.sh" &&
-      scm_create_pr "feat: task-10" "$(cat {{inputs.task_dir}}/task.md)" "main"
+      scm_create_pr "feat: task-10" "$(cat ${task_dir}/task.md)" "main"

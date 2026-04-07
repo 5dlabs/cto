@@ -1,26 +1,10 @@
-Implement subtask 10004: Network policies: default deny all ingress/egress in sigma1 namespace
+Implement subtask 10004: Author CiliumNetworkPolicy for equipment-catalog service
 
 ## Objective
-Create a default-deny NetworkPolicy in the sigma1 namespace that blocks all ingress and egress traffic by default.
+Create a CiliumNetworkPolicy for the equipment-catalog namespace/pod selector. Allow ingress only from morgan, blaze-website, and mobile-app pods. Allow egress only to postgres, valkey, and the R2 endpoint CIDR/FQDN. Deny all other traffic by default.
 
 ## Steps
-Step-by-step:
-1. Create `netpol-default-deny.yaml`:
-   ```yaml
-   apiVersion: networking.k8s.io/v1
-   kind: NetworkPolicy
-   metadata:
-     name: default-deny-all
-     namespace: sigma1
-   spec:
-     podSelector: {}
-     policyTypes:
-       - Ingress
-       - Egress
-   ```
-2. This policy selects all pods in sigma1 and denies all traffic. Subsequent allow policies will open specific paths.
-3. WARNING: Apply this AFTER the allow policies are ready, or apply them all atomically. Otherwise all sigma1 services will lose connectivity.
-4. Add a namespace label `networking/default-deny: 'true'` for documentation purposes.
+Create helm/sigma1/templates/cnp-equipment-catalog.yaml: `apiVersion: cilium.io/v2, kind: CiliumNetworkPolicy, metadata.name: equipment-catalog-policy, spec.endpointSelector: { matchLabels: { app: equipment-catalog } }, spec.ingress: [{ fromEndpoints: [{ matchLabels: { app: morgan } }, { matchLabels: { app: blaze-website } }, { matchLabels: { app: mobile-ingress } }] }], spec.egress: [{ toEndpoints: [{ matchLabels: { app: postgres } }, { matchLabels: { app: valkey } }] }, { toFQDNs: [{ matchName: '<account>.r2.cloudflarestorage.com' }], toPorts: [{ ports: [{ port: '443', protocol: TCP }] }] }]`. Apply with helm upgrade.
 
 ## Validation
-Apply the deny policy in isolation on a test namespace first. Spin up a test pod and verify it cannot reach any external endpoint or other pods. Then verify that adding a specific allow policy restores that specific path only.
+`kubectl exec -n sigma1 <equipment-catalog-pod> -- curl -s http://finance-svc:8080/health` returns connection timeout or refused (blocked). `kubectl exec -n sigma1 <morgan-pod> -- curl -s http://equipment-catalog-svc:8080/health` returns 200 (allowed). `kubectl exec` from finance pod to equipment-catalog must be blocked.

@@ -1,112 +1,47 @@
-Implement task 10: Production Hardening, Security & CI/CD (Bolt - Kubernetes/Helm)
+Implement task 10: Production Hardening & Security (Bolt - Kubernetes/Helm)
 
 ## Goal
-Harden the entire Sigma-1 platform for production: HA scaling for all services, CDN/TLS/ingress configuration, network policies, RBAC, secret rotation, GDPR deletion orchestrator, CI/CD pipelines with automated QA agents (Stitch, Cleo, Tess, Cipher, Atlas), ArgoCD GitOps, and comprehensive monitoring/alerting.
+Harden the Sigma-1 platform for production: scale all services to >=2 replicas with HPA, configure CiliumNetworkPolicies enforcing zero-trust pod-to-pod isolation, set up TLS/ingress via Cloudflare Tunnel, enable RBAC and secret rotation schedules, configure ArgoCD GitOps with automatic rollbacks, set up CI/CD quality pipeline (Stitch, Cleo, Tess, Cipher, Atlas), verify GDPR deletion pipeline end-to-end, and validate all performance SLOs.
 
 ## Task Context
 - Agent owner: bolt
-- Stack: Kubernetes/Helm
+- Stack: Kubernetes/Helm/Cilium
 - Priority: high
 - Dependencies: 2, 3, 4, 5, 6, 7, 8, 9
 
 ## Implementation Plan
-1. **HA Scaling**:
-   - Equipment Catalog: 2 replicas with pod anti-affinity (already in Task 2 manifest, verify)
-   - RMS: 2 replicas with pod anti-affinity
-   - Finance: 2 replicas with pod anti-affinity
-   - Customer Vetting: 2 replicas with pod anti-affinity
-   - Social Engine: 1→2 replicas (upgrade from medium priority)
-   - Morgan: 1 replica (stateful with workspace PVC; HA requires session affinity design — document limitation)
-   - PostgreSQL: already instances: 2 from Task 1. Add resource requests/limits tuning based on observed usage.
-   - Valkey: Configure Sentinel mode if operator supports, or document single-instance limitation.
-   - HorizontalPodAutoscaler (HPA) for Equipment Catalog (CPU > 70% → scale to 4).
-2. **Network Policies**:
-   - Default deny all ingress/egress in `sigma1` namespace.
-   - Allow: sigma1 services → sigma1-db namespace (PostgreSQL, Valkey) on specific ports.
-   - Allow: sigma1 services → openclaw namespace (NATS) on port 4222 (social engine only).
-   - Allow: openclaw namespace (Morgan) → sigma1 services on service ports.
-   - Allow: sigma1 services → external APIs (OpenCorporates, Stripe, Google, etc.) via egress.
-   - Allow: ingress controller → sigma1 services for public endpoints.
-   - Deny: direct cross-service communication except documented paths.
-3. **Ingress & TLS**:
-   - Cloudflare Tunnel configuration for all public endpoints.
-   - TLS termination at Cloudflare edge.
-   - Internal mTLS between services using cert-manager if available, or document as Phase 2.
-   - CDN caching rules: equipment images (1 year cache), API responses (no cache or short TTL).
-4. **RBAC & Security**:
-   - Per-service Kubernetes ServiceAccounts with minimal RBAC roles.
-   - PodSecurityPolicies/PodSecurityStandards: restricted profile (no root, read-only rootfs, drop all capabilities).
-   - Image scanning: configure policy to block images with critical CVEs.
-   - Secret rotation: document process for rotating DB passwords, API keys, Stripe keys. If external-secrets-operator is available, configure automatic rotation.
-5. **GDPR Deletion Orchestrator** (per D12 resolution):
-   - Build a Rust CLI binary (in Rex Cargo workspace, new member `gdpr-orchestrator`) that:
-     a. Accepts `--customer-id <UUID>` argument
-     b. Calls GDPR deletion endpoint on each service in order: Vetting → Social → Finance → RMS → Catalog
-     c. Collects HTTP response status and confirmation from each service
-     d. Writes structured JSON audit log to `audit` schema table: `gdpr_deletions` (request_id, customer_id, service, status, response, completed_at)
-     e. Exits with code 0 only if all services return success
-   - Package as Docker image.
-   - Create Kubernetes Job template that Morgan can trigger via MCP tool `sigma1_gdpr_delete`.
-   - Alternatively, CronJob that processes pending deletion requests from a queue table.
-6. **CI/CD Pipeline** (GitHub Actions):
-   - **On PR**:
-     a. Lint: Clippy (Rust), golangci-lint (Go), Biome (Node.js/TypeScript), ESLint (Next.js)
-     b. Build: Cargo build (all workspace members), go build, bun build, next build
-     c. Test: cargo test, go test, bun test, vitest — enforce 80% minimum coverage
-     d. Security scan: Semgrep + CodeQL + Dependabot alerts
-     e. Container image build (no push)
-   - **On merge to main**:
-     a. Build + push container images to registry (ghcr.io or Cloudflare Container Registry)
-     b. Update ArgoCD Application manifests with new image tags
-     c. ArgoCD syncs automatically
-   - **Deployment**:
-     a. ArgoCD Applications for each service in `sigma1` namespace
-     b. Sync policy: automated with self-heal and prune
-     c. Rollback: ArgoCD automatic rollback on health check failure
-7. **Monitoring & Alerting**:
-   - Grafana dashboards:
-     a. Platform overview: all service health, request rates, error rates
-     b. Per-service dashboard: latency percentiles, error rates, resource usage
-     c. PostgreSQL dashboard: connections, query latency, replication lag
-     d. Morgan dashboard: conversation count, tool call latency, Signal-CLI health
-   - Prometheus AlertManager rules:
-     a. Service down > 2 minutes → PagerDuty/Signal alert
-     b. Error rate > 5% for 5 minutes → warning
-     c. PostgreSQL replication lag > 30 seconds → critical
-     d. Signal-CLI pod restart > 3 in 10 minutes → warning (memory leak indicator)
-     e. Valkey memory > 80% → warning
-     f. Certificate expiry < 14 days → warning
-8. **Audit Logging**:
-   - All services log to stdout in structured JSON (already configured in individual tasks).
-   - Loki collects logs from all sigma1 and openclaw namespaces.
-   - Audit-specific events (login, data access, deletion) tagged with `audit=true` label for filtered queries.
-   - Retention: 90 days for standard logs, 1 year for audit logs.
+1. Scale production replicas: update all Deployments to replicas: 2. Create HorizontalPodAutoscaler for equipment-catalog (min=2, max=8, CPU=70%), rms (min=2, max=6, CPU=70%), finance (min=2, max=4, CPU=70%), customer-vetting (min=2, max=4, CPU=70%), social-engine (min=2, max=4, CPU=70%). Morgan remains at 1 replica (stateful Signal-CLI dependency).
+2. Scale PostgreSQL CNPG cluster to 2 instances (1 primary + 1 replica) for HA. Verify streaming replication. Enable WAL archival to R2 bucket (sigma1-wal-archive). Scale Valkey to replicas: 2.
+3. CiliumNetworkPolicies: create policy for each service namespace allowing only required pod-to-pod traffic. Rules: equipment-catalog: ingress from morgan, blaze-website, mobile-app; egress to postgres, valkey, R2 endpoint. rms: ingress from morgan, equipment-catalog; egress to postgres, valkey, Google Calendar API. finance: ingress from morgan, rms; egress to postgres, valkey, Stripe API. customer-vetting: ingress from morgan, rms; egress to postgres, valkey, OpenCorporates/LinkedIn/Google APIs. social-engine: ingress from morgan; egress to postgres, valkey, R2, Instagram/LinkedIn/TikTok/Facebook APIs, OpenAI API. Morgan: ingress from Cloudflare Tunnel, web clients; egress to all services, signal-cli, ElevenLabs, Twilio. Deny all other cross-namespace traffic by default.
+4. Cloudflare Tunnel: deploy cloudflared Deployment (1 replica) in sigma1 namespace. Configure tunnel to expose: morgan-chat-svc:3000 → chat.sigma1.com, signal webhook → signals.sigma1.com. Configure TLS via Cloudflare (terminate at edge, forward to pods over HTTP internally).
+5. Ingress and TLS: all external API access via Cloudflare Tunnel (no direct NodePort/LoadBalancer). Internal services use ClusterIP only. Enforce HTTPS redirect on Cloudflare dashboard.
+6. RBAC: create ServiceAccount per deployment. Role with least-privilege rules (pods can only read their own secrets via projected volumes). ClusterRoleBinding only for ArgoCD service account. Remove default ServiceAccount auto-mount from all non-ArgoCD pods.
+7. Secret rotation: create Kubernetes CronJob secret-rotation-reminder running monthly, logging rotation reminder to Loki for all secrets (stripe, opencorporates, linkedin, google, elevenlabs, twilio, openai, cloudflare). Document rotation runbook in ops/runbooks/secret-rotation.md.
+8. ArgoCD Applications: create Application CR for each service pointing to helm/sigma1/ with automated sync policy, selfHeal: true, prune: true. Set health check hooks. Configure rollback: if 3 consecutive sync failures, ArgoCD alerts via Loki alert rule.
+9. CI/CD pipeline (GitHub Actions .github/workflows/): pr-review.yml: Stitch code review on PR open/update (github_get_pull_request, github_get_pull_request_files). quality.yml: Cleo runs clippy + rustfmt for Rust services, eslint + biome.js for Node/TS, go vet + golangci-lint for Go. test.yml: Tess runs cargo test, go test, vitest with coverage report; fails if coverage < 80%. security.yml: Cipher runs Semgrep + cargo-audit + nancy (Go) + npm audit; blocks merge on CRITICAL/HIGH. merge.yml: Atlas enforces required checks + 1 approval before github_merge_pull_request.
+10. Prometheus alerting rules: latency alert (equipment-catalog p99 > 500ms for 5m), error rate alert (any service 5xx > 1% for 2m), pod down alert (desired != available for 5m). Grafana dashboards: per-service request rate, error rate, latency heatmap; PostgreSQL connections and replication lag; Valkey memory and hit rate.
+11. GDPR verification: run end-to-end test — create test customer, run vetting, create opportunity, invoice, social draft. Invoke morgan tool sigma1_gdpr_delete for test customer_id. Verify: GET /api/v1/vetting/:org_id → 404, GET /api/v1/invoices?org_id=:id → empty, RMS customer_id anonymized, social drafts event_id cleared. Verify audit schema contains deletion log row with timestamp and operator.
+12. Performance SLO validation: run k6 load test against equipment-catalog availability endpoint at 100 RPS for 60s; assert p99 < 500ms. Run k6 against full quote submission flow; assert end-to-end < 2min. Verify Morgan chat response < 10s using timed HTTP call to chat endpoint with simple greeting.
 
 ## Acceptance Criteria
-1. Network policy test: from a test pod in sigma1 namespace, verify connectivity to PostgreSQL (allowed) and verify connectivity to an unrelated namespace (denied). Use `kubectl exec` + `nc` connectivity checks. 2. RBAC test: verify service account for equipment-catalog cannot access secrets in finance namespace. 3. GDPR orchestrator test: run CLI with a test customer ID against all running services, verify each service returns 200/204, verify audit log row created in `audit.gdpr_deletions` table with all service confirmations. 4. CI pipeline test: submit a PR with intentional lint violation, verify pipeline fails. Submit clean PR, verify all stages pass and image is built. 5. ArgoCD sync test: update image tag in manifests, verify ArgoCD detects drift and syncs within 3 minutes. 6. Rollback test: deploy a service with failing health check, verify ArgoCD rolls back to previous healthy version within 5 minutes. 7. Alert test: scale equipment-catalog to 0 replicas, verify Prometheus alert fires within 2 minutes, then scale back. 8. HPA test: generate load on equipment-catalog, verify HPA scales from 2 to 3+ replicas when CPU exceeds 70%. 9. Pod security test: attempt to deploy a pod with `runAsRoot: true` in sigma1 namespace, verify it is rejected by PodSecurity admission.
+1. kubectl get pods -n sigma1 shows all service Deployments with READY=2/2 (or 1/1 for Morgan). 2. kubectl get hpa -n sigma1 shows HPA objects for equipment-catalog, rms, finance, customer-vetting, social-engine with MINPODS=2. 3. CiliumNetworkPolicy enforcement: attempt direct HTTP from finance pod to social-engine pod (kubectl exec curl); connection must be refused (exit code 1 or connection timeout). 4. k6 run --vus 100 --duration 60s availability_check.js: p99 latency < 500ms, error rate < 0.1%. 5. ArgoCD UI shows all Applications in Synced + Healthy state. 6. GitHub Actions: open a test PR, verify Stitch posts review comment, Tess reports coverage >= 80%, Cipher reports no CRITICAL findings, Atlas blocks merge until all checks pass. 7. Grafana dashboard loads and shows real-time metrics for all 5 backend services with non-zero request_rate. 8. GDPR end-to-end: after sigma1_gdpr_delete execution, audit schema contains row with customer_id, deleted_at timestamp, and services_affected array listing all 5 services. 9. CNPG cluster: kubectl get cluster sigma1-postgres -n databases shows instances: 2 and status Ready. 10. Cloudflare Tunnel: curl https://chat.sigma1.com/health returns 200 from Morgan chat service.
 
 ## Subtasks
-- HA scaling: update replica counts and pod anti-affinity for all application services: Update Kubernetes deployment manifests for Equipment Catalog, RMS, Finance, Customer Vetting, and Social Engine to 2 replicas each with pod anti-affinity rules. Document Morgan single-replica limitation with session affinity notes.
-- HA scaling: configure HPA for Equipment Catalog: Create a HorizontalPodAutoscaler resource for the Equipment Catalog service that scales from 2 to 4 replicas when CPU utilization exceeds 70%.
-- HA scaling: PostgreSQL and Valkey resource tuning and Valkey Sentinel evaluation: Tune PostgreSQL resource requests/limits based on observed usage from Task 1 (already 2 instances). Evaluate Valkey operator for Sentinel mode support and either configure it or document the single-instance limitation.
-- Network policies: default deny all ingress/egress in sigma1 namespace: Create a default-deny NetworkPolicy in the sigma1 namespace that blocks all ingress and egress traffic by default.
-- Network policies: allow sigma1 services to sigma1-db namespace (PostgreSQL and Valkey): Create NetworkPolicy allowing sigma1 service pods to reach PostgreSQL on port 5432 and Valkey on port 6379 in the sigma1-db namespace.
-- Network policies: allow sigma1 social-engine to NATS in openclaw namespace: Create NetworkPolicy allowing only the social-engine pod in sigma1 to reach NATS on port 4222 in the openclaw namespace.
-- Network policies: allow Morgan (openclaw) to sigma1 services and ingress controller to sigma1: Create NetworkPolicy allowing Morgan pods in openclaw namespace to reach sigma1 service ports, and allowing the ingress controller to reach sigma1 public endpoints.
-- Network policies: allow sigma1 egress to external APIs: Create egress NetworkPolicy allowing sigma1 services to reach external APIs (OpenCorporates, Stripe, Google, etc.) and DNS resolution.
-- Ingress and TLS: configure Cloudflare Tunnel for all public endpoints: Configure a Cloudflare Tunnel (cloudflared) deployment to expose all sigma1 public endpoints with TLS termination at the Cloudflare edge.
-- Ingress and CDN: configure CDN caching rules for equipment images vs API responses: Set up Cloudflare CDN caching rules: 1-year cache for equipment images, no-cache or short TTL for API responses.
-- RBAC: create per-service ServiceAccounts with minimal roles: Create dedicated Kubernetes ServiceAccounts for each sigma1 service with minimal RBAC Roles and RoleBindings scoped to only what each service needs.
-- Pod security: apply PodSecurity Standards restricted profile and image scanning policy: Enforce PodSecurity Standards restricted profile on the sigma1 namespace (no root, read-only rootfs, drop all capabilities) and configure image scanning to block critical CVEs.
-- Secret rotation: document process and configure automation if external-secrets-operator is available: Document the process for rotating all secrets (DB passwords, API keys, Stripe keys) and configure external-secrets-operator for automatic rotation if available in the cluster.
-- GDPR deletion orchestrator: implement Rust CLI binary: Build a Rust CLI binary (new Cargo workspace member `gdpr-orchestrator`) that accepts a customer ID, calls GDPR deletion endpoints on each service in order, and writes a structured audit log.
-- GDPR deletion orchestrator: create Dockerfile and Kubernetes Job template: Package the GDPR orchestrator CLI as a Docker image and create a Kubernetes Job manifest template that Morgan can trigger via MCP tool.
-- CI/CD: GitHub Actions PR workflow (lint, build, test, security scan): Create a GitHub Actions workflow that runs on every PR: linting for all languages, building all projects, running tests with 80% coverage enforcement, and security scanning.
-- CI/CD: GitHub Actions merge-to-main workflow (image build, push, manifest update): Create a GitHub Actions workflow triggered on merge to main that builds and pushes container images to the registry and updates ArgoCD application manifests with new image tags.
-- ArgoCD GitOps: create Application CRs for all sigma1 services with automated sync: Create ArgoCD Application custom resources for each sigma1 service with automated sync, self-heal, prune, and rollback on health check failure.
-- Monitoring: create Grafana dashboards (platform overview, per-service, PostgreSQL, Morgan): Create four Grafana dashboard JSON definitions: platform overview, per-service detail, PostgreSQL metrics, and Morgan/Signal-CLI health.
-- Monitoring: configure Prometheus AlertManager rules: Create PrometheusRule CRs for all alerting conditions: service down, error rate, PostgreSQL replication lag, Signal-CLI restarts, Valkey memory, certificate expiry.
-- Audit logging: configure Loki log collection with retention policies: Configure Loki to collect logs from sigma1 and openclaw namespaces, with audit-tagged event filtering and differentiated retention (90 days standard, 1 year audit).
+- Scale all service Deployments to 2 replicas and create HPAs for 5 services: Update all service Deployment manifests in helm/sigma1/ to set replicas: 2 (except Morgan which stays at 1). Create HorizontalPodAutoscaler manifests for equipment-catalog (min=2, max=8, CPU=70%), rms (min=2, max=6, CPU=70%), finance (min=2, max=4, CPU=70%), customer-vetting (min=2, max=4, CPU=70%), and social-engine (min=2, max=4, CPU=70%). Apply and verify.
+- Scale CNPG PostgreSQL cluster to 2 instances with WAL archival to R2: Update the CloudNativePG Cluster CR to instances: 2 (1 primary + 1 replica). Enable WAL archival to the sigma1-wal-archive R2 bucket using the barmanObjectStore configuration. Verify streaming replication is active and replication lag is within acceptable bounds.
+- Scale Valkey to 2 replicas: Update the Valkey Deployment or StatefulSet manifest to replicas: 2. If Valkey supports primary/replica mode, configure replication. If standalone, run 2 independent instances behind a service. Apply and verify both pods are Running.
+- Author CiliumNetworkPolicy for equipment-catalog service: Create a CiliumNetworkPolicy for the equipment-catalog namespace/pod selector. Allow ingress only from morgan, blaze-website, and mobile-app pods. Allow egress only to postgres, valkey, and the R2 endpoint CIDR/FQDN. Deny all other traffic by default.
+- Author CiliumNetworkPolicy for RMS service: Create a CiliumNetworkPolicy for the rms pod selector. Allow ingress only from morgan and equipment-catalog pods. Allow egress only to postgres, valkey, and Google Calendar API FQDN.
+- Author CiliumNetworkPolicy for finance service: Create a CiliumNetworkPolicy for the finance pod selector. Allow ingress only from morgan and rms pods. Allow egress only to postgres, valkey, and Stripe API FQDN.
+- Author CiliumNetworkPolicy for customer-vetting service: Create a CiliumNetworkPolicy for the customer-vetting pod selector. Allow ingress only from morgan and rms. Allow egress only to postgres, valkey, and the external API FQDNs: OpenCorporates, LinkedIn, Google APIs.
+- Author CiliumNetworkPolicy for social-engine service: Create a CiliumNetworkPolicy for the social-engine pod selector. Allow ingress only from morgan. Allow egress to postgres, valkey, R2 endpoint, and the external social/AI API FQDNs: Instagram, LinkedIn, TikTok, Facebook, OpenAI.
+- Author CiliumNetworkPolicy for Morgan service: Create a CiliumNetworkPolicy for the Morgan pod selector. Allow ingress from cloudflared pods (Cloudflare Tunnel) and any web clients arriving through the tunnel. Allow egress to all 5 backend services, signal-cli pod, and the external FQDNs: ElevenLabs, Twilio.
+- Deploy cloudflared Cloudflare Tunnel and configure ingress routing: Deploy a cloudflared Deployment (1 replica) in the sigma1 namespace. Configure the tunnel to expose morgan-chat-svc:3000 → chat.sigma1.com and signal webhook → signals.sigma1.com. Store the tunnel credentials as a Kubernetes Secret. Enforce HTTPS-only at the Cloudflare dashboard. All services use ClusterIP only (no NodePort or LoadBalancer).
+- Implement per-service RBAC: ServiceAccounts, Roles, and automountServiceAccountToken disabled: Create a dedicated ServiceAccount for each of the 6 service Deployments. Create a Role per service with least-privilege rules (read own secrets via projected volumes only). Remove default ServiceAccount auto-mount from all non-ArgoCD pods by setting automountServiceAccountToken: false on each Deployment pod spec.
+- Create secret rotation CronJob and ops runbook: Create a Kubernetes CronJob named secret-rotation-reminder that runs monthly (schedule: '0 9 1 * *'). The job logs a rotation reminder message to stdout (picked up by Loki) listing all secrets requiring rotation: stripe, opencorporates, linkedin, google, elevenlabs, twilio, openai, cloudflare. Write the rotation runbook at ops/runbooks/secret-rotation.md.
+- Create ArgoCD Application CRs for all services with automated sync and rollback alerting: Create an ArgoCD Application CR for each of the 6 services (equipment-catalog, rms, finance, customer-vetting, social-engine, morgan) pointing to helm/sigma1/ in the Git repo. Enable automated sync with selfHeal: true and prune: true. Add a Loki alert rule that fires when any Application has 3+ consecutive sync failures.
+- Create GitHub Actions pr-review.yml workflow with Stitch code review integration: Create .github/workflows/pr-review.yml that triggers on pull_request events (opened, synchronize). The workflow calls Stitch to perform code review using github_get_pull_request and github_get_pull_request_files, then posts the review as a PR comment.
+- Create GitHub Actions quality.yml workflow with Cleo linting for all language stacks: Create .github/workflows/quality.yml that triggers on pull_request. Run Cleo-driven linting: clippy + rustfmt for Rust services, eslint + biome.js for Node/TypeScript services, go vet + golangci-lint for Go services. Fail the workflow if any linter reports errors.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

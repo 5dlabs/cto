@@ -1,18 +1,10 @@
-Implement subtask 10002: HA scaling: configure HPA for Equipment Catalog
+Implement subtask 10002: Scale CNPG PostgreSQL cluster to 2 instances with WAL archival to R2
 
 ## Objective
-Create a HorizontalPodAutoscaler resource for the Equipment Catalog service that scales from 2 to 4 replicas when CPU utilization exceeds 70%.
+Update the CloudNativePG Cluster CR to instances: 2 (1 primary + 1 replica). Enable WAL archival to the sigma1-wal-archive R2 bucket using the barmanObjectStore configuration. Verify streaming replication is active and replication lag is within acceptable bounds.
 
 ## Steps
-Step-by-step:
-1. Create `hpa-equipment-catalog.yaml` with:
-   - `apiVersion: autoscaling/v2`
-   - `spec.scaleTargetRef` pointing to Equipment Catalog Deployment
-   - `spec.minReplicas: 2`, `spec.maxReplicas: 4`
-   - `spec.metrics[0].type: Resource`, `resource.name: cpu`, `resource.target.type: Utilization`, `resource.target.averageUtilization: 70`
-   - `spec.behavior.scaleDown.stabilizationWindowSeconds: 300` to prevent flapping
-2. Ensure the Equipment Catalog Deployment has `resources.requests.cpu` set (e.g., 250m) so HPA can calculate utilization.
-3. Apply the manifest.
+Edit the CNPG Cluster CR in helm/sigma1/templates/postgres-cluster.yaml: `spec.instances: 2`. Add `spec.backup.barmanObjectStore: { destinationPath: 's3://sigma1-wal-archive/', endpointURL: 'https://<account>.r2.cloudflarestorage.com', s3Credentials: { accessKeyId: { name: sigma1-r2-secret, key: ACCESS_KEY_ID }, secretAccessKey: { name: sigma1-r2-secret, key: SECRET_ACCESS_KEY } }, wal: { compression: gzip } }`. Apply via helm upgrade. Run `kubectl get cluster sigma1-postgres -n databases` — confirm instances=2, status=Ready. Run `kubectl exec -n databases sigma1-postgres-1 -- psql -c 'SELECT * FROM pg_stat_replication;'` to confirm replica connected.
 
 ## Validation
-Apply HPA manifest. Run `kubectl get hpa` and verify targets show current/target CPU values (not <unknown>). Use a load generator (e.g., `hey` or `k6`) to drive CPU above 70% on equipment-catalog, verify `kubectl get hpa` shows scaling to 3+ replicas within 2-3 minutes.
+`kubectl get cluster sigma1-postgres -n databases` shows `instances: 2` and `readyInstances: 2`. `kubectl exec` pg_stat_replication query returns 1 row showing streaming replica. R2 bucket sigma1-wal-archive receives WAL segment files within 60s of a test write (check R2 console or `aws s3 ls s3://sigma1-wal-archive/` with R2-compatible CLI).

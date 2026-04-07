@@ -1,27 +1,22 @@
-Implement subtask 7005: Implement quote-gen and upsell skills
+Implement subtask 7005: Configure Signal-CLI adapter in OpenClaw for Morgan
 
 ## Objective
-Build the quote-gen skill that assembles line items from catalog data, calculates totals, creates an opportunity via RMS, and sends a quote summary. Build the upsell skill that suggests additional services/equipment after quote generation.
+Set up the OpenClaw Signal messaging adapter pointing to the signal-cli-svc JSON-RPC endpoint, with phone number from secret and receive loop enabled.
 
 ## Steps
-1. `quote-gen` skill:
-   a. Accept gathered product/event data from sales-qual conversation state.
-   b. Assemble line items: product name, quantity, daily/weekly rate, rental period calculation.
-   c. Calculate subtotals, delivery fees (if applicable), damage waiver/insurance, tax estimates.
-   d. Call `sigma1_generate_quote` (POST to RMS /api/v1/opportunities) with the assembled quote data.
-   e. Format the quote summary as a readable message: itemized list, totals, rental period, pickup/delivery options.
-   f. Send quote summary back to customer via the active channel (Signal, voice, or web chat).
-   g. Store opportunity ID in conversation state for follow-up.
-2. `upsell` skill:
-   a. Trigger after quote-gen completes successfully.
-   b. Based on event type and selected equipment, suggest complementary items:
-      - Weddings: uplighting add-on, haze machine, photo booth lighting
-      - Corporate: confidence monitors, presentation clickers, podium lighting
-      - Concerts: additional moving heads, fog machines, follow spots
-   c. Suggest insurance/damage waiver if not already included.
-   d. Suggest delivery/setup service if customer selected pickup.
-   e. Use `sigma1_catalog_search` to find upsell products and `sigma1_check_availability` to verify.
-   f. If customer accepts upsell items, regenerate quote via quote-gen with updated line items.
+1. In agents/morgan/agent.yaml (or a separate adapters/signal.yaml referenced from agent.yaml), add the signal adapter block:
+   adapters:
+     signal:
+       enabled: true
+       json_rpc_url: http://signal-cli-svc.signal.svc.cluster.local:7583
+       phone_number: ${SIGNAL_PHONE_NUMBER}  # sourced from secret
+       receive_loop: true
+       reconnect_on_failure: true
+       reconnect_interval_seconds: 10
+2. Map the SIGNAL_PHONE_NUMBER env var from the existing Kubernetes secret (likely the same secret holding TWILIO_PHONE_NUMBER — confirm secret key name from Task 2 infra endpoints).
+3. Configure message routing: all incoming Signal messages route to Morgan's main conversation handler.
+4. Set max_message_length: 1500 to stay within Signal limits.
+5. Document the adapter config in agents/morgan/README.md under 'Signal Integration'.
 
 ## Validation
-Verify quote-gen produces a correctly formatted quote with accurate line item calculations by providing known product data and verifying totals. Verify RMS opportunity is created with correct data. Verify upsell suggests relevant items for a wedding event type and can regenerate the quote with accepted additions.
+After Morgan pod is running: send a test Signal message to the configured phone number from a registered Signal account. Verify `kubectl logs -n openclaw deployment/morgan` shows 'Signal message received' log line within 30 seconds. Verify Morgan's reply appears in the Signal conversation.

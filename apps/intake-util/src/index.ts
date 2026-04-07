@@ -415,6 +415,7 @@ async function main(): Promise<void> {
         const baseUrl = getArg(args, '--base-url') || '';
         const prUrl = getArg(args, '--pr-url') || '';
         const agentMapArg = getArg(args, '--agent-map');
+        const milestoneMapArg = getArg(args, '--milestone-map');
         const pmUrl = getArg(args, '--pm-url') || process.env.PM_URL || '';
 
         if (!projectId || !prdIssueId || !teamId) {
@@ -440,6 +441,16 @@ async function main(): Promise<void> {
           console.error('sync-linear issues: no --agent-map provided, using empty map');
         }
 
+        let milestoneMap: Record<string, string> | undefined;
+        if (milestoneMapArg) {
+          try {
+            milestoneMap = JSON.parse(milestoneMapArg);
+            console.error(`sync-linear issues: parsed milestoneMap with ${Object.keys(milestoneMap!).length} entries`);
+          } catch {
+            console.error(`Warning: Could not parse --milestone-map JSON, issues will not be assigned to milestones`);
+          }
+        }
+
         if (pmUrl) {
           console.error(`sync-linear issues: PM server at ${pmUrl} — will use per-agent tokens for self-assignment`);
         }
@@ -460,6 +471,7 @@ async function main(): Promise<void> {
           apiKey,
           personalApiKey,
           pmUrl: pmUrl || undefined,
+          milestoneMap,
         });
 
         console.log(JSON.stringify(result, null, 2));
@@ -485,6 +497,7 @@ async function main(): Promise<void> {
         process.exit(0);
       } else if (subMode === 'github-sync') {
         const projectId = getArg(args, '--project-id');
+        const projectName = getArg(args, '--project-name');
         const repo = getArg(args, '--repo');
         const branch = getArg(args, '--branch');
         const githubProjectArg = getArg(args, '--github-project');
@@ -502,6 +515,7 @@ async function main(): Promise<void> {
 
         const result = await syncGitHubIssues({
           projectId,
+          projectName,
           repo,
           branch,
           apiKey,

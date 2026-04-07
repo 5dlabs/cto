@@ -1,22 +1,10 @@
-Implement subtask 3003: Define inventory.proto, crew.proto, and delivery.proto with grpc-gateway annotations
+Implement subtask 3003: Write database migrations for all seven RMS schema tables
 
 ## Objective
-Create protobuf definitions for the Inventory, Crew, and Delivery gRPC services with full REST gateway annotations.
+Create numbered SQL migration files in services/rms/migrations/ targeting the rms schema. Cover all seven tables: opportunities, opportunity_line_items, projects, inventory_transactions, crew_members, crew_assignments, deliveries.
 
 ## Steps
-1. Create `proto/rms/v1/inventory.proto`:
-   - Service `InventoryService` with RPCs: `GetStockLevel`, `RecordTransaction`, `ScanBarcode`, `ListInventoryItems`.
-   - Messages: `InventoryItem` (id, org_id, name, barcode, category, current_location, status enum [AVAILABLE, CHECKED_OUT, MAINTENANCE, RETIRED], quantity_total, quantity_available), `InventoryTransaction` (id, item_id, project_id, type enum [CHECK_OUT, CHECK_IN, TRANSFER, ADJUSTMENT], quantity, timestamp), `ScanBarcodeResponse` (item with current location and status).
-   - grpc-gateway: `GET /api/v1/inventory/{id}/stock`, `POST /api/v1/inventory/transactions`, `POST /api/v1/inventory/scan`, `GET /api/v1/inventory`.
-2. Create `proto/rms/v1/crew.proto`:
-   - Service `CrewService` with RPCs: `ListCrew`, `AssignCrew`, `ScheduleCrew`, `GetCrewAvailability`.
-   - Messages: `CrewMember` (id, org_id, name, email, role, skills), `CrewAssignment` (id, crew_member_id, project_id, date_start, date_end, role), `AvailabilitySlot`.
-   - grpc-gateway: `GET /api/v1/crew`, `POST /api/v1/crew/assign`, `POST /api/v1/crew/schedule`, `GET /api/v1/crew/{id}/availability`.
-3. Create `proto/rms/v1/delivery.proto`:
-   - Service `DeliveryService` with RPCs: `ScheduleDelivery`, `UpdateDeliveryStatus`, `OptimizeRoute`, `ListDeliveries`.
-   - Messages: `Delivery` (id, org_id, project_id, type enum [DELIVERY, PICKUP], address, scheduled_at, status enum [SCHEDULED, IN_TRANSIT, DELIVERED, CANCELLED]), `DeliveryRoute` (id, delivery_ids, optimized_order, estimated_duration).
-   - grpc-gateway: `POST /api/v1/deliveries`, `PUT /api/v1/deliveries/{id}/status`, `POST /api/v1/deliveries/optimize-route`, `GET /api/v1/deliveries`.
-4. Run `buf generate` and verify all stubs compile.
+Each migration file uses `SET search_path=rms;` at the top. Migration 001: CREATE SCHEMA IF NOT EXISTS rms. Migration 002: opportunities table with all columns, constraints, and CHECK constraints for status and lead_score enums. Migration 003: opportunity_line_items with FK to opportunities. Migration 004: projects with FK to opportunities. Migration 005: inventory_transactions with CHECK constraint on type. Migration 006: crew_members. Migration 007: crew_assignments with FKs to projects and crew_members. Migration 008: deliveries with FK to projects and JSONB route_data column. Add indexes on foreign keys and frequently filtered columns (status, customer_id, inventory_id, project_id). Use golang-migrate UP/DOWN pairs for all migrations.
 
 ## Validation
-Run `buf lint` with zero errors on all three proto files. Run `buf generate` and verify all Go service interfaces and message types are generated. Confirm grpc-gateway annotations produce correct HTTP paths.
+Run `migrate -path migrations -database $DATABASE_URL up` against a fresh rms schema; all 8 migrations apply without error. Run `migrate down` to 0; all tables are dropped cleanly. `psql -c '\dt rms.*'` lists all 7 tables after UP.

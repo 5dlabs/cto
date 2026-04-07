@@ -115,6 +115,12 @@ if [ -z "${GH_TOKEN:-}" ] && [ -n "${GITHUB_TOKEN:-}" ]; then
   export GH_TOKEN="${GITHUB_TOKEN}"
 fi
 
+# Ensure HOME is writable for git config --global
+if [ ! -w "${HOME:-/root}" ]; then
+  export HOME="/tmp/agent-home"
+  mkdir -p "$HOME"
+fi
+
 # Configure git credential helper for GitHub App token
 if [ -n "${GITHUB_TOKEN:-}" ]; then
   git config --global credential.helper "!f() { echo \"password=\$GITHUB_TOKEN\"; }; f"

@@ -1,20 +1,22 @@
-Implement subtask 8009: Build Portfolio page with filterable gallery and lazy-loaded images
+Implement subtask 8009: Build quote builder page (app/quote/page.tsx) with Effect.Schema validation and RMS submission
 
 ## Objective
-Implement the `/portfolio` route as a statically generated gallery of past events with photos, filterable by event type, with lazy-loaded image grid and Schema.org Event markup.
+Implement the self-service quote builder as a client component with pre-populated items from localStorage, customer info form with Effect.Schema validation, and RMS opportunity creation on submit.
 
 ## Steps
-1. Create `app/portfolio/page.tsx` — Server Component with static generation (or ISR if content comes from API).
-2. Data source: fetch from social engine published posts endpoint, or use static JSON/MDX content for v1.
-3. Filter bar: horizontal pill buttons for event types (Concerts, Corporate, Festivals, Weddings, etc.). Clicking filters the grid client-side.
-4. Image grid:
-   - Masonry or uniform grid layout using CSS grid.
-   - Each card: event image (lazy loaded via `<Image loading="lazy">`), event name overlay, event type badge, date.
-   - Click opens Dialog/Sheet with larger image, full description, additional photos.
-5. Lazy loading: only load images as they scroll into viewport (native lazy loading + Intersection Observer for animation).
-6. SEO: `generateMetadata` with portfolio description. Schema.org: ItemList of Event entries.
-7. Responsive: 1 col mobile, 2 cols tablet, 3 cols desktop.
-8. Empty state: if no portfolio items match filter, show friendly message.
+1. Create app/quote/page.tsx — thin server wrapper. Main logic in components/quote/QuoteBuilder.tsx as 'use client'.
+2. State: quoteItems (read from localStorage sigma1_quote_items on mount), eventDates ({from, to}), customerInfo ({name, email, org, phone}).
+3. UI sections:
+   - Quote line items table: Table component from shadcn. Columns: Product Name, Quantity (Input), Days (derived from dates), Day Rate, Subtotal. Allow removing items.
+   - Event date picker: DayPicker range selector.
+   - Customer info: Input fields for name, email, org, phone.
+4. Validation using Effect.Schema before submit:
+   - Define CustomerInfoSchema with S.String (non-empty), email pattern, phone optional.
+   - On submit: S.decode(CustomerInfoSchema)(formData) — on ParseError, show field-level error messages.
+5. Submit handler: calls runApiEffect(createOpportunity({ customer_id: email, line_items, event_date: from })).
+6. Success state: hide form, show confirmation Card with opportunity_id and message 'Your quote has been submitted. Morgan will contact you shortly.'.
+7. Error state: show Dialog with error message and retry button.
+8. Empty state: if no items, show prompt 'Browse equipment to add items to your quote' with Button linking to /equipment.
 
 ## Validation
-Render portfolio page with mock data (5+ events across 3 types). Verify all events shown initially. Click a filter, verify only matching events shown. Click 'All', verify all events shown again. Verify images have `loading="lazy"` attribute. Open an event detail dialog, verify larger image and description shown. Test responsive layout at 375px, 768px, 1440px.
+Playwright: navigate to /quote with localStorage sigma1_quote_items pre-set — items appear in table. Submit form with invalid email — email field shows validation error, form does not submit. Submit with valid data and mocked API (MSW returning 201) — confirmation panel appears with opportunity ID. GET /quote with empty localStorage — empty state prompt is visible.

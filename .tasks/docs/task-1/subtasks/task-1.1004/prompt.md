@@ -1,18 +1,10 @@
-Implement subtask 1004: Deploy PgBouncer Pooler CR for connection pooling
+Implement subtask 1004: Deploy Opstree Valkey 7.2 single-replica instance (sigma1-valkey)
 
 ## Objective
-Deploy the CloudNative-PG `Pooler` CR to front the sigma1-postgres cluster with PgBouncer in transaction pooling mode with a default pool size of 20.
+Define and apply the Opstree Redis/Valkey operator CR for sigma1-valkey in the databases namespace using valkey/valkey:7.2-alpine, single replica.
 
 ## Steps
-1. Create `Pooler` CR YAML named `sigma1-postgres-pooler` in `sigma1-db` namespace:
-   - `spec.cluster.name: sigma1-postgres`
-   - `spec.type: rw` (read-write pooler pointing to primary)
-   - `spec.pgbouncer.poolMode: transaction`
-   - `spec.pgbouncer.parameters.default_pool_size: '20'`
-   - `spec.instances: 1` (single replica for dev)
-2. Apply the Pooler CR.
-3. Verify the pooler service is created: `sigma1-postgres-pooler.sigma1-db.svc.cluster.local:5432`.
-4. Test connectivity through the pooler from a temporary pod in sigma1 namespace.
+Create sigma1/infra/templates/valkey.yaml. Use the Opstree Redis operator CR (apiVersion: redis.redis.opstreelabs.in/v1beta2, kind: Redis or RedisCluster — use standalone Redis kind for single replica). metadata.name: sigma1-valkey, metadata.namespace: databases. spec.kubernetesConfig.image: valkey/valkey:7.2-alpine. spec.redisConfig or equivalent: no auth for dev (document production auth requirement). spec.storage: use default ephemeral or 5Gi PVC depending on operator defaults. Ensure the Opstree Redis operator is installed (document as prerequisite). Apply via Helm. Wait: kubectl wait redis/sigma1-valkey -n databases --for=condition=Ready --timeout=120s (or equivalent operator status condition).
 
 ## Validation
-PgBouncer pod is Running. `psql -h sigma1-postgres-pooler.sigma1-db.svc.cluster.local -U sigma1_user -d sigma1 -c 'SELECT 1'` succeeds from a pod in sigma1 namespace. `SHOW POOLS` via PgBouncer admin interface shows pool_mode=transaction.
+kubectl get pods -n databases shows sigma1-valkey-0 in Running state. redis-cli -h sigma1-valkey.databases.svc.cluster.local -p 6379 ping returns PONG from within the cluster (run via kubectl exec into a temporary pod).

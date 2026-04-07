@@ -1,26 +1,10 @@
-Implement subtask 4009: Implement payroll endpoints and currency rate endpoints
+Implement subtask 4009: Implement automated overdue invoice reminder background task
 
 ## Objective
-Build the payroll entry CRUD endpoints under `/api/v1/payroll` and the currency rate query endpoint under `/api/v1/currency/rates`.
+Implement a daily tokio background task that queries invoices with status=sent and due_at more than 1 day past, transitions them to status=overdue, and logs a reminder entry.
 
 ## Steps
-1. Create `services/rust/finance/src/routes/payroll.rs` and `services/rust/finance/src/db/payroll.rs`.
-2. `POST /api/v1/payroll`:
-   - Accept: org_id, employee_id, period_start, period_end, amount_cents, currency, type (employee/contractor), notes.
-   - Validate period_start < period_end, amount_cents > 0.
-   - Insert into `payroll_entries`.
-   - Return 201 with created entry.
-3. `GET /api/v1/payroll`:
-   - Query params: org_id (required), period_start, period_end (for range filtering), employee_id (optional), type (optional), offset, limit.
-   - Return paginated list with total count.
-4. Create `services/rust/finance/src/routes/currency.rs`.
-5. `GET /api/v1/currency/rates`:
-   - Query params: base_currency (default USD).
-   - First check Valkey cache for key `currency_rates:{base_currency}` with JSON payload.
-   - If cache miss, query `currency_rates` table for latest rates by `fetched_at`.
-   - Return {base_currency, rates: [{target_currency, rate, fetched_at}]}.
-6. Add utoipa annotations.
-7. Wire into Axum router.
+Create src/tasks/overdue_reminder.rs. Spawn a tokio::task::spawn loop at server startup: sleep until next midnight UTC, then repeat every 24 hours. On each run: UPDATE finance.invoices SET status='overdue' WHERE status='sent' AND due_at < NOW() - INTERVAL '1 day' RETURNING id, org_id, invoice_number. For each returned row: log tracing::info!('Invoice {} for org {} is now overdue — reminder enqueued', invoice_number, org_id). Include a TODO comment referencing Morgan integration for real email dispatch. Ensure the task handles DB errors gracefully (log error, continue loop without crashing).
 
 ## Validation
-Integration tests: (1) Create payroll entry, verify 201 and correct fields returned. (2) Create 5 entries across 2 periods, GET with period filter returns correct subset. (3) GET with employee_id filter works. (4) Verify validation: period_start >= period_end returns 400. (5) Currency rates: seed rates in DB, GET returns correct rates. (6) Verify Valkey cache is populated after first DB query. (7) Verify cache hit on second request (mock or check Valkey directly).
+Seed invoice with due_at = NOW() - INTERVAL '2 days' and status=sent. Trigger task manually by setting sleep to 0 in test configuration or calling the update function directly. Assert invoice status is overdue via GET /api/v1/invoices/:id. Verify log output contains the invoice number. DB error during update does not panic the task (test with poisoned DB connection).

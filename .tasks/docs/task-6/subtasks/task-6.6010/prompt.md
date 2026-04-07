@@ -1,26 +1,10 @@
-Implement subtask 6010: Implement GDPR deletion endpoint with R2 cleanup
+Implement subtask 6010: Implement LinkedInService with Effect retry and Share API integration
 
 ## Objective
-Build the DELETE /api/v1/gdpr/customer/:id endpoint that removes all photos, drafts, published posts, and R2 objects associated with a customer's events.
+Implement the LinkedInService Effect.Service that publishes posts to LinkedIn via the UGC Posts Share API with exponential backoff retry and timeout.
 
 ## Steps
-1. Create `src/routes/gdpr.ts` with Elysia route.
-2. `DELETE /api/v1/gdpr/customer/:id`:
-   - Param: customer_id (string, the uploaded_by identifier).
-   - Effect.gen pipeline:
-     a. Find all uploads where uploaded_by = customer_id.
-     b. For each upload: collect all photo r2_keys and all draft image_keys (cropped images).
-     c. Collect all unique R2 keys (originals + crops).
-     d. Call R2Service.deleteBatch(allKeys) to remove from R2.
-     e. Delete published_posts (via draft_id cascade or explicit).
-     f. Delete drafts (via upload_id cascade or explicit).
-     g. Delete photos (via upload_id cascade or explicit).
-     h. Delete uploads.
-   - Use a database transaction (Effect.acquireRelease or sql transaction) to ensure atomicity of DB deletes.
-   - Return { deleted: { uploads: number, photos: number, drafts: number, published_posts: number, r2_objects: number } }.
-3. Handle case where customer has no data: return 200 with all counts = 0.
-4. Log GDPR deletion request for audit trail (log customer_id, timestamp, counts).
-5. Error handling: If R2 deletion partially fails, still proceed with DB deletion and log R2 failures for manual cleanup.
+In src/services/linkedin.ts: implement LinkedInService. publishPost(draft): POST to https://api.linkedin.com/v2/ugcPosts with body {author: 'urn:li:organization:{LINKEDIN_ORG_ID}', lifecycleState:'PUBLISHED', specificContent:{shareCommentary:{text:caption}, shareMediaCategory:'IMAGE', media:[{status:'READY',originalUrl:linkedin_crop_url}]}, visibility:{memberNetworkVisibility:'PUBLIC'}}. Set Authorization: Bearer {LINKEDIN_ACCESS_TOKEN}. Apply same Effect.retry + Effect.timeout pattern as Instagram. On success, insert social_posts row with platform='linkedin'.
 
 ## Validation
-Integration test: (1) Create upload with 5 photos, 4 drafts, 2 published_posts for customer 'test-customer'. Call DELETE /gdpr/customer/test-customer. Verify all DB records removed. Verify R2Service.deleteBatch called with all original + crop keys. (2) Test no-data case: DELETE for nonexistent customer returns 200 with zero counts. (3) Test R2 partial failure: mock one R2 delete failing, verify DB records still deleted and error logged.
+Unit test: mock LinkedIn API returning 201 on first attempt. Verify social_posts row inserted with platform='linkedin' and status='published'. Mock 429 rate limit for 3 attempts then 201: verify retry behavior and final success. Verify Authorization header is set correctly in mock.

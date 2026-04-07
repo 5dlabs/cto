@@ -1,59 +1,41 @@
-## Develop Mobile App (Tap - Expo/React Native)
+## Build Sigma-1 Mobile App (Tap - Expo/React Native)
 
 ### Objective
-Build the Sigma-1 mobile app using Expo with equipment catalog browsing, self-service quote builder, dedicated Morgan chat screen, and barcode scanning for equipment check-in/check-out. Maintains visual consistency with the web frontend.
+Build the Sigma-1 mobile app using Expo (managed workflow), React Native, NativeWind 4 for styling, and Effect 3.x for data fetching and validation. Implements bottom tab navigation (Equipment, Quote, Chat, Portfolio), equipment catalog browsing with availability checking, quote request submission, Morgan AI chat interface, and push notifications for quote status updates. Consumes shared Tailwind design tokens from packages/design-tokens.
 
 ### Ownership
 - Agent: tap
-- Stack: Expo (React Native)
+- Stack: Expo/React Native/NativeWind 4/Effect 3.x
 - Priority: medium
 - Status: pending
 - Dependencies: 2, 7
 
 ### Implementation Details
-1. Initialize Expo project (SDK 51+) with TypeScript, Expo Router for file-based navigation.
-2. Design system:
-   - Port design tokens from web (Task 8) to React Native: colors, typography (using expo-font), spacing scale.
-   - Use React Native equivalents of shadcn/ui patterns: NativeWind (TailwindCSS for RN) or styled components matching web aesthetic.
-   - Component library: ProductCard, AvailabilityBadge, QuoteLineItem, ChatBubble, BarcodeScanner.
-3. Navigation structure (Expo Router tabs):
-   - **Equipment tab**: Category list → Product grid → Product detail with availability. Pull-to-refresh. Infinite scroll pagination.
-   - **Quote tab**: Quote builder adapted for mobile. Step-by-step wizard with native date picker, equipment selector (searchable list), venue input, review screen. Submit creates opportunity.
-   - **Chat tab** (dedicated screen per D10): Full-screen Morgan chat. WebSocket connection to Morgan agent. Message history. Support rich messages (product cards as interactive elements). Push notification integration for incoming messages.
-   - **Scan tab**: Camera-based barcode scanner using `expo-camera` or `expo-barcode-scanner`. Scans equipment barcode → calls RMS ScanBarcode → shows equipment details and check-in/check-out actions.
-   - **Profile/Settings tab**: User info, notification preferences, saved quotes.
-4. API integration:
-   - Shared API client module using `fetch` or `axios` with Effect for error handling.
-   - Base URL configurable per environment (dev/staging/prod).
-   - JWT token storage in `expo-secure-store`.
-   - API key auth for service calls (if needed, else JWT from user session).
-5. Morgan Chat (dedicated screen):
-   - WebSocket connection to Morgan agent (same endpoint as web).
-   - Push notifications via Expo Notifications for incoming Morgan messages when app is backgrounded.
-   - Conversation persistence in AsyncStorage with sync to server.
-   - Support photo sending (for social pipeline): use `expo-image-picker`, upload to social engine.
-6. Barcode scanning:
-   - `expo-camera` with barcode detection.
-   - On scan: call RMS `POST /api/v1/inventory/scan` (ScanBarcode via REST gateway).
-   - Display equipment details, current status, option to check-out or check-in.
-   - Haptic feedback on successful scan.
-7. Offline capability:
-   - Cache equipment catalog locally using AsyncStorage or MMKV.
-   - Queue quote submissions if offline, submit when connectivity restored.
-8. Build configuration:
-   - EAS Build profiles for development, preview, production.
-   - iOS and Android builds.
-   - App icons and splash screen matching Sigma-1 branding.
+1. Initialize Expo project at apps/mobile using expo init with TypeScript template. SDK 51+. Install: nativewind@4.x, tailwindcss@3.4 (NativeWind 4 still uses TW3 internally — configure postcss accordingly), effect@3.x, @effect/schema, @tanstack/react-query v5, expo-router@3.x, expo-notifications, expo-camera (for barcode scanning), expo-image, @expo/vector-icons, react-native-reanimated, react-native-gesture-handler.
+2. Import shared design tokens: import tailwind.config.ts from packages/design-tokens as base config. Extend in apps/mobile/tailwind.config.ts with NativeWind-specific presets.
+3. Expo Router file-based routing: app/(tabs)/_layout.tsx (bottom tab navigator), app/(tabs)/index.tsx (equipment catalog), app/(tabs)/quote.tsx (quote builder), app/(tabs)/chat.tsx (Morgan chat), app/(tabs)/portfolio.tsx (event portfolio). app/equipment/[id].tsx (product detail).
+4. Bottom tab navigation: use Expo Router Tabs with tab icons from @expo/vector-icons (Ionicons). Tabs: Equipment (search icon), Quote (document icon), Chat (chat-bubble icon), Portfolio (images icon). Active tab highlight using brand accent color from design tokens.
+5. Equipment catalog tab: FlatList of products fetched via TanStack Query from GET /api/v1/catalog/products. Search bar at top with 300ms debounce. Product card: expo-image for R2 image URLs, product name, day_rate badge, availability indicator. Pull-to-refresh.
+6. Product detail screen (app/equipment/[id].tsx): DateRangePicker (custom component using react-native-calendars or similar), queries GET /api/v1/catalog/products/:id/availability on date selection via TanStack Query. Shows quantity_available. Add to Quote button navigates to quote tab with product pre-filled.
+7. Quote builder tab: ScrollView form with product list (pre-filled or manually added), event date fields, customer name/email/company inputs. Effect.Schema validation on all fields. Submit calls POST /api/v1/opportunities. Success screen shows quote ID and prompts to check Signal for Morgan follow-up.
+8. Morgan chat tab: WebView pointing to Morgan web chat URL (EXPO_PUBLIC_MORGAN_CHAT_URL) OR native implementation using EventSource/WebSocket if Morgan exposes native chat API. Prefer native implementation: text input + message list FlatList, calls POST /api/v1/chat to Morgan chat endpoint, displays conversation history.
+9. Portfolio tab: MasonryFlashList (or FlashList with numColumns=2) displaying published social posts from GET /api/v1/social/published. Image tap opens full-screen modal with caption and hashtags.
+10. Push notifications: expo-notifications setup with Expo Push Token registration on app launch. Backend notification endpoint (simple webhook in social engine or RMS) sends push via Expo Push API when opportunity status changes. Display notification with quote ID and new status.
+11. Barcode scanner (bonus screen accessible from Equipment tab): expo-camera to scan product barcodes, calls GET /api/v1/catalog/products?barcode={code}, navigates to product detail.
+12. Effect data fetching layer: lib/api.ts defining typed fetch functions using Effect.Schema for Product, Opportunity, SocialPost. Error handling with Effect.catchAll showing user-friendly error states.
+13. EAS Build configuration: eas.json with development, preview, production profiles. EXPO_PUBLIC_API_URL and EXPO_PUBLIC_MORGAN_CHAT_URL in .env.production.
 
 ### Subtasks
-- [ ] Initialize Expo project with TypeScript and Expo Router tab navigation: Scaffold the Expo SDK 51+ project with TypeScript configuration, install Expo Router, and configure file-based tab navigation with all five tab screens (Equipment, Quote, Chat, Scan, Profile).
-- [ ] Port design system tokens and build shared component library: Port the web frontend's design tokens (colors, typography, spacing) to React Native using NativeWind or chosen styling approach. Build the shared component library: ProductCard, AvailabilityBadge, QuoteLineItem, ChatBubble.
-- [ ] Build shared API client with JWT auth and environment configuration: Create a shared API client module with configurable base URL per environment, JWT token storage in expo-secure-store, automatic token refresh, and Effect-based error handling.
-- [ ] Implement Equipment tab with category browsing, product grid, and infinite scroll: Build the Equipment tab screens: category list, product grid with infinite scroll pagination, product detail with availability display, and pull-to-refresh across list screens.
-- [ ] Build Quote Builder tab with step-by-step wizard and submission: Implement the Quote tab as a multi-step wizard: equipment selection (searchable list), date range picker, venue input, review screen, and API submission to create an opportunity.
-- [ ] Implement offline quote queuing and equipment catalog caching: Add offline capability: cache equipment catalog locally for offline browsing and queue quote submissions when offline, auto-submitting when connectivity is restored.
-- [ ] Build Morgan Chat tab with WebSocket connection and message history: Implement the dedicated Morgan chat screen with full-screen WebSocket-based conversation, message history persistence in AsyncStorage, and support for rich messages (interactive product cards).
-- [ ] Integrate push notifications for Morgan chat via Expo Notifications: Set up Expo Notifications to receive push notifications for incoming Morgan messages when the app is backgrounded, including permission handling and notification tap navigation.
-- [ ] Implement Barcode Scan tab with camera scanner and RMS integration: Build the Scan tab with camera-based barcode detection using expo-camera, integration with RMS ScanBarcode API, equipment details display, and check-in/check-out actions with haptic feedback.
-- [ ] Build Profile/Settings tab with user info and notification preferences: Implement the Profile tab displaying user information, notification preference toggles, saved quotes list, and sign-out functionality.
-- [ ] Configure EAS Build profiles, app branding, and production build pipeline: Set up EAS Build with development, preview, and production profiles. Configure app icons, splash screen, and branding assets. Verify builds for both iOS and Android platforms.
+- [ ] Initialize Expo managed project with TypeScript template at apps/mobile: Scaffold the Expo SDK 51+ project with TypeScript template at apps/mobile. Install all required dependencies: nativewind@4.x, tailwindcss@3.4, effect@3.x, @effect/schema, @tanstack/react-query v5, expo-router@3.x, expo-notifications, expo-camera, expo-image, @expo/vector-icons, react-native-reanimated, react-native-gesture-handler. Configure babel.config.js for NativeWind and reanimated plugins. Configure metro.config.js for monorepo symlink resolution.
+- [ ] Configure NativeWind 4 with shared design tokens from packages/design-tokens: Set up NativeWind 4 / Tailwind CSS 3.4 integration. Import the shared tailwind.config.ts from packages/design-tokens as the base preset. Extend in apps/mobile/tailwind.config.ts with NativeWind-specific settings (content paths covering .tsx files). Configure postcss.config.js required by NativeWind 4's build step. Add global.css entry point and import it in the root _layout.tsx.
+- [ ] Implement Expo Router file-based route structure and bottom tab navigator layout: Create the full Expo Router directory structure: app/_layout.tsx (root layout with QueryClientProvider and TanStack Query setup), app/(tabs)/_layout.tsx (Tabs navigator with 4 tab entries), app/(tabs)/index.tsx, app/(tabs)/quote.tsx, app/(tabs)/chat.tsx, app/(tabs)/portfolio.tsx, and app/equipment/[id].tsx as placeholder screens. Configure tab icons using Ionicons and active tab color from the brand accent token.
+- [ ] Build Effect data fetching layer with Effect.Schema type definitions and TanStack Query integration: Create lib/api.ts defining typed Effect-based fetch functions for Product, Opportunity, and SocialPost. Define Effect.Schema decoders for all three types. Create a TanStack Query v5 queryClient singleton. Implement query factory functions that wrap Effect runners for use in useQuery/useMutation hooks. Include Effect.catchAll error mapping to typed AppError variants displayed as user-friendly messages.
+- [ ] Build equipment catalog tab with FlatList, debounced search, expo-image product cards, and pull-to-refresh: Implement app/(tabs)/index.tsx as the equipment catalog. Render a search TextInput with 300ms debounce, a FlatList of ProductCard components using expo-image for R2 image URLs, day_rate badge, and availability indicator. Data fetched via TanStack Query useQuery wrapping the Effect fetchProducts function. Implement pull-to-refresh via FlatList refreshControl prop.
+- [ ] Build product detail screen with DateRangePicker and availability query: Implement app/equipment/[id].tsx. Fetch product details via TanStack Query. Render a custom DateRangePicker component. On date range selection, fire a secondary useQuery to GET /api/v1/catalog/products/:id/availability with the selected dates. Display quantity_available. Render 'Add to Quote' Pressable that navigates to the quote tab with the product pre-filled via router.push params.
+- [ ] Build quote builder tab with Effect.Schema form validation and opportunity submission: Implement app/(tabs)/quote.tsx as a ScrollView form. Accept pre-filled product params from router params. Render product list, event date fields, customer name/email/company inputs. Apply Effect.Schema validation on submit — show inline field-level error messages on decode failure. On valid submission call POST /api/v1/opportunities via useMutation. Show confirmation screen with quote_id on 201 success.
+- [ ] Build Morgan chat tab with native message FlatList and POST /api/v1/chat integration: Implement app/(tabs)/chat.tsx as a native chat UI: a FlatList of messages (user/assistant bubbles) and a TextInput + Send button at the bottom. On send, call POST /api/v1/chat via useMutation wrapping Effect fetchChat. Append assistant response to message list. Maintain conversation history in component state for context. Implement keyboard-avoiding behavior with KeyboardAvoidingView.
+- [ ] Build portfolio tab with FlashList masonry grid and full-screen image modal: Implement app/(tabs)/portfolio.tsx fetching published social posts from GET /api/v1/social/published via TanStack Query. Render posts in a 2-column FlashList (or MasonryFlashList). On image tap, open a full-screen modal displaying the image, caption, and hashtags. Implement modal dismiss via swipe or close button.
+- [ ] Implement expo-camera barcode scanner screen accessible from equipment tab: Create app/equipment/scan.tsx as a barcode scanner screen using expo-camera. Request camera permissions on mount. Render a CameraView with onBarcodeScanned handler. On scan, call GET /api/v1/catalog/products?barcode={code} and navigate to app/equipment/[id].tsx with the matched product ID. Show error if no product found for barcode. Add a 'Scan Barcode' button in the equipment catalog tab header.
+- [ ] Implement push notification setup with Expo Push Token registration: Configure expo-notifications in the root app/_layout.tsx. On app launch, request notification permissions and register for an Expo Push Token. Store the token and POST it to the backend (or log it for manual backend configuration). Set up a notification received handler and a notification response handler that navigates to the quote tab when a quote-status notification is tapped.
+- [ ] Configure EAS Build profiles and CI environment variables: Create eas.json with development, preview, and production build profiles for both iOS and Android. Configure .env.production with EXPO_PUBLIC_API_URL and EXPO_PUBLIC_MORGAN_CHAT_URL. Add EAS build step to CI (GitHub Actions or equivalent) that runs the preview profile on main branch merges. Document how to set EAS secrets for API URLs in the EAS dashboard.
+- [ ] Write Jest and React Native Testing Library test suite with >= 80% coverage: Write the complete Jest + RNTL test suite covering lib/ (Effect schemas, API functions) and all components/screens. Configure msw for API mocking. Set up jest.config.ts with coverage thresholds. Ensure coverage of happy paths, validation errors, empty states, and error states for all 5 tab screens and the lib/ data layer.

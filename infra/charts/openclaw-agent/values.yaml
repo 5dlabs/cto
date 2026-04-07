@@ -350,6 +350,7 @@ tools:
     maxConcurrentSessions: 4
     permissionMode: "approve-all"
     nonInteractivePermissions: "deny"
+    pluginToolsMcpBridge: false
     dispatch:
       enabled: true
     stream:

@@ -1,13 +1,10 @@
-Implement subtask 1001: Create sigma1 and sigma1-db namespaces with labels
+Implement subtask 1001: Create Kubernetes namespaces: sigma1, databases, openclaw, signal
 
 ## Objective
-Create the `sigma1` application namespace and the `sigma1-db` database namespace (or reuse `databases` per cluster convention). Apply standard labels including `app.kubernetes.io/part-of: sigma1` for observability selector matching.
+Define and apply Namespace manifests for all four namespaces required by the Sigma-1 platform. These namespaces gate every subsequent resource deployment.
 
 ## Steps
-1. Create namespace manifest for `sigma1` with labels: `app.kubernetes.io/part-of: sigma1`, `purpose: application`.
-2. Create namespace manifest for `sigma1-db` with labels: `app.kubernetes.io/part-of: sigma1`, `purpose: database`.
-3. Apply both namespace YAMLs via `kubectl apply`.
-4. Verify namespaces exist and labels are correctly applied.
+Create a Helm chart at sigma1/infra/templates/namespaces.yaml (or equivalent). Define four Namespace resources: sigma1, databases, openclaw, signal. Apply labels: app.kubernetes.io/part-of=sigma1, managed-by=helm. Ensure the chart includes this template first in render order so dependent resources in the same chart do not fail. Add a Helm hook weight or ordering note if necessary. Apply with: helm upgrade --install sigma1-infra sigma1/infra --namespace sigma1 --create-namespace.
 
 ## Validation
-`kubectl get ns sigma1 -o jsonpath='{.metadata.labels}'` returns expected labels. Same for `sigma1-db`. Both namespaces are in Active phase.
+Run: kubectl get namespaces sigma1 databases openclaw signal — all four must show STATUS=Active. Verify labels with: kubectl get ns sigma1 --show-labels.

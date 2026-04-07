@@ -1,18 +1,10 @@
-Implement subtask 3002: Define opportunity.proto and project.proto with grpc-gateway annotations
+Implement subtask 3002: Define protobuf schemas for all five RMS domains
 
 ## Objective
-Create protobuf definitions for the Opportunity and Project gRPC services with full REST gateway annotations for all endpoints including approve and convert actions.
+Write proto/sigma1/rms/v1/opportunity.proto, project.proto, inventory.proto, crew.proto, and delivery.proto with grpc-gateway HTTP annotations for REST mapping. Run buf generate to produce Go stubs.
 
 ## Steps
-1. Create `proto/rms/v1/opportunity.proto`:
-   - Service `OpportunityService` with RPCs: `CreateOpportunity`, `GetOpportunity`, `UpdateOpportunity`, `ListOpportunities`, `ScoreLead`, `ApproveOpportunity`, `ConvertOpportunity`.
-   - Messages: `Opportunity` (id, org_id, customer_id, title, description, event_date_start, event_date_end, status enum [PENDING, QUALIFIED, APPROVED, CONVERTED], lead_score, line_items repeated, created_at, updated_at), `LeadScore` (score enum [GREEN, YELLOW, RED], breakdown map), `OpportunityLineItem`.
-   - grpc-gateway annotations: `POST /api/v1/opportunities`, `GET /api/v1/opportunities/{id}`, `PUT /api/v1/opportunities/{id}`, `GET /api/v1/opportunities`, `POST /api/v1/opportunities/{id}/score`, `POST /api/v1/opportunities/{id}/approve`, `POST /api/v1/opportunities/{id}/convert`.
-2. Create `proto/rms/v1/project.proto`:
-   - Service `ProjectService` with RPCs: `CreateProject`, `GetProject`, `UpdateProject`, `ListProjects`, `CheckOut`, `CheckIn`.
-   - Messages: `Project` (id, org_id, opportunity_id, customer_id, title, status, line_items, checkout_date, checkin_date, created_at, updated_at), `CheckOutRequest` (project_id, item_ids, date_range), `CheckOutResponse` (success, conflicts repeated), `Conflict` (item_id, conflicting_project_id, date_range).
-   - grpc-gateway annotations: `POST /api/v1/projects`, `GET /api/v1/projects/{id}`, `PUT /api/v1/projects/{id}`, `GET /api/v1/projects`, `POST /api/v1/projects/{id}/checkout`, `POST /api/v1/projects/{id}/checkin`.
-3. Run `buf generate` and verify Go stubs compile.
+Each proto file must define the service, all request/response messages, and google.api.http option annotations for grpc-gateway. opportunity.proto: OpportunityService with CreateOpportunity (POST /api/v1/opportunities), GetOpportunity (GET /api/v1/opportunities/{id}), UpdateOpportunity (PUT /api/v1/opportunities/{id}), ListOpportunities (GET /api/v1/opportunities), ScoreLead (POST /api/v1/opportunities/{id}/score). project.proto: ProjectService with CreateProject, GetProject, UpdateProject, CheckOut (POST /api/v1/projects/{id}/checkout), CheckIn (POST /api/v1/projects/{id}/checkin). inventory.proto: InventoryService with GetStockLevel, RecordTransaction, ScanBarcode. crew.proto: CrewService with ListCrew, AssignCrew, ScheduleCrew. delivery.proto: DeliveryService with ScheduleDelivery, UpdateDeliveryStatus, OptimizeRoute. Run `buf generate` and verify generated files appear in gen/go/sigma1/rms/v1/.
 
 ## Validation
-Run `buf lint` with zero errors on both proto files. Run `buf generate` and verify generated Go service interfaces contain all defined RPCs. Verify grpc-gateway reverse proxy code is generated with correct HTTP method/path mappings.
+`buf generate` exits 0 with no errors. Generated *_grpc.pb.go and *.pb.go files exist for all five domains. `buf lint` returns zero violations. `go build ./...` still passes with generated code included.

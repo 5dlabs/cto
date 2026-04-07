@@ -1,0 +1,194 @@
+# =========================================================================
+# ACP Agent Dispatch
+#
+# Dispatches coding tasks to external CLI harnesses (droid, codex, claude,
+# cursor, gemini, etc.) via acpx — the ACP runtime.
+#
+# Each CLI handles its own reasoning and coding. acpx manages the ACP
+# protocol. No separate OpenClaw reasoning provider is needed.
+#
+# Required context variables:
+#   - CLAUDE_WORK_DIR: Working directory
+#   - PROMPT_CONTENT: Task prompt (or read from task/prompt.md)
+#
+# Optional context variables:
+#   - cli_type: Backend harness (droid, codex, claude, cursor, gemini, ...)
+#               defaults to "codex"
+#   - model:    Model override passed to the CLI (optional)
+# =========================================================================
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               ACP AGENT DISPATCH (acpx)                      ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+WORK_DIR="${CLAUDE_WORK_DIR:-/workspace}"
+CLI_TYPE="{{cli_type}}"
+CLI_TYPE="${CLI_TYPE:-codex}"
+CRD_MODEL="{{model}}"
+
+echo "✓ Work dir:  $WORK_DIR"
+echo "✓ CLI:       $CLI_TYPE"
+echo "✓ Model:     ${CRD_MODEL:-default}"
+
+# Map CRD cli_type to acpx agent name
+case "$CLI_TYPE" in
+  factory)  ACPX_AGENT="droid" ;;
+  *)        ACPX_AGENT="$CLI_TYPE" ;;
+esac
+echo "✓ acpx agent: $ACPX_AGENT"
+
+# =========================================================================
+# CLI-specific auth setup
+# Each CLI reads its own credentials — we just ensure they're discoverable
+# =========================================================================
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               CLI AUTH SETUP                                  ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+case "$CLI_TYPE" in
+  factory)
+    # Droid reads FACTORY_API_KEY from env (already mounted from cto-secrets)
+    if [ -n "${FACTORY_API_KEY:-}" ]; then
+      echo "  ✓ FACTORY_API_KEY present (${#FACTORY_API_KEY} chars)"
+    else
+      echo "  ❌ FACTORY_API_KEY not set"
+      exit 1
+    fi
+    ;;
+  codex)
+    # Codex reads auth from ~/.codex/auth.json (mounted from codex-oauth secret)
+    # The secret may be mounted at /root/.codex/ but we run as node — copy it
+    CODEX_AUTH="${HOME}/.codex/auth.json"
+    if [ ! -f "$CODEX_AUTH" ] && [ -f "/root/.codex/auth.json" ]; then
+      mkdir -p "${HOME}/.codex"
+      cp /root/.codex/auth.json "${HOME}/.codex/auth.json" 2>/dev/null || true
+      CODEX_AUTH="${HOME}/.codex/auth.json"
+    fi
+    if [ -f "$CODEX_AUTH" ]; then
+      echo "  ✓ Codex OAuth found at $CODEX_AUTH"
+    elif [ -n "${OPENAI_API_KEY:-}" ]; then
+      echo "  ✓ OPENAI_API_KEY present (fallback)"
+    else
+      echo "  ❌ No Codex auth (need ~/.codex/auth.json or OPENAI_API_KEY)"
+      exit 1
+    fi
+    ;;
+  claude)
+    # Claude Code reads ANTHROPIC_API_KEY from env
+    if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+      echo "  ✓ ANTHROPIC_API_KEY present (${#ANTHROPIC_API_KEY} chars)"
+    else
+      echo "  ❌ ANTHROPIC_API_KEY not set"
+      exit 1
+    fi
+    ;;
+  cursor)
+    # Cursor reads CURSOR_API_KEY from env
+    if [ -n "${CURSOR_API_KEY:-}" ]; then
+      echo "  ✓ CURSOR_API_KEY present (${#CURSOR_API_KEY} chars)"
+    else
+      echo "  ❌ CURSOR_API_KEY not set"
+      exit 1
+    fi
+    ;;
+  gemini)
+    # Gemini CLI reads GEMINI_API_KEY or GOOGLE_API_KEY from env
+    if [ -n "${GEMINI_API_KEY:-}" ]; then
+      echo "  ✓ GEMINI_API_KEY present"
+    elif [ -n "${GOOGLE_API_KEY:-}" ]; then
+      echo "  ✓ GOOGLE_API_KEY present (fallback)"
+    else
+      echo "  ❌ GEMINI_API_KEY not set"
+      exit 1
+    fi
+    ;;
+  *)
+    echo "  ⚠️ No specific auth check for CLI type: $CLI_TYPE"
+    ;;
+esac
+
+# =========================================================================
+# Write .acpxrc.json — per-CLI agent overrides for native autonomy flags
+# ACP --approve-all covers ACP permissions, but CLIs like droid also need
+# their own native autonomy flags (e.g., --auto high) to actually write.
+# =========================================================================
+echo ""
+cat > "$WORK_DIR/.acpxrc.json" << 'ACPXRC'
+{
+  "defaultPermissions": "approve-all",
+  "nonInteractivePermissions": "deny",
+  "authPolicy": "skip",
+  "agents": {
+    "droid": {
+      "command": "droid exec --output-format acp --auto high"
+    },
+    "codex": {
+      "command": "codex exec --output-format acp --full-auto"
+    }
+  }
+}
+ACPXRC
+echo "✓ Wrote $WORK_DIR/.acpxrc.json (CLI autonomy overrides)"
+
+# =========================================================================
+# Skills Setup
+# =========================================================================
+{{> skills-setup skills_target="$WORK_DIR/.openclaw/skills" skills_label="ACP" }}
+
+# =========================================================================
+# Determine prompt
+# =========================================================================
+if [ -n "${PROMPT_CONTENT:-}" ]; then
+    PROMPT_TEXT="$PROMPT_CONTENT"
+elif [ -f "$WORK_DIR/task/prompt.md" ]; then
+    PROMPT_TEXT=$(cat "$WORK_DIR/task/prompt.md")
+    echo "✓ Using prompt from task/prompt.md"
+else
+    echo "❌ ERROR: No prompt content available"
+    exit 1
+fi
+
+# Write prompt to file for acpx -f (avoids shell quoting issues)
+PROMPT_FILE="$WORK_DIR/.acpx-prompt.md"
+printf '%s' "$PROMPT_TEXT" > "$PROMPT_FILE"
+echo "✓ Wrote prompt to $PROMPT_FILE ($(wc -c < "$PROMPT_FILE") bytes)"
+
+# =========================================================================
+# Build acpx command
+# =========================================================================
+ACPX_CMD="acpx"
+ACPX_CMD="$ACPX_CMD --cwd $WORK_DIR"
+ACPX_CMD="$ACPX_CMD --approve-all"
+ACPX_CMD="$ACPX_CMD --non-interactive-permissions deny"
+ACPX_CMD="$ACPX_CMD --timeout 1800"
+ACPX_CMD="$ACPX_CMD --format text"
+
+# Model override from CRD spec (if provided)
+if [ -n "$CRD_MODEL" ]; then
+    ACPX_CMD="$ACPX_CMD --model $CRD_MODEL"
+fi
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               LAUNCHING ACP SESSION                          ║"
+echo "═══════════════════════════════════════════════════════════════"
+echo "🚀 $ACPX_CMD $ACPX_AGENT exec -f $PROMPT_FILE"
+echo ""
+
+# =========================================================================
+# Execute via acpx — dispatches to the target CLI via ACP protocol
+# =========================================================================
+cd "$WORK_DIR"
+$ACPX_CMD "$ACPX_AGENT" exec -f "$PROMPT_FILE"
+
+ACPX_EXIT=$?
+rm -f "$PROMPT_FILE"
+echo ""
+echo "✓ ACP execution completed (exit code: $ACPX_EXIT)"
+
+if [ "$ACPX_EXIT" -ne 0 ]; then
+    echo "❌ acpx $ACPX_AGENT exited with error code $ACPX_EXIT"
+fi
+
+exit $ACPX_EXIT

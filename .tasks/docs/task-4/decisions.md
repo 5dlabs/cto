@@ -1,9 +1,10 @@
 ## Decision Points
 
-- Stripe integration approach: use the `stripe-rust` crate (higher-level, opinionated) vs raw `reqwest` with typed Stripe API models (more control, more boilerplate). Affects error handling patterns and webhook signature verification.
-- Currency rate provider: exchangerate.host (free, no key) vs Open Exchange Rates (free tier with API key, more reliable). Affects secret management and rate limits.
-- Invoice number generation strategy: database sequence (simple, gaps on rollback) vs application-level sequential generation with org-scoped prefixes (e.g., ORG-2024-0001). Affects migration design and concurrency handling.
-- Stripe webhook signature verification: should the service verify webhook signatures using Stripe's signing secret (recommended for production) or skip verification in v1? Affects security posture and secret provisioning.
+- Stripe client library: the details mention 'stripe 0.17 (async stripe-rust crate or reqwest-based Stripe REST client)' — the team must choose between the async-stripe crate and a manual reqwest client before implementation, as the API surface differs significantly.
+- Currency rate provider: 'exchangerate.host or similar free API' is unresolved — a specific provider with its API key management strategy must be selected before the background sync task is implemented.
+- SMTP email provider: POST /api/v1/invoices/:id/send mentions 'triggers email via optional SMTP' with no provider or credential strategy specified — the team must decide whether to implement SMTP in v1 or defer entirely to the Morgan integration.
+- JWT middleware: JWT validation requires a shared signing key or JWKS endpoint — the key distribution mechanism (shared secret vs. public key from an identity service) must be decided before the middleware is implemented.
+- Tax calculation scope: the task states 'full tax engine deferred' but implements CAD=13% HST, USD=0% — the team must confirm whether any other currencies/locales need tax rates for v1 to avoid rework.
 
 ## Coordination Notes
 

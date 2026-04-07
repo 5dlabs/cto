@@ -1,7 +1,7 @@
 ## Provision Core Infrastructure (Bolt - Kubernetes/Helm)
 
 ### Objective
-Bootstrap the sigma1 namespace and all shared infrastructure: CloudNative-PG PostgreSQL cluster (instances: 2, PgBouncer sidecar), Valkey 7.2 via existing Redis operator, Cloudflare R2 bucket credentials, Signal-CLI sidecar resource definitions, Cloudflare Tunnel ingress, and the sigma1-infra-endpoints ConfigMap aggregating all connection strings. Also configure observability targets (Prometheus ServiceMonitors, Loki log shipping) for the existing Grafana stack.
+Bootstrap all foundational cluster resources for the Sigma-1 platform: namespace creation, CloudNative-PG PostgreSQL 16 cluster with six schemas, Opstree Valkey 7.2 instance, Cloudflare R2 bucket configuration, Signal-CLI pod with PVC, Kubernetes Secrets for all external APIs, and a sigma1-infra-endpoints ConfigMap aggregating all connection strings for downstream services.
 
 ### Ownership
 - Agent: bolt
@@ -11,48 +11,22 @@ Bootstrap the sigma1 namespace and all shared infrastructure: CloudNative-PG Pos
 - Dependencies: None
 
 ### Implementation Details
-1. Create namespace `sigma1` and namespace `sigma1-db` (or reuse `databases` if cluster convention).
-2. Deploy CloudNative-PG Cluster CR `sigma1-postgres`:
-   - `instances: 2` (HA failover per D3 resolution)
-   - `storage.size: 50Gi`
-   - Bootstrap initdb: database `sigma1`, owner `sigma1_user`
-   - Enable PgBouncer pooler CR (`Pooler` kind) with `pgbouncer.pool_mode: transaction`, `default_pool_size: 20`
-   - Create per-service PostgreSQL roles: `catalog_svc`, `rms_svc`, `finance_svc`, `vetting_svc`, `social_svc` each with schema-level GRANTs
-   - Run init SQL to create schemas: `catalog`, `rms`, `finance`, `vetting`, `social`, `audit`
-3. Deploy Valkey CR `sigma1-valkey` using existing `redis.redis.opstreelabs.in/v1beta2` operator:
-   - Image: `valkey/valkey:7.2-alpine`
-   - Resource limits: 256Mi memory, 250m CPU
-4. Create Kubernetes Secrets:
-   - `sigma1-db-credentials` (PostgreSQL connection per role)
-   - `sigma1-r2-credentials` (Cloudflare R2 access key, secret key, bucket name, endpoint URL)
-   - `sigma1-stripe-credentials` (placeholder for Stripe API keys)
-   - `sigma1-external-apis` (OpenCorporates API key, ElevenLabs API key, Twilio SID/token, Google Calendar API credentials)
-   - `sigma1-service-api-keys` (pre-shared API keys for inter-service auth per D7 resolution — one key per service pair)
-5. Create ConfigMap `sigma1-infra-endpoints`:
-   - `POSTGRES_URL=postgresql://sigma1_user:$(password)@sigma1-postgres-pooler.sigma1-db.svc.cluster.local:5432/sigma1`
-   - `VALKEY_URL=redis://sigma1-valkey.sigma1-db.svc.cluster.local:6379`
-   - `R2_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com`
-   - `R2_BUCKET=sigma1-media`
-   - `NATS_URL=nats://openclaw-nats.openclaw.svc.cluster.local:4222` (for social engine only per D4)
-6. Deploy Cloudflare Tunnel Deployment + Service for Morgan external access.
-7. Define Signal-CLI sidecar container spec as a shared template (ConfigMap or Kustomize component):
-   - Image: `bbernhard/signal-cli-rest-api:latest`
-   - Resource limits: 512Mi memory (Java process), 500m CPU
-   - Liveness probe on Signal-CLI REST health endpoint
-   - Restart policy: Always (mitigates memory leak per open question #2)
-8. Create Prometheus ServiceMonitor CRs for all sigma1 services (label selector `app.kubernetes.io/part-of: sigma1`).
-9. Verify PgBouncer pooler is reachable from sigma1 namespace via NetworkPolicy allowing ingress from `sigma1` to `sigma1-db`.
+1. Create namespaces: sigma1, databases, openclaw, signal.
+2. Deploy CloudNative-PG Cluster CR named sigma1-postgres in databases namespace: PostgreSQL 16, 1 replica (dev), 50Gi storage, database sigma1, owner sigma1_user. Bootstrap initdb with extensions: uuid-ossp, pgcrypto, pg_trgm.
+3. Post-cluster init Job: CREATE SCHEMA catalog; CREATE SCHEMA rms; CREATE SCHEMA finance; CREATE SCHEMA vetting; CREATE SCHEMA social; CREATE SCHEMA audit;. Create per-service roles: sigma1_catalog, sigma1_rms, sigma1_finance, sigma1_vetting, sigma1_social each with USAGE on their respective schema only.
+4. Deploy Opstree Redis CR named sigma1-valkey in databases namespace using image valkey/valkey:7.2-alpine, single replica.
+5. Create Kubernetes Secrets in sigma1 namespace: sigma1-stripe-secret (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET), sigma1-opencorporates-secret (OPENCORPORATES_API_KEY), sigma1-linkedin-secret (LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET), sigma1-google-secret (GOOGLE_REVIEWS_API_KEY, GOOGLE_CALENDAR_CLIENT_ID, GOOGLE_CALENDAR_CLIENT_SECRET), sigma1-elevenlabs-secret (ELEVENLABS_API_KEY), sigma1-twilio-secret (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER), sigma1-openai-secret (OPENAI_API_KEY), sigma1-cloudflare-secret (CF_R2_ACCESS_KEY_ID, CF_R2_SECRET_ACCESS_KEY, CF_R2_ENDPOINT, CF_R2_BUCKET_NAME), sigma1-jwt-secret (JWT_SECRET).
+6. Deploy Signal-CLI pod in signal namespace: image signalapp/signal-cli:latest, PVC signal-cli-data (5Gi RWO) mounted at /home/signal-cli/.local/share/signal-cli. Expose as ClusterIP Service signal-cli-svc:7583 (JSON-RPC port). Document manual registration step required before first use.
+7. Create ConfigMap sigma1-infra-endpoints in sigma1 namespace with keys: CNPG_SIGMA1_URL=postgresql://sigma1_user:$(PGPASSWORD)@sigma1-postgres-rw.databases.svc.cluster.local:5432/sigma1, VALKEY_SIGMA1_URL=redis://sigma1-valkey.databases.svc.cluster.local:6379, R2_ENDPOINT=$(CF_R2_ENDPOINT), R2_BUCKET=$(CF_R2_BUCKET_NAME), SIGNAL_CLI_URL=http://signal-cli-svc.signal.svc.cluster.local:7583.
+8. Apply ArgoCD Application CR pointing to the sigma1/infra Helm chart in the GitOps repo.
+9. Validate all pods reach Running state; validate ConfigMap keys are populated; validate schema creation Job completes successfully.
 
 ### Subtasks
-- [ ] Create sigma1 and sigma1-db namespaces with labels: Create the `sigma1` application namespace and the `sigma1-db` database namespace (or reuse `databases` per cluster convention). Apply standard labels including `app.kubernetes.io/part-of: sigma1` for observability selector matching.
-- [ ] Deploy CloudNative-PG Cluster CR with initdb bootstrap: Deploy the CloudNative-PG `Cluster` CR named `sigma1-postgres` in the `sigma1-db` namespace with 2 instances, 50Gi storage, and initdb bootstrap creating the `sigma1` database owned by `sigma1_user`.
-- [ ] Create per-service PostgreSQL roles and schemas via init SQL: Run init SQL against the sigma1-postgres cluster to create 6 schemas (catalog, rms, finance, vetting, social, audit) and 5 per-service roles (catalog_svc, rms_svc, finance_svc, vetting_svc, social_svc) with schema-level GRANTs.
-- [ ] Deploy PgBouncer Pooler CR for connection pooling: Deploy the CloudNative-PG `Pooler` CR to front the sigma1-postgres cluster with PgBouncer in transaction pooling mode with a default pool size of 20.
-- [ ] Deploy Valkey CR via Redis operator: Deploy the Valkey 7.2 instance using the existing `redis.redis.opstreelabs.in/v1beta2` operator in the `sigma1-db` namespace.
-- [ ] Create Kubernetes Secrets for database credentials: Create the `sigma1-db-credentials` Secret in the `sigma1` namespace containing PostgreSQL connection strings for each per-service role (catalog_svc, rms_svc, finance_svc, vetting_svc, social_svc) and the sigma1_user superuser.
-- [ ] Create Kubernetes Secrets for R2, Stripe, external APIs, and inter-service keys: Create the remaining four Kubernetes Secrets: sigma1-r2-credentials, sigma1-stripe-credentials, sigma1-external-apis, and sigma1-service-api-keys in the sigma1 namespace.
-- [ ] Create sigma1-infra-endpoints ConfigMap: Create the `sigma1-infra-endpoints` ConfigMap in the `sigma1` namespace aggregating all non-secret connection strings and endpoint URLs for consumption via `envFrom` by downstream services.
-- [ ] Deploy Cloudflare Tunnel Deployment and Service: Deploy a Cloudflare Tunnel (cloudflared) Deployment and associated Service in the sigma1 namespace for Morgan external access routing.
-- [ ] Define Signal-CLI sidecar container template: Create a reusable Signal-CLI sidecar container specification as a Kustomize component or ConfigMap that downstream service Deployments can include.
-- [ ] Create Prometheus ServiceMonitor CRs for sigma1 services: Create Prometheus ServiceMonitor custom resources that auto-discover and scrape metrics from all sigma1 services using the common label selector.
-- [ ] Create NetworkPolicy allowing sigma1 to sigma1-db ingress: Create a NetworkPolicy in the sigma1-db namespace that allows ingress traffic from pods in the sigma1 namespace to the PgBouncer pooler and Valkey services, while denying other ingress by default.
+- [ ] Create Kubernetes namespaces: sigma1, databases, openclaw, signal: Define and apply Namespace manifests for all four namespaces required by the Sigma-1 platform. These namespaces gate every subsequent resource deployment.
+- [ ] Deploy CloudNative-PG PostgreSQL 16 Cluster CR (sigma1-postgres): Define and apply the CloudNative-PG Cluster custom resource for sigma1-postgres in the databases namespace with PostgreSQL 16, 1 replica (dev), 50Gi storage, and required extensions.
+- [ ] Run post-cluster schema init Job: create six schemas and per-service roles: Deploy a Kubernetes Job that connects to sigma1-postgres and creates the six application schemas (catalog, rms, finance, vetting, social, audit) plus per-service PostgreSQL roles with scoped USAGE grants.
+- [ ] Deploy Opstree Valkey 7.2 single-replica instance (sigma1-valkey): Define and apply the Opstree Redis/Valkey operator CR for sigma1-valkey in the databases namespace using valkey/valkey:7.2-alpine, single replica.
+- [ ] Create all nine Kubernetes Secrets in the sigma1 namespace: Define Helm secret templates (or ExternalSecrets if using ESO) for all nine external API secrets required by the platform in the sigma1 namespace.
+- [ ] Deploy Signal-CLI pod, PVC, and ClusterIP Service in the signal namespace: Create a PersistentVolumeClaim, Pod (or Deployment), and ClusterIP Service for Signal-CLI in the signal namespace with a 5Gi RWO volume mounted at the Signal data path.
+- [ ] Create sigma1-infra-endpoints ConfigMap aggregating all connection strings: Define the sigma1-infra-endpoints ConfigMap in the sigma1 namespace with the five required connection string keys referencing in-cluster DNS addresses for PostgreSQL, Valkey, R2, and Signal-CLI.
+- [ ] Apply ArgoCD Application CR for the sigma1/infra Helm chart and validate full stack: Create the ArgoCD Application custom resource pointing to the sigma1/infra Helm chart in the GitOps repo, sync it, and run the full validation suite confirming all pods, secrets, schemas, and the ConfigMap are healthy.

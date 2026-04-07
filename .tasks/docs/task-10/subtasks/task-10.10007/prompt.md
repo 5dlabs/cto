@@ -1,18 +1,10 @@
-Implement subtask 10007: Network policies: allow Morgan (openclaw) to sigma1 services and ingress controller to sigma1
+Implement subtask 10007: Author CiliumNetworkPolicy for customer-vetting service
 
 ## Objective
-Create NetworkPolicy allowing Morgan pods in openclaw namespace to reach sigma1 service ports, and allowing the ingress controller to reach sigma1 public endpoints.
+Create a CiliumNetworkPolicy for the customer-vetting pod selector. Allow ingress only from morgan and rms. Allow egress only to postgres, valkey, and the external API FQDNs: OpenCorporates, LinkedIn, Google APIs.
 
 ## Steps
-Step-by-step:
-1. **Morgan → sigma1 ingress policy** in sigma1 namespace:
-   - `podSelector: {}` or specific public service labels
-   - `ingress[0].from[0].namespaceSelector.matchLabels: {name: openclaw}`, `ingress[0].from[0].podSelector.matchLabels: {app: morgan}`
-   - `ingress[0].ports`: list all sigma1 service ports (e.g., 8080, 3000, etc. for each service Morgan calls)
-2. **Ingress controller → sigma1 ingress policy**:
-   - `ingress[0].from[0].namespaceSelector.matchLabels: {name: ingress-system}` (or whatever namespace the ingress controller/cloudflared runs in)
-   - `ingress[0].ports`: list public service ports
-3. Verify the ingress controller namespace label exists; add it if missing.
+Create helm/sigma1/templates/cnp-customer-vetting.yaml. Ingress from morgan and rms. Egress to postgres and valkey endpoints, plus `toFQDNs: [{ matchName: 'api.opencorporates.com' }, { matchName: 'api.linkedin.com' }, { matchName: 'www.googleapis.com' }, { matchName: 'people.googleapis.com' }]` on port 443.
 
 ## Validation
-From a pod with Morgan labels in openclaw namespace, curl each sigma1 service endpoint and verify 200 responses. From the ingress controller namespace, verify traffic flows to sigma1 services. From an unlabeled pod in a random namespace, verify access is denied.
+`kubectl exec <customer-vetting-pod> -- curl -s http://equipment-catalog-svc:8080/` times out. `kubectl exec <morgan-pod> -- curl -s http://customer-vetting-svc:8080/health` returns 200. `kubectl exec <customer-vetting-pod> -- curl -s https://api.opencorporates.com` not blocked by Cilium.

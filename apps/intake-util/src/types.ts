@@ -44,6 +44,8 @@ export interface GeneratedSubtask {
   subagentType?: string;
 }
 
+export type TaskType = 'task' | 'infra';
+
 export interface GeneratedTask {
   id: number;
   title: string;
@@ -53,6 +55,8 @@ export interface GeneratedTask {
   priority?: TaskPriority;
   agent?: string;
   stack?: string;
+  task_type?: TaskType;
+  difficulty_score?: number;
   details?: string;
   test_strategy?: string;
   subtasks?: GeneratedSubtask[];
@@ -60,6 +64,8 @@ export interface GeneratedTask {
   // compat: source code uses camelCase fallback
   testStrategy?: string;
   decisionPoints?: DecisionPoint[];
+  taskType?: TaskType;
+  difficultyScore?: number;
 }
 
 // =============================================================================

@@ -1,18 +1,10 @@
-Implement subtask 5004: Implement Stage 1: Business Verification via OpenCorporates API
+Implement subtask 5004: Implement OpenCorporates and LinkedIn pipeline steps with per-step timeout
 
 ## Objective
-Build the OpenCorporates integration stage that searches for a company by name, verifies existence and incorporation status, extracts directors, and returns structured results with raw response capture.
+Implement the first two steps of the vetting background pipeline: OpenCorporates company search and LinkedIn company presence check. Each step must complete within a 10-second timeout; on timeout or HTTP error, set the corresponding risk_flag and continue to the next step.
 
 ## Steps
-1. Create `src/stages/business_verification.rs` module.
-2. Define `BusinessVerificationResult` struct: company_found (bool), incorporation_status (Option<String>), directors (Vec<String>), opencorporates_data (serde_json::Value).
-3. Implement `run_business_verification(client: &ResilientClient, company_name: &str, api_key: &str) -> StageResult<BusinessVerificationResult>`.
-4. Call OpenCorporates API: `GET https://api.opencorporates.com/v0.4/companies/search?q={company_name}&api_token={api_key}`.
-5. Parse response JSON: extract `results.companies[0].company` — check `inactive` field for incorporation status, extract `officers` endpoint for directors if available.
-6. API key sourced from `sigma1-external-apis` Kubernetes secret, passed via environment variable `OPENCORPORATES_API_KEY`.
-7. Use `ResilientClient.execute_with_retry` with the `opencorporates` circuit breaker.
-8. On circuit open or all retries exhausted, return `StageResult::Unavailable` with reason string.
-9. Return raw API response JSON alongside parsed result for audit storage.
+Step 1 — OpenCorporates: build reqwest GET to https://api.opencorporates.com/v0.4/companies/search?q={name}&jurisdiction_code={code}&api_token={OPENCORPORATES_API_KEY}. Deserialize response into OpenCorporatesResult struct. If company found and status='active', set business_verified=true and store opencorporates_data JSONB. Wrap call in tokio::time::timeout(Duration::from_secs(10), ...). On Err or non-200, push 'business_not_found' into risk_flags and set business_verified=false. Step 2 — LinkedIn: obtain OAuth2 access token via POST https://www.linkedin.com/oauth/v2/accessToken with grant_type=client_credentials, LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET. Then GET /v2/companies?q=universalName&universalName={slug} with Bearer token. Parse followerCount and employeeCount. Wrap in 10s timeout. On failure push 'linkedin_unavailable' into risk_flags and set linkedin_exists=false, linkedin_followers=0. Read all secrets from environment variables.
 
 ## Validation
-Unit tests with wiremock-rs: mock OpenCorporates search endpoint returning a valid company response, verify BusinessVerificationResult has company_found=true, correct incorporation status, and extracted directors. Test with empty results (company not found). Test with malformed JSON response (graceful error handling). Verify raw_response is captured.
+Unit test with mockito (or wiremock-rs): mock OpenCorporates returning a 200 active company → business_verified=true, opencorporates_data populated. Mock returning 404 → risk_flags contains 'business_not_found'. Mock hanging response → timeout fires within ~11 seconds and risk_flag is set. Same pattern for LinkedIn mock.

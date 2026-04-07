@@ -1,22 +1,10 @@
-Implement subtask 10005: Network policies: allow sigma1 services to sigma1-db namespace (PostgreSQL and Valkey)
+Implement subtask 10005: Author CiliumNetworkPolicy for RMS service
 
 ## Objective
-Create NetworkPolicy allowing sigma1 service pods to reach PostgreSQL on port 5432 and Valkey on port 6379 in the sigma1-db namespace.
+Create a CiliumNetworkPolicy for the rms pod selector. Allow ingress only from morgan and equipment-catalog pods. Allow egress only to postgres, valkey, and Google Calendar API FQDN.
 
 ## Steps
-Step-by-step:
-1. Create `netpol-allow-db.yaml` with two NetworkPolicy resources:
-   a. **PostgreSQL egress** from sigma1:
-      - `podSelector: {}` (all sigma1 pods)
-      - `policyTypes: [Egress]`
-      - `egress[0].to[0].namespaceSelector.matchLabels: {name: sigma1-db}`, `egress[0].ports: [{protocol: TCP, port: 5432}]`
-   b. **Valkey egress** from sigma1:
-      - Same structure but port 6379.
-2. Create corresponding **ingress** policies in the `sigma1-db` namespace:
-   a. Allow ingress from `sigma1` namespace pods on port 5432 for PostgreSQL pods.
-   b. Allow ingress from `sigma1` namespace pods on port 6379 for Valkey pods.
-3. Ensure namespaces have labels: `sigma1-db` namespace needs `name: sigma1-db`, `sigma1` namespace needs `name: sigma1`.
-4. Also allow DNS egress (port 53 TCP/UDP to kube-system) so pods can resolve service names.
+Create helm/sigma1/templates/cnp-rms.yaml with `spec.endpointSelector: { matchLabels: { app: rms } }`. Ingress from morgan and equipment-catalog pods. Egress to postgres and valkey endpoints, plus `toFQDNs: [{ matchName: 'www.googleapis.com' }, { matchName: 'calendar.googleapis.com' }]` on port 443. Default deny all other traffic.
 
 ## Validation
-From a test pod in sigma1 namespace, run `nc -zv <postgres-service>.sigma1-db.svc.cluster.local 5432` and verify connection succeeds. Run `nc -zv <valkey-service>.sigma1-db.svc.cluster.local 6379` and verify success. Attempt connection on port 3306 (MySQL) and verify it is denied.
+`kubectl exec <rms-pod> -- curl -s http://finance-svc:8080/` times out (blocked). `kubectl exec <morgan-pod> -- curl -s http://rms-svc:8080/health` returns 200. `kubectl exec <rms-pod> -- curl -s https://calendar.googleapis.com` returns response (not blocked by Cilium).

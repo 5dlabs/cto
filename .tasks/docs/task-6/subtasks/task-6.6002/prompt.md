@@ -1,22 +1,10 @@
-Implement subtask 6002: Implement Cloudflare R2 integration service with S3-compatible client
+Implement subtask 6002: Write database migrations for social schema tables
 
 ## Objective
-Build an Effect Service for Cloudflare R2 using @aws-sdk/client-s3 that handles photo uploads, deletion, and CDN URL generation. This service is used by the upload endpoint, AI pipeline, and GDPR deletion.
+Create SQL migration files for the social schema: social_drafts and social_posts tables with all columns, constraints, foreign keys, and indexes.
 
 ## Steps
-1. Install `@aws-sdk/client-s3` package.
-2. Create `src/services/R2Service.ts` as an Effect.Service tag:
-   - Constructor takes R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL from environment.
-   - Configure S3Client with endpoint `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`.
-3. Methods (all returning Effect):
-   - `upload(key: string, body: Buffer, contentType: string)`: PutObjectCommand, returns the r2_key.
-   - `delete(key: string)`: DeleteObjectCommand.
-   - `deleteBatch(keys: string[])`: DeleteObjectsCommand for bulk deletion (GDPR).
-   - `getPublicUrl(key: string)`: Returns `${R2_PUBLIC_URL}/${key}`.
-   - `generateKey(uploadId: string, filename: string)`: Returns structured key like `social/uploads/${uploadId}/${uuid}-${filename}`.
-4. Create `src/services/R2Service.live.ts` — Effect Layer that constructs the live R2Service from config.
-5. Wrap all AWS SDK calls in `Effect.tryPromise` with tagged errors (R2UploadError, R2DeleteError).
-6. Add content-type detection for common image types (jpeg, png, webp, heic).
+Use a migration tool compatible with postgres.js (e.g., node-postgres-migrate or raw SQL files run at startup). Migration 001_social_drafts.sql: id UUID PK DEFAULT gen_random_uuid(), event_id UUID NOT NULL, source_photo_urls TEXT[] NOT NULL DEFAULT '{}', selected_photo_urls TEXT[] NOT NULL DEFAULT '{}', instagram_crop_url TEXT, linkedin_crop_url TEXT, tiktok_crop_url TEXT, caption TEXT, hashtags TEXT[] NOT NULL DEFAULT '{}', status TEXT NOT NULL CHECK (status IN ('pending_curation','ready_for_approval','approved','rejected','published')), approved_by TEXT, approved_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT now(). Migration 002_social_posts.sql: id UUID PK DEFAULT gen_random_uuid(), draft_id UUID NOT NULL REFERENCES social.social_drafts(id), platform TEXT NOT NULL CHECK (platform IN ('instagram','linkedin','tiktok','facebook')), external_post_id TEXT, published_at TIMESTAMPTZ, status TEXT NOT NULL CHECK (status IN ('pending','published','failed')), error_text TEXT. Add index on social_drafts(event_id) and social_posts(draft_id). Run migrations at application startup before Elysia listens.
 
 ## Validation
-Unit test with mocked S3Client: verify upload sends correct PutObjectCommand params, delete sends correct DeleteObjectCommand, deleteBatch handles multiple keys. Verify getPublicUrl returns correctly formatted URLs. Verify generateKey produces unique structured paths.
+Run migrations against a local Postgres instance; verify via `\d social.social_drafts` and `\d social.social_posts` that all columns exist with correct types. Run migrations twice and confirm idempotency. Insert a test draft and post row to confirm FK constraint works.

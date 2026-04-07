@@ -1,16 +1,10 @@
-Implement subtask 9006: Implement offline quote queuing and equipment catalog caching
+Implement subtask 9006: Build product detail screen with DateRangePicker and availability query
 
 ## Objective
-Add offline capability: cache equipment catalog locally for offline browsing and queue quote submissions when offline, auto-submitting when connectivity is restored.
+Implement app/equipment/[id].tsx. Fetch product details via TanStack Query. Render a custom DateRangePicker component. On date range selection, fire a secondary useQuery to GET /api/v1/catalog/products/:id/availability with the selected dates. Display quantity_available. Render 'Add to Quote' Pressable that navigates to the quote tab with the product pre-filled via router.push params.
 
 ## Steps
-1. Install `@react-native-community/netinfo` for connectivity detection.
-2. Create `lib/offline/connectivityMonitor.ts`: export a `useIsOnline()` hook that reflects current network state.
-3. **Equipment caching**: After successful API fetch of categories and products, persist to AsyncStorage (or MMKV if chosen). On app launch or when offline, read from cache. Display a banner indicating 'Viewing cached data' when offline.
-4. **Quote queue**: Create `lib/offline/quoteQueue.ts`. When submitting a quote and `isOnline === false`, serialize the quote payload and store in AsyncStorage under a queue key. Show user a 'Quote saved — will submit when online' toast.
-5. **Queue processor**: On connectivity restored (NetInfo event), read pending quotes from queue, submit each sequentially, remove from queue on success. Show local notification on successful background submission.
-6. Implement queue status indicator in Quote tab: show count of pending offline quotes.
-7. Handle edge case: if the same quote is queued multiple times, deduplicate by hash of payload.
+Use `useLocalSearchParams` to get `id`. Query product detail: `useQuery({ queryKey: productKeys.detail(id), queryFn: () => runEffect(fetchProductDetail(id)) })`. DateRangePicker component: two calendar presses setting startDate and endDate state. On both dates set, fire: `useQuery({ queryKey: ['availability', id, startDate, endDate], queryFn: () => runEffect(fetchAvailability(id, startDate, endDate)), enabled: !!(startDate && endDate) })`. Show skeleton while loading availability. Show `quantity_available` badge once resolved. 'Add to Quote' button: `router.push({ pathname: '/(tabs)/quote', params: { productId: id, startDate, endDate } })`.
 
 ## Validation
-Mock NetInfo to simulate offline state. Attempt quote submission while offline — verify payload is stored in AsyncStorage queue. Simulate connectivity restored — verify queued quote is submitted via API. Verify equipment catalog renders from cache when offline. Verify 'cached data' banner appears. Deduplicate test: queue same payload twice, verify only one submission.
+RNTL test with msw: render detail screen for product id='p1'. Assert product name rendered. Simulate selecting start+end dates — assert msw received GET /api/v1/catalog/products/p1/availability with correct date params. Assert quantity_available text appears after mock resolves. Assert 'Add to Quote' press calls router.push with correct params.

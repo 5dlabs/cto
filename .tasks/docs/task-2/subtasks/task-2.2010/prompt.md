@@ -1,19 +1,10 @@
-Implement subtask 2010: Implement GDPR deletion endpoint
+Implement subtask 2010: Implement internal GDPR export and deletion endpoints
 
 ## Objective
-Build the DELETE /api/v1/gdpr/customer/:id endpoint that removes all customer-related booking data and returns a confirmation response.
+Write GET /internal/gdpr/export/:customer_id and DELETE /internal/gdpr/delete/:customer_id handlers that respectively return and remove all catalog-related PII for a given customer from availability_blocks checkout records.
 
 ## Steps
-1. Implement `DELETE /api/v1/gdpr/customer/:id` (protected by API key auth):
-   - In a database transaction:
-     a. Find all bookings for the given customer_id.
-     b. For each booking with status 'reserved', restore availability (decrement reserved count on availability rows).
-     c. Delete all bookings for the customer.
-     d. Commit transaction.
-   - Return JSON: `{"customer_id": "...", "deleted_bookings": N, "status": "completed", "timestamp": "..."}`.
-2. Handle edge cases: customer with no bookings returns 200 with deleted_bookings: 0 (not 404 — GDPR deletion should be idempotent).
-3. Log the deletion event (customer_id, count, timestamp) for audit trail.
-4. Ensure no customer PII is retained in any logs.
+Create src/handlers/gdpr.rs. GET /internal/gdpr/export/:customer_id: SELECT * FROM catalog.availability_blocks WHERE customer_id = $1 (ensure customer_id column exists — add migration 0002_add_customer_id_to_availability_blocks.sql: ALTER TABLE catalog.availability_blocks ADD COLUMN IF NOT EXISTS customer_id UUID). Return JSON array of matching rows. If no rows return empty array (200). DELETE /internal/gdpr/delete/:customer_id: DELETE FROM catalog.availability_blocks WHERE customer_id = $1. Also nullify or anonymize any other PII fields if applicable. Return 204 No Content on success. Note: access control for these endpoints is enforced at network level via Cilium NetworkPolicy (document this); no JWT is required. However add a check: if X-Internal-Request header is not present return 403 as a defense-in-depth measure (Cilium policy is primary enforcement). Wire under /internal/gdpr/ router group. Write migration 0002 file.
 
 ## Validation
-Integration test: 1) Create bookings for a customer via checkout. 2) Call DELETE endpoint. 3) Verify bookings table has no rows for that customer_id. 4) Verify availability rows have been restored (reserved count decremented). 5) Verify response JSON contains correct deleted count. 6) Call DELETE again for same customer — verify idempotent 200 with deleted_bookings: 0. 7) Call without API key — verify 401.
+Insert an availability_block with customer_id = test-uuid. GET /internal/gdpr/export/test-uuid returns HTTP 200 with JSON array containing that block. DELETE /internal/gdpr/delete/test-uuid returns HTTP 204. Subsequent GET /internal/gdpr/export/test-uuid returns HTTP 200 with empty array []. Calling without X-Internal-Request header returns HTTP 403.

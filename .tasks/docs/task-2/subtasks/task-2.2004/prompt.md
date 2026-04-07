@@ -1,17 +1,10 @@
-Implement subtask 2004: Implement shared rate limiting middleware using Valkey
+Implement subtask 2004: Implement catalog CRUD handlers: categories list and products list/get/create/update
 
 ## Objective
-Build a configurable per-route rate limiting middleware in the shared crate using a sliding window algorithm backed by Valkey (redis-rs).
+Write Axum handlers for GET /api/v1/catalog/categories, GET /api/v1/catalog/products (with pagination and search), GET /api/v1/catalog/products/:id, POST /api/v1/catalog/products, and PATCH /api/v1/catalog/products/:id.
 
 ## Steps
-1. In `shared/src/rate_limit.rs`, define `RateLimitConfig { max_requests: u32, window_secs: u64 }`.
-2. Implement sliding window rate limiting using Valkey sorted sets:
-   - Key: `ratelimit:{identifier}:{route}` where identifier is IP or API key.
-   - On each request: ZADD current timestamp, ZREMRANGEBYSCORE to remove entries outside the window, ZCARD to count.
-   - If count > max_requests, return 429 with `Retry-After` header.
-3. Create Axum middleware `pub fn rate_limit_layer(config: RateLimitConfig, valkey: Client) -> impl Layer`.
-4. Ensure the middleware is configurable per-route (e.g., applied selectively via Axum's `.layer()` on specific route groups).
-5. Add appropriate error handling: if Valkey is unavailable, log warning and allow the request (fail-open).
+Create src/handlers/catalog.rs. Define request/response types with serde Serialize/Deserialize. GET /api/v1/catalog/categories: SELECT id, name, parent_id, icon, sort_order FROM catalog.categories ORDER BY sort_order — return Vec<Category>. GET /api/v1/catalog/products: accept Query params { category_id: Option<Uuid>, search: Option<String>, page: u32, limit: u32 (max 100) }. Build dynamic sqlx query using QueryBuilder: WHERE category_id = $1 if provided, AND (name ILIKE $2 OR description ILIKE $2) if search provided, LIMIT $n OFFSET $m. GET /api/v1/catalog/products/:id: SELECT by PK, return 404 if not found. POST /api/v1/catalog/products: extract AdminClaims, deserialize CreateProduct body, INSERT INTO catalog.products, return 201 with created resource. PATCH /api/v1/catalog/products/:id: extract AdminClaims, deserialize PatchProduct (all fields Optional), build UPDATE SET ... WHERE id = $1, return 200. Wire all routes onto the Router in main.rs under /api/v1/catalog. Write integration tests using sqlx::test transactions: insert a test category and product, call handler logic, assert response.
 
 ## Validation
-Integration test with real Valkey: send max_requests within the window and verify all return 200. Send one more and verify 429 with Retry-After header. Test fail-open behavior: disconnect Valkey and verify requests still pass through. Test window expiry: send max requests, wait for window to elapse, verify requests succeed again.
+GET /api/v1/catalog/categories returns HTTP 200 JSON array. GET /api/v1/catalog/products?limit=10 returns HTTP 200 JSON array with pagination metadata. GET /api/v1/catalog/products/:nonexistent-uuid returns HTTP 404. POST /api/v1/catalog/products with admin JWT and valid body returns HTTP 201 with id field. PATCH /api/v1/catalog/products/:id updates name field — subsequent GET returns updated name.

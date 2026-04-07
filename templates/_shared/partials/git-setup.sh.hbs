@@ -109,7 +109,7 @@ if [ -z "$BASE_BRANCH" ]; then
   fi
 fi
 
-FEATURE_BRANCH="feat/task-{{task_id}}-{{agent_name}}-{{job_type}}"
+FEATURE_BRANCH="feat/task-{{task_id}}-{{agent_name}}-{{job_type}}{{#if cli_type}}-{{cli_type}}{{/if}}"
 if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   git checkout "$FEATURE_BRANCH"
   # If there's a tracking branch, reset to it to avoid diverged state

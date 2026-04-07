@@ -1,16 +1,10 @@
-Implement subtask 10010: Ingress and CDN: configure CDN caching rules for equipment images vs API responses
+Implement subtask 10010: Deploy cloudflared Cloudflare Tunnel and configure ingress routing
 
 ## Objective
-Set up Cloudflare CDN caching rules: 1-year cache for equipment images, no-cache or short TTL for API responses.
+Deploy a cloudflared Deployment (1 replica) in the sigma1 namespace. Configure the tunnel to expose morgan-chat-svc:3000 → chat.sigma1.com and signal webhook → signals.sigma1.com. Store the tunnel credentials as a Kubernetes Secret. Enforce HTTPS-only at the Cloudflare dashboard. All services use ClusterIP only (no NodePort or LoadBalancer).
 
 ## Steps
-Step-by-step:
-1. In the Cloudflare dashboard (or via Terraform/API if IaC is used), create Page Rules or Cache Rules:
-   - Rule 1: `*sigma1.example.com/images/*` → Cache Level: Cache Everything, Edge Cache TTL: 1 year (31536000s), Browser Cache TTL: 1 year.
-   - Rule 2: `*sigma1.example.com/api/*` → Cache Level: Bypass (or Standard with `Cache-Control: no-store` respected).
-2. Ensure equipment-catalog service sets appropriate `Cache-Control` headers on image responses: `public, max-age=31536000, immutable`.
-3. Ensure all API endpoints set `Cache-Control: no-store` or `private, no-cache`.
-4. Document the mTLS Phase 2 decision: create `docs/mtls-phase2.md` explaining that internal service-to-service mTLS via cert-manager is deferred, with a brief architecture sketch for future implementation.
+Create a Cloudflare Tunnel via `cloudflared tunnel create sigma1-tunnel`. Store the credentials JSON as `kubectl create secret generic cloudflare-tunnel-creds --from-file=credentials.json -n sigma1`. Create helm/sigma1/templates/cloudflared-deployment.yaml: `image: cloudflare/cloudflared:latest, args: ['tunnel', '--config', '/etc/cloudflared/config.yaml', 'run']`. Mount ConfigMap with config.yaml: `tunnel: <TUNNEL_ID>, credentials-file: /etc/cloudflared/creds/credentials.json, ingress: [{ hostname: chat.sigma1.com, service: http://morgan-svc:3000 }, { hostname: signals.sigma1.com, service: http://morgan-svc:3000/webhook/signal }, { service: http_status:404 }]`. Confirm all services have `type: ClusterIP`. Enable Cloudflare dashboard HTTPS redirect rule for both hostnames.
 
 ## Validation
-Fetch an equipment image URL via curl with `-I` flag, verify `CF-Cache-Status: HIT` on second request and appropriate cache headers. Fetch an API endpoint, verify `CF-Cache-Status: DYNAMIC` or `BYPASS` and no caching.
+`curl https://chat.sigma1.com/health` returns HTTP 200 with Morgan health response. `curl https://signals.sigma1.com` returns expected response (not 404 or SSL error). `kubectl get svc -n sigma1` shows no LoadBalancer or NodePort types — all ClusterIP. TLS certificate shown by `openssl s_client -connect chat.sigma1.com:443` is valid Cloudflare-issued cert.

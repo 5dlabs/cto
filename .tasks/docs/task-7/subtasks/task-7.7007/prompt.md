@@ -1,27 +1,21 @@
-Implement subtask 7007: Implement Signal messaging integration (inbound/outbound via Signal-CLI REST API)
+Implement subtask 7007: Configure OpenClaw web chat adapter and expose morgan-chat-svc
 
 ## Objective
-Build the Signal channel adapter that connects Morgan to the Signal-CLI sidecar REST API for receiving and sending messages, handling photos, and distinguishing group vs direct messages.
+Enable the OpenClaw web chat adapter on port 3000, serving the chat API endpoint and the embeddable widget JavaScript, and create the ClusterIP Kubernetes Service.
 
 ## Steps
-1. Implement inbound message listener:
-   a. Poll Signal-CLI REST API at `localhost:8080/v1/receive/{number}` on a configurable interval (1-2 seconds).
-   b. Parse incoming messages: extract sender, timestamp, body text, attachments (photos), group info.
-   c. Determine message type: direct message (1:1 with Morgan) vs group message (only respond when @mentioned or directly addressed).
-   d. For direct messages: forward full message body to Morgan's agent processing pipeline.
-   e. For group messages: detect if Morgan is being addressed, extract relevant content, forward to agent.
-2. Implement outbound message sending:
-   a. Send text responses via `POST /v2/send` with recipient number and message body.
-   b. Support sending photos/attachments (e.g., quote PDFs, curated social media previews) via attachment API.
-   c. Handle message length limits — split long messages if necessary.
-3. Photo handling:
-   a. When photos are received, download attachment from Signal-CLI, store in morgan-workspace PVC.
-   b. Pass file path to social-media skill or other processing pipeline.
-   c. For outbound photos (quote previews), upload to Signal-CLI attachment endpoint first, then reference in send.
-4. Conversation context:
-   a. Map Signal phone numbers to customer identities/conversation threads.
-   b. Maintain conversation continuity across multiple messages from the same sender.
-5. Error handling: retry failed sends (3 attempts with backoff), log failed messages for manual follow-up.
+1. In agents/morgan/agent.yaml, add web chat adapter block:
+   adapters:
+     web_chat:
+       enabled: true
+       port: 3000
+       cors_origins: ['*']  # tighten to Sigma-1 domain post-launch
+       widget_path: /widget.js
+       chat_path: /chat
+2. The /chat endpoint accepts POST {message: string, session_id?: string} and returns {reply: string, session_id: string}.
+3. The /widget.js endpoint returns a self-contained JavaScript snippet that renders a floating chat button and slide-up panel targeting the /chat endpoint.
+4. Create k8s/openclaw/morgan-chat-svc.yaml: ClusterIP Service in openclaw namespace, selector: app=morgan, port 3000 → targetPort 3000, name: morgan-chat-svc.
+5. Apply service manifest: `kubectl apply -f k8s/openclaw/morgan-chat-svc.yaml`.
 
 ## Validation
-Send a test message via Signal-CLI REST API to Morgan's number, verify it is received and parsed correctly within 2 seconds. Send a response and verify it arrives at the sender. Send a photo attachment and verify it is downloaded and stored in workspace PVC. Send a group message without @mention and verify Morgan ignores it; send with @mention and verify Morgan responds.
+After pod is running: `kubectl port-forward svc/morgan-chat-svc 3000:3000 -n openclaw`. POST http://localhost:3000/chat with {"message": "hello"} returns JSON with non-empty reply field within 10s. GET http://localhost:3000/widget.js returns JavaScript with Content-Type: application/javascript.

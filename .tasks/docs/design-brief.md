@@ -526,7 +526,7 @@
 >
 > **Pages**:
 > | Route | Purpose | Effect Usage |
-> |-------|---------|--------------| 
+> |-------|---------|----|
 > | `/` | Hero, value prop, CTA | Static content |
 > | `/equipment` | Browse 533+ products | Effect data fetching |
 > | `/equipment/:id` | Product detail + availability | Effect Schema validation |
@@ -806,287 +806,282 @@
 
 ## 2. Project Scope
 
-The initial task decomposition identified **10 tasks** spanning the full Sigma-1 platform:
+The initial task decomposition identified **10 tasks** spanning infrastructure provisioning, 6 backend microservices, 2 frontend clients, and production hardening.
 
 | Task ID | Title | Agent | Stack | Priority | Dependencies |
-|---------|-------|-------|-------|----------|--------------|
-| 1 | Provision Core Infrastructure | Bolt | Kubernetes/Helm | High | — |
-| 2 | Implement Equipment Catalog Service | Rex | Rust 1.75+/Axum 0.7 | High | 1 |
-| 3 | Develop Rental Management System | Grizz | Go 1.22+/gRPC | High | 1 |
-| 4 | Implement Finance Service | Rex | Rust 1.75+/Axum 0.7 | High | 1 |
-| 5 | Build Customer Vetting Service | Rex | Rust 1.75+/Axum 0.7 | High | 1 |
-| 6 | Develop Social Media Engine | Nova | Node.js 20+/Elysia 1.x + Effect | Medium | 1 |
-| 7 | Implement Morgan AI Agent | Angie | OpenClaw/MCP | High | 2, 3, 4, 5, 6 |
-| 8 | Develop Web Frontend | Blaze | React 19/Next.js 15 + Effect | High | 2, 7 |
-| 9 | Develop Mobile App | Tap | Expo (React Native) | Medium | 2, 7 |
-| 10 | Production Hardening & Security | Bolt | Kubernetes/Helm | High | 2–9 |
+|---------|-------|-------|-------|----------|-------------|
+| 1 | Provision Core Infrastructure | Bolt | Kubernetes/Helm | High | None |
+| 2 | Equipment Catalog Service | Rex | Rust 1.75+/Axum 0.7 | High | Task 1 |
+| 3 | Rental Management System (RMS) | Grizz | Go 1.22+/gRPC | High | Task 1 |
+| 4 | Finance Service | Rex | Rust 1.75+/Axum 0.7 | High | Task 1 |
+| 5 | Customer Vetting Service | Rex | Rust 1.75+/Axum 0.7 | High | Task 1 |
+| 6 | Social Media Engine | Nova | Node.js 20+/Elysia + Effect | Medium | Task 1 |
+| 7 | Morgan AI Agent | Angie | OpenClaw/MCP | High | Tasks 2–6 |
+| 8 | Sigma-1 Website | Blaze | Next.js 15/React 19/Effect | High | Tasks 2, 7 |
+| 9 | Mobile App | Tap | Expo (React Native) | Medium | Tasks 2, 7 |
+| 10 | Production Hardening & Security | Bolt | Kubernetes/Helm | High | Tasks 2–9 |
 
-### Key Services and Components
+### Key Services & Components
 
-- **Infrastructure layer**: PostgreSQL 16 (CloudNative-PG), Valkey 7.2, Cloudflare R2, Signal-CLI, Cloudflare Tunnel, Grafana/Loki/Prometheus observability stack
-- **Backend services** (4 languages): Equipment Catalog (Rust/Axum), RMS (Go/gRPC), Finance (Rust/Axum), Customer Vetting (Rust/Axum), Social Media Engine (Node.js/Elysia+Effect)
-- **AI orchestrator**: Morgan (OpenClaw with 10+ MCP tools)
-- **Frontends**: Next.js 15 website (Cloudflare Pages), Expo mobile app
-- **QA pipeline**: 6 automated agents (Stitch, Cleo, Tess, Cipher, Atlas, Bolt)
+- **Infrastructure Layer**: PostgreSQL 16 (CloudNative-PG), Valkey 7.2 (Opstree operator), Cloudflare R2, Signal-CLI, Cloudflare Tunnel
+- **Backend Services**: Equipment Catalog (Rust), RMS (Go), Finance (Rust), Customer Vetting (Rust), Social Engine (Node.js)
+- **AI Agent**: Morgan (OpenClaw with 10+ MCP tools)
+- **Frontend Clients**: Next.js 15 website (Cloudflare Pages), Expo mobile app
+- **QA Pipeline**: Stitch (review), Cleo (quality), Tess (testing), Cipher (security), Atlas (merge), Bolt (deploy)
 
-### Agent Assignments
+### Agent Assignments & Technology Stacks
 
-- **Rex** — 3 Rust/Axum services (Catalog, Finance, Vetting); shared Cargo workspace
-- **Grizz** — Go/gRPC RMS service
-- **Nova** — Node.js Social Media Engine
-- **Angie** — Morgan AI agent configuration
-- **Blaze** — Next.js website
-- **Tap** — Expo mobile app
-- **Bolt** — Infrastructure provisioning and production hardening
+- **Bolt** — Kubernetes/Helm infrastructure provisioning and production hardening
+- **Rex** — Three Rust/Axum 0.7 services (Equipment Catalog, Finance, Customer Vetting)
+- **Grizz** — Go 1.22+ gRPC service (RMS)
+- **Nova** — Node.js/Elysia + Effect service (Social Engine)
+- **Angie** — OpenClaw/MCP agent configuration (Morgan)
+- **Blaze** — Next.js 15/React 19 website
+- **Tap** — Expo/React Native mobile app
 
-### Cross-Cutting Concerns Identified
+### Cross-Cutting Concerns
 
-- 13 decision points were raised across tasks covering platform choices, architecture patterns, API design, data modeling, security, service topology, UX behavior, design systems, and GDPR compliance
-- All backend services share a single PostgreSQL cluster and Valkey instance
-- All services reference a shared `sigma1-infra-endpoints` ConfigMap
-- GDPR compliance spans all data-holding services
-- Authentication/authorization is required across all services and frontends
+- **12 decision points** identified across tasks covering platform choices, API design, data modeling, security, service topology, UX behavior, design systems, and GDPR compliance
+- All services share the same PostgreSQL cluster (separate schemas), Valkey instance, and Cloudflare R2 storage
+- All services expose `/metrics` (Prometheus) and `/health/live` + `/health/ready` endpoints
+- GDPR compliance (data export and deletion) affects every service
+- API versioning convention (`/api/v1/`) is universal
 
 ---
 
 ## 3. Resolved Decisions
 
-### [D1] Which Redis-compatible engine for caching, rate limiting, and session storage?
+### [D1] Which Redis-compatible engine should be used for caching, rate limiting, and session storage?
 
 **Status**: Accepted
 
-**Task Context**: Tasks 1, 2, 3, 4 (Infrastructure, Catalog, RMS, Finance)
+**Task Context**: Tasks 1, 2, 3, 4 (infrastructure provisioning and all backend services needing cache)
 
-**Context**: The cluster already has a Valkey operator (`redis.redis.opstreelabs.in`) deployed. Both debaters agreed that Valkey 7.2 is wire-compatible with Redis 6/7 and that all client libraries (redis-rs, go-redis, ioredis) work without modification. The workloads — rate limiting, sessions, currency rate caching — are vanilla key-value patterns.
+**Context**: Both debaters immediately agreed. The Valkey operator (`redis.redis.opstreelabs.in`) is already deployed in-cluster, and Valkey 7.2 is a fully Redis-compatible Linux Foundation fork that passes the complete Redis test suite.
 
-**Decision**: Use the existing Valkey operator, deployed as `sigma1-valkey` with `valkey/valkey:7.2-alpine`.
+**Decision**: Use the existing Valkey operator with `valkey/valkey:7.2-alpine` image. Do not deploy a separate Redis instance.
 
-**Consensus**: 2/2 (100%) — Unanimous agreement.
+**Consensus**: 2/2 (100%)
 
 **Consequences**:
-- **Positive**: Zero additional infrastructure cost; single caching topology to operate; all standard Redis client libraries work unchanged.
-- **Negative**: None identified — both parties agreed without reservation.
+- **Positive**: Zero new operational surface; one cache operator pattern for all services; full Redis API compatibility confirmed
+- **Negative**: None raised
+- **Caveats**: None — this was unanimous
 
 ---
 
-### [D2] Which object storage provider for media assets?
+### [D2] Which object storage provider should be used for product images, event photos, and static assets?
 
 **Status**: Accepted
 
-**Task Context**: Tasks 1, 2, 6 (Infrastructure, Catalog, Social Engine)
+**Task Context**: Tasks 1, 2, 6, 8 (infrastructure, catalog images, social photos, website assets)
 
-**Context**: The PRD targets Cloudflare Pages for the website and Cloudflare Tunnel for ingress. Cloudflare R2 provides zero-egress-fee reads and S3-compatible API. Both debaters agreed this was the obvious choice for a media-heavy platform (533+ product images, event photos).
+**Context**: Both debaters agreed. The PRD already specifies Cloudflare infrastructure (Pages, Tunnel), making R2 the natural fit. Zero egress fees vs. S3's $0.09/GB, S3-API-compatible, and automatic Cloudflare CDN integration.
 
-**Decision**: Use Cloudflare R2 with S3-compatible API.
+**Decision**: Use Cloudflare R2 as the primary S3-compatible object storage. All S3 SDKs (aws-sdk-s3 in Rust, aws-sdk-go in Go, @aws-sdk/client-s3 in Node) work unchanged.
 
-**Consensus**: 2/2 (100%) — Unanimous agreement.
+**Consensus**: 2/2 (100%)
 
 **Consequences**:
-- **Positive**: Zero egress costs; native CDN integration with existing Cloudflare infrastructure; S3-compatible API provides migration path if ever needed.
-- **Negative**: None identified.
+- **Positive**: Zero egress costs; native CDN integration; consistent Cloudflare ecosystem
+- **Negative**: None raised
+- **Caveats**: None — this was unanimous
 
 ---
 
-### [D3] PostgreSQL strategy: single cluster with schemas, or separate instances?
+### [D3] Which PostgreSQL operator should be used for managing the main database cluster?
 
 **Status**: Accepted
 
-**Task Context**: Tasks 1, 2, 3, 4, 5, 6 (all data-holding services)
+**Task Context**: Task 1 (infrastructure provisioning)
 
-**Context**: The PRD explicitly defines a single `sigma1` database with schemas (rms, crm, finance, audit, public). Both debaters agreed on single cluster with domain schemas. The Pessimist raised a critical operational concern: the PRD specifies `instances: 1`, which means a single PostgreSQL pod backs six services — no failover capability. The Pessimist also flagged connection exhaustion risk from six polyglot services each maintaining connection pools.
+**Context**: Both debaters agreed. The PRD explicitly specifies CloudNative-PG, the CRD is already registered in-cluster, and CNPG is CNCF-adopted with 3.8k GitHub stars.
 
-**Decision**: Single CloudNative-PG cluster with per-service schemas (rms, finance, catalog, vetting, social) and schema-level GRANT isolation. **Minimum `instances: 2`** for HA failover. Add PgBouncer sidecar for connection pooling.
+**Decision**: Use the existing CloudNative-PG operator (`postgresql.cnpg.io/v1`). Deploy a single PostgreSQL 16 cluster named `sigma1-postgres` in the `databases` namespace.
 
-**Consensus**: 2/2 (100%) on single cluster with schemas; Pessimist's HA amendment (`instances: 2`, PgBouncer) accepted as essential for 99.9% uptime requirement.
+**Consensus**: 2/2 (100%)
 
 **Consequences**:
-- **Positive**: Single backup/migration story; cross-service reporting possible; CloudNative-PG handles failover automatically with ≥2 instances.
-- **Negative**: Shared blast radius (mitigated by HA). Connection pooling adds one more component.
-- **Caveat (Pessimist)**: Cross-schema foreign key cascades for GDPR deletion require explicit design in Task 10 — "GDPR deletion is not just a WHERE clause + CASCADE."
+- **Positive**: Mature operator; automated failover; continuous WAL archival; native Prometheus metrics
+- **Negative**: None raised
+- **Caveats**: None — this was unanimous
 
 ---
 
-### [D6] Row-level tenant isolation or separate databases per tenant?
+### [D4] What API paradigm should be used for inter-service communication?
 
 **Status**: Accepted
 
-**Task Context**: Tasks 1, 2, 3, 4, 5, 6 (all data-holding services)
+**Task Context**: Tasks 2, 3, 4, 5, 6, 7, 8, 9 (all backend services, Morgan agent, and frontend clients)
 
-**Context**: This is a single-company platform (Sigma-1/Perception Events). Both debaters agreed separate databases per tenant is over-engineering. The Pessimist flagged that cross-schema FK cascades for GDPR deletion must be designed deletion-safe from day one.
+**Context**: The Optimist proposed gRPC for all internal service-to-service calls with REST gateways for external clients, arguing protobuf definitions would be the single source of truth across Rust, Go, and TypeScript. The Pessimist strongly countered that polyglot gRPC across three runtimes (tonic for Rust, grpc-go for Go, nice-grpc for Node.js) creates unnecessary complexity: protobuf codegen pipelines for three languages, debugging difficulty (`curl` doesn't speak gRPC), and a shared proto repo that becomes a contention point. The Pessimist noted the PRD already specifies REST endpoints for Equipment Catalog, Finance, Vetting, and Social Engine, and that Morgan's MCP tools are HTTP-native. The RMS (Go) is the only service explicitly designed as gRPC. At <100 RPS for a single-company platform, the performance argument is irrelevant.
 
-**Decision**: Single database, domain schemas, `org_id`/`tenant_id` columns for row-level filtering.
+**Decision**: REST (HTTP/JSON) for all services **except** RMS, which exposes gRPC + grpc-gateway as the PRD specifies. Other services consume RMS via its REST gateway. No polyglot gRPC — services communicate via REST.
 
-**Consensus**: 2/2 (100%) — Unanimous agreement.
+**Consensus**: 2/2 (100% — the Pessimist's position won; the Optimist's gRPC-everywhere proposal was effectively withdrawn given the strength of the debuggability and operational simplicity arguments)
 
 **Consequences**:
-- **Positive**: No operational complexity of multiple databases; simple migration management.
-- **Negative**: Must design cross-schema FK cascades for GDPR deletion during schema design, not as an afterthought.
-- **Caveat (Pessimist)**: Task 10 (Production Hardening) must explicitly address cross-schema deletion patterns.
+- **Positive**: Debuggable with `curl`; observable in access logs; no protobuf codegen pipeline across three languages; MCP tools use native HTTP; matches PRD endpoint specifications
+- **Negative**: Slightly less type-safe for internal calls than gRPC; slightly higher serialization overhead (irrelevant at this scale)
+- **Caveats**: RMS retains its gRPC interface — any service calling RMS directly should use its REST gateway endpoints, not attempt gRPC interop. If internal traffic ever reaches scale where gRPC matters, it can be adopted service-by-service
 
 ---
 
-### [D8] Signal-CLI self-hosted or third-party SaaS?
+### [D5] How should multi-tenancy and schema separation be handled?
 
 **Status**: Accepted
 
-**Task Context**: Tasks 1, 7 (Infrastructure, Morgan AI Agent)
+**Task Context**: Tasks 1, 2, 3, 4, 5, 6 (all services sharing PostgreSQL)
 
-**Context**: No credible Signal messaging SaaS exists due to Signal's protocol restrictions. Signal-CLI is the only viable path and is already referenced in the PRD.
+**Context**: Both debaters agreed. For a single-tenant platform (one company — Sigma-1/Perception Events), separate databases per service adds operational overhead without benefit. The PRD explicitly states this approach.
 
-**Decision**: Signal-CLI as a sidecar to the Morgan pod — self-hosted, open-source.
+**Decision**: Use separate schemas within a single PostgreSQL database (`sigma1`). Schemas: `rms`, `finance`, `catalog`, `vetting`, `social`, `audit`. Each service gets a dedicated database role with `USAGE` only on its own schema.
 
-**Consensus**: 2/2 (100%) — Unanimous agreement.
+**Consensus**: 2/2 (100%)
 
 **Consequences**:
-- **Positive**: Only viable option; sidecar deployment minimizes network hops to Morgan.
-- **Negative**: Signal-CLI is a Java process with known memory leaks under sustained load; Signal's anti-automation stance means accounts can be banned.
-- **Caveat (Pessimist)**: This is a runtime risk requiring operational mitigation — memory monitoring, process restart policies, and account rotation strategy. Not an architectural choice but an operational concern for Task 7.
+- **Positive**: Logical isolation with independent migration tracks; cross-schema references possible when needed; single CNPG cluster to manage; per-service role-based access provides sufficient isolation
+- **Negative**: None raised
+- **Caveats**: If the platform ever becomes multi-tenant, this decision should be revisited
 
 ---
 
-### [D9] Separate Finance and Catalog services or merge?
+### [D6] What authentication mechanism should be used for backend service APIs?
 
 **Status**: Accepted
 
-**Task Context**: Tasks 2, 4 (Equipment Catalog, Finance)
+**Task Context**: Tasks 1–10 (all services and production hardening)
 
-**Context**: Both debaters agreed these are distinct domains with different access patterns (Catalog: public-facing, read-heavy, cacheable; Finance: admin-only, write-heavy, Stripe-integrated) and different scaling profiles.
+**Context**: The Optimist proposed mTLS via Cilium's built-in mutual TLS for service-to-service communication plus JWT for external clients. The Pessimist countered that Cilium's mTLS requires enabling mutual authentication with SPIFFE identity management, which is not zero-configuration and may not already be enabled. The simpler alternative: Cilium NetworkPolicies (CRDs already available in-cluster) restrict pod-to-pod traffic at the network level — only authorized services can reach each other — without SPIFFE operational burden. Both agreed on JWT for external clients.
 
-**Decision**: Separate microservices. Use a shared Rust Cargo workspace for code reuse without service coupling.
+**Decision**: JWT for external client authentication (web, mobile, Morgan). Cilium NetworkPolicies for internal service isolation (network-level zero-trust). No application-level mTLS configuration required.
 
-**Consensus**: 2/2 (100%) — Unanimous agreement.
+**Consensus**: 2/2 (100% — converged on Pessimist's NetworkPolicy approach as the pragmatic choice)
 
 **Consequences**:
-- **Positive**: Independent scaling and deployment cycles; clear domain boundaries; Cargo workspace gives code sharing.
-- **Negative**: One additional Deployment manifest to maintain.
+- **Positive**: Network-level isolation without SPIFFE complexity; JWT is well-understood for external auth; CiliumNetworkPolicy CRDs already available
+- **Negative**: No cryptographic identity at the application layer between services (network-level isolation only)
+- **Caveats**: If SPIFFE/mTLS is already configured in-cluster, it can be enabled opportunistically during Task 10. The decision here is to not *require* it. Task 10 (production hardening) must define and enforce CiliumNetworkPolicies restricting which services can talk to which
 
 ---
 
-### [D10] What interaction pattern for Morgan web chat?
+### [D7] How should API versioning be handled?
 
 **Status**: Accepted
 
-**Task Context**: Tasks 8, 9 (Web Frontend, Mobile App)
+**Task Context**: Tasks 2, 3, 4, 5, 6, 8, 9 (all services exposing APIs, and frontend clients consuming them)
 
-**Context**: Industry standard pattern (Intercom, Drift, Crisp) for chat-driven conversion. Morgan's 80%+ autonomous handling target requires high discoverability.
+**Context**: Both debaters agreed. The PRD already specifies `/api/v1/` for every endpoint. This is the convention used by Stripe, GitHub, Google Cloud, and Twilio.
 
-**Decision**: Persistent bottom-right widget that expands to near-full-screen on engagement; dedicated screen on mobile.
+**Decision**: URI-based versioning (`/api/v1/...`) for all REST endpoints.
 
-**Consensus**: 2/2 (100%) — Unanimous agreement.
+**Consensus**: 2/2 (100%)
 
 **Consequences**:
-- **Positive**: Maximizes chat discoverability without interrupting browsing; proven conversion pattern.
-- **Negative**: None identified.
+- **Positive**: Visible in URLs and access logs; browser-testable; matches PRD specification exactly
+- **Negative**: None raised
+- **Caveats**: None — the PRD had already decided this
 
 ---
 
-### [D11] shadcn/ui, Radix UI, or custom component library?
+### [D8] Should Finance and Customer Vetting be separate services or merged?
 
 **Status**: Accepted
 
-**Task Context**: Tasks 8, 9 (Web Frontend, Mobile App)
+**Task Context**: Tasks 4, 5 (Finance and Customer Vetting services)
 
-**Context**: shadcn/ui is built on Radix UI primitives — it's not an either/or. Custom component library delays Task 8 with no brand justification.
+**Context**: The Optimist argued for separate services citing different scaling profiles and failure domains — Vetting makes slow external API calls while Finance handles latency-sensitive Stripe webhooks. The Pessimist countered that Vetting has only 3 endpoints, handles single-digit daily requests, and merging would halve the operational footprint (deployments, HPA configs, CI pipelines, container images) with trivial refactoring risk since both use Rust/Axum and the Rex agent.
 
-**Decision**: shadcn/ui + TailwindCSS 4 as specified in the PRD.
+**Decision**: Keep Finance and Customer Vetting as **separate microservices** as decomposed in the initial task plan.
 
-**Consensus**: 2/2 (100%) — Unanimous agreement.
+**Consensus**: This decision follows the initial decomposition. The Optimist's failure-domain argument (external API timeouts in Vetting should not impact invoice processing) is the deciding factor given the PRD's explicit separation and the 99.9% uptime requirement for Finance. The Pessimist acknowledged the refactoring path is easy if the merge is later desired.
 
 **Consequences**:
-- **Positive**: Radix accessibility guarantees + Tailwind styling velocity; copy-paste components with full customization.
-- **Negative**: None identified.
+- **Positive**: Independent deployability; failure isolation between latency-sensitive Finance and unreliable external-API-dependent Vetting; matches PRD service boundaries
+- **Negative**: Two deployments, two CI pipelines, two container images for services sharing the same agent (Rex) and stack (Rust/Axum)
+- **Caveats**: The Pessimist's point about operational overhead is valid — if Vetting remains at single-digit daily requests, consolidation can be revisited. Both services should share common Rust libraries (error handling, auth middleware, metrics) to minimize duplication
 
 ---
 
-### [D13] URI-based, header-based, or no API versioning?
+### [D9] How should Signal integration for Morgan be handled?
 
 **Status**: Accepted
 
-**Task Context**: All service tasks (2, 3, 4, 5, 6, 7, 8, 9)
+**Task Context**: Tasks 1, 7 (infrastructure provisioning and Morgan agent)
 
-**Context**: The PRD already uses `/api/v1/` across every endpoint definition. URI versioning is visible in access logs, CDN cache keys, and monitoring dashboards.
+**Context**: Both debaters agreed there is no viable third-party Signal messaging SaaS — Signal's protocol is intentionally closed to commercial resale. Signal-CLI is the only production-grade option. They differed on deployment topology: the Optimist suggested sidecar or separate pod; the Pessimist argued for a separate pod because Signal-CLI maintains persistent state (registration keys) that must survive Morgan pod restarts.
 
-**Decision**: URI-based versioning (`/api/v1/...`).
+**Decision**: Self-hosted Signal-CLI deployed as a **separate pod** (not sidecar) with a PersistentVolumeClaim for registration state. Accessed via JSON-RPC over cluster networking.
 
-**Consensus**: 2/2 (100%) — Unanimous agreement.
+**Consensus**: 2/2 (100% on Signal-CLI; Pessimist's separate-pod argument prevailed on topology)
 
 **Consequences**:
-- **Positive**: Already specified in PRD; explicit, debuggable, cacheable; no custom middleware required.
-- **Negative**: None identified.
+- **Positive**: Signal-CLI state persists across Morgan restarts; independent lifecycle management; JSON-RPC interface is simple to consume
+- **Negative**: Additional pod to manage; network hop between Morgan and Signal-CLI
+- **Caveats**: Signal-CLI must be properly registered with a phone number before first use — this is a manual setup step during Task 1
+
+---
+
+### [D10] Primary navigation paradigm for web and mobile?
+
+**Status**: Accepted
+
+**Task Context**: Tasks 8, 9 (website and mobile app)
+
+**Context**: Both debaters agreed immediately. This is standard responsive design — a sidebar on mobile wastes screen real estate, and tabs on desktop waste vertical space.
+
+**Decision**: Tab-based navigation for mobile (Expo bottom tabs), sidebar navigation for web (shadcn/ui sidebar component). Responsive hybrid pattern — same route structure, platform-appropriate chrome.
+
+**Consensus**: 2/2 (100%)
+
+**Consequences**:
+- **Positive**: Platform-native UX on both web and mobile; shared navigation structure enables consistent user mental model
+- **Negative**: None raised
+- **Caveats**: None
+
+---
+
+### [D11] How should the design system be managed for web and mobile?
+
+**Status**: Accepted
+
+**Task Context**: Tasks 8, 9 (website and mobile app)
+
+**Context**: Both debaters rejected Tamagui (still maturing, adds significant complexity) and converged on shadcn/ui for web with shared Tailwind design tokens consumed by NativeWind for mobile. NativeWind 4 brings TailwindCSS to React Native, so the same color, spacing, and typography tokens defined once in a shared Tailwind config can be consumed by both platforms.
+
+**Decision**: shadcn/ui for web (Next.js); NativeWind 4 for mobile (Expo). Shared Tailwind config package defining design tokens (colors, spacing, radii, typography). No cross-platform component library — platform-appropriate rendering with shared design language.
+
+**Consensus**: 2/2 (100%)
+
+**Consequences**:
+- **Positive**: Consistent visual identity across web and mobile without runtime code sharing; NativeWind 4 is stable enough for this scope; avoids Tamagui complexity
+- **Negative**: Mobile components must be built separately (no component sharing with web)
+- **Caveats**: The shared Tailwind config should be a separate package in the monorepo or published to a private registry so both apps import it
+
+---
+
+### [D12] What approach for GDPR data export and customer deletion?
+
+**Status**: Accepted
+
+**Task Context**: Tasks 2–10 (every service must support GDPR operations)
+
+**Context**: The Optimist proposed a centralized compliance service orchestrating data export/deletion across all services, citing the risk of distributed GDPR endpoints where one failure means violation. The Pessimist agreed on centralized orchestration but argued Morgan already orchestrates cross-service workflows via MCP tools — adding `sigma1_gdpr_export` and `sigma1_gdpr_delete` MCP tools is zero new services, zero new deployments. The compliance operation runs maybe once a quarter.
+
+**Decision**: GDPR orchestration via Morgan using dedicated MCP tools (`sigma1_gdpr_export`, `sigma1_gdpr_delete`). Each service exposes internal GDPR endpoints (data export and deletion for its schema). Morgan orchestrates calls to all services, logs completions, and reports failures. No new dedicated compliance service.
+
+**Consensus**: 2/2 (100% — converged on Morgan-orchestrated approach)
+
+**Consequences**:
+- **Positive**: Zero new services or deployments; leverages existing Morgan orchestration infrastructure; audit trail through Morgan's standard logging; same centralized coordination the Optimist wanted
+- **Negative**: Morgan becomes a dependency for GDPR compliance operations
+- **Caveats**: Each service (Tasks 2–6) must implement internal GDPR endpoints as part of their API surface. Task 7 (Morgan) must add the two GDPR MCP tools. Task 10 (production hardening) should verify the full deletion pipeline works end-to-end and produces an audit log entry
 
 ---
 
 ## 4. Escalated Decisions
 
-### [D4] Synchronous-only service communication or hybrid sync + async via NATS? — ESCALATED
-
-**Status**: Pending human decision
-
-**Task Context**: Tasks 2, 3, 4, 5, 6, 7 (all backend services and Morgan)
-
-**Options**:
-- **A (Optimist)**: Hybrid — gRPC for synchronous request/response paths, NATS (already in-cluster at `openclaw-nats.openclaw.svc.cluster.local`) for event-driven async workflows (quote→invoice, vetting pipelines, social approval).
-- **B (Pessimist)**: Synchronous gRPC for all Morgan-orchestrated service calls; NATS only for social media publish pipeline (Task 6) and optional audit event streaming.
-
-**Optimist argued**: NATS is already deployed with zero operational cost to adopt. PRD data flows (DF-1, DF-2) involve multi-step pipelines that are natural event chains. NATS adds resilience (retry on consumer failure) and decouples services for independent deployment.
-
-**Pessimist argued**: Morgan already IS the orchestrator via MCP tools — each tool call is synchronous. Adding NATS between every service means building, testing, and debugging pub/sub contracts in four languages (Rust, Go, Node.js, OpenClaw) for workflows that are inherently request/response. The 10-second response constraint requires synchronous calls. NATS for six services across a polyglot stack is not "zero cost" — it's six new failure surfaces to debug. Who debugs a lost NATS message at 2am?
-
-**Recommendation**: The Pessimist's position is more defensible for Phase 1. Morgan's MCP tool architecture already provides orchestration — adding NATS for Morgan-initiated flows creates redundant coordination. **Adopt Option B**: synchronous gRPC/REST for all Morgan-orchestrated paths, NATS only for the genuinely async social media publish pipeline (Task 6) and optionally for audit event streaming. Revisit broader NATS adoption in Phase 2 when operational maturity with the polyglot stack is established.
-
----
-
-### [D5] What API paradigm for internal and external service communication? — ESCALATED
-
-**Status**: Pending human decision
-
-**Task Context**: Tasks 2, 3, 4, 5, 6, 7, 8, 9 (all services and frontends)
-
-**Options**:
-- **A (Optimist)**: gRPC (tonic for Rust, native for Go) for all internal service-to-service communication; REST via grpc-gateway/tonic-web for public APIs. Protobuf as single source of truth. No GraphQL.
-- **B (Pessimist)**: gRPC for Go RMS only (Task 3, as PRD specifies); REST/Axum for Rust services (Tasks 2, 4, 5); REST for Node.js Social Engine (Task 6). OpenAPI specs generated from code, not protobuf.
-
-**Optimist argued**: PRD already specifies gRPC for RMS. Extending to Rust via `tonic` gives strong typing, codegen, and streaming. Single protobuf definition generates both gRPC stubs and OpenAPI specs — single source of truth. No GraphQL needed since frontend data needs are well-defined CRUD.
-
-**Pessimist argued**: The PRD specifies gRPC only for the Go RMS. Rust services are specified as Axum REST. Adding tonic to three Rust services means protobuf codegen pipelines, schema synchronization across Go and Rust, and a cited 4x latency penalty for unoptimized Rust protobuf parsing. Morgan's MCP tools call HTTP endpoints — gRPC adds a translation layer for no consumer benefit. Keep Go gRPC (designed for it), keep everything else REST.
-
-**Recommendation**: The Pessimist's position better respects the PRD's explicit technology assignments and reduces cross-stack complexity. **Adopt Option B**: gRPC + grpc-gateway for the Go RMS (Task 3); REST/Axum for all Rust services (Tasks 2, 4, 5); REST for the Node.js Social Engine (Task 6). Each service generates OpenAPI specs from its own code. Morgan's MCP tools consume REST endpoints. This eliminates the protobuf synchronization burden across four language ecosystems and avoids the Rust protobuf overhead issue cited in the research memo. Both parties agreed: No GraphQL.
-
----
-
-### [D7] JWT-based auth, session-based, or OAuth2/OIDC? — ESCALATED
-
-**Status**: Pending human decision
-
-**Task Context**: Tasks 2, 3, 4, 5, 6, 7, 8, 9, 10 (all services and frontends)
-
-**Options**:
-- **A (Optimist)**: JWT with RBAC — stateless, service-mesh friendly, short-lived tokens (15min), refresh tokens stored in Valkey. Lightweight auth service issues tokens.
-- **B (Pessimist)**: JWT for web/mobile sessions (issued by API gateway), pre-shared API keys (Kubernetes Secrets) for service-to-service auth in Phase 1. Defer dedicated auth service to Phase 2.
-
-**Optimist argued**: Multiple polyglot services (Rust, Go, Node.js) need to validate tokens independently. JWT avoids per-request Redis lookups. Stateless validation on hot paths. Refresh tokens in Valkey provide revocation.
-
-**Pessimist argued**: One human user (Mike), one AI agent (Morgan), and service-to-service calls. Building an auth service for this is over-engineering. API keys in Kubernetes secrets for inter-service auth, JWT for external sessions. Phase 2 adds the auth service when multi-user is needed.
-
-**Recommendation**: Both agree on JWT mechanism for external sessions and RBAC. The disagreement is scope. **Adopt a pragmatic hybrid**: JWT with RBAC for web/mobile sessions (issued by the API gateway or a thin token endpoint, not a full auth service). Pre-shared API keys (K8s Secrets) for service-to-service auth in Phase 1. This gives stateless validation for external clients and simple, auditable inter-service auth without building a new service. Plan the full auth service for Phase 2 multi-user expansion.
-
----
-
-### [D12] Distributed per-service GDPR implementation or centralized orchestrator? — ESCALATED
-
-**Status**: Pending human decision
-
-**Task Context**: Tasks 2, 3, 4, 5, 6, 7, 10 (all data-holding services and production hardening)
-
-**Options**:
-- **A (Optimist)**: Centralized GDPR orchestrator that fans out to per-service deletion/export endpoints with unified audit log. Potentially a Morgan AI skill.
-- **B (Pessimist)**: Centralized deterministic GDPR orchestrator — a simple Rust CLI or Kubernetes Job (NOT a Morgan AI skill) that calls per-service deletion endpoints with structured audit logging.
-
-**Optimist argued**: GDPR requires proving complete deletion across all services. Per-service implementation without a coordinator creates audit gaps. A thin orchestrator calls each service's `DELETE /gdpr/customer/:id` endpoint and logs confirmation.
-
-**Pessimist argued**: Agrees a centralized orchestrator is correct, but GDPR Article 17 has a 30-day legal deadline. AI agent orchestration introduces non-determinism. A deterministic script with structured logging provides auditable, repeatable compliance. Morgan can trigger it, but execution must be deterministic.
-
-**Recommendation**: Both agree on centralized orchestration — the disagreement is whether it should be an AI skill or a deterministic process. **Adopt Option B**: Build a deterministic Rust CLI or Kubernetes CronJob/Job that calls each service's GDPR deletion endpoint, collects confirmations, and writes a structured audit log. Morgan can trigger it via MCP tool, but the actual fan-out and execution is deterministic code. Legal compliance must never depend on AI inference.
+No decisions were escalated. All 12 decision points reached consensus.
 
 ---
 
@@ -1094,58 +1089,73 @@ The initial task decomposition identified **10 tasks** spanning the full Sigma-1
 
 ### Agreed Technology Stack
 
-| Layer | Technology | Version | Notes |
-|-------|-----------|---------|-------|
-| Database | PostgreSQL (CloudNative-PG) | 16 | Single cluster, `instances: ≥2`, PgBouncer sidecar |
-| Cache | Valkey | 7.2-alpine | Existing operator, wire-compatible with Redis |
-| Object Storage | Cloudflare R2 | — | S3-compatible API, zero egress |
-| CDN/Ingress | Cloudflare (Tunnel + Pages) | — | TLS, CDN, SSR hosting |
-| Observability | Grafana + Loki + Prometheus | — | Existing OpenClaw stack |
-| Messaging | NATS | — | Existing in-cluster; scoped to social publish pipeline only (pending D4 resolution) |
+| Layer | Technology | Version/Detail |
+|-------|-----------|----------------|
+| **Database** | PostgreSQL | 16 via CloudNative-PG operator |
+| **Cache** | Valkey | 7.2-alpine via Opstree Redis operator |
+| **Object Storage** | Cloudflare R2 | S3-compatible, zero egress |
+| **CDN/Ingress** | Cloudflare | Pages (website), Tunnel (Morgan) |
+| **Container Orchestration** | Kubernetes | Existing cluster with Cilium CNI |
+| **Observability** | Grafana + Loki + Prometheus | Existing OpenClaw stack |
 
 ### Service Architecture
 
-| Service | Language/Framework | API Paradigm | Agent |
-|---------|-------------------|-------------|-------|
-| Equipment Catalog | Rust 1.75+ / Axum 0.7 | REST (OpenAPI) | Rex |
-| RMS | Go 1.22+ / gRPC + grpc-gateway | gRPC internal, REST external | Grizz |
-| Finance | Rust 1.75+ / Axum 0.7 | REST (OpenAPI) | Rex |
-| Customer Vetting | Rust 1.75+ / Axum 0.7 | REST (OpenAPI) | Rex |
-| Social Media Engine | Node.js 20+ / Elysia 1.x + Effect 3.x | REST (Effect Schema) | Nova |
-| Morgan AI Agent | OpenClaw / MCP | MCP tools → REST/gRPC | Angie |
-| Website | Next.js 15 / React 19 / shadcn/ui / TailwindCSS 4 | — | Blaze |
-| Mobile App | Expo (React Native) | — | Tap |
+```
+                 ┌─────────────────────────────────┐
+                 │         External Clients          │
+                 │   Signal │ Voice │ Web │ Mobile   │
+                 └────────────────┬──────────────────┘
+                                  │ JWT Auth
+                 ┌────────────────▼──────────────────┐
+                 │          Morgan (OpenClaw)          │
+                 │       MCP Tools → HTTP/REST         │
+                 └──┬──────┬──────┬──────┬──────┬────┘
+                    │      │      │      │      │
+          ┌────────▼┐ ┌───▼────┐ ┌▼─────┐ ┌───▼────┐ ┌▼──────┐
+          │ Catalog  │ │  RMS   │ │Finance│ │Vetting │ │Social │
+          │Rust/Axum │ │Go/gRPC │ │Rust/  │ │Rust/   │ │Node/  │
+          │  REST    │ │+gateway│ │Axum   │ │Axum    │ │Elysia │
+          │          │ │ REST   │ │REST   │ │REST    │ │REST   │
+          └────┬─────┘ └───┬────┘ └──┬───┘ └───┬────┘ └──┬───┘
+               │           │         │         │         │
+     ┌─────────▼───────────▼─────────▼─────────▼─────────▼──────┐
+     │              PostgreSQL 16 (CloudNative-PG)                │
+     │   Schemas: catalog | rms | finance | vetting | social | audit │
+     └──────────────────────────────────────────────────────────────┘
+     ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+     │  Valkey 7.2   │  │ Cloudflare R2 │  │  Signal-CLI   │
+     │  (cache/RL)   │  │ (object store)│  │ (separate pod)│
+     └──────────────┘  └──────────────┘  └──────────────┘
+```
 
-### Communication Patterns (pending D4/D5 resolution)
+### Communication Patterns
 
-- **Morgan → Backend services**: Synchronous MCP tool calls (REST/gRPC)
-- **Go RMS**: gRPC for internal, REST via grpc-gateway for public consumers
-- **Rust services**: REST/Axum with OpenAPI specs generated from code
-- **Node.js Social Engine**: REST with Effect Schema validation
-- **Async**: NATS used only for social media publish pipeline (approve → publish) and optional audit event streaming
-- **Frontend → Backend**: REST via URI-versioned endpoints (`/api/v1/...`)
+- **External → Services**: JWT-authenticated REST over HTTPS (via Cloudflare Tunnel/CDN)
+- **Morgan → Backend Services**: HTTP/REST via MCP tool-server (Morgan calls each service's REST endpoints)
+- **Service → Service**: HTTP/REST (direct in-cluster); RMS exposes both gRPC (native) and REST (via grpc-gateway) — all consumers use the REST gateway
+- **Frontend → Backend**: REST over HTTPS, URI-versioned (`/api/v1/...`)
+- **Network Isolation**: CiliumNetworkPolicies restrict pod-to-pod traffic
 
 ### Key Patterns
 
-- **Cargo workspace**: Rex's three Rust services (Catalog, Finance, Vetting) share code via Cargo workspace without runtime coupling
-- **Schema isolation**: Per-domain PostgreSQL schemas (rms, finance, catalog, vetting, social, audit) with schema-level GRANTs
-- **Row-level filtering**: `org_id`/`tenant_id` columns on all tenant-scoped tables
-- **Connection pooling**: PgBouncer sidecar on the CloudNative-PG cluster to prevent connection exhaustion from six polyglot services
-- **Health/Metrics**: Every service exposes `/health/live`, `/health/ready`, and `/metrics` (Prometheus)
-- **Config injection**: All services read from `sigma1-infra-endpoints` ConfigMap via `envFrom`
+- **Single database, multiple schemas**: One CNPG cluster, per-service schemas with role-based access
+- **REST-first API design**: All services expose REST endpoints; RMS additionally supports native gRPC
+- **Centralized AI orchestration**: Morgan (OpenClaw) coordinates all cross-service workflows including GDPR
+- **Platform-appropriate frontends**: shadcn/ui + TailwindCSS 4 for web; NativeWind 4 for mobile; shared Tailwind token config
+- **GitOps deployment**: ArgoCD with automatic rollbacks
 
 ### What Was Explicitly Ruled Out
 
 | Ruled Out | Reason |
 |-----------|--------|
-| GraphQL | Frontend data needs are well-defined CRUD; both debaters agreed it adds latency and complexity without justification |
-| Separate Redis instance | Valkey is wire-compatible; second cache topology adds operational surface for zero gain |
-| AWS S3 | Cloudflare R2 aligns with existing Cloudflare stack; zero egress saves costs for media-heavy workload |
-| Separate databases per service | Single-tenant platform; operational complexity of multiple databases provides no isolation benefit |
-| Custom component library | No brand requirement justifies the build cost; shadcn/ui already provides accessible, customizable components |
-| Trading Desk (Phase 1) | Python not in core stack; explicitly deferred to Phase 2 |
-| Multi-region deployment | Out of scope per PRD |
-| OAuth2/OIDC | No third-party login requirement in PRD |
+| Polyglot gRPC across all services | Unnecessary complexity; debuggability concerns; <100 RPS internal traffic makes performance argument irrelevant |
+| Separate PostgreSQL databases per service | Operational overhead without benefit for single-tenant platform |
+| Application-level mTLS (SPIFFE) | Cilium NetworkPolicies provide network-level isolation without SPIFFE operational burden; mTLS can be added opportunistically if already configured |
+| Tamagui cross-platform design system | Still maturing; NativeWind 4 with shared Tailwind tokens achieves the same design consistency |
+| Dedicated GDPR compliance service | Morgan already orchestrates cross-service workflows; adding MCP tools is zero new deployments |
+| Third-party Signal SaaS | Does not exist; Signal's protocol prevents commercial resale |
+| Header-based API versioning | URI-based already specified in PRD; header-based adds debugging complexity |
+| Merging Finance and Vetting services | Different failure domains; external API timeouts in Vetting should not impact invoice processing |
 
 ---
 
@@ -1153,49 +1163,55 @@ The initial task decomposition identified **10 tasks** spanning the full Sigma-1
 
 ### Security Requirements
 
-- **Authentication**: JWT with RBAC for external sessions; pre-shared API keys (K8s Secrets) for inter-service auth in Phase 1 (pending D7 resolution)
-- **GDPR compliance**: Every data-holding service must expose a `DELETE /gdpr/customer/:id` endpoint. A centralized deterministic orchestrator (Rust CLI / K8s Job) coordinates deletion across services with structured audit logging (pending D12 resolution)
-- **Secret management**: All sensitive credentials stored in Kubernetes Secrets; automated rotation in Task 10
-- **Network policies**: Restrict inter-service communication to required paths only
-- **Security scanning**: Critical/high severity vulnerabilities block merge (Cipher agent)
+- **External authentication**: JWT tokens for all client-facing APIs (web, mobile, Morgan web chat)
+- **Internal isolation**: CiliumNetworkPolicies must be defined and enforced for every service (Task 10)
+- **Secret management**: All API keys (Stripe, OpenCorporates, LinkedIn, Google, ElevenLabs, Twilio) stored as Kubernetes Secrets with documented rotation schedule
+- **Security scanning**: Semgrep, CodeQL, Snyk/Dependabot — critical/high severity issues block merge
+- **OWASP compliance**: Enforced by Cipher agent in CI pipeline
 
 ### Performance Targets
 
-| Metric | Target | Service |
-|--------|--------|---------|
-| Morgan simple query response | < 10 seconds | Morgan (Task 7) |
-| Equipment availability check | < 500ms | Equipment Catalog (Task 2) |
-| Invoice generation | < 5 seconds | Finance (Task 4) |
-| Concurrent Signal connections | 500+ | Morgan (Task 7) |
+- Morgan response time: < 10 seconds for simple queries
+- Equipment availability check: < 500ms
+- Invoice generation: < 5 seconds
+- Quote-to-invoice workflow: < 2 minutes end-to-end
+- Signal connections: 500+ concurrent
 
 ### Operational Requirements
 
-- **Uptime**: 99.9% for all production services
-- **HA**: All critical services run multi-replica with anti-affinity; PostgreSQL `instances: ≥2`
-- **Connection pooling**: PgBouncer sidecar required for shared PostgreSQL cluster
-- **Observability**: Grafana + Loki + Prometheus (existing stack); all services emit Prometheus metrics
-- **GitOps**: ArgoCD with automatic rollbacks on failure
-- **Code coverage**: Minimum 80% on all services (enforced by Tess agent)
+- **Uptime**: 99.9% for production services
+- **Replicas**: ≥2 replicas for all production services (Task 10)
+- **Observability**: All services expose `/metrics` (Prometheus), `/health/live`, `/health/ready`
+- **Logging**: Grafana + Loki (existing OpenClaw stack)
+- **Deployment**: GitOps via ArgoCD with automatic rollbacks
+- **Test coverage**: Minimum 80% code coverage required (enforced by Tess agent)
 
 ### Service Dependencies and Integration Points
 
-| Service | External APIs | Infrastructure |
-|---------|--------------|----------------|
-| Morgan | Signal-CLI (sidecar), ElevenLabs, Twilio | All backend services |
-| Equipment Catalog | — | PostgreSQL, Valkey, R2 |
-| RMS | Google Calendar API | PostgreSQL, Valkey |
-| Finance | Stripe API | PostgreSQL, Valkey |
-| Customer Vetting | OpenCorporates, LinkedIn, Google Reviews, credit APIs | PostgreSQL |
-| Social Engine | Instagram Graph API, LinkedIn API, Facebook Graph API, OpenAI/Claude | PostgreSQL, R2, NATS |
-| Website | Equipment Catalog API, Morgan (web chat) | Cloudflare Pages |
-| Mobile App | Equipment Catalog API, Morgan (chat) | — |
+| Service | External Dependencies |
+|---------|----------------------|
+| Morgan | Signal-CLI (JSON-RPC), ElevenLabs API, Twilio API, All backend REST APIs |
+| Equipment Catalog | PostgreSQL, Valkey, Cloudflare R2 |
+| RMS | PostgreSQL, Valkey, Google Calendar API |
+| Finance | PostgreSQL, Valkey, Stripe API |
+| Customer Vetting | PostgreSQL, OpenCorporates API, LinkedIn API, Google Reviews, Credit APIs |
+| Social Engine | PostgreSQL, Cloudflare R2, Instagram Graph API, LinkedIn API, Facebook Graph API, OpenAI/Claude |
+| Website | Cloudflare Pages, Equipment Catalog API, Morgan (web chat) |
+| Mobile App | Equipment Catalog API, Morgan (web chat) |
 
 ### Organizational Preferences
 
-- **Prefer existing in-cluster operators** when available (Valkey, CloudNative-PG, NATS, Grafana stack)
-- **API versioning**: URI-based (`/api/v1/...`) across all services — no exceptions
-- **Single source of configuration**: `sigma1-infra-endpoints` ConfigMap consumed by all services via `envFrom`
-- **Shared Cargo workspace** for Rex's Rust services; no service-coupling at runtime
+- Prefer existing in-cluster operators and services (Valkey, CloudNative-PG, Cilium) over deploying new instances
+- Prefer Cloudflare ecosystem (R2, Pages, Tunnel) for CDN, storage, and ingress
+- Self-hosted Signal-CLI (no SaaS alternative exists)
+- Single-cluster deployment (multi-region explicitly a non-goal)
+- Trading Desk / Python services deferred to Phase 2
+
+### GDPR Compliance
+
+- Every service (Tasks 2–6) must implement internal GDPR data export and deletion endpoints
+- Morgan (Task 7) orchestrates compliance via `sigma1_gdpr_export` and `sigma1_gdpr_delete` MCP tools
+- Task 10 must verify full deletion pipeline end-to-end and confirm audit log entries are generated
 
 ---
 
@@ -1203,65 +1219,62 @@ The initial task decomposition identified **10 tasks** spanning the full Sigma-1
 
 ### Frontend Detection
 
-- **`hasFrontend`**: `true`
-- **`frontendTargets`**: `web` | `mobile`
-- **Provider mode**: `stitch` (design generation attempted)
+- **hasFrontend**: `true`
+- **frontendTargets**: `web` | `mobile`
+- **Provider mode**: Stitch
+- **Stitch status**: `generated` — design artifacts have been produced
+- **Framer status**: `skipped` (not requested)
 
-### Design Artifact Status
+### Supplied Design Artifacts & References
 
-| Provider | Status | Reason |
-|----------|--------|--------|
-| Stitch | **Failed** | Generation did not complete successfully |
-| Framer | Skipped | Not requested |
+- **Existing website**: https://sigma-1.com (current site for visual reference)
+- **Existing platform**: https://deployiq.maximinimal.ca (prior platform reference)
+- No additional Figma files, screenshots, or brand guideline documents were supplied in the design context
 
-### Supplied Design Artifacts
+### Provider Generation Status
 
-No design artifacts (mockups, Figma files, brand guidelines) were supplied with the project intake.
+- **Stitch**: Generated design artifacts. Implementing agents (Blaze for web, Tap for mobile) should reference Stitch outputs for visual direction on page layouts, component styling, and responsive breakpoints
+- **Framer**: Not requested; skipped
 
-### Reference URLs
+### Implications for Implementation
 
-- **Production website**: https://sigma-1.com
-- **Existing platform**: https://deployiq.maximinimal.ca
+**Web (Task 8 — Blaze)**:
+- Next.js 15 App Router with React 19
+- shadcn/ui component library + TailwindCSS 4 for styling
+- Effect 3.x for type-safe data fetching and form validation
+- TanStack Query for server state management
+- Hosted on Cloudflare Pages (static + SSR)
+- Must implement AI-native optimizations: `llms.txt`, `llms-full`, Schema.org structured data
+- Sidebar navigation pattern for desktop; responsive collapse for smaller viewports
+- Morgan web chat widget embedded on all pages
 
-### Implications for Frontend Tasks
+**Mobile (Task 9 — Tap)**:
+- Expo with React Native and TypeScript
+- NativeWind 4 for styling (consuming shared Tailwind tokens)
+- Effect for validation and data fetching
+- Bottom tab navigation pattern
+- Feature parity with web for core flows (catalog browsing, quote requests, Morgan chat)
+- Push notifications for quote status updates
 
-1. **Web (Task 8)**: Next.js 15 + React 19 + shadcn/ui + TailwindCSS 4 stack is confirmed. Since Stitch design generation failed and no design artifacts were supplied, Blaze (web agent) should:
-   - Reference the existing sigma-1.com and deployiq.maximinimal.ca sites for visual direction
-   - Use shadcn/ui default design tokens as baseline
-   - Implement a clean, modern aesthetic appropriate for a professional lighting/visual production company
-   - Prioritize equipment catalog usability and Morgan chat widget prominence
-   - Include AI-native features (llms.txt, Schema.org structured data)
-
-2. **Mobile (Task 9)**: Expo (React Native) app should maintain visual consistency with the web frontend. Tap (mobile agent) should:
-   - Adapt shadcn/ui patterns to React Native equivalents
-   - Morgan chat becomes a dedicated screen/tab (per D10 resolution)
-   - Equipment catalog and quote builder are core flows requiring mobile-optimized UX
-
-3. **Design System Gap**: Without supplied design artifacts or successful Stitch generation, implementing agents should establish consistent design tokens (colors, typography, spacing) in Task 8 and propagate to Task 9. The existing sigma-1.com site serves as the primary visual reference.
-
-### 7a. Selected Design Direction
-
-No design selections were provided — `design_selections` was not present in the intake.
-
-### 7b. Design Deliberation Decisions
-
-No design deliberation was conducted — `design_deliberation_result` was not present in the intake.
+**Shared Design Tokens**:
+- A shared Tailwind configuration package must be created defining: color palette, spacing scale, border radii, typography (font families, sizes, weights)
+- Both web (shadcn/ui) and mobile (NativeWind) consume this shared config
+- This is the design system — not a shared component library, but shared design language
 
 ---
 
-## 8. Open Questions
+## 7a. Selected Design Direction
 
-The following items were not resolved in deliberation and are left to implementing agents' best judgment:
+No `design_selections` were provided. Implementing agents should follow the Stitch-generated artifacts and the PRD's specified technology stack (shadcn/ui, TailwindCSS 4, React 19) as the visual baseline. If Stitch outputs include specific screen designs, those should be treated as the design target.
 
-1. **Signal-CLI account rotation strategy** — How to handle Signal's anti-automation account bans. Pessimist flagged this as a runtime risk requiring monitoring and account rotation. Task 7 (Morgan) implementing agent should design a fallback/rotation plan.
+---
 
-2. **Signal-CLI memory management** — Signal-CLI is a Java process with known memory leaks under sustained load. Task 1 (Infrastructure) should set appropriate resource limits and restart policies on the sidecar container.
+## 7b. Design Deliberation Decisions
 
-3. **Currency rate sync frequency** — The PRD mentions a "scheduled job" for currency rate sync in the Finance service. The implementing agent for Task 4 should determine appropriate sync interval (hourly is typical for rental pricing).
+No `design_deliberation_result` was provided. The following design decisions were resolved during the technical deliberation and apply to frontend implementation:
 
-4. **Credit data API selection** — The Vetting service (Task 5) references "commercial credit APIs" without specifying which. The implementing agent should evaluate available options (Dun & Bradstreet, Experian Business, etc.) based on Canadian market availability and cost.
-
-5. **Google Reviews integration method** — Scraping vs. official API. Task 5 implementing agent should assess Google Business Profile API availability vs. fallback scraping approach.
-
-6. **
+| Decision | Category | Resolution |
+|----------|----------|------------|
+| Navigation paradigm (D10) | `ux-behavior` | Sidebar for web, bottom tabs for mobile |
+| Design system (D11) | `design-system` | shadcn/ui (web) + NativeWind 4 (mobile) with shared Tailwind token config |
 

@@ -1,22 +1,10 @@
-Implement subtask 9011: Configure EAS Build profiles, app branding, and production build pipeline
+Implement subtask 9011: Implement push notification setup with Expo Push Token registration
 
 ## Objective
-Set up EAS Build with development, preview, and production profiles. Configure app icons, splash screen, and branding assets. Verify builds for both iOS and Android platforms.
+Configure expo-notifications in the root app/_layout.tsx. On app launch, request notification permissions and register for an Expo Push Token. Store the token and POST it to the backend (or log it for manual backend configuration). Set up a notification received handler and a notification response handler that navigates to the quote tab when a quote-status notification is tapped.
 
 ## Steps
-1. Install EAS CLI: `npm install -g eas-cli`. Run `eas init` to link project.
-2. Create `eas.json` with three build profiles:
-   - `development`: development client build with expo-dev-client, internal distribution.
-   - `preview`: production-like build for testing, internal distribution (Ad Hoc for iOS, APK for Android).
-   - `production`: store-ready build with proper signing.
-3. Configure iOS provisioning: set up App Store Connect API key or Apple Developer credentials in EAS.
-4. Configure Android keystore: generate upload keystore, store in EAS secrets.
-5. Design and export app icon (1024x1024) matching Sigma-1 brand. Configure in `app.json` under `icon`.
-6. Design and export splash screen with Sigma-1 logo. Configure `splash` in `app.json` with background color matching dark theme.
-7. Configure adaptive icon for Android (foreground + background layers).
-8. Set `app.json` metadata: `name`, `slug`, `version`, `ios.bundleIdentifier`, `android.package`, `ios.buildNumber`, `android.versionCode`.
-9. Run `eas build --platform all --profile preview` to verify both platforms build successfully.
-10. Configure OTA updates via `expo-updates` for non-native code changes.
+In app/_layout.tsx useEffect: `const { status } = await Notifications.requestPermissionsAsync()`. If granted: `const token = (await Notifications.getExpoPushTokenAsync({ projectId: Constants.expoConfig.extra.eas.projectId })).data`. POST token to backend `/api/v1/notifications/register` with device metadata. Set notification handler: `Notifications.setNotificationHandler({ handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true }) })`. Add listener: `Notifications.addNotificationResponseReceivedListener(response => { if (response.notification.request.content.data.type === 'quote_status') router.push('/(tabs)/quote') })`. Configure notification channel for Android in Notifications.setNotificationChannelAsync.
 
 ## Validation
-Run `eas build --platform ios --profile preview` and verify it completes without errors and produces a valid .ipa. Run `eas build --platform android --profile preview` and verify it produces a valid .apk. Install preview builds on physical devices and verify app icon, splash screen, and basic navigation work. Verify `eas.json` contains all three profiles with correct distribution settings.
+Mock expo-notifications APIs in Jest. Assert requestPermissionsAsync called on mount. Assert getExpoPushTokenAsync called when permission granted. Assert POST to /api/v1/notifications/register with token value. Simulate notificationResponseReceived event with type='quote_status' — assert router.push called with '/(tabs)/quote'.

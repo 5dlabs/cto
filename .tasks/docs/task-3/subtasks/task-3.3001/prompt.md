@@ -1,17 +1,10 @@
-Implement subtask 3001: Initialize Go module and buf protobuf toolchain
+Implement subtask 3001: Initialize Go module and dependency manifest for RMS service
 
 ## Objective
-Set up the Go module, directory structure, and buf configuration for protobuf management and code generation across all 5 services.
+Create the Go module at services/rms with go.mod declaring all required dependencies: grpc, protobuf, grpc-gateway, pgx/v5, go-redis, uuid, decimal, zap, prometheus, google.golang.org/api, golang-migrate.
 
 ## Steps
-1. Run `go mod init github.com/sigma1/rms` with Go 1.22+.
-2. Create directory structure: `proto/`, `internal/`, `cmd/server/`, `db/migrations/`.
-3. Install and configure buf: create `buf.yaml` with `name: buf.build/sigma1/rms` and lint/breaking rules.
-4. Create `buf.gen.yaml` with plugins: `protoc-gen-go`, `protoc-gen-go-grpc`, `protoc-gen-grpc-gateway`, `protoc-gen-openapiv2`.
-5. Add `google/api/annotations.proto` and `google/api/http.proto` dependencies via buf BSR.
-6. Create a minimal `proto/rms/v1/common.proto` with shared message types: `Timestamp`, `Money`, `Address`, `PaginationRequest`, `PaginationResponse`, `OrgId`.
-7. Run `buf generate` to verify toolchain produces Go code in `gen/` directory.
-8. Add Makefile targets: `proto-gen`, `proto-lint`, `proto-breaking`.
+Run `go mod init github.com/sigma1/services/rms` inside services/rms. Add all dependencies listed in the task details with their pinned minimum versions using `go get`. Create a minimal main.go stub that compiles. Add a buf.yaml and buf.gen.yaml at the repo root or services/rms/proto level for protobuf code generation. Ensure `go build ./...` succeeds before any further work.
 
 ## Validation
-Run `buf lint` with zero errors. Run `buf generate` and verify Go files are generated in the expected output directory. Verify `go build ./...` succeeds with generated code.
+`go build ./...` exits 0. `go mod tidy` produces no changes. `buf lint` passes with zero errors.

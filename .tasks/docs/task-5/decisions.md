@@ -1,9 +1,8 @@
 ## Decision Points
 
-- LinkedIn data retrieval strategy: use official LinkedIn Company API (requires partnership/OAuth), or fall back to HTTP scraping of public company pages, or use a third-party enrichment service (e.g., Proxycurl, PeopleDataLabs). This affects reliability and legal compliance.
-- Google Reviews data source: Google Business Profile API vs Google Places API vs structured search scraping. Each has different pricing, rate limits, and ToS implications.
-- Credit provider selection: which commercial credit API to integrate (e.g., Dun & Bradstreet, Experian Business, CreditSafe)? The trait abstraction is decided, but the initial concrete implementation beyond the stub needs a vendor choice.
-- Scoring weight calibration: the 30/20/20/20/10 point allocation and GREEN≥70/YELLOW≥40/RED<40 thresholds are specified but may need business stakeholder validation before hardcoding.
+- Credit signal provider for Phase 2: Equifax vs. Dun & Bradstreet — affects data model fields, API contract, and cost. Should be decided before the stub is replaced so the schema does not need a breaking migration.
+- LinkedIn OAuth2 client_credentials flow availability: LinkedIn's API may require a partner program or specific product access for company lookup. Confirm API access tier and whether a fallback scraping approach is acceptable if partner access is unavailable.
+- Valkey vs. Redis for caching layer: the details mention both 'redis 0.24' crate and 'Valkey'. Confirm which backing store is provisioned by the bolt infra task so the connection string and crate choice are consistent.
 
 ## Coordination Notes
 

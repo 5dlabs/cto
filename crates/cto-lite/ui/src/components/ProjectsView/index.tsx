@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { PrdMarkdownEditor } from '@/components/PrdMarkdownEditor'
 import type { ProjectRecord, StudioState } from '@/lib/tauri'
 
 type ProjectsViewProps = {
@@ -125,19 +126,20 @@ export function ProjectsView({ state, onStateChange }: ProjectsViewProps) {
                 PRD
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid min-w-0 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+            <CardContent className="flex min-w-0 flex-col gap-6">
               <Field
                 label="PRD title"
                 value={selectedProject.prdTitle}
                 onChange={(value) => updateProject({ prdTitle: value })}
               />
-              <Field
-                label="PRD content"
-                value={selectedProject.prdContent}
-                onChange={(value) => updateProject({ prdContent: value })}
-                multiline
-                rows={16}
-              />
+              <div>
+                <p className="mb-3 text-[11px] uppercase tracking-[0.28em] text-cyan-100/70">PRD content</p>
+                <PrdMarkdownEditor
+                  value={selectedProject.prdContent}
+                  onChange={(value) => updateProject({ prdContent: value })}
+                  minHeightPx={380}
+                />
+              </div>
             </CardContent>
           </Card>
 

@@ -1,0 +1,10 @@
+Implement subtask 6014: Implement JWT middleware, health endpoints, Prometheus metrics, and GDPR endpoints
+
+## Objective
+Wire up JWT authentication middleware on all /api/v1/* routes, implement /health/live, /health/ready (postgres + redis + R2), /metrics with prom-client, GDPR export/delete internal endpoints, and the Kubernetes Deployment manifest.
+
+## Steps
+JWT middleware: use Elysia .derive() plugin to extract and verify Authorization: Bearer token using jsonwebtoken or jose with JWT_SECRET env var. Return 401 on invalid/missing token. Apply to all /api/v1/* routes using .guard(). Health: GET /health/live returns 200 {status:'ok'}. GET /health/ready: ping postgres (SELECT 1), ping redis (ioredis.ping()), ping R2 (HeadBucketCommand). Return 200 if all pass, 503 with failing deps otherwise. Metrics: register http_requests_total (Counter, labels method/path/status) and http_request_duration_seconds (Histogram) using prom-client. Expose GET /metrics in text format. GDPR: GET /internal/gdpr/export/:customer_id — query social_drafts and social_posts JOIN on event_id linkage, return JSON. DELETE /internal/gdpr/delete/:customer_id — UPDATE social_drafts SET event_id=NULL WHERE event_id IN (SELECT id FROM events WHERE customer_id=$1), return 200. Kubernetes: write k8s/deployment.yaml with 2 replicas, resource limits 512Mi/500m, envFrom referencing social-engine-config ConfigMap and social-engine-secret Secret, liveness/readiness probes.
+
+## Validation
+Request to /api/v1/social/drafts without JWT → 401. Request with valid JWT → 200. GET /health/ready with all deps up → 200. GET /health/ready with redis stopped → 503 with 'redis' in response. GET /metrics contains http_requests_total. DELETE /internal/gdpr/delete/:id returns 200; subsequent query for that customer's drafts shows event_id=NULL. `kubectl apply -f k8s/deployment.yaml --dry-run=client` succeeds.

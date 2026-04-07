@@ -1,17 +1,10 @@
-Implement subtask 5005: Implement Stage 2: Online Presence Check (LinkedIn and Website)
+Implement subtask 5005: Implement Google Reviews pipeline step and weighted scoring algorithm
 
 ## Objective
-Build the online presence stage that checks for a company's LinkedIn page existence and follower count, and probes for website existence via DNS/HTTP.
+Implement the third pipeline step (Google Places API for reviews) and the weighted scoring function that aggregates all four step results into a GREEN/YELLOW/RED final_score. The scoring logic must be unit-testable independently of HTTP calls.
 
 ## Steps
-1. Create `src/stages/online_presence.rs` module.
-2. Define `OnlinePresenceResult` struct: linkedin_exists (bool), linkedin_followers (i32), website_exists (bool), raw_responses (serde_json::Value).
-3. Implement LinkedIn check: attempt HTTP GET to `https://www.linkedin.com/company/{company_slug}/` with appropriate User-Agent header. Parse response for indicators of a valid company page (200 status, presence of follower count in meta tags or structured data). If official API is available, prefer that. Fallback: treat 200 as exists with followers=0 if count cannot be parsed.
-4. Implement website check: given the company domain, perform DNS lookup (tokio::net::lookup_host) and HTTP HEAD request. Website exists if either returns successfully.
-5. Run LinkedIn check and website check concurrently using `tokio::join!`.
-6. Use `ResilientClient` with `linkedin` circuit breaker for the LinkedIn request.
-7. On circuit open or failure, return linkedin_exists=false, linkedin_followers=0 with Unavailable note.
-8. Capture all raw HTTP responses for audit trail.
+Step 3 — Google Reviews: GET https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input={company_name}&inputtype=textquery&key={GOOGLE_PLACES_API_KEY}. Extract place_id from response. Then GET https://maps.googleapis.com/maps/api/place/details/json?place_id={id}&fields=rating,user_ratings_total&key={key}. Parse rating (FLOAT4) and user_ratings_total (INT). Wrap in 10s timeout. On failure push 'google_reviews_unavailable'. Step 4 — Credit stub: generate a mock credit_score in range 600-750, push 'credit_stub' into risk_flags to signal Phase 2 replacement. Scoring function (pure, no I/O): fn compute_score(business_verified: bool, linkedin_followers: i32, google_rating: f32, google_count: i32, credit_score: i32) -> &'static str. Weights: business_verified → 0 or 40 points; linkedin_score = min(linkedin_followers/1000.0, 1.0)*20; reviews_score = (google_rating/5.0)*min(google_count as f32/50.0, 1.0)*20; credit_component = ((credit_score-300) as f32/550.0).clamp(0.0,1.0)*20. Sum → >=70 GREEN, 40-69 YELLOW, <40 RED.
 
 ## Validation
-Unit tests with wiremock-rs: mock LinkedIn company page returning 200 with sample HTML containing follower count, verify linkedin_exists=true and followers parsed. Mock 404 for non-existent company. Mock DNS/HTTP for website existence check. Test concurrent execution of both checks. Verify graceful degradation when LinkedIn is unavailable.
+Unit test compute_score: (true, 500, 4.2, 20, 700) → GREEN. (false, 0, 0.0, 0, 0) → RED. (false, 200, 3.0, 10, 600) → YELLOW. Integration test mocking Places API: valid response → google_reviews_rating and google_reviews_count populated in vetting_results. Timeout mock → 'google_reviews_unavailable' in risk_flags.

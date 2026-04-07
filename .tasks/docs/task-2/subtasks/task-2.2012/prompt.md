@@ -1,28 +1,10 @@
-Implement subtask 2012: Build catalog service main entrypoint with router composition
+Implement subtask 2012: Write integration test suite and verify cargo-tarpaulin coverage >= 80%
 
 ## Objective
-Create the catalog service binary entrypoint that composes all routes, middleware layers, and shared infrastructure (DB pool, Valkey, metrics, rate limiting) into a running Axum server.
+Write sqlx-based integration tests using test transactions for catalog handlers, availability logic, and GDPR endpoints, then run cargo-tarpaulin to confirm >= 80% line coverage.
 
 ## Steps
-1. In `catalog/src/main.rs`:
-   - Parse config from environment using shared::config.
-   - Initialize PgPool via shared::db::create_pool().
-   - Run SQLx migrations on startup (`sqlx::migrate!().run(&pool).await`).
-   - Initialize Valkey client via shared::valkey::create_valkey_client().
-   - Initialize Prometheus metrics via shared::metrics::init_metrics().
-   - Build AppState struct holding PgPool, Valkey client, ApiKeyStore, PrometheusHandle.
-2. Compose the Axum router:
-   - Mount health routes at `/health/*`
-   - Mount metrics route at `/metrics`
-   - Mount catalog category/product routes at `/api/v1/catalog/*`
-   - Mount equipment API routes at `/api/v1/equipment-api/*`
-   - Mount GDPR routes at `/api/v1/gdpr/*`
-   - Apply metrics middleware globally
-   - Apply rate limiting middleware to public endpoints
-   - Apply API key auth middleware to admin and GDPR routes
-3. Bind to `0.0.0.0:8080` and start serving.
-4. Add graceful shutdown handling on SIGTERM.
-5. Add startup log with version, bound address, and configured endpoints.
+Create tests/integration_test.rs. Use #[sqlx::test] macro for DB tests (automatically creates and tears down a test database with migrations applied). Test cases: (1) test_create_and_list_products: insert category, insert product, call list handler, assert product appears. (2) test_availability_with_block: insert product with stock_quantity=2, insert availability_block for requested window with quantity_booked=2, call availability handler, assert quantity_available=0. (3) test_checkout_atomicity: two concurrent checkout tasks for the same product with quantity=1 and stock=1 — assert exactly one 201 and one 409. (4) test_gdpr_export_and_delete: insert block with customer_id, export, verify, delete, re-export empty. (5) test_rate_limiter_unit: call rate_limit logic with mocked redis responses 100 times success, 101st returns RateLimitExceeded. Add [dev-dependencies] in Cargo.toml: sqlx = {features = ['test']}, tokio = {features = ['test-util']}. Install cargo-tarpaulin: cargo install cargo-tarpaulin. Run: cargo tarpaulin --out Lcov --output-dir coverage/. Assert coverage >= 80% or CI fails.
 
 ## Validation
-Integration test: start the full application against test database and Valkey, verify all routes respond correctly (health, metrics, catalog, equipment-api, GDPR). Verify metrics middleware is recording. Verify rate limiting is active on public routes. Verify API key auth protects admin routes. Test graceful shutdown: send SIGTERM and verify in-flight requests complete.
+cargo test runs all integration tests with 0 failures. cargo tarpaulin outputs coverage percentage >= 80% in CI logs. Test (3) for checkout atomicity must demonstrate exactly 1 success and 1 conflict when run 10 times consecutively (no flakiness). Test output shows all 5 named test functions as passed.

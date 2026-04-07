@@ -1,19 +1,10 @@
-Implement subtask 10009: Ingress and TLS: configure Cloudflare Tunnel for all public endpoints
+Implement subtask 10009: Author CiliumNetworkPolicy for Morgan service
 
 ## Objective
-Configure a Cloudflare Tunnel (cloudflared) deployment to expose all sigma1 public endpoints with TLS termination at the Cloudflare edge.
+Create a CiliumNetworkPolicy for the Morgan pod selector. Allow ingress from cloudflared pods (Cloudflare Tunnel) and any web clients arriving through the tunnel. Allow egress to all 5 backend services, signal-cli pod, and the external FQDNs: ElevenLabs, Twilio.
 
 ## Steps
-Step-by-step:
-1. Create a `cloudflared` Deployment in the `ingress-system` namespace (or sigma1 if preferred).
-2. Create a Kubernetes Secret containing the Cloudflare Tunnel credentials JSON (tunnel ID, account tag, tunnel secret).
-3. Create a ConfigMap `cloudflared-config` with the ingress rules mapping hostnames to sigma1 services:
-   - `api.sigma1.example.com` → `http://equipment-catalog.sigma1.svc.cluster.local:8080`
-   - `rms.sigma1.example.com` → `http://rms.sigma1.svc.cluster.local:8080`
-   - Similar entries for finance, customer-vetting, and the Next.js frontend.
-   - Catch-all `http_status: 404`
-4. TLS is terminated at Cloudflare edge; internal traffic is plain HTTP within the cluster.
-5. Set replicas: 2 for cloudflared with pod anti-affinity for HA.
+Create helm/sigma1/templates/cnp-morgan.yaml. Ingress from pods with label `app: cloudflared` and from within the sigma1 namespace on the Morgan service port. Egress to all 5 service pods (equipment-catalog, rms, finance, customer-vetting, social-engine) and `app: signal-cli`, plus `toFQDNs: [{ matchName: 'api.elevenlabs.io' }, { matchName: 'api.twilio.com' }]` on port 443. Deny ingress from arbitrary internet IPs (only cloudflared terminates external traffic).
 
 ## Validation
-Deploy cloudflared and verify pods are running. Check Cloudflare dashboard to confirm tunnel is connected. Curl the public hostname (e.g., `curl https://api.sigma1.example.com/health`) from an external machine and verify a valid TLS-terminated response from the correct backend service.
+`kubectl exec <finance-pod> -- curl -s http://morgan-svc:3000/health` connection refused. `kubectl exec <cloudflared-pod> -- curl -s http://morgan-svc:3000/health` returns 200. `kubectl exec <morgan-pod> -- curl -s http://equipment-catalog-svc:8080/health` returns 200.

@@ -1,11 +1,12 @@
 ## Decision Points
 
-- AI model selection: OpenAI Vision API vs Claude for photo scoring and caption generation — cost, latency, and quality trade-offs need evaluation before implementation
-- Postgres client library choice: `@effect/sql-pg` (tighter Effect integration but less mature) vs `postgres` (postgresjs — battle-tested but requires manual Effect wrapping)
-- Instagram publishing: Instagram Graph API requires a Meta App Review process and business account — confirm whether OAuth tokens and app approval are already in place or if a sandbox/mock strategy is needed for v1
-- TikTok publishing: TikTok Content Posting API has restrictive access requirements — confirm whether API access is approved or if TikTok support should be deferred to a later iteration
+- Runtime choice: Bun vs. Node.js 20. The details mention both. Bun offers native Elysia performance but may have compatibility gaps with sharp and @aws-sdk/client-s3. This must be decided before project initialization (subtask 6001).
+- Caption generation provider: the description mentions both OpenAI and Claude (Anthropic). The details only reference OpenAI chat API. A single provider must be selected to avoid maintaining two SDK integrations in v1.
+- Signal notification mechanism for approval workflow: Signal does not have an official REST API. The implementation likely requires signal-cli or a third-party bridge. The specific integration approach and hosting must be decided before the approval workflow subtask.
+- TikTok Content Posting API access: TikTok's API requires approved developer access and is restricted for business use. Confirm API access availability and fallback strategy (e.g., skip TikTok for v1) before implementing TikTokService.
+- R2 bucket vs. S3: the stack mentions @aws-sdk/client-s3 but the storage is Cloudflare R2. Confirm the R2 endpoint, credentials format, and whether the S3-compatible SDK is the approved approach, or if a Cloudflare-native SDK is preferred.
 
 ## Coordination Notes
 
 - Agent owner: nova
-- Primary stack: Node.js 20+/Elysia 1.x + Effect 3.x
+- Primary stack: Node.js 20+/Elysia 1.x/Effect 3.x

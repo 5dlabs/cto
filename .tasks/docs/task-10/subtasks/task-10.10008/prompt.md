@@ -1,28 +1,10 @@
-Implement subtask 10008: Network policies: allow sigma1 egress to external APIs
+Implement subtask 10008: Author CiliumNetworkPolicy for social-engine service
 
 ## Objective
-Create egress NetworkPolicy allowing sigma1 services to reach external APIs (OpenCorporates, Stripe, Google, etc.) and DNS resolution.
+Create a CiliumNetworkPolicy for the social-engine pod selector. Allow ingress only from morgan. Allow egress to postgres, valkey, R2 endpoint, and the external social/AI API FQDNs: Instagram, LinkedIn, TikTok, Facebook, OpenAI.
 
 ## Steps
-Step-by-step:
-1. Create `netpol-allow-external-egress.yaml`:
-   - Since external API IPs change, use a broad egress allow for HTTPS (port 443) to `0.0.0.0/0` but exclude cluster CIDRs to prevent lateral movement:
-     ```yaml
-     egress:
-       - to:
-           - ipBlock:
-               cidr: 0.0.0.0/0
-               except:
-                 - 10.0.0.0/8
-                 - 172.16.0.0/12
-                 - 192.168.0.0/16
-         ports:
-           - protocol: TCP
-             port: 443
-     ```
-   - Apply to specific pods that need external access: customer-vetting (OpenCorporates), finance (Stripe), social-engine (Signal-CLI outbound if applicable).
-2. Separately ensure DNS egress is allowed (port 53 to kube-dns) — this should be in the db-access policy or a shared DNS policy.
-3. Create a dedicated `netpol-allow-dns.yaml` that allows all sigma1 pods egress to kube-dns on port 53 TCP/UDP.
+Create helm/sigma1/templates/cnp-social-engine.yaml. Ingress only from morgan. Egress to postgres and valkey, plus R2 FQDN, `graph.facebook.com`, `api.instagram.com`, `open.tiktokapis.com`, `api.linkedin.com`, `api.openai.com` on port 443.
 
 ## Validation
-From the customer-vetting pod, run `curl -I https://api.opencorporates.com` and verify a response is received. From the equipment-catalog pod (if it doesn't need external access), verify the same curl times out or is denied. Verify DNS resolution works from all sigma1 pods.
+`kubectl exec <rms-pod> -- curl -s http://social-engine-svc:8080/` connection refused. `kubectl exec <morgan-pod> -- curl -s http://social-engine-svc:8080/health` returns 200. `kubectl exec <social-engine-pod> -- curl -s https://api.openai.com` not blocked.

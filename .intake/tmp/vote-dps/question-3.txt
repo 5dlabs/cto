@@ -1,1 +1,1 @@
-JWT-based auth, session-based, or OAuth2/OIDC?
+How should API versioning be handled?

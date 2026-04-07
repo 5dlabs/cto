@@ -1,39 +1,29 @@
-Implement subtask 8011: Build Morgan web chat widget with WebSocket connection and rich messages
+Implement subtask 8011: Implement AI-native routes (llms.txt, llms-full) and Schema.org JSON-LD in layout
 
 ## Objective
-Implement the persistent floating chat widget for Morgan AI agent: bottom-right floating button, expandable near-full-screen chat UI, WebSocket connection, rich message support (product cards, quote summaries), typing indicators, localStorage message persistence, and minimizable state.
+Create the /llms.txt and /llms-full route handlers for AI crawler discoverability, and inject Schema.org Organization/LocalBusiness JSON-LD into the root layout.
 
 ## Steps
-1. Create `components/custom/ChatWidget.tsx` — Client Component, rendered in root layout.
-2. Floating trigger button:
-   - Fixed bottom-right position, circular button with chat icon and badge for unread count.
-   - Animated pulse/glow effect to draw attention (subtle, not obnoxious).
-3. Expanded chat interface:
-   - Near-full-screen panel (mobile: full screen, desktop: right-side panel ~400px wide, ~80vh tall).
-   - Header: 'Morgan' name, avatar, status indicator (online/typing), minimize/close buttons.
-   - Message list: scrollable, auto-scrolls to bottom on new messages.
-   - Input area: text input + send button, Enter to send.
-4. WebSocket connection (`hooks/useChatSocket.ts`):
-   - Connect to `NEXT_PUBLIC_WS_URL` with session ID.
-   - Generate/persist session ID in localStorage.
-   - Handle events: message, typing_start, typing_stop, error, connection status.
-   - Auto-reconnect with exponential backoff on disconnect.
-   - Effect-based WebSocket wrapper for clean error handling.
-5. Message types and rendering (`components/custom/ChatBubble.tsx`):
-   - Text messages: plain text bubbles (user right-aligned, Morgan left-aligned).
-   - Product cards: inline card with product image, name, price, 'View' link to `/equipment/:id`.
-   - Quote summaries: mini table of products, dates, estimated total.
-   - Availability results: date grid or text summary.
-   - Message status: sent ✓, delivered ✓✓ indicators.
-6. Typing indicator: animated dots shown when Morgan is composing.
-7. Persistence:
-   - Store message history in localStorage keyed by session ID.
-   - On page load, restore previous messages.
-   - Clear history option in settings.
-8. State management:
-   - Widget open/closed/minimized state persisted in localStorage.
-   - Remembers state across page navigations (SPA navigation doesn't unmount).
-9. Accessibility: focus trap when chat is open, Escape to close, aria-live for new messages.
+1. Create app/llms.txt/route.ts as a Next.js Route Handler:
+   - Returns Response with Content-Type: text/plain.
+   - Body: multi-line plain text including: company name (Sigma-1 / Perception Events), description of services (event lighting, visual production, equipment rental), contact email, website URL, and a list of equipment categories.
+   - Keep under 2000 characters.
+2. Create app/llms-full/route.ts as a Route Handler:
+   - Returns Response with Content-Type: application/json.
+   - Fetches categories and products server-side (or uses static cached data).
+   - Returns JSON: { company, services[], equipment_categories[], product_count, contact }.
+3. In app/layout.tsx, add a <script type='application/ld+json'> tag in <head> with Schema.org JSON-LD:
+   ```json
+   {
+     "@context": "https://schema.org",
+     "@type": ["Organization", "LocalBusiness"],
+     "name": "Sigma-1 / Perception Events",
+     "description": "Event lighting and visual production",
+     "url": "https://sigma1.com",
+     "contactPoint": { "@type": "ContactPoint", "contactType": "sales" }
+   }
+   ```
+4. Add <link rel='ai-content' href='/llms.txt' /> in layout <head>.
 
 ## Validation
-Unit test ChatWidget: verify floating button renders, click opens chat panel, click minimize collapses to button. Mock WebSocket: send a text message, verify it appears in message list as user bubble. Simulate Morgan response, verify it appears as Morgan bubble. Test rich messages: send mock product card message, verify image and product name render. Test typing indicator: simulate typing_start event, verify dots animation shown. Test localStorage persistence: send messages, unmount component, remount, verify messages restored. Test reconnection: simulate WebSocket close, verify reconnect attempt after delay.
+GET /llms.txt returns HTTP 200 with Content-Type: text/plain and body contains 'Sigma-1'. GET /llms-full returns HTTP 200 with Content-Type: application/json and parseable JSON containing company and equipment_categories fields. View page source of / — JSON-LD script tag is present with @type containing 'Organization'.

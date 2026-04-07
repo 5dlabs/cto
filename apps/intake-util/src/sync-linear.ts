@@ -12,7 +12,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import type { GeneratedTask } from './types';
 
 const LINEAR_API_URL = 'https://api.linear.app/graphql';
@@ -57,6 +57,7 @@ export interface InitResult {
   prdIdentifier: string;
   teamId: string;
   agentMap: Record<string, string>;
+  milestoneMap: Record<string, string>;
 }
 
 export interface SyncIssueEntry {
@@ -86,35 +87,67 @@ export interface SyncIssuesResult {
 // GraphQL Executor
 // =============================================================================
 
+const THROTTLE_MS = 500; // minimum gap between Linear API calls
+let lastCallAt = 0;
+
 async function execute<T>(apiKey: string, query: string, variables: Record<string, unknown> = {}): Promise<T> {
   const authHeader = apiKey.startsWith('lin_api_') ? apiKey : `Bearer ${apiKey}`;
+  const MAX_RETRIES = 8;
 
-  const response = await fetch(LINEAR_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: authHeader,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    // Throttle: enforce minimum gap between API calls
+    const now = Date.now();
+    const elapsed = now - lastCallAt;
+    if (elapsed < THROTTLE_MS) {
+      await new Promise((r) => setTimeout(r, THROTTLE_MS - elapsed));
+    }
+    lastCallAt = Date.now();
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Linear API returned ${response.status}: ${body}`);
+    const response = await fetch(LINEAR_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: authHeader,
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+
+    // Rate-limit / usage-limit: back off and retry
+    if (response.status === 429 || response.status === 503) {
+      const retryAfter = parseInt(response.headers.get('retry-after') ?? '', 10);
+      const waitMs = (retryAfter > 0 ? retryAfter : Math.min(2 ** attempt * 5, 60)) * 1000;
+      console.error(`Linear API ${response.status} — retrying in ${waitMs / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Linear API returned ${response.status}: ${body}`);
+    }
+
+    const json = (await response.json()) as GraphQLResponse<T>;
+
+    if (json.errors?.length) {
+      const messages = json.errors.map((e) => e.message).join(', ');
+      // Retry on usage/rate limit errors surfaced as GraphQL errors
+      if (messages.includes('usage limit') || messages.includes('rate limit')) {
+        const waitMs = Math.min(2 ** attempt * 5, 60) * 1000;
+        console.error(`Linear GraphQL limit hit — retrying in ${waitMs / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+      throw new Error(`GraphQL errors: ${messages}`);
+    }
+
+    if (!json.data) {
+      throw new Error('No data in GraphQL response');
+    }
+
+    return json.data;
   }
 
-  const json = (await response.json()) as GraphQLResponse<T>;
-
-  if (json.errors?.length) {
-    const messages = json.errors.map((e) => e.message).join(', ');
-    throw new Error(`GraphQL errors: ${messages}`);
-  }
-
-  if (!json.data) {
-    throw new Error('No data in GraphQL response');
-  }
-
-  return json.data;
+  throw new Error('Linear API: max retries exceeded due to rate/usage limits');
 }
 
 // =============================================================================
@@ -272,29 +305,68 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
   // Resolve team key (e.g., "CTOPA") → UUID
   const teamId = await resolveTeamId(apiKey, opts.teamId);
 
-  // 1. Create project
+  // 1. Find existing project by name, or create a new one
   interface ProjectResponse {
     projectCreate: { success: boolean; project?: LinearProject };
   }
-
-  const projectData = await execute<ProjectResponse>(
-    apiKey,
-    `mutation CreateProject($input: ProjectCreateInput!) {
-      projectCreate(input: $input) {
-        success
-        project { id name url }
-      }
-    }`,
-    { input: { name: projectName, teamIds: [teamId] } },
-  );
-
-  if (!projectData.projectCreate.success || !projectData.projectCreate.project) {
-    throw new Error('Failed to create Linear project');
+  interface ProjectSearchResponse {
+    projects: { nodes: LinearProject[] };
+  }
+  interface ProjectIssueCountResponse {
+    project: { issues: { nodes: { id: string }[] } };
   }
 
-  const project = projectData.projectCreate.project;
+  let project: LinearProject;
 
-  // 1b. Create custom views scoped to this project
+  const existingData = await execute<ProjectSearchResponse>(
+    apiKey,
+    `query FindProject($name: String!) {
+      projects(filter: { name: { eq: $name } }) {
+        nodes { id name url }
+      }
+    }`,
+    { name: projectName },
+  );
+
+  if (existingData.projects.nodes.length > 0) {
+    // If multiple projects share the same name, pick the one with the most issues
+    if (existingData.projects.nodes.length === 1) {
+      project = existingData.projects.nodes[0];
+    } else {
+      let best = existingData.projects.nodes[0];
+      let bestCount = 0;
+      for (const candidate of existingData.projects.nodes) {
+        try {
+          const countData = await execute<ProjectIssueCountResponse>(apiKey,
+            `query($id: String!) { project(id: $id) { issues { nodes { id } } } }`,
+            { id: candidate.id });
+          const count = countData.project.issues.nodes.length;
+          if (count > bestCount) { best = candidate; bestCount = count; }
+        } catch { /* use first as fallback */ }
+      }
+      project = best;
+    }
+    console.error(`Reusing existing Linear project: ${project.name} (${project.id})`);
+  } else {
+    const projectData = await execute<ProjectResponse>(
+      apiKey,
+      `mutation CreateProject($input: ProjectCreateInput!) {
+        projectCreate(input: $input) {
+          success
+          project { id name url }
+        }
+      }`,
+      { input: { name: projectName, teamIds: [teamId] } },
+    );
+
+    if (!projectData.projectCreate.success || !projectData.projectCreate.project) {
+      throw new Error('Failed to create Linear project');
+    }
+    project = projectData.projectCreate.project;
+    console.error(`Created new Linear project: ${project.name} (${project.id})`);
+  }
+
+  // 1b. Create single board view with pipeline stage milestones
   interface CustomViewResponse {
     customViewCreate: { success: boolean; customView?: { id: string; name: string } };
   }
@@ -308,52 +380,109 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
     viewPreferencesCreate(input: $input) { success }
   }`;
 
+  // Query existing custom views for this project to avoid duplicates
+  interface CustomViewListResponse {
+    customViews: { nodes: { id: string; name: string }[] };
+  }
+  const existingViews = new Set<string>();
+  try {
+    const viewList = await execute<CustomViewListResponse>(apiKey,
+      `query { customViews { nodes { id name } } }`, {});
+    for (const v of viewList.customViews.nodes) {
+      existingViews.add(v.name);
+    }
+  } catch {
+    // ignore — will attempt creation regardless
+  }
+
   const viewFilter = { project: { id: { eq: project.id } } };
 
-  // Helper: create a custom view and set its board preferences
-  async function createProjectView(
-    viewName: string,
-    grouping: string,
-  ): Promise<void> {
-    const viewData = await execute<CustomViewResponse>(apiKey, VIEW_MUTATION, {
-      input: {
-        name: viewName,
-        teamId,
-        projectId: project.id,
-        filterData: viewFilter,
-        shared: true,
-      },
-    });
-    if (viewData.customViewCreate.success && viewData.customViewCreate.customView) {
-      const viewId = viewData.customViewCreate.customView.id;
-      console.error(`Created view: ${viewData.customViewCreate.customView.name} (${viewId})`);
-      await execute(apiKey, PREFS_MUTATION, {
-        input: {
-          customViewId: viewId,
-          type: 'organization',
-          viewType: 'customView',
-          preferences: {
-            layout: 'board',
-            issueGrouping: grouping,
-            showSubIssues: true,
-          },
-        },
-      });
+  // Pipeline stage milestones — these become the board columns
+  const PIPELINE_STAGES = [
+    { name: 'Backlog', sortOrder: 0 },
+    { name: 'Implementation', sortOrder: 1 },
+    { name: 'Quality', sortOrder: 2 },
+    { name: 'Security', sortOrder: 3 },
+    { name: 'Testing', sortOrder: 4 },
+    { name: 'Deployment', sortOrder: 5 },
+  ] as const;
+
+  interface MilestoneResponse {
+    projectMilestoneCreate: { success: boolean; projectMilestone?: { id: string; name: string } };
+  }
+  interface ExistingMilestonesResponse {
+    project: { projectMilestones: { nodes: { id: string; name: string }[] } };
+  }
+  const milestoneMap: Record<string, string> = {};
+
+  // Check for existing milestones first (idempotent re-runs)
+  try {
+    const existing = await execute<ExistingMilestonesResponse>(apiKey,
+      `query GetMilestones($id: String!) { project(id: $id) { projectMilestones { nodes { id name } } } }`,
+      { id: project.id },
+    );
+    for (const ms of existing.project.projectMilestones.nodes) {
+      milestoneMap[ms.name.toLowerCase()] = ms.id;
+    }
+  } catch {
+    // ignore — will create fresh
+  }
+
+  for (const stage of PIPELINE_STAGES) {
+    if (milestoneMap[stage.name.toLowerCase()]) {
+      console.error(`Milestone exists: ${stage.name} (${milestoneMap[stage.name.toLowerCase()]})`);
+      continue;
+    }
+    try {
+      const msData = await execute<MilestoneResponse>(apiKey,
+        `mutation CreateMilestone($input: ProjectMilestoneCreateInput!) {
+          projectMilestoneCreate(input: $input) { success projectMilestone { id name } }
+        }`,
+        { input: { name: stage.name, projectId: project.id, sortOrder: stage.sortOrder } },
+      );
+      if (msData.projectMilestoneCreate.success && msData.projectMilestoneCreate.projectMilestone) {
+        milestoneMap[stage.name.toLowerCase()] = msData.projectMilestoneCreate.projectMilestone.id;
+        console.error(`Created milestone: ${stage.name}`);
+      }
+    } catch (err) {
+      console.error(`Warning: failed to create milestone ${stage.name}: ${err}`);
     }
   }
 
-  // Board view (Kanban grouped by status)
-  try {
-    await createProjectView(`${projectName} — Board`, 'status');
-  } catch (err) {
-    console.error(`Warning: failed to create project board view: ${err}`);
-  }
-
-  // Agent view (board grouped by assignee)
-  try {
-    await createProjectView(`${projectName} — By Agent`, 'assignee');
-  } catch (err) {
-    console.error(`Warning: failed to create project agent view: ${err}`);
+  // Single board view grouped by pipeline milestone
+  const viewName = `${projectName} — Pipeline`;
+  if (!existingViews.has(viewName)) {
+    try {
+      const viewData = await execute<CustomViewResponse>(apiKey, VIEW_MUTATION, {
+        input: {
+          name: viewName,
+          teamId,
+          projectId: project.id,
+          filterData: viewFilter,
+          shared: true,
+        },
+      });
+      if (viewData.customViewCreate.success && viewData.customViewCreate.customView) {
+        const viewId = viewData.customViewCreate.customView.id;
+        console.error(`Created view: ${viewData.customViewCreate.customView.name} (${viewId})`);
+        await execute(apiKey, PREFS_MUTATION, {
+          input: {
+            customViewId: viewId,
+            type: 'organization',
+            viewType: 'customView',
+            preferences: {
+              layout: 'board',
+              issueGrouping: 'projectMilestone',
+              showSubIssues: true,
+            },
+          },
+        });
+      }
+    } catch (err) {
+      console.error(`Warning: failed to create pipeline view: ${err}`);
+    }
+  } else {
+    console.error(`View exists: ${viewName} — skipping`);
   }
 
   // 2. Get/create labels
@@ -407,6 +536,7 @@ export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitR
     prdIdentifier: prdIssue.identifier,
     teamId,
     agentMap,
+    milestoneMap,
   };
 }
 
@@ -427,6 +557,8 @@ export interface SyncIssuesOptions {
   personalApiKey?: string;
   /** PM server URL for per-agent OAuth tokens (enables self-assignment). */
   pmUrl?: string;
+  /** Milestone ID map (lowercase name → id) from init phase. */
+  milestoneMap?: Record<string, string>;
 }
 
 /**
@@ -507,6 +639,81 @@ function readDocSnippet(filePath: string, maxChars: number): string {
   }
 }
 
+interface DeliberationAudioArtifact {
+  label: string;
+  mp3Path: string;
+  transcriptPath: string;
+  statusPath: string;
+  status: string;
+  mp3Exists: boolean;
+  transcriptExists: boolean;
+}
+
+function readJsonFile<T>(filePath: string): T | null {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T;
+  } catch {
+    return null;
+  }
+}
+
+function collectDeliberationAudioArtifacts(): DeliberationAudioArtifact[] {
+  const cwd = process.cwd();
+  const definitions = [
+    {
+      label: 'Architecture deliberation',
+      mp3Path: path.join(cwd, '.tasks', 'audio', 'architecture-deliberation.mp3'),
+      transcriptPath: path.join(cwd, '.tasks', 'audio', 'architecture-deliberation.transcript.json'),
+      statusPath: path.join(cwd, '.intake', 'audio', 'architecture-deliberation.status.json'),
+    },
+    {
+      label: 'Design deliberation',
+      mp3Path: path.join(cwd, '.tasks', 'audio', 'design-deliberation.mp3'),
+      transcriptPath: path.join(cwd, '.tasks', 'audio', 'design-deliberation.transcript.json'),
+      statusPath: path.join(cwd, '.intake', 'audio', 'design-deliberation.status.json'),
+    },
+  ];
+
+  return definitions.map((artifact) => {
+    const statusJson = readJsonFile<{ status?: string }>(artifact.statusPath);
+    const mp3Exists = fs.existsSync(artifact.mp3Path);
+    const transcriptExists = fs.existsSync(artifact.transcriptPath);
+    const status = mp3Exists ? 'ready' : (statusJson?.status ?? (transcriptExists ? 'pending' : 'not started'));
+    return {
+      ...artifact,
+      status,
+      mp3Exists,
+      transcriptExists,
+    };
+  });
+}
+
+function toRepoRelative(filePath: string): string {
+  return path.relative(process.cwd(), filePath).split(path.sep).join('/');
+}
+
+function buildDeliberationAudioSection(baseUrl: string): string[] {
+  const artifacts = collectDeliberationAudioArtifacts().filter((artifact) => artifact.transcriptExists || artifact.mp3Exists || artifact.status !== 'not started');
+  if (artifacts.length === 0) return [];
+
+  const lines: string[] = ['', '## Deliberation Audio'];
+  for (const artifact of artifacts) {
+    lines.push(`- **${artifact.label}:** ${artifact.status}`);
+    if (artifact.transcriptExists && baseUrl) {
+      const transcriptPath = toRepoRelative(artifact.transcriptPath);
+      lines.push(`  Transcript: [${transcriptPath}](${baseUrl}/${transcriptPath})`);
+    }
+    if (artifact.mp3Exists && baseUrl) {
+      const mp3Path = toRepoRelative(artifact.mp3Path);
+      lines.push(`  MP3: [${mp3Path}](${baseUrl}/${mp3Path})`);
+    } else if (!artifact.mp3Exists) {
+      lines.push('  MP3: pending background render');
+    }
+  }
+
+  return lines;
+}
+
 function buildTaskDescription(task: GeneratedTask, baseUrl: string, prUrl: string): string {
   const lines: string[] = [];
 
@@ -555,6 +762,8 @@ function buildTaskDescription(task: GeneratedTask, baseUrl: string, prUrl: strin
   if (prUrl) {
     lines.push('', `**PR:** ${prUrl}`);
   }
+
+  lines.push(...buildDeliberationAudioSection(baseUrl));
 
   const taskDocPath = path.join('.tasks', 'docs', `task-${task.id}`, 'task.md');
   const acceptanceDocPath = path.join('.tasks', 'docs', `task-${task.id}`, 'acceptance.md');
@@ -609,6 +818,8 @@ function buildSubtaskDescription(
     lines.push(`**PR:** ${prUrl}`);
   }
 
+  lines.push(...buildDeliberationAudioSection(baseUrl));
+
   const subtaskPromptPath = path.join('.tasks', 'docs', `task-${taskId}`, 'subtasks', `task-${taskId}.${subtask.id}`, 'prompt.md');
   const subtaskPrompt = readDocSnippet(subtaskPromptPath, 2500);
   if (subtaskPrompt) {
@@ -625,7 +836,8 @@ const PRIORITY_MAP: Record<string, number> = {
 };
 
 export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssuesResult> {
-  const { tasks, projectId, prdIssueId, baseUrl, prUrl, agentMap, apiKey, personalApiKey, pmUrl } = opts;
+  const { tasks, projectId, prdIssueId, baseUrl, prUrl, agentMap, apiKey, personalApiKey, pmUrl, milestoneMap } = opts;
+  const backlogMilestoneId = milestoneMap?.['backlog'] || undefined;
 
   // ── Agent Delegation Model ──
   // Linear's agent model uses "delegate" (not "assignee") for app users:
@@ -752,6 +964,7 @@ export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssue
     };
     if (labelIds.length > 0) issueInput.labelIds = labelIds;
     if (assigneeId) issueInput.assigneeId = assigneeId;
+    if (backlogMilestoneId) issueInput.projectMilestoneId = backlogMilestoneId;
     if (task.priority && PRIORITY_MAP[task.priority]) {
       issueInput.priority = PRIORITY_MAP[task.priority];
     }
@@ -965,6 +1178,7 @@ export interface GitHubSyncResult {
 
 export interface GitHubSyncOptions {
   projectId: string;
+  projectName?: string;
   repo: string;
   branch: string;
   apiKey: string;
@@ -980,9 +1194,9 @@ function sleep(ms: number): Promise<void> {
  * Execute a `gh` CLI command and return the trimmed stdout.
  * Throws on non-zero exit with the stderr message.
  */
-function gh(args: string): string {
+function gh(args: string[]): string {
   try {
-    return execSync(`gh ${args}`, {
+    return execFileSync('gh', args, {
       encoding: 'utf-8',
       timeout: 30_000,
       env: { ...process.env },
@@ -994,14 +1208,13 @@ function gh(args: string): string {
 }
 
 /**
- * Check if a GitHub issue with the exact title already exists in the repo.
+ * Check if an **open** GitHub issue with the exact title already exists in the repo.
  * Returns the issue number if found, undefined otherwise.
  */
 function findExistingGitHubIssue(repo: string, title: string): { number: number; url: string } | undefined {
   try {
-    // Search for issues with the exact title (open or closed)
     const result = gh(
-      `issue list --repo ${JSON.stringify(repo)} --search ${JSON.stringify(`"${title}" in:title`)} --json number,title,url --limit 50`,
+      ['issue', 'list', '--repo', repo, '--state', 'open', '--search', `"${title}" in:title`, '--json', 'number,title,url', '--limit', '50'],
     );
     if (!result) return undefined;
 
@@ -1013,18 +1226,132 @@ function findExistingGitHubIssue(repo: string, title: string): { number: number;
   }
 }
 
-/**
- * Add a GitHub issue to a GitHub Project (Projects v2).
- * Requires the `gh` CLI with the `project` extension or native support.
- */
-function addIssueToProject(repo: string, issueNumber: number, projectNumber: number): void {
+/** Agent display names for GitHub Project board columns. */
+const AGENT_DISPLAY_NAMES: Record<string, string> = {
+  bolt: 'Bolt (Infrastructure)',
+  rex: 'Rex (Implementation)',
+  blaze: 'Blaze (Frontend)',
+  grizz: 'Grizz (Go)',
+  nova: 'Nova (Node)',
+  tess: 'Tess (QA)',
+  cleo: 'Cleo (Quality)',
+  cipher: 'Cipher (Security)',
+  morgan: 'Morgan (PM)',
+  atlas: 'Atlas (Integration)',
+  stitch: 'Stitch (Review)',
+  angie: 'Angie (Agent Systems)',
+  spark: 'Spark (Prototype)',
+  tap: 'Tap (Integration)',
+  vex: 'Vex (Debug)',
+  keeper: 'Keeper (Ops)',
+  healer: 'Healer (Self-Heal)',
+  pixel: 'Pixel (Desktop)',
+};
+
+/** Extract agent name from issue title patterns like [bolt], [rex], etc. */
+function extractAgentFromTitle(title: string): string | undefined {
+  const match = title.match(/^\[(\w+)\]/);
+  if (match) {
+    const name = match[1].toLowerCase();
+    if (AGENT_DISPLAY_NAMES[name]) return name;
+  }
+  // PRD issues default to morgan
+  if (title.toLowerCase().startsWith('prd:')) return 'morgan';
+  return undefined;
+}
+
+/** Get the GitHub Projects V2 internal node ID for a project by its number. */
+function getProjectNodeId(owner: string, projectNumber: number): string | undefined {
   try {
-    const issueUrl = `https://github.com/${repo}/issues/${issueNumber}`;
-    gh(`project item-add ${projectNumber} --owner ${repo.split('/')[0]} --url ${JSON.stringify(issueUrl)}`);
-    console.error(`github-sync: added issue #${issueNumber} to project #${projectNumber}`);
+    return gh(['api', 'graphql', '-f',
+      `query=query { organization(login: "${owner}") { projectV2(number: ${projectNumber}) { id } } }`,
+      '--jq', '.data.organization.projectV2.id']).trim() || undefined;
+  } catch {
+    try {
+      return gh(['api', 'graphql', '-f',
+        `query=query { user(login: "${owner}") { projectV2(number: ${projectNumber}) { id } } }`,
+        '--jq', '.data.user.projectV2.id']).trim() || undefined;
+    } catch { return undefined; }
+  }
+}
+
+/** Create an "Agent" single-select field on a project with all agent options. */
+function setupAgentField(projectNodeId: string): { fieldId: string; optionMap: Record<string, string> } | undefined {
+  // Check if field already exists
+  try {
+    const fieldsJson = gh(['api', 'graphql', '-f',
+      `query=query { node(id: "${projectNodeId}") { ... on ProjectV2 { fields(first: 30) { nodes { ... on ProjectV2SingleSelectField { id name options { id name } } } } } } }`,
+      '--jq', '.data.node.fields.nodes']);
+    const fields = JSON.parse(fieldsJson);
+    const existing = fields.find((f: { name?: string }) => f?.name === 'Agent');
+    if (existing) {
+      const optionMap: Record<string, string> = {};
+      for (const opt of existing.options || []) {
+        optionMap[opt.name] = opt.id;
+      }
+      return { fieldId: existing.id, optionMap };
+    }
+  } catch { /* proceed to create */ }
+
+  // Create the field with agent options
+  const options = Object.values(AGENT_DISPLAY_NAMES)
+    .map((name) => `{ name: "${name}", color: GRAY, description: "" }`)
+    .join(', ');
+  // Also add Pending and Complete
+  const allOptions = `{ name: "Pending", color: YELLOW, description: "" }, ${options}, { name: "Complete ✅", color: GREEN, description: "" }`;
+  try {
+    const result = gh(['api', 'graphql', '-f',
+      `query=mutation { createProjectV2Field(input: { projectId: "${projectNodeId}", dataType: SINGLE_SELECT, name: "Agent", singleSelectOptions: [${allOptions}] }) { projectV2Field { ... on ProjectV2SingleSelectField { id options { id name } } } } }`,
+      '--jq', '.data.createProjectV2Field.projectV2Field']);
+    const field = JSON.parse(result);
+    const optionMap: Record<string, string> = {};
+    for (const opt of field.options || []) {
+      optionMap[opt.name] = opt.id;
+    }
+    console.error(`github-sync: created "Agent" field with ${Object.keys(optionMap).length} options`);
+    return { fieldId: field.id, optionMap };
   } catch (err) {
-    // Non-fatal — project integration is optional
+    console.error(`github-sync: warning: could not create Agent field: ${err}`);
+    return undefined;
+  }
+}
+
+/** Add issue to project and optionally set its Agent field. Returns the project item ID. */
+function addIssueToProject(
+  repo: string,
+  issueNumber: number,
+  projectNodeId: string,
+  agentField?: { fieldId: string; optionMap: Record<string, string> },
+  agentName?: string,
+): string | undefined {
+  try {
+    // Get issue node ID
+    const nodeId = gh(['api', `repos/${repo}/issues/${issueNumber}`, '--jq', '.node_id']).trim();
+    if (!nodeId) return undefined;
+
+    // Add to project
+    const itemResult = gh(['api', 'graphql', '-f',
+      `query=mutation { addProjectV2ItemById(input: { projectId: "${projectNodeId}", contentId: "${nodeId}" }) { item { id } } }`,
+      '--jq', '.data.addProjectV2ItemById.item.id']);
+    const itemId = itemResult.trim();
+    if (!itemId) return undefined;
+
+    // Set Agent field value if we have one
+    if (agentField && agentName) {
+      const displayName = AGENT_DISPLAY_NAMES[agentName] || 'Pending';
+      const optionId = agentField.optionMap[displayName] || agentField.optionMap['Pending'];
+      if (optionId) {
+        try {
+          gh(['api', 'graphql', '-f',
+            `query=mutation { updateProjectV2ItemFieldValue(input: { projectId: "${projectNodeId}", itemId: "${itemId}", fieldId: "${agentField.fieldId}", value: { singleSelectOptionId: "${optionId}" } }) { projectV2Item { id } } }`]);
+        } catch { /* non-fatal */ }
+      }
+    }
+
+    return itemId;
+  } catch (err) {
     console.error(`github-sync: warning: could not add issue #${issueNumber} to project: ${err}`);
+    return undefined;
   }
 }
 
@@ -1051,11 +1378,8 @@ function extractAgentLabel(labels: Array<{ name: string }>): string | undefined 
 /**
  * Sync all issues from a Linear project into GitHub issues with 1:1 mapping.
  *
- * For each Linear issue:
- *  1. Check if a GitHub issue with the same title already exists → skip
- *  2. Create a GitHub issue with matching title, body with Linear link, agent label
- *  3. Update the Linear issue description to include the GitHub issue link
- *  4. Optionally add the issue to a GitHub Project
+ * Creates a GitHub Project, mirrors the full Linear hierarchy (parent → sub-issues),
+ * uses full descriptions (no truncation), and links back to Linear.
  */
 export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubSyncResult> {
   const { projectId, repo, branch, apiKey, githubProject } = opts;
@@ -1064,33 +1388,45 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
   let createdCount = 0;
   let skippedCount = 0;
   let errorCount = 0;
-  let totalLinearIssues = 0;
-  let hasNextPage = true;
-  let cursor: string | undefined;
 
   console.error(`github-sync: syncing Linear project ${projectId} → GitHub repo ${repo} (branch: ${branch})`);
 
   // Verify gh CLI is available and authenticated
   try {
-    gh('auth status');
+    gh(['auth', 'status']);
   } catch (err) {
     throw new Error(`gh CLI is not authenticated. Run "gh auth login" first. Error: ${err}`);
   }
 
+  // Ensure required labels exist
+  for (const labelName of ['intake']) {
+    try {
+      gh(['label', 'create', labelName, '--repo', repo, '--force']);
+    } catch { /* label may already exist */ }
+  }
+
+  // 1. Fetch ALL issues from the Linear project with parent/child info
+  interface LinearIssueNode {
+    id: string;
+    identifier: string;
+    title: string;
+    description: string | null;
+    url: string;
+    labels: { nodes: Array<{ name: string }> };
+    parent: { id: string; identifier: string } | null;
+    children: { nodes: Array<{ id: string; identifier: string }> };
+  }
+
+  const allIssues: LinearIssueNode[] = [];
+  let hasNextPage = true;
+  let cursor: string | undefined;
+
   while (hasNextPage) {
     const afterClause = cursor ? `, after: "${cursor}"` : '';
-
     interface ProjectIssuesPage {
       project: {
         issues: {
-          nodes: Array<{
-            id: string;
-            identifier: string;
-            title: string;
-            description: string | null;
-            url: string;
-            labels: { nodes: Array<{ name: string }> };
-          }>;
+          nodes: LinearIssueNode[];
           pageInfo: { hasNextPage: boolean; endCursor: string | null };
         };
       };
@@ -1102,12 +1438,10 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
         project(id: $pid) {
           issues(first: 50${afterClause}) {
             nodes {
-              id
-              identifier
-              title
-              description
-              url
+              id identifier title description url
               labels { nodes { name } }
+              parent { id identifier }
+              children { nodes { id identifier } }
             }
             pageInfo { hasNextPage endCursor }
           }
@@ -1116,118 +1450,287 @@ export async function syncGitHubIssues(opts: GitHubSyncOptions): Promise<GitHubS
       { pid: projectId },
     );
 
-    const issues = page.project.issues.nodes;
-    const pageInfo = page.project.issues.pageInfo;
-    totalLinearIssues += issues.length;
+    allIssues.push(...page.project.issues.nodes);
+    hasNextPage = page.project.issues.pageInfo.hasNextPage;
+    cursor = page.project.issues.pageInfo.endCursor ?? undefined;
+  }
 
-    for (const issue of issues) {
-      // Check for existing GitHub issue with same title
-      const existing = findExistingGitHubIssue(repo, issue.title);
-      if (existing) {
-        console.error(`github-sync: skipping "${issue.identifier}" — GitHub issue #${existing.number} already exists`);
-        mappings.push({
-          linearId: issue.id,
-          linearIdentifier: issue.identifier,
-          linearTitle: issue.title,
-          githubIssueNumber: existing.number,
-          githubIssueUrl: existing.url,
-        });
-        skippedCount++;
+  console.error(`github-sync: fetched ${allIssues.length} Linear issues`);
+
+  // Build lookup maps
+  const identifierSet = new Set(allIssues.map((i) => i.identifier));
+  const issueByIdentifier = new Map(allIssues.map((i) => [i.identifier, i]));
+
+  // Classify hierarchy: roots have no parent in this project
+  const roots = allIssues.filter((i) => !i.parent || !identifierSet.has(i.parent.identifier));
+  const childrenOf = (parentId: string) =>
+    allIssues.filter((i) => i.parent && i.parent.identifier === parentId);
+
+  // Flatten to 2 levels: skip "wrapper" roots that only serve as containers
+  // (e.g., "Main Implementation Task"). Their children become top-level tasks,
+  // and leaves stay as sub-issues of those tasks.
+  const topLevelTasks: LinearIssueNode[] = [];
+  const skipIssues = new Set<string>();
+
+  for (const root of roots) {
+    const children = childrenOf(root.identifier);
+    const hasGrandchildren = children.some((c) => childrenOf(c.identifier).length > 0);
+
+    if (hasGrandchildren && children.length > 0) {
+      // This root is a 3-level wrapper — skip it, promote its children
+      skipIssues.add(root.identifier);
+      console.error(`github-sync: skipping wrapper "${root.title}" — promoting ${children.length} children to top-level`);
+      topLevelTasks.push(...children);
+    } else {
+      // Root is either a standalone issue or a direct parent of leaves — keep it
+      topLevelTasks.push(root);
+    }
+  }
+
+  // Build processing order: top-level tasks first, then their leaf children
+  const processingOrder: LinearIssueNode[] = [];
+  for (const task of topLevelTasks) {
+    processingOrder.push(task);
+    const leaves = childrenOf(task.identifier);
+    processingOrder.push(...leaves);
+  }
+  // Add standalone issues (PRDs, etc.) not yet seen
+  const seen = new Set(processingOrder.map((i) => i.identifier));
+  for (const issue of allIssues) {
+    if (!seen.has(issue.identifier) && !skipIssues.has(issue.identifier)) {
+      processingOrder.push(issue);
+    }
+  }
+
+  console.error(`github-sync: processing ${processingOrder.length} issues (${topLevelTasks.length} top-level tasks, ${skipIssues.size} wrappers skipped)`);
+
+  // 2. Create or find a GitHub Project + set up Agent field
+  const owner = repo.split('/')[0];
+  let ghProjectNumber: number | undefined = githubProject;
+  let ghProjectNodeId: string | undefined;
+
+  if (!ghProjectNumber) {
+    const projectTitle = opts.projectName || 'intake';
+    try {
+      let ownerId = '';
+      try {
+        ownerId = gh(['api', 'graphql', '-f', `query={ organization(login: "${owner}") { id } }`, '--jq', '.data.organization.id']);
+      } catch {
+        ownerId = gh(['api', 'graphql', '-f', `query={ user(login: "${owner}") { id } }`, '--jq', '.data.user.id']);
+      }
+      if (ownerId) {
+        const result = gh(['api', 'graphql', '-f',
+          `query=mutation { createProjectV2(input: { ownerId: "${ownerId}", title: "${projectTitle}" }) { projectV2 { id number url } } }`,
+          '--jq', '.data.createProjectV2.projectV2']);
+        const proj = JSON.parse(result);
+        ghProjectNumber = proj.number;
+        ghProjectNodeId = proj.id;
+        console.error(`github-sync: created GitHub Project #${ghProjectNumber}: ${projectTitle}`);
+        // Link project to the repository and set description
+        try {
+          const repoNodeId = gh(['api', `repos/${repo}`, '--jq', '.node_id']).trim();
+          if (repoNodeId && ghProjectNodeId) {
+            gh(['api', 'graphql', '-f',
+              `query=mutation { linkProjectV2ToRepository(input: { projectId: "${ghProjectNodeId}", repositoryId: "${repoNodeId}" }) { repository { name } } }`]);
+            console.error(`github-sync: linked project to ${repo}`);
+          }
+        } catch { /* non-fatal */ }
+        try {
+          const desc = `Intake-generated project board. Show Agent column, hide Assignees (agents use GitHub Apps).`;
+          gh(['api', 'graphql', '-f',
+            `query=mutation { updateProjectV2(input: { projectId: "${ghProjectNodeId}", shortDescription: "${desc}" }) { projectV2 { id } } }`]);
+        } catch { /* non-fatal */ }
+      }
+    } catch (err) {
+      console.error(`github-sync: warning: could not create GitHub Project: ${err}`);
+    }
+  } else {
+    ghProjectNodeId = getProjectNodeId(owner, ghProjectNumber);
+  }
+
+  // Set up Agent single-select field on the project board
+  let agentField: { fieldId: string; optionMap: Record<string, string> } | undefined;
+  if (ghProjectNodeId) {
+    agentField = setupAgentField(ghProjectNodeId);
+    if (agentField) {
+      console.error(`github-sync: Agent field ready with ${Object.keys(agentField.optionMap).length} options`);
+    }
+  }
+
+  // 3. Create issues in hierarchy order, tracking identifier → GitHub issue number + node ID
+  const ghIssueMap = new Map<string, { number: number; url: string; nodeId: string }>();
+  const repoUrl = `https://github.com/${repo}`;
+  const branchUrl = `${repoUrl}/tree/${branch}`;
+
+  for (const issue of processingOrder) {
+    // Check for existing GitHub issue with same title
+    const existing = findExistingGitHubIssue(repo, issue.title);
+    if (existing) {
+      console.error(`github-sync: skipping "${issue.identifier}" — GitHub issue #${existing.number} already exists`);
+      // Get node ID for sub-issue linking
+      try {
+        const nodeId = gh(['issue', 'view', String(existing.number), '--repo', repo, '--json', 'id', '--jq', '.id']);
+        ghIssueMap.set(issue.identifier, { number: existing.number, url: existing.url, nodeId });
+      } catch { /* best effort */ }
+      mappings.push({
+        linearId: issue.id,
+        linearIdentifier: issue.identifier,
+        linearTitle: issue.title,
+        githubIssueNumber: existing.number,
+        githubIssueUrl: existing.url,
+      });
+      skippedCount++;
+      continue;
+    }
+
+    // Build full body (no truncation)
+    const description = issue.description || '_No description._';
+    const body = [
+      `> **Linear issue:** [${issue.identifier}](${issue.url})`,
+      `> **Branch:** [\`${branch}\`](${branchUrl})`,
+      '',
+      '---',
+      '',
+      description,
+    ].join('\n');
+
+    // Determine labels
+    const agentLabel = extractAgentLabel(issue.labels.nodes);
+    const ghLabels: string[] = ['intake'];
+    if (agentLabel) ghLabels.push(agentLabel);
+
+    try {
+      const createArgs = ['issue', 'create', '--repo', repo, '--title', issue.title, '--body', body];
+      for (const l of ghLabels) {
+        createArgs.push('--label', l);
+      }
+
+      const createResult = gh(createArgs);
+      const ghIssueUrl = createResult.trim();
+      const ghIssueNumberMatch = ghIssueUrl.match(/\/issues\/(\d+)$/);
+      const ghIssueNumber = ghIssueNumberMatch ? parseInt(ghIssueNumberMatch[1], 10) : 0;
+
+      if (!ghIssueNumber) {
+        console.error(`github-sync: warning: could not parse issue number from: ${createResult}`);
+        errorCount++;
         continue;
       }
 
-      // Build GitHub issue body
-      const descSnippet = issue.description
-        ? issue.description.slice(0, 500) + (issue.description.length > 500 ? '\n\n…_(truncated)_' : '')
-        : '_No description._';
-
-      const repoUrl = `https://github.com/${repo}`;
-      const branchUrl = `${repoUrl}/tree/${branch}`;
-
-      const body = [
-        `> **Linear issue:** [${issue.identifier}](${issue.url})`,
-        `> **Branch:** [\`${branch}\`](${branchUrl})`,
-        '',
-        '---',
-        '',
-        descSnippet,
-      ].join('\n');
-
-      // Determine labels
-      const agentLabel = extractAgentLabel(issue.labels.nodes);
-      const ghLabels: string[] = ['intake'];
-      if (agentLabel) ghLabels.push(agentLabel);
-
+      // Get the node ID for sub-issue linking
+      let nodeId = '';
       try {
-        // Build label args
-        const labelArgs = ghLabels.map((l) => `--label ${JSON.stringify(l)}`).join(' ');
+        nodeId = gh(['issue', 'view', String(ghIssueNumber), '--repo', repo, '--json', 'id', '--jq', '.id']);
+      } catch { /* best effort */ }
 
-        // Create the GitHub issue
-        const createResult = gh(
-          `issue create --repo ${JSON.stringify(repo)} --title ${JSON.stringify(issue.title)} --body ${JSON.stringify(body)} ${labelArgs}`,
+      ghIssueMap.set(issue.identifier, { number: ghIssueNumber, url: ghIssueUrl, nodeId });
+
+      console.error(`github-sync: created GitHub issue #${ghIssueNumber} for ${issue.identifier}`);
+
+      mappings.push({
+        linearId: issue.id,
+        linearIdentifier: issue.identifier,
+        linearTitle: issue.title,
+        githubIssueNumber: ghIssueNumber,
+        githubIssueUrl: ghIssueUrl,
+      });
+      createdCount++;
+
+      // Back-link in Linear
+      const ghLink = `\n\n---\n🔗 **GitHub issue:** [#${ghIssueNumber}](${ghIssueUrl})`;
+      const updatedDescription = (issue.description || '') + ghLink;
+      try {
+        interface UpdateResult { issueUpdate: { success: boolean } }
+        await execute<UpdateResult>(apiKey,
+          `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`,
+          { id: issue.id, input: { description: updatedDescription } },
         );
-
-        // gh issue create outputs the issue URL on success
-        const ghIssueUrl = createResult.trim();
-        const ghIssueNumberMatch = ghIssueUrl.match(/\/issues\/(\d+)$/);
-        const ghIssueNumber = ghIssueNumberMatch ? parseInt(ghIssueNumberMatch[1], 10) : 0;
-
-        if (!ghIssueNumber) {
-          console.error(`github-sync: warning: could not parse issue number from: ${createResult}`);
-          errorCount++;
-          continue;
-        }
-
-        console.error(`github-sync: created GitHub issue #${ghIssueNumber} for ${issue.identifier}`);
-
-        mappings.push({
-          linearId: issue.id,
-          linearIdentifier: issue.identifier,
-          linearTitle: issue.title,
-          githubIssueNumber: ghIssueNumber,
-          githubIssueUrl: ghIssueUrl,
-        });
-        createdCount++;
-
-        // Update Linear issue description with a back-link to the GitHub issue
-        const ghLink = `\n\n---\n🔗 **GitHub issue:** [#${ghIssueNumber}](${ghIssueUrl})`;
-        const updatedDescription = (issue.description || '') + ghLink;
-
-        try {
-          interface UpdateResult {
-            issueUpdate: { success: boolean };
-          }
-          await execute<UpdateResult>(
-            apiKey,
-            `mutation($id: String!, $input: IssueUpdateInput!) {
-              issueUpdate(id: $id, input: $input) { success }
-            }`,
-            { id: issue.id, input: { description: updatedDescription } },
-          );
-        } catch (err) {
-          console.error(`github-sync: warning: could not update Linear issue ${issue.identifier} with back-link: ${err}`);
-        }
-
-        // Optionally add to GitHub Project
-        if (githubProject) {
-          addIssueToProject(repo, ghIssueNumber, githubProject);
-        }
-
-        // Rate limit: ~2s between creates to stay under 30/min
-        await sleep(2000);
       } catch (err) {
-        console.error(`github-sync: failed to create GitHub issue for ${issue.identifier}: ${err}`);
-        errorCount++;
+        console.error(`github-sync: warning: could not update Linear back-link for ${issue.identifier}: ${err}`);
       }
+
+      // Rate limit: ~2s between creates
+      await sleep(2000);
+    } catch (err) {
+      console.error(`github-sync: failed to create GitHub issue for ${issue.identifier}: ${err}`);
+      errorCount++;
     }
-
-    hasNextPage = pageInfo.hasNextPage;
-    cursor = pageInfo.endCursor ?? undefined;
-
-    console.error(
-      `github-sync: processed ${totalLinearIssues} Linear issues (${createdCount} created, ${skippedCount} skipped, ${errorCount} errors)`,
-    );
   }
 
-  return { createdCount, skippedCount, errorCount, totalLinearIssues, mappings };
+  // 4. Link sub-issues to parents via the GitHub sub-issues API
+  // Skip links where the parent was a skipped wrapper issue
+  console.error(`github-sync: linking sub-issues...`);
+  let linkedCount = 0;
+  let alreadyLinkedCount = 0;
+
+  for (const issue of allIssues) {
+    if (!issue.parent || !identifierSet.has(issue.parent.identifier)) continue;
+    if (skipIssues.has(issue.parent.identifier)) continue;  // parent was flattened out
+
+    const parentGh = ghIssueMap.get(issue.parent.identifier);
+    const childGh = ghIssueMap.get(issue.identifier);
+    if (!parentGh || !childGh || !childGh.nodeId) continue;
+
+    try {
+      // Check if already linked by fetching parent's sub-issues
+      const existingSubs = gh(['api', `repos/${repo}/issues/${parentGh.number}/sub_issues`, '--jq', '.[].number']);
+      const existingNums = new Set(existingSubs.trim().split('\n').filter(Boolean).map(Number));
+      if (existingNums.has(childGh.number)) {
+        alreadyLinkedCount++;
+        continue;
+      }
+
+      const issueJson = gh(['api', `repos/${repo}/issues/${childGh.number}`, '--jq', '.id']);
+      const databaseId = parseInt(issueJson.trim(), 10);
+      if (!databaseId) continue;
+
+      gh(['api', `repos/${repo}/issues/${parentGh.number}/sub_issues`, '--method', 'POST',
+        '-F', `sub_issue_id=${databaseId}`]);
+      linkedCount++;
+      console.error(`github-sync: linked #${childGh.number} as sub-issue of #${parentGh.number}`);
+      await sleep(1000);
+    } catch (err) {
+      console.error(`github-sync: warning: could not link ${issue.identifier} → ${issue.parent.identifier}: ${err}`);
+    }
+  }
+  if (alreadyLinkedCount) {
+    console.error(`github-sync: ${alreadyLinkedCount} sub-issue links already existed (skipped)`);
+  }
+
+  // 5. Add all issues to GitHub Project with agent assignment
+  let projectAddedCount = 0;
+  if (ghProjectNodeId) {
+    console.error(`github-sync: populating GitHub Project board...`);
+    for (const issue of processingOrder) {
+      const ghEntry = ghIssueMap.get(issue.identifier);
+      if (!ghEntry) continue;
+
+      // Determine agent: check own title, own labels, then inherit from parent
+      let agentName = extractAgentFromTitle(issue.title)
+        || extractAgentLabel(issue.labels?.nodes || [])?.replace('agent:', '');
+
+      if (!agentName && issue.parent) {
+        const parent = issueByIdentifier.get(issue.parent.identifier);
+        if (parent) {
+          agentName = extractAgentFromTitle(parent.title)
+            || extractAgentLabel(parent.labels?.nodes || [])?.replace('agent:', '');
+        }
+      }
+
+      const itemId = addIssueToProject(repo, ghEntry.number, ghProjectNodeId, agentField, agentName);
+      if (itemId) {
+        projectAddedCount++;
+        if (projectAddedCount % 10 === 0) {
+          console.error(`github-sync: added ${projectAddedCount} issues to project...`);
+        }
+      }
+      await sleep(500);
+    }
+    console.error(`github-sync: added ${projectAddedCount} issues to project #${ghProjectNumber}`);
+  }
+
+  console.error(
+    `github-sync: done — ${createdCount} created, ${skippedCount} skipped, ${errorCount} errors, ${linkedCount} sub-issue links, ${projectAddedCount} in project`,
+  );
+
+  return { createdCount, skippedCount, errorCount, totalLinearIssues: allIssues.length, mappings };
 }

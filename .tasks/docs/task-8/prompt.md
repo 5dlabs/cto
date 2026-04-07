@@ -1,79 +1,47 @@
-Implement task 8: Develop Web Frontend (Blaze - React/Next.js)
+Implement task 8: Build Sigma-1 Website (Blaze - Next.js 15/React 19/Effect)
 
 ## Goal
-Build the Sigma-1 website with Next.js 15 App Router, React 19, shadcn/ui, TailwindCSS 4, and Effect for data fetching/validation. Features equipment catalog with real-time availability, self-service quote builder, Morgan web chat widget, project portfolio, and AI-native optimization (llms.txt, Schema.org).
+Build the Sigma-1 public website using Next.js 15 App Router, React 19, shadcn/ui, TailwindCSS 4, and Effect 3.x. Implements equipment catalog browsing with real-time availability, self-service quote builder, Morgan web chat widget, project portfolio gallery, and AI-native optimizations (llms.txt, Schema.org). Deployed to Cloudflare Pages. Uses sidebar navigation on desktop, responsive collapse on mobile.
 
 ## Task Context
 - Agent owner: blaze
-- Stack: React 19/Next.js 15 + Effect 3.x
+- Stack: Next.js 15/React 19/TailwindCSS 4/Effect 3.x
 - Priority: high
 - Dependencies: 2, 7
 
 ## Implementation Plan
-1. Initialize Next.js 15 project with App Router, TypeScript 5.x, TailwindCSS 4, shadcn/ui.
-   - Configure Effect 3.x integration for data fetching and schema validation.
-   - Set up TanStack Query with Effect for server state management.
-   - Establish design tokens referencing existing sigma-1.com visual direction: dark/moody palette appropriate for lighting/visual production company, professional typography, generous spacing.
-2. Pages and routes:
-   - **`/` (Home)**: Hero section with video/image background showcasing lighting production, value proposition, CTA buttons ("Browse Equipment", "Get a Quote", "Chat with Morgan"). SEO metadata, Schema.org Organization markup.
-   - **`/equipment` (Catalog)**: Server-rendered product grid with category sidebar. Filterable by category, searchable by name. Pagination. Each product card shows image (from R2 CDN), name, day rate, availability indicator. Uses `GET /api/v1/catalog/categories` and `GET /api/v1/catalog/products`.
-   - **`/equipment/:id` (Product Detail)**: Full product info with image gallery, specs table (from JSONB), day rate, availability calendar component. Date range picker triggers `GET /api/v1/catalog/products/:id/availability`. "Add to Quote" button. Effect Schema validation for date inputs.
-   - **`/quote` (Quote Builder)**: Multi-step form: 1) Select products (from catalog, with availability check), 2) Event details (date range, venue, contact info), 3) Review & submit. Form state managed with Effect. Submits to Morgan or directly to RMS opportunities endpoint. Confirmation page with opportunity reference.
-   - **`/portfolio` (Portfolio)**: Gallery of past events with photos (from social engine published posts or static content). Filterable by event type. Lazy-loaded image grid.
-   - **`/llms.txt` (AI)**: Static route returning plain text machine-readable site description for AI agents.
-   - **`/llms-full` (AI)**: Full content dump including equipment catalog summary, services, pricing ranges.
-3. Morgan Web Chat Widget:
-   - Persistent bottom-right floating button (per D10 resolution).
-   - On click, expands to near-full-screen chat interface.
-   - WebSocket connection to Morgan agent.
-   - Message history persisted in localStorage with session ID.
-   - Support for rich messages: product cards, quote summaries, availability results.
-   - Typing indicators, message status (sent/delivered/read).
-   - Minimizable, closable, remembers state across page navigations.
-4. Component library:
-   - Install and configure shadcn/ui components: Button, Card, Dialog, Form, Input, Select, Table, Tabs, Badge, Calendar, Sheet, Popover.
-   - Custom components: ProductCard, AvailabilityCalendar, QuoteLineItem, ChatBubble, ChatWidget.
-   - Design tokens in `tailwind.config.ts`: colors (dark theme with accent colors), border radius, font family.
-5. Data fetching pattern:
-   - Server Components for initial data (categories, product lists) using Effect + fetch.
-   - Client Components with TanStack Query + Effect for interactive data (availability checks, search).
-   - API base URL from environment variable pointing to backend services (or API gateway).
-6. SEO and AI optimization:
-   - Schema.org structured data on all pages: Organization, Product (on equipment pages), Event (on portfolio).
-   - OpenGraph and Twitter Card meta tags.
-   - Sitemap.xml generation.
-   - `robots.txt` allowing all crawlers.
-7. Accessibility:
-   - shadcn/ui provides Radix UI accessibility primitives.
-   - Verify WCAG 2.1 AA compliance: keyboard navigation, screen reader labels, color contrast.
-8. Performance:
-   - Image optimization via Next.js Image component with R2 CDN loader.
-   - Static generation for home, portfolio pages.
-   - Dynamic rendering for equipment catalog (filterable/searchable).
-   - Target: Lighthouse Performance > 90, Accessibility > 95.
-9. Deployment:
-   - Configure for Cloudflare Pages deployment (using `@cloudflare/next-on-pages` adapter).
-   - Environment variables for API endpoints.
-   - Build output optimized for edge runtime where possible.
+1. Initialize Next.js 15 project at apps/website using create-next-app with App Router, TypeScript, TailwindCSS 4. Install: shadcn/ui (latest), effect@3.x, @effect/schema, @tanstack/react-query v5, next@15, react@19, tailwindcss@4, @cloudflare/next-on-pages.
+2. Create shared Tailwind config package at packages/design-tokens/tailwind.config.ts. Define: colors (sigma1 brand palette — dark background, accent electric blue/cyan per Stitch artifacts), spacing scale, border radii, font families (Geist or Inter). Export as module. Import in both apps/website and apps/mobile.
+3. shadcn/ui initialization: npx shadcn-ui init with New York style, TailwindCSS 4. Install components: Button, Card, Badge, Sheet, Sidebar, Dialog, Select, Input, Skeleton, Avatar, Table, Tabs.
+4. App Router structure: app/layout.tsx (root layout with sidebar nav), app/page.tsx (hero + value prop + CTA), app/equipment/page.tsx (catalog browser), app/equipment/[id]/page.tsx (product detail + availability), app/quote/page.tsx (quote builder), app/portfolio/page.tsx (event gallery), app/llms.txt/route.ts (static text route), app/llms-full/route.ts (full content route).
+5. Effect data fetching: create lib/api.ts defining Effect.Service ApiClient with base URL from NEXT_PUBLIC_API_URL env var. Define Effect.Schema types for Product, Category, Availability, Opportunity matching backend response shapes. Use Effect.runPromise in server components or React Query integration for client components.
+6. Equipment catalog page: server component fetching GET /api/v1/catalog/categories and GET /api/v1/catalog/products. Client-side filtering by category, search input with debounce (300ms). Product cards with image (next/image pointing to R2 CDN URLs), name, day_rate, availability badge.
+7. Product detail page (/equipment/[id]): fetch product details server-side. Client-side availability date picker (react-day-picker), calls GET /api/v1/catalog/products/:id/availability?from=&to= on date change via TanStack Query. Show quantity_available in real time. Add to Quote button.
+8. Quote builder (/quote): client component. State: selected products (from equipment catalog), event dates, customer info. Effect.Schema validation on form fields. On submit: POST /api/v1/opportunities via RMS. Show confirmation with quote ID.
+9. Portfolio (/portfolio): fetch GET /api/v1/social/published. Masonry grid of published event photos with lightbox (vaul or next/image modal). Event caption and hashtags displayed.
+10. Morgan web chat widget: embed Morgan chat JS snippet in root layout.tsx as next/script (strategy=afterInteractive) pointing to http://morgan-chat-svc:3000/widget.js (via Cloudflare Tunnel public URL). Floating chat button, slide-up panel.
+11. AI-native: app/llms.txt/route.ts returns plain text describing company, services, contact. app/llms-full/route.ts returns JSON dump of catalog categories, products summary. Add Schema.org JSON-LD in layout.tsx (Organization, LocalBusiness).
+12. Sidebar navigation: shadcn/ui Sidebar component for desktop (> 768px). Mobile: Sheet-based hamburger menu. Nav links: Home, Equipment, Quote, Portfolio, Contact.
+13. Cloudflare Pages deployment: wrangler.toml with pages_build_output_dir=.vercel/output/static. GitHub Actions workflow triggers next-on-pages build and wrangler pages deploy on push to main.
+14. Environment variables: NEXT_PUBLIC_API_URL (equipment catalog base), NEXT_PUBLIC_MORGAN_WIDGET_URL (Morgan chat endpoint).
 
 ## Acceptance Criteria
-1. Component unit tests (Vitest + React Testing Library): ProductCard renders name, image, price; AvailabilityCalendar shows available/unavailable dates; ChatWidget opens/closes correctly. 2. Page integration tests: `/equipment` page renders product grid after mocking catalog API; `/equipment/:id` shows product details and availability calendar. 3. Quote builder flow test: add 2 products, fill event details, submit, verify API call made with correct payload. 4. Chat widget test: mock WebSocket, send message, verify message appears in chat, verify typing indicator shows during response. 5. SEO test: verify Schema.org JSON-LD present on home page (Organization), equipment page (Product). Verify `llms.txt` returns plain text with correct content. 6. Accessibility audit: run axe-core on all pages, verify zero critical/serious violations. 7. Lighthouse CI: Performance > 90, Accessibility > 95, Best Practices > 90 on home and equipment pages. 8. Cloudflare Pages build: `npx @cloudflare/next-on-pages` completes without errors. 9. Responsive test: verify equipment grid renders correctly at mobile (375px), tablet (768px), desktop (1440px) widths.
+1. next build completes without TypeScript errors or missing module errors. 2. GET / renders hero section with CTA button linking to /equipment and /quote (Playwright snapshot test). 3. GET /equipment displays product grid; filter by category 'Lighting' shows only lighting products (Playwright interaction test). 4. GET /equipment/:id with a valid product ID shows product name, day_rate, and availability date picker; selecting dates within 7 days updates availability badge without full page reload (Playwright assertion on DOM change). 5. POST quote form on /quote with valid data creates opportunity — mock API returns 201, UI shows confirmation panel with quote ID. 6. GET /llms.txt returns Content-Type: text/plain and body contains company name Sigma-1. 7. Lighthouse score on / >= 90 for Performance and Accessibility (measured via CI Lighthouse action). 8. Morgan chat widget: chat button visible on all pages, clicking opens panel, panel renders iframe/widget pointing to NEXT_PUBLIC_MORGAN_WIDGET_URL.
 
 ## Subtasks
-- Initialize Next.js 15 project with App Router, TypeScript, and TailwindCSS 4: Scaffold the Next.js 15 project with App Router, TypeScript 5.x strict mode, and TailwindCSS 4. Configure project structure with app directory, layout files, global styles, and environment variable handling for API endpoints and CDN URLs.
-- Configure shadcn/ui component library and design token system: Install and configure shadcn/ui with Radix UI primitives. Define the dark/moody design token system in tailwind.config.ts reflecting the Sigma-1 lighting/production company brand: dark palette, accent colors, professional typography, generous spacing.
-- Set up Effect 3.x integration and TanStack Query data fetching layer: Configure Effect 3.x for schema validation and data fetching. Integrate TanStack Query with Effect programs for client-side server state management. Create reusable API client utilities and Effect schemas for catalog, availability, and quote payloads.
-- Build Home page with hero section, CTAs, and Schema.org Organization markup: Implement the `/` (Home) route as a statically generated page with a video/image hero background showcasing lighting production, value proposition text, CTA buttons ('Browse Equipment', 'Get a Quote', 'Chat with Morgan'), and Schema.org Organization JSON-LD.
-- Build Equipment Catalog listing page with filtering, search, and pagination: Implement the `/equipment` route with a server-rendered product grid, category sidebar filter, search-by-name input, and pagination. Each ProductCard displays image, name, day rate, and availability indicator. Data fetched from catalog API endpoints.
-- Build Product Detail page with image gallery, specs table, and Add to Quote: Implement the `/equipment/:id` route showing full product information: image gallery, specifications table (from JSONB data), day rate, and an 'Add to Quote' button that stores selection in quote builder state.
-- Build AvailabilityCalendar component with date range picker: Create the AvailabilityCalendar custom component that displays available/unavailable dates for a product and integrates a date range picker. Fetches availability data from the API with Effect Schema validation for date inputs.
-- Build Quote Builder multi-step form: Implement the `/quote` route with a multi-step form: Step 1 — select products with availability check, Step 2 — event details (date range, venue, contact info), Step 3 — review and submit. Form state managed with Effect, submission to backend API.
-- Build Portfolio page with filterable gallery and lazy-loaded images: Implement the `/portfolio` route as a statically generated gallery of past events with photos, filterable by event type, with lazy-loaded image grid and Schema.org Event markup.
-- Build SEO infrastructure: sitemap.xml, robots.txt, llms.txt, and llms-full routes: Implement sitemap.xml generation, robots.txt, and the AI-native optimization routes `/llms.txt` and `/llms-full` returning plain text machine-readable site descriptions.
-- Build Morgan web chat widget with WebSocket connection and rich messages: Implement the persistent floating chat widget for Morgan AI agent: bottom-right floating button, expandable near-full-screen chat UI, WebSocket connection, rich message support (product cards, quote summaries), typing indicators, localStorage message persistence, and minimizable state.
-- Accessibility audit and WCAG 2.1 AA compliance verification: Run comprehensive accessibility audit across all pages using axe-core, verify WCAG 2.1 AA compliance including keyboard navigation, screen reader labels, color contrast, and focus management. Fix any violations found.
-- Performance optimization and Lighthouse CI targets: Optimize all pages for Lighthouse Performance > 90 and Accessibility > 95. Configure Next.js Image with R2 CDN loader, static generation for appropriate pages, code splitting, and bundle analysis.
-- Configure Cloudflare Pages deployment with @cloudflare/next-on-pages: Set up the project for Cloudflare Pages deployment using the @cloudflare/next-on-pages adapter. Configure edge runtime compatibility, environment variables, build output, and wrangler configuration.
+- Initialize Next.js 15 project at apps/website with TypeScript and TailwindCSS 4: Scaffold the Next.js 15 App Router project with all required dependencies installed and baseline configuration files in place.
+- Create shared design tokens Tailwind config package at packages/design-tokens: Build the shared Tailwind configuration package defining the Sigma-1 brand palette, typography, spacing, and border radius tokens, importable by apps/website.
+- Initialize shadcn/ui with New York style and install all required components: Run shadcn/ui initialization configured for New York style and TailwindCSS 4, then install all component primitives needed across the site.
+- Build root layout with sidebar navigation and mobile hamburger menu: Implement app/layout.tsx with the shadcn/ui Sidebar for desktop and Sheet-based hamburger menu for mobile, plus nav links to all pages.
+- Implement Effect ApiClient service and Effect.Schema type definitions for all backend response shapes: Create lib/api.ts with an Effect.Service-based ApiClient and define Effect.Schema schemas for all backend data types used across the site.
+- Build hero page (app/page.tsx) with value proposition and CTAs: Implement the homepage with a hero section, Sigma-1 value proposition copy, and CTA buttons linking to /equipment and /quote.
+- Build equipment catalog page (app/equipment/page.tsx) with category filter and search: Implement the equipment catalog browser as a server-rendered page with client-side category filtering, debounced search, and product cards displaying image, name, day rate, and availability badge.
+- Build product detail page (app/equipment/[id]/page.tsx) with real-time availability date picker: Implement the individual product detail page with server-side product data fetch and client-side date range picker that updates the availability badge in real time via TanStack Query.
+- Build quote builder page (app/quote/page.tsx) with Effect.Schema validation and RMS submission: Implement the self-service quote builder as a client component with pre-populated items from localStorage, customer info form with Effect.Schema validation, and RMS opportunity creation on submit.
+- Build portfolio page (app/portfolio/page.tsx) with masonry grid and lightbox: Implement the event portfolio page fetching published social posts and displaying them in a masonry grid with a lightbox modal for full-size image viewing.
+- Implement AI-native routes (llms.txt, llms-full) and Schema.org JSON-LD in layout: Create the /llms.txt and /llms-full route handlers for AI crawler discoverability, and inject Schema.org Organization/LocalBusiness JSON-LD into the root layout.
+- Embed Morgan web chat widget in root layout via next/script: Add the Morgan chat widget JavaScript to the root layout using next/script with afterInteractive strategy, sourcing the URL from the NEXT_PUBLIC_MORGAN_WIDGET_URL environment variable.
+- Configure Cloudflare Pages deployment with wrangler.toml and GitHub Actions workflow: Set up the Cloudflare Pages deployment pipeline using @cloudflare/next-on-pages, wrangler.toml configuration, and a GitHub Actions workflow that builds and deploys on push to main.
 
 ## Deliverables
 - Update the relevant code, configuration, and tests.

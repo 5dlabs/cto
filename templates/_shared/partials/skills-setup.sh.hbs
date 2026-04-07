@@ -1,11 +1,11 @@
 # =========================================================================
-# Skills Setup - Copy skills to a native skill directory and print what loaded
+# Skills Setup - Write skills inline (content embedded at render time)
 #
 # Usage:
 #   \{\{> skills-setup skills_target="$CLAUDE_WORK_DIR/.claude/skills" skills_label="Claude Code" \}\}
 #
 # Required context variables:
-#   - skills: array of skill names (directories under /templates/skills/*/<skill>/SKILL.md)
+#   - skills: array of {name, content} objects (content embedded by controller at render time)
 #
 # Required partial params:
 #   - skills_target: destination directory (string, may include env vars like $CLAUDE_WORK_DIR)
@@ -19,43 +19,29 @@ echo "════════════════════════�
 echo "║               SKILLS SETUP                                   ║"
 echo "═══════════════════════════════════════════════════════════════"
 
-SKILLS_SOURCE="${SKILLS_PATH:-/templates/skills}"
 SKILLS_TARGET="{{skills_target}}"
 
 echo "Setting up {{#if skills_label}}{{skills_label}}{{else}}agent{{/if}} skills..."
-echo "  ✓ Source: $SKILLS_SOURCE"
 echo "  ✓ Target: $SKILLS_TARGET"
 
 mkdir -p "$SKILLS_TARGET"
 
 LOADED_SKILLS=""
+SKILLS_LOADED_COUNT=0
 
 {{#each skills}}
-SKILL_NAME="{{this}}"
-FOUND=0
-
-# Find skill in any category subdirectory
-for category in stacks auth context design documents languages llm-docs platforms quality security workflow animations tools; do
-    if [ -f "$SKILLS_SOURCE/$category/$SKILL_NAME/SKILL.md" ]; then
-        mkdir -p "$SKILLS_TARGET/$SKILL_NAME"
-        cp "$SKILLS_SOURCE/$category/$SKILL_NAME/SKILL.md" "$SKILLS_TARGET/$SKILL_NAME/"
-        echo "  ✓ Loaded skill: $SKILL_NAME"
-        LOADED_SKILLS="${LOADED_SKILLS}${LOADED_SKILLS:+ }$SKILL_NAME"
-        FOUND=1
-        break
-    fi
-done
-
-if [ "$FOUND" -eq 0 ]; then
-    echo "  ⚠️ Skill not found in templates: $SKILL_NAME"
-fi
+{{#if this.content}}
+mkdir -p "$SKILLS_TARGET/{{this.name}}"
+cat > "$SKILLS_TARGET/{{this.name}}/SKILL.md" << 'OPENCLAW_SKILL_EOF_{{@index}}'
+{{this.content}}
+OPENCLAW_SKILL_EOF_{{@index}}
+echo "  ✓ Loaded skill: {{this.name}}"
+LOADED_SKILLS="${LOADED_SKILLS}${LOADED_SKILLS:+ }{{this.name}}"
+SKILLS_LOADED_COUNT=$((SKILLS_LOADED_COUNT + 1))
+{{else}}
+echo "  ⚠️ Skill not found in templates: {{this.name}}"
+{{/if}}
 {{/each}}
-
-# Deterministic summary (useful for headless logs / parsing)
-SKILLS_LOADED_COUNT=0
-for _s in $LOADED_SKILLS; do
-    SKILLS_LOADED_COUNT=$((SKILLS_LOADED_COUNT + 1))
-done
 
 echo ""
 echo "📚 Skills summary"

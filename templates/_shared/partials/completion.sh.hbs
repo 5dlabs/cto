@@ -4,12 +4,14 @@
 
 # Read acceptance probe result if available
 ACCEPTANCE_RESULT="unknown"
-if [ -f "/workspace/.acceptance_result" ]; then
-    ACCEPTANCE_RESULT=$(cat /workspace/.acceptance_result)
+PROBE_RESULT_FILE="${CLAUDE_WORK_DIR:-/tmp}/.acceptance_result"
+if [ -f "$PROBE_RESULT_FILE" ]; then
+    ACCEPTANCE_RESULT=$(cat "$PROBE_RESULT_FILE")
 fi
 
 # Write completion status for controller
-cat > /workspace/.agent_status.json << EOF
+STATUS_DIR="${CLAUDE_WORK_DIR:-/tmp}"
+cat > "$STATUS_DIR/.agent_status.json" << EOF
 {
     "agent": "{{agent_name}}",
     "job_type": "{{job_type}}",
@@ -23,7 +25,7 @@ cat > /workspace/.agent_status.json << EOF
 EOF
 
 # Signal completion to sidecar
-touch /workspace/.agent_done 2>/dev/null || true
+touch /workspace/.agent_done 2>/dev/null || touch /tmp/.agent_done 2>/dev/null || true
 
 echo ""
 echo "════════════════════════════════════════════════════════════════"

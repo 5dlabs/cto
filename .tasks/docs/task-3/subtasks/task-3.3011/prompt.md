@@ -1,28 +1,10 @@
-Implement subtask 3011: Implement inter-service auth, GDPR endpoint, and gRPC server bootstrap
+Implement subtask 3011: Implement GDPR export and delete endpoints
 
 ## Objective
-Build the API key authentication interceptor, GDPR customer deletion endpoint, and the main gRPC + grpc-gateway server wiring.
+Implement GET /internal/gdpr/export/:customer_id and DELETE /internal/gdpr/delete/:customer_id on the grpc-gateway mux. Export returns all customer data; delete anonymizes customer_id fields and logs to audit schema.
 
 ## Steps
-1. Create `internal/auth/apikey.go`:
-   - gRPC unary and stream interceptors that extract `Authorization: Bearer <key>` from metadata.
-   - Validate key against `sigma1-service-api-keys` secret loaded from env var `SERVICE_API_KEYS` (comma-separated valid keys).
-   - Return `codes.Unauthenticated` for missing/invalid keys.
-   - Exempt health check endpoints from auth.
-2. Create `internal/gdpr/handler.go`:
-   - Implement GDPR deletion: given customer_id, delete across all tables in a single transaction.
-   - Order: crew_assignments (by project's customer_id) → inventory_transactions (by project) → project_line_items → deliveries → delivery_routes → projects → opportunities.
-   - Return structured confirmation: `{deleted: {opportunities: N, projects: N, crew_assignments: N, ...}}`.
-   - Register as REST endpoint `DELETE /api/v1/gdpr/customer/{id}` via grpc-gateway or custom HTTP handler on the gateway mux.
-3. Create `cmd/server/main.go`:
-   - Initialize pgx pool from `DATABASE_URL` env.
-   - Run migrations.
-   - Create all repo instances.
-   - Create all service instances, inject repos and CalendarSyncer.
-   - Start gRPC server on port 50051 with auth interceptor.
-   - Start grpc-gateway HTTP server on port 8081, registering all services.
-   - Mount GDPR handler, health endpoints, and metrics endpoint on the HTTP mux.
-   - Graceful shutdown on SIGTERM.
+Create internal/gdpr/handler.go with a plain net/http handler (not gRPC, registered directly on the gateway mux or a separate internal mux). GET /internal/gdpr/export/:customer_id: query opportunities, projects, and inventory_transactions WHERE customer_id = $1; serialize to JSON response. DELETE /internal/gdpr/delete/:customer_id: within a pgx transaction, UPDATE rms.opportunities SET customer_id = NULL WHERE customer_id = $1; UPDATE rms.projects SET customer_id = NULL WHERE customer_id = $1; INSERT INTO audit.gdpr_deletions (entity='rms', deleted_customer_id=$1, deleted_at=NOW()). Return 204 on success. Ensure audit schema and gdpr_deletions table exist (add migration if needed). Protect endpoints with a simple internal API key header check (X-Internal-Key must match INTERNAL_API_KEY env var).
 
 ## Validation
-1) Auth interceptor test: send gRPC request without auth header → verify Unauthenticated error. Send with invalid key → same. Send with valid key → verify request passes through. 2) GDPR integration test: create opportunity, convert to project, assign crew, create delivery. Call GDPR delete for customer_id. Verify all records deleted and confirmation counts are correct. 3) Server bootstrap test: start server, verify both ports accept connections, verify gRPC reflection lists all 5 services.
+GET /internal/gdpr/export/:id with valid X-Internal-Key returns JSON containing opportunities and projects arrays. DELETE /internal/gdpr/delete/:id returns 204; subsequent GET /api/v1/opportunities?customer_id=:id returns empty list; audit.gdpr_deletions has one row for the deleted id. Request without X-Internal-Key returns 401.

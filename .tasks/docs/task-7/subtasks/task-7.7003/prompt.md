@@ -1,20 +1,20 @@
-Implement subtask 7003: Implement sales-qual skill (multi-turn lead qualification conversation flow)
+Implement subtask 7003: Configure MCP tools.yaml for 10 business tools
 
 ## Objective
-Build the sales-qual skill that drives multi-turn conversations to qualify leads by identifying event type, date, venue, budget, and equipment needs, using catalog_search and check_availability tools, ending with quote generation or escalation.
+Author agents/morgan/tools.yaml defining all 10 business MCP tools with correct in-cluster service URLs, HTTP methods, parameter schemas, and response field descriptions.
 
 ## Steps
-1. Define the `sales-qual` skill configuration in OpenClaw.
-2. Implement conversation flow stages:
-   a. Greeting and intent detection — identify that the customer wants to rent equipment.
-   b. Event details gathering — ask for event type (wedding, corporate, concert, etc.), date/date range, venue name/location, expected attendance.
-   c. Equipment needs — based on event type, ask targeted questions (e.g., for weddings: 'Do you need uplighting, a DJ booth, or a full lighting rig?'). Use `sigma1_catalog_search` to find matching products.
-   d. Availability check — for each identified product, call `sigma1_check_availability` with the event dates. Report conflicts or alternatives.
-   e. Budget discussion — ask about budget range, adjust recommendations accordingly.
-   f. Decision point: if customer is ready, transition to quote-gen skill. If customer needs time, offer to follow up. If requirements exceed Morgan's knowledge, escalate to Mike.
-3. Configure tool call parallelization: when checking availability for multiple items, issue concurrent `check_availability` calls.
-4. Include conversation state tracking: store current stage, gathered info, and tool call results in workspace.
-5. Handle edge cases: customer changes dates mid-conversation, asks about products not in catalog, requests custom builds (escalate).
+1. Create agents/morgan/tools.yaml. For each tool define: tool_id, display_name, description, http_method, url_template (with {param} placeholders), request_schema (JSON Schema for body or query params), response_schema (JSON Schema describing expected response shape), and timeout_seconds.
+2. sigma1_catalog_search: GET http://equipment-catalog-svc.sigma1.svc.cluster.local:8080/api/v1/catalog/products?search={query}. Response schema: array of {name: string, product_id: string, day_rate: number}.
+3. sigma1_check_availability: GET .../products/{product_id}/availability?from={from}&to={to}. Params: product_id (path), from/to (ISO8601 query). Response: {quantity_available: integer}.
+4. sigma1_generate_quote: POST http://rms-svc.sigma1.svc.cluster.local:8080/api/v1/opportunities. Body schema: {customer_id, line_items: [{product_id, quantity, days}], event_date}.
+5. sigma1_vet_customer: POST http://customer-vetting-svc.sigma1.svc.cluster.local:8080/api/v1/vetting/run. Body: {org_name, contact_email, event_description}. Response: {vetting_id: string, status: string}.
+6. sigma1_score_lead: GET http://rms-svc.sigma1.svc.cluster.local:8080/api/v1/opportunities/{id}/score. Path param: id. Response: {score: number, tier: string}.
+7. sigma1_create_invoice: POST http://finance-svc.sigma1.svc.cluster.local:8080/api/v1/invoices. Body: {opportunity_id, customer_id, line_items}. Response: {invoice_id, total_cents}.
+8. sigma1_finance_report: GET http://finance-svc.sigma1.svc.cluster.local:8080/api/v1/finance/reports/revenue?period={period}. Param: period (e.g. 2025-Q1). Response: {total_revenue_cents, invoice_count}.
+9. sigma1_social_curate: POST http://social-engine-svc.sigma1.svc.cluster.local:8080/api/v1/social/upload. Multipart body: file + metadata JSON. Response: {draft_id}.
+10. sigma1_social_publish: POST .../social/drafts/{draft_id}/publish. Path param: draft_id. Response: {published_url}.
+11. sigma1_equipment_lookup: GET http://equipment-catalog-svc.sigma1.svc.cluster.local:8080/api/v1/equipment-api/catalog. Response: array of catalog items.
 
 ## Validation
-Simulate a complete multi-turn conversation: 'I need lighting for a wedding on June 15 at The Grand Ballroom, budget around $5000.' Verify Morgan calls catalog_search with relevant terms, calls check_availability for suggested products, and offers to generate a quote. Verify escalation triggers when customer requests custom fabrication.
+`openclaw validate agents/morgan/tools.yaml` exits 0. Tool count in file equals 10 (excluding GDPR tools which are in separate file). Each tool entry has non-empty url_template, http_method, request_schema, and response_schema.

@@ -1,22 +1,10 @@
-Implement subtask 2009: Implement machine-readable equipment API endpoint and OpenAPI spec generation
+Implement subtask 2009: Implement health check endpoints: /health/live and /health/ready
 
 ## Objective
-Build the GET /api/v1/equipment-api/catalog endpoint returning a flat JSON structure optimized for AI agent consumption, and generate the OpenAPI spec using utoipa served at /api/v1/catalog/openapi.json.
+Write GET /health/live (always 200) and GET /health/ready (checks Postgres and Valkey connectivity, returns 200 or 503) handlers.
 
 ## Steps
-1. Implement `GET /api/v1/equipment-api/catalog`:
-   - Return a flat JSON array of all active products with denormalized category names.
-   - Structure: `[{"id": "...", "name": "...", "category": "Cameras", "day_rate": 150.00, "specs": {...}, "available": true}]`.
-   - Include a top-level `available` boolean based on whether the product has any availability in the next 30 days.
-   - Support query param `category` for filtering.
-   - No pagination — return all products (optimized for AI agent single-call consumption).
-2. Integrate `utoipa` crate:
-   - Add `#[derive(utoipa::ToSchema)]` to all request/response DTOs.
-   - Add `#[utoipa::path(...)]` annotations to all endpoint handlers.
-   - Create the OpenAPI doc struct with `#[derive(OpenApi)]` collecting all paths.
-   - Serve the spec at `GET /api/v1/catalog/openapi.json`.
-3. Include API metadata: title, version, description, contact info, server URLs.
-4. Add `utoipa-swagger-ui` for optional Swagger UI at `/swagger-ui` (dev only, behind feature flag).
+Create src/handlers/health.rs. GET /health/live: return StatusCode::OK with body {"status": "ok"}. GET /health/ready: acquire a connection from PgPool and run SELECT 1 (timeout 2s); send PING command to Redis ConnectionManager (timeout 2s). If both succeed return 200 with {"status": "ready", "postgres": "ok", "valkey": "ok"}. If either fails return 503 with {"status": "degraded", "postgres": "<ok|error>", "valkey": "<ok|error>"}. Use tokio::time::timeout wrapping each check. Wire both routes in main.rs. Ensure these routes are excluded from the rate limiter layer.
 
 ## Validation
-Integration test: seed products across categories, call GET /api/v1/equipment-api/catalog and verify flat structure with denormalized category names. Filter by category and verify correct subset. Verify `available` field reflects actual availability data. Fetch /api/v1/catalog/openapi.json and validate it with `swagger-cli validate` or equivalent. Verify all endpoints are documented in the spec.
+GET /health/live returns HTTP 200 always including when DB is unreachable. GET /health/ready returns HTTP 200 when both postgres and valkey are running. Scale postgres to 0 replicas (kubectl scale cluster sigma1-postgres --replicas 0 -n databases) — GET /health/ready returns HTTP 503 with postgres field showing error. Restore replicas and re-check returns 200.

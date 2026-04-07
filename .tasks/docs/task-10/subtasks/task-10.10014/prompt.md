@@ -1,24 +1,10 @@
-Implement subtask 10014: GDPR deletion orchestrator: implement Rust CLI binary
+Implement subtask 10014: Create GitHub Actions pr-review.yml workflow with Stitch code review integration
 
 ## Objective
-Build a Rust CLI binary (new Cargo workspace member `gdpr-orchestrator`) that accepts a customer ID, calls GDPR deletion endpoints on each service in order, and writes a structured audit log.
+Create .github/workflows/pr-review.yml that triggers on pull_request events (opened, synchronize). The workflow calls Stitch to perform code review using github_get_pull_request and github_get_pull_request_files, then posts the review as a PR comment.
 
 ## Steps
-Step-by-step:
-1. In the Rex Cargo workspace, add a new member: `crates/gdpr-orchestrator/Cargo.toml` with dependencies: `clap` (CLI args), `reqwest` (HTTP client), `serde`/`serde_json`, `sqlx` (PostgreSQL), `tokio`, `uuid`, `tracing`.
-2. Implement `main.rs`:
-   - Parse `--customer-id <UUID>` via clap
-   - Read service URLs from env vars: `VETTING_URL`, `SOCIAL_URL`, `FINANCE_URL`, `RMS_URL`, `CATALOG_URL`
-   - Call each service's GDPR deletion endpoint in order: Vetting → Social → Finance → RMS → Catalog
-   - For each call: POST to `{SERVICE_URL}/api/gdpr/delete` with JSON body `{"customer_id": "<uuid>"}`
-   - Collect response status code and body for each
-   - If any service returns non-2xx, log error and continue to report all statuses, but set exit code to 1
-3. Write audit log:
-   - Connect to PostgreSQL using `DATABASE_URL` env var
-   - Insert into `audit.gdpr_deletions` table: `(request_id UUID DEFAULT gen_random_uuid(), customer_id UUID, service TEXT, status INT, response JSONB, completed_at TIMESTAMPTZ DEFAULT now())`
-   - One row per service call
-4. Exit 0 only if all services returned 2xx.
-5. Add `gdpr-orchestrator` to workspace `Cargo.toml` members list.
+Create .github/workflows/pr-review.yml: `on: pull_request: types: [opened, synchronize]`. Job `stitch-review`: uses stitch-action or curl to call Stitch API with PR number and list of changed files from `github_get_pull_request_files`. Stitch posts back a review comment via `github_create_pull_request_comment`. Store STITCH_API_TOKEN in GitHub Actions secrets. The workflow should not block merge — it is advisory only. Example step: `- uses: actions/github-script@v7` calling octokit to get PR files, then POST to Stitch review endpoint with file contents.
 
 ## Validation
-Run `cargo build -p gdpr-orchestrator` and verify it compiles. Run with `--help` and verify usage is printed. Mock all service endpoints locally (e.g., with a simple HTTP server returning 204) and run the CLI with a test UUID. Verify it exits 0 and that audit rows are written to the database. Run with one service returning 500, verify exit code is 1 and error is logged.
+Open a test PR — within 2 minutes a bot comment appears on the PR from Stitch with code review content. Check GitHub Actions run log shows stitch-review job completed with exit 0. Verify the comment references at least one changed file by name.

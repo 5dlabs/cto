@@ -1,23 +1,10 @@
-Implement subtask 5007: Implement Stage 4: Credit Signals with CreditProvider trait and stub
+Implement subtask 5007: Implement JWT middleware, health endpoints, Prometheus metrics, and GDPR endpoints
 
 ## Objective
-Design the CreditProvider trait for pluggable credit API implementations and build the initial stub implementation that returns UNKNOWN/unavailable credit data with appropriate logging.
+Wire up JWT authentication middleware for all non-internal routes, implement /health/live, /health/ready, /metrics, and the GDPR export/delete internal endpoints. Configure Kubernetes Deployment manifest for 2 replicas.
 
 ## Steps
-1. Create `src/stages/credit_signals.rs` module.
-2. Define `CreditResult` struct: credit_score (Option<i32>), credit_available (bool), provider_name (String), raw_responses (serde_json::Value).
-3. Define `CreditProvider` trait:
-   ```rust
-   #[async_trait]
-   pub trait CreditProvider: Send + Sync {
-       fn provider_name(&self) -> &str;
-       async fn check_credit(&self, company_name: &str, domain: &str) -> StageResult<CreditResult>;
-   }
-   ```
-4. Implement `StubCreditProvider` that logs a warning ("No credit provider configured, returning UNKNOWN") and returns CreditResult { credit_score: None, credit_available: false, provider_name: "stub" }.
-5. Create a factory function `create_credit_provider(config: &AppConfig) -> Box<dyn CreditProvider>` that returns StubCreditProvider for now, but is designed for easy swap-in of a real provider.
-6. Document the trait contract so future implementations (Dun & Bradstreet, Experian, CreditSafe) can be added by implementing the trait.
-7. The stage runner function accepts `&dyn CreditProvider` and delegates to it.
+JWT middleware: use axum::middleware::from_fn with a layer that extracts Authorization: Bearer token, validates with jsonwebtoken crate using the JWT_SECRET env var (HS256), returns 401 on failure. Apply to all /api/v1/* routes. Health: GET /health/live returns 200 {status:'ok'} unconditionally. GET /health/ready pings postgres (SELECT 1) and redis (PING); returns 200 if both succeed, 503 with failing deps listed otherwise. Metrics: initialize prometheus::Registry, register http_requests_total (Counter, labels: method, path, status) and http_request_duration_seconds (Histogram). Expose GET /metrics in text format. GDPR: GET /internal/gdpr/export/:org_id — query vetting_results WHERE org_id=$1, return JSON row or 404. DELETE /internal/gdpr/delete/:org_id — DELETE FROM vetting_results WHERE org_id=$1, DELETE FROM vetting_requests WHERE org_id=$1, INSERT INTO audit.deletion_log (entity='vetting', org_id, deleted_at=now()), return 200. Kubernetes: write k8s/deployment.yaml with 2 replicas, resource limits (256Mi/500m), envFrom referencing customer-vetting-config ConfigMap and customer-vetting-secret Secret, liveness/readiness probes on /health/live and /health/ready.
 
 ## Validation
-Unit test: StubCreditProvider returns credit_available=false and credit_score=None. Verify provider_name is 'stub'. Verify warning is logged (use tracing-test or capture logs). Verify trait is object-safe and can be used as Box<dyn CreditProvider>. Write a mock implementation of CreditProvider that returns a real score to verify the trait works end-to-end.
+Request without JWT to /api/v1/vetting/run returns 401. Request with valid JWT returns 202. GET /health/ready with postgres and redis running returns 200; with redis stopped returns 503 with 'redis' in body. GET /metrics contains http_requests_total in prometheus text format. DELETE /internal/gdpr/delete/:org_id returns 200; subsequent GET /api/v1/vetting/:org_id returns 404; audit.deletion_log contains one row for that org_id. `kubectl apply -f k8s/deployment.yaml` dry-run succeeds.

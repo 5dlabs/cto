@@ -1,1 +1,1 @@
-Centralized GDPR orchestrator service that coordinates deletion/export across all services via their existing APIs
+Centralized compliance service that orchestrates data export/deletion across all services

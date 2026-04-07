@@ -1,17 +1,10 @@
-Implement subtask 10011: RBAC: create per-service ServiceAccounts with minimal roles
+Implement subtask 10011: Implement per-service RBAC: ServiceAccounts, Roles, and automountServiceAccountToken disabled
 
 ## Objective
-Create dedicated Kubernetes ServiceAccounts for each sigma1 service with minimal RBAC Roles and RoleBindings scoped to only what each service needs.
+Create a dedicated ServiceAccount for each of the 6 service Deployments. Create a Role per service with least-privilege rules (read own secrets via projected volumes only). Remove default ServiceAccount auto-mount from all non-ArgoCD pods by setting automountServiceAccountToken: false on each Deployment pod spec.
 
 ## Steps
-Step-by-step:
-1. For each service (equipment-catalog, rms, finance, customer-vetting, social-engine), create:
-   - `ServiceAccount` named `sa-<service-name>` in sigma1 namespace
-   - `Role` with minimal permissions (most services need NO Kubernetes API access; the Role can be empty or omitted)
-   - `RoleBinding` binding the Role to the ServiceAccount
-2. Update each Deployment manifest to set `spec.template.spec.serviceAccountName: sa-<service-name>` and `automountServiceAccountToken: false` (unless the service specifically needs K8s API access).
-3. For the GDPR orchestrator Job (created later), create `sa-gdpr-orchestrator` with permission to read ConfigMaps (for service discovery) but nothing else.
-4. Verify no service uses the `default` ServiceAccount.
+For each service (equipment-catalog, rms, finance, customer-vetting, social-engine, morgan): create helm/sigma1/templates/rbac-<service>.yaml containing: `ServiceAccount` with `automountServiceAccountToken: false`, `Role` with rules limited to `resources: ['secrets'], verbs: ['get']` scoped to only the secrets that service needs (by resourceNames), `RoleBinding` linking the ServiceAccount to the Role. Update each Deployment spec: `spec.template.spec.serviceAccountName: <service>-sa, automountServiceAccountToken: false`. ClusterRoleBinding only for ArgoCD SA (already managed by ArgoCD install). Verify no pod has default SA token mounted.
 
 ## Validation
-For each service, exec into the pod and attempt `curl https://kubernetes.default.svc/api/v1/namespaces/sigma1/secrets -H 'Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)'` — verify 403 Forbidden or confirm token is not mounted. Verify `kubectl get sa -n sigma1` lists all expected ServiceAccounts.
+`kubectl get sa -n sigma1` lists one SA per service plus argocd SA. `kubectl exec <equipment-catalog-pod> -- ls /var/run/secrets/kubernetes.io/serviceaccount/` shows no token file (automount disabled). `kubectl exec <equipment-catalog-pod> -- kubectl get pods -n sigma1` returns Forbidden (least privilege). `kubectl get rolebinding -n sigma1` shows 6 service role bindings.

@@ -1,26 +1,10 @@
-Implement subtask 3006: Implement Opportunity service with state machine, lead scoring, and convert-to-project
+Implement subtask 3006: Implement InventoryService with atomic conflict detection and unit tests
 
 ## Objective
-Build the OpportunityService gRPC implementation with the full quote-to-project workflow including status state machine, lead scoring algorithm, and opportunity-to-project conversion.
+Implement InventoryService handlers (GetStockLevel, RecordTransaction, ScanBarcode) and the inventory conflict detection logic that returns ConflictError on overlapping checkout windows. Write unit tests for conflict detection.
 
 ## Steps
-1. Create `internal/service/opportunity_svc.go` implementing the generated `OpportunityServiceServer` interface.
-2. Implement the state machine in `internal/domain/opportunity_state.go`:
-   - Define valid transitions: PENDING→QUALIFIED, QUALIFIED→APPROVED, APPROVED→CONVERTED. Also allow PENDING→QUALIFIED→APPROVED as composite path.
-   - `ValidateTransition(current, next Status) error` returns descriptive error for invalid transitions (e.g., PENDING→CONVERTED is invalid).
-   - State transitions are enforced in `UpdateOpportunity` and dedicated RPCs.
-3. Implement `ScoreLead` RPC in `internal/domain/lead_scoring.go`:
-   - Input: customer vetting data (bool flags: verified_identity, verified_insurance, positive_references), event_size (int), payment_history (enum: GOOD, MIXED, BAD, NEW).
-   - Scoring: assign points per factor. GREEN >= 80 points, YELLOW 50-79, RED < 50. Return `LeadScore` with per-factor breakdown.
-4. Implement `ApproveOpportunity` RPC: validate QUALIFIED→APPROVED transition, update status.
-5. Implement `ConvertOpportunity` RPC:
-   - Validate status is APPROVED.
-   - Call `projectRepo.CreateFromOpportunity(ctx, orgID, oppID)` to create project with linked opportunity_id and copied line items.
-   - Update opportunity status to CONVERTED.
-   - Return the new Project ID.
-   - Wrap in a database transaction (via pgx.Tx passed through repo).
-6. Implement `CreateOpportunity`, `GetOpportunity`, `UpdateOpportunity`, `ListOpportunities` as standard CRUD delegating to repo.
-7. Wire service into gRPC server registration in `cmd/server/main.go`.
+Create internal/inventory/handler.go and internal/inventory/conflict.go. RecordTransaction: before inserting a checkout transaction, execute SELECT COUNT(*) FROM rms.inventory_transactions WHERE inventory_id=$1 AND type='checkout' AND timestamp BETWEEN $2 AND $3 within the same pgx transaction using SELECT FOR UPDATE on the inventory row to prevent races. If count > 0, return gRPC status.Error(codes.AlreadyExists, 'inventory conflict') which grpc-gateway maps to HTTP 409. GetStockLevel: query distinct inventory_ids checked out vs checked in to compute availability. ScanBarcode: accept barcode string, resolve to inventory_id via product catalog lookup (use a stub returning fixed UUID if catalog service is not yet available). Unit tests in internal/inventory/conflict_test.go: mock pgx rows, assert ConflictError returned when overlapping window exists, no error when window is free.
 
 ## Validation
-Unit tests for state machine: test all 4 states × all possible next states, verify exactly 3 valid transitions pass and all others return error. Unit tests for lead scoring with parameterized table: test GREEN boundary (80+), YELLOW (50-79), RED (<50) with various input combinations. Integration test: CreateOpportunity → ScoreLead → UpdateStatus to QUALIFIED → Approve → Convert → verify Project exists with correct opportunity_id link and line items copied.
+POST checkout for inventory_id X in window [T1,T2] succeeds (201). Second POST checkout for same inventory_id X in overlapping window returns HTTP 409. go test ./internal/inventory/... passes all conflict unit tests. GetStockLevel returns numeric availability count.

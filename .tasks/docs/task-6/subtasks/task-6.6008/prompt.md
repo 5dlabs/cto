@@ -1,37 +1,10 @@
-Implement subtask 6008: Implement Effect Service clients for Instagram, LinkedIn, Facebook, and TikTok APIs
+Implement subtask 6008: Implement approval workflow endpoints and Signal notification
 
 ## Objective
-Build four separate Effect.Service implementations for publishing content to each social media platform via their respective APIs, all with exponential backoff retry logic.
+Implement POST /api/v1/social/drafts/:id/approve, POST /api/v1/social/drafts/:id/reject, and the Signal notification trigger that sends a preview link to the configured phone number when a draft reaches ready_for_approval.
 
 ## Steps
-1. Create `src/services/platforms/InstagramService.ts`:
-   - Effect.Service tag: InstagramService.
-   - Method `publishPost(imageUrls: string[], caption: string, hashtags: string[])`: Effect<PublishResult, PlatformPublishError>
-     - Use Instagram Graph API: POST /{ig-user-id}/media (for container), then POST /{ig-user-id}/media_publish.
-     - For carousel (multiple images): create child containers, then publish carousel container.
-     - Return { postId: string, postUrl: string }.
-   - Wrap in Effect.retry(Schedule.exponential('1 second').pipe(Schedule.intersect(Schedule.recurs(3)))).
-2. Create `src/services/platforms/LinkedInService.ts`:
-   - Method `publishPost(imageUrls: string[], caption: string)`: Effect<PublishResult, PlatformPublishError>
-     - Use LinkedIn API: Register image upload, upload image, create ugcPost with image.
-     - Return { postId, postUrl }.
-3. Create `src/services/platforms/FacebookService.ts`:
-   - Method `publishPost(pageId: string, imageUrls: string[], caption: string)`: Effect<PublishResult, PlatformPublishError>
-     - Use Facebook Graph API: POST /{page-id}/photos for single, or unpublished photos + POST /{page-id}/feed for multi-photo.
-     - Return { postId, postUrl }.
-4. Create `src/services/platforms/TikTokService.ts`:
-   - Method `publishVideo(videoUrl: string, caption: string, hashtags: string[])`: Effect<PublishResult, PlatformPublishError>
-     - Use TikTok Content Posting API: init upload, upload video, publish.
-     - For photo mode (if supported): use photo post endpoint.
-     - Return { postId, postUrl }.
-5. Each service:
-   - Takes API credentials (access tokens, app IDs) from environment.
-   - Uses `Effect.tryPromise` for all HTTP calls (via fetch or undici).
-   - Tagged error types: InstagramPublishError, LinkedInPublishError, etc.
-   - All have a `.live` layer file.
-6. Create `src/services/platforms/PlatformRouter.ts`:
-   - Method `publishToPlatform(platform: Platform, draft: Draft)`: Effect<PublishResult, PlatformPublishError>
-   - Routes to the correct service based on platform field.
+POST /api/v1/social/drafts/:id/approve: check current status; if 'ready_for_approval', transition to 'approved', set approved_by from JWT claims sub field, approved_at=now(). Return 200 {status:'approved'}. If status is not 'ready_for_approval', return 409 with message. POST /api/v1/social/drafts/:id/reject: set status='rejected', store optional reason in a new rejected_reason column (add migration). Return 200. Signal notification: triggered when curation pipeline sets status='ready_for_approval'. Use signal-cli REST API (POST {SIGNAL_CLI_URL}/v2/send, body: {message: 'New draft ready for approval: {APP_URL}/drafts/{draft_id}', recipients:[SIGNAL_PHONE_NUMBER]}). Wrap in try/catch — Signal failure must not block pipeline. Read SIGNAL_CLI_URL, SIGNAL_PHONE_NUMBER, APP_URL from env vars.
 
 ## Validation
-Unit test each service with mocked HTTP responses: (1) InstagramService: mock Graph API container creation and publish, verify correct API calls sequence for single and carousel posts. (2) LinkedInService: mock image registration and ugcPost creation. (3) FacebookService: mock multi-photo publish flow. (4) TikTokService: mock upload init, upload, and publish sequence. (5) Test retry logic: mock 500 response twice then 200, verify 3 attempts made with exponential delay. (6) Test PlatformRouter routes to correct service for each platform string.
+POST approve on a ready_for_approval draft → 200, status=approved, approved_by=JWT sub, approved_at set. POST approve on an already-approved draft → 409. POST reject on any non-published draft → 200, status=rejected. Signal mock: verify POST to signal-cli is called with correct recipient and draft URL when curation completes. Signal mock returns 500 → pipeline still completes successfully.

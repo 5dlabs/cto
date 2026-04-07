@@ -1,27 +1,10 @@
-Implement subtask 3012: Implement health checks, Prometheus metrics, and structured logging
+Implement subtask 3012: Write Kubernetes Deployment and Service manifests for RMS
 
 ## Objective
-Add gRPC health checking protocol, REST health endpoints, Prometheus metrics via grpc-prometheus, and structured logging with slog throughout the service.
+Create Kubernetes Deployment (2 replicas) and ClusterIP Service manifests for the RMS service with correct port configuration, envFrom references, and health probes.
 
 ## Steps
-1. Health checks in `internal/health/health.go`:
-   - Implement `grpc.health.v1.Health` service: `Check` and `Watch` RPCs.
-   - Liveness: always SERVING if process is running.
-   - Readiness: check pgx pool connectivity (`pool.Ping(ctx)`), return NOT_SERVING if DB unreachable.
-   - Register on gRPC server.
-2. REST health endpoints on grpc-gateway mux:
-   - `GET /health/live` → 200 if process running.
-   - `GET /health/ready` → 200 if DB connected, 503 otherwise.
-3. Prometheus metrics:
-   - Add `grpc-prometheus` server interceptors (unary + stream) to gRPC server.
-   - Initialize `grpc_prometheus.EnableHandlingTimeHistogram()`.
-   - Mount `/metrics` endpoint on HTTP mux using `promhttp.Handler()`.
-   - Add custom business metrics: `rms_opportunities_converted_total`, `rms_conflict_detections_total`, `rms_gdpr_deletions_total` as Prometheus counters.
-4. Structured logging:
-   - Configure `slog.NewJSONHandler` as default logger in `cmd/server/main.go`.
-   - Add `slog` logging to all service methods: log request start (with org_id, method), log errors, log completion with duration.
-   - Add gRPC logging interceptor using `slog` for request/response metadata.
-   - Include request_id in log context (extract from gRPC metadata or generate UUID).
+Create k8s/rms/deployment.yaml: apiVersion apps/v1, kind Deployment, replicas: 2, image: placeholder (to be set by CI), envFrom: [{configMapRef: {name: sigma1-infra-endpoints}}, {secretRef: {name: sigma1-google-secret}}, {secretRef: {name: sigma1-rms-secret}}]. Container ports: 8080 (rest), 9090 (grpc), 8081 (health). LivenessProbe: httpGet /health/live :8081 initialDelaySeconds 10. ReadinessProbe: httpGet /health/ready :8081 initialDelaySeconds 15. Create k8s/rms/service.yaml: ClusterIP Service exposing port 8080 (name: rest) and port 9090 (name: grpc); health port 8081 not exposed externally. Add resource requests/limits: requests cpu 100m memory 128Mi, limits cpu 500m memory 512Mi.
 
 ## Validation
-1) Health: start server, call gRPC Health.Check → SERVING. Call /health/live → 200. Call /health/ready with DB up → 200. Stop DB container, call /health/ready → 503. 2) Metrics: send 5 gRPC requests, scrape /metrics, verify grpc_server_handled_total counter = 5. Convert an opportunity, verify rms_opportunities_converted_total = 1. 3) Logging: capture log output during a request, verify JSON format with org_id, method, duration fields.
+kubectl apply -f k8s/rms/ --dry-run=client exits 0 with no errors. kubectl apply against a dev cluster shows 2/2 pods Ready within 60 seconds. kubectl describe service rms shows ClusterIP with ports 8080 and 9090.

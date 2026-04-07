@@ -1,32 +1,13 @@
-Implement subtask 7010: Create Kubernetes deployment manifests for Morgan agent with Signal-CLI sidecar
+Implement subtask 7010: Verify Signal message receipt and web chat endpoint via integration test
 
 ## Objective
-Write the Kubernetes Deployment, Service, PVC, and related manifests to deploy Morgan in the openclaw namespace with the Signal-CLI sidecar container, workspace PVC, API key secrets, and health probes.
+Send a real Signal test message to Morgan's number and validate round-trip receipt in pod logs. Also validate the web chat /chat endpoint returns a coherent reply.
 
 ## Steps
-1. Deployment manifest:
-   a. Namespace: `openclaw`
-   b. Main container: Morgan agent image with workspace PVC mounted at `/data/workspace`.
-   c. Sidecar container: Signal-CLI REST API image, resource limits 512Mi memory / 500m CPU, restartPolicy Always.
-   d. Signal-CLI sidecar exposes port 8080 (localhost only, no Service exposure).
-   e. Morgan agent exposes port 8081 for WebSocket chat and port 8082 for voice adapter HTTP endpoint.
-2. PVC:
-   a. `morgan-workspace` PVC: 10Gi, ReadWriteOnce, mounted in Morgan container.
-   b. Signal-CLI data PVC: for Signal-CLI state/keys persistence across restarts.
-3. Secrets:
-   a. Mount `sigma1-service-api-keys` secret as environment variables for backend service authentication.
-   b. Mount ElevenLabs API key secret.
-   c. Mount Twilio credentials secret (account SID, auth token, phone number).
-   d. Mount Signal-CLI registration credentials.
-4. Services:
-   a. ClusterIP Service exposing Morgan's WebSocket port (8081) for frontend access.
-   b. ClusterIP Service exposing voice adapter port (8082) for ElevenLabs callbacks.
-5. Health probes:
-   a. Liveness probe on Morgan agent: HTTP GET /healthz on port 8081.
-   b. Readiness probe: HTTP GET /readyz (checks MCP tool server connectivity).
-   c. Liveness probe on Signal-CLI sidecar: HTTP GET /v1/about on port 8080.
-6. Resource limits: Morgan agent 1Gi memory / 1 CPU (adjust based on model inference location — if inference is remote API, lower limits suffice).
-7. Cloudflare Tunnel annotation or sidecar for external access to voice/Signal endpoints.
+1. Signal integration test: using a Signal-registered test account, send the message 'Test connectivity ping' to Morgan's configured phone number. Watch `kubectl logs -f -n openclaw deployment/morgan` for a log line containing 'Signal message received' within 30 seconds. Verify a reply appears in the Signal conversation within 60 seconds.
+2. Web chat integration test: `kubectl port-forward svc/morgan-chat-svc 3000:3000 -n openclaw &`. Run: `curl -s -X POST http://localhost:3000/chat -H 'Content-Type: application/json' -d '{"message": "What lighting equipment do you offer?"}' | jq .`. Verify response contains reply field with non-empty string and session_id field.
+3. Document both test outcomes in agents/morgan/test-results/integration-tests.md.
+4. If Signal test fails: check signal-cli-svc pod logs for JSON-RPC connection errors, verify SIGNAL_PHONE_NUMBER secret value matches registered Signal number.
 
 ## Validation
-Apply manifests to openclaw namespace, verify pod starts with both containers running. Verify PVCs are bound and writable. Verify secrets are mounted as environment variables. Verify liveness probes pass for both containers. Verify ClusterIP services route traffic correctly to Morgan's ports.
+Morgan pod logs show Signal message receipt log within 30s of sending test message. Signal conversation shows Morgan reply within 60s. curl to /chat returns JSON {reply: <non-empty>, session_id: <non-empty>} with HTTP 200 within 10s.

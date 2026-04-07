@@ -22,15 +22,20 @@ const DEFAULTS: Record<VoiceLevel, VoiceConfig> = {
     style: 0.3,
   },
   error: {
-    provider: "xai",
-    voiceId: "rex",
-    language: "en",
+    provider: "elevenlabs",
+    voiceId: "ErXwobaYiN019PkySvjV",   // Antoni — sharp, urgent
+    model: "eleven_flash_v2_5",
+    stability: 0.45,
+    similarityBoost: 0.8,
+    style: 0.5,
   },
   wait: {
-    provider: "openai",
-    voiceId: "alloy",
-    model: "tts-1",
-    speed: 1.0,
+    provider: "elevenlabs",
+    voiceId: "MF3mGyEYCl7XYWbV9V6O",   // Elli — neutral, patient
+    model: "eleven_flash_v2_5",
+    stability: 0.7,
+    similarityBoost: 0.7,
+    style: 0.15,
   },
 };
 

@@ -1,1 +1,1 @@
-Per-service GDPR endpoints called by Morgan (existing orchestrator), not a new dedicated service
+Per-service GDPR endpoints orchestrated by Morgan (an existing component), not a new dedicated service

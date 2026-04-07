@@ -1,17 +1,10 @@
-Implement subtask 2002: Implement shared health check handlers (liveness and readiness)
+Implement subtask 2002: Implement application entrypoint, AppState, and database/Valkey connection pool setup
 
 ## Objective
-Add health check route handlers to the shared crate: GET /health/live returns 200 unconditionally, GET /health/ready checks PostgreSQL and Valkey connectivity and returns 200 or 503.
+Write src/main.rs and src/state.rs establishing the Axum application entry point, shared AppState struct containing PgPool and Redis ConnectionManager, and configuration loading from environment variables.
 
 ## Steps
-1. In `shared/src/health.rs`, implement `pub async fn liveness() -> impl IntoResponse` returning `StatusCode::OK` with `{"status": "ok"}`.
-2. Implement `pub async fn readiness(State(pool): State<PgPool>, State(valkey): State<ValkeyCon>) -> impl IntoResponse` that:
-   - Executes `SELECT 1` on PgPool
-   - Executes `PING` on Valkey connection
-   - Returns 200 if both succeed, 503 with `{"status": "degraded", "checks": {"db": "ok/fail", "valkey": "ok/fail"}}` if either fails.
-3. Add `redis-rs` (with `tokio-comp` feature) to shared dependencies for Valkey connectivity.
-4. Implement `shared::valkey` module: `pub async fn create_valkey_client() -> Result<Client>` reading `VALKEY_URL` from env.
-5. Export a `pub fn health_routes() -> Router` that mounts both handlers.
+Create src/main.rs: initialize tracing_subscriber with EnvFilter from RUST_LOG env var. Load config from env: DATABASE_URL (from CNPG_SIGMA1_URL + PGPASSWORD), VALKEY_URL (from VALKEY_SIGMA1_URL), JWT_SECRET. Create sqlx::PgPool via PgPoolOptions with max_connections: 10, connect_lazy: false. Create redis::aio::ConnectionManager from VALKEY_URL. Construct AppState { db: PgPool, redis: ConnectionManager, jwt_secret: String }. Wrap in Arc<AppState>. Build Axum Router (routes added in later subtasks), attach tower-http layers: TraceLayer, CompressionLayer, CorsLayer (permissive for dev). Bind to 0.0.0.0:8080. Create src/state.rs defining pub struct AppState and impl AppState with db(), redis(), jwt_secret() accessors. Create src/config.rs reading all env vars with descriptive errors on missing values.
 
 ## Validation
-Unit test liveness always returns 200. Integration test with real Postgres and Valkey: readiness returns 200. Test readiness returns 503 with degraded status when Valkey is unavailable (use invalid URL).
+cargo build succeeds. Running the binary with valid DATABASE_URL and VALKEY_URL env vars starts without panic and logs 'listening on 0.0.0.0:8080'. curl http://localhost:8080/ returns 404 (router not yet populated — confirming server is alive).

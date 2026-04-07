@@ -38,6 +38,9 @@ interface PromptEntry {
 interface WorkflowEntry {
   task_id: number;
   workflow_yaml: string;
+  quality_yaml?: string;
+  security_yaml?: string;
+  testing_yaml?: string;
 }
 
 function asText(value: unknown): string {
@@ -78,9 +81,33 @@ export async function writeFiles(
       const taskDir = path.join(basePath, `task-${wf.task_id}`);
       await fs.mkdir(taskDir, { recursive: true });
 
-      const filePath = path.join(taskDir, 'implementation.lobster.yaml');
-      await fs.writeFile(filePath, asText(wf.workflow_yaml));
-      paths.push(filePath);
+      const implPath = path.join(taskDir, 'implementation.lobster.yaml');
+      await fs.writeFile(implPath, asText(wf.workflow_yaml));
+      paths.push(implPath);
+
+      if (wf.quality_yaml) {
+        const qPath = path.join(taskDir, 'quality.lobster.yaml');
+        await fs.writeFile(qPath, asText(wf.quality_yaml));
+        paths.push(qPath);
+      }
+      if (wf.security_yaml) {
+        const sPath = path.join(taskDir, 'security.lobster.yaml');
+        await fs.writeFile(sPath, asText(wf.security_yaml));
+        paths.push(sPath);
+      }
+      if (wf.testing_yaml) {
+        const tPath = path.join(taskDir, 'testing.lobster.yaml');
+        await fs.writeFile(tPath, asText(wf.testing_yaml));
+        paths.push(tPath);
+      }
+    }
+
+    // Write master play.lobster.yaml at the tasks root
+    const obj = input as Record<string, unknown>;
+    if (typeof obj.play_yaml === 'string') {
+      const playPath = path.join(basePath, 'play.lobster.yaml');
+      await fs.writeFile(playPath, obj.play_yaml);
+      paths.push(playPath);
     }
   } else if (type === 'docs') {
     const docs = asArray<DocEntry>(input, ['task_docs', 'docs']);

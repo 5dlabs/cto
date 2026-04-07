@@ -1,6 +1,6 @@
 ## Acceptance Criteria
 
-- [ ] 1. `kubectl get cluster sigma1-postgres -n sigma1-db` shows READY with 2/2 instances healthy. 2. `kubectl exec` into a sigma1 pod and verify `psql` connection via PgBouncer pooler URL succeeds and `\dn` lists all 6 schemas (catalog, rms, finance, vetting, social, audit). 3. `redis-cli -u $VALKEY_URL PING` returns PONG. 4. ConfigMap `sigma1-infra-endpoints` exists with all 5 expected keys. 5. All Kubernetes Secrets exist with non-empty data keys. 6. Cloudflare Tunnel pod is Running and tunnel status shows CONNECTED. 7. ServiceMonitor CRs are picked up by Prometheus (check Prometheus targets page). 8. PgBouncer stats show active connection pools when queried via `SHOW POOLS`.
+- [ ] 1. kubectl get pods -n databases shows sigma1-postgres-1 and sigma1-valkey-0 in Running state within 5 minutes of apply. 2. psql -U sigma1_user -d sigma1 -c '\dn' returns catalog, rms, finance, vetting, social, audit schemas. 3. redis-cli -u $VALKEY_URL ping returns PONG. 4. kubectl get secret -n sigma1 shows all 9 secrets present. 5. kubectl get pod -n signal shows signal-cli pod Running. 6. kubectl get configmap sigma1-infra-endpoints -n sigma1 -o yaml contains all 5 required keys. 7. ArgoCD application shows Synced and Healthy.
 
 ## Verification Notes
 

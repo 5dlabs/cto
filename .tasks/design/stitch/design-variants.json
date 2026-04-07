@@ -1,54 +1,44 @@
 {
-  "project_id": "7370747614258136980",
   "screens": [
     {
-      "source_screen_id": "40b8b541e631423db20aa5f99d06e4d4",
+      "source_screen_id": "76efd04574374a53b0c26305dc18fb57",
       "source_target": "web",
       "variants": [
         {
-          "variant_id": "40b8b541e631423db20aa5f99d06e4d4-v1",
-          "source_screen_id": "40b8b541e631423db20aa5f99d06e4d4",
+          "variant_id": "76efd04574374a53b0c26305dc18fb57-v1",
+          "source_screen_id": "76efd04574374a53b0c26305dc18fb57",
           "source_target": "web",
-          "label": "Layout Focus",
-          "description": "web variant emphasizing layout focus.",
-          "aspects_changed": [
-            "LAYOUT"
-          ],
-          "screen_id": "9d3a49fdff684c499d17dc278cd5dfbe",
-          "html_url": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzJhNmUzYzZiMDUwZjRhMTliNDY0NDIwNGIxYmQzNmNhEgsSBxD0x7nTwxwYAZIBIwoKcHJvamVjdF9pZBIVQhM3MzcwNzQ3NjE0MjU4MTM2OTgw&filename=&opi=96797242",
-          "image_url": "https://lh3.googleusercontent.com/aida/ADBb0uhSvawurJhwR0A9_okK3AqoxboUb5ogLs7ZewZ5h4GzIq55GGIWp2-KvWhaV18qKl6wTMKr9NlAgmCtcjrdgiMYUQhNdDzjVK4eGIY-GLwtQfEejLn8LdQ2T6tccl91fBsRxZbuL22CBxhGXq_TXa2tnGhrEQRekGCylKPyQM0J5JyNu3B8gz5NCCQUYPDu7VLeSsf4YDVBI8QJmX9vCZN7De4PxGgUukVwrNxOcgBAVunCSMREKTwrXQc=w1920",
-          "status": "generated"
-        },
-        {
-          "variant_id": "40b8b541e631423db20aa5f99d06e4d4-v2",
-          "source_screen_id": "40b8b541e631423db20aa5f99d06e4d4",
-          "source_target": "web",
-          "label": "Color Scheme",
-          "description": "Failed to retrieve variant screen.",
-          "aspects_changed": [
-            "COLOR_SCHEME"
-          ],
+          "label": "Original (fallback)",
+          "description": "Variant generation failed; using original.",
+          "aspects_changed": [],
+          "screen_id": "76efd04574374a53b0c26305dc18fb57",
+          "html_url": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzYwYzdlMTA4MGM5NjQ1YmQ4YjIxMmJhYzQzZWRlN2Q3EgsSBxD0x7nTwxwYAZIBJAoKcHJvamVjdF9pZBIWQhQxNjU2NjkwOTExMzY4OTY2NzQ1NQ&filename=&opi=96797242",
+          "image_url": "https://lh3.googleusercontent.com/aida/ADBb0uiLelrgWWUOO-zOHsv0Rv-3qBeYQDW7APVNDVZtZ7A7Jb26cbdVSm8EF2dycM5yVS2-Pv26h-xYaZLlLiBIXY5zVYhDiaEVbZrUPVvzWajYAilHDV_BTjd6Nuv8X5mqJ4m9lxPkXtbFXITIDRJbXB_MfewU0fKX6y9MEAshP6JI_eZA56rKaM1Ot3J6kMQNDmRsBDsSlATfhESG1hR1G3EX6TUhiRJqthX3Syi9bMw8Ainax9RyCzvPnQDl=w1920",
           "status": "failed",
           "error": "The operation was aborted."
-        },
+        }
+      ]
+    },
+    {
+      "source_screen_id": "ae4c6d48d61c49658522adbc57b14bb7",
+      "source_target": "mobile",
+      "variants": [
         {
-          "variant_id": "40b8b541e631423db20aa5f99d06e4d4-v3",
-          "source_screen_id": "40b8b541e631423db20aa5f99d06e4d4",
-          "source_target": "web",
-          "label": "Typography & Spacing",
-          "description": "web variant emphasizing typography & spacing.",
-          "aspects_changed": [
-            "TEXT_FONT",
-            "TEXT_CONTENT"
-          ],
-          "screen_id": "c817ba09323c4f989b63351323fe32af",
-          "html_url": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sX2JhZDUwZDU1MmNlZjQ3ODE5ZThlMzc3YjNiM2NhNzA5EgsSBxD0x7nTwxwYAZIBIwoKcHJvamVjdF9pZBIVQhM3MzcwNzQ3NjE0MjU4MTM2OTgw&filename=&opi=96797242",
-          "image_url": "https://lh3.googleusercontent.com/aida/ADBb0uji7pL7Be2qHPWJ9ytjq93wEqpEv-dJURqeki4ei8stouz5KzpYeiA7O4I2gXcwBqMk-GUNfB-6_auQOnmGnNXVP_lZUEvcEALbaT5Fp3-Yo8cYcdpjIdKLG_RVmH5SZryozOoqWZqNtMVcdzkpvB0YA6Ni9pzAlh3Fk2euLHUGYZHaWPd1wcbPNmLpXAOYmHKI7_dfp4hXmBCcDwWH5EFRk536Ife1XbJSyQuC1zUEYyM-UkSL2QkHgsg=w1920",
-          "status": "generated"
+          "variant_id": "ae4c6d48d61c49658522adbc57b14bb7-v1",
+          "source_screen_id": "ae4c6d48d61c49658522adbc57b14bb7",
+          "source_target": "mobile",
+          "label": "Original (fallback)",
+          "description": "Variant generation failed; using original.",
+          "aspects_changed": [],
+          "screen_id": "ae4c6d48d61c49658522adbc57b14bb7",
+          "html_url": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzVkMTMyNmJjZjBmOTQ0MDE4MmEwOWJlMzk2NGMyZGQzEgsSBxD0x7nTwxwYAZIBJAoKcHJvamVjdF9pZBIWQhQxNjU2NjkwOTExMzY4OTY2NzQ1NQ&filename=&opi=96797242",
+          "image_url": "https://lh3.googleusercontent.com/aida/ADBb0ujeOke7RqtICLGAF43vkES78xN9XrRSJN_ywwk2mHll5NAYPH9rxetOKE8a0jcohM7opg7LlsYb-PS484d0jCqxc82NIOyJAryFyDpEdnOqUfz3fCsFHZRCD50flqjN0MgLYSIzsO6oEL9qGPGkJYCcIbijQ9VbKyhakH5QSI1jWM6yBVvAHBLrqAUb_Ymi6sbz78CW-2AZi4_005Cn9u3k7lLDWm_tfpgNtTcj2EWUHwFBN-YPocbifsuL=w1920",
+          "status": "failed",
+          "error": "Stitch tool \"generate_variants\" failed: Requested entity was not found."
         }
       ]
     }
   ],
-  "total_variants": 2,
-  "timestamp": "2026-03-30T21:57:58.030Z"
+  "total_variants": 0,
+  "timestamp": "2026-04-06T23:43:43.893Z"
 }

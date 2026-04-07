@@ -1,24 +1,36 @@
-Implement subtask 8005: Build Equipment Catalog listing page with filtering, search, and pagination
+Implement subtask 8005: Implement Effect ApiClient service and Effect.Schema type definitions for all backend response shapes
 
 ## Objective
-Implement the `/equipment` route with a server-rendered product grid, category sidebar filter, search-by-name input, and pagination. Each ProductCard displays image, name, day rate, and availability indicator. Data fetched from catalog API endpoints.
+Create lib/api.ts with an Effect.Service-based ApiClient and define Effect.Schema schemas for all backend data types used across the site.
 
 ## Steps
-1. Create `app/equipment/page.tsx` — dynamic route (search params for category, search term, page).
-2. Server Component fetches initial data: `GET /api/v1/catalog/categories` for sidebar, `GET /api/v1/catalog/products?category=X&search=Y&page=N` for grid.
-3. Category sidebar:
-   - List all categories with count badges.
-   - Clicking a category updates URL search params (shallow navigation).
-   - 'All Categories' option to clear filter.
-4. Search bar: text input with debounced client-side search that updates URL search params.
-5. Product grid:
-   - Responsive grid: 1 col mobile, 2 cols tablet, 3-4 cols desktop.
-   - ProductCard custom component: R2 CDN image via `<Image>`, product name, day rate formatted as currency, availability Badge (green/red).
-   - Skeleton loading states using shadcn Skeleton.
-6. Pagination: page number buttons at grid bottom, updates search params.
-7. Client-side interactivity: wrap search/filter in a Client Component that uses `useRouter` and `useSearchParams` to update URL, triggering server re-render or TanStack Query refetch.
-8. SEO: `generateMetadata` with dynamic title based on category, canonical URL.
-9. Schema.org: ItemList on the listing page.
+1. Create apps/website/lib/api.ts.
+2. Define ApiClient using Effect.Service pattern:
+   ```ts
+   import { Effect, Layer } from 'effect'
+   import * as S from '@effect/schema/Schema'
+   
+   class ApiClient extends Effect.Service<ApiClient>()('ApiClient', {
+     effect: Effect.sync(() => ({
+       baseUrl: process.env.NEXT_PUBLIC_API_URL ?? ''
+     }))
+   }) {}
+   ```
+3. Define Effect.Schema types for all response shapes:
+   - Product: { product_id: S.String, name: S.String, day_rate: S.Number, category: S.String, image_url: S.optionalWith(S.String, {default: () => ''}) }
+   - Category: { category_id: S.String, name: S.String }
+   - Availability: { product_id: S.String, quantity_available: S.Number, from: S.String, to: S.String }
+   - Opportunity: { opportunity_id: S.String, status: S.String, total_cents: S.Number }
+   - PublishedPost: { post_id: S.String, image_url: S.String, caption: S.String, hashtags: S.Array(S.String), published_at: S.String }
+4. Define typed fetch helpers using Effect.tryPromise with schema decoding:
+   - getCategories(): Effect.Effect<Category[]>
+   - getProducts(search?: string): Effect.Effect<Product[]>
+   - getProductById(id: string): Effect.Effect<Product>
+   - getAvailability(id: string, from: string, to: string): Effect.Effect<Availability>
+   - createOpportunity(body: OpportunityCreate): Effect.Effect<Opportunity>
+   - getPublishedPosts(): Effect.Effect<PublishedPost[]>
+5. Export runApiEffect helper: wraps Effect.runPromise with ApiClient.Default layer.
+6. For client components needing TanStack Query: export queryFn wrappers that call runApiEffect.
 
 ## Validation
-Mock catalog API responses. Render `/equipment` page, verify product grid shows correct number of ProductCards. Test category filter: click a category, verify URL search params update and grid re-renders. Test search: type a query, verify debounced URL update. Test pagination: click page 2, verify page param in URL. Verify ProductCard displays image, name, and price. Responsive test at 375px (1 col), 768px (2 cols), 1440px (3+ cols).
+`tsc --noEmit` on lib/api.ts exits 0. Unit test: mock fetch returning valid Product JSON, call getProducts() via runApiEffect, assert decoded array has correct types. Unit test: mock fetch returning invalid JSON (missing day_rate), assert Effect fails with ParseError.

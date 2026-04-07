@@ -1,10 +1,10 @@
 ## Decision Points
 
-- NativeWind vs styled-components/Tamagui for the React Native styling approach — NativeWind mirrors web Tailwind classes but may have RN edge cases; Tamagui provides cross-platform tokens natively.
-- AsyncStorage vs MMKV for local caching and offline storage — MMKV is significantly faster but adds a native dependency; AsyncStorage is built-in but slower for large datasets like equipment catalogs.
-- Push notification service: Expo Push Notification service vs direct integration with FCM/APNs — Expo simplifies cross-platform but adds a proxy dependency.
+- The details list both a WebView approach (EXPO_PUBLIC_MORGAN_CHAT_URL) and a native EventSource/WebSocket approach as the preferred option. The final choice determines the chat screen architecture, testability, and whether Morgan must expose a native-compatible API endpoint.
+- The details suggest react-native-calendars 'or similar' for the product detail DateRangePicker. Library choice affects bundle size, iOS/Android parity, and NativeWind 4 styling compatibility.
+- The details offer two layout options for the portfolio tab. MasonryFlashList provides true masonry layout but is a separate package with different stability characteristics than FlashList.
 
 ## Coordination Notes
 
 - Agent owner: tap
-- Primary stack: Expo (React Native)
+- Primary stack: Expo/React Native/NativeWind 4/Effect 3.x

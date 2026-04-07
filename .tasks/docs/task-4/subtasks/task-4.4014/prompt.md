@@ -1,28 +1,10 @@
-Implement subtask 4014: Create Dockerfile and Kubernetes deployment manifests
+Implement subtask 4014: Write integration tests for Finance service end-to-end flows
 
 ## Objective
-Build the multi-stage Dockerfile for the finance service and create Kubernetes Deployment, Service, and related manifests for namespace sigma1.
+Write integration tests covering invoice lifecycle, aging bucket correctness, Stripe webhook processing, and GDPR anonymization.
 
 ## Steps
-1. Create `services/rust/finance/Dockerfile`:
-   - Stage 1 (builder): `FROM rust:1.75-bookworm`, copy workspace Cargo.toml/Cargo.lock and all crate directories, `cargo build --release -p finance`.
-   - Stage 2 (runtime): `FROM debian:bookworm-slim`, install `ca-certificates` and `libssl3`, copy binary from builder, set `ENTRYPOINT ["./finance"]`.
-   - Use `.dockerignore` to exclude `target/`, `.git/`, etc.
-2. Create `k8s/finance/deployment.yaml`:
-   - Namespace: sigma1.
-   - Replicas: 2.
-   - Container: image from Dockerfile, port 8082.
-   - `envFrom`: reference `sigma1-infra-endpoints` ConfigMap.
-   - Environment variables from secrets: `sigma1-postgres-credentials`, `sigma1-stripe-credentials`, API key secret.
-   - Resource requests/limits: 256Mi memory, 250m CPU request; 512Mi memory, 500m CPU limit.
-   - Readiness probe: GET /health, port 8082, initialDelaySeconds 5.
-   - Liveness probe: GET /health, port 8082, initialDelaySeconds 10.
-3. Create `k8s/finance/service.yaml`:
-   - ClusterIP service, port 80 → targetPort 8082.
-   - Selector matching deployment labels.
-4. Create `k8s/finance/hpa.yaml` (optional, simple):
-   - Min 2, max 4 replicas, target CPU 70%.
-5. Verify Dockerfile builds successfully with `docker build`.
+Create tests/integration.rs (Rust integration test file). Use sqlx::PgPool pointed at a test PostgreSQL instance (managed via testcontainers-rs or a pre-seeded CI database). Spin up the Axum app in a tokio::test with a bound listener. Test cases: (1) Full invoice lifecycle: create → send → receive Stripe webhook → verify paid status. (2) Aging report: seed invoice issued_at = NOW()-35d with status=sent; GET /aging returns count=1 in 31-60 bucket. (3) Overdue task: seed invoice due_at=NOW()-2d status=sent, call the update function directly, assert status=overdue. (4) GDPR delete: create invoice for org_id X, DELETE /internal/gdpr/delete/X, re-query invoices, org_id is NULL. (5) Currency rates: call sync function with mocked HTTP, assert DB row inserted and Valkey key set. Run with `cargo test --test integration`.
 
 ## Validation
-Verify Dockerfile builds without errors using `docker build -t finance:test .` from workspace root. Verify resulting image runs and responds to GET /health. Verify Kubernetes manifests are valid YAML (use `kubectl apply --dry-run=client`). Verify deployment references correct ConfigMap and secrets. Verify service selector matches deployment labels. Verify resource requests/limits are set.
+cargo test --test integration exits 0 with all 5 scenarios passing. cargo test -- --nocapture shows per-test logs. cargo tarpaulin or cargo llvm-cov reports >= 80% line coverage across src/. No async deadlocks (test timeout = 30s per test).

@@ -1,1 +1,1 @@
-Synchronous-only service communication or hybrid sync + async via NATS?
+What API paradigm for inter-service communication?

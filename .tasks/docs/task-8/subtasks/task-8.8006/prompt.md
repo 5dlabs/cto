@@ -1,26 +1,16 @@
-Implement subtask 8006: Build Product Detail page with image gallery, specs table, and Add to Quote
+Implement subtask 8006: Build hero page (app/page.tsx) with value proposition and CTAs
 
 ## Objective
-Implement the `/equipment/:id` route showing full product information: image gallery, specifications table (from JSONB data), day rate, and an 'Add to Quote' button that stores selection in quote builder state.
+Implement the homepage with a hero section, Sigma-1 value proposition copy, and CTA buttons linking to /equipment and /quote.
 
 ## Steps
-1. Create `app/equipment/[id]/page.tsx` — dynamic route.
-2. Server Component fetches `GET /api/v1/catalog/products/:id` and validates with Effect Schema.
-3. Image gallery:
-   - Primary image large display, thumbnail strip below.
-   - Click thumbnail to swap primary image.
-   - All images via `<Image>` with R2 CDN loader.
-4. Product info section:
-   - Product name (H1), category badge, day rate prominently displayed.
-   - Description paragraph.
-   - Specs table: render JSONB specs as key-value table rows using shadcn Table.
-5. 'Add to Quote' button:
-   - Stores product in client-side quote state (React context or localStorage-backed store).
-   - Shows toast/notification on add.
-   - Button text changes to 'Added ✓' if already in quote, with option to remove.
-6. Quote state management: create `hooks/useQuoteStore.ts` (or context) that persists selected products and quantities to localStorage. Export `addProduct`, `removeProduct`, `getQuoteItems`.
-7. SEO: `generateMetadata` with product name, description, image. Schema.org Product JSON-LD with name, image, offers (price, availability).
-8. Breadcrumb navigation: Home > Equipment > [Product Name].
+1. Create app/page.tsx as a Server Component.
+2. Hero section: full-width dark background, centered content. H1: 'Illuminate Every Event' (or approved brand copy). Subheadline: 2-line description of Sigma-1's lighting and visual production services.
+3. CTA buttons: primary Button linking to /equipment ('Browse Equipment'), secondary outline Button linking to /quote ('Get a Quote').
+4. Value props section below hero: 3-column grid of Card components, each with an icon (lucide-react), title, and 1-sentence description. Topics: Equipment Range, Real-Time Availability, Instant Quotes.
+5. Contact anchor section (#contact): email address, phone, and location. Keep minimal for v1.
+6. Apply sigma1 brand colors from design tokens (background, accent electric blue for CTA).
+7. Add og:image meta tag referencing a static placeholder image for social sharing.
 
 ## Validation
-Mock product API response with sample data including multiple images and JSONB specs. Render product detail page, verify: H1 shows product name, image gallery renders with thumbnails, specs table has correct rows, day rate displayed. Test 'Add to Quote' click: verify product added to localStorage quote state. Test Schema.org Product JSON-LD contains correct name, price, image URL.
+Playwright: GET / on 1280px viewport — h1 is visible, two CTA buttons present with correct href attributes. GET / on 375px viewport — h1 and CTAs are visible without horizontal scroll. `next build` produces no TypeScript errors for this file.
