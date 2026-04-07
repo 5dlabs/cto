@@ -54,7 +54,7 @@ if [ -f /task-files/client-config.json ]; then
         fi
         
         # Also copy full project config for reference
-        cp "$PROJECT_CONFIG" "/workspace/project-cto-config.json" 2>/dev/null || true
+        cp "$PROJECT_CONFIG" "${CLAUDE_WORK_DIR:-/tmp}/project-cto-config.json" 2>/dev/null || true
         echo "    └─ Project config copied to /workspace/project-cto-config.json"
     fi
     

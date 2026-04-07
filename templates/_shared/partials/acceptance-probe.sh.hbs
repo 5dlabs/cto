@@ -3,8 +3,8 @@
 # =========================================================================
 
 ACCEPTANCE_FILE="${CLI_WORK_DIR}/task/acceptance-criteria.md"
-PROBE_RESULT_FILE="/workspace/.acceptance_result"
-JUDGE_DECISION_FILE="${JUDGE_DECISION_FILE:-/workspace/.judge_decision}"
+PROBE_RESULT_FILE="${CLAUDE_WORK_DIR:-/tmp}/.acceptance_result"
+JUDGE_DECISION_FILE="${JUDGE_DECISION_FILE:-${CLAUDE_WORK_DIR:-/tmp}/.judge_decision}"
 
 # Initialize probe result
 echo "pending" > "$PROBE_RESULT_FILE"
