@@ -238,3 +238,25 @@ if [ -f "$TASKS_JSON" ]; then
     " |"
   ' "$TASKS_JSON" 2>/dev/null || true
 fi
+
+# --- Harness dispatch table (from cto-config.json agentHarness mapping) ---
+CTO_CONFIG="$ROOT/cto-config.json"
+if [ -f "$CTO_CONFIG" ] && [ -f "$TASKS_JSON" ]; then
+  HARNESS_MAP=$(jq -r '.defaults.play.agentHarness // empty' "$CTO_CONFIG" 2>/dev/null)
+  if [ -n "$HARNESS_MAP" ]; then
+    cat <<'HEOF'
+
+---
+
+### Harness Dispatch
+
+| Task | Agent | CLI | Model | Fallback |
+|------|-------|-----|-------|----------|
+HEOF
+    jq -r --argjson harness "$HARNESS_MAP" '
+      .[] |
+      ($harness[.agent] // $harness["_default"] // {primary:"claude",model:"claude-opus-4-6",fallback:"codex",fallbackModel:"gpt-5.2-codex"}) as $h |
+      "| \(.id) | **\(.agent)** | \($h.primary) | `\($h.model)` | \($h.fallback // "-")/\($h.fallbackModel // "-") |"
+    ' "$TASKS_JSON" 2>/dev/null || true
+  fi
+fi

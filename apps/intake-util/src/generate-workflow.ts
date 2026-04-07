@@ -71,6 +71,19 @@ function getAgentHarness(agent: string, config: PlayConfig): AgentHarness {
   return map[agent] ?? map['_default'] ?? DEFAULT_HARNESS;
 }
 
+// --- Notification helpers for play workflow ---
+
+function notifyDiscord(from: string, to: string, message: string, metadata: Record<string, unknown>): string {
+  const metaJson = JSON.stringify(metadata).replace(/'/g, "'\\''");
+  const safeMsg = message.replace(/'/g, "'\\''");
+  return `echo '${safeMsg}' | intake-util bridge-notify --from ${from} --to ${to} --metadata '${metaJson}' || true`;
+}
+
+function notifyLinear(sessionIdExpr: string, type: string, body: string): string {
+  const safeBody = body.replace(/'/g, "'\\''");
+  return `[ -n "${sessionIdExpr}" ] && intake-util linear-activity --session-id "${sessionIdExpr}" --type ${type} --body '${safeBody}' >/dev/null || true`;
+}
+
 function generateTaskWorkflow(
   task: GeneratedTask,
   scaffold: TaskScaffold | undefined,
@@ -559,6 +572,9 @@ function generatePlayWorkflow(
   lines.push(`    default: ""`);
   lines.push(`  - name: enable_docker`);
   lines.push(`    default: "true"`);
+  lines.push(`  - name: discord_channel`);
+  lines.push(`    description: Discord target channel for play notifications (e.g. play, execution)`);
+  lines.push(`    default: "play"`);
   lines.push(``);
 
   // Build a lookup for dependency resolution
@@ -567,7 +583,35 @@ function generatePlayWorkflow(
     taskTypeMap.set(t.id, resolveTaskType(t));
   }
 
+  // Build harness summary table for notifications
+  const harnessTable = tasks.map((t) => {
+    const a = t.agent ?? 'nova';
+    const h = getAgentHarness(a, config);
+    const tt = taskTypeMap.get(t.id)!;
+    return { id: t.id, title: t.title, agent: a, cli: h.primary, model: h.model, type: tt };
+  });
+  const harnessTableMd = [
+    '| Task | Title | Agent | CLI | Model | Type |',
+    '|------|-------|-------|-----|-------|------|',
+    ...harnessTable.map((r) =>
+      `| ${r.id} | ${r.title.slice(0, 40)} | ${r.agent} | ${r.cli} | ${r.model} | ${r.type} |`,
+    ),
+  ].join('\\n');
+
   lines.push(`steps:`);
+
+  // --- Play start notification ---
+  lines.push(``);
+  lines.push(`  # ── Play start notification ──`);
+  lines.push(`  - name: notify-play-start`);
+  lines.push(`    command: |`);
+  lines.push(`      ${notifyDiscord('morgan', '{{inputs.discord_channel}}',
+    `🎬 Play started — ${tasks.length} tasks dispatching`,
+    { step: 'play-start', task_count: tasks.length, time_utc: '$(date -u +%Y-%m-%dT%H:%M:%SZ)' })}`);
+  lines.push(`      LINEAR_SID="{{inputs.linear_session_id}}"`);
+  lines.push(`      ${notifyLinear('$LINEAR_SID', 'action',
+    `## 🎬 Play Started\\n\\n${harnessTable.length} tasks dispatching to ${new Set(harnessTable.map((r) => r.cli)).size} harnesses.\\n\\n${harnessTableMd}`)}`);
+  lines.push(``);
 
   for (const task of tasks) {
     const tid = task.id;
@@ -591,13 +635,26 @@ function generatePlayWorkflow(
       }
     }
 
-    // --- Submit CodeRun CRD for implementation ---
+    // --- Notify task dispatch ---
+    const shortTitle = task.title.length > 50 ? task.title.slice(0, 47) + '...' : task.title;
     lines.push(``);
     lines.push(`  # ── Task ${tid}: ${task.title} (${taskType}, agent: ${agent}, cli: ${taskCli}, model: ${taskModel}, difficulty: ${difficulty}) ──`);
-    lines.push(`  - name: run-task-${tid}`);
+    lines.push(`  - name: notify-task-${tid}-start`);
     if (implDeps.length > 0) {
       lines.push(`    depends_on: [${implDeps.join(', ')}]`);
     }
+    lines.push(`    command: |`);
+    lines.push(`      ${notifyDiscord(agent, '{{inputs.discord_channel}}',
+      `🚀 Task ${tid}: ${shortTitle} → ${taskCli} (${taskModel}) — agent: ${agent}`,
+      { step: 'task-dispatch', task_id: tid, agent, cli: taskCli, model: taskModel, task_type: taskType })}`);
+    lines.push(`      LINEAR_SID="{{inputs.linear_session_id}}"`);
+    lines.push(`      ${notifyLinear('$LINEAR_SID', 'action',
+      `## 🚀 Task ${tid} Dispatched\\n\\n**${task.title}**\\n- Agent: \`${agent}\`\\n- CLI: \`${taskCli}\` / Model: \`${taskModel}\`\\n- Type: ${taskType} | Difficulty: ${difficulty}\\n- Subtasks: ${(task.subtasks ?? []).length}`)}`);
+
+    // --- Submit CodeRun CRD for implementation ---
+    lines.push(``);
+    lines.push(`  - name: run-task-${tid}`);
+    lines.push(`    depends_on: [notify-task-${tid}-start]`);
     lines.push(`    command: |`);
     lines.push(`      cat <<'CODERUN_EOF' | envsubst | kubectl apply -f -`);
     lines.push(`      apiVersion: agents.platform/v1`);
@@ -704,16 +761,22 @@ function generatePlayWorkflow(
       gateSteps.push(`testing-task-${tid}`);
     }
 
-    // --- Gate step ---
+    // --- Gate step + notification ---
     lines.push(``);
     lines.push(`  - name: gate-task-${tid}`);
     lines.push(`    depends_on: [${gateSteps.join(', ')}]`);
-    lines.push(`    command: >`);
+    lines.push(`    command: |`);
     lines.push(`      echo "task-${tid} [${taskType}] gate passed — ${taskCli}/${taskModel} — all checks complete" &&`);
+    lines.push(`      ${notifyDiscord(agent, '{{inputs.discord_channel}}',
+      `✅ Task ${tid}: ${shortTitle} — gate passed (${taskCli}/${taskModel})`,
+      { step: 'gate-pass', task_id: tid, agent, cli: taskCli, model: taskModel, checks: gateSteps.length })}`);
+    lines.push(`      LINEAR_SID="{{inputs.linear_session_id}}"`);
+    lines.push(`      ${notifyLinear('$LINEAR_SID', 'action',
+      `## ✅ Task ${tid} Gate Passed\\n\\n**${task.title}**\\n- Agent: \`${agent}\` | CLI: \`${taskCli}\`\\n- Checks passed: ${gateSteps.length} (${gateSteps.join(', ')})`)}`);
     lines.push(`      jq -nc '{task_id: ${tid}, task_type: "${taskType}", agent: "${agent}", cli: "${taskCli}", model: "${taskModel}", difficulty: ${difficulty}, gate: "pass"}'`);
   }
 
-  // --- Final play-complete step with harness summary ---
+  // --- Final play-complete step with harness summary + notifications ---
   const allGates = tasks.map((t) => `gate-task-${t.id}`);
   const harnessSummary = tasks.map((t) => {
     const a = t.agent ?? 'nova';
@@ -724,9 +787,15 @@ function generatePlayWorkflow(
   lines.push(`  # ── Play complete ──`);
   lines.push(`  - name: play-complete`);
   lines.push(`    depends_on: [${allGates.join(', ')}]`);
-  lines.push(`    command: >`);
+  lines.push(`    command: |`);
   lines.push(`      echo "play complete — all ${tasks.length} tasks passed gate checks" &&`);
   lines.push(`      echo "harness summary: ${harnessSummary}" &&`);
+  lines.push(`      ${notifyDiscord('morgan', '{{inputs.discord_channel}}',
+    `🏁 Play complete — all ${tasks.length} tasks passed gate checks`,
+    { step: 'play-complete', task_count: tasks.length, time_utc: '$(date -u +%Y-%m-%dT%H:%M:%SZ)' })}`);
+  lines.push(`      LINEAR_SID="{{inputs.linear_session_id}}"`);
+  lines.push(`      ${notifyLinear('$LINEAR_SID', 'action',
+    `## 🏁 Play Complete\\n\\nAll ${tasks.length} tasks passed gate checks.\\n\\n### Harness Summary\\n${harnessTableMd}`)}`);
   lines.push(`      jq -nc '{play: "complete", tasks: ${tasks.length}, status: "pass"}'`);
 
   return lines.join('\n') + '\n';
