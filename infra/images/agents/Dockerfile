@@ -34,7 +34,7 @@ ARG BASE_IMAGE=registry.5dlabs.ai/5dlabs/runtime:full
 
 FROM ${BASE_IMAGE}
 
-LABEL org.opencontainers.image.source="https://gitlab.5dlabs.ai/5dlabs/cto"
+LABEL org.opencontainers.image.source="https://github.com/5dlabs/cto"
 LABEL org.opencontainers.image.description="CTO AI Agent - Unified multi-agent platform image"
 LABEL org.opencontainers.image.licenses="MIT"
 
@@ -246,24 +246,50 @@ USER node
 WORKDIR /workspace
 
 # =============================================================================
-# Verify all CLIs are installed
+# Version manifest — bake every CLI version into the image
 # =============================================================================
 RUN set -e; \
-    openclaw --version  && echo "openclaw       OK"; \
-    claude --version    && echo "claude         OK"; \
-    copilot --version 2>/dev/null && echo "copilot        OK" || echo "copilot        SKIP"; \
-    codex --version     && echo "codex          OK"; \
-    code --version      && echo "code           OK"; \
-    timeout 10 gemini --version 2>/dev/null && echo "gemini         OK" || echo "gemini         SKIP"; \
-    cursor-agent --version 2>/dev/null && echo "cursor-agent   OK" || echo "cursor-agent   SKIP"; \
-    FACTORY_DISABLE_TELEMETRY=1 droid --version && echo "droid          OK"; \
-    kimi --version 2>/dev/null && echo "kimi           OK" || echo "kimi           SKIP"; \
-    opencode --version  && echo "opencode       OK"; \
-    op --version        && echo "op             OK"; \
-    gh --version        && echo "gh             OK"; \
-    clawhub --cli-version && echo "clawhub        OK"; \
-    intake-util --help >/dev/null 2>&1 || true; \
-    echo "intake-util    OK"
+    V_OPENCLAW=$(openclaw --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_CLAUDE=$(claude --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_COPILOT=$(copilot --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_CODEX=$(codex --version 2>&1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 || echo "unknown"); \
+    V_CODE=$(code --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_GEMINI=$(timeout 10 gemini --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_CURSOR=$(cursor-agent --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_DROID=$(FACTORY_DISABLE_TELEMETRY=1 droid --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_KIMI=$(kimi --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_OPENCODE=$(opencode --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_CLAWHUB=$(clawhub --cli-version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_GH=$(gh --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_OP=$(op --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_NODE=$(node --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_BUN=$(bun --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ); \
+    printf '{\n  "buildDate": "%s",\n  "clis": {\n    "openclaw": "%s",\n    "claude": "%s",\n    "copilot": "%s",\n    "codex": "%s",\n    "code": "%s",\n    "gemini": "%s",\n    "cursor": "%s",\n    "droid": "%s",\n    "kimi": "%s",\n    "opencode": "%s",\n    "clawhub": "%s"\n  },\n  "tools": {\n    "gh": "%s",\n    "op": "%s",\n    "node": "%s",\n    "bun": "%s"\n  }\n}\n' \
+      "$BUILD_DATE" \
+      "$V_OPENCLAW" "$V_CLAUDE" "$V_COPILOT" "$V_CODEX" "$V_CODE" "$V_GEMINI" \
+      "$V_CURSOR" "$V_DROID" "$V_KIMI" "$V_OPENCODE" "$V_CLAWHUB" \
+      "$V_GH" "$V_OP" "$V_NODE" "$V_BUN" \
+      > /etc/cto/versions.json; \
+    echo "=== /etc/cto/versions.json ==="; \
+    cat /etc/cto/versions.json; \
+    echo ""; \
+    echo "openclaw       $V_OPENCLAW"; \
+    echo "claude         $V_CLAUDE"; \
+    echo "copilot        $V_COPILOT"; \
+    echo "codex          $V_CODEX"; \
+    echo "code           $V_CODE"; \
+    echo "gemini         $V_GEMINI"; \
+    echo "cursor-agent   $V_CURSOR"; \
+    echo "droid          $V_DROID"; \
+    echo "kimi           $V_KIMI"; \
+    echo "opencode       $V_OPENCODE"; \
+    echo "clawhub        $V_CLAWHUB"; \
+    echo "gh             $V_GH"; \
+    echo "op             $V_OP"; \
+    echo "node           $V_NODE"; \
+    echo "bun            $V_BUN"; \
+    intake-util --help >/dev/null 2>&1 && echo "intake-util    OK" || true
 
 # Health check — confirms the openclaw gateway process is running
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

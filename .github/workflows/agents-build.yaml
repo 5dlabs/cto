@@ -396,6 +396,10 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/agents:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/agents:v${{ steps.tag.outputs.tag }}
+          labels: |
+            ai.5dlabs.openclaw.version=${{ steps.openclaw-version.outputs.version }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
+            org.opencontainers.image.revision=${{ github.sha }}
           build-args: |
             BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }}
             OPENCLAW_VERSION=${{ steps.openclaw-version.outputs.version }}
