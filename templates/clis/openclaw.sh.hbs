@@ -58,9 +58,12 @@ case "$CLI_TYPE" in
     ;;
   codex)
     # Codex reads auth from ~/.codex/auth.json (mounted from codex-oauth secret)
+    # The secret may be mounted at /root/.codex/ but we run as node — copy it
     CODEX_AUTH="${HOME}/.codex/auth.json"
-    if [ ! -f "$CODEX_AUTH" ]; then
-      CODEX_AUTH="/root/.codex/auth.json"
+    if [ ! -f "$CODEX_AUTH" ] && [ -f "/root/.codex/auth.json" ]; then
+      mkdir -p "${HOME}/.codex"
+      cp /root/.codex/auth.json "${HOME}/.codex/auth.json" 2>/dev/null || true
+      CODEX_AUTH="${HOME}/.codex/auth.json"
     fi
     if [ -f "$CODEX_AUTH" ]; then
       echo "  ✓ Codex OAuth found at $CODEX_AUTH"
@@ -104,6 +107,29 @@ case "$CLI_TYPE" in
     echo "  ⚠️ No specific auth check for CLI type: $CLI_TYPE"
     ;;
 esac
+
+# =========================================================================
+# Write .acpxrc.json — per-CLI agent overrides for native autonomy flags
+# ACP --approve-all covers ACP permissions, but CLIs like droid also need
+# their own native autonomy flags (e.g., --auto high) to actually write.
+# =========================================================================
+echo ""
+cat > "$WORK_DIR/.acpxrc.json" << 'ACPXRC'
+{
+  "defaultPermissions": "approve-all",
+  "nonInteractivePermissions": "deny",
+  "authPolicy": "skip",
+  "agents": {
+    "droid": {
+      "command": "droid exec --output-format acp --auto high"
+    },
+    "codex": {
+      "command": "codex exec --output-format acp --full-auto"
+    }
+  }
+}
+ACPXRC
+echo "✓ Wrote $WORK_DIR/.acpxrc.json (CLI autonomy overrides)"
 
 # =========================================================================
 # Skills Setup
