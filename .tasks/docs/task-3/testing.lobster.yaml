@@ -4,54 +4,51 @@ metadata:
   agent: tess
   phase: testing
   stack: Go 1.22+/gRPC/grpc-gateway
+  cli: codex
+  model: gpt-5.2-codex
 
-inputs:
-  - name: task_dir
-  - name: repo_url
-  - name: branch_name
-  - name: pr_url
+args:
+  task_dir: {}
+  repo_url: {}
+  branch_name: {}
+  pr_url:
     default: ""
-  - name: cli
-    default: "claude"
-  - name: model
-    default: "claude-opus-4-6"
-  - name: max_retries
+  cli:
+    default: "codex"
+  model:
+    default: "gpt-5.2-codex"
+  max_retries:
     default: 5
 
 steps:
-  - name: checkout
+  - id: checkout
     command: >
-      git clone {{inputs.repo_url}} work && cd work &&
-      git checkout {{inputs.branch_name}}
+      git clone ${repo_url} work && cd work &&
+      git checkout ${branch_name}
 
-  - name: run-unit-tests
+  - id: run-unit-tests
     depends_on: [checkout]
-    retry: { max: "{{inputs.max_retries}}" }
+    retry: { max: "${max_retries}" }
     command: >
       cd work && go test -short ./...
 
-  - name: run-integration-tests
+  - id: run-integration-tests
     depends_on: [run-unit-tests]
-    retry: { max: "{{inputs.max_retries}}" }
+    retry: { max: "${max_retries}" }
     command: >
       cd work && go test -run Integration ./...
 
-  - name: coverage-check
+  - id: coverage-check
     depends_on: [run-unit-tests]
     command: >
       cd work && go test -coverprofile=coverage.out ./... && go tool cover -func=coverage.out
 
-  - name: test-adequacy-review
+  - id: test-adequacy-review
     depends_on: [run-integration-tests, coverage-check]
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt
-      "You are Tess, the testing agent. Review test coverage and adequacy for task 3.
-      Read the task spec at {{inputs.task_dir}}/task.md and acceptance criteria at {{inputs.task_dir}}/acceptance.md.
-      Evaluate: Are all acceptance criteria covered by tests? Are edge cases handled? Are there integration gaps?
-      If tests are missing, generate them.
-      Output: {pass: boolean, coverage_adequate: boolean, tests_generated: number, gaps: [string], summary: string}"
+      ${cli} -p "You are Tess, the testing agent. Review test coverage and adequacy for task 3. Read the task spec at ${task_dir}/task.md and acceptance criteria at ${task_dir}/acceptance.md. Evaluate: Are all acceptance criteria covered by tests? Are edge cases handled? Are there integration gaps? If tests are missing, generate them. Output: {pass: boolean, coverage_adequate: boolean, tests_generated: number, gaps: [string], summary: string}" --model ${model}
 
-  - name: verdict
+  - id: verdict
     depends_on: [test-adequacy-review]
     command: >
       echo "testing-task-3: all checks complete" &&

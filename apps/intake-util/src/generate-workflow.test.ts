@@ -263,7 +263,7 @@ describe('generateWorkflows', () => {
       const out = gen([infraTask, codingTask]);
       const play = out.play_yaml;
       const stepsSection = play.split('steps:')[1];
-      const firstStep = stepsSection.match(/- name: (\S+)/);
+      const firstStep = stepsSection.match(/- id: (\S+)/);
       expect(firstStep?.[1]).toBe('notify-play-start');
     });
 
@@ -283,9 +283,9 @@ describe('generateWorkflows', () => {
     test('each task gets a notify-task-N-start step', () => {
       const out = gen([infraTask, codingTask, frontendTask]);
       const play = out.play_yaml;
-      expect(play).toContain('name: notify-task-1-start');
-      expect(play).toContain('name: notify-task-2-start');
-      expect(play).toContain('name: notify-task-3-start');
+      expect(play).toContain('id: notify-task-1-start');
+      expect(play).toContain('id: notify-task-2-start');
+      expect(play).toContain('id: notify-task-3-start');
     });
 
     test('task dispatch notification includes harness details', () => {
@@ -298,7 +298,7 @@ describe('generateWorkflows', () => {
       const out = gen([infraTask]);
       const play = out.play_yaml;
       // run-task-1 should depend on notify-task-1-start
-      const runMatch = play.match(/name: run-task-1[\s\S]*?depends_on: \[([^\]]+)\]/);
+      const runMatch = play.match(/id: run-task-1[\s\S]*?depends_on: \[([^\]]+)\]/);
       expect(runMatch?.[1]).toContain('notify-task-1-start');
     });
 
@@ -330,7 +330,7 @@ describe('generateWorkflows', () => {
     test('discord_channel input defaults to play', () => {
       const out = gen([infraTask]);
       const play = out.play_yaml;
-      expect(play).toContain('name: discord_channel');
+      expect(play).toContain('discord_channel:');
       expect(play).toContain('default: "play"');
     });
   });
@@ -349,31 +349,31 @@ describe('generateWorkflows', () => {
     test('quality sub-workflow uses cleo harness', () => {
       const out = gen([codingTask]);
       const play = out.play_yaml;
-      const qualSection = play.split('name: quality-task-2')[1]?.split('name:')[0] ?? '';
+      const qualSection = play.split('id: quality-task-2')[1]?.split('id:')[0] ?? '';
       expect(qualSection).toContain("--arg cli 'claude'");
     });
 
     test('testing sub-workflow uses tess harness (codex)', () => {
       const out = gen([codingTask]);
       const play = out.play_yaml;
-      const testSection = play.split('name: testing-task-2')[1]?.split('name:')[0] ?? '';
+      const testSection = play.split('id: testing-task-2')[1]?.split('id:')[0] ?? '';
       expect(testSection).toContain("--arg cli 'codex'");
     });
 
     test('infra task has security but no quality/testing in play', () => {
       const out = gen([infraTask]);
       const play = out.play_yaml;
-      expect(play).toContain('name: security-task-1');
-      expect(play).not.toContain('name: quality-task-1');
-      expect(play).not.toContain('name: testing-task-1');
+      expect(play).toContain('id: security-task-1');
+      expect(play).not.toContain('id: quality-task-1');
+      expect(play).not.toContain('id: testing-task-1');
     });
 
     test('coding task has all three checks in play', () => {
       const out = gen([codingTask]);
       const play = out.play_yaml;
-      expect(play).toContain('name: security-task-2');
-      expect(play).toContain('name: quality-task-2');
-      expect(play).toContain('name: testing-task-2');
+      expect(play).toContain('id: security-task-2');
+      expect(play).toContain('id: quality-task-2');
+      expect(play).toContain('id: testing-task-2');
     });
   });
 
@@ -382,21 +382,21 @@ describe('generateWorkflows', () => {
       const out = gen([infraTask, codingTask]);
       const play = out.play_yaml;
       // Task 2 depends on task 1 → notify-task-2-start depends on gate-task-1
-      const notifySection = play.split('name: notify-task-2-start')[1]?.split('name:')[0] ?? '';
+      const notifySection = play.split('id: notify-task-2-start')[1]?.split('name:')[0] ?? '';
       expect(notifySection).toContain('gate-task-1');
     });
 
     test('task without dependencies has no depends_on on notify step', () => {
       const out = gen([infraTask]);
       const play = out.play_yaml;
-      const notifySection = play.split('name: notify-task-1-start')[1]?.split('command:')[0] ?? '';
+      const notifySection = play.split('id: notify-task-1-start')[1]?.split('command:')[0] ?? '';
       expect(notifySection).not.toContain('depends_on');
     });
 
     test('gate step depends on all check steps', () => {
       const out = gen([codingTask]);
       const play = out.play_yaml;
-      const gateSection = play.split('name: gate-task-2')[1]?.split('name:')[0] ?? '';
+      const gateSection = play.split('id: gate-task-2')[1]?.split('name:')[0] ?? '';
       expect(gateSection).toContain('security-task-2');
       expect(gateSection).toContain('quality-task-2');
       expect(gateSection).toContain('testing-task-2');
@@ -405,7 +405,7 @@ describe('generateWorkflows', () => {
     test('play-complete depends on all gates', () => {
       const out = gen([infraTask, codingTask, frontendTask]);
       const play = out.play_yaml;
-      const completeSection = play.split('name: play-complete')[1] ?? '';
+      const completeSection = play.split('id: play-complete')[1] ?? '';
       expect(completeSection).toContain('gate-task-1');
       expect(completeSection).toContain('gate-task-2');
       expect(completeSection).toContain('gate-task-3');

@@ -4,53 +4,51 @@ metadata:
   agent: cipher
   phase: security
   stack: Next.js 15/React 19/TailwindCSS 4/Effect 3.x
+  cli: claude
+  model: claude-opus-4-6
 
-inputs:
-  - name: task_dir
-  - name: repo_url
-  - name: branch_name
-  - name: pr_url
+args:
+  task_dir: {}
+  repo_url: {}
+  branch_name: {}
+  pr_url:
     default: ""
-  - name: cli
+  cli:
     default: "claude"
-  - name: model
+  model:
     default: "claude-opus-4-6"
-  - name: max_retries
+  max_retries:
     default: 2
 
 steps:
-  - name: checkout
+  - id: checkout
     command: >
-      git clone {{inputs.repo_url}} work && cd work &&
-      git checkout {{inputs.branch_name}}
+      git clone ${repo_url} work && cd work &&
+      git checkout ${branch_name}
 
-  - name: dependency-audit
+  - id: dependency-audit
     depends_on: [checkout]
-    retry: { max: "{{inputs.max_retries}}" }
+    retry: { max: "${max_retries}" }
     command: >
       cd work && npm audit --production
 
-  - name: secret-scan
+  - id: secret-scan
     depends_on: [checkout]
     command: >
       cd work && npx gitleaks detect --source . --no-git
 
-  - name: static-analysis
+  - id: static-analysis
     depends_on: [checkout]
-    retry: { max: "{{inputs.max_retries}}" }
+    retry: { max: "${max_retries}" }
     command: >
       cd work && npx semgrep --config auto --json .
 
-  - name: security-review
+  - id: security-review
     depends_on: [dependency-audit, secret-scan, static-analysis]
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt
-      "You are Cipher, the security agent. Perform a security review of the code changes for task 8.
-      Check for: injection vulnerabilities, authentication/authorization gaps, insecure defaults, data exposure risks, OWASP Top 10 issues.
-      Review the task spec at {{inputs.task_dir}}/task.md for security-relevant requirements.
-      Output: {pass: boolean, vulnerabilities: [{severity: critical|high|medium|low, category, file, description, remediation}], summary: string}"
+      ${cli} -p "You are Cipher, the security agent. Perform a security review of the code changes for task 8. Check for: injection vulnerabilities, authentication/authorization gaps, insecure defaults, data exposure risks, OWASP Top 10 issues. Review the task spec at ${task_dir}/task.md for security-relevant requirements. Output: {pass: boolean, vulnerabilities: [{severity: critical|high|medium|low, category, file, description, remediation}], summary: string}" --model ${model}
 
-  - name: verdict
+  - id: verdict
     depends_on: [security-review]
     command: >
       echo "security-task-8: all checks complete" &&

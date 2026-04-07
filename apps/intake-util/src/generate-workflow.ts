@@ -58,6 +58,11 @@ function indent(text: string, spaces: number): string {
     .join('\n');
 }
 
+/** Produce a lobster variable reference: ${varname} as a literal string. */
+function lv(name: string): string {
+  return '${' + name + '}';
+}
+
 const DEFAULT_HARNESS: AgentHarness = {
   primary: 'claude',
   model: 'claude-opus-4-6',
@@ -99,7 +104,7 @@ function generateTaskWorkflow(
   const maxQualRetries = config.qualityMaxRetries ?? 5;
   const subtasks = task.subtasks ?? [];
   const branchDefault = `task-${taskId}/feature-branch`;
-  const taskDir = `{{inputs.task_dir}}`;
+  const taskDir = lv('task_dir');
 
   const lines: string[] = [];
 
@@ -116,25 +121,25 @@ function generateTaskWorkflow(
   }
   lines.push('');
 
-  // Inputs
-  lines.push('inputs:');
-  lines.push('  - name: task_dir');
-  lines.push('  - name: repo_url');
-  lines.push('  - name: branch_name');
+  // Args
+  lines.push('args:');
+  lines.push('  task_dir: {}');
+  lines.push('  repo_url: {}');
+  lines.push('  branch_name:');
   lines.push(`    default: "${branchDefault}"`);
-  lines.push('  - name: agent');
+  lines.push('  agent:');
   lines.push(`    default: "${agent}"`);
-  lines.push('  - name: cli');
+  lines.push('  cli:');
   lines.push(`    default: "${harness.primary}"`);
-  lines.push('  - name: model');
+  lines.push('  model:');
   lines.push(`    default: "${harness.model}"`);
-  lines.push('  - name: fallback_cli');
+  lines.push('  fallback_cli:');
   lines.push(`    default: "${harness.fallback ?? 'codex'}"`);
-  lines.push('  - name: fallback_model');
+  lines.push('  fallback_model:');
   lines.push(`    default: "${harness.fallbackModel ?? 'gpt-5.2-codex'}"`);
-  lines.push('  - name: max_implementation_retries');
+  lines.push('  max_implementation_retries:');
   lines.push(`    default: ${maxImplRetries}`);
-  lines.push('  - name: max_quality_retries');
+  lines.push('  max_quality_retries:');
   lines.push(`    default: ${maxQualRetries}`);
   lines.push('');
 
@@ -142,10 +147,10 @@ function generateTaskWorkflow(
   lines.push('steps:');
 
   // Setup
-  lines.push('  - name: setup');
+  lines.push('  - id: setup');
   lines.push('    command: >');
-  lines.push('      git clone {{inputs.repo_url}} work && cd work &&');
-  lines.push('      git checkout -b {{inputs.branch_name}}');
+  lines.push('      git clone ${repo_url} work && cd work &&');
+  lines.push('      git checkout -b ${branch_name}');
   lines.push('');
 
   // Scaffold files
@@ -156,7 +161,7 @@ function generateTaskWorkflow(
       if (dir && dir !== f.path) dirs.add(dir);
     }
     if (dirs.size > 0) {
-      lines.push('  - name: scaffold-files');
+      lines.push('  - id: scaffold-files');
       lines.push('    depends_on: [setup]');
       lines.push('    command: >');
       lines.push(`      cd work && mkdir -p ${Array.from(dirs).join(' ')}`);
@@ -169,16 +174,16 @@ function generateTaskWorkflow(
   // Subtask implementation + validation steps
   if (subtasks.length === 0) {
     // No subtasks — single implementation step
-    lines.push('  - name: implement');
+    lines.push('  - id: implement');
     lines.push(`    depends_on: [${scaffoldStep}]`);
-    lines.push(`    retry: { max: "{{inputs.max_implementation_retries}}" }`);
+    lines.push(`    retry: { max: "\${max_implementation_retries\}" }`);
     lines.push('    command: >');
-    lines.push(`      {{inputs.cli}} --model {{inputs.model}} --prompt-file ${taskDir}/prompt.md`);
+    lines.push(`      \${cli} -p "$(cat ${taskDir}/prompt.md)" --model \${model}`);
     lines.push('');
 
-    lines.push('  - name: validate');
+    lines.push('  - id: validate');
     lines.push('    depends_on: [implement]');
-    lines.push(`    retry: { max: "{{inputs.max_quality_retries}}" }`);
+    lines.push(`    retry: { max: "\${max_quality_retries\}" }`);
     lines.push('    command: >');
     lines.push(`      cd work && ${validation.type_check} && ${validation.test} && ${validation.lint}`);
     lines.push('');
@@ -233,17 +238,17 @@ function generateSubtaskSteps(
     }
 
     // Implementation step
-    lines.push(`  - name: ${implName}`);
+    lines.push(`  - id: ${implName}`);
     lines.push(`    depends_on: [${deps.join(', ')}]`);
-    lines.push(`    retry: { max: "{{inputs.max_implementation_retries}}" }`);
+    lines.push(`    retry: { max: "\${max_implementation_retries\}" }`);
     lines.push('    command: >');
-    lines.push(`      {{inputs.cli}} --model {{inputs.model}} --prompt-file ${taskDir}/subtasks/task-${taskId}.${stIdx}/prompt.md`);
+    lines.push(`      \${cli} -p "$(cat ${taskDir}/subtasks/task-${taskId}.${stIdx}/prompt.md)" --model \${model}`);
     lines.push('');
 
     // Validation step
-    lines.push(`  - name: ${valName}`);
+    lines.push(`  - id: ${valName}`);
     lines.push(`    depends_on: [${implName}]`);
-    lines.push(`    retry: { max: "{{inputs.max_quality_retries}}" }`);
+    lines.push(`    retry: { max: "\${max_quality_retries\}" }`);
     lines.push('    command: >');
     lines.push(`      cd work && ${validation.type_check} && ${validation.test} && ${validation.lint}`);
     lines.push('');
@@ -261,26 +266,26 @@ function appendFinalSteps(
   dependsOn: string[],
 ): void {
   // Integration validation
-  lines.push('  - name: integration-validation');
+  lines.push('  - id: integration-validation');
   lines.push(`    depends_on: [${dependsOn.join(', ')}]`);
   lines.push('    command: >');
   lines.push('      cd work && bun tsc --noEmit && bun test --run && bun lint');
   lines.push('');
 
   // Acceptance check
-  lines.push('  - name: acceptance-check');
+  lines.push('  - id: acceptance-check');
   lines.push('    depends_on: [integration-validation]');
   lines.push('    command: >');
-  lines.push(`      {{inputs.cli}} --model {{inputs.model}} --prompt "Review changes against ${taskDir}/acceptance.md. Output PASS or FAIL."`);
+  lines.push(`      \${cli} -p "Review changes against ${taskDir}/acceptance.md. Output PASS or FAIL." --model \${model}`);
   lines.push('');
 
   // Create PR
-  lines.push('  - name: create-pr');
+  lines.push('  - id: create-pr');
   lines.push('    depends_on: [acceptance-check]');
   lines.push('    command: >');
   lines.push('      cd work && git add -A &&');
   lines.push(`      git commit -m "feat: task-${taskId}" &&`);
-  lines.push('      git push origin {{inputs.branch_name}} &&');
+  lines.push('      git push origin ${branch_name} &&');
   lines.push('      source "${WORKSPACE:-.}/scripts/scm-dispatch.sh" &&');
   lines.push(`      scm_create_pr "feat: task-${taskId}" "$(cat ${taskDir}/task.md)" "main"`);
 }
@@ -293,7 +298,7 @@ function generateQualityWorkflow(
   const stack = task.stack ?? 'typescript';
   const validation = getValidationCommands(stack);
   const maxRetries = config.qualityMaxRetries ?? 5;
-  const taskDir = `{{inputs.task_dir}}`;
+  const taskDir = lv('task_dir');
   const harness = getAgentHarness('cleo', config);
 
   return `name: quality-task-${taskId}
@@ -305,54 +310,48 @@ metadata:
   cli: ${harness.primary}
   model: ${harness.model}
 
-inputs:
-  - name: task_dir
-  - name: repo_url
-  - name: branch_name
-  - name: pr_url
+args:
+  task_dir: {}
+  repo_url: {}
+  branch_name: {}
+  pr_url:
     default: ""
-  - name: cli
+  cli:
     default: "${harness.primary}"
-  - name: model
+  model:
     default: "${harness.model}"
-  - name: max_retries
+  max_retries:
     default: ${maxRetries}
 
 steps:
-  - name: checkout
+  - id: checkout
     command: >
-      git clone {{inputs.repo_url}} work && cd work &&
-      git checkout {{inputs.branch_name}}
+      git clone \${repo_url\} work && cd work &&
+      git checkout \${branch_name\}
 
-  - name: lint
+  - id: lint
     depends_on: [checkout]
-    retry: { max: "{{inputs.max_retries}}" }
+    retry: { max: "\${max_retries\}" }
     command: >
       cd work && ${validation.lint}
 
-  - name: type-check
+  - id: type-check
     depends_on: [checkout]
-    retry: { max: "{{inputs.max_retries}}" }
+    retry: { max: "\${max_retries\}" }
     command: >
       cd work && ${validation.type_check}
 
-  - name: code-review
+  - id: code-review
     depends_on: [lint, type-check]
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file ${taskDir}/quality-review-prompt.md ||
-      {{inputs.cli}} --model {{inputs.model}} --prompt
-      "You are Cleo, the code quality agent. Review the code in this repository against the task spec at ${taskDir}/task.md.
-      Check for: code style consistency, naming conventions, dead code, complexity hotspots, error handling patterns, and documentation gaps.
-      Output a JSON report: {pass: boolean, issues: [{severity, file, line, message}], summary: string}"
+      \${cli} -p "$(cat ${taskDir}/quality-review-prompt.md 2>/dev/null || echo 'You are Cleo, the code quality agent. Review the code in this repository against the task spec at ${taskDir}/task.md. Check for: code style consistency, naming conventions, dead code, complexity hotspots, error handling patterns, and documentation gaps. Output a JSON report: {pass: boolean, issues: [{severity, file, line, message}], summary: string}')" --model \${model}
 
-  - name: standards-check
+  - id: standards-check
     depends_on: [code-review]
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt
-      "Review ${taskDir}/acceptance.md against the implementation. Verify every acceptance criterion is met.
-      Output: {criteria_met: number, criteria_total: number, pass: boolean, gaps: [string]}"
+      \${cli} -p "Review ${taskDir}/acceptance.md against the implementation. Verify every acceptance criterion is met. Output: {criteria_met: number, criteria_total: number, pass: boolean, gaps: [string]}" --model \${model}
 
-  - name: verdict
+  - id: verdict
     depends_on: [standards-check]
     command: >
       echo "quality-task-${taskId}: all checks complete" &&
@@ -367,7 +366,7 @@ function generateSecurityWorkflow(
   const stack = task.stack ?? 'typescript';
   const security = getSecurityCommands(stack);
   const maxRetries = config.securityMaxRetries ?? 3;
-  const taskDir = `{{inputs.task_dir}}`;
+  const taskDir = lv('task_dir');
   const harness = getAgentHarness('cipher', config);
 
   return `name: security-task-${taskId}
@@ -379,52 +378,48 @@ metadata:
   cli: ${harness.primary}
   model: ${harness.model}
 
-inputs:
-  - name: task_dir
-  - name: repo_url
-  - name: branch_name
-  - name: pr_url
+args:
+  task_dir: {}
+  repo_url: {}
+  branch_name: {}
+  pr_url:
     default: ""
-  - name: cli
+  cli:
     default: "${harness.primary}"
-  - name: model
+  model:
     default: "${harness.model}"
-  - name: max_retries
+  max_retries:
     default: ${maxRetries}
 
 steps:
-  - name: checkout
+  - id: checkout
     command: >
-      git clone {{inputs.repo_url}} work && cd work &&
-      git checkout {{inputs.branch_name}}
+      git clone \${repo_url\} work && cd work &&
+      git checkout \${branch_name\}
 
-  - name: dependency-audit
+  - id: dependency-audit
     depends_on: [checkout]
-    retry: { max: "{{inputs.max_retries}}" }
+    retry: { max: "\${max_retries\}" }
     command: >
       cd work && ${security.audit}
 
-  - name: secret-scan
+  - id: secret-scan
     depends_on: [checkout]
     command: >
       cd work && ${security.secrets}
 
-  - name: static-analysis
+  - id: static-analysis
     depends_on: [checkout]
-    retry: { max: "{{inputs.max_retries}}" }
+    retry: { max: "\${max_retries\}" }
     command: >
       cd work && ${security.scan}
 
-  - name: security-review
+  - id: security-review
     depends_on: [dependency-audit, secret-scan, static-analysis]
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt
-      "You are Cipher, the security agent. Perform a security review of the code changes for task ${taskId}.
-      Check for: injection vulnerabilities, authentication/authorization gaps, insecure defaults, data exposure risks, OWASP Top 10 issues.
-      Review the task spec at ${taskDir}/task.md for security-relevant requirements.
-      Output: {pass: boolean, vulnerabilities: [{severity: critical|high|medium|low, category, file, description, remediation}], summary: string}"
+      \${cli} -p "You are Cipher, the security agent. Perform a security review of the code changes for task ${taskId}. Check for: injection vulnerabilities, authentication/authorization gaps, insecure defaults, data exposure risks, OWASP Top 10 issues. Review the task spec at ${taskDir}/task.md for security-relevant requirements. Output: {pass: boolean, vulnerabilities: [{severity: critical|high|medium|low, category, file, description, remediation}], summary: string}" --model \${model}
 
-  - name: verdict
+  - id: verdict
     depends_on: [security-review]
     command: >
       echo "security-task-${taskId}: all checks complete" &&
@@ -439,7 +434,7 @@ function generateTestingWorkflow(
   const stack = task.stack ?? 'typescript';
   const testing = getTestCommands(stack);
   const maxRetries = config.testingMaxRetries ?? 5;
-  const taskDir = `{{inputs.task_dir}}`;
+  const taskDir = lv('task_dir');
   const harness = getAgentHarness('tess', config);
 
   return `name: testing-task-${taskId}
@@ -451,53 +446,48 @@ metadata:
   cli: ${harness.primary}
   model: ${harness.model}
 
-inputs:
-  - name: task_dir
-  - name: repo_url
-  - name: branch_name
-  - name: pr_url
+args:
+  task_dir: {}
+  repo_url: {}
+  branch_name: {}
+  pr_url:
     default: ""
-  - name: cli
+  cli:
     default: "${harness.primary}"
-  - name: model
+  model:
     default: "${harness.model}"
-  - name: max_retries
+  max_retries:
     default: ${maxRetries}
 
 steps:
-  - name: checkout
+  - id: checkout
     command: >
-      git clone {{inputs.repo_url}} work && cd work &&
-      git checkout {{inputs.branch_name}}
+      git clone \${repo_url\} work && cd work &&
+      git checkout \${branch_name\}
 
-  - name: run-unit-tests
+  - id: run-unit-tests
     depends_on: [checkout]
-    retry: { max: "{{inputs.max_retries}}" }
+    retry: { max: "\${max_retries\}" }
     command: >
       cd work && ${testing.unit}
 
-  - name: run-integration-tests
+  - id: run-integration-tests
     depends_on: [run-unit-tests]
-    retry: { max: "{{inputs.max_retries}}" }
+    retry: { max: "\${max_retries\}" }
     command: >
       cd work && ${testing.integration}
 
-  - name: coverage-check
+  - id: coverage-check
     depends_on: [run-unit-tests]
     command: >
       cd work && ${testing.coverage}
 
-  - name: test-adequacy-review
+  - id: test-adequacy-review
     depends_on: [run-integration-tests, coverage-check]
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt
-      "You are Tess, the testing agent. Review test coverage and adequacy for task ${taskId}.
-      Read the task spec at ${taskDir}/task.md and acceptance criteria at ${taskDir}/acceptance.md.
-      Evaluate: Are all acceptance criteria covered by tests? Are edge cases handled? Are there integration gaps?
-      If tests are missing, generate them.
-      Output: {pass: boolean, coverage_adequate: boolean, tests_generated: number, gaps: [string], summary: string}"
+      \${cli} -p "You are Tess, the testing agent. Review test coverage and adequacy for task ${taskId}. Read the task spec at ${taskDir}/task.md and acceptance criteria at ${taskDir}/acceptance.md. Evaluate: Are all acceptance criteria covered by tests? Are edge cases handled? Are there integration gaps? If tests are missing, generate them. Output: {pass: boolean, coverage_adequate: boolean, tests_generated: number, gaps: [string], summary: string}" --model \${model}
 
-  - name: verdict
+  - id: verdict
     depends_on: [test-adequacy-review]
     command: >
       echo "testing-task-${taskId}: all checks complete" &&
@@ -545,34 +535,34 @@ function generatePlayWorkflow(
   lines.push(`  available credits, and user-defined provider preferences.`);
   lines.push(``);
 
-  // -- inputs --
-  lines.push(`inputs:`);
-  lines.push(`  - name: tasks_dir`);
+  // -- args --
+  lines.push(`args:`);
+  lines.push(`  tasks_dir:`);
   lines.push(`    description: Root directory containing per-task folders`);
-  lines.push(`  - name: repo_url`);
+  lines.push(`  repo_url:`);
   if (repositoryUrl) {
     lines.push(`    default: "${repositoryUrl}"`);
   }
-  lines.push(`  - name: namespace`);
+  lines.push(`  namespace:`);
   lines.push(`    default: openclaw`);
-  lines.push(`  - name: base_branch`);
+  lines.push(`  base_branch:`);
   lines.push(`    default: main`);
-  lines.push(`  - name: cli`);
+  lines.push(`  cli:`);
   lines.push(`    description: Default CLI tool (claude, codex, cursor, gemini, etc.)`);
   lines.push(`    default: claude`);
-  lines.push(`  - name: model`);
+  lines.push(`  model:`);
   lines.push(`    description: Default LLM model — Morgan may override per-task based on difficulty + credits`);
   lines.push(`    default: claude-sonnet-4-6`);
-  lines.push(`  - name: linear_session_id`);
+  lines.push(`  linear_session_id:`);
   lines.push(`    description: Linear agent session for status updates`);
   lines.push(`    default: ""`);
-  lines.push(`  - name: linear_team_id`);
+  lines.push(`  linear_team_id:`);
   lines.push(`    default: ""`);
-  lines.push(`  - name: docs_repository_url`);
+  lines.push(`  docs_repository_url:`);
   lines.push(`    default: ""`);
-  lines.push(`  - name: enable_docker`);
+  lines.push(`  enable_docker:`);
   lines.push(`    default: "true"`);
-  lines.push(`  - name: discord_channel`);
+  lines.push(`  discord_channel:`);
   lines.push(`    description: Discord target channel for play notifications (e.g. play, execution)`);
   lines.push(`    default: "play"`);
   lines.push(``);
@@ -603,12 +593,12 @@ function generatePlayWorkflow(
   // --- Play start notification ---
   lines.push(``);
   lines.push(`  # ── Play start notification ──`);
-  lines.push(`  - name: notify-play-start`);
+  lines.push(`  - id: notify-play-start`);
   lines.push(`    command: |`);
-  lines.push(`      ${notifyDiscord('morgan', '{{inputs.discord_channel}}',
+  lines.push(`      ${notifyDiscord('morgan', '\${discord_channel\}',
     `🎬 Play started — ${tasks.length} tasks dispatching`,
     { step: 'play-start', task_count: tasks.length, time_utc: '$(date -u +%Y-%m-%dT%H:%M:%SZ)' })}`);
-  lines.push(`      LINEAR_SID="{{inputs.linear_session_id}}"`);
+  lines.push(`      LINEAR_SID="\${linear_session_id\}"`);
   lines.push(`      ${notifyLinear('$LINEAR_SID', 'action',
     `## 🎬 Play Started\\n\\n${harnessTable.length} tasks dispatching to ${new Set(harnessTable.map((r) => r.cli)).size} harnesses.\\n\\n${harnessTableMd}`)}`);
   lines.push(``);
@@ -639,15 +629,15 @@ function generatePlayWorkflow(
     const shortTitle = task.title.length > 50 ? task.title.slice(0, 47) + '...' : task.title;
     lines.push(``);
     lines.push(`  # ── Task ${tid}: ${task.title} (${taskType}, agent: ${agent}, cli: ${taskCli}, model: ${taskModel}, difficulty: ${difficulty}) ──`);
-    lines.push(`  - name: notify-task-${tid}-start`);
+    lines.push(`  - id: notify-task-${tid}-start`);
     if (implDeps.length > 0) {
       lines.push(`    depends_on: [${implDeps.join(', ')}]`);
     }
     lines.push(`    command: |`);
-    lines.push(`      ${notifyDiscord(agent, '{{inputs.discord_channel}}',
+    lines.push(`      ${notifyDiscord(agent, '\${discord_channel\}',
       `🚀 Task ${tid}: ${shortTitle} → ${taskCli} (${taskModel}) — agent: ${agent}`,
       { step: 'task-dispatch', task_id: tid, agent, cli: taskCli, model: taskModel, task_type: taskType })}`);
-    lines.push(`      LINEAR_SID="{{inputs.linear_session_id}}"`);
+    lines.push(`      LINEAR_SID="\${linear_session_id\}"`);
     lines.push(`      ${notifyLinear('$LINEAR_SID', 'action',
       `## 🚀 Task ${tid} Dispatched\\n\\n**${task.title}**\\n- Agent: \`${agent}\`\\n- CLI: \`${taskCli}\` / Model: \`${taskModel}\`\\n- Type: ${taskType} | Difficulty: ${difficulty}\\n- Subtasks: ${(task.subtasks ?? []).length}`)}`);
 
@@ -656,7 +646,7 @@ function generatePlayWorkflow(
 
     // --- Submit CodeRun CRD for implementation (with fallback cascade) ---
     lines.push(``);
-    lines.push(`  - name: run-task-${tid}`);
+    lines.push(`  - id: run-task-${tid}`);
     lines.push(`    depends_on: [notify-task-${tid}-start]`);
     lines.push(`    command: |`);
     lines.push(`      # --- Primary attempt: ${taskCli}/${taskModel} ---`);
@@ -666,7 +656,7 @@ function generatePlayWorkflow(
     lines.push(`      FALLBACK_MODEL="${fallbackModel}"`);
     lines.push(`      TASK_ID=${tid}`);
     lines.push(`      AGENT="${agent}"`);
-    lines.push(`      NS="{{inputs.namespace}}"`);
+    lines.push(`      NS="\${namespace\}"`);
     lines.push(`      RUN_NAME="play-task-${tid}-${agent}"`);
     lines.push(`      USED_CLI="$PRIMARY_CLI"`);
     lines.push(`      USED_MODEL="$PRIMARY_MODEL"`);
@@ -689,18 +679,18 @@ function generatePlayWorkflow(
     lines.push(`        runType: implementation`);
     lines.push(`        taskId: ${tid}`);
     lines.push(`        service: ${agent}`);
-    lines.push(`        repositoryUrl: {{inputs.repo_url}}`);
-    lines.push(`        docsRepositoryUrl: {{inputs.docs_repository_url}}`);
+    lines.push(`        repositoryUrl: \${repo_url\}`);
+    lines.push(`        docsRepositoryUrl: \${docs_repository_url\}`);
     lines.push(`        model: $model`);
     lines.push(`        githubApp: ${ghApp}`);
-    lines.push(`        enableDocker: {{inputs.enable_docker}}`);
+    lines.push(`        enableDocker: \${enable_docker\}`);
     lines.push(`        cliConfig:`);
     lines.push(`          cliType: $cli`);
     lines.push(`          model: $model`);
     lines.push(`        linearIntegration:`);
     lines.push(`          enabled: true`);
-    lines.push(`          sessionId: {{inputs.linear_session_id}}`);
-    lines.push(`          teamId: {{inputs.linear_team_id}}`);
+    lines.push(`          sessionId: \${linear_session_id\}`);
+    lines.push(`          teamId: \${linear_team_id\}`);
     if (task.subtasks && task.subtasks.length > 0) {
       lines.push(`        subtasks:`);
       for (const st of task.subtasks) {
@@ -733,7 +723,7 @@ function generatePlayWorkflow(
     lines.push(`        USED_CLI="$FALLBACK_CLI"`);
     lines.push(`        USED_MODEL="$FALLBACK_MODEL"`);
     lines.push(`        echo "⚠️ Primary $PRIMARY_CLI failed for task-${tid}, falling back to $FALLBACK_CLI/$FALLBACK_MODEL..." &&`);
-    lines.push(`        ${notifyDiscord(agent, '{{inputs.discord_channel}}',
+    lines.push(`        ${notifyDiscord(agent, '\${discord_channel\}',
       `⚠️ Task ${tid}: primary ${taskCli} failed, falling back to ${fallbackCli}/${fallbackModel}`,
       { step: 'fallback-trigger', task_id: tid, agent, primary_cli: taskCli, fallback_cli: fallbackCli })}`);
     lines.push(`        kubectl delete "coderun/$RUN_NAME" -n "$NS" --ignore-not-found=true &&`);
@@ -752,13 +742,13 @@ function generatePlayWorkflow(
 
     // Security — always runs
     lines.push(``);
-    lines.push(`  - name: security-task-${tid}`);
+    lines.push(`  - id: security-task-${tid}`);
     lines.push(`    depends_on: [${checkDeps.join(', ')}]`);
     lines.push(`    command: >`);
     lines.push(`      lobster run --mode tool`);
-    lines.push(`      "{{inputs.tasks_dir}}/task-${tid}/security.lobster.yaml"`);
-    lines.push(`      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-${tid}'`);
-    lines.push(`        --arg repo '{{inputs.repo_url}}'`);
+    lines.push(`      "\${tasks_dir\}/task-${tid}/security.lobster.yaml"`);
+    lines.push(`      --args-json "$(jq -nc --arg td '\${tasks_dir\}/task-${tid}'`);
+    lines.push(`        --arg repo '\${repo_url\}'`);
     lines.push(`        --arg branch '${branchName}'`);
     lines.push(`        --arg cli '${secHarness.primary}'`);
     lines.push(`        --arg model '${secHarness.model}'`);
@@ -771,13 +761,13 @@ function generatePlayWorkflow(
 
       // Quality — coding tasks only
       lines.push(``);
-      lines.push(`  - name: quality-task-${tid}`);
+      lines.push(`  - id: quality-task-${tid}`);
       lines.push(`    depends_on: [${checkDeps.join(', ')}]`);
       lines.push(`    command: >`);
       lines.push(`      lobster run --mode tool`);
-      lines.push(`      "{{inputs.tasks_dir}}/task-${tid}/quality.lobster.yaml"`);
-      lines.push(`      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-${tid}'`);
-      lines.push(`        --arg repo '{{inputs.repo_url}}'`);
+      lines.push(`      "\${tasks_dir\}/task-${tid}/quality.lobster.yaml"`);
+      lines.push(`      --args-json "$(jq -nc --arg td '\${tasks_dir\}/task-${tid}'`);
+      lines.push(`        --arg repo '\${repo_url\}'`);
       lines.push(`        --arg branch '${branchName}'`);
       lines.push(`        --arg cli '${qualHarness.primary}'`);
       lines.push(`        --arg model '${qualHarness.model}'`);
@@ -786,13 +776,13 @@ function generatePlayWorkflow(
 
       // Testing — coding tasks only
       lines.push(``);
-      lines.push(`  - name: testing-task-${tid}`);
+      lines.push(`  - id: testing-task-${tid}`);
       lines.push(`    depends_on: [${checkDeps.join(', ')}]`);
       lines.push(`    command: >`);
       lines.push(`      lobster run --mode tool`);
-      lines.push(`      "{{inputs.tasks_dir}}/task-${tid}/testing.lobster.yaml"`);
-      lines.push(`      --args-json "$(jq -nc --arg td '{{inputs.tasks_dir}}/task-${tid}'`);
-      lines.push(`        --arg repo '{{inputs.repo_url}}'`);
+      lines.push(`      "\${tasks_dir\}/task-${tid}/testing.lobster.yaml"`);
+      lines.push(`      --args-json "$(jq -nc --arg td '\${tasks_dir\}/task-${tid}'`);
+      lines.push(`        --arg repo '\${repo_url\}'`);
       lines.push(`        --arg branch '${branchName}'`);
       lines.push(`        --arg cli '${testHarness.primary}'`);
       lines.push(`        --arg model '${testHarness.model}'`);
@@ -802,14 +792,14 @@ function generatePlayWorkflow(
 
     // --- Gate step + notification ---
     lines.push(``);
-    lines.push(`  - name: gate-task-${tid}`);
+    lines.push(`  - id: gate-task-${tid}`);
     lines.push(`    depends_on: [${gateSteps.join(', ')}]`);
     lines.push(`    command: |`);
     lines.push(`      echo "task-${tid} [${taskType}] gate passed — ${taskCli}/${taskModel} — all checks complete" &&`);
-    lines.push(`      ${notifyDiscord(agent, '{{inputs.discord_channel}}',
+    lines.push(`      ${notifyDiscord(agent, '\${discord_channel\}',
       `✅ Task ${tid}: ${shortTitle} — gate passed (${taskCli}/${taskModel})`,
       { step: 'gate-pass', task_id: tid, agent, cli: taskCli, model: taskModel, checks: gateSteps.length })}`);
-    lines.push(`      LINEAR_SID="{{inputs.linear_session_id}}"`);
+    lines.push(`      LINEAR_SID="\${linear_session_id\}"`);
     lines.push(`      ${notifyLinear('$LINEAR_SID', 'action',
       `## ✅ Task ${tid} Gate Passed\\n\\n**${task.title}**\\n- Agent: \`${agent}\` | CLI: \`${taskCli}\`\\n- Checks passed: ${gateSteps.length} (${gateSteps.join(', ')})`)}`);
     lines.push(`      jq -nc '{task_id: ${tid}, task_type: "${taskType}", agent: "${agent}", cli: "${taskCli}", model: "${taskModel}", difficulty: ${difficulty}, gate: "pass"}'`);
@@ -824,15 +814,15 @@ function generatePlayWorkflow(
   }).join(', ');
   lines.push(``);
   lines.push(`  # ── Play complete ──`);
-  lines.push(`  - name: play-complete`);
+  lines.push(`  - id: play-complete`);
   lines.push(`    depends_on: [${allGates.join(', ')}]`);
   lines.push(`    command: |`);
   lines.push(`      echo "play complete — all ${tasks.length} tasks passed gate checks" &&`);
   lines.push(`      echo "harness summary: ${harnessSummary}" &&`);
-  lines.push(`      ${notifyDiscord('morgan', '{{inputs.discord_channel}}',
+  lines.push(`      ${notifyDiscord('morgan', '\${discord_channel\}',
     `🏁 Play complete — all ${tasks.length} tasks passed gate checks`,
     { step: 'play-complete', task_count: tasks.length, time_utc: '$(date -u +%Y-%m-%dT%H:%M:%SZ)' })}`);
-  lines.push(`      LINEAR_SID="{{inputs.linear_session_id}}"`);
+  lines.push(`      LINEAR_SID="\${linear_session_id\}"`);
   lines.push(`      ${notifyLinear('$LINEAR_SID', 'action',
     `## 🏁 Play Complete\\n\\nAll ${tasks.length} tasks passed gate checks.\\n\\n### Harness Summary\\n${harnessTableMd}`)}`);
   lines.push(`      jq -nc '{play: "complete", tasks: ${tasks.length}, status: "pass"}'`);

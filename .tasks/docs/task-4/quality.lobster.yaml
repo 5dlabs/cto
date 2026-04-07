@@ -4,55 +4,51 @@ metadata:
   agent: cleo
   phase: quality
   stack: Rust 1.75+/Axum 0.7
+  cli: claude
+  model: claude-opus-4-6
 
-inputs:
-  - name: task_dir
-  - name: repo_url
-  - name: branch_name
-  - name: pr_url
+args:
+  task_dir: {}
+  repo_url: {}
+  branch_name: {}
+  pr_url:
     default: ""
-  - name: cli
+  cli:
     default: "claude"
-  - name: model
+  model:
     default: "claude-opus-4-6"
-  - name: max_retries
+  max_retries:
     default: 5
 
 steps:
-  - name: checkout
+  - id: checkout
     command: >
-      git clone {{inputs.repo_url}} work && cd work &&
-      git checkout {{inputs.branch_name}}
+      git clone ${repo_url} work && cd work &&
+      git checkout ${branch_name}
 
-  - name: lint
+  - id: lint
     depends_on: [checkout]
-    retry: { max: "{{inputs.max_retries}}" }
+    retry: { max: "${max_retries}" }
     command: >
       cd work && cargo clippy -- -D warnings
 
-  - name: type-check
+  - id: type-check
     depends_on: [checkout]
-    retry: { max: "{{inputs.max_retries}}" }
+    retry: { max: "${max_retries}" }
     command: >
       cd work && cargo check
 
-  - name: code-review
+  - id: code-review
     depends_on: [lint, type-check]
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt-file {{inputs.task_dir}}/quality-review-prompt.md ||
-      {{inputs.cli}} --model {{inputs.model}} --prompt
-      "You are Cleo, the code quality agent. Review the code in this repository against the task spec at {{inputs.task_dir}}/task.md.
-      Check for: code style consistency, naming conventions, dead code, complexity hotspots, error handling patterns, and documentation gaps.
-      Output a JSON report: {pass: boolean, issues: [{severity, file, line, message}], summary: string}"
+      ${cli} -p "$(cat ${task_dir}/quality-review-prompt.md 2>/dev/null || echo 'You are Cleo, the code quality agent. Review the code in this repository against the task spec at ${task_dir}/task.md. Check for: code style consistency, naming conventions, dead code, complexity hotspots, error handling patterns, and documentation gaps. Output a JSON report: {pass: boolean, issues: [{severity, file, line, message}], summary: string}')" --model ${model}
 
-  - name: standards-check
+  - id: standards-check
     depends_on: [code-review]
     command: >
-      {{inputs.cli}} --model {{inputs.model}} --prompt
-      "Review {{inputs.task_dir}}/acceptance.md against the implementation. Verify every acceptance criterion is met.
-      Output: {criteria_met: number, criteria_total: number, pass: boolean, gaps: [string]}"
+      ${cli} -p "Review ${task_dir}/acceptance.md against the implementation. Verify every acceptance criterion is met. Output: {criteria_met: number, criteria_total: number, pass: boolean, gaps: [string]}" --model ${model}
 
-  - name: verdict
+  - id: verdict
     depends_on: [standards-check]
     command: >
       echo "quality-task-4: all checks complete" &&
