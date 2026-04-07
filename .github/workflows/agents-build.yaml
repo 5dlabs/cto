@@ -354,6 +354,7 @@ jobs:
         id: cli-versions
         run: |
           get_ver() { npm view "$1" version 2>/dev/null || echo "unknown"; }
+          echo "acpx=$(get_ver acpx)" >> "$GITHUB_OUTPUT"
           echo "claude=$(get_ver @anthropic-ai/claude-code)" >> "$GITHUB_OUTPUT"
           echo "codex=$(get_ver @openai/codex)" >> "$GITHUB_OUTPUT"
           echo "copilot=$(get_ver @github/copilot)" >> "$GITHUB_OUTPUT"
@@ -411,6 +412,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/agents:v${{ steps.tag.outputs.tag }}
           labels: |
             ai.5dlabs.openclaw.version=${{ steps.openclaw-version.outputs.version }}
+            ai.5dlabs.cli.acpx=${{ steps.cli-versions.outputs.acpx }}
             ai.5dlabs.cli.claude=${{ steps.cli-versions.outputs.claude }}
             ai.5dlabs.cli.codex=${{ steps.cli-versions.outputs.codex }}
             ai.5dlabs.cli.copilot=${{ steps.cli-versions.outputs.copilot }}
@@ -467,6 +469,7 @@ jobs:
             echo "| CLI | Version | Source |"
             echo "|-----|---------|--------|"
             echo "| OpenClaw | \`${{ steps.openclaw-version.outputs.version }}\` | npm |"
+            echo "| acpx | \`${{ steps.cli-versions.outputs.acpx }}\` | npm |"
             echo "| Claude Code | \`${{ steps.cli-versions.outputs.claude }}\` | npm |"
             echo "| Codex | \`${{ steps.cli-versions.outputs.codex }}\` | npm |"
             echo "| Copilot | \`${{ steps.cli-versions.outputs.copilot }}\` | npm |"

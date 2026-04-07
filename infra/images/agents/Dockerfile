@@ -93,6 +93,14 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     openclaw --version
 
 # =============================================================================
+# acpx — ACP runtime for dispatching to external coding CLIs
+# =============================================================================
+RUN --mount=type=cache,target=/root/.npm,sharing=shared \
+    npm install -g --no-audit --no-fund acpx@latest && \
+    echo "acpx installed" && \
+    acpx --version
+
+# =============================================================================
 # ClawHub CLI — skill registry search and installation
 # =============================================================================
 RUN --mount=type=cache,target=/root/.npm,sharing=shared \
@@ -250,6 +258,7 @@ WORKDIR /workspace
 # =============================================================================
 RUN set -e; \
     V_OPENCLAW=$(openclaw --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_ACPX=$(acpx --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_CLAUDE=$(claude --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_COPILOT=$(copilot --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_CODEX=$(codex --version 2>&1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 || echo "unknown"); \
@@ -265,9 +274,9 @@ RUN set -e; \
     V_NODE=$(node --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_BUN=$(bun --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ); \
-    printf '{\n  "buildDate": "%s",\n  "clis": {\n    "openclaw": "%s",\n    "claude": "%s",\n    "copilot": "%s",\n    "codex": "%s",\n    "code": "%s",\n    "gemini": "%s",\n    "cursor": "%s",\n    "droid": "%s",\n    "kimi": "%s",\n    "opencode": "%s",\n    "clawhub": "%s"\n  },\n  "tools": {\n    "gh": "%s",\n    "op": "%s",\n    "node": "%s",\n    "bun": "%s"\n  }\n}\n' \
+    printf '{\n  "buildDate": "%s",\n  "clis": {\n    "openclaw": "%s",\n    "acpx": "%s",\n    "claude": "%s",\n    "copilot": "%s",\n    "codex": "%s",\n    "code": "%s",\n    "gemini": "%s",\n    "cursor": "%s",\n    "droid": "%s",\n    "kimi": "%s",\n    "opencode": "%s",\n    "clawhub": "%s"\n  },\n  "tools": {\n    "gh": "%s",\n    "op": "%s",\n    "node": "%s",\n    "bun": "%s"\n  }\n}\n' \
       "$BUILD_DATE" \
-      "$V_OPENCLAW" "$V_CLAUDE" "$V_COPILOT" "$V_CODEX" "$V_CODE" "$V_GEMINI" \
+      "$V_OPENCLAW" "$V_ACPX" "$V_CLAUDE" "$V_COPILOT" "$V_CODEX" "$V_CODE" "$V_GEMINI" \
       "$V_CURSOR" "$V_DROID" "$V_KIMI" "$V_OPENCODE" "$V_CLAWHUB" \
       "$V_GH" "$V_OP" "$V_NODE" "$V_BUN" \
       > /etc/cto/versions.json; \
@@ -275,6 +284,7 @@ RUN set -e; \
     cat /etc/cto/versions.json; \
     echo ""; \
     echo "openclaw       $V_OPENCLAW"; \
+    echo "acpx           $V_ACPX"; \
     echo "claude         $V_CLAUDE"; \
     echo "copilot        $V_COPILOT"; \
     echo "codex          $V_CODEX"; \
