@@ -362,10 +362,11 @@ tools:
     backend: "acpx"
     acpxVersion: "0.1.16"
     defaultAgent: "codex"
-    allowedAgents: ["pi", "claude", "copilot", "codex", "opencode", "gemini", "kimi", "droid", "cursor"]
+    allowedAgents: ["pi", "claude", "copilot", "codex", "opencode", "gemini", "kimi", "droid", "cursor", "kilocode", "kiro", "qwen", "iflow"]
     maxConcurrentSessions: 8
     permissionMode: "approve-all"
     nonInteractivePermissions: "deny"
+    pluginToolsMcpBridge: true
     dispatch:
       enabled: true
     stream:
