@@ -101,6 +101,12 @@ steps:
     command: |
       root="${WORKSPACE:-.}";
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "parse-prd" "${audio_debug}"
+      CKPT="$root/.intake/checkpoints/parse-prd-output.json"
+      if [ -f "$CKPT" ] && [ -s "$CKPT" ]; then
+        echo "parse-prd: ♻️  resuming from checkpoint" >&2
+        cat "$CKPT"
+        exit 0
+      fi
       if [ ! -s "$root/.intake/run-prd-for-intake.txt" ]; then
         echo "parse-prd: FATAL — .intake/run-prd-for-intake.txt is missing or empty" >&2
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "parse-prd" "failed: PRD file missing" "${audio_debug}" "error"
@@ -154,7 +160,8 @@ steps:
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "parse-prd" "failed: empty or invalid output" "${audio_debug}" "error"
         exit 1
       fi
-      printf '%s' "$OUTPUT"
+      mkdir -p "$root/.intake/checkpoints"
+      printf '%s' "$OUTPUT" | tee "$root/.intake/checkpoints/parse-prd-output.json"
 
   - id: verify-parse-prd
     env:
@@ -207,6 +214,12 @@ steps:
     command: |
       root="${WORKSPACE:-.}";
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "analyze-complexity" "${audio_debug}"
+      CKPT="$root/.intake/checkpoints/analyze-complexity-output.json"
+      if [ -f "$CKPT" ] && [ -s "$CKPT" ]; then
+        echo "analyze-complexity: ♻️  resuming from checkpoint" >&2
+        cat "$CKPT"
+        exit 0
+      fi
       if [ -z "$CTO_PARSE_PRD_OUT" ]; then
         echo "analyze-complexity: FATAL — no parsed tasks available (parse-prd output empty)" >&2
         exit 1
@@ -239,7 +252,8 @@ steps:
         echo "analyze-complexity: empty output; using deterministic fallback complexity" >&2
         printf '%s' '{"overall_complexity":"medium","risk_areas":["LLM provider reliability"],"critical_path":[1],"notes":"Fallback complexity due empty model output."}'
         exit 0; fi
-      printf '%s' "$OUTPUT"
+      mkdir -p "$root/.intake/checkpoints"
+      printf '%s' "$OUTPUT" | tee "$root/.intake/checkpoints/analyze-complexity-output.json"
 
   - id: verify-analyze-complexity
     env:
@@ -308,6 +322,12 @@ steps:
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "refine-tasks" "${audio_debug}"
       WS="${WORKSPACE:-.}"
+      CKPT="$WS/.intake/checkpoints/refinement-output.json"
+      if [ -f "$CKPT" ] && [ -s "$CKPT" ]; then
+        echo "refine-tasks: ♻️  resuming from checkpoint" >&2
+        cat "$CKPT"
+        exit 0
+      fi
       mkdir -p "$WS/.intake/tmp"
       printf '%s' "$CTO_PARSE_PRD_OUT" > "$WS/.intake/tmp/refine-tasks-input.json"
       if ! printf '%s' "$CTO_ANALYZE_COMPLEXITY_OUT" | jq -c '
@@ -349,6 +369,8 @@ steps:
         "$WS/intake/scripts/workflow-gate-audio.sh" "intake" "refine-tasks" "failed: refinement workflow error" "${audio_debug}" "error"
         exit 1
       fi
+      mkdir -p "$WS/.intake/checkpoints"
+      cp "$REFINE_STDOUT_LOG" "$WS/.intake/checkpoints/refinement-output.json"
       cat "$REFINE_STDOUT_LOG"
 
   - id: verify-refine-tasks

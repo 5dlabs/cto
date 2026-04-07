@@ -10,16 +10,40 @@
       "sourceBranch": "main",
       "models": {
         "tiers": {
-          "primary": { "provider": "github-copilot", "model": "claude-opus-4.6" },
-          "fast": { "provider": "github-copilot", "model": "gpt-4.1" },
-          "frontier": { "provider": "github-copilot", "model": "claude-opus-4.6" }
+          "primary": {
+            "provider": "github-copilot",
+            "model": "claude-sonnet-4.6"
+          },
+          "fast": {
+            "provider": "github-copilot",
+            "model": "gpt-4.1"
+          },
+          "frontier": {
+            "provider": "github-copilot",
+            "model": "claude-opus-4.6"
+          }
         },
         "committee": [
-          { "provider": "github-copilot", "model": "claude-opus-4.6" },
-          { "provider": "github-copilot", "model": "gpt-5.2" },
-          { "provider": "github-copilot", "model": "claude-sonnet-4.6" },
-          { "provider": "github-copilot", "model": "gpt-4.1" },
-          { "provider": "github-copilot", "model": "claude-opus-4.6" }
+          {
+            "provider": "github-copilot",
+            "model": "claude-opus-4.6"
+          },
+          {
+            "provider": "github-copilot",
+            "model": "gpt-5.2"
+          },
+          {
+            "provider": "github-copilot",
+            "model": "claude-sonnet-4.6"
+          },
+          {
+            "provider": "github-copilot",
+            "model": "gpt-4.1"
+          },
+          {
+            "provider": "github-copilot",
+            "model": "claude-opus-4.6"
+          }
         ],
         "cliModels": {
           "claude": "claude-opus-4-6-20260205",
