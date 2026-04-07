@@ -249,12 +249,9 @@ RUN chmod +x /usr/local/bin/agent-entrypoint
 
 ENV HOME=/home/node
 
-# Drop privileges back to non-root user
-USER node
-WORKDIR /workspace
-
 # =============================================================================
 # Version manifest — bake every CLI version into the image
+# (Must run before USER node since /etc/cto requires root or explicit chown)
 # =============================================================================
 RUN set -e; \
     V_OPENCLAW=$(openclaw --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
@@ -300,6 +297,10 @@ RUN set -e; \
     echo "node           $V_NODE"; \
     echo "bun            $V_BUN"; \
     intake-util --help >/dev/null 2>&1 && echo "intake-util    OK" || true
+
+# Drop privileges back to non-root user
+USER node
+WORKDIR /workspace
 
 # Health check — confirms the openclaw gateway process is running
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
