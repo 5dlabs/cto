@@ -493,6 +493,11 @@ spec:
                 cp -f /workspace/.acpxrc.json.chart /workspace/.acpxrc.json 2>/dev/null || true
                 chmod 644 /workspace/.acpxrc.json 2>/dev/null || true
               fi
+              # Fix missing @buape/carbon peer dep in OpenClaw 2026.4.5 Discord UI
+              node -e "require('@buape/carbon')" 2>/dev/null || {
+                echo "[openclaw] Installing missing @buape/carbon dependency"
+                npm install -g --no-audit --no-fund @buape/carbon 2>&1 | tail -2
+              }
               exec openclaw gateway
           env:
             - name: HOME

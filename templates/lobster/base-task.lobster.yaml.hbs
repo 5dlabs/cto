@@ -1,0 +1,229 @@
+{{! =========================================================================
+   Base Lobster Task Runner
+   
+   Universal entrypoint for all CodeRun pods.
+   Mounted as /task-files/base-task.lobster.yaml via ConfigMap.
+   
+   Handles: GitHub auth → git clone → acpx env setup → run task → PR
+   The task flows in the repo just call: acpx $ACPX_AGENT exec -f prompt.md
+   All CLI/model/provider config is exported as env vars by this base.
+   ========================================================================= }}
+name: base-task
+description: Universal CodeRun entrypoint — setup, run task, teardown
+
+steps:
+  # ─── GitHub Authentication ───────────────────────────────────────────
+  - id: github-auth
+    description: Generate GITHUB_TOKEN from App credentials
+    command: |
+      exec bash <<'STEP'
+      set -euo pipefail
+      # Fix root-owned .gitconfig from image build
+      [ -f "$HOME/.gitconfig" ] && [ ! -w "$HOME/.gitconfig" ] && rm -f "$HOME/.gitconfig" 2>/dev/null || true
+      {{> github-auth}}
+      echo "✅ GitHub auth complete"
+      STEP
+
+  # ─── Git Clone & Branch Setup ───────────────────────────────────────
+  - id: git-setup
+    description: Clone repo and create working branch
+    command: |
+      exec bash <<'STEP'
+      set -euo pipefail
+      {{> git-setup}}
+      echo "✅ Git setup complete"
+      STEP
+
+  # ─── acpx Environment Setup ────────────────────────────────────────
+  - id: acpx-env
+    description: Export ACPX_AGENT, ACPX_MODEL, ACPX_CMD so task flows just call acpx
+    command: |
+      exec bash <<'STEP'
+      set -euo pipefail
+
+      # ── CLI → acpx agent mapping ──
+      CLI_TYPE="{{cli_type}}"
+      case "$CLI_TYPE" in
+        factory) ACPX_AGENT="droid" ;;
+        *)       ACPX_AGENT="$CLI_TYPE" ;;
+      esac
+      export ACPX_AGENT
+
+      # ── Model (with provider override) ──
+      ACPX_MODEL="{{model}}"
+
+      # Fireworks FirePass: override model to Fireworks-compatible ID
+      if [ -n "${FIREWORKS_API_KEY:-}" ]; then
+        export ANTHROPIC_AUTH_TOKEN="$FIREWORKS_API_KEY"
+        export ANTHROPIC_BASE_URL="https://api.fireworks.ai/inference"
+        FW_MODEL="${FIREWORKS_MODEL:-accounts/fireworks/models/kimi-k2p5}"
+        export ANTHROPIC_MODEL="$FW_MODEL"
+        export CLAUDE_MODEL="$FW_MODEL"
+        export CLAUDE_CODE_MODEL="$FW_MODEL"
+        ACPX_MODEL="$FW_MODEL"
+      fi
+
+      # Cursor: uses CURSOR_API_KEY, model resolved internally
+      if [ "$CLI_TYPE" = "cursor" ] && [ -n "${CURSOR_API_KEY:-}" ]; then
+        export CURSOR_API_KEY
+      fi
+
+      export ACPX_MODEL
+
+      # ── Build the base acpx command ──
+      WORK_DIR="${CLAUDE_WORK_DIR:-/workspace}/{{service}}"
+      ACPX_CMD="acpx"
+      ACPX_CMD="$ACPX_CMD --cwd $WORK_DIR"
+      ACPX_CMD="$ACPX_CMD --approve-all"
+      ACPX_CMD="$ACPX_CMD --non-interactive-permissions deny"
+      ACPX_CMD="$ACPX_CMD --timeout 1800"
+      ACPX_CMD="$ACPX_CMD --format text"
+      ACPX_CMD="$ACPX_CMD --verbose"
+      ACPX_CMD="$ACPX_CMD --auth-policy skip"
+
+      # Model flag (skip for cursor — doesn't support session/set_model)
+      if [ -n "$ACPX_MODEL" ] && [ "$ACPX_AGENT" != "cursor" ]; then
+        ACPX_CMD="$ACPX_CMD --model $ACPX_MODEL"
+      fi
+
+      export ACPX_CMD
+
+      echo "✅ acpx env ready"
+      echo "   ACPX_AGENT=$ACPX_AGENT"
+      echo "   ACPX_MODEL=$ACPX_MODEL"
+      echo "   CLI={{cli_type}} PROVIDER=${FIREWORKS_API_KEY:+fireworks}"
+      STEP
+
+  # ─── Run Task (retry until acceptance or timeout) ───────────────────
+  - id: run-task
+    description: Run index.lobster.yaml in a retry loop
+    command: |
+      exec bash <<'STEP'
+      set -euo pipefail
+      REPO_ROOT="${CLAUDE_WORK_DIR:-/workspace}/{{service}}"
+      cd "$REPO_ROOT"
+
+      TASK_ID="{{task_id}}"
+      DOCS_PROJECT="{{docs_project_directory}}"
+      TIMEOUT="${TASK_TIMEOUT:-1800}"
+      DEADLINE=$(($(date +%s) + TIMEOUT))
+
+      # Resolve task directory
+      TASK_DIR=".tasks"
+      if [ -n "$DOCS_PROJECT" ]; then
+        TASK_DIR="${DOCS_PROJECT}/.tasks"
+      fi
+      if [ -n "$TASK_ID" ] && [ "$TASK_ID" != "0" ]; then
+        TASK_DIR="${TASK_DIR}/task-${TASK_ID}"
+      fi
+      mkdir -p "$TASK_DIR"
+
+      # Inject prompt/criteria from ConfigMap if provided
+      [ -f /task-files/prompt.md ] && cp /task-files/prompt.md "$TASK_DIR/prompt.md"
+      [ -f /task-files/acceptance-criteria.md ] && cp /task-files/acceptance-criteria.md "$TASK_DIR/acceptance-criteria.md"
+
+      INDEX="${TASK_DIR}/index.lobster.yaml"
+      if [ ! -f "$INDEX" ]; then
+        echo "❌ No index.lobster.yaml in $TASK_DIR"
+        exit 1
+      fi
+
+      ATTEMPT=0
+      while true; do
+        ATTEMPT=$((ATTEMPT + 1))
+        NOW=$(date +%s)
+        REMAINING=$((DEADLINE - NOW))
+        if [ "$REMAINING" -le 0 ]; then
+          echo "❌ TIMEOUT after ${TIMEOUT}s (attempt $ATTEMPT)"
+          exit 1
+        fi
+
+        echo ""
+        echo "── Attempt $ATTEMPT (${REMAINING}s remaining) ──"
+
+        npx -y @clawdbot/lobster run "$INDEX" 2>&1 && {
+          echo "✅ Task passed on attempt $ATTEMPT"
+          break
+        } || {
+          echo "⏳ Attempt $ATTEMPT failed — retrying..."
+          sleep 5
+        }
+      done
+      STEP
+
+  # ─── Create Pull Request ────────────────────────────────────────────
+  - id: create-pr
+    description: Deterministic PR creation (zero tokens)
+    command: |
+      exec bash <<'STEP'
+      set -euo pipefail
+      REPO_ROOT="${CLAUDE_WORK_DIR:-/workspace}/{{service}}"
+      cd "$REPO_ROOT"
+
+      if [ -z "$(git status --porcelain 2>/dev/null)" ]; then
+        echo "ℹ️ No changes — skipping PR"
+        exit 0
+      fi
+
+      BRANCH=$(git branch --show-current)
+      git add -A
+      git commit -m "{{agent_name}}: task completion" -m "Co-authored-by: {{agent_name}} <{{agent_name}}@5dlabs.ai>"
+      git push origin "$BRANCH"
+
+      PR_TITLE="{{agent_name}}: $(head -1 /task-files/prompt.md 2>/dev/null || echo 'task completion')"
+      gh pr create \
+        --title "$PR_TITLE" \
+        --body "Automated task by {{agent_name}} ({{cli_type}})." \
+        --base main --head "$BRANCH" \
+        || echo "PR create failed (may already exist)"
+
+      echo "✅ PR created"
+      STEP
+
+  # ─── Discord Notification ───────────────────────────────────────────
+  - id: notify-discord
+    description: Post completion to agent's Discord channel
+    command: |
+      exec bash <<'STEP'
+      set -euo pipefail
+
+      AGENT="{{agent_name}}"
+      AGENT_UPPER=$(echo "$AGENT" | tr '[:lower:]' '[:upper:]')
+      CLI="{{cli_type}}"
+      TASK_ID="{{task_id}}"
+
+      # Per-agent Discord: DISCORD_TOKEN_<AGENT> + DISCORD_CHANNEL_<AGENT>
+      TOKEN_VAR="DISCORD_TOKEN_${AGENT_UPPER}"
+      CHANNEL_VAR="DISCORD_CHANNEL_${AGENT_UPPER}"
+      AGENT_TOKEN="${!TOKEN_VAR:-}"
+      AGENT_CHANNEL="${!CHANNEL_VAR:-}"
+
+      # Get PR URL if available
+      PR_URL=$(gh pr list --head "$(git branch --show-current 2>/dev/null)" --json url --jq '.[0].url' 2>/dev/null || echo "")
+
+      # Try per-agent Discord bot API first
+      if [ -n "$AGENT_TOKEN" ] && [ -n "$AGENT_CHANNEL" ]; then
+        curl -s -X POST "https://discord.com/api/v10/channels/${AGENT_CHANNEL}/messages" \
+          -H "Authorization: Bot ${AGENT_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "{\"content\": \"✅ **${AGENT}** completed task ${TASK_ID} (${CLI})\n${PR_URL:-no PR}\"}" > /dev/null
+        echo "📨 Discord notified (agent channel)"
+
+      # Fallback: general webhook
+      elif [ -n "${DISCORD_WEBHOOK_URL:-}" ]; then
+        curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d "{\"embeds\":[{\"title\":\"✅ ${AGENT} completed task ${TASK_ID}\",\"description\":\"**CLI:** ${CLI}\n**PR:** ${PR_URL:-none}\",\"color\":3066993,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}]}" > /dev/null
+        echo "📨 Discord notified (webhook)"
+
+      else
+        echo "ℹ️ No Discord config — skipping"
+      fi
+      STEP
+
+  # ─── Completion Signal ──────────────────────────────────────────────
+  - id: complete
+    description: Signal completion and exit
+    command: |
+      touch /workspace/.agent_done 2>/dev/null || true
+      echo "✅ Task complete"

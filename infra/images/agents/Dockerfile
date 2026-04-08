@@ -89,6 +89,10 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     else \
         npm install -g --no-audit --no-fund --ignore-scripts openclaw@${OPENCLAW_VERSION}; \
     fi && \
+    # Install peer deps skipped by --ignore-scripts (e.g. @buape/carbon for Discord UI)
+    cd /usr/local/share/npm-global/lib/node_modules/openclaw && \
+    npm install --no-audit --no-fund 2>&1 | tail -5 && \
+    cd / && \
     echo "--- OpenClaw (agent CLI) included ---" && \
     openclaw --version
 
@@ -328,6 +332,10 @@ RUN set -e; \
     echo "node           $V_NODE"; \
     echo "bun            $V_BUN"; \
     intake-util --help >/dev/null 2>&1 && echo "intake-util    OK" || true
+
+# Final ownership sweep — everything under /home/node must be writable by node (uid 1000).
+# Root-owned dotfiles (e.g. .gitconfig, .npmrc) created during image build break runtime git/npm.
+RUN find /home/node -maxdepth 1 -not -user 1000 -exec chown 1000:1000 {} + 2>/dev/null || true
 
 # Drop privileges back to non-root user
 USER node

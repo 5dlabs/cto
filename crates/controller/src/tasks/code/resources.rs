@@ -1244,13 +1244,9 @@ impl<'a> CodeResourceManager<'a> {
         final_deduplicated_env_vars.reverse();
         final_env_vars = final_deduplicated_env_vars;
 
-        // Build the job spec with environment configuration
-        // Use Always pull policy for :latest and :dev tags to ensure fresh images
-        let image_pull_policy = if image.ends_with(":latest") || image.ends_with(":dev") {
-            "Always"
-        } else {
-            "IfNotPresent"
-        };
+        // Use Always pull policy for :latest and :dev tags to ensure fresh images,
+        // unless explicitly overridden in config
+        let image_pull_policy = self.resolve_image_pull_policy(&image);
 
         let mut container_spec = json!({
             "name": container_name,
@@ -2675,6 +2671,33 @@ scrape_configs:
              Either specify cli_config in the CodeRun spec or configure agent.image in controller config.",
             code_run.metadata.name.as_deref().unwrap_or("unknown")
         )))
+    }
+
+    /// Resolve image pull policy: config override > auto-detect from tag.
+    fn resolve_image_pull_policy(&self, image: &str) -> &'static str {
+        // Check CLI-specific config first, then default image config
+        let config_policy = self
+            .config
+            .agent
+            .cli_images
+            .values()
+            .find(|img| image.starts_with(&img.repository))
+            .and_then(|img| img.pull_policy.as_deref())
+            .or(self.config.agent.image.pull_policy.as_deref());
+
+        match config_policy {
+            Some(p) if p.eq_ignore_ascii_case("always") => "Always",
+            Some(p) if p.eq_ignore_ascii_case("ifnotpresent") => "IfNotPresent",
+            Some(p) if p.eq_ignore_ascii_case("never") => "Never",
+            _ => {
+                // Auto-detect: Always for :latest/:dev, IfNotPresent otherwise
+                if image.ends_with(":latest") || image.ends_with(":dev") {
+                    "Always"
+                } else {
+                    "IfNotPresent"
+                }
+            }
+        }
     }
 }
 

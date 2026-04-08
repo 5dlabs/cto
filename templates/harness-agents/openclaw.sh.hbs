@@ -1,0 +1,42 @@
+#!/bin/bash
+# =========================================================================
+# OpenClaw Harness Agent — CRD Pod Entrypoint
+#
+# Boots OpenClaw gateway with per-CRD config. OpenClaw then runs the
+# Lobster task flow (base-task.lobster.yaml) which handles:
+#   github-auth → git-clone → run-task → PR → Discord → exit
+#
+# This template is rendered by the controller and mounted as the pod
+# entrypoint via ConfigMap.
+# =========================================================================
+set -euo pipefail
+
+# Fix root-owned dotfiles from image build (prevents git config errors)
+for f in "$HOME/.gitconfig" "$HOME/.npmrc"; do
+  [ -f "$f" ] && [ ! -w "$f" ] && rm -f "$f" 2>/dev/null || true
+done
+
+# npm cache in writable location (pod runs as uid 1000)
+mkdir -p /tmp/npm-cache
+export npm_config_cache=/tmp/npm-cache
+
+# Source profile scripts for CLI tool paths
+for f in /etc/profile.d/*.sh; do
+  [ -f "$f" ] && source "$f"
+done
+
+# Install OpenClaw config from rendered template
+mkdir -p "$HOME/.openclaw"
+cp /task-files/openclaw.json "$HOME/.openclaw/openclaw.json"
+export OPENCLAW_CONFIG="$HOME/.openclaw/openclaw.json"
+
+# Auto-migrate any legacy config keys for current OpenClaw version
+echo "[harness] Running openclaw doctor --fix..."
+openclaw doctor --fix 2>&1 || echo "[harness] WARNING: doctor --fix reported issues (continuing)"
+
+echo "[harness] OpenClaw gateway starting for {{agent_name}} ({{cli_type}})"
+echo "[harness] Config: $OPENCLAW_CONFIG"
+echo "[harness] Task flow: /task-files/base-task.lobster.yaml"
+
+# Hand off to OpenClaw — it runs the Lobster flow and manages the lifecycle
+exec openclaw gateway

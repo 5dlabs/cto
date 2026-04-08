@@ -3,10 +3,12 @@ use crate::crds::CodeRun;
 use crate::tasks::code::agent::AgentClassifier;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::template_paths::{
-    CODE_CLAUDE_CONTAINER_TEMPLATE, CODE_CODEX_CONTAINER_BASE_TEMPLATE,
+    CODE_CODEX_CONTAINER_BASE_TEMPLATE,
     CODE_CODING_GUIDELINES_TEMPLATE, CODE_CURSOR_CONTAINER_BASE_TEMPLATE,
     CODE_FACTORY_CONTAINER_BASE_TEMPLATE, CODE_GEMINI_CONTAINER_BASE_TEMPLATE,
     CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
+    HARNESS_OPENCLAW_CONFIG_TEMPLATE, HARNESS_OPENCLAW_TEMPLATE,
+    LOBSTER_BASE_TASK_TEMPLATE,
 };
 use crate::tasks::tool_catalog::resolve_tool_name;
 use crate::tasks::types::Result;
@@ -248,9 +250,22 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
         let remote_tools = Self::extract_remote_tools(&client_config_value);
 
+        // Render the Lobster base-task workflow (replaces the old container.sh flow)
+        templates.insert(
+            "base-task.lobster.yaml".to_string(),
+            Self::generate_lobster_base_task(code_run, &enriched_cli_config, config)?,
+        );
+
+        // Render the OpenClaw gateway config (per-CRD)
+        templates.insert(
+            "openclaw.json".to_string(),
+            Self::generate_openclaw_config(code_run, &enriched_cli_config, config)?,
+        );
+
+        // container.sh is the harness-agent launcher: boots OpenClaw gateway
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_container_script(code_run, &enriched_cli_config, config)?,
+            Self::generate_harness_launcher(code_run, config)?,
         );
         templates.insert(
             "CLAUDE.md".to_string(),
@@ -1252,100 +1267,129 @@ impl CodeTemplateGenerator {
         })
     }
 
-    fn generate_container_script(
+    /// Render the Lobster base-task workflow template.
+    /// Uses the same Handlebars partials as container.sh (github-auth, git-setup, etc.)
+    /// so the rendered YAML contains fully expanded shell blocks.
+    fn generate_lobster_base_task(
         code_run: &CodeRun,
         cli_config: &Value,
-        config: &ControllerConfig,
+        _config: &ControllerConfig,
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
         Self::register_template_helpers(&mut handlebars);
-
-        // Register shared partials for CLI-agnostic building blocks
         Self::register_shared_partials(&mut handlebars)?;
 
-        // Register CLI-specific invoke template as the `cli_execute` partial
-        let cli_type = Self::determine_cli_type(code_run);
-        Self::register_cli_invoke_partial(&mut handlebars, cli_type)?;
-
-        // Select agent-specific template based on github_app field
-        let template_path = Self::get_agent_container_template(code_run);
-
-        // Try to load agent-specific template, fall back to default if not found
-        let template = match Self::load_template(&template_path) {
-            Ok(content) => content,
-            Err(_) if !template_path.ends_with("container.sh.hbs") => {
-                // If agent-specific template not found, try default
-                debug!(
-                    "Agent-specific template {} not found, falling back to default",
-                    template_path
-                );
-                Self::load_template(CODE_CLAUDE_CONTAINER_TEMPLATE)?
-            }
-            Err(e) => return Err(e),
-        };
-
+        let template = Self::load_template(LOBSTER_BASE_TASK_TEMPLATE)?;
         handlebars
-            .register_template_string("container_script", template)
+            .register_template_string("lobster_base_task", template)
             .map_err(|e| {
                 crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to register container script template: {e}"
+                    "Failed to register Lobster base task template: {e}"
                 ))
             })?;
 
-        let retry_count = code_run
-            .status
-            .as_ref()
-            .and_then(|s| s.retry_count)
-            .unwrap_or(0);
-
-        let cli_type_str = cli_type.to_string();
-        let job_type = Self::determine_job_type(code_run);
+        let cli_type = Self::determine_cli_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
-        let task_language = Self::get_task_language(code_run);
-        let default_retries = Self::get_default_retries(code_run);
-        let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
-        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
-
-        // Get skills for agent (used by Claude Code and Factory for native skill loading)
-        let skills = Self::get_agent_skills_enriched(code_run, config);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
-            "docs_branch": code_run.spec.docs_branch,
-            "source_branch": code_run.spec.docs_branch,
-            "working_directory": Self::get_working_directory(code_run),
-            "continue_session": Self::get_continue_session(code_run),
-            "attempts": retry_count + 1,  // Current attempt number (1-indexed)
-            "overwrite_memory": code_run.spec.overwrite_memory,
             "docs_project_directory": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
             "github_app": Self::get_github_app_or_default(code_run),
             "model": code_run.spec.model,
+            "cli_type": cli_type.to_string(),
+            "agent_name": &agent_name,
+            "agent_name_upper": agent_name.to_uppercase(),
             "cli_config": cli_config,
-            "enable_docker": code_run.spec.enable_docker,
-            "list_tools_on_start": render_settings.list_tools_on_start,
-            // Required template context variables
-            "cli_type": cli_type_str,
-            "job_type": job_type,
-            "agent_name": agent_name,
-            "task_language": task_language,
-            "default_retries": default_retries,
-            "fresh_start_threshold": fresh_start_threshold,
-            // Skills for native skill loading (Claude Code, Factory, OpenCode, Codex)
-            "skills": skills,
-            // Flag to conditionally render partials (skip for CLIs with native skills)
-            "skills_native": Self::cli_supports_native_skills(cli_type),
-            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
         });
 
         handlebars
-            .render("container_script", &context)
+            .render("lobster_base_task", &context)
             .map_err(|e| {
                 crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to render container script: {e}"
+                    "Failed to render Lobster base task: {e}"
+                ))
+            })
+    }
+
+    /// Render the OpenClaw gateway config template for a CRD pod.
+    /// Produces a JSON config modeled on Morgan's openclaw.json.
+    fn generate_openclaw_config(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        _config: &ControllerConfig,
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
+
+        let template = Self::load_template(HARNESS_OPENCLAW_CONFIG_TEMPLATE)?;
+        handlebars
+            .register_template_string("openclaw_config", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register OpenClaw config template: {e}"
+                ))
+            })?;
+
+        let cli_type = Self::determine_cli_type(code_run);
+        let agent_name = Self::get_agent_name(code_run);
+
+        let context = json!({
+            "task_id": code_run.spec.task_id.unwrap_or(0),
+            "service": code_run.spec.service,
+            "model": code_run.spec.model,
+            "cli_type": cli_type.to_string(),
+            "agent_name": &agent_name,
+            "agent_name_upper": agent_name.to_uppercase(),
+            "github_app": Self::get_github_app_or_default(code_run),
+            "cli_config": cli_config,
+        });
+
+        handlebars
+            .render("openclaw_config", &context)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render OpenClaw config: {e}"
+                ))
+            })
+    }
+
+    /// Render the harness-agent launcher script (OpenClaw entrypoint).
+    /// Thin shell script: fix perms, copy config, exec openclaw gateway.
+    fn generate_harness_launcher(
+        code_run: &CodeRun,
+        _config: &ControllerConfig,
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
+
+        let template = Self::load_template(HARNESS_OPENCLAW_TEMPLATE)?;
+        handlebars
+            .register_template_string("harness_launcher", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register harness launcher template: {e}"
+                ))
+            })?;
+
+        let cli_type = Self::determine_cli_type(code_run);
+        let agent_name = Self::get_agent_name(code_run);
+
+        let context = json!({
+            "agent_name": &agent_name,
+            "cli_type": cli_type.to_string(),
+        });
+
+        handlebars
+            .render("harness_launcher", &context)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render harness launcher: {e}"
                 ))
             })
     }
@@ -4314,22 +4358,6 @@ Be constructive and explain the "why" behind your suggestions.
         format!("agents/{agent}/{job}{suffix}.md.hbs")
     }
 
-    /// Select the container template for Claude CLI.
-    /// All CLIs use the shared container template - CLI-specific behavior is
-    /// injected via the `{{> cli_execute}}` partial from `clis/{cli}/invoke.sh.hbs`.
-    fn get_agent_container_template(code_run: &CodeRun) -> String {
-        let run_type = code_run.spec.run_type.as_str();
-
-        // Intake runs have a specialized container
-        if run_type == "documentation" || run_type == "intake" {
-            debug!("Using intake container template for run_type: {}", run_type);
-            return "agents/morgan/intake.sh.hbs".to_string();
-        }
-
-        // All other runs use the shared container template
-        "_shared/container.sh.hbs".to_string()
-    }
-
     /// Select the container template for Codex CLI.
     /// All CLIs use the shared container template - CLI-specific behavior is
     /// injected via the `{{> cli_execute}}` partial from `clis/{cli}/invoke.sh.hbs`.
@@ -4893,58 +4921,6 @@ mod tests {
     // All agents now use the shared container template (_shared/container.sh.hbs)
     // CLI-specific behavior is injected via the cli_execute partial
     // ========================================================================
-
-    #[test]
-    fn test_container_template_uses_shared_for_all_agents() {
-        // All agents should use the shared container template
-        for github_app in [
-            "5DLabs-Rex",
-            "5DLabs-Cleo",
-            "5DLabs-Tess",
-            "5DLabs-Cipher",
-            "5DLabs-Atlas",
-            "5DLabs-Bolt",
-            "5DLabs-Blaze",
-        ] {
-            let code_run = create_test_code_run(Some(github_app.to_string()));
-            let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-            assert_eq!(
-                template_path, "_shared/container.sh.hbs",
-                "Agent {github_app} should use shared container template"
-            );
-        }
-    }
-
-    #[test]
-    fn test_container_template_default_uses_shared() {
-        let code_run = create_test_code_run(None);
-        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "_shared/container.sh.hbs");
-    }
-
-    #[test]
-    fn test_container_template_intake_uses_morgan() {
-        // Intake runs should use Morgan's intake container
-        let mut code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
-        code_run.spec.run_type = "intake".to_string();
-        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(
-            template_path, "agents/morgan/intake.sh.hbs",
-            "Intake run should use Morgan intake container"
-        );
-    }
-
-    #[test]
-    fn test_container_template_documentation_uses_morgan() {
-        // Documentation runs should also use Morgan's intake container
-        let mut code_run = create_test_code_run(Some("5DLabs-Morgan".to_string()));
-        code_run.spec.run_type = "documentation".to_string();
-        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(
-            template_path, "agents/morgan/intake.sh.hbs",
-            "Documentation run should use Morgan intake container"
-        );
-    }
 
     // ========================================================================
     // Handlebars helper tests

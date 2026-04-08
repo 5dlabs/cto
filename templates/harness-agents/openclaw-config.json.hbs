@@ -1,0 +1,116 @@
+{{!
+  OpenClaw Gateway Configuration (per-CRD)
+
+  Rendered by the controller for each CodeRun.
+  Mounted as openclaw.json in the ConfigMap.
+
+  Context variables:
+    agent_name       - Agent identity (rex, blaze, tap, etc.)
+    agent_name_upper - Agent name uppercased (REX, BLAZE, TAP, etc.)
+    model            - Primary model ID (e.g. anthropic/claude-sonnet-4-6)
+    cli_type         - CLI backend for acpx (claude, codex, cursor, factory, etc.)
+    service          - Target repo/service name
+    task_id          - Task ID from CRD
+    github_app       - GitHub App name (e.g. 5DLabs-Rex)
+
+  Secrets are referenced as env vars (injected by K8s secret mounts):
+    DISCORD_TOKEN_<AGENT>   - Per-agent Discord bot token
+    DISCORD_CHANNEL_<AGENT> - Per-agent Discord channel ID
+}}
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "{{model}}",
+        "fallbacks": []
+      },
+      "maxConcurrent": 1,
+      "timeoutSeconds": 1800,
+      "contextTokens": 200000,
+      "workspace": "/workspace"
+    }
+  },
+  "channels": {
+    "discord": {
+      "token": "${DISCORD_TOKEN_{{agent_name_upper}}}",
+      "allowBots": false,
+      "replyToMode": "first",
+      "dmPolicy": "disabled",
+      "guilds": {
+        "1490117571977019524": {
+          "requireMention": false,
+          "slug": "cto-5dlabs",
+          "channels": {
+            "${DISCORD_CHANNEL_{{agent_name_upper}}}": {
+              "enabled": true,
+              "requireMention": false
+            }
+          }
+        }
+      }
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "port": 18789,
+    "bind": "0.0.0.0",
+    "auth": {
+      "token": "openclaw-internal"
+    },
+    "controlUi": {
+      "enabled": false
+    },
+    "http": {
+      "endpoints": {
+        "chatCompletions": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "discord": {
+        "enabled": true
+      },
+      "memory-core": {
+        "enabled": true
+      }
+    }
+  },
+  "tools": {
+    "profile": "coding",
+    "exec": {
+      "host": "gateway",
+      "security": "full",
+      "backgroundMs": 5000,
+      "notifyOnExit": true,
+      "applyPatch": {
+        "enabled": true
+      }
+    },
+    "web": {
+      "search": {
+        "enabled": true,
+        "maxResults": 5,
+        "timeoutSeconds": 20,
+        "cacheTtlMinutes": 5
+      },
+      "fetch": {
+        "enabled": true,
+        "maxChars": 20000,
+        "timeoutSeconds": 20,
+        "cacheTtlMinutes": 5
+      }
+    }
+  },
+  "logging": {
+    "level": "info",
+    "consoleLevel": "info"
+  },
+  "session": {
+    "reset": {
+      "enabled": false
+    }
+  }
+}
