@@ -1347,6 +1347,7 @@ impl CodeTemplateGenerator {
             "agent_name_upper": agent_name.to_uppercase(),
             "github_app": Self::get_github_app_or_default(code_run),
             "cli_config": cli_config,
+            "discord_enabled": true,
         });
 
         handlebars
@@ -1382,7 +1383,12 @@ impl CodeTemplateGenerator {
 
         let context = json!({
             "agent_name": &agent_name,
+            "agent_name_upper": agent_name.to_uppercase(),
             "cli_type": cli_type.to_string(),
+            "model": code_run.spec.model,
+            "prompt_modification": code_run.spec.prompt_modification.as_deref().unwrap_or(""),
+            "repository_url": code_run.spec.repository_url,
+            "github_app": Self::get_github_app_or_default(code_run),
         });
 
         handlebars

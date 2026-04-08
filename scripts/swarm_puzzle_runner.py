@@ -238,23 +238,34 @@ def heuristic_solver(body: str, gist_payloads: list[dict[str, Any]], expected_di
 
     candidate_programs = []
     for content in files:
+        if expected_digits is not None and expected_digits >= 0:
+            candidate_programs.append(("digit_plus_prefix", "+" * expected_digits + content))
         candidate_programs.append(content)
         if clue:
-            candidate_programs.append(clue + content)
+            candidate_programs.append(("email_clue_prefix", clue + content))
+        else:
+            candidate_programs.append(("plain", content))
 
-    for program in candidate_programs:
+    expanded_programs: list[tuple[str, str]] = []
+    for item in candidate_programs:
+        if isinstance(item, tuple):
+            expanded_programs.append(item)
+        else:
+            expanded_programs.append(("plain", item))
+
+    for program_name, program in expanded_programs:
         for inputs in candidate_inputs:
             try:
                 output = run_brainfuck(program, inputs)
             except RuntimeError:
                 continue
-            normalized = normalize_answer(output, expected_digits)
-            if normalized:
+            canonical = canonicalize_submission_text(output)
+            if canonical and matches_digit_hint(canonical, expected_digits):
                 return {
                     "status": "solved",
-                    "answer": normalized,
+                    "answer": canonical,
                     "confidence": 0.99,
-                    "reasoning_summary": "Solved with the built-in Brainfuck heuristic path.",
+                    "reasoning_summary": f"Solved with the built-in Brainfuck heuristic path using {program_name}.",
                 }
 
     return None
@@ -342,8 +353,9 @@ def build_solver_prompt(bundle_dir: Path, expected_digits: int | None) -> str:
     ]
     if expected_digits is not None:
         lines.append(
-            f"The email appears to require a {expected_digits}-digit answer. Normalize to digits-only if appropriate."
+            f"The email appears to require {expected_digits} digits in the visible answer, but preserve punctuation exactly as printed."
         )
+    lines.append("Do not strip punctuation, decimal points, or other formatting from the final answer.")
     return "\n".join(lines)
 
 
@@ -388,18 +400,23 @@ def solve_with_codex(
         return json.load(handle)
 
 
-def normalize_answer(answer: str | None, expected_digits: int | None) -> str | None:
+def canonicalize_submission_text(answer: str | None) -> str | None:
     if answer is None:
         return None
-    raw = answer.strip()
+    raw = answer.replace("\r\n", "\n").strip("\r\n")
     if not raw:
         return None
+    lines = [line for line in raw.split("\n") if line.strip() != ""]
+    if len(lines) == 1:
+        return lines[0]
+    return raw
+
+
+def matches_digit_hint(answer: str, expected_digits: int | None) -> bool:
     if expected_digits is None:
-        return raw
-    digits = re.sub(r"\D", "", raw)
-    if len(digits) == expected_digits:
-        return digits
-    return None
+        return True
+    digits = re.sub(r"\D", "", answer)
+    return len(digits) == expected_digits
 
 
 def submit_answer(answer: str) -> subprocess.CompletedProcess[str]:
@@ -423,13 +440,13 @@ def solve_bundle(bundle_dir: Path, runtime_root: Path, workspace_root: Path, mod
             json.dump(result, handle, indent=2, sort_keys=True)
             handle.write("\n")
 
-    normalized = normalize_answer(result.get("answer"), expected_digits)
+    normalized = canonicalize_submission_text(result.get("answer"))
     return {
         "subject": (message.get("headers") or {}).get("subject"),
-        "status": "dry_run_ready" if normalized else "failed_unsolved",
+        "status": "dry_run_ready" if normalized and matches_digit_hint(normalized, expected_digits) else "failed_unsolved",
         "answer": normalized,
         "bundle_dir": str(bundle_dir),
-        "last_error": None if normalized else f"Solver did not return a valid answer: {result}",
+        "last_error": None if normalized and matches_digit_hint(normalized, expected_digits) else f"Solver did not return a valid answer: {result}",
     }
 
 
@@ -492,8 +509,8 @@ def process_message(
             handle.write("\n")
     entry["solver_result"] = result
 
-    normalized = normalize_answer(result.get("answer"), expected_digits)
-    if result.get("status") != "solved" or not normalized:
+    normalized = canonicalize_submission_text(result.get("answer"))
+    if result.get("status") != "solved" or not normalized or not matches_digit_hint(normalized, expected_digits):
         entry["status"] = "failed_unsolved"
         entry["last_error"] = f"Solver did not return a valid answer: {result}"
         save_state(state_path, state)

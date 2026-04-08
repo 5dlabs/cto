@@ -30,7 +30,38 @@
       "workspace": "/workspace"
     }
   },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "fireworks": {
+        "baseUrl": "https://api.fireworks.ai/inference/v1",
+        "apiKey": "${FIREWORKS_API_KEY}",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "accounts/fireworks/routers/kimi-k2p5-turbo",
+            "name": "Kimi K2.5 Turbo (FirePass)",
+            "reasoning": false,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 262144,
+            "maxTokens": 8192
+          },
+          {
+            "id": "accounts/fireworks/models/kimi-k2p5",
+            "name": "Kimi K2.5 (Fireworks)",
+            "reasoning": false,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 262144,
+            "maxTokens": 8192
+          }
+        ]
+      }
+    }
+  },
   "channels": {
+    {{#if discord_enabled}}
     "discord": {
       "token": "${DISCORD_TOKEN_{{agent_name_upper}}}",
       "allowBots": false,
@@ -49,6 +80,7 @@
         }
       }
     }
+    {{/if}}
   },
   "gateway": {
     "mode": "local",
@@ -70,9 +102,16 @@
   },
   "plugins": {
     "entries": {
+      {{#unless discord_enabled}}
+      "discord": {
+        "enabled": false
+      },
+      {{/unless}}
+      {{#if discord_enabled}}
       "discord": {
         "enabled": true
       },
+      {{/if}}
       "memory-core": {
         "enabled": true
       }
@@ -107,10 +146,5 @@
   "logging": {
     "level": "info",
     "consoleLevel": "info"
-  },
-  "session": {
-    "reset": {
-      "enabled": false
-    }
   }
 }

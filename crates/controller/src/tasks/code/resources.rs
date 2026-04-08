@@ -1039,6 +1039,18 @@ impl<'a> CodeResourceManager<'a> {
             "emptyDir": {}
         }));
 
+        // Shared emptyDir for OpenClaw peer deps — init container installs, main container reads.
+        // Must be added before container_spec is built (which consumes volume_mounts).
+        let openclaw_nm_path = "/usr/local/share/npm-global/lib/node_modules/openclaw/node_modules";
+        volumes.push(json!({
+            "name": "openclaw-node-modules",
+            "emptyDir": {}
+        }));
+        volume_mounts.push(json!({
+            "name": "openclaw-node-modules",
+            "mountPath": openclaw_nm_path
+        }));
+
         // GitHub App authentication only - no SSH volumes needed
         // Validate github_app is present and non-empty
         let github_app = code_run
@@ -1222,6 +1234,31 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "DOCKER_HOST",
                 "value": "unix:///var/run/docker/docker.sock"
             }));
+        }
+
+        // OpenClaw requires a valid TZ — containers default to Etc/Unknown which crashes the logger
+        final_env_vars.push(json!({ "name": "TZ", "value": "UTC" }));
+
+        // Fireworks model routing: when the model ID contains "fireworks", set
+        // ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN so the acpx/Claude Code
+        // backend routes through Fireworks' Anthropic-compatible API.
+        // Also set all ANTHROPIC_*_MODEL vars so subagents use the same model.
+        // The raw model ID (without provider prefix) is used for Claude Code env vars.
+        if code_run.spec.model.contains("fireworks") {
+            // Strip the "fireworks/" provider prefix for Claude Code env vars
+            let raw_model_id = code_run.spec.model.strip_prefix("fireworks/")
+                .unwrap_or(&code_run.spec.model);
+            final_env_vars.push(json!({ "name": "ANTHROPIC_BASE_URL", "value": "https://api.fireworks.ai/inference" }));
+            final_env_vars.push(json!({
+                "name": "ANTHROPIC_AUTH_TOKEN",
+                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
+            }));
+            final_env_vars.push(json!({ "name": "ANTHROPIC_MODEL", "value": raw_model_id }));
+            final_env_vars.push(json!({ "name": "ANTHROPIC_SMALL_FAST_MODEL", "value": raw_model_id }));
+            final_env_vars.push(json!({ "name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": raw_model_id }));
+            final_env_vars.push(json!({ "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL", "value": raw_model_id }));
+            final_env_vars.push(json!({ "name": "ANTHROPIC_DEFAULT_OPUS_MODEL", "value": raw_model_id }));
+            info!("Fireworks model detected — set ANTHROPIC_BASE_URL and AUTH_TOKEN for acpx backend");
         }
 
         // Final deduplication pass to handle any remaining duplicates from critical vars and Docker
@@ -1781,6 +1818,34 @@ scrape_configs:
                 ]
             }));
             info!("Added coordination copy init container for watcher CodeRun");
+        }
+
+        // Fix OpenClaw missing peer dependencies (e.g. @buape/carbon).
+        // The agents image installs OpenClaw with --ignore-scripts which skips peer
+        // dep resolution. This init container runs as root, installs the missing
+        // modules into the shared openclaw-node-modules emptyDir volume.
+        // NOTE: containers in a pod do NOT share image filesystem layers, only volumes.
+        {
+            let agent_image = self.select_image_for_cli(code_run)
+                .unwrap_or_else(|_| format!("{}:{}", self.config.agent.image.repository, self.config.agent.image.tag));
+            init_containers.push(json!({
+                "name": "fix-openclaw-deps",
+                "image": agent_image,
+                "command": ["/bin/sh", "-c",
+                    "cd /usr/local/share/npm-global/lib/node_modules/openclaw && \
+                     npm install --no-audit --no-fund --loglevel=warn 2>&1 | tail -5 && \
+                     echo '[fix-openclaw-deps] done'"
+                ],
+                "securityContext": {
+                    "runAsUser": 0,
+                    "runAsGroup": 0,
+                    "allowPrivilegeEscalation": false
+                },
+                "volumeMounts": [
+                    {"name": "openclaw-node-modules", "mountPath": openclaw_nm_path}
+                ]
+            }));
+            info!("Added fix-openclaw-deps init container for CodeRun {}", coderun_name);
         }
 
         // Add promtail config writer init container
