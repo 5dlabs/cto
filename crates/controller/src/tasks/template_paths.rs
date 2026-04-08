@@ -45,6 +45,12 @@ pub const PARTIAL_INFRASTRUCTURE_OPERATORS: &str =
 pub const PARTIAL_INFRASTRUCTURE_SETUP: &str = "_shared/partials/infrastructure-setup.sh.hbs";
 pub const PARTIAL_INFRASTRUCTURE_VERIFY: &str = "_shared/partials/infrastructure-verify.sh.hbs";
 
+// Auth partials referenced by agent system prompts (Spark/Tap/Blaze etc.)
+// Wrapped in {{#unless skills_native}} so only fire for CLIs without native skills (Cursor/Gemini).
+pub const PARTIAL_BETTER_AUTH: &str = "_shared/partials/better-auth.md.hbs";
+pub const PARTIAL_BETTER_AUTH_ELECTRON: &str = "_shared/partials/better-auth-electron.md.hbs";
+pub const PARTIAL_BETTER_AUTH_EXPO: &str = "_shared/partials/better-auth-expo.md.hbs";
+
 // ============================================================================
 // Skills (modular context loaded just-in-time)
 // Structure: skills/{category}/{skill_name}/SKILL.md

@@ -606,6 +606,7 @@ impl CodeTemplateGenerator {
             "model": model.clone(),
             "cli_type": cli_type,
             "enable_docker": code_run.spec.enable_docker,
+            "list_tools_on_start": render_settings.list_tools_on_start,
             // Required template context variables
             "job_type": job_type,
             "agent_name": agent_name,
@@ -705,6 +706,9 @@ impl CodeTemplateGenerator {
             // Frontend stack context for Blaze agent
             "frontend_stack": frontend_stack,
             "is_tanstack_stack": is_tanstack_stack,
+            // Default task_language so {{#eq task_language "rust"}} blocks in cipher/security
+            // and similar templates don't trip the handlebars-rust eq helper type check
+            "task_language": "",
         });
 
         handlebars.render("cursor_agents", &context).map_err(|e| {
@@ -1131,6 +1135,9 @@ impl CodeTemplateGenerator {
             // Frontend stack context for Blaze agent
             "frontend_stack": frontend_stack,
             "is_tanstack_stack": is_tanstack_stack,
+            // Default task_language so {{#eq task_language "rust"}} blocks in cipher/security
+            // and similar templates don't trip the handlebars-rust eq helper type check
+            "task_language": "",
         });
 
         handlebars.render("factory_agents", &context).map_err(|e| {
@@ -1298,6 +1305,7 @@ impl CodeTemplateGenerator {
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
         let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
         // Get skills for agent (used by Claude Code and Factory for native skill loading)
         let skills = Self::get_agent_skills_enriched(code_run, config);
@@ -1318,6 +1326,7 @@ impl CodeTemplateGenerator {
             "model": code_run.spec.model,
             "cli_config": cli_config,
             "enable_docker": code_run.spec.enable_docker,
+            "list_tools_on_start": render_settings.list_tools_on_start,
             // Required template context variables
             "cli_type": cli_type_str,
             "job_type": job_type,
@@ -1487,6 +1496,9 @@ impl CodeTemplateGenerator {
             // Frontend stack context for Blaze agent
             "frontend_stack": frontend_stack,
             "is_tanstack_stack": is_tanstack_stack,
+            // Default task_language so {{#eq task_language "rust"}} blocks in cipher/security
+            // and similar templates don't trip the handlebars-rust eq helper type check
+            "task_language": "",
         });
 
         handlebars.render("claude_memory", &context).map_err(|e| {
@@ -1686,6 +1698,7 @@ impl CodeTemplateGenerator {
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
         let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
         // Get skills for agent (Codex supports native skill loading)
         let skills = Self::get_agent_skills_enriched(code_run, config);
@@ -1707,6 +1720,15 @@ impl CodeTemplateGenerator {
                 .unwrap_or(""),
             "github_app": Self::get_github_app_or_default(code_run),
             "workflow_name": workflow_name,
+            "model": render_settings.model,
+            "auto_level": render_settings.auto_level,
+            "output_format": render_settings.output_format,
+            "model_rotation": render_settings.model_rotation,
+            "list_tools_on_start": render_settings.list_tools_on_start,
+            // Telemetry context for openclaw.sh.hbs unified dispatch
+            "telemetry_enabled": Self::is_telemetry_enabled(code_run, config),
+            "otel_endpoint": Self::get_otel_endpoint(),
+            "datadog_enabled": Self::is_datadog_enabled(config),
             // Required template context variables
             "cli_type": cli_type,
             "job_type": job_type,
@@ -1814,6 +1836,9 @@ impl CodeTemplateGenerator {
             // Frontend stack context for Blaze agent
             "frontend_stack": frontend_stack,
             "is_tanstack_stack": is_tanstack_stack,
+            // Default task_language so {{#eq task_language "rust"}} blocks in cipher/security
+            // and similar templates don't trip the handlebars-rust eq helper type check
+            "task_language": "",
         });
 
         handlebars.render("codex_agents", &context).map_err(|e| {
@@ -2391,6 +2416,7 @@ impl CodeTemplateGenerator {
             "model": code_run.spec.model,
             "tools_url": render_settings.tools_url,
             "remote_tools": remote_tools,
+            "list_tools_on_start": render_settings.list_tools_on_start,
             // Template variables expected by container.sh.hbs
             "agent_name": agent_name,
             "cli_type": cli_type_name,
@@ -3189,6 +3215,7 @@ Be constructive and explain the "why" behind your suggestions.
             "github_app": Self::get_github_app_or_default(code_run),
             "workflow_name": workflow_name,
             "model": render_settings.model,
+            "list_tools_on_start": render_settings.list_tools_on_start,
             // Required template context variables
             "cli_type": cli_type,
             "job_type": job_type,
@@ -3293,6 +3320,9 @@ Be constructive and explain the "why" behind your suggestions.
             // Frontend stack context for Blaze agent
             "frontend_stack": frontend_stack,
             "is_tanstack_stack": is_tanstack_stack,
+            // Default task_language so {{#eq task_language "rust"}} blocks in cipher/security
+            // and similar templates don't trip the handlebars-rust eq helper type check
+            "task_language": "",
         });
 
         handlebars.render("opencode_agents", &context).map_err(|e| {
@@ -3482,6 +3512,7 @@ Be constructive and explain the "why" behind your suggestions.
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
         let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
@@ -3499,6 +3530,7 @@ Be constructive and explain the "why" behind your suggestions.
             "continue_session": continue_session,
             "overwrite_memory": code_run.spec.overwrite_memory,
             "attempts": retry_count + 1,
+            "list_tools_on_start": render_settings.list_tools_on_start,
             // Required template context variables
             "cli_type": cli_type,
             "job_type": job_type,
@@ -3661,6 +3693,9 @@ Be constructive and explain the "why" behind your suggestions.
             // Frontend stack context for Blaze agent
             "frontend_stack": frontend_stack,
             "is_tanstack_stack": is_tanstack_stack,
+            // Default task_language so {{#eq task_language "rust"}} blocks in cipher/security
+            // and similar templates don't trip the handlebars-rust eq helper type check
+            "task_language": "",
         });
 
         handlebars.render("gemini_memory", &context).map_err(|e| {
@@ -3941,18 +3976,15 @@ Be constructive and explain the "why" behind your suggestions.
     }
 
     /// Check if telemetry (OTEL metrics/logs) is enabled for this CodeRun.
-    fn is_telemetry_enabled(code_run: &CodeRun, config: &ControllerConfig) -> bool {
+    fn is_telemetry_enabled(code_run: &CodeRun, _config: &ControllerConfig) -> bool {
         // CodeRun env override takes precedence
         if let Some(val) = code_run.spec.env.get("TELEMETRY_ENABLED") {
             return val == "true" || val == "1";
         }
-        // Fall back to controller config or env var
+        // Fall back to controller env var, default to true (observability stack is deployed)
         std::env::var("TELEMETRY_ENABLED")
             .map(|v| v == "true" || v == "1")
-            .unwrap_or_else(|_| {
-                // Default to true when observability stack is available
-                config.agent.service_account_name.is_some()
-            })
+            .unwrap_or(true)
     }
 
     /// Get the OTLP gRPC endpoint for telemetry export.
@@ -4641,6 +4673,7 @@ Be constructive and explain the "why" behind your suggestions.
     #[allow(clippy::too_many_lines)] // Complex function not easily split
     fn register_agent_partials(handlebars: &mut Handlebars) -> Result<()> {
         use crate::tasks::template_paths::{
+            PARTIAL_BETTER_AUTH, PARTIAL_BETTER_AUTH_ELECTRON, PARTIAL_BETTER_AUTH_EXPO,
             PARTIAL_FRONTEND_TOOLKITS, PARTIAL_INFRASTRUCTURE_OPERATORS,
             PARTIAL_INFRASTRUCTURE_SETUP, PARTIAL_INFRASTRUCTURE_VERIFY, PARTIAL_SHADCN_STACK,
             PARTIAL_TANSTACK_STACK,
@@ -4668,6 +4701,39 @@ Be constructive and explain the "why" behind your suggestions.
             ("infrastructure-setup", PARTIAL_INFRASTRUCTURE_SETUP),
             ("infrastructure-verify", PARTIAL_INFRASTRUCTURE_VERIFY),
         ];
+
+        // Auth partials used by Spark/Tap/Blaze system prompts when skills_native=false
+        // (Cursor and Gemini need these inlined; Claude/Factory/Codex/OpenCode get them via MCP skills)
+        let auth_partials = vec![
+            ("better-auth", PARTIAL_BETTER_AUTH),
+            ("better-auth-electron", PARTIAL_BETTER_AUTH_ELECTRON),
+            ("better-auth-expo", PARTIAL_BETTER_AUTH_EXPO),
+        ];
+
+        // Register auth partials (best-effort — agents only reference them when skills_native=false)
+        for (partial_name, template_path) in auth_partials {
+            match Self::load_template(template_path) {
+                Ok(content) => {
+                    match handlebars.register_partial(partial_name, content) {
+                        Ok(()) => {
+                            debug!("Successfully registered auth partial: {}", partial_name);
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Auth partial {partial_name} has invalid handlebars syntax (likely JSX {{ }} in code samples): {e}. \
+                                Agents referencing this partial will get raw markdown instead."
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to load auth partial {partial_name} from ConfigMap (path: {template_path}): {e}. \
+                        Spark/Tap/Blaze templates referencing this partial will fail to render."
+                    );
+                }
+            }
+        }
 
         // Register frontend stack partials first
         for (partial_name, template_path) in frontend_stack_partials {

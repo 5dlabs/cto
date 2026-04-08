@@ -100,6 +100,19 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     echo "acpx installed" && \
     acpx --version
 
+# =============================================================================
+# ACP adapters — pre-installed so acpx doesn't need runtime npm downloads
+# CLIs with native ACP: droid, cursor, gemini, copilot, kimi, opencode
+# CLIs needing adapters: codex → codex-acp, claude → claude-agent-acp
+# =============================================================================
+RUN --mount=type=cache,target=/root/.npm,sharing=shared \
+    npm install -g --no-audit --no-fund \
+      @zed-industries/codex-acp@latest \
+      @agentclientprotocol/claude-agent-acp@latest && \
+    echo "ACP adapters installed:" && \
+    codex-acp --help 2>&1 | head -1 || true && \
+    claude-agent-acp --help 2>&1 | head -1 || true
+
 # Patch acpx: enable shell mode for terminal/create on all platforms.
 # Without this, agents that send full command strings (e.g. "git status")
 # in terminal/create requests fail with ENOENT on Linux/macOS because

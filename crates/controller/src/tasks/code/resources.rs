@@ -997,6 +997,41 @@ impl<'a> CodeResourceManager<'a> {
             }));
         }
 
+        // CLI OAuth credential mounts (Phase B1/B2)
+        // Claude OAuth: copied by openclaw.sh.hbs into ~/.claude/.credentials.json at startup
+        if cli_type == CLIType::Claude {
+            volumes.push(json!({
+                "name": "claude-oauth",
+                "secret": {
+                    "secretName": "claude-oauth",
+                    "optional": true
+                }
+            }));
+            volume_mounts.push(json!({
+                "name": "claude-oauth",
+                "mountPath": "/root/.claude-oauth",
+                "readOnly": true
+            }));
+        }
+
+        // Codex OAuth: mount secret at a staging path; the template copies auth.json
+        // into the writable ~/.codex/ directory at startup (codex writes sqlite/cache there)
+        if cli_type == CLIType::Codex {
+            volumes.push(json!({
+                "name": "codex-oauth",
+                "secret": {
+                    "secretName": "codex-oauth",
+                    "optional": true,
+                    "items": [{ "key": "auth.json", "path": "auth.json" }]
+                }
+            }));
+            volume_mounts.push(json!({
+                "name": "codex-oauth",
+                "mountPath": "/root/.codex-oauth",
+                "readOnly": true
+            }));
+        }
+
         // Shared volume for GitHub App private key - shared between init and main containers
         // This allows the init container to write the key and main container (Ruby/Go) to read it
         volumes.push(json!({
@@ -1281,6 +1316,7 @@ impl<'a> CodeResourceManager<'a> {
 
         // Build containers array
         let mut containers = vec![container_spec];
+        #[allow(unused_assignments)]
         let mut promtail_init_config: Option<String> = None;
 
         // Add Docker daemon if enabled (kept as-is for DIND workflows)
