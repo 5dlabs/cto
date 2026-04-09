@@ -1,0 +1,226 @@
+{
+  "name": "CTO CodeRun Logs",
+  "is_enabled": true,
+  "filter": {
+    "query": "source:cto-coderun"
+  },
+  "processors": [
+    {
+      "type": "grok-parser",
+      "name": "Parse harness control messages",
+      "is_enabled": true,
+      "source": "message",
+      "grok": {
+        "support_rules": "",
+        "match_rules": "harness_msg \\[harness\\] %{data:harness.message}"
+      },
+      "samples": [
+        "[harness] ✅ Gateway healthy",
+        "[harness] 📋 Tailing ACP log: /workspace/runs/harness-rex-kimi-1febd147/.claude/projects/foo.jsonl → stdout (DD collection)"
+      ]
+    },
+    {
+      "type": "pipeline",
+      "name": "ACP Conversation Logs (JSONL)",
+      "is_enabled": true,
+      "filter": {
+        "query": "@type:(user OR assistant OR queue-operation)"
+      },
+      "processors": [
+        {
+          "type": "attribute-remapper",
+          "name": "Map type to acp.type",
+          "is_enabled": true,
+          "sources": ["type"],
+          "source_type": "attribute",
+          "target": "acp.type",
+          "target_type": "attribute",
+          "preserve_source": true,
+          "override_on_conflict": false
+        },
+        {
+          "type": "attribute-remapper",
+          "name": "Map sessionId to acp.session_id",
+          "is_enabled": true,
+          "sources": ["sessionId"],
+          "source_type": "attribute",
+          "target": "acp.session_id",
+          "target_type": "attribute",
+          "preserve_source": false,
+          "override_on_conflict": false
+        },
+        {
+          "type": "attribute-remapper",
+          "name": "Map version to acp.cli_version",
+          "is_enabled": true,
+          "sources": ["version"],
+          "source_type": "attribute",
+          "target": "acp.cli_version",
+          "target_type": "attribute",
+          "preserve_source": false,
+          "override_on_conflict": false
+        },
+        {
+          "type": "attribute-remapper",
+          "name": "Map gitBranch to git.branch",
+          "is_enabled": true,
+          "sources": ["gitBranch"],
+          "source_type": "attribute",
+          "target": "git.branch",
+          "target_type": "attribute",
+          "preserve_source": false,
+          "override_on_conflict": false
+        },
+        {
+          "type": "attribute-remapper",
+          "name": "Map entrypoint to acp.entrypoint",
+          "is_enabled": true,
+          "sources": ["entrypoint"],
+          "source_type": "attribute",
+          "target": "acp.entrypoint",
+          "target_type": "attribute",
+          "preserve_source": false,
+          "override_on_conflict": false
+        },
+        {
+          "type": "attribute-remapper",
+          "name": "Map userType to acp.user_type",
+          "is_enabled": true,
+          "sources": ["userType"],
+          "source_type": "attribute",
+          "target": "acp.user_type",
+          "target_type": "attribute",
+          "preserve_source": false,
+          "override_on_conflict": false
+        },
+        {
+          "type": "attribute-remapper",
+          "name": "Map cwd to acp.cwd",
+          "is_enabled": true,
+          "sources": ["cwd"],
+          "source_type": "attribute",
+          "target": "acp.cwd",
+          "target_type": "attribute",
+          "preserve_source": false,
+          "override_on_conflict": false
+        },
+        {
+          "type": "attribute-remapper",
+          "name": "Map uuid to acp.message_id",
+          "is_enabled": true,
+          "sources": ["uuid"],
+          "source_type": "attribute",
+          "target": "acp.message_id",
+          "target_type": "attribute",
+          "preserve_source": false,
+          "override_on_conflict": false
+        },
+        {
+          "type": "date-remapper",
+          "name": "Use timestamp as official date",
+          "is_enabled": true,
+          "sources": ["timestamp"]
+        },
+        {
+          "type": "category-processor",
+          "name": "Classify message type",
+          "is_enabled": true,
+          "target": "acp.category",
+          "categories": [
+            {
+              "name": "tool_call",
+              "filter": {
+                "query": "@type:assistant @message.content.type:tool_use"
+              }
+            },
+            {
+              "name": "tool_result",
+              "filter": {
+                "query": "@type:user @message.content.type:tool_result"
+              }
+            },
+            {
+              "name": "thinking",
+              "filter": {
+                "query": "@type:assistant @message.content.type:thinking"
+              }
+            },
+            {
+              "name": "text_response",
+              "filter": {
+                "query": "@type:assistant @message.content.type:text"
+              }
+            },
+            {
+              "name": "user_prompt",
+              "filter": {
+                "query": "@type:user @isMeta:false"
+              }
+            },
+            {
+              "name": "system",
+              "filter": {
+                "query": "@type:queue-operation"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "pipeline",
+      "name": "OpenClaw Gateway Logs (JSON)",
+      "is_enabled": true,
+      "filter": {
+        "query": "@_meta.name:*"
+      },
+      "processors": [
+        {
+          "type": "attribute-remapper",
+          "name": "Map subsystem name",
+          "is_enabled": true,
+          "sources": ["0"],
+          "source_type": "attribute",
+          "target": "openclaw.subsystem",
+          "target_type": "attribute",
+          "preserve_source": false,
+          "override_on_conflict": false
+        },
+        {
+          "type": "attribute-remapper",
+          "name": "Map log message",
+          "is_enabled": true,
+          "sources": ["1"],
+          "source_type": "attribute",
+          "target": "openclaw.message",
+          "target_type": "attribute",
+          "preserve_source": false,
+          "override_on_conflict": false
+        },
+        {
+          "type": "attribute-remapper",
+          "name": "Map log level",
+          "is_enabled": true,
+          "sources": ["_meta.logLevelName"],
+          "source_type": "attribute",
+          "target": "level",
+          "target_type": "attribute",
+          "preserve_source": false,
+          "override_on_conflict": true
+        },
+        {
+          "type": "status-remapper",
+          "name": "Set log status from level",
+          "is_enabled": true,
+          "sources": ["level"]
+        },
+        {
+          "type": "date-remapper",
+          "name": "Use gateway timestamp",
+          "is_enabled": true,
+          "sources": ["time", "_meta.date"]
+        }
+      ]
+    }
+  ]
+}
