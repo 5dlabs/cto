@@ -383,6 +383,14 @@ cp /task-files/base-task.lobster "$WORKSPACE_DIR/.tasks/index.lobster.yaml" 2>/d
 echo "[harness] Step 3: Starting gateway + lobster workflow..."
 echo "[harness] Agent: {{agent_name}} | Model: {{model}} | Task: {{task_id}}"
 
+# Copilot BYOK: unset GitHub tokens so Copilot CLI won't try to call
+# GitHub API with the GitHub App server-to-server token (wrong token type).
+# Git operations are already complete; the gateway doesn't need GH_TOKEN.
+if [ "${CLI_TYPE:-}" = "copilot" ]; then
+  unset GH_TOKEN GITHUB_TOKEN 2>/dev/null || true
+  echo "[harness] Copilot BYOK: cleared GH_TOKEN/GITHUB_TOKEN for provider-only mode"
+fi
+
 # Start gateway in background (Discord presence + acpx runtime)
 openclaw gateway &
 GW_PID=$!
