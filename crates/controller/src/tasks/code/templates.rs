@@ -244,6 +244,7 @@ impl CodeTemplateGenerator {
             CLIType::Codex => ("codex-config.toml.hbs", "codex-config.toml"),
             CLIType::Gemini => ("gemini-settings.json.hbs", "gemini-settings.json"),
             CLIType::Cursor => ("cursor-config.json.hbs", "cursor-config.json"),
+            CLIType::Factory => ("factory-config.json.hbs", "factory-config.json"),
             _ => return None,
         };
 

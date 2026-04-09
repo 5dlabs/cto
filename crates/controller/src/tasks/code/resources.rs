@@ -923,6 +923,13 @@ impl<'a> CodeResourceManager<'a> {
                 "subPath": "opencode.json"
             }));
         }
+        if cli_type == CLIType::Factory {
+            volume_mounts.push(json!({
+                "name": "task-files",
+                "mountPath": "/home/node/.factory/config.json",
+                "subPath": "factory-config.json"
+            }));
+        }
 
         // PVC workspace volume for code (persistent across sessions)
         // Use conditional naming based on CodeRun type and agent classification
