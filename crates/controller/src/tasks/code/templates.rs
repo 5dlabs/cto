@@ -168,15 +168,9 @@ impl CodeTemplateGenerator {
             "review" => Self::generate_review_templates(code_run, config)?,
             "remediate" => Self::generate_remediate_templates(code_run, config)?,
             _ => {
-                // Fall through to CLI-based dispatch for other run types
-                match Self::determine_cli_type(code_run) {
-                    CLIType::Codex => Self::generate_codex_templates(code_run, config)?,
-                    CLIType::Cursor => Self::generate_cursor_templates(code_run, config)?,
-                    CLIType::Factory => Self::generate_factory_templates(code_run, config)?,
-                    CLIType::OpenCode => Self::generate_opencode_templates(code_run, config)?,
-                    CLIType::Gemini => Self::generate_gemini_templates(code_run, config)?,
-                    _ => Self::generate_claude_templates(code_run, config)?,
-                }
+                // All CLI types route through the OpenClaw harness.
+                // The harness uses acpx to dispatch to the correct CLI at runtime.
+                Self::generate_claude_templates(code_run, config)?
             }
         };
 
