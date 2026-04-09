@@ -397,47 +397,44 @@ fi
 # Background watcher: tail ACP CLI logs as they appear during the run.
 # Uses a PID file (not shell variable) so parent can clean up tail processes
 # that are spawned inside the background watcher subshell.
+#
+# CLI tools write their logs in different structures:
+#   Claude:  .claude/projects/{path-hash}/*.jsonl (conversation logs)
+#   Codex:   .codex/logs/*.jsonl
+#   Factory: .factory/logs/*.jsonl
+#   Gemini:  .gemini/logs/*.log
+#   Cursor:  .cursor-agent/logs/*.jsonl
+#   Kimi:    .kimi/logs/*.jsonl
+#   OpenCode:.local/share/opencode/log/*.log
+#   Copilot: .copilot/logs/*.log
+#   Pi:      .pi/logs/*.log
+# We use find to discover .log and .jsonl files recursively under all CLI dirs.
 CLI_TAIL_PIDS_FILE="/tmp/cli-tail-pids"
 CLI_TAILED_FILE="/tmp/cli-tailed-files"
 : > "$CLI_TAIL_PIDS_FILE"
 : > "$CLI_TAILED_FILE"
 
-# Pre-create the expected log directory for this CLI type so the watcher
-# can detect files as soon as the ACP runtime writes them.
-# (Init container already creates these, but ensure they exist.)
-case "{{cli_type}}" in
-  claude)   mkdir -p "$WORKSPACE_DIR/.claude/logs" ;;
-  codex)    mkdir -p "$WORKSPACE_DIR/.codex/logs" ;;
-  factory)  mkdir -p "$WORKSPACE_DIR/.factory/logs" ;;
-  gemini)   mkdir -p "$WORKSPACE_DIR/.gemini/logs" ;;
-  cursor)   mkdir -p "$WORKSPACE_DIR/.cursor-agent/logs" ;;
-  kimi)     mkdir -p "$WORKSPACE_DIR/.kimi/logs" ;;
-  opencode) mkdir -p "$WORKSPACE_DIR/.local/share/opencode/log" ;;
-  copilot)  mkdir -p "$WORKSPACE_DIR/.copilot/logs" ;;
-esac
-
 (
   while [ ! -f /workspace/.agent_done ]; do
-    for cli_log_dir in \
-      "$WORKSPACE_DIR/.claude/logs" \
-      "$WORKSPACE_DIR/.factory/logs" \
-      "$WORKSPACE_DIR/.codex/logs" \
-      "$WORKSPACE_DIR/.gemini/logs" \
-      "$WORKSPACE_DIR/.cursor-agent/logs" \
-      "$WORKSPACE_DIR/.kimi/logs" \
-      "$WORKSPACE_DIR/.local/share/opencode/log" \
-      "$WORKSPACE_DIR/.copilot/logs"; do
-      [ -d "$cli_log_dir" ] || continue
-      for f in "$cli_log_dir"/*.log; do
-        [ -f "$f" ] || continue
-        grep -qxF "$f" "$CLI_TAILED_FILE" && continue
-        echo "$f" >> "$CLI_TAILED_FILE"
-        echo "[harness] 📋 Tailing ACP log: $f → stdout (DD collection)"
-        tail -f "$f" &
-        echo $! >> "$CLI_TAIL_PIDS_FILE"
-      done
+    # Recursively find .log and .jsonl files under all CLI directories
+    find "$WORKSPACE_DIR/.claude" \
+         "$WORKSPACE_DIR/.codex" \
+         "$WORKSPACE_DIR/.factory" \
+         "$WORKSPACE_DIR/.gemini" \
+         "$WORKSPACE_DIR/.cursor-agent" \
+         "$WORKSPACE_DIR/.kimi" \
+         "$WORKSPACE_DIR/.copilot" \
+         "$WORKSPACE_DIR/.pi" \
+         "$WORKSPACE_DIR/.local/share/opencode" \
+         -type f \( -name '*.jsonl' -o -name '*.log' \) 2>/dev/null | \
+    while IFS= read -r f; do
+      grep -qxF "$f" "$CLI_TAILED_FILE" && continue
+      echo "$f" >> "$CLI_TAILED_FILE"
+      echo "[harness] 📋 Tailing ACP log: $f → stdout (DD collection)"
+      tail -f "$f" &
+      echo $! >> "$CLI_TAIL_PIDS_FILE"
     done
-    sleep 1
+    sleep 2
   done
 ) &
 CLI_WATCHER_PID=$!

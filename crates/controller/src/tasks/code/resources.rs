@@ -1654,7 +1654,7 @@ scrape_configs:
           namespace: "cto"
           source: acp-claude
           cli_name: claude
-          __path__: {workspace_path}/.claude/logs/*.log
+          __path__: {workspace_path}/.claude/**/*.{{jsonl,log}}
       - targets: [localhost]
         labels:
           job: acp-cli
@@ -1663,7 +1663,7 @@ scrape_configs:
           namespace: "cto"
           source: acp-droid
           cli_name: droid
-          __path__: {workspace_path}/.factory/logs/*.log
+          __path__: {workspace_path}/.factory/**/*.{{jsonl,log}}
       - targets: [localhost]
         labels:
           job: acp-cli
@@ -1672,7 +1672,7 @@ scrape_configs:
           namespace: "cto"
           source: acp-codex
           cli_name: codex
-          __path__: {workspace_path}/.codex/logs/*.log
+          __path__: {workspace_path}/.codex/**/*.{{jsonl,log}}
       - targets: [localhost]
         labels:
           job: acp-cli
@@ -1681,7 +1681,7 @@ scrape_configs:
           namespace: "cto"
           source: acp-gemini
           cli_name: gemini
-          __path__: {workspace_path}/.gemini/logs/*.log
+          __path__: {workspace_path}/.gemini/**/*.{{jsonl,log}}
       - targets: [localhost]
         labels:
           job: acp-cli
@@ -1690,7 +1690,7 @@ scrape_configs:
           namespace: "cto"
           source: acp-cursor
           cli_name: cursor
-          __path__: {workspace_path}/.cursor-agent/logs/*.log
+          __path__: {workspace_path}/.cursor-agent/**/*.{{jsonl,log}}
       - targets: [localhost]
         labels:
           job: acp-cli
@@ -1699,7 +1699,7 @@ scrape_configs:
           namespace: "cto"
           source: acp-kimi
           cli_name: kimi
-          __path__: {workspace_path}/.kimi/logs/*.log
+          __path__: {workspace_path}/.kimi/**/*.{{jsonl,log}}
       - targets: [localhost]
         labels:
           job: acp-cli
@@ -1708,7 +1708,7 @@ scrape_configs:
           namespace: "cto"
           source: acp-opencode
           cli_name: opencode
-          __path__: {workspace_path}/.local/share/opencode/log/*.log
+          __path__: {workspace_path}/.local/share/opencode/**/*.{{jsonl,log}}
       - targets: [localhost]
         labels:
           job: acp-cli
@@ -1717,7 +1717,7 @@ scrape_configs:
           namespace: "cto"
           source: acp-copilot
           cli_name: copilot
-          __path__: {workspace_path}/.copilot/logs/*.log
+          __path__: {workspace_path}/.copilot/**/*.{{jsonl,log}}
     pipeline_stages:
       - json:
           expressions:
