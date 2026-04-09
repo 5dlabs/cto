@@ -208,7 +208,69 @@ impl CodeTemplateGenerator {
             }
         }
 
+        // Inject CLI-specific config files from templates/cli-configs/
+        // These are simple Handlebars templates rendered with CRD context
+        let cli_type = Self::determine_cli_type(code_run);
+        let model = &code_run.spec.model;
+        let workspace_dir = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok())
+            .and_then(|v| v.get("workspaceDir").and_then(|w| w.as_str().map(String::from)))
+            .unwrap_or_default();
+        let fireworks_routing = model.contains("fireworks");
+
+        if let Some((filename, content)) =
+            Self::render_cli_config(cli_type, model, &workspace_dir, fireworks_routing)
+        {
+            templates.insert(filename, content);
+        }
+
         Ok(templates)
+    }
+
+    /// Render a CLI-specific config file from templates/cli-configs/.
+    /// Returns (filename, rendered_content) or None if no config needed.
+    fn render_cli_config(
+        cli_type: CLIType,
+        model: &str,
+        workspace_dir: &str,
+        fireworks_routing: bool,
+    ) -> Option<(String, String)> {
+        let templates_path = get_templates_path();
+        let (template_file, output_name) = match cli_type {
+            CLIType::Copilot => ("copilot-config.json.hbs", "copilot-config.json"),
+            CLIType::Kimi => ("kimi-config.toml.hbs", "kimi-config.toml"),
+            // Codex, Gemini, OpenCode, Cursor already have full template generators
+            // Only add configs for CLIs that use the default Claude/OpenClaw harness
+            _ => return None,
+        };
+
+        let template_path = format!("{templates_path}/cli-configs/{template_file}");
+        let template_content = match fs::read_to_string(&template_path) {
+            Ok(content) => content,
+            Err(e) => {
+                warn!("CLI config template not found at {}: {}", template_path, e);
+                return None;
+            }
+        };
+
+        let mut hbs = Handlebars::new();
+        hbs.set_strict_mode(false);
+        let data = json!({
+            "model": model,
+            "workspace_dir": workspace_dir,
+            "fireworks_routing": fireworks_routing,
+        });
+
+        match hbs.render_template(&template_content, &data) {
+            Ok(rendered) => Some((output_name.to_string(), rendered)),
+            Err(e) => {
+                warn!("Failed to render CLI config template {}: {}", template_file, e);
+                None
+            }
+        }
     }
 
     fn determine_cli_type(code_run: &CodeRun) -> CLIType {

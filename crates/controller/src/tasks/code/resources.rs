@@ -900,6 +900,23 @@ impl<'a> CodeResourceManager<'a> {
             }));
         }
 
+        // CLI-specific config file mounts from ConfigMap
+        // These are rendered from templates/cli-configs/ and added to the ConfigMap
+        if cli_type == CLIType::Copilot {
+            volume_mounts.push(json!({
+                "name": "task-files",
+                "mountPath": "/home/node/.copilot/config.json",
+                "subPath": "copilot-config.json"
+            }));
+        }
+        if cli_type == CLIType::Kimi {
+            volume_mounts.push(json!({
+                "name": "task-files",
+                "mountPath": "/home/node/.kimi/config.toml",
+                "subPath": "kimi-config.toml"
+            }));
+        }
+
         // PVC workspace volume for code (persistent across sessions)
         // Use conditional naming based on CodeRun type and agent classification
         let classifier = AgentClassifier::new();
@@ -1199,6 +1216,21 @@ impl<'a> CodeResourceManager<'a> {
             critical_env_vars.push(json!({
                 "name": "XDG_CONFIG_HOME",
                 "value": "/root/.config"
+            }));
+        }
+
+        // Kimi: set model name and base URL for Fireworks routing
+        if cli_type == CLIType::Kimi {
+            let model = &code_run.spec.model;
+            if model.contains("fireworks") {
+                critical_env_vars.push(json!({
+                    "name": "KIMI_BASE_URL",
+                    "value": "https://api.fireworks.ai/inference/v1"
+                }));
+            }
+            critical_env_vars.push(json!({
+                "name": "KIMI_MODEL_NAME",
+                "value": model
             }));
         }
 
@@ -2003,8 +2035,8 @@ scrape_configs:
             dd_service, tags_json.join(",")
         );
         let mut dd_annotations = serde_json::Map::new();
-        // Use the specific container name so DD autodiscovery correctly applies
-        // source/service/tags. Also set on promtail sidecar with distinct source.
+        // Container name is already capped at 58 chars by container_name_for_cli(),
+        // so "{name}.logs" always fits within K8s 63-char annotation name limit.
         dd_annotations.insert(
             format!("ad.datadoghq.com/{}.logs", container_name),
             json!(dd_log_config),
@@ -2708,8 +2740,10 @@ scrape_configs:
             collapsed
         };
 
-        if final_name.len() > 63 {
-            final_name.truncate(63);
+        // Cap at 58 chars so DD annotation key `ad.datadoghq.com/{name}.logs`
+        // stays within K8s 63-char annotation name limit (58 + 5 = 63).
+        if final_name.len() > 58 {
+            final_name.truncate(58);
             while final_name.ends_with('-') {
                 final_name.pop();
             }
