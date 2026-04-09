@@ -14,13 +14,13 @@ spec:
   docsBranch: main
   workingDirectory: .
   githubApp: 5DLabs-Grizz
-  model: accounts/fireworks/routers/kimi-k2p5-turbo
+  model: accounts/fireworks/models/qwen3-235b-a22b
   contextVersion: 1
   taskId: 1
   enableDocker: false
   cliConfig:
     cliType: copilot
-    model: accounts/fireworks/routers/kimi-k2p5-turbo
+    model: accounts/fireworks/models/qwen3-235b-a22b
     settings:
       listToolsOnStart: true
   promptModification: |
