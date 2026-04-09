@@ -14,11 +14,11 @@ spec:
   docsBranch: main
   workingDirectory: .
   githubApp: 5DLabs-Tap
-  model: accounts/fireworks/routers/kimi-k2p5-turbo
+  model: glm-5.1
   enableDocker: false
   cliConfig:
     cliType: factory
-    model: accounts/fireworks/routers/kimi-k2p5-turbo
+    model: glm-5.1
     settings:
       listToolsOnStart: true
   promptModification: |

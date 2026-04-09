@@ -77,7 +77,8 @@ steps:
       ACPX_MODEL="{{model}}"
 
       # Fireworks FirePass: override model to Fireworks-compatible ID
-      if [ -n "${FIREWORKS_API_KEY:-}" ]; then
+      # Skip for factory/droid — it uses native models (GLM, etc.)
+      if [ -n "${FIREWORKS_API_KEY:-}" ] && [ "$CLI_TYPE" != "factory" ]; then
         export ANTHROPIC_AUTH_TOKEN="$FIREWORKS_API_KEY"
         export ANTHROPIC_BASE_URL="https://api.fireworks.ai/inference"
         FW_MODEL="${FIREWORKS_MODEL:-accounts/fireworks/routers/kimi-k2p5-turbo}"
