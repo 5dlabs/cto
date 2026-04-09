@@ -75,6 +75,24 @@ impl ClaudeAdapter {
                     "url": tools_url.clone()
                 });
                 tools_server["availableTools"] = json!(tool_config.remote);
+
+                // Thread escalation policy + prewarm headers so the tools
+                // server applies per-session policy.
+                let mut headers = serde_json::Map::new();
+                headers.insert(
+                    "X-Agent-Prewarm".to_string(),
+                    json!(tool_config.remote.join(" ")),
+                );
+                if let Some(policy) = &tool_config.escalation {
+                    if let Ok(policy_json) = serde_json::to_string(policy) {
+                        headers.insert(
+                            "X-Escalation-Policy".to_string(),
+                            json!(policy_json),
+                        );
+                    }
+                }
+                tools_server["headers"] = Value::Object(headers);
+
                 mcp_servers["tools"] = tools_server;
             }
 
@@ -562,6 +580,7 @@ mod tests {
                         tools: vec!["read_file".to_string(), "write_file".to_string()],
                     },
                 )])),
+                escalation: None,
             }),
             cli_config: None,
         };

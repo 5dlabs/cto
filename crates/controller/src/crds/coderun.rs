@@ -172,6 +172,41 @@ impl Default for WatcherConfig {
     }
 }
 
+/// How the MCP tools server should handle `tools_request_capability` escalation
+/// calls for agents running under this CodeRun.
+///
+/// Mirrors `tools::escalation::EscalationMode` — duplicated here because the
+/// controller crate does not depend on the tools crate and CRD types need
+/// `schemars::JsonSchema`.
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EscalationMode {
+    /// Grant any tool present in the catalog. `deny` globs still apply.
+    Auto,
+    /// Grant only tools matching at least one `allow` glob. `deny` globs still apply.
+    #[default]
+    Allowlist,
+    /// Deny every escalation and log for human review.
+    Review,
+}
+
+/// Policy governing mid-session tool escalation requests.
+///
+/// Serialized as JSON and forwarded to the tools HTTP server via the
+/// `X-Escalation-Policy` header so each agent session gets its own policy.
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
+pub struct EscalationPolicy {
+    /// Escalation mode. Defaults to `allowlist`.
+    #[serde(default)]
+    pub mode: EscalationMode,
+    /// Glob patterns allowing tools (only consulted when `mode == allowlist`).
+    #[serde(default)]
+    pub allow: Vec<String>,
+    /// Glob patterns blocking tools regardless of mode. Takes precedence over `allow`.
+    #[serde(default)]
+    pub deny: Vec<String>,
+}
+
 /// CLI-specific configuration
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct CLIConfig {
@@ -342,6 +377,13 @@ pub struct CodeRunSpec {
     /// This field is set automatically by the controller when creating watcher CodeRuns.
     #[serde(default, rename = "watcherFor")]
     pub watcher_for: Option<String>,
+
+    /// Escalation policy for mid-session tool requests.
+    /// When set, serialized as JSON and forwarded to the tools HTTP server via
+    /// the `X-Escalation-Policy` header. When absent the server's default
+    /// policy applies (typically `allowlist` with no allow patterns → deny all).
+    #[serde(default, rename = "escalationPolicy")]
+    pub escalation_policy: Option<EscalationPolicy>,
 }
 
 impl Default for CodeRunSpec {
@@ -377,6 +419,7 @@ impl Default for CodeRunSpec {
             subtasks: None,
             watcher_config: None,
             watcher_for: None,
+            escalation_policy: None,
         }
     }
 }
