@@ -17,6 +17,9 @@ agent:
     codex:
       repository: ghcr.io/5dlabs/agents
       tag: latest
+    copilot:
+      repository: ghcr.io/5dlabs/agents
+      tag: latest
     cursor:
       repository: ghcr.io/5dlabs/agents
       tag: latest
@@ -27,6 +30,9 @@ agent:
       repository: ghcr.io/5dlabs/agents
       tag: latest
     grok:
+      repository: ghcr.io/5dlabs/agents
+      tag: latest
+    kimi:
       repository: ghcr.io/5dlabs/agents
       tag: latest
     opencode:
@@ -98,9 +104,21 @@ secrets:
     codex:
       secretKey: OPENAI_API_KEY
       envVar: OPENAI_API_KEY
+    copilot:
+      secretKey: OPENAI_API_KEY
+      envVar: COPILOT_GITHUB_TOKEN
+    cursor:
+      secretKey: CURSOR_API_KEY
+      envVar: CURSOR_API_KEY
     gemini:
       secretKey: GEMINI_API_KEY
       envVar: GEMINI_API_KEY
+    kimi:
+      secretKey: FIREWORKS_API_KEY
+      envVar: KIMI_API_KEY
+    opencode:
+      secretKey: FIREWORKS_API_KEY
+      envVar: FIREWORKS_API_KEY
     factory:
       secretKey: FACTORY_API_KEY
       envVar: FACTORY_API_KEY

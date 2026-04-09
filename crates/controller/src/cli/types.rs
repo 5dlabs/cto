@@ -8,10 +8,12 @@ const CLI_TYPE_VARIANTS: &[&str] = &[
     "claude",
     "code",
     "codex",
+    "copilot",
     "dexter",
     "opencode",
     "cursor",
     "factory",
+    "kimi",
     "openhands",
     "grok",
     "gemini",
@@ -37,6 +39,10 @@ pub enum CLIType {
     Cursor,
     /// Factory Droid CLI
     Factory,
+    /// GitHub Copilot CLI
+    Copilot,
+    /// Kimi Code CLI (Moonshot AI)
+    Kimi,
     /// `OpenHands`
     OpenHands,
     /// Grok CLI
@@ -59,6 +65,8 @@ impl std::fmt::Display for CLIType {
             CLIType::OpenCode => write!(f, "opencode"),
             CLIType::Cursor => write!(f, "cursor"),
             CLIType::Factory => write!(f, "factory"),
+            CLIType::Copilot => write!(f, "copilot"),
+            CLIType::Kimi => write!(f, "kimi"),
             CLIType::OpenHands => write!(f, "openhands"),
             CLIType::Grok => write!(f, "grok"),
             CLIType::Gemini => write!(f, "gemini"),
@@ -82,6 +90,8 @@ impl CLIType {
             "opencode" | "open-code" => Some(CLIType::OpenCode),
             "cursor" => Some(CLIType::Cursor),
             "factory" => Some(CLIType::Factory),
+            "copilot" | "github-copilot" => Some(CLIType::Copilot),
+            "kimi" | "kimi-cli" => Some(CLIType::Kimi),
             "openhands" | "open-hands" => Some(CLIType::OpenHands),
             "grok" => Some(CLIType::Grok),
             "gemini" => Some(CLIType::Gemini),
