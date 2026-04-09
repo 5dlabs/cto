@@ -1244,6 +1244,31 @@ impl<'a> CodeResourceManager<'a> {
             }));
         }
 
+        // Copilot: BYOK via Fireworks — set provider env vars so copilot skips GitHub auth
+        if cli_type == CLIType::Copilot {
+            let model = &code_run.spec.model;
+            critical_env_vars.push(json!({
+                "name": "COPILOT_PROVIDER_BASE_URL",
+                "value": "https://api.fireworks.ai/inference/v1"
+            }));
+            critical_env_vars.push(json!({
+                "name": "COPILOT_PROVIDER_TYPE",
+                "value": "openai"
+            }));
+            critical_env_vars.push(json!({
+                "name": "COPILOT_PROVIDER_API_KEY",
+                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
+            }));
+            critical_env_vars.push(json!({
+                "name": "COPILOT_MODEL",
+                "value": model
+            }));
+            critical_env_vars.push(json!({
+                "name": "COPILOT_PROVIDER_WIRE_MODEL",
+                "value": model
+            }));
+        }
+
         // Comprehensive deduplication: remove all duplicates by name, keeping the last occurrence
         // This ensures that later additions (like critical system vars) take precedence
         let mut seen_names = std::collections::HashSet::new();
