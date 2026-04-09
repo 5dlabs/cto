@@ -1959,22 +1959,61 @@ scrape_configs:
             pod_spec["imagePullSecrets"] = json!(secrets);
         }
 
-        // Datadog autodiscovery annotations for container log collection
-        // With containerCollectAll:true, DD collects all containers automatically.
-        // The annotation adds source/service/tags metadata and multi-line detection.
+        // Datadog autodiscovery annotations for container log collection.
+        // Tags are derived from the CRD spec so every facet is individually searchable.
         let dd_agent_name = labels.get("agent").cloned().unwrap_or_else(|| "unknown".to_string());
-        let dd_task_id = code_run.spec.task_id.unwrap_or(0);
         let dd_service = format!("cto-coderun-{}", dd_agent_name);
         let dd_cli_type = labels.get("cli-type").cloned().unwrap_or_else(|| "unknown".to_string());
-        // Extract provider from model string (e.g., "fireworks/accounts/..." → "fireworks")
         let dd_provider = code_run.spec.model.split('/').next().unwrap_or("unknown").to_string();
-        let dd_coderun_name = coderun_name.clone();
+
+        // Build tags from all available CRD spec fields
+        let mut dd_tags: Vec<String> = vec![
+            format!("agent:{}", dd_agent_name),
+            format!("cli:{}", dd_cli_type),
+            format!("provider:{}", dd_provider),
+            format!("model:{}", code_run.spec.model),
+            format!("task:{}", code_run.spec.task_id.unwrap_or(0)),
+            format!("coderun:{}", coderun_name),
+            format!("run_type:{}", code_run.spec.run_type),
+            format!("service_target:{}", code_run.spec.service),
+            "env:production".to_string(),
+        ];
+        if let Some(ref app) = code_run.spec.github_app {
+            dd_tags.push(format!("github_app:{}", app));
+        }
+        if let Some(ref cli_cfg) = code_run.spec.cli_config {
+            if let Some(max_tokens) = cli_cfg.max_tokens {
+                dd_tags.push(format!("max_tokens:{}", max_tokens));
+            }
+            if let Some(temp) = cli_cfg.temperature {
+                dd_tags.push(format!("temperature:{}", temp));
+            }
+        }
+        dd_tags.push(format!("context_version:{}", code_run.spec.context_version));
+        if code_run.spec.continue_session {
+            dd_tags.push("continue_session:true".to_string());
+        }
+        if code_run.spec.enable_docker {
+            dd_tags.push("docker:enabled".to_string());
+        }
+
+        let tags_json: Vec<String> = dd_tags.iter().map(|t| format!("\"{}\"", t)).collect();
+        let dd_log_config = format!(
+            "[{{\"source\":\"cto-coderun\",\"service\":\"{}\",\"auto_multi_line_detection\":true,\"tags\":[{}]}}]",
+            dd_service, tags_json.join(",")
+        );
         let mut dd_annotations = serde_json::Map::new();
+        // Use the specific container name so DD autodiscovery correctly applies
+        // source/service/tags. Also set on promtail sidecar with distinct source.
         dd_annotations.insert(
-            "ad.datadoghq.com/all-containers.logs".to_string(),
+            format!("ad.datadoghq.com/{}.logs", container_name),
+            json!(dd_log_config),
+        );
+        dd_annotations.insert(
+            "ad.datadoghq.com/promtail.logs".to_string(),
             json!(format!(
-                "[{{\"source\":\"cto-coderun\",\"service\":\"{}\",\"auto_multi_line_detection\":true,\"tags\":[\"agent:{}\",\"cli:{}\",\"provider:{}\",\"model:{}\",\"task:{}\",\"coderun:{}\",\"env:production\"]}}]",
-                dd_service, dd_agent_name, dd_cli_type, dd_provider, &code_run.spec.model, dd_task_id, dd_coderun_name
+                "[{{\"source\":\"cto-promtail\",\"service\":\"{}\"}}]",
+                dd_service
             )),
         );
         let dd_annotations = serde_json::Value::Object(dd_annotations);
