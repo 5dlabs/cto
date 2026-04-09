@@ -916,6 +916,13 @@ impl<'a> CodeResourceManager<'a> {
                 "subPath": "kimi-config.toml"
             }));
         }
+        if cli_type == CLIType::OpenCode {
+            volume_mounts.push(json!({
+                "name": "task-files",
+                "mountPath": "/home/node/.config/opencode/opencode.json",
+                "subPath": "opencode.json"
+            }));
+        }
 
         // PVC workspace volume for code (persistent across sessions)
         // Use conditional naming based on CodeRun type and agent classification

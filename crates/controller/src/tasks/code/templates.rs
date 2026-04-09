@@ -240,8 +240,10 @@ impl CodeTemplateGenerator {
         let (template_file, output_name) = match cli_type {
             CLIType::Copilot => ("copilot-config.json.hbs", "copilot-config.json"),
             CLIType::Kimi => ("kimi-config.toml.hbs", "kimi-config.toml"),
-            // Codex, Gemini, OpenCode, Cursor already have full template generators
-            // Only add configs for CLIs that use the default Claude/OpenClaw harness
+            CLIType::OpenCode => ("opencode.json.hbs", "opencode.json"),
+            CLIType::Codex => ("codex-config.toml.hbs", "codex-config.toml"),
+            CLIType::Gemini => ("gemini-settings.json.hbs", "gemini-settings.json"),
+            CLIType::Cursor => ("cursor-config.json.hbs", "cursor-config.json"),
             _ => return None,
         };
 

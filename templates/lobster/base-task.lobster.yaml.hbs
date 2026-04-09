@@ -80,11 +80,15 @@ steps:
       if [ -n "${FIREWORKS_API_KEY:-}" ]; then
         export ANTHROPIC_AUTH_TOKEN="$FIREWORKS_API_KEY"
         export ANTHROPIC_BASE_URL="https://api.fireworks.ai/inference"
-        FW_MODEL="${FIREWORKS_MODEL:-accounts/fireworks/models/kimi-k2p5}"
+        FW_MODEL="${FIREWORKS_MODEL:-accounts/fireworks/routers/kimi-k2p5-turbo}"
         export ANTHROPIC_MODEL="$FW_MODEL"
         export CLAUDE_MODEL="$FW_MODEL"
         export CLAUDE_CODE_MODEL="$FW_MODEL"
         ACPX_MODEL="$FW_MODEL"
+        # OpenCode requires fireworks-ai/ provider prefix on model ID
+        if [ "$CLI_TYPE" = "opencode" ]; then
+          ACPX_MODEL="fireworks-ai/$FW_MODEL"
+        fi
       fi
 
       # Cursor: uses CURSOR_API_KEY, model resolved internally
