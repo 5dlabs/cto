@@ -347,8 +347,9 @@ echo "✅ Workspace files written (AGENTS, SOUL, IDENTITY, USER, TOOLS, HEARTBEA
 # This prevents the gateway from auto-executing old boot instructions
 rm -f /workspace/BOOT.md /workspace/.agent_done /workspace/.pr-url
 
-# Copy base-task workflow into workspace
-cp /task-files/base-task.lobster /workspace/.base-task.lobster 2>/dev/null || true
+# Copy base-task workflow into workspace (.tasks/index.lobster.yaml is lobster's expected entrypoint)
+mkdir -p /workspace/.tasks
+cp /task-files/base-task.lobster /workspace/.tasks/index.lobster.yaml 2>/dev/null || true
 
 # ─── Step 4: Start gateway + run lobster workflow ──────────────────────
 echo "[harness] Step 3: Starting gateway + lobster workflow..."
@@ -452,7 +453,7 @@ LOBSTER_LOG="/workspace/.agent-logs/lobster-$(date -u +%Y%m%dT%H%M%SZ).log"
 
 set +e  # Don't exit on lobster failure — we need to shut down gateway
 set -o pipefail
-npx -y @clawdbot/lobster run .base-task.lobster 2>&1 | tee "$LOBSTER_LOG"
+npx -y @clawdbot/lobster run .tasks/index.lobster.yaml 2>&1 | tee "$LOBSTER_LOG"
 LOBSTER_EXIT=${PIPESTATUS[0]}
 set +o pipefail
 set -e
