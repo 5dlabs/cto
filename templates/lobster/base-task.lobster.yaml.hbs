@@ -103,7 +103,7 @@ steps:
 
       # Copilot: BYOK via Fireworks — use known model ID for acpx
       if [ "$CLI_TYPE" = "copilot" ]; then
-        ACPX_MODEL="${COPILOT_MODEL:-gpt-4}"
+        ACPX_MODEL="${COPILOT_MODEL:-gpt-4.1}"
       fi
 
       export ACPX_MODEL

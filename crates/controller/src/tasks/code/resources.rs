@@ -1267,11 +1267,11 @@ impl<'a> CodeResourceManager<'a> {
             }));
             critical_env_vars.push(json!({
                 "name": "COPILOT_MODEL",
-                "value": "gpt-4"
+                "value": "gpt-4.1"
             }));
             critical_env_vars.push(json!({
                 "name": "COPILOT_PROVIDER_MODEL_ID",
-                "value": "gpt-4"
+                "value": "gpt-4.1"
             }));
             critical_env_vars.push(json!({
                 "name": "COPILOT_PROVIDER_WIRE_MODEL",
