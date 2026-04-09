@@ -19,7 +19,7 @@ spec:
       enabled: true
     logCollection:
       enabled: true
-      containerCollectAll: false
+      containerCollectAll: true
     apm:
       instrumentation:
         enabled: true
