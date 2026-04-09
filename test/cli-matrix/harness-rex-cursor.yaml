@@ -23,6 +23,9 @@ spec:
     settings:
       listToolsOnStart: true
   promptModification: |
-    Print your identity, versions, tools, and skills. Then write a single
-    line "OK: <agent-name>" to stdout and exit. Do not modify any files.
-    Do not open any PRs.
+    Create a file called `smoke-report.md` in the repository root.
+    It must contain:
+    1. A heading with your agent identity (name, version)
+    2. A section listing your available tools
+    3. Valid Markdown syntax
+    After creating the file, verify it exists with `ls -la smoke-report.md`.
