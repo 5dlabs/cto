@@ -1994,34 +1994,39 @@ scrape_configs:
         // Datadog autodiscovery annotations for container log collection.
         // Tags are derived from the CRD spec so every facet is individually searchable.
         let dd_agent_name = labels.get("agent").cloned().unwrap_or_else(|| "unknown".to_string());
-        let dd_service = format!("cto-coderun-{}", dd_agent_name);
+        let dd_service = format!("cto-coderun-{dd_agent_name}");
         let dd_cli_type = labels.get("cli-type").cloned().unwrap_or_else(|| "unknown".to_string());
         let dd_provider = code_run.spec.model.split('/').next().unwrap_or("unknown").to_string();
+        let dd_model = &code_run.spec.model;
+        let dd_task_id = code_run.spec.task_id.unwrap_or(0);
+        let dd_run_type = &code_run.spec.run_type;
+        let dd_service_target = &code_run.spec.service;
+        let dd_ctx_ver = code_run.spec.context_version;
 
         // Build tags from all available CRD spec fields
         let mut dd_tags: Vec<String> = vec![
-            format!("agent:{}", dd_agent_name),
-            format!("cli:{}", dd_cli_type),
-            format!("provider:{}", dd_provider),
-            format!("model:{}", code_run.spec.model),
-            format!("task:{}", code_run.spec.task_id.unwrap_or(0)),
-            format!("coderun:{}", coderun_name),
-            format!("run_type:{}", code_run.spec.run_type),
-            format!("service_target:{}", code_run.spec.service),
+            format!("agent:{dd_agent_name}"),
+            format!("cli:{dd_cli_type}"),
+            format!("provider:{dd_provider}"),
+            format!("model:{dd_model}"),
+            format!("task:{dd_task_id}"),
+            format!("coderun:{coderun_name}"),
+            format!("run_type:{dd_run_type}"),
+            format!("service_target:{dd_service_target}"),
             "env:production".to_string(),
         ];
         if let Some(ref app) = code_run.spec.github_app {
-            dd_tags.push(format!("github_app:{}", app));
+            dd_tags.push(format!("github_app:{app}"));
         }
         if let Some(ref cli_cfg) = code_run.spec.cli_config {
             if let Some(max_tokens) = cli_cfg.max_tokens {
-                dd_tags.push(format!("max_tokens:{}", max_tokens));
+                dd_tags.push(format!("max_tokens:{max_tokens}"));
             }
             if let Some(temp) = cli_cfg.temperature {
-                dd_tags.push(format!("temperature:{}", temp));
+                dd_tags.push(format!("temperature:{temp}"));
             }
         }
-        dd_tags.push(format!("context_version:{}", code_run.spec.context_version));
+        dd_tags.push(format!("context_version:{dd_ctx_ver}"));
         if code_run.spec.continue_session {
             dd_tags.push("continue_session:true".to_string());
         }
@@ -2029,23 +2034,22 @@ scrape_configs:
             dd_tags.push("docker:enabled".to_string());
         }
 
-        let tags_json: Vec<String> = dd_tags.iter().map(|t| format!("\"{}\"", t)).collect();
+        let tags_json: Vec<String> = dd_tags.iter().map(|t| format!("\"{t}\"")).collect();
+        let tags_joined = tags_json.join(",");
         let dd_log_config = format!(
-            "[{{\"source\":\"cto-coderun\",\"service\":\"{}\",\"auto_multi_line_detection\":true,\"tags\":[{}]}}]",
-            dd_service, tags_json.join(",")
+            "[{{\"source\":\"cto-coderun\",\"service\":\"{dd_service}\",\"auto_multi_line_detection\":true,\"tags\":[{tags_joined}]}}]",
         );
         let mut dd_annotations = serde_json::Map::new();
         // Container name is already capped at 58 chars by container_name_for_cli(),
         // so "{name}.logs" always fits within K8s 63-char annotation name limit.
         dd_annotations.insert(
-            format!("ad.datadoghq.com/{}.logs", container_name),
+            format!("ad.datadoghq.com/{container_name}.logs"),
             json!(dd_log_config),
         );
         dd_annotations.insert(
             "ad.datadoghq.com/promtail.logs".to_string(),
             json!(format!(
-                "[{{\"source\":\"cto-promtail\",\"service\":\"{}\"}}]",
-                dd_service
+                "[{{\"source\":\"cto-promtail\",\"service\":\"{dd_service}\"}}]",
             )),
         );
         let dd_annotations = serde_json::Value::Object(dd_annotations);

@@ -311,9 +311,6 @@ gateway:
       responses:
         enabled: false
 
-memorySearch:
-  enabled: false
-
 openmemory:
   enabled: false
 
@@ -425,17 +422,28 @@ nats:
   maxPingPongTurns: 10
   pingPongWindowMs: 300000
   roster:
-    - { id: atlas, role: "merge-gate" }
-    - { id: blaze, role: "frontend" }
-    - { id: bolt, role: "devops" }
-    - { id: cipher, role: "security" }
-    - { id: cleo, role: "code-quality" }
-    - { id: grizz, role: "go-implementation" }
-    - { id: healer, role: "self-healing" }
-    - { id: keeper, role: "operations" }
-    - { id: rex, role: "rust-implementation" }
-    - { id: stitch, role: "code-review" }
-    - { id: tess, role: "testing" }
+    - id: atlas
+      role: "merge-gate"
+    - id: blaze
+      role: "frontend"
+    - id: bolt
+      role: "devops"
+    - id: cipher
+      role: "security"
+    - id: cleo
+      role: "code-quality"
+    - id: grizz
+      role: "go-implementation"
+    - id: healer
+      role: "self-healing"
+    - id: keeper
+      role: "operations"
+    - id: rex
+      role: "rust-implementation"
+    - id: stitch
+      role: "code-review"
+    - id: tess
+      role: "testing"
 
 kaniko:
   enabled: true

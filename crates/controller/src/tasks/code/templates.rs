@@ -115,6 +115,10 @@ impl HelperDef for GroupByHelper {
 
 pub struct CodeTemplateGenerator;
 
+// Per-CLI template generators below are legacy paths; production routing uses
+// `generate_all_templates` → `generate_claude_templates` + OpenClaw harness.
+// Helpers are interleaved with that path, so dead-code is suppressed on the impl.
+#[allow(dead_code)]
 impl CodeTemplateGenerator {
     /// Register common Handlebars helpers for template conditionals
     /// This enables `eq` and `or` helpers used in templates like:
