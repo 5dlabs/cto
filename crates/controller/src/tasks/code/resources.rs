@@ -1244,15 +1244,14 @@ impl<'a> CodeResourceManager<'a> {
             }));
         }
 
-        // Copilot: BYOK via Fireworks in offline mode.
-        // COPILOT_OFFLINE prevents all GitHub API calls. BYOK env vars route inference
-        // to Fireworks. The harness also unsets GITHUB_APP_* vars so the copilot
-        // subprocess doesn't try GitHub App auth.
+        // Copilot: BYOK via Fireworks with OAuth token auth.
+        // COPILOT_GITHUB_TOKEN (gho_* OAuth) satisfies ACP auth. BYOK env vars route
+        // inference to Fireworks. Do NOT set COPILOT_OFFLINE — it breaks ACP auth.
         if cli_type == CLIType::Copilot {
             let model = &code_run.spec.model;
             critical_env_vars.push(json!({
-                "name": "COPILOT_OFFLINE",
-                "value": "true"
+                "name": "COPILOT_GITHUB_TOKEN",
+                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "COPILOT_GITHUB_TOKEN" } }
             }));
             critical_env_vars.push(json!({
                 "name": "COPILOT_PROVIDER_BASE_URL",

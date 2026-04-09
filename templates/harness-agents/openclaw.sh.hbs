@@ -383,23 +383,6 @@ cp /task-files/base-task.lobster "$WORKSPACE_DIR/.tasks/index.lobster.yaml" 2>/d
 echo "[harness] Step 3: Starting gateway + lobster workflow..."
 echo "[harness] Agent: {{agent_name}} | Model: {{model}} | Task: {{task_id}}"
 
-# Copilot BYOK: unset ALL GitHub-related env vars so the copilot subprocess
-# (spawned by the gateway) doesn't find any GitHub credentials and operates
-# in pure BYOK/offline mode. Save vars to a file so the lobster workflow
-# can restore them for git operations.
-if [ "${CLI_TYPE:-}" = "copilot" ]; then
-  cat > /workspace/.github-app-env <<GHENV
-export GITHUB_APP_ID="${GITHUB_APP_ID:-}"
-export GITHUB_APP_PRIVATE_KEY="${GITHUB_APP_PRIVATE_KEY:-}"
-export GITHUB_APP_INSTALLATION_ID="${GITHUB_APP_INSTALLATION_ID:-}"
-export GH_TOKEN="${GH_TOKEN:-}"
-export GITHUB_TOKEN="${GITHUB_TOKEN:-}"
-GHENV
-  unset GH_TOKEN GITHUB_TOKEN COPILOT_GITHUB_TOKEN 2>/dev/null || true
-  unset GITHUB_APP_ID GITHUB_APP_PRIVATE_KEY GITHUB_APP_INSTALLATION_ID 2>/dev/null || true
-  echo "[harness] Copilot BYOK: cleared GitHub env vars; saved to /workspace/.github-app-env"
-fi
-
 # Start gateway in background (Discord presence + acpx runtime)
 openclaw gateway &
 GW_PID=$!

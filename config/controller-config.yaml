@@ -105,8 +105,8 @@ secrets:
       secretKey: OPENAI_API_KEY
       envVar: OPENAI_API_KEY
     copilot:
-      secretKey: FIREWORKS_API_KEY
-      envVar: FIREWORKS_API_KEY
+      secretKey: COPILOT_GITHUB_TOKEN
+      envVar: COPILOT_GITHUB_TOKEN
     cursor:
       secretKey: CURSOR_API_KEY
       envVar: CURSOR_API_KEY
