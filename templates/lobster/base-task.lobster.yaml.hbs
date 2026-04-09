@@ -161,8 +161,17 @@ steps:
 
       INDEX="${TASK_DIR}/index.lobster.yaml"
       if [ ! -f "$INDEX" ]; then
-        echo "❌ No index.lobster.yaml in $TASK_DIR"
-        exit 1
+        # Search for index.lobster.yaml in common locations (docs subdir, nested .tasks, etc.)
+        echo "⚡ index.lobster.yaml not at $TASK_DIR — searching repo..."
+        FOUND=$(find . -path '*/.tasks/*/index.lobster.yaml' -o -path '*/.tasks/index.lobster.yaml' 2>/dev/null | head -1)
+        if [ -n "$FOUND" ]; then
+          INDEX="$FOUND"
+          TASK_DIR="$(dirname "$INDEX")"
+          echo "✅ Found: $INDEX"
+        else
+          echo "❌ No index.lobster.yaml found anywhere in repo"
+          exit 1
+        fi
       fi
 
       ATTEMPT=0
