@@ -21,8 +21,11 @@ set -euo pipefail
 
 # ─── Signal handling ───────────────────────────────────────────────────
 GW_PID=""
+TAIL_PIDS=""
 cleanup() {
   echo "[harness] Caught signal, cleaning up..."
+  # Kill log tailers first
+  for pid in $TAIL_PIDS; do kill "$pid" 2>/dev/null || true; done
   # Always write agent_done sentinel so sidecars can exit
   echo "interrupted" > /workspace/.agent_done 2>/dev/null || true
   [ -n "$GW_PID" ] && kill "$GW_PID" 2>/dev/null || true
@@ -352,6 +355,52 @@ if [ "$GW_HEALTHY" = "false" ]; then
   echo "[harness] ⚠️ Gateway not healthy after 30s, proceeding anyway"
 fi
 
+# ─── Tail OpenClaw gateway + CLI logs to stdout for DD collection ──────
+# Gateway writes structured JSON logs to /tmp/openclaw-*/openclaw-*.log
+# CLI tools write to /workspace/.claude/logs/ etc.
+# Tailing to stdout lets DD containerCollectAll pick them up.
+GATEWAY_LOG_DIR="/tmp/openclaw-$(id -u)"
+GATEWAY_LOG="${GATEWAY_LOG_DIR}/openclaw-$(date -u +%Y-%m-%d).log"
+
+# Wait briefly for gateway log to appear (it creates on first write)
+for _w in 1 2 3 4 5; do
+  [ -f "$GATEWAY_LOG" ] && break
+  sleep 1
+done
+
+if [ -f "$GATEWAY_LOG" ]; then
+  echo "[harness] 📋 Tailing gateway log → stdout (DD collection)"
+  tail -f "$GATEWAY_LOG" &
+  TAIL_PIDS="$!"
+else
+  echo "[harness] ⚠️ Gateway log not found at $GATEWAY_LOG"
+fi
+
+# Background watcher: tail CLI logs as they appear during the run
+(
+  while [ ! -f /workspace/.agent_done ]; do
+    for cli_log_dir in \
+      /workspace/.claude/logs \
+      /workspace/.factory/logs \
+      /workspace/.codex/logs \
+      /workspace/.gemini/logs \
+      /workspace/.cursor-agent/logs \
+      /workspace/.kimi/logs \
+      /workspace/.local/share/opencode/log \
+      /workspace/.copilot/logs; do
+      if [ -d "$cli_log_dir" ] && ! echo "$_TAILED_DIRS" | grep -q "$cli_log_dir"; then
+        echo "[harness] 📋 Tailing CLI logs: $cli_log_dir → stdout"
+        tail -f "$cli_log_dir"/*.log 2>/dev/null &
+        TAIL_PIDS="$TAIL_PIDS $!"
+        _TAILED_DIRS="$_TAILED_DIRS $cli_log_dir"
+      fi
+    done
+    sleep 5
+  done
+) &
+CLI_WATCHER_PID=$!
+TAIL_PIDS="$TAIL_PIDS $CLI_WATCHER_PID"
+
 # Run lobster workflow directly (bypasses model orchestration)
 echo "[harness] ════════════════════════════════════════════════════"
 echo "[harness] Running lobster workflow (direct execution)..."
@@ -381,6 +430,8 @@ echo "[harness] ═════════════════════�
 
 # ─── Shutdown ──────────────────────────────────────────────────────────
 echo "[harness] Shutting down gateway..."
+# Stop log tailers first
+for pid in $TAIL_PIDS; do kill "$pid" 2>/dev/null || true; done
 openclaw gateway stop 2>/dev/null || true
 sleep 2
 kill "$GW_PID" 2>/dev/null || true

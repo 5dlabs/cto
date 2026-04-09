@@ -1955,12 +1955,16 @@ scrape_configs:
         let dd_agent_name = labels.get("agent").cloned().unwrap_or_else(|| "unknown".to_string());
         let dd_task_id = code_run.spec.task_id.unwrap_or(0);
         let dd_service = format!("cto-coderun-{}", dd_agent_name);
+        let dd_cli_type = labels.get("cli-type").cloned().unwrap_or_else(|| "unknown".to_string());
+        // Extract provider from model string (e.g., "fireworks/accounts/..." → "fireworks")
+        let dd_provider = code_run.spec.model.split('/').next().unwrap_or("unknown").to_string();
+        let dd_coderun_name = coderun_name.clone();
         let mut dd_annotations = serde_json::Map::new();
         dd_annotations.insert(
             "ad.datadoghq.com/all-containers.logs".to_string(),
             json!(format!(
-                "[{{\"source\":\"cto-coderun\",\"service\":\"{}\",\"auto_multi_line_detection\":true,\"tags\":[\"agent:{}\",\"model:{}\",\"task:{}\"]}}]",
-                dd_service, dd_agent_name, &code_run.spec.model, dd_task_id
+                "[{{\"source\":\"cto-coderun\",\"service\":\"{}\",\"auto_multi_line_detection\":true,\"tags\":[\"agent:{}\",\"cli:{}\",\"provider:{}\",\"model:{}\",\"task:{}\",\"coderun:{}\",\"env:production\"]}}]",
+                dd_service, dd_agent_name, dd_cli_type, dd_provider, &code_run.spec.model, dd_task_id, dd_coderun_name
             )),
         );
         let dd_annotations = serde_json::Value::Object(dd_annotations);
@@ -2247,6 +2251,11 @@ scrape_configs:
         labels.insert(
             "tags.datadoghq.com/env".to_string(),
             "production".to_string(),
+        );
+        // CLI type and provider as DD-visible labels for faceted search
+        labels.insert(
+            "tags.datadoghq.com/version".to_string(),
+            cli_type.to_string().to_lowercase(),
         );
 
         // Add Linear session labels for pod discovery (used by PM server for routing input)

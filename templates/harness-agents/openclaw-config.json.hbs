@@ -101,6 +101,7 @@
     }
   },
   "plugins": {
+    "allow": ["diagnostics-otel"],
     "entries": {
       {{#unless discord_enabled}}
       "discord": {
@@ -114,7 +115,25 @@
       {{/if}}
       "memory-core": {
         "enabled": true
+      },
+      "diagnostics-otel": {
+        "enabled": true
       }
+    }
+  },
+  "diagnostics": {
+    "enabled": true,
+    "otel": {
+      "enabled": true,
+      "endpoint": "http://datadog-agent.datadog-agent.svc.cluster.local:4318",
+      "protocol": "http/protobuf",
+      "serviceName": "cto-coderun-{{agent_name}}",
+      "traces": true,
+      "metrics": true,
+      "logs": true,
+      "sampleRate": 1.0,
+      "flushIntervalMs": 15000,
+      "headers": {}
     }
   },
   "tools": {
@@ -145,6 +164,7 @@
   },
   "logging": {
     "level": "info",
-    "consoleLevel": "info"
+    "consoleLevel": "info",
+    "consoleStyle": "json"
   }
 }
