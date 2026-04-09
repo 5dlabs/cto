@@ -72,11 +72,11 @@ if [ "{{cli_type}}" = "kimi" ] && [ -n "${FIREWORKS_API_KEY:-}" ]; then
 {"access_token":"${FIREWORKS_API_KEY}","refresh_token":"","expires_at":4102444800.0,"scope":"","token_type":"Bearer"}
 KIMIEOF
   chmod 600 "$HOME/.kimi/credentials/kimi-code.json"
-  cat > "$HOME/.kimi/config.toml" <<'KIMICFG'
+  cat > "$HOME/.kimi/config.toml" <<KIMICFG
 [providers.fireworks]
 type = "anthropic"
 base_url = "https://api.fireworks.ai/inference"
-api_key_env = "FIREWORKS_API_KEY"
+api_key = "${FIREWORKS_API_KEY}"
 
 [models.kimi-k2p5-turbo]
 provider = "fireworks"
