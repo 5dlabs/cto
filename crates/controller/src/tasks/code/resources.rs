@@ -832,7 +832,8 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "blaze-scripts",
                 "configMap": {
                     "name": blaze_scripts_cm_name,
-                    "defaultMode": 0o755
+                    "defaultMode": 0o755,
+                    "optional": true
                 }
             }));
             volume_mounts.push(json!({
