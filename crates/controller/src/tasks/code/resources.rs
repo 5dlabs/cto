@@ -1245,10 +1245,15 @@ impl<'a> CodeResourceManager<'a> {
         }
 
         // Copilot: BYOK via Fireworks — set provider env vars so copilot skips GitHub auth
-        // COPILOT_PROVIDER_MODEL_ID uses a known model (gpt-4) for config/token limits,
-        // while COPILOT_PROVIDER_WIRE_MODEL sends the actual Fireworks model to the API.
+        // COPILOT_OFFLINE disables all GitHub API calls (auth, MCP, telemetry) while
+        // still allowing BYOK provider access. Without this, Copilot generates a token
+        // from GITHUB_APP_ID/PRIVATE_KEY and tries GitHub API endpoints that reject it.
         if cli_type == CLIType::Copilot {
             let model = &code_run.spec.model;
+            critical_env_vars.push(json!({
+                "name": "COPILOT_OFFLINE",
+                "value": "true"
+            }));
             critical_env_vars.push(json!({
                 "name": "COPILOT_PROVIDER_BASE_URL",
                 "value": "https://api.fireworks.ai/inference/v1"
