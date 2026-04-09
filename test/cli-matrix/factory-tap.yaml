@@ -14,11 +14,11 @@ spec:
   docsBranch: main
   workingDirectory: .
   githubApp: 5DLabs-Tap
-  model: claude-sonnet-4-5-20250929
+  model: accounts/fireworks/routers/kimi-k2p5-turbo
   enableDocker: false
   cliConfig:
     cliType: factory
-    model: claude-sonnet-4-5-20250929
+    model: accounts/fireworks/routers/kimi-k2p5-turbo
     settings:
       listToolsOnStart: true
   promptModification: |

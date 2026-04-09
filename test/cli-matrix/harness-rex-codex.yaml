@@ -14,12 +14,12 @@ spec:
   docsBranch: main
   workingDirectory: .
   githubApp: 5DLabs-Cipher
-  model: codex-mini-latest
+  model: accounts/fireworks/routers/kimi-k2p5-turbo
   contextVersion: 1
   enableDocker: false
   cliConfig:
     cliType: codex
-    model: codex-mini-latest
+    model: accounts/fireworks/routers/kimi-k2p5-turbo
     settings:
       listToolsOnStart: true
   promptModification: |

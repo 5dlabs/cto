@@ -14,12 +14,12 @@ spec:
   docsBranch: main
   workingDirectory: .
   githubApp: 5DLabs-Spark
-  model: fireworks-ai/accounts/fireworks/routers/kimi-k2p5-turbo
+  model: accounts/fireworks/routers/kimi-k2p5-turbo
   contextVersion: 1
   enableDocker: false
   cliConfig:
     cliType: opencode
-    model: fireworks-ai/accounts/fireworks/routers/kimi-k2p5-turbo
+    model: accounts/fireworks/routers/kimi-k2p5-turbo
     settings:
       listToolsOnStart: true
   promptModification: |
