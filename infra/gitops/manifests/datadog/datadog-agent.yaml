@@ -23,6 +23,13 @@ spec:
     apm:
       instrumentation:
         enabled: true
+    otlp:
+      receiver:
+        protocols:
+          http:
+            endpoint: "0.0.0.0:4318"
+      logs:
+        enabled: true
         targets:
           - name: cto-pm-nodejs
             ddTraceVersions:
