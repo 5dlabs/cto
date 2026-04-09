@@ -915,12 +915,6 @@ impl<'a> CodeResourceManager<'a> {
                 "mountPath": "/home/node/.kimi/config.toml",
                 "subPath": "kimi-config.toml"
             }));
-            // Kimi CLI requires an OAuth token file to pass _check_auth
-            volume_mounts.push(json!({
-                "name": "task-files",
-                "mountPath": "/home/node/.kimi/credentials/kimi-code.json",
-                "subPath": "kimi-oauth-token.json"
-            }));
         }
         if cli_type == CLIType::OpenCode {
             volume_mounts.push(json!({

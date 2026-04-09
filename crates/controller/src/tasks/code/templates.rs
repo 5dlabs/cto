@@ -226,20 +226,8 @@ impl CodeTemplateGenerator {
         }
 
         // Kimi CLI requires a persisted OAuth token to pass _check_auth.
-        // Inject a synthetic token so ACP sessions can be created.
-        if cli_type == CLIType::Kimi {
-            let oauth_token = serde_json::json!({
-                "access_token": "fireworks-passthrough",
-                "refresh_token": "",
-                "expires_at": 4102444800.0_f64,
-                "scope": "",
-                "token_type": "Bearer"
-            });
-            templates.insert(
-                "kimi-oauth-token.json".to_string(),
-                serde_json::to_string_pretty(&oauth_token).unwrap_or_default(),
-            );
-        }
+        // The harness writes ~/.kimi/credentials/kimi-code.json at startup
+        // using FIREWORKS_API_KEY from the environment.
 
         Ok(templates)
     }

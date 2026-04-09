@@ -62,6 +62,16 @@ for cli_dir in .claude .codex .factory .gemini .cursor-agent .kimi .copilot .pi 
   fi
 done
 
+# Kimi CLI requires a persisted OAuth token to pass _check_auth.
+# Write one using the Fireworks API key so sessions can be created.
+if [ "{{cli_type}}" = "kimi" ] && [ -n "${FIREWORKS_API_KEY:-}" ]; then
+  mkdir -p "$HOME/.kimi/credentials"
+  cat > "$HOME/.kimi/credentials/kimi-code.json" <<KIMIEOF
+{"access_token":"${FIREWORKS_API_KEY}","refresh_token":"","expires_at":4102444800.0,"scope":"","token_type":"Bearer"}
+KIMIEOF
+  chmod 600 "$HOME/.kimi/credentials/kimi-code.json"
+fi
+
 for f in /etc/profile.d/*.sh; do
   [ -f "$f" ] && source "$f"
 done
