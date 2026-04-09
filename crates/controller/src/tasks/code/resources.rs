@@ -1807,7 +1807,17 @@ scrape_configs:
         // 1. Creates a unique subdirectory per CodeRun to prevent git lock conflicts
         // 2. Sets proper ownership for the agent (uid 1000)
         let workspace_setup_cmd = format!(
-            "mkdir -p /workspace/{workspace_subdir} && chown -R 1000:1000 /workspace/runs && chmod -R ug+rwX /workspace/runs"
+            "mkdir -p /workspace/{workspace_subdir} && \
+             mkdir -p /workspace/{workspace_subdir}/.claude/logs \
+                      /workspace/{workspace_subdir}/.codex/logs \
+                      /workspace/{workspace_subdir}/.factory/logs \
+                      /workspace/{workspace_subdir}/.gemini/logs \
+                      /workspace/{workspace_subdir}/.cursor-agent/logs \
+                      /workspace/{workspace_subdir}/.kimi/logs \
+                      /workspace/{workspace_subdir}/.local/share/opencode/log \
+                      /workspace/{workspace_subdir}/.copilot/logs \
+                      /workspace/{workspace_subdir}/.pi/logs && \
+             chown -R 1000:1000 /workspace/runs && chmod -R ug+rwX /workspace/runs"
         );
         let mut init_containers = vec![json!({
             "name": "setup-workspace",

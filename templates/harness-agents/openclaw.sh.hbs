@@ -47,6 +47,21 @@ mkdir -p "$HOME"
 mkdir -p /tmp/npm-cache
 export npm_config_cache=/tmp/npm-cache
 
+# Capture the workspace subdir (container starts in /workspace/{subdir})
+WORKSPACE_DIR="$(pwd)"
+
+# Symlink CLI log directories from HOME to workspace so that:
+#   - CLI tools writing to ~/.claude/logs/ land on the workspace PVC
+#   - Promtail sidecar finds them at /workspace/{subdir}/.claude/logs/
+#   - DD stdout tailing finds them at the same path
+for cli_dir in .claude .codex .factory .gemini .cursor-agent .kimi .copilot .pi .local; do
+  src="$WORKSPACE_DIR/$cli_dir"
+  dest="$HOME/$cli_dir"
+  if [ -d "$src" ] && [ ! -e "$dest" ]; then
+    ln -sfn "$src" "$dest"
+  fi
+done
+
 for f in /etc/profile.d/*.sh; do
   [ -f "$f" ] && source "$f"
 done
@@ -389,28 +404,29 @@ CLI_TAILED_FILE="/tmp/cli-tailed-files"
 
 # Pre-create the expected log directory for this CLI type so the watcher
 # can detect files as soon as the ACP runtime writes them.
+# (Init container already creates these, but ensure they exist.)
 case "{{cli_type}}" in
-  claude)   mkdir -p /workspace/.claude/logs ;;
-  codex)    mkdir -p /workspace/.codex/logs ;;
-  factory)  mkdir -p /workspace/.factory/logs ;;
-  gemini)   mkdir -p /workspace/.gemini/logs ;;
-  cursor)   mkdir -p /workspace/.cursor-agent/logs ;;
-  kimi)     mkdir -p /workspace/.kimi/logs ;;
-  opencode) mkdir -p /workspace/.local/share/opencode/log ;;
-  copilot)  mkdir -p /workspace/.copilot/logs ;;
+  claude)   mkdir -p "$WORKSPACE_DIR/.claude/logs" ;;
+  codex)    mkdir -p "$WORKSPACE_DIR/.codex/logs" ;;
+  factory)  mkdir -p "$WORKSPACE_DIR/.factory/logs" ;;
+  gemini)   mkdir -p "$WORKSPACE_DIR/.gemini/logs" ;;
+  cursor)   mkdir -p "$WORKSPACE_DIR/.cursor-agent/logs" ;;
+  kimi)     mkdir -p "$WORKSPACE_DIR/.kimi/logs" ;;
+  opencode) mkdir -p "$WORKSPACE_DIR/.local/share/opencode/log" ;;
+  copilot)  mkdir -p "$WORKSPACE_DIR/.copilot/logs" ;;
 esac
 
 (
   while [ ! -f /workspace/.agent_done ]; do
     for cli_log_dir in \
-      /workspace/.claude/logs \
-      /workspace/.factory/logs \
-      /workspace/.codex/logs \
-      /workspace/.gemini/logs \
-      /workspace/.cursor-agent/logs \
-      /workspace/.kimi/logs \
-      /workspace/.local/share/opencode/log \
-      /workspace/.copilot/logs; do
+      "$WORKSPACE_DIR/.claude/logs" \
+      "$WORKSPACE_DIR/.factory/logs" \
+      "$WORKSPACE_DIR/.codex/logs" \
+      "$WORKSPACE_DIR/.gemini/logs" \
+      "$WORKSPACE_DIR/.cursor-agent/logs" \
+      "$WORKSPACE_DIR/.kimi/logs" \
+      "$WORKSPACE_DIR/.local/share/opencode/log" \
+      "$WORKSPACE_DIR/.copilot/logs"; do
       [ -d "$cli_log_dir" ] || continue
       for f in "$cli_log_dir"/*.log; do
         [ -f "$f" ] || continue
