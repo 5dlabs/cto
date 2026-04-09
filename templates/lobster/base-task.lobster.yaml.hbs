@@ -90,6 +90,10 @@ steps:
         if [ "$CLI_TYPE" = "opencode" ]; then
           ACPX_MODEL="fireworks-ai/$FW_MODEL"
         fi
+        # Kimi CLI: set_session_model uses the config model key, not raw ID
+        if [ "$CLI_TYPE" = "kimi" ]; then
+          ACPX_MODEL="kimi-k2p5-turbo"
+        fi
       fi
 
       # Cursor: uses CURSOR_API_KEY, model resolved internally

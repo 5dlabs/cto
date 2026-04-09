@@ -64,12 +64,28 @@ done
 
 # Kimi CLI requires a persisted OAuth token to pass _check_auth.
 # Write one using the Fireworks API key so sessions can be created.
+# Also write the provider config so Kimi routes through Fireworks.
 if [ "{{cli_type}}" = "kimi" ] && [ -n "${FIREWORKS_API_KEY:-}" ]; then
   mkdir -p "$HOME/.kimi/credentials"
   cat > "$HOME/.kimi/credentials/kimi-code.json" <<KIMIEOF
 {"access_token":"${FIREWORKS_API_KEY}","refresh_token":"","expires_at":4102444800.0,"scope":"","token_type":"Bearer"}
 KIMIEOF
   chmod 600 "$HOME/.kimi/credentials/kimi-code.json"
+
+  # Write provider config (Kimi reads from workspace .kimi/config.toml)
+  cat > "$HOME/.kimi/config.toml" <<'KIMICFG'
+[providers.fireworks]
+type = "anthropic"
+base_url = "https://api.fireworks.ai/inference"
+api_key_env = "FIREWORKS_API_KEY"
+
+[models.kimi-k2p5-turbo]
+provider = "fireworks"
+model = "accounts/fireworks/routers/kimi-k2p5-turbo"
+max_context_size = 131072
+
+default_model = "kimi-k2p5-turbo"
+KIMICFG
 fi
 
 for f in /etc/profile.d/*.sh; do
