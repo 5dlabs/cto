@@ -909,13 +909,8 @@ impl<'a> CodeResourceManager<'a> {
                 "subPath": "copilot-config.json"
             }));
         }
-        if cli_type == CLIType::Kimi {
-            volume_mounts.push(json!({
-                "name": "task-files",
-                "mountPath": "/home/node/.kimi/config.toml",
-                "subPath": "kimi-config.toml"
-            }));
-        }
+        // Kimi config + OAuth token written by harness at startup
+        // (can't use subPath mount — blocks credentials dir creation)
         if cli_type == CLIType::OpenCode {
             volume_mounts.push(json!({
                 "name": "task-files",
