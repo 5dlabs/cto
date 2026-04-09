@@ -24,8 +24,11 @@ GW_PID=""
 TAIL_PIDS=""
 cleanup() {
   echo "[harness] Caught signal, cleaning up..."
-  # Kill log tailers first
+  # Kill log tailers (parent-tracked + file-tracked CLI tails)
   for pid in $TAIL_PIDS; do kill "$pid" 2>/dev/null || true; done
+  if [ -f "/tmp/cli-tail-pids" ]; then
+    while read -r pid; do kill "$pid" 2>/dev/null || true; done < "/tmp/cli-tail-pids"
+  fi
   # Always write agent_done sentinel so sidecars can exit
   echo "interrupted" > /workspace/.agent_done 2>/dev/null || true
   [ -n "$GW_PID" ] && kill "$GW_PID" 2>/dev/null || true
@@ -376,7 +379,27 @@ else
   echo "[harness] ⚠️ Gateway log not found at $GATEWAY_LOG"
 fi
 
-# Background watcher: tail CLI logs as they appear during the run
+# Background watcher: tail ACP CLI logs as they appear during the run.
+# Uses a PID file (not shell variable) so parent can clean up tail processes
+# that are spawned inside the background watcher subshell.
+CLI_TAIL_PIDS_FILE="/tmp/cli-tail-pids"
+CLI_TAILED_FILE="/tmp/cli-tailed-files"
+: > "$CLI_TAIL_PIDS_FILE"
+: > "$CLI_TAILED_FILE"
+
+# Pre-create the expected log directory for this CLI type so the watcher
+# can detect files as soon as the ACP runtime writes them.
+case "{{cli_type}}" in
+  claude)   mkdir -p /workspace/.claude/logs ;;
+  codex)    mkdir -p /workspace/.codex/logs ;;
+  factory)  mkdir -p /workspace/.factory/logs ;;
+  gemini)   mkdir -p /workspace/.gemini/logs ;;
+  cursor)   mkdir -p /workspace/.cursor-agent/logs ;;
+  kimi)     mkdir -p /workspace/.kimi/logs ;;
+  opencode) mkdir -p /workspace/.local/share/opencode/log ;;
+  copilot)  mkdir -p /workspace/.copilot/logs ;;
+esac
+
 (
   while [ ! -f /workspace/.agent_done ]; do
     for cli_log_dir in \
@@ -388,14 +411,17 @@ fi
       /workspace/.kimi/logs \
       /workspace/.local/share/opencode/log \
       /workspace/.copilot/logs; do
-      if [ -d "$cli_log_dir" ] && ! echo "$_TAILED_DIRS" | grep -q "$cli_log_dir"; then
-        echo "[harness] 📋 Tailing CLI logs: $cli_log_dir → stdout"
-        tail -f "$cli_log_dir"/*.log 2>/dev/null &
-        TAIL_PIDS="$TAIL_PIDS $!"
-        _TAILED_DIRS="$_TAILED_DIRS $cli_log_dir"
-      fi
+      [ -d "$cli_log_dir" ] || continue
+      for f in "$cli_log_dir"/*.log; do
+        [ -f "$f" ] || continue
+        grep -qxF "$f" "$CLI_TAILED_FILE" && continue
+        echo "$f" >> "$CLI_TAILED_FILE"
+        echo "[harness] 📋 Tailing ACP log: $f → stdout (DD collection)"
+        tail -f "$f" &
+        echo $! >> "$CLI_TAIL_PIDS_FILE"
+      done
     done
-    sleep 5
+    sleep 1
   done
 ) &
 CLI_WATCHER_PID=$!
@@ -430,8 +456,11 @@ echo "[harness] ═════════════════════�
 
 # ─── Shutdown ──────────────────────────────────────────────────────────
 echo "[harness] Shutting down gateway..."
-# Stop log tailers first
+# Stop log tailers: parent-tracked PIDs + file-tracked CLI tail PIDs
 for pid in $TAIL_PIDS; do kill "$pid" 2>/dev/null || true; done
+if [ -f "$CLI_TAIL_PIDS_FILE" ]; then
+  while read -r pid; do kill "$pid" 2>/dev/null || true; done < "$CLI_TAIL_PIDS_FILE"
+fi
 openclaw gateway stop 2>/dev/null || true
 sleep 2
 kill "$GW_PID" 2>/dev/null || true
