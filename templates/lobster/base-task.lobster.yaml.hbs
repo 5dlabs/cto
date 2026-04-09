@@ -101,13 +101,9 @@ steps:
         export CURSOR_API_KEY
       fi
 
-      # Copilot: BYOK via Fireworks (Anthropic-compatible endpoint)
-      if [ "$CLI_TYPE" = "copilot" ] && [ -n "${FIREWORKS_API_KEY:-}" ]; then
-        export COPILOT_PROVIDER_BASE_URL="https://api.fireworks.ai/inference/v1"
-        export COPILOT_PROVIDER_TYPE="openai"
-        export COPILOT_PROVIDER_API_KEY="$FIREWORKS_API_KEY"
-        export COPILOT_PROVIDER_WIRE_MODEL="$ACPX_MODEL"
-        export COPILOT_MODEL="$ACPX_MODEL"
+      # Copilot: BYOK via Fireworks — use known model ID for acpx
+      if [ "$CLI_TYPE" = "copilot" ]; then
+        ACPX_MODEL="${COPILOT_MODEL:-gpt-4}"
       fi
 
       export ACPX_MODEL
@@ -124,8 +120,8 @@ steps:
       ACPX_CMD="$ACPX_CMD --verbose"
       ACPX_CMD="$ACPX_CMD --auth-policy skip"
 
-      # Model flag (skip for cursor/copilot — they resolve models via env vars)
-      if [ -n "$ACPX_MODEL" ] && [ "$ACPX_AGENT" != "cursor" ] && [ "$ACPX_AGENT" != "copilot" ]; then
+      # Model flag (skip for cursor — resolves model internally)
+      if [ -n "$ACPX_MODEL" ] && [ "$ACPX_AGENT" != "cursor" ]; then
         ACPX_CMD="$ACPX_CMD --model $ACPX_MODEL"
       fi
 

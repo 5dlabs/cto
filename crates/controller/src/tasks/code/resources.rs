@@ -1245,6 +1245,8 @@ impl<'a> CodeResourceManager<'a> {
         }
 
         // Copilot: BYOK via Fireworks — set provider env vars so copilot skips GitHub auth
+        // COPILOT_PROVIDER_MODEL_ID uses a known model (gpt-4) for config/token limits,
+        // while COPILOT_PROVIDER_WIRE_MODEL sends the actual Fireworks model to the API.
         if cli_type == CLIType::Copilot {
             let model = &code_run.spec.model;
             critical_env_vars.push(json!({
@@ -1259,10 +1261,16 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "COPILOT_PROVIDER_API_KEY",
                 "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
             }));
+            // Use a well-known model ID so Copilot's internals recognize it
             critical_env_vars.push(json!({
                 "name": "COPILOT_MODEL",
-                "value": model
+                "value": "gpt-4"
             }));
+            critical_env_vars.push(json!({
+                "name": "COPILOT_PROVIDER_MODEL_ID",
+                "value": "gpt-4"
+            }));
+            // The wire model is what actually gets sent to Fireworks
             critical_env_vars.push(json!({
                 "name": "COPILOT_PROVIDER_WIRE_MODEL",
                 "value": model
