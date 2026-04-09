@@ -1244,16 +1244,17 @@ impl<'a> CodeResourceManager<'a> {
             }));
         }
 
-        // Copilot: BYOK via Fireworks — set provider env vars so copilot skips GitHub auth
-        // COPILOT_OFFLINE disables all GitHub API calls (auth, MCP, telemetry) while
-        // still allowing BYOK provider access. Without this, Copilot generates a token
-        // from GITHUB_APP_ID/PRIVATE_KEY and tries GitHub API endpoints that reject it.
+        // Copilot: BYOK via Fireworks + GitHub auth token for ACP sessions.
+        // The ACP server requires a valid GitHub token with copilot scope for session/new.
+        // COPILOT_GITHUB_TOKEN provides that. BYOK env vars route inference to Fireworks.
         if cli_type == CLIType::Copilot {
             let model = &code_run.spec.model;
+            // GitHub auth for ACP sessions
             critical_env_vars.push(json!({
-                "name": "COPILOT_OFFLINE",
-                "value": "true"
+                "name": "COPILOT_GITHUB_TOKEN",
+                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "COPILOT_GITHUB_TOKEN" } }
             }));
+            // BYOK provider env vars for Fireworks inference
             critical_env_vars.push(json!({
                 "name": "COPILOT_PROVIDER_BASE_URL",
                 "value": "https://api.fireworks.ai/inference/v1"
