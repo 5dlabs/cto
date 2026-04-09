@@ -21,6 +21,19 @@ steps:
       # Fix root-owned .gitconfig from image build
       [ -f "$HOME/.gitconfig" ] && [ ! -w "$HOME/.gitconfig" ] && rm -f "$HOME/.gitconfig" 2>/dev/null || true
       {{> github-auth}}
+      # Persist env vars for subsequent steps (each step runs in a new shell)
+      cat > /workspace/.task-env <<ENVEOF
+      export GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+      export GH_TOKEN="${GH_TOKEN:-}"
+      export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME}"
+      export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL}"
+      export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME}"
+      export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL}"
+      export GIT_TERMINAL_PROMPT=0
+      export GITHUB_APP_PRIVATE_KEY_FILE="${GITHUB_APP_PRIVATE_KEY_FILE:-}"
+      export npm_config_cache="${npm_config_cache:-/tmp/npm-cache}"
+      export HOME="${HOME:-/tmp/agent-home}"
+      ENVEOF
       echo "✅ GitHub auth complete"
       STEP
 
@@ -30,7 +43,17 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
       {{> git-setup}}
+      # Persist git vars for subsequent steps
+      cat >> /workspace/.task-env <<ENVEOF
+      export FEATURE_BRANCH="${FEATURE_BRANCH}"
+      export BASE_BRANCH="${BASE_BRANCH}"
+      export REPO_ROOT="${REPO_ROOT}"
+      export CLI_WORK_DIR="${CLI_WORK_DIR}"
+      export CLAUDE_WORK_DIR="${CLAUDE_WORK_DIR}"
+      export DOCS_PROJECT_DIR="${DOCS_PROJECT_DIR:-}"
+      ENVEOF
       echo "✅ Git setup complete"
       STEP
 
@@ -40,6 +63,7 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
 
       # ── CLI → acpx agent mapping ──
       CLI_TYPE="{{cli_type}}"
@@ -71,7 +95,8 @@ steps:
       export ACPX_MODEL
 
       # ── Build the base acpx command ──
-      WORK_DIR="${CLAUDE_WORK_DIR:-/workspace}/{{service}}"
+      # CLAUDE_WORK_DIR already includes the repo path from git-setup
+      WORK_DIR="${CLAUDE_WORK_DIR:-/workspace}"
       ACPX_CMD="acpx"
       ACPX_CMD="$ACPX_CMD --cwd $WORK_DIR"
       ACPX_CMD="$ACPX_CMD --approve-all"
@@ -88,6 +113,13 @@ steps:
 
       export ACPX_CMD
 
+      # Persist acpx vars for subsequent steps
+      cat >> /workspace/.task-env <<ENVEOF
+      export ACPX_AGENT="${ACPX_AGENT}"
+      export ACPX_MODEL="${ACPX_MODEL}"
+      export ACPX_CMD="${ACPX_CMD}"
+      ENVEOF
+
       echo "✅ acpx env ready"
       echo "   ACPX_AGENT=$ACPX_AGENT"
       echo "   ACPX_MODEL=$ACPX_MODEL"
@@ -100,7 +132,12 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
-      REPO_ROOT="${CLAUDE_WORK_DIR:-/workspace}/{{service}}"
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
+      # Ensure npm cache is writable (nested npx calls need this)
+      export npm_config_cache="${npm_config_cache:-/tmp/npm-cache}"
+      export HOME="${HOME:-/tmp/agent-home}"
+      # REPO_ROOT is already set by git-setup in .task-env
+      REPO_ROOT="${REPO_ROOT:-${CLAUDE_WORK_DIR:-/workspace}}"
       cd "$REPO_ROOT"
 
       TASK_ID="{{task_id}}"
@@ -157,7 +194,8 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
-      REPO_ROOT="${CLAUDE_WORK_DIR:-/workspace}/{{service}}"
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
+      REPO_ROOT="${REPO_ROOT:-${CLAUDE_WORK_DIR:-/workspace}}"
       cd "$REPO_ROOT"
 
       if [ -z "$(git status --porcelain 2>/dev/null)" ]; then
@@ -168,16 +206,23 @@ steps:
       BRANCH=$(git branch --show-current)
       git add -A
       git commit -m "{{agent_name}}: task completion" -m "Co-authored-by: {{agent_name}} <{{agent_name}}@5dlabs.ai>"
-      git push origin "$BRANCH"
+      git push --force-with-lease origin "$BRANCH"
 
       PR_TITLE="{{agent_name}}: $(head -1 /task-files/prompt.md 2>/dev/null || echo 'task completion')"
-      gh pr create \
+      PR_OUTPUT=$(gh pr create \
         --title "$PR_TITLE" \
         --body "Automated task by {{agent_name}} ({{cli_type}})." \
-        --base main --head "$BRANCH" \
-        || echo "PR create failed (may already exist)"
-
-      echo "✅ PR created"
+        --base main --head "$BRANCH" 2>&1) && {
+        # Extract PR URL from gh output (last line is the URL)
+        PR_URL=$(echo "$PR_OUTPUT" | grep -oE 'https://github.com/[^ ]+' | tail -1)
+        echo "$PR_URL" > /workspace/.pr-url
+        echo "✅ PR created: $PR_URL"
+      } || {
+        # PR may already exist — try to get existing URL
+        PR_URL=$(gh pr list --head "$BRANCH" --json url --jq '.[0].url' 2>/dev/null || echo "")
+        [ -n "$PR_URL" ] && echo "$PR_URL" > /workspace/.pr-url
+        echo "ℹ️ PR already exists: ${PR_URL:-unknown}"
+      }
       STEP
 
   # ─── Discord Notification ───────────────────────────────────────────
@@ -186,11 +231,13 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
 
       AGENT="{{agent_name}}"
       AGENT_UPPER=$(echo "$AGENT" | tr '[:lower:]' '[:upper:]')
       CLI="{{cli_type}}"
       TASK_ID="{{task_id}}"
+      MODEL="{{model}}"
 
       # Per-agent Discord: DISCORD_TOKEN_<AGENT> + DISCORD_CHANNEL_<AGENT>
       TOKEN_VAR="DISCORD_TOKEN_${AGENT_UPPER}"
@@ -198,24 +245,85 @@ steps:
       AGENT_TOKEN="${!TOKEN_VAR:-}"
       AGENT_CHANNEL="${!CHANNEL_VAR:-}"
 
-      # Get PR URL if available
-      PR_URL=$(gh pr list --head "$(git branch --show-current 2>/dev/null)" --json url --jq '.[0].url' 2>/dev/null || echo "")
+      # Get PR URL
+      PR_URL=""
+      REPO_ROOT="${REPO_ROOT:-${CLAUDE_WORK_DIR:-/workspace}}"
+      if [ -f /workspace/.pr-url ]; then
+        PR_URL=$(cat /workspace/.pr-url)
+      elif [ -d "$REPO_ROOT/.git" ]; then
+        cd "$REPO_ROOT"
+        BRANCH=$(git branch --show-current 2>/dev/null || echo "")
+        if [ -n "$BRANCH" ] && [ -n "${GH_TOKEN:-}" ]; then
+          PR_URL=$(gh pr list --head "$BRANCH" --json url --jq '.[0].url' 2>/dev/null || echo "")
+        fi
+      fi
 
-      # Try per-agent Discord bot API first
+      # Collect PR diff stats (best-effort)
+      ADDITIONS="0"
+      DELETIONS="0"
+      FILES_CHANGED=""
+      FILE_COUNT="0"
+      if [ -d "$REPO_ROOT/.git" ]; then
+        cd "$REPO_ROOT"
+        BASE="${BASE_BRANCH:-main}"
+        FILES_CHANGED=$(git diff --name-only "$BASE"..HEAD 2>/dev/null | head -15 || true)
+        ADDITIONS=$(git diff --numstat "$BASE"..HEAD 2>/dev/null | awk '{s+=$1} END{print s+0}' || echo "0")
+        DELETIONS=$(git diff --numstat "$BASE"..HEAD 2>/dev/null | awk '{s+=$2} END{print s+0}' || echo "0")
+        FILE_COUNT=$(echo "$FILES_CHANGED" | grep -c '.' 2>/dev/null || echo "0")
+      fi
+
+      # Build file list for embed (truncated)
+      FILES_BLOCK=""
+      if [ -n "$FILES_CHANGED" ]; then
+        FILES_BLOCK=$(echo "$FILES_CHANGED" | head -10 | tr '\n' ',' | sed 's/,$//')
+        if [ "$FILE_COUNT" -gt 10 ] 2>/dev/null; then
+          EXTRA=$((FILE_COUNT - 10))
+          FILES_BLOCK="${FILES_BLOCK}, +${EXTRA} more"
+        fi
+      fi
+
+      TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
       if [ -n "$AGENT_TOKEN" ] && [ -n "$AGENT_CHANNEL" ]; then
-        curl -s -X POST "https://discord.com/api/v10/channels/${AGENT_CHANNEL}/messages" \
-          -H "Authorization: Bot ${AGENT_TOKEN}" \
-          -H "Content-Type: application/json" \
-          -d "{\"content\": \"✅ **${AGENT}** completed task ${TASK_ID} (${CLI})\n${PR_URL:-no PR}\"}" > /dev/null
-        echo "📨 Discord notified (agent channel)"
+        # Build embed JSON with a temp Python script (avoids YAML indentation issues)
+        cat > /tmp/discord_embed.py <<PYEOF
+      import json, sys
+      fields = []
+      fields.append({"name": "CLI / Model", "value": "**$CLI** · \`$MODEL\`", "inline": False})
+      fields.append({"name": "Changes", "value": "+**$ADDITIONS** −**$DELETIONS** across **$FILE_COUNT** files", "inline": True})
+      pr_url = "$PR_URL"
+      if pr_url:
+          fields.append({"name": "Pull Request", "value": pr_url, "inline": False})
+      files = "$FILES_BLOCK"
+      if files:
+          fields.append({"name": "Files", "value": "\`\`\`" + files[:900] + "\`\`\`", "inline": False})
+      payload = {"embeds": [{"title": "✅ $AGENT completed task $TASK_ID", "color": 3066993, "timestamp": "$TIMESTAMP", "fields": fields}]}
+      print(json.dumps(payload))
+      PYEOF
 
-      # Fallback: general webhook
+        EMBED_JSON=$(python3 /tmp/discord_embed.py 2>/dev/null || echo "")
+
+        if [ -n "$EMBED_JSON" ]; then
+          curl -sf -X POST "https://discord.com/api/v10/channels/${AGENT_CHANNEL}/messages" \
+            -H "Authorization: Bot ${AGENT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$EMBED_JSON" > /dev/null && echo "📨 Discord notified (rich embed)" || echo "⚠️ Discord post failed"
+        else
+          # Fallback to plain text
+          MSG=$(printf '{"content":"✅ **%s** completed task %s\\n**CLI:** %s | **Model:** %s\\n%s"}' "$AGENT" "$TASK_ID" "$CLI" "$MODEL" "${PR_URL:-no PR}")
+          curl -sf -X POST "https://discord.com/api/v10/channels/${AGENT_CHANNEL}/messages" \
+            -H "Authorization: Bot ${AGENT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$MSG" > /dev/null
+          echo "📨 Discord notified (plain text fallback)"
+        fi
+
       elif [ -n "${DISCORD_WEBHOOK_URL:-}" ]; then
-        curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+        MSG=$(printf '{"embeds":[{"title":"✅ %s completed task %s","description":"**CLI:** %s\\n**Model:** %s\\n**PR:** %s","color":3066993,"timestamp":"%s"}]}' "$AGENT" "$TASK_ID" "$CLI" "$MODEL" "${PR_URL:-none}" "$TIMESTAMP")
+        curl -sf -X POST "$DISCORD_WEBHOOK_URL" \
           -H "Content-Type: application/json" \
-          -d "{\"embeds\":[{\"title\":\"✅ ${AGENT} completed task ${TASK_ID}\",\"description\":\"**CLI:** ${CLI}\n**PR:** ${PR_URL:-none}\",\"color\":3066993,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}]}" > /dev/null
+          -d "$MSG" > /dev/null
         echo "📨 Discord notified (webhook)"
-
       else
         echo "ℹ️ No Discord config — skipping"
       fi

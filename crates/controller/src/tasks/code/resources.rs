@@ -1239,6 +1239,9 @@ impl<'a> CodeResourceManager<'a> {
         // OpenClaw requires a valid TZ — containers default to Etc/Unknown which crashes the logger
         final_env_vars.push(json!({ "name": "TZ", "value": "UTC" }));
 
+        // Disable xAI code_execution tool (cto-secrets has a placeholder XAI_API_KEY)
+        final_env_vars.push(json!({ "name": "XAI_API_KEY", "value": "" }));
+
         // Fireworks model routing: when the model ID contains "fireworks", set
         // ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN so the acpx/Claude Code
         // backend routes through Fireworks' Anthropic-compatible API.
@@ -1253,12 +1256,23 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "ANTHROPIC_AUTH_TOKEN",
                 "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
             }));
+            // Claude Code uses ANTHROPIC_API_KEY for auth — override with Fireworks key
+            // when routing through Fireworks' Anthropic-compatible endpoint
+            final_env_vars.push(json!({
+                "name": "ANTHROPIC_API_KEY",
+                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
+            }));
+            // litellm (used by ACP bridge) expects FIREWORKS_AI_API_KEY
+            final_env_vars.push(json!({
+                "name": "FIREWORKS_AI_API_KEY",
+                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
+            }));
             final_env_vars.push(json!({ "name": "ANTHROPIC_MODEL", "value": raw_model_id }));
             final_env_vars.push(json!({ "name": "ANTHROPIC_SMALL_FAST_MODEL", "value": raw_model_id }));
             final_env_vars.push(json!({ "name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": raw_model_id }));
             final_env_vars.push(json!({ "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL", "value": raw_model_id }));
             final_env_vars.push(json!({ "name": "ANTHROPIC_DEFAULT_OPUS_MODEL", "value": raw_model_id }));
-            info!("Fireworks model detected — set ANTHROPIC_BASE_URL and AUTH_TOKEN for acpx backend");
+            info!("Fireworks model detected — set ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY, AUTH_TOKEN, and FIREWORKS_AI_API_KEY");
         }
 
         // Final deduplication pass to handle any remaining duplicates from critical vars and Docker
@@ -1746,10 +1760,29 @@ scrape_configs:
                 "emptyDir": {}
             }));
 
+            // Promtail watches /workspace/.agent_done and self-terminates after the
+            // main agent container exits, matching the docker-daemon sidecar pattern.
             let promtail_container = json!({
                 "name": "promtail",
                 "image": "grafana/promtail:latest",
-                "args": ["-config.file=/etc/promtail/promtail.yaml"],
+                "command": ["/bin/sh", "-c"],
+                "args": [
+                    "/usr/bin/promtail -config.file=/etc/promtail/promtail.yaml & PROM_PID=$!; \
+                     while true; do \
+                       if [ -f /workspace/.agent_done ]; then \
+                         echo '[promtail] Agent done signal detected, flushing and stopping...'; \
+                         sleep 10; \
+                         kill -TERM $PROM_PID 2>/dev/null || true; \
+                         wait $PROM_PID 2>/dev/null; \
+                         exit 0; \
+                       fi; \
+                       if ! kill -0 $PROM_PID 2>/dev/null; then \
+                         echo '[promtail] Promtail exited unexpectedly'; \
+                         exit 1; \
+                       fi; \
+                       sleep 5; \
+                     done"
+                ],
                 "resources": {
                     "requests": { "cpu": "10m", "memory": "32Mi" },
                     "limits": { "cpu": "100m", "memory": "64Mi" }
@@ -1916,6 +1949,22 @@ scrape_configs:
             pod_spec["imagePullSecrets"] = json!(secrets);
         }
 
+        // Datadog autodiscovery annotations for container log collection
+        // With containerCollectAll:true, DD collects all containers automatically.
+        // The annotation adds source/service/tags metadata and multi-line detection.
+        let dd_agent_name = labels.get("agent").cloned().unwrap_or_else(|| "unknown".to_string());
+        let dd_task_id = code_run.spec.task_id.unwrap_or(0);
+        let dd_service = format!("cto-coderun-{}", dd_agent_name);
+        let mut dd_annotations = serde_json::Map::new();
+        dd_annotations.insert(
+            "ad.datadoghq.com/all-containers.logs".to_string(),
+            json!(format!(
+                "[{{\"source\":\"cto-coderun\",\"service\":\"{}\",\"auto_multi_line_detection\":true,\"tags\":[\"agent:{}\",\"model:{}\",\"task:{}\"]}}]",
+                dd_service, dd_agent_name, &code_run.spec.model, dd_task_id
+            )),
+        );
+        let dd_annotations = serde_json::Value::Object(dd_annotations);
+
         let mut job_spec = json!({
             "apiVersion": "batch/v1",
             "kind": "Job",
@@ -1935,7 +1984,10 @@ scrape_configs:
                 "backoffLimit": 0,
                 "activeDeadlineSeconds": 86400,  // 24-hour ultimate safety net (tasks can legitimately run for hours)
                 "template": {
-                    "metadata": { "labels": labels },
+                    "metadata": {
+                        "labels": labels,
+                        "annotations": dd_annotations
+                    },
                     "spec": pod_spec
                 }
             }
@@ -2176,6 +2228,25 @@ scrape_configs:
         labels.insert(
             "cli-container".to_string(),
             Self::sanitize_label_value(&container_label),
+        );
+
+        // Datadog unified service tagging — lets DD filter CodeRun pods distinctly
+        // Extract agent name from GitHub app (e.g., "5DLabs-Rex" → "rex")
+        let agent_name = code_run
+            .spec
+            .github_app
+            .as_ref()
+            .and_then(|app| AgentClassifier::new().extract_agent_name(app).ok())
+            .map(|n| n.to_lowercase())
+            .unwrap_or_else(|| "unknown".to_string());
+        labels.insert("agent".to_string(), Self::sanitize_label_value(&agent_name));
+        labels.insert(
+            "tags.datadoghq.com/service".to_string(),
+            format!("cto-coderun-{}", Self::sanitize_label_value(&agent_name)),
+        );
+        labels.insert(
+            "tags.datadoghq.com/env".to_string(),
+            "production".to_string(),
         );
 
         // Add Linear session labels for pod discovery (used by PM server for routing input)

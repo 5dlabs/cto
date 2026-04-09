@@ -252,7 +252,7 @@ impl CodeTemplateGenerator {
 
         // Render the Lobster base-task workflow (replaces the old container.sh flow)
         templates.insert(
-            "base-task.lobster.yaml".to_string(),
+            "base-task.lobster".to_string(),
             Self::generate_lobster_base_task(code_run, &enriched_cli_config, config)?,
         );
 
@@ -1389,6 +1389,8 @@ impl CodeTemplateGenerator {
             "prompt_modification": code_run.spec.prompt_modification.as_deref().unwrap_or(""),
             "repository_url": code_run.spec.repository_url,
             "github_app": Self::get_github_app_or_default(code_run),
+            "task_id": code_run.spec.task_id.unwrap_or(0),
+            "service": &code_run.spec.service,
         });
 
         handlebars
