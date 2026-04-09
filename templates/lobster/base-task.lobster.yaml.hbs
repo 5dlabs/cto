@@ -152,6 +152,12 @@ steps:
       exec bash <<'STEP'
       set -euo pipefail
       [ -f /workspace/.task-env ] && source /workspace/.task-env
+      # Copilot BYOK: unset GitHub vars so copilot subprocess runs in pure offline mode
+      if [ "${CLI_TYPE:-}" = "copilot" ]; then
+        unset GH_TOKEN GITHUB_TOKEN COPILOT_GITHUB_TOKEN 2>/dev/null || true
+        unset GITHUB_APP_ID GITHUB_APP_PRIVATE_KEY GITHUB_APP_INSTALLATION_ID 2>/dev/null || true
+        unset GITHUB_APP_PRIVATE_KEY_FILE 2>/dev/null || true
+      fi
       # Ensure npm cache is writable (nested npx calls need this)
       export npm_config_cache="${npm_config_cache:-/tmp/npm-cache}"
       export HOME="${HOME:-/tmp/agent-home}"
