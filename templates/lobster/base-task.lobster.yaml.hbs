@@ -20,6 +20,11 @@ steps:
       set -euo pipefail
       # Fix root-owned .gitconfig from image build
       [ -f "$HOME/.gitconfig" ] && [ ! -w "$HOME/.gitconfig" ] && rm -f "$HOME/.gitconfig" 2>/dev/null || true
+      # Copilot BYOK: restore GitHub App vars saved by harness (they were
+      # unset to keep the copilot subprocess clean)
+      if [ -f /workspace/.github-app-env ]; then
+        source /workspace/.github-app-env
+      fi
       {{> github-auth}}
       # Persist env vars for subsequent steps (each step runs in a new shell)
       cat > /workspace/.task-env <<ENVEOF

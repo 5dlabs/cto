@@ -1244,17 +1244,16 @@ impl<'a> CodeResourceManager<'a> {
             }));
         }
 
-        // Copilot: BYOK via Fireworks + GitHub auth token for ACP sessions.
-        // The ACP server requires a valid GitHub token with copilot scope for session/new.
-        // COPILOT_GITHUB_TOKEN provides that. BYOK env vars route inference to Fireworks.
+        // Copilot: BYOK via Fireworks in offline mode.
+        // COPILOT_OFFLINE prevents all GitHub API calls. BYOK env vars route inference
+        // to Fireworks. The harness also unsets GITHUB_APP_* vars so the copilot
+        // subprocess doesn't try GitHub App auth.
         if cli_type == CLIType::Copilot {
             let model = &code_run.spec.model;
-            // GitHub auth for ACP sessions
             critical_env_vars.push(json!({
-                "name": "COPILOT_GITHUB_TOKEN",
-                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "COPILOT_GITHUB_TOKEN" } }
+                "name": "COPILOT_OFFLINE",
+                "value": "true"
             }));
-            // BYOK provider env vars for Fireworks inference
             critical_env_vars.push(json!({
                 "name": "COPILOT_PROVIDER_BASE_URL",
                 "value": "https://api.fireworks.ai/inference/v1"
@@ -1267,7 +1266,6 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "COPILOT_PROVIDER_API_KEY",
                 "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
             }));
-            // Use a well-known model ID so Copilot's internals recognize it
             critical_env_vars.push(json!({
                 "name": "COPILOT_MODEL",
                 "value": "gpt-4"
@@ -1276,7 +1274,6 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "COPILOT_PROVIDER_MODEL_ID",
                 "value": "gpt-4"
             }));
-            // The wire model is what actually gets sent to Fireworks
             critical_env_vars.push(json!({
                 "name": "COPILOT_PROVIDER_WIRE_MODEL",
                 "value": model
