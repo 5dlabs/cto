@@ -348,8 +348,11 @@ echo "✅ Workspace files written (AGENTS, SOUL, IDENTITY, USER, TOOLS, HEARTBEA
 rm -f /workspace/BOOT.md /workspace/.agent_done /workspace/.pr-url
 
 # Copy base-task workflow into workspace (.tasks/index.lobster.yaml is lobster's expected entrypoint)
-mkdir -p /workspace/.tasks
+# WORKSPACE_DIR is the run subdirectory (e.g. /workspace/runs/<coderun>/) — lobster resolves
+# .tasks/ relative to the working directory, so place it there AND at /workspace root.
+mkdir -p /workspace/.tasks "$WORKSPACE_DIR/.tasks"
 cp /task-files/base-task.lobster /workspace/.tasks/index.lobster.yaml 2>/dev/null || true
+cp /task-files/base-task.lobster "$WORKSPACE_DIR/.tasks/index.lobster.yaml" 2>/dev/null || true
 
 # ─── Step 4: Start gateway + run lobster workflow ──────────────────────
 echo "[harness] Step 3: Starting gateway + lobster workflow..."
@@ -445,11 +448,11 @@ TAIL_PIDS="$TAIL_PIDS $CLI_WATCHER_PID"
 echo "[harness] ════════════════════════════════════════════════════"
 echo "[harness] Running lobster workflow (direct execution)..."
 echo "[harness] ════════════════════════════════════════════════════"
-cd /workspace
+cd "$WORKSPACE_DIR"
 
 # Log directory for ACP/lobster output (captured by Datadog via container stdout + file)
-mkdir -p /workspace/.agent-logs
-LOBSTER_LOG="/workspace/.agent-logs/lobster-$(date -u +%Y%m%dT%H%M%SZ).log"
+mkdir -p "$WORKSPACE_DIR/.agent-logs"
+LOBSTER_LOG="$WORKSPACE_DIR/.agent-logs/lobster-$(date -u +%Y%m%dT%H%M%SZ).log"
 
 set +e  # Don't exit on lobster failure — we need to shut down gateway
 set -o pipefail
