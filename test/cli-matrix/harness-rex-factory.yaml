@@ -16,6 +16,7 @@ spec:
   githubApp: 5DLabs-Bolt
   model: glm-5.1
   contextVersion: 1
+  taskId: 1
   enableDocker: false
   cliConfig:
     cliType: factory

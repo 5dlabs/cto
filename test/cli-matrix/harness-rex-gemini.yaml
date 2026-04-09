@@ -16,6 +16,7 @@ spec:
   githubApp: 5DLabs-Nova
   model: accounts/fireworks/routers/kimi-k2p5-turbo
   contextVersion: 1
+  taskId: 1
   enableDocker: false
   cliConfig:
     cliType: gemini
