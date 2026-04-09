@@ -93,10 +93,17 @@ pub mod context;
 // Configuration management
 pub mod config;
 
+// Escalation policy + per-session state (see docs in escalation.rs)
+pub mod escalation;
+
 // Re-export key types for convenience
 pub use client::McpClient;
 pub use config::{ClientInfo, ServerConfig, SystemConfigManager};
 pub use context::{ContextConfig, ContextManager};
+pub use escalation::{
+    evaluate as evaluate_escalation, EscalationDecision, EscalationMode, EscalationPolicy,
+    EscalationRecord, SessionMap, SessionState,
+};
 
 /// Helper function to resolve working directory patterns
 #[must_use]
