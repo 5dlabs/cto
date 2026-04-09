@@ -381,6 +381,7 @@ mod tests {
             tools: Some(ToolConfiguration {
                 remote: vec!["memory_create_entities".to_string()],
                 local_servers: None,
+                escalation: None,
             }),
             cli_config: Some(json!({
                 "model": "gemini-3-pro-preview",

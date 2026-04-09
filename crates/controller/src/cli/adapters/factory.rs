@@ -391,6 +391,7 @@ impl CliAdapter for FactoryAdapter {
             tools: Some(ToolConfiguration {
                 remote: vec!["memory_create_entities".to_string()],
                 local_servers: None,
+                escalation: None,
             }),
             cli_config: Some(json!({
                 "model": "gpt-5-factory-high",
@@ -444,6 +445,7 @@ mod tests {
                     "brave_search_brave_web_search".to_string(),
                 ],
                 local_servers: None,
+                escalation: None,
             }),
             cli_config: Some(json!({
                 "model": "gpt-5-factory-high",

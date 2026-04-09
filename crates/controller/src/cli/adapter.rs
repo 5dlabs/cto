@@ -242,10 +242,15 @@ pub struct AgentConfig {
 /// Tool configuration for agents
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolConfiguration {
-    /// Remote tools available
+    /// Remote tools available (interpreted as the prewarm set for escalation)
     pub remote: Vec<String>,
     /// Local server configurations
     pub local_servers: Option<HashMap<String, LocalServerConfig>>,
+    /// Escalation policy forwarded to the tools HTTP server.
+    /// When present, serialized as JSON in the `X-Escalation-Policy` header
+    /// so the server applies per-session policy instead of its default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub escalation: Option<crate::crds::coderun::EscalationPolicy>,
 }
 
 /// Local server configuration
