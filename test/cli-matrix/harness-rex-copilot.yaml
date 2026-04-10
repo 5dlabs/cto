@@ -20,6 +20,7 @@ spec:
   enableDocker: false
   cliConfig:
     cliType: copilot
+    provider: fireworks
     model: accounts/fireworks/models/qwen3-235b-a22b
     settings:
       listToolsOnStart: true

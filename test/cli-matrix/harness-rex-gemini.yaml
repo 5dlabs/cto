@@ -20,6 +20,7 @@ spec:
   enableDocker: false
   cliConfig:
     cliType: gemini
+    provider: google
     model: gemini-2.5-flash
     settings:
       listToolsOnStart: true

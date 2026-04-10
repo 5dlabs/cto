@@ -18,6 +18,7 @@ spec:
   enableDocker: false
   cliConfig:
     cliType: factory
+    provider: factory
     model: glm-5.1
     settings:
       listToolsOnStart: true
