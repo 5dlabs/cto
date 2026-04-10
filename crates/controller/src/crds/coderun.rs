@@ -31,7 +31,7 @@ fn default_context_version() -> u32 {
 
 /// Default function for `docs_branch` field
 fn default_docs_branch() -> String {
-    "develop".to_string()
+    "main".to_string()
 }
 
 /// Default function for `continue_session` field
@@ -402,7 +402,9 @@ pub struct CodeRunSpec {
     #[serde(default, rename = "workingDirectory")]
     pub working_directory: Option<String>,
 
-    /// Model identifier to use with the selected CLI (e.g., gpt-5-codex, claude-sonnet-4-20250514)
+    /// Model identifier to use with the selected CLI (e.g., gpt-5-codex, claude-sonnet-4-20250514).
+    /// When empty, resolved from the first ACP entry's first model.
+    #[serde(default)]
     pub model: String,
 
     /// Prompt style variant (e.g., "minimal" for Ralph-style prompts)
