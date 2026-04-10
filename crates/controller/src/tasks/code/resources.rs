@@ -1041,24 +1041,6 @@ impl<'a> CodeResourceManager<'a> {
             }));
         }
 
-        // Codex OAuth: mount secret at a staging path; the template copies auth.json
-        // into the writable ~/.codex/ directory at startup (codex writes sqlite/cache there)
-        if cli_type == CLIType::Codex {
-            volumes.push(json!({
-                "name": "codex-oauth",
-                "secret": {
-                    "secretName": "codex-oauth",
-                    "optional": true,
-                    "items": [{ "key": "auth.json", "path": "auth.json" }]
-                }
-            }));
-            volume_mounts.push(json!({
-                "name": "codex-oauth",
-                "mountPath": "/root/.codex-oauth",
-                "readOnly": true
-            }));
-        }
-
         // Shared volume for GitHub App private key - shared between init and main containers
         // This allows the init container to write the key and main container (Ruby/Go) to read it
         volumes.push(json!({

@@ -87,23 +87,25 @@ default_model = "kimi-k2p5-turbo"
 KIMICFG
 fi
 
-# Codex: copy ChatGPT OAuth tokens from read-only secret mount into writable ~/.codex/
-# (codex writes sqlite/cache beside auth.json so the dir must be writable)
-# Use /root/.codex explicitly — CODEX_HOME is pinned to /root/.codex regardless of HOME overrides
-# Unset OPENAI_API_KEY to prevent codex from overriding ChatGPT OAuth with the
-# service account key that leaks from cto-secrets envFrom
-if [ "{{cli_type}}" = "codex" ] && [ -f /root/.codex-oauth/auth.json ]; then
+# Codex: configure Fireworks provider via config.toml
+# Codex uses the OpenAI Responses API which Fireworks now supports.
+# CODEX_HOME is pinned to /root/.codex in the container env.
+# Unset OPENAI_API_KEY to prevent codex from trying the broken svcacct key from cto-secrets.
+if [ "{{cli_type}}" = "codex" ]; then
   mkdir -p /root/.codex
-  cp /root/.codex-oauth/auth.json /root/.codex/auth.json
-  chmod 600 /root/.codex/auth.json
   unset OPENAI_API_KEY
-  # Write config.toml: full-auto sandbox, never prompt, use CRD model
   cat > /root/.codex/config.toml <<CODEXCFG
 model = "{{model}}"
+model_provider = "fireworks"
 approval_policy = "never"
-sandbox_permissions = ["disk-full-read-access", "disk-full-write-access", "network-full-access"]
+sandbox_mode = "danger-full-access"
+
+[model_providers.fireworks]
+name = "Fireworks"
+base_url = "https://api.fireworks.ai/inference/v1"
+env_key = "FIREWORKS_API_KEY"
 CODEXCFG
-  echo "[harness] ✅ Codex OAuth tokens + config installed (OPENAI_API_KEY unset)"
+  echo "[harness] ✅ Codex config installed (Fireworks Responses API)"
 fi
 
 for f in /etc/profile.d/*.sh; do

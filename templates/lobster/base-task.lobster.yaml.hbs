@@ -106,9 +106,9 @@ steps:
         ACPX_MODEL="${COPILOT_MODEL:-gpt-4.1}"
       fi
 
-      # Codex: uses OpenAI Responses API via ChatGPT subscription
+      # Codex: uses Fireworks Responses API, model from CRD
       if [ "$CLI_TYPE" = "codex" ]; then
-        ACPX_MODEL="${CODEX_MODEL:-gpt-5.2-codex}"
+        ACPX_MODEL="${CODEX_MODEL:-{{model}}}"
       fi
 
       export ACPX_MODEL
