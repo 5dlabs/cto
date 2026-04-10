@@ -189,7 +189,7 @@ jobs:
       - name: Get version info
         id: version
         run: |
-          VERSION=$(grep '^version' crates/controller/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
