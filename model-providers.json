@@ -1,0 +1,337 @@
+{
+  "$schema": "model-providers.schema.json",
+  "version": "1.0.0",
+  "providers": {
+    "Anthropic": {
+      "enabled": true,
+      "baseUrl": "https://api.anthropic.com",
+      "apiKey": "ANTHROPIC_API_KEY",
+      "credits": 250000
+    },
+    "OpenAI": {
+      "enabled": true,
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKey": "OPENAI_API_KEY",
+      "credits": 180000
+    },
+    "Fireworks": {
+      "enabled": true,
+      "baseUrl": "https://api.fireworks.ai/inference",
+      "apiKey": "FIREWORKS_API_KEY"
+    },
+    "ZhipuAI": {
+      "enabled": true,
+      "apiKey": "FACTORY_API_KEY"
+    },
+    "Cursor": {
+      "enabled": true,
+      "apiKey": "CURSOR_API_KEY"
+    }
+  },
+  "models": {
+    "claude-opus-4-6-20260205": {
+      "enabled": true,
+      "displayName": "Claude Opus 4.6",
+      "provider": "Anthropic",
+      "thinkingLevel": "high",
+      "score": 96,
+      "tier": "frontier"
+    },
+    "claude-sonnet-4-6-20260514": {
+      "enabled": true,
+      "displayName": "Claude Sonnet 4.6",
+      "provider": "Anthropic",
+      "thinkingLevel": "medium",
+      "score": 91,
+      "tier": "standard"
+    },
+    "claude-haiku-4-5-20251001": {
+      "enabled": true,
+      "displayName": "Claude Haiku 4.5",
+      "provider": "Anthropic",
+      "thinkingLevel": "low",
+      "score": 84,
+      "tier": "fast"
+    },
+    "gpt-5.4": {
+      "enabled": true,
+      "displayName": "GPT-5.4",
+      "provider": "OpenAI",
+      "thinkingLevel": "high",
+      "score": 95,
+      "tier": "frontier"
+    },
+    "gpt-5.3-codex": {
+      "enabled": true,
+      "displayName": "GPT-5.3-Codex",
+      "provider": "OpenAI",
+      "thinkingLevel": "high",
+      "score": 94,
+      "tier": "standard"
+    },
+    "gpt-5.2-codex": {
+      "enabled": true,
+      "displayName": "GPT-5.2-Codex",
+      "provider": "OpenAI",
+      "thinkingLevel": "medium",
+      "score": 92,
+      "tier": "standard"
+    },
+    "gpt-5.2": {
+      "enabled": true,
+      "displayName": "GPT-5.2",
+      "provider": "OpenAI",
+      "thinkingLevel": "medium",
+      "score": 90,
+      "tier": "standard"
+    },
+    "gpt-5.1-codex": {
+      "enabled": true,
+      "displayName": "GPT-5.1-Codex",
+      "provider": "OpenAI",
+      "thinkingLevel": "low",
+      "score": 85,
+      "tier": "standard"
+    },
+    "gpt-4.1": {
+      "enabled": true,
+      "displayName": "GPT-4.1",
+      "provider": "OpenAI",
+      "thinkingLevel": "low",
+      "score": 82,
+      "tier": "fast"
+    },
+    "o4-mini": {
+      "enabled": true,
+      "displayName": "o4-mini",
+      "provider": "OpenAI",
+      "thinkingLevel": "medium",
+      "score": 88,
+      "tier": "standard"
+    },
+    "accounts/fireworks/routers/kimi-k2p5-turbo": {
+      "enabled": true,
+      "displayName": "Kimi K2.5 Turbo (Fireworks)",
+      "provider": "Fireworks",
+      "thinkingLevel": "high"
+    },
+    "accounts/fireworks/models/llama-v3p3-70b-instruct": {
+      "enabled": true,
+      "displayName": "Llama 3.3 70B (Fireworks)",
+      "provider": "Fireworks",
+      "thinkingLevel": "medium"
+    },
+    "claude-opus-4-6": {
+      "enabled": true,
+      "displayName": "Claude Opus 4.6 (via Factory)",
+      "provider": "Anthropic",
+      "thinkingLevel": "high",
+      "score": 96,
+      "tier": "frontier",
+      "_note": "Factory-style short ID"
+    },
+    "claude-sonnet-4-6": {
+      "enabled": true,
+      "displayName": "Claude Sonnet 4.6 (via Factory)",
+      "provider": "Anthropic",
+      "thinkingLevel": "medium",
+      "score": 91,
+      "tier": "standard",
+      "_note": "Factory-style short ID"
+    },
+    "gemini-3.1-pro-preview": {
+      "enabled": true,
+      "displayName": "Gemini 3.1 Pro",
+      "provider": "Google",
+      "thinkingLevel": "medium",
+      "score": 89,
+      "tier": "standard"
+    },
+    "gemini-3-flash-preview": {
+      "enabled": true,
+      "displayName": "Gemini 3 Flash",
+      "provider": "Google",
+      "thinkingLevel": "low",
+      "score": 83,
+      "tier": "fast"
+    },
+    "glm-5": {
+      "enabled": true,
+      "displayName": "GLM-5",
+      "provider": "ZhipuAI",
+      "thinkingLevel": "medium",
+      "score": 80,
+      "tier": "standard"
+    },
+    "glm-4.7": {
+      "enabled": true,
+      "displayName": "GLM-4.7",
+      "provider": "ZhipuAI",
+      "thinkingLevel": "low",
+      "score": 76,
+      "tier": "standard"
+    },
+    "kimi-k2.5": {
+      "enabled": true,
+      "displayName": "Kimi K2.5",
+      "provider": "Moonshot",
+      "thinkingLevel": "medium",
+      "score": 78,
+      "tier": "standard"
+    },
+    "minimax-m2.5": {
+      "enabled": true,
+      "displayName": "MiniMax M2.5",
+      "provider": "MiniMax",
+      "thinkingLevel": "medium",
+      "score": 77,
+      "tier": "standard"
+    },
+    "opus-4.6": {
+      "enabled": true,
+      "displayName": "Claude Opus 4.6 (via Cursor)",
+      "provider": "Anthropic",
+      "thinkingLevel": "high",
+      "score": 96,
+      "tier": "frontier",
+      "_note": "Cursor-style model ID"
+    },
+    "auto": {
+      "enabled": true,
+      "displayName": "Auto (Cursor picks)",
+      "provider": "Cursor",
+      "thinkingLevel": "high",
+      "score": 93,
+      "tier": "auto",
+      "_note": "Cursor auto-routing"
+    }
+  },
+  "clis": {
+    "Claude Code": {
+      "enabled": true,
+      "provider": "Anthropic",
+      "models": [
+        "claude-opus-4-6-20260205",
+        "claude-sonnet-4-6-20260514",
+        "claude-haiku-4-5-20251001"
+      ]
+    },
+    "Codex": {
+      "enabled": true,
+      "provider": "OpenAI",
+      "models": [
+        "gpt-5.4",
+        "gpt-5.3-codex",
+        "gpt-5.2-codex",
+        "gpt-5.2",
+        "gpt-5.1-codex"
+      ]
+    },
+    "Factory": {
+      "enabled": true,
+      "provider": "ZhipuAI",
+      "models": [
+        "claude-opus-4-6",
+        "claude-sonnet-4-6",
+        "claude-haiku-4-5-20251001",
+        "gpt-5.4",
+        "gpt-5.3-codex",
+        "gpt-5.2-codex",
+        "gemini-3.1-pro-preview",
+        "gemini-3-flash-preview",
+        "glm-5",
+        "glm-4.7",
+        "kimi-k2.5",
+        "minimax-m2.5"
+      ]
+    },
+    "Cursor": {
+      "enabled": true,
+      "provider": "Cursor",
+      "models": [
+        "auto",
+        "opus-4.6",
+        "gpt-5.4"
+      ]
+    }
+  },
+  "openclaw": {
+    "provider": "Fireworks",
+    "models": [
+      "accounts/fireworks/routers/kimi-k2p5-turbo",
+      "accounts/fireworks/models/llama-v3p3-70b-instruct"
+    ]
+  },
+  "acp": {
+    "_description": "Default ACP entries for CodeRun CRDs \u2014 references into clis/providers/models above",
+    "entries": [
+      "Claude Code",
+      "Codex",
+      "Factory",
+      "Cursor"
+    ]
+  },
+  "agentHarness": {
+    "_description": "Per-agent CLI+model assignment \u2014 references into clis/models above",
+    "rex": {
+      "cli": "Claude Code",
+      "model": "claude-opus-4-6-20260205"
+    },
+    "grizz": {
+      "cli": "Codex",
+      "model": "gpt-5.2-codex"
+    },
+    "blaze": {
+      "cli": "Cursor",
+      "model": "opus-4.6"
+    },
+    "bolt": {
+      "cli": "Codex",
+      "model": "gpt-5.2-codex"
+    },
+    "nova": {
+      "cli": "Claude Code",
+      "model": "claude-opus-4-6-20260205"
+    },
+    "angie": {
+      "cli": "Claude Code",
+      "model": "claude-opus-4-6-20260205"
+    },
+    "tap": {
+      "cli": "Cursor",
+      "model": "opus-4.6"
+    },
+    "cipher": {
+      "cli": "Claude Code",
+      "model": "claude-opus-4-6-20260205"
+    },
+    "tess": {
+      "cli": "Codex",
+      "model": "gpt-5.2-codex"
+    },
+    "cleo": {
+      "cli": "Claude Code",
+      "model": "claude-opus-4-6-20260205"
+    },
+    "spark": {
+      "cli": "Codex",
+      "model": "gpt-5.2-codex"
+    },
+    "stitch": {
+      "cli": "Claude Code",
+      "model": "claude-opus-4-6-20260205"
+    },
+    "vex": {
+      "cli": "Claude Code",
+      "model": "claude-opus-4-6-20260205"
+    },
+    "pixel": {
+      "cli": "Cursor",
+      "model": "opus-4.6"
+    },
+    "_default": {
+      "cli": "Claude Code",
+      "model": "claude-opus-4-6-20260205"
+    }
+  }
+}

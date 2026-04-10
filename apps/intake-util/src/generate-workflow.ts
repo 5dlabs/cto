@@ -14,11 +14,33 @@
 import type { GeneratedTask, GeneratedSubtask, TaskScaffold, TaskType } from './types';
 import { getValidationCommands, getSecurityCommands, getTestCommands } from './stack-validators';
 
+interface AgentHarnessModel {
+  name: string;
+}
+
+interface AgentHarnessProvider {
+  name: string;
+}
+
 interface AgentHarness {
-  primary: string;
-  model: string;
+  cli: string;
+  provider: AgentHarnessProvider;
+  models: AgentHarnessModel[];
+  baseUrl?: string;
+  apiKey?: string;
+  // Slim reference format (from model-providers.json agentHarness)
+  model?: string;
+  // Legacy fields for backward compat
+  primary?: string;
   fallback?: string;
   fallbackModel?: string;
+}
+
+/** Model-providers catalog shape (loaded externally) */
+interface ModelProvidersCatalog {
+  providers?: Record<string, { enabled?: boolean; baseUrl?: string; apiKey?: string; credits?: number }>;
+  models?: Record<string, { enabled?: boolean; provider?: string; thinkingLevel?: string; score?: number }>;
+  clis?: Record<string, { enabled?: boolean; provider?: string; models?: string[] }>;
 }
 
 interface PlayConfig {
@@ -27,6 +49,8 @@ interface PlayConfig {
   securityMaxRetries?: number;
   testingMaxRetries?: number;
   agentHarness?: Record<string, AgentHarness>;
+  /** Optional resolved model-providers catalog for reference resolution */
+  modelProviders?: ModelProvidersCatalog;
 }
 
 interface WorkflowInput {
@@ -64,16 +88,86 @@ function lv(name: string): string {
 }
 
 const DEFAULT_HARNESS: AgentHarness = {
-  primary: 'claude',
-  model: 'claude-opus-4-6',
-  fallback: 'codex',
-  fallbackModel: 'gpt-5.2-codex',
+  cli: 'Claude Code',
+  provider: { name: 'Anthropic' },
+  models: [
+    { name: 'claude-opus-4-6-20260205' },
+    { name: 'claude-sonnet-4-6-20260514' },
+  ],
+  baseUrl: 'https://api.anthropic.com',
+  apiKey: 'ANTHROPIC_API_KEY',
 };
+
+/** Get the CLI name from harness (new: cli, legacy: primary) */
+function harnessCli(h: AgentHarness): string {
+  return h.cli ?? h.primary ?? 'claude-code';
+}
+
+/** Get the primary model from harness (new: models[0].name, legacy: model) */
+function harnessModel(h: AgentHarness): string {
+  return h.models?.[0]?.name ?? h.model ?? 'claude-opus-4-6-20260205';
+}
+
+/** Get provider name from harness */
+function harnessProvider(h: AgentHarness): string {
+  return h.provider?.name ?? 'Anthropic';
+}
+
+/**
+ * Resolve a possibly-slim agentHarness entry into a full AgentHarness.
+ * Slim format (from model-providers.json): { cli: "Claude Code", model: "claude-opus-4-6-20260205" }
+ * Full format: { cli, provider, models[], baseUrl?, apiKey? }
+ */
+function resolveHarness(h: AgentHarness, catalog?: ModelProvidersCatalog): AgentHarness {
+  // Already fully resolved (has models array with entries)
+  if (h.models?.length > 0) return h;
+
+  // No catalog — build minimal from what we have
+  if (!catalog) {
+    const modelName = h.model ?? h.models?.[0]?.name ?? 'claude-opus-4-6-20260205';
+    return {
+      cli: h.cli ?? h.primary ?? 'Claude Code',
+      provider: h.provider ?? { name: 'Anthropic' },
+      models: [{ name: modelName }],
+      baseUrl: h.baseUrl,
+      apiKey: h.apiKey,
+    };
+  }
+
+  // Resolve from catalog
+  const cliName = h.cli ?? h.primary ?? 'Claude Code';
+  const cliDef = catalog.clis?.[cliName];
+  const providerName = cliDef?.provider ?? h.provider?.name ?? 'Anthropic';
+  const providerDef = catalog.providers?.[providerName];
+
+  // Build models list: if slim has a specific model, put it first
+  const primaryModel = h.model;
+  const cliModels = (cliDef?.models ?? [])
+    .filter((m) => catalog.models?.[m]?.enabled !== false)
+    .map((m) => ({ name: m }));
+
+  let models: AgentHarnessModel[];
+  if (primaryModel) {
+    const rest = cliModels.filter((m) => m.name !== primaryModel);
+    models = [{ name: primaryModel }, ...rest];
+  } else {
+    models = cliModels.length > 0 ? cliModels : [{ name: 'claude-opus-4-6-20260205' }];
+  }
+
+  return {
+    cli: cliName,
+    provider: { name: providerName },
+    models,
+    baseUrl: h.baseUrl ?? providerDef?.baseUrl,
+    apiKey: h.apiKey ?? providerDef?.apiKey,
+  };
+}
 
 function getAgentHarness(agent: string, config: PlayConfig): AgentHarness {
   const map = config.agentHarness;
   if (!map) return DEFAULT_HARNESS;
-  return map[agent] ?? map['_default'] ?? DEFAULT_HARNESS;
+  const raw = map[agent] ?? map['_default'] ?? DEFAULT_HARNESS;
+  return resolveHarness(raw, config.modelProviders);
 }
 
 // --- Notification helpers for play workflow ---
@@ -114,8 +208,8 @@ function generateTaskWorkflow(
   lines.push(`  task_id: ${taskId}`);
   lines.push(`  agent: ${agent}`);
   lines.push(`  stack: ${stack}`);
-  lines.push(`  cli: ${harness.primary}`);
-  lines.push(`  model: ${harness.model}`);
+  lines.push(`  cli: ${harnessCli(harness)}`);
+  lines.push(`  model: ${harnessModel(harness)}`);
   if (task.dependencies.length > 0) {
     lines.push(`  depends_on_tasks: [${task.dependencies.join(', ')}]`);
   }
@@ -130,9 +224,9 @@ function generateTaskWorkflow(
   lines.push('  agent:');
   lines.push(`    default: "${agent}"`);
   lines.push('  cli:');
-  lines.push(`    default: "${harness.primary}"`);
+  lines.push(`    default: "${harnessCli(harness)}"`);
   lines.push('  model:');
-  lines.push(`    default: "${harness.model}"`);
+  lines.push(`    default: "${harnessModel(harness)}"`);
   lines.push('  fallback_cli:');
   lines.push(`    default: "${harness.fallback ?? 'codex'}"`);
   lines.push('  fallback_model:');
@@ -307,8 +401,8 @@ metadata:
   agent: cleo
   phase: quality
   stack: ${stack}
-  cli: ${harness.primary}
-  model: ${harness.model}
+  cli: ${harnessCli(harness)}
+  model: ${harnessModel(harness)}
 
 args:
   task_dir: {}
@@ -317,9 +411,9 @@ args:
   pr_url:
     default: ""
   cli:
-    default: "${harness.primary}"
+    default: "${harnessCli(harness)}"
   model:
-    default: "${harness.model}"
+    default: "${harnessModel(harness)}"
   max_retries:
     default: ${maxRetries}
 
@@ -375,8 +469,8 @@ metadata:
   agent: cipher
   phase: security
   stack: ${stack}
-  cli: ${harness.primary}
-  model: ${harness.model}
+  cli: ${harnessCli(harness)}
+  model: ${harnessModel(harness)}
 
 args:
   task_dir: {}
@@ -385,9 +479,9 @@ args:
   pr_url:
     default: ""
   cli:
-    default: "${harness.primary}"
+    default: "${harnessCli(harness)}"
   model:
-    default: "${harness.model}"
+    default: "${harnessModel(harness)}"
   max_retries:
     default: ${maxRetries}
 
@@ -443,8 +537,8 @@ metadata:
   agent: tess
   phase: testing
   stack: ${stack}
-  cli: ${harness.primary}
-  model: ${harness.model}
+  cli: ${harnessCli(harness)}
+  model: ${harnessModel(harness)}
 
 args:
   task_dir: {}
@@ -453,9 +547,9 @@ args:
   pr_url:
     default: ""
   cli:
-    default: "${harness.primary}"
+    default: "${harnessCli(harness)}"
   model:
-    default: "${harness.model}"
+    default: "${harnessModel(harness)}"
   max_retries:
     default: ${maxRetries}
 
@@ -578,7 +672,7 @@ function generatePlayWorkflow(
     const a = t.agent ?? 'nova';
     const h = getAgentHarness(a, config);
     const tt = taskTypeMap.get(t.id)!;
-    return { id: t.id, title: t.title, agent: a, cli: h.primary, model: h.model, type: tt };
+    return { id: t.id, title: t.title, agent: a, cli: harnessCli(h), model: harnessModel(h), type: tt };
   });
   const harnessTableMd = [
     '| Task | Title | Agent | CLI | Model | Type |',
@@ -614,8 +708,8 @@ function generatePlayWorkflow(
     const harness = getAgentHarness(agent, config);
 
     // Per-task CLI/model — used in CodeRun CRD and sub-workflow calls
-    const taskCli = harness.primary;
-    const taskModel = harness.model;
+    const taskCli = harnessCli(harness);
+    const taskModel = harnessModel(harness);
 
     // Determine depends_on for this task's implementation step
     const implDeps: string[] = [];
@@ -750,8 +844,8 @@ function generatePlayWorkflow(
     lines.push(`      --args-json "$(jq -nc --arg td '\${tasks_dir\}/task-${tid}'`);
     lines.push(`        --arg repo '\${repo_url\}'`);
     lines.push(`        --arg branch '${branchName}'`);
-    lines.push(`        --arg cli '${secHarness.primary}'`);
-    lines.push(`        --arg model '${secHarness.model}'`);
+    lines.push(`        --arg cli '${harnessCli(secHarness)}'`);
+    lines.push(`        --arg model '${harnessModel(secHarness)}'`);
     lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"`);
     gateSteps.push(`security-task-${tid}`);
 
@@ -769,8 +863,8 @@ function generatePlayWorkflow(
       lines.push(`      --args-json "$(jq -nc --arg td '\${tasks_dir\}/task-${tid}'`);
       lines.push(`        --arg repo '\${repo_url\}'`);
       lines.push(`        --arg branch '${branchName}'`);
-      lines.push(`        --arg cli '${qualHarness.primary}'`);
-      lines.push(`        --arg model '${qualHarness.model}'`);
+      lines.push(`        --arg cli '${harnessCli(qualHarness)}'`);
+      lines.push(`        --arg model '${harnessModel(qualHarness)}'`);
       lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"`);
       gateSteps.push(`quality-task-${tid}`);
 
@@ -784,8 +878,8 @@ function generatePlayWorkflow(
       lines.push(`      --args-json "$(jq -nc --arg td '\${tasks_dir\}/task-${tid}'`);
       lines.push(`        --arg repo '\${repo_url\}'`);
       lines.push(`        --arg branch '${branchName}'`);
-      lines.push(`        --arg cli '${testHarness.primary}'`);
-      lines.push(`        --arg model '${testHarness.model}'`);
+      lines.push(`        --arg cli '${harnessCli(testHarness)}'`);
+      lines.push(`        --arg model '${harnessModel(testHarness)}'`);
       lines.push(`        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"`);
       gateSteps.push(`testing-task-${tid}`);
     }
@@ -810,7 +904,7 @@ function generatePlayWorkflow(
   const harnessSummary = tasks.map((t) => {
     const a = t.agent ?? 'nova';
     const h = getAgentHarness(a, config);
-    return `task-${t.id}(${a}):${h.primary}`;
+    return `task-${t.id}(${a}):${harnessCli(h)}`;
   }).join(', ');
   lines.push(``);
   lines.push(`  # ── Play complete ──`);
