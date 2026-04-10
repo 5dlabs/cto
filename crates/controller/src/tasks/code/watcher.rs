@@ -283,6 +283,8 @@ pub async fn create_watcher_coderun(
         max_tokens: None,
         temperature: None,
         model_rotation: None,
+        provider: None,
+        provider_base_url: None,
     };
 
     // Build environment variables

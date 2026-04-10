@@ -535,6 +535,8 @@ impl ControllerConfig {
                         max_tokens: agent.max_tokens,
                         temperature: agent.temperature,
                         model_rotation: None,
+                        provider: None,
+                        provider_base_url: None,
                     };
 
                     self.agent
@@ -794,6 +796,8 @@ cleanup:
                 max_tokens: None,
                 temperature: None,
                 model_rotation: None,
+                provider: None,
+                provider_base_url: None,
             },
         );
 

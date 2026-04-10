@@ -5396,6 +5396,8 @@ mod tests {
             max_tokens: None,
             temperature: None,
             model_rotation: None,
+            provider: None,
+            provider_base_url: None,
         });
         let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
         assert_eq!(
