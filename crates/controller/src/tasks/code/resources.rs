@@ -455,6 +455,7 @@ impl<'a> CodeResourceManager<'a> {
             &pvc_name,
             service_name,
             code_run_ref.spec.github_app.as_deref(),
+            code_run_ref.spec.implementation_agent.as_deref(),
         )
         .await?;
         info!("✅ PVC check completed");
@@ -749,6 +750,7 @@ impl<'a> CodeResourceManager<'a> {
         pvc_name: &str,
         service_name: &str,
         github_app: Option<&str>,
+        implementation_agent: Option<&str>,
     ) -> Result<()> {
         match self.pvcs.get(pvc_name).await {
             Ok(_) => {
@@ -757,7 +759,7 @@ impl<'a> CodeResourceManager<'a> {
             }
             Err(kube::Error::Api(ae)) if ae.code == 404 => {
                 info!("Creating PVC: {}", pvc_name);
-                let pvc = self.build_pvc_spec(pvc_name, service_name, github_app);
+                let pvc = self.build_pvc_spec(pvc_name, service_name, github_app, implementation_agent);
                 match self.pvcs.create(&PostParams::default(), &pvc).await {
                     Ok(_) => {
                         info!("Successfully created PVC: {}", pvc_name);
@@ -779,6 +781,7 @@ impl<'a> CodeResourceManager<'a> {
         pvc_name: &str,
         service_name: &str,
         github_app: Option<&str>,
+        implementation_agent: Option<&str>,
     ) -> PersistentVolumeClaim {
         let mut spec = json!({
             "accessModes": ["ReadWriteOnce"],
@@ -805,6 +808,13 @@ impl<'a> CodeResourceManager<'a> {
             let classifier = AgentClassifier::new();
             if let Ok(agent_name) = classifier.extract_agent_name(app) {
                 labels.insert("agent".to_string(), agent_name.clone());
+                // Dual-write: implementation-agent label
+                labels.insert(
+                    "implementation-agent".to_string(),
+                    implementation_agent
+                        .filter(|a| !a.is_empty())
+                        .map_or_else(|| agent_name.clone(), str::to_lowercase),
+                );
 
                 // Add workspace type label
                 if classifier.is_implementation_agent(&agent_name) {
@@ -1582,6 +1592,20 @@ impl<'a> CodeResourceManager<'a> {
 
         // Disable xAI code_execution tool (cto-secrets has a placeholder XAI_API_KEY)
         final_env_vars.push(json!({ "name": "XAI_API_KEY", "value": "" }));
+
+        // Pass ACP configuration as JSON env var (first entry = primary for now)
+        if let Some(acp) = &code_run.spec.acp {
+            if let Ok(acp_json) = serde_json::to_string(acp) {
+                final_env_vars.push(json!({ "name": "CTO_ACP_CONFIG", "value": acp_json }));
+            }
+        }
+
+        // Pass OpenClaw configuration as JSON env var
+        if let Some(openclaw) = &code_run.spec.openclaw {
+            if let Ok(oc_json) = serde_json::to_string(openclaw) {
+                final_env_vars.push(json!({ "name": "CTO_OPENCLAW_CONFIG", "value": oc_json }));
+            }
+        }
 
         // Provider env vars are now handled by EffectiveProviderConfig.build_env_vars()
         // above (in the critical_env_vars section). No more model-string detection here.
@@ -2624,6 +2648,17 @@ scrape_configs:
             .and_then(|app| AgentClassifier::new().extract_agent_name(app).ok())
             .map_or_else(|| "unknown".to_string(), |n| n.to_lowercase());
         labels.insert("agent".to_string(), Self::sanitize_label_value(&agent_name));
+        // Dual-write: implementation-agent label for new naming convention
+        let impl_agent_name = code_run
+            .spec
+            .implementation_agent
+            .as_ref()
+            .filter(|a| !a.is_empty())
+            .map_or_else(|| agent_name.clone(), |a| a.to_lowercase());
+        labels.insert(
+            "implementation-agent".to_string(),
+            Self::sanitize_label_value(&impl_agent_name),
+        );
         labels.insert(
             "tags.datadoghq.com/service".to_string(),
             format!("cto-coderun-{}", Self::sanitize_label_value(&agent_name)),
