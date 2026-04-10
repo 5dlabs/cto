@@ -64,48 +64,91 @@ done
 
 # Kimi CLI requires a persisted OAuth token to pass _check_auth.
 # Set KIMI_SHARE_DIR so Kimi finds config+creds at $HOME/.kimi
-# (harness HOME=/tmp/agent-home; Kimi's get_share_dir() respects this env).
-if [ "{{cli_type}}" = "kimi" ] && [ -n "${FIREWORKS_API_KEY:-}" ]; then
+# Provider and base URL are now set by the controller via RESOLVED_PROVIDER env var.
+if [ "{{cli_type}}" = "kimi" ]; then
+  PROVIDER="${RESOLVED_PROVIDER:-fireworks}"
   export KIMI_SHARE_DIR="$HOME/.kimi"
   mkdir -p "$HOME/.kimi/credentials"
-  cat > "$HOME/.kimi/credentials/kimi-code.json" <<KIMIEOF
-{"access_token":"${FIREWORKS_API_KEY}","refresh_token":"","expires_at":4102444800.0,"scope":"","token_type":"Bearer"}
+
+  # Determine API key and base URL based on resolved provider
+  case "$PROVIDER" in
+    fireworks)
+      KIMI_PROVIDER_KEY="${FIREWORKS_API_KEY:-}"
+      KIMI_PROVIDER_URL="${KIMI_BASE_URL:-https://api.fireworks.ai/inference}"
+      KIMI_PROVIDER_TYPE="anthropic"
+      ;;
+    moonshot)
+      KIMI_PROVIDER_KEY="${KIMI_API_KEY:-}"
+      KIMI_PROVIDER_URL="${KIMI_BASE_URL:-https://api.moonshot.cn/v1}"
+      KIMI_PROVIDER_TYPE="moonshot"
+      ;;
+    *)
+      KIMI_PROVIDER_KEY="${FIREWORKS_API_KEY:-}"
+      KIMI_PROVIDER_URL="${KIMI_BASE_URL:-https://api.fireworks.ai/inference}"
+      KIMI_PROVIDER_TYPE="anthropic"
+      ;;
+  esac
+
+  if [ -n "$KIMI_PROVIDER_KEY" ]; then
+    cat > "$HOME/.kimi/credentials/kimi-code.json" <<KIMIEOF
+{"access_token":"${KIMI_PROVIDER_KEY}","refresh_token":"","expires_at":4102444800.0,"scope":"","token_type":"Bearer"}
 KIMIEOF
-  chmod 600 "$HOME/.kimi/credentials/kimi-code.json"
-  cat > "$HOME/.kimi/config.toml" <<KIMICFG
-[providers.fireworks]
-type = "anthropic"
-base_url = "https://api.fireworks.ai/inference"
-api_key = "${FIREWORKS_API_KEY}"
+    chmod 600 "$HOME/.kimi/credentials/kimi-code.json"
+    cat > "$HOME/.kimi/config.toml" <<KIMICFG
+[providers.${PROVIDER}]
+type = "${KIMI_PROVIDER_TYPE}"
+base_url = "${KIMI_PROVIDER_URL}"
+api_key = "${KIMI_PROVIDER_KEY}"
 
 [models.kimi-k2p5-turbo]
-provider = "fireworks"
-model = "accounts/fireworks/routers/kimi-k2p5-turbo"
+provider = "${PROVIDER}"
+model = "${KIMI_MODEL_NAME:-accounts/fireworks/routers/kimi-k2p5-turbo}"
 max_context_size = 131072
 
 default_model = "kimi-k2p5-turbo"
 KIMICFG
+  fi
 fi
 
-# Codex: configure Fireworks provider via config.toml
-# Codex uses the OpenAI Responses API which Fireworks now supports.
+# Codex: configure provider via config.toml
 # CODEX_HOME is pinned to /root/.codex in the container env.
 # Unset OPENAI_API_KEY to prevent codex from trying the broken svcacct key from cto-secrets.
 if [ "{{cli_type}}" = "codex" ]; then
+  PROVIDER="${RESOLVED_PROVIDER:-fireworks}"
   mkdir -p /root/.codex
   unset OPENAI_API_KEY
+
+  # Determine provider config for Codex
+  case "$PROVIDER" in
+    fireworks)
+      CODEX_PROVIDER_NAME="Fireworks"
+      CODEX_PROVIDER_URL="https://api.fireworks.ai/inference/v1"
+      CODEX_ENV_KEY="FIREWORKS_API_KEY"
+      ;;
+    openai)
+      CODEX_PROVIDER_NAME="OpenAI"
+      CODEX_PROVIDER_URL="https://api.openai.com/v1"
+      CODEX_ENV_KEY="OPENAI_API_KEY"
+      ;;
+    *)
+      CODEX_PROVIDER_NAME="Fireworks"
+      CODEX_PROVIDER_URL="https://api.fireworks.ai/inference/v1"
+      CODEX_ENV_KEY="FIREWORKS_API_KEY"
+      ;;
+  esac
+
   cat > /root/.codex/config.toml <<CODEXCFG
 model = "{{model}}"
-model_provider = "fireworks"
+model_provider = "${PROVIDER}"
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
-[model_providers.fireworks]
-name = "Fireworks"
-base_url = "https://api.fireworks.ai/inference/v1"
-env_key = "FIREWORKS_API_KEY"
+[model_providers.${PROVIDER}]
+name = "${CODEX_PROVIDER_NAME}"
+base_url = "${CODEX_PROVIDER_URL}"
+env_key = "${CODEX_ENV_KEY}"
 CODEXCFG
-  echo "[harness] ✅ Codex config installed (Fireworks Responses API)"
+  echo "[harness] ✅ Codex config installed (${PROVIDER} provider)"
 fi
 
 # Gemini: configure settings.json for headless API-key auth + yolo approval

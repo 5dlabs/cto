@@ -286,6 +286,28 @@ impl EffectiveProviderConfig {
 
         // ── CLI-specific env vars (independent of provider) ──
 
+        // ACPX_AGENT: maps CLI type to acpx agent name (factory → droid, rest → identity)
+        let acpx_agent = if self.cli_type == CLIType::Factory {
+            "droid".to_string()
+        } else {
+            self.cli_type.to_string()
+        };
+        vars.push(json!({ "name": "ACPX_AGENT", "value": &acpx_agent }));
+
+        // ACPX_MODEL: the model ID acpx should use, with CLI-specific transforms
+        let acpx_model = match (self.cli_type, self.provider) {
+            (CLIType::OpenCode, Provider::Fireworks) => format!("fireworks-ai/{}", self.raw_model),
+            (CLIType::Kimi, Provider::Fireworks) => "kimi-k2p5-turbo".to_string(),
+            (CLIType::Copilot, _) => "gpt-4.1".to_string(),
+            (CLIType::Codex, _) => self.raw_model.clone(),
+            (CLIType::Gemini, _) => self.raw_model.clone(),
+            (CLIType::Cursor, _) => String::new(), // cursor resolves internally
+            _ => self.raw_model.clone(),
+        };
+        if !acpx_model.is_empty() {
+            vars.push(json!({ "name": "ACPX_MODEL", "value": &acpx_model }));
+        }
+
         if self.cli_type == CLIType::Codex {
             vars.push(json!({ "name": "HOME", "value": "/root" }));
             vars.push(json!({ "name": "XDG_CONFIG_HOME", "value": "/root/.config" }));
