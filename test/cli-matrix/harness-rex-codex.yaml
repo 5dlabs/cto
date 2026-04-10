@@ -14,13 +14,13 @@ spec:
   docsBranch: main
   workingDirectory: .
   githubApp: 5DLabs-Cipher
-  model: accounts/fireworks/routers/kimi-k2p5-turbo
+  model: gpt-4.1
   contextVersion: 1
   taskId: 1
   enableDocker: false
   cliConfig:
     cliType: codex
-    model: accounts/fireworks/routers/kimi-k2p5-turbo
+    model: gpt-4.1
     settings:
       listToolsOnStart: true
   promptModification: |

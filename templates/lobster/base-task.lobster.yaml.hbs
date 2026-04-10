@@ -77,8 +77,8 @@ steps:
       ACPX_MODEL="{{model}}"
 
       # Fireworks FirePass: override model to Fireworks-compatible ID
-      # Skip for factory/droid — it uses native models (GLM, etc.)
-      if [ -n "${FIREWORKS_API_KEY:-}" ] && [ "$CLI_TYPE" != "factory" ]; then
+      # Skip for factory/droid (native models) and codex (requires OpenAI Responses API)
+      if [ -n "${FIREWORKS_API_KEY:-}" ] && [ "$CLI_TYPE" != "factory" ] && [ "$CLI_TYPE" != "codex" ]; then
         export ANTHROPIC_AUTH_TOKEN="$FIREWORKS_API_KEY"
         export ANTHROPIC_BASE_URL="https://api.fireworks.ai/inference"
         FW_MODEL="${FIREWORKS_MODEL:-accounts/fireworks/routers/kimi-k2p5-turbo}"
@@ -104,6 +104,11 @@ steps:
       # Copilot: BYOK via Fireworks — use known model ID for acpx
       if [ "$CLI_TYPE" = "copilot" ]; then
         ACPX_MODEL="${COPILOT_MODEL:-gpt-4.1}"
+      fi
+
+      # Codex: uses OpenAI Responses API via ChatGPT subscription
+      if [ "$CLI_TYPE" = "codex" ]; then
+        ACPX_MODEL="${CODEX_MODEL:-gpt-4.1}"
       fi
 
       export ACPX_MODEL
