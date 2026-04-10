@@ -366,7 +366,44 @@
             }
           }
         }
-      }
+      },
+      "acp": [
+        {
+          "cli": "Claude Code",
+          "provider": { "name": "Anthropic", "credits": 250000 },
+          "models": [
+            { "name": "claude-opus-4-20250514", "thinkingLevel": "high", "score": 96 },
+            { "name": "claude-sonnet-4-20250514", "thinkingLevel": "medium", "score": 91 },
+            { "name": "claude-3-5-haiku-20241022", "thinkingLevel": "low", "score": 84 }
+          ],
+          "baseUrl": "https://api.anthropic.com",
+          "apiKey": "ANTHROPIC_API_KEY"
+        },
+        {
+          "cli": "Codex",
+          "provider": { "name": "OpenAI", "credits": 180000 },
+          "models": [
+            { "name": "gpt-5.2-codex", "thinkingLevel": "high", "score": 95 },
+            { "name": "o4-mini", "thinkingLevel": "medium", "score": 88 },
+            { "name": "gpt-4.1", "thinkingLevel": "low", "score": 82 }
+          ],
+          "baseUrl": "https://api.openai.com/v1",
+          "apiKey": "OPENAI_API_KEY"
+        }
+      ],
+      "openclaw": {
+        "provider": { "name": "Fireworks" },
+        "models": [
+          { "name": "accounts/fireworks/routers/kimi-k2p5-turbo", "thinkingLevel": "high" },
+          { "name": "accounts/fireworks/models/llama-v3p3-70b-instruct", "thinkingLevel": "medium" }
+        ],
+        "baseUrl": "https://api.fireworks.ai/inference",
+        "apiKey": "FIREWORKS_API_KEY"
+      },
+      "quality": true,
+      "security": true,
+      "testing": true,
+      "deployment": false
     },
     "remediation": {
       "repository": "5dlabs/cto",

@@ -61,12 +61,20 @@ impl ResourceNaming {
                     .cloned()
             });
 
-        // Extract agent name if available
+        // Extract agent name: prefer implementation_agent, then github_app
         let agent = code_run
             .spec
-            .github_app
+            .implementation_agent
             .as_ref()
-            .and_then(|app| Self::extract_agent_name(app).ok())
+            .filter(|a| !a.is_empty())
+            .cloned()
+            .or_else(|| {
+                code_run
+                    .spec
+                    .github_app
+                    .as_ref()
+                    .and_then(|app| Self::extract_agent_name(app).ok())
+            })
             .unwrap_or_else(|| "default".to_string());
 
         // Extract model name (shortened for pod naming)
@@ -199,23 +207,18 @@ impl ResourceNaming {
             return format!("{prefix}{trimmed}");
         }
 
-        // Extract CLI type if available
-        let cli = code_run.spec.cli_config.as_ref().map_or_else(
-            || "unknown".to_string(),
-            |config| config.cli_type.to_string(),
-        );
+        // New naming: t{task_id}-{cli}-{model}-{provider}-{uid}-v{version}
+        let cli_readable = Self::extract_cli_readable(&code_run.spec);
+        let provider_readable = Self::extract_provider_readable(&code_run.spec);
 
-        // Build name with PR number prefix if available for easy identification
         let base_name = if let Some(pr) = pr_number {
-            format!("pr{pr}-t{task_id}-{agent}-{cli}-{uid_suffix}-v{context_version}")
+            format!("pr{pr}-t{task_id}-{cli_readable}-{model_short}-{provider_readable}-{uid_suffix}-v{context_version}")
         } else {
-            format!("t{task_id}-{agent}-{cli}-{uid_suffix}-v{context_version}")
+            format!("t{task_id}-{cli_readable}-{model_short}-{provider_readable}-{uid_suffix}-v{context_version}")
         };
 
-        let available = MAX_K8S_NAME_LENGTH.saturating_sub(CODERUN_JOB_PREFIX.len());
-        let trimmed = Self::ensure_k8s_name_length(&base_name, available);
-
-        format!("{CODERUN_JOB_PREFIX}{trimmed}")
+        // No prefix for implementation CodeRuns (was play-coderun-)
+        Self::ensure_k8s_name_length(&base_name, MAX_K8S_NAME_LENGTH)
     }
 
     /// Generate cleanup job name with length compliance.
@@ -271,6 +274,9 @@ impl ResourceNaming {
         // Map common model names to short versions
         // Order matters: check more specific patterns first
         if model_lower.contains("opus") {
+            if model_lower.contains("4-6") || model_lower.contains("4.6") {
+                return "opus46".to_string();
+            }
             if model_lower.contains("4-5") || model_lower.contains("4.5") {
                 return "opus45".to_string();
             }
@@ -289,6 +295,16 @@ impl ResourceNaming {
         }
         if model_lower.contains("haiku") {
             return "haiku".to_string();
+        }
+        // OpenAI new models (check specific patterns before generic gpt-4)
+        if model_lower.contains("gpt-5.2-codex") || model_lower.contains("gpt-5-2-codex") {
+            return "gpt52codex".to_string();
+        }
+        if model_lower.contains("o4-mini") {
+            return "o4mini".to_string();
+        }
+        if model_lower.contains("gpt-4.1") || model_lower.contains("gpt-4-1") {
+            return "gpt41".to_string();
         }
         if model_lower.contains("gpt-4") || model_lower.contains("gpt4") {
             return "gpt4".to_string();
@@ -337,6 +353,82 @@ impl ResourceNaming {
                     "Invalid GitHub app format: {github_app}"
                 ))
             })
+    }
+
+    /// Extract readable CLI name from ACP or cli_config
+    fn extract_cli_readable(spec: &crate::crds::coderun::CodeRunSpec) -> String {
+        // Try ACP first entry
+        if let Some(acp) = &spec.acp {
+            if let Some(first) = acp.first() {
+                return Self::shorten_cli_name(&first.cli);
+            }
+        }
+        // Fallback to cli_config
+        spec.cli_config.as_ref().map_or_else(
+            || "unknown".to_string(),
+            |config| Self::shorten_cli_name(&config.cli_type.to_string()),
+        )
+    }
+
+    /// Extract readable provider name from ACP or cli_config
+    fn extract_provider_readable(spec: &crate::crds::coderun::CodeRunSpec) -> String {
+        // Try ACP first entry
+        if let Some(acp) = &spec.acp {
+            if let Some(first) = acp.first() {
+                return Self::shorten_provider_name(&first.provider.name);
+            }
+        }
+        // Fallback to cli_config.provider (Provider enum → Display string)
+        spec.cli_config
+            .as_ref()
+            .and_then(|c| c.provider.as_ref())
+            .map_or_else(
+                || "default".to_string(),
+                |p| Self::shorten_provider_name(&p.to_string()),
+            )
+    }
+
+    /// Shorten CLI name for K8s naming (e.g., "Claude Code" → "claude-code")
+    pub fn shorten_cli_name(cli: &str) -> String {
+        let lower = cli.to_lowercase();
+        match lower.as_str() {
+            "claude code" | "claude" => "claude-code".to_string(),
+            "codex" => "codex".to_string(),
+            "factory" => "factory".to_string(),
+            "cursor" => "cursor".to_string(),
+            "copilot" => "copilot".to_string(),
+            "code" => "code".to_string(),
+            "dexter" => "dexter".to_string(),
+            "opencode" => "opencode".to_string(),
+            "kimi" => "kimi".to_string(),
+            "openhands" => "openhands".to_string(),
+            "grok" => "grok".to_string(),
+            "gemini" => "gemini".to_string(),
+            "qwen" => "qwen".to_string(),
+            "minimax" => "minimax".to_string(),
+            _ => lower
+                .replace(' ', "-")
+                .chars()
+                .filter(|c| c.is_alphanumeric() || *c == '-')
+                .collect(),
+        }
+    }
+
+    /// Shorten provider name for K8s naming (e.g., "Anthropic" → "anthropic")
+    pub fn shorten_provider_name(provider: &str) -> String {
+        let lower = provider.to_lowercase();
+        match lower.as_str() {
+            "anthropic" => "anthropic".to_string(),
+            "openai" => "openai".to_string(),
+            "openrouter" | "open-router" | "open router" => "open-router".to_string(),
+            "fireworks" => "fireworks".to_string(),
+            "google" => "google".to_string(),
+            _ => lower
+                .replace(' ', "-")
+                .chars()
+                .filter(|c| c.is_alphanumeric() || *c == '-')
+                .collect(),
+        }
     }
 
     // Private helper methods
@@ -525,13 +617,17 @@ mod tests {
     }
 
     #[test]
-    fn job_name_has_play_coderun_prefix() {
+    fn job_name_has_new_format() {
         let code_run = build_code_run();
         let job_name = ResourceNaming::job_name(&code_run);
 
-        assert!(job_name.starts_with(CODERUN_JOB_PREFIX));
-        // New format uses t{task_id} instead of task-{task_id}
-        assert!(job_name.contains("t42"));
+        // New format: no play-coderun- prefix
+        assert!(!job_name.starts_with(CODERUN_JOB_PREFIX));
+        assert!(job_name.starts_with("t42"));
+        // No cli_config set, so cli is "unknown" and provider is "default"
+        assert!(job_name.contains("unknown"), "Should contain unknown cli: {job_name}");
+        assert!(job_name.contains("sonnet"), "Should contain model: {job_name}");
+        assert!(job_name.contains("default"), "Should contain default provider: {job_name}");
         assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
     }
 
@@ -540,8 +636,8 @@ mod tests {
         let code_run = build_code_run_with_pr_label("1627");
         let job_name = ResourceNaming::job_name(&code_run);
 
-        assert!(job_name.starts_with(CODERUN_JOB_PREFIX));
-        assert!(job_name.contains("pr1627"));
+        assert!(!job_name.starts_with(CODERUN_JOB_PREFIX));
+        assert!(job_name.starts_with("pr1627-t42"));
         assert!(job_name.contains("t42"));
         assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
     }
@@ -551,7 +647,7 @@ mod tests {
         let code_run = build_code_run_with_pr_env("1650");
         let job_name = ResourceNaming::job_name(&code_run);
 
-        assert!(job_name.starts_with(CODERUN_JOB_PREFIX));
+        assert!(!job_name.starts_with(CODERUN_JOB_PREFIX));
         assert!(
             job_name.contains("pr1650"),
             "Expected job name to contain PR number from env var"
@@ -575,13 +671,21 @@ mod tests {
 
     #[test]
     fn cleanup_job_name_truncates_with_hash_when_needed() {
-        let mut code_run = build_code_run();
-        let long_agent = "aaaaaaaaaaaaaaaaaaaaaaaa";
-        code_run.spec.github_app = Some(format!("5DLabs-{long_agent}"));
+        let mut code_run = build_code_run_with_pr_label("99999");
+        // Use a very long model name to trigger truncation (new format doesn't include agent)
+        code_run.spec.model =
+            "some-extremely-long-custom-model-name-that-will-definitely-overflow-k8s-limits"
+                .to_string();
 
         let job_name = ResourceNaming::job_name(&code_run);
         let available = MAX_K8S_NAME_LENGTH.saturating_sub(WORKSPACE_CLEANUP_JOB_SUFFIX.len());
-        assert!(job_name.len() > available);
+        assert!(
+            job_name.len() > available,
+            "Job name should exceed cleanup available: len={} available={} name={}",
+            job_name.len(),
+            available,
+            job_name
+        );
 
         let cleanup_name = ResourceNaming::cleanup_job_name(&code_run);
         assert!(cleanup_name.ends_with(WORKSPACE_CLEANUP_JOB_SUFFIX));
@@ -989,6 +1093,48 @@ mod tests {
             job_name.contains("claude"),
             "Intake job should contain CLI type: {job_name}"
         );
+        assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
+    }
+
+    #[test]
+    fn shorten_cli_name_works() {
+        assert_eq!(ResourceNaming::shorten_cli_name("Claude Code"), "claude-code");
+        assert_eq!(ResourceNaming::shorten_cli_name("claude"), "claude-code");
+        assert_eq!(ResourceNaming::shorten_cli_name("Codex"), "codex");
+        assert_eq!(ResourceNaming::shorten_cli_name("Factory"), "factory");
+        assert_eq!(ResourceNaming::shorten_cli_name("Some New CLI"), "some-new-cli");
+    }
+
+    #[test]
+    fn shorten_provider_name_works() {
+        assert_eq!(ResourceNaming::shorten_provider_name("Anthropic"), "anthropic");
+        assert_eq!(ResourceNaming::shorten_provider_name("OpenAI"), "openai");
+        assert_eq!(ResourceNaming::shorten_provider_name("OpenRouter"), "open-router");
+        assert_eq!(ResourceNaming::shorten_provider_name("Fireworks"), "fireworks");
+        assert_eq!(
+            ResourceNaming::shorten_provider_name("Some Provider"),
+            "some-provider"
+        );
+    }
+
+    #[test]
+    fn shorten_model_name_handles_new_models() {
+        assert_eq!(ResourceNaming::shorten_model_name("gpt-5.2-codex"), "gpt52codex");
+        assert_eq!(ResourceNaming::shorten_model_name("o4-mini"), "o4mini");
+        assert_eq!(ResourceNaming::shorten_model_name("gpt-4.1"), "gpt41");
+        assert_eq!(
+            ResourceNaming::shorten_model_name("claude-opus-4-6-20260205"),
+            "opus46"
+        );
+    }
+
+    #[test]
+    fn job_name_uses_implementation_agent_when_set() {
+        let mut code_run = build_code_run();
+        code_run.spec.implementation_agent = Some("blaze".to_string());
+        let job_name = ResourceNaming::job_name(&code_run);
+        // New format: t{task_id}-{cli}-{model}-{provider}-{uid}-v{version}
+        assert!(job_name.contains("t42"));
         assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
     }
 }

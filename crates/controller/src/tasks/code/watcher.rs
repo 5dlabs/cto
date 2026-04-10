@@ -365,6 +365,13 @@ pub async fn create_watcher_coderun(
         watcher_config: None, // Watcher doesn't spawn another watcher
         watcher_for: Some(executor_name.clone()),
         escalation_policy: None,
+        implementation_agent: executor.spec.implementation_agent.clone(),
+        quality: false,     // Watcher doesn't run phase gates
+        security: false,
+        testing: false,
+        deployment: false,
+        acp: None,
+        openclaw: None,
     };
 
     let watcher = CodeRun {
