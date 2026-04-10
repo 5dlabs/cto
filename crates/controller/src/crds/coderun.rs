@@ -344,6 +344,7 @@ pub struct CLIConfig {
 #[kube(printcolumn = r#"{"name":"Model","type":"string","jsonPath":".spec.model"}"#)]
 #[kube(printcolumn = r#"{"name":"Phase","type":"string","jsonPath":".status.phase"}"#)]
 #[kube(printcolumn = r#"{"name":"Age","type":"date","jsonPath":".metadata.creationTimestamp"}"#)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct CodeRunSpec {
     /// Type of run: "implementation" (default), "documentation", "intake"
     #[serde(default = "default_run_type", rename = "runType")]

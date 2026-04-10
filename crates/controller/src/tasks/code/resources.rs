@@ -813,7 +813,7 @@ impl<'a> CodeResourceManager<'a> {
                     "implementation-agent".to_string(),
                     implementation_agent
                         .filter(|a| !a.is_empty())
-                        .map_or_else(|| agent_name.clone(), |a| a.to_lowercase()),
+                        .map_or_else(|| agent_name.clone(), str::to_lowercase),
                 );
 
                 // Add workspace type label
