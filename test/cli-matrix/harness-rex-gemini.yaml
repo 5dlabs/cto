@@ -24,9 +24,10 @@ spec:
     settings:
       listToolsOnStart: true
   promptModification: |
-    Create a file called `smoke-report.md` in the repository root.
-    It must contain:
+    Use the shell tool (run_shell_command / shell) to create a file called `smoke-report.md` in the repository root.
+    Do NOT use write_file or edit_file tools — use shell commands like `cat > smoke-report.md << 'EOF'` instead.
+    The file must contain:
     1. A heading with your agent identity (name, version)
     2. A section listing your available tools
     3. Valid Markdown syntax
-    After creating the file, verify it exists with `ls -la smoke-report.md`.
+    After creating the file, verify it exists with `ls -la smoke-report.md` and `cat smoke-report.md`.
