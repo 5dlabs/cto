@@ -90,7 +90,7 @@ jobs:
             https://github.com/axodotdev/cargo-dist/releases/download/v${{ env.CARGO_DIST_VERSION }}/cargo-dist-installer.sh | sh
 
       - name: Upload cargo-dist binary
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: cargo-dist-bin
           path: ~/.cargo/bin/dist
@@ -223,7 +223,7 @@ jobs:
           ls -lh "$DEST"
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: binary-${{ matrix.package.binary }}-${{ matrix.target.suffix }}
           path: dist/
@@ -276,7 +276,7 @@ jobs:
           ls -lh dist/
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: binary-intake-agent-${{ matrix.suffix }}
           path: dist/
@@ -297,13 +297,13 @@ jobs:
           ls -la /cache/buildx/ 2>/dev/null || echo "No buildx cache yet"
 
       - name: Download Linux x86_64 tools binary
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: binary-tools-server-linux-x86_64
           path: artifacts/
 
       - name: Download Linux x86_64 cto-mcp binary
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: binary-cto-mcp-linux-x86_64
           path: artifacts/
@@ -318,17 +318,17 @@ jobs:
           ls -lh infra/images/tools/cto-mcp
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v3
 
       - name: Log in to Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v5
         with:
           context: ./infra/images/tools
           file: ./infra/images/tools/Dockerfile
@@ -367,7 +367,7 @@ jobs:
           ls -la /cache/buildx/ 2>/dev/null || echo "No buildx cache yet"
 
       - name: Download Linux x86_64 controller binary
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: binary-agent-controller-linux-x86_64
           path: artifacts/
@@ -382,17 +382,17 @@ jobs:
           ls -la infra/images/controller/templates/
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v3
 
       - name: Log in to Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v5
         with:
           context: ./infra/images/controller
           file: ./infra/images/controller/Dockerfile
@@ -431,7 +431,7 @@ jobs:
           ls -la /cache/buildx/ 2>/dev/null || echo "No buildx cache yet"
 
       - name: Download Linux x86_64 healer binary
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: binary-healer-linux-x86_64
           path: artifacts/
@@ -446,17 +446,17 @@ jobs:
           ls -la infra/images/healer/templates/
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v3
 
       - name: Log in to Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v5
         with:
           context: ./infra/images/healer
           file: ./infra/images/healer/Dockerfile
@@ -497,7 +497,7 @@ jobs:
           sudo apt-get install -y gh
 
       - name: Download all binary artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: binary-*
           path: artifacts/
