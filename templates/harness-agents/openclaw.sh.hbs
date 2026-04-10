@@ -89,10 +89,11 @@ fi
 
 # Codex: copy ChatGPT OAuth tokens from read-only secret mount into writable ~/.codex/
 # (codex writes sqlite/cache beside auth.json so the dir must be writable)
+# Use /root/.codex explicitly — CODEX_HOME is pinned to /root/.codex regardless of HOME overrides
 if [ "{{cli_type}}" = "codex" ] && [ -f /root/.codex-oauth/auth.json ]; then
-  mkdir -p "$HOME/.codex"
-  cp /root/.codex-oauth/auth.json "$HOME/.codex/auth.json"
-  chmod 600 "$HOME/.codex/auth.json"
+  mkdir -p /root/.codex
+  cp /root/.codex-oauth/auth.json /root/.codex/auth.json
+  chmod 600 /root/.codex/auth.json
   echo "[harness] ✅ Codex OAuth tokens installed"
 fi
 

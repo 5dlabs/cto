@@ -1227,6 +1227,12 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "XDG_CONFIG_HOME",
                 "value": "/root/.config"
             }));
+            // Pin CODEX_HOME so codex always finds auth.json at /root/.codex
+            // regardless of HOME overrides in .task-env
+            critical_env_vars.push(json!({
+                "name": "CODEX_HOME",
+                "value": "/root/.codex"
+            }));
         }
 
         // Kimi: set model name and base URL for Fireworks routing
