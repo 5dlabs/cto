@@ -71,9 +71,6 @@ spec:
               skillsUrl:
                 type: string
                 description: "Optional base URL of a skills-release repo (https://github.com/{owner}/{repo}). When set, the controller fetches per-skill tarballs from the repo's GitHub Releases and resolves skill content from its local cache."
-              skillsProject:
-                type: string
-                description: "Project overlay name for skills. Maps to {agent}-{project}.tar.gz in the skills release. Defaults to 'default' when absent."
               docsProjectDirectory:
                 type: string
                 description: "Project directory within docs repository (e.g. '_projects/simple-api')"
@@ -169,105 +166,77 @@ spec:
                 description: "Run deployment phase (Bolt). Defaults to false (opt-in)."
               acp:
                 type: array
-                description: "AI-CLI-Provider candidates. Each entry is a CLI with its available providers and models. The OpenClaw harness agent picks based on task difficulty, credits, and model scores."
+                description: "AI-CLI-Provider candidates. The OpenClaw harness agent picks from this array based on task difficulty, credits, and model scores."
                 items:
                   type: object
-                  required: ["cli", "providers"]
+                  required: ["cli", "provider", "models"]
                   properties:
                     cli:
                       type: string
-                      description: "CLI identifier, lowercase, no spaces (e.g. claude, codex, copilot)"
-                    providers:
-                      type: array
-                      description: "Providers available for this CLI, each with credits and models"
-                      items:
-                        type: object
-                        required: ["name", "credits", "models"]
-                        properties:
-                          name:
-                            type: string
-                            description: "Provider slug, lowercase (e.g. anthropic, fireworks, openai)"
-                          credits:
-                            type: integer
-                            format: int64
-                            description: "Available credits budget for this provider (dynamic, sent every call)"
-                          baseUrl:
-                            type: string
-                            description: "Optional API base URL override"
-                          apiKeyEnvVar:
-                            type: string
-                            description: "Env var name in cto-secrets for this provider's API key"
-                          models:
-                            type: array
-                            items:
-                              type: object
-                              required: ["name"]
-                              properties:
-                                name:
-                                  type: string
-                                  description: "Model identifier"
-                                thinkingLevel:
-                                  type: string
-                                  description: "Thinking level hint: high, medium, or low"
-                                score:
-                                  type: integer
-                                  format: int32
-                                  description: "Performance score 0-100"
-              openclaw:
-                type: object
-                description: "OpenClaw runtime configuration — rendered into openclaw.json ConfigMap. When absent, default providers (fireworks, google) are used."
-                required: ["providers"]
-                properties:
-                  providers:
-                    type: array
-                    description: "Provider configurations for the OpenClaw gateway"
-                    items:
+                      description: "CLI name (e.g. Claude Code, Codex)"
+                    provider:
                       type: object
-                      required: ["name", "models"]
+                      required: ["name"]
                       properties:
                         name:
                           type: string
-                          description: "Provider slug, lowercase — used as JSON key in openclaw.json (e.g. fireworks, google, openai)"
-                        baseUrl:
+                          description: "Provider name (e.g. Anthropic, OpenAI)"
+                        credits:
+                          type: integer
+                          format: int64
+                          description: "Available credits budget for this provider"
+                    models:
+                      type: array
+                      items:
+                        type: object
+                        required: ["name"]
+                        properties:
+                          name:
+                            type: string
+                            description: "Model identifier"
+                          thinkingLevel:
+                            type: string
+                            description: "Thinking level hint: high, medium, or low"
+                          score:
+                            type: integer
+                            format: int32
+                            description: "Performance score 0-100"
+                    baseUrl:
+                      type: string
+                      description: "Optional API base URL override"
+                    apiKey:
+                      type: string
+                      description: "Environment variable name for the API key (not a raw secret)"
+              openclaw:
+                type: object
+                description: "OpenClaw runtime configuration — maps to OpenClaw gateway provider settings."
+                required: ["provider", "models"]
+                properties:
+                  provider:
+                    type: object
+                    required: ["name"]
+                    properties:
+                      name:
+                        type: string
+                        description: "Provider name (e.g. Fireworks)"
+                  models:
+                    type: array
+                    items:
+                      type: object
+                      required: ["name"]
+                      properties:
+                        name:
                           type: string
-                          description: "API base URL for this provider"
-                        apiKeyEnvVar:
+                          description: "Model identifier"
+                        thinkingLevel:
                           type: string
-                          description: "Env var name for the API key (e.g. FIREWORKS_API_KEY)"
-                        api:
-                          type: string
-                          description: "OpenClaw API adapter type (e.g. openai-completions, google-generative-ai). Defaults to openai-completions."
-                        models:
-                          type: array
-                          items:
-                            type: object
-                            required: ["name"]
-                            properties:
-                              name:
-                                type: string
-                                description: "Model identifier (e.g. accounts/fireworks/routers/kimi-k2p5-turbo)"
-                              displayName:
-                                type: string
-                                description: "Human-readable display name"
-                              thinkingLevel:
-                                type: string
-                                description: "Thinking level hint: high, medium, or low"
-                              reasoning:
-                                type: boolean
-                                description: "Whether the model supports reasoning/chain-of-thought"
-                              input:
-                                type: array
-                                items:
-                                  type: string
-                                description: "Accepted input modalities (defaults to [text])"
-                              contextWindow:
-                                type: integer
-                                format: int64
-                                description: "Context window size in tokens"
-                              maxTokens:
-                                type: integer
-                                format: int64
-                                description: "Maximum output tokens"
+                          description: "Thinking level hint: high, medium, or low"
+                  baseUrl:
+                    type: string
+                    description: "Optional API base URL"
+                  apiKey:
+                    type: string
+                    description: "Environment variable name for the API key"
               promptStyle:
                 type: string
                 description: "Prompt style variant (e.g. minimal for Ralph-style prompts)"
@@ -360,9 +329,6 @@ spec:
                   providerBaseUrl:
                     type: string
                     description: "Custom base URL for the provider API"
-                  apiKeyEnvVar:
-                    type: string
-                    description: "Secret key name in cto-secrets for this provider's API key (e.g. FIREWORKS_API_KEY). Overrides hardcoded defaults."
                   settings:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
