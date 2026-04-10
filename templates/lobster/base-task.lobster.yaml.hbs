@@ -141,9 +141,6 @@ steps:
       fi
       mkdir -p "$TASK_DIR"
 
-      # Prompt and acceptance criteria are pulled from the repo by intake —
-      # no ConfigMap injection needed.
-
       INDEX="${TASK_DIR}/index.lobster.yaml"
       if [ ! -f "$INDEX" ]; then
         # Search for index.lobster.yaml in common locations (docs subdir, nested .tasks, etc.)

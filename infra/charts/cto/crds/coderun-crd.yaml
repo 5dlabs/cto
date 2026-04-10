@@ -153,6 +153,12 @@ spec:
                   model:
                     type: string
                     description: "Model identifier for the selected CLI"
+                  provider:
+                    type: string
+                    description: "Inference provider (fireworks, anthropic, google, openai, cursor, factory, moonshot)"
+                  providerBaseUrl:
+                    type: string
+                    description: "Override base URL for the provider API endpoint"
                   settings:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
