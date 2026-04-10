@@ -14,13 +14,13 @@ spec:
   docsBranch: main
   workingDirectory: .
   githubApp: 5DLabs-Cipher
-  model: gpt-4.1
+  model: gpt-5.2-codex
   contextVersion: 1
   taskId: 1
   enableDocker: false
   cliConfig:
     cliType: codex
-    model: gpt-4.1
+    model: gpt-5.2-codex
     settings:
       listToolsOnStart: true
   promptModification: |

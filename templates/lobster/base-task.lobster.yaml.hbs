@@ -108,7 +108,7 @@ steps:
 
       # Codex: uses OpenAI Responses API via ChatGPT subscription
       if [ "$CLI_TYPE" = "codex" ]; then
-        ACPX_MODEL="${CODEX_MODEL:-gpt-4.1}"
+        ACPX_MODEL="${CODEX_MODEL:-gpt-5.2-codex}"
       fi
 
       export ACPX_MODEL

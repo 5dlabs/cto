@@ -97,7 +97,13 @@ if [ "{{cli_type}}" = "codex" ] && [ -f /root/.codex-oauth/auth.json ]; then
   cp /root/.codex-oauth/auth.json /root/.codex/auth.json
   chmod 600 /root/.codex/auth.json
   unset OPENAI_API_KEY
-  echo "[harness] ✅ Codex OAuth tokens installed (OPENAI_API_KEY unset)"
+  # Write config.toml: full-auto sandbox, never prompt, use CRD model
+  cat > /root/.codex/config.toml <<CODEXCFG
+model = "{{model}}"
+approval_policy = "never"
+sandbox_permissions = ["disk-full-read-access", "disk-full-write-access", "network-full-access"]
+CODEXCFG
+  echo "[harness] ✅ Codex OAuth tokens + config installed (OPENAI_API_KEY unset)"
 fi
 
 for f in /etc/profile.d/*.sh; do
