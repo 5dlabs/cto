@@ -325,6 +325,7 @@ cursor-api-key|Cursor API Key|credential
 minimax-api-key|MiniMax API Keys|credential
 brave-api-key|Brave Search API Key|credential
 perplexity-api-key|Perplexity API Key|credential
+fireworks-api-key|Fireworks API Key|credential
 EOF
 )
 
