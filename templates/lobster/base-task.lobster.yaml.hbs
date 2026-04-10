@@ -65,61 +65,23 @@ steps:
       set -euo pipefail
       [ -f /workspace/.task-env ] && source /workspace/.task-env
 
-      # ── CLI → acpx agent mapping ──
-      CLI_TYPE="{{cli_type}}"
-      case "$CLI_TYPE" in
-        factory) ACPX_AGENT="droid" ;;
-        *)       ACPX_AGENT="$CLI_TYPE" ;;
-      esac
-      export ACPX_AGENT
-
-      # ── Model (with provider override) ──
-      ACPX_MODEL="{{model}}"
-
-      # Fireworks FirePass: override model to Fireworks-compatible ID
-      # Skip for factory/droid (native models), codex (Fireworks Responses API), and gemini (native Google API)
-      if [ -n "${FIREWORKS_API_KEY:-}" ] && [ "$CLI_TYPE" != "factory" ] && [ "$CLI_TYPE" != "codex" ] && [ "$CLI_TYPE" != "gemini" ]; then
-        export ANTHROPIC_AUTH_TOKEN="$FIREWORKS_API_KEY"
-        export ANTHROPIC_BASE_URL="https://api.fireworks.ai/inference"
-        FW_MODEL="${FIREWORKS_MODEL:-accounts/fireworks/routers/kimi-k2p5-turbo}"
-        export ANTHROPIC_MODEL="$FW_MODEL"
-        export CLAUDE_MODEL="$FW_MODEL"
-        export CLAUDE_CODE_MODEL="$FW_MODEL"
-        ACPX_MODEL="$FW_MODEL"
-        # OpenCode requires fireworks-ai/ provider prefix on model ID
-        if [ "$CLI_TYPE" = "opencode" ]; then
-          ACPX_MODEL="fireworks-ai/$FW_MODEL"
-        fi
-        # Kimi CLI: set_session_model uses the config model key, not raw ID
-        if [ "$CLI_TYPE" = "kimi" ]; then
-          ACPX_MODEL="kimi-k2p5-turbo"
-        fi
+      # ACPX_AGENT and ACPX_MODEL are set by the controller as pod env vars.
+      # Fall back to template values only for backward compatibility.
+      if [ -z "${ACPX_AGENT:-}" ]; then
+        CLI_TYPE="{{cli_type}}"
+        case "$CLI_TYPE" in
+          factory) ACPX_AGENT="droid" ;;
+          *)       ACPX_AGENT="$CLI_TYPE" ;;
+        esac
+        export ACPX_AGENT
       fi
 
-      # Cursor: uses CURSOR_API_KEY, model resolved internally
-      if [ "$CLI_TYPE" = "cursor" ] && [ -n "${CURSOR_API_KEY:-}" ]; then
-        export CURSOR_API_KEY
+      if [ -z "${ACPX_MODEL:-}" ]; then
+        ACPX_MODEL="{{model}}"
+        export ACPX_MODEL
       fi
-
-      # Copilot: BYOK via Fireworks — use known model ID for acpx
-      if [ "$CLI_TYPE" = "copilot" ]; then
-        ACPX_MODEL="${COPILOT_MODEL:-gpt-4.1}"
-      fi
-
-      # Codex: uses Fireworks Responses API, model from CRD
-      if [ "$CLI_TYPE" = "codex" ]; then
-        ACPX_MODEL="${CODEX_MODEL:-{{model}}}"
-      fi
-
-      # Gemini: uses native Google API with GEMINI_API_KEY from secrets
-      if [ "$CLI_TYPE" = "gemini" ]; then
-        ACPX_MODEL="${GEMINI_MODEL:-gemini-2.5-flash}"
-      fi
-
-      export ACPX_MODEL
 
       # ── Build the base acpx command ──
-      # CLAUDE_WORK_DIR already includes the repo path from git-setup
       WORK_DIR="${CLAUDE_WORK_DIR:-/workspace}"
       ACPX_CMD="acpx"
       ACPX_CMD="$ACPX_CMD --cwd $WORK_DIR"
@@ -147,7 +109,7 @@ steps:
       echo "✅ acpx env ready"
       echo "   ACPX_AGENT=$ACPX_AGENT"
       echo "   ACPX_MODEL=$ACPX_MODEL"
-      echo "   CLI={{cli_type}} PROVIDER=${FIREWORKS_API_KEY:+fireworks}"
+      echo "   PROVIDER=${RESOLVED_PROVIDER:-unknown}"
       STEP
 
   # ─── Run Task (retry until acceptance or timeout) ───────────────────
@@ -179,9 +141,8 @@ steps:
       fi
       mkdir -p "$TASK_DIR"
 
-      # Inject prompt/criteria from ConfigMap if provided
-      [ -f /task-files/prompt.md ] && cp /task-files/prompt.md "$TASK_DIR/prompt.md"
-      [ -f /task-files/acceptance-criteria.md ] && cp /task-files/acceptance-criteria.md "$TASK_DIR/acceptance-criteria.md"
+      # Prompt and acceptance criteria are pulled from the repo by intake —
+      # no ConfigMap injection needed.
 
       INDEX="${TASK_DIR}/index.lobster.yaml"
       if [ ! -f "$INDEX" ]; then

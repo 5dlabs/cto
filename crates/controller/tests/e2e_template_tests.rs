@@ -489,6 +489,8 @@ mod rendering_tests {
                     max_tokens: Some(16000),
                     temperature: Some(0.7),
                     model_rotation: None,
+                    provider: None,
+                    provider_base_url: None,
                 }),
                 task_id: Some(1),
                 service: "test-service".to_string(),

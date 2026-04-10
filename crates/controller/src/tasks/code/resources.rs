@@ -1,7 +1,7 @@
 use super::agent::AgentClassifier;
 use super::naming::ResourceNaming;
 use super::watcher::coordination_configmap_name;
-use crate::cli::types::CLIType;
+use crate::cli::types::{CLIType, Provider};
 use crate::crds::{CLIConfig, CodeRun};
 use crate::tasks::cleanup::{
     LABEL_CLEANUP_KIND, LABEL_CLEANUP_RUN, LABEL_CLEANUP_SCOPE, SCOPE_RUN,
@@ -20,6 +20,334 @@ use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tracing::{error, info, warn};
+
+// ─── Effective Provider Resolution ────────────────────────────────────────
+//
+// Single source of truth for how a CodeRun resolves its provider, base URL,
+// secret key, and model identity. Every env-var emitter, ConfigMap generator,
+// and DD-tag builder MUST go through `resolve_effective_provider`.
+
+/// Fully resolved provider configuration for a CodeRun.
+///
+/// All env var logic, config file generation, and observability tags
+/// should read from this struct instead of inspecting raw CRD fields.
+#[derive(Debug, Clone)]
+pub struct EffectiveProviderConfig {
+    /// The resolved provider.
+    pub provider: Provider,
+    /// How the provider was determined — for debugging / log messages.
+    pub source: ProviderSource,
+    /// Base URL for inference (provider default or CRD override).
+    pub base_url: Option<String>,
+    /// Secret key name in `cto-secrets` (e.g. `FIREWORKS_API_KEY`).
+    pub secret_key: String,
+    /// The model ID as-is from the CRD (before any CLI-specific transforms).
+    pub raw_model: String,
+    /// CLI type for this run.
+    pub cli_type: CLIType,
+}
+
+/// How the provider was resolved — logged for debuggability.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProviderSource {
+    /// Explicitly set in `cliConfig.provider`.
+    Explicit,
+    /// Carried in legacy `cliConfig.settings.provider` / `settings.modelProvider`.
+    LegacySetting,
+    /// Resolved from operator-level `cliProviders` config map.
+    OperatorConfig,
+    /// Inferred from model ID string patterns.
+    ModelInference,
+}
+
+impl std::fmt::Display for ProviderSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProviderSource::Explicit => write!(f, "explicit"),
+            ProviderSource::LegacySetting => write!(f, "legacy-setting"),
+            ProviderSource::OperatorConfig => write!(f, "operator-default"),
+            ProviderSource::ModelInference => write!(f, "inferred"),
+        }
+    }
+}
+
+impl EffectiveProviderConfig {
+    /// Resolve the effective provider for a CodeRun.
+    ///
+    /// Precedence (first match wins):
+    /// 1. `cliConfig.provider` (explicit CRD field)
+    /// 2. `cliConfig.settings.provider` or `settings.modelProvider.name` (legacy)
+    /// 3. Controller `cliProviders` config (operator-level default)
+    /// 4. `Provider::infer_from_model()` (model ID string patterns)
+    /// 5. Fallback to `Fireworks` (current default for the platform)
+    #[allow(clippy::too_many_lines)]
+    pub fn resolve(
+        code_run: &CodeRun,
+        controller_config: &ControllerConfig,
+    ) -> Self {
+        let cli_type = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .map_or(CLIType::Claude, |cfg| cfg.cli_type);
+
+        let raw_model = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .map_or_else(|| code_run.spec.model.clone(), |cfg| cfg.model.clone());
+
+        // 1. Explicit cliConfig.provider
+        if let Some(ref cli_cfg) = code_run.spec.cli_config {
+            if let Some(provider) = cli_cfg.provider {
+                let base_url = cli_cfg
+                    .provider_base_url
+                    .clone()
+                    .or_else(|| provider.default_base_url().map(String::from));
+                info!(
+                    "Provider resolved ({}): {} for {} (model={})",
+                    ProviderSource::Explicit,
+                    provider,
+                    cli_type,
+                    raw_model
+                );
+                return Self {
+                    provider,
+                    source: ProviderSource::Explicit,
+                    base_url,
+                    secret_key: provider.secret_key().to_string(),
+                    raw_model,
+                    cli_type,
+                };
+            }
+        }
+
+        // 2. Legacy settings.provider / settings.modelProvider
+        if let Some(ref cli_cfg) = code_run.spec.cli_config {
+            let legacy_provider_str = cli_cfg
+                .settings
+                .get("provider")
+                .and_then(|v| v.as_str())
+                .or_else(|| {
+                    cli_cfg
+                        .settings
+                        .get("modelProvider")
+                        .and_then(|v| v.get("name"))
+                        .and_then(|v| v.as_str())
+                });
+            if let Some(ps) = legacy_provider_str {
+                if let Some(provider) = Provider::from_str_ci(ps) {
+                    let base_url = cli_cfg
+                        .provider_base_url
+                        .clone()
+                        .or_else(|| provider.default_base_url().map(String::from));
+                    info!(
+                        "Provider resolved ({}): {} for {} (model={})",
+                        ProviderSource::LegacySetting,
+                        provider,
+                        cli_type,
+                        raw_model
+                    );
+                    return Self {
+                        provider,
+                        source: ProviderSource::LegacySetting,
+                        base_url,
+                        secret_key: provider.secret_key().to_string(),
+                        raw_model,
+                        cli_type,
+                    };
+                }
+            }
+        }
+
+        // 3. Operator-level cliProviders config
+        let cli_key = cli_type.to_string().to_lowercase();
+        if let Some(provider_name) = controller_config.agent.cli_providers.get(&cli_key) {
+            if let Some(provider) = Provider::from_str_ci(provider_name) {
+                let base_url = code_run
+                    .spec
+                    .cli_config
+                    .as_ref()
+                    .and_then(|c| c.provider_base_url.clone())
+                    .or_else(|| provider.default_base_url().map(String::from));
+                info!(
+                    "Provider resolved ({}): {} for {} (model={})",
+                    ProviderSource::OperatorConfig,
+                    provider,
+                    cli_type,
+                    raw_model
+                );
+                return Self {
+                    provider,
+                    source: ProviderSource::OperatorConfig,
+                    base_url,
+                    secret_key: provider.secret_key().to_string(),
+                    raw_model,
+                    cli_type,
+                };
+            }
+        }
+
+        // 4. Infer from model ID
+        if let Some(provider) = Provider::infer_from_model(&raw_model) {
+            let base_url = code_run
+                .spec
+                .cli_config
+                .as_ref()
+                .and_then(|c| c.provider_base_url.clone())
+                .or_else(|| provider.default_base_url().map(String::from));
+            info!(
+                "Provider resolved ({}): {} for {} (model={})",
+                ProviderSource::ModelInference,
+                provider,
+                cli_type,
+                raw_model
+            );
+            return Self {
+                provider,
+                source: ProviderSource::ModelInference,
+                base_url,
+                secret_key: provider.secret_key().to_string(),
+                raw_model,
+                cli_type,
+            };
+        }
+
+        // 5. Fallback to Fireworks
+        warn!(
+            "Could not resolve provider for {} (model={}), defaulting to Fireworks",
+            cli_type, raw_model
+        );
+        Self {
+            provider: Provider::Fireworks,
+            source: ProviderSource::ModelInference,
+            base_url: Provider::Fireworks.default_base_url().map(String::from),
+            secret_key: Provider::Fireworks.secret_key().to_string(),
+            raw_model,
+            cli_type,
+        }
+    }
+
+    /// Build the env vars specific to this provider × CLI combination.
+    ///
+    /// Returns a Vec of `serde_json::Value` env var objects ready for the
+    /// pod spec. This replaces all the scattered `if cli_type ==` blocks.
+    #[allow(clippy::too_many_lines)]
+    pub fn build_env_vars(&self) -> Vec<serde_json::Value> {
+        let mut vars = Vec::new();
+        let secret_name = "cto-secrets";
+
+        // ── Provider-level env vars (apply to all CLIs using this provider) ──
+
+        match self.provider {
+            Provider::Fireworks => {
+                if let Some(ref url) = self.base_url {
+                    vars.push(json!({ "name": "ANTHROPIC_BASE_URL", "value": url }));
+                }
+                vars.push(json!({
+                    "name": "ANTHROPIC_AUTH_TOKEN",
+                    "valueFrom": { "secretKeyRef": { "name": secret_name, "key": "FIREWORKS_API_KEY" } }
+                }));
+                vars.push(json!({
+                    "name": "ANTHROPIC_API_KEY",
+                    "valueFrom": { "secretKeyRef": { "name": secret_name, "key": "FIREWORKS_API_KEY" } }
+                }));
+                vars.push(json!({
+                    "name": "FIREWORKS_AI_API_KEY",
+                    "valueFrom": { "secretKeyRef": { "name": secret_name, "key": "FIREWORKS_API_KEY" } }
+                }));
+
+                // Model identity env vars for Claude Code / subagents
+                let raw = self
+                    .raw_model
+                    .strip_prefix("fireworks/")
+                    .unwrap_or(&self.raw_model);
+                vars.push(json!({ "name": "ANTHROPIC_MODEL", "value": raw }));
+                vars.push(json!({ "name": "ANTHROPIC_SMALL_FAST_MODEL", "value": raw }));
+                vars.push(json!({ "name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": raw }));
+                vars.push(json!({ "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL", "value": raw }));
+                vars.push(json!({ "name": "ANTHROPIC_DEFAULT_OPUS_MODEL", "value": raw }));
+            }
+            Provider::Google => {
+                vars.push(json!({ "name": "GEMINI_MODEL", "value": &self.raw_model }));
+            }
+            Provider::Anthropic
+            | Provider::OpenAI
+            | Provider::Cursor
+            | Provider::Factory => {
+                // Native providers — API keys come from cto-secrets envFrom
+            }
+            Provider::Moonshot => {
+                if let Some(ref url) = self.base_url {
+                    vars.push(json!({ "name": "KIMI_BASE_URL", "value": url }));
+                }
+            }
+        }
+
+        // ── CLI-specific env vars (independent of provider) ──
+
+        // ACPX_AGENT: maps CLI type to acpx agent name (factory → droid, rest → identity)
+        let acpx_agent = if self.cli_type == CLIType::Factory {
+            "droid".to_string()
+        } else {
+            self.cli_type.to_string()
+        };
+        vars.push(json!({ "name": "ACPX_AGENT", "value": &acpx_agent }));
+
+        // ACPX_MODEL: the model ID acpx should use, with CLI-specific transforms
+        let acpx_model = match (self.cli_type, self.provider) {
+            (CLIType::OpenCode, Provider::Fireworks) => format!("fireworks-ai/{}", self.raw_model),
+            (CLIType::Kimi, Provider::Fireworks) => "kimi-k2p5-turbo".to_string(),
+            (CLIType::Copilot, _) => "gpt-4.1".to_string(),
+            (CLIType::Cursor, _) => String::new(), // cursor resolves internally
+            _ => self.raw_model.clone(),
+        };
+        if !acpx_model.is_empty() {
+            vars.push(json!({ "name": "ACPX_MODEL", "value": &acpx_model }));
+        }
+
+        if self.cli_type == CLIType::Codex {
+            vars.push(json!({ "name": "HOME", "value": "/root" }));
+            vars.push(json!({ "name": "XDG_CONFIG_HOME", "value": "/root/.config" }));
+            vars.push(json!({ "name": "CODEX_HOME", "value": "/root/.codex" }));
+        }
+
+        // ── CLI × Provider specializations ──
+
+        if self.cli_type == CLIType::Kimi {
+            vars.push(json!({ "name": "KIMI_MODEL_NAME", "value": &self.raw_model }));
+            if self.provider == Provider::Fireworks {
+                vars.push(json!({
+                    "name": "KIMI_BASE_URL",
+                    "value": "https://api.fireworks.ai/inference/v1"
+                }));
+            }
+        }
+
+        if self.cli_type == CLIType::Copilot {
+            vars.push(json!({
+                "name": "COPILOT_GITHUB_TOKEN",
+                "valueFrom": { "secretKeyRef": { "name": secret_name, "key": "COPILOT_GITHUB_TOKEN" } }
+            }));
+            if self.provider == Provider::Fireworks {
+                vars.push(json!({
+                    "name": "COPILOT_PROVIDER_BASE_URL",
+                    "value": "https://api.fireworks.ai/inference/v1"
+                }));
+                vars.push(json!({ "name": "COPILOT_PROVIDER_TYPE", "value": "openai" }));
+                vars.push(json!({
+                    "name": "COPILOT_PROVIDER_API_KEY",
+                    "valueFrom": { "secretKeyRef": { "name": secret_name, "key": "FIREWORKS_API_KEY" } }
+                }));
+                vars.push(json!({ "name": "COPILOT_MODEL", "value": "gpt-4.1" }));
+                vars.push(json!({ "name": "COPILOT_PROVIDER_MODEL_ID", "value": "gpt-4.1" }));
+                vars.push(json!({ "name": "COPILOT_PROVIDER_WIRE_MODEL", "value": &self.raw_model }));
+            }
+        }
+
+        vars
+    }
+}
 
 pub struct CodeResourceManager<'a> {
     pub jobs: &'a Api<Job>,
@@ -1088,15 +1416,18 @@ impl<'a> CodeResourceManager<'a> {
         let cli_model = code_run.spec.model.clone();
         let container_name = Self::container_name_for_cli(cli_type, &cli_model);
 
+        // ── Single source of truth for provider resolution ──
+        let provider_config = EffectiveProviderConfig::resolve(code_run, self.config);
+
         // Resolve CLI-specific API key binding (env var + secret reference)
-        let provider = self
+        let legacy_provider = self
             .config
             .agent
             .cli_providers
             .get(&cli_type.to_string().to_lowercase())
             .map(std::string::String::as_str);
 
-        let api_key_binding = self.config.secrets.resolve_cli_binding(&cli_type, provider);
+        let api_key_binding = self.config.secrets.resolve_cli_binding(&cli_type, legacy_provider);
         let ResolvedSecretBinding {
             env_var: api_env_var,
             secret_name: api_secret_name,
@@ -1200,72 +1531,17 @@ impl<'a> CodeResourceManager<'a> {
             }),
         ];
 
-        if cli_type == CLIType::Codex {
-            critical_env_vars.push(json!({
-                "name": "HOME",
-                "value": "/root"
-            }));
-            critical_env_vars.push(json!({
-                "name": "XDG_CONFIG_HOME",
-                "value": "/root/.config"
-            }));
-            // Pin CODEX_HOME so codex always finds auth.json at /root/.codex
-            // regardless of HOME overrides in .task-env
-            critical_env_vars.push(json!({
-                "name": "CODEX_HOME",
-                "value": "/root/.codex"
-            }));
-        }
-
-        // Kimi: set model name and base URL for Fireworks routing
-        if cli_type == CLIType::Kimi {
-            let model = &code_run.spec.model;
-            if model.contains("fireworks") {
-                critical_env_vars.push(json!({
-                    "name": "KIMI_BASE_URL",
-                    "value": "https://api.fireworks.ai/inference/v1"
-                }));
-            }
-            critical_env_vars.push(json!({
-                "name": "KIMI_MODEL_NAME",
-                "value": model
-            }));
-        }
-
-        // Copilot: BYOK via Fireworks with OAuth token auth.
-        // COPILOT_GITHUB_TOKEN (gho_* OAuth) satisfies ACP auth. BYOK env vars route
-        // inference to Fireworks. Do NOT set COPILOT_OFFLINE — it breaks ACP auth.
-        if cli_type == CLIType::Copilot {
-            let model = &code_run.spec.model;
-            critical_env_vars.push(json!({
-                "name": "COPILOT_GITHUB_TOKEN",
-                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "COPILOT_GITHUB_TOKEN" } }
-            }));
-            critical_env_vars.push(json!({
-                "name": "COPILOT_PROVIDER_BASE_URL",
-                "value": "https://api.fireworks.ai/inference/v1"
-            }));
-            critical_env_vars.push(json!({
-                "name": "COPILOT_PROVIDER_TYPE",
-                "value": "openai"
-            }));
-            critical_env_vars.push(json!({
-                "name": "COPILOT_PROVIDER_API_KEY",
-                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
-            }));
-            critical_env_vars.push(json!({
-                "name": "COPILOT_MODEL",
-                "value": "gpt-4.1"
-            }));
-            critical_env_vars.push(json!({
-                "name": "COPILOT_PROVIDER_MODEL_ID",
-                "value": "gpt-4.1"
-            }));
-            critical_env_vars.push(json!({
-                "name": "COPILOT_PROVIDER_WIRE_MODEL",
-                "value": model
-            }));
-        }
+        // ── Provider × CLI env vars (replaces scattered if-blocks) ──
+        critical_env_vars.extend(provider_config.build_env_vars());
+        // Export resolved provider as env var for templates/observability
+        critical_env_vars.push(json!({
+            "name": "RESOLVED_PROVIDER",
+            "value": provider_config.provider.to_string()
+        }));
+        critical_env_vars.push(json!({
+            "name": "RESOLVED_PROVIDER_SOURCE",
+            "value": provider_config.source.to_string()
+        }));
 
         // Comprehensive deduplication: remove all duplicates by name, keeping the last occurrence
         // This ensures that later additions (like critical system vars) take precedence
@@ -1307,45 +1583,8 @@ impl<'a> CodeResourceManager<'a> {
         // Disable xAI code_execution tool (cto-secrets has a placeholder XAI_API_KEY)
         final_env_vars.push(json!({ "name": "XAI_API_KEY", "value": "" }));
 
-        // Fireworks model routing: when the model ID contains "fireworks", set
-        // ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN so the acpx/Claude Code
-        // backend routes through Fireworks' Anthropic-compatible API.
-        // Also set all ANTHROPIC_*_MODEL vars so subagents use the same model.
-        // The raw model ID (without provider prefix) is used for Claude Code env vars.
-        if code_run.spec.model.contains("fireworks") {
-            // Strip the "fireworks/" provider prefix for Claude Code env vars
-            let raw_model_id = code_run
-                .spec
-                .model
-                .strip_prefix("fireworks/")
-                .unwrap_or(&code_run.spec.model);
-            final_env_vars.push(json!({ "name": "ANTHROPIC_BASE_URL", "value": "https://api.fireworks.ai/inference" }));
-            final_env_vars.push(json!({
-                "name": "ANTHROPIC_AUTH_TOKEN",
-                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
-            }));
-            // Claude Code uses ANTHROPIC_API_KEY for auth — override with Fireworks key
-            // when routing through Fireworks' Anthropic-compatible endpoint
-            final_env_vars.push(json!({
-                "name": "ANTHROPIC_API_KEY",
-                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
-            }));
-            // litellm (used by ACP bridge) expects FIREWORKS_AI_API_KEY
-            final_env_vars.push(json!({
-                "name": "FIREWORKS_AI_API_KEY",
-                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
-            }));
-            final_env_vars.push(json!({ "name": "ANTHROPIC_MODEL", "value": raw_model_id }));
-            final_env_vars
-                .push(json!({ "name": "ANTHROPIC_SMALL_FAST_MODEL", "value": raw_model_id }));
-            final_env_vars
-                .push(json!({ "name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": raw_model_id }));
-            final_env_vars
-                .push(json!({ "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL", "value": raw_model_id }));
-            final_env_vars
-                .push(json!({ "name": "ANTHROPIC_DEFAULT_OPUS_MODEL", "value": raw_model_id }));
-            info!("Fireworks model detected — set ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY, AUTH_TOKEN, and FIREWORKS_AI_API_KEY");
-        }
+        // Provider env vars are now handled by EffectiveProviderConfig.build_env_vars()
+        // above (in the critical_env_vars section). No more model-string detection here.
 
         // Final deduplication pass to handle any remaining duplicates from critical vars and Docker
         let mut final_seen_names = std::collections::HashSet::new();
@@ -2052,13 +2291,7 @@ scrape_configs:
             .get("cli-type")
             .cloned()
             .unwrap_or_else(|| "unknown".to_string());
-        let dd_provider = code_run
-            .spec
-            .model
-            .split('/')
-            .next()
-            .unwrap_or("unknown")
-            .to_string();
+        let dd_provider = provider_config.provider.to_string();
         let dd_model = &code_run.spec.model;
         let dd_task_id = code_run.spec.task_id.unwrap_or(0);
         let dd_run_type = &code_run.spec.run_type;
@@ -2891,6 +3124,14 @@ scrape_configs:
             existing.model_rotation.clone_from(&defaults.model_rotation);
         }
 
+        if existing.provider.is_none() {
+            existing.provider = defaults.provider;
+        }
+
+        if existing.provider_base_url.is_none() {
+            existing.provider_base_url.clone_from(&defaults.provider_base_url);
+        }
+
         for (key, value) in &defaults.settings {
             existing
                 .settings
@@ -3010,6 +3251,8 @@ mod tests {
             max_tokens: None,
             temperature: None,
             model_rotation: None,
+            provider: None,
+            provider_base_url: None,
         }
     }
 
@@ -3052,6 +3295,8 @@ mod tests {
                     max_tokens: Some(16000),
                     temperature: Some(0.7),
                     model_rotation: None,
+                    provider: None,
+                    provider_base_url: None,
                 }),
                 task_id: Some(1),
                 service: "test-service".to_string(),
@@ -3486,6 +3731,8 @@ mod tests {
             max_tokens: Some(16_000),
             temperature: Some(0.7_f32),
             model_rotation: None,
+            provider: None,
+            provider_base_url: None,
         };
 
         CodeResourceManager::merge_cli_config(&mut existing, &defaults);
@@ -3515,6 +3762,8 @@ mod tests {
             max_tokens: Some(8_192),
             temperature: Some(0.3_f32),
             model_rotation: None,
+            provider: None,
+            provider_base_url: None,
         };
 
         let mut defaults_settings = HashMap::new();
@@ -3527,6 +3776,8 @@ mod tests {
             max_tokens: Some(16_000),
             temperature: Some(0.9_f32),
             model_rotation: None,
+            provider: None,
+            provider_base_url: None,
         };
 
         CodeResourceManager::merge_cli_config(&mut existing, &defaults);
@@ -3553,6 +3804,8 @@ mod tests {
             max_tokens: None,
             temperature: None,
             model_rotation: Some(json!(["model1", "model2", "model3"])),
+            provider: None,
+            provider_base_url: None,
         };
 
         CodeResourceManager::merge_cli_config(&mut existing, &defaults);
@@ -3570,6 +3823,8 @@ mod tests {
             max_tokens: None,
             temperature: None,
             model_rotation: Some(json!(["existing-model"])),
+            provider: None,
+            provider_base_url: None,
         };
 
         CodeResourceManager::merge_cli_config(&mut existing_with_rotation, &defaults);

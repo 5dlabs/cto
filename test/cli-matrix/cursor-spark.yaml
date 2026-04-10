@@ -18,6 +18,7 @@ spec:
   enableDocker: false
   cliConfig:
     cliType: cursor
+    provider: cursor
     model: accounts/fireworks/routers/kimi-k2p5-turbo
     settings:
       listToolsOnStart: true

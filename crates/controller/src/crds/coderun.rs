@@ -1,6 +1,6 @@
 //! `CodeRun` Custom Resource Definition for code implementation tasks
 
-use crate::cli::types::CLIType;
+use crate::cli::types::{CLIType, Provider};
 use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -216,6 +216,20 @@ pub struct CLIConfig {
 
     /// Model identifier (CLI-specific, e.g., "sonnet", "gpt-4", "claude-sonnet-4-5-20250929")
     pub model: String,
+
+    /// Inference provider (fireworks, anthropic, google, openai, cursor, factory, moonshot).
+    /// When omitted, inferred from model ID or controller-level `cliProviders` config.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<Provider>,
+
+    /// Custom base URL for the provider API.
+    /// Overrides the provider's default base URL when set.
+    #[serde(
+        default,
+        rename = "providerBaseUrl",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub provider_base_url: Option<String>,
 
     /// CLI-specific settings (key-value pairs)
     #[serde(default)]
@@ -544,6 +558,8 @@ mod tests {
             max_tokens: Some(4096),
             temperature: Some(0.7),
             model_rotation: None,
+            provider: None,
+            provider_base_url: None,
         };
 
         assert_eq!(cli_config.cli_type, CLIType::Codex);
