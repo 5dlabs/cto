@@ -38,7 +38,7 @@ telemetry:
 agent:
   id: "morgan"
   name: "Morgan"
-  model: "google/gemini-2.5-flash"
+  model: "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
   heartbeat:
     every: "12h"
     target: "last"
@@ -54,12 +54,11 @@ agentDefaults:
   typingMode: "instant"
 
 modelDefaults:
-  primary: "google/gemini-2.5-flash"
+  primary: "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
   fallbacks:
     - "google/gemini-2.5-pro"
     - "anthropic/claude-sonnet-4-20250514"
-    - "openai-api/gpt-5.4"
-    - "openai-api/gpt-5.3-codex"
+    - "openai-api/gpt-5.4-pro"
 
 secrets:
   external:
@@ -69,17 +68,82 @@ secrets:
 messaging:
   discord:
     enabled: true
-    accountId: "morgan"
-    tokenSecretKey: "henry"
-    allowBots: "mentions"
+    accountId: "default"
+    tokenSecretKey: "DISCORD_TOKEN_MORGAN"
+    allowBots: false
+    dmPolicy: "allowlist"
+    allowFrom:
+      - "444519104808878090"       # jonathon
+      - "1467013771548426291"
+      - "1466937419981918220"
+      - "1466938003451674748"
+      - "1466938424790356253"
+      - "1468829684195135592"
+      - "1466930035356078251"
+      - "1466938744593715210"
+    groupPolicy: "allowlist"
+    guilds:
+      "*":
+        requireMention: true
+        users:
+          - "444519104808878090"
+          - "1467013771548426291"
+          - "1466937419981918220"
+          - "1466938003451674748"
+          - "1466938424790356253"
+          - "1468829684195135592"
+          - "1466930035356078251"
+          - "1466938744593715210"
+      "1490117571977019524":         # CTO-5DLabs guild
+        requireMention: true
+        slug: "cto-5dlabs"
+        users:
+          - "444519104808878090"
+          - "1467013771548426291"
+          - "1466937419981918220"
+          - "1466938003451674748"
+          - "1466938424790356253"
+          - "1468829684195135592"
+          - "1466930035356078251"
+          - "1466938744593715210"
+        channels:
+          "1490372680124465245":      # #morgan channel
+            enabled: true
+            requireMention: false
+            users:
+              - "444519104808878090"
+              - "1466928805384945775"
+              - "1466898696720617509"
+              - "1466936388162162731"
+              - "1467013771548426291"
+              - "1466937419981918220"
+              - "1466937061079781458"
+              - "1466938424790356253"
+              - "1467592725938573353"
+              - "1468829684195135592"
+              - "1466937750329757960"
+              - "1467274765587972258"
+              - "1466930035356078251"
+              - "1466930808010051850"
+              - "1467347075598651636"
+              - "1466938744593715210"
+              - "1467592156209483969"
+    # Streaming: show partial previews as tokens arrive
+    streaming: "partial"
+    # Reply threading
+    replyToMode: "first"
+    # Config writes disabled (managed via Helm, not chat)
+    configWrites: false
+    # Thread bindings for subagent sessions
     threadBindings:
       enabled: true
       spawnSubagentSessions: true
       spawnAcpSessions: true
-    dm:
-      policy: "allowlist"
-    allowFrom:
-      - "444519104808878090"
+      idleHours: 24
+    # Auto presence: maps runtime health to Discord status
+    autoPresence:
+      enabled: true
+      intervalMs: 30000
 
 models:
   providers:
