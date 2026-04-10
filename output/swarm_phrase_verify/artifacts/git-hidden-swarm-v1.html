@@ -1,0 +1,1511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWARM — Canteen × Colosseum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --black: #000;
+  --white: #fff;
+  --g50:  #f0f0f0;
+  --g100: #d8d8d8;
+  --g200: #b0b0b0;
+  --g400: #787878;
+  --g600: #484848;
+  --g700: #303030;
+  --g800: #1e1e1e;
+  --g900: #111;
+  --accent: #00e100;
+  --accent-dim: rgba(0,225,0,0.07);
+  --accent-border: rgba(0,225,0,0.2);
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --pad: 32px;
+  --max: 900px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--black);
+  color: var(--white);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* ======================================================
+   NAV
+   ====================================================== */
+.nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 200;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--pad);
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--g800);
+}
+
+.nav-brand {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 500;
+}
+.nav-x { color: var(--g700); }
+.nav-colosseum { color: var(--g400); }
+
+.nav-right { display: flex; align-items: center; gap: 20px; }
+
+.nav-links { display: flex; gap: 20px; }
+.nav-links a {
+  font-size: 11px; letter-spacing: 0.06em;
+  color: var(--g600); transition: color 0.1s;
+}
+.nav-links a:hover { color: var(--white); }
+
+.nav-apply {
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--black); background: var(--accent);
+  padding: 6px 14px; border-radius: 2px;
+  transition: opacity 0.1s;
+}
+.nav-apply:hover { opacity: 0.85; }
+
+/* ======================================================
+   HERO — 100vh, canvas background
+   ====================================================== */
+.hero {
+  height: 100vh;
+  min-height: 600px;
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  padding-top: 48px; /* nav height */
+}
+
+/* ASCII canvas fills the entire hero */
+#ascii-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+}
+
+/* Vignette — darker on the left where text lives, lighter on right */
+.hero-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg,
+      rgba(0,0,0,0.92) 0%,
+      rgba(0,0,0,0.75) 30%,
+      rgba(0,0,0,0.4) 55%,
+      rgba(0,0,0,0.15) 100%
+    ),
+    linear-gradient(180deg,
+      rgba(0,0,0,0.6) 0%,
+      transparent 15%,
+      transparent 80%,
+      rgba(0,0,0,0.8) 100%
+    );
+  pointer-events: none;
+}
+
+/* Hero content grid */
+.hero-body {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  align-items: stretch;
+  max-width: var(--max);
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 var(--pad);
+  padding-top: 52px;
+  gap: 0;
+  /* Must have explicit height for term-block flex:1 to work */
+  height: calc(100% - 40px);
+  box-sizing: border-box;
+}
+
+.hero-divider-v {
+  background: var(--g800);
+  width: 1px;
+  align-self: stretch;
+  margin: 0 32px;
+}
+
+/* LEFT */
+.hero-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-bottom: 8px;
+}
+
+.hero-access {
+  font-size: 10px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--accent);
+  margin-bottom: 18px;
+  display: flex; align-items: center; gap: 8px;
+}
+.hero-access-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity:1; transform:scale(1); box-shadow: 0 0 0 0 rgba(0,225,0,0.4); }
+  50% { opacity:0.6; transform:scale(0.8); box-shadow: 0 0 0 6px rgba(0,225,0,0); }
+}
+
+.hero-title {
+  font-size: clamp(72px, 11vw, 108px);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 0.88;
+  color: var(--white);
+  margin-bottom: 20px;
+  /* Subtle glitch effect on load */
+  animation: title-in 0.6s ease both;
+}
+@keyframes title-in {
+  from { opacity:0; transform: translateY(12px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+
+.hero-tagline {
+  font-size: 13px;
+  color: var(--g100);
+  line-height: 1.75;
+  max-width: 360px;
+  margin-bottom: 8px;
+  animation: title-in 0.6s ease 0.1s both;
+}
+.hero-tagline strong { color: var(--white); font-weight: 600; }
+
+.hero-selected {
+  font-size: 12px;
+  color: var(--g400);
+  margin-bottom: 28px;
+  animation: title-in 0.6s ease 0.15s both;
+}
+
+.hero-ctas {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  animation: title-in 0.6s ease 0.2s both;
+}
+
+.btn-primary {
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  letter-spacing: 0.06em; padding: 10px 20px;
+  background: var(--accent); color: var(--black);
+  border-radius: 2px; border: none; cursor: pointer;
+  text-decoration: none; transition: opacity 0.1s;
+}
+.btn-primary:hover { opacity: 0.85; }
+
+.btn-outline {
+  font-family: var(--mono); font-size: 12px;
+  letter-spacing: 0.06em; padding: 10px 20px;
+  background: transparent; color: var(--g200);
+  border: 1px solid var(--g700); border-radius: 2px;
+  cursor: pointer; text-decoration: none;
+  transition: color 0.1s, border-color 0.1s;
+}
+.btn-outline:hover { color: var(--white); border-color: var(--g400); }
+
+/* RIGHT */
+.hero-right {
+  display: flex; flex-direction: column; gap: 12px;
+  animation: title-in 0.6s ease 0.25s both;
+  min-height: 0;
+  height: 100%;
+}
+
+/* Meta cells */
+.meta-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--g800); border-radius: 2px;
+}
+.meta-cell {
+  padding: 12px 14px;
+  border-right: 1px solid var(--g800);
+  border-bottom: 1px solid var(--g800);
+}
+.meta-cell:nth-child(2) { border-right: none; }
+.meta-cell:nth-child(3) { border-bottom: none; }
+.meta-cell:nth-child(4) { border-right: none; border-bottom: none; }
+.meta-key {
+  font-size: 9px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--g600); margin-bottom: 4px;
+}
+.meta-val { font-size: 13px; font-weight: 500; color: var(--white); }
+.meta-val.green { color: var(--accent); }
+
+/* Canteen card */
+.canteen-card {
+  border: 1px solid var(--g800); border-radius: 2px;
+  padding: 16px; display: flex; flex-direction: column; gap: 10px;
+}
+.canteen-header {
+  display: flex; align-items: center; gap: 10px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--g800);
+}
+.canteen-mark {
+  width: 36px; height: 36px;
+  border-radius: 5px; overflow: hidden; flex-shrink: 0;
+}
+.canteen-mark img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.canteen-name { font-size: 12px; font-weight: 600; color: var(--white); }
+.canteen-sub  { font-size: 10px; color: var(--g600); letter-spacing: 0.05em; margin-top: 1px; }
+.canteen-desc { font-size: 12px; color: var(--g100); line-height: 1.7; }
+.canteen-desc strong { color: var(--white); font-weight: 500; }
+.canteen-swarm {
+  font-size: 12px; color: var(--g400); line-height: 1.65;
+  padding-top: 10px; border-top: 1px solid var(--g800);
+}
+
+/* Terminal log block */
+.term-block {
+  border: 1px solid var(--g800);
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.term-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--g800);
+  background: var(--g900);
+  flex-shrink: 0;
+}
+
+.term-title {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--g600);
+}
+
+.term-live {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  opacity: 0.8;
+}
+
+.term-live-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+.term-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  scrollbar-width: none;
+  min-height: 80px;
+  max-height: 180px;
+}
+.term-log::-webkit-scrollbar { display: none; }
+
+.term-line {
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.term-sys   { color: var(--g600); }
+.term-spawn { color: var(--g400); }
+.term-tx    { color: var(--accent); opacity: 0.75; }
+
+
+/* ======================================================
+   GLITCH TEXT EFFECT (on SWARM hover)
+   ====================================================== */
+.hero-title { position: relative; display: inline-block; cursor: default; }
+.hero-title:hover { animation: glitch 0.3s ease; }
+@keyframes glitch {
+  0%   { transform: translateX(0); }
+  15%  { transform: translateX(-3px); clip-path: inset(20% 0 60% 0); }
+  30%  { transform: translateX(3px); clip-path: inset(60% 0 20% 0); }
+  45%  { transform: translateX(-2px); clip-path: inset(40% 0 40% 0); }
+  60%  { transform: translateX(2px); }
+  75%  { transform: translateX(-1px); }
+  100% { transform: translateX(0); }
+}
+
+
+/* ======================================================
+   DETAIL SECTIONS
+   ====================================================== */
+.section {
+  scroll-margin-top: 52px;
+  border-top: 1px solid var(--g800);
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 var(--pad);
+  display: grid;
+  grid-template-columns: 160px 1fr;
+}
+
+.sec-label {
+  padding: 28px 0;
+  border-right: 1px solid var(--g800);
+  padding-right: 24px;
+}
+.sec-label-text {
+  font-size: 10px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--g600); line-height: 1.5;
+}
+.sec-label-num { font-size: 11px; color: var(--g800); margin-top: 4px; }
+
+.sec-body { padding: 28px 0 28px 28px; }
+
+/* Prize */
+.prize-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.prize-num {
+  font-size: 48px; font-weight: 600;
+  letter-spacing: -0.04em; line-height: 1; color: var(--white);
+}
+.prize-lbl { font-size: 12px; color: var(--g600); }
+.prize-desc { font-size: 13px; color: var(--g200); line-height: 1.7; max-width: 500px; margin-bottom: 20px; }
+.prize-desc strong { color: var(--white); font-weight: 500; }
+
+.perk-list { display: flex; flex-direction: column; }
+.perk-row { display: flex; gap: 14px; padding: 10px 0; border-top: 1px solid var(--g800); }
+.perk-row:first-child { border-top: none; padding-top: 0; }
+.perk-n { font-size: 10px; color: var(--g700); min-width: 18px; padding-top: 1px; }
+.perk-title { font-size: 13px; font-weight: 500; color: var(--white); margin-bottom: 2px; }
+.perk-desc-t { font-size: 12px; color: var(--g400); line-height: 1.6; }
+
+/* Pass grid */
+.pass-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--g800); border-radius: 2px; overflow: hidden; }
+.pass-col { padding: 18px; }
+.pass-col:first-child { border-right: 1px solid var(--g800); }
+.pass-lbl { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--g600); margin-bottom: 7px; }
+.pass-col:last-child .pass-lbl { color: var(--accent); }
+.pass-title { font-size: 15px; font-weight: 600; color: var(--white); margin-bottom: 8px; }
+.pass-col:last-child .pass-title { color: var(--accent); }
+.pass-body { font-size: 12px; color: var(--g400); line-height: 1.7; margin-bottom: 12px; }
+.pass-foot { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--g600); padding-top: 10px; border-top: 1px solid var(--g800); }
+.pass-col:last-child .pass-foot { color: var(--accent); opacity: 0.7; border-top-color: rgba(0,225,0,0.15); }
+
+/* RFBs */
+.rfb-intro { font-size: 13px; color: var(--g200); line-height: 1.7; max-width: 480px; margin-bottom: 16px; }
+.rfb-intro strong { color: var(--white); font-weight: 500; }
+.rfb-intro a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+
+.rfb-list { display: flex; flex-direction: column; }
+.rfb-item { border-top: 1px solid var(--g800); }
+.rfb-item:first-child { border-top: none; }
+
+.rfb-trigger {
+  width: 100%; background: rgba(0,225,0,0.02); border: none; cursor: default;
+  text-align: left; padding: 11px 0;
+  display: flex; align-items: flex-start; gap: 12px;
+  font-family: var(--mono);
+}
+
+.rfb-n { font-size: 10px; color: var(--accent); min-width: 36px; padding-top: 2px; letter-spacing: 0.04em; }
+.rfb-trigger-main { flex: 1; }
+.rfb-t-title { font-size: 13px; font-weight: 500; color: var(--white); margin-bottom: 2px; }
+.rfb-t-sub { font-size: 11px; color: var(--g600); font-style: italic; }
+
+.rfb-body { display: block; padding: 0 0 20px 48px; }
+
+.sub-lbl { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--g600); margin-bottom: 5px; margin-top: 10px; }
+.sub-lbl:first-of-type { margin-top: 0; }
+
+.bl { list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.bl li { font-size: 12px; color: var(--g400); display: flex; gap: 8px; line-height: 1.5; }
+.bl li::before { content: '—'; color: var(--g700); flex-shrink: 0; }
+
+.ql { list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.ql li { font-size: 12px; color: var(--g600); font-style: italic; display: flex; gap: 8px; line-height: 1.5; }
+.ql li::before { content: '—'; color: var(--g700); font-style: normal; flex-shrink: 0; }
+
+.rfb-ex { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--g800); border-radius: 2px; }
+.rfb-ex-lbl { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; opacity: 0.6; }
+.rfb-ex p { font-size: 12px; color: var(--g400); line-height: 1.6; }
+
+/* Research */
+.example-list { display: flex; flex-direction: column; }
+.example-item { border-top: 1px solid var(--g800); padding: 16px 0; }
+.example-item:first-child { border-top: none; padding-top: 0; }
+.example-header { display: flex; gap: 12px; margin-bottom: 8px; align-items: flex-start; }
+.example-n { font-size: 10px; color: var(--accent); min-width: 36px; padding-top: 2px; letter-spacing: 0.04em; flex-shrink: 0; }
+.example-title { font-size: 13px; font-weight: 500; color: var(--white); margin-bottom: 3px; line-height: 1.4; }
+.example-title a { color: inherit; text-decoration: none; transition: color 0.1s; }
+.example-title a:hover { color: var(--accent); }
+.example-attr a { color: inherit; text-decoration: none; transition: color 0.1s; }
+.example-attr a:hover { color: var(--g200); }
+.example-attr { font-size: 11px; color: var(--g600); letter-spacing: 0.03em; }
+.example-body { padding-left: 48px; }
+.example-desc { font-size: 12px; color: var(--g400); line-height: 1.75; margin-bottom: 8px; }
+
+/* Judging */
+.j-row { display: flex; gap: 16px; padding: 12px 0; border-top: 1px solid var(--g800); align-items: flex-start; }
+.j-row:first-child { border-top: none; padding-top: 0; }
+.j-pct { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--white); min-width: 48px; line-height: 1; padding-top: 2px; }
+.j-row:nth-child(1) .j-pct { color: var(--accent); }
+.j-name { font-size: 13px; font-weight: 500; color: var(--white); margin-bottom: 3px; }
+.j-desc { font-size: 12px; color: var(--g400); line-height: 1.6; max-width: 400px; }
+.j-levels { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.j-lv { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--g600); }
+.j-dot { width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; }
+.j-dot.hi { background: var(--white); }
+.j-dot.md { background: var(--g600); }
+.j-dot.lo { background: transparent; border: 1px solid var(--g700); }
+
+/* Resources */
+.res-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.res-group-title { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--g600); margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--g800); }
+.res-links { display: flex; flex-direction: column; gap: 1px; }
+.res-link { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 2px; text-decoration: none; transition: background 0.1s; gap: 10px; }
+.res-link:hover { background: rgba(255,255,255,0.04); }
+.res-link-name { font-size: 13px; font-weight: 500; color: var(--white); }
+.res-link-desc { font-size: 11px; color: var(--g600); flex: 1; text-align: right; font-style: italic; }
+.res-link-arr { font-size: 10px; color: var(--g700); }
+
+
+/* Modal */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0,0,0,0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  align-items: center;
+  justify-content: center;
+  padding: var(--pad);
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--g900);
+  border: 1px solid var(--g700);
+  border-radius: 2px;
+  padding: 32px;
+  max-width: 380px;
+  width: 100%;
+  position: relative;
+}
+.modal-close {
+  position: absolute; top: 14px; right: 16px;
+  background: none; border: none; cursor: pointer;
+  font-size: 20px; color: var(--g600);
+  font-family: var(--mono); line-height: 1;
+  transition: color 0.1s; padding: 0;
+}
+.modal-close:hover { color: var(--white); }
+.modal-lbl { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+.modal-title { font-size: 18px; font-weight: 600; color: var(--white); letter-spacing: -0.02em; margin-bottom: 8px; }
+.modal-desc { font-size: 12px; color: var(--g400); line-height: 1.7; margin-bottom: 20px; }
+.modal-pass {
+  border: 1px solid var(--g800); border-radius: 2px;
+  padding: 12px 16px; margin-bottom: 20px;
+  background: var(--black);
+}
+.modal-pass-lbl { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--g600); margin-bottom: 5px; }
+.modal-pass-val { font-size: 22px; font-weight: 600; color: var(--accent); letter-spacing: 0.06em; }
+.modal-cta { display: block; text-align: center; }
+
+/* Footer */
+.footer {
+  border-top: 1px solid var(--g800);
+  max-width: var(--max); margin: 0 auto;
+  padding: 16px var(--pad);
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; color: var(--g700); gap: 12px; flex-wrap: wrap;
+}
+.footer a { color: var(--g600); transition: color 0.1s; }
+.footer a:hover { color: var(--white); }
+
+/* ======================================================
+   RESPONSIVE
+   ====================================================== */
+@media (max-width: 680px) {
+  :root { --pad: 18px; }
+  .hero-body { grid-template-columns: 1fr; padding-top: 28px; }
+  .hero-divider-v { display: none; }
+  .hero-right { margin-top: 24px; }
+  .hero-title { font-size: 64px; }
+  .hide-mobile { display: none; }
+  .section { grid-template-columns: 1fr; }
+  .sec-label { border-right: none; border-bottom: 1px solid var(--g800); padding: 16px 0 8px; }
+  .sec-body { padding: 16px 0; }
+  .pass-grid { grid-template-columns: 1fr; }
+  .pass-col:first-child { border-right: none; border-bottom: 1px solid var(--g800); }
+  .res-grid { grid-template-columns: 1fr; }
+  .rfb-body { padding-left: 18px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-brand">
+    <span>Canteen</span>
+    <span class="nav-x">×</span>
+    <a href="https://colosseum.com/frontier" target="_blank" class="nav-colosseum">Colosseum</a>
+  </div>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="#next-steps" class="hide-mobile">Next Steps</a>
+      <a href="#prizes" class="hide-mobile">Prizes</a>
+      <a href="#ideas">Ideas</a>
+      <a href="#examples" class="hide-mobile">Research</a>
+      <a href="#judging" class="hide-mobile">Judging</a>
+      <a href="#resources" class="hide-mobile">Resources</a>
+    </div>
+    <a href="#" class="nav-apply" onclick="openApplyModal(event)">Apply</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="hero">
+  <canvas id="ascii-canvas"></canvas>
+  <div class="hero-vignette"></div>
+
+  <div class="hero-body">
+    <!-- LEFT -->
+    <div class="hero-left">
+      <div class="hero-access">
+        <div class="hero-access-dot"></div>
+        Priority Access · <a href="https://colosseum.com/frontier" target="_blank" style="color:inherit;text-decoration:none;">Colosseum Frontier</a>
+      </div>
+      <h1 class="hero-title">SWARM</h1>
+      <p class="hero-tagline">
+        Canteen's exclusive priority access for Colosseum's Frontier Hackathon.
+        $25,000 in additional prizes, dedicated mentorship,
+        and direct access to Canteen's network.
+      </p>
+      <p class="hero-selected">Selective cohort · Apply to join.</p>
+      <div class="hero-ctas">
+        <a href="#" class="btn-primary" onclick="openApplyModal(event)">Request access →</a>
+        <a href="https://discord.gg/NDgvUzFqBY" target="_blank" class="btn-outline">Join Discord ↗</a>
+      </div>
+    </div>
+
+    <div class="hero-divider-v"></div>
+
+    <!-- RIGHT -->
+    <div class="hero-right">
+      <div class="meta-grid">
+        <div class="meta-cell">
+          <div class="meta-key">Prize pool</div>
+          <div class="meta-val green">$25K</div>
+        </div>
+        <div class="meta-cell">
+          <div class="meta-key">Dates</div>
+          <div class="meta-val">Apr 6 – May 11</div>
+        </div>
+        <div class="meta-cell">
+          <div class="meta-key">Format</div>
+          <div class="meta-val">Online · 4 weeks</div>
+        </div>
+        <div class="meta-cell">
+          <div class="meta-key">Access</div>
+          <div class="meta-val">Apply to join</div>
+        </div>
+      </div>
+
+<div class="canteen-card">
+        <div class="canteen-header">
+          <div class="canteen-mark"><img src="canteen-logo.png" alt="Canteen"></div>
+          <div>
+            <div class="canteen-name">Canteen</div>
+            <div class="canteen-sub">Research &amp; Technology · New York City</div>
+          </div>
+        </div>
+        <div class="canteen-desc">
+          Canteen is a research and technology firm at the intersection of <strong>AI, crypto, and payments</strong>. We publish the research, run the experiments, and back the builders doing the same.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<!-- PRIZES -->
+<div class="section" id="prizes">
+  <div class="sec-label">
+    <div class="sec-label-text">Prizes<br>&amp; Access</div>
+    <div class="sec-label-num">01</div>
+  </div>
+  <div class="sec-body">
+    <div class="prize-row">
+      <div class="prize-num">$250k</div>
+      <div class="prize-lbl">in follow-on support from <a href="https://colosseum.com/" target="_blank" style="color:inherit;text-decoration:underline;text-underline-offset:3px;">Colosseum</a>'s venture fund</div>
+    </div>
+    <p class="prize-desc">
+      These investments are offered by <a href="https://colosseum.com/frontier" target="_blank" style="color:inherit;text-decoration:underline;text-underline-offset:3px;">Colosseum's Frontier</a> and in addition to SWARM.
+      The best projects compete for both.
+    </p>
+    <div class="perk-list">
+	    <div class="perk-row">
+	<div class="perk-n">01</div>
+        <div>
+          <div class="perk-title">$25,000 in prizes</div>
+          <div class="perk-desc-t">Awarded to standout SWARM projects, stacked on top of everything Frontier already offers.</div>
+        </div>
+	    </div>
+      </div>
+      <div class="perk-row">
+        <div class="perk-n">02</div>
+        <div>
+          <div class="perk-title">Canteen access, start to finish</div>
+          <div class="perk-desc-t">Direct lines to Canteen researchers and founders for the full four weeks. Real conversations, not scheduled office hours.</div>
+        </div>
+      </div>
+      <div class="perk-row">
+        <div class="perk-n">03</div>
+        <div>
+          <div class="perk-title">Priority programming</div>
+          <div class="perk-desc-t">Dedicated sessions, workshops, and briefings for SWARM builders throughout the four weeks.</div>
+        </div>
+      </div>
+      <div class="perk-row">
+        <div class="perk-n">04</div>
+        <div>
+          <div class="perk-title">The Canteen network</div>
+          <div class="perk-desc-t">Introductions to operators, investors, and builders already working on the agent economy. No cold outreach required.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRIORITY PASS -->
+<div class="section">
+  <div class="sec-label">
+    <div class="sec-label-text">Priority<br>Pass</div>
+    <div class="sec-label-num">02</div>
+  </div>
+  <div class="sec-body">
+    <div class="pass-grid">
+      <a href="https://colosseum.com/frontier" target="_blank" class="pass-col" style="text-decoration:none;display:block;transition:opacity 0.1s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+        <div class="pass-lbl">The hackathon</div>
+        <div class="pass-title">Colosseum Frontier</div>
+        <p class="pass-body">Colosseum's flagship hackathon. Thousands of builders competing for serious prizes and an accelerator pipeline that has launched some of the most important companies in the Solana ecosystem.</p>
+        <div class="pass-foot">All SWARM builders compete in Frontier</div>
+      </a>
+      <div class="pass-col">
+        <div class="pass-lbl">Your priority pass</div>
+        <div class="pass-title">SWARM</div>
+        <p class="pass-body">Canteen's program running alongside Frontier. Selected builders get $25,000 in additional prizes, dedicated mentorship, and Canteen's full research and founder network.</p>
+        <div class="pass-foot">Selective cohort · Apply below</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RFBs -->
+<div class="section" id="ideas">
+  <div class="sec-label">
+    <div class="sec-label-text">Ideas</div>
+    <div class="sec-label-num">03</div>
+  </div>
+  <div class="sec-body">
+    <p class="rfb-intro">RFBs — "Requests for Builders" — are our version of <a href="https://www.ycombinator.com/rfs" target="_blank">YC's Requests for Startups</a>. Five open problems in the agent economy that we think are worth solving. If one excites you, treat it as extra validation to dive in — but you don't need to work on any of these to participate in SWARM. <strong>The best submissions always are what you care most about.</strong></p>
+    <div class="rfb-list">
+      <div class="rfb-item" id="rfb-1">
+        <div class="rfb-trigger">
+          <div class="rfb-n">RFB 01</div>
+          <div class="rfb-trigger-main">
+            <div class="rfb-t-title">Agent Discovery &amp; Reputation Networks</div>
+            <div class="rfb-t-sub">Your agent offers a service. How do other agents find it and decide to trust it?</div>
+          </div>
+        </div>
+        <div class="rfb-body">
+          <div class="sub-lbl">What builders create</div>
+          <ul class="bl">
+            <li>Agent marketplaces with reputation and ranking algorithms</li>
+            <li>Agent recommendation systems, collaborative filtering for AI</li>
+            <li>Quality scoring mechanisms where other agents rate your agent</li>
+            <li>Agent advertising platforms: how do agents market to agents?</li>
+          </ul>
+          <div class="sub-lbl">Questions worth exploring</div>
+          <ul class="ql">
+            <li>Do agents form cliques and networks like humans?</li>
+            <li>Can agent reputation be gamed? How do you prevent Sybil attacks?</li>
+            <li>Do specialized agent networks emerge — trading agents only talk to trading agents?</li>
+          </ul>
+          <div class="rfb-ex"><div class="rfb-ex-lbl">Example</div><p>"AgentGraph" — Yelp for AI agents. Agents build profiles, other agents review them, and on-chain payment history serves as the reputation signal.</p></div>
+          <div class="sub-lbl">Traction metrics</div>
+          <ul class="bl">
+            <li>Number of agents and agent startups using your product for discovery and reputation</li>
+            <li>Agent-to-agent transactions</li>
+            <li>Network density and structure</li>
+            <li>Reputation score distribution</li>
+            <li>Review authenticity rate</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="rfb-item" id="rfb-2">
+        <div class="rfb-trigger">
+          <div class="rfb-n">RFB 02</div>
+          <div class="rfb-trigger-main">
+            <div class="rfb-t-title">Real-Time Agent Coordination</div>
+            <div class="rfb-t-sub">Multiple agents need to coordinate in real-time. Voice calls. Live auctions. Streaming services.</div>
+          </div>
+        </div>
+        <div class="rfb-body">
+          <div class="sub-lbl">What builders create</div>
+          <ul class="bl">
+            <li>Voice agents that negotiate deals with other voice agents</li>
+            <li>Live agent auctions where agents bid against each other in real-time</li>
+            <li>Streaming payment systems — pay-per-second for agent services</li>
+            <li>Real-time collaboration tools where agents work together and split payment dynamically</li>
+          </ul>
+          <div class="sub-lbl">Real-time use cases</div>
+          <ul class="ql">
+            <li>Shopping agent calls a merchant agent, negotiates bulk discount in real-time</li>
+            <li>Live compute marketplace: AI needs GPU now, agents bid using instant finality</li>
+            <li>Streaming analysis: agent provides live market commentary, paid per second</li>
+            <li>Multi-agent brainstorming: several agents collaborate, payment splits dynamically</li>
+          </ul>
+          <div class="rfb-ex"><div class="rfb-ex-lbl">Example</div><p>"AgentCall" — Voice agents that negotiate with each other. Shopping agent calls merchant agent, negotiates bulk discount in real-time using Solana's instant finality.</p></div>
+          <div class="sub-lbl">Traction metrics</div>
+          <ul class="bl">
+            <li>Number of agents and agent startups using your product for coordination</li>
+            <li>Number of real-time agent interactions</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="rfb-item" id="rfb-3">
+        <div class="rfb-trigger">
+          <div class="rfb-n">RFB 03</div>
+          <div class="rfb-trigger-main">
+            <div class="rfb-t-title">Agent Attention Markets</div>
+            <div class="rfb-t-sub">You're selling to agents. Traditional marketing doesn't work on AI. What does?</div>
+          </div>
+        </div>
+        <div class="rfb-body">
+          <div class="sub-lbl">What builders create</div>
+          <ul class="bl">
+            <li>Agent advertising platforms where agents pay to promote to other agents</li>
+            <li>Priority queues where paying more means faster responses from busy agents</li>
+            <li>Agent influencer networks where popular agents endorse services</li>
+            <li>Attention bidding systems where agents auction their attention</li>
+          </ul>
+          <div class="sub-lbl">Questions worth exploring</div>
+          <ul class="ql">
+            <li>Do agents develop brands like humans?</li>
+            <li>Will there be agent influencers that other agents follow?</li>
+            <li>Can you A/B test messaging on agents?</li>
+            <li>What is the ROI of agent-to-agent marketing?</li>
+          </ul>
+          <div class="rfb-ex"><div class="rfb-ex-lbl">Example</div><p>"AgentAds" — Google Ads but for AI agents. Providers bid for placement when agents search for services. Solana's low fees enable $0.001 attention bids.</p></div>
+          <div class="sub-lbl">Traction metrics</div>
+          <ul class="bl">
+            <li>How many advertisers can you onboard?</li>
+            <li>How many ads can you create, and how effective are they — how many agents convert?</li>
+            <li>Cost per agent acquisition</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="rfb-item" id="rfb-4">
+        <div class="rfb-trigger">
+          <div class="rfb-n">RFB 04</div>
+          <div class="rfb-trigger-main">
+            <div class="rfb-t-title">Emergent Agent Economies</div>
+            <div class="rfb-t-sub">What actually happens when hundreds of agents with different goals interact?</div>
+          </div>
+        </div>
+        <div class="rfb-body">
+          <div class="sub-lbl">What builders create</div>
+          <ul class="bl">
+            <li>Agent simulation environments with real money on Solana</li>
+            <li>Tools to observe and analyze agent network dynamics</li>
+            <li>Intervention mechanisms: inject agents, change incentives, observe outcomes</li>
+            <li>Agent economy analytics: who is trading with who and what patterns emerge</li>
+          </ul>
+          <div class="sub-lbl">Research questions</div>
+          <ul class="ql">
+            <li>Do agent economies develop specialization and division of labor?</li>
+            <li>Can you predict agent behavior from network structure?</li>
+            <li>Do agents form cartels or monopolies?</li>
+            <li>What economic structures emerge naturally?</li>
+            <li>How do agent economies differ from human economies?</li>
+          </ul>
+          <div class="rfb-ex"><div class="rfb-ex-lbl">Example</div><p>"AgentWorld" — Simulation environment where 100 AI agents with different goals interact on Solana. Researchers observe what economic structures emerge using real SOL/USDC with safety limits.</p></div>
+          <div class="sub-lbl">Traction metrics</div>
+          <ul class="bl">
+            <li>Number of frontier labs interested in using your simulation environment to explore emergent agent dynamics</li>
+            <li>If you built evals with emergent agents, how many LOIs can you get from labs?</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="rfb-item" id="rfb-5">
+        <div class="rfb-trigger">
+          <div class="rfb-n">RFB 05</div>
+          <div class="rfb-trigger-main">
+            <div class="rfb-t-title">Multi-Agent Orchestration</div>
+            <div class="rfb-t-sub">Complex tasks need multiple agents working together. Who coordinates, and who gets paid?</div>
+          </div>
+        </div>
+        <div class="rfb-body">
+          <div class="sub-lbl">What builders create</div>
+          <ul class="bl">
+            <li>Multi-agent coordination protocols inspired by workflow orchestration</li>
+            <li>Real-time task decomposition where agents bid and self-assemble into teams</li>
+            <li>Dynamic payment splitting based on contribution, effort, and quality</li>
+            <li>Agent swarm controllers where one agent orchestrates many specialized agents</li>
+          </ul>
+          <div class="sub-lbl">Use cases</div>
+          <ul class="ql">
+            <li>Research: coordinator agent recruits researcher, writer, and editor agents</li>
+            <li>Complex analysis: data, modeling, and visualization agents collaborate</li>
+            <li>Content production: idea agent, writer agent, editor agent, and designer agent in sequence</li>
+            <li>Live event coverage: multiple agents streaming different angles, paid by contribution</li>
+          </ul>
+          <div class="rfb-ex"><div class="rfb-ex-lbl">Example</div><p>"SwarmOS" — Operating system for agent coordination. Submit a complex task, agents self-assemble into a team using a Solana marketplace, complete the work, and auto-split payment based on contribution tracked on-chain.</p></div>
+          <div class="sub-lbl">Traction metrics</div>
+          <ul class="bl">
+            <li>If you built evals with agent orchestration, how many LOIs can you get from labs?</li>
+            <li>Number of agent runtimes using your orchestration workflow</li>
+            <li>Number of users for your research, content production, or complex analysis tool</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- EARLY BUILDER EXAMPLES -->
+<div class="section" id="examples">
+  <div class="sec-label">
+    <div class="sec-label-text">Research</div>
+    <div class="sec-label-num">04</div>
+  </div>
+  <div class="sec-body">
+    <p class="rfb-intro">Research that points directly to buildable products. <a href="https://thecanteenapp.com/analysis/2026/03/27/multi-agent-landscape.html" target="_blank">Read more about our take on mass agent networks here.</a></p>
+    <div class="example-list">
+
+      <div class="example-item">
+        <div class="example-header">
+          <div class="example-n">01</div>
+          <div>
+            <div class="example-title"><a href="https://github.com/deeplearning-wisc/debate-or-vote" target="_blank">Debate Primitives for Multi-Agent LLM Collaboration</a></div>
+            <div class="example-attr"><a href="https://github.com/deeplearning-wisc/debate-or-vote" target="_blank">Li et al., 2025 · UW-Madison</a></div>
+          </div>
+        </div>
+        <div class="example-body">
+          <p class="example-desc">Li's work gives us a concrete design question: when should a swarm deliberate vs. aggregate? The hack here is building that decision as an on-chain primitive — the mechanism selector (debate or vote) lives in a smart contract, debate transcripts are hashed and stored as receipts, and payment releases only after the chosen mechanism reaches quorum. This turns a research finding into auditable, trust-minimized coordination infrastructure. The interesting product wedge is selling it to agent runtime providers (e.g. LangGraph, CrewAI) as a drop-in arbitration layer.</p>
+        </div>
+      </div>
+
+      <div class="example-item">
+        <div class="example-header">
+          <div class="example-n">02</div>
+          <div>
+            <div class="example-title"><a href="https://arxiv.org/abs/2504.19874" target="_blank">TurboQuant KV Cache as Agent Memory</a></div>
+            <div class="example-attr"><a href="https://arxiv.org/abs/2504.19874" target="_blank">Zandieh &amp; Mirrokni · Google Research · 2026</a></div>
+          </div>
+        </div>
+        <div class="example-body">
+          <p class="example-desc">Extreme KV cache compression may enable agent memory to be stored onchain for the first time. This would give agents verifiable, persistent memory that survives across sessions and providers — no single inference provider controls the memory state. The hack is a PoC that snapshots a compressed KV cache (using TurboQuant's technique) at the end of each agent session, pins it to Arweave/Filecoin with a hash on Solana, and rehydrates it at session start. If retrieval quality holds up at extreme compression ratios, this is the missing piece for truly persistent agent identity.</p>
+        </div>
+      </div>
+
+      <div class="example-item">
+        <div class="example-header">
+          <div class="example-n">03</div>
+          <div>
+            <div class="example-title"><a href="https://github.com/mikelma/craftium" target="_blank">Craftium On-Chain via Rust Game Engine</a></div>
+            <div class="example-attr"><a href="https://github.com/mikelma/craftium" target="_blank">Mikelma et al. · ICML 2025</a></div>
+          </div>
+        </div>
+        <div class="example-body">
+          <p class="example-desc">Craftium provides a Minecraft-based framework for building diverse multi-agent environments in a composable way. Can we rewrite the environment core in a Rust-based game engine (Bevy is the obvious choice given its ECS architecture and WASM compilation target)? This creates a permissionless arena for agent training and evaluation.</p>
+        </div>
+      </div>
+
+      <div class="example-item">
+        <div class="example-header">
+          <div class="example-n">04</div>
+          <div>
+            <div class="example-title"><a href="https://github.com/camel-ai/oasis" target="_blank">MiroFish as a Prediction Market Oracle</a></div>
+            <div class="example-attr"><a href="https://github.com/camel-ai/oasis" target="_blank">OASIS + Manifold/Polymarket</a></div>
+          </div>
+        </div>
+        <div class="example-body">
+          <p class="example-desc">OASIS simulates one million agents reacting to a seed event. MiroFish wraps this into a structured report. The gap: there's no way to bet on whether the simulation is right. The hack is to wire MiroFish's output — e.g. "68% of simulated agents react negatively to this policy in 72 hours" — into a prediction market where the resolution criterion is measured real-world sentiment (X API, Farcaster, Reddit). The simulation run is committed on-chain before the real-world event unfolds, making it tamper-evident. The interesting research question OASIS itself raises: at what agent-count threshold does the simulation's predicted sentiment distribution start matching real observed distributions? You'd have ground truth data to actually answer this.</p>
+        </div>
+      </div>
+
+      <div class="example-item">
+        <div class="example-header">
+          <div class="example-n">05</div>
+          <div>
+            <div class="example-title"><a href="https://github.com/666ghj/MiroFish" target="_blank">zkVM Verifiable Simulation Replays via MiroFish Architecture</a></div>
+            <div class="example-attr"><a href="https://github.com/666ghj/MiroFish" target="_blank">MiroFish</a></div>
+          </div>
+        </div>
+        <div class="example-body">
+          <p class="example-desc">MiroFish runs "dual-platform parallel" simulations — agents act across two synthetic social platforms simultaneously. This is a natural structure for zkVM-verifiable replays: run the simulation once, generate a proof that the reported emergent behaviors follow deterministically from the initial graph state and the model weights used. Builders could then ship simulation results to clients who verify the proof without re-running the full simulation. The practical bottleneck is that LLM inference isn't cheaply provable today — but MiroFish-Offline's Ollama backend with a quantized local model (qwen2.5 at 4-bit) is small enough that zkML proof generation becomes at least tractable for short simulation windows.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- JUDGING -->
+<div class="section" id="judging">
+  <div class="sec-label">
+    <div class="sec-label-text">How we<br>judge</div>
+    <div class="sec-label-num">05</div>
+  </div>
+  <div class="sec-body">
+    <p style="font-size:12px;color:var(--g600);line-height:1.7;margin-bottom:20px;">These weightings are recommendations. Our judges have the final say, and the best projects tend to break all the rules.</p>
+    <div class="j-row">
+      <div class="j-pct">40%</div>
+      <div>
+        <div class="j-name">Innovation</div>
+        <div class="j-desc">Novel approach, emergent behaviors, genuine research insights. Something that did not exist before you built it.</div>
+      </div>
+    </div>
+    <div class="j-row">
+      <div class="j-pct">30%</div>
+      <div>
+        <div class="j-name">Agentic Sophistication</div>
+        <div class="j-desc">How much does the AI actually decide versus just automate?</div>
+        <div class="j-levels">
+          <div class="j-lv"><div class="j-dot hi"></div>Full autonomy — AI manages everything</div>
+          <div class="j-lv"><div class="j-dot md"></div>Meaningful agency, partial autonomy</div>
+          <div class="j-lv"><div class="j-dot lo"></div>AI features but not truly agentic</div>
+        </div>
+      </div>
+    </div>
+    <div class="j-row">
+      <div class="j-pct">30%</div>
+      <div>
+        <div class="j-name">Traction</div>
+        <div class="j-desc">Real users and real transactions during the event. Four weeks is your window to prove it works.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RESOURCES -->
+<div class="section" id="resources">
+  <div class="sec-label">
+    <div class="sec-label-text">The<br>Stack</div>
+    <div class="sec-label-num">06</div>
+  </div>
+  <div class="sec-body">
+    <div class="res-grid">
+      <div>
+        <div class="res-group-title">Agent Commerce</div>
+        <div class="res-links">
+          <a href="https://github.com/payainetwork/x402-solana" target="_blank" class="res-link"><span class="res-link-name">x402-solana</span><span class="res-link-desc">TypeScript SDK</span><span class="res-link-arr">↗</span></a>
+          <a href="https://github.com/t54-labs/x402-secure" target="_blank" class="res-link"><span class="res-link-name">x402-secure</span><span class="res-link-desc">Python SDK</span><span class="res-link-arr">↗</span></a>
+          <a href="https://github.com/sendaifun/solana-agent-kit" target="_blank" class="res-link"><span class="res-link-name">Solana Agent Kit</span><span class="res-link-desc">Agent framework</span><span class="res-link-arr">↗</span></a>
+          <a href="http://frames.ag" target="_blank" class="res-link"><span class="res-link-name">Frames.ag</span><span class="res-link-desc">Agent wallet OOTB</span><span class="res-link-arr">↗</span></a>
+        </div>
+      </div>
+      <div>
+        <div class="res-group-title">Infrastructure</div>
+        <div class="res-links">
+          <a href="https://github.com/solana-foundation/anchor" target="_blank" class="res-link"><span class="res-link-name">Anchor Framework</span><span class="res-link-desc">Smart contracts</span><span class="res-link-arr">↗</span></a>
+          <a href="https://helius.dev/" target="_blank" class="res-link"><span class="res-link-name">Helius</span><span class="res-link-desc">RPC + data</span><span class="res-link-arr">↗</span></a>
+          <a href="https://pyth.network/" target="_blank" class="res-link"><span class="res-link-name">Pyth Network</span><span class="res-link-desc">Oracle data</span><span class="res-link-arr">↗</span></a>
+          <a href="https://jup.ag/" target="_blank" class="res-link"><span class="res-link-name">Jupiter</span><span class="res-link-desc">Solana DeFi</span><span class="res-link-arr">↗</span></a>
+          <a href="https://github.com/rpcpool/yellowstone-grpc" target="_blank" class="res-link"><span class="res-link-name">Yellowstone gRPC</span><span class="res-link-desc">Real-time network data</span><span class="res-link-arr">↗</span></a>
+          <a href="https://lightprotocol.com/" target="_blank" class="res-link"><span class="res-link-name">Light Protocol</span><span class="res-link-desc">ZK compression</span><span class="res-link-arr">↗</span></a>
+          <a href="https://github.com/sevenlabs-hq/carbon" target="_blank" class="res-link"><span class="res-link-name">Carbon</span><span class="res-link-desc">Indexing framework</span><span class="res-link-arr">↗</span></a>
+          <a href="https://github.com/helium/tuktuk" target="_blank" class="res-link"><span class="res-link-name">Tukuk</span><span class="res-link-desc">Automated task triggers</span><span class="res-link-arr">↗</span></a>
+        </div>
+      </div>
+      <div>
+        <div class="res-group-title">Reading</div>
+        <div class="res-links">
+          <a href="https://thecanteenapp.com/analysis/2026/03/27/multi-agent-landscape.html" target="_blank" class="res-link"><span class="res-link-name">Multi-Agent Landscape 2026</span><span class="res-link-desc">Mar 2026</span><span class="res-link-arr">↗</span></a>
+          <a href="https://thecanteenapp.com/analysis/2026/01/06/ai-agent-landscape.html" target="_blank" class="res-link"><span class="res-link-name">AI Agent Landscape 2026</span><span class="res-link-desc">Jan 2026</span><span class="res-link-arr">↗</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- FOOTER -->
+<div class="footer">
+  <span>Canteen × Colosseum · SWARM 2026</span>
+  <a href="https://thecanteenapp.com" target="_blank">thecanteenapp.com</a>
+</div>
+
+<script>
+/* ============================================================
+   ASCII TEXT-MODE HERO — v9
+   Mouse reactive: cursor activates a radius of cells,
+   driving character density and brightness.
+   Away from cursor = calm sparse dim chars.
+   Near cursor = intense bright chars, fast mutation,
+   ripple outward as cursor moves.
+   Terminal log: slower, deliberate.
+   ============================================================ */
+(function() {
+  const canvas = document.getElementById('ascii-canvas');
+  const ctx    = canvas.getContext('2d');
+
+  const FS   = 13;
+  const FONT = `${FS}px "IBM Plex Mono", ui-monospace, monospace`;
+  const CW   = 8.4;
+  const CH   = FS * 1.35;
+
+  let COLS, ROWS, W, H, frame = 0;
+  let mouseX = -999, mouseY = -999;  // canvas coords
+  let mouseMC = -999, mouseMR = -999; // grid coords
+  let mouseVX = 0, mouseVY = 0;       // velocity
+  let lastMX = -999, lastMY = -999;
+
+  // Character sets by intensity tier
+  const T0 = [' ',' ',' ',' ',' ',' ',' ','·'];            // idle background
+  const T1 = ['·','.',',','`','\u2019','-','_'];            // low
+  const T2 = ['+','~','=','x','o','s','i','l','|','/','\\'];// mid
+  const T3 = ['#','%','@','&','W','M','H','X','Z','8','$']; // high
+  const TX  = ['█','▓','▒','░','◆','◇','●','■'];           // transaction burst
+
+  // Grid cells
+  let grid = [];
+
+  // Agents
+  let agents = [];
+  const MAX_AGENTS = 22;
+
+  // Pulses — visual ripples from mouse movement
+  let ripples = [];
+
+  // Flashes from agent collisions
+  let flashes = [];
+
+  const COL = {
+    dim:    'rgba(55,55,55,',
+    mid:    'rgba(130,130,130,',
+    bright: 'rgba(220,220,220,',
+    white:  'rgba(255,255,255,',
+    green:  'rgba(0,225,0,',
+    greenD: 'rgba(0,140,0,',
+  };
+
+  /* ---- resize ---- */
+  function resize() {
+    W = canvas.offsetWidth;
+    H = canvas.offsetHeight;
+    canvas.width  = W * devicePixelRatio;
+    canvas.height = H * devicePixelRatio;
+    ctx.scale(devicePixelRatio, devicePixelRatio);
+    COLS = Math.ceil(W / CW) + 1;
+    ROWS = Math.ceil(H / CH) + 1;
+    grid = Array.from({length: ROWS}, () =>
+      Array.from({length: COLS}, () => ({
+        char: ' ', alpha: 0, targetAlpha: 0,
+        decay: 0.006, color: 'dim',
+        energy: 0,   // 0-1, driven by mouse proximity + agents
+      }))
+    );
+  }
+
+  /* ---- mouse tracking ---- */
+  // Listen on hero section — canvas is behind z-index:2 content and never
+  // receives pointer events directly. Hero section catches everything.
+  const heroEl = document.getElementById('hero');
+
+  heroEl.addEventListener('mousemove', e => {
+    const r = canvas.getBoundingClientRect();
+    mouseX = e.clientX - r.left;
+    mouseY = e.clientY - r.top;
+    mouseVX = mouseX - lastMX;
+    mouseVY = mouseY - lastMY;
+    lastMX = mouseX; lastMY = mouseY;
+    mouseMC = mouseX / CW;
+    mouseMR = mouseY / CH;
+
+    const spd = Math.hypot(mouseVX, mouseVY);
+    if (spd > 3) {
+      ripples.push({
+        col: mouseMC, row: mouseMR,
+        r: 0, maxR: 8 + spd * 0.5,
+        alpha: Math.min(0.8, spd * 0.06),
+        speed: 0.35 + spd * 0.03,
+      });
+    }
+  });
+
+  heroEl.addEventListener('mouseleave', () => {
+    mouseX = -999; mouseY = -999;
+    mouseMC = -999; mouseMR = -999;
+    lastMX = -999; lastMY = -999;
+  });
+
+  /* ---- agents ---- */
+  function spawnAgent() {
+    if (agents.length >= MAX_AGENTS) return;
+    const edge = Math.floor(Math.random() * 4);
+    let col, row, dx, dy;
+    const spd = 0.03 + Math.random() * 0.05;
+    if (edge===0) { col=Math.random()*COLS; row=-1;   dx=(Math.random()-0.5)*0.4; dy=spd; }
+    else if(edge===1){col=COLS+1; row=Math.random()*ROWS; dx=-spd; dy=(Math.random()-0.5)*0.4;}
+    else if(edge===2){col=Math.random()*COLS; row=ROWS+1; dx=(Math.random()-0.5)*0.4; dy=-spd;}
+    else             {col=-1; row=Math.random()*ROWS; dx=spd; dy=(Math.random()-0.5)*0.4;}
+    const type = Math.random() < 0.18 ? 'coord' : 'worker';
+    agents.push({
+      col, row, dx, dy, type,
+      char: T3[Math.floor(Math.random()*T3.length)],
+      id: Math.floor(Math.random()*0xffff).toString(16).padStart(4,'0'),
+      energy: 0,
+    });
+  }
+
+  /* ---- collision check ---- */
+  function checkCollisions() {
+    for (let i=0;i<agents.length;i++) {
+      for (let j=i+1;j<agents.length;j++) {
+        const a=agents[i], b=agents[j];
+        if (Math.hypot(a.col-b.col, a.row-b.row) < 1.6) {
+          const fc=Math.round((a.col+b.col)/2);
+          const fr=Math.round((a.row+b.row)/2);
+          if (fc>=0&&fc<COLS&&fr>=0&&fr<ROWS) {
+            flashes.push({col:fc,row:fr,age:0,maxAge:20,
+              char:TX[Math.floor(Math.random()*TX.length)]});
+          }
+          [a.dx,b.dx]=[b.dx*0.9,a.dx*0.9];
+          [a.dy,b.dy]=[b.dy*0.9,a.dy*0.9];
+          addLog(a.id, b.id);
+        }
+      }
+    }
+  }
+
+  /* ---- terminal log ---- */
+  const logEl = document.getElementById('term-log');
+  let logQueue = [];
+  let logBusy  = false;
+  const LOG_INTERVAL = 1400; // ms between lines — slow and deliberate
+
+  const LOG_TX = [
+    (a,b)=>`[0x${a}→0x${b}] TX_SETTLE`,
+    (a,b)=>`[0x${a}] REPUTATION +${(Math.random()*0.09+0.01).toFixed(3)}`,
+    (a,b)=>`[0x${b}] AGENT_DISCOVER 0x${a}`,
+    (a,b)=>`[0x${a}] BID_SUBMIT ${(Math.random()*0.005+0.0001).toFixed(5)} SOL`,
+    (a,b)=>`[0x${a}→0x${b}] SESSION_OPEN`,
+    (a,b)=>`[0x${b}] SCORE_UPDATE +${Math.floor(Math.random()*3+1)}`,
+    (a,b)=>`[0x${a}] TASK_ASSIGN → 0x${b}`,
+    (a,b)=>`[0x${b}] PAYMENT_STREAM ${(Math.random()*0.002+0.0005).toFixed(4)} SOL/s`,
+    (a,b)=>`[0x${a}] ATTN_BID $0.00${Math.floor(Math.random()*9+1)}`,
+    (a,b)=>`[0x${a}→0x${b}] COORD_HANDSHAKE`,
+    (a,b)=>`[0x${a}] ZK_PROOF verified`,
+    (a,b)=>`[0x${b}] REPUTATION_QUERY → 0x${a}`,
+  ];
+  const SPAWN_MSGS = [
+    id=>`[0x${id}] AGENT_SPAWN worker`,
+    id=>`[0x${id}] WALLET_INIT`,
+    id=>`[0x${id}] REGISTER_SERVICE`,
+    id=>`[0x${id}] JOIN_NETWORK`,
+    id=>`[0x${id}] AGENT_SPAWN coordinator`,
+  ];
+
+  function addLog(a,b) {
+    const fn = LOG_TX[Math.floor(Math.random()*LOG_TX.length)];
+    logQueue.push({text: fn(a,b), type:'tx'});
+    drainLog();
+  }
+
+  function addSpawnLog(agent) {
+    const fn = SPAWN_MSGS[Math.floor(Math.random()*SPAWN_MSGS.length)];
+    logQueue.push({text: fn(agent.id), type:'spawn'});
+    drainLog();
+  }
+
+  function drainLog() {
+    if (logBusy || logQueue.length===0 || !logEl) return;
+    logBusy = true;
+    const item = logQueue.shift();
+    pushLogLine(item.text, item.type);
+    setTimeout(()=>{ logBusy=false; drainLog(); }, LOG_INTERVAL);
+  }
+
+  function pushLogLine(text, type) {
+    if (!logEl) return;
+    const line = document.createElement('div');
+    line.className = `term-line term-${type}`;
+    const ts = new Date().toISOString().slice(11,23);
+    line.textContent = `${ts}  ${text}`;
+    logEl.appendChild(line);
+    while (logEl.children.length > 60) logEl.removeChild(logEl.firstChild);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function seedLog() {
+    const SYS = [
+      '[SYS] SWARM network initializing...',
+      '[SYS] Colosseum Frontier · Apr 13 – May 11',
+      '[SYS] Agent economy bootstrapping on Solana',
+      '[SYS] Awaiting agent spawns...',
+    ];
+    let delay = 0;
+    SYS.forEach(msg => {
+      setTimeout(()=>pushLogLine(msg,'sys'), delay);
+      delay += LOG_INTERVAL;
+    });
+  }
+
+  /* ---- compute mouse influence for a cell ---- */
+  function mouseInfluence(c, r) {
+    if (mouseMC < 0) return 0;
+    const dist = Math.hypot(c - mouseMC, r - mouseMR);
+    const radius = 10; // cells
+    if (dist > radius) return 0;
+    return Math.pow(1 - dist/radius, 2); // quadratic falloff
+  }
+
+  /* ---- main draw loop ---- */
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    ctx.font = FONT;
+    ctx.textBaseline = 'top';
+    frame++;
+
+    // Spawn agents
+    if (frame % 60 === 0 && agents.length < MAX_AGENTS) {
+      spawnAgent();
+      addSpawnLog(agents[agents.length-1]);
+    }
+
+    // Update ripples
+    ripples = ripples.filter(rp => rp.r < rp.maxR);
+    for (const rp of ripples) rp.r += rp.speed;
+
+    // ---- Update + draw grid cells ----
+    for (let r=0; r<ROWS; r++) {
+      for (let c=0; c<COLS; c++) {
+        const cell = grid[r][c];
+
+        // Mouse influence
+        const mi = mouseInfluence(c, r);
+
+        // Ripple influence
+        let ri = 0;
+        for (const rp of ripples) {
+          const d = Math.hypot(c - rp.col, r - rp.row);
+          const band = 1.2; // ring thickness
+          const ring = Math.abs(d - rp.r);
+          if (ring < band) {
+            ri = Math.max(ri, rp.alpha * (1 - ring/band) * (1 - rp.r/rp.maxR));
+          }
+        }
+
+        // Combined energy
+        const energy = Math.min(1, mi * 1.2 + ri * 0.8 + cell.energy);
+
+        // Set char based on energy
+        if (energy > 0.75) {
+          cell.char  = T3[Math.floor(Math.random()*T3.length)];
+          cell.alpha = 0.7 + energy * 0.25;
+          cell.color = energy > 0.9 ? 'green' : 'bright';
+          cell.decay = 0.04;
+        } else if (energy > 0.45) {
+          if (Math.random() < 0.12) cell.char = T2[Math.floor(Math.random()*T2.length)];
+          cell.alpha = Math.min(cell.alpha + 0.08, 0.55 + energy * 0.2);
+          cell.color = 'mid';
+          cell.decay = 0.02;
+        } else if (energy > 0.1) {
+          if (Math.random() < 0.04) cell.char = T1[Math.floor(Math.random()*T1.length)];
+          cell.alpha = Math.min(cell.alpha + 0.02, 0.22 + energy * 0.15);
+          cell.color = 'dim';
+          cell.decay = 0.008;
+        } else {
+          // Idle decay
+          cell.alpha = Math.max(0, cell.alpha - cell.decay);
+          if (cell.alpha < 0.01) cell.char = ' ';
+        }
+
+        // Occasionally seed background noise randomly
+        if (Math.random() < 0.00015 && energy < 0.1) {
+          cell.char  = T0[Math.floor(Math.random()*T0.length)];
+          cell.alpha = 0.06 + Math.random() * 0.08;
+          cell.decay = 0.003;
+          cell.color = 'dim';
+        }
+
+        // Decay agent energy
+        cell.energy = Math.max(0, cell.energy - 0.04);
+
+        if (cell.alpha > 0.008 && cell.char !== ' ') {
+          const colStr = cell.color==='green'  ? COL.green  :
+                         cell.color==='bright' ? COL.bright :
+                         cell.color==='mid'    ? COL.mid    : COL.dim;
+          ctx.fillStyle = colStr + Math.min(1,cell.alpha) + ')';
+          ctx.fillText(cell.char, c*CW, r*CH);
+        }
+      }
+    }
+
+    // ---- Draw flashes ----
+    flashes = flashes.filter(f=>f.age<f.maxAge);
+    for (const f of flashes) {
+      f.age++;
+      const p = f.age/f.maxAge;
+      const a = (1-p)*0.95;
+      ctx.fillStyle = COL.green + a + ')';
+      ctx.fillText(f.char, f.col*CW, f.row*CH);
+      // Expanding ring
+      if (f.age < 10) {
+        const ring = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
+        for (const [dc,dr] of ring) {
+          const nc=f.col+dc, nr=f.row+dr;
+          if (nc>=0&&nc<COLS&&nr>=0&&nr<ROWS) {
+            ctx.fillStyle = COL.greenD + (a*0.4) + ')';
+            ctx.fillText('·', nc*CW, nr*CH);
+          }
+        }
+      }
+    }
+
+    // ---- Move + draw agents ----
+    checkCollisions();
+    agents = agents.filter(a =>
+      a.col>-3 && a.col<COLS+3 && a.row>-3 && a.row<ROWS+3
+    );
+
+    for (const a of agents) {
+      // Gentle random drift
+      a.dx += (Math.random()-0.5)*0.006;
+      a.dy += (Math.random()-0.5)*0.006;
+      const spd = Math.hypot(a.dx, a.dy);
+      if (spd>0.1) { a.dx*=0.94; a.dy*=0.94; }
+      if (spd<0.02){ a.dx*=1.08; a.dy*=1.08; }
+
+      // Mouse attraction/repulsion — agents are slightly repelled by cursor
+      if (mouseMC > 0) {
+        const dc = a.col - mouseMC, dr = a.row - mouseMR;
+        const d = Math.hypot(dc, dr);
+        if (d < 8 && d > 0.5) {
+          a.dx += (dc/d) * 0.012;
+          a.dy += (dr/d) * 0.012;
+        }
+      }
+
+      a.col += a.dx;
+      a.row += a.dy;
+
+      const gc = Math.round(a.col);
+      const gr = Math.round(a.row);
+
+      // Write trail into grid
+      if (gc>=0&&gc<COLS&&gr>=0&&gr<ROWS) {
+        const cell = grid[gr][gc];
+        cell.char   = T2[Math.floor(Math.random()*T2.length)];
+        cell.alpha  = a.type==='coord' ? 0.5 : 0.32;
+        cell.decay  = 0.009;
+        cell.color  = 'mid';
+        cell.energy = a.type==='coord' ? 0.6 : 0.35;
+      }
+
+      // Draw agent
+      if (gc>=0&&gc<COLS&&gr>=0&&gr<ROWS) {
+        ctx.fillStyle = a.type==='coord'
+          ? COL.green+'0.95)'
+          : COL.white+'0.88)';
+        ctx.fillText(a.char, gc*CW, gr*CH);
+        if (a.type==='coord') {
+          ctx.fillStyle = COL.greenD+'0.25)';
+          for(const[dc,dr]of[[-1,0],[1,0],[0,-1],[0,1]]){
+            const nc=gc+dc,nr=gr+dr;
+            if(nc>=0&&nc<COLS&&nr>=0&&nr<ROWS)
+              ctx.fillText('·', nc*CW, nr*CH);
+          }
+        }
+      }
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  /* ---- init ---- */
+  resize();
+  window.addEventListener('resize', ()=>{ resize(); });
+  seedLog();
+  for (let i=0;i<4;i++) spawnAgent();
+  draw();
+})();
+</script>
+
+<script>
+/* Apply modal */
+function openApplyModal(e) {
+  e.preventDefault();
+  document.getElementById('apply-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeApplyModal() {
+  document.getElementById('apply-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeApplyModal();
+});
+</script>
+
+<!-- APPLY MODAL -->
+<div id="apply-modal" class="modal-overlay" onclick="if(event.target===this)closeApplyModal()">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeApplyModal()">×</button>
+    <div class="modal-lbl">Priority Access</div>
+    <h3 class="modal-title">Register for SWARM</h3>
+    <p class="modal-desc">Enter the passphrase below when registering on Luma to unlock your SWARM priority access.</p>
+    <div class="modal-pass">
+      <div class="modal-pass-lbl">Passphrase</div>
+      <div class="modal-pass-val">SITEx4249</div>
+    </div>
+    <a href="https://luma.com/6229drs5" target="_blank" class="btn-primary modal-cta">Register on Luma →</a>
+  </div>
+</div>
+
+</body>
+</html>

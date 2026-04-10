@@ -1314,7 +1314,10 @@ impl<'a> CodeResourceManager<'a> {
         // The raw model ID (without provider prefix) is used for Claude Code env vars.
         if code_run.spec.model.contains("fireworks") {
             // Strip the "fireworks/" provider prefix for Claude Code env vars
-            let raw_model_id = code_run.spec.model.strip_prefix("fireworks/")
+            let raw_model_id = code_run
+                .spec
+                .model
+                .strip_prefix("fireworks/")
                 .unwrap_or(&code_run.spec.model);
             final_env_vars.push(json!({ "name": "ANTHROPIC_BASE_URL", "value": "https://api.fireworks.ai/inference" }));
             final_env_vars.push(json!({
@@ -1333,10 +1336,14 @@ impl<'a> CodeResourceManager<'a> {
                 "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
             }));
             final_env_vars.push(json!({ "name": "ANTHROPIC_MODEL", "value": raw_model_id }));
-            final_env_vars.push(json!({ "name": "ANTHROPIC_SMALL_FAST_MODEL", "value": raw_model_id }));
-            final_env_vars.push(json!({ "name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": raw_model_id }));
-            final_env_vars.push(json!({ "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL", "value": raw_model_id }));
-            final_env_vars.push(json!({ "name": "ANTHROPIC_DEFAULT_OPUS_MODEL", "value": raw_model_id }));
+            final_env_vars
+                .push(json!({ "name": "ANTHROPIC_SMALL_FAST_MODEL", "value": raw_model_id }));
+            final_env_vars
+                .push(json!({ "name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": raw_model_id }));
+            final_env_vars
+                .push(json!({ "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL", "value": raw_model_id }));
+            final_env_vars
+                .push(json!({ "name": "ANTHROPIC_DEFAULT_OPUS_MODEL", "value": raw_model_id }));
             info!("Fireworks model detected — set ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY, AUTH_TOKEN, and FIREWORKS_AI_API_KEY");
         }
 
@@ -1807,10 +1814,6 @@ scrape_configs:
           older_than: 6h
           drop_counter_reason: stale_cli_entry
 "#,
-                loki_url = loki_url,
-                agent_name = agent_name,
-                coderun_name = coderun_name,
-                workspace_path = workspace_path,
             );
 
             // Store the promtail YAML config — write via init container to emptyDir
@@ -1864,7 +1867,10 @@ scrape_configs:
             // Store config for init container to write
             promtail_init_config = Some(promtail_config);
 
-            info!("Added promtail sidecar for CodeRun {} (agent: {}, Loki: {})", coderun_name, agent_name, loki_url);
+            info!(
+                "Added promtail sidecar for CodeRun {} (agent: {}, Loki: {})",
+                coderun_name, agent_name, loki_url
+            );
         }
 
         // Build init containers array
@@ -1934,8 +1940,12 @@ scrape_configs:
         // modules into the shared openclaw-node-modules emptyDir volume.
         // NOTE: containers in a pod do NOT share image filesystem layers, only volumes.
         {
-            let agent_image = self.select_image_for_cli(code_run)
-                .unwrap_or_else(|_| format!("{}:{}", self.config.agent.image.repository, self.config.agent.image.tag));
+            let agent_image = self.select_image_for_cli(code_run).unwrap_or_else(|_| {
+                format!(
+                    "{}:{}",
+                    self.config.agent.image.repository, self.config.agent.image.tag
+                )
+            });
             init_containers.push(json!({
                 "name": "fix-openclaw-deps",
                 "image": agent_image,
@@ -1953,7 +1963,10 @@ scrape_configs:
                     {"name": "openclaw-node-modules", "mountPath": openclaw_nm_path}
                 ]
             }));
-            info!("Added fix-openclaw-deps init container for CodeRun {}", coderun_name);
+            info!(
+                "Added fix-openclaw-deps init container for CodeRun {}",
+                coderun_name
+            );
         }
 
         // Add promtail config writer init container
@@ -1967,7 +1980,10 @@ scrape_configs:
                     {"name": "promtail-config", "mountPath": "/etc/promtail"}
                 ]
             }));
-            info!("Added promtail config init container for CodeRun {}", coderun_name);
+            info!(
+                "Added promtail config init container for CodeRun {}",
+                coderun_name
+            );
         }
 
         // Build Pod spec and set ServiceAccountName (required by CRD)
@@ -2027,10 +2043,22 @@ scrape_configs:
 
         // Datadog autodiscovery annotations for container log collection.
         // Tags are derived from the CRD spec so every facet is individually searchable.
-        let dd_agent_name = labels.get("agent").cloned().unwrap_or_else(|| "unknown".to_string());
+        let dd_agent_name = labels
+            .get("agent")
+            .cloned()
+            .unwrap_or_else(|| "unknown".to_string());
         let dd_service = format!("cto-coderun-{dd_agent_name}");
-        let dd_cli_type = labels.get("cli-type").cloned().unwrap_or_else(|| "unknown".to_string());
-        let dd_provider = code_run.spec.model.split('/').next().unwrap_or("unknown").to_string();
+        let dd_cli_type = labels
+            .get("cli-type")
+            .cloned()
+            .unwrap_or_else(|| "unknown".to_string());
+        let dd_provider = code_run
+            .spec
+            .model
+            .split('/')
+            .next()
+            .unwrap_or("unknown")
+            .to_string();
         let dd_model = &code_run.spec.model;
         let dd_task_id = code_run.spec.task_id.unwrap_or(0);
         let dd_run_type = &code_run.spec.run_type;
@@ -2275,6 +2303,7 @@ scrape_configs:
         Ok((env_vars, env_from))
     }
 
+    #[allow(clippy::too_many_lines)]
     fn create_task_labels(code_run: &CodeRun) -> BTreeMap<String, String> {
         let mut labels = BTreeMap::new();
         let cli_type = Self::code_run_cli_type(code_run);
@@ -2360,8 +2389,7 @@ scrape_configs:
             .github_app
             .as_ref()
             .and_then(|app| AgentClassifier::new().extract_agent_name(app).ok())
-            .map(|n| n.to_lowercase())
-            .unwrap_or_else(|| "unknown".to_string());
+            .map_or_else(|| "unknown".to_string(), |n| n.to_lowercase());
         labels.insert("agent".to_string(), Self::sanitize_label_value(&agent_name));
         labels.insert(
             "tags.datadoghq.com/service".to_string(),

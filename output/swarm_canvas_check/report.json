@@ -1,0 +1,83 @@
+{
+  "run1": {
+    "runName": "run1",
+    "info": {
+      "hasCanvas": true,
+      "hasTermLog": false,
+      "heroBox": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 1800,
+        "top": 0,
+        "right": 1440,
+        "bottom": 1800,
+        "left": 0
+      },
+      "canvasBox": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 1800,
+        "top": 0,
+        "right": 1440,
+        "bottom": 1800,
+        "left": 0
+      },
+      "canvasSize": {
+        "width": 1440,
+        "height": 1800
+      },
+      "mathRandomCount": 32,
+      "requestAnimationFrame": true,
+      "hasMouseInfluence": true,
+      "hasSeedLog": true,
+      "hasFetch": false,
+      "hasBase58": false,
+      "dataUrlHead": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABaAAAAcICAYAAADKcG"
+    },
+    "restHash": "9ad70eb983e574362bdf6123b8d29c4c9c4c543190756b10749b60cacd68b540",
+    "postHash": "eb191a398cfe9f8222cbd32efff0453224698e631342e5e4c994c8479f37de54"
+  },
+  "run2": {
+    "runName": "run2",
+    "info": {
+      "hasCanvas": true,
+      "hasTermLog": false,
+      "heroBox": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 1800,
+        "top": 0,
+        "right": 1440,
+        "bottom": 1800,
+        "left": 0
+      },
+      "canvasBox": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 1800,
+        "top": 0,
+        "right": 1440,
+        "bottom": 1800,
+        "left": 0
+      },
+      "canvasSize": {
+        "width": 1440,
+        "height": 1800
+      },
+      "mathRandomCount": 32,
+      "requestAnimationFrame": true,
+      "hasMouseInfluence": true,
+      "hasSeedLog": true,
+      "hasFetch": false,
+      "hasBase58": false,
+      "dataUrlHead": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABaAAAAcICAYAAADKcG"
+    },
+    "restHash": "7c64ccea0279a99f9e62a1522d315cd4a8783080c8c7683a95036a01f226604b",
+    "postHash": "53623c2c97b55302fc842cd4d9b1bd7530991c7225aab2436556f8fc6d708947"
+  },
+  "sameRestHashAcrossReloads": false
+}

@@ -3,12 +3,11 @@ use crate::crds::CodeRun;
 use crate::tasks::code::agent::AgentClassifier;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::template_paths::{
-    CODE_CODEX_CONTAINER_BASE_TEMPLATE,
-    CODE_CODING_GUIDELINES_TEMPLATE, CODE_CURSOR_CONTAINER_BASE_TEMPLATE,
-    CODE_FACTORY_CONTAINER_BASE_TEMPLATE, CODE_GEMINI_CONTAINER_BASE_TEMPLATE,
-    CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
-    HARNESS_OPENCLAW_CONFIG_TEMPLATE, HARNESS_OPENCLAW_TEMPLATE,
-    LOBSTER_BASE_TASK_TEMPLATE,
+    CODE_CODEX_CONTAINER_BASE_TEMPLATE, CODE_CODING_GUIDELINES_TEMPLATE,
+    CODE_CURSOR_CONTAINER_BASE_TEMPLATE, CODE_FACTORY_CONTAINER_BASE_TEMPLATE,
+    CODE_GEMINI_CONTAINER_BASE_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE,
+    CODE_OPENCODE_CONTAINER_BASE_TEMPLATE, HARNESS_OPENCLAW_CONFIG_TEMPLATE,
+    HARNESS_OPENCLAW_TEMPLATE, LOBSTER_BASE_TASK_TEMPLATE,
 };
 use crate::tasks::tool_catalog::resolve_tool_name;
 use crate::tasks::types::Result;
@@ -215,7 +214,10 @@ impl CodeTemplateGenerator {
             .cli_config
             .as_ref()
             .and_then(|c| serde_json::to_value(c).ok())
-            .and_then(|v| v.get("workspaceDir").and_then(|w| w.as_str().map(String::from)))
+            .and_then(|v| {
+                v.get("workspaceDir")
+                    .and_then(|w| w.as_str().map(String::from))
+            })
             .unwrap_or_default();
         let fireworks_routing = model.contains("fireworks");
 
@@ -272,7 +274,10 @@ impl CodeTemplateGenerator {
         match hbs.render_template(&template_content, &data) {
             Ok(rendered) => Some((output_name.to_string(), rendered)),
             Err(e) => {
-                warn!("Failed to render CLI config template {}: {}", template_file, e);
+                warn!(
+                    "Failed to render CLI config template {}: {}",
+                    template_file, e
+                );
                 None
             }
         }
@@ -1417,21 +1422,16 @@ impl CodeTemplateGenerator {
             "discord_enabled": true,
         });
 
-        handlebars
-            .render("openclaw_config", &context)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to render OpenClaw config: {e}"
-                ))
-            })
+        handlebars.render("openclaw_config", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render OpenClaw config: {e}"
+            ))
+        })
     }
 
     /// Render the harness-agent launcher script (OpenClaw entrypoint).
     /// Thin shell script: fix perms, copy config, exec openclaw gateway.
-    fn generate_harness_launcher(
-        code_run: &CodeRun,
-        _config: &ControllerConfig,
-    ) -> Result<String> {
+    fn generate_harness_launcher(code_run: &CodeRun, _config: &ControllerConfig) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
         Self::register_template_helpers(&mut handlebars);
@@ -4172,9 +4172,19 @@ Be constructive and explain the "why" behind your suggestions.
     /// Returns the SKILL.md content if found, None otherwise.
     fn resolve_skill_content(skill_name: &str, templates_path: &str) -> Option<String> {
         let categories = [
-            "stacks", "auth", "context", "design", "documents", "languages",
-            "llm-docs", "platforms", "quality", "security", "workflow",
-            "animations", "tools",
+            "stacks",
+            "auth",
+            "context",
+            "design",
+            "documents",
+            "languages",
+            "llm-docs",
+            "platforms",
+            "quality",
+            "security",
+            "workflow",
+            "animations",
+            "tools",
         ];
         for category in &categories {
             let path = format!("{templates_path}/skills/{category}/{skill_name}/SKILL.md");
@@ -4187,13 +4197,16 @@ Be constructive and explain the "why" behind your suggestions.
 
     /// Get skills enriched with inline content for embedding in container scripts.
     /// Returns JSON array of {name, content} objects. Content is empty string if skill not found.
-    fn get_agent_skills_enriched(code_run: &CodeRun, config: &ControllerConfig) -> Vec<serde_json::Value> {
+    fn get_agent_skills_enriched(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Vec<serde_json::Value> {
         let templates_path = get_templates_path();
         Self::get_agent_skills(code_run, config)
             .into_iter()
             .map(|name| {
-                let content = Self::resolve_skill_content(&name, &templates_path)
-                    .unwrap_or_default();
+                let content =
+                    Self::resolve_skill_content(&name, &templates_path).unwrap_or_default();
                 if content.is_empty() {
                     debug!("Skill content not found for '{}' in templates", name);
                 } else {
@@ -4816,19 +4829,17 @@ Be constructive and explain the "why" behind your suggestions.
         // Register auth partials (best-effort — agents only reference them when skills_native=false)
         for (partial_name, template_path) in auth_partials {
             match Self::load_template(template_path) {
-                Ok(content) => {
-                    match handlebars.register_partial(partial_name, content) {
-                        Ok(()) => {
-                            debug!("Successfully registered auth partial: {}", partial_name);
-                        }
-                        Err(e) => {
-                            warn!(
+                Ok(content) => match handlebars.register_partial(partial_name, content) {
+                    Ok(()) => {
+                        debug!("Successfully registered auth partial: {}", partial_name);
+                    }
+                    Err(e) => {
+                        warn!(
                                 "Auth partial {partial_name} has invalid handlebars syntax (likely JSX {{ }} in code samples): {e}. \
                                 Agents referencing this partial will get raw markdown instead."
                             );
-                        }
                     }
-                }
+                },
                 Err(e) => {
                     warn!(
                         "Failed to load auth partial {partial_name} from ConfigMap (path: {template_path}): {e}. \
@@ -4954,12 +4965,10 @@ Be constructive and explain the "why" behind your suggestions.
                 debug!("Registered unified ACP dispatch partial (openclaw.sh.hbs)");
                 Ok(())
             }
-            Err(e) => {
-                Err(crate::tasks::types::Error::ConfigError(format!(
-                    "ACP dispatch template not found ({invoke_template_path}): {e}. \
+            Err(e) => Err(crate::tasks::types::Error::ConfigError(format!(
+                "ACP dispatch template not found ({invoke_template_path}): {e}. \
                     Ensure templates/clis/openclaw.sh.hbs exists in the controller image."
-                )))
-            }
+            ))),
         }
     }
 }
