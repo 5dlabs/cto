@@ -498,6 +498,8 @@ spec:
                 echo "[openclaw] Installing missing @buape/carbon dependency"
                 npm install -g --no-audit --no-fund @buape/carbon 2>&1 | tail -2
               }
+              # Auto-fix legacy config keys for newer OpenClaw versions
+              openclaw doctor --fix 2>&1 | tail -5 || true
               exec openclaw gateway
           env:
             - name: HOME

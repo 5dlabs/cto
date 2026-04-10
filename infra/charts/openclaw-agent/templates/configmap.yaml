@@ -222,14 +222,7 @@ data:
           {{- if .Values.tools.acp.enabled }},
           "acpx": {
             "enabled": true,
-            "config": {
-              "permissionMode": {{ .Values.tools.acp.permissionMode | default "approve-all" | quote }},
-              "nonInteractivePermissions": {{ .Values.tools.acp.nonInteractivePermissions | default "deny" | quote }},
-              "pluginToolsMcpBridge": {{ .Values.tools.acp.pluginToolsMcpBridge | default false }}
-              {{- if .Values.tools.acp.acpxVersion }},
-              "expectedVersion": "any"
-              {{- end }}
-            }
+            "config": {}
           }
           {{- end }}
           {{- if .Values.nats.enabled }},
