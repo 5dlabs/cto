@@ -212,6 +212,8 @@ impl DiscoveryService {
             CLIType::OpenCode => ("opencode", vec!["--version"]),
             CLIType::Cursor => ("cursor-agent", vec!["--version"]),
             CLIType::Factory => ("droid", vec!["--version"]),
+            CLIType::Copilot => ("copilot", vec!["--version"]),
+            CLIType::Kimi => ("kimi", vec!["--version"]),
             CLIType::OpenHands => (
                 "python3",
                 vec!["-c", "import openhands; print(openhands.__version__)"],

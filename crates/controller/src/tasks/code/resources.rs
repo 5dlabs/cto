@@ -832,7 +832,8 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "blaze-scripts",
                 "configMap": {
                     "name": blaze_scripts_cm_name,
-                    "defaultMode": 0o755
+                    "defaultMode": 0o755,
+                    "optional": true
                 }
             }));
             volume_mounts.push(json!({
@@ -897,6 +898,32 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "task-files",
                 "mountPath": "/etc/claude-code/managed-settings.json",
                 "subPath": "settings.json"
+            }));
+        }
+
+        // CLI-specific config file mounts from ConfigMap
+        // These are rendered from templates/cli-configs/ and added to the ConfigMap
+        if cli_type == CLIType::Copilot {
+            volume_mounts.push(json!({
+                "name": "task-files",
+                "mountPath": "/home/node/.copilot/config.json",
+                "subPath": "copilot-config.json"
+            }));
+        }
+        // Kimi config + OAuth token written by harness at startup
+        // (can't use subPath mount — blocks credentials dir creation)
+        if cli_type == CLIType::OpenCode {
+            volume_mounts.push(json!({
+                "name": "task-files",
+                "mountPath": "/home/node/.config/opencode/opencode.json",
+                "subPath": "opencode.json"
+            }));
+        }
+        if cli_type == CLIType::Factory {
+            volume_mounts.push(json!({
+                "name": "task-files",
+                "mountPath": "/home/node/.factory/config.json",
+                "subPath": "factory-config.json"
             }));
         }
 
@@ -997,11 +1024,40 @@ impl<'a> CodeResourceManager<'a> {
             }));
         }
 
+        // CLI OAuth credential mounts (Phase B1/B2)
+        // Claude OAuth: copied by openclaw.sh.hbs into ~/.claude/.credentials.json at startup
+        if cli_type == CLIType::Claude {
+            volumes.push(json!({
+                "name": "claude-oauth",
+                "secret": {
+                    "secretName": "claude-oauth",
+                    "optional": true
+                }
+            }));
+            volume_mounts.push(json!({
+                "name": "claude-oauth",
+                "mountPath": "/root/.claude-oauth",
+                "readOnly": true
+            }));
+        }
+
         // Shared volume for GitHub App private key - shared between init and main containers
         // This allows the init container to write the key and main container (Ruby/Go) to read it
         volumes.push(json!({
             "name": "github-app-key",
             "emptyDir": {}
+        }));
+
+        // Shared emptyDir for OpenClaw peer deps — init container installs, main container reads.
+        // Must be added before container_spec is built (which consumes volume_mounts).
+        let openclaw_nm_path = "/usr/local/share/npm-global/lib/node_modules/openclaw/node_modules";
+        volumes.push(json!({
+            "name": "openclaw-node-modules",
+            "emptyDir": {}
+        }));
+        volume_mounts.push(json!({
+            "name": "openclaw-node-modules",
+            "mountPath": openclaw_nm_path
         }));
 
         // GitHub App authentication only - no SSH volumes needed
@@ -1153,6 +1209,62 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "XDG_CONFIG_HOME",
                 "value": "/root/.config"
             }));
+            // Pin CODEX_HOME so codex always finds auth.json at /root/.codex
+            // regardless of HOME overrides in .task-env
+            critical_env_vars.push(json!({
+                "name": "CODEX_HOME",
+                "value": "/root/.codex"
+            }));
+        }
+
+        // Kimi: set model name and base URL for Fireworks routing
+        if cli_type == CLIType::Kimi {
+            let model = &code_run.spec.model;
+            if model.contains("fireworks") {
+                critical_env_vars.push(json!({
+                    "name": "KIMI_BASE_URL",
+                    "value": "https://api.fireworks.ai/inference/v1"
+                }));
+            }
+            critical_env_vars.push(json!({
+                "name": "KIMI_MODEL_NAME",
+                "value": model
+            }));
+        }
+
+        // Copilot: BYOK via Fireworks with OAuth token auth.
+        // COPILOT_GITHUB_TOKEN (gho_* OAuth) satisfies ACP auth. BYOK env vars route
+        // inference to Fireworks. Do NOT set COPILOT_OFFLINE — it breaks ACP auth.
+        if cli_type == CLIType::Copilot {
+            let model = &code_run.spec.model;
+            critical_env_vars.push(json!({
+                "name": "COPILOT_GITHUB_TOKEN",
+                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "COPILOT_GITHUB_TOKEN" } }
+            }));
+            critical_env_vars.push(json!({
+                "name": "COPILOT_PROVIDER_BASE_URL",
+                "value": "https://api.fireworks.ai/inference/v1"
+            }));
+            critical_env_vars.push(json!({
+                "name": "COPILOT_PROVIDER_TYPE",
+                "value": "openai"
+            }));
+            critical_env_vars.push(json!({
+                "name": "COPILOT_PROVIDER_API_KEY",
+                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
+            }));
+            critical_env_vars.push(json!({
+                "name": "COPILOT_MODEL",
+                "value": "gpt-4.1"
+            }));
+            critical_env_vars.push(json!({
+                "name": "COPILOT_PROVIDER_MODEL_ID",
+                "value": "gpt-4.1"
+            }));
+            critical_env_vars.push(json!({
+                "name": "COPILOT_PROVIDER_WIRE_MODEL",
+                "value": model
+            }));
         }
 
         // Comprehensive deduplication: remove all duplicates by name, keeping the last occurrence
@@ -1189,6 +1301,52 @@ impl<'a> CodeResourceManager<'a> {
             }));
         }
 
+        // OpenClaw requires a valid TZ — containers default to Etc/Unknown which crashes the logger
+        final_env_vars.push(json!({ "name": "TZ", "value": "UTC" }));
+
+        // Disable xAI code_execution tool (cto-secrets has a placeholder XAI_API_KEY)
+        final_env_vars.push(json!({ "name": "XAI_API_KEY", "value": "" }));
+
+        // Fireworks model routing: when the model ID contains "fireworks", set
+        // ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN so the acpx/Claude Code
+        // backend routes through Fireworks' Anthropic-compatible API.
+        // Also set all ANTHROPIC_*_MODEL vars so subagents use the same model.
+        // The raw model ID (without provider prefix) is used for Claude Code env vars.
+        if code_run.spec.model.contains("fireworks") {
+            // Strip the "fireworks/" provider prefix for Claude Code env vars
+            let raw_model_id = code_run
+                .spec
+                .model
+                .strip_prefix("fireworks/")
+                .unwrap_or(&code_run.spec.model);
+            final_env_vars.push(json!({ "name": "ANTHROPIC_BASE_URL", "value": "https://api.fireworks.ai/inference" }));
+            final_env_vars.push(json!({
+                "name": "ANTHROPIC_AUTH_TOKEN",
+                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
+            }));
+            // Claude Code uses ANTHROPIC_API_KEY for auth — override with Fireworks key
+            // when routing through Fireworks' Anthropic-compatible endpoint
+            final_env_vars.push(json!({
+                "name": "ANTHROPIC_API_KEY",
+                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
+            }));
+            // litellm (used by ACP bridge) expects FIREWORKS_AI_API_KEY
+            final_env_vars.push(json!({
+                "name": "FIREWORKS_AI_API_KEY",
+                "valueFrom": { "secretKeyRef": { "name": "cto-secrets", "key": "FIREWORKS_API_KEY" } }
+            }));
+            final_env_vars.push(json!({ "name": "ANTHROPIC_MODEL", "value": raw_model_id }));
+            final_env_vars
+                .push(json!({ "name": "ANTHROPIC_SMALL_FAST_MODEL", "value": raw_model_id }));
+            final_env_vars
+                .push(json!({ "name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": raw_model_id }));
+            final_env_vars
+                .push(json!({ "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL", "value": raw_model_id }));
+            final_env_vars
+                .push(json!({ "name": "ANTHROPIC_DEFAULT_OPUS_MODEL", "value": raw_model_id }));
+            info!("Fireworks model detected — set ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY, AUTH_TOKEN, and FIREWORKS_AI_API_KEY");
+        }
+
         // Final deduplication pass to handle any remaining duplicates from critical vars and Docker
         let mut final_seen_names = std::collections::HashSet::new();
         let mut final_deduplicated_env_vars = Vec::new();
@@ -1209,13 +1367,9 @@ impl<'a> CodeResourceManager<'a> {
         final_deduplicated_env_vars.reverse();
         final_env_vars = final_deduplicated_env_vars;
 
-        // Build the job spec with environment configuration
-        // Use Always pull policy for :latest and :dev tags to ensure fresh images
-        let image_pull_policy = if image.ends_with(":latest") || image.ends_with(":dev") {
-            "Always"
-        } else {
-            "IfNotPresent"
-        };
+        // Use Always pull policy for :latest and :dev tags to ensure fresh images,
+        // unless explicitly overridden in config
+        let image_pull_policy = self.resolve_image_pull_policy(&image);
 
         let mut container_spec = json!({
             "name": container_name,
@@ -1265,6 +1419,15 @@ impl<'a> CodeResourceManager<'a> {
             }
         }));
 
+        // Mount discord-agent-bots for per-agent Discord tokens and channels
+        // (DISCORD_TOKEN_<AGENT>, DISCORD_CHANNEL_<AGENT>)
+        env_from.push(json!({
+            "secretRef": {
+                "name": "discord-agent-bots",
+                "optional": serde_json::Value::Bool(true)
+            }
+        }));
+
         // Add envFrom if we have secrets to mount
         if !env_from.is_empty() {
             container_spec["envFrom"] = json!(env_from);
@@ -1272,6 +1435,8 @@ impl<'a> CodeResourceManager<'a> {
 
         // Build containers array
         let mut containers = vec![container_spec];
+        #[allow(unused_assignments)]
+        let mut promtail_init_config: Option<String> = None;
 
         // Add Docker daemon if enabled (kept as-is for DIND workflows)
         if enable_docker {
@@ -1523,12 +1688,207 @@ impl<'a> CodeResourceManager<'a> {
             }
         }
 
+        // Add promtail sidecar for shipping CLI logs to Loki
+        // Mirrors Morgan's promtail config — scrapes CLI-specific log paths
+        // and ships them to the in-cluster Loki gateway via the OTLP pipeline
+        {
+            let agent_name = code_run
+                .spec
+                .github_app
+                .as_deref()
+                .unwrap_or("unknown")
+                .replace("5DLabs-", "")
+                .to_lowercase();
+
+            let loki_url = std::env::var("LOKI_PUSH_URL").unwrap_or_else(|_| {
+                "http://openclaw-observability-loki-gateway.openclaw.svc.cluster.local/loki/api/v1/push".to_string()
+            });
+
+            let workspace_path = format!("/workspace/{workspace_subdir}");
+
+            let promtail_config = format!(
+                r#"server:
+  http_listen_port: 0
+  grpc_listen_port: 0
+positions:
+  filename: /run/promtail/positions.yaml
+clients:
+  - url: {loki_url}
+    tenant_id: openclaw
+scrape_configs:
+  - job_name: acp-cli
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-claude
+          cli_name: claude
+          __path__: {workspace_path}/.claude/**/*.{{jsonl,log}}
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-droid
+          cli_name: droid
+          __path__: {workspace_path}/.factory/**/*.{{jsonl,log}}
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-codex
+          cli_name: codex
+          __path__: {workspace_path}/.codex/**/*.{{jsonl,log}}
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-gemini
+          cli_name: gemini
+          __path__: {workspace_path}/.gemini/**/*.{{jsonl,log}}
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-cursor
+          cli_name: cursor
+          __path__: {workspace_path}/.cursor-agent/**/*.{{jsonl,log}}
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-kimi
+          cli_name: kimi
+          __path__: {workspace_path}/.kimi/**/*.{{jsonl,log}}
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-opencode
+          cli_name: opencode
+          __path__: {workspace_path}/.local/share/opencode/**/*.{{jsonl,log}}
+      - targets: [localhost]
+        labels:
+          job: acp-cli
+          agent_id: "{agent_name}"
+          coderun: "{coderun_name}"
+          namespace: "cto"
+          source: acp-copilot
+          cli_name: copilot
+          __path__: {workspace_path}/.copilot/**/*.{{jsonl,log}}
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: time
+            level: level
+            message: message
+      - regex:
+          source: message
+          expression: '^(?P<timestamp>\d{{4}}-\d{{2}}-\d{{2}}[T ]\d{{2}}:\d{{2}}:\d{{2}}[^\s]*)\s*(?:\[(?P<level>[A-Z]+)\])?\s*(?P<content>.*)$'
+      - template:
+          source: level
+          template: '{{{{ if .level }}}}{{{{ .level | ToLower }}}}{{{{ else }}}}info{{{{ end }}}}'
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+          fallback_formats:
+            - "2006-01-02T150405"
+            - "2006-01-02 15:04:05"
+      - drop:
+          older_than: 6h
+          drop_counter_reason: stale_cli_entry
+"#,
+            );
+
+            // Store the promtail YAML config — write via init container to emptyDir
+            // This avoids needing a separate ConfigMap resource
+            volumes.push(json!({
+                "name": "promtail-config",
+                "emptyDir": {}
+            }));
+
+            volumes.push(json!({
+                "name": "promtail-positions",
+                "emptyDir": {}
+            }));
+
+            // Promtail watches /workspace/.agent_done and self-terminates after the
+            // main agent container exits, matching the docker-daemon sidecar pattern.
+            let promtail_container = json!({
+                "name": "promtail",
+                "image": "grafana/promtail:latest",
+                "command": ["/bin/sh", "-c"],
+                "args": [
+                    "/usr/bin/promtail -config.file=/etc/promtail/promtail.yaml & PROM_PID=$!; \
+                     while true; do \
+                       if [ -f /workspace/.agent_done ]; then \
+                         echo '[promtail] Agent done signal detected, flushing and stopping...'; \
+                         sleep 10; \
+                         kill -TERM $PROM_PID 2>/dev/null || true; \
+                         wait $PROM_PID 2>/dev/null; \
+                         exit 0; \
+                       fi; \
+                       if ! kill -0 $PROM_PID 2>/dev/null; then \
+                         echo '[promtail] Promtail exited unexpectedly'; \
+                         exit 1; \
+                       fi; \
+                       sleep 5; \
+                     done"
+                ],
+                "resources": {
+                    "requests": { "cpu": "10m", "memory": "32Mi" },
+                    "limits": { "cpu": "100m", "memory": "64Mi" }
+                },
+                "volumeMounts": [
+                    { "name": "workspace", "mountPath": "/workspace", "readOnly": true },
+                    { "name": "promtail-config", "mountPath": "/etc/promtail" },
+                    { "name": "promtail-positions", "mountPath": "/run/promtail" }
+                ]
+            });
+
+            containers.push(promtail_container);
+
+            // Store config for init container to write
+            promtail_init_config = Some(promtail_config);
+
+            info!(
+                "Added promtail sidecar for CodeRun {} (agent: {}, Loki: {})",
+                coderun_name, agent_name, loki_url
+            );
+        }
+
         // Build init containers array
         // Always include the workspace setup init container that:
         // 1. Creates a unique subdirectory per CodeRun to prevent git lock conflicts
         // 2. Sets proper ownership for the agent (uid 1000)
         let workspace_setup_cmd = format!(
-            "mkdir -p /workspace/{workspace_subdir} && chown -R 1000:1000 /workspace/runs && chmod -R ug+rwX /workspace/runs"
+            "mkdir -p /workspace/{workspace_subdir} && \
+             mkdir -p /workspace/{workspace_subdir}/.claude/logs \
+                      /workspace/{workspace_subdir}/.codex/logs \
+                      /workspace/{workspace_subdir}/.factory/logs \
+                      /workspace/{workspace_subdir}/.gemini/logs \
+                      /workspace/{workspace_subdir}/.cursor-agent/logs \
+                      /workspace/{workspace_subdir}/.kimi/logs \
+                      /workspace/{workspace_subdir}/.local/share/opencode/log \
+                      /workspace/{workspace_subdir}/.copilot/logs \
+                      /workspace/{workspace_subdir}/.pi/logs && \
+             chown -R 1000:1000 /workspace/runs && chmod -R ug+rwX /workspace/runs"
         );
         let mut init_containers = vec![json!({
             "name": "setup-workspace",
@@ -1574,6 +1934,58 @@ impl<'a> CodeResourceManager<'a> {
             info!("Added coordination copy init container for watcher CodeRun");
         }
 
+        // Fix OpenClaw missing peer dependencies (e.g. @buape/carbon).
+        // The agents image installs OpenClaw with --ignore-scripts which skips peer
+        // dep resolution. This init container runs as root, installs the missing
+        // modules into the shared openclaw-node-modules emptyDir volume.
+        // NOTE: containers in a pod do NOT share image filesystem layers, only volumes.
+        {
+            let agent_image = self.select_image_for_cli(code_run).unwrap_or_else(|_| {
+                format!(
+                    "{}:{}",
+                    self.config.agent.image.repository, self.config.agent.image.tag
+                )
+            });
+            init_containers.push(json!({
+                "name": "fix-openclaw-deps",
+                "image": agent_image,
+                "command": ["/bin/sh", "-c",
+                    "cd /usr/local/share/npm-global/lib/node_modules/openclaw && \
+                     npm install --no-audit --no-fund --loglevel=warn 2>&1 | tail -5 && \
+                     echo '[fix-openclaw-deps] done'"
+                ],
+                "securityContext": {
+                    "runAsUser": 0,
+                    "runAsGroup": 0,
+                    "allowPrivilegeEscalation": false
+                },
+                "volumeMounts": [
+                    {"name": "openclaw-node-modules", "mountPath": openclaw_nm_path}
+                ]
+            }));
+            info!(
+                "Added fix-openclaw-deps init container for CodeRun {}",
+                coderun_name
+            );
+        }
+
+        // Add promtail config writer init container
+        if let Some(config_yaml) = promtail_init_config {
+            let escaped = config_yaml.replace('\'', "'\\''");
+            init_containers.push(json!({
+                "name": "write-promtail-config",
+                "image": "busybox:1.36",
+                "command": ["/bin/sh", "-c", format!("printf '%s' '{}' > /etc/promtail/promtail.yaml", escaped)],
+                "volumeMounts": [
+                    {"name": "promtail-config", "mountPath": "/etc/promtail"}
+                ]
+            }));
+            info!(
+                "Added promtail config init container for CodeRun {}",
+                coderun_name
+            );
+        }
+
         // Build Pod spec and set ServiceAccountName (required by CRD)
         let mut pod_spec = json!({
             "shareProcessNamespace": true,
@@ -1596,7 +2008,8 @@ impl<'a> CodeResourceManager<'a> {
                 "runAsGroup": 0,
                 "fsGroupChangePolicy": "OnRootMismatch"
             });
-            pod_spec["initContainers"] = json!([]);
+            // Keep init containers (promtail config writer, workspace setup, etc.)
+            // Only the securityContext needs root for Codex's sandbox mode.
         }
 
         // Prefer CRD-provided ServiceAccountName; else use controller default if set
@@ -1628,6 +2041,81 @@ impl<'a> CodeResourceManager<'a> {
             pod_spec["imagePullSecrets"] = json!(secrets);
         }
 
+        // Datadog autodiscovery annotations for container log collection.
+        // Tags are derived from the CRD spec so every facet is individually searchable.
+        let dd_agent_name = labels
+            .get("agent")
+            .cloned()
+            .unwrap_or_else(|| "unknown".to_string());
+        let dd_service = format!("cto-coderun-{dd_agent_name}");
+        let dd_cli_type = labels
+            .get("cli-type")
+            .cloned()
+            .unwrap_or_else(|| "unknown".to_string());
+        let dd_provider = code_run
+            .spec
+            .model
+            .split('/')
+            .next()
+            .unwrap_or("unknown")
+            .to_string();
+        let dd_model = &code_run.spec.model;
+        let dd_task_id = code_run.spec.task_id.unwrap_or(0);
+        let dd_run_type = &code_run.spec.run_type;
+        let dd_service_target = &code_run.spec.service;
+        let dd_ctx_ver = code_run.spec.context_version;
+
+        // Build tags from all available CRD spec fields
+        let mut dd_tags: Vec<String> = vec![
+            format!("agent:{dd_agent_name}"),
+            format!("cli:{dd_cli_type}"),
+            format!("provider:{dd_provider}"),
+            format!("model:{dd_model}"),
+            format!("task:{dd_task_id}"),
+            format!("coderun:{coderun_name}"),
+            format!("run_type:{dd_run_type}"),
+            format!("service_target:{dd_service_target}"),
+            "env:production".to_string(),
+        ];
+        if let Some(ref app) = code_run.spec.github_app {
+            dd_tags.push(format!("github_app:{app}"));
+        }
+        if let Some(ref cli_cfg) = code_run.spec.cli_config {
+            if let Some(max_tokens) = cli_cfg.max_tokens {
+                dd_tags.push(format!("max_tokens:{max_tokens}"));
+            }
+            if let Some(temp) = cli_cfg.temperature {
+                dd_tags.push(format!("temperature:{temp}"));
+            }
+        }
+        dd_tags.push(format!("context_version:{dd_ctx_ver}"));
+        if code_run.spec.continue_session {
+            dd_tags.push("continue_session:true".to_string());
+        }
+        if code_run.spec.enable_docker {
+            dd_tags.push("docker:enabled".to_string());
+        }
+
+        let tags_json: Vec<String> = dd_tags.iter().map(|t| format!("\"{t}\"")).collect();
+        let tags_joined = tags_json.join(",");
+        let dd_log_config = format!(
+            "[{{\"source\":\"cto-coderun\",\"service\":\"{dd_service}\",\"auto_multi_line_detection\":true,\"tags\":[{tags_joined}]}}]",
+        );
+        let mut dd_annotations = serde_json::Map::new();
+        // Container name is already capped at 58 chars by container_name_for_cli(),
+        // so "{name}.logs" always fits within K8s 63-char annotation name limit.
+        dd_annotations.insert(
+            format!("ad.datadoghq.com/{container_name}.logs"),
+            json!(dd_log_config),
+        );
+        dd_annotations.insert(
+            "ad.datadoghq.com/promtail.logs".to_string(),
+            json!(format!(
+                "[{{\"source\":\"cto-promtail\",\"service\":\"{dd_service}\"}}]",
+            )),
+        );
+        let dd_annotations = serde_json::Value::Object(dd_annotations);
+
         let mut job_spec = json!({
             "apiVersion": "batch/v1",
             "kind": "Job",
@@ -1647,7 +2135,10 @@ impl<'a> CodeResourceManager<'a> {
                 "backoffLimit": 0,
                 "activeDeadlineSeconds": 86400,  // 24-hour ultimate safety net (tasks can legitimately run for hours)
                 "template": {
-                    "metadata": { "labels": labels },
+                    "metadata": {
+                        "labels": labels,
+                        "annotations": dd_annotations
+                    },
                     "spec": pod_spec
                 }
             }
@@ -1812,6 +2303,7 @@ impl<'a> CodeResourceManager<'a> {
         Ok((env_vars, env_from))
     }
 
+    #[allow(clippy::too_many_lines)]
     fn create_task_labels(code_run: &CodeRun) -> BTreeMap<String, String> {
         let mut labels = BTreeMap::new();
         let cli_type = Self::code_run_cli_type(code_run);
@@ -1888,6 +2380,29 @@ impl<'a> CodeResourceManager<'a> {
         labels.insert(
             "cli-container".to_string(),
             Self::sanitize_label_value(&container_label),
+        );
+
+        // Datadog unified service tagging — lets DD filter CodeRun pods distinctly
+        // Extract agent name from GitHub app (e.g., "5DLabs-Rex" → "rex")
+        let agent_name = code_run
+            .spec
+            .github_app
+            .as_ref()
+            .and_then(|app| AgentClassifier::new().extract_agent_name(app).ok())
+            .map_or_else(|| "unknown".to_string(), |n| n.to_lowercase());
+        labels.insert("agent".to_string(), Self::sanitize_label_value(&agent_name));
+        labels.insert(
+            "tags.datadoghq.com/service".to_string(),
+            format!("cto-coderun-{}", Self::sanitize_label_value(&agent_name)),
+        );
+        labels.insert(
+            "tags.datadoghq.com/env".to_string(),
+            "production".to_string(),
+        );
+        // CLI type and provider as DD-visible labels for faceted search
+        labels.insert(
+            "tags.datadoghq.com/version".to_string(),
+            cli_type.to_string().to_lowercase(),
         );
 
         // Add Linear session labels for pod discovery (used by PM server for routing input)
@@ -2291,8 +2806,10 @@ impl<'a> CodeResourceManager<'a> {
             collapsed
         };
 
-        if final_name.len() > 63 {
-            final_name.truncate(63);
+        // Cap at 58 chars so DD annotation key `ad.datadoghq.com/{name}.logs`
+        // stays within K8s 63-char annotation name limit (58 + 5 = 63).
+        if final_name.len() > 58 {
+            final_name.truncate(58);
             while final_name.ends_with('-') {
                 final_name.pop();
             }
@@ -2448,6 +2965,33 @@ impl<'a> CodeResourceManager<'a> {
              Either specify cli_config in the CodeRun spec or configure agent.image in controller config.",
             code_run.metadata.name.as_deref().unwrap_or("unknown")
         )))
+    }
+
+    /// Resolve image pull policy: config override > auto-detect from tag.
+    fn resolve_image_pull_policy(&self, image: &str) -> &'static str {
+        // Check CLI-specific config first, then default image config
+        let config_policy = self
+            .config
+            .agent
+            .cli_images
+            .values()
+            .find(|img| image.starts_with(&img.repository))
+            .and_then(|img| img.pull_policy.as_deref())
+            .or(self.config.agent.image.pull_policy.as_deref());
+
+        match config_policy {
+            Some(p) if p.eq_ignore_ascii_case("always") => "Always",
+            Some(p) if p.eq_ignore_ascii_case("ifnotpresent") => "IfNotPresent",
+            Some(p) if p.eq_ignore_ascii_case("never") => "Never",
+            _ => {
+                // Auto-detect: Always for :latest/:dev, IfNotPresent otherwise
+                if image.ends_with(":latest") || image.ends_with(":dev") {
+                    "Always"
+                } else {
+                    "IfNotPresent"
+                }
+            }
+        }
     }
 }
 

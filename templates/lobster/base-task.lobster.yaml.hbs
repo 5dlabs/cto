@@ -1,0 +1,370 @@
+{{! =========================================================================
+   Base Lobster Task Runner
+   
+   Universal entrypoint for all CodeRun pods.
+   Mounted as /task-files/base-task.lobster.yaml via ConfigMap.
+   
+   Handles: GitHub auth → git clone → acpx env setup → run task → PR
+   The task flows in the repo just call: acpx $ACPX_AGENT exec -f prompt.md
+   All CLI/model/provider config is exported as env vars by this base.
+   ========================================================================= }}
+name: base-task
+description: Universal CodeRun entrypoint — setup, run task, teardown
+
+steps:
+  # ─── GitHub Authentication ───────────────────────────────────────────
+  - id: github-auth
+    description: Generate GITHUB_TOKEN from App credentials
+    command: |
+      exec bash <<'STEP'
+      set -euo pipefail
+      # Fix root-owned .gitconfig from image build
+      [ -f "$HOME/.gitconfig" ] && [ ! -w "$HOME/.gitconfig" ] && rm -f "$HOME/.gitconfig" 2>/dev/null || true
+      {{> github-auth}}
+      # Persist env vars for subsequent steps (each step runs in a new shell)
+      cat > /workspace/.task-env <<ENVEOF
+      export GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+      export GH_TOKEN="${GH_TOKEN:-}"
+      export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME}"
+      export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL}"
+      export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME}"
+      export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL}"
+      export GIT_TERMINAL_PROMPT=0
+      export GITHUB_APP_PRIVATE_KEY_FILE="${GITHUB_APP_PRIVATE_KEY_FILE:-}"
+      export npm_config_cache="${npm_config_cache:-/tmp/npm-cache}"
+      export HOME="${HOME:-/tmp/agent-home}"
+      ENVEOF
+      echo "✅ GitHub auth complete"
+      STEP
+
+  # ─── Git Clone & Branch Setup ───────────────────────────────────────
+  - id: git-setup
+    description: Clone repo and create working branch
+    command: |
+      exec bash <<'STEP'
+      set -euo pipefail
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
+      {{> git-setup}}
+      # Persist git vars for subsequent steps
+      cat >> /workspace/.task-env <<ENVEOF
+      export FEATURE_BRANCH="${FEATURE_BRANCH}"
+      export BASE_BRANCH="${BASE_BRANCH}"
+      export REPO_ROOT="${REPO_ROOT}"
+      export CLI_WORK_DIR="${CLI_WORK_DIR}"
+      export CLAUDE_WORK_DIR="${CLAUDE_WORK_DIR}"
+      export DOCS_PROJECT_DIR="${DOCS_PROJECT_DIR:-}"
+      ENVEOF
+      echo "✅ Git setup complete"
+      STEP
+
+  # ─── acpx Environment Setup ────────────────────────────────────────
+  - id: acpx-env
+    description: Export ACPX_AGENT, ACPX_MODEL, ACPX_CMD so task flows just call acpx
+    command: |
+      exec bash <<'STEP'
+      set -euo pipefail
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
+
+      # ── CLI → acpx agent mapping ──
+      CLI_TYPE="{{cli_type}}"
+      case "$CLI_TYPE" in
+        factory) ACPX_AGENT="droid" ;;
+        *)       ACPX_AGENT="$CLI_TYPE" ;;
+      esac
+      export ACPX_AGENT
+
+      # ── Model (with provider override) ──
+      ACPX_MODEL="{{model}}"
+
+      # Fireworks FirePass: override model to Fireworks-compatible ID
+      # Skip for factory/droid (native models), codex (Fireworks Responses API), and gemini (native Google API)
+      if [ -n "${FIREWORKS_API_KEY:-}" ] && [ "$CLI_TYPE" != "factory" ] && [ "$CLI_TYPE" != "codex" ] && [ "$CLI_TYPE" != "gemini" ]; then
+        export ANTHROPIC_AUTH_TOKEN="$FIREWORKS_API_KEY"
+        export ANTHROPIC_BASE_URL="https://api.fireworks.ai/inference"
+        FW_MODEL="${FIREWORKS_MODEL:-accounts/fireworks/routers/kimi-k2p5-turbo}"
+        export ANTHROPIC_MODEL="$FW_MODEL"
+        export CLAUDE_MODEL="$FW_MODEL"
+        export CLAUDE_CODE_MODEL="$FW_MODEL"
+        ACPX_MODEL="$FW_MODEL"
+        # OpenCode requires fireworks-ai/ provider prefix on model ID
+        if [ "$CLI_TYPE" = "opencode" ]; then
+          ACPX_MODEL="fireworks-ai/$FW_MODEL"
+        fi
+        # Kimi CLI: set_session_model uses the config model key, not raw ID
+        if [ "$CLI_TYPE" = "kimi" ]; then
+          ACPX_MODEL="kimi-k2p5-turbo"
+        fi
+      fi
+
+      # Cursor: uses CURSOR_API_KEY, model resolved internally
+      if [ "$CLI_TYPE" = "cursor" ] && [ -n "${CURSOR_API_KEY:-}" ]; then
+        export CURSOR_API_KEY
+      fi
+
+      # Copilot: BYOK via Fireworks — use known model ID for acpx
+      if [ "$CLI_TYPE" = "copilot" ]; then
+        ACPX_MODEL="${COPILOT_MODEL:-gpt-4.1}"
+      fi
+
+      # Codex: uses Fireworks Responses API, model from CRD
+      if [ "$CLI_TYPE" = "codex" ]; then
+        ACPX_MODEL="${CODEX_MODEL:-{{model}}}"
+      fi
+
+      # Gemini: uses native Google API with GEMINI_API_KEY from secrets
+      if [ "$CLI_TYPE" = "gemini" ]; then
+        ACPX_MODEL="${GEMINI_MODEL:-gemini-2.5-flash}"
+      fi
+
+      export ACPX_MODEL
+
+      # ── Build the base acpx command ──
+      # CLAUDE_WORK_DIR already includes the repo path from git-setup
+      WORK_DIR="${CLAUDE_WORK_DIR:-/workspace}"
+      ACPX_CMD="acpx"
+      ACPX_CMD="$ACPX_CMD --cwd $WORK_DIR"
+      ACPX_CMD="$ACPX_CMD --approve-all"
+      ACPX_CMD="$ACPX_CMD --non-interactive-permissions deny"
+      ACPX_CMD="$ACPX_CMD --timeout 1800"
+      ACPX_CMD="$ACPX_CMD --format text"
+      ACPX_CMD="$ACPX_CMD --verbose"
+      ACPX_CMD="$ACPX_CMD --auth-policy skip"
+
+      # Model flag (skip for cursor — resolves model internally)
+      if [ -n "$ACPX_MODEL" ] && [ "$ACPX_AGENT" != "cursor" ]; then
+        ACPX_CMD="$ACPX_CMD --model $ACPX_MODEL"
+      fi
+
+      export ACPX_CMD
+
+      # Persist acpx vars for subsequent steps
+      cat >> /workspace/.task-env <<ENVEOF
+      export ACPX_AGENT="${ACPX_AGENT}"
+      export ACPX_MODEL="${ACPX_MODEL}"
+      export ACPX_CMD="${ACPX_CMD}"
+      ENVEOF
+
+      echo "✅ acpx env ready"
+      echo "   ACPX_AGENT=$ACPX_AGENT"
+      echo "   ACPX_MODEL=$ACPX_MODEL"
+      echo "   CLI={{cli_type}} PROVIDER=${FIREWORKS_API_KEY:+fireworks}"
+      STEP
+
+  # ─── Run Task (retry until acceptance or timeout) ───────────────────
+  - id: run-task
+    description: Run index.lobster.yaml in a retry loop
+    command: |
+      exec bash <<'STEP'
+      set -euo pipefail
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
+      # Ensure npm cache is writable (nested npx calls need this)
+      export npm_config_cache="${npm_config_cache:-/tmp/npm-cache}"
+      export HOME="${HOME:-/tmp/agent-home}"
+      # REPO_ROOT is already set by git-setup in .task-env
+      REPO_ROOT="${REPO_ROOT:-${CLAUDE_WORK_DIR:-/workspace}}"
+      cd "$REPO_ROOT"
+
+      TASK_ID="{{task_id}}"
+      DOCS_PROJECT="{{docs_project_directory}}"
+      TIMEOUT="${TASK_TIMEOUT:-1800}"
+      DEADLINE=$(($(date +%s) + TIMEOUT))
+
+      # Resolve task directory
+      TASK_DIR=".tasks"
+      if [ -n "$DOCS_PROJECT" ]; then
+        TASK_DIR="${DOCS_PROJECT}/.tasks"
+      fi
+      if [ -n "$TASK_ID" ] && [ "$TASK_ID" != "0" ]; then
+        TASK_DIR="${TASK_DIR}/task-${TASK_ID}"
+      fi
+      mkdir -p "$TASK_DIR"
+
+      # Inject prompt/criteria from ConfigMap if provided
+      [ -f /task-files/prompt.md ] && cp /task-files/prompt.md "$TASK_DIR/prompt.md"
+      [ -f /task-files/acceptance-criteria.md ] && cp /task-files/acceptance-criteria.md "$TASK_DIR/acceptance-criteria.md"
+
+      INDEX="${TASK_DIR}/index.lobster.yaml"
+      if [ ! -f "$INDEX" ]; then
+        # Search for index.lobster.yaml in common locations (docs subdir, nested .tasks, etc.)
+        echo "⚡ index.lobster.yaml not at $TASK_DIR — searching repo..."
+        FOUND=$(find . -path '*/.tasks/*/index.lobster.yaml' -o -path '*/.tasks/index.lobster.yaml' 2>/dev/null | head -1)
+        if [ -n "$FOUND" ]; then
+          INDEX="$FOUND"
+          TASK_DIR="$(dirname "$INDEX")"
+          echo "✅ Found: $INDEX"
+        else
+          echo "❌ No index.lobster.yaml found anywhere in repo"
+          exit 1
+        fi
+      fi
+
+      ATTEMPT=0
+      while true; do
+        ATTEMPT=$((ATTEMPT + 1))
+        NOW=$(date +%s)
+        REMAINING=$((DEADLINE - NOW))
+        if [ "$REMAINING" -le 0 ]; then
+          echo "❌ TIMEOUT after ${TIMEOUT}s (attempt $ATTEMPT)"
+          exit 1
+        fi
+
+        echo ""
+        echo "── Attempt $ATTEMPT (${REMAINING}s remaining) ──"
+
+        npx -y @clawdbot/lobster run "$INDEX" 2>&1 && {
+          echo "✅ Task passed on attempt $ATTEMPT"
+          break
+        } || {
+          echo "⏳ Attempt $ATTEMPT failed — retrying..."
+          sleep 5
+        }
+      done
+      STEP
+
+  # ─── Create Pull Request ────────────────────────────────────────────
+  - id: create-pr
+    description: Deterministic PR creation (zero tokens)
+    command: |
+      exec bash <<'STEP'
+      set -euo pipefail
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
+      REPO_ROOT="${REPO_ROOT:-${CLAUDE_WORK_DIR:-/workspace}}"
+      cd "$REPO_ROOT"
+
+      if [ -z "$(git status --porcelain 2>/dev/null)" ]; then
+        echo "ℹ️ No changes — skipping PR"
+        exit 0
+      fi
+
+      BRANCH=$(git branch --show-current)
+      git add -A
+      git commit -m "{{agent_name}}: task completion" -m "Co-authored-by: {{agent_name}} <{{agent_name}}@5dlabs.ai>"
+      git push --force-with-lease origin "$BRANCH"
+
+      PR_TITLE="{{agent_name}}: $(head -1 /task-files/prompt.md 2>/dev/null || echo 'task completion')"
+      PR_OUTPUT=$(gh pr create \
+        --title "$PR_TITLE" \
+        --body "Automated task by {{agent_name}} ({{cli_type}})." \
+        --base main --head "$BRANCH" 2>&1) && {
+        # Extract PR URL from gh output (last line is the URL)
+        PR_URL=$(echo "$PR_OUTPUT" | grep -oE 'https://github.com/[^ ]+' | tail -1)
+        echo "$PR_URL" > /workspace/.pr-url
+        echo "✅ PR created: $PR_URL"
+      } || {
+        # PR may already exist — try to get existing URL
+        PR_URL=$(gh pr list --head "$BRANCH" --json url --jq '.[0].url' 2>/dev/null || echo "")
+        [ -n "$PR_URL" ] && echo "$PR_URL" > /workspace/.pr-url
+        echo "ℹ️ PR already exists: ${PR_URL:-unknown}"
+      }
+      STEP
+
+  # ─── Discord Notification ───────────────────────────────────────────
+  - id: notify-discord
+    description: Post completion to agent's Discord channel
+    command: |
+      exec bash <<'STEP'
+      set -euo pipefail
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
+
+      AGENT="{{agent_name}}"
+      AGENT_UPPER=$(echo "$AGENT" | tr '[:lower:]' '[:upper:]')
+      CLI="{{cli_type}}"
+      TASK_ID="{{task_id}}"
+      MODEL="{{model}}"
+
+      # Per-agent Discord: DISCORD_TOKEN_<AGENT> + DISCORD_CHANNEL_<AGENT>
+      TOKEN_VAR="DISCORD_TOKEN_${AGENT_UPPER}"
+      CHANNEL_VAR="DISCORD_CHANNEL_${AGENT_UPPER}"
+      AGENT_TOKEN="${!TOKEN_VAR:-}"
+      AGENT_CHANNEL="${!CHANNEL_VAR:-}"
+
+      # Get PR URL
+      PR_URL=""
+      REPO_ROOT="${REPO_ROOT:-${CLAUDE_WORK_DIR:-/workspace}}"
+      if [ -f /workspace/.pr-url ]; then
+        PR_URL=$(cat /workspace/.pr-url)
+      elif [ -d "$REPO_ROOT/.git" ]; then
+        cd "$REPO_ROOT"
+        BRANCH=$(git branch --show-current 2>/dev/null || echo "")
+        if [ -n "$BRANCH" ] && [ -n "${GH_TOKEN:-}" ]; then
+          PR_URL=$(gh pr list --head "$BRANCH" --json url --jq '.[0].url' 2>/dev/null || echo "")
+        fi
+      fi
+
+      # Collect PR diff stats (best-effort)
+      ADDITIONS="0"
+      DELETIONS="0"
+      FILES_CHANGED=""
+      FILE_COUNT="0"
+      if [ -d "$REPO_ROOT/.git" ]; then
+        cd "$REPO_ROOT"
+        BASE="${BASE_BRANCH:-main}"
+        FILES_CHANGED=$(git diff --name-only "$BASE"..HEAD 2>/dev/null | head -15 || true)
+        ADDITIONS=$(git diff --numstat "$BASE"..HEAD 2>/dev/null | awk '{s+=$1} END{print s+0}' || echo "0")
+        DELETIONS=$(git diff --numstat "$BASE"..HEAD 2>/dev/null | awk '{s+=$2} END{print s+0}' || echo "0")
+        FILE_COUNT=$(echo "$FILES_CHANGED" | grep -c '.' 2>/dev/null || echo "0")
+      fi
+
+      # Build file list for embed (truncated)
+      FILES_BLOCK=""
+      if [ -n "$FILES_CHANGED" ]; then
+        FILES_BLOCK=$(echo "$FILES_CHANGED" | head -10 | tr '\n' ',' | sed 's/,$//')
+        if [ "$FILE_COUNT" -gt 10 ] 2>/dev/null; then
+          EXTRA=$((FILE_COUNT - 10))
+          FILES_BLOCK="${FILES_BLOCK}, +${EXTRA} more"
+        fi
+      fi
+
+      TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+      if [ -n "$AGENT_TOKEN" ] && [ -n "$AGENT_CHANNEL" ]; then
+        # Build embed JSON with a temp Python script (avoids YAML indentation issues)
+        cat > /tmp/discord_embed.py <<PYEOF
+      import json, sys
+      fields = []
+      fields.append({"name": "CLI / Model", "value": "**$CLI** · \`$MODEL\`", "inline": False})
+      fields.append({"name": "Changes", "value": "+**$ADDITIONS** −**$DELETIONS** across **$FILE_COUNT** files", "inline": True})
+      pr_url = "$PR_URL"
+      if pr_url:
+          fields.append({"name": "Pull Request", "value": pr_url, "inline": False})
+      files = "$FILES_BLOCK"
+      if files:
+          fields.append({"name": "Files", "value": "\`\`\`" + files[:900] + "\`\`\`", "inline": False})
+      payload = {"embeds": [{"title": "✅ $AGENT completed task $TASK_ID", "color": 3066993, "timestamp": "$TIMESTAMP", "fields": fields}]}
+      print(json.dumps(payload))
+      PYEOF
+
+        EMBED_JSON=$(python3 /tmp/discord_embed.py 2>/dev/null || echo "")
+
+        if [ -n "$EMBED_JSON" ]; then
+          curl -sf -X POST "https://discord.com/api/v10/channels/${AGENT_CHANNEL}/messages" \
+            -H "Authorization: Bot ${AGENT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$EMBED_JSON" > /dev/null && echo "📨 Discord notified (rich embed)" || echo "⚠️ Discord post failed"
+        else
+          # Fallback to plain text
+          MSG=$(printf '{"content":"✅ **%s** completed task %s\\n**CLI:** %s | **Model:** %s\\n%s"}' "$AGENT" "$TASK_ID" "$CLI" "$MODEL" "${PR_URL:-no PR}")
+          curl -sf -X POST "https://discord.com/api/v10/channels/${AGENT_CHANNEL}/messages" \
+            -H "Authorization: Bot ${AGENT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$MSG" > /dev/null
+          echo "📨 Discord notified (plain text fallback)"
+        fi
+
+      elif [ -n "${DISCORD_WEBHOOK_URL:-}" ]; then
+        MSG=$(printf '{"embeds":[{"title":"✅ %s completed task %s","description":"**CLI:** %s\\n**Model:** %s\\n**PR:** %s","color":3066993,"timestamp":"%s"}]}' "$AGENT" "$TASK_ID" "$CLI" "$MODEL" "${PR_URL:-none}" "$TIMESTAMP")
+        curl -sf -X POST "$DISCORD_WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d "$MSG" > /dev/null
+        echo "📨 Discord notified (webhook)"
+      else
+        echo "ℹ️ No Discord config — skipping"
+      fi
+      STEP
+
+  # ─── Completion Signal ──────────────────────────────────────────────
+  - id: complete
+    description: Signal completion and exit
+    command: |
+      touch /workspace/.agent_done 2>/dev/null || true
+      echo "✅ Task complete"

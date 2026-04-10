@@ -139,7 +139,9 @@ data:
               "token": "${DISCORD_TOKEN}"
               ,
               "allowBots": {{ if hasKey $discordConfig "allowBots" }}{{ $discordConfig.allowBots | toJson }}{{ else }}true{{ end }},
-              {{- if $discordConfig.dm }}
+              {{- if $discordConfig.dmPolicy }}
+              "dmPolicy": {{ $discordConfig.dmPolicy | quote }},
+              {{- else if $discordConfig.dm }}
               "dmPolicy": {{ $discordConfig.dm.policy | default "allowlist" | quote }},
               {{- end }}
               {{- if $discordConfig.allowFrom }}
@@ -149,6 +151,9 @@ data:
               {{- end }}
               "groupPolicy": {{ $discordConfig.groupPolicy | default "allowlist" | quote }},
               "guilds": {{ $discordConfig.guilds | default dict | toJson }}
+              {{- if $discordConfig.replyToMode }},
+              "replyToMode": {{ $discordConfig.replyToMode | quote }}
+              {{- end }}
               {{- if $discordConfig.threadBindings }},
               "threadBindings": {
                 "enabled": {{ $discordConfig.threadBindings.enabled | default false }},

@@ -1,0 +1,48 @@
+# syntax=docker/dockerfile:1
+# Minimal controller image — builds only `-p controller --bin agent-controller`
+# (skips Tauri/GTK workspace members that the unified Dockerfile's cargo-chef
+# stage tries to compile). Gitignored — recreate locally if missing.
+
+FROM rust:1.94-bookworm AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        pkg-config \
+        libssl-dev \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+COPY templates/ templates/
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-controller \
+    --mount=type=cache,target=/build/target,id=cargo-target-controller \
+    cargo build --release -p controller --bin agent-controller \
+    && cp /build/target/release/agent-controller /agent-controller
+
+# Runtime
+FROM debian:bookworm-slim AS runtime
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        libssl3 \
+        wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -r -u 1000 -m -d /app -s /bin/bash app
+
+WORKDIR /app
+
+COPY --from=builder /agent-controller /app/agent-controller
+COPY templates/ /app/templates/
+
+RUN chmod +x /app/agent-controller && chown -R app:app /app
+
+USER app
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+CMD ["./agent-controller"]

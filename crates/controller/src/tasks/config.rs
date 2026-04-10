@@ -115,6 +115,10 @@ pub struct ImageConfig {
 
     /// Image tag (e.g., "latest", "v2.1.0")
     pub tag: String,
+
+    /// Image pull policy override (Always, IfNotPresent, Never). Auto-detected if unset.
+    #[serde(default, rename = "pullPolicy")]
+    pub pull_policy: Option<String>,
 }
 
 impl ImageConfig {
@@ -149,6 +153,7 @@ fn default_agent_image() -> ImageConfig {
     ImageConfig {
         repository: "MISSING_IMAGE_CONFIG".to_string(),
         tag: "MISSING_IMAGE_CONFIG".to_string(),
+        pull_policy: None,
     }
 }
 
@@ -776,6 +781,7 @@ cleanup:
             ImageConfig {
                 repository: "registry.5dlabs.ai/5dlabs/codex".to_string(),
                 tag: "v1.2.3".to_string(),
+                pull_policy: None,
             },
         );
 

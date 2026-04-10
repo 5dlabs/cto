@@ -1,0 +1,8 @@
+goaccess /var/log/nginx/swarm.access.log --log-format=COMBINED
+goaccess /var/log/nginx/swarm.access.log --log-format=COMBINED --real-time-html -o /var/www/stats.html
+
+goaccess /var/log/nginx/swarm.access.log \
+    --log-format=COMBINED \
+    --geoip-database=/home/ubuntu/GeoLite2-City.mmdb
+
+# nginx static file server on this dir

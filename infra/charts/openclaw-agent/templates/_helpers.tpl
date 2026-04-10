@@ -47,4 +47,12 @@ openclaw.io/heartbeat: {{ .Values.agent.heartbeat.every | default "15m" | quote 
 {{- end }}
 openclaw.io/sandbox: {{ .Values.agent.sandbox | quote }}
 openclaw.io/tools-profile: {{ .Values.tools.profile | quote }}
+{{- if .Values.datadog }}
+{{- if .Values.datadog.enabled }}
+ad.datadoghq.com/agent.logs: {{ printf "[{\"source\":\"openclaw-agent\",\"service\":\"cto-%s\",\"tags\":[\"agent:%s\",\"model:%s\"]}]" .Values.agent.id .Values.agent.id .Values.agent.model | quote }}
+{{- end }}
+{{- end }}
+{{- with .Values.podAnnotations }}
+{{ toYaml . }}
+{{- end }}
 {{- end }}

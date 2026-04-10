@@ -229,8 +229,10 @@ pub enum CliType {
     Claude,
     Cursor,
     Codex,
+    Copilot,
     Factory,
     Gemini,
+    Kimi,
     OpenCode,
 }
 

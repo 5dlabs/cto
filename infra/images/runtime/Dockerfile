@@ -399,7 +399,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get -o Acquire::ForceIPv4=true update && apt-get -o Acquire::ForceIPv4=true install -y gh && \
     rm -rf /var/lib/apt/lists/* && \
     gh extension install github/gh-copilot 2>/dev/null || true && \
-    gh extension install github/gh-codeql 2>/dev/null || true
+    gh extension install github/gh-codeql 2>/dev/null || true && \
+    gh extension install https://github.com/nektos/gh-act 2>/dev/null || true
 
 # GitLab CLI (glab) for dual SCM support
 RUN GLAB_VERSION="1.91.0" && \
@@ -409,6 +410,21 @@ RUN GLAB_VERSION="1.91.0" && \
     mv /tmp/bin/glab /usr/local/bin/glab && \
     chmod +x /usr/local/bin/glab && \
     rm -rf /tmp/glab* /tmp/bin
+
+# nektos/act — run GitHub Actions locally (uses Docker; docker.io is installed above)
+# https://github.com/nektos/act
+RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    set -eux && \
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+      amd64) ACT_ASSET=act_Linux_x86_64.tar.gz ;; \
+      arm64) ACT_ASSET=act_Linux_arm64.tar.gz ;; \
+      *) echo "act: unsupported arch: $ARCH" >&2; exit 1 ;; \
+    esac && \
+    ACT_VERSION=$(curl -s https://api.github.com/repos/nektos/act/releases/latest | jq -r '.tag_name') && \
+    curl -fsSL "https://github.com/nektos/act/releases/download/${ACT_VERSION}/${ACT_ASSET}" | tar -xzf - -C /usr/local/bin act && \
+    chmod +x /usr/local/bin/act && \
+    act --version
 
 # AWS CLI v2
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \

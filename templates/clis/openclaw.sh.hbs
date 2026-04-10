@@ -57,30 +57,73 @@ case "$CLI_TYPE" in
     fi
     ;;
   codex)
-    # Codex reads auth from ~/.codex/auth.json (mounted from codex-oauth secret)
-    # The secret may be mounted at /root/.codex/ but we run as node — copy it
-    CODEX_AUTH="${HOME}/.codex/auth.json"
-    if [ ! -f "$CODEX_AUTH" ] && [ -f "/root/.codex/auth.json" ]; then
-      mkdir -p "${HOME}/.codex"
-      cp /root/.codex/auth.json "${HOME}/.codex/auth.json" 2>/dev/null || true
-      CODEX_AUTH="${HOME}/.codex/auth.json"
-    fi
-    if [ -f "$CODEX_AUTH" ]; then
-      echo "  ✓ Codex OAuth found at $CODEX_AUTH"
+    # Codex auth: prefer API key over ChatGPT OAuth in container environments.
+    # The codex-acp ACP adapter doesn't support ChatGPT subscription auth in
+    # remote/container contexts. If OPENAI_API_KEY or CODEX_API_KEY is set,
+    # skip installing the OAuth auth.json so the adapter uses the API key.
+    if [ -n "${CODEX_API_KEY:-}" ]; then
+      echo "  ✓ CODEX_API_KEY present (${#CODEX_API_KEY} chars) — API key auth"
     elif [ -n "${OPENAI_API_KEY:-}" ]; then
-      echo "  ✓ OPENAI_API_KEY present (fallback)"
+      echo "  ✓ OPENAI_API_KEY present (${#OPENAI_API_KEY} chars) — API key auth"
     else
-      echo "  ❌ No Codex auth (need ~/.codex/auth.json or OPENAI_API_KEY)"
-      exit 1
+      # Fallback: try ChatGPT OAuth from mounted secret
+      CODEX_AUTH="${HOME}/.codex/auth.json"
+      if [ ! -f "$CODEX_AUTH" ] && [ -f "/root/.codex-oauth/auth.json" ]; then
+        mkdir -p "${HOME}/.codex"
+        cp /root/.codex-oauth/auth.json "${HOME}/.codex/auth.json" 2>/dev/null || true
+        CODEX_AUTH="${HOME}/.codex/auth.json"
+      fi
+      if [ -f "$CODEX_AUTH" ]; then
+        echo "  ✓ Codex OAuth found at $CODEX_AUTH (⚠️ ChatGPT auth may not work in containers)"
+      else
+        echo "  ❌ No Codex auth (need OPENAI_API_KEY, CODEX_API_KEY, or ~/.codex/auth.json)"
+        exit 1
+      fi
     fi
     ;;
   claude)
-    # Claude Code reads ANTHROPIC_API_KEY from env
-    if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-      echo "  ✓ ANTHROPIC_API_KEY present (${#ANTHROPIC_API_KEY} chars)"
+    # Claude Code auth priority:
+    # 1. Fireworks FirePass (FIREWORKS_API_KEY) — routes through Anthropic-compatible API
+    # 2. OAuth credentials (claude-oauth secret)
+    # 3. CLAUDE_CODE_OAUTH_TOKEN env
+    # 4. ANTHROPIC_API_KEY env
+    if [ -n "${FIREWORKS_API_KEY:-}" ]; then
+      # FirePass: use Fireworks Anthropic-compatible endpoint with Kimi K2.5 Turbo
+      export ANTHROPIC_AUTH_TOKEN="$FIREWORKS_API_KEY"
+      export ANTHROPIC_BASE_URL="https://api.fireworks.ai/inference"
+      FW_MODEL="accounts/fireworks/models/kimi-k2p5"
+      export ANTHROPIC_MODEL="$FW_MODEL"
+      export ANTHROPIC_SMALL_FAST_MODEL="$FW_MODEL"
+      export ANTHROPIC_DEFAULT_SONNET_MODEL="$FW_MODEL"
+      export ANTHROPIC_DEFAULT_HAIKU_MODEL="$FW_MODEL"
+      export ANTHROPIC_DEFAULT_OPUS_MODEL="$FW_MODEL"
+      unset ANTHROPIC_API_KEY
+      # Override CRD_MODEL so acpx --model sends the Fireworks model ID
+      CRD_MODEL="$FW_MODEL"
+      echo "  ✓ Fireworks FirePass configured (Kimi K2.5 Turbo via Anthropic-compatible API)"
     else
-      echo "  ❌ ANTHROPIC_API_KEY not set"
-      exit 1
+      CLAUDE_OAUTH_MOUNT="/root/.claude-oauth"
+      CLAUDE_OAUTH_FILE=""
+      if [ -f "${CLAUDE_OAUTH_MOUNT}/credentials.json" ]; then
+        CLAUDE_OAUTH_FILE="${CLAUDE_OAUTH_MOUNT}/credentials.json"
+      elif [ -f "${CLAUDE_OAUTH_MOUNT}/.credentials.json" ]; then
+        CLAUDE_OAUTH_FILE="${CLAUDE_OAUTH_MOUNT}/.credentials.json"
+      fi
+      if [ -n "$CLAUDE_OAUTH_FILE" ]; then
+        mkdir -p "${HOME}/.claude"
+        cp "$CLAUDE_OAUTH_FILE" "${HOME}/.claude/.credentials.json"
+        chmod 600 "${HOME}/.claude/.credentials.json" 2>/dev/null || true
+        echo "  ✓ Claude OAuth credentials installed from $CLAUDE_OAUTH_FILE"
+        unset ANTHROPIC_API_KEY
+      elif [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+        echo "  ✓ CLAUDE_CODE_OAUTH_TOKEN present (${#CLAUDE_CODE_OAUTH_TOKEN} chars)"
+        unset ANTHROPIC_API_KEY
+      elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+        echo "  ✓ ANTHROPIC_API_KEY present (${#ANTHROPIC_API_KEY} chars) — API key fallback"
+      else
+        echo "  ❌ No Claude auth (need FIREWORKS_API_KEY, claude-oauth secret, CLAUDE_CODE_OAUTH_TOKEN, or ANTHROPIC_API_KEY)"
+        exit 1
+      fi
     fi
     ;;
   cursor)
@@ -109,9 +152,101 @@ case "$CLI_TYPE" in
 esac
 
 # =========================================================================
-# Write .acpxrc.json — per-CLI agent overrides for native autonomy flags
-# ACP --approve-all covers ACP permissions, but CLIs like droid also need
-# their own native autonomy flags (e.g., --auto high) to actually write.
+# Telemetry & Logging Configuration
+#
+# Enable metrics/logging for CLIs that support OTEL or native telemetry.
+# Logs are written to well-known paths so promtail sidecar can ship them
+# to Loki. Metrics go to the OTel Collector via OTLP gRPC.
+#
+# Context variables:
+#   - telemetry_enabled: "true"/"false" (from controller config)
+#   - otel_endpoint:     OTLP gRPC endpoint (defaults to in-cluster collector)
+#   - datadog_enabled:   "true"/"false" (from controller config)
+# =========================================================================
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               TELEMETRY & LOGGING                            ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+TELEMETRY_ENABLED="{{telemetry_enabled}}"
+TELEMETRY_ENABLED="${TELEMETRY_ENABLED:-true}"
+OTEL_ENDPOINT="{{otel_endpoint}}"
+OTEL_ENDPOINT="${OTEL_ENDPOINT:-otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317}"
+DATADOG_ENABLED="{{datadog_enabled}}"
+DATADOG_ENABLED="${DATADOG_ENABLED:-false}"
+
+if [ "$TELEMETRY_ENABLED" = "true" ]; then
+  echo "✓ Telemetry: ENABLED"
+  echo "  → OTEL endpoint: $OTEL_ENDPOINT"
+
+  # --- OTEL environment (shared across CLIs that support it) ---
+  export OTEL_METRICS_EXPORTER="otlp"
+  export OTEL_LOGS_EXPORTER="otlp"
+  export OTEL_EXPORTER_OTLP_METRICS_ENDPOINT="$OTEL_ENDPOINT"
+  export OTEL_EXPORTER_OTLP_METRICS_PROTOCOL="grpc"
+  export OTEL_EXPORTER_OTLP_LOGS_ENDPOINT="$OTEL_ENDPOINT"
+  export OTEL_EXPORTER_OTLP_LOGS_PROTOCOL="grpc"
+  export OTEL_SERVICE_NAME="cto-acp-${CLI_TYPE}"
+  export OTEL_RESOURCE_ATTRIBUTES="agent.cli=${CLI_TYPE},agent.name=${GITHUB_APP:-unknown}"
+
+  # --- Per-CLI telemetry flags ---
+  case "$CLI_TYPE" in
+    claude)
+      export CLAUDE_CODE_ENABLE_TELEMETRY="1"
+      echo "  ✓ Claude Code: OTEL metrics + logs enabled"
+      ;;
+    factory)
+      # Droid supports OTEL when FACTORY_DISABLE_TELEMETRY is unset
+      unset FACTORY_DISABLE_TELEMETRY
+      echo "  ✓ Factory/Droid: telemetry enabled"
+      ;;
+    codex)
+      # Codex respects standard OTEL env vars
+      echo "  ✓ Codex: OTEL env vars set"
+      ;;
+    gemini)
+      # Gemini CLI respects OTEL env vars
+      echo "  ✓ Gemini: OTEL env vars set"
+      ;;
+    *)
+      echo "  ℹ️ $CLI_TYPE: standard OTEL env vars set (CLI-specific support varies)"
+      ;;
+  esac
+else
+  echo "✗ Telemetry: DISABLED"
+  export CLAUDE_CODE_ENABLE_TELEMETRY="0"
+  export FACTORY_DISABLE_TELEMETRY="1"
+fi
+
+# --- Datadog APM (when enabled alongside or instead of Grafana stack) ---
+if [ "$DATADOG_ENABLED" = "true" ]; then
+  echo "  ✓ Datadog: APM tracing enabled"
+  export DD_TRACE_ENABLED="true"
+  export DD_SERVICE="cto-acp-${CLI_TYPE}"
+  export DD_ENV="${DD_ENV:-production}"
+  export DD_AGENT_HOST="${DD_AGENT_HOST:-datadog-agent.datadog.svc.cluster.local}"
+fi
+
+# --- Ensure CLI log directories exist (for promtail sidecar scraping) ---
+mkdir -p "$WORK_DIR/.openclaw/logs" 2>/dev/null || true
+mkdir -p "$WORK_DIR/.claude/logs" 2>/dev/null || true
+mkdir -p "$WORK_DIR/.factory/logs" 2>/dev/null || true
+mkdir -p "$WORK_DIR/.codex/logs" 2>/dev/null || true
+mkdir -p "$WORK_DIR/.cursor-agent/logs" 2>/dev/null || true
+mkdir -p "$WORK_DIR/.gemini/logs" 2>/dev/null || true
+mkdir -p "$WORK_DIR/.kimi/logs" 2>/dev/null || true
+echo "✓ Log directories created for promtail sidecar"
+
+# =========================================================================
+# Write .acpxrc.json — ACP runtime configuration
+#
+# - defaultPermissions / nonInteractivePermissions: harness-level permissions
+# - pluginToolsMcpBridge: exposes OpenClaw plugin tools (memory, etc.) to the
+#   ACP harness via a built-in MCP server, giving CLI agents the same tool
+#   surface as the parent OpenClaw agent
+# - Do NOT override agents.*.command — acpx has a built-in registry that
+#   knows how to invoke each CLI over ACP (adapters, --output-format acp, etc.)
+#   Overriding breaks the ACP protocol handshake.
 # =========================================================================
 echo ""
 cat > "$WORK_DIR/.acpxrc.json" << 'ACPXRC'
@@ -119,22 +254,67 @@ cat > "$WORK_DIR/.acpxrc.json" << 'ACPXRC'
   "defaultPermissions": "approve-all",
   "nonInteractivePermissions": "deny",
   "authPolicy": "skip",
-  "agents": {
-    "droid": {
-      "command": "droid exec --output-format acp --auto high"
-    },
-    "codex": {
-      "command": "codex exec --output-format acp --full-auto"
-    }
-  }
+  "pluginToolsMcpBridge": true
 }
 ACPXRC
-echo "✓ Wrote $WORK_DIR/.acpxrc.json (CLI autonomy overrides)"
+echo "✓ Wrote $WORK_DIR/.acpxrc.json (ACP config + plugin tools MCP bridge)"
 
 # =========================================================================
 # Skills Setup
 # =========================================================================
 {{> skills-setup skills_target="$WORK_DIR/.openclaw/skills" skills_label="ACP" }}
+
+{{#if list_tools_on_start}}
+# =========================================================================
+# Agent Identity & Capabilities Diagnostics
+# Prints agent name, versions, tools, skills, and OTEL env vars so a single
+# `kubectl logs` call confirms the full dispatch state. Gated on
+# cliConfig.settings.listToolsOnStart.
+# =========================================================================
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               AGENT IDENTITY & CAPABILITIES                  ║"
+echo "═══════════════════════════════════════════════════════════════"
+echo "✓ Agent:         {{agent_name}}"
+echo "✓ CLI type:      $CLI_TYPE"
+echo "✓ acpx agent:    $ACPX_AGENT"
+echo ""
+echo "── Versions ──"
+(acpx --version     2>/dev/null && true) | sed 's/^/  acpx:      /' || echo "  acpx:      (unavailable)"
+(openclaw --version 2>/dev/null && true) | sed 's/^/  openclaw:  /' || echo "  openclaw:  (unavailable)"
+case "$CLI_TYPE" in
+  factory) (droid --version        2>/dev/null && true) | sed 's/^/  droid:     /' || echo "  droid:     (unavailable)" ;;
+  codex)   (codex --version        2>/dev/null && true) | sed 's/^/  codex:     /' || echo "  codex:     (unavailable)" ;;
+  claude)  (claude --version       2>/dev/null && true) | sed 's/^/  claude:    /' || echo "  claude:    (unavailable)" ;;
+  cursor)  (cursor-agent --version 2>/dev/null && true) | sed 's/^/  cursor:    /' || echo "  cursor:    (unavailable)" ;;
+  gemini)  (gemini --version       2>/dev/null && true) | sed 's/^/  gemini:    /' || echo "  gemini:    (unavailable)" ;;
+esac
+echo ""
+echo "── Tools (from /task/client-config.json) ──"
+if [ -f /task/client-config.json ]; then
+  if command -v jq >/dev/null 2>&1; then
+    jq -r '.remoteTools[]? | "  • " + .' /task/client-config.json 2>/dev/null || echo "  (remoteTools parse failed)"
+    jq -r '.localServers | to_entries[]? | "  • (local) " + .key' /task/client-config.json 2>/dev/null || true
+  else
+    echo "  (jq not available — raw file below)"
+    sed 's/^/  /' /task/client-config.json
+  fi
+else
+  echo "  (no /task/client-config.json mounted)"
+fi
+echo ""
+echo "── Skills (from $WORK_DIR/.openclaw/skills) ──"
+if [ -d "$WORK_DIR/.openclaw/skills" ]; then
+  ( cd "$WORK_DIR/.openclaw/skills" && ls -1d */ 2>/dev/null | sed 's|/$||; s|^|  • |' ) || echo "  (no skills directories)"
+else
+  echo "  (no skills directory)"
+fi
+echo ""
+echo "── OTEL / Telemetry env ──"
+env | grep -E '^(OTEL_|DATADOG_|PROMTAIL_)' | sort | sed 's/^/  /' || echo "  (no OTEL/DATADOG env set)"
+echo "═══════════════════════════════════════════════════════════════"
+echo ""
+{{/if}}
 
 # =========================================================================
 # Determine prompt
@@ -163,9 +343,16 @@ ACPX_CMD="$ACPX_CMD --approve-all"
 ACPX_CMD="$ACPX_CMD --non-interactive-permissions deny"
 ACPX_CMD="$ACPX_CMD --timeout 1800"
 ACPX_CMD="$ACPX_CMD --format text"
+ACPX_CMD="$ACPX_CMD --verbose"
+# Skip ACP authenticate handshake — auth is handled via env vars (OPENAI_API_KEY,
+# ANTHROPIC_API_KEY, FACTORY_API_KEY, etc.) which the underlying CLIs read directly.
+# Required because acpx 0.5.2 sends authMethodId but codex-acp 0.11.1 expects methodId.
+ACPX_CMD="$ACPX_CMD --auth-policy skip"
 
 # Model override from CRD spec (if provided)
-if [ -n "$CRD_MODEL" ]; then
+# Skip --model for cursor — its built-in acpx agent doesn't support session/set_model;
+# cursor resolves models internally via CURSOR_API_KEY.
+if [ -n "$CRD_MODEL" ] && [ "$ACPX_AGENT" != "cursor" ]; then
     ACPX_CMD="$ACPX_CMD --model $CRD_MODEL"
 fi
 
