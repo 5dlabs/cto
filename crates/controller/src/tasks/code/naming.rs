@@ -4,12 +4,14 @@ use std::hash::{Hash, Hasher};
 
 const MAX_K8S_NAME_LENGTH: usize = 63;
 const MAX_DNS_LABEL_LENGTH: usize = 63;
+const CODERUN_JOB_PREFIX: &str = "play-coderun-";
 const MONITOR_JOB_PREFIX: &str = "monitor-";
 const REMEDIATION_JOB_PREFIX: &str = "remediation-";
 const HEAL_REMEDIATION_JOB_PREFIX: &str = "heal-remediation-";
 const REVIEW_JOB_PREFIX: &str = "review-";
 const REMEDIATE_JOB_PREFIX: &str = "remediate-";
 const INTAKE_JOB_PREFIX: &str = "intake-";
+const PLAY_JOB_PREFIX: &str = "play-";
 const MCP_JOB_PREFIX: &str = "mcp-";
 const WORKSPACE_CLEANUP_JOB_SUFFIX: &str = "-workspace-cleanup";
 
@@ -19,6 +21,8 @@ impl ResourceNaming {
     /// Generate job name with guaranteed length compliance.
     ///
     /// Format varies by type:
+    /// - Play CodeRun: `play-coderun-pr{pr}-t{task_id}-{agent}-{cli}-{uid}-v{version}`
+    /// - Play Trigger: `play-{service}-{uid}-v{version}` (Morgan starting workflow)
     /// - Intake: `intake-t{task_id}-{agent}-{cli}-{uid}-v{version}`
     /// - Heal Remediation: `heal-remediation-t{task_id}-{agent}-{uid}-v{version}`
     /// - Monitor: `monitor-t{task_id}-{agent}-{uid}-v{version}`
@@ -115,6 +119,16 @@ impl ResourceNaming {
             let available = MAX_K8S_NAME_LENGTH.saturating_sub(INTAKE_JOB_PREFIX.len());
             let trimmed = Self::ensure_k8s_name_length(&base_name, available);
             return format!("{INTAKE_JOB_PREFIX}{trimmed}");
+        }
+
+        // Handle play tasks (Morgan starting play workflow with project ConfigMap)
+        // Format: play-{service}-{uid}-v{version}
+        if run_type == "play" {
+            let service = &code_run.spec.service;
+            let base_name = format!("{service}-{uid_suffix}-v{context_version}");
+            let available = MAX_K8S_NAME_LENGTH.saturating_sub(PLAY_JOB_PREFIX.len());
+            let trimmed = Self::ensure_k8s_name_length(&base_name, available);
+            return format!("{PLAY_JOB_PREFIX}{trimmed}");
         }
 
         // Check if this is a heal remediation CodeRun
@@ -253,15 +267,13 @@ impl ResourceNaming {
         format!("{prefix}{trimmed}")
     }
 
-    /// Shorten model name for pod naming.
+    /// Shorten model name for pod naming (e.g., "claude-opus-4-6-20260205" -> "opus46")
     ///
-    /// Produces readable, K8s-safe names like `sonnet-4`, `opus-4-6`, `gpt-4-1`.
-    /// Generic algorithm — no hardcoded model list:
-    /// 1. Strip trailing date suffixes (YYYYMMDD)
-    /// 2. Strip leading path prefixes (accounts/fireworks/routers/…)
-    /// 3. Normalize dots to dashes, keep dashes for readability
-    /// 4. Collapse consecutive dashes, trim edges
-    /// 5. Cap at 20 chars for K8s label safety
+    /// Generic algorithm — no hardcoded model list needed:
+    /// 1. Strip date suffixes (YYYYMMDD)
+    /// 2. Extract the "family" keyword (opus, sonnet, haiku, gpt, o4, gemini, etc.)
+    /// 3. Extract version digits adjacent to the family
+    /// 4. Collapse to alphanumeric, max 12 chars for K8s label safety
     fn shorten_model_name(model: &str) -> String {
         let lower = model.to_lowercase();
 
@@ -280,38 +292,23 @@ impl ResourceNaming {
         // Strip leading path prefixes (e.g. "accounts/fireworks/routers/")
         let base = stripped.rsplit('/').next().unwrap_or(stripped);
 
-        // Normalize: dots to dashes, keep alphanumeric + dashes
+        // Normalize separators to dashes
         let normalized: String = base
             .chars()
             .map(|c| if c == '.' { '-' } else { c })
-            .filter(|c| c.is_alphanumeric() || *c == '-')
             .collect();
 
-        // Collapse consecutive dashes and trim
-        let mut result = String::with_capacity(normalized.len());
-        let mut prev_dash = true; // start true to trim leading dash
-        for ch in normalized.chars() {
-            if ch == '-' {
-                if !prev_dash {
-                    result.push('-');
-                }
-                prev_dash = true;
-            } else {
-                result.push(ch);
-                prev_dash = false;
-            }
-        }
-        // Trim trailing dash
-        while result.ends_with('-') {
-            result.pop();
-        }
+        // Collapse to alphanumeric only, compact
+        let compact: String = normalized
+            .chars()
+            .filter(|c| c.is_alphanumeric())
+            .collect();
 
-        // Cap at 20 chars, don't break mid-dash
-        if result.len() <= 20 {
-            result
+        // Cap at 16 chars for K8s label safety
+        if compact.len() <= 16 {
+            compact
         } else {
-            let truncated = &result[..20];
-            truncated.trim_end_matches('-').to_string()
+            compact[..16].to_string()
         }
     }
 
@@ -328,7 +325,7 @@ impl ResourceNaming {
             // Use deterministic hash for long names
             let hash = Self::hash_string(job_name);
             let task_id = Self::extract_task_id_from_job_name(job_name);
-            let hashed_name = format!("bridge-t{task_id}-{hash}");
+            let hashed_name = format!("{CODERUN_JOB_PREFIX}bridge-t{task_id}-{hash}");
             Self::ensure_k8s_name_length(&hashed_name, MAX_DNS_LABEL_LENGTH)
         }
     }
@@ -363,12 +360,10 @@ impl ResourceNaming {
 
     /// Extract readable provider name from ACP or cli_config
     fn extract_provider_readable(spec: &crate::crds::coderun::CodeRunSpec) -> String {
-        // Try ACP: first CLI entry → first provider
+        // Try ACP first entry
         if let Some(acp) = &spec.acp {
-            if let Some(first_cli) = acp.first() {
-                if let Some(first_prov) = first_cli.providers.first() {
-                    return Self::shorten_provider_name(&first_prov.name);
-                }
+            if let Some(first) = acp.first() {
+                return Self::shorten_provider_name(&first.provider.name);
             }
         }
         // Fallback to cli_config.provider (Provider enum → Display string)
@@ -381,7 +376,7 @@ impl ResourceNaming {
             )
     }
 
-    /// Shorten CLI name for K8s naming (e.g., "claude" → "claude", "Claude Code" → "claude-code")
+    /// Shorten CLI name for K8s naming (e.g., "Claude Code" → "claude-code")
     ///
     /// Generic: lowercase, spaces to dashes, strip non-alphanumeric.
     /// No hardcoded CLI list — any new CLI just works.
@@ -517,9 +512,6 @@ mod tests {
     use crate::crds::coderun::CodeRunSpec;
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
     use std::collections::{BTreeMap, HashMap};
-
-    /// Legacy prefix — kept in tests to assert it is NOT produced.
-    const CODERUN_JOB_PREFIX: &str = "play-coderun-";
 
     fn build_code_run() -> CodeRun {
         CodeRun {
@@ -785,11 +777,12 @@ mod tests {
     }
 
     #[test]
-    fn service_name_stays_within_dns_limit_when_hashed() {
-        let long_job_name = "x".repeat(80);
+    fn service_name_retains_prefix_when_hashed() {
+        let mut long_job_name = String::from(CODERUN_JOB_PREFIX);
+        long_job_name.push_str(&"x".repeat(80));
 
         let service_name = ResourceNaming::headless_service_name(&long_job_name);
-        assert!(service_name.starts_with("bridge-"));
+        assert!(service_name.starts_with(CODERUN_JOB_PREFIX));
         assert!(service_name.len() <= MAX_DNS_LABEL_LENGTH);
     }
 
@@ -861,7 +854,7 @@ mod tests {
             "Review job should contain agent name: {job_name}"
         );
         assert!(
-            job_name.contains("claude-opus-4-5"),
+            job_name.contains("claudeopus45"),
             "Review job should contain shortened model name: {job_name}"
         );
         assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
@@ -885,7 +878,7 @@ mod tests {
             "Remediate job should contain agent name: {job_name}"
         );
         assert!(
-            job_name.contains("claude-sonnet-4"),
+            job_name.contains("claudesonnet4"),
             "Remediate job should contain shortened model name: {job_name}"
         );
         assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
@@ -893,14 +886,14 @@ mod tests {
 
     #[test]
     fn shorten_model_name_handles_opus() {
-        // Generic: strips date, preserves dashes for readability
+        // Generic: strips date, collapses to alphanumeric
         assert_eq!(
             ResourceNaming::shorten_model_name("claude-opus-4-5-20251101"),
-            "claude-opus-4-5"
+            "claudeopus45"
         );
         assert_eq!(
             ResourceNaming::shorten_model_name("claude-opus-4.5-20251101"),
-            "claude-opus-4-5"
+            "claudeopus45"
         );
         assert_eq!(ResourceNaming::shorten_model_name("opus"), "opus");
     }
@@ -909,11 +902,11 @@ mod tests {
     fn shorten_model_name_handles_sonnet() {
         assert_eq!(
             ResourceNaming::shorten_model_name("claude-sonnet-4-20250514"),
-            "claude-sonnet-4"
+            "claudesonnet4"
         );
         assert_eq!(
             ResourceNaming::shorten_model_name("claude-3-5-sonnet-20241022"),
-            "claude-3-5-sonnet"
+            "claude35sonnet"
         );
         assert_eq!(ResourceNaming::shorten_model_name("sonnet"), "sonnet");
     }
@@ -921,11 +914,12 @@ mod tests {
     #[test]
     fn shorten_model_name_handles_other_models() {
         assert_eq!(ResourceNaming::shorten_model_name("haiku"), "haiku");
-        assert_eq!(ResourceNaming::shorten_model_name("gpt-4"), "gpt-4");
-        assert_eq!(ResourceNaming::shorten_model_name("gemini-pro"), "gemini-pro");
+        assert_eq!(ResourceNaming::shorten_model_name("gpt-4"), "gpt4");
+        assert_eq!(ResourceNaming::shorten_model_name("gemini-pro"), "geminipro");
+        // Generic fallback: strip non-alnum, cap at 16
         assert_eq!(
             ResourceNaming::shorten_model_name("some-custom-model"),
-            "some-custom-model"
+            "somecustommodel"
         );
     }
 
@@ -962,7 +956,6 @@ mod tests {
                     model_rotation: None,
                     provider: None,
                     provider_base_url: None,
-            api_key_env_var: None,
                 }),
                 task_id: Some(123),
                 service: "heal".to_string(),
@@ -1052,7 +1045,6 @@ mod tests {
                     model_rotation: None,
                     provider: None,
                     provider_base_url: None,
-            api_key_env_var: None,
                 }),
                 task_id: Some(0),
                 service: "prd-alerthub-e2e-test".to_string(),
@@ -1122,18 +1114,18 @@ mod tests {
 
     #[test]
     fn shorten_model_name_handles_new_models() {
-        // Generic algorithm: strip date, dots to dashes, preserve dashes
-        assert_eq!(ResourceNaming::shorten_model_name("gpt-5.2-codex"), "gpt-5-2-codex");
-        assert_eq!(ResourceNaming::shorten_model_name("o4-mini"), "o4-mini");
-        assert_eq!(ResourceNaming::shorten_model_name("gpt-4.1"), "gpt-4-1");
+        // Generic algorithm: strip date, collapse dots to dashes, alphanumeric only
+        assert_eq!(ResourceNaming::shorten_model_name("gpt-5.2-codex"), "gpt52codex");
+        assert_eq!(ResourceNaming::shorten_model_name("o4-mini"), "o4mini");
+        assert_eq!(ResourceNaming::shorten_model_name("gpt-4.1"), "gpt41");
         assert_eq!(
             ResourceNaming::shorten_model_name("claude-opus-4-6-20260205"),
-            "claude-opus-4-6"
+            "claudeopus46"
         );
         // Fireworks path-prefixed models get the base name only
         assert_eq!(
             ResourceNaming::shorten_model_name("accounts/fireworks/routers/kimi-k2p5-turbo"),
-            "kimi-k2p5-turbo"
+            "kimik2p5turbo"
         );
     }
 
