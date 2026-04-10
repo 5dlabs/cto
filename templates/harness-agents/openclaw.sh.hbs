@@ -108,6 +108,21 @@ CODEXCFG
   echo "[harness] ✅ Codex config installed (Fireworks Responses API)"
 fi
 
+# Gemini: configure settings.json for headless API-key auth + yolo approval
+if [ "{{cli_type}}" = "gemini" ]; then
+  mkdir -p "$HOME/.gemini"
+  cat > "$HOME/.gemini/settings.json" <<GEMINICFG
+{
+  "security": {
+    "auth": {
+      "selectedType": "gemini-api-key"
+    }
+  }
+}
+GEMINICFG
+  echo "[harness] ✅ Gemini settings installed (API key auth)"
+fi
+
 for f in /etc/profile.d/*.sh; do
   [ -f "$f" ] && source "$f"
 done

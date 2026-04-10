@@ -77,8 +77,8 @@ steps:
       ACPX_MODEL="{{model}}"
 
       # Fireworks FirePass: override model to Fireworks-compatible ID
-      # Skip for factory/droid (native models) and codex (requires OpenAI Responses API)
-      if [ -n "${FIREWORKS_API_KEY:-}" ] && [ "$CLI_TYPE" != "factory" ] && [ "$CLI_TYPE" != "codex" ]; then
+      # Skip for factory/droid (native models), codex (Fireworks Responses API), and gemini (native Google API)
+      if [ -n "${FIREWORKS_API_KEY:-}" ] && [ "$CLI_TYPE" != "factory" ] && [ "$CLI_TYPE" != "codex" ] && [ "$CLI_TYPE" != "gemini" ]; then
         export ANTHROPIC_AUTH_TOKEN="$FIREWORKS_API_KEY"
         export ANTHROPIC_BASE_URL="https://api.fireworks.ai/inference"
         FW_MODEL="${FIREWORKS_MODEL:-accounts/fireworks/routers/kimi-k2p5-turbo}"
@@ -109,6 +109,11 @@ steps:
       # Codex: uses Fireworks Responses API, model from CRD
       if [ "$CLI_TYPE" = "codex" ]; then
         ACPX_MODEL="${CODEX_MODEL:-{{model}}}"
+      fi
+
+      # Gemini: uses native Google API with GEMINI_API_KEY from secrets
+      if [ "$CLI_TYPE" = "gemini" ]; then
+        ACPX_MODEL="${GEMINI_MODEL:-gemini-2.5-flash}"
       fi
 
       export ACPX_MODEL

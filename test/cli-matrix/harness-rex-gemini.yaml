@@ -14,13 +14,13 @@ spec:
   docsBranch: main
   workingDirectory: .
   githubApp: 5DLabs-Nova
-  model: accounts/fireworks/routers/kimi-k2p5-turbo
+  model: gemini-2.5-flash
   contextVersion: 1
   taskId: 1
   enableDocker: false
   cliConfig:
     cliType: gemini
-    model: accounts/fireworks/routers/kimi-k2p5-turbo
+    model: gemini-2.5-flash
     settings:
       listToolsOnStart: true
   promptModification: |
