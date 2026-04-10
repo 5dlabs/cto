@@ -372,9 +372,9 @@
           "cli": "Claude Code",
           "provider": { "name": "Anthropic", "credits": 250000 },
           "models": [
-            { "name": "claude-opus-4-20250514", "thinkingLevel": "high", "score": 96 },
-            { "name": "claude-sonnet-4-20250514", "thinkingLevel": "medium", "score": 91 },
-            { "name": "claude-3-5-haiku-20241022", "thinkingLevel": "low", "score": 84 }
+            { "name": "claude-opus-4-6-20260205", "thinkingLevel": "high", "score": 96 },
+            { "name": "claude-sonnet-4-6-20260514", "thinkingLevel": "medium", "score": 91 },
+            { "name": "claude-haiku-4-5-20251001", "thinkingLevel": "low", "score": 84 }
           ],
           "baseUrl": "https://api.anthropic.com",
           "apiKey": "ANTHROPIC_API_KEY"
@@ -383,12 +383,43 @@
           "cli": "Codex",
           "provider": { "name": "OpenAI", "credits": 180000 },
           "models": [
-            { "name": "gpt-5.2-codex", "thinkingLevel": "high", "score": 95 },
-            { "name": "o4-mini", "thinkingLevel": "medium", "score": 88 },
-            { "name": "gpt-4.1", "thinkingLevel": "low", "score": 82 }
+            { "name": "gpt-5.4", "thinkingLevel": "high", "score": 95 },
+            { "name": "gpt-5.3-codex", "thinkingLevel": "high", "score": 94 },
+            { "name": "gpt-5.2-codex", "thinkingLevel": "medium", "score": 92 },
+            { "name": "gpt-5.2", "thinkingLevel": "medium", "score": 90 },
+            { "name": "gpt-5.1-codex", "thinkingLevel": "low", "score": 85 }
           ],
           "baseUrl": "https://api.openai.com/v1",
           "apiKey": "OPENAI_API_KEY"
+        },
+        {
+          "cli": "Factory",
+          "provider": { "name": "ZhipuAI" },
+          "models": [
+            { "name": "claude-opus-4-6", "thinkingLevel": "high", "score": 96 },
+            { "name": "claude-sonnet-4-6", "thinkingLevel": "medium", "score": 91 },
+            { "name": "claude-haiku-4-5-20251001", "thinkingLevel": "low", "score": 84 },
+            { "name": "gpt-5.4", "thinkingLevel": "high", "score": 95 },
+            { "name": "gpt-5.3-codex", "thinkingLevel": "high", "score": 94 },
+            { "name": "gpt-5.2-codex", "thinkingLevel": "medium", "score": 92 },
+            { "name": "gemini-3.1-pro-preview", "thinkingLevel": "medium", "score": 89 },
+            { "name": "gemini-3-flash-preview", "thinkingLevel": "low", "score": 83 },
+            { "name": "glm-5", "thinkingLevel": "medium", "score": 80 },
+            { "name": "glm-4.7", "thinkingLevel": "low", "score": 76 },
+            { "name": "kimi-k2.5", "thinkingLevel": "medium", "score": 78 },
+            { "name": "minimax-m2.5", "thinkingLevel": "medium", "score": 77 }
+          ],
+          "apiKey": "FACTORY_API_KEY"
+        },
+        {
+          "cli": "Cursor",
+          "provider": { "name": "Cursor" },
+          "models": [
+            { "name": "auto", "thinkingLevel": "high", "score": 93 },
+            { "name": "opus-4.6", "thinkingLevel": "high", "score": 96 },
+            { "name": "gpt-5.4", "thinkingLevel": "high", "score": 95 }
+          ],
+          "apiKey": "CURSOR_API_KEY"
         }
       ],
       "openclaw": {
