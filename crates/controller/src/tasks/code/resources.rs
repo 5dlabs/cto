@@ -299,8 +299,6 @@ impl EffectiveProviderConfig {
             (CLIType::OpenCode, Provider::Fireworks) => format!("fireworks-ai/{}", self.raw_model),
             (CLIType::Kimi, Provider::Fireworks) => "kimi-k2p5-turbo".to_string(),
             (CLIType::Copilot, _) => "gpt-4.1".to_string(),
-            (CLIType::Codex, _) => self.raw_model.clone(),
-            (CLIType::Gemini, _) => self.raw_model.clone(),
             (CLIType::Cursor, _) => String::new(), // cursor resolves internally
             _ => self.raw_model.clone(),
         };
