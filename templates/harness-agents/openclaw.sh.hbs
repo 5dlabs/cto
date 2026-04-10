@@ -90,11 +90,14 @@ fi
 # Codex: copy ChatGPT OAuth tokens from read-only secret mount into writable ~/.codex/
 # (codex writes sqlite/cache beside auth.json so the dir must be writable)
 # Use /root/.codex explicitly — CODEX_HOME is pinned to /root/.codex regardless of HOME overrides
+# Unset OPENAI_API_KEY to prevent codex from overriding ChatGPT OAuth with the
+# service account key that leaks from cto-secrets envFrom
 if [ "{{cli_type}}" = "codex" ] && [ -f /root/.codex-oauth/auth.json ]; then
   mkdir -p /root/.codex
   cp /root/.codex-oauth/auth.json /root/.codex/auth.json
   chmod 600 /root/.codex/auth.json
-  echo "[harness] ✅ Codex OAuth tokens installed"
+  unset OPENAI_API_KEY
+  echo "[harness] ✅ Codex OAuth tokens installed (OPENAI_API_KEY unset)"
 fi
 
 for f in /etc/profile.d/*.sh; do
