@@ -89,9 +89,10 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     else \
         npm install -g --no-audit --no-fund --ignore-scripts openclaw@${OPENCLAW_VERSION}; \
     fi && \
-    # Install peer deps skipped by --ignore-scripts (e.g. @buape/carbon for Discord UI)
+    # Run install scripts (native modules) without re-resolving the dep tree.
+    # Using `npm install` here restructures the global node_modules and drops deps like tslog.
     cd /usr/local/share/npm-global/lib/node_modules/openclaw && \
-    npm install --no-audit --no-fund 2>&1 | tail -5 && \
+    npm rebuild --no-audit --no-fund 2>&1 | tail -5 && \
     cd / && \
     echo "--- OpenClaw (agent CLI) included ---" && \
     openclaw --version
