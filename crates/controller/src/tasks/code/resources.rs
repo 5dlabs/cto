@@ -1992,7 +1992,8 @@ scrape_configs:
                 "runAsGroup": 0,
                 "fsGroupChangePolicy": "OnRootMismatch"
             });
-            pod_spec["initContainers"] = json!([]);
+            // Keep init containers (promtail config writer, workspace setup, etc.)
+            // Only the securityContext needs root for Codex's sandbox mode.
         }
 
         // Prefer CRD-provided ServiceAccountName; else use controller default if set

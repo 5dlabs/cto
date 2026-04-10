@@ -89,10 +89,10 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     else \
         npm install -g --no-audit --no-fund --ignore-scripts openclaw@${OPENCLAW_VERSION}; \
     fi && \
-    # Run install scripts (native modules) without re-resolving the dep tree.
-    # Using `npm install` here restructures the global node_modules and drops deps like tslog.
+    # --ignore-scripts skips postinstall that resolves deps like tslog.
+    # Run a scoped `npm install` inside the package dir to pull missing deps.
     cd /usr/local/share/npm-global/lib/node_modules/openclaw && \
-    npm rebuild --no-audit --no-fund 2>&1 | tail -5 && \
+    npm install --no-audit --no-fund --ignore-scripts=false 2>&1 | tail -10 && \
     cd / && \
     echo "--- OpenClaw (agent CLI) included ---" && \
     openclaw --version
