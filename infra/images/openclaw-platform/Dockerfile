@@ -26,6 +26,13 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     openclaw --version && \
     clawhub --cli-version
 
+# Install OpenClaw bundled plugin runtime deps (--ignore-scripts skips post-install)
+# and chown so the node user can update at runtime.
+RUN OC_DIR="$(npm root -g)/openclaw" && \
+    cd "$OC_DIR" && \
+    npm install --no-audit --no-fund --omit=dev 2>/dev/null || true && \
+    chown -R node:node "$OC_DIR/node_modules" 2>/dev/null || true
+
 RUN mkdir -p \
       /workspace \
       /workspace/.openclaw \
