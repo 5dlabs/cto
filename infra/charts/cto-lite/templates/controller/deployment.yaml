@@ -42,6 +42,10 @@ spec:
               value: "true"
             - name: TOOLS_SERVER_URL
               value: "http://{{ include "cto-lite.fullname" . }}-tools:8080"
+            {{- if .Values.controller.skillsCache.enabled }}
+            - name: SKILLS_CACHE_PATH
+              value: "/data/skills-cache"
+            {{- end }}
           envFrom:
             {{- if .Values.secrets.anthropic.enabled }}
             - secretRef:
@@ -72,10 +76,19 @@ spec:
           volumeMounts:
             - name: cto-config
               mountPath: /etc/cto
+            {{- if .Values.controller.skillsCache.enabled }}
+            - name: skills-cache
+              mountPath: /data/skills-cache
+            {{- end }}
       volumes:
         - name: cto-config
           configMap:
             name: {{ include "cto-lite.fullname" . }}-config
+        {{- if .Values.controller.skillsCache.enabled }}
+        - name: skills-cache
+          persistentVolumeClaim:
+            claimName: {{ include "cto-lite.fullname" . }}-controller-skills-cache
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service

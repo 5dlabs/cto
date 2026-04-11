@@ -1060,6 +1060,17 @@ pub struct Defaults {
     /// Play workflow defaults.
     #[serde(default)]
     pub play: PlayDefaults,
+
+    /// Default skills-release repo URL threaded into every CodeRun spec.
+    /// Format: "https://github.com/{owner}/{repo}". When set, CodeRun
+    /// producers stamp this into `spec.skillsUrl` and the controller
+    /// fetches per-skill tarballs from the repo's GitHub Releases.
+    #[serde(
+        rename = "skillsRepo",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub skills_repo: Option<String>,
 }
 
 /// Default org name for agent GitHub App names.

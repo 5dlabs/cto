@@ -248,6 +248,12 @@ controller:
     serverPort: "8080"
     rustLog: "debug"
 
+  # Skills cache PVC for downloaded skill tarballs
+  skillsCache:
+    enabled: false
+    storageSize: 1Gi
+    storageClassName: ""
+
   # Linear sidecar configuration (whip cracking enabled)
   linear:
     sidecarImage: registry.5dlabs.ai/5dlabs/linear-sidecar:dev

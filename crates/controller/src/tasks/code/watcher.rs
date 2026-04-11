@@ -362,6 +362,7 @@ pub async fn create_watcher_coderun(
         subtasks: None,
         watcher_config: None, // Watcher doesn't spawn another watcher
         watcher_for: Some(executor_name.clone()),
+        skills_url: None, // Watcher doesn't need skills
     };
 
     let watcher = CodeRun {

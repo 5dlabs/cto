@@ -1190,6 +1190,7 @@ pub async fn submit_intake_coderun(
             "githubApp": github_app,
             "model": primary_model,
             "enableDocker": false,
+            "skillsUrl": config.skills_repo,
             "env": {
                 "PROJECT_NAME": project_name_for_repo,
                 "REPOSITORY_URL": repository_url,
@@ -1468,9 +1469,7 @@ pub async fn resolve_agent_delegates(
                 let expected_full = format!("5dlabs-{agent_name}");
                 let found = users.iter().find(|u| {
                     let lower = u.name.to_lowercase();
-                    lower == expected_full
-                        || lower == *agent_name
-                        || lower.contains(agent_name)
+                    lower == expected_full || lower == *agent_name || lower.contains(agent_name)
                 });
                 if let Some(user) = found {
                     info!(

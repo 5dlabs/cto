@@ -3986,9 +3986,19 @@ Be constructive and explain the "why" behind your suggestions.
     /// Returns the SKILL.md content if found, None otherwise.
     fn resolve_skill_content(skill_name: &str, templates_path: &str) -> Option<String> {
         let categories = [
-            "stacks", "auth", "context", "design", "documents", "languages",
-            "llm-docs", "platforms", "quality", "security", "workflow",
-            "animations", "tools",
+            "stacks",
+            "auth",
+            "context",
+            "design",
+            "documents",
+            "languages",
+            "llm-docs",
+            "platforms",
+            "quality",
+            "security",
+            "workflow",
+            "animations",
+            "tools",
         ];
         for category in &categories {
             let path = format!("{templates_path}/skills/{category}/{skill_name}/SKILL.md");
@@ -4001,13 +4011,55 @@ Be constructive and explain the "why" behind your suggestions.
 
     /// Get skills enriched with inline content for embedding in container scripts.
     /// Returns JSON array of {name, content} objects. Content is empty string if skill not found.
-    fn get_agent_skills_enriched(code_run: &CodeRun, config: &ControllerConfig) -> Vec<serde_json::Value> {
+    ///
+    /// When `spec.skills_url` is set, skills are fetched from the remote skills
+    /// repo via [`skills_cache::ensure_skills`]. A fetch/hash/extract failure
+    /// logs an error and sets content to empty (the CodeRun will still proceed
+    /// but the skill will be missing — callers can check for empty content).
+    ///
+    /// When `skills_url` is `None`, the baked-in templates directory is used.
+    fn get_agent_skills_enriched(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Vec<serde_json::Value> {
+        let skill_names = Self::get_agent_skills(code_run, config);
+
+        // If a skills repo URL is configured, try the remote cache first.
+        if let Some(ref skills_url) = code_run.spec.skills_url {
+            let agent_name = Self::get_agent_name(code_run);
+            // TODO: wire project from CodeRunSpec once we add a project field
+            let project: Option<&str> = None;
+            match super::skills_cache::ensure_skills(skills_url, &agent_name, project, &skill_names) {
+                Ok(cached) => {
+                    return skill_names
+                        .into_iter()
+                        .map(|name| {
+                            let content = cached.get(&name).cloned().unwrap_or_default();
+                            if content.is_empty() {
+                                warn!("Skill '{}' resolved from cache but content is empty", name);
+                            } else {
+                                debug!("Loaded skill '{}' from skills cache", name);
+                            }
+                            json!({ "name": name, "content": content })
+                        })
+                        .collect();
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to fetch skills from {}: {} — falling back to baked-in templates",
+                        skills_url, e
+                    );
+                }
+            }
+        }
+
+        // Fallback: resolve from baked-in templates directory
         let templates_path = get_templates_path();
-        Self::get_agent_skills(code_run, config)
+        skill_names
             .into_iter()
             .map(|name| {
-                let content = Self::resolve_skill_content(&name, &templates_path)
-                    .unwrap_or_default();
+                let content =
+                    Self::resolve_skill_content(&name, &templates_path).unwrap_or_default();
                 if content.is_empty() {
                     debug!("Skill content not found for '{}' in templates", name);
                 } else {
