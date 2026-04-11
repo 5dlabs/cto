@@ -69,7 +69,11 @@ pub struct ACPModel {
     /// Model identifier (e.g. "claude-opus-4-20250514")
     pub name: String,
     /// Thinking level hint: "high", "medium", or "low"
-    #[serde(default, rename = "thinkingLevel", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "thinkingLevel",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub thinking_level: Option<String>,
     /// Performance score 0-100
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -110,7 +114,11 @@ pub struct OpenClawModel {
     /// Model identifier
     pub name: String,
     /// Thinking level hint: "high", "medium", or "low"
-    #[serde(default, rename = "thinkingLevel", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "thinkingLevel",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub thinking_level: Option<String>,
 }
 
@@ -365,6 +373,27 @@ pub struct CodeRunSpec {
     #[serde(rename = "docsRepositoryUrl")]
     pub docs_repository_url: String,
 
+    /// Optional base URL of a skills-release repo. When set, the controller
+    /// downloads per-skill tarballs from the repo's GitHub Releases into its
+    /// local cache and resolves skill content from there. When unset, the
+    /// controller falls back to the baked-in /app/templates/skills directory.
+    ///
+    /// Format: "https://github.com/{owner}/{repo}"
+    #[serde(default, rename = "skillsUrl", skip_serializing_if = "Option::is_none")]
+    pub skills_url: Option<String>,
+
+    /// Optional project name for skills/persona overlays. When set, the controller
+    /// downloads `{agent}-{project}.tar.gz` instead of `{agent}-default.tar.gz`,
+    /// which contains the merged `_default` + project-specific overrides.
+    ///
+    /// Example: "test-sandbox" → downloads `rex-test-sandbox.tar.gz`
+    #[serde(
+        default,
+        rename = "skillsProject",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub skills_project: Option<String>,
+
     /// Project directory within docs repository (e.g. "_projects/simple-api")
     #[serde(default, rename = "docsProjectDirectory")]
     pub docs_project_directory: Option<String>,
@@ -482,7 +511,6 @@ pub struct CodeRunSpec {
     pub escalation_policy: Option<EscalationPolicy>,
 
     // ── New fields: multi-agent CodeRun overhaul ─────────────────────
-
     /// Explicit implementation agent name (e.g. "rex", "blaze").
     /// Takes precedence over `github_app` derivation for naming and labels.
     #[serde(default, rename = "implementationAgent")]
@@ -522,6 +550,8 @@ impl Default for CodeRunSpec {
             service: String::new(),
             repository_url: String::new(),
             docs_repository_url: String::new(),
+            skills_url: None,
+            skills_project: None,
             docs_project_directory: None,
             working_directory: None,
             model: String::new(),
@@ -740,6 +770,44 @@ mod tests {
     }
 
     #[test]
+    fn test_coderun_spec_with_skills_url() {
+        let json = r#"{
+            "service": "test-service",
+            "repositoryUrl": "https://github.com/test/repo",
+            "docsRepositoryUrl": "https://github.com/test/docs",
+            "model": "claude-opus",
+            "skillsUrl": "https://github.com/5dlabs/cto-agent-personas",
+            "skillsProject": "test-sandbox"
+        }"#;
+        let spec: CodeRunSpec = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            spec.skills_url,
+            Some("https://github.com/5dlabs/cto-agent-personas".to_string())
+        );
+        assert_eq!(spec.skills_project, Some("test-sandbox".to_string()));
+
+        // Round-trip: omitted on the wire when None
+        let default_json = r#"{
+            "service": "s",
+            "repositoryUrl": "r",
+            "docsRepositoryUrl": "d",
+            "model": "m"
+        }"#;
+        let default_spec: CodeRunSpec = serde_json::from_str(default_json).unwrap();
+        assert!(default_spec.skills_url.is_none());
+        assert!(default_spec.skills_project.is_none());
+        let serialized = serde_json::to_string(&default_spec).unwrap();
+        assert!(
+            !serialized.contains("skillsUrl"),
+            "skillsUrl should be omitted when None, got: {serialized}"
+        );
+        assert!(
+            !serialized.contains("skillsProject"),
+            "skillsProject should be omitted when None, got: {serialized}"
+        );
+    }
+
+    #[test]
     fn test_coderun_spec_watcher_for() {
         let json = r#"{
             "service": "test-service",
@@ -805,7 +873,10 @@ mod tests {
         let deserialized: OpenClawConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.provider.name, "Fireworks");
         assert_eq!(deserialized.models.len(), 1);
-        assert_eq!(deserialized.base_url.unwrap(), "https://api.fireworks.ai/inference");
+        assert_eq!(
+            deserialized.base_url.unwrap(),
+            "https://api.fireworks.ai/inference"
+        );
     }
 
     #[test]

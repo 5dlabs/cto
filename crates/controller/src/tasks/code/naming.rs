@@ -625,9 +625,18 @@ mod tests {
         assert!(!job_name.starts_with(CODERUN_JOB_PREFIX));
         assert!(job_name.starts_with("t42"));
         // No cli_config set, so cli is "unknown" and provider is "default"
-        assert!(job_name.contains("unknown"), "Should contain unknown cli: {job_name}");
-        assert!(job_name.contains("sonnet"), "Should contain model: {job_name}");
-        assert!(job_name.contains("default"), "Should contain default provider: {job_name}");
+        assert!(
+            job_name.contains("unknown"),
+            "Should contain unknown cli: {job_name}"
+        );
+        assert!(
+            job_name.contains("sonnet"),
+            "Should contain model: {job_name}"
+        );
+        assert!(
+            job_name.contains("default"),
+            "Should contain default provider: {job_name}"
+        );
         assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
     }
 
@@ -1098,19 +1107,34 @@ mod tests {
 
     #[test]
     fn shorten_cli_name_works() {
-        assert_eq!(ResourceNaming::shorten_cli_name("Claude Code"), "claude-code");
+        assert_eq!(
+            ResourceNaming::shorten_cli_name("Claude Code"),
+            "claude-code"
+        );
         assert_eq!(ResourceNaming::shorten_cli_name("claude"), "claude-code");
         assert_eq!(ResourceNaming::shorten_cli_name("Codex"), "codex");
         assert_eq!(ResourceNaming::shorten_cli_name("Factory"), "factory");
-        assert_eq!(ResourceNaming::shorten_cli_name("Some New CLI"), "some-new-cli");
+        assert_eq!(
+            ResourceNaming::shorten_cli_name("Some New CLI"),
+            "some-new-cli"
+        );
     }
 
     #[test]
     fn shorten_provider_name_works() {
-        assert_eq!(ResourceNaming::shorten_provider_name("Anthropic"), "anthropic");
+        assert_eq!(
+            ResourceNaming::shorten_provider_name("Anthropic"),
+            "anthropic"
+        );
         assert_eq!(ResourceNaming::shorten_provider_name("OpenAI"), "openai");
-        assert_eq!(ResourceNaming::shorten_provider_name("OpenRouter"), "open-router");
-        assert_eq!(ResourceNaming::shorten_provider_name("Fireworks"), "fireworks");
+        assert_eq!(
+            ResourceNaming::shorten_provider_name("OpenRouter"),
+            "open-router"
+        );
+        assert_eq!(
+            ResourceNaming::shorten_provider_name("Fireworks"),
+            "fireworks"
+        );
         assert_eq!(
             ResourceNaming::shorten_provider_name("Some Provider"),
             "some-provider"
@@ -1119,7 +1143,10 @@ mod tests {
 
     #[test]
     fn shorten_model_name_handles_new_models() {
-        assert_eq!(ResourceNaming::shorten_model_name("gpt-5.2-codex"), "gpt52codex");
+        assert_eq!(
+            ResourceNaming::shorten_model_name("gpt-5.2-codex"),
+            "gpt52codex"
+        );
         assert_eq!(ResourceNaming::shorten_model_name("o4-mini"), "o4mini");
         assert_eq!(ResourceNaming::shorten_model_name("gpt-4.1"), "gpt41");
         assert_eq!(

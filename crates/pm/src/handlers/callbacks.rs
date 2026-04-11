@@ -78,6 +78,10 @@ pub struct CallbackState {
     pub gitlab_webhook_secret: Option<String>,
     /// Morgan/OpenClaw webhook dispatch settings.
     pub morgan_dispatch: MorganDispatchConfig,
+    /// Default skills-release repo URL for CodeRun specs.
+    pub skills_repo: Option<String>,
+    /// Default skills project name for CodeRun specs.
+    pub skills_project: Option<String>,
 }
 
 /// Handle intake workflow completion callback.
@@ -305,7 +309,15 @@ pub async fn handle_intake_complete(
 
     // Create task issues (with project if created)
     let project_id = project.as_ref().map(|p| p.id.as_str());
-    match create_task_issues_with_project(client, &request, &payload.tasks, project_id, delegates_ref).await {
+    match create_task_issues_with_project(
+        client,
+        &request,
+        &payload.tasks,
+        project_id,
+        delegates_ref,
+    )
+    .await
+    {
         Ok(task_issue_map) => {
             let created_count = task_issue_map.len();
             info!(

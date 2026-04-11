@@ -205,6 +205,37 @@ impl CodeTemplateGenerator {
             }
         }
 
+        // Inject persona files from the remote skills cache.
+        // Persona AGENTS.md is prepended to the generated AGENTS.md.
+        // Other persona files (SOUL.md, USER.md, etc.) are added as new entries.
+        if code_run.spec.skills_url.is_some() {
+            let agent_name = Self::get_agent_name(code_run);
+            let persona = super::skills_cache::get_persona_files(&agent_name);
+
+            if !persona.is_empty() {
+                debug!(
+                    "Injecting {} persona files for agent '{}'",
+                    persona.len(),
+                    agent_name
+                );
+
+                for (filename, content) in &persona {
+                    if filename == "AGENTS.md" {
+                        // Prepend persona AGENTS.md to the generated one
+                        if let Some(existing) = templates.get("AGENTS.md") {
+                            let merged = format!("{content}\n\n---\n\n{existing}");
+                            templates.insert("AGENTS.md".to_string(), merged);
+                        } else {
+                            templates.insert("AGENTS.md".to_string(), content.clone());
+                        }
+                    } else {
+                        // Add other persona files directly
+                        templates.insert(filename.clone(), content.clone());
+                    }
+                }
+            }
+        }
+
         // Inject CLI-specific config files from templates/cli-configs/
         // These are simple Handlebars templates rendered with CRD context
         let cli_type = Self::determine_cli_type(code_run);
@@ -1754,31 +1785,18 @@ impl CodeTemplateGenerator {
             let mut headers = serde_json::Map::new();
 
             // Agent identity — used by the tools server to key per-session state.
-            let agent_name = code_run
-                .spec
-                .github_app
-                .as_deref()
-                .unwrap_or("unknown");
-            headers.insert(
-                "X-Agent-Id".to_string(),
-                json!(agent_name),
-            );
+            let agent_name = code_run.spec.github_app.as_deref().unwrap_or("unknown");
+            headers.insert("X-Agent-Id".to_string(), json!(agent_name));
 
             // Prewarm set — the tools the agent starts with before escalation.
             if !remote_tools.is_empty() {
-                headers.insert(
-                    "X-Agent-Prewarm".to_string(),
-                    json!(remote_tools.join(" ")),
-                );
+                headers.insert("X-Agent-Prewarm".to_string(), json!(remote_tools.join(" ")));
             }
 
             // Per-session escalation policy from the CRD (overrides server default).
             if let Some(policy) = &code_run.spec.escalation_policy {
                 if let Ok(policy_json) = serde_json::to_string(policy) {
-                    headers.insert(
-                        "X-Escalation-Policy".to_string(),
-                        json!(policy_json),
-                    );
+                    headers.insert("X-Escalation-Policy".to_string(), json!(policy_json));
                 }
             }
 
@@ -4236,12 +4254,57 @@ Be constructive and explain the "why" behind your suggestions.
 
     /// Get skills enriched with inline content for embedding in container scripts.
     /// Returns JSON array of {name, content} objects. Content is empty string if skill not found.
+    ///
+    /// When `spec.skills_url` is set, skills are fetched from the remote skills
+    /// repo via [`skills_cache::ensure_skills`]. A fetch/hash/extract failure
+    /// logs an error and sets content to empty (the CodeRun will still proceed
+    /// but the skill will be missing — callers can check for empty content).
+    ///
+    /// When `skills_url` is `None`, the baked-in templates directory is used.
     fn get_agent_skills_enriched(
         code_run: &CodeRun,
         config: &ControllerConfig,
     ) -> Vec<serde_json::Value> {
+        let skill_names = Self::get_agent_skills(code_run, config);
+
+        // If a skills repo URL is configured, try the remote cache first.
+        if let Some(ref skills_url) = code_run.spec.skills_url {
+            let agent_name = Self::get_agent_name(code_run);
+            let project = code_run.spec.skills_project.as_deref();
+            match super::skills_cache::ensure_skills(skills_url, &agent_name, project, &skill_names)
+            {
+                Ok(cached) => {
+                    return skill_names
+                        .into_iter()
+                        .map(|name| {
+                            let content = cached.get(&name).cloned().unwrap_or_default();
+                            if content.is_empty() {
+                                warn!("Skill '{}' resolved from cache but content is empty", name);
+                            } else {
+                                debug!("Loaded skill '{}' from skills cache", name);
+                            }
+                            json!({ "name": name, "content": content })
+                        })
+                        .collect();
+                }
+                Err(e) => {
+                    // Fail loud: if skills_url is configured, remote fetch must succeed.
+                    // No silent fallback to baked-in templates — archived skills are gone.
+                    warn!(
+                        "Failed to fetch skills from {}: {} — returning empty skills (no baked-in fallback)",
+                        skills_url, e
+                    );
+                    return skill_names
+                        .into_iter()
+                        .map(|name| json!({ "name": name, "content": "" }))
+                        .collect();
+                }
+            }
+        }
+
+        // Fallback: resolve from baked-in templates directory
         let templates_path = get_templates_path();
-        Self::get_agent_skills(code_run, config)
+        skill_names
             .into_iter()
             .map(|name| {
                 let content =

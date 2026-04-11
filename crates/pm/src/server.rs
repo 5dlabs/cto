@@ -262,6 +262,7 @@ pub struct AppState {
 }
 
 /// Build the HTTP router for the Linear service.
+#[allow(clippy::too_many_lines)]
 pub fn build_router(state: AppState) -> Router {
     let http_client = state.http_client.clone();
 
@@ -278,6 +279,8 @@ pub fn build_router(state: AppState) -> Router {
         github_webhook_secret: state.config.github_webhook_secret.clone(),
         gitlab_webhook_secret: state.config.gitlab_webhook_secret.clone(),
         morgan_dispatch: state.config.morgan_dispatch.clone(),
+        skills_repo: state.config.intake.skills_repo.clone(),
+        skills_project: state.config.intake.skills_project.clone(),
     });
 
     Router::new()

@@ -50,6 +50,10 @@ spec:
               value: {{ .Values.controller.templatesVersion | quote }}
             - name: AGENT_TEMPLATES_PATH
               value: "/app/templates"
+            {{- if .Values.controller.skillsCache.enabled }}
+            - name: SKILLS_CACHE_PATH
+              value: "/data/skills-cache"
+            {{- end }}
             {{- if .Values.datadog.enabled }}
             - name: DD_ENV
               value: {{ .Values.datadog.tags.env | quote }}
@@ -64,6 +68,10 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /config
+            {{- if .Values.controller.skillsCache.enabled }}
+            - name: skills-cache
+              mountPath: /data/skills-cache
+            {{- end }}
           resources:
             {{- toYaml .Values.controller.resources | nindent 12 }}
           livenessProbe:
@@ -82,4 +90,9 @@ spec:
         - name: config
           configMap:
             name: task-controller-config
+        {{- if .Values.controller.skillsCache.enabled }}
+        - name: skills-cache
+          persistentVolumeClaim:
+            claimName: {{ include "cto.controller.fullname" . }}-skills-cache
+        {{- end }}
 {{- end }}

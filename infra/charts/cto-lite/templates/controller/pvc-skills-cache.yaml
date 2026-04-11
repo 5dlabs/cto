@@ -1,0 +1,19 @@
+{{- if and .Values.controller.enabled .Values.controller.skillsCache.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "cto-lite.fullname" . }}-controller-skills-cache
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "cto-lite.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.controller.skillsCache.storageSize }}
+  {{- if .Values.controller.skillsCache.storageClassName }}
+  storageClassName: {{ .Values.controller.skillsCache.storageClassName | quote }}
+  {{- end }}
+{{- end }}

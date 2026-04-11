@@ -667,6 +667,11 @@ pub struct IntakeConfig {
     /// Budget for extended thinking in tokens.
     /// Only used when `extended_thinking` is true.
     pub thinking_budget: Option<i32>,
+    /// Default skills-release repo URL stamped into every CodeRun spec.
+    /// Format: "https://github.com/{owner}/{repo}"
+    pub skills_repo: Option<String>,
+    /// Default project name for skills/persona overlays.
+    pub skills_project: Option<String>,
 }
 
 impl Default for IntakeConfig {
@@ -712,6 +717,8 @@ impl Default for IntakeConfig {
             thinking_budget: env::var("TASKS_THINKING_BUDGET")
                 .ok()
                 .and_then(|s| s.parse().ok()),
+            skills_repo: env::var("SKILLS_REPO").ok(),
+            skills_project: env::var("SKILLS_PROJECT").ok(),
         }
     }
 }

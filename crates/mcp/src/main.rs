@@ -110,6 +110,9 @@ struct WorkflowDefaults {
     acp: cto_config::AcpDefaults,
     #[serde(default)]
     play: PlayDefaults,
+    /// Default skills-release repo URL threaded into every CodeRun spec.
+    #[serde(default, rename = "skillsRepo")]
+    skills_repo: Option<String>,
 }
 
 /// Simplified model configuration for intake (CLI-only, no provider needed)
@@ -5237,6 +5240,7 @@ fn create_mcp_server_coderun(
                 "model": model
             },
             "remoteTools": "mcp_tools_github_*,mcp_tools_argocd_*,mcp_tools_kubernetes_*",
+            "skillsUrl": config.defaults.skills_repo,
             "env": env_map
         }
     });
@@ -5661,6 +5665,7 @@ fn create_add_skills_coderun(
                 "model": model
             },
             "remoteTools": "mcp_tools_github_*",
+            "skillsUrl": config.defaults.skills_repo,
             "env": env_map
         }
     });

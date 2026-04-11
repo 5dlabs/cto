@@ -31,6 +31,11 @@ controller:
     limits:
       memory: "128Mi"
       cpu: "200m"
+  # Skills cache PVC for downloaded skill tarballs
+  skillsCache:
+    enabled: false
+    storageSize: 1Gi
+    storageClassName: ""
   # Service account for creating pods
   serviceAccount:
     create: true

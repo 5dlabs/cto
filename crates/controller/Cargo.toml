@@ -42,10 +42,18 @@ opentelemetry_sdk = { workspace = true }
 tracing-opentelemetry = { workspace = true }
 
 # HTTP Client
-reqwest = { workspace = true }
+# "blocking" is enabled locally so the skills_cache module can make a small
+# synchronous HTTP call from within the sync template-rendering pipeline
+# without threading async through the entire call tree.
+reqwest = { workspace = true, features = ["blocking"] }
 
 # GitHub API
 octocrab = "0.49"
+
+# Archive extraction for the skills cache (per-skill .tar.gz from GitHub Releases)
+flate2 = "1.0"
+tar = "0.4"
+sha2 = "0.10"
 
 # Time utilities
 chrono = { version = "0.4", features = ["serde"] }

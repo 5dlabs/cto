@@ -795,7 +795,7 @@ async fn handle_remediation_webhook_impl(
 
 /// Create a `CodeRun` CR for an @mention
 async fn create_mention_coderun(
-    _state: &CallbackState,
+    state: &CallbackState,
     mention: &ParsedMention,
     pr_context: &PrContext,
     comment_url: &str,
@@ -830,6 +830,8 @@ async fn create_mention_coderun(
             "workingDirectory": ".",
             "githubApp": mention.agent.github_app_name(),
             "model": "claude-opus-4-5-20251101",
+            "skillsUrl": state.skills_repo,
+            "skillsProject": state.skills_project,
             "env": {
                 "PR_NUMBER": pr_context.number.to_string(),
                 "PR_BRANCH": pr_context.head_branch,
@@ -872,7 +874,7 @@ async fn create_mention_coderun(
 
 /// Create a `CodeRun` CR for a remediation button click
 async fn create_remediation_coderun(
-    _state: &CallbackState,
+    state: &CallbackState,
     agent: Agent,
     pr_context: &PrContext,
     check_name: &str,
@@ -909,6 +911,8 @@ async fn create_remediation_coderun(
             "workingDirectory": ".",
             "githubApp": agent.github_app_name(),
             "model": "claude-opus-4-5-20251101",
+            "skillsUrl": state.skills_repo,
+            "skillsProject": state.skills_project,
             "env": {
                 "PR_NUMBER": pr_context.number.to_string(),
                 "PR_BRANCH": pr_context.head_branch,

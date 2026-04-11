@@ -364,9 +364,11 @@ pub async fn create_watcher_coderun(
         subtasks: None,
         watcher_config: None, // Watcher doesn't spawn another watcher
         watcher_for: Some(executor_name.clone()),
+        skills_url: None, // Watcher doesn't need skills
+        skills_project: None,
         escalation_policy: None,
         implementation_agent: executor.spec.implementation_agent.clone(),
-        quality: false,     // Watcher doesn't run phase gates
+        quality: false, // Watcher doesn't run phase gates
         security: false,
         testing: false,
         deployment: false,

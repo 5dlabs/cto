@@ -120,6 +120,8 @@ pub fn generate_project_config(input: &ProjectConfigInput) -> CtoConfig {
                     .unwrap_or_else(|| "docs".to_string()),
                 ..PlayDefaults::default()
             },
+            skills_repo: None,
+            skills_project: None,
         },
         agents: HashMap::new(),
     };
@@ -258,6 +260,8 @@ pub fn generate_config_with_tasks<T: ToolAnalyzable>(
                     .unwrap_or_else(|| "docs".to_string()),
                 ..PlayDefaults::default()
             },
+            skills_repo: None,
+            skills_project: None,
         },
         agents,
     }

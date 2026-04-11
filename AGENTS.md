@@ -49,6 +49,22 @@ For **multi-agent Plays** or heavy intake runs, use **[Cursor subagents](https:/
 
 Full protocol: [`docs/intake-coordinator.md`](docs/intake-coordinator.md). Terminal checkpoints: **`intake/scripts/iteration-checkpoints.sh`**. Quick chain (clear → `feedback-loop-signal start` → checkpoints): **`intake/scripts/go-green.sh`** (`--bridges-skip` when bridge URLs are not reachable yet; see [`docs/intake-local-prereqs.md`](docs/intake-local-prereqs.md)). **Retry until green:** **`intake/scripts/go-green-loop.sh`** (same flags + `INTAKE_GO_GREEN_*`, `INTAKE_OP_ENV_FILE`).
 
+## Rust code quality (pre-push gate)
+
+Before pushing **any** Rust changes, run clippy pedantic for every crate touched by the CI workflows:
+
+```bash
+cargo clippy --all-targets -- -D warnings -W clippy::pedantic
+```
+
+If you only changed one crate, you may scope it:
+
+```bash
+cargo clippy -p <crate> --all-targets -- -D warnings -W clippy::pedantic
+```
+
+**Do not push if your changes introduce new clippy errors.** Pre-existing errors on `main` are acceptable until they are resolved in a dedicated cleanup, but your diff must not add to that count. Also run `cargo fmt --all -- --check` before pushing.
+
 ## Configuration
 
 - Agent configs: `cto-config.json` (models, tools, skills per agent)

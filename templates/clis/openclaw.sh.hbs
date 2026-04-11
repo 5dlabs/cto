@@ -317,6 +317,22 @@ echo ""
 {{/if}}
 
 # =========================================================================
+# Persona Files (AGENTS.md, SOUL.md, USER.md, etc.)
+# =========================================================================
+# Copy persona files from ConfigMap mount to work dir so the underlying
+# CLI agent (Claude Code, Codex, etc.) picks them up from its cwd.
+for persona_file in AGENTS.md SOUL.md USER.md IDENTITY.md TOOLS.md HEARTBEAT.md BOOT.md; do
+    if [ -f "/task-files/$persona_file" ]; then
+        if [ ! -f "$WORK_DIR/$persona_file" ]; then
+            cp "/task-files/$persona_file" "$WORK_DIR/" 2>/dev/null || true
+            echo "  ✓ $persona_file (from ConfigMap)"
+        else
+            echo "  ✓ $persona_file (using repo version)"
+        fi
+    fi
+done
+
+# =========================================================================
 # Determine prompt
 # =========================================================================
 if [ -n "${PROMPT_CONTENT:-}" ]; then

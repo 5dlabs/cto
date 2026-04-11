@@ -3157,7 +3157,9 @@ async fn escalation_handler_inner(
                 }
             })
         }
-        EscalationDecision::Deny { reason: policy_reason } => {
+        EscalationDecision::Deny {
+            reason: policy_reason,
+        } => {
             tracing::info!(
                 "🛡️  escalation deny: agent={agent_id} tool={tool_name} policy_reason={policy_reason}"
             );
@@ -3192,7 +3194,9 @@ impl BridgeState {
     }
 
     /// Extract the `X-Agent-Prewarm` header as a set of tool names.
-    fn prewarm_from_headers(headers: Option<&axum::http::HeaderMap>) -> std::collections::HashSet<String> {
+    fn prewarm_from_headers(
+        headers: Option<&axum::http::HeaderMap>,
+    ) -> std::collections::HashSet<String> {
         headers
             .and_then(|h| h.get("x-agent-prewarm"))
             .and_then(|v| v.to_str().ok())
@@ -3389,7 +3393,8 @@ impl BridgeState {
                                     params.get("arguments").cloned().unwrap_or(json!({}));
                                 let agent_id = Self::agent_id_from_headers(headers);
                                 let prewarm = Self::prewarm_from_headers(headers);
-                                self.handle_escalation(&arguments, &agent_id, &prewarm).await
+                                self.handle_escalation(&arguments, &agent_id, &prewarm)
+                                    .await
                             } else if tool_name == "tools_screenshot_upload" {
                                 // Handle screenshot upload to S3-compatible storage (SeaweedFS)
                                 let arguments =
@@ -4743,7 +4748,10 @@ mod tests {
     #[test]
     fn agent_id_from_headers_defaults_when_missing() {
         let headers = axum::http::HeaderMap::new();
-        assert_eq!(BridgeState::agent_id_from_headers(Some(&headers)), "default");
+        assert_eq!(
+            BridgeState::agent_id_from_headers(Some(&headers)),
+            "default"
+        );
         assert_eq!(BridgeState::agent_id_from_headers(None), "default");
     }
 
@@ -4761,7 +4769,10 @@ mod tests {
     fn agent_id_from_headers_rejects_empty() {
         let mut headers = axum::http::HeaderMap::new();
         headers.insert("x-agent-id", "".parse().unwrap());
-        assert_eq!(BridgeState::agent_id_from_headers(Some(&headers)), "default");
+        assert_eq!(
+            BridgeState::agent_id_from_headers(Some(&headers)),
+            "default"
+        );
     }
 
     #[test]

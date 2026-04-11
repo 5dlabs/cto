@@ -1,0 +1,18 @@
+{{- if and .Values.controller.enabled .Values.controller.skillsCache.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "cto.controller.fullname" . }}-skills-cache
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.controller.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.controller.skillsCache.storageSize }}
+  {{- if .Values.controller.skillsCache.storageClassName }}
+  storageClassName: {{ .Values.controller.skillsCache.storageClassName | quote }}
+  {{- end }}
+{{- end }}

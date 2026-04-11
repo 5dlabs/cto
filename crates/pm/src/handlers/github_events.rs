@@ -393,6 +393,8 @@ async fn handle_pr_review_trigger(
             "workingDirectory": ".",
             "githubApp": "5DLabs-Stitch",
             "model": "claude-opus-4-5-20251101",
+            "skillsUrl": state.skills_repo,
+            "skillsProject": state.skills_project,
             "env": {
                 "PR_NUMBER": pr_number.to_string(),
                 "PR_URL": payload.pull_request.html_url,
@@ -558,6 +560,8 @@ async fn handle_task_pr_merged(
             "workingDirectory": ".",
             "githubApp": "5DLabs-Morgan",
             "model": "claude-sonnet-4-20250514",
+            "skillsUrl": state.skills_repo,
+            "skillsProject": state.skills_project,
             "env": {
                 "TASK_ID": task_id,
                 "PR_NUMBER": pr.number.to_string(),
