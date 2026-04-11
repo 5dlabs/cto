@@ -1175,6 +1175,7 @@ async fn trigger_play_workflow(
             "githubApp": "5DLabs-Morgan",
             "model": state.play_config.model.as_deref().unwrap_or("claude-sonnet-4-20250514"),
             "enableDocker": false,
+            "skillsUrl": state.skills_repo,
             "env": {
                 "PROJECT_NAME": metadata.project_name.clone().unwrap_or_else(|| payload.repository.name.clone()),
                 "PROJECT_DIR": project_dir,

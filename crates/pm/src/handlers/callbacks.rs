@@ -78,6 +78,8 @@ pub struct CallbackState {
     pub gitlab_webhook_secret: Option<String>,
     /// Morgan/OpenClaw webhook dispatch settings.
     pub morgan_dispatch: MorganDispatchConfig,
+    /// Default skills-release repo URL for CodeRun specs.
+    pub skills_repo: Option<String>,
 }
 
 /// Handle intake workflow completion callback.
