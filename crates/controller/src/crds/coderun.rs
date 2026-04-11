@@ -460,7 +460,10 @@ pub struct CLIConfig {
 #[kube(printcolumn = r#"{"name":"Age","type":"date","jsonPath":".metadata.creationTimestamp"}"#)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct CodeRunSpec {
-    /// Type of run: "implementation" (default), "documentation", "intake"
+    /// Type of run. **Deprecated for standard task work** — phase booleans
+    /// (`quality`, `security`, `testing`, `deployment`) are handled by Lobster.
+    /// Still used internally for special workflows: "intake", "documentation",
+    /// "review", "remediate". Defaults to "implementation".
     #[serde(default = "default_run_type", rename = "runType")]
     pub run_type: String,
 
@@ -521,7 +524,9 @@ pub struct CodeRunSpec {
     #[serde(rename = "githubUser", default)]
     pub github_user: Option<String>,
 
-    /// GitHub App name for authentication (e.g., "5DLabs-Rex")
+    /// GitHub App name for authentication (e.g., "5DLabs-Rex").
+    /// **Deprecated** — prefer `implementationAgent`. When absent, the controller
+    /// derives this as `5DLabs-{Capitalized(implementationAgent)}`.
     #[serde(rename = "githubApp", default)]
     pub github_app: Option<String>,
 
@@ -600,14 +605,13 @@ pub struct CodeRunSpec {
     #[serde(default)]
     pub subtasks: Option<Vec<SubtaskSpec>>,
 
+    /// **Deprecated** — watcher dual-model pattern is no longer used.
     /// Watcher configuration for dual-model execution pattern.
-    /// When enabled, a paired watcher CodeRun monitors this executor and provides
-    /// real-time feedback via a coordination file.
     #[serde(default, rename = "watcherConfig")]
     pub watcher_config: Option<WatcherConfig>,
 
+    /// **Deprecated** — watcher dual-model pattern is no longer used.
     /// If this CodeRun is a watcher, the name of the executor CodeRun it monitors.
-    /// This field is set automatically by the controller when creating watcher CodeRuns.
     #[serde(default, rename = "watcherFor")]
     pub watcher_for: Option<String>,
 
