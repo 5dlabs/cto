@@ -509,6 +509,14 @@ steps:
       if [ -z "$OUTPUT" ]; then
         echo "generate-scaffolds: empty output; building deterministic fallback scaffolds" >&2
         printf '%s' "$EXP" | jq '{scaffolds:[.[] | {task_id:.id}]}' && exit 0; fi
+      # Normalize: ensure output is always {scaffolds:[...]}
+      OUTPUT=$(printf '%s' "$OUTPUT" | jq '
+        if type=="array" then {scaffolds: .}
+        elif type=="object" and has("scaffolds") then .
+        elif type=="object" then {scaffolds: [.]}
+        else {scaffolds: []}
+        end
+      ')
       printf '%s' "$OUTPUT"
 
   - id: verify-generate-scaffolds
@@ -989,40 +997,53 @@ steps:
               task_id: $t.id,
               task_title: (($t.title // "Untitled") | tostring),
               prompt_md: (
-                "Implement task " + (($t.id // 0)|tostring) + ": " + (($t.title // "Untitled task") | tostring)
-                + "\n\n## Goal\n" + (($t.description // "No description provided.") | tostring)
-                + "\n\n## Task Context\n"
-                + "- Agent owner: " + (($t.agent // "Unassigned") | tostring)
-                + "\n- Stack: " + (($t.stack // "Unspecified") | tostring)
-                + "\n- Priority: " + (($t.priority // "unspecified") | tostring)
-                + "\n- Dependencies: "
+                "<identity>\nYou are " + (($t.agent // "Unassigned") | tostring)
+                + ", the " + (($t.stack // "general") | tostring) + " implementation agent. You own task "
+                + (($t.id // 0)|tostring) + " end-to-end.\n</identity>\n\n"
+                + "<context>\n<task_overview>\nTask " + (($t.id // 0)|tostring) + ": "
+                + (($t.title // "Untitled task") | tostring)
+                + "\n" + (($t.description // "No description provided.") | tostring)
+                + "\nPriority: " + (($t.priority // "unspecified") | tostring)
+                + "\nDependencies: "
                 + (if (($t.dependencies // []) | length) > 0
                     then (($t.dependencies // []) | map(tostring) | join(", "))
                     else "None"
                   end)
-                + "\n\n## Implementation Plan\n" + (($t.details // $t.description // "No implementation details provided.") | tostring)
-                + "\n\n## Acceptance Criteria\n" + (($t.test_strategy // "Run tests and confirm task outcomes.") | tostring)
-                + "\n\n## Subtasks\n"
+                + "\n</task_overview>\n</context>\n\n"
+                + "<implementation_plan>\n" + (($t.details // $t.description // "No implementation details provided.") | tostring)
+                + "\n</implementation_plan>\n\n"
+                + "<acceptance_criteria>\n" + (($t.test_strategy // "Run tests and confirm task outcomes.") | tostring)
+                + "\n</acceptance_criteria>\n\n"
+                + "<subtasks>\n"
                 + (if (($t.subtasks // []) | length) > 0
                     then (($t.subtasks // [])
                       | map(select(type == "object"))
                       | map("- " + ((.title // ("Subtask " + ((.id // 0)|tostring))) | tostring) + ": " + ((.description // .details // "No description provided.") | tostring))
                       | join("\n"))
-                    else "_No subtasks generated._"
+                    else "No subtasks generated."
                   end)
-                + "\n\n## Deliverables\n"
-                + "- Update the relevant code, configuration, and tests.\n"
-                + "- Keep artifacts aligned with the acceptance criteria.\n"
-                + "- Document blockers or assumptions in your final summary."
+                + "\n</subtasks>"
               ),
-              prompt_xml: "<acceptance><checklist><item>Implement required behavior.</item><item>Run tests and lint.</item></checklist></acceptance>",
+              prompt_xml: (
+                "<task id=\"" + (($t.id // 0)|tostring) + "\">\n"
+                + "  <agent name=\"" + (($t.agent // "unassigned") | tostring) + "\" stack=\"" + (($t.stack // "general") | tostring) + "\" />\n"
+                + "  <title>" + (($t.title // "Untitled") | tostring) + "</title>\n"
+                + "  <description>" + (($t.description // "No description") | tostring) + "</description>\n"
+                + "  <implementation>\n    <details>" + (($t.details // $t.description // "") | tostring) + "</details>\n  </implementation>\n"
+                + "  <acceptance_criteria>" + (($t.test_strategy // "Verify task outcomes.") | tostring) + "</acceptance_criteria>\n"
+                + "</task>"
+              ),
               subtasks: [($t.subtasks // [])[]? | select(type == "object") | {
                 subtask_id: .id,
                 prompt_md: (
-                  "Implement subtask " + ((.id // 0)|tostring) + ": " + ((.title // "Untitled subtask") | tostring)
-                  + "\n\n## Objective\n" + ((.description // "No description provided.") | tostring)
-                  + "\n\n## Steps\n" + ((.details // .description // "No implementation details provided.") | tostring)
-                  + "\n\n## Validation\n" + ((.test_strategy // "Verify the subtask outcomes.") | tostring)
+                  "<identity>\nYou are " + (($t.agent // "Unassigned") | tostring)
+                  + " working on subtask " + ((.id // 0)|tostring) + " of task " + (($t.id // 0)|tostring) + ".\n</identity>\n\n"
+                  + "<context>\n<scope>\n" + ((.description // "No description provided.") | tostring)
+                  + "\n</scope>\n</context>\n\n"
+                  + "<implementation_plan>\n" + ((.details // .description // "No implementation details provided.") | tostring)
+                  + "\n</implementation_plan>\n\n"
+                  + "<validation>\n" + ((.test_strategy // "Verify the subtask outcomes.") | tostring)
+                  + "\n</validation>"
                 )
               }]
             } ]'
@@ -1076,45 +1097,66 @@ steps:
               $p
               and (($p.prompt_md // "") | length > 0)
             ) then
-              ($p + { prompt_xml: ($p.prompt_xml // "<acceptance><checklist><item>Implement and verify task outcomes.</item></checklist></acceptance>") })
+              ($p + { prompt_xml: ($p.prompt_xml // (
+                "<task id=\"" + (($t.id // 0)|tostring) + "\">\n"
+                + "  <agent name=\"" + (($t.agent // "unassigned") | tostring) + "\" stack=\"" + (($t.stack // "general") | tostring) + "\" />\n"
+                + "  <title>" + (($t.title // "Untitled") | tostring) + "</title>\n"
+                + "  <description>" + (($t.description // "No description") | tostring) + "</description>\n"
+                + "  <implementation>\n    <details>" + (($t.details // $t.description // "") | tostring) + "</details>\n  </implementation>\n"
+                + "  <acceptance_criteria>" + (($t.test_strategy // "Verify task outcomes.") | tostring) + "</acceptance_criteria>\n"
+                + "</task>"
+              )) })
             else {
               task_id: $t.id,
               task_title: (($t.title // "Untitled") | tostring),
               prompt_md: (
-                "Implement task " + (($t.id // 0)|tostring) + ": " + (($t.title // "Untitled task") | tostring)
-                + "\n\n## Goal\n" + (($t.description // "No description provided.") | tostring)
-                + "\n\n## Task Context\n"
-                + "- Agent owner: " + (($t.agent // "Unassigned") | tostring)
-                + "\n- Stack: " + (($t.stack // "Unspecified") | tostring)
-                + "\n- Priority: " + (($t.priority // "unspecified") | tostring)
-                + "\n- Dependencies: "
+                "<identity>\nYou are " + (($t.agent // "Unassigned") | tostring)
+                + ", the " + (($t.stack // "general") | tostring) + " implementation agent. You own task "
+                + (($t.id // 0)|tostring) + " end-to-end.\n</identity>\n\n"
+                + "<context>\n<task_overview>\nTask " + (($t.id // 0)|tostring) + ": "
+                + (($t.title // "Untitled task") | tostring)
+                + "\n" + (($t.description // "No description provided.") | tostring)
+                + "\nPriority: " + (($t.priority // "unspecified") | tostring)
+                + "\nDependencies: "
                 + (if (($t.dependencies // []) | length) > 0
                     then (($t.dependencies // []) | map(tostring) | join(", "))
                     else "None"
                   end)
-                + "\n\n## Implementation Plan\n" + (($t.details // $t.description // "No implementation details provided.") | tostring)
-                + "\n\n## Acceptance Criteria\n" + (($t.test_strategy // "Run tests and confirm task outcomes.") | tostring)
-                + "\n\n## Subtasks\n"
+                + "\n</task_overview>\n</context>\n\n"
+                + "<implementation_plan>\n" + (($t.details // $t.description // "No implementation details provided.") | tostring)
+                + "\n</implementation_plan>\n\n"
+                + "<acceptance_criteria>\n" + (($t.test_strategy // "Run tests and confirm task outcomes.") | tostring)
+                + "\n</acceptance_criteria>\n\n"
+                + "<subtasks>\n"
                 + (if (($t.subtasks // []) | length) > 0
                     then (($t.subtasks // [])
                       | map(select(type == "object"))
                       | map("- " + ((.title // ("Subtask " + ((.id // 0)|tostring))) | tostring) + ": " + ((.description // .details // "No description provided.") | tostring))
                       | join("\n"))
-                    else "_No subtasks generated._"
+                    else "No subtasks generated."
                   end)
-                + "\n\n## Deliverables\n"
-                + "- Update the relevant code, configuration, and tests.\n"
-                + "- Keep artifacts aligned with the acceptance criteria.\n"
-                + "- Document blockers or assumptions in your final summary."
+                + "\n</subtasks>"
               ),
-              prompt_xml: "<acceptance><checklist><item>Implement required behavior.</item><item>Run tests and lint.</item></checklist></acceptance>",
+              prompt_xml: (
+                "<task id=\"" + (($t.id // 0)|tostring) + "\">\n"
+                + "  <agent name=\"" + (($t.agent // "unassigned") | tostring) + "\" stack=\"" + (($t.stack // "general") | tostring) + "\" />\n"
+                + "  <title>" + (($t.title // "Untitled") | tostring) + "</title>\n"
+                + "  <description>" + (($t.description // "No description") | tostring) + "</description>\n"
+                + "  <implementation>\n    <details>" + (($t.details // $t.description // "") | tostring) + "</details>\n  </implementation>\n"
+                + "  <acceptance_criteria>" + (($t.test_strategy // "Verify task outcomes.") | tostring) + "</acceptance_criteria>\n"
+                + "</task>"
+              ),
               subtasks: [($t.subtasks // [])[]? | select(type == "object") | {
                 subtask_id: .id,
                 prompt_md: (
-                  "Implement subtask " + ((.id // 0)|tostring) + ": " + ((.title // "Untitled subtask") | tostring)
-                  + "\n\n## Objective\n" + ((.description // "No description provided.") | tostring)
-                  + "\n\n## Steps\n" + ((.details // .description // "No implementation details provided.") | tostring)
-                  + "\n\n## Validation\n" + ((.test_strategy // "Verify the subtask outcomes.") | tostring)
+                  "<identity>\nYou are " + (($t.agent // "Unassigned") | tostring)
+                  + " working on subtask " + ((.id // 0)|tostring) + " of task " + (($t.id // 0)|tostring) + ".\n</identity>\n\n"
+                  + "<context>\n<scope>\n" + ((.description // "No description provided.") | tostring)
+                  + "\n</scope>\n</context>\n\n"
+                  + "<implementation_plan>\n" + ((.details // .description // "No implementation details provided.") | tostring)
+                  + "\n</implementation_plan>\n\n"
+                  + "<validation>\n" + ((.test_strategy // "Verify the subtask outcomes.") | tostring)
+                  + "\n</validation>"
                 )
               }]
             } end
