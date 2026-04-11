@@ -252,7 +252,48 @@ pub fn ensure_skills(
     Ok(result)
 }
 
-/// Download an agent-project tarball, verify its hash, and extract to the cache.
+/// Persona file names that are read from the `_persona/` subdirectory of
+/// the agent's cached tarball.
+const PERSONA_FILES: &[&str] = &[
+    "AGENTS.md",
+    "SOUL.md",
+    "USER.md",
+    "IDENTITY.md",
+    "TOOLS.md",
+    "HEARTBEAT.md",
+    "BOOT.md",
+];
+
+/// Read persona/personality files from the agent's cached tarball directory.
+///
+/// Must be called **after** [`ensure_skills`] so the tarball is already extracted.
+/// Returns a map of `filename -> content` for each persona file found
+/// (e.g. `"AGENTS.md" -> "# Rex — Operating Instructions\n..."`).
+///
+/// Missing files are silently skipped — not every agent has every persona file.
+pub fn get_persona_files(agent_name: &str) -> HashMap<String, String> {
+    let persona_dir = cache_root().join(agent_name).join("_persona");
+    let mut result = HashMap::new();
+
+    if !persona_dir.exists() {
+        debug!("No _persona/ directory for agent '{agent_name}'");
+        return result;
+    }
+
+    for filename in PERSONA_FILES {
+        let path = persona_dir.join(filename);
+        if let Ok(content) = fs::read_to_string(&path) {
+            debug!("Loaded persona file '{filename}' for agent '{agent_name}'");
+            result.insert((*filename).to_string(), content);
+        }
+    }
+
+    info!(
+        "Loaded {} persona files for agent '{agent_name}'",
+        result.len()
+    );
+    result
+}
 ///
 /// `tarball_stem` is the release asset stem (e.g. `rex-default`, `rex-test-sandbox`).
 /// `agent_name` is the agent directory inside the tarball (e.g. `rex`).

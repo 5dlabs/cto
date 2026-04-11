@@ -206,6 +206,37 @@ impl CodeTemplateGenerator {
             }
         }
 
+        // Inject persona files from the remote skills cache.
+        // Persona AGENTS.md is prepended to the generated AGENTS.md.
+        // Other persona files (SOUL.md, USER.md, etc.) are added as new entries.
+        if code_run.spec.skills_url.is_some() {
+            let agent_name = Self::get_agent_name(code_run);
+            let persona = super::skills_cache::get_persona_files(&agent_name);
+
+            if !persona.is_empty() {
+                debug!(
+                    "Injecting {} persona files for agent '{}'",
+                    persona.len(),
+                    agent_name
+                );
+
+                for (filename, content) in &persona {
+                    if filename == "AGENTS.md" {
+                        // Prepend persona AGENTS.md to the generated one
+                        if let Some(existing) = templates.get("AGENTS.md") {
+                            let merged = format!("{content}\n\n---\n\n{existing}");
+                            templates.insert("AGENTS.md".to_string(), merged);
+                        } else {
+                            templates.insert("AGENTS.md".to_string(), content.clone());
+                        }
+                    } else {
+                        // Add other persona files directly
+                        templates.insert(filename.clone(), content.clone());
+                    }
+                }
+            }
+        }
+
         Ok(templates)
     }
 

@@ -142,4 +142,17 @@ if [ -f /task-files/AGENTS.md ]; then
     fi
 fi
 
+# Persona files from remote skills cache (SOUL.md, USER.md, IDENTITY.md, etc.)
+# Only copy if present in the ConfigMap and not already in the repo
+for persona_file in SOUL.md USER.md IDENTITY.md TOOLS.md HEARTBEAT.md BOOT.md; do
+    if [ -f "/task-files/$persona_file" ]; then
+        if [ ! -f "$CLI_WORK_DIR/$persona_file" ]; then
+            cp "/task-files/$persona_file" "$CLI_WORK_DIR/" 2>/dev/null || true
+            echo "  ✓ $persona_file (from ConfigMap)"
+        else
+            echo "  ✓ $persona_file (using repo version)"
+        fi
+    fi
+done
+
 echo ""
