@@ -264,6 +264,8 @@ echo "✓ Wrote $WORK_DIR/.acpxrc.json (ACP config + plugin tools MCP bridge)"
 # =========================================================================
 {{> skills-setup skills_target="$WORK_DIR/.openclaw/skills" skills_label="ACP" }}
 
+{{> cto-tools-setup}}
+
 {{#if list_tools_on_start}}
 # =========================================================================
 # Agent Identity & Capabilities Diagnostics

@@ -200,7 +200,8 @@
           "skill-authoring",
           "ask-questions",
           "brainstorming",
-          "writing-plans"
+          "writing-plans",
+          "cto-tools"
         ],
         "intake": [
           "prd-analysis",
@@ -264,7 +265,8 @@
           "github-mcp",
           "rust-patterns",
           "mcp-development",
-          "rust-error-handling"
+          "rust-error-handling",
+          "cto-tools"
         ],
         "coder": [
           "tool-design",
@@ -331,7 +333,8 @@
           "repomix",
           "firecrawl",
           "code-maturity",
-          "ask-questions"
+          "ask-questions",
+          "cto-tools"
         ],
         "quality": [
           "tool-design",
@@ -442,7 +445,8 @@
           "frontend-excellence",
           "frontend-design",
           "react-best-practices",
-          "web-design-guidelines"
+          "web-design-guidelines",
+          "cto-tools"
         ],
         "coder": [
           "tool-design",
@@ -729,7 +733,8 @@
       "skills": {
         "default": [
           "verification-before-completion",
-          "systematic-debugging"
+          "systematic-debugging",
+          "cto-tools"
         ],
         "coder": [
           "tool-design",
@@ -886,7 +891,8 @@
           "github-mcp",
           "openclaw-cli",
           "openclaw-mcp-debugger",
-          "agent-team-orchestration"
+          "agent-team-orchestration",
+          "cto-tools"
         ],
         "coder": [
           "tool-design",

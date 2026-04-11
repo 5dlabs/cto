@@ -1,0 +1,141 @@
+# =========================================================================
+# CTO Tools SDK Setup
+# Sets up the TypeScript code execution SDK and cto-tools CLI
+# for dynamic MCP tool discovery and invocation.
+# =========================================================================
+
+echo ""
+echo "🛠️  CTO Tools SDK Setup:"
+
+# ── Step 1: Environment variables ────────────────────────────────────────
+
+# Derive agent ID from GitHub app name (strip "5DLabs-" prefix, lowercase)
+CTO_AGENT_ID=$(echo "{{github_app_name}}" | sed 's/^5DLabs-//' | tr '[:upper:]' '[:lower:]')
+export CTO_AGENT_ID
+echo "  ✓ CTO_AGENT_ID=$CTO_AGENT_ID"
+
+# Convert comma-separated remote_tools to space-separated prewarm list
+{{#if remote_tools}}
+CTO_AGENT_PREWARM=$(echo "{{remote_tools}}" | tr ',' ' ')
+export CTO_AGENT_PREWARM
+echo "  ✓ CTO_AGENT_PREWARM=$CTO_AGENT_PREWARM"
+{{else}}
+export CTO_AGENT_PREWARM=""
+{{/if}}
+
+# Ensure TOOLS_SERVER_URL is exported (already set by tools-config / mcp-check)
+export TOOLS_SERVER_URL="${TOOLS_SERVER_URL:-http://cto-tools.cto.svc.cluster.local:3000}"
+
+# ── Step 2: Install cto-tools CLI ────────────────────────────────────────
+
+CTO_CLI_AVAILABLE=false
+if [ -f /task-files/cto-tools ]; then
+    cp /task-files/cto-tools /usr/local/bin/cto-tools 2>/dev/null || {
+        echo "  ⚠️  Cannot copy cto-tools to /usr/local/bin (read-only?)"
+    }
+    chmod +x /usr/local/bin/cto-tools 2>/dev/null || true
+
+    if command -v cto-tools >/dev/null 2>&1; then
+        CTO_CLI_VERSION=$(cto-tools version 2>/dev/null || echo "unknown")
+        CTO_CLI_AVAILABLE=true
+        echo "  ✓ cto-tools CLI installed (${CTO_CLI_VERSION})"
+    else
+        echo "  ⚠️  cto-tools installed but not on PATH"
+    fi
+else
+    echo "  ⚠️  /task-files/cto-tools not found — CLI not available"
+fi
+
+# ── Step 3: Set up SDK directory ─────────────────────────────────────────
+
+SDK_DIR="/.cto-tools"
+mkdir -p "$SDK_DIR" 2>/dev/null || {
+    echo "  ⚠️  Cannot create $SDK_DIR, falling back to \${HOME}/.cto-tools"
+    SDK_DIR="${HOME:-/root}/.cto-tools"
+    mkdir -p "$SDK_DIR" 2>/dev/null || true
+}
+export CTO_TOOLS_SDK_DIR="$SDK_DIR"
+
+SDK_FILES_COPIED=0
+for sdk_file in mcp.ts codegen.ts deno.json; do
+    if [ -f "/task-files/${sdk_file}" ]; then
+        cp "/task-files/${sdk_file}" "${SDK_DIR}/${sdk_file}" 2>/dev/null && {
+            SDK_FILES_COPIED=$((SDK_FILES_COPIED + 1))
+        } || echo "  ⚠️  Failed to copy ${sdk_file}"
+    else
+        echo "  ⚠️  /task-files/${sdk_file} not found"
+    fi
+done
+echo "  ✓ SDK files copied: ${SDK_FILES_COPIED}/3 → ${SDK_DIR}/"
+
+# ── Step 4: Run codegen (if Deno is available) ──────────────────────────
+
+CTO_CODEGEN_OK=false
+CTO_DENO_AVAILABLE=false
+CODEGEN_SERVERS=0
+CODEGEN_TOOLS=0
+
+if command -v deno >/dev/null 2>&1; then
+    CTO_DENO_AVAILABLE=true
+    DENO_VERSION=$(deno --version 2>/dev/null | head -1 || echo "unknown")
+    echo "  ✓ Deno detected: ${DENO_VERSION}"
+
+    if [ -f "${SDK_DIR}/codegen.ts" ]; then
+        echo "  → Running codegen (timeout 60s)..."
+
+        CODEGEN_OUTPUT=$(CTO_TOOLS_OUTPUT="$SDK_DIR" \
+            TOOLS_SERVER_URL="${TOOLS_SERVER_URL}" \
+            CTO_AGENT_ID="${CTO_AGENT_ID}" \
+            timeout 60 deno run \
+                --allow-net \
+                --allow-write \
+                --allow-read \
+                --allow-env \
+                "${SDK_DIR}/codegen.ts" 2>&1) && CTO_CODEGEN_OK=true
+
+        if [ "$CTO_CODEGEN_OK" = "true" ]; then
+            # Parse codegen summary from output (expects lines like "servers: N" / "tools: N")
+            CODEGEN_SERVERS=$(echo "$CODEGEN_OUTPUT" | grep -i 'servers\?[[:space:]]*[:=]' | grep -o '[0-9]\+' | tail -1)
+            CODEGEN_TOOLS=$(echo "$CODEGEN_OUTPUT" | grep -i 'tools\?[[:space:]]*[:=]' | grep -o '[0-9]\+' | tail -1)
+            CODEGEN_SERVERS="${CODEGEN_SERVERS:-0}"
+            CODEGEN_TOOLS="${CODEGEN_TOOLS:-0}"
+            echo "  ✓ Codegen complete: ${CODEGEN_SERVERS} server(s), ${CODEGEN_TOOLS} tool(s)"
+        else
+            echo "  ⚠️  Codegen failed (non-fatal) — CLI still works without generated files"
+            # Log last few lines for debugging (don't spam the whole output)
+            echo "$CODEGEN_OUTPUT" | tail -5 | while IFS= read -r line; do
+                echo "     │ $line"
+            done
+        fi
+    else
+        echo "  ⚠️  ${SDK_DIR}/codegen.ts missing — skipping codegen"
+    fi
+else
+    echo "  ⚠️  Deno not installed — SDK code execution won't be available"
+    echo "     CLI tool invocation still works via cto-tools"
+fi
+
+# ── Step 5: Summary ─────────────────────────────────────────────────────
+
+echo ""
+echo "🛠️  CTO Tools SDK Summary:"
+echo "  Agent ID:        ${CTO_AGENT_ID}"
+if [ "$CTO_CLI_AVAILABLE" = "true" ]; then
+    echo "  ✓ CLI:           available (cto-tools)"
+else
+    echo "  ❌ CLI:           not available"
+fi
+if [ "$CTO_DENO_AVAILABLE" = "true" ]; then
+    echo "  ✓ Code execution: available (Deno)"
+else
+    echo "  ❌ Code execution: not available (Deno missing)"
+fi
+if [ "$CTO_CODEGEN_OK" = "true" ]; then
+    echo "  ✓ Codegen:       ${CODEGEN_SERVERS} server(s), ${CODEGEN_TOOLS} tool(s)"
+else
+    echo "  ⚠️  Codegen:       skipped or failed"
+fi
+{{#if remote_tools}}
+echo "  Prewarm:         ${CTO_AGENT_PREWARM}"
+{{/if}}
+echo ""

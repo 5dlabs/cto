@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true
+  },
+  "tasks": {
+    "codegen": "deno run --allow-net --allow-write --allow-read --allow-env codegen.ts",
+    "test": "deno test --allow-net --allow-write --allow-read --allow-env"
+  }
+}

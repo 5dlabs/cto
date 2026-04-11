@@ -13,5 +13,8 @@ RUN npm uninstall -g @zed-industries/claude-agent-acp 2>/dev/null; \
     which codex-acp && \
     which claude-agent-acp
 
+# Install Deno (used by cto-tools SDK)
+RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh
+
 USER node
 WORKDIR /workspace
