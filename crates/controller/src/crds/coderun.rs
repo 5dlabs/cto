@@ -53,17 +53,7 @@ fn default_true() -> bool {
     true
 }
 
-/// Provider entry inside an [`ACPEntry`].
-#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
-pub struct ACPProvider {
-    /// Provider name (e.g. "Anthropic", "OpenAI")
-    pub name: String,
-    /// Available credits budget for this provider
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub credits: Option<u64>,
-}
-
-/// Model entry inside an [`ACPEntry`].
+/// Model entry inside an [`ACPProviderEntry`].
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct ACPModel {
     /// Model identifier (e.g. "claude-opus-4-20250514")
@@ -80,25 +70,35 @@ pub struct ACPModel {
     pub score: Option<u32>,
 }
 
-/// AI-CLI-Provider entry — one candidate runtime environment.
+/// Provider entry inside an [`ACPEntry`] — carries credits, URL, key, and models.
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+pub struct ACPProviderEntry {
+    /// Provider name (e.g. "Anthropic", "Fireworks", "OpenAI")
+    pub name: String,
+    /// Available credits budget for this provider (dynamic, sent every call)
+    #[serde(default)]
+    pub credits: u64,
+    /// Optional API base URL override
+    #[serde(default, rename = "baseUrl", skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    /// Secret key name in cto-secrets for this provider's API key.
+    /// Overrides hardcoded defaults so new providers work without Rust changes.
+    #[serde(default, rename = "apiKeyEnvVar", skip_serializing_if = "Option::is_none")]
+    pub api_key_env_var: Option<String>,
+    /// Models available from this provider
+    pub models: Vec<ACPModel>,
+}
+
+/// AI-CLI-Provider entry — one CLI with its available providers and models.
 ///
 /// The OpenClaw harness agent picks from the ACP array based on
 /// task difficulty, credits, and model scores.
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct ACPEntry {
-    /// CLI name (e.g. "Claude Code", "Codex")
+    /// CLI name (e.g. "Claude Code", "Codex", "Copilot")
     pub cli: String,
-    /// Provider metadata
-    pub provider: ACPProvider,
-    /// Available models for this CLI/provider combination
-    pub models: Vec<ACPModel>,
-    /// Optional API base URL override
-    #[serde(default, rename = "baseUrl", skip_serializing_if = "Option::is_none")]
-    pub base_url: Option<String>,
-    /// Environment variable name for the API key (e.g. "ANTHROPIC_API_KEY").
-    /// The controller ensures this env var is set in the pod — this is NOT a raw secret.
-    #[serde(default, rename = "apiKey", skip_serializing_if = "Option::is_none")]
-    pub api_key: Option<String>,
+    /// Providers available for this CLI, each with their own credits and models
+    pub providers: Vec<ACPProviderEntry>,
 }
 
 /// Provider entry inside [`OpenClawConfig`].
@@ -839,33 +839,34 @@ mod tests {
     fn test_acp_entry_serde_roundtrip() {
         let entry = ACPEntry {
             cli: "Claude Code".to_string(),
-            provider: ACPProvider {
+            providers: vec![ACPProviderEntry {
                 name: "Anthropic".to_string(),
-                credits: Some(250_000),
-            },
-            models: vec![
-                ACPModel {
-                    name: "claude-opus-4-20250514".to_string(),
-                    thinking_level: Some("high".to_string()),
-                    score: Some(96),
-                },
-                ACPModel {
-                    name: "claude-sonnet-4-20250514".to_string(),
-                    thinking_level: Some("medium".to_string()),
-                    score: Some(91),
-                },
-            ],
-            base_url: Some("https://api.anthropic.com".to_string()),
-            api_key: Some("ANTHROPIC_API_KEY".to_string()),
+                credits: 250_000,
+                base_url: Some("https://api.anthropic.com".to_string()),
+                api_key_env_var: Some("ANTHROPIC_API_KEY".to_string()),
+                models: vec![
+                    ACPModel {
+                        name: "claude-opus-4-20250514".to_string(),
+                        thinking_level: Some("high".to_string()),
+                        score: Some(96),
+                    },
+                    ACPModel {
+                        name: "claude-sonnet-4-20250514".to_string(),
+                        thinking_level: Some("medium".to_string()),
+                        score: Some(91),
+                    },
+                ],
+            }],
         };
 
         let json = serde_json::to_string(&entry).unwrap();
         let deserialized: ACPEntry = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.cli, "Claude Code");
-        assert_eq!(deserialized.provider.name, "Anthropic");
-        assert_eq!(deserialized.provider.credits, Some(250_000));
-        assert_eq!(deserialized.models.len(), 2);
-        assert_eq!(deserialized.models[0].score, Some(96));
+        assert_eq!(deserialized.providers.len(), 1);
+        assert_eq!(deserialized.providers[0].name, "Anthropic");
+        assert_eq!(deserialized.providers[0].credits, 250_000);
+        assert_eq!(deserialized.providers[0].models.len(), 2);
+        assert_eq!(deserialized.providers[0].models[0].score, Some(96));
     }
 
     #[test]
@@ -929,10 +930,13 @@ mod tests {
             "deployment": true,
             "acp": [{
                 "cli": "Claude Code",
-                "provider": { "name": "Anthropic", "credits": 250000 },
-                "models": [{ "name": "opus", "thinkingLevel": "high", "score": 96 }],
-                "baseUrl": "https://api.anthropic.com",
-                "apiKey": "ANTHROPIC_API_KEY"
+                "providers": [{
+                    "name": "Anthropic",
+                    "credits": 250000,
+                    "baseUrl": "https://api.anthropic.com",
+                    "apiKeyEnvVar": "ANTHROPIC_API_KEY",
+                    "models": [{ "name": "opus", "thinkingLevel": "high", "score": 96 }]
+                }]
             }],
             "openclaw": {
                 "provider": { "name": "Fireworks" },
@@ -951,7 +955,8 @@ mod tests {
         let acp = spec.acp.unwrap();
         assert_eq!(acp.len(), 1);
         assert_eq!(acp[0].cli, "Claude Code");
-        assert_eq!(acp[0].provider.credits, Some(250_000));
+        assert_eq!(acp[0].providers[0].credits, 250_000);
+        assert_eq!(acp[0].providers[0].models.len(), 1);
         assert!(spec.openclaw.is_some());
         assert_eq!(spec.openclaw.unwrap().provider.name, "Fireworks");
     }
