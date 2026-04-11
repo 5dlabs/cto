@@ -95,10 +95,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
     let span = tracing::Span::current();
     if let Some(app) = &code_run.spec.github_app {
         let agent = app.to_lowercase().replace("5dlabs-", "");
-        span.record("agent", agent.as_str());
+        span.record("agent", &agent.as_str());
     }
     if let Some(cli) = &code_run.spec.cli_config {
-        span.record("cli_type", tracing::field::display(&cli.cli_type));
+        span.record("cli_type", &tracing::field::display(&cli.cli_type));
     }
     span.record("model", code_run.spec.model.as_str());
 
