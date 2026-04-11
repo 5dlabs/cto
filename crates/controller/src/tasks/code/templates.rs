@@ -3292,7 +3292,7 @@ Be constructive and explain the "why" behind your suggestions.
         // 4) Fall back to built-in defaults based on agent + run_type
         // This ensures agents get their required tools even without explicit Helm config
         let run_type = code_run.spec.run_type.as_str();
-        let default_tools = Self::get_default_agent_tools(github_app, run_type);
+        let default_tools = Self::get_default_agent_tools(&github_app, run_type);
 
         if !default_tools.is_empty() {
             debug!(
@@ -4120,28 +4120,44 @@ Be constructive and explain the "why" behind your suggestions.
     /// Returns the github_app if set and non-empty, otherwise returns "agent".
     /// Used for template context where github_app should never be empty.
     #[allow(dead_code)]
-    fn get_github_app_or_default(code_run: &CodeRun) -> &str {
-        code_run
-            .spec
-            .github_app
-            .as_deref()
-            .filter(|s| !s.is_empty())
-            .unwrap_or("agent")
+    fn get_github_app_or_default(code_run: &CodeRun) -> String {
+        // 1. Explicit githubApp field (backward compat)
+        if let Some(ref app) = code_run.spec.github_app {
+            if !app.is_empty() {
+                return app.clone();
+            }
+        }
+        // 2. Derive from implementationAgent (e.g. "rex" → "5DLabs-Rex")
+        if let Some(ref agent) = code_run.spec.implementation_agent {
+            if !agent.is_empty() {
+                let mut chars = agent.chars();
+                let capitalized: String = match chars.next() {
+                    Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+                    None => agent.clone(),
+                };
+                return format!("5DLabs-{capitalized}");
+            }
+        }
+        "agent".to_string()
     }
 
-    /// Get the lowercase agent name from the github_app field.
-    /// Returns lowercase agent name (e.g., "5DLabs-Rex" -> "rex", "5DLabs-Tap" -> "tap")
-    /// Templates use lowercase names for agent-specific conditionals.
-    /// Returns "agent" as default if github_app is None or empty.
+    /// Get the lowercase agent name from `implementation_agent` or `github_app`.
+    /// Returns lowercase agent name (e.g., "rex", "blaze", "tap").
+    /// Prefers `implementation_agent` directly; falls back to extracting from
+    /// `github_app` ("5DLabs-Rex" → "rex"). Returns "agent" as default.
     #[allow(dead_code)]
     fn get_agent_name(code_run: &CodeRun) -> String {
+        // Prefer implementationAgent directly (already lowercase)
+        if let Some(ref agent) = code_run.spec.implementation_agent {
+            if !agent.is_empty() {
+                return agent.to_lowercase();
+            }
+        }
+        // Fall back to github_app extraction
         let github_app = Self::get_github_app_or_default(code_run);
-
-        // Extract agent name from 5DLabs-AgentName pattern or use as-is
-        // Return lowercase for consistent template matching
         github_app
             .strip_prefix("5DLabs-")
-            .unwrap_or(github_app)
+            .unwrap_or(&github_app)
             .to_lowercase()
     }
 
@@ -4508,13 +4524,9 @@ Be constructive and explain the "why" behind your suggestions.
         if template_setting.contains("heal") || service.contains("heal") {
             return "healer";
         }
-        if template_setting.contains("watch") || service.contains("watch") {
-            return "healer"; // Watch workflows use healer role
-        }
 
         match run_type {
             "documentation" | "intake" => "intake",
-            "play" => "play",
             "quality" => "quality",
             "test" => "test",
             "deploy" => "deploy",
@@ -4525,40 +4537,19 @@ Be constructive and explain the "why" behind your suggestions.
         }
     }
 
-    /// Get the system prompt template path for an agent based on github_app and job type.
+    /// Get the system prompt template path for an agent based on agent name and job type.
     /// Returns path in format: agents/{agent}/{job}.md.hbs
     fn get_agent_system_prompt_template(code_run: &CodeRun) -> String {
-        let github_app = Self::get_github_app_or_default(code_run);
+        let agent_name = Self::get_agent_name(code_run);
         let job_type = Self::determine_job_type(code_run);
         let run_type = code_run.spec.run_type.as_str();
 
-        // Intake/documentation/play runs always use morgan templates regardless of github_app
-        // This handles cases like github_app = "cto-dev" for development workflows
-        if run_type == "intake" || run_type == "documentation" || run_type == "play" {
+        // Intake/documentation runs always use morgan templates
+        if run_type == "intake" || run_type == "documentation" {
             return format!("agents/morgan/{job_type}.md.hbs");
         }
 
-        // Map GitHub app to agent name
-        // Explicit patterns document known agents even if some share defaults
-        let agent = match github_app {
-            "5DLabs-Morgan" => "morgan",
-            "5DLabs-Blaze" => "blaze",
-            "5DLabs-Cipher" => "cipher",
-            "5DLabs-Cleo" => "cleo",
-            "5DLabs-Tess" => "tess",
-            "5DLabs-Atlas" => "atlas",
-            "5DLabs-Bolt" => "bolt",
-            "5DLabs-Grizz" => "grizz",
-            "5DLabs-Nova" => "nova",
-            "5DLabs-Tap" => "tap",
-            "5DLabs-Spark" => "spark",
-            "5DLabs-Stitch" => "stitch",
-            "5DLabs-Angie" => "angie",
-            "5DLabs-Vex" => "vex",
-            "5DLabs-Pixel" => "pixel",
-            // Rex variants and unknown agents default to rex
-            _ => "rex",
-        };
+        let agent = agent_name.as_str();
 
         // Agent-specific job type defaults
         // Some agents only support specific job types
