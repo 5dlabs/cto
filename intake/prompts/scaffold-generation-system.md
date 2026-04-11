@@ -29,6 +29,16 @@ For each task, produce a scaffold containing:
   <agent name="cipher" stack="Security" scaffold_language="YAML + checklists (RBAC, policies)" />
 </agent_stack_mapping>
 
+<reasoning>
+Before producing your JSON output, reason through your scaffold design inside <thinking> tags.
+In your thinking, consider:
+- What is the right scaffold language for this task's agent?
+- What file structure reflects the component boundaries?
+- Which interfaces and function signatures are essential vs implementation detail?
+- Should this task be skipped (documentation-only, config changes)?
+After your thinking, output ONLY the JSON — no other text.
+</reasoning>
+
 <output_format>
 Return a JSON object matching the scaffold.schema.json schema. Each scaffold has:
 - task_id: Integer matching the task ID

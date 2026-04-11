@@ -63,7 +63,12 @@ When hasFrontend is false:
 </agent_mapping>
 
 <instructions>
-Generate {{num_tasks}} tasks starting from ID {{next_id}}, each representing a single deployable unit of work for one agent.
+<parameters>
+  <num_tasks>{{num_tasks}}</num_tasks>
+  <starting_id>{{next_id}}</starting_id>
+</parameters>
+
+Generate the specified number of tasks, each representing a single deployable unit of work for one agent.
 
 <process>
 1. Read the entire PRD — identify all services, components, and cross-cutting concerns
@@ -120,6 +125,16 @@ test_strategy: "Tests pass" — does not specify which tests or what behavior th
 </example>
 </examples>
 </acceptance_criteria_guidance>
+
+<reasoning>
+Before producing your JSON output, reason through your analysis inside <thinking> tags.
+In your thinking, consider:
+- What are the major system boundaries and service decomposition points?
+- Which agent owns each component based on the agent mapping?
+- What dependencies exist between tasks?
+- Are the acceptance criteria specific and measurable for each task?
+After your thinking, output ONLY the JSON array — no other text.
+</reasoning>
 
 <output_format>
 Each task object must follow this schema:

@@ -17,12 +17,20 @@
 {{/complexity_reasoning}}
 </task_context>
 
-Break down this task into {{#subtask_count}}exactly {{subtask_count}}{{/subtask_count}}{{^subtask_count}}an appropriate number of{{/subtask_count}} specific subtasks{{#enable_subagents}} optimized for parallel subagent execution{{/enable_subagents}}.
+<parameters>
+{{#subtask_count}}  <subtask_count>{{subtask_count}}</subtask_count>{{/subtask_count}}
+  <starting_id>{{next_id}}</starting_id>
+{{#next_id_plus_1}}  <next_id_example>{{next_id_plus_1}}</next_id_example>{{/next_id_plus_1}}
+</parameters>
 
-Use sequential IDs starting from {{next_id}}. The first subtask must have id={{next_id}}, the second must have id={{next_id_plus_1}}, and so on. Do not use parent task ID in subtask numbering.
+Break down this task into {{#subtask_count}}exactly the specified number of{{/subtask_count}}{{^subtask_count}}an appropriate number of{{/subtask_count}} specific subtasks{{#enable_subagents}} optimized for parallel subagent execution{{/enable_subagents}}.
+
+Use sequential IDs starting from the starting_id parameter. Do not use parent task ID in subtask numbering.
 
 {{#enable_subagents}}
 Include subagentType and parallelizable on every subtask. Maximize parallel execution. Include at least one reviewer subtask after implementation.
 {{/enable_subagents}}
 
-Output: Continue the JSON array by outputting subtask objects directly. Start with the first subtask's opening brace { — do not output {"subtasks":[ again as that is already provided. End with ]} to close the array and object.
+<output_format>
+Continue the JSON array by outputting subtask objects directly. Start with the first subtask's opening brace { — do not output {"subtasks":[ again as that is already provided. End with ]} to close the array and object.
+</output_format>

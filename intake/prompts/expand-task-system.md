@@ -109,6 +109,16 @@ Bolt infrastructure expansion:
 - Populate decision_points when there are genuine ambiguities (AI model selection, auth strategy, external API choices, data model trade-offs)
 </constraints>
 
+<reasoning>
+Before producing your JSON output, reason through your decomposition inside <thinking> tags.
+In your thinking, consider:
+- What are the natural implementation boundaries for this task?
+- Which subtasks can run in parallel vs which have ordering dependencies?
+- Are there genuine decision points (not just implementation choices)?
+- Does each subtask represent a single, testable concern?
+After your thinking, output ONLY the JSON array — no other text.
+</reasoning>
+
 <output_format>
 Return a JSON array of the parent tasks with subtasks arrays populated. No markdown fences, no explanations — only the JSON array.
 </output_format>
