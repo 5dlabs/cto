@@ -320,6 +320,16 @@ pub struct CLIConfig {
     )]
     pub provider_base_url: Option<String>,
 
+    /// Name of the secret key in `cto-secrets` for this provider's API key.
+    /// Overrides the provider's hardcoded default (e.g. `FIREWORKS_API_KEY`).
+    /// Use this to add ad-hoc providers without changing Rust code.
+    #[serde(
+        default,
+        rename = "apiKeyEnvVar",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub api_key_env_var: Option<String>,
+
     /// CLI-specific settings (key-value pairs)
     #[serde(default)]
     pub settings: HashMap<String, serde_json::Value>,
@@ -713,6 +723,7 @@ mod tests {
             model_rotation: None,
             provider: None,
             provider_base_url: None,
+            api_key_env_var: None,
         };
 
         assert_eq!(cli_config.cli_type, CLIType::Codex);

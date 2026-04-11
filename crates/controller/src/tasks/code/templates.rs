@@ -5461,6 +5461,7 @@ mod tests {
             model_rotation: None,
             provider: None,
             provider_base_url: None,
+            api_key_env_var: None,
         });
         let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
         assert_eq!(

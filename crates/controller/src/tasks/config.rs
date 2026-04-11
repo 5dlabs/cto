@@ -537,6 +537,7 @@ impl ControllerConfig {
                         model_rotation: None,
                         provider: None,
                         provider_base_url: None,
+                        api_key_env_var: None,
                     };
 
                     self.agent
@@ -798,6 +799,7 @@ cleanup:
                 model_rotation: None,
                 provider: None,
                 provider_base_url: None,
+                api_key_env_var: None,
             },
         );
 

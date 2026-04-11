@@ -94,6 +94,13 @@ impl EffectiveProviderConfig {
             .as_ref()
             .map_or_else(|| code_run.spec.model.clone(), |cfg| cfg.model.clone());
 
+        // Helper: resolve secret_key from CRD passthrough or provider default
+        let resolve_secret_key = |cli_cfg: Option<&CLIConfig>, provider: &Provider| -> String {
+            cli_cfg
+                .and_then(|c| c.api_key_env_var.clone())
+                .unwrap_or_else(|| provider.secret_key().to_string())
+        };
+
         // 1. Explicit cliConfig.provider
         if let Some(ref cli_cfg) = code_run.spec.cli_config {
             if let Some(provider) = cli_cfg.provider {
@@ -101,6 +108,7 @@ impl EffectiveProviderConfig {
                     .provider_base_url
                     .clone()
                     .or_else(|| provider.default_base_url().map(String::from));
+                let secret_key = resolve_secret_key(Some(cli_cfg), &provider);
                 info!(
                     "Provider resolved ({}): {} for {} (model={})",
                     ProviderSource::Explicit,
@@ -112,7 +120,7 @@ impl EffectiveProviderConfig {
                     provider,
                     source: ProviderSource::Explicit,
                     base_url,
-                    secret_key: provider.secret_key().to_string(),
+                    secret_key,
                     raw_model,
                     cli_type,
                 };
@@ -138,6 +146,7 @@ impl EffectiveProviderConfig {
                         .provider_base_url
                         .clone()
                         .or_else(|| provider.default_base_url().map(String::from));
+                    let secret_key = resolve_secret_key(Some(cli_cfg), &provider);
                     info!(
                         "Provider resolved ({}): {} for {} (model={})",
                         ProviderSource::LegacySetting,
@@ -149,7 +158,7 @@ impl EffectiveProviderConfig {
                         provider,
                         source: ProviderSource::LegacySetting,
                         base_url,
-                        secret_key: provider.secret_key().to_string(),
+                        secret_key,
                         raw_model,
                         cli_type,
                     };
@@ -159,14 +168,13 @@ impl EffectiveProviderConfig {
 
         // 3. Operator-level cliProviders config
         let cli_key = cli_type.to_string().to_lowercase();
+        let cli_cfg_ref = code_run.spec.cli_config.as_ref();
         if let Some(provider_name) = controller_config.agent.cli_providers.get(&cli_key) {
             if let Some(provider) = Provider::from_str_ci(provider_name) {
-                let base_url = code_run
-                    .spec
-                    .cli_config
-                    .as_ref()
+                let base_url = cli_cfg_ref
                     .and_then(|c| c.provider_base_url.clone())
                     .or_else(|| provider.default_base_url().map(String::from));
+                let secret_key = resolve_secret_key(cli_cfg_ref, &provider);
                 info!(
                     "Provider resolved ({}): {} for {} (model={})",
                     ProviderSource::OperatorConfig,
@@ -178,7 +186,7 @@ impl EffectiveProviderConfig {
                     provider,
                     source: ProviderSource::OperatorConfig,
                     base_url,
-                    secret_key: provider.secret_key().to_string(),
+                    secret_key,
                     raw_model,
                     cli_type,
                 };
@@ -187,12 +195,10 @@ impl EffectiveProviderConfig {
 
         // 4. Infer from model ID
         if let Some(provider) = Provider::infer_from_model(&raw_model) {
-            let base_url = code_run
-                .spec
-                .cli_config
-                .as_ref()
+            let base_url = cli_cfg_ref
                 .and_then(|c| c.provider_base_url.clone())
                 .or_else(|| provider.default_base_url().map(String::from));
+            let secret_key = resolve_secret_key(cli_cfg_ref, &provider);
             info!(
                 "Provider resolved ({}): {} for {} (model={})",
                 ProviderSource::ModelInference,
@@ -204,7 +210,7 @@ impl EffectiveProviderConfig {
                 provider,
                 source: ProviderSource::ModelInference,
                 base_url,
-                secret_key: provider.secret_key().to_string(),
+                secret_key,
                 raw_model,
                 cli_type,
             };
@@ -218,8 +224,10 @@ impl EffectiveProviderConfig {
         Self {
             provider: Provider::Fireworks,
             source: ProviderSource::ModelInference,
-            base_url: Provider::Fireworks.default_base_url().map(String::from),
-            secret_key: Provider::Fireworks.secret_key().to_string(),
+            base_url: cli_cfg_ref
+                .and_then(|c| c.provider_base_url.clone())
+                .or_else(|| Provider::Fireworks.default_base_url().map(String::from)),
+            secret_key: resolve_secret_key(cli_cfg_ref, &Provider::Fireworks),
             raw_model,
             cli_type,
         }
@@ -243,15 +251,15 @@ impl EffectiveProviderConfig {
                 }
                 vars.push(json!({
                     "name": "ANTHROPIC_AUTH_TOKEN",
-                    "valueFrom": { "secretKeyRef": { "name": secret_name, "key": "FIREWORKS_API_KEY" } }
+                    "valueFrom": { "secretKeyRef": { "name": secret_name, "key": &self.secret_key } }
                 }));
                 vars.push(json!({
                     "name": "ANTHROPIC_API_KEY",
-                    "valueFrom": { "secretKeyRef": { "name": secret_name, "key": "FIREWORKS_API_KEY" } }
+                    "valueFrom": { "secretKeyRef": { "name": secret_name, "key": &self.secret_key } }
                 }));
                 vars.push(json!({
                     "name": "FIREWORKS_AI_API_KEY",
-                    "valueFrom": { "secretKeyRef": { "name": secret_name, "key": "FIREWORKS_API_KEY" } }
+                    "valueFrom": { "secretKeyRef": { "name": secret_name, "key": &self.secret_key } }
                 }));
 
                 // Model identity env vars for Claude Code / subagents
@@ -310,11 +318,8 @@ impl EffectiveProviderConfig {
 
         if self.cli_type == CLIType::Kimi {
             vars.push(json!({ "name": "KIMI_MODEL_NAME", "value": &self.raw_model }));
-            if self.provider == Provider::Fireworks {
-                vars.push(json!({
-                    "name": "KIMI_BASE_URL",
-                    "value": "https://api.fireworks.ai/inference/v1"
-                }));
+            if let Some(ref url) = self.base_url {
+                vars.push(json!({ "name": "KIMI_BASE_URL", "value": format!("{}/v1", url.trim_end_matches("/v1").trim_end_matches('/')) }));
             }
         }
 
@@ -323,15 +328,13 @@ impl EffectiveProviderConfig {
                 "name": "COPILOT_GITHUB_TOKEN",
                 "valueFrom": { "secretKeyRef": { "name": secret_name, "key": "COPILOT_GITHUB_TOKEN" } }
             }));
-            if self.provider == Provider::Fireworks {
-                vars.push(json!({
-                    "name": "COPILOT_PROVIDER_BASE_URL",
-                    "value": "https://api.fireworks.ai/inference/v1"
-                }));
+            if let Some(ref url) = self.base_url {
+                let v1_url = format!("{}/v1", url.trim_end_matches("/v1").trim_end_matches('/'));
+                vars.push(json!({ "name": "COPILOT_PROVIDER_BASE_URL", "value": &v1_url }));
                 vars.push(json!({ "name": "COPILOT_PROVIDER_TYPE", "value": "openai" }));
                 vars.push(json!({
                     "name": "COPILOT_PROVIDER_API_KEY",
-                    "valueFrom": { "secretKeyRef": { "name": secret_name, "key": "FIREWORKS_API_KEY" } }
+                    "valueFrom": { "secretKeyRef": { "name": secret_name, "key": &self.secret_key } }
                 }));
                 vars.push(json!({ "name": "COPILOT_MODEL", "value": "gpt-4.1" }));
                 vars.push(json!({ "name": "COPILOT_PROVIDER_MODEL_ID", "value": "gpt-4.1" }));
@@ -3169,6 +3172,10 @@ scrape_configs:
                 .clone_from(&defaults.provider_base_url);
         }
 
+        if existing.api_key_env_var.is_none() {
+            existing.api_key_env_var.clone_from(&defaults.api_key_env_var);
+        }
+
         for (key, value) in &defaults.settings {
             existing
                 .settings
@@ -3290,6 +3297,7 @@ mod tests {
             model_rotation: None,
             provider: None,
             provider_base_url: None,
+            api_key_env_var: None,
         }
     }
 
@@ -3334,6 +3342,7 @@ mod tests {
                     model_rotation: None,
                     provider: None,
                     provider_base_url: None,
+            api_key_env_var: None,
                 }),
                 task_id: Some(1),
                 service: "test-service".to_string(),
@@ -3770,6 +3779,7 @@ mod tests {
             model_rotation: None,
             provider: None,
             provider_base_url: None,
+            api_key_env_var: None,
         };
 
         CodeResourceManager::merge_cli_config(&mut existing, &defaults);
@@ -3801,6 +3811,7 @@ mod tests {
             model_rotation: None,
             provider: None,
             provider_base_url: None,
+            api_key_env_var: None,
         };
 
         let mut defaults_settings = HashMap::new();
@@ -3815,6 +3826,7 @@ mod tests {
             model_rotation: None,
             provider: None,
             provider_base_url: None,
+            api_key_env_var: None,
         };
 
         CodeResourceManager::merge_cli_config(&mut existing, &defaults);
@@ -3843,6 +3855,7 @@ mod tests {
             model_rotation: Some(json!(["model1", "model2", "model3"])),
             provider: None,
             provider_base_url: None,
+            api_key_env_var: None,
         };
 
         CodeResourceManager::merge_cli_config(&mut existing, &defaults);
@@ -3862,6 +3875,7 @@ mod tests {
             model_rotation: Some(json!(["existing-model"])),
             provider: None,
             provider_base_url: None,
+            api_key_env_var: None,
         };
 
         CodeResourceManager::merge_cli_config(&mut existing_with_rotation, &defaults);

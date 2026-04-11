@@ -329,6 +329,9 @@ spec:
                   providerBaseUrl:
                     type: string
                     description: "Custom base URL for the provider API"
+                  apiKeyEnvVar:
+                    type: string
+                    description: "Secret key name in cto-secrets for this provider's API key (e.g. FIREWORKS_API_KEY). Overrides hardcoded defaults."
                   settings:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
