@@ -509,6 +509,14 @@ steps:
       if [ -z "$OUTPUT" ]; then
         echo "generate-scaffolds: empty output; building deterministic fallback scaffolds" >&2
         printf '%s' "$EXP" | jq '{scaffolds:[.[] | {task_id:.id}]}' && exit 0; fi
+      # Normalize: ensure output is always {scaffolds:[...]}
+      OUTPUT=$(printf '%s' "$OUTPUT" | jq '
+        if type=="array" then {scaffolds: .}
+        elif type=="object" and has("scaffolds") then .
+        elif type=="object" then {scaffolds: [.]}
+        else {scaffolds: []}
+        end
+      ')
       printf '%s' "$OUTPUT"
 
   - id: verify-generate-scaffolds
