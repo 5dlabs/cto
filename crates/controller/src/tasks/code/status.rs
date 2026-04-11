@@ -5,7 +5,7 @@ use kube::api::{Api, Patch, PatchParams};
 use kube::ResourceExt;
 use serde_json::json;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 pub struct CodeStatusManager;
 
@@ -86,10 +86,14 @@ impl CodeStatusManager {
 
         match code_api.patch_status(&name, &pp, &patch).await {
             Ok(_) => {
-                info!("Updated CodeRun status: {} -> Running", name);
+                info!(
+                    coderun = %name,
+                    phase = "Running",
+                    "Updated CodeRun status"
+                );
             }
             Err(e) => {
-                error!("Failed to update CodeRun status for {}: {}", name, e);
+                error!(coderun = %name, phase = "Running", error = %e, "Failed to update CodeRun status");
             }
         }
 
@@ -219,19 +223,20 @@ impl CodeStatusManager {
         match code_api.patch_status(&name, &pp, &patch).await {
             Ok(updated_code_run) => {
                 info!(
-                    "✅ Successfully updated CodeRun status: {} -> {}",
-                    name, phase
+                    coderun = %name,
+                    phase = %phase,
+                    "✅ Updated CodeRun status"
                 );
-                info!(
-                    "✅ Updated resource version: {:?}",
+                debug!(
+                    "Updated resource version: {:?}",
                     updated_code_run.metadata.resource_version
                 );
                 Ok(())
             }
             Err(e) => {
-                error!("❌ Failed to update CodeRun status for {}: {}", name, e);
+                error!(coderun = %name, phase = %phase, error = %e, "❌ Failed to update CodeRun status");
                 error!("❌ Error type: {}", std::any::type_name_of_val(&e));
-                error!("❌ Full error details: {:?}", e);
+                debug!("Full error details: {:?}", e);
                 Err(e.into())
             }
         }

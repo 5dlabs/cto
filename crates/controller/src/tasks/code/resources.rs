@@ -377,7 +377,26 @@ impl<'a> CodeResourceManager<'a> {
     #[allow(clippy::too_many_lines)] // Complex function not easily split
     pub async fn reconcile_create_or_update(&self, code_run: &Arc<CodeRun>) -> Result<Action> {
         let name = code_run.name_any();
-        info!("🚀 Creating/updating code resources for: {}", name);
+        let cli_type = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .map(|c| c.cli_type.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        let model = &code_run.spec.model;
+        let has_acp = code_run.spec.acp.is_some();
+        let has_openclaw = code_run.spec.openclaw.is_some();
+        let has_skills = code_run.spec.skills_url.is_some();
+
+        info!(
+            coderun = %name,
+            cli = %cli_type,
+            model = %model,
+            acp = has_acp,
+            openclaw = has_openclaw,
+            skills = has_skills,
+            "🚀 Creating/updating code resources"
+        );
 
         // STEP: Auto-populate CLI config based on agent (if not already specified)
         let code_run = self.populate_cli_config_if_needed(code_run);
