@@ -173,7 +173,7 @@ spec:
                   properties:
                     cli:
                       type: string
-                      description: "CLI name (e.g. Claude Code, Codex, Copilot)"
+                      description: "CLI identifier, lowercase, no spaces (e.g. claude, codex, copilot)"
                     providers:
                       type: array
                       description: "Providers available for this CLI, each with credits and models"
@@ -183,7 +183,7 @@ spec:
                         properties:
                           name:
                             type: string
-                            description: "Provider name (e.g. Anthropic, Fireworks, OpenAI)"
+                            description: "Provider slug, lowercase (e.g. anthropic, fireworks, openai)"
                           credits:
                             type: integer
                             format: int64
@@ -193,7 +193,7 @@ spec:
                             description: "Optional API base URL override"
                           apiKeyEnvVar:
                             type: string
-                            description: "Secret key name in cto-secrets for this provider's API key"
+                            description: "Env var name in cto-secrets for this provider's API key"
                           models:
                             type: array
                             items:
@@ -212,34 +212,59 @@ spec:
                                   description: "Performance score 0-100"
               openclaw:
                 type: object
-                description: "OpenClaw runtime configuration — maps to OpenClaw gateway provider settings."
-                required: ["provider", "models"]
+                description: "OpenClaw runtime configuration — rendered into openclaw.json ConfigMap. When absent, default providers (fireworks, google) are used."
+                required: ["providers"]
                 properties:
-                  provider:
-                    type: object
-                    required: ["name"]
-                    properties:
-                      name:
-                        type: string
-                        description: "Provider name (e.g. Fireworks)"
-                  models:
+                  providers:
                     type: array
+                    description: "Provider configurations for the OpenClaw gateway"
                     items:
                       type: object
-                      required: ["name"]
+                      required: ["name", "models"]
                       properties:
                         name:
                           type: string
-                          description: "Model identifier"
-                        thinkingLevel:
+                          description: "Provider slug, lowercase — used as JSON key in openclaw.json (e.g. fireworks, google, openai)"
+                        baseUrl:
                           type: string
-                          description: "Thinking level hint: high, medium, or low"
-                  baseUrl:
-                    type: string
-                    description: "Optional API base URL"
-                  apiKey:
-                    type: string
-                    description: "Environment variable name for the API key"
+                          description: "API base URL for this provider"
+                        apiKeyEnvVar:
+                          type: string
+                          description: "Env var name for the API key (e.g. FIREWORKS_API_KEY)"
+                        api:
+                          type: string
+                          description: "OpenClaw API adapter type (e.g. openai-completions, google-generative-ai). Defaults to openai-completions."
+                        models:
+                          type: array
+                          items:
+                            type: object
+                            required: ["name"]
+                            properties:
+                              name:
+                                type: string
+                                description: "Model identifier (e.g. accounts/fireworks/routers/kimi-k2p5-turbo)"
+                              displayName:
+                                type: string
+                                description: "Human-readable display name"
+                              thinkingLevel:
+                                type: string
+                                description: "Thinking level hint: high, medium, or low"
+                              reasoning:
+                                type: boolean
+                                description: "Whether the model supports reasoning/chain-of-thought"
+                              input:
+                                type: array
+                                items:
+                                  type: string
+                                description: "Accepted input modalities (defaults to [text])"
+                              contextWindow:
+                                type: integer
+                                format: int64
+                                description: "Context window size in tokens"
+                              maxTokens:
+                                type: integer
+                                format: int64
+                                description: "Maximum output tokens"
               promptStyle:
                 type: string
                 description: "Prompt style variant (e.g. minimal for Ralph-style prompts)"
