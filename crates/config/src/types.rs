@@ -1061,8 +1061,8 @@ pub struct Defaults {
     #[serde(default)]
     pub play: PlayDefaults,
 
-    /// Default skills-release repo URL threaded into every CodeRun spec.
-    /// Format: "https://github.com/{owner}/{repo}". When set, CodeRun
+    /// Default skills-release repo URL threaded into every `CodeRun` spec.
+    /// Format: `https://github.com/{owner}/{repo}`. When set, `CodeRun`
     /// producers stamp this into `spec.skillsUrl` and the controller
     /// fetches per-skill tarballs from the repo's GitHub Releases.
     #[serde(
