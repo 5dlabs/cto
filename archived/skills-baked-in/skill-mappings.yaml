@@ -28,6 +28,7 @@ blaze:
     - octocode
     - llm-docs
     - github-mcp
+    - cto-tools
     # Frontend specific
     - shadcn-stack
     - anime-js
@@ -91,6 +92,7 @@ tap:
     - octocode
     - llm-docs
     - github-mcp
+    - cto-tools
     - expo-patterns
     - frontend-design
     - web-design-guidelines
@@ -147,6 +149,7 @@ spark:
     - octocode
     - llm-docs
     - github-mcp
+    - cto-tools
     - electron-patterns
     - frontend-design
     - web-design-guidelines
@@ -178,6 +181,7 @@ rex:
     - octocode
     - llm-docs
     - github-mcp
+    - cto-tools
     - rust-patterns
     - mcp-development
     # Rust skills (from skills.sh)
@@ -226,6 +230,7 @@ grizz:
     - octocode
     - llm-docs
     - github-mcp
+    - cto-tools
     - go-patterns
     # Go skills (from skills.sh)
     - go-concurrency
@@ -268,6 +273,7 @@ nova:
     - octocode
     - llm-docs
     - github-mcp
+    - cto-tools
     - effect-patterns
     # Elysia and Drizzle (from skills.sh)
     - elysia
@@ -319,6 +325,7 @@ bolt:
     - octocode
     - llm-docs
     - github-mcp
+    - cto-tools
     - kubernetes-mcp
     - observability
     # Infrastructure core
@@ -370,6 +377,7 @@ atlas:
     - context7
     - llm-docs
     - github-mcp
+    - cto-tools
     - git-integration
     - git-worktrees
     - repomix
@@ -395,6 +403,7 @@ stitch:
     - context7
     - llm-docs
     - github-mcp
+    - cto-tools
     - pr-review
   review:
     - code-review
@@ -415,6 +424,7 @@ cleo:
     - octocode
     - llm-docs
     - github-mcp
+    - cto-tools
     - code-review
     - evaluation
     - advanced-evaluation
@@ -453,6 +463,7 @@ tess:
     - context7
     - llm-docs
     - github-mcp
+    - cto-tools
     - testing-strategies
     - evaluation
     - advanced-evaluation
@@ -500,6 +511,7 @@ cipher:
     - octocode
     - llm-docs
     - github-mcp
+    - cto-tools
     - security-analysis
     - observability
     # Security tools (from skills.sh - Trail of Bits)
@@ -545,6 +557,7 @@ morgan:
     - context7
     - octocode
     - llm-docs
+    - cto-tools
     - firecrawl
     - repomix
     - project-development
@@ -591,6 +604,7 @@ angie:
     - octocode
     - llm-docs
     - github-mcp
+    - cto-tools
     - openclaw-cli
     - openclaw-mcp-debugger
     - agent-team-orchestration
@@ -639,6 +653,7 @@ vex:
     - octocode
     - llm-docs
     - github-mcp
+    - cto-tools
     - unity-vr
     - openxr
   coder:

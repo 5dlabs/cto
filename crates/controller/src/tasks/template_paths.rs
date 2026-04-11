@@ -36,6 +36,7 @@ pub const PARTIAL_GITHUB_AUTH: &str = "_shared/partials/github-auth.sh.hbs";
 pub const PARTIAL_GIT_SETUP: &str = "_shared/partials/git-setup.sh.hbs";
 pub const PARTIAL_TASK_FILES: &str = "_shared/partials/task-files.sh.hbs";
 pub const PARTIAL_TOOLS_CONFIG: &str = "_shared/partials/tools-config.sh.hbs";
+pub const PARTIAL_CTO_TOOLS_SETUP: &str = "_shared/partials/cto-tools-setup.sh.hbs";
 pub const PARTIAL_ACCEPTANCE_PROBE: &str = "_shared/partials/acceptance-probe.sh.hbs";
 pub const PARTIAL_RETRY_LOOP: &str = "_shared/partials/retry-loop.sh.hbs";
 pub const PARTIAL_COMPLETION: &str = "_shared/partials/completion.sh.hbs";
@@ -58,6 +59,14 @@ pub const PARTIAL_INFRASTRUCTURE_VERIFY: &str = "_shared/partials/infrastructure
 pub const PARTIAL_BETTER_AUTH: &str = "_shared/partials/better-auth.md.hbs";
 pub const PARTIAL_BETTER_AUTH_ELECTRON: &str = "_shared/partials/better-auth-electron.md.hbs";
 pub const PARTIAL_BETTER_AUTH_EXPO: &str = "_shared/partials/better-auth-expo.md.hbs";
+
+// ============================================================================
+// CTO Tools (static files for dynamic MCP tool access)
+// Copied into agent pods via task-files ConfigMap
+// ============================================================================
+
+pub const CTO_TOOLS_CLI: &str = "cto-tools/cto-tools";
+pub const CTO_TOOLS_MCP_TS: &str = "cto-tools/mcp.ts";
 
 // ============================================================================
 // Skills (modular context loaded just-in-time)

@@ -16,7 +16,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference}
 use kube::api::{Api, DeleteParams, ListParams, PostParams};
 use kube::runtime::controller::Action;
 use kube::ResourceExt;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tracing::{error, info, warn};
@@ -1949,6 +1949,91 @@ impl<'a> CodeResourceManager<'a> {
                 containers.push(sidecar_spec);
                 info!("Added Linear sidecar for session {} (status sync + log streaming + 2-way comms + whip cracking)", session_id);
             }
+        }
+
+        // Add tools-server sidecar when enabled — gives each agent pod its own
+        // MCP tool proxy on localhost so escalation state stays per-session.
+        if self.config.tools_sidecar.enabled {
+            let port = self.config.tools_sidecar.port;
+            let image = self.config.tools_sidecar.image.clone().unwrap_or_else(|| {
+                "registry.5dlabs.ai/5dlabs/tools-server:latest".to_string()
+            });
+            let pull_policy = if image.ends_with(":latest") || image.ends_with(":dev") {
+                "Always"
+            } else {
+                "IfNotPresent"
+            };
+
+            // Build sidecar env — forward escalation policy from CRD if present
+            let mut sidecar_env: Vec<Value> = vec![
+                json!({ "name": "RUST_LOG", "value": "info" }),
+            ];
+            if let Some(policy) = &code_run.spec.escalation_policy {
+                if let Ok(policy_json) = serde_json::to_string(policy) {
+                    sidecar_env.push(json!({
+                        "name": "TOOLS_ESCALATION_POLICY",
+                        "value": policy_json
+                    }));
+                }
+            }
+
+            // Mount the cluster-wide tools config so the sidecar knows about
+            // upstream MCP servers. The ConfigMap name follows the Helm naming
+            // convention: {release}-tools-config.
+            let tools_config_cm = std::env::var("TOOLS_CONFIG_CONFIGMAP")
+                .unwrap_or_else(|_| "cto-tools-config".to_string());
+
+            volumes.push(json!({
+                "name": "tools-config",
+                "configMap": { "name": tools_config_cm }
+            }));
+
+            let sidecar_spec = json!({
+                "name": "tools-server",
+                "image": image,
+                "imagePullPolicy": pull_policy,
+                "command": ["tools-server"],
+                "args": ["--port", port.to_string(), "--project-dir", "/config"],
+                "env": sidecar_env,
+                "volumeMounts": [
+                    { "name": "tools-config", "mountPath": "/config" }
+                ],
+                "ports": [
+                    { "containerPort": port, "name": "tools" }
+                ],
+                "resources": {
+                    "requests": { "cpu": "50m", "memory": "64Mi" },
+                    "limits": { "cpu": "500m", "memory": "256Mi" }
+                },
+                "readinessProbe": {
+                    "httpGet": { "path": "/health", "port": port },
+                    "initialDelaySeconds": 2,
+                    "periodSeconds": 10
+                }
+            });
+            containers.push(sidecar_spec);
+
+            // Set TOOLS_SERVER_URL on the main container so the cto-tools CLI
+            // and mcp.ts runtime automatically route through the sidecar.
+            if let Some(main_container) = containers.first_mut() {
+                let env = main_container
+                    .as_object_mut()
+                    .and_then(|obj| {
+                        if !obj.contains_key("env") {
+                            obj.insert("env".to_string(), json!([]));
+                        }
+                        obj.get_mut("env")
+                    })
+                    .and_then(|v| v.as_array_mut());
+                if let Some(env_arr) = env {
+                    env_arr.push(json!({
+                        "name": "TOOLS_SERVER_URL",
+                        "value": format!("http://localhost:{port}/mcp")
+                    }));
+                }
+            }
+
+            info!("Added tools-server sidecar on port {port}");
         }
 
         // Add promtail sidecar for shipping CLI logs to Loki

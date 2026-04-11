@@ -68,6 +68,12 @@ RUN set -eux; \
     ln -sf /root/.bun/bin/bunx /usr/local/bin/bunx; \
     bun --version
 
+# Deno runtime - sandbox for agent TypeScript code execution (MCP tool scripts)
+RUN set -eux; \
+    curl -fsSL https://deno.land/install.sh | sh; \
+    ln -sf /root/.deno/bin/deno /usr/local/bin/deno; \
+    deno --version
+
 # Core coding CLIs (claude, copilot, codex, every-code, gemini, openai SDK)
 RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     npm install -g --no-audit --no-fund \
