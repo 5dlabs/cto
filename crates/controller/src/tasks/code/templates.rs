@@ -4076,10 +4076,16 @@ Be constructive and explain the "why" behind your suggestions.
                         .collect();
                 }
                 Err(e) => {
+                    // Fail loud: if skills_url is configured, remote fetch must succeed.
+                    // No silent fallback to baked-in templates — archived skills are gone.
                     warn!(
-                        "Failed to fetch skills from {}: {} — falling back to baked-in templates",
+                        "Failed to fetch skills from {}: {} — returning empty skills (no baked-in fallback)",
                         skills_url, e
                     );
+                    return skill_names
+                        .into_iter()
+                        .map(|name| json!({ "name": name, "content": "" }))
+                        .collect();
                 }
             }
         }
