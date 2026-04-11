@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# cto-tools — lightweight CLI for agent MCP tool discovery and invocation.
+#
+# Usage:
+#   cto-tools mcp list               List all tools (name + description)
+#   cto-tools mcp describe <tool>    Show full JSON schema for a tool
+#   cto-tools mcp call <tool> --json '{"arg":"val"}'  Invoke a tool
+#   cto-tools mcp escalate <tool> --reason "..."       Request tool access
+#
+# Environment:
+#   TOOLS_SERVER_URL  — HTTP proxy URL (default: http://cto-tools.cto.svc.cluster.local:3000/mcp)
+#   CTO_AGENT_ID      — Agent identity for session tracking (default: unknown)
+
+set -euo pipefail
+
+TOOLS_URL="${TOOLS_SERVER_URL:-http://cto-tools.cto.svc.cluster.local:3000/mcp}"
+AGENT_ID="${CTO_AGENT_ID:-unknown}"
+
+_rpc() {
+  local body="$1"
+  curl -sS -X POST "$TOOLS_URL" \
+    -H "Content-Type: application/json" \
+    -H "X-Agent-Id: $AGENT_ID" \
+    -d "$body"
+}
+
+_rpc_result() {
+  local body="$1"
+  _rpc "$body" | jq -r '.result // .error'
+}
+
+cmd_list() {
+  local body='{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+  local result
+  result=$(_rpc "$body")
+
+  if [ "${1:-}" = "--json" ]; then
+    echo "$result" | jq '.result.tools'
+  else
+    echo "$result" | jq -r '.result.tools[] | "\(.name)\t\(.description)"' | column -t -s $'\t'
+  fi
+}
+
+cmd_describe() {
+  local tool="$1"
+  local body='{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+  local result
+  result=$(_rpc "$body")
+  echo "$result" | jq --arg name "$tool" '.result.tools[] | select(.name == $name)'
+}
+
+cmd_call() {
+  local tool="$1"
+  shift
+  local args='{}'
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --json) args="$2"; shift 2 ;;
+      *) echo "Unknown flag: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  local body
+  body=$(jq -n --arg tool "$tool" --argjson args "$args" \
+    '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":$tool,"arguments":$args}}')
+  _rpc_result "$body" | jq '.'
+}
+
+cmd_escalate() {
+  local tool="$1"
+  shift
+  local reason=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --reason) reason="$2"; shift 2 ;;
+      *) echo "Unknown flag: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  if [ -z "$reason" ]; then
+    echo "Error: --reason is required" >&2
+    exit 1
+  fi
+
+  local args
+  args=$(jq -n --arg tool "$tool" --arg reason "$reason" \
+    '{"tool_name":$tool,"reason":$reason}')
+
+  local body
+  body=$(jq -n --argjson args "$args" \
+    '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"tools_request_capability","arguments":$args}}')
+  _rpc_result "$body" | jq '.'
+}
+
+# ---- main dispatcher ----
+
+if [ $# -lt 2 ]; then
+  echo "Usage: cto-tools mcp <list|describe|call|escalate> [args...]" >&2
+  exit 1
+fi
+
+if [ "$1" != "mcp" ]; then
+  echo "Unknown command: $1 (expected 'mcp')" >&2
+  exit 1
+fi
+shift
+
+subcmd="$1"
+shift
+
+case "$subcmd" in
+  list)     cmd_list "$@" ;;
+  describe) cmd_describe "$@" ;;
+  call)     cmd_call "$@" ;;
+  escalate) cmd_escalate "$@" ;;
+  *)        echo "Unknown subcommand: $subcmd" >&2; exit 1 ;;
+esac

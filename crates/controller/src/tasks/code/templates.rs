@@ -2,6 +2,7 @@ use crate::cli::types::CLIType;
 use crate::crds::CodeRun;
 use crate::tasks::code::agent::AgentClassifier;
 use crate::tasks::config::ControllerConfig;
+use crate::tasks::template_paths;
 use crate::tasks::template_paths::{
     CODE_CODEX_CONTAINER_BASE_TEMPLATE, CODE_CODING_GUIDELINES_TEMPLATE,
     CODE_CURSOR_CONTAINER_BASE_TEMPLATE, CODE_FACTORY_CONTAINER_BASE_TEMPLATE,
@@ -261,6 +262,20 @@ impl CodeTemplateGenerator {
         // Kimi CLI requires a persisted OAuth token to pass _check_auth.
         // The harness writes ~/.kimi/credentials/kimi-code.json at startup
         // using FIREWORKS_API_KEY from the environment.
+
+        // Include cto-tools CLI and mcp.ts runtime for dynamic MCP tool access.
+        // These are static files loaded into every agent pod via the task-files ConfigMap.
+        // The cto-tools-setup partial copies them from /task-files/ to /.cto-tools/.
+        if let Ok(cli_content) = Self::load_template(template_paths::CTO_TOOLS_CLI) {
+            templates.insert("cto-tools".to_string(), cli_content);
+        } else {
+            debug!("cto-tools CLI not found in templates — dynamic tool CLI unavailable");
+        }
+        if let Ok(ts_content) = Self::load_template(template_paths::CTO_TOOLS_MCP_TS) {
+            templates.insert("mcp.ts".to_string(), ts_content);
+        } else {
+            debug!("mcp.ts runtime not found in templates — TS code execution unavailable");
+        }
 
         Ok(templates)
     }
@@ -4763,6 +4778,7 @@ Be constructive and explain the "why" behind your suggestions.
             PARTIAL_ACCEPTANCE_PROBE,
             PARTIAL_COMPLETION,
             PARTIAL_CONFIG,
+            PARTIAL_CTO_TOOLS_SETUP,
             PARTIAL_EXPO_ENV,
             PARTIAL_FRONTEND_TOOLKITS,
             PARTIAL_GITHUB_AUTH,
@@ -4807,6 +4823,7 @@ Be constructive and explain the "why" behind your suggestions.
             ("git-setup", PARTIAL_GIT_SETUP),
             ("task-files", PARTIAL_TASK_FILES),
             ("tools-config", PARTIAL_TOOLS_CONFIG),
+            ("cto-tools-setup", PARTIAL_CTO_TOOLS_SETUP),
             ("acceptance-probe", PARTIAL_ACCEPTANCE_PROBE),
             ("retry-loop", PARTIAL_RETRY_LOOP),
             ("completion", PARTIAL_COMPLETION),

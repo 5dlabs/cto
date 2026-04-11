@@ -1,0 +1,44 @@
+# =========================================================================
+# CTO Tools Setup — install CLI shim + TS runtime for dynamic tool access
+#
+# Copies the cto-tools CLI and mcp.ts runtime library to /.cto-tools/ so
+# agents can discover and invoke MCP tools on demand.
+#
+# Requires: TOOLS_SERVER_URL, CTO_AGENT_ID environment variables
+# =========================================================================
+
+echo ""
+echo "🔧 CTO Tools Setup (dynamic MCP tool access):"
+
+CTO_TOOLS_DIR="/.cto-tools"
+mkdir -p "$CTO_TOOLS_DIR"
+
+# Install CLI shim if present in task files
+if [ -f /task-files/cto-tools ]; then
+    cp /task-files/cto-tools "$CTO_TOOLS_DIR/cto-tools"
+    chmod +x "$CTO_TOOLS_DIR/cto-tools"
+    ln -sf "$CTO_TOOLS_DIR/cto-tools" /usr/local/bin/cto-tools
+    echo "  ✓ cto-tools CLI installed → /usr/local/bin/cto-tools"
+else
+    echo "  ⚠️ cto-tools CLI not found in /task-files/ — dynamic tool access via CLI unavailable"
+fi
+
+# Install TS runtime library for Deno code execution
+if [ -f /task-files/mcp.ts ]; then
+    cp /task-files/mcp.ts "$CTO_TOOLS_DIR/mcp.ts"
+    echo "  ✓ mcp.ts runtime → $CTO_TOOLS_DIR/mcp.ts"
+else
+    echo "  ⚠️ mcp.ts not found in /task-files/ — TS code execution unavailable"
+fi
+
+# Export agent identity for tools server session tracking
+export CTO_AGENT_ID="${GITHUB_APP:-unknown}"
+
+# Verify Deno is available
+if command -v deno >/dev/null 2>&1; then
+    echo "  ✓ Deno $(deno --version 2>/dev/null | head -1 | awk '{print $2}') available"
+else
+    echo "  ⚠️ Deno not installed — TS code execution unavailable"
+fi
+
+echo ""
