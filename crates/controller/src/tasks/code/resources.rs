@@ -2287,6 +2287,16 @@ scrape_configs:
             "volumes": volumes
         });
 
+        // Short hostname to avoid mDNS 63-byte label overflow from @homebridge/ciao
+        // OpenClaw appends " (OpenClaw)" (11 chars) to hostname for mDNS registration
+        let task_id = code_run.spec.task_id.unwrap_or(0);
+        let uid_short = code_run
+            .metadata
+            .uid
+            .as_ref()
+            .map_or("x", |u| &u[..6.min(u.len())]);
+        pod_spec["hostname"] = json!(format!("t{task_id}-{uid_short}"));
+
         if cli_type == CLIType::Codex {
             pod_spec["securityContext"] = json!({
                 "runAsUser": 0,
