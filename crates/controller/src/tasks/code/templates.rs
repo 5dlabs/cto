@@ -1420,11 +1420,16 @@ impl CodeTemplateGenerator {
 
     /// Render the OpenClaw gateway config template for a CRD pod.
     /// Produces a JSON config modeled on Morgan's openclaw.json.
+    ///
+    /// Provider data is sourced from `spec.openclaw` when present,
+    /// otherwise [`OpenClawConfig::default_providers()`] is used.
     fn generate_openclaw_config(
         code_run: &CodeRun,
         cli_config: &Value,
         _config: &ControllerConfig,
     ) -> Result<String> {
+        use crate::crds::coderun::OpenClawConfig;
+
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
         Self::register_template_helpers(&mut handlebars);
@@ -1441,6 +1446,51 @@ impl CodeTemplateGenerator {
         let cli_type = Self::determine_cli_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
 
+        // Use CRD openclaw providers, or fall back to defaults
+        let openclaw_cfg = code_run
+            .spec
+            .openclaw
+            .clone()
+            .unwrap_or_else(OpenClawConfig::default_providers);
+
+        // Build normalized provider data for the template.
+        // Each provider becomes a JSON object with all fields the template needs,
+        // applying sensible defaults for missing optional values.
+        let openclaw_providers: Vec<Value> = openclaw_cfg
+            .providers
+            .iter()
+            .map(|p| {
+                let models: Vec<Value> = p
+                    .models
+                    .iter()
+                    .map(|m| {
+                        let input = m
+                            .input
+                            .clone()
+                            .unwrap_or_else(|| vec!["text".to_string()]);
+                        // Pre-serialize input array as JSON string for safe template insertion
+                        let input_json =
+                            serde_json::to_string(&input).unwrap_or_else(|_| "[\"text\"]".into());
+                        json!({
+                            "id": m.name,
+                            "name": m.display_name.as_deref().unwrap_or(&m.name),
+                            "reasoning": m.reasoning.unwrap_or(false),
+                            "input_json": input_json,
+                            "contextWindow": m.context_window.unwrap_or(131_072),
+                            "maxTokens": m.max_tokens.unwrap_or(8192),
+                        })
+                    })
+                    .collect();
+                json!({
+                    "name": p.name,
+                    "baseUrl": p.base_url.as_deref().unwrap_or(""),
+                    "apiKeyEnvVar": p.api_key_env_var.as_deref().unwrap_or(""),
+                    "api": p.api.as_deref().unwrap_or("openai-completions"),
+                    "models": models,
+                })
+            })
+            .collect();
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -1451,6 +1501,7 @@ impl CodeTemplateGenerator {
             "github_app": Self::get_github_app_or_default(code_run),
             "cli_config": cli_config,
             "discord_enabled": true,
+            "openclaw_providers": openclaw_providers,
         });
 
         handlebars.render("openclaw_config", &context).map_err(|e| {

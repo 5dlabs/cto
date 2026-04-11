@@ -394,7 +394,7 @@ impl ResourceNaming {
             )
     }
 
-    /// Shorten CLI name for K8s naming (e.g., "Claude Code" → "claude-code")
+    /// Shorten CLI name for K8s naming (e.g., "claude" → "claude", "Claude Code" → "claude-code")
     ///
     /// Generic: lowercase, spaces to dashes, strip non-alphanumeric.
     /// No hardcoded CLI list — any new CLI just works.
