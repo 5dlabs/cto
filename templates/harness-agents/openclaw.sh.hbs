@@ -527,6 +527,8 @@ fi
     if [ -n "$GW_PID" ] && ! kill -0 "$GW_PID" 2>/dev/null; then
       WD_RETRIES=$(( WD_RETRIES + 1 ))
       echo "[harness] 🔄 Gateway watchdog: process died, restarting (${WD_RETRIES}/5, backoff=${WD_BACKOFF}s)..."
+      # Clean up stale gateway state before restart
+      openclaw gateway stop 2>/dev/null || true
       sleep "$WD_BACKOFF"
       openclaw gateway &
       GW_PID=$!
