@@ -18,14 +18,11 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
-      # Per-CodeRun task-env to avoid cross-pod stomping on shared PVC
-      TASK_ENV="${WORKSPACE_DIR:?}/.task-env"
-      mkdir -p "$WORKSPACE_DIR"
       # Fix root-owned .gitconfig from image build
       [ -f "$HOME/.gitconfig" ] && [ ! -w "$HOME/.gitconfig" ] && rm -f "$HOME/.gitconfig" 2>/dev/null || true
       {{> github-auth}}
       # Persist env vars for subsequent steps (each step runs in a new shell)
-      cat > "$TASK_ENV" <<ENVEOF
+      cat > /workspace/.task-env <<ENVEOF
       export GITHUB_TOKEN="${GITHUB_TOKEN:-}"
       export GH_TOKEN="${GH_TOKEN:-}"
       export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME}"
@@ -46,11 +43,10 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
-      TASK_ENV="${WORKSPACE_DIR:?}/.task-env"
-      [ -f "$TASK_ENV" ] && source "$TASK_ENV"
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
       {{> git-setup}}
       # Persist git vars for subsequent steps
-      cat >> "$TASK_ENV" <<ENVEOF
+      cat >> /workspace/.task-env <<ENVEOF
       export FEATURE_BRANCH="${FEATURE_BRANCH}"
       export BASE_BRANCH="${BASE_BRANCH}"
       export REPO_ROOT="${REPO_ROOT}"
@@ -67,8 +63,7 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
-      TASK_ENV="${WORKSPACE_DIR:?}/.task-env"
-      [ -f "$TASK_ENV" ] && source "$TASK_ENV"
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
 
       # ACPX_AGENT and ACPX_MODEL are set by the controller as pod env vars.
       # Fall back to template values only for backward compatibility.
@@ -105,7 +100,7 @@ steps:
       export ACPX_CMD
 
       # Persist acpx vars for subsequent steps
-      cat >> "$TASK_ENV" <<ENVEOF
+      cat >> /workspace/.task-env <<ENVEOF
       export ACPX_AGENT="${ACPX_AGENT}"
       export ACPX_MODEL="${ACPX_MODEL}"
       export ACPX_CMD="${ACPX_CMD}"
@@ -123,8 +118,7 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
-      TASK_ENV="${WORKSPACE_DIR:?}/.task-env"
-      [ -f "$TASK_ENV" ] && source "$TASK_ENV"
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
       REPO_ROOT="${REPO_ROOT:-${CLAUDE_WORK_DIR:-/workspace}}"
       cd "$REPO_ROOT"
 
@@ -166,8 +160,7 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
-      TASK_ENV="${WORKSPACE_DIR:?}/.task-env"
-      [ -f "$TASK_ENV" ] && source "$TASK_ENV"
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
       # Ensure npm cache is writable (nested npx calls need this)
       export npm_config_cache="${npm_config_cache:-/tmp/npm-cache}"
       export HOME="${HOME:-/tmp/agent-home}"
@@ -190,6 +183,9 @@ steps:
       fi
       mkdir -p "$TASK_DIR"
 
+      # Prompt and acceptance criteria are pulled from the repo by intake —
+      # no ConfigMap injection needed.
+
       INDEX="${TASK_DIR}/index.lobster.yaml"
       if [ ! -f "$INDEX" ]; then
         # Search for index.lobster.yaml in common locations (docs subdir, nested .tasks, etc.)
@@ -203,14 +199,6 @@ steps:
           echo "❌ No index.lobster.yaml found anywhere in repo"
           exit 1
         fi
-      fi
-
-      # If prompt_modification was injected via ConfigMap, copy it into TASK_DIR
-      # so the inner lobster workflow can find it (intake normally places it here).
-      if [ -f /task-files/prompt.md ] && [ ! -f "${TASK_DIR}/prompt.md" ]; then
-        mkdir -p "$TASK_DIR"
-        cp /task-files/prompt.md "${TASK_DIR}/prompt.md"
-        echo "📝 Copied prompt.md → ${TASK_DIR}/prompt.md"
       fi
 
       ATTEMPT=0
@@ -242,8 +230,7 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
-      TASK_ENV="${WORKSPACE_DIR:?}/.task-env"
-      [ -f "$TASK_ENV" ] && source "$TASK_ENV"
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
       REPO_ROOT="${REPO_ROOT:-${CLAUDE_WORK_DIR:-/workspace}}"
       cd "$REPO_ROOT"
 
@@ -280,8 +267,7 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
-      TASK_ENV="${WORKSPACE_DIR:?}/.task-env"
-      [ -f "$TASK_ENV" ] && source "$TASK_ENV"
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
 
       AGENT="{{agent_name}}"
       AGENT_UPPER=$(echo "$AGENT" | tr '[:lower:]' '[:upper:]')

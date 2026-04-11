@@ -4401,7 +4401,7 @@ Be constructive and explain the "why" behind your suggestions.
     ) -> Vec<serde_json::Value> {
         if let Some(ref skills_url) = code_run.spec.skills_url {
             let agent_name = Self::get_agent_name(code_run);
-            let project = code_run.spec.skills_project.as_deref().map(str::to_owned);
+            let project = code_run.spec.skills_project.as_deref().map(|s| s.to_owned());
             // Run blocking HTTP + filesystem work on a dedicated OS thread
             // to avoid panicking reqwest::blocking inside the tokio runtime.
             let url = skills_url.clone();
@@ -4464,7 +4464,7 @@ Be constructive and explain the "why" behind your suggestions.
         // inside the tokio async runtime.
         if let Some(ref skills_url) = code_run.spec.skills_url {
             let agent_name = Self::get_agent_name(code_run);
-            let project = code_run.spec.skills_project.as_deref().map(str::to_owned);
+            let project = code_run.spec.skills_project.as_deref().map(|s| s.to_owned());
             let url = skills_url.clone();
             let agent = agent_name.clone();
             let proj = project.clone();
