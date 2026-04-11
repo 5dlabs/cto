@@ -376,10 +376,12 @@ impl ResourceNaming {
 
     /// Extract readable provider name from ACP or cli_config
     fn extract_provider_readable(spec: &crate::crds::coderun::CodeRunSpec) -> String {
-        // Try ACP first entry
+        // Try ACP: first CLI entry → first provider
         if let Some(acp) = &spec.acp {
-            if let Some(first) = acp.first() {
-                return Self::shorten_provider_name(&first.provider.name);
+            if let Some(first_cli) = acp.first() {
+                if let Some(first_prov) = first_cli.providers.first() {
+                    return Self::shorten_provider_name(&first_prov.name);
+                }
             }
         }
         // Fallback to cli_config.provider (Provider enum → Display string)

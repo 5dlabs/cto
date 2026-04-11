@@ -166,47 +166,50 @@ spec:
                 description: "Run deployment phase (Bolt). Defaults to false (opt-in)."
               acp:
                 type: array
-                description: "AI-CLI-Provider candidates. The OpenClaw harness agent picks from this array based on task difficulty, credits, and model scores."
+                description: "AI-CLI-Provider candidates. Each entry is a CLI with its available providers and models. The OpenClaw harness agent picks based on task difficulty, credits, and model scores."
                 items:
                   type: object
-                  required: ["cli", "provider", "models"]
+                  required: ["cli", "providers"]
                   properties:
                     cli:
                       type: string
-                      description: "CLI name (e.g. Claude Code, Codex)"
-                    provider:
-                      type: object
-                      required: ["name"]
-                      properties:
-                        name:
-                          type: string
-                          description: "Provider name (e.g. Anthropic, OpenAI)"
-                        credits:
-                          type: integer
-                          format: int64
-                          description: "Available credits budget for this provider"
-                    models:
+                      description: "CLI name (e.g. Claude Code, Codex, Copilot)"
+                    providers:
                       type: array
+                      description: "Providers available for this CLI, each with credits and models"
                       items:
                         type: object
-                        required: ["name"]
+                        required: ["name", "credits", "models"]
                         properties:
                           name:
                             type: string
-                            description: "Model identifier"
-                          thinkingLevel:
-                            type: string
-                            description: "Thinking level hint: high, medium, or low"
-                          score:
+                            description: "Provider name (e.g. Anthropic, Fireworks, OpenAI)"
+                          credits:
                             type: integer
-                            format: int32
-                            description: "Performance score 0-100"
-                    baseUrl:
-                      type: string
-                      description: "Optional API base URL override"
-                    apiKey:
-                      type: string
-                      description: "Environment variable name for the API key (not a raw secret)"
+                            format: int64
+                            description: "Available credits budget for this provider (dynamic, sent every call)"
+                          baseUrl:
+                            type: string
+                            description: "Optional API base URL override"
+                          apiKeyEnvVar:
+                            type: string
+                            description: "Secret key name in cto-secrets for this provider's API key"
+                          models:
+                            type: array
+                            items:
+                              type: object
+                              required: ["name"]
+                              properties:
+                                name:
+                                  type: string
+                                  description: "Model identifier"
+                                thinkingLevel:
+                                  type: string
+                                  description: "Thinking level hint: high, medium, or low"
+                                score:
+                                  type: integer
+                                  format: int32
+                                  description: "Performance score 0-100"
               openclaw:
                 type: object
                 description: "OpenClaw runtime configuration — maps to OpenClaw gateway provider settings."
