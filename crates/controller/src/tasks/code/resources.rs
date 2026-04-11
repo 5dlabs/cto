@@ -381,8 +381,7 @@ impl<'a> CodeResourceManager<'a> {
             .spec
             .cli_config
             .as_ref()
-            .map(|c| c.cli_type.to_string())
-            .unwrap_or_else(|| "unknown".to_string());
+            .map_or_else(|| "unknown".to_string(), |c| c.cli_type.to_string());
         let model = &code_run.spec.model;
         let has_acp = code_run.spec.acp.is_some();
         let has_openclaw = code_run.spec.openclaw.is_some();
