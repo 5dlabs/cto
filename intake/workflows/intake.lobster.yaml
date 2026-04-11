@@ -631,7 +631,7 @@ steps:
               ),
               acceptance_md: (
                 "## Acceptance Criteria for Task " + (($t.id // 0)|tostring)
-                + "\n\n" + (($t.test_strategy // "Run tests and confirm task outcomes.") | tostring)
+                + "\n\n" + (($t.test_strategy // "Run tests and confirm task outcomes.") | tostring | gsub(" (?<n>[0-9]+)[.] "; "\n\(.n). "))
                 + "\n\n_Generated from task metadata (LLM fallback)._"
               )
           } ]'
@@ -1012,8 +1012,8 @@ steps:
                 + "\n</task_overview>\n</context>\n\n"
                 + "<implementation_plan>\n" + (($t.details // $t.description // "No implementation details provided.") | tostring)
                 + "\n</implementation_plan>\n\n"
-                + "<acceptance_criteria>\n" + (($t.test_strategy // "Run tests and confirm task outcomes.") | tostring)
-                + "\n</acceptance_criteria>\n\n"
+                + "<acceptance_criteria>\n" + (($t.test_strategy // "Run tests and confirm task outcomes.") | tostring | gsub(" (?<n>[0-9]+)[.] "; "\n\(.n). "))
+                + "\n\nSee also: acceptance.md in this task directory for the checklist version.\n</acceptance_criteria>\n\n"
                 + "<subtasks>\n"
                 + (if (($t.subtasks // []) | length) > 0
                     then (($t.subtasks // [])
@@ -1125,8 +1125,8 @@ steps:
                 + "\n</task_overview>\n</context>\n\n"
                 + "<implementation_plan>\n" + (($t.details // $t.description // "No implementation details provided.") | tostring)
                 + "\n</implementation_plan>\n\n"
-                + "<acceptance_criteria>\n" + (($t.test_strategy // "Run tests and confirm task outcomes.") | tostring)
-                + "\n</acceptance_criteria>\n\n"
+                + "<acceptance_criteria>\n" + (($t.test_strategy // "Run tests and confirm task outcomes.") | tostring | gsub(" (?<n>[0-9]+)[.] "; "\n\(.n). "))
+                + "\n\nSee also: acceptance.md in this task directory for the checklist version.\n</acceptance_criteria>\n\n"
                 + "<subtasks>\n"
                 + (if (($t.subtasks // []) | length) > 0
                     then (($t.subtasks // [])
