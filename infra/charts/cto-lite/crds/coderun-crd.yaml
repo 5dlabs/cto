@@ -71,6 +71,9 @@ spec:
               skillsUrl:
                 type: string
                 description: "Optional base URL of a skills-release repo (https://github.com/{owner}/{repo}). When set, the controller fetches per-skill tarballs from the repo's GitHub Releases and resolves skill content from its local cache."
+              skillsProject:
+                type: string
+                description: "Project overlay name for skills. Maps to {agent}-{project}.tar.gz in the skills release. Defaults to 'default' when absent."
               docsProjectDirectory:
                 type: string
                 description: "Project directory within docs repository (e.g. '_projects/simple-api')"
