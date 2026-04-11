@@ -1,1736 +1,550 @@
 [
-  {
-    "scaffold_analysis": {
-      "task_id": 1,
-      "coverage": {
-        "namespaces": {
-          "file": "sigma1/infra/templates/namespaces.yaml",
-          "description": "Helm template for all required Kubernetes Namespaces with labels.",
-          "status": "present"
-        },
-        "cnpg_cluster": {
-          "file": "sigma1/infra/templates/cnpg-cluster.yaml",
-          "description": "CloudNative-PG Cluster CR for sigma1-postgres with initdb and extensions.",
-          "status": "present"
-        },
-        "schema_init_job": {
-          "file": "sigma1/infra/templates/schema-init-job.yaml",
-          "description": "Kubernetes Job for post-cluster schema and role initialization.",
-          "status": "present"
-        },
-        "valkey": {
-          "file": "sigma1/infra/templates/valkey.yaml",
-          "description": "Opstree Valkey (Redis) CR for sigma1-valkey instance.",
-          "status": "present"
-        },
-        "secrets": {
-          "file": "sigma1/infra/templates/secrets.yaml",
-          "description": "Helm template for all nine Kubernetes Secrets in sigma1 namespace.",
-          "status": "present"
-        },
-        "signal_cli": {
-          "file": "sigma1/infra/templates/signal-cli.yaml",
-          "description": "PVC, Pod/Deployment, and Service for Signal-CLI in signal namespace.",
-          "status": "present"
-        },
-        "infra_endpoints_configmap": {
-          "file": "sigma1/infra/templates/infra-endpoints-configmap.yaml",
-          "description": "ConfigMap aggregating all connection strings for downstream services.",
-          "status": "present"
-        },
-        "argocd_application": {
-          "file": "sigma1/infra/argocd-application.yaml",
-          "description": "ArgoCD Application CR for sigma1/infra Helm chart.",
-          "status": "present"
-        },
-        "values_secrets_example": {
-          "file": "sigma1/infra/values-secrets.yaml.example",
-          "description": "Example Helm values file showing required secret keys.",
-          "status": "present"
-        }
-      },
-      "completeness": "All required files for the core infrastructure provisioning task are present in the scaffold. Each subtask has a corresponding file and description matching the requirements.",
-      "test_coverage": "Test stubs are provided for each file and subtask, covering kubectl, psql, redis-cli, and ArgoCD validation steps as described in the parent task's test_strategy.",
-      "gaps": [],
-      "notes": "No missing files or major gaps detected. All subtasks and their dependencies are represented in the scaffold. The structure supports Helm-based deployment and GitOps via ArgoCD as required."
+  [
+    {
+      "subtask_id": 1001,
+      "title": "Create core Kubernetes namespaces",
+      "commands": [
+        "kubectl create namespace databases",
+        "kubectl create namespace sigma1"
+      ]
+    },
+    {
+      "subtask_id": 1002,
+      "title": "Deploy CloudNative-PG operator and PostgreSQL cluster",
+      "commands": [
+        "helm repo add cloudnative-pg https://cloudnative-pg.github.io/charts --force-update",
+        "helm upgrade --install cnpg cloudnative-pg/cloudnative-pg -n databases --create-namespace",
+        "kubectl create secret generic sigma1-postgres-superuser -n databases --from-literal=username=postgres --from-literal=password='YOUR_SUPERUSER_PASSWORD' --dry-run=client -o yaml | kubectl apply -f -",
+        "kubectl create secret generic sigma1-postgres-app-user -n databases --from-literal=username=sigma1_user --from-literal=password='YOUR_APP_USER_PASSWORD' --dry-run=client -o yaml | kubectl apply -f -",
+        "cat <<EOF | kubectl apply -f -\napiVersion: postgresql.cnpg.io/v1\nkind: Cluster\nmetadata:\n  name: sigma1-postgres\n  namespace: databases\nspec:\n  instances: 1\n  storage:\n    size: 50Gi\n  postgresql:\n    parameters:\n      max_connections: \"100\"\n  superuserSecret:\n    name: sigma1-postgres-superuser\n  bootstrap:\n    initdb:\n      data:\n        - owner: sigma1_user\n          database: sigma1\n          secret:\n            name: sigma1-postgres-app-user\nEOF"
+      ]
+    },
+    {
+      "subtask_id": 1003,
+      "title": "Deploy Redis/Valkey operator and instance",
+      "commands": [
+        "helm repo add valkey-io https://valkey-io.github.io/valkey-operator --force-update",
+        "helm upgrade --install valkey-operator valkey-io/valkey-operator -n databases --create-namespace",
+        "cat <<EOF | kubectl apply -f -\napiVersion: valkey.valkey.io/v1alpha1\nkind: Valkey\nmetadata:\n  name: sigma1-valkey\n  namespace: databases\nspec:\n  replicas: 1\n  valkeyConfig:\n    image: valkey/valkey:7.2-alpine\n    persistence:\n      enabled: false\nEOF"
+      ]
+    },
+    {
+      "subtask_id": 1004,
+      "title": "Configure S3/R2 bucket access credentials",
+      "commands": [
+        "kubectl create secret generic sigma1-s3-credentials -n sigma1 --from-literal=AWS_ACCESS_KEY_ID='YOUR_S3_R2_ACCESS_KEY_ID' --from-literal=AWS_SECRET_ACCESS_KEY='YOUR_S3_R2_SECRET_ACCESS_KEY' --dry-run=client -o yaml | kubectl apply -f -"
+      ]
+    },
+    {
+      "subtask_id": 1005,
+      "title": "Create sigma1-infra-endpoints ConfigMap",
+      "commands": [
+        "cat <<EOF | kubectl apply -f -\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: sigma1-infra-endpoints\n  namespace: sigma1\ndata:\n  POSTGRES_SIGMA1_POSTGRES_URL: \"postgresql://sigma1_user:$(cat /var/run/secrets/sigma1-postgres-app-user/password)@sigma1-postgres-rw.databases.svc.cluster.local:5432/sigma1\"\n  REDIS_SIGMA1_VALKEY_URL: \"redis://sigma1-valkey.databases.svc.cluster.local:6379\"\nEOF"
+      ]
+    },
+    {
+      "subtask_id": 1006,
+      "title": "Implement basic internal network policies",
+      "commands": [
+        "cat <<EOF | kubectl apply -f -\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: allow-internal-sigma1-ingress\n  namespace: sigma1\nspec:\n  podSelector: {}\n  policyTypes:\n    - Ingress\n  ingress:\n    - from:\n        - podSelector: {}\nEOF",
+        "cat <<EOF | kubectl apply -f -\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: allow-sigma1-to-databases-egress\n  namespace: sigma1\nspec:\n  podSelector: {}\n  policyTypes:\n    - Egress\n  egress:\n    - to:\n        - namespaceSelector:\n            matchLabels:\n              kubernetes.io/metadata.name: databases\n      ports:\n        - protocol: TCP\n          port: 5432\n        - protocol: TCP\n          port: 6379\nEOF"
+      ]
     }
-  },
-  {
-    "task_id": 2,
-    "title": "Build Equipment Catalog Service (Rex - Rust/Axum)",
-    "status": "pending",
-    "priority": "high",
-    "dependencies": [
-      1
-    ],
-    "stack": "Rust 1.75+/Axum 0.7",
-    "description": "Implement the high-performance Equipment Catalog microservice in Rust using Axum 0.7. Serves 533+ products across 24 categories with real-time availability checking, barcode/SKU lookup, image URL serving via Cloudflare R2, a machine-readable AI agent API, and rate limiting via Valkey. Exposes all catalog REST endpoints plus health and metrics. Implements internal GDPR data export and deletion endpoints.",
-    "details": "1. Initialize Cargo workspace at services/equipment-catalog. Add dependencies: axum 0.7, tokio 1.x (full), sqlx 0.7 (postgres, uuid, chrono, rust_decimal, json), redis 0.24 (tokio-comp), aws-sdk-s3 1.x, tower 0.4, tower-http (cors, trace, compression), prometheus 0.13, uuid 1.x (v4, serde), serde/serde_json, anyhow, tracing/tracing-subscriber.\n2. Database: Use DATABASE_URL from sigma1-infra-endpoints ConfigMap (envFrom). Run sqlx migrations in migrations/ targeting the catalog schema: set search_path=catalog. Tables: categories (id UUID PK, name TEXT, parent_id UUID nullable, icon TEXT, sort_order INT), products (id UUID PK, category_id UUID FK, name TEXT, description TEXT, day_rate NUMERIC(10,2), weight_kg FLOAT4, dimensions JSONB, image_urls TEXT[], specs JSONB, barcode TEXT, created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ), availability_blocks (id UUID PK, product_id UUID FK, date_from DATE, date_to DATE, quantity_reserved INT, quantity_booked INT).\n3. Implement handlers: GET /api/v1/catalog/categories, GET /api/v1/catalog/products (query params: category_id, search, page, limit), GET /api/v1/catalog/products/:id, GET /api/v1/catalog/products/:id/availability?from=&to=, POST /api/v1/catalog/products (admin JWT required), PATCH /api/v1/catalog/products/:id (admin JWT required), GET /api/v1/equipment-api/catalog (machine-readable JSON for AI agents, include specs and availability windows), POST /api/v1/equipment-api/checkout (programmatic booking endpoint, validates availability and creates availability_block row).\n4. Availability check logic: query availability_blocks for product_id WHERE date ranges overlap; compute quantity_available = product.stock_quantity - SUM(reserved + booked) for requested window. Target: < 500ms p99.\n5. JWT middleware: extract Bearer token, validate against JWT_SECRET from sigma1-jwt-secret. Admin role check for write endpoints.\n6. Valkey rate limiting: use sliding window counter per (tenant_id or IP) with 100 req/min limit. Use redis::aio::ConnectionManager.\n7. Prometheus metrics: register Counter(requests_total, labels: method, route, status), Histogram(request_duration_seconds). Expose GET /metrics.\n8. Health endpoints: GET /health/live returns 200 immediately; GET /health/ready checks db ping and redis ping, returns 200 or 503.\n9. GDPR endpoints (internal, no external JWT required but validate internal-network origin via Cilium policy): GET /internal/gdpr/export/:customer_id returns all catalog data associated with customer (checkout records); DELETE /internal/gdpr/delete/:customer_id removes PII from checkout records.\n10. Kubernetes Deployment: 2 replicas, envFrom sigma1-infra-endpoints ConfigMap and relevant Secrets, liveness/readiness probes, resource limits (256Mi RAM, 250m CPU). Image: ghcr.io/sigma1/equipment-catalog:latest.\n11. Write unit tests for availability calculation logic and rate limit middleware. Write integration tests using sqlx test transactions.",
-    "test_strategy": "1. GET /api/v1/catalog/products returns JSON array with at least 1 seeded product, status 200. 2. GET /api/v1/catalog/products/:id/availability?from=2025-01-01&to=2025-01-03 returns availability object with quantity_available >= 0 in under 500ms measured via curl -w '%{time_total}'. 3. POST /api/v1/catalog/products without JWT returns 401. 4. GET /health/ready returns 200 when postgres and valkey are reachable, 503 when either is down (test by temporarily scaling postgres to 0). 5. GET /metrics returns Prometheus text format with requests_total and request_duration_seconds metrics. 6. Rate limiter: 101 rapid requests from same IP returns HTTP 429 on the 101st. 7. GET /internal/gdpr/export/:id returns customer checkout JSON; subsequent DELETE /internal/gdpr/delete/:id causes re-fetch to return empty result. 8. cargo test passes with >= 80% coverage reported by cargo-tarpaulin.",
-    "decision_points": [],
-    "subtasks": [
-      {
-        "id": 2001,
-        "title": "Initialize Cargo workspace, declare all dependencies, and write sqlx catalog schema migrations",
-        "status": "pending",
-        "dependencies": [],
-        "details": "Bootstrap the services/equipment-catalog Cargo workspace with Cargo.toml, all required crate dependencies pinned to specified versions, and write the three sqlx migration files for the catalog schema tables.",
-        "test_strategy": "cargo check completes with no errors. sqlx migrate run against a test Postgres instance returns 'Applied 1 migration'. All three tables exist under catalog schema: SELECT table_name FROM information_schema.tables WHERE table_schema='catalog' returns categories, products, availability_blocks.",
-        "subagentType": "implementer",
-        "parallelizable": false
-      },
-      {
-        "id": 2002,
-        "title": "Implement application entrypoint, AppState, and database/Valkey connection pool setup",
-        "status": "pending",
-        "dependencies": [
-          2001
-        ],
-        "details": "Write src/main.rs and src/state.rs establishing the Axum application entry point, shared AppState struct containing PgPool and Redis ConnectionManager, and configuration loading from environment variables.",
-        "test_strategy": "cargo build succeeds. Running the binary with valid DATABASE_URL and VALKEY_URL env vars starts without panic and logs 'listening on 0.0.0.0:8080'. curl http://localhost:8080/ returns 404 (router not yet populated — confirming server is alive).",
-        "subagentType": "implementer",
-        "parallelizable": false
-      },
-      {
-        "id": 2003,
-        "title": "Implement JWT extraction and validation middleware for admin-protected write endpoints",
-        "status": "pending",
-        "dependencies": [
-          2002
-        ],
-        "details": "Write a reusable Axum middleware (or extractor) that extracts Bearer tokens from Authorization headers, validates them against JWT_SECRET, and enforces an 'admin' role claim for write endpoints.",
-        "test_strategy": "cargo test middleware::auth passes. Integration: POST /api/v1/catalog/products with no Authorization header returns HTTP 401. POST with valid non-admin token returns HTTP 403. POST with valid admin token proceeds to handler (returns 400 if body is invalid JSON, not 401/403).",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 2004,
-        "title": "Implement catalog CRUD handlers: categories list and products list/get/create/update",
-        "status": "pending",
-        "dependencies": [
-          2002,
-          2003
-        ],
-        "details": "Write Axum handlers for GET /api/v1/catalog/categories, GET /api/v1/catalog/products (with pagination and search), GET /api/v1/catalog/products/:id, POST /api/v1/catalog/products, and PATCH /api/v1/catalog/products/:id.",
-        "test_strategy": "GET /api/v1/catalog/categories returns HTTP 200 JSON array. GET /api/v1/catalog/products?limit=10 returns HTTP 200 JSON array with pagination metadata. GET /api/v1/catalog/products/:nonexistent-uuid returns HTTP 404. POST /api/v1/catalog/products with admin JWT and valid body returns HTTP 201 with id field. PATCH /api/v1/catalog/products/:id updates name field — subsequent GET returns updated name.",
-        "subagentType": "implementer",
-        "parallelizable": false
-      },
-      {
-        "id": 2005,
-        "title": "Implement availability calculation logic and GET /availability endpoint with unit tests",
-        "status": "pending",
-        "dependencies": [
-          2004
-        ],
-        "details": "Write the core availability computation function and expose it via GET /api/v1/catalog/products/:id/availability?from=&to=, with unit tests covering overlap edge cases.",
-        "test_strategy": "cargo test availability passes all 4+ unit test cases. GET /api/v1/catalog/products/:id/availability?from=2025-01-01&to=2025-01-03 returns HTTP 200 with quantity_available >= 0 in under 500ms (measured with curl -w '%{time_total}'). Insert a blocking availability_block for the same period and verify quantity_available decreases. Invalid date format returns HTTP 400.",
-        "subagentType": "implementer",
-        "parallelizable": false
-      },
-      {
-        "id": 2006,
-        "title": "Implement Valkey sliding-window rate limiter middleware",
-        "status": "pending",
-        "dependencies": [
-          2002
-        ],
-        "details": "Write an Axum middleware layer that enforces a 100 requests/minute sliding-window rate limit per client IP (or tenant_id claim), using the Redis ConnectionManager.",
-        "test_strategy": "cargo test middleware::rate_limit passes. Integration test: send 101 sequential requests from the same IP to GET /api/v1/catalog/products — the 101st returns HTTP 429 with Retry-After header present. After 60 seconds (or mocking time), requests succeed again. /health/live and /metrics are not subject to rate limiting (101 requests to /health/live all return 200).",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 2007,
-        "title": "Implement AI agent machine-readable catalog endpoint and programmatic checkout endpoint",
-        "status": "pending",
-        "dependencies": [
-          2005
-        ],
-        "details": "Write GET /api/v1/equipment-api/catalog returning full catalog JSON with specs and availability windows, and POST /api/v1/equipment-api/checkout atomically validating availability and creating an availability_block row.",
-        "test_strategy": "GET /api/v1/equipment-api/catalog returns HTTP 200 JSON array where each item contains specs and availability_windows fields. POST /api/v1/equipment-api/checkout with valid product and available dates returns HTTP 201 with block id. POST checkout for same product/dates where quantity would exceed stock returns HTTP 409. POST checkout with two concurrent requests for the last available unit — exactly one succeeds (201) and one returns 409, verifying FOR UPDATE locking.",
-        "subagentType": "implementer",
-        "parallelizable": false
-      },
-      {
-        "id": 2008,
-        "title": "Implement Prometheus metrics middleware and /metrics endpoint",
-        "status": "pending",
-        "dependencies": [
-          2002
-        ],
-        "details": "Register a request counter and request duration histogram with Prometheus, instrument all HTTP handlers via a tower middleware layer, and expose GET /metrics in Prometheus text format.",
-        "test_strategy": "GET /metrics returns HTTP 200 with Content-Type: text/plain; version=0.0.4. Response body contains lines matching: http_requests_total{method=\"GET\",route=\"/api/v1/catalog/products\",status=\"200\"} and http_request_duration_seconds_bucket. After 10 GET /api/v1/catalog/products requests, http_requests_total counter value >= 10.",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 2009,
-        "title": "Implement health check endpoints: /health/live and /health/ready",
-        "status": "pending",
-        "dependencies": [
-          2002
-        ],
-        "details": "Write GET /health/live (always 200) and GET /health/ready (checks Postgres and Valkey connectivity, returns 200 or 503) handlers.",
-        "test_strategy": "GET /health/live returns HTTP 200 always including when DB is unreachable. GET /health/ready returns HTTP 200 when both postgres and valkey are running. Scale postgres to 0 replicas (kubectl scale cluster sigma1-postgres --replicas 0 -n databases) — GET /health/ready returns HTTP 503 with postgres field showing error. Restore replicas and re-check returns 200.",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 2010,
-        "title": "Implement internal GDPR export and deletion endpoints",
-        "status": "pending",
-        "dependencies": [
-          2004
-        ],
-        "details": "Write GET /internal/gdpr/export/:customer_id and DELETE /internal/gdpr/delete/:customer_id handlers that respectively return and remove all catalog-related PII for a given customer from availability_blocks checkout records.",
-        "test_strategy": "Insert an availability_block with customer_id = test-uuid. GET /internal/gdpr/export/test-uuid returns HTTP 200 with JSON array containing that block. DELETE /internal/gdpr/delete/test-uuid returns HTTP 204. Subsequent GET /internal/gdpr/export/test-uuid returns HTTP 200 with empty array []. Calling without X-Internal-Request header returns HTTP 403.",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 2011,
-        "title": "Write Dockerfile and Kubernetes Deployment/Service manifests for equipment-catalog",
-        "status": "pending",
-        "dependencies": [
-          2002
-        ],
-        "details": "Create a multi-stage Dockerfile for the Rust service and Kubernetes Deployment (2 replicas) and Service manifests with envFrom referencing sigma1-infra-endpoints and required secrets, plus liveness/readiness probes.",
-        "test_strategy": "docker build -t equipment-catalog:test . completes without error. docker run with env vars set starts and curl http://localhost:8080/health/live returns 200. kubectl apply -f k8s/ -n sigma1 creates Deployment and Service. kubectl get pods -n sigma1 -l app=equipment-catalog shows 2/2 Running within 2 minutes. kubectl get endpoints equipment-catalog -n sigma1 shows 2 endpoint IPs.",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 2012,
-        "title": "Write integration test suite and verify cargo-tarpaulin coverage >= 80%",
-        "status": "pending",
-        "dependencies": [
-          2005,
-          2007,
-          2010
-        ],
-        "details": "Write sqlx-based integration tests using test transactions for catalog handlers, availability logic, and GDPR endpoints, then run cargo-tarpaulin to confirm >= 80% line coverage.",
-        "test_strategy": "cargo test runs all integration tests with 0 failures. cargo tarpaulin outputs coverage percentage >= 80% in CI logs. Test (3) for checkout atomicity must demonstrate exactly 1 success and 1 conflict when run 10 times consecutively (no flakiness). Test output shows all 5 named test functions as passed.",
-        "subagentType": "tester",
-        "parallelizable": false
-      }
-    ]
-  },
+  ],
+  [
+    "Image Storage Strategy: Decide on the specific S3/R2 bucket structure and access patterns for images.",
+    "Rate Limiting Algorithm: Choose the specific algorithm and parameters for tenant-based rate limiting (e.g., token bucket, leaky bucket).",
+    "Caching Strategy: Define what data to cache in Redis and for how long (e.g., product lists, availability).",
+    "API Versioning Strategy: Confirm the API versioning strategy (`/api/v1/`) and future upgrade path."
+  ],
   {
     "task_id": 3,
-    "service": "Rental Management System (RMS)",
-    "stack": {
-      "language": "Go 1.22+",
-      "frameworks": [
-        "gRPC",
-        "grpc-gateway"
-      ],
-      "dependencies": [
-        "google.golang.org/grpc v1.63+",
-        "google.golang.org/protobuf v1.33+",
-        "github.com/grpc-ecosystem/grpc-gateway/v2 v2.19+",
-        "github.com/jackc/pgx/v5",
-        "github.com/redis/go-redis/v9",
-        "github.com/google/uuid",
-        "github.com/shopspring/decimal",
-        "go.uber.org/zap",
-        "github.com/prometheus/client_golang",
-        "google.golang.org/api (calendar)",
-        "github.com/golang-migrate/migrate/v4"
-      ]
-    },
-    "domains": [
-      "opportunity",
-      "project",
-      "inventory",
-      "crew",
-      "delivery"
-    ],
-    "proto_files": [
-      "proto/sigma1/rms/v1/opportunity.proto",
-      "proto/sigma1/rms/v1/project.proto",
-      "proto/sigma1/rms/v1/inventory.proto",
-      "proto/sigma1/rms/v1/crew.proto",
-      "proto/sigma1/rms/v1/delivery.proto"
-    ],
-    "migrations": [
-      "001_create_schema.sql",
-      "002_create_opportunities.sql",
-      "003_create_opportunity_line_items.sql",
-      "004_create_projects.sql",
-      "005_create_inventory_transactions.sql",
-      "006_create_crew_members.sql",
-      "007_create_crew_assignments.sql",
-      "008_create_deliveries.sql"
-    ],
-    "grpc_services": [
-      {
-        "name": "OpportunityService",
-        "methods": [
-          "CreateOpportunity",
-          "GetOpportunity",
-          "UpdateOpportunity",
-          "ListOpportunities",
-          "ScoreLead"
-        ]
-      },
-      {
-        "name": "ProjectService",
-        "methods": [
-          "CreateProject",
-          "GetProject",
-          "UpdateProject",
-          "CheckOut",
-          "CheckIn"
-        ]
-      },
-      {
-        "name": "InventoryService",
-        "methods": [
-          "GetStockLevel",
-          "RecordTransaction",
-          "ScanBarcode"
-        ]
-      },
-      {
-        "name": "CrewService",
-        "methods": [
-          "ListCrew",
-          "AssignCrew",
-          "ScheduleCrew"
-        ]
-      },
-      {
-        "name": "DeliveryService",
-        "methods": [
-          "ScheduleDelivery",
-          "UpdateDeliveryStatus",
-          "OptimizeRoute"
-        ]
-      }
-    ],
-    "rest_gateway": {
-      "port": 8080,
-      "mapping": "grpc-gateway mux, all external consumers use REST endpoints"
-    },
-    "grpc_server": {
-      "port": 9090,
-      "reflection": true,
-      "internal_only": true
-    },
-    "health_metrics": {
-      "port": 8081,
-      "endpoints": [
-        "/health/live",
-        "/health/ready",
-        "/metrics"
-      ],
-      "prometheus_metrics": [
-        "rms_grpc_requests_total",
-        "rms_inventory_conflicts_total"
-      ]
-    },
-    "google_calendar_integration": {
-      "trigger": "Project status transitions to confirmed",
-      "api": "google.golang.org/api/calendar/v3",
-      "credentials": "GOOGLE_CALENDAR_CLIENT_ID/SECRET from sigma1-google-secret",
-      "event_storage": "calendar_event_id in project row"
-    },
-    "gdpr_endpoints": [
-      {
-        "method": "GET",
-        "path": "/internal/gdpr/export/:customer_id",
-        "description": "Export all customer data"
-      },
-      {
-        "method": "DELETE",
-        "path": "/internal/gdpr/delete/:customer_id",
-        "description": "Anonymize customer_id fields and log to audit schema"
-      }
-    ],
-    "kubernetes": {
-      "deployment": {
-        "replicas": 2,
-        "envFrom": [
-          "sigma1-infra-endpoints",
-          "sigma1-google-secret",
-          "sigma1-rms-secret"
-        ],
-        "ports": [
-          {
-            "name": "rest",
-            "containerPort": 8080
-          },
-          {
-            "name": "grpc",
-            "containerPort": 9090
-          },
-          {
-            "name": "health",
-            "containerPort": 8081
-          }
-        ],
-        "probes": {
-          "liveness": {
-            "httpGet": {
-              "path": "/health/live",
-              "port": 8081
-            },
-            "initialDelaySeconds": 10
-          },
-          "readiness": {
-            "httpGet": {
-              "path": "/health/ready",
-              "port": 8081
-            },
-            "initialDelaySeconds": 15
-          }
-        },
-        "resources": {
-          "requests": {
-            "cpu": "100m",
-            "memory": "128Mi"
-          },
-          "limits": {
-            "cpu": "500m",
-            "memory": "512Mi"
-          }
-        }
-      },
-      "service": {
-        "type": "ClusterIP",
-        "ports": [
-          {
-            "name": "rest",
-            "port": 8080
-          },
-          {
-            "name": "grpc",
-            "port": 9090
-          }
-        ]
-      }
-    },
-    "test_strategy": [
-      "POST /api/v1/opportunities returns 201 with id and status=pending",
-      "POST /api/v1/opportunities/:id/convert returns 200 and creates a project row",
-      "ScoreLead returns correct color based on seeded vetting results",
-      "CheckOut creates inventory_transaction; second CheckOut in same window returns 409",
-      "GET /health/ready returns 200 with postgres and redis reachable",
-      "gRPC reflection accessible on port 9090",
-      "GDPR delete anonymizes customer_id and logs to audit",
-      "go test ./... passes with >= 80% coverage"
-    ],
-    "decision_points": [
-      {
-        "topic": "ScoreLead weighting formula",
-        "description": "Numeric weights for event size, venue history, customer vetting score, and lead age must be defined by product owner/analyst"
-      },
-      {
-        "topic": "Vetting service transport",
-        "description": "Confirm base URL and fallback behavior if vetting service is unavailable"
-      },
-      {
-        "topic": "Google Calendar OAuth2 flow",
-        "description": "Confirm credential type (service account JSON vs. OAuth2 client ID + refresh token)"
-      },
-      {
-        "topic": "DeliveryService OptimizeRoute algorithm",
-        "description": "Decide on routing algorithm or third-party API"
-      }
-    ],
-    "subtasks": [
-      3001,
-      3002,
-      3003,
-      3004,
-      3005,
-      3006,
-      3007,
-      3008,
-      3009,
-      3010,
-      3011,
-      3012,
-      3013
-    ],
-    "status": "pending",
-    "dependencies": [
-      1
-    ],
-    "priority": "high"
-  },
-  {
-    "task_id": 4,
-    "title": "Build Finance Service (Rex - Rust/Axum)",
-    "agent": "rex",
-    "stack": "Rust 1.75+/Axum 0.7",
-    "status": "pending",
-    "description": "Implement the Finance microservice in Rust/Axum handling invoicing, payment recording, AR aging reports, payroll tracking, multi-currency support with live rate sync, and Stripe integration. Replaces QuickBooks/Xero for Sigma-1. Exposes REST endpoints, Prometheus metrics, health probes, and internal GDPR endpoints.",
-    "dependencies": [
-      1
-    ],
+    "title": "Develop Rental Management System (RMS) Service (Grizz - Go/gRPC)",
+    "description": "Build the core Rental Management System (RMS) service, handling opportunities, projects, inventory, crew, and deliveries. This service is central to the quote-to-project workflow and operational logistics.",
+    "stack": "Go/gRPC",
     "priority": "high",
-    "details": "1. Initialize Cargo workspace at services/finance. Dependencies: axum 0.7, tokio 1.x, sqlx 0.7 (postgres, uuid, chrono, rust_decimal), stripe 0.17 (async stripe-rust crate or reqwest-based Stripe REST client), redis 0.24, tower-http, prometheus 0.13, serde/serde_json, anyhow, tracing, chrono, rust_decimal.\n2. Database migrations targeting finance schema. Tables: invoices (id UUID PK, project_id UUID, org_id UUID, invoice_number TEXT UNIQUE, status TEXT CHECK IN (draft,sent,viewed,paid,overdue,cancelled), issued_at TIMESTAMPTZ, due_at DATE, currency CHAR(3), subtotal_cents BIGINT, tax_cents BIGINT, total_cents BIGINT, paid_amount_cents BIGINT DEFAULT 0, stripe_invoice_id TEXT), invoice_line_items (id UUID PK, invoice_id UUID FK, description TEXT, quantity INT, unit_price_cents BIGINT, currency CHAR(3)), payments (id UUID PK, invoice_id UUID FK, amount_cents BIGINT, currency CHAR(3), method TEXT CHECK IN (cash,check,wire,card,stripe), stripe_payment_id TEXT, received_at TIMESTAMPTZ), payroll_entries (id UUID PK, period DATE, worker_id UUID, worker_name TEXT, worker_type TEXT CHECK IN (contractor,employee), amount_cents BIGINT, currency CHAR(3), description TEXT, created_at TIMESTAMPTZ), currency_rates (base CHAR(3), target CHAR(3), rate NUMERIC(18,8), fetched_at TIMESTAMPTZ, PRIMARY KEY (base, target)).\n3. Implement handlers: POST /api/v1/invoices, GET /api/v1/invoices, GET /api/v1/invoices/:id, POST /api/v1/invoices/:id/send (updates status=sent, triggers email via optional SMTP), POST /api/v1/invoices/:id/paid (records payment, updates paid_amount_cents, sets status=paid if fully paid), POST /api/v1/payments, GET /api/v1/payments, GET /api/v1/payments/invoice/:id.\n4. Reports: GET /api/v1/finance/reports/revenue?period=YYYY-MM returns sum of paid invoices grouped by month. GET /api/v1/finance/reports/aging returns unpaid invoices grouped by age buckets (0-30, 31-60, 61-90, 90+ days). GET /api/v1/finance/reports/cashflow returns monthly in/out. GET /api/v1/finance/reports/profitability returns per-project revenue minus payroll entries.\n5. Payroll: GET /api/v1/payroll?period=YYYY-MM, POST /api/v1/payroll/entries.\n6. Currency: GET /api/v1/currency/rates returns cached rates from Valkey (cache key: rates:v1). Background tokio::task spawned at startup syncs rates from exchangerate.host or similar free API every 6 hours, storing in both currency_rates table and Valkey with 6h TTL.\n7. Stripe integration: on POST /api/v1/invoices/:id/send (if stripe_invoice_id null), create Stripe Invoice via API, store stripe_invoice_id. Stripe webhook endpoint POST /api/v1/webhooks/stripe validates signature, processes invoice.paid and payment_intent.succeeded events to update payment records.\n8. Tax calculation: apply tax_rate based on currency/locale field on invoice; default CAD=13% HST, USD=0% (simplified — full tax engine deferred). Store tax_cents on invoice.\n9. Automated payment reminders: tokio::spawn background task running daily, queries invoices WHERE status=sent AND due_at < NOW() - INTERVAL '1 day', updates status=overdue, enqueues reminder (log for now, real email/signal in Morgan integration).\n10. JWT middleware, /metrics, /health/live, /health/ready, GDPR endpoints (/internal/gdpr/export/:org_id, /internal/gdpr/delete/:org_id — anonymize org_id on invoices and payroll). Kubernetes Deployment 2 replicas.",
-    "test_strategy": "1. POST /api/v1/invoices with valid project_id and line items returns 201 with status=draft and computed total_cents = subtotal_cents + tax_cents. 2. POST /api/v1/invoices/:id/paid with amount equal to total_cents returns invoice status=paid. 3. GET /api/v1/finance/reports/aging returns JSON with buckets 0-30, 31-60, 61-90, 90+ each as numeric counts; overdue invoice (created 35 days ago, unpaid) appears in 31-60 bucket. 4. GET /api/v1/currency/rates returns JSON object with at least USD, CAD, AUD keys and non-zero rate values. 5. Stripe webhook POST /api/v1/webhooks/stripe with valid Stripe-Signature header and invoice.paid payload updates invoice status to paid (verify via GET /api/v1/invoices/:id). 6. Overdue reminder task: seed invoice with due_at = NOW()-2d and status=sent; after background task runs, status becomes overdue. 7. GET /health/ready returns 200. 8. cargo test passes with >= 80% coverage.",
+    "status": "pending",
+    "dependencies": [
+      1
+    ],
+    "details": [
+      "Initialize a new Go project targeting Go 1.22.2.",
+      "Define gRPC services and protobufs for `OpportunityService`, `ProjectService`, `InventoryService`, `CrewService`, and `DeliveryService`.",
+      "Generate Go code from protobuf definitions.",
+      "Implement gRPC server logic for all services.",
+      "Integrate `grpc-gateway` to expose REST endpoints as defined in the PRD.",
+      "Define `Opportunity`, `Project`, and `InventoryTransaction` data models and implement `sqlx` (or similar ORM) for PostgreSQL interaction, referencing the `sigma1-infra-endpoints` ConfigMap.",
+      "Implement core features: quote-to-project conversion, barcode scanning (mocked initially), crew scheduling, and delivery tracking.",
+      "Integrate with Redis for session caching, referencing the `sigma1-infra-endpoints` ConfigMap.",
+      "Add basic health checks for gRPC and REST endpoints."
+    ],
+    "test_strategy": [
+      "Deploy the service to Kubernetes and verify it starts successfully.",
+      "Use `grpcurl` to test gRPC endpoints for `CreateOpportunity`, `GetProject`, `RecordTransaction`, etc.",
+      "Use `curl` or Postman to verify REST endpoints exposed via `grpc-gateway` are functional.",
+      "Test the full quote-to-project workflow: create opportunity, approve, convert to project.",
+      "Verify inventory transactions can be recorded and retrieved.",
+      "Confirm data persistence in PostgreSQL for all RMS entities."
+    ],
     "decision_points": [
-      "Stripe client library: the details mention 'stripe 0.17 (async stripe-rust crate or reqwest-based Stripe REST client)' — the team must choose between the async-stripe crate and a manual reqwest client before implementation, as the API surface differs significantly.",
-      "Currency rate provider: 'exchangerate.host or similar free API' is unresolved — a specific provider with its API key management strategy must be selected before the background sync task is implemented.",
-      "SMTP email provider: POST /api/v1/invoices/:id/send mentions 'triggers email via optional SMTP' with no provider or credential strategy specified — the team must decide whether to implement SMTP in v1 or defer entirely to the Morgan integration.",
-      "JWT middleware: JWT validation requires a shared signing key or JWKS endpoint — the key distribution mechanism (shared secret vs. public key from an identity service) must be decided before the middleware is implemented.",
-      "Tax calculation scope: the task states 'full tax engine deferred' but implements CAD=13% HST, USD=0% — the team must confirm whether any other currencies/locales need tax rates for v1 to avoid rework."
+      "gRPC-Gateway REST Mapping: Decide on the specific REST endpoint mappings for gRPC services.",
+      "Barcode Scanning Implementation: Define the initial mocking strategy for barcode scanning and future integration plan.",
+      "Crew Scheduling Algorithm: Determine the initial complexity and approach for crew scheduling (e.g., simple availability check vs. complex optimization).",
+      "Session Caching Strategy: Define what data to cache in Redis for sessions and its invalidation strategy.",
+      "Inter-service Authentication: How will RMS authenticate calls to other services (e.g., Catalog, Finance) and vice-versa? (e.g., JWT, API keys, mTLS)."
     ],
     "subtasks": [
       {
-        "id": 4001,
-        "title": "Initialize Cargo workspace and dependency manifest for Finance service",
-        "description": "Create the Cargo workspace at services/finance with Cargo.toml declaring all required dependencies: axum, tokio, sqlx, stripe client, redis, tower-http, prometheus, serde, anyhow, tracing, chrono, rust_decimal.",
+        "id": 3001,
+        "title": "Initialize Go project and define gRPC protobuf schemas",
+        "description": "Initialize a new Go project and define all necessary gRPC service and message protobufs for Opportunity, Project, Inventory, Crew, and Delivery services.",
         "dependencies": [],
-        "details": "Create services/finance/Cargo.toml as a workspace with a single member crate finance-service. In finance-service/Cargo.toml, add all dependencies with pinned versions from the task details. Create src/main.rs with a minimal tokio::main that binds Axum to :3000 and returns 200 on GET /. Add a .cargo/config.toml with incremental = true for faster builds. Run `cargo build` to verify the dependency graph resolves. Add sqlx-cli to dev-dependencies or document the migration command using DATABASE_URL.",
+        "details": [
+          "Run `go mod init <project-name>` targeting Go 1.22.2.",
+          "Create `.proto` files for `OpportunityService`, `ProjectService`, `InventoryService`, `CrewService`, and `DeliveryService`, including their respective message definitions."
+        ],
         "status": "pending",
-        "test_strategy": "`cargo build` exits 0 with no compilation errors. `cargo check` passes. `cargo test` runs zero tests without panic.",
+        "test_strategy": [
+          "Verify `go.mod` and `go.sum` are created.",
+          "Validate `.proto` files for correct syntax using `protoc --verify_only`."
+        ],
         "subagentType": "implementer",
         "parallelizable": false
       },
       {
-        "id": 4002,
-        "title": "Write database migrations for all five Finance schema tables",
-        "description": "Create SQL migration files targeting the finance schema for: invoices, invoice_line_items, payments, payroll_entries, and currency_rates tables.",
+        "id": 3002,
+        "title": "Generate Go code and set up base gRPC server",
+        "description": "Generate Go code from the defined protobufs and establish a basic gRPC server structure capable of serving requests.",
         "dependencies": [
-          4001
+          3001
         ],
-        "details": "Use sqlx migrate with files in finance-service/migrations/. Migration 001: CREATE SCHEMA IF NOT EXISTS finance. Migration 002: invoices table with all columns, CHECK constraints for status enum, DEFAULT 0 for paid_amount_cents. Migration 003: invoice_line_items with FK to invoices. Migration 004: payments with FK to invoices and CHECK constraint on method. Migration 005: payroll_entries with CHECK on worker_type. Migration 006: currency_rates with composite PRIMARY KEY (base, target). Add indexes: invoices(status), invoices(org_id), invoices(due_at) for aging queries, payments(invoice_id). Also add migration 007 for finance.gdpr_deletions audit table (entity TEXT, deleted_org_id UUID, deleted_at TIMESTAMPTZ). Use UP/DOWN pairs. Run via `sqlx migrate run`.",
-        "status": "pending",
-        "test_strategy": "`sqlx migrate run` against a fresh finance schema applies all 7 migrations without error. `sqlx migrate revert` repeatedly down to 0 drops all tables cleanly. `psql -c '\\dt finance.*'` lists all 6 domain tables plus gdpr_deletions.",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 4003,
-        "title": "Implement invoice CRUD handlers with tax calculation and status state machine",
-        "description": "Implement POST /api/v1/invoices (create with tax computation), GET /api/v1/invoices (list), GET /api/v1/invoices/:id, POST /api/v1/invoices/:id/send, and POST /api/v1/invoices/:id/paid handlers in Axum.",
-        "dependencies": [
-          4002
+        "details": [
+          "Install `protoc-gen-go` and `protoc-gen-go-grpc`.",
+          "Run `protoc` commands to generate Go client and server stubs from all `.proto` files.",
+          "Implement a basic `main.go` to start a gRPC server and register placeholder service implementations."
         ],
-        "details": "Create src/handlers/invoices.rs. POST /api/v1/invoices: accept JSON body with project_id, org_id, currency, line_items array. Compute subtotal_cents = sum(quantity * unit_price_cents). Apply tax: if currency == 'CAD' tax_cents = subtotal_cents * 13 / 100 else tax_cents = 0. total_cents = subtotal_cents + tax_cents. Generate invoice_number as 'INV-' + sequential padded number. INSERT invoices and invoice_line_items in a sqlx transaction. Return 201. GET /api/v1/invoices: SELECT with optional status and org_id query params. GET /api/v1/invoices/:id: SELECT with 404 on missing. POST /api/v1/invoices/:id/send: UPDATE status=sent if current status=draft; log 'email would be sent' for now (SMTP deferred). POST /api/v1/invoices/:id/paid: INSERT payment row, UPDATE paid_amount_cents += amount_cents, if paid_amount_cents >= total_cents SET status=paid. Use rust_decimal for all financial arithmetic to avoid floating point. Define InvoiceStatus enum with state machine guard (e.g., cannot send a cancelled invoice).",
         "status": "pending",
-        "test_strategy": "POST /api/v1/invoices with CAD currency and line items: total_cents = subtotal + 13% tax, status=draft, returns 201. POST send → status becomes sent. POST paid with exact total_cents → status becomes paid. POST paid again → returns 400 (already paid). GET list with status=draft filter returns only draft invoices.",
+        "test_strategy": [
+          "Verify generated Go files exist in the expected directories.",
+          "Run the basic gRPC server and confirm it starts without errors.",
+          "Use `grpcurl` to attempt a connection to the server and verify it's reachable."
+        ],
         "subagentType": "implementer",
         "parallelizable": false
       },
       {
-        "id": 4004,
-        "title": "Implement payment recording handlers",
-        "description": "Implement POST /api/v1/payments, GET /api/v1/payments, and GET /api/v1/payments/invoice/:id handlers for recording and retrieving payment records.",
+        "id": 3003,
+        "title": "Define data models and integrate with PostgreSQL",
+        "description": "Define Go structs for `Opportunity`, `Project`, and `InventoryTransaction` and integrate `sqlx` for PostgreSQL interaction, using the `sigma1-infra-endpoints` ConfigMap.",
         "dependencies": [
-          4003
+          3002
         ],
-        "details": "Create src/handlers/payments.rs. POST /api/v1/payments: accept invoice_id, amount_cents, currency, method, optional stripe_payment_id, received_at. INSERT into finance.payments. Call the same paid_amount_cents update logic as POST /api/v1/invoices/:id/paid (extract shared logic into src/services/invoice_payment.rs). Return 201 with created payment. GET /api/v1/payments: SELECT all payments with optional invoice_id filter query param. GET /api/v1/payments/invoice/:id: SELECT payments WHERE invoice_id = $1, return array. Register routes on the Axum router.",
+        "details": [
+          "Define Go structs for `Opportunity`, `Project`, and `InventoryTransaction` with `sqlx` tags.",
+          "Set up `sqlx` connection pool using the PostgreSQL URL from the `sigma1-infra-endpoints` ConfigMap.",
+          "Implement basic CRUD operations for these models."
+        ],
         "status": "pending",
-        "test_strategy": "POST /api/v1/payments with valid invoice_id and method=cash returns 201 with id. GET /api/v1/payments/invoice/:id returns the payment in an array. Partial payment does not change invoice status to paid; second payment completing the total does.",
+        "test_strategy": [
+          "Write unit tests for `sqlx` connection and basic CRUD operations.",
+          "Deploy the service and verify successful connection to PostgreSQL.",
+          "Insert and retrieve sample data to confirm persistence."
+        ],
         "subagentType": "implementer",
         "parallelizable": false
       },
       {
-        "id": 4005,
-        "title": "Implement Stripe invoice creation and webhook endpoint with signature validation",
-        "description": "On POST /api/v1/invoices/:id/send when stripe_invoice_id is null, create a Stripe Invoice via the Stripe API and store the returned ID. Implement POST /api/v1/webhooks/stripe to validate Stripe-Signature and process invoice.paid and payment_intent.succeeded events.",
+        "id": 3004,
+        "title": "Implement Opportunity and Project gRPC service logic",
+        "description": "Implement the server-side logic for `OpportunityService` and `ProjectService`, including quote-to-project conversion.",
         "dependencies": [
-          4003
+          3003
         ],
-        "details": "Create src/integrations/stripe.rs. Configure Stripe client using STRIPE_SECRET_KEY from environment. On /send: if invoice.stripe_invoice_id IS NULL, call Stripe CreateInvoice API with customer email and total_cents, store returned stripe_invoice_id on the invoice row. POST /api/v1/webhooks/stripe: read raw request body as bytes before any deserialization (required for HMAC validation). Validate Stripe-Signature header using STRIPE_WEBHOOK_SECRET via the stripe-rust verify_webhook or manual HMAC-SHA256 computation with reqwest. On validation failure return 400. Parse event type: invoice.paid → call invoice_payment service to mark invoice paid and insert payment row with method=stripe. payment_intent.succeeded → log and update stripe_payment_id on the matching payment row. Return 200 to Stripe on all successfully processed events.",
+        "details": [
+          "Implement gRPC handlers for `CreateOpportunity`, `GetOpportunity`, `UpdateOpportunity`, `ConvertOpportunityToProject`.",
+          "Implement gRPC handlers for `CreateProject`, `GetProject`, `UpdateProject`."
+        ],
         "status": "pending",
-        "test_strategy": "POST /api/v1/webhooks/stripe with valid Stripe-Signature and invoice.paid body updates invoice status to paid (verify via GET /api/v1/invoices/:id). POST with invalid signature returns 400. POST with payment_intent.succeeded updates stripe_payment_id on payment row. Invoice send with null stripe_invoice_id results in non-null stripe_invoice_id after call.",
+        "test_strategy": [
+          "Use `grpcurl` to test `CreateOpportunity`, `ConvertOpportunityToProject`, and `GetProject` endpoints.",
+          "Verify data consistency in PostgreSQL after these operations."
+        ],
         "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 4006,
-        "title": "Implement financial report endpoints (revenue, aging, cashflow, profitability)",
-        "description": "Implement GET /api/v1/finance/reports/revenue, /aging, /cashflow, and /profitability query handlers returning aggregated financial data.",
-        "dependencies": [
-          4003,
-          4004
-        ],
-        "details": "Create src/handlers/reports.rs. GET /api/v1/finance/reports/revenue?period=YYYY-MM: SELECT SUM(total_cents) FROM finance.invoices WHERE status='paid' AND DATE_TRUNC('month', issued_at) = $1. GET /api/v1/finance/reports/aging: SELECT COUNT(*), SUM(total_cents - paid_amount_cents) FROM finance.invoices WHERE status IN ('sent','viewed','overdue') GROUP BY CASE WHEN NOW()-issued_at <= 30 THEN '0-30' WHEN NOW()-issued_at <= 60 THEN '31-60' WHEN NOW()-issued_at <= 90 THEN '61-90' ELSE '90+' END. Return JSON with bucket keys and count + amount fields. GET /api/v1/finance/reports/cashflow: monthly in (paid invoices) and out (payroll entries) for the trailing 12 months. GET /api/v1/finance/reports/profitability: per project_id, SUM(paid invoices total_cents) - SUM(payroll_entries amount_cents). All queries use sqlx::query_as with typed result structs.",
-        "status": "pending",
-        "test_strategy": "Seed one invoice issued 35 days ago with status=sent; GET /aging shows it in 31-60 bucket with count=1. Seed paid invoices for two months; GET /revenue?period=YYYY-MM returns correct sum for each month. GET /cashflow returns array with at least the current month. GET /profitability returns per-project rows.",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 4007,
-        "title": "Implement payroll entry handlers",
-        "description": "Implement GET /api/v1/payroll?period=YYYY-MM and POST /api/v1/payroll/entries handlers for payroll entry management.",
-        "dependencies": [
-          4002
-        ],
-        "details": "Create src/handlers/payroll.rs. POST /api/v1/payroll/entries: accept JSON with period (DATE), worker_id, worker_name, worker_type (contractor|employee), amount_cents, currency, description. INSERT into finance.payroll_entries. Return 201 with created entry. GET /api/v1/payroll?period=YYYY-MM: SELECT WHERE DATE_TRUNC('month', period) = $1. If period param missing, return current month. Return array of payroll entry objects. Register routes on the Axum router.",
-        "status": "pending",
-        "test_strategy": "POST /api/v1/payroll/entries with worker_type=contractor returns 201. GET /api/v1/payroll?period=2024-01 returns the seeded entry. POST with invalid worker_type returns 422. GET with no period param returns current month entries.",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 4008,
-        "title": "Implement currency rate sync background task with Valkey caching",
-        "description": "Implement the GET /api/v1/currency/rates endpoint returning cached rates from Valkey, and a tokio background task that fetches live rates from the chosen external API every 6 hours and stores them in both Valkey and the currency_rates table.",
-        "dependencies": [
-          4002
-        ],
-        "details": "Create src/tasks/currency_sync.rs. Spawn a tokio::task::spawn loop at server startup: sleep 0 for first run, then repeat every 6 hours. On each run: fetch rates from the chosen external currency API (confirm provider via decision point). Parse response into a HashMap<String, f64> of target currency → rate relative to base USD. For each rate: UPSERT into finance.currency_rates (base, target, rate, fetched_at) ON CONFLICT (base, target) DO UPDATE. Serialize full rates map to JSON, call redis SET rates:v1 <json> EX 21600. GET /api/v1/currency/rates handler: try redis GET rates:v1; if hit, return parsed JSON; if miss, SELECT all from currency_rates and return. Register handler route.",
-        "status": "pending",
-        "test_strategy": "After server start, wait for first sync cycle; GET /api/v1/currency/rates returns JSON with USD, CAD, AUD keys and non-zero values. Flush Valkey; GET /api/v1/currency/rates falls back to DB and returns same data. Currency_rates table has rows for USD, CAD, AUD after sync. Background task logs 'currency sync complete' every 6 hours.",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 4009,
-        "title": "Implement automated overdue invoice reminder background task",
-        "description": "Implement a daily tokio background task that queries invoices with status=sent and due_at more than 1 day past, transitions them to status=overdue, and logs a reminder entry.",
-        "dependencies": [
-          4003
-        ],
-        "details": "Create src/tasks/overdue_reminder.rs. Spawn a tokio::task::spawn loop at server startup: sleep until next midnight UTC, then repeat every 24 hours. On each run: UPDATE finance.invoices SET status='overdue' WHERE status='sent' AND due_at < NOW() - INTERVAL '1 day' RETURNING id, org_id, invoice_number. For each returned row: log tracing::info!('Invoice {} for org {} is now overdue — reminder enqueued', invoice_number, org_id). Include a TODO comment referencing Morgan integration for real email dispatch. Ensure the task handles DB errors gracefully (log error, continue loop without crashing).",
-        "status": "pending",
-        "test_strategy": "Seed invoice with due_at = NOW() - INTERVAL '2 days' and status=sent. Trigger task manually by setting sleep to 0 in test configuration or calling the update function directly. Assert invoice status is overdue via GET /api/v1/invoices/:id. Verify log output contains the invoice number. DB error during update does not panic the task (test with poisoned DB connection).",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 4010,
-        "title": "Implement JWT authentication middleware",
-        "description": "Add Tower/Axum middleware that validates JWT Bearer tokens on all /api/v1/* routes, rejecting requests without a valid token with HTTP 401.",
-        "dependencies": [
-          4003
-        ],
-        "details": "Create src/middleware/auth.rs using tower::Layer and axum::middleware::from_fn. Extract the Authorization: Bearer <token> header. Validate the JWT using the jsonwebtoken crate (add to Cargo.toml) against a secret loaded from JWT_SECRET env var (or a JWKS endpoint — confirm via decision point). Decode claims into a struct with sub (user/org id) and exp fields. Reject expired tokens with 401. On success, insert the decoded claims into Axum's request Extensions for use by handlers. Apply the middleware to the /api/v1 router group only; exclude /health, /metrics, and /api/v1/webhooks/stripe (Stripe webhook uses its own HMAC auth). Apply middleware to /internal/gdpr routes with a separate internal key check instead of JWT.",
-        "status": "pending",
-        "test_strategy": "GET /api/v1/invoices without Authorization header returns 401. GET with expired JWT returns 401. GET with valid JWT returns 200. POST /api/v1/webhooks/stripe without JWT but with valid Stripe-Signature returns 200 (not blocked by JWT middleware). GET /health/live returns 200 without auth.",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 4011,
-        "title": "Add Prometheus metrics and health endpoints",
-        "description": "Expose /metrics, /health/live, and /health/ready endpoints. Register custom Prometheus counters for invoice creation and payment recording.",
-        "dependencies": [
-          4001
-        ],
-        "details": "Create src/handlers/health.rs. GET /health/live: return 200 JSON {status: live}. GET /health/ready: attempt sqlx pool acquire with 1s timeout and redis PING; return 200 if both succeed, 503 with JSON {postgres: false/true, redis: false/true} on any failure. Create a Prometheus Registry in src/metrics.rs using the prometheus crate. Register counters: finance_invoices_created_total (labels: currency), finance_payments_recorded_total (labels: method). Expose GET /metrics returning prometheus text format via prometheus::TextEncoder. Increment counters in the respective handlers. Register /health/live, /health/ready, /metrics on the Axum router without JWT middleware.",
-        "status": "pending",
-        "test_strategy": "GET /health/live returns 200. GET /health/ready returns 200 with running DB and Redis; returns 503 when postgres pool is exhausted. GET /metrics returns text/plain with finance_invoices_created_total and finance_payments_recorded_total lines. After creating one invoice, GET /metrics shows finance_invoices_created_total counter >= 1.",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 4012,
-        "title": "Implement GDPR export and delete endpoints",
-        "description": "Implement GET /internal/gdpr/export/:org_id returning all finance data for an org and DELETE /internal/gdpr/delete/:org_id anonymizing org_id on invoices and payroll entries.",
-        "dependencies": [
-          4003,
-          4007
-        ],
-        "details": "Create src/handlers/gdpr.rs. GET /internal/gdpr/export/:org_id: validate X-Internal-Key header against INTERNAL_API_KEY env var (401 if missing/wrong). SELECT invoices WHERE org_id=$1, SELECT invoice_line_items for those invoices, SELECT payments for those invoices, SELECT payroll_entries WHERE worker_id=$1 (approximation — org may not map directly; use org_id field if added to payroll). Return JSON with keys invoices, payments, payroll. DELETE /internal/gdpr/delete/:org_id: within sqlx transaction, UPDATE finance.invoices SET org_id=NULL WHERE org_id=$1; UPDATE finance.payroll_entries SET worker_id=NULL WHERE worker_id=$1 (cast org_id as worker_id approximation — clarify data model if needed). INSERT INTO finance.gdpr_deletions (entity='finance', deleted_org_id=$1, deleted_at=NOW()). Return 204.",
-        "status": "pending",
-        "test_strategy": "GET /internal/gdpr/export/:id with valid X-Internal-Key returns JSON with invoices array containing seeded records. DELETE /internal/gdpr/delete/:id returns 204. Subsequent GET /api/v1/invoices?org_id=:id returns empty list. finance.gdpr_deletions table has one row for the org. Request without X-Internal-Key returns 401.",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 4013,
-        "title": "Write Kubernetes Deployment and Service manifests for Finance service",
-        "description": "Create Kubernetes Deployment (2 replicas) and ClusterIP Service manifests for the Finance service with correct port configuration, envFrom references, health probes, and resource limits.",
-        "dependencies": [
-          4011
-        ],
-        "details": "Create k8s/finance/deployment.yaml: apiVersion apps/v1, kind Deployment, replicas: 2, image: placeholder, envFrom: [{configMapRef: {name: sigma1-infra-endpoints}}, {secretRef: {name: sigma1-finance-secret}}]. sigma1-finance-secret must contain STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, JWT_SECRET, INTERNAL_API_KEY. Container port: 3000 (api). LivenessProbe: httpGet /health/live :3000 initialDelaySeconds 10 periodSeconds 15. ReadinessProbe: httpGet /health/ready :3000 initialDelaySeconds 20 periodSeconds 10. Resource requests: cpu 100m memory 128Mi; limits: cpu 500m memory 512Mi. Create k8s/finance/service.yaml: ClusterIP Service exposing port 3000 named api.",
-        "status": "pending",
-        "test_strategy": "kubectl apply -f k8s/finance/ --dry-run=client exits 0. kubectl apply against dev cluster shows 2/2 pods Ready within 90 seconds. kubectl describe service finance shows ClusterIP with port 3000. kubectl logs shows no startup errors.",
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 4014,
-        "title": "Write integration tests for Finance service end-to-end flows",
-        "description": "Write integration tests covering invoice lifecycle, aging bucket correctness, Stripe webhook processing, and GDPR anonymization.",
-        "dependencies": [
-          4003,
-          4004,
-          4005,
-          4006,
-          4009,
-          4012
-        ],
-        "details": "Create tests/integration.rs (Rust integration test file). Use sqlx::PgPool pointed at a test PostgreSQL instance (managed via testcontainers-rs or a pre-seeded CI database). Spin up the Axum app in a tokio::test with a bound listener. Test cases: (1) Full invoice lifecycle: create → send → receive Stripe webhook → verify paid status. (2) Aging report: seed invoice issued_at = NOW()-35d with status=sent; GET /aging returns count=1 in 31-60 bucket. (3) Overdue task: seed invoice due_at=NOW()-2d status=sent, call the update function directly, assert status=overdue. (4) GDPR delete: create invoice for org_id X, DELETE /internal/gdpr/delete/X, re-query invoices, org_id is NULL. (5) Currency rates: call sync function with mocked HTTP, assert DB row inserted and Valkey key set. Run with `cargo test --test integration`.",
-        "status": "pending",
-        "test_strategy": "cargo test --test integration exits 0 with all 5 scenarios passing. cargo test -- --nocapture shows per-test logs. cargo tarpaulin or cargo llvm-cov reports >= 80% line coverage across src/. No async deadlocks (test timeout = 30s per test).",
-        "subagentType": "tester",
         "parallelizable": false
-      }
-    ]
-  },
-  {
-    "task_analysis": {
-      "task_id": 5,
-      "title": "Build Customer Vetting Service (Rex - Rust/Axum)",
-      "description": "Implement a Rust/Axum microservice for customer vetting, orchestrating a multi-step background research pipeline (OpenCorporates, LinkedIn, Google Reviews, credit signal stub), scoring, persistence, and caching. Exposes REST API for Morgan/RMS, supports GDPR endpoints, JWT auth, Prometheus metrics, and is Kubernetes-ready.",
-      "dependencies": [
-        1
-      ],
-      "priority": "high",
-      "status": "pending",
-      "subtasks": [
-        {
-          "id": 5001,
-          "title": "Initialize Cargo workspace and declare all dependencies",
-          "status": "pending",
-          "dependencies": [],
-          "parallelizable": false
-        },
-        {
-          "id": 5002,
-          "title": "Write sqlx database migrations for vetting schema",
-          "status": "pending",
-          "dependencies": [
-            5001
-          ],
-          "parallelizable": false
-        },
-        {
-          "id": 5003,
-          "title": "Implement POST /api/v1/vetting/run handler with async pipeline orchestration",
-          "status": "pending",
-          "dependencies": [
-            5002
-          ],
-          "parallelizable": false
-        },
-        {
-          "id": 5004,
-          "title": "Implement OpenCorporates and LinkedIn pipeline steps with per-step timeout",
-          "status": "pending",
-          "dependencies": [
-            5003
-          ],
-          "parallelizable": false
-        },
-        {
-          "id": 5005,
-          "title": "Implement Google Reviews pipeline step and weighted scoring algorithm",
-          "status": "pending",
-          "dependencies": [
-            5003
-          ],
-          "parallelizable": true
-        },
-        {
-          "id": 5006,
-          "title": "Implement Valkey result caching with 24h TTL",
-          "status": "pending",
-          "dependencies": [
-            5004,
-            5005
-          ],
-          "parallelizable": false
-        },
-        {
-          "id": 5007,
-          "title": "Implement JWT middleware, health endpoints, Prometheus metrics, and GDPR endpoints",
-          "status": "pending",
-          "dependencies": [
-            5003
-          ],
-          "parallelizable": true
-        },
-        {
-          "id": 5008,
-          "title": "Write integration and unit test suite targeting >= 80% coverage",
-          "status": "pending",
-          "dependencies": [
-            5004,
-            5005,
-            5006,
-            5007
-          ],
-          "parallelizable": false
-        }
-      ],
-      "decision_points": [
-        "Credit signal provider for Phase 2: Equifax vs. Dun & Bradstreet — affects data model fields, API contract, and cost. Should be decided before the stub is replaced so the schema does not need a breaking migration.",
-        "LinkedIn OAuth2 client_credentials flow availability: LinkedIn's API may require a partner program or specific product access for company lookup. Confirm API access tier and whether a fallback scraping approach is acceptable if partner access is unavailable.",
-        "Valkey vs. Redis for caching layer: the details mention both 'redis 0.24' crate and 'Valkey'. Confirm which backing store is provisioned by the bolt infra task so the connection string and crate choice are consistent."
-      ],
-      "test_strategy": [
-        "POST /api/v1/vetting/run returns 202 with request_id within 1 second (pipeline runs async).",
-        "After async pipeline completes (poll GET /api/v1/vetting/:org_id up to 30s), response contains final_score of GREEN, YELLOW, or RED and vetted_at timestamp.",
-        "Scoring unit test: business_verified=true, linkedin_followers=500, google_reviews_rating=4.2, google_reviews_count=20, credit_score=700 should produce GREEN.",
-        "If OpenCorporates returns 404 for org, risk_flags contains business_not_found and final_score is RED or YELLOW.",
-        "Second call to POST /api/v1/vetting/run for same org_id within 24h returns cached result (verify by checking Valkey key exists via redis-cli GET vetting:org:{id}).",
-        "DELETE /internal/gdpr/delete/:org_id returns 200; subsequent GET /api/v1/vetting/:org_id returns 404.",
-        "GET /health/ready returns 200.",
-        "cargo test passes with >= 80% coverage."
-      ]
-    },
-    "infra_requirements": {
-      "database": {
-        "type": "PostgreSQL",
-        "schema": "vetting",
-        "tables": [
-          "vetting_requests",
-          "vetting_results"
-        ]
-      },
-      "cache": {
-        "type": "Valkey (Redis-compatible)",
-        "connection": "Provisioned by infra, connection string to be provided via secret/config"
-      },
-      "kubernetes": {
-        "deployment": {
-          "replicas": 2,
-          "resources": {
-            "limits": {
-              "memory": "256Mi",
-              "cpu": "500m"
-            }
-          },
-          "envFrom": [
-            "customer-vetting-config (ConfigMap)",
-            "customer-vetting-secret (Secret)"
-          ],
-          "livenessProbe": "/health/live",
-          "readinessProbe": "/health/ready"
-        }
-      },
-      "secrets": [
-        "OPENCORPORATES_API_KEY",
-        "LINKEDIN_CLIENT_ID",
-        "LINKEDIN_CLIENT_SECRET",
-        "GOOGLE_PLACES_API_KEY",
-        "JWT_SECRET",
-        "DATABASE_URL",
-        "VALKEY_URL"
-      ]
-    },
-    "api_endpoints": [
-      {
-        "method": "POST",
-        "path": "/api/v1/vetting/run",
-        "auth": "JWT required",
-        "description": "Initiate vetting pipeline for org_id/company, returns 202 with request_id"
       },
       {
-        "method": "GET",
-        "path": "/api/v1/vetting/:org_id",
-        "auth": "JWT required",
-        "description": "Fetch vetting result for org_id"
+        "id": 3005,
+        "title": "Implement Inventory, Crew, and Delivery gRPC service logic",
+        "description": "Implement the server-side logic for `InventoryService`, `CrewService`, and `DeliveryService`, including inventory transactions, crew scheduling, and delivery tracking.",
+        "dependencies": [
+          3003
+        ],
+        "details": [
+          "Implement gRPC handlers for `RecordInventoryTransaction`, `GetInventoryTransactionsByProject`.",
+          "Implement gRPC handlers for `CrewService` (e.g., `ScheduleCrew`, `GetCrewAvailability`).",
+          "Implement gRPC handlers for `DeliveryService` (e.g., `CreateDelivery`, `TrackDelivery`)."
+        ],
+        "status": "pending",
+        "test_strategy": [
+          "Use `grpcurl` to test `RecordInventoryTransaction`, `ScheduleCrew`, and `CreateDelivery` endpoints.",
+          "Verify data consistency in PostgreSQL for inventory, crew, and delivery entities."
+        ],
+        "subagentType": "implementer",
+        "parallelizable": true
       },
       {
-        "method": "GET",
-        "path": "/api/v1/vetting/credit/:org_id",
-        "auth": "JWT required",
-        "description": "Fetch credit score/risk for org_id"
-      },
-      {
-        "method": "GET",
-        "path": "/health/live",
-        "auth": "none",
-        "description": "Liveness probe"
-      },
-      {
-        "method": "GET",
-        "path": "/health/ready",
-        "auth": "none",
-        "description": "Readiness probe (checks DB and cache)"
-      },
-      {
-        "method": "GET",
-        "path": "/metrics",
-        "auth": "none",
-        "description": "Prometheus metrics endpoint"
-      },
-      {
-        "method": "GET",
-        "path": "/internal/gdpr/export/:org_id",
-        "auth": "internal only",
-        "description": "GDPR export for org_id"
-      },
-      {
-        "method": "DELETE",
-        "path": "/internal/gdpr/delete/:org_id",
-        "auth": "internal only",
-        "description": "GDPR delete for org_id"
+        "id": 3006,
+        "title": "Integrate grpc-gateway, Redis caching, and health checks",
+        "description": "Integrate `grpc-gateway` to expose REST endpoints, add Redis for session caching, and implement basic health checks for gRPC and REST endpoints.",
+        "dependencies": [
+          3004,
+          3005
+        ],
+        "details": [
+          "Integrate `grpc-gateway` to expose REST endpoints for all gRPC services.",
+          "Integrate `go-redis` client for session caching, using the Redis URL from `sigma1-infra-endpoints`.",
+          "Add `/healthz` and `/readyz` endpoints for both gRPC and REST, checking database and Redis connectivity."
+        ],
+        "status": "pending",
+        "test_strategy": [
+          "Use `curl` to verify REST endpoints exposed by `grpc-gateway` are functional.",
+          "Verify Redis caching by setting and retrieving a session value.",
+          "Access health check endpoints and confirm they return 200 OK."
+        ],
+        "subagentType": "implementer",
+        "parallelizable": false
       }
     ],
-    "scoring_algorithm": {
-      "inputs": [
-        "business_verified (bool)",
-        "linkedin_followers (int)",
-        "google_reviews_rating (float)",
-        "google_reviews_count (int)",
-        "credit_score (int)"
-      ],
-      "weights": {
-        "business_verified": 40,
-        "linkedin_score": 20,
-        "reviews_score": 20,
-        "credit_score": 20
-      },
-      "formula": "score = (business_verified ? 40 : 0) + min(linkedin_followers/1000.0, 1.0)*20 + (google_reviews_rating/5.0)*min(google_reviews_count/50.0, 1.0)*20 + ((credit_score-300)/550.0).clamp(0.0,1.0)*20",
-      "bands": {
-        "GREEN": "score >= 70",
-        "YELLOW": "40 <= score < 70",
-        "RED": "score < 40"
-      }
-    },
-    "gdpr": {
-      "export": "GET /internal/gdpr/export/:org_id returns vetting_results row as JSON",
-      "delete": "DELETE /internal/gdpr/delete/:org_id deletes vetting_results and vetting_requests, logs to audit.deletion_log"
-    },
-    "caching": {
-      "store": "Valkey (Redis-compatible)",
-      "key_pattern": "vetting:org:{org_id}",
-      "ttl_seconds": 86400,
-      "behavior": "Cache hit on POST /api/v1/vetting/run returns cached result immediately; cache miss triggers pipeline"
-    },
-    "security": {
-      "jwt": {
-        "algorithm": "HS256",
-        "env_var": "JWT_SECRET",
-        "applies_to": "/api/v1/*"
-      }
-    },
-    "observability": {
-      "metrics": [
-        "http_requests_total (Counter, labels: method, path, status)",
-        "http_request_duration_seconds (Histogram)"
-      ],
-      "health_endpoints": [
-        "/health/live",
-        "/health/ready"
-      ]
+    "contextual_notes": {
+      "deployment_environment": "Kubernetes (inferred from `infrastructure_context` listing CRDs and Services).",
+      "data_store_configuration": "PostgreSQL and Redis connection details are expected to be provided via the `sigma1-infra-endpoints` ConfigMap. Ensure this ConfigMap is created and accessible in the target Kubernetes namespace.",
+      "inter_service_communication_considerations": "The `cto` namespace contains several existing services (e.g., `cto-controller`, `cto-web`). The RMS service may need to interact with these. The 'Inter-service Authentication' decision point is critical for defining how this communication will be secured (e.g., JWT, API keys, mTLS).",
+      "potential_future_integrations": "NATS messaging (`messaging/nats`) is available in the cluster. While not a direct requirement for this task, it could be considered for future event-driven architectures or asynchronous communication patterns within the RMS or with other services."
     }
   },
   {
-    "decision_points": [
-      {
-        "id": "runtime_choice",
-        "question": "Should the project use Bun or Node.js 20 as the runtime?",
-        "options": [
-          {
-            "value": "nodejs",
-            "description": "Node.js 20 is the most compatible with all required dependencies (sharp, @aws-sdk/client-s3, ioredis, etc.) and is explicitly mentioned in the stack. It is the safest choice for production and CI/CD."
-          },
-          {
-            "value": "bun",
-            "description": "Bun offers performance benefits and native Elysia support, but may have compatibility issues with sharp and AWS SDK. Use only if all dependencies are confirmed to work and the team is comfortable with Bun's ecosystem."
-          }
-        ],
-        "recommendation": "nodejs",
-        "rationale": "Node.js 20 is explicitly required in the stack, and all dependencies are known to work. Bun is not yet fully compatible with sharp and AWS SDK, which are critical for this project."
-      },
-      {
-        "id": "caption_generation_provider",
-        "question": "Should the caption generation use OpenAI or Claude (Anthropic)?",
-        "options": [
-          {
-            "value": "openai",
-            "description": "OpenAI is referenced in the detailed steps and is widely used for caption generation. The SDK is already included in the dependencies."
-          },
-          {
-            "value": "claude",
-            "description": "Claude (Anthropic) is mentioned as an alternative, but is not referenced in the implementation details. Would require additional integration and testing."
-          }
-        ],
-        "recommendation": "openai",
-        "rationale": "The implementation details and test strategies only reference OpenAI. Using a single provider reduces complexity and avoids maintaining two SDKs."
-      },
-      {
-        "id": "signal_notification_mechanism",
-        "question": "How should Signal notifications be sent for the approval workflow?",
-        "options": [
-          {
-            "value": "signal_cli",
-            "description": "Use signal-cli (REST API) as a sidecar or standalone service. This is the most reliable and scriptable way to send Signal messages from a server."
-          },
-          {
-            "value": "third_party_bridge",
-            "description": "Use a third-party Signal bridge (e.g., matrix-signal-bridge) if signal-cli is not feasible. May introduce additional operational complexity."
-          }
-        ],
-        "recommendation": "signal_cli",
-        "rationale": "signal-cli is already referenced in the infrastructure and is the most direct way to send Signal messages programmatically. It is already provisioned in the infra scaffolding."
-      },
-      {
-        "id": "tiktok_api_access",
-        "question": "Is TikTok Content Posting API access available for this project?",
-        "options": [
-          {
-            "value": "available",
-            "description": "TikTok API access is approved and credentials are available. TikTokService can be implemented as described."
-          },
-          {
-            "value": "not_available",
-            "description": "TikTok API access is not available. TikTokService should be a no-op or return a not-configured error, and TikTok can be skipped for v1."
-          }
-        ],
-        "recommendation": "not_available",
-        "rationale": "TikTok's API is restricted and requires business approval. Unless credentials are already available, implementation should gracefully skip TikTok for v1."
-      },
-      {
-        "id": "r2_sdk_approach",
-        "question": "Should Cloudflare R2 be accessed via the S3-compatible AWS SDK or a Cloudflare-native SDK?",
-        "options": [
-          {
-            "value": "aws_sdk",
-            "description": "Use @aws-sdk/client-s3 with R2 endpoint and credentials. This is the most common and supported approach for Node.js apps."
-          },
-          {
-            "value": "cloudflare_sdk",
-            "description": "Use a Cloudflare-native SDK if available. May offer better integration but is less common and may lack features."
-          }
-        ],
-        "recommendation": "aws_sdk",
-        "rationale": "The stack and implementation details specify @aws-sdk/client-s3. Cloudflare R2 is S3-compatible and this approach is well-documented and supported."
-      }
-    ],
-    "subtasks": [
-      {
-        "id": 6001,
-        "title": "Initialize Node.js/TypeScript project and install all dependencies",
-        "status": "pending"
-      },
-      {
-        "id": 6002,
-        "title": "Write database migrations for social schema tables",
-        "status": "pending"
-      },
-      {
-        "id": 6003,
-        "title": "Define Effect.Schema types and Effect.Service interfaces",
-        "status": "pending"
-      },
-      {
-        "id": 6004,
-        "title": "Implement photo upload handler and R2 multipart storage",
-        "status": "pending"
-      },
-      {
-        "id": 6005,
-        "title": "Implement AI photo curation pipeline with OpenAI vision scoring",
-        "status": "pending"
-      },
-      {
-        "id": 6006,
-        "title": "Implement sharp image cropping for platform-specific formats and R2 upload",
-        "status": "pending"
-      },
-      {
-        "id": 6007,
-        "title": "Implement caption generation via OpenAI chat API",
-        "status": "pending"
-      },
-      {
-        "id": 6008,
-        "title": "Implement approval workflow endpoints and Signal notification",
-        "status": "pending"
-      },
-      {
-        "id": 6009,
-        "title": "Implement InstagramService with Effect retry and Graph API integration",
-        "status": "pending"
-      },
-      {
-        "id": 6010,
-        "title": "Implement LinkedInService with Effect retry and Share API integration",
-        "status": "pending"
-      },
-      {
-        "id": 6011,
-        "title": "Implement TikTokService with Effect retry and Content Posting API integration",
-        "status": "pending"
-      },
-      {
-        "id": 6012,
-        "title": "Implement FacebookService with Effect retry and Graph API integration",
-        "status": "pending"
-      },
-      {
-        "id": 6013,
-        "title": "Implement POST /api/v1/social/drafts/:id/publish orchestration and GET /api/v1/social/published",
-        "status": "pending"
-      },
-      {
-        "id": 6014,
-        "title": "Implement JWT middleware, health endpoints, Prometheus metrics, and GDPR endpoints",
-        "status": "pending"
-      },
-      {
-        "id": 6015,
-        "title": "Write vitest test suite targeting >= 80% coverage",
-        "status": "pending"
-      }
-    ]
-  },
-  {
-    "task_id": 7,
-    "title": "Configure Morgan AI Agent (Angie - OpenClaw/MCP)",
-    "status": "pending",
-    "dependencies": [
-      2,
-      3,
-      4,
-      5,
-      6
-    ],
-    "priority": "high",
-    "agent": "angie",
-    "stack": "OpenClaw/MCP",
-    "description": "Configure and deploy the Morgan AI agent on OpenClaw with all 12 MCP tools (10 business tools + 2 GDPR tools) pointing to the Rust, Go, and Node.js backend services. Define agent skills, system prompt, Signal-CLI integration, ElevenLabs voice config, and web chat widget endpoint. Morgan becomes the single intelligent interface for all customer interactions.",
-    "details": [
-      "Create OpenClaw agent configuration at agents/morgan/agent.yaml. Set agent_id: morgan, model: openai-api/gpt-4o (use available model, update when gpt-5.4-pro available), namespace: openclaw.",
-      "System prompt (agents/morgan/system-prompt.md): Morgan is the AI agent for Sigma-1/Perception Events, a lighting and visual production company. Persona: professional, efficient, friendly. Core responsibilities listed with decision trees for lead qualification, quote generation, vetting, invoicing, social media approval.",
-      "MCP tool-server configuration (agents/morgan/tools.yaml). Define tools pointing to in-cluster service URLs.",
-      "Skills configuration (agents/morgan/skills/): Define skill manifests for sales-qual, customer-vet, quote-gen, upsell, finance, social-media, rms-checkout, rms-checkin, admin. Each skill references relevant MCP tools and includes decision logic in the skill prompt.",
-      "Signal-CLI integration: configure OpenClaw Signal adapter to connect to http://signal-cli-svc.signal.svc.cluster.local:7583 JSON-RPC. Set phone_number from TWILIO_PHONE_NUMBER secret. Configure receive_loop: true.",
-      "ElevenLabs voice: configure voice_id from ELEVENLABS_API_KEY secret. Set voice model to eleven_turbo_v2 for low latency. Twilio SIP trunk configuration: Morgan receives inbound calls via Twilio webhook POST /voice/inbound, responds with TwiML, bridges to ElevenLabs.",
-      "Web chat: configure OpenClaw web chat adapter on port 3000. Expose as ClusterIP service morgan-chat-svc:3000. Web chat widget JS snippet to be embedded by Blaze in Task 8.",
-      "Kubernetes: Morgan Deployment in openclaw namespace, 1 replica, PVC morgan-workspace (10Gi) at /workspace. envFrom sigma1-infra-endpoints + all API key secrets. Liveness probe: GET /health/live on OpenClaw admin port. Cloudflare Tunnel annotation for external Signal webhook access.",
-      "Test all MCP tool connections by running Morgan in interactive CLI mode and issuing one request per tool. Verify tool responses are correctly parsed."
-    ],
-    "test_strategy": [
-      "kubectl exec into Morgan pod and run morgan tool-test sigma1_catalog_search query=lights — response contains product array with name and day_rate fields.",
-      "sigma1_check_availability for a known product_id with valid date range returns availability object with quantity_available field.",
-      "sigma1_generate_quote with customer_id and line items creates opportunity in RMS — verify via GET /api/v1/opportunities/:id returns status=pending.",
-      "sigma1_vet_customer with valid org data returns 202 and polling returns final_score within 60s.",
-      "sigma1_create_invoice creates invoice in Finance — verify via GET /api/v1/invoices/:id returns total_cents > 0.",
-      "sigma1_gdpr_export returns aggregated JSON containing data from at least 3 services.",
-      "Signal-CLI connectivity: send test message to Morgan's phone number via Signal; verify Morgan pod logs show incoming message received.",
-      "Web chat endpoint: POST http://morgan-chat-svc:3000/chat with {message: 'hello'} returns {reply: <non-empty string>} within 10 seconds."
-    ],
-    "decision_points": [
-      {
-        "id": "dp-7-1",
-        "question": "Which OpenClaw model identifier should be used at launch? The details specify openai-api/gpt-4o as a placeholder pending gpt-5.4-pro. Should the initial deployment pin to gpt-4o, or is there a preferred interim model (e.g., gpt-4-turbo, gpt-4o-mini) based on cost/latency trade-offs?",
-        "impact": "Affects agent.yaml model field and system prompt token budget calculations."
-      },
-      {
-        "id": "dp-7-2",
-        "question": "The GDPR orchestration tools (sigma1_gdpr_export, sigma1_gdpr_delete) must fan out to all 5 services. Should this orchestration be implemented as a dedicated MCP proxy sidecar, as inline OpenClaw tool chaining logic, or as a separate lightweight Go/Node.js aggregator service?",
-        "impact": "Determines architecture complexity, failure isolation, and audit logging placement for GDPR operations."
-      },
-      {
-        "id": "dp-7-3",
-        "question": "Signal-CLI phone_number is sourced from the TWILIO_PHONE_NUMBER secret, but Signal and Twilio use different number registries. Should Morgan use a dedicated Signal-registered number separate from the Twilio voice number, or are they expected to be the same number with dual registration?",
-        "impact": "Affects secrets configuration, Signal-CLI registration steps, and how inbound call vs. inbound message routing is differentiated."
-      },
-      {
-        "id": "dp-7-4",
-        "question": "ElevenLabs TwiML bridging: should Morgan respond to Twilio voice calls with a live streaming TTS connection to ElevenLabs, or should responses be pre-synthesized and returned as audio URLs in TwiML? The eleven_turbo_v2 model supports streaming but adds integration complexity.",
-        "impact": "Determines latency characteristics, TwiML response structure, and whether a WebSocket bridge component is needed."
-      }
-    ],
-    "subtasks": [
-      {
-        "id": 7001,
-        "title": "Create OpenClaw agent.yaml and system-prompt.md for Morgan",
-        "description": "Author the core OpenClaw agent configuration file at agents/morgan/agent.yaml and the system prompt at agents/morgan/system-prompt.md defining Morgan's persona, responsibilities, and decision trees.",
-        "dependencies": [],
-        "details": [
-          "Create agents/morgan/agent.yaml with fields: agent_id: morgan, model: openai-api/gpt-4o, namespace: openclaw, description, and references to tools.yaml and skills/ directory.",
-          "Create agents/morgan/system-prompt.md. Content must cover: (a) company context — Sigma-1/Perception Events, lighting and visual production; (b) persona — professional, efficient, friendly; (c) core responsibilities: lead qualification, quote generation, customer vetting, invoicing, social media content approval; (d) decision trees for each responsibility as numbered flowcharts in markdown; (e) tone guidelines and escalation rules.",
-          "Validate agent.yaml against OpenClaw schema using `openclaw validate agents/morgan/agent.yaml`.",
-          "Ensure system prompt fits within the model's context window — keep under 4000 tokens."
-        ],
-        "status": "pending",
-        "test_strategy": [
-          "`openclaw validate agents/morgan/agent.yaml` exits 0 with no errors.",
-          "Character count of system-prompt.md is below 16000 chars.",
-          "Manual review confirms all 5 responsibility areas have explicit decision tree branches."
-        ],
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 7002,
-        "title": "Define all 9 skill manifests in agents/morgan/skills/",
-        "description": "Create individual YAML skill manifest files for each of the 9 Morgan skills: sales-qual, customer-vet, quote-gen, upsell, finance, social-media, rms-checkout, rms-checkin, and admin.",
-        "dependencies": [
-          7001
-        ],
-        "details": [
-          "For each skill, create agents/morgan/skills/{skill-name}.yaml with fields: skill_id, display_name, description, tools (list of MCP tool IDs this skill uses), and skill_prompt (embedded decision logic as a string).",
-          "sales-qual.yaml: references sigma1_catalog_search, sigma1_score_lead; prompt includes lead scoring thresholds.",
-          "customer-vet.yaml: references sigma1_vet_customer; prompt includes go/no-go criteria based on final_score.",
-          "quote-gen.yaml: references sigma1_generate_quote, sigma1_check_availability; prompt includes line item assembly logic.",
-          "upsell.yaml: references sigma1_catalog_search, sigma1_equipment_lookup; prompt includes cross-sell logic.",
-          "finance.yaml: references sigma1_create_invoice, sigma1_finance_report; prompt includes invoice confirmation flow.",
-          "social-media.yaml: references sigma1_social_curate, sigma1_social_publish; prompt includes approval gate logic.",
-          "rms-checkout.yaml: references sigma1_generate_quote; prompt covers equipment dispatch confirmation.",
-          "rms-checkin.yaml: references sigma1_equipment_lookup; prompt covers return inspection.",
-          "admin.yaml: references sigma1_gdpr_export, sigma1_gdpr_delete; prompt includes GDPR request handling steps and confirmation requirements.",
-          "Register all skills in agent.yaml skills list."
-        ],
-        "status": "pending",
-        "test_strategy": [
-          "`openclaw validate agents/morgan/skills/*.yaml` exits 0 for all 9 files.",
-          "Each skill YAML has non-empty tools array and non-empty skill_prompt.",
-          "`openclaw agent list-skills morgan` returns all 9 skill IDs."
-        ],
-        "subagentType": "implementer",
-        "parallelizable": false
-      },
-      {
-        "id": 7003,
-        "title": "Configure MCP tools.yaml for 10 business tools",
-        "description": "Author agents/morgan/tools.yaml defining all 10 business MCP tools with correct in-cluster service URLs, HTTP methods, parameter schemas, and response field descriptions.",
-        "dependencies": [],
-        "details": [
-          "Create agents/morgan/tools.yaml. For each tool define: tool_id, display_name, description, http_method, url_template (with {param} placeholders), request_schema (JSON Schema for body or query params), response_schema (JSON Schema describing expected response shape), and timeout_seconds.",
-          "sigma1_catalog_search: GET http://equipment-catalog-svc.sigma1.svc.cluster.local:8080/api/v1/catalog/products?search={query}. Response schema: array of {name: string, product_id: string, day_rate: number}.",
-          "sigma1_check_availability: GET .../products/{product_id}/availability?from={from}&to={to}. Params: product_id (path), from/to (ISO8601 query). Response: {quantity_available: integer}.",
-          "sigma1_generate_quote: POST http://rms-svc.sigma1.svc.cluster.local:8080/api/v1/opportunities. Body schema: {customer_id, line_items: [{product_id, quantity, days}], event_date}.",
-          "sigma1_vet_customer: POST http://customer-vetting-svc.sigma1.svc.cluster.local:8080/api/v1/vetting/run. Body: {org_name, contact_email, event_description}. Response: {vetting_id: string, status: string}.",
-          "sigma1_score_lead: GET http://rms-svc.sigma1.svc.cluster.local:8080/api/v1/opportunities/{id}/score. Path param: id. Response: {score: number, tier: string}.",
-          "sigma1_create_invoice: POST http://finance-svc.sigma1.svc.cluster.local:8080/api/v1/invoices. Body: {opportunity_id, customer_id, line_items}. Response: {invoice_id, total_cents}.",
-          "sigma1_finance_report: GET http://finance-svc.sigma1.svc.cluster.local:8080/api/v1/finance/reports/revenue?period={period}. Param: period (e.g. 2025-Q1). Response: {total_revenue_cents, invoice_count}.",
-          "sigma1_social_curate: POST http://social-engine-svc.sigma1.svc.cluster.local:8080/api/v1/social/upload. Multipart body: file + metadata JSON. Response: {draft_id}.",
-          "sigma1_social_publish: POST .../social/drafts/{draft_id}/publish. Path param: draft_id. Response: {published_url}.",
-          "sigma1_equipment_lookup: GET http://equipment-catalog-svc.sigma1.svc.cluster.local:8080/api/v1/equipment-api/catalog. Response: array of catalog items."
-        ],
-        "status": "pending",
-        "test_strategy": [
-          "`openclaw validate agents/morgan/tools.yaml` exits 0.",
-          "Tool count in file equals 10 (excluding GDPR tools which are in separate file).",
-          "Each tool entry has non-empty url_template, http_method, request_schema, and response_schema."
-        ],
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 7004,
-        "title": "Configure GDPR orchestration tools (sigma1_gdpr_export and sigma1_gdpr_delete)",
-        "description": "Define the two GDPR MCP tools in a dedicated agents/morgan/tools-gdpr.yaml that fan out to all 5 backend services and aggregate or delete data, with audit logging for the delete operation.",
-        "dependencies": [
-          7003
-        ],
-        "details": [
-          "Create agents/morgan/tools-gdpr.yaml.",
-          "sigma1_gdpr_export tool: tool_id: sigma1_gdpr_export, http_method: ORCHESTRATED, description: 'Export all personal data for a customer across all services'. Define fan_out array targeting 5 services. Aggregation strategy: merge all response bodies into top-level keyed object by service name. On partial failure: include error key per service, do not fail entire request.",
-          "sigma1_gdpr_delete tool: tool_id: sigma1_gdpr_delete, http_method: ORCHESTRATED. Define fan_out array with DELETE method for all 5 services at /internal/gdpr/delete/{customer_id}. Post-delete: write audit record to OpenClaw audit log with customer_id, timestamp, and per-service status. Require human confirmation step in skill prompt before executing.",
-          "Reference both tools in admin.yaml skill manifest.",
-          "Include GDPR tools in main agent.yaml tool reference list."
-        ],
-        "status": "pending",
-        "test_strategy": [
-          "`openclaw validate agents/morgan/tools-gdpr.yaml` exits 0.",
-          "sigma1_gdpr_export fan_out array contains exactly 5 entries.",
-          "sigma1_gdpr_delete fan_out array contains exactly 5 entries and audit_log field is present.",
-          "`openclaw agent list-tools morgan` includes both gdpr tool IDs."
-        ],
-        "subagentType": "implementer",
-        "parallelizable": false
-      },
-      {
-        "id": 7005,
-        "title": "Configure Signal-CLI adapter in OpenClaw for Morgan",
-        "description": "Set up the OpenClaw Signal messaging adapter pointing to the signal-cli-svc JSON-RPC endpoint, with phone number from secret and receive loop enabled.",
-        "dependencies": [],
-        "details": [
-          "In agents/morgan/agent.yaml (or a separate adapters/signal.yaml referenced from agent.yaml), add the signal adapter block.",
-          "Map the SIGNAL_PHONE_NUMBER env var from the existing Kubernetes secret (likely the same secret holding TWILIO_PHONE_NUMBER — confirm secret key name from Task 2 infra endpoints).",
-          "Configure message routing: all incoming Signal messages route to Morgan's main conversation handler.",
-          "Set max_message_length: 1500 to stay within Signal limits.",
-          "Document the adapter config in agents/morgan/README.md under 'Signal Integration'."
-        ],
-        "status": "pending",
-        "test_strategy": [
-          "After Morgan pod is running: send a test Signal message to the configured phone number from a registered Signal account.",
-          "Verify `kubectl logs -n openclaw deployment/morgan` shows 'Signal message received' log line within 30 seconds.",
-          "Verify Morgan's reply appears in the Signal conversation."
-        ],
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 7006,
-        "title": "Configure ElevenLabs voice adapter and Twilio TwiML webhook in OpenClaw",
-        "description": "Set up ElevenLabs TTS voice configuration using the eleven_turbo_v2 model and define the Twilio inbound call TwiML webhook handler so Morgan can receive and respond to phone calls.",
-        "dependencies": [],
-        "details": [
-          "In agents/morgan/agent.yaml, add voice adapter block.",
-          "Add Twilio webhook adapter block.",
-          "The /voice/inbound endpoint must return TwiML that: (a) greets the caller with a synthesized ElevenLabs message via <Play> or <Say> with voice attribute, (b) captures speech input with <Gather>, (c) POSTs transcription back to Morgan for processing.",
-          "Map ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID from Kubernetes secrets in the Deployment (handled in subtask 7008).",
-          "Document call flow in agents/morgan/README.md under 'Voice Integration'."
-        ],
-        "status": "pending",
-        "test_strategy": [
-          "POST to Morgan's /voice/inbound webhook (via port-forward or Cloudflare Tunnel URL) with a mock Twilio inbound call payload.",
-          "Response must be valid TwiML XML (Content-Type: application/xml) containing <Response> root element.",
-          "ElevenLabs API key validation: `openclaw agent test-voice morgan --text 'hello'` returns an audio file."
-        ],
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 7007,
-        "title": "Configure OpenClaw web chat adapter and expose morgan-chat-svc",
-        "description": "Enable the OpenClaw web chat adapter on port 3000, serving the chat API endpoint and the embeddable widget JavaScript, and create the ClusterIP Kubernetes Service.",
-        "dependencies": [],
-        "details": [
-          "In agents/morgan/agent.yaml, add web chat adapter block.",
-          "The /chat endpoint accepts POST {message: string, session_id?: string} and returns {reply: string, session_id: string}.",
-          "The /widget.js endpoint returns a self-contained JavaScript snippet that renders a floating chat button and slide-up panel targeting the /chat endpoint.",
-          "Create k8s/openclaw/morgan-chat-svc.yaml: ClusterIP Service in openclaw namespace, selector: app=morgan, port 3000 → targetPort 3000, name: morgan-chat-svc.",
-          "Apply service manifest: `kubectl apply -f k8s/openclaw/morgan-chat-svc.yaml`."
-        ],
-        "status": "pending",
-        "test_strategy": [
-          "After pod is running: `kubectl port-forward svc/morgan-chat-svc 3000:3000 -n openclaw`.",
-          "POST http://localhost:3000/chat with {\"message\": \"hello\"} returns JSON with non-empty reply field within 10s.",
-          "GET http://localhost:3000/widget.js returns JavaScript with Content-Type: application/javascript."
-        ],
-        "subagentType": "implementer",
-        "parallelizable": true
-      },
-      {
-        "id": 7008,
-        "title": "Create Morgan Kubernetes Deployment with PVC, secrets, and Cloudflare Tunnel annotation",
-        "description": "Author the Kubernetes Deployment manifest for Morgan in the openclaw namespace, including the 10Gi PVC, envFrom references to all required secrets and ConfigMaps, liveness probe, and Cloudflare Tunnel annotation for the Signal webhook.",
-        "dependencies": [
-          7001,
-          7002,
-          7003,
-          7004,
-          7005,
-          7006,
-          7007
-        ],
-        "details": [
-          "Create k8s/openclaw/morgan-deployment.yaml.",
-          "Deployment spec: namespace: openclaw, replicas: 1, selector: app=morgan.",
-          "Container spec: image: openclaw/agent:latest (or pinned tag), args: ['--agent-dir', '/agents/morgan'].",
-          "Volume mounts: /workspace from PVC morgan-workspace, /agents/morgan from ConfigMap or mounted from repo via init container.",
-          "PVC: create k8s/openclaw/morgan-pvc.yaml — PersistentVolumeClaim name: morgan-workspace, storageClassName: standard, accessModes: ReadWriteOnce, storage: 10Gi.",
-          "envFrom: sigma1-infra-endpoints ConfigMap (from Task 2), plus secretRef entries for: elevenlabs-secret (ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID), twilio-secret (TWILIO_PHONE_NUMBER, TWILIO_SIP_DOMAIN), openai-secret (OPENAI_API_KEY), signal-secret (SIGNAL_PHONE_NUMBER).",
-          "Liveness probe: httpGet path: /health/live, port: 8081 (OpenClaw admin port), initialDelaySeconds: 30, periodSeconds: 15.",
-          "Readiness probe: httpGet path: /health/ready, port: 8081, initialDelaySeconds: 15.",
-          "Annotations: cloudflare-tunnel/enabled: 'true', cloudflare-tunnel/hostname: '${MORGAN_TUNNEL_HOSTNAME}', cloudflare-tunnel/service: 'http://morgan-chat-svc:3000' (also routes /voice/inbound externally).",
-          "Apply: `kubectl apply -f k8s/openclaw/morgan-pvc.yaml -f k8s/openclaw/morgan-deployment.yaml`.",
-          "Wait for rollout: `kubectl rollout status deployment/morgan -n openclaw`."
-        ],
-        "status": "pending",
-        "test_strategy": [
-          "`kubectl get deployment morgan -n openclaw` shows 1/1 READY.",
-          "`kubectl get pvc morgan-workspace -n openclaw` shows Bound.",
-          "`kubectl describe deployment morgan -n openclaw` shows all expected envFrom sources listed.",
-          "`kubectl exec -n openclaw deployment/morgan -- wget -qO- http://localhost:8081/health/live` returns HTTP 200."
-        ],
-        "subagentType": "implementer",
-        "parallelizable": false
-      },
-      {
-        "id": 7009,
-        "title": "Execute end-to-end MCP tool connectivity tests for all 12 tools",
-        "description": "Run one interactive CLI test request per MCP tool to verify every tool correctly reaches its backend service, receives a valid response, and is correctly parsed by Morgan.",
-        "dependencies": [
-          7008
-        ],
-        "details": [
-          "For each of the 12 tools, run `kubectl exec -n openclaw deployment/morgan -- morgan tool-test <tool_id> [params]` and capture output.",
-          "sigma1_catalog_search: query=lights → expect array with name and day_rate fields.",
-          "sigma1_check_availability: product_id=<known_id> from={today} to={today+7} → expect {quantity_available: integer}.",
-          "sigma1_generate_quote: customer_id=test-cust-001, line_items=[{product_id: <id>, quantity: 1, days: 2}] → expect opportunity_id in response; verify via GET /api/v1/opportunities/:id returns status=pending.",
-          "sigma1_vet_customer: org_name='Test Co', contact_email='test@example.com', event_description='Corporate event' → expect {vetting_id, status}; poll until final_score appears within 60s.",
-          "sigma1_score_lead: id=<opportunity_id from step 4> → expect {score: number, tier: string}.",
-          "sigma1_create_invoice: use opportunity from step 4 → expect {invoice_id, total_cents > 0}; verify via GET /api/v1/invoices/:id.",
-          "sigma1_finance_report: period=2025-Q1 → expect {total_revenue_cents, invoice_count}.",
-          "sigma1_social_curate: upload test image file → expect {draft_id}.",
-          "sigma1_social_publish: draft_id=<from step 9> → expect {published_url}.",
-          "sigma1_equipment_lookup: no params → expect array of catalog items.",
-          "sigma1_gdpr_export: customer_id=test-cust-001 → expect aggregated JSON with keys from at least 3 services.",
-          "sigma1_gdpr_delete: customer_id=test-cust-gdpr-del-001 (dedicated test customer) → expect per-service status map; verify audit log entry via OpenClaw audit API.",
-          "Record pass/fail per tool in a test report file at agents/morgan/test-results/tool-connectivity.json."
-        ],
-        "status": "pending",
-        "test_strategy": [
-          "All 12 tool tests return exit code 0 from morgan tool-test.",
-          "tool-connectivity.json shows 12 entries all with status: pass.",
-          "No tool times out (default 30s timeout).",
-          "GDPR delete audit log entry is present and contains customer_id and per-service statuses."
-        ],
-        "subagentType": "tester",
-        "parallelizable": false
-      },
-      {
-        "id": 7010,
-        "title": "Verify Signal message receipt and web chat endpoint via integration test",
-        "description": "Send a real Signal test message to Morgan's number and validate round-trip receipt in pod logs. Also validate the web chat /chat endpoint returns a coherent reply.",
-        "dependencies": [
-          7008,
-          7009
-        ],
-        "details": [
-          "Signal integration test: using a Signal-registered test account, send the message 'Test connectivity ping' to Morgan's configured phone number. Watch `kubectl logs -f -n openclaw deployment/morgan` for a log line containing 'Signal message received' within 30 seconds. Verify a reply appears in the Signal conversation within 60 seconds.",
-          "Web chat integration test: `kubectl port-forward svc/morgan-chat-svc 3000:3000 -n openclaw &`. Run: `curl -s -X POST http://localhost:3000/chat -H 'Content-Type: application/json' -d '{\"message\": \"What lighting equipment do you offer?\"}' | jq .`. Verify response contains reply field with non-empty string and session_id field.",
-          "Document both test outcomes in agents/morgan/test-results/integration-tests.md.",
-          "If Signal test fails: check signal-cli-svc pod logs for JSON-RPC connection errors, verify SIGNAL_PHONE_NUMBER secret value matches registered Signal number."
-        ],
-        "status": "pending",
-        "test_strategy": [
-          "Morgan pod logs show Signal message receipt log within 30s of sending test message.",
-          "Signal conversation shows Morgan reply within 60s.",
-          "curl to /chat returns JSON {reply: <non-empty>, session_id: <non-empty>} with HTTP 200 within 10s."
-        ],
-        "subagentType": "tester",
-        "parallelizable": false
-      }
-    ]
-  },
-  {
-    "decision_points": [
-      {
-        "id": "dp-8-1",
-        "question": "Should the shared design tokens package (packages/design-tokens) be consumed by a mobile app as well? The details mention 'Import in both apps/website and apps/mobile' but no mobile app task exists in the input. Should mobile be scoped out of the design token package for now, or is apps/mobile expected to be created later?",
-        "options": [
-          {
-            "option": "Scope design tokens for web only (apps/website) for now.",
-            "pros": [
-              "Simplifies initial implementation (no need to support React Native or Expo).",
-              "No need to export tokens as JS objects or CSS variables for mobile.",
-              "Reduces risk of overengineering before mobile requirements are clear."
-            ],
-            "cons": [
-              "If a mobile app is added later, refactoring may be needed to support React Native.",
-              "Misses opportunity to enforce brand consistency across platforms from the start."
-            ],
-            "recommended": true,
-            "rationale": "No mobile app task exists in the current scope. Design tokens can be extended for mobile later if/when apps/mobile is created."
-          },
-          {
-            "option": "Design tokens package should be platform-agnostic and support both web and mobile from the start.",
-            "pros": [
-              "Future-proofs the design system for cross-platform use.",
-              "Enables brand consistency if/when a mobile app is added.",
-              "May allow for easier adoption in Storybook or other design tools."
-            ],
-            "cons": [
-              "Requires additional work to export tokens in both CSS and JS formats.",
-              "May introduce complexity (e.g., Tailwind config for React Native is non-trivial).",
-              "No immediate consumer for mobile tokens."
-            ],
-            "recommended": false,
-            "rationale": "No mobile app is in scope yet; premature optimization."
-          }
-        ],
-        "decision": "Scope design tokens for web only (apps/website) for now. If/when a mobile app is added, extend the package to support React Native."
-      },
-      {
-        "id": "dp-8-2",
-        "question": "For the portfolio masonry lightbox, should the implementation use vaul (a drawer/bottom-sheet library) or a next/image modal pattern? The details list both as options. These have meaningfully different UX and dependency footprints.",
-        "options": [
-          {
-            "option": "Use shadcn/ui Dialog (modal) with next/image for the lightbox.",
-            "pros": [
-              "No extra dependency (shadcn/ui Dialog is already installed).",
-              "Standard modal UX for image lightbox is familiar to users.",
-              "next/image provides optimized image loading and responsive support.",
-              "Keyboard accessibility and focus management are handled."
-            ],
-            "cons": [
-              "Not as mobile-native as a bottom sheet.",
-              "Dialog modals can be less discoverable on mobile if not styled well."
-            ],
-            "recommended": true,
-            "rationale": "shadcn/ui Dialog is already a dependency, and next/image is required for image optimization. This approach is simple, accessible, and covers both desktop and mobile adequately."
-          },
-          {
-            "option": "Use vaul (drawer/bottom-sheet) for the lightbox.",
-            "pros": [
-              "Mobile-native UX (swipeable bottom sheet).",
-              "Modern feel, especially on mobile devices.",
-              "Can be reused for other bottom-sheet interactions."
-            ],
-            "cons": [
-              "Adds a new dependency (vaul).",
-              "Drawer UX is less common for image lightboxes on desktop.",
-              "Potentially more complex to implement for keyboard accessibility."
-            ],
-            "recommended": false,
-            "rationale": "Not required unless a mobile-first bottom sheet is a strong design goal. Dialog modal is sufficient for v1."
-          }
-        ],
-        "decision": "Use shadcn/ui Dialog (modal) with next/image for the lightbox. Do not add vaul unless a mobile-native bottom sheet is specifically requested."
-      },
-      {
-        "id": "dp-8-3",
-        "question": "The Morgan chat widget is embedded via next/script pointing to the morgan-chat-svc Cloudflare Tunnel URL. Should the widget iframe be sandboxed or fully trusted? If the Cloudflare Tunnel URL changes between environments (staging vs. prod), how should NEXT_PUBLIC_MORGAN_WIDGET_URL be managed — per-environment in wrangler.toml or via CI secrets?",
-        "options": [
-          {
-            "option": "Fully trust the widget (no sandbox), but restrict script-src and connect-src to the specific Cloudflare Tunnel domain in CSP.",
-            "pros": [
-              "Widget is a first-party service (Morgan), so full trust is reasonable.",
-              "No risk of breaking widget functionality due to sandbox restrictions.",
-              "CSP still limits risk of XSS or data exfiltration."
-            ],
-            "cons": [
-              "If the widget is compromised, it has full access to the DOM.",
-              "Requires careful management of allowed domains in CSP."
-            ],
-            "recommended": true,
-            "rationale": "Morgan is a trusted internal service. Sandboxing may break widget features (e.g., postMessage, localStorage). CSP is sufficient for risk mitigation."
-          },
-          {
-            "option": "Sandbox the widget iframe/script (restrict access to DOM, cookies, etc.).",
-            "pros": [
-              "Limits blast radius if widget is compromised.",
-              "Best practice for third-party widgets."
-            ],
-            "cons": [
-              "May break widget functionality (e.g., cannot interact with parent window, limited styling).",
-              "Requires widget to be designed for sandboxing."
-            ],
-            "recommended": false,
-            "rationale": "Widget is first-party and may require full DOM access. Sandboxing is not necessary unless security review finds specific risks."
-          }
-        ],
-        "decision": "Do not sandbox the widget. Trust the Morgan widget as a first-party script, but restrict allowed domains in CSP (script-src, connect-src) to the Cloudflare Tunnel domain.",
-        "env_management": {
-          "option": "Manage NEXT_PUBLIC_MORGAN_WIDGET_URL per-environment via CI secrets (GitHub Actions) and/or wrangler.toml [vars].",
-          "pros": [
-            "Allows different widget endpoints for staging, preview, and production.",
-            "No need to hardcode URLs in source code.",
-            "Works with Cloudflare Pages and local dev."
-          ],
-          "cons": [
-            "Requires CI/CD configuration for each environment.",
-            "Developers must keep .env.local.example up to date."
-          ],
-          "recommended": true,
-          "rationale": "Per-environment configuration is standard for URLs that differ between staging and production. Use wrangler.toml [vars] for Cloudflare Pages, and CI secrets for GitHub Actions deploys."
+    "plan": {
+      "title": "Development Plan: Finance Service (Rex - Rust/Axum)",
+      "overview": "This plan outlines the development of the Finance Service, a Rust/Axum application responsible for invoicing, payments, and financial reporting. It will integrate with the existing RMS service and utilize PostgreSQL for data persistence. The service will be deployed to Kubernetes, leveraging existing infrastructure components like External Secrets and Loki.",
+      "decision_points_resolution": [
+        {
+          "point": "Stripe Integration Depth",
+          "resolution": "The initial focus will be on recording payment events received via Stripe webhooks, rather than initiating full payment processing from the Finance service. This aligns with the task description and subtask 4005 details."
+        },
+        {
+          "point": "RMS Integration Protocol",
+          "resolution": "For fetching project details from the RMS service (Task 3) for quote-to-invoice conversion, a RESTful API client will be implemented. This provides a direct and synchronous method for data retrieval. While NATS is available in the infrastructure, REST is simpler for initial direct queries. Future enhancements could explore NATS for event-driven communication."
+        },
+        {
+          "point": "Financial Report Data Sources",
+          "resolution": "Initially, financial reports (revenue, aging, cashflow, profitability) will primarily draw data from the Finance service's own database (invoices, payments). If 'profitability' requires cost data from RMS, this will be fetched via the established RMS integration protocol (REST). Specific data aggregation logic will be defined during implementation of subtask 4004."
+        },
+        {
+          "point": "Inter-service Authentication",
+          "resolution": "For communication between the Finance service and RMS, JWTs (JSON Web Tokens) will be used for authentication. These tokens will be issued and validated by a central identity provider (if available) or managed as API keys stored securely via External Secrets. Given the presence of Cilium CRDs, mTLS could be considered as a future enhancement if a service mesh is fully configured for it."
         }
+      ],
+      "implementation_phases": [
+        {
+          "phase": "Phase 1: Foundation Setup",
+          "description": "Establish the basic project structure, define data models, and set up database connectivity.",
+          "subtasks": [
+            {
+              "id": 4001,
+              "title": "Initialize Rust project, Axum, and define finance data models",
+              "details": "1. Create a new Rust binary project: `cargo new --bin finance-service` (targeting Rust 1.77.2).\n2. Add core dependencies: `axum`, `tokio` (with `full` feature), `sqlx` (with `runtime-tokio`, `postgres`, `macros` features), `chrono` (with `serde` feature), `serde` (with `derive` feature), `dotenvy` (for local development).\n3. Define Rust structs for `Invoice`, `Payment`, and `InvoiceStatus` (enum) with `serde::Serialize` and `serde::Deserialize` derives.\n4. Create initial `sqlx-cli` migrations for `invoices` and `payments` tables, including fields for `id`, `created_at`, `updated_at`, and relevant finance-specific fields (e.g., `amount`, `currency`, `status`, `due_date`, `project_id`).",
+              "test_strategy": "1. Run `cargo run` to verify the basic Axum server starts without errors.\n2. Configure a local PostgreSQL instance and run `sqlx migrate run` to confirm successful table creation.\n3. Implement unit tests for data model serialization/deserialization and basic validation logic."
+            },
+            {
+              "id": 4002,
+              "title": "Integrate PostgreSQL for data persistence",
+              "details": "1. Configure `sqlx` to connect to PostgreSQL. The database URL will be sourced from an environment variable (e.g., `DATABASE_URL`), which will be populated via an External Secret in Kubernetes, referencing the `gitlab/gitlab-postgresql` service.\n2. Implement `sqlx::PgPool` for efficient connection pooling.\n3. Create a `database` module or utility functions for executing basic CRUD operations (insert, select, update, delete) against the `invoices` and `payments` tables.",
+              "test_strategy": "1. Deploy the service to a local Kubernetes environment (or use Docker Compose with PostgreSQL) and verify successful connection to the PostgreSQL instance.\n2. Perform a basic database operation (e.g., insert a dummy invoice, then select it) to confirm data persistence and retrieval functionality."
+            }
+          ]
+        },
+        {
+          "phase": "Phase 2: Core API Development",
+          "description": "Implement the primary API endpoints for managing invoices and payments.",
+          "subtasks": [
+            {
+              "id": 4003,
+              "title": "Implement Invoice and Payment API endpoints",
+              "details": "1. Develop Axum handlers and associated business logic for `POST /api/v1/invoices` to create new invoices.\n2. Implement handlers for `GET /api/v1/invoices` (list all) and `GET /api/v1/invoices/:id` (retrieve by ID).\n3. Implement handlers for `POST /api/v1/invoices/:id/send` and `POST /api/v1/invoices/:id/paid` to manage invoice status transitions.\n4. Develop handlers for `POST /api/v1/payments` (record new payment), `GET /api/v1/payments` (list all payments), and `GET /api/v1/payments/invoice/:id` (retrieve payments for a specific invoice).",
+              "test_strategy": "1. Use `curl` or a tool like Postman/Insomnia to create an invoice, then retrieve it by ID and in a list.\n2. Test invoice status transitions by calling the `/send` and `/paid` endpoints and verifying the status update in the database.\n3. Create a payment, link it to an existing invoice, and verify it's retrievable via both general payment listing and invoice-specific payment retrieval."
+            }
+          ]
+        },
+        {
+          "phase": "Phase 3: Integrations and Reporting",
+          "description": "Develop financial reporting capabilities and integrate with external services like Stripe and RMS.",
+          "subtasks": [
+            {
+              "id": 4004,
+              "title": "Implement financial reporting API endpoints",
+              "details": "1. Implement Axum handlers for `GET /api/v1/finance/reports/revenue`, `GET /api/v1/finance/reports/aging`, `GET /api/v1/finance/reports/cashflow`, and `GET /api/v1/finance/reports/profitability`.\n2. Develop SQL queries and Rust logic to aggregate data from the `invoices` and `payments` tables to generate the required reports. Consider parameters like date ranges for reports.\n3. For `profitability`, define how cost data (if needed from RMS) will be integrated.",
+              "test_strategy": "1. Call each report endpoint using `curl` and verify that a structured JSON response is returned (even if initially containing mock or empty data).\n2. Write integration tests to ensure reports correctly aggregate data based on various invoice and payment scenarios."
+            },
+            {
+              "id": 4005,
+              "title": "Implement basic Stripe integration for payment recording",
+              "details": "1. Integrate a Rust Stripe client library (e.g., `stripe-rs`) to interact with the Stripe API for recording payment events.\n2. Implement an Axum webhook handler (e.g., `POST /api/v1/stripe/webhook`) to receive Stripe payment notifications.\n3. Within the webhook handler, parse Stripe event data (e.g., `payment_intent.succeeded`) and record relevant payment details into the `payments` table, linking them to existing invoices.",
+              "test_strategy": "1. Set up a Stripe test account and configure a webhook to point to the service's webhook endpoint.\n2. Simulate a Stripe payment event (e.g., create a successful payment intent) and verify that the corresponding payment is recorded in the Finance service's database and correctly linked to an invoice."
+            },
+            {
+              "id": 4006,
+              "title": "Implement RMS integration for quote-to-invoice conversion",
+              "details": "1. Develop a Rust client for the RMS service (Task 3) to fetch project details (e.g., project name, client info, quoted amount) based on a `project_id` via its REST API.\n2. Implement an Axum endpoint (e.g., `POST /api/v1/invoices/from-project/:project_id`) or an internal function that:\n    a. Calls the RMS client to retrieve project details.\n    b. Uses the fetched data to create a new `Invoice` record in the Finance service database.\n    c. Handles potential errors during RMS communication or invoice creation.",
+              "test_strategy": "1. Create a mock project in the RMS service (or simulate its API response).\n2. Call the `POST /api/v1/invoices/from-project/:project_id` endpoint with the mock project ID.\n3. Verify that a new invoice is successfully created in the Finance service database with the correct project details and an initial status (e.g., 'draft')."
+            }
+          ]
+        }
+      ],
+      "deployment_strategy": {
+        "platform": "Kubernetes",
+        "gitops_tool": "ArgoCD",
+        "details": "1. **Containerization**: The Rust application will be containerized using Docker, with a multi-stage build for optimized image size.\n2. **Kubernetes Manifests**: Standard Kubernetes Deployment, Service, and Ingress (if public exposure is needed) manifests will be created.\n3. **Secrets Management**: Database credentials, Stripe API keys, and RMS API keys will be managed using `ExternalSecrets` (referencing `ClusterSecretStores` or `SecretStores`) to inject them as environment variables into the Finance service pod.\n4. **Configuration**: Non-sensitive configurations will be managed via Kubernetes ConfigMaps.\n5. **GitOps**: All Kubernetes manifests will be stored in a Git repository and deployed via ArgoCD, ensuring declarative and automated deployments."
+      },
+      "observability_strategy": {
+        "logging": "Logs will be emitted to standard output (stdout/stderr) from the Rust application. These logs will be collected by the Kubernetes logging agent (e.g., Promtail) and forwarded to Loki for centralized logging and querying.",
+        "metrics": "The service will expose Prometheus-compatible metrics (e.g., via `axum-prometheus` or similar middleware) for request duration, error rates, and other service-specific metrics. These will be scraped by Prometheus and visualized in Grafana.",
+        "health_checks": "Kubernetes liveness and readiness probes will be configured to ensure the service is healthy and responsive."
+      },
+      "security_considerations": [
+        "**Secrets Management**: All sensitive information (database credentials, API keys) will be stored securely using External Secrets, preventing them from being committed to Git or exposed in plain text.\n**Input Validation**: All API endpoints will implement robust input validation to prevent common vulnerabilities like SQL injection and cross-site scripting.\n**Authentication/Authorization**: Inter-service communication will use JWTs (as decided) and API endpoints will enforce appropriate authorization checks.\n**Dependency Scanning**: Regular scanning of Rust dependencies for known vulnerabilities will be performed using tools like `cargo audit`."
+      ],
+      "overall_test_strategy": "1. **Unit Tests**: Comprehensive unit tests for data models, business logic, and utility functions.\n2. **Integration Tests**: Tests covering API endpoint functionality, database interactions, and integrations with Stripe and RMS (using mocks or test environments).\n3. **End-to-End Tests**: Deploy the service to a staging environment and perform end-to-end tests covering the full user flows (e.g., create project in RMS -> convert to invoice -> record payment -> generate report).\n4. **Deployment Verification**: Verify successful deployment to Kubernetes, correct secret injection, and service accessibility.\n5. **Performance Testing**: Basic load testing to ensure the service can handle expected traffic volumes."
+    }
+  },
+  {
+    "task_summary": {
+      "id": 5,
+      "title": "Develop Customer Vetting Service (Rex - Rust/Axum)",
+      "agent": "rex",
+      "stack": "Rust/Axum",
+      "description": "Create the Customer Vetting Service to automate background research on prospects, providing a GREEN/YELLOW/RED lead score. This service supports Morgan's lead qualification workflow.",
+      "priority": "high",
+      "core_functionality": "Integrate with various external APIs (mocked initially) for business verification, online presence, reputation, and credit signals. Compute a weighted lead score and persist results in PostgreSQL."
+    },
+    "infrastructure_relevance": {
+      "deployment_environment": "Kubernetes is the target deployment environment, indicated by the presence of numerous CRDs and services. The new 'rex' service will be deployed here.",
+      "database_integration": "PostgreSQL is the chosen database. The service will need to connect to PostgreSQL using `sqlx`, and critically, it must reference the `sigma1-infra-endpoints` ConfigMap for connection details. This ConfigMap will need to be accessible to the service.",
+      "secret_management": "Given the use of `externalsecrets.external-secrets.io` CRD and the `external-secrets/openclaw-external-secrets-webhook` service, it is highly recommended to use ExternalSecrets for managing API keys for OpenCorporates, commercial credit, and any other sensitive credentials.",
+      "observability": "Loki is deployed (`openclaw/loki-canary`, `openclaw/loki-headless`), suggesting that the new service should integrate with Loki for centralized logging.",
+      "ci_cd": "ArgoCD is deployed, implying a GitOps approach for deploying the service to Kubernetes. GitLab services are also present, likely for source control and CI/CD pipelines.",
+      "inter_service_communication": "NATS (`messaging/nats`) is available, which could be considered for asynchronous communication or eventing with other services, though not explicitly required by the current subtasks."
+    },
+    "implementation_plan": [
+      {
+        "id": 5001,
+        "title": "Initialize Rust project, Axum, and define vetting data models",
+        "description": "Set up a new Rust project for the Customer Vetting Service, configure Axum, and define `VettingResult` and `LeadScore` data models with `sqlx` migrations.",
+        "dependencies": [],
+        "details": "1. Run `cargo new --bin customer-vetting` targeting Rust 1.77.2.2. Add `axum`, `tokio`, `sqlx`, `serde` dependencies.3. Define Rust structs for `VettingResult` and `LeadScore`.4. Create `sqlx-cli` migrations for `vetting_results` table.",
+        "test_strategy": "1. Run `cargo run` to verify basic server starts.2. Run `sqlx migrate run` against a local PostgreSQL instance and verify table creation.3. Write unit tests for data model serialization/deserialization.",
+        "parallelizable": false
+      },
+      {
+        "id": 5002,
+        "title": "Implement customer vetting API endpoints",
+        "description": "Develop API endpoints for triggering the vetting pipeline and retrieving vetting results and credit signals for an organization.",
+        "dependencies": [
+          5001
+        ],
+        "details": "1. Implement handlers for `POST /api/v1/vetting/run` to initiate a vetting process.2. Implement handlers for `GET /api/v1/vetting/:org_id` to retrieve full vetting results.3. Implement handlers for `GET /api/v1/vetting/credit/:org_id` to retrieve specific credit signals.",
+        "test_strategy": "1. Use `curl` to call `POST /api/v1/vetting/run` with sample data and verify a 202 Accepted response.2. Use `curl` to call `GET /api/v1/vetting/:org_id` and `GET /api/v1/vetting/credit/:org_id` and verify structured (even if empty/mock) responses.",
+        "parallelizable": false
+      },
+      {
+        "id": 5003,
+        "title": "Implement business verification and online presence vetting modules",
+        "description": "Develop the Business Verification module (mock OpenCorporates API) and Online Presence module (mock LinkedIn/website checks) as part of the vetting pipeline.",
+        "dependencies": [
+          5002
+        ],
+        "details": "1. Create a mock client for OpenCorporates API to simulate business verification.2. Implement logic for mocking LinkedIn and website checks to assess online presence.",
+        "test_strategy": "1. Write unit tests for the mock OpenCorporates client.2. Write unit tests for the online presence check logic, ensuring it returns expected mock data.",
+        "parallelizable": false
+      },
+      {
+        "id": 5004,
+        "title": "Implement reputation analysis and credit signal vetting modules",
+        "description": "Develop the Reputation module (mock Google Reviews sentiment) and Credit Signals module (mock commercial credit API) as part of the vetting pipeline.",
+        "dependencies": [
+          5002
+        ],
+        "details": "1. Implement logic for mocking Google Reviews sentiment analysis.2. Create a mock client for a commercial credit API to simulate credit signal retrieval.",
+        "test_strategy": "1. Write unit tests for the mock Google Reviews sentiment analysis.2. Write unit tests for the mock commercial credit API client, ensuring it returns expected mock data.",
+        "parallelizable": true
+      },
+      {
+        "id": 5005,
+        "title": "Implement final lead scoring, persistence, and error handling",
+        "description": "Implement the weighted algorithm to compute the GREEN/YELLOW/RED lead score, store vetting results in PostgreSQL, and ensure robust error handling and retry mechanisms for external API calls.",
+        "dependencies": [
+          5003,
+          5004
+        ],
+        "details": "1. Implement the weighted algorithm to combine results from all vetting modules and compute the final `LeadScore`.2. Store the complete `VettingResult` (including `LeadScore`) in PostgreSQL using `sqlx`, referencing the `sigma1-infra-endpoints` ConfigMap.3. Implement error handling and retry logic for all external API calls (mocked or real).",
+        "test_strategy": "1. Call `POST /api/v1/vetting/run` with various mock inputs and verify the `final_score` is correctly computed and persisted in PostgreSQL.2. Simulate API failures (e.g., network errors, 500s) and verify the service handles them gracefully with retries or appropriate error responses.",
+        "parallelizable": false
       }
+    ],
+    "key_decision_points": [
+      "External API Mocking Strategy: Define the specific mocking framework or approach for OpenCorporates, LinkedIn, Google Reviews, and commercial credit APIs.",
+      "Lead Scoring Algorithm Weights: Determine the exact weighting and thresholds for each vetting signal to compute the GREEN/YELLOW/RED score.",
+      "Data Retention Policy: Define how long vetting results are stored and any data privacy considerations.",
+      "Inter-service Authentication: How will the Vetting service authenticate calls from other services (e.g., RMS, AI Agent)? (e.g., JWT, API keys, mTLS)."
+    ],
+    "next_steps": [
+      "Begin with subtask 5001 to initialize the Rust project and define core data models and migrations.",
+      "Concurrently, address the 'External API Mocking Strategy' decision point to ensure a consistent approach for subtasks 5003 and 5004.",
+      "Start planning for Kubernetes deployment, including how the `sigma1-infra-endpoints` ConfigMap will be accessed and how `ExternalSecrets` will be used for API keys.",
+      "Define the 'Lead Scoring Algorithm Weights' early to guide the implementation of subtask 5005."
     ]
   },
   {
-    "task_id": 9,
-    "title": "Build Sigma-1 Mobile App (Tap - Expo/React Native)",
-    "stack": "Expo/React Native/NativeWind 4/Effect 3.x",
-    "status": "pending",
-    "priority": "medium",
-    "dependencies": [
-      2,
-      7
-    ],
-    "description": "Build the Sigma-1 mobile app using Expo (managed workflow), React Native, NativeWind 4 for styling, and Effect 3.x for data fetching and validation. Implements bottom tab navigation (Equipment, Quote, Chat, Portfolio), equipment catalog browsing with availability checking, quote request submission, Morgan AI chat interface, and push notifications for quote status updates. Consumes shared Tailwind design tokens from packages/design-tokens.",
-    "subtasks": [
+    "subtask_id": 6001,
+    "title": "Deploy Morgan OpenClaw agent and configure LLM",
+    "plan": [
       {
-        "id": 9001,
-        "title": "Initialize Expo managed project with TypeScript template at apps/mobile",
-        "status": "pending",
-        "parallelizable": false,
-        "dependencies": [],
-        "test_strategy": "Run `npx expo start --no-dev` — CLI exits without module-not-found or TypeScript errors. Run `npx tsc --noEmit` — zero type errors on the empty scaffold."
+        "step": 1,
+        "description": "Verify or create the 'openclaw' Kubernetes namespace.",
+        "commands": [
+          "kubectl get namespace openclaw || kubectl create namespace openclaw"
+        ],
+        "expected_output": "Namespace 'openclaw' exists."
       },
       {
-        "id": 9002,
-        "title": "Configure NativeWind 4 with shared design tokens from packages/design-tokens",
-        "status": "pending",
-        "parallelizable": false,
-        "dependencies": [
-          9001
+        "step": 2,
+        "description": "Securely manage OpenAI API key using ExternalSecrets.",
+        "details": "Create an ExternalSecret resource to fetch the OpenAI API key from a configured SecretStore (e.g., AWS Secrets Manager, GCP Secret Manager, Vault) and make it available as a Kubernetes Secret named 'morgan-openai-secret' in the 'openclaw' namespace. This secret will then be mounted or injected as an environment variable into the Morgan agent pod.",
+        "commands": [
+          "# Example: Create an ExternalSecret (adjust source and secret store name as per environment)",
+          "cat <<EOF | kubectl apply -f -",
+          "apiVersion: external-secrets.io/v1beta1",
+          "kind: ExternalSecret",
+          "metadata:",
+          "  name: morgan-openai-api-key",
+          "  namespace: openclaw",
+          "spec:",
+          "  refreshInterval: 1h",
+          "  secretStoreRef:",
+          "    name: cluster-secret-store # Reference to an existing ClusterSecretStore or SecretStore",
+          "    kind: ClusterSecretStore",
+          "  target:",
+          "    name: morgan-openai-secret",
+          "    creationPolicy: Owner",
+          "  data:",
+          "  - secretKey: OPENAI_API_KEY",
+          "    remoteRef:",
+          "      key: openai-api-key-path # Path/name of the secret in your external secret manager",
+          "      property: api_key # Optional: if the remote secret is a JSON object and 'api_key' is the field",
+          "EOF"
         ],
-        "test_strategy": "Render a Text component with a design-token-derived className (e.g., `className='bg-brand-accent'`). Confirm the correct color appears in Expo Go on iOS simulator. Run `npx tailwindcss --config tailwind.config.ts --content './app/**/*.tsx' --dry-run` — outputs CSS without error."
+        "expected_output": "ExternalSecret 'morgan-openai-api-key' created/updated."
       },
       {
-        "id": 9003,
-        "title": "Implement Expo Router file-based route structure and bottom tab navigator layout",
-        "status": "pending",
-        "parallelizable": false,
-        "dependencies": [
-          9002
+        "step": 3,
+        "description": "Prepare Kubernetes Deployment manifest for the 'morgan' OpenClaw agent.",
+        "details": "Define the Deployment YAML for the 'morgan' agent, specifying the container image (e.g., `5dlabs/openclaw-agent:latest`), resource requests/limits, and environment variables for LLM configuration. The `OPENAI_API_KEY` will be sourced from the Kubernetes Secret created by the ExternalSecret.",
+        "commands": [
+          "cat <<EOF > morgan-agent-deployment.yaml",
+          "apiVersion: apps/v1",
+          "kind: Deployment",
+          "metadata:",
+          "  name: morgan-agent",
+          "  namespace: openclaw",
+          "  labels:",
+          "    app: morgan-agent",
+          "spec:",
+          "  replicas: 1",
+          "  selector:",
+          "    matchLabels:",
+          "      app: morgan-agent",
+          "  template:",
+          "    metadata:",
+          "      labels:",
+          "        app: morgan-agent",
+          "    spec:",
+          "      containers:",
+          "      - name: morgan",
+          "        image: 5dlabs/openclaw-agent:latest # Placeholder, replace with actual OpenClaw agent image",
+          "        imagePullPolicy: Always",
+          "        env:",
+          "        - name: OPENCLAW_AGENT_NAME",
+          "          value: morgan",
+          "        - name: OPENCLAW_LLM_MODEL",
+          "          value: openai-api/gpt-5.4-pro",
+          "        - name: OPENAI_API_KEY",
+          "          valueFrom:",
+          "            secretKeyRef:",
+          "              name: morgan-openai-secret",
+          "              key: OPENAI_API_KEY",
+          "        ports:",
+          "        - containerPort: 8080 # Assuming the agent exposes an HTTP port for internal communication/webhooks",
+          "          name: http",
+          "        resources:",
+          "          requests:",
+          "            cpu: \"200m\"",
+          "            memory: \"512Mi\"",
+          "          limits:",
+          "            cpu: \"1000m\"",
+          "            memory: \"1Gi\"",
+          "        livenessProbe:",
+          "          httpGet:",
+          "            path: /healthz # Assuming a health endpoint for the agent",
+          "            port: http",
+          "          initialDelaySeconds: 30",
+          "          periodSeconds: 10",
+          "        readinessProbe:",
+          "          httpGet:",
+          "            path: /readyz # Assuming a readiness endpoint for the agent",
+          "            port: http",
+          "          initialDelaySeconds: 15",
+          "          periodSeconds: 5",
+          "EOF"
         ],
-        "test_strategy": "Open app in Expo Go — bottom tab bar displays 4 tabs with correct Ionicons icons. Tapping each tab navigates to the corresponding screen without crash. Active tab icon color matches brand accent from design tokens."
+        "expected_output": "File 'morgan-agent-deployment.yaml' created."
       },
       {
-        "id": 9004,
-        "title": "Build Effect data fetching layer with Effect.Schema type definitions and TanStack Query integration",
-        "status": "pending",
-        "parallelizable": false,
-        "dependencies": [
-          9003
+        "step": 4,
+        "description": "Prepare Kubernetes Service manifest for the 'morgan' OpenClaw agent.",
+        "details": "Define a ClusterIP Service to expose the 'morgan' agent within the 'openclaw' namespace, allowing other services (e.g., webhooks, other OpenClaw components) to communicate with it.",
+        "commands": [
+          "cat <<EOF > morgan-agent-service.yaml",
+          "apiVersion: v1",
+          "kind: Service",
+          "metadata:",
+          "  name: morgan-agent",
+          "  namespace: openclaw",
+          "  labels:",
+          "    app: morgan-agent",
+          "spec:",
+          "  selector:",
+          "    app: morgan-agent",
+          "  ports:",
+          "    - protocol: TCP",
+          "      port: 80",
+          "      targetPort: http",
+          "      name: http",
+          "EOF"
         ],
-        "test_strategy": "Jest unit tests: (1) `Schema.decodeUnknown(Product)` on a valid object resolves, on invalid object rejects with ParseError. (2) `fetchProducts` with msw intercepting GET /api/v1/catalog/products returns decoded Product[] array. (3) `fetchProducts` with msw returning 500 rejects with AppError. Coverage of lib/ >= 80%."
+        "expected_output": "File 'morgan-agent-service.yaml' created."
       },
       {
-        "id": 9005,
-        "title": "Build equipment catalog tab with FlatList, debounced search, expo-image product cards, and pull-to-refresh",
-        "status": "pending",
-        "parallelizable": false,
-        "dependencies": [
-          9004
+        "step": 5,
+        "description": "Apply the Deployment and Service manifests to the 'openclaw' namespace.",
+        "commands": [
+          "kubectl apply -f morgan-agent-deployment.yaml",
+          "kubectl apply -f morgan-agent-service.yaml"
         ],
-        "test_strategy": "RNTL test: render catalog screen with msw returning 3 products — assert 3 ProductCard elements rendered. Type 'cam' in search input — after 300ms debounce assert msw received GET with `q=cam`. Pull-to-refresh gesture triggers refetch (spy on queryClient.invalidateQueries). Empty state renders when msw returns []."
-      },
-      {
-        "id": 9006,
-        "title": "Build product detail screen with DateRangePicker and availability query",
-        "status": "pending",
-        "parallelizable": false,
-        "dependencies": [
-          9005
-        ],
-        "test_strategy": "RNTL test with msw: render detail screen for product id='p1'. Assert product name rendered. Simulate selecting start+end dates — assert msw received GET /api/v1/catalog/products/p1/availability with correct date params. Assert quantity_available text appears after mock resolves. Assert 'Add to Quote' press calls router.push with correct params."
-      },
-      {
-        "id": 9007,
-        "title": "Build quote builder tab with Effect.Schema form validation and opportunity submission",
-        "status": "pending",
-        "parallelizable": true,
-        "dependencies": [
-          9004
-        ],
-        "test_strategy": "RNTL: submit empty form — assert error messages appear under each required field. Submit with invalid email — assert email error message. Submit valid form with msw returning 201 { id: 'opp_123' } — assert ConfirmationScreen renders with 'opp_123'. Submit with msw returning 500 — assert error banner shown, form not cleared."
-      },
-      {
-        "id": 9008,
-        "title": "Build Morgan chat tab with native message FlatList and POST /api/v1/chat integration",
-        "status": "pending",
-        "parallelizable": true,
-        "dependencies": [
-          9004
-        ],
-        "test_strategy": "RNTL: render chat screen with msw intercepting POST /api/v1/chat returning { content: 'Hello!' }. Type 'Hi' in input, press Send — assert user bubble 'Hi' appears. Assert assistant bubble 'Hello!' appears after mock resolves. Assert input cleared. Assert full conversation history sent in subsequent request body."
-      },
-      {
-        "id": 9009,
-        "title": "Build portfolio tab with FlashList masonry grid and full-screen image modal",
-        "status": "pending",
-        "parallelizable": true,
-        "dependencies": [
-          9004
-        ],
-        "test_strategy": "RNTL: render portfolio with msw returning 4 posts — assert 4 image elements rendered. Tap first image — assert Modal visible with correct caption text. Press close — assert Modal not visible. Empty state renders when msw returns []."
-      },
-      {
-        "id": 9010,
-        "title": "Implement expo-camera barcode scanner screen accessible from equipment tab",
-        "status": "pending",
-        "parallelizable": true,
-        "dependencies": [
-          9005
-        ],
-        "test_strategy": "Jest: mock expo-camera useCameraPermissions returning granted. Mock runEffect returning a product. Call handleScan with barcode data — assert router.replace called with '/equipment/p1'. Mock runEffect returning empty — assert alert shown. Verify 'Scan Barcode' button present in equipment tab header via RNTL."
-      },
-      {
-        "id": 9011,
-        "title": "Implement push notification setup with Expo Push Token registration",
-        "status": "pending",
-        "parallelizable": true,
-        "dependencies": [
-          9003
-        ],
-        "test_strategy": "Mock expo-notifications APIs in Jest. Assert requestPermissionsAsync called on mount. Assert getExpoPushTokenAsync called when permission granted. Assert POST to /api/v1/notifications/register with token value. Simulate notificationResponseReceived event with type='quote_status' — assert router.push called with '/(tabs)/quote'."
-      },
-      {
-        "id": 9012,
-        "title": "Configure EAS Build profiles and CI environment variables",
-        "status": "pending",
-        "parallelizable": true,
-        "dependencies": [
-          9001
-        ],
-        "test_strategy": "Run `eas build --profile preview --platform android --non-interactive` in CI — exits 0, produces downloadable APK artifact. `eas build --profile preview --platform ios --non-interactive` produces IPA (or simulator build). Verify EXPO_PUBLIC_API_URL is accessible in app via `process.env.EXPO_PUBLIC_API_URL` at runtime in preview build."
-      },
-      {
-        "id": 9013,
-        "title": "Write Jest and React Native Testing Library test suite with >= 80% coverage",
-        "status": "pending",
-        "parallelizable": false,
-        "dependencies": [
-          9007,
-          9008,
-          9009,
-          9010,
-          9011
-        ],
-        "test_strategy": "CI run of `jest --coverage` exits 0 with reported line coverage >= 80% and branch coverage >= 80%. All test files pass with zero failing assertions. Coverage report in CI artifacts shows per-file breakdown."
+        "expected_output": "Deployment 'morgan-agent' and Service 'morgan-agent' created/updated in 'openclaw' namespace."
       }
     ],
-    "decision_points": [
-      {
-        "id": "dp-9-1",
-        "title": "Morgan Chat: Native vs WebView implementation",
-        "description": "The details list both a WebView approach (EXPO_PUBLIC_MORGAN_CHAT_URL) and a native EventSource/WebSocket approach as the preferred option. The final choice determines the chat screen architecture, testability, and whether Morgan must expose a native-compatible API endpoint.",
-        "options": [
-          "Native FlatList + POST /api/v1/chat polling or WebSocket",
-          "WebView embedding EXPO_PUBLIC_MORGAN_CHAT_URL"
-        ],
-        "impact": "High — determines chat tab implementation, Morgan API contract, and test strategy"
-      },
-      {
-        "id": "dp-9-2",
-        "title": "DateRangePicker library selection",
-        "description": "The details suggest react-native-calendars 'or similar' for the product detail DateRangePicker. Library choice affects bundle size, iOS/Android parity, and NativeWind 4 styling compatibility.",
-        "options": [
-          "react-native-calendars",
-          "react-native-date-picker",
-          "custom implementation"
-        ],
-        "impact": "Medium — affects product detail screen UX and bundle size"
-      },
-      {
-        "id": "dp-9-3",
-        "title": "Portfolio grid: MasonryFlashList vs FlashList numColumns=2",
-        "description": "The details offer two layout options for the portfolio tab. MasonryFlashList provides true masonry layout but is a separate package with different stability characteristics than FlashList.",
-        "options": [
-          "@shopify/flash-list with numColumns=2 (uniform grid)",
-          "MasonryFlashList for true masonry layout"
-        ],
-        "impact": "Low — visual difference only; both are performant"
-      }
-    ],
-    "test_strategy": "1. expo start --no-dev builds without TypeScript errors and Expo Go app launches on iOS simulator and Android emulator. 2. Equipment tab: renders FlatList with product cards; search input filters results in real time (Jest + React Native Testing Library: render, type in search input, assert filtered items). 3. Product detail: date range selection triggers GET availability call (mock API with msw); quantity_available badge updates from skeleton to numeric value. 4. Quote builder: submitting form with empty required fields shows validation error messages (Effect.Schema decoding failure triggers inline error UI). 5. Successful quote submission (mocked 201 response) shows confirmation screen with quote_id displayed. 6. Push notification: call Expo Push API with test token; device displays notification with title containing opportunity status. 7. jest --coverage reports >= 80% coverage across lib/ and components/. 8. EAS build preview profile produces APK/IPA successfully in CI without build errors."
-  },
-  {
-    "decision_points": [
-      {
-        "id": "dp-10-1",
-        "title": "Morgan replica count: StatefulSet vs Deployment with PVC",
-        "description": "Morgan is held at 1 replica due to Signal-CLI statefulness. The details do not specify whether Morgan should be managed as a Deployment (simpler) or converted to a StatefulSet with a PVC for Signal-CLI data persistence. This choice affects pod restart behavior and data durability.",
-        "options": [
-          "Keep as Deployment with emptyDir (data lost on restart)",
-          "Convert to StatefulSet with PVC for Signal-CLI state persistence"
-        ],
-        "impact": "High — data loss risk on Morgan pod restart if Signal-CLI registration state is not persisted",
-        "recommendation": "Convert to StatefulSet with PVC for Signal-CLI state persistence",
-        "rationale": "Production hardening requires minimizing data loss risk. Persisting Signal-CLI state across pod restarts is critical for reliable message delivery and registration. StatefulSet with PVC ensures durability and aligns with best practices for stateful workloads."
-      },
-      {
-        "id": "dp-10-2",
-        "title": "Cloudflare Tunnel authentication strategy for mobile app API traffic",
-        "description": "The details route only chat.sigma1.com and signals.sigma1.com through Cloudflare Tunnel. It is unclear whether the mobile app's REST API calls to /api/v1/* should also route through the Tunnel or through a separate ingress path. This affects network policy rules and TLS termination strategy.",
-        "options": [
-          "All external traffic (mobile API + chat) via Cloudflare Tunnel",
-          "Chat/webhooks via Tunnel, mobile API via separate Cloudflare-proxied A-record"
-        ],
-        "impact": "High — determines CiliumNetworkPolicy ingress rules for all services and cloudflared routing config",
-        "recommendation": "All external traffic (mobile API + chat) via Cloudflare Tunnel",
-        "rationale": "Routing all external traffic through Cloudflare Tunnel simplifies ingress, centralizes TLS termination, and enforces a single zero-trust entry point. This reduces attack surface, simplifies CiliumNetworkPolicy rules, and leverages Cloudflare's security features for all user-facing endpoints."
-      },
-      {
-        "id": "dp-10-3",
-        "title": "Secret rotation mechanism: CronJob reminder vs automated rotation with External Secrets Operator",
-        "description": "The details specify a CronJob that logs a reminder to Loki monthly. This is a manual-reminder approach. An alternative is integrating External Secrets Operator with a secrets manager (Vault, AWS Secrets Manager) for automated rotation. The v1 spec chooses manual reminders but this is an explicit architectural trade-off.",
-        "options": [
-          "CronJob logs rotation reminder to Loki (manual rotation)",
-          "External Secrets Operator with Vault/AWS SM for automated rotation"
-        ],
-        "impact": "Medium — security posture difference; manual approach accepted for v1 but should be explicitly confirmed",
-        "recommendation": "CronJob logs rotation reminder to Loki (manual rotation)",
-        "rationale": "The v1 spec explicitly chooses a manual reminder approach for secret rotation, likely due to current team/process constraints or lack of external secrets infrastructure. This is acceptable for initial production hardening, but should be revisited for future automation."
-      }
+    "acceptance_criteria": [
+      "The `morgan` agent pod is running in the `openclaw` namespace (e.g., `kubectl get pods -n openclaw -l app=morgan-agent`).",
+      "Agent logs show successful LLM configuration and initialization messages (e.g., `kubectl logs -n openclaw -l app=morgan-agent`)."
     ]
   }
 ]

@@ -165,6 +165,12 @@ pub struct OpenClawProviderEntry {
 pub struct OpenClawConfig {
     /// Provider configurations for the OpenClaw gateway
     pub providers: Vec<OpenClawProviderEntry>,
+
+    /// Whether the Discord gateway should be enabled for this pod.
+    /// Defaults to `true`. Set to `false` to avoid Discord rate limits
+    /// when multiple pods share the same bot token.
+    #[serde(default = "default_true", rename = "discordEnabled")]
+    pub discord_enabled: bool,
 }
 
 impl OpenClawConfig {
@@ -173,6 +179,7 @@ impl OpenClawConfig {
     #[must_use]
     pub fn default_providers() -> Self {
         Self {
+            discord_enabled: true,
             providers: vec![
                 OpenClawProviderEntry {
                     name: "fireworks".to_string(),
@@ -972,6 +979,7 @@ mod tests {
     #[test]
     fn test_openclaw_config_serde_roundtrip() {
         let config = OpenClawConfig {
+            discord_enabled: true,
             providers: vec![OpenClawProviderEntry {
                 name: "fireworks".to_string(),
                 base_url: Some("https://api.fireworks.ai/inference/v1".to_string()),

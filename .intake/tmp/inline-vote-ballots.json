@@ -1,53 +1,57 @@
 [
   {
-    "scores": {
-      "task_decomposition": 9,
-      "dependency_ordering": 8,
-      "decision_point_coverage": 8,
-      "test_strategy_quality": 9,
-      "agent_assignment": 9
-    },
-    "overall_score": 8.71,
-    "verdict": "approve",
-    "reasoning": "This is an exceptionally well-structured plan with clean architectural boundaries. Each task owns a single service boundary (catalog, RMS, finance, vetting, social, agent, website, mobile, infra, hardening) and subtasks within each service are decomposed along clear architectural seams — migrations, handlers, middleware, background tasks, K8s manifests, and integration tests are separated into distinct implementable units. Dependency ordering follows infrastructure-first gravity correctly (Task 1 → services 2-6 in parallel → Morgan 7 → frontends 8-9 → hardening 10), and subtask-level dependencies form clean DAGs with good parallelism (e.g., 1004/1005/1006 run parallel after namespace creation). Decision points are well-identified with meaningful options and impact statements, though a few architectural decisions are buried in details rather than surfaced as explicit decision points. Task 10 subtask 10015 has a truncated details field, and Task 8 subtask 8013 has a truncated details field — both are structural defects in the plan content.",
-    "suggestions": [
-      "Fix truncated subtasks: Task 8 subtask 8013 (Cloudflare Pages deployment) and Task 10 subtask 10015 (quality.yml workflow) have details fields that are cut off mid-sentence — these must be completed before implementation begins, as agents cannot implement from incomplete specifications.",
-      "Split Task 5 subtask 5007 into at least three separate subtasks: (1) JWT middleware, (2) health/metrics endpoints, (3) GDPR endpoints + K8s manifest. Currently it spans four distinct architectural concerns (auth middleware, observability, data privacy, and infrastructure manifests) which violates single-responsibility and makes it difficult for one agent to implement and test atomically.",
-      "Surface the JWT key distribution mechanism (shared secret vs JWKS) as a top-level cross-cutting decision point rather than repeating it per-service (Tasks 4, 5, 6 each mention it independently). This is an architectural decision that affects all services uniformly and should be resolved once in Task 1 or as a global decision point, then referenced by downstream tasks."
-    ]
-  },
-  {
-    "scores": {
-      "task_decomposition": 6,
-      "dependency_ordering": 4,
-      "decision_point_coverage": 6,
-      "test_strategy_quality": 7,
-      "agent_assignment": 8
-    },
-    "overall_score": 5.4,
-    "verdict": "revise",
-    "reasoning": "Strong per-task test strategies and generally appropriate agent/stack matching, but many tasks are oversized and would take far longer than 1–3 days for a single engineer (notably Service builds like id=3 RMS, id=4 Finance, id=6 Social Engine). Dependency ordering is brittle and overly serial in places (e.g., Morgan id=7 depends on full completion of 2–6, and Website id=8 depends on both 2 and 7; Production hardening id=10 depends on almost everything while also containing partially specified subtasks like 10015). Decision points exist for some services, but several high-risk ambiguities remain un-captured or not tied to gating tasks (identity/JWKS strategy across services, R2/R2 WAL archival credential naming, and Signal/Twilio number assumptions).",
-    "suggestions": [
-      "Split each large service build (RMS id=3, Finance id=4, Social Engine id=6) into 2–3 shippable vertical slices with an early deployable milestone: (a) skeleton service + migrations + health/metrics + one core endpoint, (b) core domain CRUD, (c) integrations/background jobs/GDPR. Make each slice independently deployable and testable in-cluster so you can integrate Morgan/Website earlier without waiting for the full feature matrix.",
-      "Fix dependency ordering to create parallel tracks and earlier working software: allow Morgan (id=7) to start after minimal endpoints exist (health + one tool per service) rather than full completion of ids 2–6; allow Website (id=8) to start after Equipment Catalog read endpoints and Morgan widget stub exist; add explicit dependencies from service build tasks (2–6) to their required infra outputs (ConfigMap/secrets naming, CNPG secret names) instead of only depending on infra mega-task id=1.",
-      "Complete and normalize decision points and gating: add explicit decision points (with options) for auth/JWT distribution (shared secret vs JWKS/IdP) used by all services, Signal number management (separate Signal vs Twilio numbers), and R2/S3 credential/endpoint conventions; then create small “decision resolution” tasks that must complete before implementing JWT middleware, Signal integration, and WAL archival. Also fill in any incomplete subtasks (e.g., id=10 subtask 10015 has empty details) or remove them to avoid plan dead-ends."
-    ]
-  },
-  {
+    "voter_id": "the_architect",
     "scores": {
       "task_decomposition": 7,
-      "dependency_ordering": 8,
-      "decision_point_coverage": 8,
-      "test_strategy_quality": 8,
+      "dependency_ordering": 10,
+      "decision_point_coverage": 6,
+      "test_strategy_quality": 7,
       "agent_assignment": 9
     },
-    "overall_score": 7.8,
+    "overall_score": 8,
     "verdict": "approve",
-    "reasoning": "The plan is comprehensive and well-structured for a distributed multi-service platform of this complexity. Task decomposition is appropriately granular — subtasks are single-concern and agent-actionable — though there is measurable inflation: subtask 10003 (scale Valkey to 2 replicas) is a 3-line manifest change that does not warrant its own task, and tasks 10004-10009 are six nearly-identical CiliumNetworkPolicy stubs that could collapse to 2-3 tasks without losing fidelity. Dependency ordering is clean with no forward references and good parallelism annotations, though tasks 10001-10003 and 10011-10013 are fully independent of each other yet could block if a consumer misreads the DAG. Decision points are a genuine strength — the plan captures real ambiguities (ScoreLead weighting, LinkedIn API access tier, Google Calendar credential type, Stripe client library choice) with correct constraint framing rather than hand-waving. Test strategies are specific and measurable with happy-path and error-case coverage throughout. Agent assignments are accurate and consistent.",
+    "reasoning": "The architectural foundation is structurally sound, with dependencies strictly following gravity (infrastructure -> core services -> dependent services -> AI consumer). Service boundaries are well-defined per bounded context, though Task 6 violates separation of concerns by bundling infrastructure routing with application logic and external communication channels.",
     "suggestions": [
-      "Collapse CiliumNetworkPolicy subtasks 10004-10009 into 2 tasks: one for data-plane services (catalog, RMS, finance, vetting, social) and one for Morgan/cloudflared — each policy follows the same template and the current 6-task split inflates the plan without adding clarity or enabling meaningful parallelism that isn't already present.",
-      "Subtask 10003 (scale Valkey to 2 replicas) and 10002 (CNPG scale to 2 + WAL archival) should be merged into a single 'Scale stateful dependencies' task — scaling Valkey is a 5-line manifest change and does not justify independent task overhead; WAL archival config is the only substantive work in 10002 and can carry both.",
-      "Task 8013 (Cloudflare Pages deployment) has truncated content in the details field ending mid-TOML — this subtask is incomplete and will block the website deployment; the wrangler.toml and GitHub Actions workflow body must be filled in before the task is executable."
+      "Split Task 6 into three distinct tasks to respect architectural boundaries: AI Agent Infrastructure (deployment, Cloudflare tunnels), Communication Channels (Signal, Twilio/ElevenLabs), and Tool/Skill Integration (MCP tools for backend services).",
+      "Refactor the 'decision_points' arrays to use structured objects that explicitly assign constraint types (hard, soft, open, escalation) to each decision, as they are currently only plain strings.",
+      "Expand 'test_strategy' fields across all tasks to explicitly mandate negative testing, such as simulating database connection drops, rate limit triggers, or invalid gRPC payloads, rather than relying solely on happy-path verification."
+    ]
+  },
+  {
+    "voter_id": "ThePragmatist",
+    "scores": {
+      "task_decomposition": 6,
+      "dependency_ordering": 9,
+      "decision_point_coverage": 9,
+      "test_strategy_quality": 9,
+      "agent_assignment": 10
+    },
+    "overall_score": 8,
+    "verdict": "approve",
+    "reasoning": "The plan exhibits strong dependency ordering, agent assignment, and comprehensive test strategies, with well-covered decision points. However, the task decomposition for the AI Agent (Task 6) is too broad, combining multiple distinct integrations and skill developments into single subtasks, which could lead to delays.",
+    "suggestions": [
+      "Split subtasks 6004 and 6005 into more granular units, with each MCP tool definition and integration being its own subtask to reduce scope and improve tracking.",
+      "Decompose subtask 6003 (\"Integrate ElevenLabs and Twilio for voice communication\") into two separate subtasks: one for ElevenLabs integration and another for Twilio integration, as these are distinct external services.",
+      "Split subtask 6006 (\"Develop core AI skills and configure Cloudflare Tunnel\") into separate subtasks for each AI skill (`sales-qual`, `quote-gen`) and a distinct subtask for Cloudflare Tunnel configuration, as these are unrelated concerns."
+    ]
+  },
+  {
+    "voter_id": "the_minimalist",
+    "scores": {
+      "task_decomposition": 4,
+      "dependency_ordering": 7,
+      "decision_point_coverage": 7,
+      "test_strategy_quality": 6,
+      "agent_assignment": 9
+    },
+    "overall_score": 6,
+    "verdict": "revise",
+    "reasoning": "The plan is drowning in premature optimization and scope creep. Building an entire microservice (Task 5) just to mock four external APIs is a massive waste of effort for v1, and including full financial reporting or Redis rate-limiting before the core system is proven is textbook over-engineering.",
+    "suggestions": [
+      "Remove Task 5 (Customer Vetting Service) entirely for v1, or collapse it into a single hardcoded mock function within the AI Agent. Building a dedicated microservice to return mock data is unnecessary complexity.",
+      "Defer Task 4004 (Financial reporting: aging, cashflow, profitability) and Task 4005 (Stripe integration). V1 finance only needs basic invoice generation and manual payment status toggling.",
+      "Simplify Task 6 by picking a single communication channel (e.g., Web Chat or Signal) for v1. Defer ElevenLabs/Twilio voice integration (Task 6003) to a future iteration to reduce initial integration surface area.",
+      "Remove Redis rate limiting (Task 2003) and Prometheus metrics (Task 2006) from the Catalog service. These are v2 operational concerns that distract from shipping core functionality."
     ]
   }
 ]

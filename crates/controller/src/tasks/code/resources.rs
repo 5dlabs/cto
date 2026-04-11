@@ -16,7 +16,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference}
 use kube::api::{Api, DeleteParams, ListParams, PostParams};
 use kube::runtime::controller::Action;
 use kube::ResourceExt;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tracing::{error, info, warn};
@@ -1976,91 +1976,6 @@ impl<'a> CodeResourceManager<'a> {
             }
         }
 
-        // Add tools-server sidecar when enabled — gives each agent pod its own
-        // MCP tool proxy on localhost so escalation state stays per-session.
-        if self.config.tools_sidecar.enabled {
-            let port = self.config.tools_sidecar.port;
-            let image = self.config.tools_sidecar.image.clone().unwrap_or_else(|| {
-                "registry.5dlabs.ai/5dlabs/tools-server:latest".to_string()
-            });
-            let pull_policy = if image.ends_with(":latest") || image.ends_with(":dev") {
-                "Always"
-            } else {
-                "IfNotPresent"
-            };
-
-            // Build sidecar env — forward escalation policy from CRD if present
-            let mut sidecar_env: Vec<Value> = vec![
-                json!({ "name": "RUST_LOG", "value": "info" }),
-            ];
-            if let Some(policy) = &code_run.spec.escalation_policy {
-                if let Ok(policy_json) = serde_json::to_string(policy) {
-                    sidecar_env.push(json!({
-                        "name": "TOOLS_ESCALATION_POLICY",
-                        "value": policy_json
-                    }));
-                }
-            }
-
-            // Mount the cluster-wide tools config so the sidecar knows about
-            // upstream MCP servers. The ConfigMap name follows the Helm naming
-            // convention: {release}-tools-config.
-            let tools_config_cm = std::env::var("TOOLS_CONFIG_CONFIGMAP")
-                .unwrap_or_else(|_| "cto-tools-config".to_string());
-
-            volumes.push(json!({
-                "name": "tools-config",
-                "configMap": { "name": tools_config_cm }
-            }));
-
-            let sidecar_spec = json!({
-                "name": "tools-server",
-                "image": image,
-                "imagePullPolicy": pull_policy,
-                "command": ["tools-server"],
-                "args": ["--port", port.to_string(), "--project-dir", "/config"],
-                "env": sidecar_env,
-                "volumeMounts": [
-                    { "name": "tools-config", "mountPath": "/config" }
-                ],
-                "ports": [
-                    { "containerPort": port, "name": "tools" }
-                ],
-                "resources": {
-                    "requests": { "cpu": "50m", "memory": "64Mi" },
-                    "limits": { "cpu": "500m", "memory": "256Mi" }
-                },
-                "readinessProbe": {
-                    "httpGet": { "path": "/health", "port": port },
-                    "initialDelaySeconds": 2,
-                    "periodSeconds": 10
-                }
-            });
-            containers.push(sidecar_spec);
-
-            // Set TOOLS_SERVER_URL on the main container so the cto-tools CLI
-            // and mcp.ts runtime automatically route through the sidecar.
-            if let Some(main_container) = containers.first_mut() {
-                let env = main_container
-                    .as_object_mut()
-                    .and_then(|obj| {
-                        if !obj.contains_key("env") {
-                            obj.insert("env".to_string(), json!([]));
-                        }
-                        obj.get_mut("env")
-                    })
-                    .and_then(|v| v.as_array_mut());
-                if let Some(env_arr) = env {
-                    env_arr.push(json!({
-                        "name": "TOOLS_SERVER_URL",
-                        "value": format!("http://localhost:{port}/mcp")
-                    }));
-                }
-            }
-
-            info!("Added tools-server sidecar on port {port}");
-        }
-
         // Add promtail sidecar for shipping CLI logs to Loki
         // Mirrors Morgan's promtail config — scrapes CLI-specific log paths
         // and ships them to the in-cluster Loki gateway via the OTLP pipeline
@@ -2355,6 +2270,34 @@ scrape_configs:
             }));
             info!(
                 "Added promtail config init container for CodeRun {}",
+                coderun_name
+            );
+        }
+
+        // Stagger gateway startup to avoid Discord API rate limits (429).
+        // When many CodeRuns share the same bot token, simultaneous /gateway/bot
+        // calls trigger Discord rate limiting. This init container adds a
+        // deterministic delay (0-30s) based on a hash of the CodeRun name,
+        // spreading pod startups across time.
+        {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::{Hash, Hasher};
+            let mut hasher = DefaultHasher::new();
+            coderun_name.hash(&mut hasher);
+            let stagger_secs = (hasher.finish() % 31) as u64; // 0-30 seconds
+            init_containers.push(json!({
+                "name": "gateway-stagger",
+                "image": "busybox:1.36",
+                "command": ["/bin/sh", "-c", format!(
+                    "echo 'Staggering gateway startup by {stagger_secs}s to avoid Discord rate limits' && sleep {stagger_secs}"
+                )],
+                "resources": {
+                    "requests": { "cpu": "1m", "memory": "4Mi" },
+                    "limits": { "cpu": "10m", "memory": "8Mi" }
+                }
+            }));
+            info!(
+                "Added gateway-stagger init container ({stagger_secs}s delay) for CodeRun {}",
                 coderun_name
             );
         }
