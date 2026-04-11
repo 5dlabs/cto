@@ -44,6 +44,41 @@ pub struct ControllerConfig {
     /// Linear integration configuration
     #[serde(default)]
     pub linear: LinearConfig,
+
+    /// Tools sidecar configuration (per-pod tools-server on localhost)
+    #[serde(default)]
+    pub tools_sidecar: ToolsSidecarConfig,
+}
+
+/// Tools sidecar configuration — runs tools-server as a per-pod sidecar
+/// so each agent gets its own escalation state and MCP connection pool.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ToolsSidecarConfig {
+    /// Enable the tools sidecar (default: false for backward compat)
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Container image for the tools-server sidecar
+    #[serde(rename = "image")]
+    pub image: Option<String>,
+
+    /// Port the sidecar listens on (default: 3001)
+    #[serde(default = "default_tools_sidecar_port")]
+    pub port: u16,
+}
+
+fn default_tools_sidecar_port() -> u16 {
+    3001
+}
+
+impl Default for ToolsSidecarConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            image: None,
+            port: default_tools_sidecar_port(),
+        }
+    }
 }
 
 /// Linear integration configuration
@@ -711,6 +746,7 @@ impl Default for ControllerConfig {
                 delete_configmap: true,
             },
             linear: LinearConfig::default(),
+            tools_sidecar: ToolsSidecarConfig::default(),
         }
     }
 }
