@@ -344,6 +344,10 @@ impl EffectiveProviderConfig {
             }
         }
 
+        // Disable ANSI color codes for cleaner Datadog log ingestion
+        vars.push(json!({ "name": "NO_COLOR", "value": "1" }));
+        vars.push(json!({ "name": "TERM", "value": "dumb" }));
+
         vars
     }
 }

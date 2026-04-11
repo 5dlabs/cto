@@ -190,9 +190,6 @@ steps:
       fi
       mkdir -p "$TASK_DIR"
 
-      # Prompt and acceptance criteria are pulled from the repo by intake —
-      # no ConfigMap injection needed.
-
       INDEX="${TASK_DIR}/index.lobster.yaml"
       if [ ! -f "$INDEX" ]; then
         # Search for index.lobster.yaml in common locations (docs subdir, nested .tasks, etc.)
@@ -206,6 +203,14 @@ steps:
           echo "❌ No index.lobster.yaml found anywhere in repo"
           exit 1
         fi
+      fi
+
+      # If prompt_modification was injected via ConfigMap, copy it into TASK_DIR
+      # so the inner lobster workflow can find it (intake normally places it here).
+      if [ -f /task-files/prompt.md ] && [ ! -f "${TASK_DIR}/prompt.md" ]; then
+        mkdir -p "$TASK_DIR"
+        cp /task-files/prompt.md "${TASK_DIR}/prompt.md"
+        echo "📝 Copied prompt.md → ${TASK_DIR}/prompt.md"
       fi
 
       ATTEMPT=0
