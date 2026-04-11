@@ -218,6 +218,10 @@ spec:
                 description: "OpenClaw runtime configuration — rendered into openclaw.json ConfigMap. When absent, default providers (fireworks, google) are used."
                 required: ["providers"]
                 properties:
+                  discordEnabled:
+                    type: boolean
+                    description: "Whether the Discord gateway should be enabled for this pod. Defaults to true. Set to false to avoid Discord rate limits when multiple pods share the same bot token."
+                    default: true
                   providers:
                     type: array
                     description: "Provider configurations for the OpenClaw gateway"

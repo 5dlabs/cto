@@ -2274,6 +2274,34 @@ scrape_configs:
             );
         }
 
+        // Stagger gateway startup to avoid Discord API rate limits (429).
+        // When many CodeRuns share the same bot token, simultaneous /gateway/bot
+        // calls trigger Discord rate limiting. This init container adds a
+        // deterministic delay (0-30s) based on a hash of the CodeRun name,
+        // spreading pod startups across time.
+        {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::{Hash, Hasher};
+            let mut hasher = DefaultHasher::new();
+            coderun_name.hash(&mut hasher);
+            let stagger_secs = (hasher.finish() % 31) as u64; // 0-30 seconds
+            init_containers.push(json!({
+                "name": "gateway-stagger",
+                "image": "busybox:1.36",
+                "command": ["/bin/sh", "-c", format!(
+                    "echo 'Staggering gateway startup by {stagger_secs}s to avoid Discord rate limits' && sleep {stagger_secs}"
+                )],
+                "resources": {
+                    "requests": { "cpu": "1m", "memory": "4Mi" },
+                    "limits": { "cpu": "10m", "memory": "8Mi" }
+                }
+            }));
+            info!(
+                "Added gateway-stagger init container ({stagger_secs}s delay) for CodeRun {}",
+                coderun_name
+            );
+        }
+
         // Build Pod spec and set ServiceAccountName (required by CRD)
         let mut pod_spec = json!({
             "shareProcessNamespace": true,
