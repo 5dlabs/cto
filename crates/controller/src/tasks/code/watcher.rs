@@ -283,6 +283,8 @@ pub async fn create_watcher_coderun(
         max_tokens: None,
         temperature: None,
         model_rotation: None,
+        provider: None,
+        provider_base_url: None,
     };
 
     // Build environment variables
@@ -364,6 +366,14 @@ pub async fn create_watcher_coderun(
         watcher_for: Some(executor_name.clone()),
         skills_url: None, // Watcher doesn't need skills
         skills_project: None,
+        escalation_policy: None,
+        implementation_agent: executor.spec.implementation_agent.clone(),
+        quality: false,     // Watcher doesn't run phase gates
+        security: false,
+        testing: false,
+        deployment: false,
+        acp: None,
+        openclaw: None,
     };
 
     let watcher = CodeRun {

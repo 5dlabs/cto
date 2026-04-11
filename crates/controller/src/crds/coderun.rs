@@ -1,6 +1,6 @@
 //! `CodeRun` Custom Resource Definition for code implementation tasks
 
-use crate::cli::types::CLIType;
+use crate::cli::types::{CLIType, Provider};
 use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -46,6 +46,87 @@ fn default_overwrite_memory() -> bool {
 
 fn default_enable_docker() -> bool {
     true
+}
+
+/// Helper for serde defaults returning `true`.
+fn default_true() -> bool {
+    true
+}
+
+/// Provider entry inside an [`ACPEntry`].
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+pub struct ACPProvider {
+    /// Provider name (e.g. "Anthropic", "OpenAI")
+    pub name: String,
+    /// Available credits budget for this provider
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credits: Option<u64>,
+}
+
+/// Model entry inside an [`ACPEntry`].
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+pub struct ACPModel {
+    /// Model identifier (e.g. "claude-opus-4-20250514")
+    pub name: String,
+    /// Thinking level hint: "high", "medium", or "low"
+    #[serde(default, rename = "thinkingLevel", skip_serializing_if = "Option::is_none")]
+    pub thinking_level: Option<String>,
+    /// Performance score 0-100
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub score: Option<u32>,
+}
+
+/// AI-CLI-Provider entry — one candidate runtime environment.
+///
+/// The OpenClaw harness agent picks from the ACP array based on
+/// task difficulty, credits, and model scores.
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+pub struct ACPEntry {
+    /// CLI name (e.g. "Claude Code", "Codex")
+    pub cli: String,
+    /// Provider metadata
+    pub provider: ACPProvider,
+    /// Available models for this CLI/provider combination
+    pub models: Vec<ACPModel>,
+    /// Optional API base URL override
+    #[serde(default, rename = "baseUrl", skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    /// Environment variable name for the API key (e.g. "ANTHROPIC_API_KEY").
+    /// The controller ensures this env var is set in the pod — this is NOT a raw secret.
+    #[serde(default, rename = "apiKey", skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
+}
+
+/// Provider entry inside [`OpenClawConfig`].
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+pub struct OpenClawProvider {
+    /// Provider name (e.g. "Fireworks")
+    pub name: String,
+}
+
+/// Model entry inside [`OpenClawConfig`].
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+pub struct OpenClawModel {
+    /// Model identifier
+    pub name: String,
+    /// Thinking level hint: "high", "medium", or "low"
+    #[serde(default, rename = "thinkingLevel", skip_serializing_if = "Option::is_none")]
+    pub thinking_level: Option<String>,
+}
+
+/// OpenClaw runtime configuration — maps to OpenClaw gateway provider settings.
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+pub struct OpenClawConfig {
+    /// Provider metadata
+    pub provider: OpenClawProvider,
+    /// Available models
+    pub models: Vec<OpenClawModel>,
+    /// Optional API base URL
+    #[serde(default, rename = "baseUrl", skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    /// Environment variable name for the API key
+    #[serde(default, rename = "apiKey", skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
 }
 
 /// Linear integration configuration for status sync
@@ -172,6 +253,41 @@ impl Default for WatcherConfig {
     }
 }
 
+/// How the MCP tools server should handle `tools_request_capability` escalation
+/// calls for agents running under this CodeRun.
+///
+/// Mirrors `tools::escalation::EscalationMode` — duplicated here because the
+/// controller crate does not depend on the tools crate and CRD types need
+/// `schemars::JsonSchema`.
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EscalationMode {
+    /// Grant any tool present in the catalog. `deny` globs still apply.
+    Auto,
+    /// Grant only tools matching at least one `allow` glob. `deny` globs still apply.
+    #[default]
+    Allowlist,
+    /// Deny every escalation and log for human review.
+    Review,
+}
+
+/// Policy governing mid-session tool escalation requests.
+///
+/// Serialized as JSON and forwarded to the tools HTTP server via the
+/// `X-Escalation-Policy` header so each agent session gets its own policy.
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
+pub struct EscalationPolicy {
+    /// Escalation mode. Defaults to `allowlist`.
+    #[serde(default)]
+    pub mode: EscalationMode,
+    /// Glob patterns allowing tools (only consulted when `mode == allowlist`).
+    #[serde(default)]
+    pub allow: Vec<String>,
+    /// Glob patterns blocking tools regardless of mode. Takes precedence over `allow`.
+    #[serde(default)]
+    pub deny: Vec<String>,
+}
+
 /// CLI-specific configuration
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct CLIConfig {
@@ -181,6 +297,20 @@ pub struct CLIConfig {
 
     /// Model identifier (CLI-specific, e.g., "sonnet", "gpt-4", "claude-sonnet-4-5-20250929")
     pub model: String,
+
+    /// Inference provider (fireworks, anthropic, google, openai, cursor, factory, moonshot).
+    /// When omitted, inferred from model ID or controller-level `cliProviders` config.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<Provider>,
+
+    /// Custom base URL for the provider API.
+    /// Overrides the provider's default base URL when set.
+    #[serde(
+        default,
+        rename = "providerBaseUrl",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub provider_base_url: Option<String>,
 
     /// CLI-specific settings (key-value pairs)
     #[serde(default)]
@@ -214,6 +344,7 @@ pub struct CLIConfig {
 #[kube(printcolumn = r#"{"name":"Model","type":"string","jsonPath":".spec.model"}"#)]
 #[kube(printcolumn = r#"{"name":"Phase","type":"string","jsonPath":".status.phase"}"#)]
 #[kube(printcolumn = r#"{"name":"Age","type":"date","jsonPath":".metadata.creationTimestamp"}"#)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct CodeRunSpec {
     /// Type of run: "implementation" (default), "documentation", "intake"
     #[serde(default = "default_run_type", rename = "runType")]
@@ -363,6 +494,45 @@ pub struct CodeRunSpec {
     /// This field is set automatically by the controller when creating watcher CodeRuns.
     #[serde(default, rename = "watcherFor")]
     pub watcher_for: Option<String>,
+
+    /// Escalation policy for mid-session tool requests.
+    /// When set, serialized as JSON and forwarded to the tools HTTP server via
+    /// the `X-Escalation-Policy` header. When absent the server's default
+    /// policy applies (typically `allowlist` with no allow patterns → deny all).
+    #[serde(default, rename = "escalationPolicy")]
+    pub escalation_policy: Option<EscalationPolicy>,
+
+    // ── New fields: multi-agent CodeRun overhaul ─────────────────────
+
+    /// Explicit implementation agent name (e.g. "rex", "blaze").
+    /// Takes precedence over `github_app` derivation for naming and labels.
+    #[serde(default, rename = "implementationAgent")]
+    pub implementation_agent: Option<String>,
+
+    /// Run quality review phase (Cleo). Defaults to true.
+    #[serde(default = "default_true")]
+    pub quality: bool,
+
+    /// Run security scan phase (Cipher). Defaults to true.
+    #[serde(default = "default_true")]
+    pub security: bool,
+
+    /// Run testing phase (Tess). Defaults to true.
+    #[serde(default = "default_true")]
+    pub testing: bool,
+
+    /// Run deployment phase (Bolt). Defaults to false (opt-in).
+    #[serde(default)]
+    pub deployment: bool,
+
+    /// AI-CLI-Provider candidates. The OpenClaw harness agent picks from this
+    /// array based on task difficulty, credits, and model scores.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acp: Option<Vec<ACPEntry>>,
+
+    /// OpenClaw runtime configuration — maps to OpenClaw gateway provider settings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub openclaw: Option<OpenClawConfig>,
 }
 
 impl Default for CodeRunSpec {
@@ -400,6 +570,14 @@ impl Default for CodeRunSpec {
             subtasks: None,
             watcher_config: None,
             watcher_for: None,
+            escalation_policy: None,
+            implementation_agent: None,
+            quality: true,
+            security: true,
+            testing: true,
+            deployment: false,
+            acp: None,
+            openclaw: None,
         }
     }
 }
@@ -524,6 +702,8 @@ mod tests {
             max_tokens: Some(4096),
             temperature: Some(0.7),
             model_rotation: None,
+            provider: None,
+            provider_base_url: None,
         };
 
         assert_eq!(cli_config.cli_type, CLIType::Codex);
@@ -633,5 +813,123 @@ mod tests {
         let spec: CodeRunSpec = serde_json::from_str(json).unwrap();
         assert_eq!(spec.watcher_for, Some("my-executor-coderun".to_string()));
         assert_eq!(spec.run_type, "watcher");
+    }
+
+    #[test]
+    fn test_acp_entry_serde_roundtrip() {
+        let entry = ACPEntry {
+            cli: "Claude Code".to_string(),
+            provider: ACPProvider {
+                name: "Anthropic".to_string(),
+                credits: Some(250_000),
+            },
+            models: vec![
+                ACPModel {
+                    name: "claude-opus-4-20250514".to_string(),
+                    thinking_level: Some("high".to_string()),
+                    score: Some(96),
+                },
+                ACPModel {
+                    name: "claude-sonnet-4-20250514".to_string(),
+                    thinking_level: Some("medium".to_string()),
+                    score: Some(91),
+                },
+            ],
+            base_url: Some("https://api.anthropic.com".to_string()),
+            api_key: Some("ANTHROPIC_API_KEY".to_string()),
+        };
+
+        let json = serde_json::to_string(&entry).unwrap();
+        let deserialized: ACPEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.cli, "Claude Code");
+        assert_eq!(deserialized.provider.name, "Anthropic");
+        assert_eq!(deserialized.provider.credits, Some(250_000));
+        assert_eq!(deserialized.models.len(), 2);
+        assert_eq!(deserialized.models[0].score, Some(96));
+    }
+
+    #[test]
+    fn test_openclaw_config_serde_roundtrip() {
+        let config = OpenClawConfig {
+            provider: OpenClawProvider {
+                name: "Fireworks".to_string(),
+            },
+            models: vec![OpenClawModel {
+                name: "kimi-k2p5-turbo".to_string(),
+                thinking_level: Some("high".to_string()),
+            }],
+            base_url: Some("https://api.fireworks.ai/inference".to_string()),
+            api_key: Some("FIREWORKS_API_KEY".to_string()),
+        };
+
+        let json = serde_json::to_string(&config).unwrap();
+        let deserialized: OpenClawConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.provider.name, "Fireworks");
+        assert_eq!(deserialized.models.len(), 1);
+        assert_eq!(deserialized.base_url.unwrap(), "https://api.fireworks.ai/inference");
+    }
+
+    #[test]
+    fn test_coderun_spec_backward_compat() {
+        // Minimal JSON without any new fields — must deserialize with defaults
+        let json = r#"{
+            "runType": "implementation",
+            "service": "cto",
+            "repositoryUrl": "https://github.com/5dlabs/cto.git",
+            "docsRepositoryUrl": "https://github.com/5dlabs/cto.git",
+            "model": "sonnet",
+            "contextVersion": 1
+        }"#;
+        let spec: CodeRunSpec = serde_json::from_str(json).unwrap();
+        assert!(spec.quality);
+        assert!(spec.security);
+        assert!(spec.testing);
+        assert!(!spec.deployment);
+        assert!(spec.implementation_agent.is_none());
+        assert!(spec.acp.is_none());
+        assert!(spec.openclaw.is_none());
+    }
+
+    #[test]
+    fn test_coderun_spec_with_new_fields() {
+        let json = r#"{
+            "runType": "implementation",
+            "service": "cto",
+            "repositoryUrl": "https://github.com/5dlabs/cto.git",
+            "docsRepositoryUrl": "https://github.com/5dlabs/cto.git",
+            "model": "sonnet",
+            "contextVersion": 1,
+            "implementationAgent": "rex",
+            "quality": false,
+            "security": true,
+            "testing": false,
+            "deployment": true,
+            "acp": [{
+                "cli": "Claude Code",
+                "provider": { "name": "Anthropic", "credits": 250000 },
+                "models": [{ "name": "opus", "thinkingLevel": "high", "score": 96 }],
+                "baseUrl": "https://api.anthropic.com",
+                "apiKey": "ANTHROPIC_API_KEY"
+            }],
+            "openclaw": {
+                "provider": { "name": "Fireworks" },
+                "models": [{ "name": "kimi-k2p5-turbo", "thinkingLevel": "high" }],
+                "baseUrl": "https://api.fireworks.ai/inference",
+                "apiKey": "FIREWORKS_API_KEY"
+            }
+        }"#;
+        let spec: CodeRunSpec = serde_json::from_str(json).unwrap();
+        assert_eq!(spec.implementation_agent, Some("rex".to_string()));
+        assert!(!spec.quality);
+        assert!(spec.security);
+        assert!(!spec.testing);
+        assert!(spec.deployment);
+        assert!(spec.acp.is_some());
+        let acp = spec.acp.unwrap();
+        assert_eq!(acp.len(), 1);
+        assert_eq!(acp[0].cli, "Claude Code");
+        assert_eq!(acp[0].provider.credits, Some(250_000));
+        assert!(spec.openclaw.is_some());
+        assert_eq!(spec.openclaw.unwrap().provider.name, "Fireworks");
     }
 }

@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["solved", "unsure", "skip"]
+    },
+    "answer": {
+      "type": ["string", "null"]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "reasoning_summary": {
+      "type": "string"
+    }
+  },
+  "required": ["status", "answer", "confidence", "reasoning_summary"],
+  "additionalProperties": false
+}

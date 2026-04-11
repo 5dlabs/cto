@@ -89,6 +89,11 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     else \
         npm install -g --no-audit --no-fund --ignore-scripts openclaw@${OPENCLAW_VERSION}; \
     fi && \
+    # --ignore-scripts skips postinstall that resolves deps like tslog.
+    # Run a scoped `npm install` inside the package dir to pull missing deps.
+    cd /usr/local/share/npm-global/lib/node_modules/openclaw && \
+    npm install --no-audit --no-fund --ignore-scripts=false 2>&1 | tail -10 && \
+    cd / && \
     echo "--- OpenClaw (agent CLI) included ---" && \
     openclaw --version
 
@@ -99,6 +104,19 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     npm install -g --no-audit --no-fund acpx@latest && \
     echo "acpx installed" && \
     acpx --version
+
+# =============================================================================
+# ACP adapters — pre-installed so acpx doesn't need runtime npm downloads
+# CLIs with native ACP: droid, cursor, gemini, copilot, kimi, opencode
+# CLIs needing adapters: codex → codex-acp, claude → claude-agent-acp
+# =============================================================================
+RUN --mount=type=cache,target=/root/.npm,sharing=shared \
+    npm install -g --no-audit --no-fund \
+      @zed-industries/codex-acp@latest \
+      @agentclientprotocol/claude-agent-acp@latest && \
+    echo "ACP adapters installed:" && \
+    codex-acp --help 2>&1 | head -1 || true && \
+    claude-agent-acp --help 2>&1 | head -1 || true
 
 # Patch acpx: enable shell mode for terminal/create on all platforms.
 # Without this, agents that send full command strings (e.g. "git status")
@@ -315,6 +333,10 @@ RUN set -e; \
     echo "node           $V_NODE"; \
     echo "bun            $V_BUN"; \
     intake-util --help >/dev/null 2>&1 && echo "intake-util    OK" || true
+
+# Final ownership sweep — everything under /home/node must be writable by node (uid 1000).
+# Root-owned dotfiles (e.g. .gitconfig, .npmrc) created during image build break runtime git/npm.
+RUN find /home/node -maxdepth 1 -not -user 1000 -exec chown 1000:1000 {} + 2>/dev/null || true
 
 # Drop privileges back to non-root user
 USER node

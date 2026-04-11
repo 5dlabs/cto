@@ -1,0 +1,34 @@
+apiVersion: agents.platform/v1
+kind: CodeRun
+metadata:
+  name: harness-nova-gemini
+  namespace: cto
+  labels:
+    harness-test: openclaw-gateway
+    cli-type: gemini
+spec:
+  runType: implementation
+  service: test-sandbox
+  repositoryUrl: https://github.com/5dlabs/test-sandbox
+  docsRepositoryUrl: https://github.com/5dlabs/test-sandbox
+  docsBranch: main
+  workingDirectory: .
+  githubApp: 5DLabs-Nova
+  model: gemini-2.5-flash
+  contextVersion: 1
+  taskId: 1
+  enableDocker: false
+  cliConfig:
+    cliType: gemini
+    provider: google
+    model: gemini-2.5-flash
+    settings:
+      listToolsOnStart: true
+  promptModification: |
+    Use the shell tool (run_shell_command / shell) to create a file called `smoke-report.md` in the repository root.
+    Do NOT use write_file or edit_file tools — use shell commands like `cat > smoke-report.md << 'EOF'` instead.
+    The file must contain:
+    1. A heading with your agent identity (name, version)
+    2. A section listing your available tools
+    3. Valid Markdown syntax
+    After creating the file, verify it exists with `ls -la smoke-report.md` and `cat smoke-report.md`.

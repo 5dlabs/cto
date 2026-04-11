@@ -528,6 +528,7 @@ mod tests {
                     "brave_search_brave_web_search".to_string(),
                 ],
                 local_servers: None,
+                escalation: None,
             }),
             cli_config: Some(json!({
                 "model": "gpt-5-codex",

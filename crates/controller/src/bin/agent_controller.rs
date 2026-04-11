@@ -269,8 +269,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(state);
 
     // Start the HTTP server
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
-    info!("Controller HTTP server listening on 0.0.0.0:8080");
+    let port = std::env::var("CONTROLLER_PORT").unwrap_or_else(|_| "8080".to_string());
+    let addr = format!("0.0.0.0:{port}");
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    info!("Controller HTTP server listening on {addr}");
 
     // Run the server with graceful shutdown
     axum::serve(listener, app)

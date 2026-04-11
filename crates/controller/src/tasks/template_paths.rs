@@ -3,7 +3,8 @@
 //! Templates are embedded in the Docker image and accessed via AGENT_TEMPLATES_PATH env var.
 //! Structure:
 //!   - `_shared/` - Shared partials and container base
-//!   - `clis/` - CLI invocation templates (flat: {cli}.sh.hbs)
+//!   - `clis/` - Unified ACP dispatch partial (openclaw.sh.hbs)
+//!   - `harness-agents/` - OpenClaw gateway entrypoint + config templates
 //!   - `agents/{agent}/` - Agent templates (flat: {job}.md.hbs, {job}.sh.hbs)
 
 // ============================================================================
@@ -12,6 +13,13 @@
 
 // Main container template (uses partials)
 pub const SHARED_CONTAINER_TEMPLATE: &str = "_shared/container.sh.hbs";
+
+// Lobster base task template (replaces container.sh for Lobster-based flows)
+pub const LOBSTER_BASE_TASK_TEMPLATE: &str = "lobster/base-task.lobster.yaml.hbs";
+
+// Harness-agent templates (OpenClaw gateway entrypoint)
+pub const HARNESS_OPENCLAW_TEMPLATE: &str = "harness-agents/openclaw.sh.hbs";
+pub const HARNESS_OPENCLAW_CONFIG_TEMPLATE: &str = "harness-agents/openclaw-config.json.hbs";
 
 // Partials directory
 pub const SHARED_PARTIALS_DIR: &str = "_shared/partials";
@@ -45,6 +53,12 @@ pub const PARTIAL_INFRASTRUCTURE_OPERATORS: &str =
 pub const PARTIAL_INFRASTRUCTURE_SETUP: &str = "_shared/partials/infrastructure-setup.sh.hbs";
 pub const PARTIAL_INFRASTRUCTURE_VERIFY: &str = "_shared/partials/infrastructure-verify.sh.hbs";
 
+// Auth partials referenced by agent system prompts (Spark/Tap/Blaze etc.)
+// Wrapped in {{#unless skills_native}} so only fire for CLIs without native skills (Cursor/Gemini).
+pub const PARTIAL_BETTER_AUTH: &str = "_shared/partials/better-auth.md.hbs";
+pub const PARTIAL_BETTER_AUTH_ELECTRON: &str = "_shared/partials/better-auth-electron.md.hbs";
+pub const PARTIAL_BETTER_AUTH_EXPO: &str = "_shared/partials/better-auth-expo.md.hbs";
+
 // ============================================================================
 // Skills (modular context loaded just-in-time)
 // Structure: skills/{category}/{skill_name}/SKILL.md
@@ -54,18 +68,11 @@ pub const SKILLS_DIR: &str = "skills";
 pub const SKILLS_MAPPINGS: &str = "skills/skill-mappings.yaml";
 
 // ============================================================================
-// CLI-specific templates (invocation scripts)
-// Flat structure: clis/{cli}.sh.hbs
+// CLI invocation partial (unified ACP dispatch)
+// The `clis/openclaw.sh.hbs` template is registered as the `{{> cli_execute}}`
+// partial by `register_cli_invoke_partial()` in templates.rs.
+// Individual per-CLI templates are archived in `clis/_archived/`.
 // ============================================================================
-
-pub const CLI_CLAUDE_INVOKE: &str = "clis/claude.sh.hbs";
-pub const CLI_CODE_INVOKE: &str = "clis/code.sh.hbs"; // Every Code
-pub const CLI_CODEX_INVOKE: &str = "clis/codex.sh.hbs";
-pub const CLI_CURSOR_INVOKE: &str = "clis/cursor.sh.hbs";
-pub const CLI_DEXTER_INVOKE: &str = "clis/dexter.sh.hbs";
-pub const CLI_FACTORY_INVOKE: &str = "clis/factory.sh.hbs";
-pub const CLI_GEMINI_INVOKE: &str = "clis/gemini.sh.hbs";
-pub const CLI_OPENCODE_INVOKE: &str = "clis/opencode.sh.hbs";
 
 // ============================================================================
 // Agent identity templates

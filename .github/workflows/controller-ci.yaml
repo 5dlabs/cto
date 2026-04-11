@@ -179,31 +179,17 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         (github.event_name == 'push' && needs.changes.outputs.controller == 'true')
       )
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v6
 
-      - name: Setup Rust (k8s-runner)
-        uses: ./.github/actions/setup-rust-k8s
-        with:
-          sccache-size: '50G'
-
-      - name: Build controller binary
-        uses: ./.github/actions/rust-build
-        with:
-          package: controller
-          binary: agent-controller
-          working-directory: ./crates/controller
-          output-path: ../../agent-controller
-          use-sccache: 'true'
-
       - name: Get version info
         id: version
         run: |
-          VERSION=$(cargo metadata --manifest-path crates/controller/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "controller") | .version')
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
@@ -213,7 +199,7 @@ jobs:
         with:
           image-name: controller
           context: .
-          dockerfile: ./infra/images/controller/Dockerfile
+          dockerfile: ./controller-build.Dockerfile
           version: ${{ steps.version.outputs.version }}
           short-sha: ${{ steps.version.outputs.short-sha }}
           github-token: ${{ secrets.GITHUB_TOKEN }}

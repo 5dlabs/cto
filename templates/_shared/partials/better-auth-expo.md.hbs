@@ -232,7 +232,7 @@ export default function SocialSignIn() {
   }
 
   return (
-    <View style={{ gap: 12 }}>
+    <View style=\{{ gap: 12 }}>
       <Button title="Continue with Google" onPress={handleGoogleSignIn} />
       <Button title="Continue with Apple" onPress={handleAppleSignIn} />
     </View>
@@ -281,11 +281,11 @@ export default function Profile() {
   }
 
   return (
-    <View style={{ flex: 1, padding: 20 }}>
-      <Text style={{ fontSize: 24, fontWeight: "bold" }}>
+    <View style=\{{ flex: 1, padding: 20 }}>
+      <Text style=\{{ fontSize: 24, fontWeight: "bold" }}>
         Welcome, {session.user.name}!
       </Text>
-      <Text style={{ color: "#666", marginTop: 8 }}>
+      <Text style=\{{ color: "#666", marginTop: 8 }}>
         {session.user.email}
       </Text>
       <Button title="Sign Out" onPress={handleSignOut} />
@@ -350,7 +350,7 @@ export default function AuthLayout() {
 
   if (isPending) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style=\{{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" />
       </View>
     )

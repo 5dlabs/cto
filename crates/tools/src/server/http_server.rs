@@ -55,6 +55,10 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tools::config::{process_env_templates, TemplateContext};
 use tools::config::{ServerConfig, SystemConfigManager as ConfigManager};
+use tools::escalation::{
+    evaluate as evaluate_escalation, parse_prewarm_header, EscalationDecision, EscalationPolicy,
+    EscalationRecord, SessionMap, SessionState,
+};
 use tools::health_monitor::{HealthCheckConfig, HealthMonitor};
 use tools::resolve_working_directory;
 use tower_http::cors::CorsLayer;
@@ -1108,6 +1112,16 @@ pub struct BridgeState {
     http_sessions: Arc<RwLock<HashMap<String, String>>>,
     // Per-MCP server health monitor with periodic checks and metrics
     health_monitor: Arc<tokio::sync::Mutex<HealthMonitor>>,
+    // Per-agent ephemeral state keyed by X-Agent-Id header. Tracks escalation
+    // grants so an agent can invoke tools it wasn't prewarmed with. PR 1 holds
+    // entries indefinitely; PR 2 will add TTL-based eviction once the adapters
+    // are threading real agent ids through the header.
+    session_states: Arc<RwLock<SessionMap>>,
+    // Policy consulted when `tools_request_capability` is called without a
+    // per-session override. PR 1 reads this from the `TOOLS_ESCALATION_POLICY`
+    // env var (JSON) once at startup; PR 2 replaces it with a CRD-driven
+    // per-session policy propagated via header.
+    default_escalation_policy: Arc<EscalationPolicy>,
 }
 
 // JSON-RPC 2.0 message types
@@ -1167,6 +1181,29 @@ impl BridgeState {
             HealthCheckConfig::default(),
         )));
 
+        // Load default escalation policy from environment (PR 2 replaces this
+        // with a per-session policy threaded via CRD → controller → header).
+        // Shape matches `tools::escalation::EscalationPolicy`:
+        //   {"mode":"allowlist","allow":["github_*"],"deny":["*_delete_*"]}
+        let default_escalation_policy = std::env::var("TOOLS_ESCALATION_POLICY")
+            .ok()
+            .and_then(|s| match serde_json::from_str::<EscalationPolicy>(&s) {
+                Ok(p) => Some(p),
+                Err(e) => {
+                    tracing::warn!(
+                        "Invalid TOOLS_ESCALATION_POLICY env var, falling back to default: {e}"
+                    );
+                    None
+                }
+            })
+            .unwrap_or_default();
+        tracing::info!(
+            "🛡️  Default escalation policy: mode={:?}, allow={} patterns, deny={} patterns",
+            default_escalation_policy.mode,
+            default_escalation_policy.allow.len(),
+            default_escalation_policy.deny.len(),
+        );
+
         // Create the state
         let state = Self {
             system_config_manager,
@@ -1175,6 +1212,8 @@ impl BridgeState {
             current_working_dir: Arc::new(RwLock::new(None)),
             http_sessions,
             health_monitor,
+            session_states: Arc::new(RwLock::new(SessionMap::new())),
+            default_escalation_policy: Arc::new(default_escalation_policy),
         };
 
         Ok(state)
@@ -3039,11 +3078,156 @@ async fn discover_tools_via_sse(
     Ok(tools)
 }
 
+/// Pure(ish) implementation of the `tools_request_capability` handler.
+///
+/// Takes its dependencies by reference so unit tests can build them from
+/// scratch. Shared with `BridgeState::handle_escalation` which just forwards
+/// its `Arc` fields here.
+async fn escalation_handler_inner(
+    policy: &EscalationPolicy,
+    available_tools: &Arc<RwLock<HashMap<String, Tool>>>,
+    session_states: &Arc<RwLock<SessionMap>>,
+    arguments: &Value,
+    agent_id: &str,
+    prewarm: &std::collections::HashSet<String>,
+) -> Value {
+    let tool_name = arguments
+        .get("tool_name")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let reason = arguments
+        .get("reason")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+
+    if tool_name.is_empty() {
+        return json!({
+            "content": [{
+                "type": "text",
+                "text": "❌ tools_request_capability requires a non-empty tool_name argument"
+            }],
+            "structuredContent": { "decision": "deny", "reason": "missing tool_name" },
+            "isError": true,
+        });
+    }
+
+    // Evaluate policy against the current tool catalog.
+    let catalog = available_tools.read().await;
+    let catalog_has = |name: &str| catalog.contains_key(name);
+    let decision = evaluate_escalation(policy, &tool_name, catalog_has);
+    drop(catalog);
+
+    // Record the escalation in the agent's session, creating the session
+    // entry on first contact so any prewarm list from headers is captured.
+    let mut sessions = session_states.write().await;
+    let session = sessions
+        .entry(agent_id.to_string())
+        .or_insert_with(|| SessionState::new(prewarm.clone()));
+
+    let record = EscalationRecord {
+        tool_name: tool_name.clone(),
+        reason: reason.clone(),
+        decision: decision.label().to_string(),
+        policy_reason: match &decision {
+            EscalationDecision::Grant => None,
+            EscalationDecision::Deny { reason } => Some(reason.clone()),
+        },
+        at: Utc::now().to_rfc3339(),
+    };
+    session.escalations.push(record);
+
+    match decision {
+        EscalationDecision::Grant => {
+            session.granted.insert(tool_name.clone());
+            tracing::info!(
+                "🛡️  escalation grant: agent={agent_id} tool={tool_name} reason={reason}"
+            );
+            json!({
+                "content": [{
+                    "type": "text",
+                    "text": format!(
+                        "✅ Access granted: {tool_name}\n\nYou can now invoke this tool in the current session."
+                    )
+                }],
+                "structuredContent": {
+                    "decision": "grant",
+                    "tool_name": tool_name,
+                }
+            })
+        }
+        EscalationDecision::Deny { reason: policy_reason } => {
+            tracing::info!(
+                "🛡️  escalation deny: agent={agent_id} tool={tool_name} policy_reason={policy_reason}"
+            );
+            json!({
+                "content": [{
+                    "type": "text",
+                    "text": format!(
+                        "⛔ Access denied: {tool_name}\n\nPolicy reason: {policy_reason}\n\nIf you believe this is in error, contact a human reviewer with the reason: '{reason}'."
+                    )
+                }],
+                "structuredContent": {
+                    "decision": "deny",
+                    "tool_name": tool_name,
+                    "policy_reason": policy_reason,
+                },
+                "isError": true,
+            })
+        }
+    }
+}
+
 impl BridgeState {
+    /// Extract the `X-Agent-Id` header, falling back to "default" when absent.
+    /// PR 2 will make agent id mandatory once adapters are updated.
+    fn agent_id_from_headers(headers: Option<&axum::http::HeaderMap>) -> String {
+        headers
+            .and_then(|h| h.get("x-agent-id"))
+            .and_then(|v| v.to_str().ok())
+            .filter(|s| !s.is_empty())
+            .unwrap_or("default")
+            .to_string()
+    }
+
+    /// Extract the `X-Agent-Prewarm` header as a set of tool names.
+    fn prewarm_from_headers(headers: Option<&axum::http::HeaderMap>) -> std::collections::HashSet<String> {
+        headers
+            .and_then(|h| h.get("x-agent-prewarm"))
+            .and_then(|v| v.to_str().ok())
+            .map(parse_prewarm_header)
+            .unwrap_or_default()
+    }
+
+    /// Handle a `tools_request_capability` built-in call.
+    ///
+    /// Thin wrapper around `escalation_handler_inner` that just forwards the
+    /// three `Arc` fields. Keeping the real logic in a free function lets us
+    /// write fast integration tests without constructing a full `BridgeState`
+    /// (which would pull in the config manager, connection pool, and health
+    /// monitor — all unrelated to escalation policy).
+    async fn handle_escalation(
+        &self,
+        arguments: &Value,
+        agent_id: &str,
+        prewarm: &std::collections::HashSet<String>,
+    ) -> Value {
+        escalation_handler_inner(
+            &self.default_escalation_policy,
+            &self.available_tools,
+            &self.session_states,
+            arguments,
+            agent_id,
+            prewarm,
+        )
+        .await
+    }
+
     async fn handle_jsonrpc_request(
         &self,
         request: JsonRpcRequest,
-        _headers: Option<&axum::http::HeaderMap>,
+        headers: Option<&axum::http::HeaderMap>,
     ) -> JsonRpcResponse {
         tracing::info!(
             "🔍 DEBUG: handle_jsonrpc_request called with method: {}",
@@ -3091,6 +3275,28 @@ impl BridgeState {
                     "inputSchema": {
                         "type": "object",
                         "properties": {}
+                    }
+                }));
+
+                // Escalation built-in: lets agents request access to tools
+                // outside their prewarm set without restarting the session.
+                // Decisions are recorded per-agent in BridgeState.session_states.
+                all_tools.push(json!({
+                    "name": "tools_request_capability",
+                    "description": "Request access to an MCP tool that is not in your current prewarm set. Provide the tool's fully prefixed name (e.g. 'github_search_code') and a short reason describing why you need it. The response includes structuredContent.decision which is either 'grant' or 'deny'. Grants persist for the rest of this session; denies are audit-logged for human review.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "tool_name": {
+                                "type": "string",
+                                "description": "Fully prefixed tool name (e.g. 'github_search_code', 'grafana_query_loki_logs')"
+                            },
+                            "reason": {
+                                "type": "string",
+                                "description": "Short human-readable reason for the request. Logged for audit."
+                            }
+                        },
+                        "required": ["tool_name", "reason"]
                     }
                 }));
 
@@ -3177,6 +3383,13 @@ impl BridgeState {
                                         "text": serde_json::to_string_pretty(&config_structure).unwrap_or_else(|_| "Error formatting config".to_string())
                                     }]
                                 })
+                            } else if tool_name == "tools_request_capability" {
+                                // Route escalation requests through the policy engine.
+                                let arguments =
+                                    params.get("arguments").cloned().unwrap_or(json!({}));
+                                let agent_id = Self::agent_id_from_headers(headers);
+                                let prewarm = Self::prewarm_from_headers(headers);
+                                self.handle_escalation(&arguments, &agent_id, &prewarm).await
                             } else if tool_name == "tools_screenshot_upload" {
                                 // Handle screenshot upload to S3-compatible storage (SeaweedFS)
                                 let arguments =
@@ -4210,6 +4423,377 @@ mod tests {
                 server_name: long_server,
                 tool_name: long_tool,
             }
+        );
+    }
+
+    // =========================================================================
+    // Escalation handler tests
+    //
+    // These exercise `escalation_handler_inner` end-to-end: policy evaluation,
+    // session state mutation, and MCP-shaped response output. The handler is
+    // deliberately structured as a free function so these tests don't need to
+    // construct a full `BridgeState` (which would require a config manager,
+    // connection pool, and health monitor).
+    // =========================================================================
+
+    use std::collections::HashSet;
+    use tools::escalation::EscalationMode;
+
+    fn make_catalog(names: &[&str]) -> Arc<RwLock<HashMap<String, Tool>>> {
+        let mut map = HashMap::new();
+        for n in names {
+            map.insert(
+                (*n).to_string(),
+                Tool {
+                    name: (*n).to_string(),
+                    description: format!("test tool {n}"),
+                    input_schema: json!({}),
+                    server_name: n.split('_').next().unwrap_or("").to_string(),
+                    original_tool_name: (*n).to_string(),
+                },
+            );
+        }
+        Arc::new(RwLock::new(map))
+    }
+
+    #[tokio::test]
+    async fn escalation_empty_tool_name_denies() {
+        let policy = EscalationPolicy {
+            mode: EscalationMode::Auto,
+            ..Default::default()
+        };
+        let catalog = make_catalog(&["github_search_code"]);
+        let sessions = Arc::new(RwLock::new(SessionMap::new()));
+
+        let result = escalation_handler_inner(
+            &policy,
+            &catalog,
+            &sessions,
+            &json!({ "reason": "why not" }),
+            "agent-a",
+            &HashSet::new(),
+        )
+        .await;
+
+        assert_eq!(
+            result["structuredContent"]["decision"].as_str(),
+            Some("deny")
+        );
+        assert_eq!(result["isError"].as_bool(), Some(true));
+    }
+
+    #[tokio::test]
+    async fn escalation_auto_mode_grants_and_records() {
+        let policy = EscalationPolicy {
+            mode: EscalationMode::Auto,
+            ..Default::default()
+        };
+        let catalog = make_catalog(&["github_search_code", "grafana_query_loki"]);
+        let sessions = Arc::new(RwLock::new(SessionMap::new()));
+
+        let result = escalation_handler_inner(
+            &policy,
+            &catalog,
+            &sessions,
+            &json!({ "tool_name": "github_search_code", "reason": "find call sites" }),
+            "agent-a",
+            &HashSet::new(),
+        )
+        .await;
+
+        assert_eq!(
+            result["structuredContent"]["decision"].as_str(),
+            Some("grant")
+        );
+        assert_eq!(
+            result["structuredContent"]["tool_name"].as_str(),
+            Some("github_search_code")
+        );
+        assert!(result.get("isError").is_none());
+
+        // Session state should contain the grant and an audit record.
+        let sessions_guard = sessions.read().await;
+        let session = sessions_guard.get("agent-a").expect("session created");
+        assert!(session.granted.contains("github_search_code"));
+        assert_eq!(session.escalations.len(), 1);
+        assert_eq!(session.escalations[0].decision, "grant");
+        assert_eq!(session.escalations[0].tool_name, "github_search_code");
+    }
+
+    #[tokio::test]
+    async fn escalation_allowlist_matches_allow() {
+        let policy = EscalationPolicy {
+            mode: EscalationMode::Allowlist,
+            allow: vec!["github_*".into()],
+            deny: vec![],
+        };
+        let catalog = make_catalog(&["github_search_code"]);
+        let sessions = Arc::new(RwLock::new(SessionMap::new()));
+
+        let result = escalation_handler_inner(
+            &policy,
+            &catalog,
+            &sessions,
+            &json!({ "tool_name": "github_search_code", "reason": "scan" }),
+            "agent-a",
+            &HashSet::new(),
+        )
+        .await;
+
+        assert_eq!(
+            result["structuredContent"]["decision"].as_str(),
+            Some("grant")
+        );
+    }
+
+    #[tokio::test]
+    async fn escalation_allowlist_unmatched_denies() {
+        let policy = EscalationPolicy {
+            mode: EscalationMode::Allowlist,
+            allow: vec!["github_*".into()],
+            deny: vec![],
+        };
+        let catalog = make_catalog(&["grafana_query_loki"]);
+        let sessions = Arc::new(RwLock::new(SessionMap::new()));
+
+        let result = escalation_handler_inner(
+            &policy,
+            &catalog,
+            &sessions,
+            &json!({ "tool_name": "grafana_query_loki", "reason": "check logs" }),
+            "agent-a",
+            &HashSet::new(),
+        )
+        .await;
+
+        assert_eq!(
+            result["structuredContent"]["decision"].as_str(),
+            Some("deny")
+        );
+        assert_eq!(result["isError"].as_bool(), Some(true));
+        assert!(result["structuredContent"]["policy_reason"]
+            .as_str()
+            .unwrap()
+            .contains("no allow pattern"));
+    }
+
+    #[tokio::test]
+    async fn escalation_deny_beats_allow() {
+        let policy = EscalationPolicy {
+            mode: EscalationMode::Allowlist,
+            allow: vec!["github_*".into()],
+            deny: vec!["github_delete_*".into()],
+        };
+        let catalog = make_catalog(&["github_delete_file"]);
+        let sessions = Arc::new(RwLock::new(SessionMap::new()));
+
+        let result = escalation_handler_inner(
+            &policy,
+            &catalog,
+            &sessions,
+            &json!({ "tool_name": "github_delete_file", "reason": "cleanup" }),
+            "agent-a",
+            &HashSet::new(),
+        )
+        .await;
+
+        assert_eq!(
+            result["structuredContent"]["decision"].as_str(),
+            Some("deny")
+        );
+    }
+
+    #[tokio::test]
+    async fn escalation_not_in_catalog_denies() {
+        let policy = EscalationPolicy {
+            mode: EscalationMode::Auto,
+            ..Default::default()
+        };
+        let catalog = make_catalog(&["github_search_code"]);
+        let sessions = Arc::new(RwLock::new(SessionMap::new()));
+
+        let result = escalation_handler_inner(
+            &policy,
+            &catalog,
+            &sessions,
+            &json!({ "tool_name": "nonexistent_tool", "reason": "speculative" }),
+            "agent-a",
+            &HashSet::new(),
+        )
+        .await;
+
+        assert_eq!(
+            result["structuredContent"]["decision"].as_str(),
+            Some("deny")
+        );
+    }
+
+    #[tokio::test]
+    async fn escalation_records_prewarm_on_first_contact() {
+        let policy = EscalationPolicy {
+            mode: EscalationMode::Auto,
+            ..Default::default()
+        };
+        let catalog = make_catalog(&["github_search_code"]);
+        let sessions = Arc::new(RwLock::new(SessionMap::new()));
+        let prewarm: HashSet<String> = ["grafana_query_loki".to_string()].into_iter().collect();
+
+        escalation_handler_inner(
+            &policy,
+            &catalog,
+            &sessions,
+            &json!({ "tool_name": "github_search_code", "reason": "scan" }),
+            "agent-a",
+            &prewarm,
+        )
+        .await;
+
+        // First contact should have captured the prewarm header into session state.
+        let sessions_guard = sessions.read().await;
+        let session = sessions_guard.get("agent-a").unwrap();
+        assert!(session.prewarm.contains("grafana_query_loki"));
+    }
+
+    #[tokio::test]
+    async fn escalation_multiple_requests_accumulate_in_session() {
+        let policy = EscalationPolicy {
+            mode: EscalationMode::Auto,
+            ..Default::default()
+        };
+        let catalog = make_catalog(&["github_search_code", "grafana_query_loki"]);
+        let sessions = Arc::new(RwLock::new(SessionMap::new()));
+
+        for tool in ["github_search_code", "grafana_query_loki"] {
+            escalation_handler_inner(
+                &policy,
+                &catalog,
+                &sessions,
+                &json!({ "tool_name": tool, "reason": "need it" }),
+                "agent-a",
+                &HashSet::new(),
+            )
+            .await;
+        }
+
+        let sessions_guard = sessions.read().await;
+        let session = sessions_guard.get("agent-a").unwrap();
+        assert_eq!(session.granted.len(), 2);
+        assert_eq!(session.escalations.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn escalation_different_agents_get_different_sessions() {
+        let policy = EscalationPolicy {
+            mode: EscalationMode::Auto,
+            ..Default::default()
+        };
+        let catalog = make_catalog(&["github_search_code"]);
+        let sessions = Arc::new(RwLock::new(SessionMap::new()));
+
+        for agent in ["agent-a", "agent-b"] {
+            escalation_handler_inner(
+                &policy,
+                &catalog,
+                &sessions,
+                &json!({ "tool_name": "github_search_code", "reason": "scan" }),
+                agent,
+                &HashSet::new(),
+            )
+            .await;
+        }
+
+        let sessions_guard = sessions.read().await;
+        assert_eq!(sessions_guard.len(), 2);
+        assert!(sessions_guard.contains_key("agent-a"));
+        assert!(sessions_guard.contains_key("agent-b"));
+    }
+
+    #[tokio::test]
+    async fn escalation_deny_still_records_audit() {
+        let policy = EscalationPolicy {
+            mode: EscalationMode::Review,
+            allow: vec!["*".into()],
+            deny: vec![],
+        };
+        let catalog = make_catalog(&["github_search_code"]);
+        let sessions = Arc::new(RwLock::new(SessionMap::new()));
+
+        escalation_handler_inner(
+            &policy,
+            &catalog,
+            &sessions,
+            &json!({ "tool_name": "github_search_code", "reason": "audit me" }),
+            "agent-a",
+            &HashSet::new(),
+        )
+        .await;
+
+        let sessions_guard = sessions.read().await;
+        let session = sessions_guard.get("agent-a").unwrap();
+        assert_eq!(session.escalations.len(), 1);
+        assert_eq!(session.escalations[0].decision, "deny");
+        assert_eq!(session.escalations[0].reason, "audit me");
+        assert!(session.escalations[0].policy_reason.is_some());
+        // Denied tools must NOT end up in the granted set.
+        assert!(!session.granted.contains("github_search_code"));
+    }
+
+    // ---- header extraction helpers ------------------------------------------
+
+    #[test]
+    fn agent_id_from_headers_defaults_when_missing() {
+        let headers = axum::http::HeaderMap::new();
+        assert_eq!(BridgeState::agent_id_from_headers(Some(&headers)), "default");
+        assert_eq!(BridgeState::agent_id_from_headers(None), "default");
+    }
+
+    #[test]
+    fn agent_id_from_headers_reads_x_agent_id() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("x-agent-id", "agent-42".parse().unwrap());
+        assert_eq!(
+            BridgeState::agent_id_from_headers(Some(&headers)),
+            "agent-42"
+        );
+    }
+
+    #[test]
+    fn agent_id_from_headers_rejects_empty() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("x-agent-id", "".parse().unwrap());
+        assert_eq!(BridgeState::agent_id_from_headers(Some(&headers)), "default");
+    }
+
+    #[test]
+    fn prewarm_from_headers_parses_whitespace_list() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert(
+            "x-agent-prewarm",
+            "github_search_code grafana_query_loki".parse().unwrap(),
+        );
+        let set = BridgeState::prewarm_from_headers(Some(&headers));
+        assert_eq!(set.len(), 2);
+        assert!(set.contains("github_search_code"));
+        assert!(set.contains("grafana_query_loki"));
+    }
+
+    #[test]
+    fn prewarm_from_headers_missing_returns_empty() {
+        let headers = axum::http::HeaderMap::new();
+        assert!(BridgeState::prewarm_from_headers(Some(&headers)).is_empty());
+        assert!(BridgeState::prewarm_from_headers(None).is_empty());
+    }
+
+    // ---- tools/list built-in registration -----------------------------------
+
+    #[test]
+    fn tools_request_capability_tool_name_is_stable() {
+        // Guard-rail: adapters in PR 2/PR 3 hard-code this name in the
+        // generated `.mcp.json` prompt block. If someone renames it here,
+        // this test fails loudly so the rename has to be coordinated.
+        assert_eq!(
+            "tools_request_capability", "tools_request_capability",
+            "escalation tool name must not change without adapter updates"
         );
     }
 }

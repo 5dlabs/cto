@@ -1,0 +1,33 @@
+apiVersion: agents.platform/v1
+kind: CodeRun
+metadata:
+  name: harness-angie-kimi
+  namespace: cto
+  labels:
+    harness-test: openclaw-gateway
+    cli-type: kimi
+spec:
+  runType: implementation
+  service: test-sandbox
+  repositoryUrl: https://github.com/5dlabs/test-sandbox
+  docsRepositoryUrl: https://github.com/5dlabs/test-sandbox
+  docsBranch: main
+  workingDirectory: .
+  githubApp: 5DLabs-Angie
+  model: accounts/fireworks/routers/kimi-k2p5-turbo
+  contextVersion: 1
+  taskId: 1
+  enableDocker: false
+  cliConfig:
+    cliType: kimi
+    provider: fireworks
+    model: accounts/fireworks/routers/kimi-k2p5-turbo
+    settings:
+      listToolsOnStart: true
+  promptModification: |
+    Create a file called `smoke-report.md` in the repository root.
+    It must contain:
+    1. A heading with your agent identity (name, version)
+    2. A section listing your available tools
+    3. Valid Markdown syntax
+    After creating the file, verify it exists with `ls -la smoke-report.md`.

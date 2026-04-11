@@ -3,10 +3,11 @@ use crate::crds::CodeRun;
 use crate::tasks::code::agent::AgentClassifier;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::template_paths::{
-    CODE_CLAUDE_CONTAINER_TEMPLATE, CODE_CODEX_CONTAINER_BASE_TEMPLATE,
-    CODE_CODING_GUIDELINES_TEMPLATE, CODE_CURSOR_CONTAINER_BASE_TEMPLATE,
-    CODE_FACTORY_CONTAINER_BASE_TEMPLATE, CODE_GEMINI_CONTAINER_BASE_TEMPLATE,
-    CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
+    CODE_CODEX_CONTAINER_BASE_TEMPLATE, CODE_CODING_GUIDELINES_TEMPLATE,
+    CODE_CURSOR_CONTAINER_BASE_TEMPLATE, CODE_FACTORY_CONTAINER_BASE_TEMPLATE,
+    CODE_GEMINI_CONTAINER_BASE_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE,
+    CODE_OPENCODE_CONTAINER_BASE_TEMPLATE, HARNESS_OPENCLAW_CONFIG_TEMPLATE,
+    HARNESS_OPENCLAW_TEMPLATE, LOBSTER_BASE_TASK_TEMPLATE,
 };
 use crate::tasks::tool_catalog::resolve_tool_name;
 use crate::tasks::types::Result;
@@ -113,6 +114,10 @@ impl HelperDef for GroupByHelper {
 
 pub struct CodeTemplateGenerator;
 
+// Per-CLI template generators below are legacy paths; production routing uses
+// `generate_all_templates` → `generate_claude_templates` + OpenClaw harness.
+// Helpers are interleaved with that path, so dead-code is suppressed on the impl.
+#[allow(dead_code)]
 impl CodeTemplateGenerator {
     /// Register common Handlebars helpers for template conditionals
     /// This enables `eq` and `or` helpers used in templates like:
@@ -166,15 +171,9 @@ impl CodeTemplateGenerator {
             "review" => Self::generate_review_templates(code_run, config)?,
             "remediate" => Self::generate_remediate_templates(code_run, config)?,
             _ => {
-                // Fall through to CLI-based dispatch for other run types
-                match Self::determine_cli_type(code_run) {
-                    CLIType::Codex => Self::generate_codex_templates(code_run, config)?,
-                    CLIType::Cursor => Self::generate_cursor_templates(code_run, config)?,
-                    CLIType::Factory => Self::generate_factory_templates(code_run, config)?,
-                    CLIType::OpenCode => Self::generate_opencode_templates(code_run, config)?,
-                    CLIType::Gemini => Self::generate_gemini_templates(code_run, config)?,
-                    _ => Self::generate_claude_templates(code_run, config)?,
-                }
+                // All CLI types route through the OpenClaw harness.
+                // The harness uses acpx to dispatch to the correct CLI at runtime.
+                Self::generate_claude_templates(code_run, config)?
             }
         };
 
@@ -237,7 +236,82 @@ impl CodeTemplateGenerator {
             }
         }
 
+        // Inject CLI-specific config files from templates/cli-configs/
+        // These are simple Handlebars templates rendered with CRD context
+        let cli_type = Self::determine_cli_type(code_run);
+        let model = &code_run.spec.model;
+        let workspace_dir = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|c| serde_json::to_value(c).ok())
+            .and_then(|v| {
+                v.get("workspaceDir")
+                    .and_then(|w| w.as_str().map(String::from))
+            })
+            .unwrap_or_default();
+        let fireworks_routing = model.contains("fireworks");
+
+        if let Some((filename, content)) =
+            Self::render_cli_config(cli_type, model, &workspace_dir, fireworks_routing)
+        {
+            templates.insert(filename, content);
+        }
+
+        // Kimi CLI requires a persisted OAuth token to pass _check_auth.
+        // The harness writes ~/.kimi/credentials/kimi-code.json at startup
+        // using FIREWORKS_API_KEY from the environment.
+
         Ok(templates)
+    }
+
+    /// Render a CLI-specific config file from templates/cli-configs/.
+    /// Returns (filename, rendered_content) or None if no config needed.
+    fn render_cli_config(
+        cli_type: CLIType,
+        model: &str,
+        workspace_dir: &str,
+        fireworks_routing: bool,
+    ) -> Option<(String, String)> {
+        let templates_path = get_templates_path();
+        let (template_file, output_name) = match cli_type {
+            CLIType::Copilot => ("copilot-config.json.hbs", "copilot-config.json"),
+            CLIType::Kimi => ("kimi-config.toml.hbs", "kimi-config.toml"),
+            CLIType::OpenCode => ("opencode.json.hbs", "opencode.json"),
+            CLIType::Codex => ("codex-config.toml.hbs", "codex-config.toml"),
+            CLIType::Gemini => ("gemini-settings.json.hbs", "gemini-settings.json"),
+            CLIType::Cursor => ("cursor-config.json.hbs", "cursor-config.json"),
+            CLIType::Factory => ("factory-config.json.hbs", "factory-config.json"),
+            _ => return None,
+        };
+
+        let template_path = format!("{templates_path}/cli-configs/{template_file}");
+        let template_content = match fs::read_to_string(&template_path) {
+            Ok(content) => content,
+            Err(e) => {
+                warn!("CLI config template not found at {}: {}", template_path, e);
+                return None;
+            }
+        };
+
+        let mut hbs = Handlebars::new();
+        hbs.set_strict_mode(false);
+        let data = json!({
+            "model": model,
+            "workspace_dir": workspace_dir,
+            "fireworks_routing": fireworks_routing,
+        });
+
+        match hbs.render_template(&template_content, &data) {
+            Ok(rendered) => Some((output_name.to_string(), rendered)),
+            Err(e) => {
+                warn!(
+                    "Failed to render CLI config template {}: {}",
+                    template_file, e
+                );
+                None
+            }
+        }
     }
 
     fn determine_cli_type(code_run: &CodeRun) -> CLIType {
@@ -279,9 +353,22 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
         let remote_tools = Self::extract_remote_tools(&client_config_value);
 
+        // Render the Lobster base-task workflow (replaces the old container.sh flow)
+        templates.insert(
+            "base-task.lobster".to_string(),
+            Self::generate_lobster_base_task(code_run, &enriched_cli_config, config)?,
+        );
+
+        // Render the OpenClaw gateway config (per-CRD)
+        templates.insert(
+            "openclaw.json".to_string(),
+            Self::generate_openclaw_config(code_run, &enriched_cli_config, config)?,
+        );
+
+        // container.sh is the harness-agent launcher: boots OpenClaw gateway
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_container_script(code_run, &enriched_cli_config, config)?,
+            Self::generate_harness_launcher(code_run, config)?,
         );
         templates.insert(
             "CLAUDE.md".to_string(),
@@ -637,6 +724,7 @@ impl CodeTemplateGenerator {
             "model": model.clone(),
             "cli_type": cli_type,
             "enable_docker": code_run.spec.enable_docker,
+            "list_tools_on_start": render_settings.list_tools_on_start,
             // Required template context variables
             "job_type": job_type,
             "agent_name": agent_name,
@@ -736,6 +824,9 @@ impl CodeTemplateGenerator {
             // Frontend stack context for Blaze agent
             "frontend_stack": frontend_stack,
             "is_tanstack_stack": is_tanstack_stack,
+            // Default task_language so {{#eq task_language "rust"}} blocks in cipher/security
+            // and similar templates don't trip the handlebars-rust eq helper type check
+            "task_language": "",
         });
 
         handlebars.render("cursor_agents", &context).map_err(|e| {
@@ -1051,6 +1142,10 @@ impl CodeTemplateGenerator {
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
+            // Telemetry configuration
+            "telemetry_enabled": Self::is_telemetry_enabled(code_run, config),
+            "otel_endpoint": Self::get_otel_endpoint(),
+            "datadog_enabled": Self::is_datadog_enabled(config),
             // Watch-specific context
             "iteration": iteration,
             "max_iterations": max_iterations,
@@ -1158,6 +1253,9 @@ impl CodeTemplateGenerator {
             // Frontend stack context for Blaze agent
             "frontend_stack": frontend_stack,
             "is_tanstack_stack": is_tanstack_stack,
+            // Default task_language so {{#eq task_language "rust"}} blocks in cipher/security
+            // and similar templates don't trip the handlebars-rust eq helper type check
+            "task_language": "",
         });
 
         handlebars.render("factory_agents", &context).map_err(|e| {
@@ -1272,98 +1370,132 @@ impl CodeTemplateGenerator {
         })
     }
 
-    fn generate_container_script(
+    /// Render the Lobster base-task workflow template.
+    /// Uses the same Handlebars partials as container.sh (github-auth, git-setup, etc.)
+    /// so the rendered YAML contains fully expanded shell blocks.
+    fn generate_lobster_base_task(
         code_run: &CodeRun,
         cli_config: &Value,
-        config: &ControllerConfig,
+        _config: &ControllerConfig,
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
         Self::register_template_helpers(&mut handlebars);
-
-        // Register shared partials for CLI-agnostic building blocks
         Self::register_shared_partials(&mut handlebars)?;
 
-        // Register CLI-specific invoke template as the `cli_execute` partial
-        let cli_type = Self::determine_cli_type(code_run);
-        Self::register_cli_invoke_partial(&mut handlebars, cli_type)?;
-
-        // Select agent-specific template based on github_app field
-        let template_path = Self::get_agent_container_template(code_run);
-
-        // Try to load agent-specific template, fall back to default if not found
-        let template = match Self::load_template(&template_path) {
-            Ok(content) => content,
-            Err(_) if !template_path.ends_with("container.sh.hbs") => {
-                // If agent-specific template not found, try default
-                debug!(
-                    "Agent-specific template {} not found, falling back to default",
-                    template_path
-                );
-                Self::load_template(CODE_CLAUDE_CONTAINER_TEMPLATE)?
-            }
-            Err(e) => return Err(e),
-        };
-
+        let template = Self::load_template(LOBSTER_BASE_TASK_TEMPLATE)?;
         handlebars
-            .register_template_string("container_script", template)
+            .register_template_string("lobster_base_task", template)
             .map_err(|e| {
                 crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to register container script template: {e}"
+                    "Failed to register Lobster base task template: {e}"
                 ))
             })?;
 
-        let retry_count = code_run
-            .status
-            .as_ref()
-            .and_then(|s| s.retry_count)
-            .unwrap_or(0);
-
-        let cli_type_str = cli_type.to_string();
-        let job_type = Self::determine_job_type(code_run);
+        let cli_type = Self::determine_cli_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
-        let task_language = Self::get_task_language(code_run);
-        let default_retries = Self::get_default_retries(code_run);
-        let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
-
-        // Get skills for agent (used by Claude Code and Factory for native skill loading)
-        let skills = Self::get_agent_skills_enriched(code_run, config);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
-            "docs_branch": code_run.spec.docs_branch,
-            "source_branch": code_run.spec.docs_branch,
-            "working_directory": Self::get_working_directory(code_run),
-            "continue_session": Self::get_continue_session(code_run),
-            "attempts": retry_count + 1,  // Current attempt number (1-indexed)
-            "overwrite_memory": code_run.spec.overwrite_memory,
             "docs_project_directory": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
             "github_app": Self::get_github_app_or_default(code_run),
             "model": code_run.spec.model,
+            "cli_type": cli_type.to_string(),
+            "agent_name": &agent_name,
+            "agent_name_upper": agent_name.to_uppercase(),
             "cli_config": cli_config,
-            "enable_docker": code_run.spec.enable_docker,
-            // Required template context variables
-            "cli_type": cli_type_str,
-            "job_type": job_type,
-            "agent_name": agent_name,
-            "task_language": task_language,
-            "default_retries": default_retries,
-            "fresh_start_threshold": fresh_start_threshold,
-            // Skills for native skill loading (Claude Code, Factory, OpenCode, Codex)
-            "skills": skills,
-            // Flag to conditionally render partials (skip for CLIs with native skills)
-            "skills_native": Self::cli_supports_native_skills(cli_type),
-            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
         });
 
         handlebars
-            .render("container_script", &context)
+            .render("lobster_base_task", &context)
             .map_err(|e| {
                 crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to render container script: {e}"
+                    "Failed to render Lobster base task: {e}"
+                ))
+            })
+    }
+
+    /// Render the OpenClaw gateway config template for a CRD pod.
+    /// Produces a JSON config modeled on Morgan's openclaw.json.
+    fn generate_openclaw_config(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        _config: &ControllerConfig,
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
+
+        let template = Self::load_template(HARNESS_OPENCLAW_CONFIG_TEMPLATE)?;
+        handlebars
+            .register_template_string("openclaw_config", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register OpenClaw config template: {e}"
+                ))
+            })?;
+
+        let cli_type = Self::determine_cli_type(code_run);
+        let agent_name = Self::get_agent_name(code_run);
+
+        let context = json!({
+            "task_id": code_run.spec.task_id.unwrap_or(0),
+            "service": code_run.spec.service,
+            "model": code_run.spec.model,
+            "cli_type": cli_type.to_string(),
+            "agent_name": &agent_name,
+            "agent_name_upper": agent_name.to_uppercase(),
+            "github_app": Self::get_github_app_or_default(code_run),
+            "cli_config": cli_config,
+            "discord_enabled": true,
+        });
+
+        handlebars.render("openclaw_config", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render OpenClaw config: {e}"
+            ))
+        })
+    }
+
+    /// Render the harness-agent launcher script (OpenClaw entrypoint).
+    /// Thin shell script: fix perms, copy config, exec openclaw gateway.
+    fn generate_harness_launcher(code_run: &CodeRun, _config: &ControllerConfig) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
+
+        let template = Self::load_template(HARNESS_OPENCLAW_TEMPLATE)?;
+        handlebars
+            .register_template_string("harness_launcher", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register harness launcher template: {e}"
+                ))
+            })?;
+
+        let cli_type = Self::determine_cli_type(code_run);
+        let agent_name = Self::get_agent_name(code_run);
+
+        let context = json!({
+            "agent_name": &agent_name,
+            "agent_name_upper": agent_name.to_uppercase(),
+            "cli_type": cli_type.to_string(),
+            "model": code_run.spec.model,
+            "prompt_modification": code_run.spec.prompt_modification.as_deref().unwrap_or(""),
+            "repository_url": code_run.spec.repository_url,
+            "github_app": Self::get_github_app_or_default(code_run),
+            "task_id": code_run.spec.task_id.unwrap_or(0),
+            "service": &code_run.spec.service,
+        });
+
+        handlebars
+            .render("harness_launcher", &context)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render harness launcher: {e}"
                 ))
             })
     }
@@ -1514,6 +1646,9 @@ impl CodeTemplateGenerator {
             // Frontend stack context for Blaze agent
             "frontend_stack": frontend_stack,
             "is_tanstack_stack": is_tanstack_stack,
+            // Default task_language so {{#eq task_language "rust"}} blocks in cipher/security
+            // and similar templates don't trip the handlebars-rust eq helper type check
+            "task_language": "",
         });
 
         handlebars.render("claude_memory", &context).map_err(|e| {
@@ -1643,6 +1778,45 @@ impl CodeTemplateGenerator {
             if !remote_tools.is_empty() {
                 tools_server["availableTools"] = json!(remote_tools);
             }
+
+            // Thread escalation policy + agent identity as HTTP headers so the
+            // tools server can apply per-session policy (PR 1 added the
+            // server-side handler; this wires the CRD-side policy through).
+            let mut headers = serde_json::Map::new();
+
+            // Agent identity — used by the tools server to key per-session state.
+            let agent_name = code_run
+                .spec
+                .github_app
+                .as_deref()
+                .unwrap_or("unknown");
+            headers.insert(
+                "X-Agent-Id".to_string(),
+                json!(agent_name),
+            );
+
+            // Prewarm set — the tools the agent starts with before escalation.
+            if !remote_tools.is_empty() {
+                headers.insert(
+                    "X-Agent-Prewarm".to_string(),
+                    json!(remote_tools.join(" ")),
+                );
+            }
+
+            // Per-session escalation policy from the CRD (overrides server default).
+            if let Some(policy) = &code_run.spec.escalation_policy {
+                if let Ok(policy_json) = serde_json::to_string(policy) {
+                    headers.insert(
+                        "X-Escalation-Policy".to_string(),
+                        json!(policy_json),
+                    );
+                }
+            }
+
+            if !headers.is_empty() {
+                tools_server["headers"] = Value::Object(headers);
+            }
+
             mcp_servers["tools"] = tools_server;
         }
 
@@ -1713,6 +1887,7 @@ impl CodeTemplateGenerator {
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
         let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
         // Get skills for agent (Codex supports native skill loading)
         let skills = Self::get_agent_skills_enriched(code_run, config);
@@ -1734,6 +1909,15 @@ impl CodeTemplateGenerator {
                 .unwrap_or(""),
             "github_app": Self::get_github_app_or_default(code_run),
             "workflow_name": workflow_name,
+            "model": render_settings.model,
+            "auto_level": render_settings.auto_level,
+            "output_format": render_settings.output_format,
+            "model_rotation": render_settings.model_rotation,
+            "list_tools_on_start": render_settings.list_tools_on_start,
+            // Telemetry context for openclaw.sh.hbs unified dispatch
+            "telemetry_enabled": Self::is_telemetry_enabled(code_run, config),
+            "otel_endpoint": Self::get_otel_endpoint(),
+            "datadog_enabled": Self::is_datadog_enabled(config),
             // Required template context variables
             "cli_type": cli_type,
             "job_type": job_type,
@@ -1841,6 +2025,9 @@ impl CodeTemplateGenerator {
             // Frontend stack context for Blaze agent
             "frontend_stack": frontend_stack,
             "is_tanstack_stack": is_tanstack_stack,
+            // Default task_language so {{#eq task_language "rust"}} blocks in cipher/security
+            // and similar templates don't trip the handlebars-rust eq helper type check
+            "task_language": "",
         });
 
         handlebars.render("codex_agents", &context).map_err(|e| {
@@ -2418,6 +2605,7 @@ impl CodeTemplateGenerator {
             "model": code_run.spec.model,
             "tools_url": render_settings.tools_url,
             "remote_tools": remote_tools,
+            "list_tools_on_start": render_settings.list_tools_on_start,
             // Template variables expected by container.sh.hbs
             "agent_name": agent_name,
             "cli_type": cli_type_name,
@@ -3216,6 +3404,7 @@ Be constructive and explain the "why" behind your suggestions.
             "github_app": Self::get_github_app_or_default(code_run),
             "workflow_name": workflow_name,
             "model": render_settings.model,
+            "list_tools_on_start": render_settings.list_tools_on_start,
             // Required template context variables
             "cli_type": cli_type,
             "job_type": job_type,
@@ -3320,6 +3509,9 @@ Be constructive and explain the "why" behind your suggestions.
             // Frontend stack context for Blaze agent
             "frontend_stack": frontend_stack,
             "is_tanstack_stack": is_tanstack_stack,
+            // Default task_language so {{#eq task_language "rust"}} blocks in cipher/security
+            // and similar templates don't trip the handlebars-rust eq helper type check
+            "task_language": "",
         });
 
         handlebars.render("opencode_agents", &context).map_err(|e| {
@@ -3509,6 +3701,7 @@ Be constructive and explain the "why" behind your suggestions.
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
         let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
@@ -3526,6 +3719,7 @@ Be constructive and explain the "why" behind your suggestions.
             "continue_session": continue_session,
             "overwrite_memory": code_run.spec.overwrite_memory,
             "attempts": retry_count + 1,
+            "list_tools_on_start": render_settings.list_tools_on_start,
             // Required template context variables
             "cli_type": cli_type,
             "job_type": job_type,
@@ -3688,6 +3882,9 @@ Be constructive and explain the "why" behind your suggestions.
             // Frontend stack context for Blaze agent
             "frontend_stack": frontend_stack,
             "is_tanstack_stack": is_tanstack_stack,
+            // Default task_language so {{#eq task_language "rust"}} blocks in cipher/security
+            // and similar templates don't trip the handlebars-rust eq helper type check
+            "task_language": "",
         });
 
         handlebars.render("gemini_memory", &context).map_err(|e| {
@@ -3965,6 +4162,34 @@ Be constructive and explain the "why" behind your suggestions.
             .get("FRESH_START_THRESHOLD")
             .and_then(|v| v.parse::<u32>().ok())
             .unwrap_or(3) // Platform default - same as cto-config default
+    }
+
+    /// Check if telemetry (OTEL metrics/logs) is enabled for this CodeRun.
+    fn is_telemetry_enabled(code_run: &CodeRun, _config: &ControllerConfig) -> bool {
+        // CodeRun env override takes precedence
+        if let Some(val) = code_run.spec.env.get("TELEMETRY_ENABLED") {
+            return val == "true" || val == "1";
+        }
+        // Fall back to controller env var, default to true (observability stack is deployed)
+        std::env::var("TELEMETRY_ENABLED")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(true)
+    }
+
+    /// Get the OTLP gRPC endpoint for telemetry export.
+    fn get_otel_endpoint() -> String {
+        std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").unwrap_or_else(|_| {
+            "otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317"
+                .to_string()
+        })
+    }
+
+    /// Check if Datadog APM is enabled.
+    fn is_datadog_enabled(_config: &ControllerConfig) -> bool {
+        std::env::var("DATADOG_ENABLED")
+            .or_else(|_| std::env::var("DD_TRACE_ENABLED"))
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false)
     }
 
     /// Get default MCP tools for an agent based on github_app and run_type.
@@ -4336,22 +4561,6 @@ Be constructive and explain the "why" behind your suggestions.
         format!("agents/{agent}/{job}{suffix}.md.hbs")
     }
 
-    /// Select the container template for Claude CLI.
-    /// All CLIs use the shared container template - CLI-specific behavior is
-    /// injected via the `{{> cli_execute}}` partial from `clis/{cli}/invoke.sh.hbs`.
-    fn get_agent_container_template(code_run: &CodeRun) -> String {
-        let run_type = code_run.spec.run_type.as_str();
-
-        // Intake runs have a specialized container
-        if run_type == "documentation" || run_type == "intake" {
-            debug!("Using intake container template for run_type: {}", run_type);
-            return "agents/morgan/intake.sh.hbs".to_string();
-        }
-
-        // All other runs use the shared container template
-        "_shared/container.sh.hbs".to_string()
-    }
-
     /// Select the container template for Codex CLI.
     /// All CLIs use the shared container template - CLI-specific behavior is
     /// injected via the `{{> cli_execute}}` partial from `clis/{cli}/invoke.sh.hbs`.
@@ -4695,6 +4904,7 @@ Be constructive and explain the "why" behind your suggestions.
     #[allow(clippy::too_many_lines)] // Complex function not easily split
     fn register_agent_partials(handlebars: &mut Handlebars) -> Result<()> {
         use crate::tasks::template_paths::{
+            PARTIAL_BETTER_AUTH, PARTIAL_BETTER_AUTH_ELECTRON, PARTIAL_BETTER_AUTH_EXPO,
             PARTIAL_FRONTEND_TOOLKITS, PARTIAL_INFRASTRUCTURE_OPERATORS,
             PARTIAL_INFRASTRUCTURE_SETUP, PARTIAL_INFRASTRUCTURE_VERIFY, PARTIAL_SHADCN_STACK,
             PARTIAL_TANSTACK_STACK,
@@ -4722,6 +4932,37 @@ Be constructive and explain the "why" behind your suggestions.
             ("infrastructure-setup", PARTIAL_INFRASTRUCTURE_SETUP),
             ("infrastructure-verify", PARTIAL_INFRASTRUCTURE_VERIFY),
         ];
+
+        // Auth partials used by Spark/Tap/Blaze system prompts when skills_native=false
+        // (Cursor and Gemini need these inlined; Claude/Factory/Codex/OpenCode get them via MCP skills)
+        let auth_partials = vec![
+            ("better-auth", PARTIAL_BETTER_AUTH),
+            ("better-auth-electron", PARTIAL_BETTER_AUTH_ELECTRON),
+            ("better-auth-expo", PARTIAL_BETTER_AUTH_EXPO),
+        ];
+
+        // Register auth partials (best-effort — agents only reference them when skills_native=false)
+        for (partial_name, template_path) in auth_partials {
+            match Self::load_template(template_path) {
+                Ok(content) => match handlebars.register_partial(partial_name, content) {
+                    Ok(()) => {
+                        debug!("Successfully registered auth partial: {}", partial_name);
+                    }
+                    Err(e) => {
+                        warn!(
+                                "Auth partial {partial_name} has invalid handlebars syntax (likely JSX {{ }} in code samples): {e}. \
+                                Agents referencing this partial will get raw markdown instead."
+                            );
+                    }
+                },
+                Err(e) => {
+                    warn!(
+                        "Failed to load auth partial {partial_name} from ConfigMap (path: {template_path}): {e}. \
+                        Spark/Tap/Blaze templates referencing this partial will fail to render."
+                    );
+                }
+            }
+        }
 
         // Register frontend stack partials first
         for (partial_name, template_path) in frontend_stack_partials {
@@ -4820,24 +5061,12 @@ Be constructive and explain the "why" behind your suggestions.
     /// Register CLI-specific invoke template as the `cli_execute` partial.
     /// This allows the container.sh.hbs template to use {{> cli_execute}} to include
     /// the CLI-specific invocation logic.
-    fn register_cli_invoke_partial(handlebars: &mut Handlebars, cli_type: CLIType) -> Result<()> {
-        let cli_name = match cli_type {
-            CLIType::Code => "code",
-            CLIType::Codex => "codex",
-            CLIType::Cursor => "cursor",
-            CLIType::Dexter => "dexter",
-            CLIType::Factory => "factory",
-            CLIType::Gemini => "gemini",
-            CLIType::OpenCode => "opencode",
-            // Claude and types without dedicated invoke templates fall back to claude
-            CLIType::Claude
-            | CLIType::OpenHands
-            | CLIType::Grok
-            | CLIType::Qwen
-            | CLIType::MiniMax => "claude",
-        };
-
-        let invoke_template_path = format!("clis/{cli_name}.sh.hbs");
+    fn register_cli_invoke_partial(handlebars: &mut Handlebars, _cli_type: CLIType) -> Result<()> {
+        // All CLI types route through the unified ACP dispatch template (openclaw.sh.hbs).
+        // CLI-specific behavior (auth, flags, autonomy) is handled inside the template
+        // via the cli_type context variable and acpx agent mapping.
+        // Legacy per-CLI templates are archived in templates/clis/_archived/.
+        let invoke_template_path = "clis/openclaw.sh.hbs".to_string();
 
         match Self::load_template(&invoke_template_path) {
             Ok(content) => {
@@ -4845,37 +5074,16 @@ Be constructive and explain the "why" behind your suggestions.
                     .register_partial("cli_execute", content)
                     .map_err(|e| {
                         crate::tasks::types::Error::ConfigError(format!(
-                            "Failed to register CLI invoke partial for {cli_name}: {e}"
+                            "Failed to register ACP dispatch partial: {e}"
                         ))
                     })?;
-                debug!(
-                    "Successfully registered CLI invoke partial for {}",
-                    cli_name
-                );
+                debug!("Registered unified ACP dispatch partial (openclaw.sh.hbs)");
                 Ok(())
             }
-            Err(e) => {
-                // If the CLI-specific invoke template is not found, fall back to a simple echo
-                warn!(
-                    "CLI invoke template not found for {cli_name} (path: {invoke_template_path}): {e}. \
-                    Registering a fallback placeholder."
-                );
-
-                // Register a fallback that just echoes the CLI type
-                let fallback = format!(
-                    r#"echo "⚠️ No invoke template found for {cli_name} CLI"
-echo "CLI invocation should be handled by the adapter."
-"#
-                );
-                handlebars
-                    .register_partial("cli_execute", fallback)
-                    .map_err(|e| {
-                        crate::tasks::types::Error::ConfigError(format!(
-                            "Failed to register fallback CLI invoke partial: {e}"
-                        ))
-                    })?;
-                Ok(())
-            }
+            Err(e) => Err(crate::tasks::types::Error::ConfigError(format!(
+                "ACP dispatch template not found ({invoke_template_path}): {e}. \
+                    Ensure templates/clis/openclaw.sh.hbs exists in the controller image."
+            ))),
         }
     }
 }
@@ -4912,58 +5120,6 @@ mod tests {
     // All agents now use the shared container template (_shared/container.sh.hbs)
     // CLI-specific behavior is injected via the cli_execute partial
     // ========================================================================
-
-    #[test]
-    fn test_container_template_uses_shared_for_all_agents() {
-        // All agents should use the shared container template
-        for github_app in [
-            "5DLabs-Rex",
-            "5DLabs-Cleo",
-            "5DLabs-Tess",
-            "5DLabs-Cipher",
-            "5DLabs-Atlas",
-            "5DLabs-Bolt",
-            "5DLabs-Blaze",
-        ] {
-            let code_run = create_test_code_run(Some(github_app.to_string()));
-            let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-            assert_eq!(
-                template_path, "_shared/container.sh.hbs",
-                "Agent {github_app} should use shared container template"
-            );
-        }
-    }
-
-    #[test]
-    fn test_container_template_default_uses_shared() {
-        let code_run = create_test_code_run(None);
-        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "_shared/container.sh.hbs");
-    }
-
-    #[test]
-    fn test_container_template_intake_uses_morgan() {
-        // Intake runs should use Morgan's intake container
-        let mut code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
-        code_run.spec.run_type = "intake".to_string();
-        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(
-            template_path, "agents/morgan/intake.sh.hbs",
-            "Intake run should use Morgan intake container"
-        );
-    }
-
-    #[test]
-    fn test_container_template_documentation_uses_morgan() {
-        // Documentation runs should also use Morgan's intake container
-        let mut code_run = create_test_code_run(Some("5DLabs-Morgan".to_string()));
-        code_run.spec.run_type = "documentation".to_string();
-        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(
-            template_path, "agents/morgan/intake.sh.hbs",
-            "Documentation run should use Morgan intake container"
-        );
-    }
 
     // ========================================================================
     // Handlebars helper tests
@@ -5316,6 +5472,8 @@ mod tests {
             max_tokens: None,
             temperature: None,
             model_rotation: None,
+            provider: None,
+            provider_base_url: None,
         });
         let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
         assert_eq!(

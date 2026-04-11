@@ -4,14 +4,145 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// ─── Provider (inference API backend) ─────────────────────────────────────
+
+const PROVIDER_VARIANTS: &[&str] = &[
+    "fireworks",
+    "anthropic",
+    "google",
+    "openai",
+    "cursor",
+    "factory",
+    "moonshot",
+];
+
+/// Model inference provider — the backend that serves completions.
+///
+/// Each variant carries a default base URL and the secret key name used to
+/// resolve the API key from `cto-secrets`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Provider {
+    /// Fireworks AI (Anthropic-compatible + OpenAI Responses API)
+    Fireworks,
+    /// Anthropic native API
+    Anthropic,
+    /// Google Gemini API
+    Google,
+    /// OpenAI API
+    #[serde(rename = "openai")]
+    OpenAI,
+    /// Cursor backend
+    Cursor,
+    /// Factory / Droid backend
+    Factory,
+    /// Moonshot AI (Kimi)
+    Moonshot,
+}
+
+impl Provider {
+    /// Default base URL for this provider (if applicable).
+    #[must_use]
+    pub const fn default_base_url(&self) -> Option<&'static str> {
+        match self {
+            Provider::Fireworks => Some("https://api.fireworks.ai/inference"),
+            Provider::Anthropic => Some("https://api.anthropic.com"),
+            Provider::OpenAI => Some("https://api.openai.com/v1"),
+            Provider::Moonshot => Some("https://api.moonshot.cn/v1"),
+            Provider::Google | Provider::Cursor | Provider::Factory => None,
+        }
+    }
+
+    /// The key name in `cto-secrets` for this provider's API key.
+    #[must_use]
+    pub const fn secret_key(&self) -> &'static str {
+        match self {
+            Provider::Fireworks => "FIREWORKS_API_KEY",
+            Provider::Anthropic => "ANTHROPIC_API_KEY",
+            Provider::Google => "GEMINI_API_KEY",
+            Provider::OpenAI => "OPENAI_API_KEY",
+            Provider::Cursor => "CURSOR_API_KEY",
+            Provider::Factory => "FACTORY_API_KEY",
+            Provider::Moonshot => "KIMI_API_KEY",
+        }
+    }
+
+    /// Parse a provider from a case-insensitive string.
+    #[must_use]
+    pub fn from_str_ci(value: &str) -> Option<Self> {
+        match value.trim().to_lowercase().as_str() {
+            "fireworks" | "fireworks-ai" => Some(Provider::Fireworks),
+            "anthropic" => Some(Provider::Anthropic),
+            "google" | "gemini" => Some(Provider::Google),
+            "openai" => Some(Provider::OpenAI),
+            "cursor" => Some(Provider::Cursor),
+            "factory" | "droid" => Some(Provider::Factory),
+            "moonshot" | "kimi" => Some(Provider::Moonshot),
+            _ => None,
+        }
+    }
+
+    /// Infer provider from a model ID string.
+    ///
+    /// Used for backward compatibility when the CRD omits `provider`.
+    #[must_use]
+    pub fn infer_from_model(model: &str) -> Option<Self> {
+        let m = model.to_lowercase();
+        if m.contains("fireworks") {
+            Some(Provider::Fireworks)
+        } else if m.starts_with("claude") || m.contains("sonnet") || m.contains("haiku") || m.contains("opus") {
+            Some(Provider::Anthropic)
+        } else if m.starts_with("gemini") {
+            Some(Provider::Google)
+        } else if m.starts_with("gpt") || m.starts_with("o1") || m.starts_with("o3") || m.starts_with("o4") {
+            Some(Provider::OpenAI)
+        } else if m.starts_with("glm") {
+            Some(Provider::Factory)
+        } else if m.contains("moonshot") || m.contains("kimi") {
+            Some(Provider::Moonshot)
+        } else {
+            None
+        }
+    }
+}
+
+impl std::fmt::Display for Provider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Provider::Fireworks => write!(f, "fireworks"),
+            Provider::Anthropic => write!(f, "anthropic"),
+            Provider::Google => write!(f, "google"),
+            Provider::OpenAI => write!(f, "openai"),
+            Provider::Cursor => write!(f, "cursor"),
+            Provider::Factory => write!(f, "factory"),
+            Provider::Moonshot => write!(f, "moonshot"),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Provider {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Provider::from_str_ci(&value)
+            .ok_or_else(|| serde::de::Error::unknown_variant(&value, PROVIDER_VARIANTS))
+    }
+}
+
+// ─── CLIType ──────────────────────────────────────────────────────────────
+
 const CLI_TYPE_VARIANTS: &[&str] = &[
     "claude",
     "code",
     "codex",
+    "copilot",
     "dexter",
     "opencode",
     "cursor",
     "factory",
+    "kimi",
     "openhands",
     "grok",
     "gemini",
@@ -37,6 +168,10 @@ pub enum CLIType {
     Cursor,
     /// Factory Droid CLI
     Factory,
+    /// GitHub Copilot CLI
+    Copilot,
+    /// Kimi Code CLI (Moonshot AI)
+    Kimi,
     /// `OpenHands`
     OpenHands,
     /// Grok CLI
@@ -59,6 +194,8 @@ impl std::fmt::Display for CLIType {
             CLIType::OpenCode => write!(f, "opencode"),
             CLIType::Cursor => write!(f, "cursor"),
             CLIType::Factory => write!(f, "factory"),
+            CLIType::Copilot => write!(f, "copilot"),
+            CLIType::Kimi => write!(f, "kimi"),
             CLIType::OpenHands => write!(f, "openhands"),
             CLIType::Grok => write!(f, "grok"),
             CLIType::Gemini => write!(f, "gemini"),
@@ -82,6 +219,8 @@ impl CLIType {
             "opencode" | "open-code" => Some(CLIType::OpenCode),
             "cursor" => Some(CLIType::Cursor),
             "factory" => Some(CLIType::Factory),
+            "copilot" | "github-copilot" => Some(CLIType::Copilot),
+            "kimi" | "kimi-cli" => Some(CLIType::Kimi),
             "openhands" | "open-hands" => Some(CLIType::OpenHands),
             "grok" => Some(CLIType::Grok),
             "gemini" => Some(CLIType::Gemini),
@@ -143,6 +282,55 @@ mod tests {
         let result = serde_json::from_str::<CLIType>("\"\"");
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), CLIType::Claude);
+    }
+
+    // ── Provider tests ──
+
+    #[test]
+    fn provider_deserializes_case_insensitive() {
+        let fw: Provider = serde_json::from_str("\"Fireworks\"").unwrap();
+        let goog: Provider = serde_json::from_str("\"google\"").unwrap();
+        let oai: Provider = serde_json::from_str("\"OpenAI\"").unwrap();
+        assert_eq!(fw, Provider::Fireworks);
+        assert_eq!(goog, Provider::Google);
+        assert_eq!(oai, Provider::OpenAI);
+    }
+
+    #[test]
+    fn provider_aliases() {
+        assert_eq!(Provider::from_str_ci("fireworks-ai"), Some(Provider::Fireworks));
+        assert_eq!(Provider::from_str_ci("gemini"), Some(Provider::Google));
+        assert_eq!(Provider::from_str_ci("droid"), Some(Provider::Factory));
+        assert_eq!(Provider::from_str_ci("kimi"), Some(Provider::Moonshot));
+    }
+
+    #[test]
+    fn provider_infer_from_model() {
+        assert_eq!(Provider::infer_from_model("accounts/fireworks/routers/kimi-k2p5-turbo"), Some(Provider::Fireworks));
+        assert_eq!(Provider::infer_from_model("gemini-2.5-flash"), Some(Provider::Google));
+        assert_eq!(Provider::infer_from_model("glm-5.1"), Some(Provider::Factory));
+        assert_eq!(Provider::infer_from_model("gpt-4.1"), Some(Provider::OpenAI));
+        assert_eq!(Provider::infer_from_model("claude-sonnet-4-20250514"), Some(Provider::Anthropic));
+        assert_eq!(Provider::infer_from_model("totally-unknown-model"), None);
+    }
+
+    #[test]
+    fn provider_default_base_urls() {
+        assert_eq!(Provider::Fireworks.default_base_url(), Some("https://api.fireworks.ai/inference"));
+        assert_eq!(Provider::Google.default_base_url(), None);
+        assert_eq!(Provider::Cursor.default_base_url(), None);
+    }
+
+    #[test]
+    fn provider_secret_keys() {
+        assert_eq!(Provider::Fireworks.secret_key(), "FIREWORKS_API_KEY");
+        assert_eq!(Provider::Google.secret_key(), "GEMINI_API_KEY");
+        assert_eq!(Provider::Moonshot.secret_key(), "KIMI_API_KEY");
+    }
+
+    #[test]
+    fn provider_rejects_unknown() {
+        assert!(serde_json::from_str::<Provider>("\"unknown\"").is_err());
     }
 }
 

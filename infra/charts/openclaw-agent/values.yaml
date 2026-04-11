@@ -103,22 +103,22 @@ discord:
       slug: "5dlabs"
       channels:
         "1409006087969177735":
-          allow: true
+          enabled: true
           requireMention: true
         "1445330230926381056":
-          allow: true
+          enabled: true
           requireMention: true
         # Agent-to-agent coordination channel (no @mention required)
         "1467540094490640529":
-          allow: true
+          enabled: true
           requireMention: false
   # -- Allow bot interactions
   allowBots: true
   # -- DM policy (must be explicitly "allowlist" — see MEMORY.md)
-  dm:
-    policy: "allowlist"
-    allowFrom:
-      - "444519104808878090"
+  dmPolicy: "allowlist"
+  # -- Users allowed to DM (top-level, not nested under dm)
+  allowFrom:
+    - "444519104808878090"
 
 # =============================================================================
 # Model Providers

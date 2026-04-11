@@ -1,0 +1,378 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]: Canteen
+      - generic [ref=e5]: ×
+      - link "Colosseum" [ref=e6] [cursor=pointer]:
+        - /url: https://colosseum.com/frontier
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - link "Next Steps" [ref=e9] [cursor=pointer]:
+          - /url: "#next-steps"
+        - link "Prizes" [ref=e10] [cursor=pointer]:
+          - /url: "#prizes"
+        - link "Ideas" [ref=e11] [cursor=pointer]:
+          - /url: "#ideas"
+        - link "Research" [ref=e12] [cursor=pointer]:
+          - /url: "#examples"
+        - link "Judging" [ref=e13] [cursor=pointer]:
+          - /url: "#judging"
+        - link "Resources" [ref=e14] [cursor=pointer]:
+          - /url: "#resources"
+      - link "Apply" [ref=e15] [cursor=pointer]:
+        - /url: "#"
+  - generic [ref=e18]:
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - text: Priority Access ·
+        - link "Colosseum Frontier" [ref=e22] [cursor=pointer]:
+          - /url: https://colosseum.com/frontier
+      - heading "SWARM" [level=1] [ref=e23]
+      - paragraph [ref=e24]: Canteen's exclusive priority access for Colosseum's Frontier Hackathon. $25,000 in additional prizes, dedicated mentorship, and direct access to Canteen's network.
+      - paragraph [ref=e25]: Selective cohort · Apply to join.
+      - generic [ref=e26]:
+        - link "Request access →" [ref=e27] [cursor=pointer]:
+          - /url: "#"
+        - link "Join Discord ↗" [ref=e28] [cursor=pointer]:
+          - /url: https://discord.gg/NDgvUzFqBY
+    - generic [ref=e30]:
+      - generic [ref=e31]:
+        - generic [ref=e32]:
+          - generic [ref=e33]: Prize pool
+          - generic [ref=e34]: $25K
+        - generic [ref=e35]:
+          - generic [ref=e36]: Dates
+          - generic [ref=e37]: Apr 6 – May 11
+        - generic [ref=e38]:
+          - generic [ref=e39]: Format
+          - generic [ref=e40]: Online · 4 weeks
+        - generic [ref=e41]:
+          - generic [ref=e42]: Access
+          - generic [ref=e43]: Apply to join
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - img "Canteen" [ref=e47]
+          - generic [ref=e48]:
+            - generic [ref=e49]: Canteen
+            - generic [ref=e50]: Research & Technology · New York City
+        - generic [ref=e51]:
+          - text: Canteen is a research and technology firm at the intersection of
+          - strong [ref=e52]: AI, crypto, and payments
+          - text: . We publish the research, run the experiments, and back the builders doing the same.
+  - generic [ref=e53]:
+    - generic [ref=e54]:
+      - generic [ref=e55]:
+        - text: Next
+        - text: Steps
+      - generic [ref=e56]: "01"
+    - generic [ref=e58]:
+      - generic [ref=e59]:
+        - generic [ref=e60]: "01"
+        - generic [ref=e61]:
+          - generic [ref=e62]: Join our Discord
+          - link "https://discord.gg/NDgvUzFqBY" [ref=e64] [cursor=pointer]:
+            - /url: https://discord.gg/NDgvUzFqBY
+      - generic [ref=e65]:
+        - generic [ref=e66]: "02"
+        - generic [ref=e67]:
+          - generic [ref=e68]: Register for Frontier (be sure to use this link with the referral to be eligble for SWARM prizes)
+          - link "https://arena.colosseum.org?ref=SWARM" [ref=e70] [cursor=pointer]:
+            - /url: https://arena.colosseum.org?ref=SWARM
+      - generic [ref=e71]:
+        - generic [ref=e72]: "03"
+        - generic [ref=e73]:
+          - generic [ref=e74]: Get the SWARM CLI to submit updates - and (maybe) win some hidden prizes along the way!
+          - generic [ref=e76]:
+            - code [ref=e77]: uv tool install git+https://github.com/the-canteen-dev/SWARM-cli.git
+            - button "⧉" [ref=e78] [cursor=pointer]
+      - generic [ref=e79]:
+        - generic [ref=e80]: "04"
+        - generic [ref=e81]:
+          - generic [ref=e82]: Submit your project on Frontier
+          - generic [ref=e83]: "You will need: a product demo (live working product), a founder pitch video (who you are, what you built and why), and a public link to your GitHub repo. You will also be asked traction questions — e.g. how many users, labs, or companies you have onboarded."
+      - generic [ref=e84]:
+        - generic [ref=e85]: "05"
+        - generic [ref=e86]:
+          - generic [ref=e87]: Win! And (maybe) build an amazing company!
+          - generic [ref=e88]: The best SWARM projects compete for prizes, Canteen support, and Colosseum's accelerator pipeline.
+  - generic [ref=e89]:
+    - generic [ref=e90]:
+      - generic [ref=e91]:
+        - text: Prizes
+        - text: "& Access"
+      - generic [ref=e92]: "02"
+    - generic [ref=e93]:
+      - generic [ref=e94]:
+        - generic [ref=e95]: $250k
+        - generic [ref=e96]:
+          - text: in follow-on support from
+          - link "Colosseum" [ref=e97] [cursor=pointer]:
+            - /url: https://colosseum.com/
+          - text: "'s venture fund"
+      - paragraph [ref=e98]:
+        - text: These investments are offered by
+        - link "Colosseum's Frontier" [ref=e99] [cursor=pointer]:
+          - /url: https://colosseum.com/frontier
+        - text: and in addition to SWARM. The best projects compete for both.
+      - generic [ref=e101]:
+        - generic [ref=e102]: "01"
+        - generic [ref=e103]:
+          - generic [ref=e104]: $25,000 in prizes
+          - generic [ref=e105]: Awarded to standout SWARM projects, stacked on top of everything Frontier already offers.
+      - generic [ref=e106]:
+        - generic [ref=e107]: "02"
+        - generic [ref=e108]:
+          - generic [ref=e109]: Canteen access, start to finish
+          - generic [ref=e110]: Direct lines to Canteen researchers and founders for the full four weeks. Real conversations, not scheduled office hours.
+      - generic [ref=e111]:
+        - generic [ref=e112]: "03"
+        - generic [ref=e113]:
+          - generic [ref=e114]: Priority programming
+          - generic [ref=e115]: Dedicated sessions, workshops, and briefings for SWARM builders throughout the four weeks.
+      - generic [ref=e116]:
+        - generic [ref=e117]: "04"
+        - generic [ref=e118]:
+          - generic [ref=e119]: The Canteen network
+          - generic [ref=e120]: Introductions to operators, investors, and builders already working on the agent economy. No cold outreach required.
+  - generic [ref=e121]:
+    - generic [ref=e122]:
+      - generic [ref=e123]:
+        - text: Priority
+        - text: Pass
+      - generic [ref=e124]: "03"
+    - generic [ref=e126]:
+      - link "The hackathon Colosseum Frontier Colosseum's flagship hackathon. Thousands of builders competing for serious prizes and an accelerator pipeline that has launched some of the most important companies in the Solana ecosystem. All SWARM builders compete in Frontier" [ref=e127] [cursor=pointer]:
+        - /url: https://colosseum.com/frontier
+        - generic [ref=e128]: The hackathon
+        - generic [ref=e129]: Colosseum Frontier
+        - paragraph [ref=e130]: Colosseum's flagship hackathon. Thousands of builders competing for serious prizes and an accelerator pipeline that has launched some of the most important companies in the Solana ecosystem.
+        - generic [ref=e131]: All SWARM builders compete in Frontier
+      - generic [ref=e132]:
+        - generic [ref=e133]: Your priority pass
+        - generic [ref=e134]: SWARM
+        - paragraph [ref=e135]: Canteen's program running alongside Frontier. Selected builders get $25,000 in additional prizes, dedicated mentorship, and Canteen's full research and founder network.
+        - generic [ref=e136]: Selective cohort · Apply below
+  - generic [ref=e137]:
+    - generic [ref=e138]:
+      - generic [ref=e139]: Ideas
+      - generic [ref=e140]: "04"
+    - generic [ref=e141]:
+      - paragraph [ref=e142]:
+        - text: RFBs — "Requests for Builders" — are our version of
+        - link "YC's Requests for Startups" [ref=e143] [cursor=pointer]:
+          - /url: https://www.ycombinator.com/rfs
+        - text: . Five open problems in the agent economy that we think are worth solving. If one excites you, treat it as extra validation to dive in — but you don't need to work on any of these to participate in SWARM.
+        - strong [ref=e144]: The best submissions always are what you care most about.
+      - generic [ref=e145]:
+        - generic [ref=e146]:
+          - button "RFB 01 Agent Discovery & Reputation Networks Your agent offers a service. How do other agents find it and decide to trust it? +" [ref=e147] [cursor=pointer]:
+            - generic [ref=e148]: RFB 01
+            - generic [ref=e149]:
+              - generic [ref=e150]: Agent Discovery & Reputation Networks
+              - generic [ref=e151]: Your agent offers a service. How do other agents find it and decide to trust it?
+            - generic [ref=e152]: +
+          - text: — — — — — — — — — — — —
+        - generic [ref=e153]:
+          - button "RFB 02 Real-Time Agent Coordination Multiple agents need to coordinate in real-time. Voice calls. Live auctions. Streaming services. +" [ref=e154] [cursor=pointer]:
+            - generic [ref=e155]: RFB 02
+            - generic [ref=e156]:
+              - generic [ref=e157]: Real-Time Agent Coordination
+              - generic [ref=e158]: Multiple agents need to coordinate in real-time. Voice calls. Live auctions. Streaming services.
+            - generic [ref=e159]: +
+          - text: — — — — — — — — — —
+        - generic [ref=e160]:
+          - button "RFB 03 Agent Attention Markets You're selling to agents. Traditional marketing doesn't work on AI. What does? +" [ref=e161] [cursor=pointer]:
+            - generic [ref=e162]: RFB 03
+            - generic [ref=e163]:
+              - generic [ref=e164]: Agent Attention Markets
+              - generic [ref=e165]: You're selling to agents. Traditional marketing doesn't work on AI. What does?
+            - generic [ref=e166]: +
+          - text: — — — — — — — — — — —
+        - generic [ref=e167]:
+          - button "RFB 04 Emergent Agent Economies What actually happens when hundreds of agents with different goals interact? +" [ref=e168] [cursor=pointer]:
+            - generic [ref=e169]: RFB 04
+            - generic [ref=e170]:
+              - generic [ref=e171]: Emergent Agent Economies
+              - generic [ref=e172]: What actually happens when hundreds of agents with different goals interact?
+            - generic [ref=e173]: +
+          - text: — — — — — — — — — — —
+        - generic [ref=e174]:
+          - button "RFB 05 Multi-Agent Orchestration Complex tasks need multiple agents working together. Who coordinates, and who gets paid? +" [ref=e175] [cursor=pointer]:
+            - generic [ref=e176]: RFB 05
+            - generic [ref=e177]:
+              - generic [ref=e178]: Multi-Agent Orchestration
+              - generic [ref=e179]: Complex tasks need multiple agents working together. Who coordinates, and who gets paid?
+            - generic [ref=e180]: +
+          - text: — — — — — — — — — — —
+  - generic [ref=e181]:
+    - generic [ref=e182]:
+      - generic [ref=e183]: Research
+      - generic [ref=e184]: "05"
+    - generic [ref=e185]:
+      - paragraph [ref=e186]:
+        - text: Research that points directly to buildable products.
+        - link "Read more about our take on mass agent networks here." [ref=e187] [cursor=pointer]:
+          - /url: https://thecanteenapp.com/analysis/2026/03/27/multi-agent-landscape.html
+      - generic [ref=e188]:
+        - generic [ref=e189]:
+          - generic [ref=e190]:
+            - generic [ref=e191]: "01"
+            - generic [ref=e192]:
+              - link "Debate Primitives for Multi-Agent LLM Collaboration" [ref=e194] [cursor=pointer]:
+                - /url: https://github.com/deeplearning-wisc/debate-or-vote
+              - link "Li et al., 2025 · UW-Madison" [ref=e196] [cursor=pointer]:
+                - /url: https://github.com/deeplearning-wisc/debate-or-vote
+          - paragraph [ref=e198]: "Li's work gives us a concrete design question: when should a swarm deliberate vs. aggregate? The hack here is building that decision as an on-chain primitive — the mechanism selector (debate or vote) lives in a smart contract, debate transcripts are hashed and stored as receipts, and payment releases only after the chosen mechanism reaches quorum. This turns a research finding into auditable, trust-minimized coordination infrastructure. The interesting product wedge is selling it to agent runtime providers (e.g. LangGraph, CrewAI) as a drop-in arbitration layer."
+        - generic [ref=e199]:
+          - generic [ref=e200]:
+            - generic [ref=e201]: "02"
+            - generic [ref=e202]:
+              - link "TurboQuant KV Cache as Agent Memory" [ref=e204] [cursor=pointer]:
+                - /url: https://arxiv.org/abs/2504.19874
+              - link "Zandieh & Mirrokni · Google Research · 2026" [ref=e206] [cursor=pointer]:
+                - /url: https://arxiv.org/abs/2504.19874
+          - paragraph [ref=e208]: Extreme KV cache compression may enable agent memory to be stored onchain for the first time. This would give agents verifiable, persistent memory that survives across sessions and providers — no single inference provider controls the memory state. The hack is a PoC that snapshots a compressed KV cache (using TurboQuant's technique) at the end of each agent session, pins it to Arweave/Filecoin with a hash on Solana, and rehydrates it at session start. If retrieval quality holds up at extreme compression ratios, this is the missing piece for truly persistent agent identity.
+        - generic [ref=e209]:
+          - generic [ref=e210]:
+            - generic [ref=e211]: "03"
+            - generic [ref=e212]:
+              - link "Craftium On-Chain via Rust Game Engine" [ref=e214] [cursor=pointer]:
+                - /url: https://github.com/mikelma/craftium
+              - link "Mikelma et al. · ICML 2025" [ref=e216] [cursor=pointer]:
+                - /url: https://github.com/mikelma/craftium
+          - paragraph [ref=e218]: Craftium provides a Minecraft-based framework for building diverse multi-agent environments in a composable way. Can we rewrite the environment core in a Rust-based game engine (Bevy is the obvious choice given its ECS architecture and WASM compilation target)? This creates a permissionless arena for agent training and evaluation.
+        - generic [ref=e219]:
+          - generic [ref=e220]:
+            - generic [ref=e221]: "04"
+            - generic [ref=e222]:
+              - link "MiroFish as a Prediction Market Oracle" [ref=e224] [cursor=pointer]:
+                - /url: https://github.com/camel-ai/oasis
+              - link "OASIS + Manifold/Polymarket" [ref=e226] [cursor=pointer]:
+                - /url: https://github.com/camel-ai/oasis
+          - paragraph [ref=e228]: "OASIS simulates one million agents reacting to a seed event. MiroFish wraps this into a structured report. The gap: there's no way to bet on whether the simulation is right. The hack is to wire MiroFish's output — e.g. \"68% of simulated agents react negatively to this policy in 72 hours\" — into a prediction market where the resolution criterion is measured real-world sentiment (X API, Farcaster, Reddit). The simulation run is committed on-chain before the real-world event unfolds, making it tamper-evident. The interesting research question OASIS itself raises: at what agent-count threshold does the simulation's predicted sentiment distribution start matching real observed distributions? You'd have ground truth data to actually answer this."
+        - generic [ref=e229]:
+          - generic [ref=e230]:
+            - generic [ref=e231]: "05"
+            - generic [ref=e232]:
+              - link "zkVM Verifiable Simulation Replays via MiroFish Architecture" [ref=e234] [cursor=pointer]:
+                - /url: https://github.com/666ghj/MiroFish
+              - link "MiroFish" [ref=e236] [cursor=pointer]:
+                - /url: https://github.com/666ghj/MiroFish
+          - paragraph [ref=e238]: "MiroFish runs \"dual-platform parallel\" simulations — agents act across two synthetic social platforms simultaneously. This is a natural structure for zkVM-verifiable replays: run the simulation once, generate a proof that the reported emergent behaviors follow deterministically from the initial graph state and the model weights used. Builders could then ship simulation results to clients who verify the proof without re-running the full simulation. The practical bottleneck is that LLM inference isn't cheaply provable today — but MiroFish-Offline's Ollama backend with a quantized local model (qwen2.5 at 4-bit) is small enough that zkML proof generation becomes at least tractable for short simulation windows."
+  - generic [ref=e239]:
+    - generic [ref=e240]:
+      - generic [ref=e241]:
+        - text: How we
+        - text: judge
+      - generic [ref=e242]: "06"
+    - generic [ref=e243]:
+      - paragraph [ref=e244]: These weightings are recommendations. Our judges have the final say, and the best projects tend to break all the rules.
+      - generic [ref=e245]:
+        - generic [ref=e246]: 40%
+        - generic [ref=e247]:
+          - generic [ref=e248]: Innovation
+          - generic [ref=e249]: Novel approach, emergent behaviors, genuine research insights. Something that did not exist before you built it.
+      - generic [ref=e250]:
+        - generic [ref=e251]: 30%
+        - generic [ref=e252]:
+          - generic [ref=e253]: Agentic Sophistication
+          - generic [ref=e254]: How much does the AI actually decide versus just automate?
+          - generic [ref=e255]:
+            - generic [ref=e256]: Full autonomy — AI manages everything
+            - generic [ref=e258]: Meaningful agency, partial autonomy
+            - generic [ref=e260]: AI features but not truly agentic
+      - generic [ref=e262]:
+        - generic [ref=e263]: 30%
+        - generic [ref=e264]:
+          - generic [ref=e265]: Traction
+          - generic [ref=e266]: Real users and real transactions during the event. Four weeks is your window to prove it works.
+  - generic [ref=e267]:
+    - generic [ref=e268]:
+      - generic [ref=e269]:
+        - text: The
+        - text: Stack
+      - generic [ref=e270]: "07"
+    - generic [ref=e272]:
+      - generic [ref=e273]:
+        - generic [ref=e274]: Agent Commerce
+        - generic [ref=e275]:
+          - link "x402-solana TypeScript SDK ↗" [ref=e276] [cursor=pointer]:
+            - /url: https://github.com/payainetwork/x402-solana
+            - generic [ref=e277]: x402-solana
+            - generic [ref=e278]: TypeScript SDK
+            - generic [ref=e279]: ↗
+          - link "x402-secure Python SDK ↗" [ref=e280] [cursor=pointer]:
+            - /url: https://github.com/t54-labs/x402-secure
+            - generic [ref=e281]: x402-secure
+            - generic [ref=e282]: Python SDK
+            - generic [ref=e283]: ↗
+          - link "Solana Agent Kit Agent framework ↗" [ref=e284] [cursor=pointer]:
+            - /url: https://github.com/sendaifun/solana-agent-kit
+            - generic [ref=e285]: Solana Agent Kit
+            - generic [ref=e286]: Agent framework
+            - generic [ref=e287]: ↗
+          - link "Frames.ag Agent wallet OOTB ↗" [ref=e288] [cursor=pointer]:
+            - /url: http://frames.ag
+            - generic [ref=e289]: Frames.ag
+            - generic [ref=e290]: Agent wallet OOTB
+            - generic [ref=e291]: ↗
+      - generic [ref=e292]:
+        - generic [ref=e293]: Infrastructure
+        - generic [ref=e294]:
+          - link "Anchor Framework Smart contracts ↗" [ref=e295] [cursor=pointer]:
+            - /url: https://github.com/solana-foundation/anchor
+            - generic [ref=e296]: Anchor Framework
+            - generic [ref=e297]: Smart contracts
+            - generic [ref=e298]: ↗
+          - link "Helius RPC + data ↗" [ref=e299] [cursor=pointer]:
+            - /url: https://helius.dev/
+            - generic [ref=e300]: Helius
+            - generic [ref=e301]: RPC + data
+            - generic [ref=e302]: ↗
+          - link "Pyth Network Oracle data ↗" [ref=e303] [cursor=pointer]:
+            - /url: https://pyth.network/
+            - generic [ref=e304]: Pyth Network
+            - generic [ref=e305]: Oracle data
+            - generic [ref=e306]: ↗
+          - link "Jupiter Solana DeFi ↗" [ref=e307] [cursor=pointer]:
+            - /url: https://jup.ag/
+            - generic [ref=e308]: Jupiter
+            - generic [ref=e309]: Solana DeFi
+            - generic [ref=e310]: ↗
+          - link "Yellowstone gRPC Real-time network data ↗" [ref=e311] [cursor=pointer]:
+            - /url: https://github.com/rpcpool/yellowstone-grpc
+            - generic [ref=e312]: Yellowstone gRPC
+            - generic [ref=e313]: Real-time network data
+            - generic [ref=e314]: ↗
+          - link "Light Protocol ZK compression ↗" [ref=e315] [cursor=pointer]:
+            - /url: https://lightprotocol.com/
+            - generic [ref=e316]: Light Protocol
+            - generic [ref=e317]: ZK compression
+            - generic [ref=e318]: ↗
+          - link "Carbon Indexing framework ↗" [ref=e319] [cursor=pointer]:
+            - /url: https://github.com/sevenlabs-hq/carbon
+            - generic [ref=e320]: Carbon
+            - generic [ref=e321]: Indexing framework
+            - generic [ref=e322]: ↗
+          - link "Tukuk Automated task triggers ↗" [ref=e323] [cursor=pointer]:
+            - /url: https://github.com/helium/tuktuk
+            - generic [ref=e324]: Tukuk
+            - generic [ref=e325]: Automated task triggers
+            - generic [ref=e326]: ↗
+      - generic [ref=e327]:
+        - generic [ref=e328]: Reading
+        - generic [ref=e329]:
+          - link "Multi-Agent Landscape 2026 Mar 2026 ↗" [ref=e330] [cursor=pointer]:
+            - /url: https://thecanteenapp.com/analysis/2026/03/27/multi-agent-landscape.html
+            - generic [ref=e331]: Multi-Agent Landscape 2026
+            - generic [ref=e332]: Mar 2026
+            - generic [ref=e333]: ↗
+          - link "AI Agent Landscape 2026 Jan 2026 ↗" [ref=e334] [cursor=pointer]:
+            - /url: https://thecanteenapp.com/analysis/2026/01/06/ai-agent-landscape.html
+            - generic [ref=e335]: AI Agent Landscape 2026
+            - generic [ref=e336]: Jan 2026
+            - generic [ref=e337]: ↗
+  - generic [ref=e338]:
+    - generic [ref=e339]: Canteen × Colosseum · SWARM 2026
+    - link "thecanteenapp.com" [ref=e340] [cursor=pointer]:
+      - /url: https://thecanteenapp.com
