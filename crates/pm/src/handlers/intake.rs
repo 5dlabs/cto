@@ -1191,6 +1191,7 @@ pub async fn submit_intake_coderun(
             "model": primary_model,
             "enableDocker": false,
             "skillsUrl": config.skills_repo,
+            "skillsProject": config.skills_project,
             "env": {
                 "PROJECT_NAME": project_name_for_repo,
                 "REPOSITORY_URL": repository_url,

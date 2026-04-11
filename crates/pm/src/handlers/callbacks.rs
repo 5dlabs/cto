@@ -80,6 +80,8 @@ pub struct CallbackState {
     pub morgan_dispatch: MorganDispatchConfig,
     /// Default skills-release repo URL for CodeRun specs.
     pub skills_repo: Option<String>,
+    /// Default skills project name for CodeRun specs.
+    pub skills_project: Option<String>,
 }
 
 /// Handle intake workflow completion callback.

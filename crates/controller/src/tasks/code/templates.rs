@@ -4058,8 +4058,7 @@ Be constructive and explain the "why" behind your suggestions.
         // If a skills repo URL is configured, try the remote cache first.
         if let Some(ref skills_url) = code_run.spec.skills_url {
             let agent_name = Self::get_agent_name(code_run);
-            // TODO: wire project from CodeRunSpec once we add a project field
-            let project: Option<&str> = None;
+            let project = code_run.spec.skills_project.as_deref();
             match super::skills_cache::ensure_skills(skills_url, &agent_name, project, &skill_names) {
                 Ok(cached) => {
                     return skill_names

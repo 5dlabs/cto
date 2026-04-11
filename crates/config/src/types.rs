@@ -1071,6 +1071,15 @@ pub struct Defaults {
         skip_serializing_if = "Option::is_none"
     )]
     pub skills_repo: Option<String>,
+
+    /// Default project name for skills/persona overlays.
+    /// Producers can override this per-CodeRun via `skillsProject`.
+    #[serde(
+        rename = "skillsProject",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub skills_project: Option<String>,
 }
 
 /// Default org name for agent GitHub App names.

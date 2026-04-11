@@ -279,6 +279,7 @@ pub fn build_router(state: AppState) -> Router {
         gitlab_webhook_secret: state.config.gitlab_webhook_secret.clone(),
         morgan_dispatch: state.config.morgan_dispatch.clone(),
         skills_repo: state.config.intake.skills_repo.clone(),
+        skills_project: state.config.intake.skills_project.clone(),
     });
 
     Router::new()

@@ -670,6 +670,8 @@ pub struct IntakeConfig {
     /// Default skills-release repo URL stamped into every CodeRun spec.
     /// Format: "https://github.com/{owner}/{repo}"
     pub skills_repo: Option<String>,
+    /// Default project name for skills/persona overlays.
+    pub skills_project: Option<String>,
 }
 
 impl Default for IntakeConfig {
@@ -716,6 +718,7 @@ impl Default for IntakeConfig {
                 .ok()
                 .and_then(|s| s.parse().ok()),
             skills_repo: env::var("SKILLS_REPO").ok(),
+            skills_project: env::var("SKILLS_PROJECT").ok(),
         }
     }
 }

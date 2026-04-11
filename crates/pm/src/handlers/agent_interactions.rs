@@ -831,6 +831,7 @@ async fn create_mention_coderun(
             "githubApp": mention.agent.github_app_name(),
             "model": "claude-opus-4-5-20251101",
             "skillsUrl": state.skills_repo,
+            "skillsProject": state.skills_project,
             "env": {
                 "PR_NUMBER": pr_context.number.to_string(),
                 "PR_BRANCH": pr_context.head_branch,
@@ -911,6 +912,7 @@ async fn create_remediation_coderun(
             "githubApp": agent.github_app_name(),
             "model": "claude-opus-4-5-20251101",
             "skillsUrl": state.skills_repo,
+            "skillsProject": state.skills_project,
             "env": {
                 "PR_NUMBER": pr_context.number.to_string(),
                 "PR_BRANCH": pr_context.head_branch,

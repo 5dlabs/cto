@@ -243,6 +243,18 @@ pub struct CodeRunSpec {
     #[serde(default, rename = "skillsUrl", skip_serializing_if = "Option::is_none")]
     pub skills_url: Option<String>,
 
+    /// Optional project name for skills/persona overlays. When set, the controller
+    /// downloads `{agent}-{project}.tar.gz` instead of `{agent}-default.tar.gz`,
+    /// which contains the merged `_default` + project-specific overrides.
+    ///
+    /// Example: "test-sandbox" → downloads `rex-test-sandbox.tar.gz`
+    #[serde(
+        default,
+        rename = "skillsProject",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub skills_project: Option<String>,
+
     /// Project directory within docs repository (e.g. "_projects/simple-api")
     #[serde(default, rename = "docsProjectDirectory")]
     pub docs_project_directory: Option<String>,
@@ -362,6 +374,7 @@ impl Default for CodeRunSpec {
             repository_url: String::new(),
             docs_repository_url: String::new(),
             skills_url: None,
+            skills_project: None,
             docs_project_directory: None,
             working_directory: None,
             model: String::new(),
@@ -576,12 +589,17 @@ mod tests {
             "repositoryUrl": "https://github.com/test/repo",
             "docsRepositoryUrl": "https://github.com/test/docs",
             "model": "claude-opus",
-            "skillsUrl": "https://github.com/5dlabs/cto-skills"
+            "skillsUrl": "https://github.com/5dlabs/cto-agent-personas",
+            "skillsProject": "test-sandbox"
         }"#;
         let spec: CodeRunSpec = serde_json::from_str(json).unwrap();
         assert_eq!(
             spec.skills_url,
-            Some("https://github.com/5dlabs/cto-skills".to_string())
+            Some("https://github.com/5dlabs/cto-agent-personas".to_string())
+        );
+        assert_eq!(
+            spec.skills_project,
+            Some("test-sandbox".to_string())
         );
 
         // Round-trip: omitted on the wire when None
@@ -593,10 +611,15 @@ mod tests {
         }"#;
         let default_spec: CodeRunSpec = serde_json::from_str(default_json).unwrap();
         assert!(default_spec.skills_url.is_none());
+        assert!(default_spec.skills_project.is_none());
         let serialized = serde_json::to_string(&default_spec).unwrap();
         assert!(
             !serialized.contains("skillsUrl"),
             "skillsUrl should be omitted when None, got: {serialized}"
+        );
+        assert!(
+            !serialized.contains("skillsProject"),
+            "skillsProject should be omitted when None, got: {serialized}"
         );
     }
 
