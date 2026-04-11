@@ -10,7 +10,6 @@ const HEAL_REMEDIATION_JOB_PREFIX: &str = "heal-remediation-";
 const REVIEW_JOB_PREFIX: &str = "review-";
 const REMEDIATE_JOB_PREFIX: &str = "remediate-";
 const INTAKE_JOB_PREFIX: &str = "intake-";
-const PLAY_JOB_PREFIX: &str = "play-";
 const MCP_JOB_PREFIX: &str = "mcp-";
 const WORKSPACE_CLEANUP_JOB_SUFFIX: &str = "-workspace-cleanup";
 
@@ -20,8 +19,6 @@ impl ResourceNaming {
     /// Generate job name with guaranteed length compliance.
     ///
     /// Format varies by type:
-    /// - Play CodeRun: `play-coderun-pr{pr}-t{task_id}-{agent}-{cli}-{uid}-v{version}`
-    /// - Play Trigger: `play-{service}-{uid}-v{version}` (Morgan starting workflow)
     /// - Intake: `intake-t{task_id}-{agent}-{cli}-{uid}-v{version}`
     /// - Heal Remediation: `heal-remediation-t{task_id}-{agent}-{uid}-v{version}`
     /// - Monitor: `monitor-t{task_id}-{agent}-{uid}-v{version}`
@@ -118,16 +115,6 @@ impl ResourceNaming {
             let available = MAX_K8S_NAME_LENGTH.saturating_sub(INTAKE_JOB_PREFIX.len());
             let trimmed = Self::ensure_k8s_name_length(&base_name, available);
             return format!("{INTAKE_JOB_PREFIX}{trimmed}");
-        }
-
-        // Handle play tasks (Morgan starting play workflow with project ConfigMap)
-        // Format: play-{service}-{uid}-v{version}
-        if run_type == "play" {
-            let service = &code_run.spec.service;
-            let base_name = format!("{service}-{uid_suffix}-v{context_version}");
-            let available = MAX_K8S_NAME_LENGTH.saturating_sub(PLAY_JOB_PREFIX.len());
-            let trimmed = Self::ensure_k8s_name_length(&base_name, available);
-            return format!("{PLAY_JOB_PREFIX}{trimmed}");
         }
 
         // Check if this is a heal remediation CodeRun
