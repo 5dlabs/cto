@@ -112,6 +112,48 @@ steps:
       echo "   PROVIDER=${RESOLVED_PROVIDER:-unknown}"
       STEP
 
+  # ─── Skills Setup (copy skills from ConfigMap to CLI-native directory) ─────
+  - id: skills-setup
+    description: Copy skills from ConfigMap mount to CLI-native skills directory
+    command: |
+      exec bash <<'STEP'
+      set -euo pipefail
+      [ -f /workspace/.task-env ] && source /workspace/.task-env
+      REPO_ROOT="${REPO_ROOT:-${CLAUDE_WORK_DIR:-/workspace}}"
+      cd "$REPO_ROOT"
+
+      {{#if skills}}
+      echo "═══════════════════════════════════════════════════════════════"
+      echo "║               SKILLS SETUP                                   ║"
+      echo "═══════════════════════════════════════════════════════════════"
+
+      SKILLS_TARGET="{{cli_skills_path}}"
+      echo "Setting up CLI skills..."
+      echo "  ✓ Target: $SKILLS_TARGET"
+      mkdir -p "$SKILLS_TARGET"
+
+      SKILLS_LOADED_COUNT=0
+      {{#each skills}}
+      SKILL_SRC="/task-files/skill-{{this.name}}.md"
+      if [ -f "$SKILL_SRC" ]; then
+        mkdir -p "$SKILLS_TARGET/{{this.name}}"
+        cp "$SKILL_SRC" "$SKILLS_TARGET/{{this.name}}/SKILL.md"
+        echo "  ✓ Loaded skill: {{this.name}}"
+        SKILLS_LOADED_COUNT=$((SKILLS_LOADED_COUNT + 1))
+      else
+        echo "  ⚠️ Skill file missing: $SKILL_SRC"
+      fi
+      {{/each}}
+
+      echo ""
+      echo "📚 Skills summary: $SKILLS_LOADED_COUNT loaded"
+      echo ""
+      {{else}}
+      echo "No skills configured, skipping."
+      {{/if}}
+
+      STEP
+
   # ─── Run Task (retry until acceptance or timeout) ───────────────────
   - id: run-task
     description: Run index.lobster.yaml in a retry loop

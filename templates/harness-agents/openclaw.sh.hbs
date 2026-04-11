@@ -462,6 +462,9 @@ cp /task-files/base-task.lobster "$WORKSPACE_DIR/.tasks/index.lobster.yaml" 2>/d
 echo "[harness] Step 3: Starting gateway + lobster workflow..."
 echo "[harness] Agent: {{agent_name}} | Model: {{model}} | Task: {{task_id}}"
 
+# Short hostname to avoid mDNS 63-byte label overflow from @homebridge/ciao
+export HOSTNAME="oc-t{{task_id}}"
+
 # Start gateway in background (Discord presence + acpx runtime)
 openclaw gateway &
 GW_PID=$!

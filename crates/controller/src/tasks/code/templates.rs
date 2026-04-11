@@ -19,7 +19,7 @@ use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 // Template base path (embedded in Docker image at /app/templates)
 // Set via AGENT_TEMPLATES_PATH env var in deployment
@@ -347,6 +347,23 @@ impl CodeTemplateGenerator {
         )
     }
 
+    /// Return the CLI-native skills directory path (relative to repo root)
+    /// where each CLI expects SKILL.md files to be placed.
+    fn cli_native_skills_dir(cli_type: CLIType) -> &'static str {
+        match cli_type {
+            CLIType::Claude => ".claude/skills",
+            CLIType::Factory => ".factory/skills",
+            CLIType::OpenCode => ".opencode/skills",
+            CLIType::Codex => ".codex/skills",
+            CLIType::Cursor => ".cursor/skills",
+            CLIType::Gemini => ".gemini/skills",
+            CLIType::Copilot => ".copilot/skills",
+            CLIType::Kimi => ".kimi/skills",
+            // Fallback: use a generic path that won't collide
+            _ => ".agent/skills",
+        }
+    }
+
     fn generate_claude_templates(
         code_run: &CodeRun,
         config: &ControllerConfig,
@@ -368,10 +385,30 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
         let remote_tools = Self::extract_remote_tools(&client_config_value);
 
+        // Fetch all skills from remote tarball (used by both harness and lobster)
+        let all_skills = Self::fetch_all_skills_for_coderun(code_run, config);
+
+        // Write each skill as a separate ConfigMap entry to avoid E2BIG
+        // when inlining large heredocs in the lobster script.
+        // Skills are mounted at /task-files/skill-{name}.md and copied by
+        // the skills-setup lobster step.
+        let skill_names: Vec<serde_json::Value> = all_skills
+            .iter()
+            .map(|s| {
+                let name = s["name"].as_str().unwrap_or("");
+                let content = s["content"].as_str().unwrap_or("");
+                if !name.is_empty() && !content.is_empty() {
+                    templates.insert(format!("skill-{name}.md"), content.to_string());
+                }
+                json!({ "name": name })
+            })
+            .filter(|s| !s["name"].as_str().unwrap_or("").is_empty())
+            .collect();
+
         // Render the Lobster base-task workflow (replaces the old container.sh flow)
         templates.insert(
             "base-task.lobster".to_string(),
-            Self::generate_lobster_base_task(code_run, &enriched_cli_config, config)?,
+            Self::generate_lobster_base_task(code_run, &enriched_cli_config, config, &skill_names)?,
         );
 
         // Render the OpenClaw gateway config (per-CRD)
@@ -1392,6 +1429,7 @@ impl CodeTemplateGenerator {
         code_run: &CodeRun,
         cli_config: &Value,
         _config: &ControllerConfig,
+        skills: &[serde_json::Value],
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
@@ -1422,6 +1460,9 @@ impl CodeTemplateGenerator {
             "agent_name": &agent_name,
             "agent_name_upper": agent_name.to_uppercase(),
             "cli_config": cli_config,
+            "skills": skills,
+            "cli_skills_dir": Self::cli_native_skills_dir(cli_type),
+            "cli_skills_path": format!("$REPO_ROOT/{}", Self::cli_native_skills_dir(cli_type)),
         });
 
         handlebars
@@ -4348,6 +4389,61 @@ Be constructive and explain the "why" behind your suggestions.
         None
     }
 
+    /// Fetch ALL skills from the remote tarball for this CodeRun.
+    /// Returns a JSON array of {name, content} objects containing every skill
+    /// in the agent's published tarball (not filtered by cto-config mappings).
+    ///
+    /// When `skills_url` is not set, falls back to the mapped skills from
+    /// `get_agent_skills_enriched()` for backward compatibility.
+    fn fetch_all_skills_for_coderun(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Vec<serde_json::Value> {
+        if let Some(ref skills_url) = code_run.spec.skills_url {
+            let agent_name = Self::get_agent_name(code_run);
+            let project = code_run.spec.skills_project.as_deref().map(|s| s.to_owned());
+            // Run blocking HTTP + filesystem work on a dedicated OS thread
+            // to avoid panicking reqwest::blocking inside the tokio runtime.
+            let url = skills_url.clone();
+            let agent = agent_name.clone();
+            let proj = project.clone();
+            let handle = std::thread::spawn(move || {
+                super::skills_cache::ensure_all_skills(
+                    &url,
+                    &agent,
+                    proj.as_deref(),
+                )
+            });
+            match handle.join() {
+                Ok(Ok(all_skills)) => {
+                    info!(
+                        "Fetched {} skills from tarball for agent '{}'",
+                        all_skills.len(),
+                        agent_name
+                    );
+                    return all_skills
+                        .into_iter()
+                        .map(|(name, content)| json!({ "name": name, "content": content }))
+                        .collect();
+                }
+                Ok(Err(e)) => {
+                    warn!(
+                        "Failed to fetch all skills from {}: {} — falling back to mapped skills",
+                        skills_url, e
+                    );
+                }
+                Err(_) => {
+                    warn!(
+                        "Skills fetch thread panicked for {} — falling back to mapped skills",
+                        skills_url
+                    );
+                }
+            }
+        }
+        // Fallback: use the filtered/mapped skill set
+        Self::get_agent_skills_enriched(code_run, config)
+    }
+
     /// Get skills enriched with inline content for embedding in container scripts.
     /// Returns JSON array of {name, content} objects. Content is empty string if skill not found.
     ///
@@ -4364,12 +4460,20 @@ Be constructive and explain the "why" behind your suggestions.
         let skill_names = Self::get_agent_skills(code_run, config);
 
         // If a skills repo URL is configured, try the remote cache first.
+        // Run on a dedicated OS thread to avoid reqwest::blocking panicking
+        // inside the tokio async runtime.
         if let Some(ref skills_url) = code_run.spec.skills_url {
             let agent_name = Self::get_agent_name(code_run);
-            let project = code_run.spec.skills_project.as_deref();
-            match super::skills_cache::ensure_skills(skills_url, &agent_name, project, &skill_names)
-            {
-                Ok(cached) => {
+            let project = code_run.spec.skills_project.as_deref().map(|s| s.to_owned());
+            let url = skills_url.clone();
+            let agent = agent_name.clone();
+            let proj = project.clone();
+            let names = skill_names.clone();
+            let handle = std::thread::spawn(move || {
+                super::skills_cache::ensure_skills(&url, &agent, proj.as_deref(), &names)
+            });
+            match handle.join() {
+                Ok(Ok(cached)) => {
                     return skill_names
                         .into_iter()
                         .map(|name| {
@@ -4383,12 +4487,20 @@ Be constructive and explain the "why" behind your suggestions.
                         })
                         .collect();
                 }
-                Err(e) => {
-                    // Fail loud: if skills_url is configured, remote fetch must succeed.
-                    // No silent fallback to baked-in templates — archived skills are gone.
+                Ok(Err(e)) => {
                     warn!(
                         "Failed to fetch skills from {}: {} — returning empty skills (no baked-in fallback)",
                         skills_url, e
+                    );
+                    return skill_names
+                        .into_iter()
+                        .map(|name| json!({ "name": name, "content": "" }))
+                        .collect();
+                }
+                Err(_) => {
+                    warn!(
+                        "Skills fetch thread panicked for {} — returning empty skills",
+                        skills_url
                     );
                     return skill_names
                         .into_iter()
