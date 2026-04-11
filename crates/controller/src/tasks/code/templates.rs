@@ -1557,7 +1557,7 @@ impl CodeTemplateGenerator {
             "github_app": Self::get_github_app_or_default(code_run),
             "cli_config": cli_config,
             "discord_enabled": code_run.spec.openclaw.as_ref()
-                .map_or(true, |oc| oc.discord_enabled),
+                .is_none_or(|oc| oc.discord_enabled),
             "openclaw_providers": openclaw_providers,
         });
 
@@ -1598,7 +1598,7 @@ impl CodeTemplateGenerator {
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": &code_run.spec.service,
             "discord_enabled": code_run.spec.openclaw.as_ref()
-                .map_or(true, |oc| oc.discord_enabled),
+                .is_none_or(|oc| oc.discord_enabled),
         });
 
         handlebars

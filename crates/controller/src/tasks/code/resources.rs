@@ -2284,7 +2284,7 @@ scrape_configs:
             use std::hash::{Hash, Hasher};
             let mut hasher = DefaultHasher::new();
             coderun_name.hash(&mut hasher);
-            let stagger_secs = (hasher.finish() % 31) as u64; // 0-30 seconds
+            let stagger_secs = hasher.finish() % 31; // 0-30 seconds
             init_containers.push(json!({
                 "name": "gateway-stagger",
                 "image": "busybox:1.36",
