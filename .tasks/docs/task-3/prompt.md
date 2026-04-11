@@ -1,15 +1,17 @@
-Implement task 3: Build Rental Management System Service (Grizz - Go/gRPC)
+<identity>
+You are grizz, the Go 1.22+/gRPC/grpc-gateway implementation agent. You own task 3 end-to-end.
+</identity>
 
-## Goal
+<context>
+<task_overview>
+Task 3: Build Rental Management System Service (Grizz - Go/gRPC)
 Implement the full Rental Management System (RMS) as a Go gRPC service with grpc-gateway REST bridge. Handles opportunities (quotes), projects, inventory transactions, crew management, and delivery scheduling. This is the operational backbone replacing Current RMS. Exposes both native gRPC and REST endpoints. All other services communicate via the REST gateway. Includes Google Calendar integration and internal GDPR endpoints.
+Priority: high
+Dependencies: 1
+</task_overview>
+</context>
 
-## Task Context
-- Agent owner: grizz
-- Stack: Go 1.22+/gRPC/grpc-gateway
-- Priority: high
-- Dependencies: 1
-
-## Implementation Plan
+<implementation_plan>
 1. Initialize Go module at services/rms. Dependencies (go.mod): google.golang.org/grpc v1.63+, google.golang.org/protobuf v1.33+, github.com/grpc-ecosystem/grpc-gateway/v2 v2.19+, github.com/jackc/pgx/v5, github.com/redis/go-redis/v9, github.com/google/uuid, github.com/shopspring/decimal, go.uber.org/zap, github.com/prometheus/client_golang, google.golang.org/api (calendar), github.com/golang-migrate/migrate/v4.
 2. Define protobuf files in proto/sigma1/rms/v1/: opportunity.proto, project.proto, inventory.proto, crew.proto, delivery.proto. Generate with buf generate. Include grpc-gateway annotations for REST mapping.
 3. Database migrations in migrations/ targeting rms schema (SET search_path=rms). Tables: opportunities (id UUID PK, customer_id UUID, status TEXT CHECK IN (pending,qualified,approved,converted), event_date_start TIMESTAMPTZ, event_date_end TIMESTAMPTZ, venue TEXT, total_estimate NUMERIC(12,2), lead_score TEXT CHECK IN (GREEN,YELLOW,RED), notes TEXT, created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ), opportunity_line_items (id UUID PK, opportunity_id UUID FK, product_id UUID, quantity INT, day_rate NUMERIC(10,2)), projects (id UUID PK, opportunity_id UUID FK, customer_id UUID, status TEXT, confirmed_at TIMESTAMPTZ, event_date_start TIMESTAMPTZ, event_date_end TIMESTAMPTZ, venue_address TEXT, crew_notes TEXT), inventory_transactions (id UUID PK, inventory_id UUID, type TEXT CHECK IN (checkout,checkin,transfer), project_id UUID, from_store_id UUID, to_store_id UUID, timestamp TIMESTAMPTZ, user_id UUID), crew_members (id UUID PK, name TEXT, email TEXT, phone TEXT, role TEXT), crew_assignments (id UUID PK, project_id UUID FK, crew_member_id UUID FK, role TEXT, notes TEXT), deliveries (id UUID PK, project_id UUID FK, status TEXT, scheduled_at TIMESTAMPTZ, completed_at TIMESTAMPTZ, route_data JSONB).
@@ -22,11 +24,13 @@ Implement the full Rental Management System (RMS) as a Go gRPC service with grpc
 10. GDPR: GET /internal/gdpr/export/:customer_id returns all opportunities, projects, transactions for customer. DELETE /internal/gdpr/delete/:customer_id anonymizes customer_id fields (replace with NULL and log to audit schema).
 11. Kubernetes Deployment: 2 replicas, envFrom sigma1-infra-endpoints + secrets, probes on :8081, gRPC port 9090 internal only, REST port 8080 exposed via ClusterIP Service.
 12. Unit tests for ScoreLead algorithm and conflict detection. Integration tests using pgx test containers.
+</implementation_plan>
 
-## Acceptance Criteria
+<acceptance_criteria>
 1. POST /api/v1/opportunities with valid payload returns 201 with id field and status=pending. 2. POST /api/v1/opportunities/:id/convert returns 200 and creates a project row (verify via GET /api/v1/projects/:id). 3. ScoreLead returns GREEN for opportunity with verified customer, YELLOW for unvetted, RED for flagged — verified by seeding vetting results and calling POST /api/v1/opportunities/:id/score. 4. CheckOut creates inventory_transaction of type=checkout; second CheckOut for same item in same window returns 409 Conflict. 5. GET /health/ready returns 200 with postgres and redis reachable. 6. gRPC reflection accessible on port 9090 (grpcurl list returns service names). 7. GET /internal/gdpr/delete/:id anonymizes customer_id in opportunities and projects (re-query returns null customer_id). 8. go test ./... passes with >= 80% coverage.
+</acceptance_criteria>
 
-## Subtasks
+<subtasks>
 - Initialize Go module and dependency manifest for RMS service: Create the Go module at services/rms with go.mod declaring all required dependencies: grpc, protobuf, grpc-gateway, pgx/v5, go-redis, uuid, decimal, zap, prometheus, google.golang.org/api, golang-migrate.
 - Define protobuf schemas for all five RMS domains: Write proto/sigma1/rms/v1/opportunity.proto, project.proto, inventory.proto, crew.proto, and delivery.proto with grpc-gateway HTTP annotations for REST mapping. Run buf generate to produce Go stubs.
 - Write database migrations for all seven RMS schema tables: Create numbered SQL migration files in services/rms/migrations/ targeting the rms schema. Cover all seven tables: opportunities, opportunity_line_items, projects, inventory_transactions, crew_members, crew_assignments, deliveries.
@@ -40,8 +44,4 @@ Implement the full Rental Management System (RMS) as a Go gRPC service with grpc
 - Implement GDPR export and delete endpoints: Implement GET /internal/gdpr/export/:customer_id and DELETE /internal/gdpr/delete/:customer_id on the grpc-gateway mux. Export returns all customer data; delete anonymizes customer_id fields and logs to audit schema.
 - Write Kubernetes Deployment and Service manifests for RMS: Create Kubernetes Deployment (2 replicas) and ClusterIP Service manifests for the RMS service with correct port configuration, envFrom references, and health probes.
 - Write integration tests for RMS service end-to-end flows: Write integration tests using pgx testcontainers covering the full opportunity-to-project flow, inventory conflict detection producing 409, and GDPR anonymization correctness.
-
-## Deliverables
-- Update the relevant code, configuration, and tests.
-- Keep artifacts aligned with the acceptance criteria.
-- Document blockers or assumptions in your final summary.
+</subtasks>

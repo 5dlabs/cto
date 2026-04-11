@@ -1,15 +1,17 @@
-Implement task 10: Production Hardening & Security (Bolt - Kubernetes/Helm)
+<identity>
+You are bolt, the Kubernetes/Helm/Cilium implementation agent. You own task 10 end-to-end.
+</identity>
 
-## Goal
+<context>
+<task_overview>
+Task 10: Production Hardening & Security (Bolt - Kubernetes/Helm)
 Harden the Sigma-1 platform for production: scale all services to >=2 replicas with HPA, configure CiliumNetworkPolicies enforcing zero-trust pod-to-pod isolation, set up TLS/ingress via Cloudflare Tunnel, enable RBAC and secret rotation schedules, configure ArgoCD GitOps with automatic rollbacks, set up CI/CD quality pipeline (Stitch, Cleo, Tess, Cipher, Atlas), verify GDPR deletion pipeline end-to-end, and validate all performance SLOs.
+Priority: high
+Dependencies: 2, 3, 4, 5, 6, 7, 8, 9
+</task_overview>
+</context>
 
-## Task Context
-- Agent owner: bolt
-- Stack: Kubernetes/Helm/Cilium
-- Priority: high
-- Dependencies: 2, 3, 4, 5, 6, 7, 8, 9
-
-## Implementation Plan
+<implementation_plan>
 1. Scale production replicas: update all Deployments to replicas: 2. Create HorizontalPodAutoscaler for equipment-catalog (min=2, max=8, CPU=70%), rms (min=2, max=6, CPU=70%), finance (min=2, max=4, CPU=70%), customer-vetting (min=2, max=4, CPU=70%), social-engine (min=2, max=4, CPU=70%). Morgan remains at 1 replica (stateful Signal-CLI dependency).
 2. Scale PostgreSQL CNPG cluster to 2 instances (1 primary + 1 replica) for HA. Verify streaming replication. Enable WAL archival to R2 bucket (sigma1-wal-archive). Scale Valkey to replicas: 2.
 3. CiliumNetworkPolicies: create policy for each service namespace allowing only required pod-to-pod traffic. Rules: equipment-catalog: ingress from morgan, blaze-website, mobile-app; egress to postgres, valkey, R2 endpoint. rms: ingress from morgan, equipment-catalog; egress to postgres, valkey, Google Calendar API. finance: ingress from morgan, rms; egress to postgres, valkey, Stripe API. customer-vetting: ingress from morgan, rms; egress to postgres, valkey, OpenCorporates/LinkedIn/Google APIs. social-engine: ingress from morgan; egress to postgres, valkey, R2, Instagram/LinkedIn/TikTok/Facebook APIs, OpenAI API. Morgan: ingress from Cloudflare Tunnel, web clients; egress to all services, signal-cli, ElevenLabs, Twilio. Deny all other cross-namespace traffic by default.
@@ -22,11 +24,13 @@ Harden the Sigma-1 platform for production: scale all services to >=2 replicas w
 10. Prometheus alerting rules: latency alert (equipment-catalog p99 > 500ms for 5m), error rate alert (any service 5xx > 1% for 2m), pod down alert (desired != available for 5m). Grafana dashboards: per-service request rate, error rate, latency heatmap; PostgreSQL connections and replication lag; Valkey memory and hit rate.
 11. GDPR verification: run end-to-end test — create test customer, run vetting, create opportunity, invoice, social draft. Invoke morgan tool sigma1_gdpr_delete for test customer_id. Verify: GET /api/v1/vetting/:org_id → 404, GET /api/v1/invoices?org_id=:id → empty, RMS customer_id anonymized, social drafts event_id cleared. Verify audit schema contains deletion log row with timestamp and operator.
 12. Performance SLO validation: run k6 load test against equipment-catalog availability endpoint at 100 RPS for 60s; assert p99 < 500ms. Run k6 against full quote submission flow; assert end-to-end < 2min. Verify Morgan chat response < 10s using timed HTTP call to chat endpoint with simple greeting.
+</implementation_plan>
 
-## Acceptance Criteria
+<acceptance_criteria>
 1. kubectl get pods -n sigma1 shows all service Deployments with READY=2/2 (or 1/1 for Morgan). 2. kubectl get hpa -n sigma1 shows HPA objects for equipment-catalog, rms, finance, customer-vetting, social-engine with MINPODS=2. 3. CiliumNetworkPolicy enforcement: attempt direct HTTP from finance pod to social-engine pod (kubectl exec curl); connection must be refused (exit code 1 or connection timeout). 4. k6 run --vus 100 --duration 60s availability_check.js: p99 latency < 500ms, error rate < 0.1%. 5. ArgoCD UI shows all Applications in Synced + Healthy state. 6. GitHub Actions: open a test PR, verify Stitch posts review comment, Tess reports coverage >= 80%, Cipher reports no CRITICAL findings, Atlas blocks merge until all checks pass. 7. Grafana dashboard loads and shows real-time metrics for all 5 backend services with non-zero request_rate. 8. GDPR end-to-end: after sigma1_gdpr_delete execution, audit schema contains row with customer_id, deleted_at timestamp, and services_affected array listing all 5 services. 9. CNPG cluster: kubectl get cluster sigma1-postgres -n databases shows instances: 2 and status Ready. 10. Cloudflare Tunnel: curl https://chat.sigma1.com/health returns 200 from Morgan chat service.
+</acceptance_criteria>
 
-## Subtasks
+<subtasks>
 - Scale all service Deployments to 2 replicas and create HPAs for 5 services: Update all service Deployment manifests in helm/sigma1/ to set replicas: 2 (except Morgan which stays at 1). Create HorizontalPodAutoscaler manifests for equipment-catalog (min=2, max=8, CPU=70%), rms (min=2, max=6, CPU=70%), finance (min=2, max=4, CPU=70%), customer-vetting (min=2, max=4, CPU=70%), and social-engine (min=2, max=4, CPU=70%). Apply and verify.
 - Scale CNPG PostgreSQL cluster to 2 instances with WAL archival to R2: Update the CloudNativePG Cluster CR to instances: 2 (1 primary + 1 replica). Enable WAL archival to the sigma1-wal-archive R2 bucket using the barmanObjectStore configuration. Verify streaming replication is active and replication lag is within acceptable bounds.
 - Scale Valkey to 2 replicas: Update the Valkey Deployment or StatefulSet manifest to replicas: 2. If Valkey supports primary/replica mode, configure replication. If standalone, run 2 independent instances behind a service. Apply and verify both pods are Running.
@@ -42,8 +46,4 @@ Harden the Sigma-1 platform for production: scale all services to >=2 replicas w
 - Create ArgoCD Application CRs for all services with automated sync and rollback alerting: Create an ArgoCD Application CR for each of the 6 services (equipment-catalog, rms, finance, customer-vetting, social-engine, morgan) pointing to helm/sigma1/ in the Git repo. Enable automated sync with selfHeal: true and prune: true. Add a Loki alert rule that fires when any Application has 3+ consecutive sync failures.
 - Create GitHub Actions pr-review.yml workflow with Stitch code review integration: Create .github/workflows/pr-review.yml that triggers on pull_request events (opened, synchronize). The workflow calls Stitch to perform code review using github_get_pull_request and github_get_pull_request_files, then posts the review as a PR comment.
 - Create GitHub Actions quality.yml workflow with Cleo linting for all language stacks: Create .github/workflows/quality.yml that triggers on pull_request. Run Cleo-driven linting: clippy + rustfmt for Rust services, eslint + biome.js for Node/TypeScript services, go vet + golangci-lint for Go services. Fail the workflow if any linter reports errors.
-
-## Deliverables
-- Update the relevant code, configuration, and tests.
-- Keep artifacts aligned with the acceptance criteria.
-- Document blockers or assumptions in your final summary.
+</subtasks>

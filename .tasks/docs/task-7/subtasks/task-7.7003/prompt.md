@@ -1,9 +1,14 @@
-Implement subtask 7003: Configure MCP tools.yaml for 10 business tools
+<identity>
+You are angie working on subtask 7003 of task 7.
+</identity>
 
-## Objective
+<context>
+<scope>
 Author agents/morgan/tools.yaml defining all 10 business MCP tools with correct in-cluster service URLs, HTTP methods, parameter schemas, and response field descriptions.
+</scope>
+</context>
 
-## Steps
+<implementation_plan>
 1. Create agents/morgan/tools.yaml. For each tool define: tool_id, display_name, description, http_method, url_template (with {param} placeholders), request_schema (JSON Schema for body or query params), response_schema (JSON Schema describing expected response shape), and timeout_seconds.
 2. sigma1_catalog_search: GET http://equipment-catalog-svc.sigma1.svc.cluster.local:8080/api/v1/catalog/products?search={query}. Response schema: array of {name: string, product_id: string, day_rate: number}.
 3. sigma1_check_availability: GET .../products/{product_id}/availability?from={from}&to={to}. Params: product_id (path), from/to (ISO8601 query). Response: {quantity_available: integer}.
@@ -15,6 +20,8 @@ Author agents/morgan/tools.yaml defining all 10 business MCP tools with correct 
 9. sigma1_social_curate: POST http://social-engine-svc.sigma1.svc.cluster.local:8080/api/v1/social/upload. Multipart body: file + metadata JSON. Response: {draft_id}.
 10. sigma1_social_publish: POST .../social/drafts/{draft_id}/publish. Path param: draft_id. Response: {published_url}.
 11. sigma1_equipment_lookup: GET http://equipment-catalog-svc.sigma1.svc.cluster.local:8080/api/v1/equipment-api/catalog. Response: array of catalog items.
+</implementation_plan>
 
-## Validation
+<validation>
 `openclaw validate agents/morgan/tools.yaml` exits 0. Tool count in file equals 10 (excluding GDPR tools which are in separate file). Each tool entry has non-empty url_template, http_method, request_schema, and response_schema.
+</validation>

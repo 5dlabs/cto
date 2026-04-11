@@ -10,7 +10,6 @@ inputs:
   - name: tasks_dir
     description: Root directory containing per-task folders
   - name: repo_url
-    default: "https://github.com/5dlabs/sigma-1"
   - name: namespace
     default: openclaw
   - name: base_branch

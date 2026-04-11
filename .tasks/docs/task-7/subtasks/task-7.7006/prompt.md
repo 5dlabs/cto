@@ -1,9 +1,14 @@
-Implement subtask 7006: Configure ElevenLabs voice adapter and Twilio TwiML webhook in OpenClaw
+<identity>
+You are angie working on subtask 7006 of task 7.
+</identity>
 
-## Objective
+<context>
+<scope>
 Set up ElevenLabs TTS voice configuration using the eleven_turbo_v2 model and define the Twilio inbound call TwiML webhook handler so Morgan can receive and respond to phone calls.
+</scope>
+</context>
 
-## Steps
+<implementation_plan>
 1. In agents/morgan/agent.yaml, add voice adapter block:
    adapters:
      voice:
@@ -22,6 +27,8 @@ Set up ElevenLabs TTS voice configuration using the eleven_turbo_v2 model and de
 3. The /voice/inbound endpoint must return TwiML that: (a) greets the caller with a synthesized ElevenLabs message via <Play> or <Say> with voice attribute, (b) captures speech input with <Gather>, (c) POSTs transcription back to Morgan for processing.
 4. Map ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID from Kubernetes secrets in the Deployment (handled in subtask 7008).
 5. Document call flow in agents/morgan/README.md under 'Voice Integration'.
+</implementation_plan>
 
-## Validation
+<validation>
 POST to Morgan's /voice/inbound webhook (via port-forward or Cloudflare Tunnel URL) with a mock Twilio inbound call payload. Response must be valid TwiML XML (Content-Type: application/xml) containing <Response> root element. ElevenLabs API key validation: `openclaw agent test-voice morgan --text 'hello'` returns an audio file.
+</validation>

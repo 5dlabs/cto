@@ -1,15 +1,17 @@
-Implement task 8: Build Sigma-1 Website (Blaze - Next.js 15/React 19/Effect)
+<identity>
+You are blaze, the Next.js 15/React 19/TailwindCSS 4/Effect 3.x implementation agent. You own task 8 end-to-end.
+</identity>
 
-## Goal
+<context>
+<task_overview>
+Task 8: Build Sigma-1 Website (Blaze - Next.js 15/React 19/Effect)
 Build the Sigma-1 public website using Next.js 15 App Router, React 19, shadcn/ui, TailwindCSS 4, and Effect 3.x. Implements equipment catalog browsing with real-time availability, self-service quote builder, Morgan web chat widget, project portfolio gallery, and AI-native optimizations (llms.txt, Schema.org). Deployed to Cloudflare Pages. Uses sidebar navigation on desktop, responsive collapse on mobile.
+Priority: high
+Dependencies: 2, 7
+</task_overview>
+</context>
 
-## Task Context
-- Agent owner: blaze
-- Stack: Next.js 15/React 19/TailwindCSS 4/Effect 3.x
-- Priority: high
-- Dependencies: 2, 7
-
-## Implementation Plan
+<implementation_plan>
 1. Initialize Next.js 15 project at apps/website using create-next-app with App Router, TypeScript, TailwindCSS 4. Install: shadcn/ui (latest), effect@3.x, @effect/schema, @tanstack/react-query v5, next@15, react@19, tailwindcss@4, @cloudflare/next-on-pages.
 2. Create shared Tailwind config package at packages/design-tokens/tailwind.config.ts. Define: colors (sigma1 brand palette — dark background, accent electric blue/cyan per Stitch artifacts), spacing scale, border radii, font families (Geist or Inter). Export as module. Import in both apps/website and apps/mobile.
 3. shadcn/ui initialization: npx shadcn-ui init with New York style, TailwindCSS 4. Install components: Button, Card, Badge, Sheet, Sidebar, Dialog, Select, Input, Skeleton, Avatar, Table, Tabs.
@@ -24,11 +26,13 @@ Build the Sigma-1 public website using Next.js 15 App Router, React 19, shadcn/u
 12. Sidebar navigation: shadcn/ui Sidebar component for desktop (> 768px). Mobile: Sheet-based hamburger menu. Nav links: Home, Equipment, Quote, Portfolio, Contact.
 13. Cloudflare Pages deployment: wrangler.toml with pages_build_output_dir=.vercel/output/static. GitHub Actions workflow triggers next-on-pages build and wrangler pages deploy on push to main.
 14. Environment variables: NEXT_PUBLIC_API_URL (equipment catalog base), NEXT_PUBLIC_MORGAN_WIDGET_URL (Morgan chat endpoint).
+</implementation_plan>
 
-## Acceptance Criteria
+<acceptance_criteria>
 1. next build completes without TypeScript errors or missing module errors. 2. GET / renders hero section with CTA button linking to /equipment and /quote (Playwright snapshot test). 3. GET /equipment displays product grid; filter by category 'Lighting' shows only lighting products (Playwright interaction test). 4. GET /equipment/:id with a valid product ID shows product name, day_rate, and availability date picker; selecting dates within 7 days updates availability badge without full page reload (Playwright assertion on DOM change). 5. POST quote form on /quote with valid data creates opportunity — mock API returns 201, UI shows confirmation panel with quote ID. 6. GET /llms.txt returns Content-Type: text/plain and body contains company name Sigma-1. 7. Lighthouse score on / >= 90 for Performance and Accessibility (measured via CI Lighthouse action). 8. Morgan chat widget: chat button visible on all pages, clicking opens panel, panel renders iframe/widget pointing to NEXT_PUBLIC_MORGAN_WIDGET_URL.
+</acceptance_criteria>
 
-## Subtasks
+<subtasks>
 - Initialize Next.js 15 project at apps/website with TypeScript and TailwindCSS 4: Scaffold the Next.js 15 App Router project with all required dependencies installed and baseline configuration files in place.
 - Create shared design tokens Tailwind config package at packages/design-tokens: Build the shared Tailwind configuration package defining the Sigma-1 brand palette, typography, spacing, and border radius tokens, importable by apps/website.
 - Initialize shadcn/ui with New York style and install all required components: Run shadcn/ui initialization configured for New York style and TailwindCSS 4, then install all component primitives needed across the site.
@@ -42,8 +46,4 @@ Build the Sigma-1 public website using Next.js 15 App Router, React 19, shadcn/u
 - Implement AI-native routes (llms.txt, llms-full) and Schema.org JSON-LD in layout: Create the /llms.txt and /llms-full route handlers for AI crawler discoverability, and inject Schema.org Organization/LocalBusiness JSON-LD into the root layout.
 - Embed Morgan web chat widget in root layout via next/script: Add the Morgan chat widget JavaScript to the root layout using next/script with afterInteractive strategy, sourcing the URL from the NEXT_PUBLIC_MORGAN_WIDGET_URL environment variable.
 - Configure Cloudflare Pages deployment with wrangler.toml and GitHub Actions workflow: Set up the Cloudflare Pages deployment pipeline using @cloudflare/next-on-pages, wrangler.toml configuration, and a GitHub Actions workflow that builds and deploys on push to main.
-
-## Deliverables
-- Update the relevant code, configuration, and tests.
-- Keep artifacts aligned with the acceptance criteria.
-- Document blockers or assumptions in your final summary.
+</subtasks>

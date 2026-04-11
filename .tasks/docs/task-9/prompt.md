@@ -1,15 +1,17 @@
-Implement task 9: Build Sigma-1 Mobile App (Tap - Expo/React Native)
+<identity>
+You are tap, the Expo/React Native/NativeWind 4/Effect 3.x implementation agent. You own task 9 end-to-end.
+</identity>
 
-## Goal
+<context>
+<task_overview>
+Task 9: Build Sigma-1 Mobile App (Tap - Expo/React Native)
 Build the Sigma-1 mobile app using Expo (managed workflow), React Native, NativeWind 4 for styling, and Effect 3.x for data fetching and validation. Implements bottom tab navigation (Equipment, Quote, Chat, Portfolio), equipment catalog browsing with availability checking, quote request submission, Morgan AI chat interface, and push notifications for quote status updates. Consumes shared Tailwind design tokens from packages/design-tokens.
+Priority: medium
+Dependencies: 2, 7
+</task_overview>
+</context>
 
-## Task Context
-- Agent owner: tap
-- Stack: Expo/React Native/NativeWind 4/Effect 3.x
-- Priority: medium
-- Dependencies: 2, 7
-
-## Implementation Plan
+<implementation_plan>
 1. Initialize Expo project at apps/mobile using expo init with TypeScript template. SDK 51+. Install: nativewind@4.x, tailwindcss@3.4 (NativeWind 4 still uses TW3 internally — configure postcss accordingly), effect@3.x, @effect/schema, @tanstack/react-query v5, expo-router@3.x, expo-notifications, expo-camera (for barcode scanning), expo-image, @expo/vector-icons, react-native-reanimated, react-native-gesture-handler.
 2. Import shared design tokens: import tailwind.config.ts from packages/design-tokens as base config. Extend in apps/mobile/tailwind.config.ts with NativeWind-specific presets.
 3. Expo Router file-based routing: app/(tabs)/_layout.tsx (bottom tab navigator), app/(tabs)/index.tsx (equipment catalog), app/(tabs)/quote.tsx (quote builder), app/(tabs)/chat.tsx (Morgan chat), app/(tabs)/portfolio.tsx (event portfolio). app/equipment/[id].tsx (product detail).
@@ -23,11 +25,13 @@ Build the Sigma-1 mobile app using Expo (managed workflow), React Native, Native
 11. Barcode scanner (bonus screen accessible from Equipment tab): expo-camera to scan product barcodes, calls GET /api/v1/catalog/products?barcode={code}, navigates to product detail.
 12. Effect data fetching layer: lib/api.ts defining typed fetch functions using Effect.Schema for Product, Opportunity, SocialPost. Error handling with Effect.catchAll showing user-friendly error states.
 13. EAS Build configuration: eas.json with development, preview, production profiles. EXPO_PUBLIC_API_URL and EXPO_PUBLIC_MORGAN_CHAT_URL in .env.production.
+</implementation_plan>
 
-## Acceptance Criteria
+<acceptance_criteria>
 1. expo start --no-dev builds without TypeScript errors and Expo Go app launches on iOS simulator and Android emulator. 2. Equipment tab: renders FlatList with product cards; search input filters results in real time (Jest + React Native Testing Library: render, type in search input, assert filtered items). 3. Product detail: date range selection triggers GET availability call (mock API with msw); quantity_available badge updates from skeleton to numeric value. 4. Quote builder: submitting form with empty required fields shows validation error messages (Effect.Schema decoding failure triggers inline error UI). 5. Successful quote submission (mocked 201 response) shows confirmation screen with quote_id displayed. 6. Push notification: call Expo Push API with test token; device displays notification with title containing opportunity status. 7. jest --coverage reports >= 80% coverage across lib/ and components/. 8. EAS build preview profile produces APK/IPA successfully in CI without build errors.
+</acceptance_criteria>
 
-## Subtasks
+<subtasks>
 - Initialize Expo managed project with TypeScript template at apps/mobile: Scaffold the Expo SDK 51+ project with TypeScript template at apps/mobile. Install all required dependencies: nativewind@4.x, tailwindcss@3.4, effect@3.x, @effect/schema, @tanstack/react-query v5, expo-router@3.x, expo-notifications, expo-camera, expo-image, @expo/vector-icons, react-native-reanimated, react-native-gesture-handler. Configure babel.config.js for NativeWind and reanimated plugins. Configure metro.config.js for monorepo symlink resolution.
 - Configure NativeWind 4 with shared design tokens from packages/design-tokens: Set up NativeWind 4 / Tailwind CSS 3.4 integration. Import the shared tailwind.config.ts from packages/design-tokens as the base preset. Extend in apps/mobile/tailwind.config.ts with NativeWind-specific settings (content paths covering .tsx files). Configure postcss.config.js required by NativeWind 4's build step. Add global.css entry point and import it in the root _layout.tsx.
 - Implement Expo Router file-based route structure and bottom tab navigator layout: Create the full Expo Router directory structure: app/_layout.tsx (root layout with QueryClientProvider and TanStack Query setup), app/(tabs)/_layout.tsx (Tabs navigator with 4 tab entries), app/(tabs)/index.tsx, app/(tabs)/quote.tsx, app/(tabs)/chat.tsx, app/(tabs)/portfolio.tsx, and app/equipment/[id].tsx as placeholder screens. Configure tab icons using Ionicons and active tab color from the brand accent token.
@@ -41,8 +45,4 @@ Build the Sigma-1 mobile app using Expo (managed workflow), React Native, Native
 - Implement push notification setup with Expo Push Token registration: Configure expo-notifications in the root app/_layout.tsx. On app launch, request notification permissions and register for an Expo Push Token. Store the token and POST it to the backend (or log it for manual backend configuration). Set up a notification received handler and a notification response handler that navigates to the quote tab when a quote-status notification is tapped.
 - Configure EAS Build profiles and CI environment variables: Create eas.json with development, preview, and production build profiles for both iOS and Android. Configure .env.production with EXPO_PUBLIC_API_URL and EXPO_PUBLIC_MORGAN_CHAT_URL. Add EAS build step to CI (GitHub Actions or equivalent) that runs the preview profile on main branch merges. Document how to set EAS secrets for API URLs in the EAS dashboard.
 - Write Jest and React Native Testing Library test suite with >= 80% coverage: Write the complete Jest + RNTL test suite covering lib/ (Effect schemas, API functions) and all components/screens. Configure msw for API mocking. Set up jest.config.ts with coverage thresholds. Ensure coverage of happy paths, validation errors, empty states, and error states for all 5 tab screens and the lib/ data layer.
-
-## Deliverables
-- Update the relevant code, configuration, and tests.
-- Keep artifacts aligned with the acceptance criteria.
-- Document blockers or assumptions in your final summary.
+</subtasks>
