@@ -2086,6 +2086,16 @@ impl CodeTemplateGenerator {
             }
         }
 
+        // When the tools sidecar is enabled, override toolsUrl so all generators
+        // route through localhost instead of the cluster-wide tools service.
+        if config.tools_sidecar.enabled {
+            let sidecar_url = format!("http://localhost:{}/mcp", config.tools_sidecar.port);
+            if enriched.get("settings").is_none() {
+                enriched["settings"] = json!({});
+            }
+            enriched["settings"]["toolsUrl"] = json!(sidecar_url);
+        }
+
         enriched
     }
 
@@ -2582,7 +2592,9 @@ impl CodeTemplateGenerator {
             .as_ref()
             .and_then(|cfg| serde_json::to_value(cfg).ok())
             .unwrap_or_else(|| json!({}));
-        let render_settings = Self::build_cli_render_settings(code_run, &cli_config_value);
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+        let render_settings = Self::build_cli_render_settings(code_run, &enriched_cli_config);
 
         // Determine agent name from service or default to "stitch"
         let agent_name = code_run
@@ -2811,7 +2823,9 @@ Be constructive and explain the "why" behind your suggestions.
             .as_ref()
             .and_then(|cfg| serde_json::to_value(cfg).ok())
             .unwrap_or_else(|| json!({}));
-        let render_settings = Self::build_cli_render_settings(code_run, &cli_config_value);
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+        let render_settings = Self::build_cli_render_settings(code_run, &enriched_cli_config);
 
         let context = json!({
             "github_app": code_run.spec.github_app.as_deref().unwrap_or("5DLabs-Rex"),
