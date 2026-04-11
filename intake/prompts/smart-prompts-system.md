@@ -69,7 +69,9 @@ Dependencies: {dependency list or "None — you are first in the execution order
 </testing>
 
 <acceptance_criteria>
-{Numbered list of concrete, verifiable criteria. Each criterion should be testable with a specific command or check.}
+{Numbered list of concrete, verifiable criteria. Each criterion on its own line, numbered 1. 2. 3. etc. Each criterion should be testable with a specific command or check.}
+
+See also: acceptance.md in this task directory for the checklist version.
 </acceptance_criteria>
 
 <decisions>
