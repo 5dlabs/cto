@@ -1597,6 +1597,8 @@ impl CodeTemplateGenerator {
             "github_app": Self::get_github_app_or_default(code_run),
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": &code_run.spec.service,
+            "discord_enabled": code_run.spec.openclaw.as_ref()
+                .map_or(true, |oc| oc.discord_enabled),
         });
 
         handlebars

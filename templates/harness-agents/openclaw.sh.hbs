@@ -177,7 +177,8 @@ mkdir -p "$HOME/.openclaw/credentials"
 mkdir -p "$HOME/.openclaw/agents/main/sessions"
 mkdir -p "$HOME/.openclaw/canvas"
 
-# Runtime Discord gate
+# Runtime Discord gate — check both CRD-level toggle and env var availability
+{{#if discord_enabled}}
 DISCORD_TOKEN_VAR="DISCORD_TOKEN_{{agent_name_upper}}"
 DISCORD_CHANNEL_VAR="DISCORD_CHANNEL_{{agent_name_upper}}"
 if [ -n "${!DISCORD_TOKEN_VAR:-}" ] && [ -n "${!DISCORD_CHANNEL_VAR:-}" ]; then
@@ -187,6 +188,10 @@ else
   echo "⚠️ Missing Discord ($DISCORD_TOKEN_VAR / $DISCORD_CHANNEL_VAR), disabled"
   DISCORD_ACTIVE=false
 fi
+{{else}}
+echo "🔴 Discord disabled by CRD (discordEnabled: false)"
+DISCORD_ACTIVE=false
+{{/if}}
 
 cp /task-files/openclaw.json "$HOME/.openclaw/openclaw.json"
 export OPENCLAW_CONFIG="$HOME/.openclaw/openclaw.json"
