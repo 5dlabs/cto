@@ -262,6 +262,7 @@ pub struct AppState {
 }
 
 /// Build the HTTP router for the Linear service.
+#[allow(clippy::too_many_lines)]
 pub fn build_router(state: AppState) -> Router {
     let http_client = state.http_client.clone();
 

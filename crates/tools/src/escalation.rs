@@ -275,7 +275,7 @@ mod tests {
         let d = evaluate(&policy, "nope", catalog(&["github_search_code"]));
         match d {
             EscalationDecision::Deny { reason } => {
-                assert!(reason.contains("not in the tool catalog"))
+                assert!(reason.contains("not in the tool catalog"));
             }
             EscalationDecision::Grant => panic!("expected deny"),
         }

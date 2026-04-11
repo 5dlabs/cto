@@ -408,11 +408,11 @@ mod tests {
 
     #[test]
     fn test_parse_manifest() {
-        let body = r#"
+        let body = r"
 abc123def456  rex-default.tar.gz
 # comment line
 789aaa000bbb  rex-test-sandbox.tar.gz
-"#;
+";
         let m = parse_manifest(body);
         assert_eq!(m.len(), 2);
         assert_eq!(m.get("rex-default.tar.gz").unwrap(), "abc123def456");
