@@ -34,7 +34,22 @@ Evaluate structure and substance, not prose quality. This is automated pipeline 
 </scoring_dimensions>
 
 <instructions>
-Set pass to true when score >= {{min_score}}.
+<parameters>
+  <min_score>{{min_score}}</min_score>
+</parameters>
+
+<reasoning>
+Before producing your JSON output, reason through your evaluation inside <thinking> tags.
+In your thinking, consider:
+- How well do tasks decompose into concrete, implementable subtasks?
+- Are docs and prompts specific to each task, or boilerplate?
+- Do dependencies form a valid DAG? Are agent assignments appropriate?
+- What is the overall quality score and why?
+After your thinking, output ONLY the JSON — no other text.
+</reasoning>
+
+<output_format>
+Set pass to true when score meets or exceeds the min_score parameter.
 
 Return JSON matching the schema exactly:
 - pass: boolean
@@ -44,4 +59,5 @@ Return JSON matching the schema exactly:
 - warnings: array of non-blocking concerns
 
 No markdown fences. No prose outside JSON.
+</output_format>
 </instructions>

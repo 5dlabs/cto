@@ -39,6 +39,15 @@ For tasks scoring 5+, the expansion_prompt should provide:
 - Subagent types needed (implementer, tester, reviewer)
 </expansion_prompt_guidance>
 
+<reasoning>
+Before producing your JSON output, reason through your analysis inside <thinking> tags.
+In your thinking, consider:
+- What technical factors drive this task's complexity (integration points, state management, external APIs)?
+- How many subtasks would properly cover the implementation without padding?
+- What guidance would help the expansion agent produce high-quality subtasks?
+After your thinking, output ONLY the JSON — no other text.
+</reasoning>
+
 <output_format>
 For each task, produce:
 

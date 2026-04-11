@@ -12,8 +12,12 @@ Research current best practices, stable library versions, and known pitfalls bef
 </context>
 {{/research}}
 
-Generate {{num_tasks}} tasks starting from ID {{next_id}}.
+<parameters>
+  <num_tasks>{{num_tasks}}</num_tasks>
+  <starting_id>{{next_id}}</starting_id>
+</parameters>
 
+<output_format>
 Requirements:
 - Agent hints in titles: "(AgentName - Stack)"
 - test_strategy with specific, measurable acceptance criteria
@@ -25,3 +29,4 @@ Requirements:
 {{/if}}
 
 Output ONLY the JSON array. No markdown fences, no explanations.
+</output_format>

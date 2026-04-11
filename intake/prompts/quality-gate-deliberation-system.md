@@ -34,7 +34,22 @@ Evaluate substance and coverage, not prose quality. This is automated pipeline o
 </scoring_dimensions>
 
 <instructions>
-Set pass to true when score >= {{min_score}}.
+<parameters>
+  <min_score>{{min_score}}</min_score>
+</parameters>
+
+<reasoning>
+Before producing your JSON output, reason through your evaluation inside <thinking> tags.
+In your thinking, consider:
+- Does the design brief cover major architectural decisions?
+- Are technology choices specific to this project with rationale?
+- Are trade-offs explicitly stated for key decisions?
+- Does the brief feel complete or fragmentary?
+After your thinking, output ONLY the JSON — no other text.
+</reasoning>
+
+<output_format>
+Set pass to true when score meets or exceeds the min_score parameter.
 
 Return JSON matching the schema exactly:
 - pass: boolean
@@ -44,4 +59,5 @@ Return JSON matching the schema exactly:
 - warnings: array of non-blocking concerns
 
 No markdown fences. No prose outside JSON.
+</output_format>
 </instructions>
