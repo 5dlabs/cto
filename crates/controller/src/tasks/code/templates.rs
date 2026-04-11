@@ -19,7 +19,7 @@ use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 // Template base path (embedded in Docker image at /app/templates)
 // Set via AGENT_TEMPLATES_PATH env var in deployment
@@ -347,6 +347,23 @@ impl CodeTemplateGenerator {
         )
     }
 
+    /// Return the CLI-native skills directory path (relative to repo root)
+    /// where each CLI expects SKILL.md files to be placed.
+    fn cli_native_skills_dir(cli_type: CLIType) -> &'static str {
+        match cli_type {
+            CLIType::Claude => ".claude/skills",
+            CLIType::Factory => ".factory/skills",
+            CLIType::OpenCode => ".opencode/skills",
+            CLIType::Codex => ".codex/skills",
+            CLIType::Cursor => ".cursor/skills",
+            CLIType::Gemini => ".gemini/skills",
+            CLIType::Copilot => ".copilot/skills",
+            CLIType::Kimi => ".kimi/skills",
+            // Fallback: use a generic path that won't collide
+            _ => ".agent/skills",
+        }
+    }
+
     fn generate_claude_templates(
         code_run: &CodeRun,
         config: &ControllerConfig,
@@ -368,10 +385,30 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
         let remote_tools = Self::extract_remote_tools(&client_config_value);
 
+        // Fetch all skills from remote tarball (used by both harness and lobster)
+        let all_skills = Self::fetch_all_skills_for_coderun(code_run, config);
+
+        // Write each skill as a separate ConfigMap entry to avoid E2BIG
+        // when inlining large heredocs in the lobster script.
+        // Skills are mounted at /task-files/skill-{name}.md and copied by
+        // the skills-setup lobster step.
+        let skill_names: Vec<serde_json::Value> = all_skills
+            .iter()
+            .map(|s| {
+                let name = s["name"].as_str().unwrap_or("");
+                let content = s["content"].as_str().unwrap_or("");
+                if !name.is_empty() && !content.is_empty() {
+                    templates.insert(format!("skill-{name}.md"), content.to_string());
+                }
+                json!({ "name": name })
+            })
+            .filter(|s| !s["name"].as_str().unwrap_or("").is_empty())
+            .collect();
+
         // Render the Lobster base-task workflow (replaces the old container.sh flow)
         templates.insert(
             "base-task.lobster".to_string(),
-            Self::generate_lobster_base_task(code_run, &enriched_cli_config, config)?,
+            Self::generate_lobster_base_task(code_run, &enriched_cli_config, config, &skill_names)?,
         );
 
         // Render the OpenClaw gateway config (per-CRD)
@@ -1392,6 +1429,7 @@ impl CodeTemplateGenerator {
         code_run: &CodeRun,
         cli_config: &Value,
         _config: &ControllerConfig,
+        skills: &[serde_json::Value],
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
@@ -1422,6 +1460,9 @@ impl CodeTemplateGenerator {
             "agent_name": &agent_name,
             "agent_name_upper": agent_name.to_uppercase(),
             "cli_config": cli_config,
+            "skills": skills,
+            "cli_skills_dir": Self::cli_native_skills_dir(cli_type),
+            "cli_skills_path": format!("$REPO_ROOT/{}", Self::cli_native_skills_dir(cli_type)),
         });
 
         handlebars
@@ -1435,11 +1476,16 @@ impl CodeTemplateGenerator {
 
     /// Render the OpenClaw gateway config template for a CRD pod.
     /// Produces a JSON config modeled on Morgan's openclaw.json.
+    ///
+    /// Provider data is sourced from `spec.openclaw` when present,
+    /// otherwise [`OpenClawConfig::default_providers()`] is used.
     fn generate_openclaw_config(
         code_run: &CodeRun,
         cli_config: &Value,
         _config: &ControllerConfig,
     ) -> Result<String> {
+        use crate::crds::coderun::OpenClawConfig;
+
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
         Self::register_template_helpers(&mut handlebars);
@@ -1456,6 +1502,51 @@ impl CodeTemplateGenerator {
         let cli_type = Self::determine_cli_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
 
+        // Use CRD openclaw providers, or fall back to defaults
+        let openclaw_cfg = code_run
+            .spec
+            .openclaw
+            .clone()
+            .unwrap_or_else(OpenClawConfig::default_providers);
+
+        // Build normalized provider data for the template.
+        // Each provider becomes a JSON object with all fields the template needs,
+        // applying sensible defaults for missing optional values.
+        let openclaw_providers: Vec<Value> = openclaw_cfg
+            .providers
+            .iter()
+            .map(|p| {
+                let models: Vec<Value> = p
+                    .models
+                    .iter()
+                    .map(|m| {
+                        let input = m
+                            .input
+                            .clone()
+                            .unwrap_or_else(|| vec!["text".to_string()]);
+                        // Pre-serialize input array as JSON string for safe template insertion
+                        let input_json =
+                            serde_json::to_string(&input).unwrap_or_else(|_| "[\"text\"]".into());
+                        json!({
+                            "id": m.name,
+                            "name": m.display_name.as_deref().unwrap_or(&m.name),
+                            "reasoning": m.reasoning.unwrap_or(false),
+                            "input_json": input_json,
+                            "contextWindow": m.context_window.unwrap_or(131_072),
+                            "maxTokens": m.max_tokens.unwrap_or(8192),
+                        })
+                    })
+                    .collect();
+                json!({
+                    "name": p.name,
+                    "baseUrl": p.base_url.as_deref().unwrap_or(""),
+                    "apiKeyEnvVar": p.api_key_env_var.as_deref().unwrap_or(""),
+                    "api": p.api.as_deref().unwrap_or("openai-completions"),
+                    "models": models,
+                })
+            })
+            .collect();
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -1466,6 +1557,7 @@ impl CodeTemplateGenerator {
             "github_app": Self::get_github_app_or_default(code_run),
             "cli_config": cli_config,
             "discord_enabled": true,
+            "openclaw_providers": openclaw_providers,
         });
 
         handlebars.render("openclaw_config", &context).map_err(|e| {
@@ -3270,7 +3362,7 @@ Be constructive and explain the "why" behind your suggestions.
         // 4) Fall back to built-in defaults based on agent + run_type
         // This ensures agents get their required tools even without explicit Helm config
         let run_type = code_run.spec.run_type.as_str();
-        let default_tools = Self::get_default_agent_tools(github_app, run_type);
+        let default_tools = Self::get_default_agent_tools(&github_app, run_type);
 
         if !default_tools.is_empty() {
             debug!(
@@ -4098,28 +4190,44 @@ Be constructive and explain the "why" behind your suggestions.
     /// Returns the github_app if set and non-empty, otherwise returns "agent".
     /// Used for template context where github_app should never be empty.
     #[allow(dead_code)]
-    fn get_github_app_or_default(code_run: &CodeRun) -> &str {
-        code_run
-            .spec
-            .github_app
-            .as_deref()
-            .filter(|s| !s.is_empty())
-            .unwrap_or("agent")
+    fn get_github_app_or_default(code_run: &CodeRun) -> String {
+        // 1. Explicit githubApp field (backward compat)
+        if let Some(ref app) = code_run.spec.github_app {
+            if !app.is_empty() {
+                return app.clone();
+            }
+        }
+        // 2. Derive from implementationAgent (e.g. "rex" → "5DLabs-Rex")
+        if let Some(ref agent) = code_run.spec.implementation_agent {
+            if !agent.is_empty() {
+                let mut chars = agent.chars();
+                let capitalized: String = match chars.next() {
+                    Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+                    None => agent.clone(),
+                };
+                return format!("5DLabs-{capitalized}");
+            }
+        }
+        "agent".to_string()
     }
 
-    /// Get the lowercase agent name from the github_app field.
-    /// Returns lowercase agent name (e.g., "5DLabs-Rex" -> "rex", "5DLabs-Tap" -> "tap")
-    /// Templates use lowercase names for agent-specific conditionals.
-    /// Returns "agent" as default if github_app is None or empty.
+    /// Get the lowercase agent name from `implementation_agent` or `github_app`.
+    /// Returns lowercase agent name (e.g., "rex", "blaze", "tap").
+    /// Prefers `implementation_agent` directly; falls back to extracting from
+    /// `github_app` ("5DLabs-Rex" → "rex"). Returns "agent" as default.
     #[allow(dead_code)]
     fn get_agent_name(code_run: &CodeRun) -> String {
+        // Prefer implementationAgent directly (already lowercase)
+        if let Some(ref agent) = code_run.spec.implementation_agent {
+            if !agent.is_empty() {
+                return agent.to_lowercase();
+            }
+        }
+        // Fall back to github_app extraction
         let github_app = Self::get_github_app_or_default(code_run);
-
-        // Extract agent name from 5DLabs-AgentName pattern or use as-is
-        // Return lowercase for consistent template matching
         github_app
             .strip_prefix("5DLabs-")
-            .unwrap_or(github_app)
+            .unwrap_or(&github_app)
             .to_lowercase()
     }
 
@@ -4281,6 +4389,61 @@ Be constructive and explain the "why" behind your suggestions.
         None
     }
 
+    /// Fetch ALL skills from the remote tarball for this CodeRun.
+    /// Returns a JSON array of {name, content} objects containing every skill
+    /// in the agent's published tarball (not filtered by cto-config mappings).
+    ///
+    /// When `skills_url` is not set, falls back to the mapped skills from
+    /// `get_agent_skills_enriched()` for backward compatibility.
+    fn fetch_all_skills_for_coderun(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Vec<serde_json::Value> {
+        if let Some(ref skills_url) = code_run.spec.skills_url {
+            let agent_name = Self::get_agent_name(code_run);
+            let project = code_run.spec.skills_project.as_deref().map(str::to_owned);
+            // Run blocking HTTP + filesystem work on a dedicated OS thread
+            // to avoid panicking reqwest::blocking inside the tokio runtime.
+            let url = skills_url.clone();
+            let agent = agent_name.clone();
+            let proj = project.clone();
+            let handle = std::thread::spawn(move || {
+                super::skills_cache::ensure_all_skills(
+                    &url,
+                    &agent,
+                    proj.as_deref(),
+                )
+            });
+            match handle.join() {
+                Ok(Ok(all_skills)) => {
+                    info!(
+                        "Fetched {} skills from tarball for agent '{}'",
+                        all_skills.len(),
+                        agent_name
+                    );
+                    return all_skills
+                        .into_iter()
+                        .map(|(name, content)| json!({ "name": name, "content": content }))
+                        .collect();
+                }
+                Ok(Err(e)) => {
+                    warn!(
+                        "Failed to fetch all skills from {}: {} — falling back to mapped skills",
+                        skills_url, e
+                    );
+                }
+                Err(_) => {
+                    warn!(
+                        "Skills fetch thread panicked for {} — falling back to mapped skills",
+                        skills_url
+                    );
+                }
+            }
+        }
+        // Fallback: use the filtered/mapped skill set
+        Self::get_agent_skills_enriched(code_run, config)
+    }
+
     /// Get skills enriched with inline content for embedding in container scripts.
     /// Returns JSON array of {name, content} objects. Content is empty string if skill not found.
     ///
@@ -4297,12 +4460,20 @@ Be constructive and explain the "why" behind your suggestions.
         let skill_names = Self::get_agent_skills(code_run, config);
 
         // If a skills repo URL is configured, try the remote cache first.
+        // Run on a dedicated OS thread to avoid reqwest::blocking panicking
+        // inside the tokio async runtime.
         if let Some(ref skills_url) = code_run.spec.skills_url {
             let agent_name = Self::get_agent_name(code_run);
-            let project = code_run.spec.skills_project.as_deref();
-            match super::skills_cache::ensure_skills(skills_url, &agent_name, project, &skill_names)
-            {
-                Ok(cached) => {
+            let project = code_run.spec.skills_project.as_deref().map(str::to_owned);
+            let url = skills_url.clone();
+            let agent = agent_name.clone();
+            let proj = project.clone();
+            let names = skill_names.clone();
+            let handle = std::thread::spawn(move || {
+                super::skills_cache::ensure_skills(&url, &agent, proj.as_deref(), &names)
+            });
+            match handle.join() {
+                Ok(Ok(cached)) => {
                     return skill_names
                         .into_iter()
                         .map(|name| {
@@ -4316,12 +4487,20 @@ Be constructive and explain the "why" behind your suggestions.
                         })
                         .collect();
                 }
-                Err(e) => {
-                    // Fail loud: if skills_url is configured, remote fetch must succeed.
-                    // No silent fallback to baked-in templates — archived skills are gone.
+                Ok(Err(e)) => {
                     warn!(
                         "Failed to fetch skills from {}: {} — returning empty skills (no baked-in fallback)",
                         skills_url, e
+                    );
+                    return skill_names
+                        .into_iter()
+                        .map(|name| json!({ "name": name, "content": "" }))
+                        .collect();
+                }
+                Err(_) => {
+                    warn!(
+                        "Skills fetch thread panicked for {} — returning empty skills",
+                        skills_url
                     );
                     return skill_names
                         .into_iter()
@@ -4486,13 +4665,9 @@ Be constructive and explain the "why" behind your suggestions.
         if template_setting.contains("heal") || service.contains("heal") {
             return "healer";
         }
-        if template_setting.contains("watch") || service.contains("watch") {
-            return "healer"; // Watch workflows use healer role
-        }
 
         match run_type {
             "documentation" | "intake" => "intake",
-            "play" => "play",
             "quality" => "quality",
             "test" => "test",
             "deploy" => "deploy",
@@ -4503,40 +4678,19 @@ Be constructive and explain the "why" behind your suggestions.
         }
     }
 
-    /// Get the system prompt template path for an agent based on github_app and job type.
+    /// Get the system prompt template path for an agent based on agent name and job type.
     /// Returns path in format: agents/{agent}/{job}.md.hbs
     fn get_agent_system_prompt_template(code_run: &CodeRun) -> String {
-        let github_app = Self::get_github_app_or_default(code_run);
+        let agent_name = Self::get_agent_name(code_run);
         let job_type = Self::determine_job_type(code_run);
         let run_type = code_run.spec.run_type.as_str();
 
-        // Intake/documentation/play runs always use morgan templates regardless of github_app
-        // This handles cases like github_app = "cto-dev" for development workflows
-        if run_type == "intake" || run_type == "documentation" || run_type == "play" {
+        // Intake/documentation runs always use morgan templates
+        if run_type == "intake" || run_type == "documentation" {
             return format!("agents/morgan/{job_type}.md.hbs");
         }
 
-        // Map GitHub app to agent name
-        // Explicit patterns document known agents even if some share defaults
-        let agent = match github_app {
-            "5DLabs-Morgan" => "morgan",
-            "5DLabs-Blaze" => "blaze",
-            "5DLabs-Cipher" => "cipher",
-            "5DLabs-Cleo" => "cleo",
-            "5DLabs-Tess" => "tess",
-            "5DLabs-Atlas" => "atlas",
-            "5DLabs-Bolt" => "bolt",
-            "5DLabs-Grizz" => "grizz",
-            "5DLabs-Nova" => "nova",
-            "5DLabs-Tap" => "tap",
-            "5DLabs-Spark" => "spark",
-            "5DLabs-Stitch" => "stitch",
-            "5DLabs-Angie" => "angie",
-            "5DLabs-Vex" => "vex",
-            "5DLabs-Pixel" => "pixel",
-            // Rex variants and unknown agents default to rex
-            _ => "rex",
-        };
+        let agent = agent_name.as_str();
 
         // Agent-specific job type defaults
         // Some agents only support specific job types
@@ -5492,6 +5646,7 @@ mod tests {
             model_rotation: None,
             provider: None,
             provider_base_url: None,
+            api_key_env_var: None,
         });
         let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
         assert_eq!(

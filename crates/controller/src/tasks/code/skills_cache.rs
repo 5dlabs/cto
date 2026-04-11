@@ -259,6 +259,63 @@ pub fn ensure_skills(
     Ok(result)
 }
 
+/// Ensure the agent's skills tarball is cached, then return **all** skills
+/// found in the extracted directory (not just a filtered subset).
+///
+/// This is used by the harness/lobster templates to embed every skill from
+/// the published tarball into the pod, regardless of what `cto-config.json`
+/// maps. Each CLI gets the full set of skills available for the agent.
+pub fn ensure_all_skills(
+    skills_url: &str,
+    agent_name: &str,
+    project: Option<&str>,
+) -> Result<HashMap<String, String>> {
+    // Re-use ensure_skills with an empty skill_names list to trigger
+    // the download/cache logic, then enumerate the extracted directory.
+    ensure_skills(skills_url, agent_name, project, &[])?;
+
+    let agent_dir = cache_root().join(agent_name);
+    let mut result = HashMap::new();
+
+    if !agent_dir.exists() {
+        warn!(
+            "Agent dir '{}' missing after ensure_skills",
+            agent_dir.display()
+        );
+        return Ok(result);
+    }
+
+    // Walk the agent directory; each subdirectory with a SKILL.md is a skill.
+    // Skip _persona/ (those are persona files, not skills).
+    if let Ok(entries) = fs::read_dir(&agent_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let dir_name = match path.file_name().and_then(|n| n.to_str()) {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+            if dir_name.starts_with('_') {
+                continue; // skip _persona, _shared, etc.
+            }
+            let skill_md = path.join("SKILL.md");
+            if let Ok(content) = fs::read_to_string(&skill_md) {
+                debug!("Loaded skill '{}' for agent '{}'", dir_name, agent_name);
+                result.insert(dir_name, content);
+            }
+        }
+    }
+
+    info!(
+        "Loaded all {} skills from cache for agent '{}'",
+        result.len(),
+        agent_name
+    );
+    Ok(result)
+}
+
 /// Persona file names that are read from the `_persona/` subdirectory of
 /// the agent's cached tarball.
 const PERSONA_FILES: &[&str] = &[

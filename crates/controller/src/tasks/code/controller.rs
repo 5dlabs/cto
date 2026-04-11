@@ -80,10 +80,28 @@ pub async fn reconcile_code_run(code_run: Arc<CodeRun>, ctx: Arc<Context>) -> Re
     Ok(result)
 }
 
-#[instrument(skip(ctx), fields(code_run_name = %code_run.name_any(), namespace = %ctx.namespace))]
+#[instrument(skip(ctx), fields(
+    code_run_name = %code_run.name_any(),
+    namespace = %ctx.namespace,
+    agent = tracing::field::Empty,
+    cli_type = tracing::field::Empty,
+    model = tracing::field::Empty,
+))]
 #[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) -> Result<Action> {
     let code_run_name = code_run.name_any();
+
+    // Populate span fields from CRD spec for structured observability
+    let span = tracing::Span::current();
+    if let Some(app) = &code_run.spec.github_app {
+        let agent = app.to_lowercase().replace("5dlabs-", "");
+        span.record("agent", agent.as_str());
+    }
+    if let Some(cli) = &code_run.spec.cli_config {
+        span.record("cli_type", tracing::field::display(&cli.cli_type));
+    }
+    span.record("model", code_run.spec.model.as_str());
+
     debug!(
         "Starting status-first idempotent reconcile for CodeRun: {}",
         code_run_name

@@ -31,7 +31,7 @@ fn default_context_version() -> u32 {
 
 /// Default function for `docs_branch` field
 fn default_docs_branch() -> String {
-    "develop".to_string()
+    "main".to_string()
 }
 
 /// Default function for `continue_session` field
@@ -53,17 +53,13 @@ fn default_true() -> bool {
     true
 }
 
-/// Provider entry inside an [`ACPEntry`].
-#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
-pub struct ACPProvider {
-    /// Provider name (e.g. "Anthropic", "OpenAI")
-    pub name: String,
-    /// Available credits budget for this provider
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub credits: Option<u64>,
+/// Default OpenClaw API adapter type.
+#[allow(clippy::unnecessary_wraps)]
+fn default_openclaw_api() -> Option<String> {
+    Some(String::from("openai-completions"))
 }
 
-/// Model entry inside an [`ACPEntry`].
+/// Model entry inside an [`ACPProviderEntry`].
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct ACPModel {
     /// Model identifier (e.g. "claude-opus-4-20250514")
@@ -80,39 +76,45 @@ pub struct ACPModel {
     pub score: Option<u32>,
 }
 
-/// AI-CLI-Provider entry — one candidate runtime environment.
+/// Provider entry inside an [`ACPEntry`] — carries credits, URL, key, and models.
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+pub struct ACPProviderEntry {
+    /// Provider name, lowercase (e.g. "anthropic", "fireworks", "openai")
+    pub name: String,
+    /// Available credits budget for this provider (dynamic, sent every call)
+    #[serde(default)]
+    pub credits: u64,
+    /// Optional API base URL override
+    #[serde(default, rename = "baseUrl", skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    /// Secret key name in cto-secrets for this provider's API key.
+    /// Overrides hardcoded defaults so new providers work without Rust changes.
+    #[serde(default, rename = "apiKeyEnvVar", skip_serializing_if = "Option::is_none")]
+    pub api_key_env_var: Option<String>,
+    /// Models available from this provider
+    pub models: Vec<ACPModel>,
+}
+
+/// AI-CLI-Provider entry — one CLI with its available providers and models.
 ///
 /// The OpenClaw harness agent picks from the ACP array based on
 /// task difficulty, credits, and model scores.
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct ACPEntry {
-    /// CLI name (e.g. "Claude Code", "Codex")
+    /// CLI identifier, lowercase, no spaces (e.g. "claude", "codex", "copilot")
     pub cli: String,
-    /// Provider metadata
-    pub provider: ACPProvider,
-    /// Available models for this CLI/provider combination
-    pub models: Vec<ACPModel>,
-    /// Optional API base URL override
-    #[serde(default, rename = "baseUrl", skip_serializing_if = "Option::is_none")]
-    pub base_url: Option<String>,
-    /// Environment variable name for the API key (e.g. "ANTHROPIC_API_KEY").
-    /// The controller ensures this env var is set in the pod — this is NOT a raw secret.
-    #[serde(default, rename = "apiKey", skip_serializing_if = "Option::is_none")]
-    pub api_key: Option<String>,
+    /// Providers available for this CLI, each with their own credits and models
+    pub providers: Vec<ACPProviderEntry>,
 }
 
-/// Provider entry inside [`OpenClawConfig`].
+/// Model entry inside [`OpenClawProviderEntry`].
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
-pub struct OpenClawProvider {
-    /// Provider name (e.g. "Fireworks")
+pub struct OpenClawModelEntry {
+    /// Model identifier (e.g. "accounts/fireworks/routers/kimi-k2p5-turbo")
     pub name: String,
-}
-
-/// Model entry inside [`OpenClawConfig`].
-#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
-pub struct OpenClawModel {
-    /// Model identifier
-    pub name: String,
+    /// Human-readable display name (e.g. "Kimi K2.5 Turbo")
+    #[serde(default, rename = "displayName", skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
     /// Thinking level hint: "high", "medium", or "low"
     #[serde(
         default,
@@ -120,21 +122,115 @@ pub struct OpenClawModel {
         skip_serializing_if = "Option::is_none"
     )]
     pub thinking_level: Option<String>,
+    /// Whether the model supports reasoning/chain-of-thought
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<bool>,
+    /// Accepted input modalities (defaults to `["text"]`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<Vec<String>>,
+    /// Context window size in tokens
+    #[serde(default, rename = "contextWindow", skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u64>,
+    /// Maximum output tokens
+    #[serde(default, rename = "maxTokens", skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u64>,
+}
+
+/// Provider entry inside [`OpenClawConfig`].
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+pub struct OpenClawProviderEntry {
+    /// Provider slug, lowercase (e.g. "fireworks", "google", "openai").
+    /// Used as the JSON key in the rendered openclaw.json `models.providers` map.
+    pub name: String,
+    /// API base URL for this provider
+    #[serde(default, rename = "baseUrl", skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    /// Environment variable name for the API key (e.g. "FIREWORKS_API_KEY")
+    #[serde(default, rename = "apiKeyEnvVar", skip_serializing_if = "Option::is_none")]
+    pub api_key_env_var: Option<String>,
+    /// OpenClaw API adapter type (e.g. "openai-completions", "google-generative-ai").
+    /// Defaults to "openai-completions" when not specified.
+    #[serde(default = "default_openclaw_api", skip_serializing_if = "Option::is_none")]
+    pub api: Option<String>,
+    /// Models available from this provider
+    pub models: Vec<OpenClawModelEntry>,
 }
 
 /// OpenClaw runtime configuration — maps to OpenClaw gateway provider settings.
+///
+/// The `providers` array is rendered into the `models.providers` section of
+/// `openclaw.json` (the OpenClaw gateway ConfigMap). When absent from the CRD,
+/// a default config with Fireworks and Google providers is synthesised.
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct OpenClawConfig {
-    /// Provider metadata
-    pub provider: OpenClawProvider,
-    /// Available models
-    pub models: Vec<OpenClawModel>,
-    /// Optional API base URL
-    #[serde(default, rename = "baseUrl", skip_serializing_if = "Option::is_none")]
-    pub base_url: Option<String>,
-    /// Environment variable name for the API key
-    #[serde(default, rename = "apiKey", skip_serializing_if = "Option::is_none")]
-    pub api_key: Option<String>,
+    /// Provider configurations for the OpenClaw gateway
+    pub providers: Vec<OpenClawProviderEntry>,
+}
+
+impl OpenClawConfig {
+    /// Synthesize the default OpenClaw config (Fireworks + Google) used when
+    /// `spec.openclaw` is absent from the CRD.
+    #[must_use]
+    pub fn default_providers() -> Self {
+        Self {
+            providers: vec![
+                OpenClawProviderEntry {
+                    name: "fireworks".to_string(),
+                    base_url: Some("https://api.fireworks.ai/inference/v1".to_string()),
+                    api_key_env_var: Some("FIREWORKS_API_KEY".to_string()),
+                    api: Some("openai-completions".to_string()),
+                    models: vec![
+                        OpenClawModelEntry {
+                            name: "accounts/fireworks/routers/kimi-k2p5-turbo".to_string(),
+                            display_name: Some("Kimi K2.5 Turbo (FirePass)".to_string()),
+                            thinking_level: None,
+                            reasoning: Some(false),
+                            input: Some(vec!["text".to_string(), "image".to_string()]),
+                            context_window: Some(262_144),
+                            max_tokens: Some(8192),
+                        },
+                        OpenClawModelEntry {
+                            name: "accounts/fireworks/models/qwen3-235b-a22b".to_string(),
+                            display_name: Some("Qwen3 235B (Fireworks)".to_string()),
+                            thinking_level: None,
+                            reasoning: Some(false),
+                            input: Some(vec!["text".to_string()]),
+                            context_window: Some(131_072),
+                            max_tokens: Some(8192),
+                        },
+                    ],
+                },
+                OpenClawProviderEntry {
+                    name: "google".to_string(),
+                    base_url: Some(
+                        "https://generativelanguage.googleapis.com/v1beta".to_string(),
+                    ),
+                    api_key_env_var: Some("GEMINI_API_KEY".to_string()),
+                    api: Some("google-generative-ai".to_string()),
+                    models: vec![
+                        OpenClawModelEntry {
+                            name: "gemini-2.5-flash".to_string(),
+                            display_name: Some("Gemini 2.5 Flash".to_string()),
+                            thinking_level: None,
+                            reasoning: Some(true),
+                            input: Some(vec!["text".to_string(), "image".to_string()]),
+                            context_window: Some(1_048_576),
+                            max_tokens: Some(65_536),
+                        },
+                        OpenClawModelEntry {
+                            name: "gemini-2.5-pro".to_string(),
+                            display_name: Some("Gemini 2.5 Pro".to_string()),
+                            thinking_level: None,
+                            reasoning: Some(true),
+                            input: Some(vec!["text".to_string(), "image".to_string()]),
+                            context_window: Some(1_048_576),
+                            max_tokens: Some(65_536),
+                        },
+                    ],
+                },
+            ],
+        }
+    }
 }
 
 /// Linear integration configuration for status sync
@@ -320,6 +416,16 @@ pub struct CLIConfig {
     )]
     pub provider_base_url: Option<String>,
 
+    /// Name of the secret key in `cto-secrets` for this provider's API key.
+    /// Overrides the provider's hardcoded default (e.g. `FIREWORKS_API_KEY`).
+    /// Use this to add ad-hoc providers without changing Rust code.
+    #[serde(
+        default,
+        rename = "apiKeyEnvVar",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub api_key_env_var: Option<String>,
+
     /// CLI-specific settings (key-value pairs)
     #[serde(default)]
     pub settings: HashMap<String, serde_json::Value>,
@@ -354,7 +460,10 @@ pub struct CLIConfig {
 #[kube(printcolumn = r#"{"name":"Age","type":"date","jsonPath":".metadata.creationTimestamp"}"#)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct CodeRunSpec {
-    /// Type of run: "implementation" (default), "documentation", "intake"
+    /// Type of run. **Deprecated for standard task work** — phase booleans
+    /// (`quality`, `security`, `testing`, `deployment`) are handled by Lobster.
+    /// Still used internally for special workflows: "intake", "documentation",
+    /// "review", "remediate". Defaults to "implementation".
     #[serde(default = "default_run_type", rename = "runType")]
     pub run_type: String,
 
@@ -402,7 +511,9 @@ pub struct CodeRunSpec {
     #[serde(default, rename = "workingDirectory")]
     pub working_directory: Option<String>,
 
-    /// Model identifier to use with the selected CLI (e.g., gpt-5-codex, claude-sonnet-4-20250514)
+    /// Model identifier to use with the selected CLI (e.g., gpt-5-codex, claude-sonnet-4-20250514).
+    /// When empty, resolved from the first ACP entry's first model.
+    #[serde(default)]
     pub model: String,
 
     /// Prompt style variant (e.g., "minimal" for Ralph-style prompts)
@@ -413,7 +524,9 @@ pub struct CodeRunSpec {
     #[serde(rename = "githubUser", default)]
     pub github_user: Option<String>,
 
-    /// GitHub App name for authentication (e.g., "5DLabs-Rex")
+    /// GitHub App name for authentication (e.g., "5DLabs-Rex").
+    /// **Deprecated** — prefer `implementationAgent`. When absent, the controller
+    /// derives this as `5DLabs-{Capitalized(implementationAgent)}`.
     #[serde(rename = "githubApp", default)]
     pub github_app: Option<String>,
 
@@ -492,14 +605,13 @@ pub struct CodeRunSpec {
     #[serde(default)]
     pub subtasks: Option<Vec<SubtaskSpec>>,
 
+    /// **Deprecated** — watcher dual-model pattern is no longer used.
     /// Watcher configuration for dual-model execution pattern.
-    /// When enabled, a paired watcher CodeRun monitors this executor and provides
-    /// real-time feedback via a coordination file.
     #[serde(default, rename = "watcherConfig")]
     pub watcher_config: Option<WatcherConfig>,
 
+    /// **Deprecated** — watcher dual-model pattern is no longer used.
     /// If this CodeRun is a watcher, the name of the executor CodeRun it monitors.
-    /// This field is set automatically by the controller when creating watcher CodeRuns.
     #[serde(default, rename = "watcherFor")]
     pub watcher_for: Option<String>,
 
@@ -711,6 +823,7 @@ mod tests {
             model_rotation: None,
             provider: None,
             provider_base_url: None,
+            api_key_env_var: None,
         };
 
         assert_eq!(cli_config.cli_type, CLIType::Codex);
@@ -825,58 +938,77 @@ mod tests {
     #[test]
     fn test_acp_entry_serde_roundtrip() {
         let entry = ACPEntry {
-            cli: "Claude Code".to_string(),
-            provider: ACPProvider {
-                name: "Anthropic".to_string(),
-                credits: Some(250_000),
-            },
-            models: vec![
-                ACPModel {
-                    name: "claude-opus-4-20250514".to_string(),
-                    thinking_level: Some("high".to_string()),
-                    score: Some(96),
-                },
-                ACPModel {
-                    name: "claude-sonnet-4-20250514".to_string(),
-                    thinking_level: Some("medium".to_string()),
-                    score: Some(91),
-                },
-            ],
-            base_url: Some("https://api.anthropic.com".to_string()),
-            api_key: Some("ANTHROPIC_API_KEY".to_string()),
+            cli: "claude".to_string(),
+            providers: vec![ACPProviderEntry {
+                name: "anthropic".to_string(),
+                credits: 250_000,
+                base_url: Some("https://api.anthropic.com".to_string()),
+                api_key_env_var: Some("ANTHROPIC_API_KEY".to_string()),
+                models: vec![
+                    ACPModel {
+                        name: "claude-opus-4-20250514".to_string(),
+                        thinking_level: Some("high".to_string()),
+                        score: Some(96),
+                    },
+                    ACPModel {
+                        name: "claude-sonnet-4-20250514".to_string(),
+                        thinking_level: Some("medium".to_string()),
+                        score: Some(91),
+                    },
+                ],
+            }],
         };
 
         let json = serde_json::to_string(&entry).unwrap();
         let deserialized: ACPEntry = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.cli, "Claude Code");
-        assert_eq!(deserialized.provider.name, "Anthropic");
-        assert_eq!(deserialized.provider.credits, Some(250_000));
-        assert_eq!(deserialized.models.len(), 2);
-        assert_eq!(deserialized.models[0].score, Some(96));
+        assert_eq!(deserialized.cli, "claude");
+        assert_eq!(deserialized.providers.len(), 1);
+        assert_eq!(deserialized.providers[0].name, "anthropic");
+        assert_eq!(deserialized.providers[0].credits, 250_000);
+        assert_eq!(deserialized.providers[0].models.len(), 2);
+        assert_eq!(deserialized.providers[0].models[0].score, Some(96));
     }
 
     #[test]
     fn test_openclaw_config_serde_roundtrip() {
         let config = OpenClawConfig {
-            provider: OpenClawProvider {
-                name: "Fireworks".to_string(),
-            },
-            models: vec![OpenClawModel {
-                name: "kimi-k2p5-turbo".to_string(),
-                thinking_level: Some("high".to_string()),
+            providers: vec![OpenClawProviderEntry {
+                name: "fireworks".to_string(),
+                base_url: Some("https://api.fireworks.ai/inference/v1".to_string()),
+                api_key_env_var: Some("FIREWORKS_API_KEY".to_string()),
+                api: Some("openai-completions".to_string()),
+                models: vec![OpenClawModelEntry {
+                    name: "accounts/fireworks/routers/kimi-k2p5-turbo".to_string(),
+                    display_name: Some("Kimi K2.5 Turbo".to_string()),
+                    thinking_level: Some("high".to_string()),
+                    reasoning: Some(false),
+                    input: Some(vec!["text".to_string(), "image".to_string()]),
+                    context_window: Some(262_144),
+                    max_tokens: Some(8192),
+                }],
             }],
-            base_url: Some("https://api.fireworks.ai/inference".to_string()),
-            api_key: Some("FIREWORKS_API_KEY".to_string()),
         };
 
         let json = serde_json::to_string(&config).unwrap();
         let deserialized: OpenClawConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.provider.name, "Fireworks");
-        assert_eq!(deserialized.models.len(), 1);
+        assert_eq!(deserialized.providers.len(), 1);
+        assert_eq!(deserialized.providers[0].name, "fireworks");
+        assert_eq!(deserialized.providers[0].models.len(), 1);
         assert_eq!(
-            deserialized.base_url.unwrap(),
-            "https://api.fireworks.ai/inference"
+            deserialized.providers[0].base_url.as_deref().unwrap(),
+            "https://api.fireworks.ai/inference/v1"
         );
+        assert_eq!(deserialized.providers[0].api.as_deref().unwrap(), "openai-completions");
+    }
+
+    #[test]
+    fn test_openclaw_default_providers() {
+        let config = OpenClawConfig::default_providers();
+        assert_eq!(config.providers.len(), 2);
+        assert_eq!(config.providers[0].name, "fireworks");
+        assert_eq!(config.providers[1].name, "google");
+        assert!(config.providers[0].models.len() >= 2);
+        assert!(config.providers[1].models.len() >= 2);
     }
 
     #[test]
@@ -915,17 +1047,23 @@ mod tests {
             "testing": false,
             "deployment": true,
             "acp": [{
-                "cli": "Claude Code",
-                "provider": { "name": "Anthropic", "credits": 250000 },
-                "models": [{ "name": "opus", "thinkingLevel": "high", "score": 96 }],
-                "baseUrl": "https://api.anthropic.com",
-                "apiKey": "ANTHROPIC_API_KEY"
+                "cli": "claude",
+                "providers": [{
+                    "name": "anthropic",
+                    "credits": 250000,
+                    "baseUrl": "https://api.anthropic.com",
+                    "apiKeyEnvVar": "ANTHROPIC_API_KEY",
+                    "models": [{ "name": "opus", "thinkingLevel": "high", "score": 96 }]
+                }]
             }],
             "openclaw": {
-                "provider": { "name": "Fireworks" },
-                "models": [{ "name": "kimi-k2p5-turbo", "thinkingLevel": "high" }],
-                "baseUrl": "https://api.fireworks.ai/inference",
-                "apiKey": "FIREWORKS_API_KEY"
+                "providers": [{
+                    "name": "fireworks",
+                    "baseUrl": "https://api.fireworks.ai/inference/v1",
+                    "apiKeyEnvVar": "FIREWORKS_API_KEY",
+                    "api": "openai-completions",
+                    "models": [{ "name": "kimi-k2p5-turbo", "thinkingLevel": "high" }]
+                }]
             }
         }"#;
         let spec: CodeRunSpec = serde_json::from_str(json).unwrap();
@@ -937,9 +1075,13 @@ mod tests {
         assert!(spec.acp.is_some());
         let acp = spec.acp.unwrap();
         assert_eq!(acp.len(), 1);
-        assert_eq!(acp[0].cli, "Claude Code");
-        assert_eq!(acp[0].provider.credits, Some(250_000));
+        assert_eq!(acp[0].cli, "claude");
+        assert_eq!(acp[0].providers[0].credits, 250_000);
+        assert_eq!(acp[0].providers[0].models.len(), 1);
         assert!(spec.openclaw.is_some());
-        assert_eq!(spec.openclaw.unwrap().provider.name, "Fireworks");
+        let oc = spec.openclaw.unwrap();
+        assert_eq!(oc.providers.len(), 1);
+        assert_eq!(oc.providers[0].name, "fireworks");
+        assert_eq!(oc.providers[0].api.as_deref().unwrap(), "openai-completions");
     }
 }

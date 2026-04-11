@@ -1,0 +1,478 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# cto-tools — CLI wrapper for MCP tool server (curl + jq)
+# Version: 1.0.0
+
+readonly VERSION="1.0.0"
+readonly TOOLS_SERVER_URL="${TOOLS_SERVER_URL:-http://cto-tools.cto.svc.cluster.local:3000/mcp}"
+readonly CTO_AGENT_ID="${CTO_AGENT_ID:-unknown}"
+readonly CTO_AGENT_PREWARM="${CTO_AGENT_PREWARM:-}"
+readonly CTO_TOOLS_TIMEOUT="${CTO_TOOLS_TIMEOUT:-120}"
+readonly EXEC_MAX_BYTES=102400  # 100KB
+
+# ── Dependency checks ────────────────────────────────────────────────
+
+check_deps() {
+  local missing=()
+  command -v curl >/dev/null 2>&1 || missing+=(curl)
+  command -v jq   >/dev/null 2>&1 || missing+=(jq)
+  if (( ${#missing[@]} )); then
+    echo "error: missing required dependencies: ${missing[*]}" >&2
+    echo "Install with:  brew install ${missing[*]}  (macOS) or  apt-get install ${missing[*]}  (Debian/Ubuntu)" >&2
+    exit 1
+  fi
+}
+
+# ── JSON-RPC helpers ─────────────────────────────────────────────────
+
+rpc_call() {
+  local method="$1" params="$2"
+  local payload
+  payload=$(jq -n --arg m "$method" --argjson p "$params" \
+    '{jsonrpc:"2.0",id:1,method:$m,params:$p}')
+
+  local http_code body
+  body=$(curl -s -w '\n%{http_code}' -X POST "$TOOLS_SERVER_URL" \
+    -H "Content-Type: application/json" \
+    -H "X-Agent-Id: $CTO_AGENT_ID" \
+    -H "X-Agent-Prewarm: $CTO_AGENT_PREWARM" \
+    -d "$payload" 2>/dev/null) || {
+      echo "error: server unreachable at $TOOLS_SERVER_URL" >&2
+      exit 4
+    }
+
+  http_code=$(echo "$body" | tail -1)
+  body=$(echo "$body" | sed '$d')
+
+  if [[ "$http_code" -lt 200 || "$http_code" -ge 300 ]]; then
+    echo "error: server returned HTTP $http_code" >&2
+    exit 4
+  fi
+
+  # Check for JSON-RPC error
+  local rpc_err
+  rpc_err=$(echo "$body" | jq -r '.error // empty' 2>/dev/null)
+  if [[ -n "$rpc_err" && "$rpc_err" != "null" ]]; then
+    echo "error: JSON-RPC error: $(echo "$body" | jq -c '.error')" >&2
+    exit 1
+  fi
+
+  echo "$body"
+}
+
+tools_list_raw() {
+  rpc_call "tools/list" '{}'
+}
+
+# ── Usage ────────────────────────────────────────────────────────────
+
+usage() {
+  cat <<'EOF'
+cto-tools — CLI access to MCP tool server
+
+Usage:
+  cto-tools mcp list [--category SERVER_PREFIX]
+  cto-tools mcp describe <tool_name>
+  cto-tools mcp call <tool_name> --json '<args>' [--raw]
+  cto-tools mcp escalate <tool_name> --reason '<reason>'
+  cto-tools exec [-e '<code>'] [file.ts]
+  cto-tools version
+  cto-tools --help
+
+Environment:
+  TOOLS_SERVER_URL     MCP endpoint (default: http://cto-tools.cto.svc.cluster.local:3000/mcp)
+  CTO_AGENT_ID         Agent identity (default: unknown)
+  CTO_AGENT_PREWARM    Pre-warmed tools
+  CTO_TOOLS_TIMEOUT    Exec timeout in seconds (default: 120)
+
+Exit codes:
+  0  success
+  1  tool error (MCP returned an error)
+  2  policy denied (escalation denied)
+  3  tool not in catalog
+  4  server unreachable
+EOF
+}
+
+usage_mcp_list() {
+  cat <<'EOF'
+Usage: cto-tools mcp list [--category SERVER_PREFIX]
+
+List available MCP tools grouped by server prefix.
+
+Options:
+  --category PREFIX   Filter to tools from a specific server (e.g. github, linear)
+  --help              Show this help
+
+Examples:
+  cto-tools mcp list
+  cto-tools mcp list --category github
+EOF
+}
+
+usage_mcp_describe() {
+  cat <<'EOF'
+Usage: cto-tools mcp describe <tool_name>
+
+Show name, description, and input schema for a tool.
+
+Options:
+  --help   Show this help
+
+Examples:
+  cto-tools mcp describe github_search_code
+EOF
+}
+
+usage_mcp_call() {
+  cat <<'EOF'
+Usage: cto-tools mcp call <tool_name> --json '<args>' [--raw]
+
+Invoke an MCP tool with the given JSON arguments.
+
+Options:
+  --json ARGS   JSON object of tool arguments (required)
+  --raw         Print raw JSON-RPC response instead of extracted text
+  --help        Show this help
+
+Examples:
+  cto-tools mcp call github_search_code --json '{"query":"hello world"}'
+  cto-tools mcp call github_search_code --json '{"query":"hello"}' --raw
+EOF
+}
+
+usage_mcp_escalate() {
+  cat <<'EOF'
+Usage: cto-tools mcp escalate <tool_name> --reason '<reason>'
+
+Request elevated capability for a tool.
+
+Options:
+  --reason TEXT   Reason for escalation (required)
+  --help          Show this help
+
+Examples:
+  cto-tools mcp escalate admin_deploy --reason 'hotfix for production outage'
+EOF
+}
+
+usage_exec() {
+  cat <<'EOF'
+Usage: cto-tools exec [-e '<code>'] [file.ts]
+
+Execute TypeScript/Deno code. Requires Deno on PATH.
+
+Options:
+  -e CODE   Execute inline code
+  --help    Show this help
+
+Environment:
+  CTO_TOOLS_TIMEOUT   Execution timeout in seconds (default: 120)
+
+Examples:
+  cto-tools exec -e 'console.log("hello")'
+  cto-tools exec script.ts
+EOF
+}
+
+# ── mcp list ─────────────────────────────────────────────────────────
+
+cmd_mcp_list() {
+  local category=""
+  while (( $# )); do
+    case "$1" in
+      --category) category="${2:-}"; shift 2 || { echo "error: --category requires a value" >&2; exit 1; } ;;
+      --help|-h) usage_mcp_list; exit 0 ;;
+      *) echo "error: unknown option: $1" >&2; usage_mcp_list >&2; exit 1 ;;
+    esac
+  done
+
+  local resp
+  resp=$(tools_list_raw)
+
+  local tools_json
+  tools_json=$(echo "$resp" | jq -r '.result.tools // []')
+
+  if [[ "$tools_json" == "[]" || "$tools_json" == "null" ]]; then
+    echo "(no tools found)" >&2
+    exit 0
+  fi
+
+  if [[ -n "$category" ]]; then
+    # Filter: tool names starting with category/ or category_
+    echo "$tools_json" | jq -r --arg pfx "$category" '
+      [ .[] | select(
+        (.name | startswith($pfx + "/")) or
+        (.name | startswith($pfx + "_")) or
+        (.name | startswith($pfx + "-"))
+      ) ] |
+      if length == 0 then "(no tools matching category: \($pfx))\n" | halt_error(0)
+      else
+        group_by(.name | split("/")[0] // split("_")[0] // split("-")[0]) |
+        .[] |
+        ("── " + (.[0].name | split("/")[0] // split("_")[0]) + " ──"),
+        (.[] | "  " + .name)
+      end
+    '
+  else
+    echo "$tools_json" | jq -r '
+      def prefix: .name | capture("^(?<p>[^/_-]+)[/_-]") | .p // .name;
+      group_by(prefix) |
+      .[] |
+      ("── " + (.[0] | prefix) + " ──"),
+      (.[] | "  " + .name)
+    '
+  fi
+}
+
+# ── mcp describe ─────────────────────────────────────────────────────
+
+cmd_mcp_describe() {
+  if (( $# == 0 )) || [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    usage_mcp_describe
+    exit 0
+  fi
+
+  local tool_name="$1"; shift
+
+  local resp
+  resp=$(tools_list_raw)
+
+  local tool
+  tool=$(echo "$resp" | jq -r --arg name "$tool_name" '
+    .result.tools // [] | map(select(.name == $name)) | first // empty
+  ')
+
+  if [[ -z "$tool" || "$tool" == "null" ]]; then
+    echo "error: tool not found in catalog: $tool_name" >&2
+    exit 3
+  fi
+
+  echo "$tool" | jq '{name, description, inputSchema}'
+}
+
+# ── mcp call ─────────────────────────────────────────────────────────
+
+cmd_mcp_call() {
+  if (( $# == 0 )) || [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    usage_mcp_call
+    exit 0
+  fi
+
+  local tool_name="$1"; shift
+  local args_json="{}"
+  local raw=false
+
+  while (( $# )); do
+    case "$1" in
+      --json) args_json="${2:-}"; shift 2 || { echo "error: --json requires a value" >&2; exit 1; } ;;
+      --raw)  raw=true; shift ;;
+      --help|-h) usage_mcp_call; exit 0 ;;
+      *) echo "error: unknown option: $1" >&2; usage_mcp_call >&2; exit 1 ;;
+    esac
+  done
+
+  # Validate args_json is valid JSON
+  if ! echo "$args_json" | jq empty 2>/dev/null; then
+    echo "error: invalid JSON in --json argument" >&2
+    exit 1
+  fi
+
+  local params
+  params=$(jq -n --arg name "$tool_name" --argjson args "$args_json" \
+    '{name:$name, arguments:$args}')
+
+  local resp
+  resp=$(rpc_call "tools/call" "$params")
+
+  if $raw; then
+    echo "$resp" | jq .
+  else
+    # Check for isError in result
+    local is_error
+    is_error=$(echo "$resp" | jq -r '.result.isError // false')
+    if [[ "$is_error" == "true" ]]; then
+      echo "$resp" | jq -r '.result.content[]? | select(.type=="text") | .text' >&2
+      exit 1
+    fi
+    # Extract text content
+    echo "$resp" | jq -r '.result.content[]? | select(.type=="text") | .text'
+  fi
+}
+
+# ── mcp escalate ─────────────────────────────────────────────────────
+
+cmd_mcp_escalate() {
+  if (( $# == 0 )) || [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    usage_mcp_escalate
+    exit 0
+  fi
+
+  local tool_name="$1"; shift
+  local reason=""
+
+  while (( $# )); do
+    case "$1" in
+      --reason) reason="${2:-}"; shift 2 || { echo "error: --reason requires a value" >&2; exit 1; } ;;
+      --help|-h) usage_mcp_escalate; exit 0 ;;
+      *) echo "error: unknown option: $1" >&2; usage_mcp_escalate >&2; exit 1 ;;
+    esac
+  done
+
+  if [[ -z "$reason" ]]; then
+    echo "error: --reason is required" >&2
+    usage_mcp_escalate >&2
+    exit 1
+  fi
+
+  local params
+  params=$(jq -n --arg tool "$tool_name" --arg reason "$reason" \
+    '{name:"tools_request_capability", arguments:{tool_name:$tool, reason:$reason}}')
+
+  local resp
+  resp=$(rpc_call "tools/call" "$params")
+
+  local is_error
+  is_error=$(echo "$resp" | jq -r '.result.isError // false')
+
+  if [[ "$is_error" == "true" ]]; then
+    local denied
+    denied=$(echo "$resp" | jq -r '.result.content[]? | select(.type=="text") | .text' | grep -qi 'denied' && echo "true" || echo "false")
+    if [[ "$denied" == "true" ]]; then
+      echo "DENIED: $(echo "$resp" | jq -r '.result.content[]? | select(.type=="text") | .text')" >&2
+      exit 2
+    fi
+    echo "ERROR: $(echo "$resp" | jq -r '.result.content[]? | select(.type=="text") | .text')" >&2
+    exit 1
+  fi
+
+  echo "$resp" | jq -r '.result.content[]? | select(.type=="text") | .text'
+}
+
+# ── exec ─────────────────────────────────────────────────────────────
+
+cmd_exec() {
+  if (( $# == 0 )) || [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    usage_exec
+    exit 0
+  fi
+
+  if ! command -v deno >/dev/null 2>&1; then
+    echo "error: deno is not installed or not on PATH" >&2
+    echo "Install: https://deno.land/#installation" >&2
+    exit 1
+  fi
+
+  local deno_perms=(
+    "--allow-net=cto-tools.cto.svc.cluster.local,localhost"
+    "--allow-read=/workspace,/.cto-tools"
+    "--allow-write=/tmp"
+    "--allow-env=TOOLS_SERVER_URL,LOCAL_TOOLS_URL,CTO_AGENT_ID,CTO_AGENT_PREWARM,LOCAL_TOOLS"
+  )
+
+  local inline=""
+  local file=""
+
+  case "$1" in
+    -e)
+      inline="${2:-}"
+      if [[ -z "$inline" ]]; then
+        echo "error: -e requires a code string" >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    *)
+      file="$1"
+      shift
+      ;;
+  esac
+
+  if [[ -n "$inline" ]]; then
+    # Check size
+    local size=${#inline}
+    if (( size > EXEC_MAX_BYTES )); then
+      echo "error: inline code exceeds 100KB limit (${size} bytes)" >&2
+      exit 1
+    fi
+
+    local tmpfile
+    tmpfile="$(pwd)/.cto-tools-exec-$$.ts"
+    # Ensure cleanup on exit
+    trap 'rm -f "$tmpfile"' EXIT
+    printf '%s' "$inline" > "$tmpfile"
+
+    timeout "$CTO_TOOLS_TIMEOUT" deno run "${deno_perms[@]}" "$tmpfile"
+    local rc=$?
+    rm -f "$tmpfile"
+    trap - EXIT
+    return $rc
+  fi
+
+  if [[ -n "$file" ]]; then
+    if [[ ! -f "$file" ]]; then
+      echo "error: file not found: $file" >&2
+      exit 1
+    fi
+
+    local filesize
+    filesize=$(wc -c < "$file" | tr -d ' ')
+    if (( filesize > EXEC_MAX_BYTES )); then
+      echo "error: file exceeds 100KB limit (${filesize} bytes): $file" >&2
+      exit 1
+    fi
+
+    timeout "$CTO_TOOLS_TIMEOUT" deno run "${deno_perms[@]}" "$file"
+    return $?
+  fi
+
+  echo "error: provide -e '<code>' or a file path" >&2
+  usage_exec >&2
+  exit 1
+}
+
+# ── version ──────────────────────────────────────────────────────────
+
+cmd_version() {
+  echo "cto-tools $VERSION"
+  echo "  TOOLS_SERVER_URL : $TOOLS_SERVER_URL"
+  echo "  CTO_AGENT_ID     : $CTO_AGENT_ID"
+  echo "  CTO_AGENT_PREWARM: ${CTO_AGENT_PREWARM:-(unset)}"
+  echo "  CTO_TOOLS_TIMEOUT: ${CTO_TOOLS_TIMEOUT}s"
+}
+
+# ── Main dispatch ────────────────────────────────────────────────────
+
+main() {
+  if (( $# == 0 )); then
+    usage
+    exit 0
+  fi
+
+  case "$1" in
+    --help|-h) usage; exit 0 ;;
+    version)   cmd_version; exit 0 ;;
+    exec)      shift; check_deps; cmd_exec "$@" ;;
+    mcp)
+      shift
+      check_deps
+      if (( $# == 0 )); then
+        echo "error: mcp requires a subcommand (list|describe|call|escalate)" >&2
+        usage >&2
+        exit 1
+      fi
+      case "$1" in
+        list)     shift; cmd_mcp_list "$@" ;;
+        describe) shift; cmd_mcp_describe "$@" ;;
+        call)     shift; cmd_mcp_call "$@" ;;
+        escalate) shift; cmd_mcp_escalate "$@" ;;
+        --help|-h) usage; exit 0 ;;
+        *) echo "error: unknown mcp subcommand: $1" >&2; usage >&2; exit 1 ;;
+      esac
+      ;;
+    *) echo "error: unknown command: $1" >&2; usage >&2; exit 1 ;;
+  esac
+}
+
+main "$@"

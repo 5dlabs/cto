@@ -18,11 +18,14 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
+      # Per-CodeRun task-env to avoid cross-pod stomping on shared PVC
+      TASK_ENV="${WORKSPACE_DIR:?}/.task-env"
+      mkdir -p "$WORKSPACE_DIR"
       # Fix root-owned .gitconfig from image build
       [ -f "$HOME/.gitconfig" ] && [ ! -w "$HOME/.gitconfig" ] && rm -f "$HOME/.gitconfig" 2>/dev/null || true
       {{> github-auth}}
       # Persist env vars for subsequent steps (each step runs in a new shell)
-      cat > /workspace/.task-env <<ENVEOF
+      cat > "$TASK_ENV" <<ENVEOF
       export GITHUB_TOKEN="${GITHUB_TOKEN:-}"
       export GH_TOKEN="${GH_TOKEN:-}"
       export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME}"
@@ -43,10 +46,11 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
-      [ -f /workspace/.task-env ] && source /workspace/.task-env
+      TASK_ENV="${WORKSPACE_DIR:?}/.task-env"
+      [ -f "$TASK_ENV" ] && source "$TASK_ENV"
       {{> git-setup}}
       # Persist git vars for subsequent steps
-      cat >> /workspace/.task-env <<ENVEOF
+      cat >> "$TASK_ENV" <<ENVEOF
       export FEATURE_BRANCH="${FEATURE_BRANCH}"
       export BASE_BRANCH="${BASE_BRANCH}"
       export REPO_ROOT="${REPO_ROOT}"
@@ -63,7 +67,8 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
-      [ -f /workspace/.task-env ] && source /workspace/.task-env
+      TASK_ENV="${WORKSPACE_DIR:?}/.task-env"
+      [ -f "$TASK_ENV" ] && source "$TASK_ENV"
 
       # ACPX_AGENT and ACPX_MODEL are set by the controller as pod env vars.
       # Fall back to template values only for backward compatibility.
@@ -100,7 +105,7 @@ steps:
       export ACPX_CMD
 
       # Persist acpx vars for subsequent steps
-      cat >> /workspace/.task-env <<ENVEOF
+      cat >> "$TASK_ENV" <<ENVEOF
       export ACPX_AGENT="${ACPX_AGENT}"
       export ACPX_MODEL="${ACPX_MODEL}"
       export ACPX_CMD="${ACPX_CMD}"
@@ -112,13 +117,57 @@ steps:
       echo "   PROVIDER=${RESOLVED_PROVIDER:-unknown}"
       STEP
 
+  # ─── Skills Setup (copy skills from ConfigMap to CLI-native directory) ─────
+  - id: skills-setup
+    description: Copy skills from ConfigMap mount to CLI-native skills directory
+    command: |
+      exec bash <<'STEP'
+      set -euo pipefail
+      TASK_ENV="${WORKSPACE_DIR:?}/.task-env"
+      [ -f "$TASK_ENV" ] && source "$TASK_ENV"
+      REPO_ROOT="${REPO_ROOT:-${CLAUDE_WORK_DIR:-/workspace}}"
+      cd "$REPO_ROOT"
+
+      {{#if skills}}
+      echo "═══════════════════════════════════════════════════════════════"
+      echo "║               SKILLS SETUP                                   ║"
+      echo "═══════════════════════════════════════════════════════════════"
+
+      SKILLS_TARGET="{{cli_skills_path}}"
+      echo "Setting up CLI skills..."
+      echo "  ✓ Target: $SKILLS_TARGET"
+      mkdir -p "$SKILLS_TARGET"
+
+      SKILLS_LOADED_COUNT=0
+      {{#each skills}}
+      SKILL_SRC="/task-files/skill-{{this.name}}.md"
+      if [ -f "$SKILL_SRC" ]; then
+        mkdir -p "$SKILLS_TARGET/{{this.name}}"
+        cp "$SKILL_SRC" "$SKILLS_TARGET/{{this.name}}/SKILL.md"
+        echo "  ✓ Loaded skill: {{this.name}}"
+        SKILLS_LOADED_COUNT=$((SKILLS_LOADED_COUNT + 1))
+      else
+        echo "  ⚠️ Skill file missing: $SKILL_SRC"
+      fi
+      {{/each}}
+
+      echo ""
+      echo "📚 Skills summary: $SKILLS_LOADED_COUNT loaded"
+      echo ""
+      {{else}}
+      echo "No skills configured, skipping."
+      {{/if}}
+
+      STEP
+
   # ─── Run Task (retry until acceptance or timeout) ───────────────────
   - id: run-task
     description: Run index.lobster.yaml in a retry loop
     command: |
       exec bash <<'STEP'
       set -euo pipefail
-      [ -f /workspace/.task-env ] && source /workspace/.task-env
+      TASK_ENV="${WORKSPACE_DIR:?}/.task-env"
+      [ -f "$TASK_ENV" ] && source "$TASK_ENV"
       # Ensure npm cache is writable (nested npx calls need this)
       export npm_config_cache="${npm_config_cache:-/tmp/npm-cache}"
       export HOME="${HOME:-/tmp/agent-home}"
@@ -141,9 +190,6 @@ steps:
       fi
       mkdir -p "$TASK_DIR"
 
-      # Prompt and acceptance criteria are pulled from the repo by intake —
-      # no ConfigMap injection needed.
-
       INDEX="${TASK_DIR}/index.lobster.yaml"
       if [ ! -f "$INDEX" ]; then
         # Search for index.lobster.yaml in common locations (docs subdir, nested .tasks, etc.)
@@ -157,6 +203,14 @@ steps:
           echo "❌ No index.lobster.yaml found anywhere in repo"
           exit 1
         fi
+      fi
+
+      # If prompt_modification was injected via ConfigMap, copy it into TASK_DIR
+      # so the inner lobster workflow can find it (intake normally places it here).
+      if [ -f /task-files/prompt.md ] && [ ! -f "${TASK_DIR}/prompt.md" ]; then
+        mkdir -p "$TASK_DIR"
+        cp /task-files/prompt.md "${TASK_DIR}/prompt.md"
+        echo "📝 Copied prompt.md → ${TASK_DIR}/prompt.md"
       fi
 
       ATTEMPT=0
@@ -188,7 +242,8 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
-      [ -f /workspace/.task-env ] && source /workspace/.task-env
+      TASK_ENV="${WORKSPACE_DIR:?}/.task-env"
+      [ -f "$TASK_ENV" ] && source "$TASK_ENV"
       REPO_ROOT="${REPO_ROOT:-${CLAUDE_WORK_DIR:-/workspace}}"
       cd "$REPO_ROOT"
 
@@ -225,7 +280,8 @@ steps:
     command: |
       exec bash <<'STEP'
       set -euo pipefail
-      [ -f /workspace/.task-env ] && source /workspace/.task-env
+      TASK_ENV="${WORKSPACE_DIR:?}/.task-env"
+      [ -f "$TASK_ENV" ] && source "$TASK_ENV"
 
       AGENT="{{agent_name}}"
       AGENT_UPPER=$(echo "$AGENT" | tr '[:lower:]' '[:upper:]')

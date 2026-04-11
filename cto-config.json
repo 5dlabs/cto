@@ -85,320 +85,16 @@
         "circuitBreakerThreshold": 3
       },
       "agentHarness": {
-        "rex": {
-          "primary": "claude",
-          "model": "claude-opus-4-6",
-          "fallback": "codex",
-          "fallbackModel": "gpt-5.2-codex"
-        },
-        "grizz": {
-          "primary": "codex",
-          "model": "gpt-5.2-codex",
-          "fallback": "claude",
-          "fallbackModel": "claude-opus-4-6"
-        },
-        "blaze": {
-          "primary": "cursor",
-          "model": "opus-4.6",
-          "fallback": "claude",
-          "fallbackModel": "claude-opus-4-6"
-        },
-        "bolt": {
-          "primary": "codex",
-          "model": "gpt-5.2-codex",
-          "fallback": "claude",
-          "fallbackModel": "claude-opus-4-6"
-        },
-        "nova": {
-          "primary": "claude",
-          "model": "claude-opus-4-6",
-          "fallback": "codex",
-          "fallbackModel": "gpt-5.2-codex"
-        },
-        "angie": {
-          "primary": "claude",
-          "model": "claude-opus-4-6",
-          "fallback": "codex",
-          "fallbackModel": "gpt-5.2-codex"
-        },
-        "tap": {
-          "primary": "cursor",
-          "model": "opus-4.6",
-          "fallback": "claude",
-          "fallbackModel": "claude-opus-4-6"
-        },
-        "cipher": {
-          "primary": "claude",
-          "model": "claude-opus-4-6",
-          "fallback": "codex",
-          "fallbackModel": "gpt-5.2-codex"
-        },
-        "tess": {
-          "primary": "codex",
-          "model": "gpt-5.2-codex",
-          "fallback": "claude",
-          "fallbackModel": "claude-opus-4-6"
-        },
-        "cleo": {
-          "primary": "claude",
-          "model": "claude-opus-4-6",
-          "fallback": "codex",
-          "fallbackModel": "gpt-5.2-codex"
-        },
-        "spark": {
-          "primary": "codex",
-          "model": "gpt-5.2-codex",
-          "fallback": "claude",
-          "fallbackModel": "claude-opus-4-6"
-        },
-        "stitch": {
-          "primary": "claude",
-          "model": "claude-opus-4-6",
-          "fallback": "codex",
-          "fallbackModel": "gpt-5.2-codex"
-        },
-        "vex": {
-          "primary": "claude",
-          "model": "claude-opus-4-6",
-          "fallback": "codex",
-          "fallbackModel": "gpt-5.2-codex"
-        },
-        "pixel": {
-          "primary": "cursor",
-          "model": "opus-4.6",
-          "fallback": "claude",
-          "fallbackModel": "claude-opus-4-6"
-        },
-        "_default": {
-          "primary": "claude",
-          "model": "claude-opus-4-6",
-          "fallback": "codex",
-          "fallbackModel": "gpt-5.2-codex"
-        }
+        "$ref": "model-providers.json#/agentHarness"
       },
       "modelCatalog": {
-        "factory": {
-          "_source": "https://docs.factory.ai/cli/user-guides/choosing-your-model",
-          "_updated": "2026-03-11",
-          "models": {
-            "claude-opus-4-6": {
-              "name": "Claude Opus 4.6",
-              "provider": "anthropic",
-              "reasoning": "Off/Low/Medium/High/Max",
-              "defaultReasoning": "high",
-              "tier": "frontier"
-            },
-            "claude-opus-4-6-fast": {
-              "name": "Claude Opus 4.6 Fast",
-              "provider": "anthropic",
-              "reasoning": "Off/Low/Medium/High/Max",
-              "defaultReasoning": "high",
-              "tier": "frontier"
-            },
-            "claude-opus-4-5-20251101": {
-              "name": "Claude Opus 4.5",
-              "provider": "anthropic",
-              "reasoning": "Off/Low/Medium/High",
-              "defaultReasoning": "off",
-              "tier": "frontier"
-            },
-            "claude-sonnet-4-6": {
-              "name": "Claude Sonnet 4.6",
-              "provider": "anthropic",
-              "reasoning": "Off/Low/Medium/High/Max",
-              "defaultReasoning": "high",
-              "tier": "standard"
-            },
-            "claude-sonnet-4-5-20250929": {
-              "name": "Claude Sonnet 4.5",
-              "provider": "anthropic",
-              "reasoning": "Off/Low/Medium/High",
-              "defaultReasoning": "off",
-              "tier": "standard"
-            },
-            "claude-haiku-4-5-20251001": {
-              "name": "Claude Haiku 4.5",
-              "provider": "anthropic",
-              "reasoning": "Off/Low/Medium/High",
-              "defaultReasoning": "off",
-              "tier": "fast"
-            },
-            "gpt-5.4": {
-              "name": "GPT-5.4",
-              "provider": "openai",
-              "reasoning": "None/Low/Medium/High/Extra High",
-              "defaultReasoning": "medium",
-              "tier": "frontier"
-            },
-            "gpt-5.3-codex": {
-              "name": "GPT-5.3-Codex",
-              "provider": "openai",
-              "reasoning": "None/Low/Medium/High/Extra High",
-              "defaultReasoning": "medium",
-              "tier": "standard"
-            },
-            "gpt-5.2-codex": {
-              "name": "GPT-5.2-Codex",
-              "provider": "openai",
-              "reasoning": "None/Low/Medium/High/Extra High",
-              "defaultReasoning": "medium",
-              "tier": "standard"
-            },
-            "gpt-5.2": {
-              "name": "GPT-5.2",
-              "provider": "openai",
-              "reasoning": "Off/Low/Medium/High/Extra High",
-              "defaultReasoning": "low",
-              "tier": "standard"
-            },
-            "gemini-3.1-pro-preview": {
-              "name": "Gemini 3.1 Pro",
-              "provider": "google",
-              "reasoning": "Low/Medium/High",
-              "defaultReasoning": "high",
-              "tier": "standard"
-            },
-            "gemini-3-flash-preview": {
-              "name": "Gemini 3 Flash",
-              "provider": "google",
-              "reasoning": "Minimal/Low/Medium/High",
-              "defaultReasoning": "high",
-              "tier": "fast",
-              "costMultiplier": 0.2
-            },
-            "glm-5": {
-              "name": "Droid Core (GLM-5)",
-              "provider": "open-source",
-              "reasoning": "None",
-              "defaultReasoning": "none",
-              "tier": "core",
-              "costMultiplier": 0.4
-            },
-            "glm-4.7": {
-              "name": "Droid Core (GLM-4.7)",
-              "provider": "open-source",
-              "reasoning": "None",
-              "defaultReasoning": "none",
-              "tier": "core",
-              "costMultiplier": 0.25
-            },
-            "kimi-k2.5": {
-              "name": "Droid Core (Kimi K2.5)",
-              "provider": "open-source",
-              "reasoning": "None",
-              "defaultReasoning": "none",
-              "tier": "core",
-              "costMultiplier": 0.25,
-              "supportsImages": true
-            },
-            "minimax-m2.5": {
-              "name": "Droid Core (MiniMax M2.5)",
-              "provider": "open-source",
-              "reasoning": "Low/Medium/High",
-              "defaultReasoning": "high",
-              "tier": "core",
-              "costMultiplier": 0.12
-            }
-          },
-          "recommended": {
-            "deepPlanning": "claude-opus-4-6",
-            "implementation": "claude-opus-4-6",
-            "codeReview": "claude-sonnet-4-6",
-            "testing": "gpt-5.3-codex",
-            "automation": "claude-haiku-4-5-20251001",
-            "bulkEdits": "minimax-m2.5",
-            "research": "gemini-3.1-pro-preview"
-          }
-        },
-        "codex": {
-          "models": {
-            "gpt-5.4": {
-              "name": "GPT-5.4",
-              "tier": "frontier"
-            },
-            "gpt-5.3-codex": {
-              "name": "GPT-5.3-Codex",
-              "tier": "standard"
-            },
-            "gpt-5.2-codex": {
-              "name": "GPT-5.2-Codex",
-              "tier": "standard"
-            },
-            "gpt-5.2": {
-              "name": "GPT-5.2",
-              "tier": "standard"
-            },
-            "gpt-5.1-codex": {
-              "name": "GPT-5.1-Codex",
-              "tier": "standard"
-            }
-          }
-        },
-        "claude": {
-          "models": {
-            "claude-opus-4-6-20260205": {
-              "name": "Claude Opus 4.6",
-              "tier": "frontier"
-            },
-            "claude-sonnet-4-6-20260514": {
-              "name": "Claude Sonnet 4.6",
-              "tier": "standard"
-            },
-            "claude-haiku-4-5-20251001": {
-              "name": "Claude Haiku 4.5",
-              "tier": "fast"
-            }
-          }
-        },
-        "cursor": {
-          "models": {
-            "auto": {
-              "name": "Auto (Cursor picks)",
-              "tier": "auto"
-            },
-            "opus-4.6": {
-              "name": "Claude Opus 4.6",
-              "tier": "frontier"
-            },
-            "gpt-5.4": {
-              "name": "GPT-5.4",
-              "tier": "frontier"
-            }
-          }
-        }
+        "$ref": "model-providers.json#/models"
       },
-      "acp": [
-        {
-          "cli": "Claude Code",
-          "provider": { "name": "Anthropic", "credits": 250000 },
-          "models": [
-            { "name": "claude-opus-4-20250514", "thinkingLevel": "high", "score": 96 },
-            { "name": "claude-sonnet-4-20250514", "thinkingLevel": "medium", "score": 91 },
-            { "name": "claude-3-5-haiku-20241022", "thinkingLevel": "low", "score": 84 }
-          ],
-          "baseUrl": "https://api.anthropic.com",
-          "apiKey": "ANTHROPIC_API_KEY"
-        },
-        {
-          "cli": "Codex",
-          "provider": { "name": "OpenAI", "credits": 180000 },
-          "models": [
-            { "name": "gpt-5.2-codex", "thinkingLevel": "high", "score": 95 },
-            { "name": "o4-mini", "thinkingLevel": "medium", "score": 88 },
-            { "name": "gpt-4.1", "thinkingLevel": "low", "score": 82 }
-          ],
-          "baseUrl": "https://api.openai.com/v1",
-          "apiKey": "OPENAI_API_KEY"
-        }
-      ],
+      "acp": {
+        "$ref": "model-providers.json#/acp"
+      },
       "openclaw": {
-        "provider": { "name": "Fireworks" },
-        "models": [
-          { "name": "accounts/fireworks/routers/kimi-k2p5-turbo", "thinkingLevel": "high" },
-          { "name": "accounts/fireworks/models/llama-v3p3-70b-instruct", "thinkingLevel": "medium" }
-        ],
-        "baseUrl": "https://api.fireworks.ai/inference",
-        "apiKey": "FIREWORKS_API_KEY"
+        "$ref": "model-providers.json#/openclaw"
       },
       "quality": true,
       "security": true,
@@ -409,7 +105,7 @@
       "repository": "5dlabs/cto",
       "docsRepository": "5dlabs/cto",
       "docsProjectDirectory": "docs",
-      "agent": "5DLabs-Rex",
+      "implementationAgent": "5DLabs-Rex",
       "cli": "claude",
       "model": "claude-opus-4-6-20260205",
       "maxIterations": 3,
@@ -417,7 +113,7 @@
       "syncTimeoutSecs": 300
     },
     "monitor": {
-      "agent": "5DLabs-Rex",
+      "implementationAgent": "5DLabs-Rex",
       "cli": "factory",
       "model": "glm-4-plus",
       "template": "watch/factory",
@@ -504,7 +200,8 @@
           "skill-authoring",
           "ask-questions",
           "brainstorming",
-          "writing-plans"
+          "writing-plans",
+          "cto-tools"
         ],
         "intake": [
           "prd-analysis",
@@ -568,7 +265,8 @@
           "github-mcp",
           "rust-patterns",
           "mcp-development",
-          "rust-error-handling"
+          "rust-error-handling",
+          "cto-tools"
         ],
         "coder": [
           "tool-design",
@@ -635,7 +333,8 @@
           "repomix",
           "firecrawl",
           "code-maturity",
-          "ask-questions"
+          "ask-questions",
+          "cto-tools"
         ],
         "quality": [
           "tool-design",
@@ -746,7 +445,8 @@
           "frontend-excellence",
           "frontend-design",
           "react-best-practices",
-          "web-design-guidelines"
+          "web-design-guidelines",
+          "cto-tools"
         ],
         "coder": [
           "tool-design",
@@ -1033,7 +733,8 @@
       "skills": {
         "default": [
           "verification-before-completion",
-          "systematic-debugging"
+          "systematic-debugging",
+          "cto-tools"
         ],
         "coder": [
           "tool-design",
@@ -1190,7 +891,8 @@
           "github-mcp",
           "openclaw-cli",
           "openclaw-mcp-debugger",
-          "agent-team-orchestration"
+          "agent-team-orchestration",
+          "cto-tools"
         ],
         "coder": [
           "tool-design",
