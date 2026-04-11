@@ -81,10 +81,7 @@ impl EffectiveProviderConfig {
     /// 4. `Provider::infer_from_model()` (model ID string patterns)
     /// 5. Fallback to `Fireworks` (current default for the platform)
     #[allow(clippy::too_many_lines)]
-    pub fn resolve(
-        code_run: &CodeRun,
-        controller_config: &ControllerConfig,
-    ) -> Self {
+    pub fn resolve(code_run: &CodeRun, controller_config: &ControllerConfig) -> Self {
         let cli_type = code_run
             .spec
             .cli_config
@@ -271,10 +268,7 @@ impl EffectiveProviderConfig {
             Provider::Google => {
                 vars.push(json!({ "name": "GEMINI_MODEL", "value": &self.raw_model }));
             }
-            Provider::Anthropic
-            | Provider::OpenAI
-            | Provider::Cursor
-            | Provider::Factory => {
+            Provider::Anthropic | Provider::OpenAI | Provider::Cursor | Provider::Factory => {
                 // Native providers — API keys come from cto-secrets envFrom
             }
             Provider::Moonshot => {
@@ -341,7 +335,9 @@ impl EffectiveProviderConfig {
                 }));
                 vars.push(json!({ "name": "COPILOT_MODEL", "value": "gpt-4.1" }));
                 vars.push(json!({ "name": "COPILOT_PROVIDER_MODEL_ID", "value": "gpt-4.1" }));
-                vars.push(json!({ "name": "COPILOT_PROVIDER_WIRE_MODEL", "value": &self.raw_model }));
+                vars.push(
+                    json!({ "name": "COPILOT_PROVIDER_WIRE_MODEL", "value": &self.raw_model }),
+                );
             }
         }
 
@@ -759,7 +755,8 @@ impl<'a> CodeResourceManager<'a> {
             }
             Err(kube::Error::Api(ae)) if ae.code == 404 => {
                 info!("Creating PVC: {}", pvc_name);
-                let pvc = self.build_pvc_spec(pvc_name, service_name, github_app, implementation_agent);
+                let pvc =
+                    self.build_pvc_spec(pvc_name, service_name, github_app, implementation_agent);
                 match self.pvcs.create(&PostParams::default(), &pvc).await {
                     Ok(_) => {
                         info!("Successfully created PVC: {}", pvc_name);
@@ -1437,7 +1434,10 @@ impl<'a> CodeResourceManager<'a> {
             .get(&cli_type.to_string().to_lowercase())
             .map(std::string::String::as_str);
 
-        let api_key_binding = self.config.secrets.resolve_cli_binding(&cli_type, legacy_provider);
+        let api_key_binding = self
+            .config
+            .secrets
+            .resolve_cli_binding(&cli_type, legacy_provider);
         let ResolvedSecretBinding {
             env_var: api_env_var,
             secret_name: api_secret_name,
@@ -3164,7 +3164,9 @@ scrape_configs:
         }
 
         if existing.provider_base_url.is_none() {
-            existing.provider_base_url.clone_from(&defaults.provider_base_url);
+            existing
+                .provider_base_url
+                .clone_from(&defaults.provider_base_url);
         }
 
         for (key, value) in &defaults.settings {

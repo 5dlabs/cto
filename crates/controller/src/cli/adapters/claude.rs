@@ -85,10 +85,7 @@ impl ClaudeAdapter {
                 );
                 if let Some(policy) = &tool_config.escalation {
                     if let Ok(policy_json) = serde_json::to_string(policy) {
-                        headers.insert(
-                            "X-Escalation-Policy".to_string(),
-                            json!(policy_json),
-                        );
+                        headers.insert("X-Escalation-Policy".to_string(), json!(policy_json));
                     }
                 }
                 tools_server["headers"] = Value::Object(headers);

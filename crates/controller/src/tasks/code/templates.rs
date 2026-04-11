@@ -1785,31 +1785,18 @@ impl CodeTemplateGenerator {
             let mut headers = serde_json::Map::new();
 
             // Agent identity — used by the tools server to key per-session state.
-            let agent_name = code_run
-                .spec
-                .github_app
-                .as_deref()
-                .unwrap_or("unknown");
-            headers.insert(
-                "X-Agent-Id".to_string(),
-                json!(agent_name),
-            );
+            let agent_name = code_run.spec.github_app.as_deref().unwrap_or("unknown");
+            headers.insert("X-Agent-Id".to_string(), json!(agent_name));
 
             // Prewarm set — the tools the agent starts with before escalation.
             if !remote_tools.is_empty() {
-                headers.insert(
-                    "X-Agent-Prewarm".to_string(),
-                    json!(remote_tools.join(" ")),
-                );
+                headers.insert("X-Agent-Prewarm".to_string(), json!(remote_tools.join(" ")));
             }
 
             // Per-session escalation policy from the CRD (overrides server default).
             if let Some(policy) = &code_run.spec.escalation_policy {
                 if let Ok(policy_json) = serde_json::to_string(policy) {
-                    headers.insert(
-                        "X-Escalation-Policy".to_string(),
-                        json!(policy_json),
-                    );
+                    headers.insert("X-Escalation-Policy".to_string(), json!(policy_json));
                 }
             }
 

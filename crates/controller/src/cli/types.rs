@@ -90,11 +90,19 @@ impl Provider {
         let m = model.to_lowercase();
         if m.contains("fireworks") {
             Some(Provider::Fireworks)
-        } else if m.starts_with("claude") || m.contains("sonnet") || m.contains("haiku") || m.contains("opus") {
+        } else if m.starts_with("claude")
+            || m.contains("sonnet")
+            || m.contains("haiku")
+            || m.contains("opus")
+        {
             Some(Provider::Anthropic)
         } else if m.starts_with("gemini") {
             Some(Provider::Google)
-        } else if m.starts_with("gpt") || m.starts_with("o1") || m.starts_with("o3") || m.starts_with("o4") {
+        } else if m.starts_with("gpt")
+            || m.starts_with("o1")
+            || m.starts_with("o3")
+            || m.starts_with("o4")
+        {
             Some(Provider::OpenAI)
         } else if m.starts_with("glm") {
             Some(Provider::Factory)
@@ -298,7 +306,10 @@ mod tests {
 
     #[test]
     fn provider_aliases() {
-        assert_eq!(Provider::from_str_ci("fireworks-ai"), Some(Provider::Fireworks));
+        assert_eq!(
+            Provider::from_str_ci("fireworks-ai"),
+            Some(Provider::Fireworks)
+        );
         assert_eq!(Provider::from_str_ci("gemini"), Some(Provider::Google));
         assert_eq!(Provider::from_str_ci("droid"), Some(Provider::Factory));
         assert_eq!(Provider::from_str_ci("kimi"), Some(Provider::Moonshot));
@@ -306,17 +317,35 @@ mod tests {
 
     #[test]
     fn provider_infer_from_model() {
-        assert_eq!(Provider::infer_from_model("accounts/fireworks/routers/kimi-k2p5-turbo"), Some(Provider::Fireworks));
-        assert_eq!(Provider::infer_from_model("gemini-2.5-flash"), Some(Provider::Google));
-        assert_eq!(Provider::infer_from_model("glm-5.1"), Some(Provider::Factory));
-        assert_eq!(Provider::infer_from_model("gpt-4.1"), Some(Provider::OpenAI));
-        assert_eq!(Provider::infer_from_model("claude-sonnet-4-20250514"), Some(Provider::Anthropic));
+        assert_eq!(
+            Provider::infer_from_model("accounts/fireworks/routers/kimi-k2p5-turbo"),
+            Some(Provider::Fireworks)
+        );
+        assert_eq!(
+            Provider::infer_from_model("gemini-2.5-flash"),
+            Some(Provider::Google)
+        );
+        assert_eq!(
+            Provider::infer_from_model("glm-5.1"),
+            Some(Provider::Factory)
+        );
+        assert_eq!(
+            Provider::infer_from_model("gpt-4.1"),
+            Some(Provider::OpenAI)
+        );
+        assert_eq!(
+            Provider::infer_from_model("claude-sonnet-4-20250514"),
+            Some(Provider::Anthropic)
+        );
         assert_eq!(Provider::infer_from_model("totally-unknown-model"), None);
     }
 
     #[test]
     fn provider_default_base_urls() {
-        assert_eq!(Provider::Fireworks.default_base_url(), Some("https://api.fireworks.ai/inference"));
+        assert_eq!(
+            Provider::Fireworks.default_base_url(),
+            Some("https://api.fireworks.ai/inference")
+        );
         assert_eq!(Provider::Google.default_base_url(), None);
         assert_eq!(Provider::Cursor.default_base_url(), None);
     }

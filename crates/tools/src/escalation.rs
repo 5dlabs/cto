@@ -274,7 +274,9 @@ mod tests {
         };
         let d = evaluate(&policy, "nope", catalog(&["github_search_code"]));
         match d {
-            EscalationDecision::Deny { reason } => assert!(reason.contains("not in the tool catalog")),
+            EscalationDecision::Deny { reason } => {
+                assert!(reason.contains("not in the tool catalog"))
+            }
             EscalationDecision::Grant => panic!("expected deny"),
         }
     }
@@ -286,7 +288,11 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            evaluate(&policy, "github_search_code", catalog(&["github_search_code"])),
+            evaluate(
+                &policy,
+                "github_search_code",
+                catalog(&["github_search_code"])
+            ),
             EscalationDecision::Grant
         );
     }
@@ -314,7 +320,11 @@ mod tests {
             deny: vec![],
         };
         assert_eq!(
-            evaluate(&policy, "github_search_code", catalog(&["github_search_code"])),
+            evaluate(
+                &policy,
+                "github_search_code",
+                catalog(&["github_search_code"])
+            ),
             EscalationDecision::Grant
         );
     }
@@ -394,7 +404,9 @@ mod tests {
 
     #[test]
     fn parse_prewarm_splits_on_any_whitespace() {
-        let set = parse_prewarm_header("github_search_code  grafana_query_loki\tterraform_search_modules");
+        let set = parse_prewarm_header(
+            "github_search_code  grafana_query_loki\tterraform_search_modules",
+        );
         assert_eq!(set.len(), 3);
         assert!(set.contains("github_search_code"));
         assert!(set.contains("grafana_query_loki"));
@@ -412,20 +424,14 @@ mod tests {
     #[test]
     fn decision_is_grant() {
         assert!(EscalationDecision::Grant.is_grant());
-        assert!(!EscalationDecision::Deny {
-            reason: "x".into()
-        }
-        .is_grant());
+        assert!(!EscalationDecision::Deny { reason: "x".into() }.is_grant());
     }
 
     #[test]
     fn decision_label() {
         assert_eq!(EscalationDecision::Grant.label(), "grant");
         assert_eq!(
-            EscalationDecision::Deny {
-                reason: "x".into()
-            }
-            .label(),
+            EscalationDecision::Deny { reason: "x".into() }.label(),
             "deny"
         );
     }

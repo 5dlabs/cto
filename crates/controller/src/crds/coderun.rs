@@ -69,7 +69,11 @@ pub struct ACPModel {
     /// Model identifier (e.g. "claude-opus-4-20250514")
     pub name: String,
     /// Thinking level hint: "high", "medium", or "low"
-    #[serde(default, rename = "thinkingLevel", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "thinkingLevel",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub thinking_level: Option<String>,
     /// Performance score 0-100
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -110,7 +114,11 @@ pub struct OpenClawModel {
     /// Model identifier
     pub name: String,
     /// Thinking level hint: "high", "medium", or "low"
-    #[serde(default, rename = "thinkingLevel", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "thinkingLevel",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub thinking_level: Option<String>,
 }
 
@@ -503,7 +511,6 @@ pub struct CodeRunSpec {
     pub escalation_policy: Option<EscalationPolicy>,
 
     // ── New fields: multi-agent CodeRun overhaul ─────────────────────
-
     /// Explicit implementation agent name (e.g. "rex", "blaze").
     /// Takes precedence over `github_app` derivation for naming and labels.
     #[serde(default, rename = "implementationAgent")]
@@ -866,7 +873,10 @@ mod tests {
         let deserialized: OpenClawConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.provider.name, "Fireworks");
         assert_eq!(deserialized.models.len(), 1);
-        assert_eq!(deserialized.base_url.unwrap(), "https://api.fireworks.ai/inference");
+        assert_eq!(
+            deserialized.base_url.unwrap(),
+            "https://api.fireworks.ai/inference"
+        );
     }
 
     #[test]
