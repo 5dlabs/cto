@@ -597,10 +597,7 @@ mod tests {
             spec.skills_url,
             Some("https://github.com/5dlabs/cto-agent-personas".to_string())
         );
-        assert_eq!(
-            spec.skills_project,
-            Some("test-sandbox".to_string())
-        );
+        assert_eq!(spec.skills_project, Some("test-sandbox".to_string()));
 
         // Round-trip: omitted on the wire when None
         let default_json = r#"{

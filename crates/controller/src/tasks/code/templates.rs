@@ -4059,7 +4059,8 @@ Be constructive and explain the "why" behind your suggestions.
         if let Some(ref skills_url) = code_run.spec.skills_url {
             let agent_name = Self::get_agent_name(code_run);
             let project = code_run.spec.skills_project.as_deref();
-            match super::skills_cache::ensure_skills(skills_url, &agent_name, project, &skill_names) {
+            match super::skills_cache::ensure_skills(skills_url, &agent_name, project, &skill_names)
+            {
                 Ok(cached) => {
                     return skill_names
                         .into_iter()

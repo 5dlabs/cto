@@ -217,12 +217,19 @@ pub fn ensure_skills(
             true
         }
     } else {
-        info!("Skills for '{tarball_stem}' not in cache, downloading", );
+        info!("Skills for '{tarball_stem}' not in cache, downloading",);
         true
     };
 
     if needs_download {
-        download_and_extract(&client, skills_url, &tarball_stem, agent_name, remote_hash, &root)?;
+        download_and_extract(
+            &client,
+            skills_url,
+            &tarball_stem,
+            agent_name,
+            remote_hash,
+            &root,
+        )?;
     }
 
     // 3. Read SKILL.md content for each requested skill
@@ -362,7 +369,10 @@ fn download_and_extract(
 
     // Count extracted skills
     let skill_count = fs::read_dir(&agent_dir)
-        .map(|rd| rd.filter(|e| e.as_ref().is_ok_and(|e| e.path().is_dir())).count())
+        .map(|rd| {
+            rd.filter(|e| e.as_ref().is_ok_and(|e| e.path().is_dir()))
+                .count()
+        })
         .unwrap_or(0);
 
     info!(
@@ -406,10 +416,7 @@ abc123def456  rex-default.tar.gz
         let m = parse_manifest(body);
         assert_eq!(m.len(), 2);
         assert_eq!(m.get("rex-default.tar.gz").unwrap(), "abc123def456");
-        assert_eq!(
-            m.get("rex-test-sandbox.tar.gz").unwrap(),
-            "789aaa000bbb"
-        );
+        assert_eq!(m.get("rex-test-sandbox.tar.gz").unwrap(), "789aaa000bbb");
     }
 
     #[test]
