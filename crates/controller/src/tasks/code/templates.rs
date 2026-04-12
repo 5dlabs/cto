@@ -1449,19 +1449,67 @@ impl CodeTemplateGenerator {
         let agent_name = Self::get_agent_name(code_run);
         let job_type = Self::determine_job_type(code_run);
 
+        let coderun_name = code_run.metadata.name.as_deref().unwrap_or("unknown");
+        let namespace = code_run.metadata.namespace.as_deref().unwrap_or("cto");
+        let qualified_model = Self::qualify_model_for_openclaw(code_run);
+        let github_app_name = Self::get_github_app_or_default(code_run);
+
+        // Build openclaw_providers for the CRD param dump (same logic as openclaw config)
+        use crate::crds::coderun::OpenClawConfig;
+        let openclaw_cfg = code_run
+            .spec
+            .openclaw
+            .clone()
+            .unwrap_or_else(OpenClawConfig::default_providers);
+        let openclaw_providers_summary: Vec<Value> = openclaw_cfg
+            .providers
+            .iter()
+            .map(|p| {
+                let models: Vec<Value> = p.models.iter().map(|m| {
+                    let display = m.display_name.as_deref().unwrap_or(&m.name);
+                    json!({
+                        "id": m.name,
+                        "name": display,
+                    })
+                }).collect();
+                json!({
+                    "name": p.name,
+                    "baseUrl": p.base_url,
+                    "api": p.api.as_deref().unwrap_or("openai-completions"),
+                    "apiKeyEnvVar": p.api_key_env_var,
+                    "models": models,
+                })
+            })
+            .collect();
+
+        let discord_enabled = code_run.spec.openclaw.as_ref()
+            .is_none_or(|oc| oc.discord_enabled);
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "task_number": code_run.spec.task_id.unwrap_or(0),
+            "coderun_name": coderun_name,
             "service": code_run.spec.service,
             "run_type": code_run.spec.run_type,
             "job_type": job_type,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
             "docs_project_directory": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
-            "github_app": Self::get_github_app_or_default(code_run),
-            "model": code_run.spec.model,
+            "docs_project": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
+            "git_branch": &code_run.spec.docs_branch,
+            "github_app": &github_app_name,
+            "github_app_name": &github_app_name,
+            "github_app_id": "",
+            "model": &qualified_model,
+            "cli_model": &code_run.spec.model,
+            "resolved_provider": &qualified_model,
             "cli_type": cli_type.to_string(),
             "agent_name": &agent_name,
             "agent_name_upper": agent_name.to_uppercase(),
+            "namespace": namespace,
+            "discord_enabled": discord_enabled,
+            "discord_channel_id": "",
+            "openclaw_providers": openclaw_providers_summary,
             "cli_config": cli_config,
             "skills": skills,
             "cli_skills_dir": Self::cli_native_skills_dir(cli_type),
