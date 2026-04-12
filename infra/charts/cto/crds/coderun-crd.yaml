@@ -138,6 +138,10 @@ spec:
                   - secretName
                   - secretKey
                 description: "Environment variables from secrets"
+              debugMode:
+                type: boolean
+                description: "Debug mode: keep pod alive without running the lobster workflow for manual testing"
+                default: false
               enableDocker:
                 type: boolean
                 description: "Whether to enable Docker-in-Docker support for this CodeRun (defaults to true)"

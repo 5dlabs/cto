@@ -565,6 +565,12 @@ pub struct CodeRunSpec {
     #[serde(default = "default_enable_docker", rename = "enableDocker")]
     pub enable_docker: bool,
 
+    /// Debug mode: keep pod alive without running the lobster workflow.
+    /// When enabled, the harness starts the OpenClaw gateway but sleeps
+    /// instead of executing the task, allowing exec-in for manual testing.
+    #[serde(default, rename = "debugMode")]
+    pub debug_mode: bool,
+
     /// Base64-encoded YAML containing task requirements (secrets and environment variables)
     #[serde(default, rename = "taskRequirements")]
     pub task_requirements: Option<String>,
@@ -684,6 +690,7 @@ impl Default for CodeRunSpec {
             env: std::collections::HashMap::new(),
             env_from_secrets: vec![],
             enable_docker: true,
+            debug_mode: false,
             task_requirements: None,
             service_account_name: None,
             cli_config: None,

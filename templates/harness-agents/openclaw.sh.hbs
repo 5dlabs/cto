@@ -644,6 +644,17 @@ CLI_TAILED_FILE="/tmp/cli-tailed-files"
 CLI_WATCHER_PID=$!
 TAIL_PIDS="$TAIL_PIDS $CLI_WATCHER_PID"
 
+{{#if debug_mode}}
+# ─── DEBUG MODE ─────────────────────────────────────────────────────────
+echo "[harness] ════════════════════════════════════════════════════"
+echo "[harness] 🐛 DEBUG MODE — pod staying alive for manual testing"
+echo "[harness]    kubectl exec -it $(hostname) -c harness -n cto -- bash"
+echo "[harness]    Gateway is running on localhost:18789"
+echo "[harness] ════════════════════════════════════════════════════"
+echo "debug" > /workspace/.agent_done
+exec sleep infinity
+{{/if}}
+
 # Run lobster workflow directly (bypasses model orchestration)
 echo "[harness] ════════════════════════════════════════════════════"
 echo "[harness] Running lobster workflow (direct execution)..."

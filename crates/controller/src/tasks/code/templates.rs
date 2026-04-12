@@ -1658,6 +1658,7 @@ impl CodeTemplateGenerator {
             "discord_enabled": code_run.spec.openclaw.as_ref()
                 .is_none_or(|oc| oc.discord_enabled),
             "gateway_agents": gateway_agents,
+            "debug_mode": code_run.spec.debug_mode,
         });
 
         handlebars

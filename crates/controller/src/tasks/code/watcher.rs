@@ -353,6 +353,7 @@ pub async fn create_watcher_coderun(
         env,
         env_from_secrets: executor.spec.env_from_secrets.clone(),
         enable_docker: false, // Watcher doesn't need Docker
+            debug_mode: false,
         task_requirements: None,
         service_account_name: executor.spec.service_account_name.clone(),
         cli_config: Some(cli_config),
