@@ -319,19 +319,20 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
             let service = &code_run.spec.service;
             let agent = code_run.spec.github_app.as_deref().unwrap_or("unknown");
             if task_id > 0 {
-                let label_selector = format!(
-                    "task-id={},project-name={},github-user={}",
-                    task_id,
-                    CodeResourceManager::<'_>::sanitize_label_value(service),
-                    CodeResourceManager::<'_>::sanitize_label_value(agent),
-                );
                 let coderuns: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
                 let existing = coderuns
-                    .list(&kube::api::ListParams::default().labels(&label_selector))
+                    .list(&kube::api::ListParams::default())
                     .await?;
                 let has_active_sibling = existing.items.iter().any(|cr| {
                     // Skip ourselves
                     if cr.metadata.name == code_run.metadata.name {
+                        return false;
+                    }
+                    // Match by spec fields: same task_id + service + agent
+                    let cr_task_id = cr.spec.task_id.unwrap_or(0);
+                    let cr_service = &cr.spec.service;
+                    let cr_agent = cr.spec.github_app.as_deref().unwrap_or("unknown");
+                    if cr_task_id != task_id || cr_service != service || cr_agent != agent {
                         return false;
                     }
                     // Check if sibling is in an active phase
@@ -374,6 +375,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     e
                 );
             }
+
+            // Re-fetch CodeRun after annotation patch so the Job spec includes the thread ID
+            let coderuns_api: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+            let code_run = Arc::new(coderuns_api.get(&code_run_name).await.unwrap_or_else(|_| (*code_run).clone()));
 
             // STEP 3: Optimistic job creation with conflict handling (copied from working docs controller)
             let ctx_arc = Arc::new(ctx.clone());
