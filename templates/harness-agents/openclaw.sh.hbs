@@ -179,15 +179,19 @@ mkdir -p "$HOME/.openclaw/canvas"
 
 # Runtime Discord gate — check both CRD-level toggle and env var availability
 {{#if discord_enabled}}
-DISCORD_TOKEN_VAR="DISCORD_TOKEN_{{agent_name_upper}}"
-DISCORD_CHANNEL_VAR="DISCORD_CHANNEL_{{agent_name_upper}}"
-if [ -n "${!DISCORD_TOKEN_VAR:-}" ] && [ -n "${!DISCORD_CHANNEL_VAR:-}" ]; then
-  echo "🟢 Discord token + channel found for {{agent_name}}"
+DISCORD_ACTIVE=false
+DISCORD_VALID_AGENTS=""
+{{#each gateway_agents}}
+_TOKEN_VAR="DISCORD_TOKEN_{{this.name_upper}}"
+_CHANNEL_VAR="DISCORD_CHANNEL_{{this.name_upper}}"
+if [ -n "${!_TOKEN_VAR:-}" ] && [ -n "${!_CHANNEL_VAR:-}" ]; then
+  echo "🟢 Discord token + channel found for {{this.name}} ({{this.role}})"
   DISCORD_ACTIVE=true
+  DISCORD_VALID_AGENTS="${DISCORD_VALID_AGENTS} {{this.name}}"
 else
-  echo "⚠️ Missing Discord ($DISCORD_TOKEN_VAR / $DISCORD_CHANNEL_VAR), disabled"
-  DISCORD_ACTIVE=false
+  echo "⚠️ Missing Discord ($_TOKEN_VAR / $_CHANNEL_VAR), skipping {{this.name}}"
 fi
+{{/each}}
 {{else}}
 echo "🔴 Discord disabled by CRD (discordEnabled: false)"
 DISCORD_ACTIVE=false
@@ -196,29 +200,43 @@ DISCORD_ACTIVE=false
 cp /task-files/openclaw.json "$HOME/.openclaw/openclaw.json"
 export OPENCLAW_CONFIG="$HOME/.openclaw/openclaw.json"
 
-# Resolve Discord env vars in config (OpenClaw can't substitute in JSON keys)
+# Resolve Discord env vars in config for each agent account
 if command -v jq >/dev/null 2>&1; then
   if [ "$DISCORD_ACTIVE" = "true" ]; then
-    RESOLVED_TOKEN="${!DISCORD_TOKEN_VAR}"
-    RESOLVED_CHANNEL="${!DISCORD_CHANNEL_VAR}"
-    jq --arg token "$RESOLVED_TOKEN" --arg channel "$RESOLVED_CHANNEL" --arg old_key "\${$DISCORD_CHANNEL_VAR}" '
-      .channels.discord.accounts.default.token = $token |
-      .channels.discord.accounts.default.guilds["1490117571977019524"].channels =
-        { ($channel): .channels.discord.accounts.default.guilds["1490117571977019524"].channels[$old_key] }
-    ' "$OPENCLAW_CONFIG" > "$OPENCLAW_CONFIG.tmp" && mv "$OPENCLAW_CONFIG.tmp" "$OPENCLAW_CONFIG"
-    echo "✅ Discord config resolved (channel=$RESOLVED_CHANNEL)"
+    {{#each gateway_agents}}
+    # --- Resolve {{this.name}} ---
+    _TOKEN_VAR="DISCORD_TOKEN_{{this.name_upper}}"
+    _CHANNEL_VAR="DISCORD_CHANNEL_{{this.name_upper}}"
+    if [ -n "${!_TOKEN_VAR:-}" ] && [ -n "${!_CHANNEL_VAR:-}" ]; then
+      _RESOLVED_TOKEN="${!_TOKEN_VAR}"
+      _RESOLVED_CHANNEL="${!_CHANNEL_VAR}"
+      jq --arg token "$_RESOLVED_TOKEN" \
+         --arg channel "$_RESOLVED_CHANNEL" \
+         --arg old_key "\${$_CHANNEL_VAR}" \
+         --arg acct "{{this.name}}" '
+        .channels.discord.accounts[$acct].token = $token |
+        .channels.discord.accounts[$acct].guilds["1490117571977019524"].channels =
+          { ($channel): .channels.discord.accounts[$acct].guilds["1490117571977019524"].channels[$old_key] }
+      ' "$OPENCLAW_CONFIG" > "$OPENCLAW_CONFIG.tmp" && mv "$OPENCLAW_CONFIG.tmp" "$OPENCLAW_CONFIG"
+      echo "✅ Discord config resolved for {{this.name}} (channel=$_RESOLVED_CHANNEL)"
 
-    # Set bot guild nickname to match agent name
-    GUILD_ID="1490117571977019524"
-    AGENT_DISPLAY_NAME="{{agent_name}}"
-    AGENT_DISPLAY_NAME="$(echo "${AGENT_DISPLAY_NAME:0:1}" | tr '[:lower:]' '[:upper:]')${AGENT_DISPLAY_NAME:1}"
-    curl -sf -X PATCH \
-      "https://discord.com/api/v10/guilds/${GUILD_ID}/members/@me" \
-      -H "Authorization: Bot ${RESOLVED_TOKEN}" \
-      -H "Content-Type: application/json" \
-      -d "{\"nick\": \"${AGENT_DISPLAY_NAME}\"}" 2>/dev/null && \
-      echo "✅ Discord nickname → '${AGENT_DISPLAY_NAME}'" || \
-      echo "⚠️ Could not set Discord nickname"
+      GUILD_ID="1490117571977019524"
+      _DISPLAY_NAME="{{this.name}}"
+      _DISPLAY_NAME="$(echo "${_DISPLAY_NAME:0:1}" | tr '[:lower:]' '[:upper:]')${_DISPLAY_NAME:1}"
+      curl -sf -X PATCH \
+        "https://discord.com/api/v10/guilds/${GUILD_ID}/members/@me" \
+        -H "Authorization: Bot ${_RESOLVED_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "{\"nick\": \"${_DISPLAY_NAME}\"}" 2>/dev/null && \
+        echo "✅ Discord nickname → '${_DISPLAY_NAME}' for {{this.name}}" || \
+        echo "⚠️ Could not set Discord nickname for {{this.name}}"
+    else
+      # Remove invalid account from config
+      jq --arg acct "{{this.name}}" 'del(.channels.discord.accounts[$acct])' \
+        "$OPENCLAW_CONFIG" > "$OPENCLAW_CONFIG.tmp" && mv "$OPENCLAW_CONFIG.tmp" "$OPENCLAW_CONFIG"
+      echo "🔴 Removed {{this.name}} from Discord config (missing credentials)"
+    fi
+    {{/each}}
   else
     jq '.plugins.entries.discord.enabled = false | del(.channels.discord)' \
       "$OPENCLAW_CONFIG" > "$OPENCLAW_CONFIG.tmp" && mv "$OPENCLAW_CONFIG.tmp" "$OPENCLAW_CONFIG"

@@ -15,6 +15,10 @@ spec:
   enableDocker: false
   env:
     GIT_BRANCH: main
+  implementationAgent: rex
+  quality: cleo
+  security: cipher
+  testing: tess
   githubApp: 5DLabs-Rex
   model: kimi-k2p5-turbo
   openclaw:

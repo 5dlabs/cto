@@ -148,8 +148,9 @@
     {{#if discord_enabled}}
     "discord": {
       "accounts": {
-        "default": {
-          "token": "${DISCORD_TOKEN_{{agent_name_upper}}}",
+        {{#each gateway_agents}}
+        "{{this.name}}": {
+          "token": "${DISCORD_TOKEN_{{this.name_upper}}}",
           "allowBots": false,
           "dmPolicy": "allowlist",
           "allowFrom": [
@@ -179,7 +180,7 @@
             },
             "1490117571977019524": {
               "channels": {
-                "${DISCORD_CHANNEL_{{agent_name_upper}}}": {
+                "${DISCORD_CHANNEL_{{this.name_upper}}}": {
                   "enabled": true,
                   "requireMention": false,
                   "users": [
@@ -228,7 +229,8 @@
             "spawnAcpSessions": true,
             "idleHours": 24
           }
-        }
+        }{{#unless @last}},{{/unless}}
+        {{/each}}
       },
       "enabled": true,
       "groupPolicy": "allowlist"

@@ -369,10 +369,10 @@ pub async fn create_watcher_coderun(
         skills_project: None,
         escalation_policy: None,
         implementation_agent: executor.spec.implementation_agent.clone(),
-        quality: false, // Watcher doesn't run phase gates
-        security: false,
-        testing: false,
-        deployment: false,
+        quality: None,
+        security: None,
+        testing: None,
+        deployment: None,
         acp: None,
         openclaw: None,
     };

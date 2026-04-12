@@ -1552,6 +1552,7 @@ impl CodeTemplateGenerator {
 
         let cli_type = Self::determine_cli_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
+        let gateway_agents = Self::collect_gateway_agents(code_run);
 
         // Use CRD openclaw providers, or fall back to defaults
         let openclaw_cfg = code_run
@@ -1610,6 +1611,7 @@ impl CodeTemplateGenerator {
             "discord_enabled": code_run.spec.openclaw.as_ref()
                 .is_none_or(|oc| oc.discord_enabled),
             "openclaw_providers": openclaw_providers,
+            "gateway_agents": gateway_agents,
         });
 
         handlebars.render("openclaw_config", &context).map_err(|e| {
@@ -1639,6 +1641,9 @@ impl CodeTemplateGenerator {
         let agent_name = Self::get_agent_name(code_run);
         let job_type = Self::determine_job_type(code_run);
 
+        // Build gateway_agents list (same logic as generate_openclaw_config)
+        let gateway_agents = Self::collect_gateway_agents(code_run);
+
         let context = json!({
             "agent_name": &agent_name,
             "agent_name_upper": agent_name.to_uppercase(),
@@ -1652,6 +1657,7 @@ impl CodeTemplateGenerator {
             "service": &code_run.spec.service,
             "discord_enabled": code_run.spec.openclaw.as_ref()
                 .is_none_or(|oc| oc.discord_enabled),
+            "gateway_agents": gateway_agents,
         });
 
         handlebars
@@ -4285,6 +4291,41 @@ Be constructive and explain the "why" behind your suggestions.
             .strip_prefix("5DLabs-")
             .unwrap_or(&github_app)
             .to_lowercase()
+    }
+
+    /// Collect all agents that should run on this gateway pod.
+    /// Returns a deduped list with name, name_upper, and role for each agent.
+    fn collect_gateway_agents(code_run: &CodeRun) -> Vec<Value> {
+        let agent_name = Self::get_agent_name(code_run);
+        let mut agents: Vec<Value> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+
+        let mut add = |name: &str, role: &str| {
+            let canonical = name.to_lowercase();
+            if seen.insert(canonical.clone()) {
+                agents.push(json!({
+                    "name": canonical,
+                    "name_upper": canonical.to_uppercase(),
+                    "role": role,
+                }));
+            }
+        };
+
+        add(&agent_name, "implementation");
+        if let Some(ref name) = code_run.spec.quality {
+            add(name, "quality");
+        }
+        if let Some(ref name) = code_run.spec.security {
+            add(name, "security");
+        }
+        if let Some(ref name) = code_run.spec.testing {
+            add(name, "testing");
+        }
+        if let Some(ref name) = code_run.spec.deployment {
+            add(name, "deployment");
+        }
+
+        agents
     }
 
     /// Get the task language based on agent type or explicit TASK_LANGUAGE env var.

@@ -65,6 +65,10 @@ cargo clippy -p <crate> --all-targets -- -D warnings -W clippy::pedantic
 
 **Do not push if your changes introduce new clippy errors.** Pre-existing errors on `main` are acceptable until they are resolved in a dedicated cleanup, but your diff must not add to that count. Also run `cargo fmt --all -- --check` before pushing.
 
+## Engineering Rules
+
+- **No backward compatibility for new functionality.** New CRD fields, APIs, and schemas should use the final desired type from day one. Do not add custom deserializers, union types, or shim logic to accept legacy formats for features that have never shipped. This avoids unnecessary technical debt.
+
 ## Configuration
 
 - Agent configs: `cto-config.json` (models, tools, skills per agent)

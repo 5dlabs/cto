@@ -635,21 +635,21 @@ pub struct CodeRunSpec {
     #[serde(default, rename = "implementationAgent")]
     pub implementation_agent: Option<String>,
 
-    /// Run quality review phase (Cleo). Defaults to true.
-    #[serde(default = "default_true")]
-    pub quality: bool,
+    /// Quality review agent name (e.g. "cleo"). Omit to skip quality phase.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quality: Option<String>,
 
-    /// Run security scan phase (Cipher). Defaults to true.
-    #[serde(default = "default_true")]
-    pub security: bool,
+    /// Security scan agent name (e.g. "cipher"). Omit to skip security phase.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub security: Option<String>,
 
-    /// Run testing phase (Tess). Defaults to true.
-    #[serde(default = "default_true")]
-    pub testing: bool,
+    /// Testing agent name (e.g. "tess"). Omit to skip testing phase.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub testing: Option<String>,
 
-    /// Run deployment phase (Bolt). Defaults to false (opt-in).
-    #[serde(default)]
-    pub deployment: bool,
+    /// Deployment agent name (e.g. "bolt"). Omit to skip deployment phase.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deployment: Option<String>,
 
     /// AI-CLI-Provider candidates. The OpenClaw harness agent picks from this
     /// array based on task difficulty, credits, and model scores.
@@ -698,10 +698,10 @@ impl Default for CodeRunSpec {
             watcher_for: None,
             escalation_policy: None,
             implementation_agent: None,
-            quality: true,
-            security: true,
-            testing: true,
-            deployment: false,
+            quality: None,
+            security: None,
+            testing: None,
+            deployment: None,
             acp: None,
             openclaw: None,
         }
@@ -1031,10 +1031,10 @@ mod tests {
             "contextVersion": 1
         }"#;
         let spec: CodeRunSpec = serde_json::from_str(json).unwrap();
-        assert!(spec.quality);
-        assert!(spec.security);
-        assert!(spec.testing);
-        assert!(!spec.deployment);
+        assert!(spec.quality.is_none());
+        assert!(spec.security.is_none());
+        assert!(spec.testing.is_none());
+        assert!(spec.deployment.is_none());
         assert!(spec.implementation_agent.is_none());
         assert!(spec.acp.is_none());
         assert!(spec.openclaw.is_none());
@@ -1050,10 +1050,10 @@ mod tests {
             "model": "sonnet",
             "contextVersion": 1,
             "implementationAgent": "rex",
-            "quality": false,
-            "security": true,
-            "testing": false,
-            "deployment": true,
+            "quality": "cleo",
+            "security": "cipher",
+            "testing": "tess",
+            "deployment": "bolt",
             "acp": [{
                 "cli": "claude",
                 "providers": [{
@@ -1076,10 +1076,10 @@ mod tests {
         }"#;
         let spec: CodeRunSpec = serde_json::from_str(json).unwrap();
         assert_eq!(spec.implementation_agent, Some("rex".to_string()));
-        assert!(!spec.quality);
-        assert!(spec.security);
-        assert!(!spec.testing);
-        assert!(spec.deployment);
+        assert_eq!(spec.quality, Some("cleo".to_string()));
+        assert_eq!(spec.security, Some("cipher".to_string()));
+        assert_eq!(spec.testing, Some("tess".to_string()));
+        assert_eq!(spec.deployment, Some("bolt".to_string()));
         assert!(spec.acp.is_some());
         let acp = spec.acp.unwrap();
         assert_eq!(acp.len(), 1);
