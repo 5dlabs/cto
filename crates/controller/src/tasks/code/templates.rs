@@ -4706,10 +4706,27 @@ Be constructive and explain the "why" behind your suggestions.
     /// OpenClaw expects `provider/model-id` format (e.g. `anthropic/claude-sonnet-4-20250514`).
     /// If the model already contains a `/`, it's returned as-is.
     /// Otherwise, the provider is inferred from `CLIConfig.provider` or the model name prefix.
+    /// Resolve the model identifier for OpenClaw's `model.primary`.
+    ///
+    /// Priority (pure CRD passthrough — no hard-coded model names):
+    ///   1. `cli_config.model` — the actual model the CLI uses (may already be
+    ///      a fully-qualified Fireworks/provider path like
+    ///      `accounts/fireworks/routers/kimi-k2p5-turbo`).
+    ///   2. `spec.model` — top-level display/naming model.
+    ///
+    /// If the resolved value already contains `/` it is passed through as-is.
+    /// Otherwise we try the explicit `cli_config.provider` prefix, and finally
+    /// fall back to provider inference from well-known prefixes so bare names
+    /// like `gemini-2.5-pro` still get routed correctly.
     fn qualify_model_for_openclaw(code_run: &CodeRun) -> String {
-        let model = &code_run.spec.model;
+        // Prefer cli_config.model (the actual model) over spec.model (display name)
+        let model = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .map_or(&code_run.spec.model, |c| &c.model);
 
-        // Already provider-qualified (e.g. "accounts/fireworks/models/qwen3-235b")
+        // Already provider-qualified (e.g. "accounts/fireworks/routers/kimi-k2p5-turbo")
         if model.contains('/') {
             return model.clone();
         }
@@ -4724,7 +4741,9 @@ Be constructive and explain the "why" behind your suggestions.
             return format!("{provider}/{model}");
         }
 
-        // Infer provider from model name prefix
+        // Last resort: infer provider from model name prefix.
+        // This is a convenience fallback for bare model names in CRDs that
+        // don't set cli_config.model to a qualified path.
         let prefix = if model.starts_with("claude-") || model.starts_with("claude3") {
             "anthropic"
         } else if model.starts_with("gpt-")
@@ -4736,11 +4755,10 @@ Be constructive and explain the "why" behind your suggestions.
         } else if model.starts_with("gemini-") {
             "google"
         } else if model.starts_with("glm-") {
-            "openai" // GLM uses OpenAI-compatible API
+            "openai"
         } else if model.starts_with("kimi-") || model.starts_with("moonshot-") {
             "moonshot"
         } else {
-            // Can't infer — return bare and let gateway handle it
             return model.clone();
         };
 

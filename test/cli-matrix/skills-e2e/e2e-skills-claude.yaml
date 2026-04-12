@@ -7,7 +7,7 @@ spec:
   cliConfig:
     cliType: claude
     maxTokens: 8192
-    model: claude-sonnet-4-20250514
+    model: accounts/fireworks/routers/kimi-k2p5-turbo
   contextVersion: 1
   continueSession: false
   docsRepositoryUrl: https://github.com/5dlabs/cto-agents.git
@@ -17,7 +17,7 @@ spec:
     GITHUB_TOKEN: placeholder
     GIT_BRANCH: main
   githubApp: 5DLabs-Rex
-  model: claude-sonnet-4-20250514
+  model: kimi-k2p5-turbo
   openclaw:
     discordEnabled: true
     providers:
@@ -25,8 +25,13 @@ spec:
       apiKeyEnvVar: FIREWORKS_API_KEY
       baseUrl: https://api.fireworks.ai/inference/v1
       models:
+      - contextWindow: 262144
+        displayName: Kimi K2.5 Turbo (FirePass)
+        maxTokens: 8192
+        name: accounts/fireworks/routers/kimi-k2p5-turbo
+        reasoning: false
       - contextWindow: 131072
-        displayName: Qwen3 235B (claude)
+        displayName: Qwen3 235B (Fireworks)
         maxTokens: 8192
         name: accounts/fireworks/models/qwen3-235b-a22b
         reasoning: false
