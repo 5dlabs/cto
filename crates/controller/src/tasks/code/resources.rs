@@ -3110,7 +3110,7 @@ scrape_configs:
         Ok(())
     }
 
-    fn sanitize_label_value(input: &str) -> String {
+    pub(crate) fn sanitize_label_value(input: &str) -> String {
         if input.is_empty() {
             return String::new();
         }

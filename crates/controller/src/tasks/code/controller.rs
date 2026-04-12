@@ -313,6 +313,57 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 }
             }
 
+            // STEP 2.4: Task deduplication — reject if an active CodeRun with the same
+            // task_id + service + agent already has a running Job.
+            let task_id = code_run.spec.task_id.unwrap_or(0);
+            let service = &code_run.spec.service;
+            let agent = code_run.spec.github_app.as_deref().unwrap_or("unknown");
+            if task_id > 0 {
+                let label_selector = format!(
+                    "task-id={},project-name={},github-user={}",
+                    task_id,
+                    CodeResourceManager::<'_>::sanitize_label_value(service),
+                    CodeResourceManager::<'_>::sanitize_label_value(agent),
+                );
+                let coderuns: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+                let existing = coderuns
+                    .list(&kube::api::ListParams::default().labels(&label_selector))
+                    .await?;
+                let has_active_sibling = existing.items.iter().any(|cr| {
+                    // Skip ourselves
+                    if cr.metadata.name == code_run.metadata.name {
+                        return false;
+                    }
+                    // Check if sibling is in an active phase
+                    let phase = cr.status.as_ref().map_or("", |s| s.phase.as_str());
+                    matches!(phase, "Running" | "Pending" | "")
+                });
+                if has_active_sibling {
+                    warn!(
+                        code_run = %code_run_name,
+                        task_id = task_id,
+                        service = %service,
+                        agent = %agent,
+                        "Duplicate task detected — another active CodeRun exists with same task+service+agent"
+                    );
+                    update_code_status_with_completion(
+                        &code_run,
+                        ctx,
+                        "Rejected",
+                        &format!(
+                            "Duplicate: active CodeRun already exists for task {} / {} / {}",
+                            task_id, service, agent
+                        ),
+                        true,
+                        None,
+                        Some(Utc::now()),
+                        ExpireAtUpdate::Set(Utc::now() + ChronoDuration::minutes(5)),
+                    )
+                    .await?;
+                    return Ok(Action::await_change());
+                }
+            }
+
             // STEP 2.5: Create per-task Discord thread (best-effort)
             // Creates a thread in the agent's Discord channel for task-scoped communication.
             // Thread ID is stored as an annotation so cleanup can archive it.
