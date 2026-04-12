@@ -3,11 +3,12 @@
 
   Rendered by the controller for each CodeRun.
   Mounted as openclaw.json in the ConfigMap.
+  Matches Morgan's Helm-managed config structure (v2026.4.x accounts format).
 
   Context variables:
     agent_name          - Agent identity (rex, blaze, tap, etc.)
     agent_name_upper    - Agent name uppercased (REX, BLAZE, TAP, etc.)
-    model               - Primary model ID (e.g. anthropic/claude-sonnet-4-6)
+    model               - Primary model ID (e.g. fireworks/accounts/fireworks/routers/kimi-k2p5-turbo)
     cli_type            - CLI backend for acpx (claude, codex, cursor, factory, etc.)
     service             - Target repo/service name
     task_id             - Task ID from CRD
@@ -32,13 +33,89 @@
 {
   "agents": {
     "defaults": {
+      "compaction": {
+        "memoryFlush": {
+          "enabled": true,
+          "prompt": "Before this conversation is compacted, write lasting notes to memory/YYYY-MM-DD.md. Include: ongoing tasks, decisions made, user preferences learned, key context. Be specific and concise. If nothing meaningful to store, reply NO_REPLY.",
+          "softThresholdTokens": 1000
+        },
+        "mode": "safeguard",
+        "reserveTokensFloor": 25000,
+        "maxHistoryShare": 0.5,
+        "recentTurnsPreserve": 4
+      },
+      "contextPruning": {
+        "mode": "cache-ttl",
+        "ttl": "1h",
+        "keepLastAssistants": 6,
+        "softTrimRatio": 0.75,
+        "hardClearRatio": 0.95,
+        "minPrunableToolChars": 800
+      },
+      "elevatedDefault": "full",
+      "heartbeat": {
+        "every": "15m",
+        "target": "last",
+        "ackMaxChars": 500,
+        "prompt": "Check for pending tasks and execute autonomously. Ask only when genuinely blocked or when a decision requires user preferences you cannot infer. Reply HEARTBEAT_OK only if nothing needs attention."
+      },
       "model": {
         "primary": "{{model}}",
-        "fallbacks": []
+        "fallbacks": [
+          "google/gemini-2.5-pro"
+        ]
       },
-      "maxConcurrent": 1,
-      "timeoutSeconds": 1800,
+      "maxConcurrent": 4,
+      "thinkingDefault": "low",
+      "timeoutSeconds": 600,
+      "mediaMaxMb": 5,
+      "typingMode": "instant",
+      "typingIntervalSeconds": 5,
+      "bootstrapMaxChars": 20000,
       "contextTokens": 200000,
+      "subagents": {
+        "maxConcurrent": 4,
+        "archiveAfterMinutes": 60
+      },
+      "cliBackends": {
+        "claude": {
+          "args": [],
+          "command": "/usr/local/bin/claude",
+          "input": "arg",
+          "maxPromptArgChars": 8000,
+          "output": "text"
+        },
+        "code": {
+          "args": [],
+          "command": "/usr/local/bin/code",
+          "output": "text"
+        },
+        "codex": {
+          "args": [],
+          "command": "/usr/local/bin/codex",
+          "output": "text"
+        },
+        "cursor": {
+          "args": [],
+          "command": "/usr/local/bin/cursor-agent",
+          "output": "text"
+        },
+        "gemini": {
+          "args": ["--experimental-acp"],
+          "command": "/usr/local/bin/gemini",
+          "output": "text"
+        },
+        "kimi": {
+          "args": [],
+          "command": "/usr/local/bin/kimi",
+          "output": "text"
+        },
+        "opencode": {
+          "args": [],
+          "command": "/usr/local/bin/opencode",
+          "output": "text"
+        }
+      },
       "workspace": "/workspace"
     }
   },
@@ -70,54 +147,132 @@
   "channels": {
     {{#if discord_enabled}}
     "discord": {
-      "token": "${DISCORD_TOKEN_{{agent_name_upper}}}",
-      "allowBots": false,
-      "replyToMode": "first",
-      "dmPolicy": "disabled",
-      "guilds": {
-        "1490117571977019524": {
-          "requireMention": false,
-          "slug": "cto-5dlabs",
-          "channels": {
-            "${DISCORD_CHANNEL_{{agent_name_upper}}}": {
-              "enabled": true,
-              "requireMention": false
+      "accounts": {
+        "default": {
+          "token": "${DISCORD_TOKEN_{{agent_name_upper}}}",
+          "allowBots": false,
+          "dmPolicy": "allowlist",
+          "allowFrom": [
+            "444519104808878090",
+            "1467013771548426291",
+            "1466937419981918220",
+            "1466938003451674748",
+            "1466938424790356253",
+            "1468829684195135592",
+            "1466930035356078251",
+            "1466938744593715210"
+          ],
+          "groupPolicy": "allowlist",
+          "guilds": {
+            "*": {
+              "requireMention": true,
+              "users": [
+                "444519104808878090",
+                "1467013771548426291",
+                "1466937419981918220",
+                "1466938003451674748",
+                "1466938424790356253",
+                "1468829684195135592",
+                "1466930035356078251",
+                "1466938744593715210"
+              ]
+            },
+            "1490117571977019524": {
+              "channels": {
+                "${DISCORD_CHANNEL_{{agent_name_upper}}}": {
+                  "enabled": true,
+                  "requireMention": false,
+                  "users": [
+                    "444519104808878090",
+                    "1466928805384945775",
+                    "1466898696720617509",
+                    "1466936388162162731",
+                    "1467013771548426291",
+                    "1466937419981918220",
+                    "1466937061079781458",
+                    "1466938424790356253",
+                    "1467592725938573353",
+                    "1468829684195135592",
+                    "1466937750329757960",
+                    "1467274765587972258",
+                    "1466930035356078251",
+                    "1466930808010051850",
+                    "1467347075598651636",
+                    "1466938744593715210",
+                    "1467592156209483969"
+                  ]
+                }
+              },
+              "requireMention": true,
+              "slug": "cto-5dlabs",
+              "users": [
+                "444519104808878090",
+                "1467013771548426291",
+                "1466937419981918220",
+                "1466938003451674748",
+                "1466938424790356253",
+                "1468829684195135592",
+                "1466930035356078251",
+                "1466938744593715210"
+              ]
             }
+          },
+          "streaming": {
+            "mode": "partial"
+          },
+          "replyToMode": "first",
+          "configWrites": false,
+          "threadBindings": {
+            "enabled": true,
+            "spawnSubagentSessions": true,
+            "spawnAcpSessions": true,
+            "idleHours": 24
           }
         }
-      }
+      },
+      "enabled": true,
+      "groupPolicy": "allowlist"
     }
     {{/if}}
   },
   "gateway": {
     "mode": "local",
     "port": 18789,
-    "bind": "0.0.0.0",
+    "bind": "lan",
+    "reload": {
+      "mode": "hybrid"
+    },
     "auth": {
       "token": "openclaw-internal"
     },
     "controlUi": {
-      "enabled": false
+      "enabled": false,
+      "allowedOrigins": [
+        "http://localhost:18789",
+        "http://127.0.0.1:18789"
+      ]
     },
     "http": {
       "endpoints": {
         "chatCompletions": {
           "enabled": true
+        },
+        "responses": {
+          "enabled": false,
+          "maxBodyBytes": 20971520
         }
       }
     }
   },
   "plugins": {
-    "allow": ["diagnostics-otel", "discord", "memory-core"],
     "entries": {
-      {{#unless discord_enabled}}
-      "discord": {
-        "enabled": false
-      },
-      {{/unless}}
       {{#if discord_enabled}}
       "discord": {
         "enabled": true
+      },
+      {{else}}
+      "discord": {
+        "enabled": false
       },
       {{/if}}
       "memory-core": {
@@ -144,34 +299,54 @@
     }
   },
   "tools": {
-    "profile": "coding",
+    "agentToAgent": {
+      "enabled": true
+    },
+    "allow": [],
+    "elevated": {
+      "enabled": true
+    },
+    "profile": "full",
     "exec": {
+      "pathPrepend": [
+        "/usr/local/bin",
+        "/workspace/.local/bin",
+        "/root/.local/bin"
+      ],
       "host": "gateway",
       "security": "full",
       "backgroundMs": 5000,
       "notifyOnExit": true,
+      "cleanupMs": 1800000,
       "applyPatch": {
+        "enabled": true
+      }
+    },
+    "message": {
+      "broadcast": {
         "enabled": true
       }
     },
     "web": {
       "search": {
         "enabled": true,
-        "maxResults": 5,
+        "provider": "perplexity",
+        "maxResults": 8,
         "timeoutSeconds": 20,
         "cacheTtlMinutes": 5
       },
       "fetch": {
         "enabled": true,
         "maxChars": 20000,
+        "maxCharsCap": 50000,
         "timeoutSeconds": 20,
-        "cacheTtlMinutes": 5
+        "cacheTtlMinutes": 5,
+        "maxRedirects": 3
       }
     }
   },
   "logging": {
-    "level": "info",
-    "consoleLevel": "info",
-    "consoleStyle": "json"
+    "level": "debug",
+    "consoleLevel": "info"
   }
 }

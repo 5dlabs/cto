@@ -202,9 +202,9 @@ if command -v jq >/dev/null 2>&1; then
     RESOLVED_TOKEN="${!DISCORD_TOKEN_VAR}"
     RESOLVED_CHANNEL="${!DISCORD_CHANNEL_VAR}"
     jq --arg token "$RESOLVED_TOKEN" --arg channel "$RESOLVED_CHANNEL" --arg old_key "\${$DISCORD_CHANNEL_VAR}" '
-      .channels.discord.token = $token |
-      .channels.discord.guilds["1490117571977019524"].channels =
-        { ($channel): .channels.discord.guilds["1490117571977019524"].channels[$old_key] }
+      .channels.discord.accounts.default.token = $token |
+      .channels.discord.accounts.default.guilds["1490117571977019524"].channels =
+        { ($channel): .channels.discord.accounts.default.guilds["1490117571977019524"].channels[$old_key] }
     ' "$OPENCLAW_CONFIG" > "$OPENCLAW_CONFIG.tmp" && mv "$OPENCLAW_CONFIG.tmp" "$OPENCLAW_CONFIG"
     echo "✅ Discord config resolved (channel=$RESOLVED_CHANNEL)"
 

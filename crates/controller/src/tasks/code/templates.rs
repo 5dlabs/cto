@@ -1447,18 +1447,69 @@ impl CodeTemplateGenerator {
 
         let cli_type = Self::determine_cli_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
+        let job_type = Self::determine_job_type(code_run);
+
+        let coderun_name = code_run.metadata.name.as_deref().unwrap_or("unknown");
+        let namespace = code_run.metadata.namespace.as_deref().unwrap_or("cto");
+        let qualified_model = Self::qualify_model_for_openclaw(code_run);
+        let github_app_name = Self::get_github_app_or_default(code_run);
+
+        // Build openclaw_providers for the CRD param dump (same logic as openclaw config)
+        use crate::crds::coderun::OpenClawConfig;
+        let openclaw_cfg = code_run
+            .spec
+            .openclaw
+            .clone()
+            .unwrap_or_else(OpenClawConfig::default_providers);
+        let openclaw_providers_summary: Vec<Value> = openclaw_cfg
+            .providers
+            .iter()
+            .map(|p| {
+                let models: Vec<Value> = p.models.iter().map(|m| {
+                    let display = m.display_name.as_deref().unwrap_or(&m.name);
+                    json!({
+                        "id": m.name,
+                        "name": display,
+                    })
+                }).collect();
+                json!({
+                    "name": p.name,
+                    "baseUrl": p.base_url,
+                    "api": p.api.as_deref().unwrap_or("openai-completions"),
+                    "apiKeyEnvVar": p.api_key_env_var,
+                    "models": models,
+                })
+            })
+            .collect();
+
+        let discord_enabled = code_run.spec.openclaw.as_ref()
+            .is_none_or(|oc| oc.discord_enabled);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "task_number": code_run.spec.task_id.unwrap_or(0),
+            "coderun_name": coderun_name,
             "service": code_run.spec.service,
+            "run_type": code_run.spec.run_type,
+            "job_type": job_type,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
             "docs_project_directory": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
-            "github_app": Self::get_github_app_or_default(code_run),
-            "model": code_run.spec.model,
+            "docs_project": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
+            "git_branch": &code_run.spec.docs_branch,
+            "github_app": &github_app_name,
+            "github_app_name": &github_app_name,
+            "github_app_id": "",
+            "model": &qualified_model,
+            "cli_model": &code_run.spec.model,
+            "resolved_provider": &qualified_model,
             "cli_type": cli_type.to_string(),
             "agent_name": &agent_name,
             "agent_name_upper": agent_name.to_uppercase(),
+            "namespace": namespace,
+            "discord_enabled": discord_enabled,
+            "discord_channel_id": "",
+            "openclaw_providers": openclaw_providers_summary,
             "cli_config": cli_config,
             "skills": skills,
             "cli_skills_dir": Self::cli_native_skills_dir(cli_type),
@@ -1550,14 +1601,14 @@ impl CodeTemplateGenerator {
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
-            "model": code_run.spec.model,
+            "model": Self::resolve_openclaw_primary_model(code_run, &openclaw_providers),
             "cli_type": cli_type.to_string(),
             "agent_name": &agent_name,
             "agent_name_upper": agent_name.to_uppercase(),
             "github_app": Self::get_github_app_or_default(code_run),
             "cli_config": cli_config,
             "discord_enabled": code_run.spec.openclaw.as_ref()
-                .map_or(true, |oc| oc.discord_enabled),
+                .is_none_or(|oc| oc.discord_enabled),
             "openclaw_providers": openclaw_providers,
         });
 
@@ -1586,11 +1637,13 @@ impl CodeTemplateGenerator {
 
         let cli_type = Self::determine_cli_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
+        let job_type = Self::determine_job_type(code_run);
 
         let context = json!({
             "agent_name": &agent_name,
             "agent_name_upper": agent_name.to_uppercase(),
             "cli_type": cli_type.to_string(),
+            "job_type": job_type,
             "model": code_run.spec.model,
             "prompt_modification": code_run.spec.prompt_modification.as_deref().unwrap_or(""),
             "repository_url": code_run.spec.repository_url,
@@ -1598,7 +1651,7 @@ impl CodeTemplateGenerator {
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": &code_run.spec.service,
             "discord_enabled": code_run.spec.openclaw.as_ref()
-                .map_or(true, |oc| oc.discord_enabled),
+                .is_none_or(|oc| oc.discord_enabled),
         });
 
         handlebars
@@ -4646,6 +4699,97 @@ Be constructive and explain the "why" behind your suggestions.
         }
 
         skills
+    }
+
+    /// Qualify a model name with its provider prefix for OpenClaw gateway.
+    ///
+    /// Resolve the full `model.primary` value for the OpenClaw config.
+    ///
+    /// OpenClaw gateway looks up models as `{provider_name}/{model_id}` where
+    /// `provider_name` is the key under `models.providers` and `model_id` is
+    /// the `id` field of a model entry in that provider.
+    ///
+    /// This function takes the qualified model from `qualify_model_for_openclaw()`
+    /// and finds the provider that lists it, then returns `provider/model_id`.
+    fn resolve_openclaw_primary_model(
+        code_run: &CodeRun,
+        openclaw_providers: &[Value],
+    ) -> String {
+        let model_id = Self::qualify_model_for_openclaw(code_run);
+
+        // Check if any provider lists this model — if so, prefix with provider name
+        for provider in openclaw_providers {
+            let provider_name = provider.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            if let Some(models) = provider.get("models").and_then(|v| v.as_array()) {
+                for m in models {
+                    if m.get("id").and_then(|v| v.as_str()) == Some(&model_id) {
+                        return format!("{provider_name}/{model_id}");
+                    }
+                }
+            }
+        }
+
+        // No provider match — return as-is (gateway will try to route it)
+        model_id
+    }
+
+    /// Resolve the raw model identifier from the CRD for OpenClaw.
+    ///
+    /// Priority (pure CRD passthrough — no hard-coded model names):
+    ///   1. `cli_config.model` — the actual model the CLI uses (may already be
+    ///      a fully-qualified Fireworks/provider path like
+    ///      `accounts/fireworks/routers/kimi-k2p5-turbo`).
+    ///   2. `spec.model` — top-level display/naming model.
+    ///
+    /// If the resolved value already contains `/` it is passed through as-is.
+    /// Otherwise we try the explicit `cli_config.provider` prefix, and finally
+    /// fall back to provider inference from well-known prefixes so bare names
+    /// like `gemini-2.5-pro` still get routed correctly.
+    fn qualify_model_for_openclaw(code_run: &CodeRun) -> String {
+        // Prefer cli_config.model (the actual model) over spec.model (display name)
+        let model = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .map_or(&code_run.spec.model, |c| &c.model);
+
+        // Already provider-qualified (e.g. "accounts/fireworks/routers/kimi-k2p5-turbo")
+        if model.contains('/') {
+            return model.clone();
+        }
+
+        // Try explicit provider from CLIConfig
+        if let Some(provider) = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|c| c.provider.as_ref())
+        {
+            return format!("{provider}/{model}");
+        }
+
+        // Last resort: infer provider from model name prefix.
+        // This is a convenience fallback for bare model names in CRDs that
+        // don't set cli_config.model to a qualified path.
+        let prefix = if model.starts_with("claude-") || model.starts_with("claude3") {
+            "anthropic"
+        } else if model.starts_with("gpt-")
+            || model.starts_with("o1-")
+            || model.starts_with("o3-")
+            || model.starts_with("o4-")
+        {
+            "openai"
+        } else if model.starts_with("gemini-") {
+            "google"
+        } else if model.starts_with("glm-") {
+            "openai"
+        } else if model.starts_with("kimi-") || model.starts_with("moonshot-") {
+            "moonshot"
+        } else {
+            return model.clone();
+        };
+
+        format!("{prefix}/{model}")
     }
 
     /// Determine the job type from a CodeRun based on run_type, service, and template settings.

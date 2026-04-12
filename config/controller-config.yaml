@@ -5,6 +5,7 @@ agent:
   image:
     repository: "ghcr.io/5dlabs/agents"
     tag: "latest"
+    pullPolicy: IfNotPresent
   imagePullSecrets:
     - ghcr-secret
   cliImages:
