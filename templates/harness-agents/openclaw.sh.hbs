@@ -177,77 +177,20 @@ mkdir -p "$HOME/.openclaw/credentials"
 mkdir -p "$HOME/.openclaw/agents/main/sessions"
 mkdir -p "$HOME/.openclaw/canvas"
 
-# Runtime Discord gate — check both CRD-level toggle and env var availability
-{{#if discord_enabled}}
-DISCORD_ACTIVE=false
-DISCORD_VALID_AGENTS=""
-{{#each gateway_agents}}
-_TOKEN_VAR="DISCORD_TOKEN_{{this.name_upper}}"
-_CHANNEL_VAR="DISCORD_CHANNEL_{{this.name_upper}}"
-if [ -n "${!_TOKEN_VAR:-}" ] && [ -n "${!_CHANNEL_VAR:-}" ]; then
-  echo "🟢 Discord token + channel found for {{this.name}} ({{this.role}})"
-  DISCORD_ACTIVE=true
-  DISCORD_VALID_AGENTS="${DISCORD_VALID_AGENTS} {{this.name}}"
-else
-  echo "⚠️ Missing Discord ($_TOKEN_VAR / $_CHANNEL_VAR), skipping {{this.name}}"
-fi
-{{/each}}
-{{else}}
-echo "🔴 Discord disabled by CRD (discordEnabled: false)"
-DISCORD_ACTIVE=false
-{{/if}}
+# Task pods no longer run their own Discord connections.
+# Morgan's centralized gateway owns all Discord bot WebSockets.
+# Discord REST API tokens are still available via discord-agent-bots secret
+# for the Lobster notification step (will be migrated to MCP Bridge later).
+echo "[harness] Discord gateway: disabled (centralized via Morgan)"
+echo "[harness] MCP Bridge: {{#if mcp_bridge_enabled}}enabled{{else}}disabled{{/if}}"
 
 cp /task-files/openclaw.json "$HOME/.openclaw/openclaw.json"
 export OPENCLAW_CONFIG="$HOME/.openclaw/openclaw.json"
 
-# Resolve Discord env vars in config for each agent account
-if command -v jq >/dev/null 2>&1; then
-  if [ "$DISCORD_ACTIVE" = "true" ]; then
-    {{#each gateway_agents}}
-    # --- Resolve {{this.name}} ---
-    _TOKEN_VAR="DISCORD_TOKEN_{{this.name_upper}}"
-    _CHANNEL_VAR="DISCORD_CHANNEL_{{this.name_upper}}"
-    if [ -n "${!_TOKEN_VAR:-}" ] && [ -n "${!_CHANNEL_VAR:-}" ]; then
-      _RESOLVED_TOKEN="${!_TOKEN_VAR}"
-      _RESOLVED_CHANNEL="${!_CHANNEL_VAR}"
-      jq --arg token "$_RESOLVED_TOKEN" \
-         --arg channel "$_RESOLVED_CHANNEL" \
-         --arg old_key "\${$_CHANNEL_VAR}" \
-         --arg acct "{{this.name}}" '
-        .channels.discord.accounts[$acct].token = $token |
-        .channels.discord.accounts[$acct].guilds["1490117571977019524"].channels =
-          { ($channel): .channels.discord.accounts[$acct].guilds["1490117571977019524"].channels[$old_key] }
-      ' "$OPENCLAW_CONFIG" > "$OPENCLAW_CONFIG.tmp" && mv "$OPENCLAW_CONFIG.tmp" "$OPENCLAW_CONFIG"
-      echo "✅ Discord config resolved for {{this.name}} (channel=$_RESOLVED_CHANNEL)"
-
-      GUILD_ID="1490117571977019524"
-      _DISPLAY_NAME="{{this.name}}"
-      _DISPLAY_NAME="$(echo "${_DISPLAY_NAME:0:1}" | tr '[:lower:]' '[:upper:]')${_DISPLAY_NAME:1}"
-      curl -sf -X PATCH \
-        "https://discord.com/api/v10/guilds/${GUILD_ID}/members/@me" \
-        -H "Authorization: Bot ${_RESOLVED_TOKEN}" \
-        -H "Content-Type: application/json" \
-        -d "{\"nick\": \"${_DISPLAY_NAME}\"}" 2>/dev/null && \
-        echo "✅ Discord nickname → '${_DISPLAY_NAME}' for {{this.name}}" || \
-        echo "⚠️ Could not set Discord nickname for {{this.name}}"
-    else
-      # Remove invalid account from config
-      jq --arg acct "{{this.name}}" 'del(.channels.discord.accounts[$acct])' \
-        "$OPENCLAW_CONFIG" > "$OPENCLAW_CONFIG.tmp" && mv "$OPENCLAW_CONFIG.tmp" "$OPENCLAW_CONFIG"
-      echo "🔴 Removed {{this.name}} from Discord config (missing credentials)"
-    fi
-    {{/each}}
-  else
-    jq '.plugins.entries.discord.enabled = false | del(.channels.discord)' \
-      "$OPENCLAW_CONFIG" > "$OPENCLAW_CONFIG.tmp" && mv "$OPENCLAW_CONFIG.tmp" "$OPENCLAW_CONFIG"
-    echo "🔴 Discord disabled in config"
-  fi
-fi
-
 echo "[harness] Running openclaw doctor --fix..."
 openclaw doctor --fix 2>&1 || echo "[harness] WARNING: doctor --fix reported issues"
 
-# Remove any 'default' account injected by doctor --fix (we use named accounts only)
+# Remove any 'default' Discord account injected by doctor --fix
 if command -v jq >/dev/null 2>&1 && jq -e '.channels.discord.accounts.default' "$OPENCLAW_CONFIG" >/dev/null 2>&1; then
   jq 'del(.channels.discord.accounts.default)' "$OPENCLAW_CONFIG" > "$OPENCLAW_CONFIG.tmp" && mv "$OPENCLAW_CONFIG.tmp" "$OPENCLAW_CONFIG"
   echo "🧹 Removed spurious 'default' Discord account injected by doctor --fix"
@@ -296,7 +239,7 @@ Don't ask permission. Just do it.
 ## Coordination
 
 - Use `sessions_send` to message other agents via NATS
-- Use Discord channels for async team communication
+- Messages route through Morgan's centralized gateway to Discord
 - Check `task/` directory for acceptance criteria and decisions
 - Write `task/decisions.md` for architectural choices
 
@@ -429,8 +372,8 @@ cat > /workspace/USER.md <<'USEREOF'
 - Working on the **CTO Platform**: Kubernetes-native multi-agent system
   with CodeRun CRDs, OpenClaw gateways, and a Lobster workflow engine.
 - Agents are deployed as pods in the `cto` namespace.
-- The team uses **Discord** for agent communication and **Linear** for
-  project management.
+- The team uses **Discord** (via Morgan's centralized gateway) for agent
+  communication and **Linear** for project management.
 - Code lives in `github.com/5dlabs/cto` (monorepo: Rust crates, Helm
   charts, TypeScript tools, Lobster workflows).
 USEREOF
@@ -458,7 +401,7 @@ cat > /workspace/TOOLS.md <<'TOOLSEOF'
 - `read` / `edit` / `write` — file operations
 - `exec` — shell commands (bash, cargo, git, etc.)
 - `lobster` — native workflow runner (run .lobster.yaml files)
-- `message` — post to Discord channels
+- `message` — post to Discord channels (via Morgan's centralized gateway)
 - `web_search` / `web_fetch` — internet access
 - `sessions_send` — message other agents via NATS
 
@@ -491,17 +434,8 @@ cp /task-files/base-task.lobster "$WORKSPACE_DIR/.tasks/index.lobster.yaml" 2>/d
 echo "[harness] Step 3: Starting gateway + lobster workflow..."
 echo "[harness] Agent: {{agent_name}} | Model: {{model}} | Task: {{task_id}}"
 
-# Jitter gateway startup to avoid Discord API rate limits when many pods
-# launch simultaneously under the same bot token. Use full 6-char hex
-# suffix for wider distribution (0-30s) to spread Discord API calls.
-GW_JITTER_SEED="${HOSTNAME##*-}"
-GW_JITTER=$(( 0x${GW_JITTER_SEED:-0} % 31 ))
-echo "[harness] Gateway startup jitter: ${GW_JITTER}s (seed=$GW_JITTER_SEED)"
-sleep "$GW_JITTER"
-
-# Start gateway with retry+backoff — Discord /gateway/bot returns 429
-# when many pods connect concurrently; OpenClaw crashes on unhandled
-# rejection, so we restart it with exponential backoff.
+# Start local gateway for model routing (no Discord — that's Morgan's job).
+# Simpler startup: no jitter needed since we're not connecting to Discord API.
 start_gateway() {
   openclaw gateway &
   GW_PID=$!
@@ -510,7 +444,7 @@ start_gateway() {
 
   for _i in $(seq 1 15); do
     if ! kill -0 "$GW_PID" 2>/dev/null; then
-      echo "[harness] ⚠️ Gateway process exited (likely Discord rate limit)"
+      echo "[harness] ⚠️ Gateway process exited"
       return 1
     fi
     if curl -sf http://127.0.0.1:18789/health >/dev/null 2>&1; then
@@ -523,8 +457,8 @@ start_gateway() {
   return 1
 }
 
-GW_MAX_RETRIES=5
-GW_BACKOFF=5
+GW_MAX_RETRIES=3
+GW_BACKOFF=3
 GW_HEALTHY=false
 
 for _gw_attempt in $(seq 1 "$GW_MAX_RETRIES"); do
@@ -541,41 +475,84 @@ for _gw_attempt in $(seq 1 "$GW_MAX_RETRIES"); do
 done
 
 if [ "$GW_HEALTHY" = "false" ]; then
-  echo "[harness] ⚠️ Gateway not healthy after ${GW_MAX_RETRIES} attempts, proceeding without Discord"
+  echo "[harness] ⚠️ Gateway not healthy after ${GW_MAX_RETRIES} attempts, proceeding anyway"
 fi
 
-# Background gateway watchdog: if gateway crashes after initial health
-# (e.g., Discord WebSocket 429 arrives late), restart with backoff.
-# Discord rate limits can persist 30s+, so we use generous delays.
+# Background gateway watchdog: restart if it crashes.
 (
   WD_BACKOFF=10
   WD_RETRIES=0
-  while [ ! -f /workspace/.agent_done ] && [ "$WD_RETRIES" -lt 5 ]; do
+  while [ ! -f /workspace/.agent_done ] && [ "$WD_RETRIES" -lt 3 ]; do
     sleep 15
     GW_PID=$(cat /tmp/gw_pid 2>/dev/null)
     if [ -n "$GW_PID" ] && ! kill -0 "$GW_PID" 2>/dev/null; then
       WD_RETRIES=$(( WD_RETRIES + 1 ))
-      echo "[harness] 🔄 Gateway watchdog: process died, restarting (${WD_RETRIES}/5, backoff=${WD_BACKOFF}s)..."
-      # Clean up stale gateway state before restart
+      echo "[harness] 🔄 Gateway watchdog: restarting (${WD_RETRIES}/3)..."
       openclaw gateway stop 2>/dev/null || true
       sleep "$WD_BACKOFF"
       openclaw gateway &
       GW_PID=$!
       echo "$GW_PID" > /tmp/gw_pid
-      echo "[harness] Gateway watchdog: new PID=$GW_PID"
       WD_BACKOFF=$(( WD_BACKOFF * 2 ))
-      # Wait for health before resuming monitoring
       for _w in $(seq 1 15); do
-        if curl -sf http://127.0.0.1:18789/health >/dev/null 2>&1; then
-          echo "[harness] ✅ Gateway watchdog: healthy after restart"
-          break
-        fi
+        curl -sf http://127.0.0.1:18789/health >/dev/null 2>&1 && break
         sleep 2
       done
     fi
   done
 ) &
 GW_WATCHDOG_PID=$!
+
+{{#if mcp_bridge_enabled}}
+# ─── MCP Bridge: connect task pod to Morgan's centralized gateway ──────
+# This provides bidirectional Discord messaging through Morgan.
+# The bridge runs as a background process for the task's lifetime.
+if [ -n "${MORGAN_GATEWAY_URL:-}" ]; then
+  echo "[harness] Starting MCP Bridge → ${MORGAN_GATEWAY_URL}..."
+  openclaw mcp serve \
+    --url "${MORGAN_GATEWAY_URL}" \
+    --token "${MORGAN_GATEWAY_TOKEN:-openclaw-internal}" &
+  MCP_BRIDGE_PID=$!
+  echo "$MCP_BRIDGE_PID" > /tmp/mcp_bridge_pid
+
+  # Warmup: MCP Bridge needs ~3s after init before tool calls succeed
+  sleep 3
+  if kill -0 "$MCP_BRIDGE_PID" 2>/dev/null; then
+    echo "[harness] ✅ MCP Bridge started (PID=$MCP_BRIDGE_PID)"
+  else
+    echo "[harness] ⚠️ MCP Bridge exited immediately — Discord messaging unavailable"
+    MCP_BRIDGE_PID=""
+  fi
+
+  # MCP Bridge watchdog: restart if it dies (e.g., Morgan pod restart)
+  if [ -n "$MCP_BRIDGE_PID" ]; then
+    (
+      MB_BACKOFF=5
+      MB_RETRIES=0
+      while [ ! -f /workspace/.agent_done ] && [ "$MB_RETRIES" -lt 5 ]; do
+        sleep 20
+        MB_PID=$(cat /tmp/mcp_bridge_pid 2>/dev/null)
+        if [ -n "$MB_PID" ] && ! kill -0 "$MB_PID" 2>/dev/null; then
+          MB_RETRIES=$(( MB_RETRIES + 1 ))
+          echo "[harness] 🔄 MCP Bridge watchdog: restarting (${MB_RETRIES}/5, backoff=${MB_BACKOFF}s)..."
+          sleep "$MB_BACKOFF"
+          openclaw mcp serve \
+            --url "${MORGAN_GATEWAY_URL}" \
+            --token "${MORGAN_GATEWAY_TOKEN:-openclaw-internal}" &
+          MB_PID=$!
+          echo "$MB_PID" > /tmp/mcp_bridge_pid
+          echo "[harness] MCP Bridge watchdog: new PID=$MB_PID"
+          MB_BACKOFF=$(( MB_BACKOFF * 2 ))
+          sleep 3  # warmup
+        fi
+      done
+    ) &
+    MCP_BRIDGE_WATCHDOG_PID=$!
+  fi
+else
+  echo "[harness] ⚠️ MORGAN_GATEWAY_URL not set — MCP Bridge disabled"
+fi
+{{/if}}
 
 # ─── Tail OpenClaw gateway + CLI logs to stdout for DD collection ──────
 # Gateway writes structured JSON logs to /tmp/openclaw-*/openclaw-*.log

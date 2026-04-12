@@ -337,12 +337,23 @@ spec:
                 echo "=== Init complete for {{ .Values.agent.id }} — all clean ==="
               fi
           env:
-            # Discord token
+            # Discord token (primary account)
             - name: DISCORD_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.discordTokensSecret }}
                   key: {{ $discordConfig.tokenSecretKey | default .Values.agent.id }}
+            {{- /* Additional Discord account tokens (for centralized gateway proxying agent bots) */}}
+            {{- if $discordConfig.additionalAccounts }}
+            {{- range $acct := $discordConfig.additionalAccounts }}
+            - name: DISCORD_TOKEN_{{ $acct.id | upper }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $acct.tokenSecret | default $.Values.secrets.discordTokensSecret }}
+                  key: {{ $acct.tokenSecretKey | default (printf "DISCORD_TOKEN_%s" ($acct.id | upper)) }}
+                  optional: true
+            {{- end }}
+            {{- end }}
             # Provider API keys used when init renders openclaw.json via envsubst.
             {{- range $name, $provider := .Values.models.providers }}
             {{- if and (or (not (hasKey $provider "enabled")) $provider.enabled) $provider.apiKeySecretKey }}
@@ -524,6 +535,17 @@ spec:
                   name: {{ .Values.secrets.discordTokensSecret }}
                   key: {{ $discordConfig.tokenSecretKey | default .Values.agent.id }}
                   optional: true
+            {{- /* Additional Discord account tokens (runtime container) */}}
+            {{- if $discordConfig.additionalAccounts }}
+            {{- range $acct := $discordConfig.additionalAccounts }}
+            - name: DISCORD_TOKEN_{{ $acct.id | upper }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $acct.tokenSecret | default $.Values.secrets.discordTokensSecret }}
+                  key: {{ $acct.tokenSecretKey | default (printf "DISCORD_TOKEN_%s" ($acct.id | upper)) }}
+                  optional: true
+            {{- end }}
+            {{- end }}
             # Provider API keys (available at runtime for dynamic use)
             - name: ANTHROPIC_API_KEY
               valueFrom:

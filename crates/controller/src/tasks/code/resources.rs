@@ -1632,6 +1632,25 @@ impl<'a> CodeResourceManager<'a> {
             }
         }
 
+        // Morgan centralized gateway: task pods connect via MCP Bridge instead of
+        // running their own Discord connections. The gateway URL points at Morgan's
+        // ClusterIP service; auth token matches Morgan's gateway.auth.token config.
+        final_env_vars.push(json!({
+            "name": "MORGAN_GATEWAY_URL",
+            "value": "ws://openclaw-morgan.cto.svc:18789"
+        }));
+        // TODO: Move this token into a K8s Secret for better security.
+        // Currently matches the hardcoded value in Morgan's Helm values.
+        final_env_vars.push(json!({
+            "name": "MORGAN_GATEWAY_TOKEN",
+            "value": "openclaw-internal"
+        }));
+        // Required for ws:// (non-TLS) WebSocket in cluster-internal networking
+        final_env_vars.push(json!({
+            "name": "OPENCLAW_ALLOW_INSECURE_PRIVATE_WS",
+            "value": "1"
+        }));
+
         // Provider env vars are now handled by EffectiveProviderConfig.build_env_vars()
         // above (in the critical_env_vars section). No more model-string detection here.
 
@@ -1707,8 +1726,11 @@ impl<'a> CodeResourceManager<'a> {
             }
         }));
 
-        // Mount discord-agent-bots for per-agent Discord tokens and channels
-        // (DISCORD_TOKEN_<AGENT>, DISCORD_CHANNEL_<AGENT>)
+        // Mount discord-agent-bots for per-agent Discord tokens and channels.
+        // Phase 2 note: task pods no longer use these for OpenClaw gateway connections
+        // (Morgan is the centralized gateway), but the Lobster notification step still
+        // uses direct Discord REST API calls with these tokens. Will migrate to MCP Bridge
+        // in a future phase.
         env_from.push(json!({
             "secretRef": {
                 "name": "discord-agent-bots",

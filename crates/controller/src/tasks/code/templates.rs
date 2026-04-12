@@ -1509,6 +1509,7 @@ impl CodeTemplateGenerator {
             "namespace": namespace,
             "discord_enabled": discord_enabled,
             "discord_channel_id": "",
+            "mcp_bridge_enabled": true,
             "openclaw_providers": openclaw_providers_summary,
             "cli_config": cli_config,
             "skills": skills,
@@ -1610,6 +1611,9 @@ impl CodeTemplateGenerator {
             "cli_config": cli_config,
             "discord_enabled": code_run.spec.openclaw.as_ref()
                 .is_none_or(|oc| oc.discord_enabled),
+            "mcp_bridge_enabled": true,
+            "morgan_gateway_url": "ws://openclaw-morgan.cto.svc:18789",
+            "morgan_gateway_token": "openclaw-internal",
             "openclaw_providers": openclaw_providers,
             "gateway_agents": gateway_agents,
         });
@@ -1657,6 +1661,7 @@ impl CodeTemplateGenerator {
             "service": &code_run.spec.service,
             "discord_enabled": code_run.spec.openclaw.as_ref()
                 .is_none_or(|oc| oc.discord_enabled),
+            "mcp_bridge_enabled": true,
             "gateway_agents": gateway_agents,
             "debug_mode": code_run.spec.debug_mode,
         });

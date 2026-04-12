@@ -135,7 +135,8 @@ data:
         "discord": {
           {{- if $discordConfig.enabled }}
           "accounts": {
-            "default": {
+            {{- /* Primary account (the agent's own Discord bot) */}}
+            {{ $discordConfig.accountId | default "default" | quote }}: {
               "token": "${DISCORD_TOKEN}"
               ,
               "allowBots": {{ if hasKey $discordConfig "allowBots" }}{{ $discordConfig.allowBots | toJson }}{{ else }}true{{ end }},
@@ -168,6 +169,25 @@ data:
               }
               {{- end }}
             }
+            {{- /* Additional Discord accounts (e.g., agent bots proxied through this gateway) */}}
+            {{- if $discordConfig.additionalAccounts }}
+            {{- range $acct := $discordConfig.additionalAccounts }}
+            ,
+            {{ $acct.id | quote }}: {
+              "token": {{ printf "${DISCORD_TOKEN_%s}" ($acct.id | upper) | quote }},
+              "allowBots": {{ $acct.allowBots | default false | toJson }},
+              "dmPolicy": {{ $acct.dmPolicy | default "allowlist" | quote }},
+              {{- if $acct.allowFrom }}
+              "allowFrom": {{ $acct.allowFrom | toJson }},
+              {{- end }}
+              "groupPolicy": {{ $acct.groupPolicy | default "allowlist" | quote }},
+              "guilds": {{ $acct.guilds | default dict | toJson }}
+              {{- if $acct.requireMention }},
+              "requireMention": {{ $acct.requireMention }}
+              {{- end }}
+            }
+            {{- end }}
+            {{- end }}
           },
           "enabled": true
           {{- else }}

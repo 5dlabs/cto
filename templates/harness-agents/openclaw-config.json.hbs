@@ -145,97 +145,6 @@
     }
   },
   "channels": {
-    {{#if discord_enabled}}
-    "discord": {
-      "accounts": {
-        {{#each gateway_agents}}
-        "{{this.name}}": {
-          "token": "${DISCORD_TOKEN_{{this.name_upper}}}",
-          "allowBots": false,
-          "dmPolicy": "allowlist",
-          "allowFrom": [
-            "444519104808878090",
-            "1467013771548426291",
-            "1466937419981918220",
-            "1466938003451674748",
-            "1466938424790356253",
-            "1468829684195135592",
-            "1466930035356078251",
-            "1466938744593715210"
-          ],
-          "groupPolicy": "allowlist",
-          "guilds": {
-            "*": {
-              "requireMention": true,
-              "users": [
-                "444519104808878090",
-                "1467013771548426291",
-                "1466937419981918220",
-                "1466938003451674748",
-                "1466938424790356253",
-                "1468829684195135592",
-                "1466930035356078251",
-                "1466938744593715210"
-              ]
-            },
-            "1490117571977019524": {
-              "channels": {
-                "${DISCORD_CHANNEL_{{this.name_upper}}}": {
-                  "enabled": true,
-                  "requireMention": false,
-                  "users": [
-                    "444519104808878090",
-                    "1466928805384945775",
-                    "1466898696720617509",
-                    "1466936388162162731",
-                    "1467013771548426291",
-                    "1466937419981918220",
-                    "1466937061079781458",
-                    "1466938424790356253",
-                    "1467592725938573353",
-                    "1468829684195135592",
-                    "1466937750329757960",
-                    "1467274765587972258",
-                    "1466930035356078251",
-                    "1466930808010051850",
-                    "1467347075598651636",
-                    "1466938744593715210",
-                    "1467592156209483969"
-                  ]
-                }
-              },
-              "requireMention": true,
-              "slug": "cto-5dlabs",
-              "users": [
-                "444519104808878090",
-                "1467013771548426291",
-                "1466937419981918220",
-                "1466938003451674748",
-                "1466938424790356253",
-                "1468829684195135592",
-                "1466930035356078251",
-                "1466938744593715210"
-              ]
-            }
-          },
-          "streaming": {
-            "mode": "partial"
-          },
-          "replyToMode": "first",
-          "configWrites": false,
-          "threadBindings": {
-            "enabled": true,
-            "spawnSubagentSessions": true,
-            "spawnAcpSessions": true,
-            "idleHours": 24
-          }
-        }{{#unless @last}},{{/unless}}
-        {{/each}}
-      },
-      "enabled": true,
-      "groupPolicy": "allowlist"
-    }
-    {{/if}}
   },
   "gateway": {
     "mode": "local",
@@ -268,15 +177,9 @@
   },
   "plugins": {
     "entries": {
-      {{#if discord_enabled}}
-      "discord": {
-        "enabled": true
-      },
-      {{else}}
       "discord": {
         "enabled": false
       },
-      {{/if}}
       "memory-core": {
         "enabled": true
       },
