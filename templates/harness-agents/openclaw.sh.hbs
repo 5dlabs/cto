@@ -247,6 +247,12 @@ fi
 echo "[harness] Running openclaw doctor --fix..."
 openclaw doctor --fix 2>&1 || echo "[harness] WARNING: doctor --fix reported issues"
 
+# Remove any 'default' account injected by doctor --fix (we use named accounts only)
+if command -v jq >/dev/null 2>&1 && jq -e '.channels.discord.accounts.default' "$OPENCLAW_CONFIG" >/dev/null 2>&1; then
+  jq 'del(.channels.discord.accounts.default)' "$OPENCLAW_CONFIG" > "$OPENCLAW_CONFIG.tmp" && mv "$OPENCLAW_CONFIG.tmp" "$OPENCLAW_CONFIG"
+  echo "🧹 Removed spurious 'default' Discord account injected by doctor --fix"
+fi
+
 # ─── Step 3: Workspace identity files ──────────────────────────────────
 echo "[harness] Step 2: Writing workspace files..."
 
