@@ -310,7 +310,12 @@ steps:
         echo ""
         echo "── Attempt $ATTEMPT (${REMAINING}s remaining) ──"
 
-        npx -y @clawdbot/lobster run "$INDEX" 2>&1 && {
+        npx -y @clawdbot/lobster run --file "$INDEX" \
+          --input task_dir="$TASK_DIR" \
+          --input repo_url="{{repository_url}}" \
+          --input branch_name="${FEATURE_BRANCH:-main}" \
+          --input cli="{{cli_type}}" \
+          --input model="{{cli_model}}" 2>&1 && {
           echo "✅ Task passed on attempt $ATTEMPT"
           break
         } || {
