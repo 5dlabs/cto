@@ -178,7 +178,8 @@ pub async fn run_task_controller(client: Client, namespace: String) -> Result<()
     // 2. Rate limiting the patches
     // 3. Only patching resources stuck for >N minutes
 
-    // Run both CodeRun and BoltRun controllers concurrently
+    // Run both CodeRun and BoltRun controllers independently.
+    // Neither controller's completion/failure should affect the other.
     info!("Starting CodeRun and BoltRun controllers...");
 
     let code_context = context.clone();
@@ -188,22 +189,28 @@ pub async fn run_task_controller(client: Client, namespace: String) -> Result<()
     let code_namespace = namespace.clone();
     let bolt_namespace = namespace.clone();
 
-    // Use tokio::select! to run both controllers concurrently
-    // Either controller completing or failing will stop both
-    tokio::select! {
-        result = run_code_controller(code_client, code_namespace, code_context) => {
-            match result {
-                Ok(()) => info!("CodeRun controller completed"),
-                Err(e) => error!("CodeRun controller failed: {:?}", e),
-            }
+    let code_handle = tokio::spawn(async move {
+        match run_code_controller(code_client, code_namespace, code_context).await {
+            Ok(()) => warn!("CodeRun controller exited unexpectedly"),
+            Err(e) => error!("CodeRun controller failed: {:?}", e),
         }
-        result = run_bolt_controller(bolt_client, bolt_namespace, bolt_context) => {
-            match result {
-                Ok(()) => info!("BoltRun controller completed"),
-                Err(e) => error!("BoltRun controller failed: {:?}", e),
-            }
+    });
+
+    let bolt_handle = tokio::spawn(async move {
+        match run_bolt_controller(bolt_client, bolt_namespace, bolt_context).await {
+            Ok(()) => info!("BoltRun controller exited (CRD may not be installed)"),
+            Err(e) => warn!("BoltRun controller failed (non-fatal): {:?}", e),
         }
+    });
+
+    // Wait for the CodeRun controller — it's the primary workload.
+    // BoltRun is optional and may exit early if the CRD isn't installed.
+    if let Err(e) = code_handle.await {
+        error!("CodeRun controller task panicked: {:?}", e);
     }
+
+    // Clean up BoltRun handle (don't block on it)
+    bolt_handle.abort();
 
     info!("Task controller shutting down");
     Ok(())

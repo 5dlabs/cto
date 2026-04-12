@@ -1447,11 +1447,13 @@ impl CodeTemplateGenerator {
 
         let cli_type = Self::determine_cli_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
+        let job_type = Self::determine_job_type(code_run);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "run_type": code_run.spec.run_type,
+            "job_type": job_type,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
             "docs_project_directory": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
@@ -1551,7 +1553,7 @@ impl CodeTemplateGenerator {
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
-            "model": code_run.spec.model,
+            "model": Self::qualify_model_for_openclaw(code_run),
             "cli_type": cli_type.to_string(),
             "agent_name": &agent_name,
             "agent_name_upper": agent_name.to_uppercase(),
@@ -1587,11 +1589,13 @@ impl CodeTemplateGenerator {
 
         let cli_type = Self::determine_cli_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
+        let job_type = Self::determine_job_type(code_run);
 
         let context = json!({
             "agent_name": &agent_name,
             "agent_name_upper": agent_name.to_uppercase(),
             "cli_type": cli_type.to_string(),
+            "job_type": job_type,
             "model": code_run.spec.model,
             "prompt_modification": code_run.spec.prompt_modification.as_deref().unwrap_or(""),
             "repository_url": code_run.spec.repository_url,
@@ -4647,6 +4651,52 @@ Be constructive and explain the "why" behind your suggestions.
         }
 
         skills
+    }
+
+    /// Qualify a model name with its provider prefix for OpenClaw gateway.
+    ///
+    /// OpenClaw expects `provider/model-id` format (e.g. `anthropic/claude-sonnet-4-20250514`).
+    /// If the model already contains a `/`, it's returned as-is.
+    /// Otherwise, the provider is inferred from `CLIConfig.provider` or the model name prefix.
+    fn qualify_model_for_openclaw(code_run: &CodeRun) -> String {
+        let model = &code_run.spec.model;
+
+        // Already provider-qualified (e.g. "accounts/fireworks/models/qwen3-235b")
+        if model.contains('/') {
+            return model.clone();
+        }
+
+        // Try explicit provider from CLIConfig
+        if let Some(provider) = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|c| c.provider.as_ref())
+        {
+            return format!("{provider}/{model}");
+        }
+
+        // Infer provider from model name prefix
+        let prefix = if model.starts_with("claude-") || model.starts_with("claude3") {
+            "anthropic"
+        } else if model.starts_with("gpt-")
+            || model.starts_with("o1-")
+            || model.starts_with("o3-")
+            || model.starts_with("o4-")
+        {
+            "openai"
+        } else if model.starts_with("gemini-") {
+            "google"
+        } else if model.starts_with("glm-") {
+            "openai" // GLM uses OpenAI-compatible API
+        } else if model.starts_with("kimi-") || model.starts_with("moonshot-") {
+            "moonshot"
+        } else {
+            // Can't infer — return bare and let gateway handle it
+            return model.clone();
+        };
+
+        format!("{prefix}/{model}")
     }
 
     /// Determine the job type from a CodeRun based on run_type, service, and template settings.
