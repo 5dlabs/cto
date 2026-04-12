@@ -152,21 +152,17 @@ spec:
                 type: string
                 description: "Explicit implementation agent name (e.g. rex, blaze). Takes precedence over githubApp derivation for naming and labels."
               quality:
-                type: boolean
-                default: true
-                description: "Run quality review phase (Cleo). Defaults to true."
+                type: string
+                description: "Quality review agent name (e.g. cleo). Omit to skip quality phase."
               security:
-                type: boolean
-                default: true
-                description: "Run security scan phase (Cipher). Defaults to true."
+                type: string
+                description: "Security scan agent name (e.g. cipher). Omit to skip security phase."
               testing:
-                type: boolean
-                default: true
-                description: "Run testing phase (Tess). Defaults to true."
+                type: string
+                description: "Testing agent name (e.g. tess). Omit to skip testing phase."
               deployment:
-                type: boolean
-                default: false
-                description: "Run deployment phase (Bolt). Defaults to false (opt-in)."
+                type: string
+                description: "Deployment agent name (e.g. bolt). Omit to skip deployment phase."
               acp:
                 type: array
                 description: "AI-CLI-Provider candidates. Each entry is a CLI with its available providers and models. The OpenClaw harness agent picks based on task difficulty, credits, and model scores."
