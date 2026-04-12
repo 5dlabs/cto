@@ -112,9 +112,11 @@ fi
 FEATURE_BRANCH="feat/task-{{task_id}}-{{agent_name}}-{{job_type}}{{#if cli_type}}-{{cli_type}}{{/if}}"
 if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   git checkout "$FEATURE_BRANCH"
-  # If there's a tracking branch, reset to it to avoid diverged state
   if git show-ref --verify --quiet "refs/remotes/origin/$FEATURE_BRANCH"; then
     git reset --hard "origin/$FEATURE_BRANCH" 2>/dev/null || true
+  else
+    # Local branch exists but not on remote — rebase onto latest base to pick up new commits
+    git reset --hard "origin/$BASE_BRANCH" 2>/dev/null || true
   fi
 else
   git checkout -b "$FEATURE_BRANCH" "origin/$BASE_BRANCH" 2>/dev/null || git checkout -b "$FEATURE_BRANCH"

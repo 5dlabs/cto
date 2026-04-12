@@ -177,32 +177,52 @@ steps:
 
       TASK_ID="{{task_id}}"
       DOCS_PROJECT="{{docs_project_directory}}"
+      RUN_TYPE="{{run_type}}"
+      RUN_TYPE="${RUN_TYPE:-implementation}"
       TIMEOUT="${TASK_TIMEOUT:-1800}"
       DEADLINE=$(($(date +%s) + TIMEOUT))
 
-      # Resolve task directory
+      # Resolve task directory — try exact path first, then search
       TASK_DIR=".tasks"
       if [ -n "$DOCS_PROJECT" ]; then
-        TASK_DIR="${DOCS_PROJECT}/.tasks"
+        TASK_DIR=".tasks/${DOCS_PROJECT}"
       fi
       if [ -n "$TASK_ID" ] && [ "$TASK_ID" != "0" ]; then
         TASK_DIR="${TASK_DIR}/task-${TASK_ID}"
       fi
       mkdir -p "$TASK_DIR"
 
-      INDEX="${TASK_DIR}/index.lobster.yaml"
-      if [ ! -f "$INDEX" ]; then
-        # Search for index.lobster.yaml in common locations (docs subdir, nested .tasks, etc.)
-        echo "⚡ index.lobster.yaml not at $TASK_DIR — searching repo..."
-        FOUND=$(find . -path '*/.tasks/*/index.lobster.yaml' -o -path '*/.tasks/index.lobster.yaml' 2>/dev/null | head -1)
-        if [ -n "$FOUND" ]; then
-          INDEX="$FOUND"
-          TASK_DIR="$(dirname "$INDEX")"
-          echo "✅ Found: $INDEX"
-        else
-          echo "❌ No index.lobster.yaml found anywhere in repo"
-          exit 1
+      # Look for workflow file: try {run_type}.lobster.yaml, then index.lobster.yaml
+      INDEX=""
+      for CANDIDATE in "${RUN_TYPE}.lobster.yaml" "index.lobster.yaml"; do
+        if [ -f "${TASK_DIR}/${CANDIDATE}" ]; then
+          INDEX="${TASK_DIR}/${CANDIDATE}"
+          break
         fi
+      done
+
+      if [ -z "$INDEX" ]; then
+        # Deep search across the whole repo for task-specific workflow
+        echo "⚡ No workflow at $TASK_DIR — searching repo for task-${TASK_ID}..."
+        for CANDIDATE in "${RUN_TYPE}.lobster.yaml" "index.lobster.yaml"; do
+          if [ -n "$TASK_ID" ] && [ "$TASK_ID" != "0" ]; then
+            FOUND=$(find . -path "*/task-${TASK_ID}/${CANDIDATE}" 2>/dev/null | head -1)
+          fi
+          if [ -z "$FOUND" ]; then
+            FOUND=$(find . -path "*/.tasks/*/${CANDIDATE}" 2>/dev/null | head -1)
+          fi
+          if [ -n "$FOUND" ]; then
+            INDEX="$FOUND"
+            TASK_DIR="$(dirname "$INDEX")"
+            echo "✅ Found: $INDEX"
+            break
+          fi
+        done
+      fi
+
+      if [ -z "$INDEX" ]; then
+        echo "❌ No lobster workflow found (searched ${RUN_TYPE}.lobster.yaml and index.lobster.yaml)"
+        exit 1
       fi
 
       # If prompt_modification was injected via ConfigMap, copy it into TASK_DIR

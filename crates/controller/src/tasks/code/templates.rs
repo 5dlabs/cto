@@ -1451,6 +1451,7 @@ impl CodeTemplateGenerator {
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
+            "run_type": code_run.spec.run_type,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
             "docs_project_directory": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
