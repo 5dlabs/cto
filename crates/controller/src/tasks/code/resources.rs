@@ -2121,6 +2121,7 @@ scrape_configs:
             let promtail_container = json!({
                 "name": "promtail",
                 "image": "grafana/promtail:latest",
+                "imagePullPolicy": "IfNotPresent",
                 "command": ["/bin/sh", "-c"],
                 "args": [
                     "/usr/bin/promtail -config.file=/etc/promtail/promtail.yaml & PROM_PID=$!; \
@@ -2237,6 +2238,7 @@ scrape_configs:
             init_containers.push(json!({
                 "name": "fix-openclaw-deps",
                 "image": agent_image,
+                "imagePullPolicy": self.resolve_image_pull_policy(&agent_image),
                 "command": ["/bin/sh", "-c",
                     "cd /usr/local/share/npm-global/lib/node_modules/openclaw && \
                      npm install --no-audit --no-fund --loglevel=warn 2>&1 | tail -5 && \
