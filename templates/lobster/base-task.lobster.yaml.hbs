@@ -237,18 +237,27 @@ steps:
       DEADLINE=$(($(date +%s) + TIMEOUT))
 
       # Resolve task directory — try exact path first, then search
-      TASK_DIR=".tasks"
+      # DOCS_PROJECT may already include the .tasks prefix (e.g. ".tasks/docs/task-2")
+      TASK_DIR=""
       if [ -n "$DOCS_PROJECT" ]; then
-        TASK_DIR=".tasks/${DOCS_PROJECT}"
-      fi
-      if [ -n "$TASK_ID" ] && [ "$TASK_ID" != "0" ]; then
-        TASK_DIR="${TASK_DIR}/task-${TASK_ID}"
+        # Use DOCS_PROJECT as-is if it starts with .tasks/, otherwise prepend it
+        case "$DOCS_PROJECT" in
+          .tasks/*) TASK_DIR="$DOCS_PROJECT" ;;
+          *)        TASK_DIR=".tasks/${DOCS_PROJECT}" ;;
+        esac
+      else
+        TASK_DIR=".tasks"
+        if [ -n "$TASK_ID" ] && [ "$TASK_ID" != "0" ]; then
+          TASK_DIR="${TASK_DIR}/task-${TASK_ID}"
+        fi
       fi
       mkdir -p "$TASK_DIR"
 
-      # Look for workflow file: try {run_type}.lobster.yaml, then index.lobster.yaml
+      # Look for workflow file: prefer index.lobster.yaml (multi-phase orchestrator)
+      # over {run_type}.lobster.yaml (single phase). This ensures the full agent
+      # pipeline (Rex→Cleo→Cipher→Tess→acceptance) runs when defined.
       INDEX=""
-      for CANDIDATE in "${RUN_TYPE}.lobster.yaml" "index.lobster.yaml"; do
+      for CANDIDATE in "index.lobster.yaml" "${RUN_TYPE}.lobster.yaml"; do
         if [ -f "${TASK_DIR}/${CANDIDATE}" ]; then
           INDEX="${TASK_DIR}/${CANDIDATE}"
           break
@@ -258,7 +267,8 @@ steps:
       if [ -z "$INDEX" ]; then
         # Deep search across the whole repo for task-specific workflow
         echo "⚡ No workflow at $TASK_DIR — searching repo for task-${TASK_ID}..."
-        for CANDIDATE in "${RUN_TYPE}.lobster.yaml" "index.lobster.yaml"; do
+        FOUND=""
+        for CANDIDATE in "index.lobster.yaml" "${RUN_TYPE}.lobster.yaml"; do
           if [ -n "$TASK_ID" ] && [ "$TASK_ID" != "0" ]; then
             FOUND=$(find . -path "*/task-${TASK_ID}/${CANDIDATE}" 2>/dev/null | head -1)
           fi
