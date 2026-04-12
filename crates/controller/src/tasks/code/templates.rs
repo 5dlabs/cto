@@ -1601,7 +1601,7 @@ impl CodeTemplateGenerator {
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
-            "model": Self::qualify_model_for_openclaw(code_run),
+            "model": Self::resolve_openclaw_primary_model(code_run, &openclaw_providers),
             "cli_type": cli_type.to_string(),
             "agent_name": &agent_name,
             "agent_name_upper": agent_name.to_uppercase(),
@@ -4703,10 +4703,37 @@ Be constructive and explain the "why" behind your suggestions.
 
     /// Qualify a model name with its provider prefix for OpenClaw gateway.
     ///
-    /// OpenClaw expects `provider/model-id` format (e.g. `anthropic/claude-sonnet-4-20250514`).
-    /// If the model already contains a `/`, it's returned as-is.
-    /// Otherwise, the provider is inferred from `CLIConfig.provider` or the model name prefix.
-    /// Resolve the model identifier for OpenClaw's `model.primary`.
+    /// Resolve the full `model.primary` value for the OpenClaw config.
+    ///
+    /// OpenClaw gateway looks up models as `{provider_name}/{model_id}` where
+    /// `provider_name` is the key under `models.providers` and `model_id` is
+    /// the `id` field of a model entry in that provider.
+    ///
+    /// This function takes the qualified model from `qualify_model_for_openclaw()`
+    /// and finds the provider that lists it, then returns `provider/model_id`.
+    fn resolve_openclaw_primary_model(
+        code_run: &CodeRun,
+        openclaw_providers: &[Value],
+    ) -> String {
+        let model_id = Self::qualify_model_for_openclaw(code_run);
+
+        // Check if any provider lists this model — if so, prefix with provider name
+        for provider in openclaw_providers {
+            let provider_name = provider.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            if let Some(models) = provider.get("models").and_then(|v| v.as_array()) {
+                for m in models {
+                    if m.get("id").and_then(|v| v.as_str()) == Some(&model_id) {
+                        return format!("{provider_name}/{model_id}");
+                    }
+                }
+            }
+        }
+
+        // No provider match — return as-is (gateway will try to route it)
+        model_id
+    }
+
+    /// Resolve the raw model identifier from the CRD for OpenClaw.
     ///
     /// Priority (pure CRD passthrough — no hard-coded model names):
     ///   1. `cli_config.model` — the actual model the CLI uses (may already be
