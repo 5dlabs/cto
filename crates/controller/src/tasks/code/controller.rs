@@ -3,12 +3,13 @@ use super::resources::CodeResourceManager;
 use super::watcher::{cleanup_watcher, is_watcher_coderun, spawn_watcher_if_enabled};
 use crate::crds::CodeRun;
 use crate::tasks::cleanup;
+use crate::tasks::discord::{self, AutoArchiveDuration, DiscordThreadManager};
 use crate::tasks::tool_inventory::log_tool_inventory;
 use crate::tasks::types::{Context, Result, CODE_FINALIZER_NAME};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use k8s_openapi::api::{
     batch::v1::Job,
-    core::v1::{ConfigMap, PersistentVolumeClaim},
+    core::v1::{ConfigMap, PersistentVolumeClaim, Secret},
 };
 use kube::api::{DeleteParams, Patch, PatchParams};
 use kube::runtime::controller::Action;
@@ -310,6 +311,17 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                         diff.unresolved_tools
                     );
                 }
+            }
+
+            // STEP 2.5: Create per-task Discord thread (best-effort)
+            // Creates a thread in the agent's Discord channel for task-scoped communication.
+            // Thread ID is stored as an annotation so cleanup can archive it.
+            if let Err(e) = create_task_discord_thread(&code_run, ctx).await {
+                warn!(
+                    code_run = %code_run_name,
+                    "Failed to create Discord thread (non-fatal): {}",
+                    e
+                );
             }
 
             // STEP 3: Optimistic job creation with conflict handling (copied from working docs controller)
@@ -800,6 +812,16 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
 #[instrument(skip(ctx), fields(code_run_name = %code_run.name_any(), namespace = %ctx.namespace))]
 async fn cleanup_code_resources(code_run: Arc<CodeRun>, ctx: &Context) -> Result<Action> {
     debug!("Cleaning up resources for CodeRun");
+
+    // Archive Discord thread if one was created for this task
+    if let Err(e) = archive_task_discord_thread(&code_run, ctx).await {
+        warn!(
+            "Failed to archive Discord thread for CodeRun {}: {}",
+            code_run.name_any(),
+            e
+        );
+        // Don't fail cleanup
+    }
 
     // Clean up watcher if this is an executor with a watcher
     // Note: Watcher has owner reference to executor, so Kubernetes will
@@ -1644,4 +1666,205 @@ fn compute_cleanup_deadline(
 
     #[allow(clippy::cast_possible_wrap)] // TTL seconds are small config values
     Some(finished_at + ChronoDuration::seconds(ttl_seconds as i64))
+}
+
+// ─── Discord Thread Management ─────────────────────────────────────────
+
+/// Annotation key for storing the Discord thread ID on a CodeRun
+const ANNOTATION_DISCORD_THREAD_ID: &str = "agents.platform/discord-thread-id";
+
+/// Read a bot token from the discord-agent-bots K8s secret for the given agent.
+async fn get_agent_discord_token(
+    client: &kube::Client,
+    namespace: &str,
+    agent_name_upper: &str,
+) -> anyhow::Result<String> {
+    let secrets: Api<Secret> = Api::namespaced(client.clone(), namespace);
+    let secret = secrets
+        .get("discord-agent-bots")
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to get discord-agent-bots secret: {}", e))?;
+
+    let key = format!("DISCORD_TOKEN_{}", agent_name_upper);
+    let data = secret
+        .data
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("discord-agent-bots secret has no data"))?;
+
+    let token_bytes = data
+        .get(&key)
+        .ok_or_else(|| anyhow::anyhow!("Key {} not found in discord-agent-bots", key))?;
+
+    String::from_utf8(token_bytes.0.clone())
+        .map_err(|e| anyhow::anyhow!("Invalid UTF-8 in {}: {}", key, e))
+}
+
+/// Read the agent's Discord channel ID from the discord-agent-bots secret.
+async fn get_agent_discord_channel(
+    client: &kube::Client,
+    namespace: &str,
+    agent_name_upper: &str,
+) -> anyhow::Result<String> {
+    let secrets: Api<Secret> = Api::namespaced(client.clone(), namespace);
+    let secret = secrets
+        .get("discord-agent-bots")
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to get discord-agent-bots secret: {}", e))?;
+
+    let key = format!("DISCORD_CHANNEL_{}", agent_name_upper);
+    let data = secret
+        .data
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("discord-agent-bots secret has no data"))?;
+
+    let channel_bytes = data
+        .get(&key)
+        .ok_or_else(|| anyhow::anyhow!("Key {} not found in discord-agent-bots", key))?;
+
+    String::from_utf8(channel_bytes.0.clone())
+        .map_err(|e| anyhow::anyhow!("Invalid UTF-8 in {}: {}", key, e))
+}
+
+/// Create a per-task Discord thread and annotate the CodeRun with its ID.
+async fn create_task_discord_thread(
+    code_run: &CodeRun,
+    ctx: &Context,
+) -> anyhow::Result<()> {
+    // Skip if thread already exists (idempotent)
+    if code_run
+        .metadata
+        .annotations
+        .as_ref()
+        .and_then(|a| a.get(ANNOTATION_DISCORD_THREAD_ID))
+        .is_some()
+    {
+        debug!("Discord thread already exists for CodeRun {}", code_run.name_any());
+        return Ok(());
+    }
+
+    // Skip for watcher CodeRuns — they share the executor's thread
+    if is_watcher_coderun(code_run) {
+        return Ok(());
+    }
+
+    let agent_name = code_run
+        .spec
+        .github_app
+        .as_deref()
+        .unwrap_or("unknown")
+        .to_lowercase()
+        .replace("5dlabs-", "");
+    let agent_upper = agent_name.to_uppercase();
+    let task_id = code_run.spec.task_id.unwrap_or(0);
+
+    // Read bot token and channel from K8s secret
+    let token = get_agent_discord_token(&ctx.client, &ctx.namespace, &agent_upper).await?;
+    let channel_id = get_agent_discord_channel(&ctx.client, &ctx.namespace, &agent_upper).await?;
+
+    // Create the thread
+    let manager = DiscordThreadManager::new(token);
+    let thread_name = discord::task_thread_name(&agent_name, task_id);
+    let thread = manager
+        .create_thread(&channel_id, &thread_name, AutoArchiveDuration::OneDay)
+        .await?;
+
+    // Post initial context message
+    let service = &code_run.spec.service;
+    let model = &code_run.spec.model;
+    let intro = format!(
+        "🚀 **Task #{task_id}** started\n\
+         **Service:** {service}\n\
+         **Model:** {model}\n\
+         **CodeRun:** {}",
+        code_run.name_any()
+    );
+    if let Err(e) = manager.send_message(&thread.id, &intro).await {
+        warn!("Failed to post intro message to thread: {}", e);
+    }
+
+    // Annotate the CodeRun with the thread ID
+    let coderuns: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+    let patch = json!({
+        "metadata": {
+            "annotations": {
+                ANNOTATION_DISCORD_THREAD_ID: thread.id
+            }
+        }
+    });
+    coderuns
+        .patch(
+            &code_run.name_any(),
+            &PatchParams::apply("cto-controller"),
+            &Patch::Merge(&patch),
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to annotate CodeRun with thread ID: {}", e))?;
+
+    info!(
+        code_run = %code_run.name_any(),
+        thread_id = %thread.id,
+        thread_name = %thread.name,
+        "Created Discord thread for task"
+    );
+
+    Ok(())
+}
+
+/// Archive the Discord thread associated with a CodeRun (called during cleanup).
+async fn archive_task_discord_thread(
+    code_run: &CodeRun,
+    ctx: &Context,
+) -> anyhow::Result<()> {
+    let thread_id = match code_run
+        .metadata
+        .annotations
+        .as_ref()
+        .and_then(|a| a.get(ANNOTATION_DISCORD_THREAD_ID))
+    {
+        Some(id) if !id.is_empty() => id.clone(),
+        _ => {
+            debug!("No Discord thread to archive for CodeRun {}", code_run.name_any());
+            return Ok(());
+        }
+    };
+
+    let agent_name = code_run
+        .spec
+        .github_app
+        .as_deref()
+        .unwrap_or("unknown")
+        .to_lowercase()
+        .replace("5dlabs-", "");
+    let agent_upper = agent_name.to_uppercase();
+
+    // Read bot token from K8s secret
+    let token = match get_agent_discord_token(&ctx.client, &ctx.namespace, &agent_upper).await {
+        Ok(t) => t,
+        Err(e) => {
+            warn!("Cannot archive thread — failed to get bot token: {}", e);
+            return Ok(());
+        }
+    };
+
+    let manager = DiscordThreadManager::new(token);
+
+    // Post completion message before archiving
+    let phase = code_run
+        .status
+        .as_ref()
+        .map_or("Unknown", |s| s.phase.as_str());
+    let emoji = if phase == "Succeeded" { "✅" } else { "❌" };
+    let msg = format!("{} Task completed with status: **{}**", emoji, phase);
+    let _ = manager.send_message(&thread_id, &msg).await;
+
+    // Archive the thread
+    manager.archive_thread(&thread_id).await?;
+
+    info!(
+        code_run = %code_run.name_any(),
+        thread_id = %thread_id,
+        "Archived Discord thread"
+    );
+
+    Ok(())
 }

@@ -1651,6 +1651,22 @@ impl<'a> CodeResourceManager<'a> {
             "value": "1"
         }));
 
+        // Pass per-task Discord thread ID if one was created by the reconciler.
+        // The MCP Bridge and notification step use this for task-scoped messaging.
+        if let Some(thread_id) = code_run
+            .metadata
+            .annotations
+            .as_ref()
+            .and_then(|a| a.get("agents.platform/discord-thread-id"))
+        {
+            if !thread_id.is_empty() {
+                final_env_vars.push(json!({
+                    "name": "TASK_DISCORD_THREAD_ID",
+                    "value": thread_id
+                }));
+            }
+        }
+
         // Provider env vars are now handled by EffectiveProviderConfig.build_env_vars()
         // above (in the critical_env_vars section). No more model-string detection here.
 

@@ -1485,6 +1485,14 @@ impl CodeTemplateGenerator {
         let discord_enabled = code_run.spec.openclaw.as_ref()
             .is_none_or(|oc| oc.discord_enabled);
 
+        let discord_thread_id = code_run
+            .metadata
+            .annotations
+            .as_ref()
+            .and_then(|a| a.get("agents.platform/discord-thread-id"))
+            .cloned()
+            .unwrap_or_default();
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "task_number": code_run.spec.task_id.unwrap_or(0),
@@ -1508,7 +1516,8 @@ impl CodeTemplateGenerator {
             "agent_name_upper": agent_name.to_uppercase(),
             "namespace": namespace,
             "discord_enabled": discord_enabled,
-            "discord_channel_id": "",
+            "discord_channel_id": &discord_thread_id,
+            "discord_thread_id": &discord_thread_id,
             "mcp_bridge_enabled": true,
             "openclaw_providers": openclaw_providers_summary,
             "cli_config": cli_config,

@@ -14,6 +14,7 @@ pub mod cancel;
 pub mod cleanup;
 pub mod code;
 pub mod config;
+pub mod discord;
 pub mod github;
 pub mod heal;
 pub mod label;

@@ -369,6 +369,12 @@ steps:
       AGENT_TOKEN="${!TOKEN_VAR:-}"
       AGENT_CHANNEL="${!CHANNEL_VAR:-}"
 
+      # Prefer per-task Discord thread if created by the controller
+      if [ -n "${TASK_DISCORD_THREAD_ID:-}" ]; then
+        AGENT_CHANNEL="$TASK_DISCORD_THREAD_ID"
+        echo "📌 Using task-scoped Discord thread: $AGENT_CHANNEL"
+      fi
+
       # Get PR URL
       PR_URL=""
       REPO_ROOT="${REPO_ROOT:-${CLAUDE_WORK_DIR:-/workspace}}"
