@@ -40,11 +40,11 @@ steps:
       root="${WORKSPACE:-.}";
       "$root/intake/scripts/workflow-step-audio.sh" "codebase-analysis" "search-patterns" "${audio_debug}";
       REPO_PATH=$(echo "${repository_url}" | sed 's|https://github.com/||' | sed 's|\.git$||') &&
-      openclaw.invoke --tool octocode --action githubSearchCode --args-json "{
+      timeout 120 openclaw.invoke --tool octocode --action githubSearchCode --args-json "{
         \"repository\": \"${REPO_PATH}\",
         \"query\": \"path:src OR path:lib OR path:app language:rust OR language:go OR language:typescript\",
         \"maxResults\": 50
-      }"
+      }" || { echo '{"search_skipped": true, "reason": "octocode timeout or unavailable"}'; }
 
   - id: summarize-codebase
     env:
