@@ -54,6 +54,8 @@ args:
     default: ""
   target_repo_local_path:
     default: ""
+  codebase_repository_url:
+    default: ""
   verify:
     default: "true"
   breakpoints:
@@ -1010,8 +1012,13 @@ steps:
       if [ "${include_codebase}" != "true" ] && [ "${include_codebase}" != "1" ]; then
         printf ''; exit 0; fi;
       WS="${WORKSPACE:-.}";
+      # Prefer codebase_repository_url (e.g. the platform repo) over target repo for analysis
+      CODEBASE_URL="${codebase_repository_url}"
+      if [ -z "$CODEBASE_URL" ]; then
+        CODEBASE_URL="$(printf '%s' "$CTO_SETUP_REPO_JSON" | jq -r '.repository_url')"
+      fi
       ARGS=$(jq -n \
-        --arg repository_url "$(printf '%s' "$CTO_SETUP_REPO_JSON" | jq -r '.repository_url')" \
+        --arg repository_url "$CODEBASE_URL" \
         --arg branch "${pr_base_branch}" \
         --arg model_primary_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.primary_provider')" \
         --arg model_primary "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.primary_model')" \
