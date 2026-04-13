@@ -1435,9 +1435,9 @@ steps:
       printf '%s\n' "$EXP" > .tasks/tasks/tasks.json
 
       TASK_COUNT=$(printf '%s' "$EXP" | jq 'length' 2>/dev/null || echo 0)
-      DOC_COUNT=$(find .tasks/docs/task-* -name 'docs.md' -o -name 'brief.md' 2>/dev/null | wc -l | tr -d ' ')
-      PROMPT_COUNT=$(find .tasks/docs/task-* -name 'prompt.md' 2>/dev/null | wc -l | tr -d ' ')
-      WORKFLOW_COUNT=$(find .tasks/docs/task-* -name 'play.lobster.yaml' 2>/dev/null | wc -l | tr -d ' ')
+      DOC_COUNT=$(find .tasks/docs/task-* -name 'task.md' -o -name 'decisions.md' -o -name 'acceptance.md' 2>/dev/null | wc -l | tr -d ' ')
+      PROMPT_COUNT=$(find .tasks/docs/task-* -name 'prompt.md' -o -name 'prompt.xml' 2>/dev/null | wc -l | tr -d ' ')
+      WORKFLOW_COUNT=$(find .tasks/docs/task-* -name '*.lobster.yaml' 2>/dev/null | wc -l | tr -d ' ')
 
       if ! printf '%s' "$TASK_COUNT" | jq -e 'type=="number" and . > 0' >/dev/null 2>&1; then
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "artifacts" "failed: tasks missing" "${audio_debug}" "error" "project ${project_name}"
