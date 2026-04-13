@@ -11,6 +11,7 @@ data:
     {{- $discordConfig := index $messaging "discord" | default .Values.discord }}
     {{- $plugins := index .Values "plugins" | default dict }}
     {{- $memoryCore := index $plugins "memoryCore" | default dict }}
+    {{- $mem0Plugin := index .Values "mem0Plugin" | default dict }}
     {{- $webTools := index .Values.tools "web" | default dict }}
     {{- $webSearch := index $webTools "search" | default dict }}
     {{- $webFetch := index $webTools "fetch" | default dict }}
@@ -255,6 +256,55 @@ data:
             }
           }
           {{- end }}
+          {{- if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }},
+          "openclaw-mem0": {
+            "enabled": true,
+            "config": {
+              "mode": {{ $mem0Plugin.mode | default "open-source" | quote }},
+              "userId": {{ $mem0Plugin.userId | default "jonathon" | quote }},
+              "agentId": {{ .Values.agent.id | quote }},
+              "autoRecall": {{ $mem0Plugin.autoRecall | default true }},
+              "autoCapture": {{ $mem0Plugin.autoCapture | default true }},
+              "topK": {{ $mem0Plugin.topK | default 5 }},
+              "searchThreshold": {{ $mem0Plugin.searchThreshold | default 0.6 }}
+              {{- if $mem0Plugin.customCategories }},
+              "customCategories": {
+                {{- $catList := list }}
+                {{- range $name, $desc := $mem0Plugin.customCategories }}
+                {{- $catList = append $catList (printf "%s: %s" ($name | quote) ($desc | quote)) }}
+                {{- end }}
+                {{ join ", " $catList }}
+              }
+              {{- end }},
+              "oss": {
+                "vectorStore": {
+                  "provider": {{ ($mem0Plugin.oss).vectorStore.provider | default "qdrant" | quote }},
+                  "config": {
+                    "host": {{ ($mem0Plugin.oss).vectorStore.config.host | default "qdrant.cto.svc.cluster.local" | quote }},
+                    "port": {{ ($mem0Plugin.oss).vectorStore.config.port | default 6333 }},
+                    "collectionName": {{ ($mem0Plugin.oss).collectionName | default "cto_memory" | quote }}
+                  }
+                },
+                "embedder": {
+                  "provider": {{ ($mem0Plugin.oss).embedder.provider | default "google" | quote }},
+                  "config": {
+                    "model": {{ ($mem0Plugin.oss).embedder.config.model | default "gemini-embedding-001" | quote }},
+                    "apiKey": "${ {{- ($mem0Plugin.oss).embedder.config.apiKeyEnvVar | default "GOOGLE_API_KEY" -}} }"
+                  }
+                },
+                "llm": {
+                  "provider": {{ ($mem0Plugin.oss).llm.provider | default "openai" | quote }},
+                  "config": {
+                    "model": {{ ($mem0Plugin.oss).llm.config.model | default "gpt-4.1-nano" | quote }}
+                  }
+                }
+              },
+              "metadata": {
+                "source": {{ $mem0Plugin.metadataSource | default "openclaw" | quote }}
+              }
+            }
+          }
+          {{- end }}
         },
         "allow": [
           {{- $pluginEntries := list }}
@@ -267,11 +317,21 @@ data:
           {{- if .Values.nats.enabled }}
           {{- $pluginEntries = append $pluginEntries "\"nats-messenger\"" }}
           {{- end }}
+          {{- if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }}
+          {{- $pluginEntries = append $pluginEntries "\"openclaw-mem0\"" }}
+          {{- end }}
           {{- join ", " $pluginEntries }}
         ]
-        {{- if .Values.nats.enabled }},
+        {{- $loadPaths := list }}
+        {{- if .Values.nats.enabled }}
+        {{- $loadPaths = append $loadPaths "/workspace/.openclaw/extensions/nats-messenger" }}
+        {{- end }}
+        {{- if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }}
+        {{- $loadPaths = append $loadPaths "/workspace/.openclaw/extensions/openclaw-mem0" }}
+        {{- end }}
+        {{- if $loadPaths }},
         "load": {
-          "paths": ["/workspace/.openclaw/extensions/nats-messenger"]
+          "paths": {{ $loadPaths | toJson }}
         }
         {{- end }}
       },

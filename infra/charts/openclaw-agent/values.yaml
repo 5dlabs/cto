@@ -633,3 +633,42 @@ nats:
     - { id: research, role: "Web research" }
     - { id: stitch, role: "Code review" }
     - { id: trader, role: "Market research & trading" }
+
+# =============================================================================
+# Mem0 Plugin (@mem0/openclaw-mem0)
+# =============================================================================
+# Long-term memory backed by Qdrant. Single shared collection, scoped by agentId.
+# https://docs.mem0.ai/integrations/openclaw
+
+mem0Plugin:
+  enabled: false
+  mode: "open-source"
+  userId: "jonathon"
+  autoRecall: true
+  autoCapture: true
+  topK: 5
+  searchThreshold: 0.6
+  metadataSource: "openclaw"
+  customCategories:
+    intake_decision: "Decisions made during project intake"
+    task_summary: "Summary of completed tasks"
+    code_review: "Code review findings and patterns"
+    architecture: "Architecture decisions and rationale"
+    debugging: "Debugging insights and root causes"
+    user_preference: "User preferences and working style"
+  oss:
+    collectionName: "cto_memory"
+    vectorStore:
+      provider: "qdrant"
+      config:
+        host: "qdrant.cto.svc.cluster.local"
+        port: 6333
+    embedder:
+      provider: "google"
+      config:
+        model: "gemini-embedding-001"
+        apiKeyEnvVar: "GOOGLE_API_KEY"
+    llm:
+      provider: "openai"
+      config:
+        model: "gpt-4.1-nano"

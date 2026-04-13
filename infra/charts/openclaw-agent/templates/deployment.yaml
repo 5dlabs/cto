@@ -1,5 +1,6 @@
 {{- $messaging := .Values.messaging | default dict -}}
 {{- $discordConfig := index $messaging "discord" | default .Values.discord -}}
+{{- $mem0Plugin := .Values.mem0Plugin | default dict -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -203,6 +204,23 @@ spec:
                 echo "[plugin] nats-messenger: installed"
               else
                 echo "[plugin] nats-messenger: cached"
+              fi
+              cd /workspace
+              {{- end }}
+
+              {{- if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }}
+              # ---------------------------------------------------------------
+              # 4d. Mem0 plugin (@mem0/openclaw-mem0)
+              # ---------------------------------------------------------------
+              MEM0_EXT="/workspace/.openclaw/extensions/openclaw-mem0"
+              if [ ! -d "$MEM0_EXT/node_modules" ]; then
+                mkdir -p "$MEM0_EXT"
+                cd "$MEM0_EXT"
+                npm init -y --silent 2>/dev/null
+                npm install @mem0/openclaw-mem0 --production --no-audit --no-fund 2>&1 | tail -3
+                echo "[plugin] openclaw-mem0: installed"
+              else
+                echo "[plugin] openclaw-mem0: cached"
               fi
               cd /workspace
               {{- end }}

@@ -13,7 +13,7 @@
 # remotely exposed for the talking-avatar PoC, but it still lives in CTO beside
 # Optimist and Pessimist because the persona and rollout are CTO-owned.
 #
-# Chart:   5dlabs/openclaw-platform → charts/openclaw
+# Chart:   5dlabs/cto → infra/charts/openclaw-agent
 # Values:  5dlabs/cto → infra/gitops/agents/{name}-values.yaml
 # =============================================================================
 
@@ -57,20 +57,15 @@ spec:
       project: default
 
       # Two sources:
-      #   1. openclaw-platform chart (the Helm chart with workspace.files support)
-      #   2. CTO repo (agent-specific values files)
+      #   1. CTO repo — openclaw-agent chart + agent-specific values
       sources:
-        - repoURL: https://gitlab.5dlabs.ai/5dlabs/openclaw-platform.git
+        - repoURL: https://gitlab.5dlabs.ai/5dlabs/cto.git
           targetRevision: main
-          path: charts/openclaw
+          path: infra/charts/openclaw-agent
           helm:
             releaseName: 'cto-deliberation-{{ .name }}'
             valueFiles:
-              - $cto/infra/gitops/agents/{{ .name }}-values.yaml
-
-        - repoURL: https://gitlab.5dlabs.ai/5dlabs/cto.git
-          targetRevision: main
-          ref: cto
+              - ../../gitops/agents/{{ .name }}-values.yaml
 
       destination:
         server: https://kubernetes.default.svc

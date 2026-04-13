@@ -317,6 +317,9 @@ openmemory:
 mem0:
   enabled: false
 
+mem0Plugin:
+  enabled: true
+
 session:
   scope: "per-sender"
   dmScope: "per-channel-peer"
