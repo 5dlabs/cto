@@ -1,10 +1,30 @@
-Implement subtask 5004: Implement OpenCorporates and LinkedIn pipeline steps with per-step timeout
+<identity>
+You are tess working on subtask 5004 of task 5.
+</identity>
 
-## Objective
-Implement the first two steps of the vetting background pipeline: OpenCorporates company search and LinkedIn company presence check. Each step must complete within a 10-second timeout; on timeout or HTTP error, set the corresponding risk_flag and continue to the next step.
+<context>
+<scope>
+Write full-loop.test.ts that executes the complete initialize → create customer → deposit → settle → verify receipt → withdraw sequence using the exact USDC amounts (6 decimal precision) that will appear in the hackathon demo video.
+</scope>
+</context>
 
-## Steps
-Step 1 — OpenCorporates: build reqwest GET to https://api.opencorporates.com/v0.4/companies/search?q={name}&jurisdiction_code={code}&api_token={OPENCORPORATES_API_KEY}. Deserialize response into OpenCorporatesResult struct. If company found and status='active', set business_verified=true and store opencorporates_data JSONB. Wrap call in tokio::time::timeout(Duration::from_secs(10), ...). On Err or non-200, push 'business_not_found' into risk_flags and set business_verified=false. Step 2 — LinkedIn: obtain OAuth2 access token via POST https://www.linkedin.com/oauth/v2/accessToken with grant_type=client_credentials, LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET. Then GET /v2/companies?q=universalName&universalName={slug} with Bearer token. Parse followerCount and employeeCount. Wrap in 10s timeout. On failure push 'linkedin_unavailable' into risk_flags and set linkedin_exists=false, linkedin_followers=0. Read all secrets from environment variables.
+<implementation_plan>
+1. Create `tests/happy-path/full-loop.test.ts`:
+   - Single test (or tightly coupled describe block): 'complete demo flow — init, deposit, settle, verify, withdraw'
+   - Step 1: Initialize operator with treasury keypair and protocol_fee_bps = 500 (5%).
+   - Step 2: Create customer with max_per_task = 50_000_000 (50 USDC), max_per_day = 200_000_000 (200 USDC).
+   - Step 3: Customer deposits 100_000_000 (100.000000 USDC). Assert customer balance === 100_000_000. Assert vault balance increased by 100_000_000.
+   - Step 4: Settle task 'TASK-42' for 12_500_000 (12.500000 USDC). Record pre-settle treasury balance.
+   - Step 5: Assert customer balance === 87_500_000 (100M - 12.5M). Assert treasury balance increased by exactly 12_500_000.
+   - Step 6: Derive TaskReceipt PDA for 'TASK-42'. Fetch it. Assert: amount === 12_500_000, fee_amount === 625_000 (12.5M * 500 / 10000), task_id_hash matches computeTaskIdHash('TASK-42'), status === Settled.
+   - Step 7: Customer withdraws 87_500_000 (remaining balance). Assert customer balance === 0.
+   - Step 8: Verify customer's token account final balance === (initial minted tokens - 12_500_000). This confirms the only tokens consumed were the settled task amount.
 
-## Validation
-Unit test with mockito (or wiremock-rs): mock OpenCorporates returning a 200 active company → business_verified=true, opencorporates_data populated. Mock returning 404 → risk_flags contains 'business_not_found'. Mock hanging response → timeout fires within ~11 seconds and risk_flag is set. Same pattern for LinkedIn mock.
+2. Use descriptive assertion messages: e.g., `expect(balance).toBe(87_500_000, 'customer balance after settling 12.50 USDC task')`.
+3. This test serves as a regression gate — if this passes, the demo flow is guaranteed to work.
+4. Ensure all amounts use integer arithmetic (no floating point) to match on-chain u64 representation.
+</implementation_plan>
+
+<validation>
+Run `bun test tests/happy-path/full-loop.test.ts` — the single end-to-end test passes. Verify all 8 assertion checkpoints succeed with exact integer values. Confirm fee_amount === 625_000 (not 625_001 or 624_999). Confirm final customer ATA balance equals initial_mint_amount minus 12_500_000.
+</validation>

@@ -1,40 +1,79 @@
-## Build Social Media Engine (Nova - Node.js/Elysia+Effect)
+# Task 6: Anchor Program Tests — Edge Cases, Error Paths, and Security Scenarios (Tess - TypeScript/Bankrun)
 
-### Objective
-Implement the Social Media Engine using Node.js 20, Elysia 1.x, and Effect 3.x TypeScript. Handles event photo ingestion, AI-powered image curation and scoring, platform-specific cropping, caption generation via OpenAI/Claude, draft approval workflow via Signal, and multi-platform publishing to Instagram, LinkedIn, TikTok, and Facebook with Effect retry and backoff. Includes internal GDPR endpoints.
+## Overview
+Write negative test cases covering all error paths, spending cap enforcement, unauthorized access attempts, paused state behavior, overflow scenarios, and double-operation guards. These tests validate the program's security properties.
 
-### Ownership
-- Agent: nova
-- Stack: Node.js 20+/Elysia 1.x/Effect 3.x
-- Priority: medium
-- Status: pending
-- Dependencies: 1
+## Implementation Details
+1. **Test file structure**:
+   ```
+   tests/
+     edge-cases/
+       spending-caps.test.ts
+       authorization.test.ts
+       pause-behavior.test.ts
+       overflow-edge.test.ts
+       double-operations.test.ts
+       validation.test.ts
+   ```
 
-### Implementation Details
-1. Initialize project at services/social-engine using Bun or Node.js 20 with TypeScript 5.x. Install: elysia@1.x, @elysiajs/swagger, effect@3.x, @aws-sdk/client-s3, pg (postgres.js or @vercel/postgres), ioredis, sharp (image processing), openai, @anthropic-ai/sdk, zod (for any non-Effect validation), pino for logging, prom-client.
-2. Database migrations targeting social schema. Tables: social_drafts (id UUID PK, event_id UUID, source_photo_urls TEXT[], selected_photo_urls TEXT[], instagram_crop_url TEXT, linkedin_crop_url TEXT, tiktok_crop_url TEXT, caption TEXT, hashtags TEXT[], status TEXT CHECK IN (pending_curation,ready_for_approval,approved,rejected,published), approved_by TEXT, approved_at TIMESTAMPTZ, created_at TIMESTAMPTZ), social_posts (id UUID PK, draft_id UUID FK, platform TEXT CHECK IN (instagram,linkedin,tiktok,facebook), external_post_id TEXT, published_at TIMESTAMPTZ, status TEXT CHECK IN (pending,published,failed), error_text TEXT).
-3. Effect.Service definitions: InstagramService (publishPost, uploadMedia), LinkedInService (publishPost), TikTokService (uploadVideo), FacebookService (publishPost). Each service uses Effect.retry with exponential backoff (Schedule.exponential(1000ms) with max 5 attempts) and Effect.timeout(30s).
-4. Effect.Schema definitions for all request/response types: UploadEventPhotosRequest, DraftResponse, PublishRequest.
-5. Elysia routes: POST /api/v1/social/upload (multipart, upload photos to R2, create draft with status=pending_curation, trigger curation pipeline), GET /api/v1/social/drafts, GET /api/v1/social/drafts/:id, POST /api/v1/social/drafts/:id/approve, POST /api/v1/social/drafts/:id/reject, POST /api/v1/social/drafts/:id/publish, GET /api/v1/social/published.
-6. AI curation pipeline (triggered after upload): Call OpenAI vision API (gpt-4o) scoring each photo on composition (0-10), lighting (0-10), subject clarity (0-10). Select top 5-10 photos. Use sharp to generate crops: Instagram 1:1 (1080x1080), Instagram Story 9:16 (1080x1920), LinkedIn 1.91:1 (1200x628), TikTok 9:16 (1080x1920). Upload cropped versions to R2. Update draft with selected_photo_urls and crop URLs.
-7. Caption generation: POST to OpenAI chat API with event context (event name, venue, equipment used from catalog service), generate caption + hashtags. Store in draft.caption and draft.hashtags.
-8. Approval workflow: POST /api/v1/social/drafts/:id/approve sets status=ready_for_review (Morgan sends Signal message to configured phone number with draft preview link). POST approve sets status=approved. POST reject sets status=rejected with optional reason.
-9. Publishing: on POST /api/v1/social/drafts/:id/publish, run Effect program calling each platform service. Instagram: use Graph API /media + /media_publish. LinkedIn: use Share API /ugcPosts. Facebook: use Graph API /photos or /feed. TikTok: use Content Posting API. On each success, insert social_posts row. Portfolio sync: published posts exposed via GET /api/v1/social/published for website portfolio page.
-10. JWT middleware via Elysia plugin, Prometheus metrics endpoint /metrics using prom-client, /health/live, /health/ready (postgres + redis + R2 connectivity). GDPR: GET /internal/gdpr/export/:customer_id, DELETE /internal/gdpr/delete/:customer_id (anonymize event_id references). Kubernetes Deployment 2 replicas.
+2. **spending-caps.test.ts** — Spending cap enforcement (DF-3 from PRD):
+   - Test: `settle_task` with amount > `max_per_task` fails with `SpendingCapPerTaskExceeded`.
+   - Test: `settle_task` where cumulative `daily_spent + amount > max_per_day` fails with `SpendingCapDailyExceeded`.
+   - Test: Sequential settlements that individually pass per-task cap but cumulatively exceed daily cap (settle 3x 80 USDC with daily cap 200 → third fails).
+   - Test: After daily cap is hit, warping past `SLOTS_PER_DAY` slots allows new settlement.
+   - Test: Updating caps to lower values doesn't retroactively fail (caps apply to future settlements only).
+   - Test: Settlement exactly at cap boundary succeeds (amount == max_per_task).
+   - Test: Settlement exactly at daily boundary succeeds (daily_spent + amount == max_per_day).
 
-### Subtasks
-- [ ] Initialize Node.js/TypeScript project and install all dependencies: Scaffold the services/social-engine project with TypeScript 5.x configuration, install all required packages, and configure tsconfig, pino logging, and the Elysia app entry point.
-- [ ] Write database migrations for social schema tables: Create SQL migration files for the social schema: social_drafts and social_posts tables with all columns, constraints, foreign keys, and indexes.
-- [ ] Define Effect.Schema types and Effect.Service interfaces: Define all Effect.Schema request/response types (UploadEventPhotosRequest, DraftResponse, PublishRequest) and the Effect.Service interfaces for InstagramService, LinkedInService, TikTokService, and FacebookService with retry and timeout configuration.
-- [ ] Implement photo upload handler and R2 multipart storage: Implement POST /api/v1/social/upload as a multipart Elysia route that accepts JPEG/PNG files, uploads them to Cloudflare R2 via the S3-compatible SDK, creates a social_drafts row with status=pending_curation, and triggers the async curation pipeline.
-- [ ] Implement AI photo curation pipeline with OpenAI vision scoring: Implement the async curation pipeline that scores each uploaded photo using OpenAI gpt-4o vision API, selects the top 5-10 photos, and updates the draft's selected_photo_urls.
-- [ ] Implement sharp image cropping for platform-specific formats and R2 upload: Implement the image cropping step within the curation pipeline: use sharp to generate Instagram 1:1, Instagram Story 9:16, LinkedIn 1.91:1, and TikTok 9:16 crops for each selected photo, then upload cropped versions to R2.
-- [ ] Implement caption generation via OpenAI chat API: Implement the caption generation step that assembles event context and calls the OpenAI chat API to generate a caption and hashtags, storing results on the social_drafts row.
-- [ ] Implement approval workflow endpoints and Signal notification: Implement POST /api/v1/social/drafts/:id/approve, POST /api/v1/social/drafts/:id/reject, and the Signal notification trigger that sends a preview link to the configured phone number when a draft reaches ready_for_approval.
-- [ ] Implement InstagramService with Effect retry and Graph API integration: Implement the InstagramService Effect.Service that uploads media and publishes to Instagram via the Graph API, with exponential backoff retry (max 5 attempts) and 30-second timeout per call.
-- [ ] Implement LinkedInService with Effect retry and Share API integration: Implement the LinkedInService Effect.Service that publishes posts to LinkedIn via the UGC Posts Share API with exponential backoff retry and timeout.
-- [ ] Implement TikTokService with Effect retry and Content Posting API integration: Implement the TikTokService Effect.Service that uploads video/photo content to TikTok via the Content Posting API with exponential backoff retry and timeout.
-- [ ] Implement FacebookService with Effect retry and Graph API integration: Implement the FacebookService Effect.Service that publishes posts to Facebook via the Graph API /photos or /feed endpoint with exponential backoff retry and timeout.
-- [ ] Implement POST /api/v1/social/drafts/:id/publish orchestration and GET /api/v1/social/published: Implement the publish endpoint that runs all four platform Effect services in parallel for an approved draft, records per-platform social_posts rows, and exposes GET /api/v1/social/published for portfolio sync.
-- [ ] Implement JWT middleware, health endpoints, Prometheus metrics, and GDPR endpoints: Wire up JWT authentication middleware on all /api/v1/* routes, implement /health/live, /health/ready (postgres + redis + R2), /metrics with prom-client, GDPR export/delete internal endpoints, and the Kubernetes Deployment manifest.
-- [ ] Write vitest test suite targeting >= 80% coverage: Write the complete vitest test suite covering upload handler, curation pipeline, caption generation, approval workflow, all four platform Effect services with retry behavior, publish orchestration, and GDPR endpoints.
+3. **authorization.test.ts** — Unauthorized access:
+   - Test: Non-operator calling `settle_task` fails (wrong signer).
+   - Test: Non-operator calling `refund_task` fails.
+   - Test: Non-operator calling `pause` fails.
+   - Test: Non-operator calling `unpause` fails.
+   - Test: Non-customer calling `withdraw` on another customer's balance fails (wrong PDA derivation or signer).
+   - Test: Non-customer calling `update_spending_caps` on another customer's account fails.
+   - Test: Settling a task against wrong customer's balance (mismatched customer pubkey).
+
+4. **pause-behavior.test.ts** — Circuit breaker:
+   - Test: When paused, `create_customer_account` fails with `ProgramPaused`.
+   - Test: When paused, `deposit` fails with `ProgramPaused`.
+   - Test: When paused, `settle_task` fails with `ProgramPaused`.
+   - Test: When paused, `withdraw` SUCCEEDS (safety valve).
+   - Test: When paused, `refund_task` SUCCEEDS (returns funds to customers).
+   - Test: After `unpause`, all operations resume normally.
+   - Test: Only operator can pause/unpause.
+
+5. **overflow-edge.test.ts** — Arithmetic edge cases:
+   - Test: Deposit of `u64::MAX` (should succeed or fail gracefully — checked arithmetic).
+   - Test: Settle with amount that would overflow `total_spent` (pre-seed with near-max values).
+   - Test: Daily spending with values near `u64::MAX` boundary.
+   - Test: `protocol_fee_bps` computation doesn't overflow: large amount (e.g., 10^18) * 10000 bps.
+   - Test: Zero amount deposit fails with `ZeroAmount`.
+   - Test: Zero amount settlement fails with `ZeroAmount`.
+   - Test: Zero amount withdrawal fails with `ZeroAmount`.
+
+6. **double-operations.test.ts** — Idempotency and state guards:
+   - Test: Creating same customer account twice fails (Anchor init constraint).
+   - Test: Settling same `task_id_hash` twice fails (PDA already exists — Anchor init constraint).
+   - Test: Refunding an already-refunded task fails with `TaskNotSettled`.
+   - Test: Refunding a task that was never settled (doesn't exist — should fail on account validation).
+
+7. **validation.test.ts** — Input validation:
+   - Test: `initialize_operator` with `protocol_fee_bps > 10000` fails with `InvalidFeeBps`.
+   - Test: Deposit with wrong mint token account fails with `InvalidMint`.
+   - Test: `create_customer_account` with `max_per_task > max_per_day` fails (if validated).
+   - Test: Withdraw more than balance fails with `InsufficientBalance`.
+   - Test: Settle more than balance fails with `InsufficientBalance`.
+
+8. Each test must assert the specific error code, not just "transaction failed". Use Anchor's `AnchorError` parsing to validate error code matches expected `CtoPayError` variant.
+
+## Dependencies
+Tasks: 4
+
+## Subtasks
+- **Spending cap enforcement tests — per-task limits, daily limits, boundary conditions, and cap reset via slot warp**: Write spending-caps.test.ts with 7 tests verifying that the program enforces per-task and daily spending caps correctly, including boundary exact-match cases and daily reset after warping past SLOTS_PER_DAY.
+- **Authorization failure tests — wrong signer rejection for all operator and customer instructions**: Write authorization.test.ts with 7 tests verifying that all operator-gated instructions (settle, refund, pause, unpause) reject non-operator signers and all customer-gated instructions (withdraw, update_caps) reject non-owner signers.
+- **Pause behavior tests — circuit breaker blocking and safety valve pass-through verification**: Write pause-behavior.test.ts with 7 tests verifying that when the program is paused, create_customer_account/deposit/settle are blocked with ProgramPaused, while withdraw and refund_task succeed as safety valves, and unpause restores normal operation.
+- **Overflow and arithmetic edge case tests — u64 boundary, fee computation overflow, and zero amount rejection**: Write overflow-edge.test.ts with 7 tests covering u64::MAX deposits, near-overflow total_spent, large-amount fee computation, and zero-amount rejection for deposit/settle/withdraw.
+- **Double-operation guard tests — duplicate account creation, duplicate settlement, and double refund prevention**: Write double-operations.test.ts with 4 tests verifying that creating the same customer twice, settling the same task_id twice, refunding an already-refunded task, and refunding a non-existent task all fail with appropriate errors.
+- **Input validation tests — invalid fee bps, wrong mint, cap constraints, and insufficient balance**: Write validation.test.ts with 5 tests verifying that initialize_operator rejects invalid fee bps, deposit rejects wrong mint, create_customer_account validates cap relationships, and withdraw/settle reject amounts exceeding balance.

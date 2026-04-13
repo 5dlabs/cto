@@ -1,8 +1,7 @@
-## Decision Points
+## Decisions for Task 2
 
-_No explicit decision points generated._
+- Stack: Rust, Anchor 0.30.1, SPL Token
+- Agent: rex
+- Priority: high
 
-## Coordination Notes
-
-- Agent owner: rex
-- Primary stack: Rust 1.75+/Axum 0.7
+_Fallback doc: LLM generation was unavailable._

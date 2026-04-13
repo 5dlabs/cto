@@ -1,10 +1,36 @@
-Implement subtask 1004: Deploy Opstree Valkey 7.2 single-replica instance (sigma1-valkey)
+<identity>
+You are bolt working on subtask 1004 of task 1.
+</identity>
 
-## Objective
-Define and apply the Opstree Redis/Valkey operator CR for sigma1-valkey in the databases namespace using valkey/valkey:7.2-alpine, single replica.
+<context>
+<scope>
+Deploy the cto-pay-infra-endpoints ConfigMap with all 5 required keys and a separate ExternalSecret for the Helius API key, ensuring sensitive values are not inlined in the ConfigMap.
+</scope>
+</context>
 
-## Steps
-Create sigma1/infra/templates/valkey.yaml. Use the Opstree Redis operator CR (apiVersion: redis.redis.opstreelabs.in/v1beta2, kind: Redis or RedisCluster — use standalone Redis kind for single replica). metadata.name: sigma1-valkey, metadata.namespace: databases. spec.kubernetesConfig.image: valkey/valkey:7.2-alpine. spec.redisConfig or equivalent: no auth for dev (document production auth requirement). spec.storage: use default ephemeral or 5Gi PVC depending on operator defaults. Ensure the Opstree Redis operator is installed (document as prerequisite). Apply via Helm. Wait: kubectl wait redis/sigma1-valkey -n databases --for=condition=Ready --timeout=120s (or equivalent operator status condition).
+<implementation_plan>
+1. Create a 1Password item `cto-pay-helius-api-key` containing the Helius devnet API key.
+2. Configure OpenBao sync for this item.
+3. Create an ExternalSecret CR at `infra/gitops/cto-pay-helius-api-key-externalsecret.yaml` that creates K8s Secret `cto-pay-helius-api-key` with key `HELIUS_API_KEY`.
+4. Create the ConfigMap YAML at `infra/gitops/cto-pay-infra-endpoints-configmap.yaml`:
+   ```yaml
+   apiVersion: v1
+   kind: ConfigMap
+   metadata:
+     name: cto-pay-infra-endpoints
+     namespace: cto
+   data:
+     SEAWEEDFS_ENDPOINT: "http://seaweedfs-s3.cto.svc.cluster.local:8333"
+     SEAWEEDFS_BUCKET: "cto-pay-receipts"
+     SOLANA_RPC_URL: "https://devnet.helius-rpc.com"
+     SOLANA_OPERATOR_KEYPAIR_PATH: "/secrets/operator-keypair.json"
+     CTO_PAY_ENABLED: "false"
+   ```
+   Note: SOLANA_RPC_URL in ConfigMap does NOT contain the API key. The controller must read the Helius API key from the Secret and append it as a query parameter at runtime.
+5. Apply both resources and verify all keys are present.
+6. Document the expected pod spec pattern: `envFrom: [{configMapRef: {name: cto-pay-infra-endpoints}}, {secretRef: {name: cto-pay-helius-api-key}}]` plus volume mount for operator keypair.
+</implementation_plan>
 
-## Validation
-kubectl get pods -n databases shows sigma1-valkey-0 in Running state. redis-cli -h sigma1-valkey.databases.svc.cluster.local -p 6379 ping returns PONG from within the cluster (run via kubectl exec into a temporary pod).
+<validation>
+Run `kubectl get configmap cto-pay-infra-endpoints -n cto -o yaml` — contains all 5 keys with correct values. Run `kubectl get secret cto-pay-helius-api-key -n cto` — exists and contains key `HELIUS_API_KEY`. Verify SOLANA_RPC_URL in ConfigMap does NOT contain an API key substring. Verify ExternalSecret status is SecretSynced.
+</validation>

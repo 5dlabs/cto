@@ -1,32 +1,84 @@
-## Provision Core Infrastructure (Bolt - Kubernetes/Helm)
+# Task 1: Dev Infra Bootstrap — Repo Scaffold, Secrets, Receipt Storage, ConfigMap (Bolt - Anchor CLI / K8s / SeaweedFS)
 
-### Objective
-Bootstrap all foundational cluster resources for the Sigma-1 platform: namespace creation, CloudNative-PG PostgreSQL 16 cluster with six schemas, Opstree Valkey 7.2 instance, Cloudflare R2 bucket configuration, Signal-CLI pod with PVC, Kubernetes Secrets for all external APIs, and a sigma1-infra-endpoints ConfigMap aggregating all connection strings for downstream services.
+## Overview
+Bootstrap the cto-pay repo with Anchor project structure and provision all cluster-side infrastructure: SeaweedFS receipt bucket, operator keypair secret via the 1Password → OpenBao → External Secrets pipeline, and a cto-pay-infra-endpoints ConfigMap aggregating connection strings for RPC and storage. All downstream tasks depend on this.
 
-### Ownership
-- Agent: bolt
-- Stack: Kubernetes/Helm
-- Priority: high
-- Status: pending
-- Dependencies: None
+## Implementation Details
+1. **Scaffold cto-pay repo** at `https://github.com/5dlabs/cto-pay`:
+   - Run `anchor init cto-pay` with Anchor 0.30.1 (pin in Anchor.toml).
+   - Set Solana CLI version to 1.18+ in Anchor.toml.
+   - Directory structure:
+     ```
+     programs/cto-pay/src/lib.rs      ← Anchor program entry
+     programs/cto-pay/Cargo.toml
+     tests/                            ← Bankrun tests (TS)
+     cli/                              ← CLI package (Bun)
+     cli/package.json
+     cli/tsconfig.json
+     cli/src/index.ts
+     scripts/                          ← Devnet setup scripts
+     config/                           ← Token config, devnet settings
+     Anchor.toml
+     Cargo.toml (workspace)
+     package.json (root — workspace for tests + CLI)
+     tsconfig.json (root)
+     .gitignore
+     README.md
+     ```
+   - Root `package.json`: workspaces `["tests", "cli"]`, devDependencies: `@coral-xyz/anchor`, `@solana/web3.js`, `@solana/spl-token`, `typescript`, `@types/node`.
+   - `cli/package.json`: name `cto-pay`, bin `cto-pay`, dependencies: `@coral-xyz/anchor`, `@solana/web3.js`, `@solana/spl-token`, `commander` (for CLI arg parsing), `bs58`.
+   - Pin Bun 1.1+ in `.tool-versions` or `package.json#engines`.
+   - Add `.github/` directory stub for workflows (populated by Atlas in Task 12).
+   - Configure `programs/cto-pay/Cargo.toml` with: `anchor-lang = "0.30.1"`, `anchor-spl = "0.30.1"`, `solana-program = "1.18"`. Set `rust-version = "1.75"` and edition 2021.
+   - Set workspace Cargo.toml `[profile.release]` with `overflow-checks = true` and `lto = "thin"`.
+   - Add biome.json for TypeScript linting (consistent with existing CTO quality standards).
 
-### Implementation Details
-1. Create namespaces: sigma1, databases, openclaw, signal.
-2. Deploy CloudNative-PG Cluster CR named sigma1-postgres in databases namespace: PostgreSQL 16, 1 replica (dev), 50Gi storage, database sigma1, owner sigma1_user. Bootstrap initdb with extensions: uuid-ossp, pgcrypto, pg_trgm.
-3. Post-cluster init Job: CREATE SCHEMA catalog; CREATE SCHEMA rms; CREATE SCHEMA finance; CREATE SCHEMA vetting; CREATE SCHEMA social; CREATE SCHEMA audit;. Create per-service roles: sigma1_catalog, sigma1_rms, sigma1_finance, sigma1_vetting, sigma1_social each with USAGE on their respective schema only.
-4. Deploy Opstree Redis CR named sigma1-valkey in databases namespace using image valkey/valkey:7.2-alpine, single replica.
-5. Create Kubernetes Secrets in sigma1 namespace: sigma1-stripe-secret (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET), sigma1-opencorporates-secret (OPENCORPORATES_API_KEY), sigma1-linkedin-secret (LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET), sigma1-google-secret (GOOGLE_REVIEWS_API_KEY, GOOGLE_CALENDAR_CLIENT_ID, GOOGLE_CALENDAR_CLIENT_SECRET), sigma1-elevenlabs-secret (ELEVENLABS_API_KEY), sigma1-twilio-secret (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER), sigma1-openai-secret (OPENAI_API_KEY), sigma1-cloudflare-secret (CF_R2_ACCESS_KEY_ID, CF_R2_SECRET_ACCESS_KEY, CF_R2_ENDPOINT, CF_R2_BUCKET_NAME), sigma1-jwt-secret (JWT_SECRET).
-6. Deploy Signal-CLI pod in signal namespace: image signalapp/signal-cli:latest, PVC signal-cli-data (5Gi RWO) mounted at /home/signal-cli/.local/share/signal-cli. Expose as ClusterIP Service signal-cli-svc:7583 (JSON-RPC port). Document manual registration step required before first use.
-7. Create ConfigMap sigma1-infra-endpoints in sigma1 namespace with keys: CNPG_SIGMA1_URL=postgresql://sigma1_user:$(PGPASSWORD)@sigma1-postgres-rw.databases.svc.cluster.local:5432/sigma1, VALKEY_SIGMA1_URL=redis://sigma1-valkey.databases.svc.cluster.local:6379, R2_ENDPOINT=$(CF_R2_ENDPOINT), R2_BUCKET=$(CF_R2_BUCKET_NAME), SIGNAL_CLI_URL=http://signal-cli-svc.signal.svc.cluster.local:7583.
-8. Apply ArgoCD Application CR pointing to the sigma1/infra Helm chart in the GitOps repo.
-9. Validate all pods reach Running state; validate ConfigMap keys are populated; validate schema creation Job completes successfully.
+2. **Provision SeaweedFS receipt bucket** in the CTO cluster:
+   - Create bucket `cto-pay-receipts` in the existing SeaweedFS deployment (namespace `cto`).
+   - Use the SeaweedFS S3 API or `weed shell` to create the bucket.
+   - Create a K8s Job or init script in `infra/gitops/` that ensures the bucket exists.
 
-### Subtasks
-- [ ] Create Kubernetes namespaces: sigma1, databases, openclaw, signal: Define and apply Namespace manifests for all four namespaces required by the Sigma-1 platform. These namespaces gate every subsequent resource deployment.
-- [ ] Deploy CloudNative-PG PostgreSQL 16 Cluster CR (sigma1-postgres): Define and apply the CloudNative-PG Cluster custom resource for sigma1-postgres in the databases namespace with PostgreSQL 16, 1 replica (dev), 50Gi storage, and required extensions.
-- [ ] Run post-cluster schema init Job: create six schemas and per-service roles: Deploy a Kubernetes Job that connects to sigma1-postgres and creates the six application schemas (catalog, rms, finance, vetting, social, audit) plus per-service PostgreSQL roles with scoped USAGE grants.
-- [ ] Deploy Opstree Valkey 7.2 single-replica instance (sigma1-valkey): Define and apply the Opstree Redis/Valkey operator CR for sigma1-valkey in the databases namespace using valkey/valkey:7.2-alpine, single replica.
-- [ ] Create all nine Kubernetes Secrets in the sigma1 namespace: Define Helm secret templates (or ExternalSecrets if using ESO) for all nine external API secrets required by the platform in the sigma1 namespace.
-- [ ] Deploy Signal-CLI pod, PVC, and ClusterIP Service in the signal namespace: Create a PersistentVolumeClaim, Pod (or Deployment), and ClusterIP Service for Signal-CLI in the signal namespace with a 5Gi RWO volume mounted at the Signal data path.
-- [ ] Create sigma1-infra-endpoints ConfigMap aggregating all connection strings: Define the sigma1-infra-endpoints ConfigMap in the sigma1 namespace with the five required connection string keys referencing in-cluster DNS addresses for PostgreSQL, Valkey, R2, and Signal-CLI.
-- [ ] Apply ArgoCD Application CR for the sigma1/infra Helm chart and validate full stack: Create the ArgoCD Application custom resource pointing to the sigma1/infra Helm chart in the GitOps repo, sync it, and run the full validation suite confirming all pods, secrets, schemas, and the ConfigMap are healthy.
+3. **Provision operator keypair secret** via the existing secrets pipeline:
+   - Create a 1Password item `cto-pay-operator-keypair` containing the Solana keypair JSON (byte array format).
+   - Configure OpenBao to sync this item.
+   - Create an `ExternalSecret` CR in namespace `cto` that creates K8s Secret `cto-pay-operator-keypair` with key `operator-keypair.json`.
+   - The pod spec (controller) will mount this as a volume at `/secrets/operator-keypair.json`.
+   - Set `SOLANA_OPERATOR_KEYPAIR_PATH=/secrets/operator-keypair.json` in the ConfigMap.
+
+4. **Create `cto-pay-infra-endpoints` ConfigMap** in namespace `cto`:
+   ```yaml
+   apiVersion: v1
+   kind: ConfigMap
+   metadata:
+     name: cto-pay-infra-endpoints
+     namespace: cto
+   data:
+     SEAWEEDFS_ENDPOINT: "http://seaweedfs-s3.cto.svc.cluster.local:8333"
+     SEAWEEDFS_BUCKET: "cto-pay-receipts"
+     SOLANA_RPC_URL: "https://devnet.helius-rpc.com/?api-key=<HELIUS_API_KEY>"
+     SOLANA_OPERATOR_KEYPAIR_PATH: "/secrets/operator-keypair.json"
+     CTO_PAY_ENABLED: "false"
+   ```
+   - Store the Helius API key in 1Password and reference via ExternalSecret (do NOT inline in ConfigMap). Use a Secret for the RPC URL if it contains the API key, or use a separate Secret `cto-pay-helius-api-key`.
+
+5. **Generate and commit operator keypair for devnet development**:
+   - Run `solana-keygen new -o devnet-operator-keypair.json --no-bip39-passphrase` locally.
+   - Fund it on devnet: `solana airdrop 5 --keypair devnet-operator-keypair.json`.
+   - Store in 1Password for the pipeline. Add `devnet-operator-keypair.json` to `.gitignore`.
+
+6. **Create devnet setup script** at `scripts/setup-devnet.sh`:
+   - Airdrop SOL to operator and test customer wallets.
+   - Create custom SPL token mint (6 decimals) — store mint address in `config/devnet.json`.
+   - Mint test tokens to customer wallets.
+   - This script is called by CI and by developers for local setup.
+
+## Dependencies
+None
+
+## Subtasks
+- **Scaffold cto-pay Anchor repo with directory structure, Cargo.toml, and package.json workspaces**: Initialize the cto-pay repo using Anchor CLI and configure the full project directory structure, Rust workspace, TypeScript workspaces, tooling configs, and all dependency pinning.
+- **Provision SeaweedFS receipt bucket cto-pay-receipts**: Create the cto-pay-receipts bucket in the existing SeaweedFS deployment in the cto namespace, and create a K8s Job manifest in infra/gitops/ to ensure idempotent bucket creation.
+- **Provision operator keypair secret via 1Password → OpenBao → ExternalSecret pipeline**: Create the 1Password item for the operator keypair, configure OpenBao sync, and deploy the ExternalSecret CR that materializes the K8s Secret cto-pay-operator-keypair in the cto namespace.
+- **Create cto-pay-infra-endpoints ConfigMap and Helius API key ExternalSecret**: Deploy the cto-pay-infra-endpoints ConfigMap with all 5 required keys and a separate ExternalSecret for the Helius API key, ensuring sensitive values are not inlined in the ConfigMap.
+- **Generate devnet operator keypair, fund on devnet, and store in 1Password**: Generate a Solana keypair for devnet operator use, airdrop SOL to it, store it securely in 1Password for the secrets pipeline, and ensure it is gitignored.
+- **Create devnet setup script (scripts/setup-devnet.sh)**: Write the devnet bootstrap script that airdrops SOL, creates a custom SPL token mint with 6 decimals, mints test tokens to customer wallets, and writes all addresses to config/devnet.json.

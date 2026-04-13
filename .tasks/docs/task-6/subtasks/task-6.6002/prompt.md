@@ -1,10 +1,43 @@
-Implement subtask 6002: Write database migrations for social schema tables
+<identity>
+You are tess working on subtask 6002 of task 6.
+</identity>
 
-## Objective
-Create SQL migration files for the social schema: social_drafts and social_posts tables with all columns, constraints, foreign keys, and indexes.
+<context>
+<scope>
+Write authorization.test.ts with 7 tests verifying that all operator-gated instructions (settle, refund, pause, unpause) reject non-operator signers and all customer-gated instructions (withdraw, update_caps) reject non-owner signers.
+</scope>
+</context>
 
-## Steps
-Use a migration tool compatible with postgres.js (e.g., node-postgres-migrate or raw SQL files run at startup). Migration 001_social_drafts.sql: id UUID PK DEFAULT gen_random_uuid(), event_id UUID NOT NULL, source_photo_urls TEXT[] NOT NULL DEFAULT '{}', selected_photo_urls TEXT[] NOT NULL DEFAULT '{}', instagram_crop_url TEXT, linkedin_crop_url TEXT, tiktok_crop_url TEXT, caption TEXT, hashtags TEXT[] NOT NULL DEFAULT '{}', status TEXT NOT NULL CHECK (status IN ('pending_curation','ready_for_approval','approved','rejected','published')), approved_by TEXT, approved_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT now(). Migration 002_social_posts.sql: id UUID PK DEFAULT gen_random_uuid(), draft_id UUID NOT NULL REFERENCES social.social_drafts(id), platform TEXT NOT NULL CHECK (platform IN ('instagram','linkedin','tiktok','facebook')), external_post_id TEXT, published_at TIMESTAMPTZ, status TEXT NOT NULL CHECK (status IN ('pending','published','failed')), error_text TEXT. Add index on social_drafts(event_id) and social_posts(draft_id). Run migrations at application startup before Elysia listens.
+<implementation_plan>
+1. Create `tests/edge-cases/authorization.test.ts`. Import helpers and error assertion utility.
 
-## Validation
-Run migrations against a local Postgres instance; verify via `\d social.social_drafts` and `\d social.social_posts` that all columns exist with correct types. Run migrations twice and confirm idempotency. Insert a test draft and post row to confirm FK constraint works.
+2. For each test, create a fresh program context with a proper operator, then attempt the operation with a different (unauthorized) keypair as signer.
+
+3. Test 'non-operator calling settle_task fails':
+   - Initialize with operator A. Create customer, deposit. Generate random keypair B.
+   - Call settle_task with B as signer instead of A. Assert Anchor constraint error (likely `ConstraintHasOne` or `ConstraintRaw` or a custom 'Unauthorized' error — check the program's error handling).
+
+4. Test 'non-operator calling refund_task fails':
+   - Settle a task with operator A. Attempt refund with signer B. Assert authorization error.
+
+5. Test 'non-operator calling pause fails':
+   - Attempt pause with signer B. Assert authorization error.
+
+6. Test 'non-operator calling unpause fails':
+   - Pause with operator A. Attempt unpause with signer B. Assert authorization error.
+
+7. Test 'non-customer calling withdraw on another customer balance fails':
+   - Create customer1. Deposit 100M. Generate customer2 keypair. Attempt withdraw from customer1's balance signed by customer2. Assert error (PDA derivation mismatch or signer check).
+
+8. Test 'non-customer calling update_spending_caps on another account fails':
+   - Create customer1. Attempt update_spending_caps on customer1's PDA signed by customer2. Assert error.
+
+9. Test 'settling task against wrong customer balance fails':
+   - Create customer1 and customer2. Deposit to both. Attempt settle referencing customer1's PDA but with a mismatched customer pubkey or account. Assert error.
+
+10. Note: Anchor may throw different error types for constraint violations (e.g., `2003` for `ConstraintHasOne`). The tests should identify which Anchor error code is thrown and assert on it specifically. If the program uses custom errors for authorization, assert on those.
+</implementation_plan>
+
+<validation>
+Run `bun test tests/edge-cases/authorization.test.ts` — all 7 tests pass. Each test must catch a specific Anchor error code or CtoPayError variant, not just 'SendTransactionError'. Verify the unauthorized signer's transaction is fully rejected (no state changes occur).
+</validation>

@@ -1,10 +1,43 @@
-Implement subtask 6006: Implement sharp image cropping for platform-specific formats and R2 upload
+<identity>
+You are tess working on subtask 6006 of task 6.
+</identity>
 
-## Objective
-Implement the image cropping step within the curation pipeline: use sharp to generate Instagram 1:1, Instagram Story 9:16, LinkedIn 1.91:1, and TikTok 9:16 crops for each selected photo, then upload cropped versions to R2.
+<context>
+<scope>
+Write validation.test.ts with 5 tests verifying that initialize_operator rejects invalid fee bps, deposit rejects wrong mint, create_customer_account validates cap relationships, and withdraw/settle reject amounts exceeding balance.
+</scope>
+</context>
 
-## Steps
-After selecting top photos in runCurationPipeline, for each selected photo URL: download the image buffer using fetch. Use sharp(buffer).resize(1080,1080,{fit:'cover'}).toBuffer() for Instagram crop. Use sharp(buffer).resize(1080,1920,{fit:'cover'}).toBuffer() for Instagram Story and TikTok crops (same dimensions, different keys). Use sharp(buffer).resize(1200,628,{fit:'cover'}).toBuffer() for LinkedIn crop. Upload each buffer to R2: key=`events/{event_id}/crops/{photo_uuid}/{platform}.jpg`. Collect URLs. Update social_drafts: instagram_crop_url, linkedin_crop_url, tiktok_crop_url with the first selected photo's crop URLs (representative crop). Store all selected crop URLs in selected_photo_urls array. Handle sharp errors per-photo non-fatally: log warning and skip that photo's crop.
+<implementation_plan>
+1. Create `tests/edge-cases/validation.test.ts`. Import helpers and error assertion utility.
 
-## Validation
-Unit test: provide a 2000x1500 JPEG buffer, run the cropping logic, verify output buffers have correct dimensions (1080x1080, 1080x1920, 1200x628) using sharp(output).metadata(). Integration test: after curation pipeline completes for a test draft, verify instagram_crop_url, linkedin_crop_url, tiktok_crop_url are non-null and the R2 objects are accessible.
+2. Test 'initialize_operator with protocol_fee_bps > 10000 fails with InvalidFeeBps':
+   - Attempt to call initialize_operator with protocol_fee_bps = 10_001. Assert error code === 'InvalidFeeBps'. Also test with protocol_fee_bps = 65_535 (max u16) to ensure boundary is enforced.
+
+3. Test 'deposit with wrong mint token account fails':
+   - Initialize program with mint A. Create a different mint B. Create customer with an ATA for mint B. Attempt deposit providing the mint B token account. Assert Anchor constraint error (likely `ConstraintTokenMint` or custom 'InvalidMint').
+
+4. Test 'create_customer_account with max_per_task > max_per_day fails':
+   - Attempt create_customer_account with max_per_task = 200_000_000 and max_per_day = 100_000_000. If the program validates this, assert the error. If the program does NOT validate this (some designs allow it), document this test as asserting the observed behavior. Use a try/catch and log whether it passes or fails to determine program behavior.
+   - NOTE: This depends on Task 4 implementation. If the program doesn't validate this, change the test to verify the account is created (documenting the behavior) or skip with a comment.
+
+5. Test 'withdraw more than balance fails with InsufficientBalance':
+   - Create customer, deposit 50_000_000. Attempt withdraw 50_000_001. Assert error code === 'InsufficientBalance'.
+
+6. Test 'settle more than customer balance fails with InsufficientBalance':
+   - Create customer, deposit 50_000_000. Attempt settle for 50_000_001. Assert error code === 'InsufficientBalance'.
+
+7. All error assertions must check the specific error code string, not just that the transaction failed. Use the pattern:
+   ```typescript
+   try {
+     await program.methods.instruction().accounts({...}).signers([...]).rpc();
+     throw new Error('Expected error but succeeded');
+   } catch (e) {
+     expect(e.error.errorCode.code).toBe('ExpectedErrorCode');
+   }
+   ```
+</implementation_plan>
+
+<validation>
+Run `bun test tests/edge-cases/validation.test.ts` — all 5 tests pass. Verify 'InvalidFeeBps' is asserted for fee > 10000. Verify wrong mint test catches constraint error. Verify insufficient balance tests assert 'InsufficientBalance' for both withdraw and settle. Document the result of the max_per_task > max_per_day test regardless of outcome.
+</validation>

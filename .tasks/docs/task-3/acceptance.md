@@ -1,9 +1,12 @@
-## Acceptance Criteria
+## Acceptance Criteria for Task 3
 
-- [ ] 1. POST /api/v1/opportunities with valid payload returns 201 with id field and status=pending. 2. POST /api/v1/opportunities/:id/convert returns 200 and creates a project row (verify via GET /api/v1/projects/:id). 3. ScoreLead returns GREEN for opportunity with verified customer, YELLOW for unvetted, RED for flagged — verified by seeding vetting results and calling POST /api/v1/opportunities/:id/score. 4. CheckOut creates inventory_transaction of type=checkout; second CheckOut for same item in same window returns 409 Conflict. 5. GET /health/ready returns 200 with postgres and redis reachable. 6. gRPC reflection accessible on port 9090 (grpcurl list returns service names). 7. GET /internal/gdpr/delete/:id anonymizes customer_id in opportunities and projects (re-query returns null customer_id). 8. go test ./... passes with >= 80% coverage.
+1. Run `anchor build` — compiles with zero warnings.
+2. IDL contains all 4 new instructions: `create_customer_account`, `deposit`, `withdraw`, `update_spending_caps` with correct args.
+3. Verify `create_customer_account` IDL shows `max_per_task` and `max_per_day` parameters.
+4. Verify `deposit` and `withdraw` IDL show `amount` parameter.
+5. Code review: confirm `withdraw` does NOT check `operator_config.paused`.
+6. Code review: all SPL token transfers use `anchor_spl::token::Transfer` CPI, not raw invoke.
+7. Code review: every `u64` operation uses `checked_*` with error propagation.
+8. Code review: `customer_token_account.mint == operator_config.mint` validation present in deposit and withdraw account structs.
 
-## Verification Notes
-
-- [ ] Confirm dependencies are satisfied before implementation.
-- [ ] Update tests, docs, and configuration touched by this task.
-- [ ] Validate the final behavior against the task objective.
+_Generated from task metadata (LLM fallback)._

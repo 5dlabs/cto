@@ -1,1 +1,11 @@
-<acceptance><checklist><item>Implement required behavior.</item><item>Run tests and lint.</item></checklist></acceptance>
+<task id="7">
+  <agent name="cipher" stack="Anchor Verify, Soteria, Rust Security Analysis" />
+  <title>Solana Program Security Audit — Account Validation, Signer Checks, Arithmetic Safety (Cipher - Security Tooling)</title>
+  <description>Perform a security review of the CTO Pay Anchor program covering the OWASP-equivalent Solana program vulnerability classes: account validation, signer verification, arithmetic safety, PDA collision, rent exemption, and reentrancy. Produce a findings report with severity ratings and remediation guidance.</description>
+  <implementation>
+    <details>1. **Static analysis**:
+   - Run `anchor verify <PROGRAM_ID>` to confirm deployed bytecode matches source.
+   - Run Soteria static analyzer (if available): `soteria -analyzeAll</details>
+  </implementation>
+  <acceptance_criteria>Verify task outcomes.</acceptance_criteria>
+</task>

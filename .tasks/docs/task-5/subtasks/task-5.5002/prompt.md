@@ -1,10 +1,30 @@
-Implement subtask 5002: Write sqlx database migrations for vetting schema
+<identity>
+You are tess working on subtask 5002 of task 5.
+</identity>
 
-## Objective
-Create sqlx migration files under services/customer-vetting/migrations/ targeting the vetting PostgreSQL schema. Migrations must create both the vetting_requests and vetting_results tables with all columns, constraints, and indexes described in the task details.
+<context>
+<scope>
+Write initialize.test.ts covering OperatorConfig PDA creation/verification and customer-lifecycle.test.ts covering account creation, single/multiple deposits, partial/full withdrawals, and spending cap updates.
+</scope>
+</context>
 
-## Steps
-Create migrations/0001_create_vetting_requests.sql: id UUID PK DEFAULT gen_random_uuid(), org_id UUID NOT NULL, status TEXT NOT NULL CHECK (status IN ('pending','running','completed','failed')), created_at TIMESTAMPTZ NOT NULL DEFAULT now(), completed_at TIMESTAMPTZ, error_text TEXT. Create migrations/0002_create_vetting_results.sql: id UUID PK DEFAULT gen_random_uuid(), org_id UUID UNIQUE NOT NULL, business_verified BOOL, opencorporates_data JSONB, linkedin_exists BOOL, linkedin_followers INT, google_reviews_rating FLOAT4, google_reviews_count INT, credit_score INT, risk_flags TEXT[], final_score TEXT CHECK (final_score IN ('GREEN','YELLOW','RED')), vetted_at TIMESTAMPTZ, updated_at TIMESTAMPTZ NOT NULL DEFAULT now(). Add index on vetting_requests(org_id) and vetting_results(org_id). Use sqlx::migrate!() macro in main.rs to run migrations at startup.
+<implementation_plan>
+1. Create `tests/happy-path/initialize.test.ts`:
+   - Test 'initialize_operator creates OperatorConfig PDA with correct fields': Call `initializeProgram()`, fetch the OperatorConfig account, assert authority === operator.publicKey, treasury matches, mint matches, protocol_fee_bps === 500, paused === false.
+   - Test 'vault token account is created and owned by program PDA': After initialization, fetch the vault ATA, verify its owner is the program-derived vault authority PDA and its mint matches the configured mint.
+   - Test 'OperatorConfig PDA is deterministic': Re-derive the PDA using seeds and program ID, assert it matches the PDA returned during initialization.
 
-## Validation
-Run `sqlx migrate run` against a local Postgres instance in the vetting schema; verify both tables exist with correct column types using `\d vetting_results` and `\d vetting_requests` in psql. Run migrations a second time and confirm idempotency (no error).
+2. Create `tests/happy-path/customer-lifecycle.test.ts`:
+   - Test 'create_customer_account initializes CustomerBalance with zero balance and correct caps': Call `createCustomer()` with max_per_task=50_000_000, max_per_day=200_000_000. Fetch CustomerBalance PDA. Assert balance===0, max_per_task===50_000_000, max_per_day===200_000_000, total_deposited===0, total_spent===0, task_count===0, created_at > 0.
+   - Test 'deposit increases customer balance and vault balance': Deposit 50_000_000. Fetch CustomerBalance, assert balance===50_000_000, total_deposited===50_000_000. Fetch vault token account, assert its balance increased by 50_000_000.
+   - Test 'multiple deposits accumulate correctly': Deposit 50_000_000 then 30_000_000. Assert balance===80_000_000, total_deposited===80_000_000.
+   - Test 'partial withdraw decreases customer balance': Deposit 100_000_000, withdraw 40_000_000. Assert balance===60_000_000. Assert customer's ATA increased by 40_000_000.
+   - Test 'full withdraw leaves zero balance': Deposit 100_000_000, withdraw 100_000_000. Assert balance===0.
+   - Test 'update_spending_caps changes caps correctly': Create customer with initial caps, call `update_spending_caps` with new values (max_per_task=75_000_000, max_per_day=300_000_000). Fetch CustomerBalance, assert new caps are stored.
+
+3. All assertions use strict equality (===). Use `describe`/`it` blocks with business-scenario names.
+</implementation_plan>
+
+<validation>
+Run `bun test tests/happy-path/initialize.test.ts tests/happy-path/customer-lifecycle.test.ts` — all 9 tests pass. Verify 3 initialize tests and 6 customer lifecycle tests execute with zero failures. Each test independently sets up its own context via helpers.
+</validation>

@@ -1,13 +1,17 @@
-Implement subtask 7001: Create OpenClaw agent.yaml and system-prompt.md for Morgan
+<identity>
+You are cipher working on subtask 7001 of task 7.
+</identity>
 
-## Objective
-Author the core OpenClaw agent configuration file at agents/morgan/agent.yaml and the system prompt at agents/morgan/system-prompt.md defining Morgan's persona, responsibilities, and decision trees.
+<context>
+<scope>
+Run anchor verify against the deployed program ID to cryptographically confirm that the on-chain bytecode was compiled from the audited source tree. This is the foundational trust prerequisite — all subsequent analysis is meaningless if source does not match deployment.
+</scope>
+</context>
 
-## Steps
-1. Create agents/morgan/agent.yaml with fields: agent_id: morgan, model: openai-api/gpt-4o, namespace: openclaw, description, and references to tools.yaml and skills/ directory.
-2. Create agents/morgan/system-prompt.md. Content must cover: (a) company context — Sigma-1/Perception Events, lighting and visual production; (b) persona — professional, efficient, friendly; (c) core responsibilities: lead qualification, quote generation, customer vetting, invoicing, social media content approval; (d) decision trees for each responsibility as numbered flowcharts in markdown; (e) tone guidelines and escalation rules.
-3. Validate agent.yaml against OpenClaw schema using `openclaw validate agents/morgan/agent.yaml`.
-4. Ensure system prompt fits within the model's context window — keep under 4000 tokens.
+<implementation_plan>
+1. Ensure the exact Anchor and Solana CLI versions used for deployment are installed (check Anchor.toml and rust-toolchain.toml). 2. Run `anchor verify <PROGRAM_ID> --provider-url <RPC_URL>` targeting the relevant cluster (devnet or mainnet). 3. If verification fails, document the mismatch: compare build hashes, check for non-deterministic compilation factors (Solana SDK version drift, feature flags). 4. Record the verified commit SHA, Anchor version, and Solana CLI version as audit metadata. 5. If anchor verify is not feasible (e.g., no deployment yet), document this gap and note that bytecode verification must occur before any mainnet deployment.
+</implementation_plan>
 
-## Validation
-`openclaw validate agents/morgan/agent.yaml` exits 0 with no errors. Character count of system-prompt.md is below 16000 chars. Manual review confirms all 5 responsibility areas have explicit decision tree branches.
+<validation>
+Verification passes: `anchor verify` exits 0 with a matching hash. If it fails, the mismatch is documented with root cause. Audit metadata file contains commit SHA, toolchain versions, and verification timestamp.
+</validation>

@@ -1,10 +1,31 @@
-Implement subtask 6005: Implement AI photo curation pipeline with OpenAI vision scoring
+<identity>
+You are tess working on subtask 6005 of task 6.
+</identity>
 
-## Objective
-Implement the async curation pipeline that scores each uploaded photo using OpenAI gpt-4o vision API, selects the top 5-10 photos, and updates the draft's selected_photo_urls.
+<context>
+<scope>
+Write double-operations.test.ts with 4 tests verifying that creating the same customer twice, settling the same task_id twice, refunding an already-refunded task, and refunding a non-existent task all fail with appropriate errors.
+</scope>
+</context>
 
-## Steps
-Create src/pipelines/curation.ts. Function runCurationPipeline(draft_id, source_urls): for each source URL, call OpenAI chat.completions.create with model='gpt-4o', messages containing image_url content blocks and a scoring prompt: 'Score this photo on composition (0-10), lighting (0-10), and subject clarity (0-10). Return JSON {composition, lighting, clarity}.' Parse response JSON. Compute total = composition+lighting+clarity. Sort photos by total descending. Select top min(10, all) where total >= 15 (threshold for quality gate); ensure at least 1 photo is selected regardless of threshold. Update social_drafts SET selected_photo_urls=$1, status='ready_for_approval' WHERE id=$2. Wrap entire pipeline in try/catch; on error set status='pending_curation' with error logged via pino. Use OPENAI_API_KEY from environment.
+<implementation_plan>
+1. Create `tests/edge-cases/double-operations.test.ts`. Import helpers and error assertion utility.
 
-## Validation
-Integration test with mocked OpenAI API (vitest mock): supply 5 photos with mock scores [28, 22, 15, 10, 5]. Verify selected_photo_urls contains the top 3 (scores >= 15) and draft status transitions to 'ready_for_approval'. Test error path: OpenAI throws → draft status remains 'pending_curation' and error is logged.
+2. Test 'creating same customer account twice fails':
+   - Create customer1 via `create_customer_account`. Attempt to call `create_customer_account` again with the same customer pubkey and operator config (same PDA seeds). Assert Anchor's `init` constraint error — the account already exists. Expected error: Anchor error code `0` (AccountAlreadyInUse) or similar init constraint violation.
+
+3. Test 'settling same task_id_hash twice fails':
+   - Create customer, deposit. Settle task 'TASK-1' (creates TaskReceipt PDA). Attempt to settle 'TASK-1' again. The TaskReceipt PDA already exists, so Anchor's `init` constraint fails. Assert the init constraint error.
+
+4. Test 'refunding an already-refunded task fails with TaskNotSettled':
+   - Settle task 'TASK-1'. Refund it (succeeds, status = Refunded). Attempt refund again on the same TaskReceipt. Assert error code === 'TaskNotSettled' (since the program should check status === Settled before allowing refund).
+
+5. Test 'refunding a non-existent task fails':
+   - Compute a TaskReceipt PDA for a task_id_hash that was never settled. Attempt to call refund_task with this PDA. Assert error — the account doesn't exist, so Anchor's account deserialization should fail (AccountNotInitialized or similar).
+
+6. For each test, verify that no state changes occurred after the failed operation (customer balance unchanged, vault balance unchanged).
+</implementation_plan>
+
+<validation>
+Run `bun test tests/edge-cases/double-operations.test.ts` — all 4 tests pass. Verify duplicate creation test catches Anchor init constraint error. Verify duplicate settlement catches init constraint error. Verify double refund asserts 'TaskNotSettled'. Verify non-existent refund asserts account validation error.
+</validation>

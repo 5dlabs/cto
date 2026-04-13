@@ -2,1279 +2,921 @@
 
 ## 1. Original Requirements
 
-> # Project: Sigma-1 — Unified AI Business Platform
+> # Project: CTO Pay — On-Chain Usage-Based Payments for the CTO Platform
 >
-> - **Website:** https://sigma-1.com
-> - **Existing Platform:** https://deployiq.maximinimal.ca
+> - **Organization:** 5D Labs
+> - **Status:** Draft
+> - **Target:** Solana Agent Hackathon (April 2026)
+> - **Repo:** https://github.com/5dlabs/cto-pay
 >
 > ## Vision
 >
-> Sigma-1 is a comprehensive AI-powered business platform that replaces fragmented tools, manual processes, and administrative overhead with a single intelligent agent — **Morgan** — accessible through Signal, phone, and web. Built for Sigma-1 / Perception Events, a lighting and visual production company.
+> CTO Pay is the on-chain payment and settlement layer for the CTO platform. It replaces traditional off-chain billing with a Solana program that lets customers pre-pay USDC into an escrow account, have their usage metered per task, and receive verifiable on-chain receipts for every charge. Every payment is transparent, auditable, and composable.
 >
-> Instead of juggling rental software, spreadsheets, phone calls, accounting tools, and social media apps, everything runs through one interface: send Morgan a message, and it handles the rest.
->
-> This is a microservices architecture demonstrating full CTO platform agent utilization across multiple tech stacks, similar to the AlertHub pattern.
+> The long-term goal is a protocol-grade billing rail that supports usage-based payments today, and extends to agent registry royalty splits, attestation-gated settlement, and a full agent marketplace tomorrow — without rewriting the core program.
 >
 > ---
 >
 > ## Architecture Overview
 >
 > ```
-> ┌─────────────────────────────────────────────────────────────────────┐
-> │                     Sigma-1 Platform                                 │
-> ├─────────────────────────────────────────────────────────────────────┤
-> │  Clients                                                             │
-> │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-> │  │  Signal  │  │   Voice  │  │   Web    │  │  Mobile  │        │
-> │  │  (Morgan)│  │ (ElevenLabs│ │ (Next.js)│  │  (Expo)  │        │
-> │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘        │
-> │       │             │             │             │                 │
-> ├───────┴─────────────┴─────────────┴─────────────┴─────────────────┤
-> │  Backend Services                                                    │
-> │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐      │
-> │  │   Equipment    │  │     RMS        │  │    Finance     │      │
-> │  │   Catalog      │  │   Service      │  │    Service     │      │
-> │  │   (Rust/Axum)  │  │   (Go/gRPC)    │  │   (Rust/Axum)  │      │
-> │  │     Rex        │  │     Grizz      │  │     Rex        │      │
-> │  └───────┬────────┘  └───────┬────────┘  └───────┬────────┘      │
-> │          │                    │                    │                 │
-> │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐      │
-> │  │   (Out of      │  │     Social     │  │    Customer    │      │
-> │  │    Scope)      │  │    Engine      │  │    Vetting     │      │
-> │  │  (Phase 2)    │  │(Node/Elysia)  │  │  (Rust/Axum)   │      │
-> │  │                │  │     Nova       │  │     Rex        │      │
-> │  └───────┬────────┘  └───────┬────────┘  └───────┬────────┘      │
-> │          │                    │                    │                 │
-> ├──────────┴────────────────────┴────────────────────┴─────────────────┤
-> │  Infrastructure                                                      │
-> │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐     │
-> │  │PostgreSQL│ │  Redis  │ │  S3/R2  │ │ ElevenLabs│ │ Twilio  │     │
-> │  │         │ │         │ │         │ │          │ │         │     │
-> │  └─────────┘ └─────────┘ └─────────┘ └──────────┘ └─────────┘     │
-> │  ┌─────────┐ ┌─────────┐                                             │
-> │  │SignalCLI│ │OpenCorporates│                                         │
-> │  └─────────┘ └─────────┘                                             │
-> └─────────────────────────────────────────────────────────────────────┘
+> ┌─────────────────────────────────────────────────────────────────────────┐
+> │                         CTO Pay Platform                                │
+> ├─────────────────────────────────────────────────────────────────────────┤
+> │  Customer                                                               │
+> │  ┌──────────────┐                                                       │
+> │  │ Solana Wallet │  (Phantom, Backpack, Solflare)                       │
+> │  │  USDC deposit │                                                      │
+> │  └──────┬───────┘                                                       │
+> │         │                                                               │
+> ├─────────┴───────────────────────────────────────────────────────────────┤
+> │  Solana Program (Anchor)                                                │
+> │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐      │
+> │  │  OperatorConfig   │  │ CustomerBalance  │  │   TaskReceipt    │      │
+> │  │  (PDA, singleton) │  │ (PDA per cust.)  │  │  (PDA per task)  │      │
+> │  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘      │
+> │           │                     │                      │                │
+> │  ┌────────┴─────────────────────┴──────────────────────┴────────┐      │
+> │  │                     Program Vault (USDC)                      │      │
+> │  │         Holds all customer deposits; program is authority     │      │
+> │  └──────────────────────────────────────────────────────────────┘      │
+> │                                                                         │
+> ├─────────────────────────────────────────────────────────────────────────┤
+> │  CTO Controller (Kubernetes)                                            │
+> │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐      │
+> │  │  Usage Metering   │  │ Receipt Builder  │  │ Settlement Hook  │      │
+> │  │  (pod duration,   │  │ (JSON → hash →   │  │ (submit settle/  │      │
+> │  │   infra tier)     │  │  off-chain store) │  │  refund to chain)│      │
+> │  └──────────────────┘  └──────────────────┘  └──────────────────┘      │
+> │                                                                         │
+> ├─────────────────────────────────────────────────────────────────────────┤
+> │  Off-Chain Storage                                                      │
+> │  ┌──────────┐  ┌──────────┐                                             │
+> │  │  Arweave  │  │   S3     │  (itemized receipt JSON blobs)             │
+> │  └──────────┘  └──────────┘                                             │
+> ├─────────────────────────────────────────────────────────────────────────┤
+> │  Future Extensions (not in scope)                                       │
+> │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  │
+> │  │ Agent Registry│  │ Attestations │  │  Marketplace  │                 │
+> │  │ (royalty      │  │ (Tess/Cipher/│  │  (skill NFTs, │                 │
+> │  │  splits)      │  │  Stitch sigs)│  │   curation)   │                 │
+> │  └──────────────┘  └──────────────┘  └──────────────┘                  │
+> └─────────────────────────────────────────────────────────────────────────┘
 > ```
 >
 > ---
 >
 > ## Services (Workstreams)
 >
-> ### 1. Morgan AI Agent (OpenClaw)
+> ### 1. Solana Program — Anchor (Rust)
 >
-> **Agent**: Morgan (OpenClaw agent)
+> **Agent**: Rex
 > **Priority**: Critical
-> **Runtime**: OpenClaw with MCP tools
+> **Language**: Rust (Anchor framework)
+> **Target**: Solana devnet (mainnet-beta post-hackathon)
 >
-> The central AI agent that handles all customer interactions via Signal, voice, and web chat.
+> The on-chain program that holds customer deposits, enforces spending caps, settles task payments, and writes verifiable receipts.
 >
-> **Core Features**:
-> - Signal messenger integration (receive/send messages, photos)
-> - Voice calls via ElevenLabs (SIP/PSTN, natural conversation)
-> - Web chat widget for website
-> - Lead qualification and customer vetting
-> - Quote generation coordination
-> - Social media approval workflow
-> - Natural language queries to all backend services
+> **Accounts (PDAs)**:
 >
-> **MCP Tools** (accesses via tool-server):
 > ```
-> sigma1_catalog_search     — search products by name/category/specs
-> sigma1_check_availability — check date range availability for items
-> sigma1_generate_quote     — create opportunity with line items
-> sigma1_vet_customer       — run background check pipeline
-> sigma1_score_lead         — compute GREEN/YELLOW/RED score
-> sigma1_create_invoice     — generate invoice from project
-> sigma1_finance_report     — pull financial summaries
-> sigma1_social_curate      — trigger photo curation pipeline
-> sigma1_social_publish     — publish approved draft
-> sigma1_equipment_lookup   — search secondary markets for arbitrage
+> OperatorConfig (PDA, singleton)
+> ├── authority: Pubkey          // 5D Labs operator wallet
+> ├── treasury: Pubkey           // 5D Labs revenue wallet
+> ├── protocol_fee_bps: u16     // protocol fee (basis points)
+> └── paused: bool               // circuit breaker
+>
+> CustomerBalance (PDA, seeded by customer pubkey)
+> ├── customer: Pubkey
+> ├── balance: u64               // USDC lamports
+> ├── total_deposited: u64
+> ├── total_spent: u64
+> ├── task_count: u64
+> ├── max_per_task: u64          // spending cap per task
+> ├── max_per_day: u64           // daily spending cap
+> ├── daily_spent: u64
+> ├── daily_reset_slot: u64
+> └── created_at: i64
+>
+> TaskReceipt (PDA, seeded by task_id)
+> ├── task_id: String
+> ├── customer: Pubkey
+> ├── amount: u64                // USDC charged
+> ├── receipt_hash: [u8; 32]     // SHA-256 of off-chain receipt JSON
+> ├── operator: Pubkey
+> ├── settled_at: i64
+> └── status: TaskStatus         // Settled | Refunded | Disputed
 > ```
 >
-> **Skills**:
-> - `sales-qual` — Lead qualification workflow
-> - `customer-vet` — Background research (OpenCorporates, LinkedIn, Google Reviews)
-> - `quote-gen` — Equipment quote generation
-> - `upsell` — Insurance, services, packages recommendations
-> - `finance` — Invoice generation, financial summaries
-> - `social-media` — Photo curation, caption generation
-> - `rms-*` — Rental management operations
-> - `admin` — Calendar, email drafting, document management
+> **Instructions**:
 >
-> **Infrastructure Dependencies**:
-> - Signal-CLI (sidecar or separate pod)
-> - ElevenLabs (voice)
-> - Twilio (phone numbers, SIP/PSTN)
-> - All backend service APIs
+> ```
+> initialize_operator(authority, treasury, protocol_fee_bps)
+>   → Creates OperatorConfig PDA. Called once at program deployment.
+>
+> create_customer_account(max_per_task, max_per_day)
+>   → Creates CustomerBalance PDA for the signing customer.
+>
+> deposit(amount)
+>   → Transfers USDC from customer's token account to the program vault.
+>      Increments customer balance.
+>
+> withdraw(amount)
+>   → Transfers USDC from program vault back to customer.
+>      Decrements customer balance. Customer-signed.
+>
+> settle_task(task_id, amount, receipt_hash)
+>   → Called by operator wallet after CodeRun completion.
+>      Validates: operator authorized, sufficient balance, within caps.
+>      Debits customer, credits treasury, writes TaskReceipt.
+>
+> refund_task(task_id)
+>   → Called by operator wallet.
+>      Marks TaskReceipt as Refunded. Credits amount back to customer.
+>
+> update_spending_caps(max_per_task, max_per_day)
+>   → Called by customer. Updates their spending limits.
+>
+> pause / unpause
+>   → Called by operator. Circuit breaker for emergencies.
+> ```
+>
+> **Testing**:
+> - Anchor integration tests (TypeScript, `anchor test`)
+> - Bankrun for fast local program tests
+> - Devnet deployment and manual verification
 >
 > ---
 >
-> ### 2. Equipment Catalog Service (Rust/Axum)
+> ### 2. Settlement Hook — CTO Controller Integration (Rust)
 >
 > **Agent**: Rex
 > **Priority**: High
-> **Language**: Rust 1.75+
-> **Framework**: Axum 0.7
+> **Language**: Rust
+> **Location**: `crates/controller/` in the main CTO repo (integration points documented here)
 >
-> High-performance API for equipment inventory, availability checking, and self-service quoting.
+> The CTO Kubernetes controller submits settlement transactions after each CodeRun reaches a terminal state.
 >
-> **Endpoints**:
-> ```
-> GET    /api/v1/catalog/categories           — List categories
-> GET    /api/v1/catalog/products             — List products (filterable)
-> GET    /api/v1/catalog/products/:id        — Get product details
-> GET    /api/v1/catalog/products/:id/availability?from=&to= — Check availability
-> POST   /api/v1/catalog/products             — Add product (admin)
-> PATCH  /api/v1/catalog/products/:id         — Update product (admin)
-> GET    /api/v1/equipment-api/catalog       — Machine-readable (for AI agents)
-> POST   /api/v1/equipment-api/checkout      — Programmatic booking
-> GET    /metrics                             — Prometheus metrics
-> GET    /health/live                          — Liveness probe
-> GET    /health/ready                        — Readiness probe
-> ```
+> **Integration Points**:
 >
-> **Core Features**:
-> - 533+ products across 24 categories
-> - Real-time availability checking
-> - Barcode/SKU lookup
-> - Image serving (S3/R2 CDN)
-> - Machine-readable equipment API for other AI agents
-> - Rate limiting per tenant
+> | Point | File (in CTO repo) | Change |
+> |-------|---------------------|--------|
+> | Solana config | `crates/controller/src/tasks/config.rs` | Add RPC endpoint + operator keypair path |
+> | Settlement hook | `crates/controller/src/tasks/code/controller.rs` | After terminal state: compute bill → build receipt → submit `settle_task` |
+> | Wallet mapping | Customer profile model | Add `solana_pubkey` field |
+> | Tx recording | CodeRun CRD status | Add `on_chain_settlement_sig` field |
 >
-> **Data Models**:
-> ```rust
-> struct Product {
->     id: Uuid,
->     name: String,
->     category_id: Uuid,
->     description: String,
->     day_rate: Decimal,
->     weight_kg: Option<f32>,
->     dimensions: Option<Dimensions>,
->     image_urls: Vec<String>,
->     specs: JsonB,
->     created_at: DateTime<Utc>,
-> }
+> **Settlement Flow**:
 >
-> struct Category {
->     id: Uuid,
->     name: String,
->     parent_id: Option<Uuid>,
->     icon: String,
->     sort_order: i32,
-> }
+> 1. CodeRun transitions to terminal state (merged / failed / cancelled).
+> 2. Controller computes billable amount from pod duration + infra tier.
+> 3. Builds itemized receipt JSON (CodeRun minutes, compute, AI tokens if managed-key).
+> 4. Uploads receipt to off-chain storage (Arweave or S3).
+> 5. Hashes the receipt (SHA-256).
+> 6. Submits `settle_task` instruction to Solana program (or `refund_task` on failure).
+> 7. Records the transaction signature on the CodeRun status.
 >
-> struct Availability {
->     product_id: Uuid,
->     date_from: NaiveDate,
->     date_to: NaiveDate,
->     quantity_available: i32,
->     reserved: i32,
->     booked: i32,
-> }
-> ```
->
-> **Infrastructure Dependencies**:
-> - PostgreSQL (product catalog, availability)
-> - Redis (rate limiting, caching)
-> - S3/R2 (product images)
+> **Secrets**: Operator keypair managed via the existing pipeline (1Password → OpenBao → External Secrets Operator → K8s secret → pod env var).
 >
 > ---
 >
-> ### 3. Rental Management System — RMS (Go/gRPC)
->
-> **Agent**: Grizz
-> **Priority**: High
-> **Language**: Go 1.22+
-> **Framework**: gRPC with grpc-gateway for REST
->
-> Full replacement for Current RMS — bookings, projects, inventory, logistics, crew management.
->
-> **gRPC Services**:
-> ```protobuf
-> service OpportunityService {
->   rpc CreateOpportunity(CreateOpportunityRequest) returns (Opportunity);
->   rpc GetOpportunity(GetOpportunityRequest) returns (Opportunity);
->   rpc UpdateOpportunity(UpdateOpportunityRequest) returns (Opportunity);
->   rpc ListOpportunities(ListOpportunitiesRequest) returns (ListOpportunitiesResponse);
->   rpc ScoreLead(ScoreLeadRequest) returns (LeadScore);
-> }
->
-> service ProjectService {
->   rpc CreateProject(CreateProjectRequest) returns (Project);
->   rpc GetProject(GetProjectRequest) returns (Project);
->   rpc UpdateProject(UpdateProjectRequest) returns (Project);
->   rpc CheckOut(CheckOutRequest) returns (CheckOutResponse);
->   rpc CheckIn(CheckInRequest) returns (CheckInResponse);
-> }
->
-> service InventoryService {
->   rpc GetStockLevel(GetStockLevelRequest) returns (StockLevel);
->   rpc RecordTransaction(RecordTransactionRequest) returns (Transaction);
->   rpc ScanBarcode(ScanBarcodeRequest) returns (InventoryItem);
-> }
->
-> service CrewService {
->   rpc ListCrew(ListCrewRequest) returns (ListCrewResponse);
->   rpc AssignCrew(AssignCrewRequest) returns (Project);
->   rpc ScheduleCrew(ScheduleCrewRequest) returns (Schedule);
-> }
->
-> service DeliveryService {
->   rpc ScheduleDelivery(ScheduleDeliveryRequest) returns (Delivery);
->   rpc UpdateDeliveryStatus(UpdateDeliveryStatusRequest) returns (Delivery);
->   rpc OptimizeRoute(OptimizeRouteRequest) returns (Route);
-> }
-> ```
->
-> **REST Endpoints** (via grpc-gateway):
-> ```
-> # Opportunities (Quotes)
-> POST   /api/v1/opportunities
-> GET    /api/v1/opportunities/:id
-> PATCH  /api/v1/opportunities/:id
-> POST   /api/v1/opportunities/:id/approve
-> POST   /api/v1/opportunities/:id/convert    # → project
->
-> # Projects
-> GET    /api/v1/projects
-> GET    /api/v1/projects/:id
-> POST   /api/v1/projects/:id/checkout
-> POST   /api/v1/projects/:id/checkin
->
-> # Inventory
-> GET    /api/v1/inventory/transactions
-> POST   /api/v1/inventory/transactions
->
-> # Crew
-> GET    /api/v1/crew
-> POST   /api/v1/crew/assign
->
-> # Deliveries
-> POST   /api/v1/deliveries/schedule
-> GET    /api/v1/deliveries/:id/route
-> ```
->
-> **Core Features**:
-> - Quote-to-project workflow
-> - Barcode scanning for check-out/check-in
-> - Crew scheduling and assignment
-> - Vehicle/delivery tracking
-> - Calendar integration (Google Calendar)
-> - Conflict detection
->
-> **Data Models**:
-> ```go
-> type Opportunity struct {
->     ID          uuid.UUID
->     CustomerID  uuid.UUID
->     Status      string // pending, qualified, approved, converted
->     EventDateStart time.Time
->     EventDateEnd   time.Time
->     Venue       string
->     TotalEstimate decimal.Decimal
->     LeadScore   string // GREEN, YELLOW, RED
->     Notes       string
-> }
->
-> type Project struct {
->     ID              uuid.UUID
->     OpportunityID   uuid.UUID
->     CustomerID      uuid.UUID
->     Status          string // confirmed, in_progress, completed, cancelled
->     ConfirmedAt     *time.Time
->     EventDates      DateRange
->     VenueAddress    string
->     CrewNotes       string
-> }
->
-> type InventoryTransaction struct {
->     ID            uuid.UUID
->     InventoryID   uuid.UUID
->     Type          string // checkout, checkin, transfer
->     ProjectID     *uuid.UUID
->     FromStoreID   uuid.UUID
->     ToStoreID     uuid.UUID
->     Timestamp     time.Time
->     UserID        uuid.UUID
-> }
-> ```
->
-> **Infrastructure Dependencies**:
-> - PostgreSQL (all RMS data)
-> - Redis (session cache)
-> - Google Calendar API
->
-> ---
->
-> ### 4. Finance Service (Rust/Axum)
->
-> **Agent**: Rex
-> **Priority**: High
-> **Language**: Rust 1.75+
-> **Framework**: Axum 0.7
->
-> Invoicing, payments, AP/AR, payroll, multi-currency support. Replaces QuickBooks/Xero.
->
-> **Endpoints**:
-> ```
-> # Invoices
-> POST   /api/v1/invoices                    — Create invoice
-> GET    /api/v1/invoices                    — List invoices
-> GET    /api/v1/invoices/:id                — Get invoice
-> POST   /api/v1/invoices/:id/send           — Send to customer
-> POST   /api/v1/invoices/:id/paid           — Record payment
->
-> # Payments
-> POST   /api/v1/payments                    — Record payment
-> GET    /api/v1/payments                    — List payments
-> GET    /api/v1/payments/invoice/:id        — Payments for invoice
->
-> # Finance Reports
-> GET    /api/v1/finance/reports/revenue?period=    — Revenue report
-> GET    /api/v1/finance/reports/aging               — AR aging report
-> GET    /api/v1/finance/reports/cashflow            — Cash flow report
-> GET    /api/v1/finance/reports/profitability       — Job profitability
->
-> # Payroll
-> GET    /api/v1/payroll?period=            — Payroll report
-> POST   /api/v1/payroll/entries            — Add payroll entry
->
-> # Currency
-> GET    /api/v1/currency/rates             — Current rates
-> ```
->
-> **Core Features**:
-> - Quote-to-invoice conversion
-> - Multi-currency support (USD, CAD, AUD, NZD, etc.)
-> - Stripe integration for payments
-> - Automated payment reminders
-> - AR aging reports
-> - Payroll tracking (contractor/employee)
-> - Tax calculation (GST/HST, US sales tax, international)
-> - Currency rate sync (scheduled job)
->
-> **Data Models**:
-> ```rust
-> struct Invoice {
->     id: Uuid,
->     project_id: Uuid,
->     org_id: Uuid,
->     invoice_number: String,
->     status: InvoiceStatus, // draft, sent, viewed, paid, overdue
->     issued_at: DateTime<Utc>,
->     due_at: NaiveDate,
->     currency: String,
->     subtotal_cents: i64,
->     tax_cents: i64,
->     total_cents: i64,
->     paid_amount_cents: i64,
->     stripe_invoice_id: Option<String>,
-> }
->
-> struct Payment {
->     id: Uuid,
->     invoice_id: Uuid,
->     amount_cents: i64,
->     currency: String,
->     method: PaymentMethod, // cash, check, wire, card, stripe
->     stripe_payment_id: Option<String>,
->     received_at: DateTime<Utc>,
-> }
->
-> enum InvoiceStatus {
->     Draft,
->     Sent,
->     Viewed,
->     Paid,
->     Overdue,
->     Cancelled,
-> }
-> ```
->
-> **Infrastructure Dependencies**:
-> - PostgreSQL (finance data)
-> - Stripe API
-> - Redis (currency rate cache)
->
-> ---
->
-> ### 5. Customer Vetting Service (Rust/Axum)
->
-> **Agent**: Rex
-> **Priority**: High
-> **Language**: Rust 1.75+
-> **Framework**: Axum 0.7
->
-> Automated background research on prospects: business registration, online presence, reputation, credit signals.
->
-> **Endpoints**:
-> ```
-> POST   /api/v1/vetting/run                 — Run full vetting pipeline
-> GET    /api/v1/vetting/:org_id             — Get vetting results
-> GET    /api/v1/vetting/credit/:org_id      — Get credit signals
-> ```
->
-> **Core Features**:
-> - OpenCorporates API integration (business registration verification)
-> - LinkedIn company research
-> - Google Reviews sentiment analysis
-> - Credit signal lookup (via commercial APIs)
-> - Automated GREEN/YELLOW/RED scoring
->
-> **Vetting Pipeline**:
-> 1. **Business Verification** — OpenCorporates: company exists, good standing, directors
-> 2. **Online Presence** — LinkedIn page, website, social media
-> 3. **Reputation** — Google Reviews, industry mentions
-> 4. **Credit Signals** — Payment history indicators, financial health
-> 5. **Final Score** — Weighted algorithm → GREEN/YELLOW/RED
->
-> **Data Models**:
-> ```rust
-> struct VettingResult {
->     org_id: Uuid,
->     business_verified: bool,
->     opencorporates_data: Option<OpenCorporatesData>,
->     linkedin_exists: bool,
->     linkedin_followers: i32,
->     google_reviews_rating: Option<f32>,
->     google_reviews_count: i32,
->     credit_score: Option<i32>,
->     risk_flags: Vec<String>,
->     final_score: LeadScore,
->     vetted_at: DateTime<Utc>,
-> }
->
-> enum LeadScore {
->     GREEN,  // Proceed with confidence
->     YELLOW, // More verification needed
->     RED,    // High risk, decline or require deposit
-> }
-> ```
->
-> **Infrastructure Dependencies**:
-> - PostgreSQL (vetting results)
-> - OpenCorporates API
-> - LinkedIn API
-> - Google Reviews (scraping or API)
-> - Credit data APIs
->
-> ---
->
-> > **Note:** Trading Desk service is out of scope for Phase 1 (Python not in core stack).
->
-> ### 7. Social Media Engine (Node.js/Elysia + Effect)
->
-> **Agent**: Nova
-> **Priority**: Medium
-> **Runtime**: Node.js 20+
-> **Framework**: Elysia 1.x with Effect TypeScript
->
-> Automated content curation, caption generation, and multi-platform publishing.
->
-> **Endpoints**:
-> ```
-> POST   /api/v1/social/upload               — Upload event photos
-> GET    /api/v1/social/drafts                — List draft posts
-> GET    /api/v1/social/drafts/:id            — Get draft details
-> POST   /api/v1/social/drafts/:id/approve    — Approve for publishing
-> POST   /api/v1/social/drafts/:id/reject    — Reject draft
-> POST   /api/v1/social/drafts/:id/publish   — Publish to platforms
-> GET    /api/v1/social/published            — List published posts
-> ```
->
-> **Core Features**:
-> - **AI Curation** — Score compositions, select top 5-10 images
-> - **Platform-specific cropping** — Instagram (square/Story), LinkedIn (landscape), TikTok
-> - **Caption generation** — Event context, equipment featured, hashtags
-> - **Multi-platform publishing** — Instagram, TikTok, LinkedIn, Facebook
-> - **Approval workflow** — Morgan sends drafts to Mike via Signal, one-tap approval
-> - **Portfolio sync** — Published content → website automatically
->
-> **Content Pipeline**:
-> ```
-> Event Photos → AI Curation → Draft Generation → Signal Approval → Multi-Platform Publish
-> ```
->
-> **Effect Integration**:
-> | Pattern | Usage |
-> |---------|-------|
-> | `Effect.Service` | InstagramService, LinkedInService, TikTokService |
-> | `Effect.retry` | API delivery with exponential backoff |
-> | `Effect.Schema` | Request/response validation |
->
-> **Infrastructure Dependencies**:
-> - PostgreSQL (drafts, published posts)
-> - Instagram Graph API
-> - LinkedIn API
-> - Facebook Graph API
-> - S3/R2 (photo storage)
-> - OpenAI/Claude for caption generation
->
-> ---
->
-> ### 8. Website — Next.js 15 (React/Next.js + Effect)
+> ### 3. CLI / Demo Script (TypeScript)
 >
 > **Agent**: Blaze
 > **Priority**: High
-> **Framework**: Next.js 15 (App Router)
-> **UI**: React 19, shadcn/ui, TailwindCSS 4
-> **Type System**: Effect 3.x + TypeScript 5.x
+> **Language**: TypeScript (Bun runtime)
+> **Framework**: `@coral-xyz/anchor`, `@solana/web3.js`
 >
-> AI-optimized website with equipment catalog, self-service quotes, and Morgan web chat.
+> A CLI tool and demo script that simulates the full settlement loop end-to-end on devnet. Used for hackathon demo video and local development.
 >
-> **Pages**:
-> | Route | Purpose | Effect Usage |
-> |-------|---------|----|
-> | `/` | Hero, value prop, CTA | Static content |
-> | `/equipment` | Browse 533+ products | Effect data fetching |
-> | `/equipment/:id` | Product detail + availability | Effect Schema validation |
-> | `/quote` | Self-service quote builder | Effect form validation |
-> | `/portfolio` | Past events gallery | Effect data fetching |
-> | `/llms.txt` | Machine-readable for AI agents | Static |
-> | `/llms-full` | Full content dump for AI | Static |
+> **Commands**:
 >
-> **Core Features**:
-> - **Equipment catalog** with real-time availability
-> - **Self-service quote builder** — Select products, dates → submit for review
-> - **Morgan web chat** — Embedded chat widget
-> - **AI-native optimization** — llms.txt, Schema.org structured data
-> - **Project portfolio** — Event photos, equipment used, testimonials
->
-> **Technology Stack**:
-> | Component | Technology |
-> |-----------|------------|
-> | Framework | Next.js 15 App Router |
-> | UI Library | React 19 |
-> | Components | shadcn/ui |
-> | Styling | TailwindCSS 4 |
-> | Type System | Effect + TypeScript 5.x |
-> | Validation | Effect Schema |
-> | Data Fetching | TanStack Query + Effect |
-> | Hosting | Cloudflare Pages |
->
-> **Infrastructure Dependencies**:
-> - Cloudflare Pages (static + SSR)
-> - Equipment Catalog API
-> - Morgan agent (web chat)
->
-> ---
->
-> ### 9. Infrastructure & Deployment (Kubernetes)
->
-> **Agent**: Infra + Metal
-> **Priority**: Critical
->
-> **Kubernetes Resources**:
-> ```yaml
-> # PostgreSQL (CloudNative-PG)
-> apiVersion: postgresql.cnpg.io/v1
-> kind: Cluster
-> metadata:
->   name: sigma1-postgres
->   namespace: databases
-> spec:
->   instances: 1
->   storage:
->     size: 50Gi
->   bootstrap:
->     initdb:
->       database: sigma1
->       owner: sigma1_user
->   # Multiple schemas: rms, crm, finance, audit, public
->
-> # Redis/Valkey
-> apiVersion: redis.redis.opstreelabs.in/v1beta2
-> kind: Redis
-> metadata:
->   name: sigma1-valkey
->   namespace: databases
-> spec:
->   kubernetesConfig:
->     image: valkey/valkey:7.2-alpine
->
-> # Morgan Agent (OpenClaw)
-> apiVersion: v1
-> kind: Deployment
-> metadata:
->   name: morgan
->   namespace: openclaw
-> spec:
->   replicas: 1
->   template:
->     spec:
->       containers:
->       - name: agent
->         image: openclaw/openclaw-agent:latest
->         env:
->         - name: AGENT_ID
->           value: morgan
->         - name: MODEL
->           value: openai-api/gpt-5.4-pro
->         volumeMounts:
->         - name: workspace
->           mountPath: /workspace
->       volumes:
->       - name: workspace
->         persistentVolumeClaim:
->           claimName: morgan-workspace
->
-> # Backend Services (Rust, Go, Node.js)
-> apiVersion: apps/v1
-> kind: Deployment
-> metadata:
->   name: equipment-catalog
->   namespace: sigma1
-> spec:
->   replicas: 2
->   # ...
->
-> # Cloudflare Tunnel for Morgan
-> apiVersion: v1
-> kind: Service
-> metadata:
->   name: morgan-tunnel
->   annotations:
->     cloudflare.com/ingress/controller: "true"
+> ```
+> cto-pay init-operator          — Deploy OperatorConfig with treasury wallet
+> cto-pay create-account         — Create CustomerBalance for a wallet
+> cto-pay deposit <amount>       — Deposit USDC into balance
+> cto-pay withdraw <amount>      — Withdraw USDC from balance
+> cto-pay settle <task_id> <amt> — Submit mock task settlement
+> cto-pay refund <task_id>       — Refund a settled task
+> cto-pay balance                — Check customer balance
+> cto-pay receipts               — List task receipts for a customer
+> cto-pay demo                   — Run the full demo loop (deposit → settle → verify → withdraw)
 > ```
 >
-> **Infrastructure Components**:
-> | Component | Technology | Purpose |
-> |-----------|------------|---------|
-> | Database | PostgreSQL 16 | All structured data |
-> | Cache | Redis/Valkey | Rate limiting, sessions |
-> | Object Storage | Cloudflare R2 / AWS S3 | Images, photos |
-> | CDN | Cloudflare | Static assets, SSL |
-> | Ingress | Cloudflare Tunnel | Morgan access |
-> | Observability | Grafana + Loki + Prometheus | Existing OpenClaw stack |
+> **Demo Loop** (what gets filmed):
+>
+> 1. Customer deposits 100 USDC into balance PDA.
+> 2. CTO task runs (mocked or real CodeRun).
+> 3. Settlement fires — customer balance decreases, treasury increases.
+> 4. `TaskReceipt` appears on chain with receipt hash.
+> 5. Customer verifies receipt in Solana explorer (Solscan/Explorer link printed).
+> 6. Customer withdraws remaining balance.
 >
 > ---
 >
 > ## Technical Context
 >
-> | Service | Technology | Agent |
-> |---------|------------|-------|
-> | Morgan Agent | OpenClaw | Morgan |
-> | Equipment Catalog | Rust 1.75+, Axum 0.7 | Rex |
-> | RMS | Go 1.22+, gRPC | Grizz |
-> | Finance | Rust 1.75+, Axum 0.7 | Rex |
-> | Customer Vetting | Rust 1.75+, Axum 0.7 | Rex |
-> | Trading Desk | ~~Python 3.12+~~ (Phase 2) | TBD |
-> | Social Engine | Node.js 20+, Elysia + Effect | Nova |
-> | Website | Next.js 15 + React 19 + Effect | Blaze |
-> | Infrastructure | Kubernetes, CloudNative-PG | Infra + Metal |
+> | Component | Technology | Agent |
+> |-----------|------------|-------|
+> | Solana Program | Rust, Anchor 0.30+ | Rex |
+> | Program Tests | TypeScript, Anchor test, Bankrun | Tess |
+> | CLI / Demo | TypeScript, Bun, @coral-xyz/anchor | Blaze |
+> | Controller Hook | Rust, solana-sdk | Rex |
+> | Off-Chain Receipts | Arweave / S3 | Bolt |
+> | Secrets | 1Password → OpenBao → K8s | Bolt |
+> | CI/CD | GitHub Actions | Bolt |
+>
+> **Dependencies**:
+> - Solana CLI 1.18+
+> - Anchor CLI 0.30+
+> - Bun 1.1+
+> - USDC SPL token (devnet mint for testing)
 >
 > ---
 >
 > ## Data Flow Examples
 >
-> ### DF-1: Inbound Lead → Qualified Opportunity
+> ### DF-1: Customer Deposit → Task Settlement → Receipt Verification
 >
 > ```
-> Customer (Signal) ──► Morgan
->                            │
->                     ┌──────┴──────┐
->                     │ Qualify Lead │
->                     │ 1. Parse intent │
->                     │ 2. Ask questions │
->                     │ 3. Check inventory │
->                     └──────┬──────┘
->                            │
->                     ┌──────▼──────┐
->                     │ Vet Customer │
->                     │ (Rex svc)   │
->                     └──────┬──────┘
->                            │
->                     ┌──────▼──────┐
->                     │ Score Lead  │
->                     │ GREEN/YELLOW/RED │
->                     └──────┬──────┘
->                            │
->                     Mike approves ──► Opportunity created
+> Customer Wallet (Phantom)
+>     │
+>     ▼
+> deposit(100 USDC)
+>     │
+>     ▼
+> CustomerBalance PDA (+100 USDC)
+>     │
+>     │  ... CTO runs a CodeRun (off-chain, K8s) ...
+>     │
+>     ▼
+> Controller: settle_task("TASK-42", 12.50 USDC, receipt_hash)
+>     │
+>     ├──► CustomerBalance PDA (−12.50 USDC)
+>     ├──► Operator Treasury (+12.50 USDC)
+>     └──► TaskReceipt PDA created
+>               │
+>               ├── task_id: "TASK-42"
+>               ├── amount: 12_500_000  (USDC lamports)
+>               ├── receipt_hash: 0xabc...
+>               └── status: Settled
+>
+> Customer verifies on Solscan: TaskReceipt → receipt_hash → fetch JSON from Arweave/S3
 > ```
 >
-> ### DF-2: Quote → Invoice → Payment
+> ### DF-2: Task Failure → Refund
 >
 > ```
-> Quote Request ──► Morgan ──► Equipment Catalog (availability)
->                            │
->                     ┌──────▼──────┐
->                     │ Generate Quote │
->                     │ (RMS service) │
->                     └──────┬──────┘
->                            │
->                     Customer approves ──► Opportunity → Project
->                                               │
->                                     ┌────────▼────────┐
->                                     │ Generate Invoice │
->                                     │ (Finance svc)   │
->                                     └────────┬────────┘
->                                              │
->                                     ┌────────▼────────┐
->                                     │ Stripe Payment  │
->                                     └────────┬────────┘
->                                              │
->                                     ┌────────▼────────┐
->                                     │ Invoice Paid    │
->                                     └─────────────────┘
+> Controller detects CodeRun failure
+>     │
+>     ▼
+> Controller: refund_task("TASK-42")
+>     │
+>     ├──► TaskReceipt.status → Refunded
+>     └──► CustomerBalance PDA (+12.50 USDC restored)
+> ```
+>
+> ### DF-3: Spending Cap Enforcement
+>
+> ```
+> Controller: settle_task("TASK-99", 500 USDC, hash)
+>     │
+>     ▼
+> Program checks:
+>   - max_per_task: 200 USDC  → 500 > 200 → REJECTED
+>   - Transaction fails with SpendingCapExceeded error
+>   - Customer balance unchanged
 > ```
 >
 > ---
 >
-> ## Constraints
+> ## Billing Dimensions
 >
-> - Morgan must respond within 10 seconds for simple queries
-> - Equipment availability check < 500ms
-> - Invoice generation < 5 seconds
-> - Support 500+ concurrent Signal connections
-> - 99.9% uptime for production services
-> - GDPR compliant (data export, customer deletion)
+> These map directly from the existing CTO monetization model (`docs/business/saas-monetization.md` in the CTO repo):
+>
+> | Dimension | Description | Metering Source |
+> |-----------|-------------|-----------------:|
+> | CodeRun execution | Time from pod start to completion | Pod lifecycle events |
+> | Infrastructure compute | Bare-metal time (standard / high-mem / GPU) | Pod resource requests + node labels |
+> | AI tokens (managed-key) | Pass-through + margin when using 5D Labs keys | Provider API response metadata |
+>
+> **Existing tier pricing** (for context — on-chain settlement replaces the payment rail, not the pricing model):
+>
+> | Tier | Platform Fee | Included CodeRuns | Overage | AI Keys |
+> |------|-------------|-------------------|---------|---------:|
+> | Free | $0 | 50/month | $3.00/run | BYOK only |
+> | Team | $199/month | 200/month | $1.50/run | BYOK or managed (+15%) |
+> | Growth | $499/month | 1,000/month | $0.75/run | BYOK or managed (+10%) |
+> | Enterprise | Custom | Custom | $0.50/run | Flexible |
+>
+> For the hackathon, billing is **per task (metered)** — the operator submits the computed cost, and the program settles it. Subscription management stays off-chain.
+>
+> ---
+>
+> ## Open Design Questions
+>
+> These are genuinely unsolved. The hackathon submission takes a position on each, but they remain open for iteration.
+>
+> ### 1. Success-conditional billing
+>
+> Should settlement be conditional on task success? Options:
+> - **Always charge** (metered) — simplest, matches existing model.
+> - **Charge on success only** — best customer UX but exposes runtime to abuse.
+> - **Hybrid** — base attempt fee + success bonus.
+>
+> **Hackathon position**: Always charge (metered). Success-conditional billing is a future extension via attestation gates.
+>
+> ### 2. Trust model for usage reporting
+>
+> All usage measurements happen off-chain in CTO's K8s cluster. The Solana program trusts the operator wallet.
+>
+> **Hackathon position**: Trust the operator. Production trust-reduction options (signed pod receipts, review-agent co-signatures, open-source metering, dispute mechanism) are documented but not built.
+>
+> ### 3. Customer payment UX
+>
+> - **Pre-paid balance** (AWS credits) — best for real customers.
+> - **Session key delegation** — modern Solana pattern, good for demo.
+> - **Per-task escrow** — maximum visibility, worst UX.
+>
+> **Hackathon position**: Pre-paid balance (deposit/withdraw). Most practical and demo-able.
+>
+> ---
+>
+> ## Spending Controls
+>
+> Enforced on-chain by the program:
+>
+> | Control | Description | Enforced By |
+> |---------|-------------|-------------|
+> | Max per task | Program rejects `settle_task` above this cap | `CustomerBalance.max_per_task` |
+> | Max per day | Rolling daily spending limit | `CustomerBalance.max_per_day` + `daily_spent` + `daily_reset_slot` |
+> | Pre-flight estimate | Runtime shows estimated cost before execution | Off-chain UX (not a program instruction) |
+> | Customer withdrawal | Customer can withdraw unused balance at any time | `withdraw` instruction |
+> | Circuit breaker | Operator can pause all settlements in emergencies | `OperatorConfig.paused` |
+>
+> ---
+>
+> ## Failure and Refund Handling
+>
+> | Scenario | Action |
+> |----------|--------|
+> | Task fails before any agent work | No settlement submitted; balance unchanged |
+> | Task fails after partial work | Open question for production; hackathon charges for compute consumed |
+> | Task succeeds | Full charge per metered usage |
+> | Customer disputes a charge | Manual resolution initially; on-chain dispute mechanism later |
 >
 > ---
 >
 > ## Quality Assurance & Review Workflow
 >
-> All code changes go through an automated quality pipeline leveraging multiple CTO agents for comprehensive coverage:
+> All code changes go through the CTO automated quality pipeline:
 >
 > ### 1. Automated Code Review (Stitch)
 > - **Agent**: Stitch — Automated Code Reviewer
 > - **Trigger**: On every pull request
 > - **Scope**: Style, correctness, architecture alignment
 > - **Tools**: GitHub PR integration via GitHub App
-> - **MCP Tools**: `github_get_pull_request`, `github_get_pull_request_files`
 >
 > ### 2. Code Quality Enforcement (Cleo)
 > - **Agent**: Cleo — Quality Guardian
 > - **Trigger**: CI/CD pipeline
 > - **Focus**: Maintainability, refactor opportunities, code smells
-> - **Tools**: Clippy, ESLint, Rustfmt, biome.js, shadcn lint rules
-> - **Output**: PR comments with improvement suggestions
+> - **Tools**: Clippy (pedantic), Rustfmt, Biome (TypeScript)
 >
 > ### 3. Comprehensive Testing (Tess)
 > - **Agent**: Tess — Testing Genius
 > - **Trigger**: CI/CD pipeline after review approval
-> - **Coverage**: Unit tests, integration tests, end-to-end tests
-> - **Tools**: Jest/Vitest, PyTest, Cargo Test
-> - **Enforcement**: Minimum 80% code coverage required
+> - **Coverage**: Anchor program tests, CLI integration tests, settlement flow tests
+> - **Tools**: `anchor test`, Bankrun, Bun test
+> - **Enforcement**: All program instructions must have positive and negative test cases
 >
 > ### 4. Security Scanning (Cipher)
 > - **Agent**: Cipher — Security Sentinel
 > - **Trigger**: CI/CD pipeline
-> - **Focus**: Vulnerabilities, dependency scanning, OWASP compliance
-> - **Tools**: Semgrep, CodeQL, Snyk/GitHub Dependabot
+> - **Focus**: Solana program vulnerabilities, account validation, signer checks, overflow/underflow
+> - **Tools**: Anchor verify, Soteria (if available), manual audit checklist
 > - **Blocker**: Critical/high severity issues block merge
 >
 > ### 5. Merge Gate (Atlas)
 > - **Agent**: Atlas — Integration Master
 > - **Policy**: Required approvals + passing CI + passing QA
-> - **Conflict Resolution**: Automatic merge conflict detection/resolution
 > - **Tools**: GitHub merge automation
-> - **MCP Tools**: `github_merge_pull_request`, `github_get_pull_request`
 >
 > ### 6. Deployment & Operations (Bolt)
 > - **Agent**: Bolt — DevOps Engineer
-> - **Platform**: Kubernetes, ArgoCD, CloudNative-PG
-> - **Workflow**: GitOps with automatic rollbacks on failure
-> - **Monitoring**: Grafana/Loki/Prometheus
-> - **Tools**: `kubectl`, `helm`, `argocd` CLI, Cloudflare Terraform
+> - **Workflow**: `anchor build` → `anchor deploy` to devnet
+> - **Monitoring**: Transaction logs, program account state verification
 >
-> This automated workflow ensures production-ready quality with minimal human intervention.
+> ---
+>
+> ## Future Extensions (Post-Hackathon, Not In Scope)
+>
+> These are documented for context and to show the program's extensibility. They are explicitly **not part of the hackathon build**.
+>
+> ### Agent Registry with Royalty Splits
+> Full agent packages (skills, tools, Soul, user context) registered on-chain. Each agent has an author wallet and a price. When a task invokes multiple agents/skills, the settlement program splits payment across all authors atomically.
+>
+> ### Authorship NFTs
+> Each registered agent represented by a transferable NFT. Holder receives the royalty stream. Transfer the NFT = sell a revenue-generating AI agent as an asset.
+>
+> ### Attestation-Based Settlement
+> Tess, Cipher, and Stitch hold Solana keypairs. Their pass/fail signals become on-chain attestations. The program gates payment release on a quorum of attestation signatures.
+>
+> ### cNFT Invocation Receipts
+> Compressed NFTs minted per task settlement as the on-chain audit trail. Billions feasible at ~$0.00001 per mint.
+>
+> ### Agent Reputation
+> Cumulative earnings, attestation pass rates, and slash history per agent, queryable on chain.
+>
+> ### Agent Compute Marketplace
+> Sell spare CTO bare-metal cluster capacity to third-party agent runs, metered and settled via the same program.
 >
 > ---
 >
 > ## Non-Goals
 >
-> - SMS notifications (use Signal/Twilio)
-> - Self-hosted deployment (managed by 5D Labs)
-> - Multi-region deployment (single cluster initially)
-> - Real-time equipment tracking (GPS)
-> - Employee scheduling beyond crew
+> - Full agent marketplace / skill registry (future extension)
+> - NFT-based authorship tokens or receipt tokens (future extension)
+> - Subscription tier management on chain (subscriptions stay off-chain)
+> - Managed-key LLM token pass-through billing (BYOK customers pay their LLM provider directly)
+> - Production-grade security audit of the Solana program (post-hackathon)
+> - Frontend / web dashboard (CLI only for hackathon)
+> - Multi-chain support (Solana only)
+>
+> ---
+>
+> ## Hackathon Deliverables
+>
+> 1. **Anchor program** deployed to Solana devnet implementing: `initialize_operator`, `create_customer_account`, `deposit`, `withdraw`, `settle_task`, `refund_task`, `update_spending_caps`, `pause/unpause`.
+> 2. **CLI / demo script** that runs the full settlement loop: create customer → deposit USDC → submit mock task → settle → verify receipt on chain → withdraw.
+> 3. **Demo video** showing:
+>    - Customer deposits USDC into balance PDA.
+>    - CTO task runs (mocked or real CodeRun).
+>    - Settlement fires — customer balance decreases, operator treasury increases, `TaskReceipt` appears on chain with receipt hash.
+>    - Customer verifies receipt in Solana explorer.
+>    - Customer withdraws remaining balance.
+> 4. **This PRD** as supporting documentation.
 >
 > ---
 >
 > ## Success Criteria
 >
-> 1. Morgan handles 80%+ of customer inquiries autonomously
-> 2. Equipment catalog serves 533+ products with real-time availability
-> 3. Quote-to-invoice workflow completes in < 2 minutes
-> 4. Social media pipeline runs without manual intervention
-> 5. All services build, test, and deploy successfully
-> 6. End-to-end flow works: Signal message → Morgan → action → confirmation
+> 1. A judge can watch the demo video and understand: a customer paid for AI agent work, settled on Solana, with a verifiable on-chain receipt.
+> 2. The program compiles, deploys to devnet, and passes integration tests (deposit, settle, refund, withdraw, cap enforcement).
+> 3. Spending caps are enforced on-chain — oversized settlements are rejected.
+> 4. Refund flow works — failed tasks return funds to the customer balance.
+> 5. The design is extensible — adding agent registry splits or attestation gates later does not require rewriting the core program.
+> 6. End-to-end flow works: deposit USDC → task settles → receipt on chain → balance verifiable → withdrawal succeeds.
+>
+> ---
+>
+> ## References
+>
+> - `docs/business/saas-monetization.md` (CTO repo) — existing pricing model
+> - `docs/solana-hackathon-ideas.md` (CTO repo) — full ideation brainstorm
+> - `docs/solana-hackathon-prd.md` (CTO repo) — original detailed PRD
+> - `crates/controller/src/crds/coderun.rs` (CTO repo) — CodeRun CRD definition
+> - `crates/controller/src/tasks/code/controller.rs` (CTO repo) — task reconciliation loop
+> - `crates/controller/src/tasks/code/resources.rs` (CTO repo) — pod resource construction
+> - `crates/controller/src/cli/types.rs` (CTO repo) — provider/key resolution
+> - `docs/secrets-management.md` (CTO repo) — secrets pipeline (1Password → OpenBao → K8s)
+> - `AGENTS.md` (CTO repo) — agent roster (Tess, Cipher, Stitch attestation roles)
 
 ---
 
 ## 2. Project Scope
 
-The initial task decomposition identified **10 tasks** spanning infrastructure provisioning, 6 backend microservices, 2 frontend clients, and production hardening.
+The initial task decomposition identified **8 tasks** spanning 4 agents and 3 technology stacks. The project is a hackathon-scoped, self-contained system with one critical integration point into the existing CTO controller.
 
-| Task ID | Title | Agent | Stack | Priority | Dependencies |
-|---------|-------|-------|-------|----------|-------------|
-| 1 | Provision Core Infrastructure | Bolt | Kubernetes/Helm | High | None |
-| 2 | Equipment Catalog Service | Rex | Rust 1.75+/Axum 0.7 | High | Task 1 |
-| 3 | Rental Management System (RMS) | Grizz | Go 1.22+/gRPC | High | Task 1 |
-| 4 | Finance Service | Rex | Rust 1.75+/Axum 0.7 | High | Task 1 |
-| 5 | Customer Vetting Service | Rex | Rust 1.75+/Axum 0.7 | High | Task 1 |
-| 6 | Social Media Engine | Nova | Node.js 20+/Elysia + Effect | Medium | Task 1 |
-| 7 | Morgan AI Agent | Angie | OpenClaw/MCP | High | Tasks 2–6 |
-| 8 | Sigma-1 Website | Blaze | Next.js 15/React 19/Effect | High | Tasks 2, 7 |
-| 9 | Mobile App | Tap | Expo (React Native) | Medium | Tasks 2, 7 |
-| 10 | Production Hardening & Security | Bolt | Kubernetes/Helm | High | Tasks 2–9 |
+### Tasks Identified
 
-### Key Services & Components
+| ID | Title | Agent | Stack | Dependencies |
+|----|-------|-------|-------|-------------|
+| 1 | Dev Infra Bootstrap — Repo Scaffold, Secrets, Receipt Storage | Bolt | Anchor CLI, SeaweedFS/S3, External Secrets Operator | None |
+| 2 | Anchor Program — Account Structures, Errors, and `initialize_operator` | Rex | Rust, Anchor 0.30+, SPL Token | Task 1 |
+| 3 | Anchor Program — Customer Balance Operations (create, deposit, withdraw, update caps) | Rex | Rust, Anchor 0.30+, SPL Token | Task 2 |
+| 4 | Anchor Program — Settlement Engine, Refunds, and Circuit Breaker | Rex | Rust, Anchor 0.30+, SPL Token | Task 3 |
+| 5 | Anchor Program Tests — Happy-Path Integration Suite | Tess | TypeScript, Anchor Test, Bankrun | Task 4 |
+| 6 | Anchor Program Tests — Edge Cases, Error Paths, and Security Scenarios | Tess | TypeScript, Anchor Test, Bankrun | Task 4 |
+| 7 | Solana Program Security Audit | Cipher | Anchor Verify, Soteria, Manual Audit | Task 4 |
+| 8 | Controller CRD Extension and Solana Client Configuration | Rex | Rust, kube-rs, solana-sdk, solana-client | Task 4 |
 
-- **Infrastructure Layer**: PostgreSQL 16 (CloudNative-PG), Valkey 7.2 (Opstree operator), Cloudflare R2, Signal-CLI, Cloudflare Tunnel
-- **Backend Services**: Equipment Catalog (Rust), RMS (Go), Finance (Rust), Customer Vetting (Rust), Social Engine (Node.js)
-- **AI Agent**: Morgan (OpenClaw with 10+ MCP tools)
-- **Frontend Clients**: Next.js 15 website (Cloudflare Pages), Expo mobile app
-- **QA Pipeline**: Stitch (review), Cleo (quality), Tess (testing), Cipher (security), Atlas (merge), Bolt (deploy)
+**Note:** The initial decomposition did not include a standalone CLI task (Task for Blaze agent). The CLI/demo script (PRD Service 3) is referenced in decision points but not yet decomposed into a numbered task. This should be added during task generation as Task 9 or equivalent.
 
-### Agent Assignments & Technology Stacks
+### Key Services and Components
 
-- **Bolt** — Kubernetes/Helm infrastructure provisioning and production hardening
-- **Rex** — Three Rust/Axum 0.7 services (Equipment Catalog, Finance, Customer Vetting)
-- **Grizz** — Go 1.22+ gRPC service (RMS)
-- **Nova** — Node.js/Elysia + Effect service (Social Engine)
-- **Angie** — OpenClaw/MCP agent configuration (Morgan)
-- **Blaze** — Next.js 15/React 19 website
-- **Tap** — Expo/React Native mobile app
+1. **Solana Anchor Program** (`programs/cto-pay/`) — Core on-chain logic with 8 instructions, 3 PDA account types
+2. **CTO Controller Integration** (`crates/controller/`) — Settlement hook added to existing production Kubernetes controller
+3. **CLI / Demo Script** — TypeScript/Bun tool for hackathon demo video
+4. **Infrastructure** — SeaweedFS receipt bucket, External Secrets for operator keypair, CI/CD via GitHub Actions
+
+### Agent Assignments
+
+- **Rex** (Rust): Anchor program (Tasks 2–4), Controller integration (Task 8)
+- **Tess** (TypeScript): Test suites (Tasks 5–6)
+- **Cipher** (Security): Audit (Task 7)
+- **Bolt** (DevOps): Infrastructure bootstrap (Task 1)
+- **Blaze** (TypeScript): CLI / Demo script (not yet decomposed)
 
 ### Cross-Cutting Concerns
 
-- **12 decision points** identified across tasks covering platform choices, API design, data modeling, security, service topology, UX behavior, design systems, and GDPR compliance
-- All services share the same PostgreSQL cluster (separate schemas), Valkey instance, and Cloudflare R2 storage
-- All services expose `/metrics` (Prometheus) and `/health/live` + `/health/ready` endpoints
-- GDPR compliance (data export and deletion) affects every service
-- API versioning convention (`/api/v1/`) is universal
+- **11 decision points** identified across tasks, covering storage backends, RPC endpoints, data models, API design, and security
+- **Production controller modification** (Task 8) carries regression risk — requires feature flag
+- **Secrets management** spans the full 1Password → OpenBao → External Secrets → K8s pipeline
+- **SPL token strategy** affects all tasks (program, tests, CLI, controller)
 
 ---
 
 ## 3. Resolved Decisions
 
-### [D1] Which Redis-compatible engine should be used for caching, rate limiting, and session storage?
-
-**Status**: Accepted
-
-**Task Context**: Tasks 1, 2, 3, 4 (infrastructure provisioning and all backend services needing cache)
-
-**Context**: Both debaters immediately agreed. The Valkey operator (`redis.redis.opstreelabs.in`) is already deployed in-cluster, and Valkey 7.2 is a fully Redis-compatible Linux Foundation fork that passes the complete Redis test suite.
-
-**Decision**: Use the existing Valkey operator with `valkey/valkey:7.2-alpine` image. Do not deploy a separate Redis instance.
-
-**Consensus**: 2/2 (100%)
-
-**Consequences**:
-- **Positive**: Zero new operational surface; one cache operator pattern for all services; full Redis API compatibility confirmed
-- **Negative**: None raised
-- **Caveats**: None — this was unanimous
+The deliberation session completed in 6 minutes with 2 debate turns. Both personas (Optimist and Pessimist) reached explicit agreement on 6 of 11 decision points. The remaining 5 had substantive disagreement requiring synthesis. Since the session completed without formal votes (no `decision_points` array in the result), resolutions below are derived from the debate arguments — where both parties agreed, the decision is marked Accepted; where they disagreed, the strongest position is selected with rationale.
 
 ---
 
-### [D2] Which object storage provider should be used for product images, event photos, and static assets?
+### [D1] Should off-chain receipt storage use SeaweedFS, Arweave, or both?
 
-**Status**: Accepted
+**Status:** Accepted
 
-**Task Context**: Tasks 1, 2, 6, 8 (infrastructure, catalog images, social photos, website assets)
+**Task Context:** Task 1 (Infra Bootstrap), Task 8 (Controller Integration)
 
-**Context**: Both debaters agreed. The PRD already specifies Cloudflare infrastructure (Pages, Tunnel), making R2 the natural fit. Zero egress fees vs. S3's $0.09/GB, S3-API-compatible, and automatic Cloudflare CDN integration.
+**Context:** The Optimist proposed SeaweedFS as primary with best-effort Arweave uploads. The Pessimist argued that "both" adds two failure modes, two code paths, and an external network dependency with propagation delay, while the on-chain `receipt_hash` already provides verifiability regardless of storage location.
 
-**Decision**: Use Cloudflare R2 as the primary S3-compatible object storage. All S3 SDKs (aws-sdk-s3 in Rust, aws-sdk-go in Go, @aws-sdk/client-s3 in Node) work unchanged.
+**Decision:** SeaweedFS only. No Arweave integration for the hackathon.
 
-**Consensus**: 2/2 (100%)
+**Consensus:** Pessimist's position is stronger. The on-chain SHA-256 hash IS the verifiability anchor. SeaweedFS is deployed, in-cluster, zero-latency. Arweave adds external dependency, new SDK, wallet funding, and upload delays — all risk during a live demo.
 
-**Consequences**:
-- **Positive**: Zero egress costs; native CDN integration; consistent Cloudflare ecosystem
-- **Negative**: None raised
-- **Caveats**: None — this was unanimous
-
----
-
-### [D3] Which PostgreSQL operator should be used for managing the main database cluster?
-
-**Status**: Accepted
-
-**Task Context**: Task 1 (infrastructure provisioning)
-
-**Context**: Both debaters agreed. The PRD explicitly specifies CloudNative-PG, the CRD is already registered in-cluster, and CNPG is CNCF-adopted with 3.8k GitHub stars.
-
-**Decision**: Use the existing CloudNative-PG operator (`postgresql.cnpg.io/v1`). Deploy a single PostgreSQL 16 cluster named `sigma1-postgres` in the `databases` namespace.
-
-**Consensus**: 2/2 (100%)
-
-**Consequences**:
-- **Positive**: Mature operator; automated failover; continuous WAL archival; native Prometheus metrics
-- **Negative**: None raised
-- **Caveats**: None — this was unanimous
+**Consequences:**
+- **Positive:** Single storage backend, single failure mode. Simpler Task 1 (bucket provisioning) and Task 8 (upload logic). No external network dependency during demo recording.
+- **Negative:** Loses the "decentralized storage" narrative for judges.
+- **Caveat:** Arweave should be mentioned in `README.md` as a documented future extension. The architecture supports it — the `receipt_hash` on-chain means storage location is pluggable.
 
 ---
 
-### [D4] What API paradigm should be used for inter-service communication?
+### [D2] Should the CLI live in the cto-pay repo or the existing monorepo?
 
-**Status**: Accepted
+**Status:** Accepted
 
-**Task Context**: Tasks 2, 3, 4, 5, 6, 7, 8, 9 (all backend services, Morgan agent, and frontend clients)
+**Task Context:** Task 1 (Repo Scaffold)
 
-**Context**: The Optimist proposed gRPC for all internal service-to-service calls with REST gateways for external clients, arguing protobuf definitions would be the single source of truth across Rust, Go, and TypeScript. The Pessimist strongly countered that polyglot gRPC across three runtimes (tonic for Rust, grpc-go for Go, nice-grpc for Node.js) creates unnecessary complexity: protobuf codegen pipelines for three languages, debugging difficulty (`curl` doesn't speak gRPC), and a shared proto repo that becomes a contention point. The Pessimist noted the PRD already specifies REST endpoints for Equipment Catalog, Finance, Vetting, and Social Engine, and that Morgan's MCP tools are HTTP-native. The RMS (Go) is the only service explicitly designed as gRPC. At <100 RPS for a single-company platform, the performance argument is irrelevant.
+**Context:** Both personas agreed immediately. Self-contained repo for hackathon submission is unambiguous.
 
-**Decision**: REST (HTTP/JSON) for all services **except** RMS, which exposes gRPC + grpc-gateway as the PRD specifies. Other services consume RMS via its REST gateway. No polyglot gRPC — services communicate via REST.
+**Decision:** CLI lives in the `cto-pay` repo alongside the Anchor program.
 
-**Consensus**: 2/2 (100% — the Pessimist's position won; the Optimist's gRPC-everywhere proposal was effectively withdrawn given the strength of the debuggability and operational simplicity arguments)
+**Consensus:** Unanimous agreement.
 
-**Consequences**:
-- **Positive**: Debuggable with `curl`; observable in access logs; no protobuf codegen pipeline across three languages; MCP tools use native HTTP; matches PRD endpoint specifications
-- **Negative**: Slightly less type-safe for internal calls than gRPC; slightly higher serialization overhead (irrelevant at this scale)
-- **Caveats**: RMS retains its gRPC interface — any service calling RMS directly should use its REST gateway endpoints, not attempt gRPC interop. If internal traffic ever reaches scale where gRPC matters, it can be adopted service-by-service
-
----
-
-### [D5] How should multi-tenancy and schema separation be handled?
-
-**Status**: Accepted
-
-**Task Context**: Tasks 1, 2, 3, 4, 5, 6 (all services sharing PostgreSQL)
-
-**Context**: Both debaters agreed. For a single-tenant platform (one company — Sigma-1/Perception Events), separate databases per service adds operational overhead without benefit. The PRD explicitly states this approach.
-
-**Decision**: Use separate schemas within a single PostgreSQL database (`sigma1`). Schemas: `rms`, `finance`, `catalog`, `vetting`, `social`, `audit`. Each service gets a dedicated database role with `USAGE` only on its own schema.
-
-**Consensus**: 2/2 (100%)
-
-**Consequences**:
-- **Positive**: Logical isolation with independent migration tracks; cross-schema references possible when needed; single CNPG cluster to manage; per-service role-based access provides sufficient isolation
-- **Negative**: None raised
-- **Caveats**: If the platform ever becomes multi-tenant, this decision should be revisited
+**Consequences:**
+- **Positive:** Judges clone one repo, run one command. Anchor IDL generated in-repo and imported directly by CLI without cross-repo publishing.
+- **Negative:** Post-hackathon migration to monorepo may be needed if CLI evolves into production tooling.
 
 ---
 
-### [D6] What authentication mechanism should be used for backend service APIs?
+### [D3] Which Solana RPC endpoint for the controller?
 
-**Status**: Accepted
+**Status:** Accepted
 
-**Task Context**: Tasks 1–10 (all services and production hardening)
+**Task Context:** Task 1 (Infra Bootstrap), Task 8 (Controller Integration)
 
-**Context**: The Optimist proposed mTLS via Cilium's built-in mutual TLS for service-to-service communication plus JWT for external clients. The Pessimist countered that Cilium's mTLS requires enabling mutual authentication with SPIFFE identity management, which is not zero-configuration and may not already be enabled. The simpler alternative: Cilium NetworkPolicies (CRDs already available in-cluster) restrict pod-to-pod traffic at the network level — only authorized services can reach each other — without SPIFFE operational burden. Both agreed on JWT for external clients.
+**Context:** The Optimist proposed spinning a dedicated devnet agave-rpc instance in-cluster, citing public devnet rate limits and unreliability. The Pessimist argued this is not a simple "config change" — it requires stateful deployment, genesis config, snapshot sync, and persistent storage, and increases blast radius near the production mainnet node.
 
-**Decision**: JWT for external client authentication (web, mobile, Morgan). Cilium NetworkPolicies for internal service isolation (network-level zero-trust). No application-level mTLS configuration required.
+**Decision:** Use Helius free-tier devnet RPC. Do not spin up a new agave-rpc instance.
 
-**Consensus**: 2/2 (100% — converged on Pessimist's NetworkPolicy approach as the pragmatic choice)
+**Consensus:** Pessimist's position is stronger for hackathon scope. Helius free tier provides 100K requests/day on devnet with websocket support — more than sufficient. One environment variable, zero infrastructure provisioning. If Helius has issues during recording, re-record; debugging a self-hosted devnet node takes hours.
 
-**Consequences**:
-- **Positive**: Network-level isolation without SPIFFE complexity; JWT is well-understood for external auth; CiliumNetworkPolicy CRDs already available
-- **Negative**: No cryptographic identity at the application layer between services (network-level isolation only)
-- **Caveats**: If SPIFFE/mTLS is already configured in-cluster, it can be enabled opportunistically during Task 10. The decision here is to not *require* it. Task 10 (production hardening) must define and enforce CiliumNetworkPolicies restricting which services can talk to which
-
----
-
-### [D7] How should API versioning be handled?
-
-**Status**: Accepted
-
-**Task Context**: Tasks 2, 3, 4, 5, 6, 8, 9 (all services exposing APIs, and frontend clients consuming them)
-
-**Context**: Both debaters agreed. The PRD already specifies `/api/v1/` for every endpoint. This is the convention used by Stripe, GitHub, Google Cloud, and Twilio.
-
-**Decision**: URI-based versioning (`/api/v1/...`) for all REST endpoints.
-
-**Consensus**: 2/2 (100%)
-
-**Consequences**:
-- **Positive**: Visible in URLs and access logs; browser-testable; matches PRD specification exactly
-- **Negative**: None raised
-- **Caveats**: None — the PRD had already decided this
+**Consequences:**
+- **Positive:** Zero infrastructure provisioning. Task 1 provisions a config secret with an RPC URL; Task 8 consumes it. No risk of misconfiguring namespace boundaries near production mainnet node.
+- **Negative:** External dependency on Helius availability. Rate-limited compared to self-hosted.
+- **Caveat:** Store the RPC URL in a ConfigMap/Secret so it can be swapped to self-hosted, public, or another provider without code changes. If Helius free tier proves insufficient during development, upgrade to paid tier before spinning infrastructure.
 
 ---
 
-### [D8] Should Finance and Customer Vetting be separate services or merged?
+### [D4] How should the protocol fee be handled in settle_task?
 
-**Status**: Accepted
+**Status:** Accepted
 
-**Task Context**: Tasks 4, 5 (Finance and Customer Vetting services)
+**Task Context:** Task 2 (Account Structures), Task 4 (Settlement Engine), Tasks 5–6 (Tests)
 
-**Context**: The Optimist argued for separate services citing different scaling profiles and failure domains — Vetting makes slow external API calls while Finance handles latency-sensitive Stripe webhooks. The Pessimist countered that Vetting has only 3 endpoints, handles single-digit daily requests, and merging would halve the operational footprint (deployments, HPA configs, CI pipelines, container images) with trivial refactoring risk since both use Rust/Axum and the Rex agent.
+**Context:** Both personas agreed. Recording fee_amount on TaskReceipt is one `u64` field (~8 bytes) with zero runtime complexity and maximum future optionality for royalty splits.
 
-**Decision**: Keep Finance and Customer Vetting as **separate microservices** as decomposed in the initial task plan.
+**Decision:** Debit full amount to treasury (operator IS the service provider for hackathon). Record `fee_amount` as a computed field on `TaskReceipt` derived from `protocol_fee_bps` for future split compatibility.
 
-**Consensus**: This decision follows the initial decomposition. The Optimist's failure-domain argument (external API timeouts in Vetting should not impact invoice processing) is the deciding factor given the PRD's explicit separation and the 99.9% uptime requirement for Finance. The Pessimist acknowledged the refactoring path is easy if the merge is later desired.
+**Consensus:** Unanimous agreement.
 
-**Consequences**:
-- **Positive**: Independent deployability; failure isolation between latency-sensitive Finance and unreliable external-API-dependent Vetting; matches PRD service boundaries
-- **Negative**: Two deployments, two CI pipelines, two container images for services sharing the same agent (Rex) and stack (Rust/Axum)
-- **Caveats**: The Pessimist's point about operational overhead is valid — if Vetting remains at single-digit daily requests, consolidation can be revisited. Both services should share common Rust libraries (error handling, auth middleware, metrics) to minimize duplication
-
----
-
-### [D9] How should Signal integration for Morgan be handled?
-
-**Status**: Accepted
-
-**Task Context**: Tasks 1, 7 (infrastructure provisioning and Morgan agent)
-
-**Context**: Both debaters agreed there is no viable third-party Signal messaging SaaS — Signal's protocol is intentionally closed to commercial resale. Signal-CLI is the only production-grade option. They differed on deployment topology: the Optimist suggested sidecar or separate pod; the Pessimist argued for a separate pod because Signal-CLI maintains persistent state (registration keys) that must survive Morgan pod restarts.
-
-**Decision**: Self-hosted Signal-CLI deployed as a **separate pod** (not sidecar) with a PersistentVolumeClaim for registration state. Accessed via JSON-RPC over cluster networking.
-
-**Consensus**: 2/2 (100% on Signal-CLI; Pessimist's separate-pod argument prevailed on topology)
-
-**Consequences**:
-- **Positive**: Signal-CLI state persists across Morgan restarts; independent lifecycle management; JSON-RPC interface is simple to consume
-- **Negative**: Additional pod to manage; network hop between Morgan and Signal-CLI
-- **Caveats**: Signal-CLI must be properly registered with a phone number before first use — this is a manual setup step during Task 1
+**Consequences:**
+- **Positive:** Zero-cost future compatibility. When agent registry royalty splits arrive, the program already records what the protocol's share was.
+- **Negative:** `fee_amount` is informational-only for the hackathon — no actual fee split logic executes.
+- **Implementation note:** Add `fee_amount: u64` to `TaskReceipt` struct. Compute as `amount * protocol_fee_bps / 10_000` using checked arithmetic.
 
 ---
 
-### [D10] Primary navigation paradigm for web and mobile?
+### [D5] Should settlement transaction submission be synchronous, async-spawned, or a separate reconciliation loop?
 
-**Status**: Accepted
+**Status:** Accepted
 
-**Task Context**: Tasks 8, 9 (website and mobile app)
+**Task Context:** Task 8 (Controller Integration)
 
-**Context**: Both debaters agreed immediately. This is standard responsive design — a sidebar on mobile wastes screen real estate, and tabs on desktop waste vertical space.
+**Context:** The Optimist proposed `tokio::spawn` fire-and-forget with CRD status update on confirmation. The Pessimist argued that spawned tasks have no backpressure, no retry budget, and silent failure modes; kube-rs reconcilers are designed for retry, and hackathon scale has single-digit concurrent CodeRuns.
 
-**Decision**: Tab-based navigation for mobile (Expo bottom tabs), sidebar navigation for web (shadcn/ui sidebar component). Responsive hybrid pattern — same route structure, platform-appropriate chrome.
+**Decision:** Synchronous submission in the reconciler with a short timeout (5 seconds). On failure, return error — kube-rs requeues with backoff automatically.
 
-**Consensus**: 2/2 (100%)
+**Consensus:** Pessimist's position is stronger for hackathon scope. Synchronous is dramatically simpler: submit transaction, await confirmation with timeout, update CRD, return. No orphaned tasks, no silent failures, no extra state management. Reconciler stalling is not a real risk at hackathon scale.
 
-**Consequences**:
-- **Positive**: Platform-native UX on both web and mobile; shared navigation structure enables consistent user mental model
-- **Negative**: None raised
-- **Caveats**: None
-
----
-
-### [D11] How should the design system be managed for web and mobile?
-
-**Status**: Accepted
-
-**Task Context**: Tasks 8, 9 (website and mobile app)
-
-**Context**: Both debaters rejected Tamagui (still maturing, adds significant complexity) and converged on shadcn/ui for web with shared Tailwind design tokens consumed by NativeWind for mobile. NativeWind 4 brings TailwindCSS to React Native, so the same color, spacing, and typography tokens defined once in a shared Tailwind config can be consumed by both platforms.
-
-**Decision**: shadcn/ui for web (Next.js); NativeWind 4 for mobile (Expo). Shared Tailwind config package defining design tokens (colors, spacing, radii, typography). No cross-platform component library — platform-appropriate rendering with shared design language.
-
-**Consensus**: 2/2 (100%)
-
-**Consequences**:
-- **Positive**: Consistent visual identity across web and mobile without runtime code sharing; NativeWind 4 is stable enough for this scope; avoids Tamagui complexity
-- **Negative**: Mobile components must be built separately (no component sharing with web)
-- **Caveats**: The shared Tailwind config should be a separate package in the monorepo or published to a private registry so both apps import it
+**Consequences:**
+- **Positive:** Task 8 implementation is significantly simpler. kube-rs retry semantics handle failure cases natively. No orphaned background tasks.
+- **Negative:** If 10+ CodeRuns hit terminal state simultaneously in the future, reconciler could stall for up to 50 seconds. This is a post-hackathon concern.
+- **Caveat:** The 5-second timeout should be configurable via `SolanaConfig`. If the transaction doesn't confirm in 5s, fail and let kube-rs requeue. Log the transaction signature for manual verification.
 
 ---
 
-### [D12] What approach for GDPR data export and customer deletion?
+### [D6] How should daily spending cap reset work on-chain?
 
-**Status**: Accepted
+**Status:** Accepted
 
-**Task Context**: Tasks 2–10 (every service must support GDPR operations)
+**Task Context:** Task 2 (Account Structures), Task 4 (Settlement Engine), Tasks 5–6 (Tests)
 
-**Context**: The Optimist proposed a centralized compliance service orchestrating data export/deletion across all services, citing the risk of distributed GDPR endpoints where one failure means violation. The Pessimist agreed on centralized orchestration but argued Morgan already orchestrates cross-service workflows via MCP tools — adding `sigma1_gdpr_export` and `sigma1_gdpr_delete` MCP tools is zero new services, zero new deployments. The compliance operation runs maybe once a quarter.
+**Context:** The Optimist argued for Clock sysvar `unix_timestamp` citing accuracy (Solana slot times fluctuate ±10%). The Pessimist argued slot numbers are monotonically increasing, deterministic, and require zero trust in validator clocks, and that ±10% variance on a spending cap is acceptable.
 
-**Decision**: GDPR orchestration via Morgan using dedicated MCP tools (`sigma1_gdpr_export`, `sigma1_gdpr_delete`). Each service exposes internal GDPR endpoints (data export and deletion for its schema). Morgan orchestrates calls to all services, logs completions, and reports failures. No new dedicated compliance service.
+**Decision:** Use slot-based reset as the PRD specifies. Store `daily_reset_slot` and reset `daily_spent` when `current_slot >= daily_reset_slot + SLOTS_PER_DAY`.
 
-**Consensus**: 2/2 (100% — converged on Morgan-orchestrated approach)
+**Consensus:** Pessimist's position aligns with the PRD's original design. Slot numbers are monotonically increasing and deterministic. Clock sysvar timestamps can jump forward or backward based on validator vote medians. For a spending *cap* (not a billing period), ±10% variance on "one day" is acceptable — customers set conservative caps anyway.
 
-**Consequences**:
-- **Positive**: Zero new services or deployments; leverages existing Morgan orchestration infrastructure; audit trail through Morgan's standard logging; same centralized coordination the Optimist wanted
-- **Negative**: Morgan becomes a dependency for GDPR compliance operations
-- **Caveats**: Each service (Tasks 2–6) must implement internal GDPR endpoints as part of their API surface. Task 7 (Morgan) must add the two GDPR MCP tools. Task 10 (production hardening) should verify the full deletion pipeline works end-to-end and produces an audit log entry
+**Consequences:**
+- **Positive:** Matches PRD field name `daily_reset_slot`. Simpler testing with Bankrun's `warp_to_slot()`. No trust dependency on validator clock accuracy.
+- **Negative:** A "day" is approximately 23–25 hours depending on slot rate variance. Not suitable for precise billing periods.
+- **Implementation note:** Define `SLOTS_PER_DAY: u64 = 216_000` as a constant in `constants.rs` with a doc comment explaining the approximation. Keep the constant adjustable for future tuning.
+
+---
+
+### [D7] How should the operator keypair be loaded by the controller?
+
+**Status:** Accepted
+
+**Task Context:** Task 1 (Infra Bootstrap), Task 8 (Controller Integration)
+
+**Context:** Both personas agreed on file-mounted secret volume. Solana CLI conventions use file-based keypairs. File mounts don't appear in `/proc/PID/environ` or `kubectl describe pod`.
+
+**Decision:** File-mounted secret volume with the keypair as a JSON file, referenced by path via environment variable `SOLANA_OPERATOR_KEYPAIR_PATH`.
+
+**Consensus:** Unanimous agreement.
+
+**Consequences:**
+- **Positive:** `solana_sdk::signer::keypair::read_keypair_file()` is a one-liner. Marginally more secure than env var for a financial signing key. Matches Solana ecosystem conventions.
+- **Negative:** None identified.
+- **Implementation note:** External Secrets Operator creates K8s secret; pod spec mounts it as a volume at `/secrets/operator-keypair.json`. The env var `SOLANA_OPERATOR_KEYPAIR_PATH` points to this path.
+
+---
+
+### [D8] Should the CLI use devnet USDC, a custom SPL token, or wrapped SOL?
+
+**Status:** Accepted
+
+**Task Context:** Task 1 (Infra Bootstrap), Tasks 2–6 (Program + Tests), CLI (not yet decomposed)
+
+**Context:** Both personas agreed on custom SPL mint. The Pessimist added a hard constraint: the `initialize_operator` instruction MUST accept `mint: Pubkey` as a parameter, not hardcode it.
+
+**Decision:** Create a custom SPL token mint (6 decimals, controlled by operator wallet) labeled as "USDC" in the demo. Document that mainnet migration is a single mint address change in the README.
+
+**Consensus:** Unanimous agreement, with the Pessimist's sharpened constraint adopted.
+
+**Consequences:**
+- **Positive:** Unlimited supply, full control. No dependency on Circle's devnet USDC faucet (known for availability issues). Demo video shows "100.00 USDC deposited" with correct 6-decimal display.
+- **Negative:** Not actual USDC — judges may notice. Mitigated by transparent documentation.
+- **Hard constraint (from Pessimist):** The program MUST accept `mint: Pubkey` as a parameter in `initialize_operator` and store it in `OperatorConfig`. Every subsequent instruction validates the token account's mint against this stored value. If the mint is hardcoded anywhere — in PDA seeds, constants, or test fixtures — mainnet migration requires a program redeploy. Tasks 2–6 must enforce this pattern.
+
+---
+
+### [D9] Single shared USDC vault or per-customer token accounts?
+
+**Status:** Accepted
+
+**Task Context:** Tasks 2–6 (All program tasks)
+
+**Context:** Both personas agreed. This is a hard constraint from the PRD architecture diagram.
+
+**Decision:** Single program-owned USDC vault (PDA-derived ATA) that holds all customer deposits. Balances tracked in CustomerBalance PDAs.
+
+**Consensus:** Unanimous agreement. PRD hard constraint.
+
+**Consequences:**
+- **Positive:** Cheaper (one ATA vs N ATAs), simpler PDA derivation. Program's internal `CustomerBalance.balance` is source of truth for balance isolation.
+- **Negative:** Single vault means program logic must perfectly enforce balance isolation — a bug could allow one customer's funds to be spent by another's account. Mitigated by security audit (Task 7).
+
+---
+
+### [D10] How should task_id be represented on-chain in TaskReceipt PDA?
+
+**Status:** Accepted
+
+**Task Context:** Tasks 2, 4, 5, 6, 8
+
+**Context:** The Optimist proposed `[u8; 32]` SHA-256 hash as PDA seed plus the original String stored in account data. The Pessimist argued that storing the String on-chain adds variable-length serialization complexity and inflated account size for zero value — the off-chain receipt JSON already contains the human-readable task_id.
+
+**Decision:** Use `[u8; 32]` SHA-256 hash of the task_id string as the sole PDA seed and on-chain representation. Do NOT store the original task_id string in account data.
+
+**Consensus:** Pessimist's position is stronger. The receipt JSON contains the human-readable task_id. The PDA is deterministically derivable by anyone who knows the task_id (compute SHA-256, derive PDA). Storing the string adds variable-length serialization complexity in Anchor and inflates rent cost for a demo convenience that Solana explorers can't render usefully anyway.
+
+**Consequences:**
+- **Positive:** Fixed-size account. Simpler serialization. Deterministic PDA derivation for any consumer who knows the task_id.
+- **Negative:** On-chain TaskReceipt does not contain the human-readable task_id — must be looked up from off-chain receipt or CLI local state.
+- **Implementation note:** The controller (Task 8) computes `SHA256(task_id)` for PDA derivation. The CLI prints the task_id from its local state. The `settle_task` instruction accepts `task_id_hash: [u8; 32]` directly, not a String. Update the PRD's `TaskReceipt` struct to use `task_id_hash: [u8; 32]` instead of `task_id: String`.
+
+---
+
+### [D11] Should receipt building and upload happen in the controller or a separate service?
+
+**Status:** Accepted
+
+**Task Context:** Task 8 (Controller Integration)
+
+**Context:** Both personas agreed immediately. A separate microservice for a <1KB JSON blob at hackathon scale is unjustifiable complexity.
+
+**Decision:** Build receipts and upload directly in the controller's settlement hook. No separate service.
+
+**Consensus:** Unanimous agreement.
+
+**Consequences:**
+- **Positive:** Single-service simplicity. If SeaweedFS upload fails, still submit `settle_task` with the locally-computed hash. Receipt can be re-uploaded on next reconciliation cycle.
+- **Negative:** If upload latency grows (e.g., future Arweave integration), the settlement path gets slower. Extractable to async worker post-hackathon.
 
 ---
 
 ## 4. Escalated Decisions
 
-No decisions were escalated. All 12 decision points reached consensus.
+No decision points were formally escalated. All 11 decision points have resolved positions from the deliberation.
+
+However, one **structural concern** raised by the Pessimist warrants special attention:
+
+### [ADVISORY] Controller Feature Flag for Settlement Hook
+
+**Status:** Strong recommendation (not a formal decision point, but raised as a critical concern)
+
+**Task Context:** Task 8 (Controller Integration)
+
+**Context:** The Pessimist raised that Task 8 modifies the production controller (`crates/controller/`) which manages ALL CodeRun lifecycles. Adding `solana-sdk` and `solana-client` pulls in ~200 transitive dependencies and increases compile time. If the settlement code panics, every CodeRun reconciliation is affected.
+
+**Recommendation:** Task 8 MUST implement a `settlement_enabled: bool` (or `CTO_PAY_ENABLED`) configuration flag, defaulting to `false`. All Solana settlement code must be gated behind this flag. When disabled, the reconciler operates exactly as before — no Solana dependencies are loaded, no settlement is attempted. This is a safety requirement for production controller modifications.
+
+**Implementing agents must treat this as a hard constraint for Task 8.**
 
 ---
 
 ## 5. Architecture Overview
 
-### Agreed Technology Stack
+### Technology Stack
 
-| Layer | Technology | Version/Detail |
-|-------|-----------|----------------|
-| **Database** | PostgreSQL | 16 via CloudNative-PG operator |
-| **Cache** | Valkey | 7.2-alpine via Opstree Redis operator |
-| **Object Storage** | Cloudflare R2 | S3-compatible, zero egress |
-| **CDN/Ingress** | Cloudflare | Pages (website), Tunnel (Morgan) |
-| **Container Orchestration** | Kubernetes | Existing cluster with Cilium CNI |
-| **Observability** | Grafana + Loki + Prometheus | Existing OpenClaw stack |
+| Layer | Technology | Version |
+|-------|------------|---------|
+| On-chain program | Rust, Anchor framework | Anchor 0.30+, Solana 1.18+ |
+| Program tests | TypeScript, Bankrun, Anchor test | Bun 1.1+ |
+| CLI / Demo | TypeScript, Bun, @coral-xyz/anchor, @solana/web3.js | Bun 1.1+ |
+| Controller hook | Rust, kube-rs, solana-sdk, solana-client | kube-rs 0.98, solana-sdk 1.18 |
+| Off-chain receipts | SeaweedFS (S3-compatible, in-cluster) | Existing deployment |
+| Secrets | 1Password → OpenBao → External Secrets → K8s | Existing pipeline |
+| RPC | Helius free-tier devnet | External service |
+| CI/CD | GitHub Actions | Existing |
 
 ### Service Architecture
 
 ```
-                 ┌─────────────────────────────────┐
-                 │         External Clients          │
-                 │   Signal │ Voice │ Web │ Mobile   │
-                 └────────────────┬──────────────────┘
-                                  │ JWT Auth
-                 ┌────────────────▼──────────────────┐
-                 │          Morgan (OpenClaw)          │
-                 │       MCP Tools → HTTP/REST         │
-                 └──┬──────┬──────┬──────┬──────┬────┘
-                    │      │      │      │      │
-          ┌────────▼┐ ┌───▼────┐ ┌▼─────┐ ┌───▼────┐ ┌▼──────┐
-          │ Catalog  │ │  RMS   │ │Finance│ │Vetting │ │Social │
-          │Rust/Axum │ │Go/gRPC │ │Rust/  │ │Rust/   │ │Node/  │
-          │  REST    │ │+gateway│ │Axum   │ │Axum    │ │Elysia │
-          │          │ │ REST   │ │REST   │ │REST    │ │REST   │
-          └────┬─────┘ └───┬────┘ └──┬───┘ └───┬────┘ └──┬───┘
-               │           │         │         │         │
-     ┌─────────▼───────────▼─────────▼─────────▼─────────▼──────┐
-     │              PostgreSQL 16 (CloudNative-PG)                │
-     │   Schemas: catalog | rms | finance | vetting | social | audit │
-     └──────────────────────────────────────────────────────────────┘
-     ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-     │  Valkey 7.2   │  │ Cloudflare R2 │  │  Signal-CLI   │
-     │  (cache/RL)   │  │ (object store)│  │ (separate pod)│
-     └──────────────┘  └──────────────┘  └──────────────┘
+┌──────────────────────────────────────────────────┐
+│  cto-pay repo (self-contained hackathon project) │
+│                                                  │
+│  programs/cto-pay/     ← Anchor program (Rust)   │
+│  tests/                ← Bankrun tests (TS)      │
+│  cli/                  ← Demo CLI (TS/Bun)       │
+│  scripts/              ← Devnet setup scripts    │
+│  config/               ← Token config, devnet    │
+└──────────────────────────────────────────────────┘
+         │ IDL (generated)
+         ▼
+┌──────────────────────────────────────────────────┐
+│  CTO Monorepo (production, existing)             │
+│                                                  │
+│  crates/controller/    ← Settlement hook added   │
+│    └─ Feature-flagged behind CTO_PAY_ENABLED     │
+│    └─ Syncs via Solana RPC (Helius devnet)       │
+│    └─ Uploads receipts to SeaweedFS              │
+│    └─ Reads operator keypair from mounted secret │
+└──────────────────────────────────────────────────┘
 ```
 
 ### Communication Patterns
 
-- **External → Services**: JWT-authenticated REST over HTTPS (via Cloudflare Tunnel/CDN)
-- **Morgan → Backend Services**: HTTP/REST via MCP tool-server (Morgan calls each service's REST endpoints)
-- **Service → Service**: HTTP/REST (direct in-cluster); RMS exposes both gRPC (native) and REST (via grpc-gateway) — all consumers use the REST gateway
-- **Frontend → Backend**: REST over HTTPS, URI-versioned (`/api/v1/...`)
-- **Network Isolation**: CiliumNetworkPolicies restrict pod-to-pod traffic
+1. **CLI → Solana Devnet**: Direct RPC calls via `@solana/web3.js` to Helius devnet endpoint
+2. **Controller → Solana Devnet**: `solana-client` RPC calls via Helius devnet endpoint, synchronous within reconciler with 5s timeout
+3. **Controller → SeaweedFS**: HTTP PUT for receipt JSON uploads via S3-compatible API
+4. **Controller → K8s API**: CRD status patches via kube-rs to record settlement signatures
 
 ### Key Patterns
 
-- **Single database, multiple schemas**: One CNPG cluster, per-service schemas with role-based access
-- **REST-first API design**: All services expose REST endpoints; RMS additionally supports native gRPC
-- **Centralized AI orchestration**: Morgan (OpenClaw) coordinates all cross-service workflows including GDPR
-- **Platform-appropriate frontends**: shadcn/ui + TailwindCSS 4 for web; NativeWind 4 for mobile; shared Tailwind token config
-- **GitOps deployment**: ArgoCD with automatic rollbacks
+- **Single vault model**: All customer USDC held in one PDA-derived ATA; balance isolation enforced by program logic
+- **Operator-trusted metering**: Controller computes billable amounts off-chain; program trusts operator signature
+- **Feature-flagged integration**: Settlement hook in production controller gated by `CTO_PAY_ENABLED` (default `false`)
+- **Configurable mint**: `initialize_operator` accepts `mint: Pubkey` parameter — never hardcoded
+- **Slot-based daily reset**: Approximate daily spending cap using `SLOTS_PER_DAY = 216,000`
+- **Synchronous settlement**: Transaction submission is synchronous in reconciler; kube-rs requeue handles retries
 
 ### What Was Explicitly Ruled Out
 
 | Ruled Out | Reason |
 |-----------|--------|
-| Polyglot gRPC across all services | Unnecessary complexity; debuggability concerns; <100 RPS internal traffic makes performance argument irrelevant |
-| Separate PostgreSQL databases per service | Operational overhead without benefit for single-tenant platform |
-| Application-level mTLS (SPIFFE) | Cilium NetworkPolicies provide network-level isolation without SPIFFE operational burden; mTLS can be added opportunistically if already configured |
-| Tamagui cross-platform design system | Still maturing; NativeWind 4 with shared Tailwind tokens achieves the same design consistency |
-| Dedicated GDPR compliance service | Morgan already orchestrates cross-service workflows; adding MCP tools is zero new deployments |
-| Third-party Signal SaaS | Does not exist; Signal's protocol prevents commercial resale |
-| Header-based API versioning | URI-based already specified in PRD; header-based adds debugging complexity |
-| Merging Finance and Vetting services | Different failure domains; external API timeouts in Vetting should not impact invoice processing |
+| Arweave storage | External dependency, propagation delay, additional SDK — not needed when on-chain hash provides verifiability |
+| Self-hosted devnet agave-rpc | Too much operational overhead for hackathon; Helius free tier sufficient |
+| Async-spawned settlement tasks | Fire-and-forget `tokio::spawn` from reconciler is a footgun — no backpressure, silent failures |
+| Clock sysvar for daily reset | Validator timestamp drift; slots are monotonic and deterministic |
+| String task_id on-chain | Variable-length serialization complexity for no incremental value over off-chain receipt |
+| Per-customer escrow accounts | PRD hard constraint specifies single vault; per-customer adds rent costs with no benefit |
+| Separate receipt-builder service | Over-engineered for <1KB JSON at hackathon scale |
+| HSM/remote signer | Significantly more complex than file-mounted secret for hackathon scope |
 
 ---
 
 ## 6. Implementation Constraints
 
+These are hard constraints that every implementing agent must respect.
+
 ### Security Requirements
 
-- **External authentication**: JWT tokens for all client-facing APIs (web, mobile, Morgan web chat)
-- **Internal isolation**: CiliumNetworkPolicies must be defined and enforced for every service (Task 10)
-- **Secret management**: All API keys (Stripe, OpenCorporates, LinkedIn, Google, ElevenLabs, Twilio) stored as Kubernetes Secrets with documented rotation schedule
-- **Security scanning**: Semgrep, CodeQL, Snyk/Dependabot — critical/high severity issues block merge
-- **OWASP compliance**: Enforced by Cipher agent in CI pipeline
+1. **Operator keypair**: Loaded from file-mounted K8s secret at `SOLANA_OPERATOR_KEYPAIR_PATH`. Never stored in environment variables, never logged, never included in crash dumps.
+2. **All arithmetic**: Must use checked operations (`checked_add`, `checked_sub`, `checked_mul`). Zero raw arithmetic on `u64` values.
+3. **Account validation**: Every instruction must validate all account constraints via Anchor's `has_one`, `constraint`, `seeds`, `bump` attributes. No instruction may allow arbitrary account substitution.
+4. **Signer checks**: Operator-only instructions verify `operator.key() == operator_config.authority`. Customer-only instructions verify `customer_balance.customer == customer.key()`.
+5. **Mint validation**: All token account instructions must validate the token's mint matches `OperatorConfig`'s stored mint. Mint must never be hardcoded.
+6. **No `init_if_needed`**: Known dangerous pattern — all account init uses standard `init` constraint.
+7. **Feature flag**: Controller settlement code gated behind `CTO_PAY_ENABLED` (default `false`). When disabled, zero Solana code executes in reconciliation path.
 
 ### Performance Targets
 
-- Morgan response time: < 10 seconds for simple queries
-- Equipment availability check: < 500ms
-- Invoice generation: < 5 seconds
-- Quote-to-invoice workflow: < 2 minutes end-to-end
-- Signal connections: 500+ concurrent
+1. **Settlement timeout**: 5-second timeout for Solana transaction confirmation in the controller reconciler.
+2. **Bankrun tests**: Full integration suite must complete in under 30 seconds.
+3. **Program size**: Must fit within Solana's BPF program size limits (~1.4MB). Anchor programs typically well under this.
 
 ### Operational Requirements
 
-- **Uptime**: 99.9% for production services
-- **Replicas**: ≥2 replicas for all production services (Task 10)
-- **Observability**: All services expose `/metrics` (Prometheus), `/health/live`, `/health/ready`
-- **Logging**: Grafana + Loki (existing OpenClaw stack)
-- **Deployment**: GitOps via ArgoCD with automatic rollbacks
-- **Test coverage**: Minimum 80% code coverage required (enforced by Tess agent)
+1. **Receipt storage**: SeaweedFS bucket `cto-pay-receipts` in the `cto` namespace. Endpoint stored in `cto-pay-infra-endpoints` ConfigMap.
+2. **RPC endpoint**: Helius free-tier devnet. URL stored in ConfigMap/Secret, swappable without code changes.
+3. **Secrets pipeline**: 1Password → OpenBao → External Secrets Operator → K8s Secret (file mount). No shortcuts.
+4. **CRD backward compatibility**: All CodeRun CRD schema changes must be additive (new optional fields only). Existing CodeRuns must not break.
 
-### Service Dependencies and Integration Points
+### Service Dependencies
 
-| Service | External Dependencies |
-|---------|----------------------|
-| Morgan | Signal-CLI (JSON-RPC), ElevenLabs API, Twilio API, All backend REST APIs |
-| Equipment Catalog | PostgreSQL, Valkey, Cloudflare R2 |
-| RMS | PostgreSQL, Valkey, Google Calendar API |
-| Finance | PostgreSQL, Valkey, Stripe API |
-| Customer Vetting | PostgreSQL, OpenCorporates API, LinkedIn API, Google Reviews, Credit APIs |
-| Social Engine | PostgreSQL, Cloudflare R2, Instagram Graph API, LinkedIn API, Facebook Graph API, OpenAI/Claude |
-| Website | Cloudflare Pages, Equipment Catalog API, Morgan (web chat) |
-| Mobile App | Equipment Catalog API, Morgan (web chat) |
+| Dependency | Type | Critical? |
+|------------|------|-----------|
+| Helius devnet RPC | External SaaS | Yes (for settlement and CLI) |
+| SeaweedFS (in-cluster) | Internal | Yes (for receipt storage) |
+| External Secrets Operator | Internal | Yes (for keypair provisioning) |
+| OpenBao | Internal | Yes (for secrets) |
+| 1Password | External SaaS | Yes (for secrets source-of-truth) |
 
 ### Organizational Preferences
 
-- Prefer existing in-cluster operators and services (Valkey, CloudNative-PG, Cilium) over deploying new instances
-- Prefer Cloudflare ecosystem (R2, Pages, Tunnel) for CDN, storage, and ingress
-- Self-hosted Signal-CLI (no SaaS alternative exists)
-- Single-cluster deployment (multi-region explicitly a non-goal)
-- Trading Desk / Python services deferred to Phase 2
-
-### GDPR Compliance
-
-- Every service (Tasks 2–6) must implement internal GDPR data export and deletion endpoints
-- Morgan (Task 7) orchestrates compliance via `sigma1_gdpr_export` and `sigma1_gdpr_delete` MCP tools
-- Task 10 must verify full deletion pipeline end-to-end and confirm audit log entries are generated
+- Prefer in-cluster services when already deployed (SeaweedFS over external S3)
+- Follow existing secrets management pipeline — no ad hoc secret creation
+- All code changes go through automated quality pipeline (Stitch, Cleo, Tess, Cipher, Atlas)
+- Critical/high security findings block merge
 
 ---
 
 ## 7. Design Intake Summary
 
-### Frontend Detection
+**`hasFrontend`:** `false`
 
-- **hasFrontend**: `true`
-- **frontendTargets**: `web` | `mobile`
-- **Provider mode**: Stitch
-- **Stitch status**: `generated` — design artifacts have been produced
-- **Framer status**: `skipped` (not requested)
+**`frontendTargets`:** None
 
-### Supplied Design Artifacts & References
+**Supplied design artifacts:** None
 
-- **Existing website**: https://sigma-1.com (current site for visual reference)
-- **Existing platform**: https://deployiq.maximinimal.ca (prior platform reference)
-- No additional Figma files, screenshots, or brand guideline documents were supplied in the design context
+**Reference URLs:** None
 
-### Provider Generation Status
+**Provider status:**
+- Stitch (design generation): Failed — `design_intake_failed`
+- Framer: Skipped — `not_requested`
 
-- **Stitch**: Generated design artifacts. Implementing agents (Blaze for web, Tap for mobile) should reference Stitch outputs for visual direction on page layouts, component styling, and responsive breakpoints
-- **Framer**: Not requested; skipped
+**Component-library artifacts:** None
 
 ### Implications for Implementation
 
-**Web (Task 8 — Blaze)**:
-- Next.js 15 App Router with React 19
-- shadcn/ui component library + TailwindCSS 4 for styling
-- Effect 3.x for type-safe data fetching and form validation
-- TanStack Query for server state management
-- Hosted on Cloudflare Pages (static + SSR)
-- Must implement AI-native optimizations: `llms.txt`, `llms-full`, Schema.org structured data
-- Sidebar navigation pattern for desktop; responsive collapse for smaller viewports
-- Morgan web chat widget embedded on all pages
+This is a **backend-only + CLI project** for the hackathon. The PRD explicitly lists "Frontend / web dashboard (CLI only for hackathon)" as a non-goal. No frontend implementation tasks exist. The CLI is a command-line TypeScript tool using `@coral-xyz/anchor` — it has no UI components, design system, or visual layer.
 
-**Mobile (Task 9 — Tap)**:
-- Expo with React Native and TypeScript
-- NativeWind 4 for styling (consuming shared Tailwind tokens)
-- Effect for validation and data fetching
-- Bottom tab navigation pattern
-- Feature parity with web for core flows (catalog browsing, quote requests, Morgan chat)
-- Push notifications for quote status updates
-
-**Shared Design Tokens**:
-- A shared Tailwind configuration package must be created defining: color palette, spacing scale, border radii, typography (font families, sizes, weights)
-- Both web (shadcn/ui) and mobile (NativeWind) consume this shared config
-- This is the design system — not a shared component library, but shared design language
+Design intake is not applicable to this project's current scope.
 
 ---
 
-## 7a. Selected Design Direction
+## 8. Open Questions
 
-No `design_selections` were provided. Implementing agents should follow the Stitch-generated artifacts and the PRD's specified technology stack (shadcn/ui, TailwindCSS 4, React 19) as the visual baseline. If Stitch outputs include specific screen designs, those should be treated as the design target.
+These are non-blocking items where implementing agents should use their best judgment.
 
----
+1. **Refund token flow mechanics**: Task 4 identified complexity around refund_task — when `settle_task` transfers USDC from vault to treasury, `refund_task` needs to transfer back. The simplest approach for hackathon: credit `customer_balance.balance` and mark TaskReceipt as Refunded. Whether tokens physically move from treasury back to vault depends on whether the operator's treasury wallet co-signs. Implementing agent should choose the simplest correct approach and document the accounting model.
 
-## 7b. Design Deliberation Decisions
+2. **Pause behavior for refunds**: Should `refund_task` work when the program is paused? The PRD says withdrawals work during pause (customers can always exit). Refunds are operator-initiated and return funds to customers — arguably they should also work during pause. Tests (Task 6) should verify and document the chosen behavior.
 
-No `design_deliberation_result` was provided. The following design decisions were resolved during the technical deliberation and apply to frontend implementation:
+3. **CLI task decomposition**: The CLI/demo script (PRD Service 3, Blaze agent) is referenced throughout but not yet decomposed into a numbered task. Task generation should create this task with dependencies on Task 4 (program complete) and Task 1 (repo scaffold).
 
-| Decision | Category | Resolution |
-|----------|----------|------------|
-| Navigation paradigm (D10) | `ux-behavior` | Sidebar for web, bottom tabs for mobile |
-| Design system (D11) | `design-system` | shadcn/ui (web) + NativeWind 4 (mobile) with shared Tailwind token config |
+4. **`fee_amount` precision**: When computing `fee_amount = amount * protocol_fee_bps / 10_000`, integer division may lose precision. Implementing agent should decide ordering (multiply first, then divide) and document rounding behavior. Use checked arithmetic.
+
+5. **Customer profile `solana_pubkey` field**: The PRD mentions adding a `solana_pubkey` field to the customer profile model in the CTO monorepo. This is a data model change in the existing system that isn't fully scoped. Task 8 should document the integration point but may defer the actual customer profile change.
+
+6. **Demo video production**: Not scoped as a task. Someone needs to record the demo video showing the full settlement loop. This is a hackathon deliverable but not a code task.
+
+7. **Anchor version pinning**: PRD says "Anchor 0.30+" — implementing agents should pin to a specific minor version (e.g., 0.30.1) and document it in Anchor.toml to prevent build reproducibility issues.
+
+8. **TaskReceipt PDA seed update**: With the resolved decision to use `[u8; 32]` SHA-256 hash instead of String for task_id, the PDA seeds change from `[b"task_receipt", task_id.as_bytes()]` to `[b"task_receipt", &task_id_hash]`. All task descriptions referencing the original String-based seed pattern should be updated during implementation.
 

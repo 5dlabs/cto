@@ -1,10 +1,39 @@
-Implement subtask 1006: Deploy Signal-CLI pod, PVC, and ClusterIP Service in the signal namespace
+<identity>
+You are bolt working on subtask 1006 of task 1.
+</identity>
 
-## Objective
-Create a PersistentVolumeClaim, Pod (or Deployment), and ClusterIP Service for Signal-CLI in the signal namespace with a 5Gi RWO volume mounted at the Signal data path.
+<context>
+<scope>
+Write the devnet bootstrap script that airdrops SOL, creates a custom SPL token mint with 6 decimals, mints test tokens to customer wallets, and writes all addresses to config/devnet.json.
+</scope>
+</context>
 
-## Steps
-Create sigma1/infra/templates/signal-cli.yaml. PersistentVolumeClaim: name signal-cli-data, namespace signal, accessModes: [ReadWriteOnce], storage: 5Gi, storageClassName: default (or parameterize). Deployment (single replica): name signal-cli, namespace signal, image: signalapp/signal-cli:latest, volumeMounts: [{name: data, mountPath: /home/signal-cli/.local/share/signal-cli}], volumes: [{name: data, persistentVolumeClaim: {claimName: signal-cli-data}}]. Resources: limits 256Mi/250m for dev. ClusterIP Service: name signal-cli-svc, namespace signal, port 7583 targeting container port 7583 (JSON-RPC mode). Add a NOTE in a NOTES.txt or README: 'Manual step required before first use: kubectl exec -n signal deploy/signal-cli -- signal-cli -u +<PHONE> register && signal-cli -u +<PHONE> verify <CODE>'. Ensure the pod starts in daemon/JSON-RPC mode: args: ['-u', '$(SIGNAL_NUMBER)', 'daemon', '--tcp', '0.0.0.0:7583'] with SIGNAL_NUMBER as an env var (placeholder secret or configmap key).
+<implementation_plan>
+1. Create `scripts/setup-devnet.sh` with bash strict mode (`set -euo pipefail`).
+2. Script parameters: operator keypair path (default: read from env or `./devnet-operator-keypair.json`), RPC URL (default: devnet).
+3. Steps in the script:
+   a. Airdrop 2 SOL to operator wallet (if balance < 2 SOL).
+   b. Generate 2 test customer keypairs (ephemeral, stored in `config/test-customer-1.json` and `config/test-customer-2.json`). Add these to `.gitignore`.
+   c. Airdrop 2 SOL to each test customer.
+   d. Create a custom SPL token mint with 6 decimals: `spl-token create-token --decimals 6 --keypair <operator>`.
+   e. Capture the mint address.
+   f. Create associated token accounts for operator, customer-1, customer-2.
+   g. Mint 1,000,000 test tokens (1,000,000 * 10^6 = 1_000_000_000_000 base units) to each customer.
+   h. Write `config/devnet.json`:
+      ```json
+      {
+        "mintAddress": "<MINT_PUBKEY>",
+        "operatorPublicKey": "<OPERATOR_PUBKEY>",
+        "testCustomer1": "<CUSTOMER1_PUBKEY>",
+        "testCustomer2": "<CUSTOMER2_PUBKEY>",
+        "decimals": 6,
+        "network": "devnet"
+      }
+      ```
+4. Make script executable: `chmod +x scripts/setup-devnet.sh`.
+5. Add `config/test-customer-*.json` to `.gitignore`.
+</implementation_plan>
 
-## Validation
-kubectl get pvc signal-cli-data -n signal shows STATUS=Bound. kubectl get pods -n signal shows signal-cli pod in Running state. kubectl get svc signal-cli-svc -n signal shows ClusterIP with port 7583. curl from within cluster: kubectl run test --rm -it --image=curlimages/curl --restart=Never -- curl -s http://signal-cli-svc.signal.svc.cluster.local:7583 returns a response (even an error JSON is acceptable, confirming the port is reachable).
+<validation>
+Run `scripts/setup-devnet.sh` end-to-end — exits 0. Verify `config/devnet.json` exists and contains all 6 fields. Verify `mintAddress` is a 44-character base58 string. Run `spl-token supply <mintAddress> --url devnet` — shows 2,000,000 (2M tokens minted). Run `spl-token balance --owner <customer1> <mint> --url devnet` — shows 1,000,000. Verify test customer keypair files are gitignored.
+</validation>

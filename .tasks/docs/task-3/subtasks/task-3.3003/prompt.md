@@ -1,10 +1,17 @@
-Implement subtask 3003: Write database migrations for all seven RMS schema tables
+<identity>
+You are rex working on subtask 3003 of task 3.
+</identity>
 
-## Objective
-Create numbered SQL migration files in services/rms/migrations/ targeting the rms schema. Cover all seven tables: opportunities, opportunity_line_items, projects, inventory_transactions, crew_members, crew_assignments, deliveries.
+<context>
+<scope>
+Create the withdraw instruction that transfers SPL tokens from the program vault back to the customer's token account, signed by the vault PDA authority. Crucially, this instruction does NOT check pause state — it is a safety valve allowing customers to always exit.
+</scope>
+</context>
 
-## Steps
-Each migration file uses `SET search_path=rms;` at the top. Migration 001: CREATE SCHEMA IF NOT EXISTS rms. Migration 002: opportunities table with all columns, constraints, and CHECK constraints for status and lead_score enums. Migration 003: opportunity_line_items with FK to opportunities. Migration 004: projects with FK to opportunities. Migration 005: inventory_transactions with CHECK constraint on type. Migration 006: crew_members. Migration 007: crew_assignments with FKs to projects and crew_members. Migration 008: deliveries with FK to projects and JSONB route_data column. Add indexes on foreign keys and frequently filtered columns (status, customer_id, inventory_id, project_id). Use golang-migrate UP/DOWN pairs for all migrations.
+<implementation_plan>
+Create `instructions/withdraw.rs`. Define the `Withdraw` Anchor accounts struct with: `customer` (Signer), `customer_balance` (mut, has_one = customer), `customer_token_account` (mut, Account<TokenAccount> with mint constraint against operator_config.mint), `vault` (mut, Account<TokenAccount>), `operator_config` (Account read-only), `vault_authority` (UncheckedAccount or SystemAccount, PDA seeds = `[VAULT_SEED, operator_config.key().as_ref()]` with bump), `token_program`. Handler args: `amount: u64`. Logic: (1) Do NOT check paused — this is the PRD safety valve. (2) Check `amount > 0` → ZeroAmount. (3) Check `customer_balance.balance >= amount` → InsufficientBalance. (4) Build PDA signer seeds: `&[VAULT_SEED, operator_config.key().as_ref(), &[vault_authority_bump]]`. (5) Build `anchor_spl::token::Transfer` CPI context with_signer using the PDA seeds, from = vault, to = customer_token_account. (6) Call `anchor_spl::token::transfer(cpi_ctx, amount)?`. (7) Update: `balance = balance.checked_sub(amount).ok_or(CtoPayError::ArithmeticOverflow)?`. Ensure vault_authority bump is obtained from ctx.bumps. Export from `instructions/mod.rs`.
+</implementation_plan>
 
-## Validation
-Run `migrate -path migrations -database $DATABASE_URL up` against a fresh rms schema; all 8 migrations apply without error. Run `migrate down` to 0; all tables are dropped cleanly. `psql -c '\dt rms.*'` lists all 7 tables after UP.
+<validation>
+Verify `anchor build` compiles. IDL contains `withdraw` instruction with `amount` (u64) arg. Critical code review: confirm NO `operator_config.paused` check exists in withdraw handler or account constraints. Code review: vault PDA signer seeds match `[VAULT_SEED, operator_config.key().as_ref(), &[bump]]`. Code review: SPL transfer uses `anchor_spl::token::Transfer` with CPI signer. Code review: balance debit uses checked_sub.
+</validation>

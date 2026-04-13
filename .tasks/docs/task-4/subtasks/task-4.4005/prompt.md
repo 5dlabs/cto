@@ -1,10 +1,17 @@
-Implement subtask 4005: Implement Stripe invoice creation and webhook endpoint with signature validation
+<identity>
+You are rex working on subtask 4005 of task 4.
+</identity>
 
-## Objective
-On POST /api/v1/invoices/:id/send when stripe_invoice_id is null, create a Stripe Invoice via the Stripe API and store the returned ID. Implement POST /api/v1/webhooks/stripe to validate Stripe-Signature and process invoice.paid and payment_intent.succeeded events.
+<context>
+<scope>
+Add rustdoc comments to every public instruction handler, every Anchor accounts struct, and every state struct explaining purpose, security model, and design rationale — particularly for security-critical decisions like pause bypass on withdraw/refund and the ledger-only refund model.
+</scope>
+</context>
 
-## Steps
-Create src/integrations/stripe.rs. Configure Stripe client using STRIPE_SECRET_KEY from environment. On /send: if invoice.stripe_invoice_id IS NULL, call Stripe CreateInvoice API with customer email and total_cents, store returned stripe_invoice_id on the invoice row. POST /api/v1/webhooks/stripe: read raw request body as bytes before any deserialization (required for HMAC validation). Validate Stripe-Signature header using STRIPE_WEBHOOK_SECRET via the stripe-rust verify_webhook or manual HMAC-SHA256 computation with reqwest. On validation failure return 400. Parse event type: invoice.paid → call invoice_payment service to mark invoice paid and insert payment row with method=stripe. payment_intent.succeeded → log and update stripe_payment_id on the matching payment row. Return 200 to Stripe on all successfully processed events.
+<implementation_plan>
+Systematically add `///` doc comments across the entire program: (1) Each `#[program]` handler function: document purpose, who can call it (signer requirements), what it does, and any security notes. (2) Each Anchor accounts struct (e.g., `SettleTask`, `Withdraw`): document each account field, why it's needed, and any constraints. (3) State structs (OperatorConfig, CustomerBalance, TaskReceipt): document each field's semantics, units, and invariants. (4) Security-critical annotations: on `withdraw` — comment that pause is intentionally not checked (PRD safety valve); on `refund_task` — comment that pause is not checked and explain ledger-only model; on `settle_task` — document the 5-step validation ordering rationale; on fee computation — document multiply-first-then-divide and D4 resolution. (5) Constants: document SLOTS_PER_DAY = 216_000 derivation (400ms slots × 216000 ≈ 24h). (6) Error enum variants: document when each error is raised. Run `cargo doc --no-deps` to verify all doc comments compile. Run `cargo clippy -- -W clippy::missing_docs_in_private_items` to catch undocumented items.
+</implementation_plan>
 
-## Validation
-POST /api/v1/webhooks/stripe with valid Stripe-Signature and invoice.paid body updates invoice status to paid (verify via GET /api/v1/invoices/:id). POST with invalid signature returns 400. POST with payment_intent.succeeded updates stripe_payment_id on payment row. Invoice send with null stripe_invoice_id results in non-null stripe_invoice_id after call.
+<validation>
+Run `cargo doc --no-deps` — generates without warnings. Spot-check: withdraw handler has doc comment mentioning 'safety valve' and 'pause'. Spot-check: refund_task has doc comment explaining ledger-only model. Spot-check: SLOTS_PER_DAY constant has derivation comment. Run `anchor build` — still compiles cleanly after doc additions.
+</validation>

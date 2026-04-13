@@ -1,10 +1,41 @@
-Implement subtask 1003: Run post-cluster schema init Job: create six schemas and per-service roles
+<identity>
+You are bolt working on subtask 1003 of task 1.
+</identity>
 
-## Objective
-Deploy a Kubernetes Job that connects to sigma1-postgres and creates the six application schemas (catalog, rms, finance, vetting, social, audit) plus per-service PostgreSQL roles with scoped USAGE grants.
+<context>
+<scope>
+Create the 1Password item for the operator keypair, configure OpenBao sync, and deploy the ExternalSecret CR that materializes the K8s Secret cto-pay-operator-keypair in the cto namespace.
+</scope>
+</context>
 
-## Steps
-Create sigma1/infra/templates/schema-init-job.yaml. Job spec: namespace databases, initContainers: none, container uses image postgres:16-alpine. Command: psql $DATABASE_URL -f /sql/init.sql where init.sql is mounted via a ConfigMap (sigma1-schema-init-sql). SQL content: CREATE SCHEMA IF NOT EXISTS catalog; CREATE SCHEMA IF NOT EXISTS rms; CREATE SCHEMA IF NOT EXISTS finance; CREATE SCHEMA IF NOT EXISTS vetting; CREATE SCHEMA IF NOT EXISTS social; CREATE SCHEMA IF NOT EXISTS audit; CREATE ROLE IF NOT EXISTS sigma1_catalog; GRANT USAGE ON SCHEMA catalog TO sigma1_catalog; CREATE ROLE IF NOT EXISTS sigma1_rms; GRANT USAGE ON SCHEMA rms TO sigma1_rms; CREATE ROLE IF NOT EXISTS sigma1_finance; GRANT USAGE ON SCHEMA finance TO sigma1_finance; CREATE ROLE IF NOT EXISTS sigma1_vetting; GRANT USAGE ON SCHEMA vetting TO sigma1_vetting; CREATE ROLE IF NOT EXISTS sigma1_social; GRANT USAGE ON SCHEMA social TO sigma1_social; Set restartPolicy: OnFailure, backoffLimit: 3. DATABASE_URL sourced from CNPG generated secret sigma1-postgres-app. Add Job annotation helm.sh/hook: post-install,post-upgrade and helm.sh/hook-weight: '10' to ensure it runs after the cluster CR is applied.
+<implementation_plan>
+1. Create a 1Password item named `cto-pay-operator-keypair` in the appropriate vault. The item should contain the Solana keypair JSON (byte array format, e.g., `[174,47,...]` — 64 integers representing the 32-byte private key + 32-byte public key).
+2. Configure OpenBao to sync this 1Password item. Follow the existing CTO pipeline patterns for 1Password → OpenBao synchronization.
+3. Create an `ExternalSecret` CR YAML at `infra/gitops/cto-pay-operator-keypair-externalsecret.yaml`:
+   ```yaml
+   apiVersion: external-secrets.io/v1beta1
+   kind: ExternalSecret
+   metadata:
+     name: cto-pay-operator-keypair
+     namespace: cto
+   spec:
+     refreshInterval: 1h
+     secretStoreRef:
+       name: openbao-backend
+       kind: ClusterSecretStore
+     target:
+       name: cto-pay-operator-keypair
+       creationPolicy: Owner
+     data:
+       - secretKey: operator-keypair.json
+         remoteRef:
+           key: cto-pay-operator-keypair
+           property: keypair
+   ```
+4. Apply the ExternalSecret and verify the K8s Secret is created with key `operator-keypair.json`.
+5. Document the volume mount path `/secrets/operator-keypair.json` for downstream pod specs.
+</implementation_plan>
 
-## Validation
-kubectl get job schema-init -n databases shows Completions: 1/1. psql -U sigma1_user -d sigma1 -c '\dn' returns rows for catalog, rms, finance, vetting, social, audit. psql -U sigma1_user -d sigma1 -c '\du' shows roles sigma1_catalog, sigma1_rms, sigma1_finance, sigma1_vetting, sigma1_social.
+<validation>
+Run `kubectl get externalsecret cto-pay-operator-keypair -n cto` — status shows `SecretSynced`. Run `kubectl get secret cto-pay-operator-keypair -n cto -o jsonpath='{.data.operator-keypair\.json}'` — base64-decoded value is a valid JSON array of 64 integers. Verify the secret refreshes on schedule (check ExternalSecret status conditions).
+</validation>

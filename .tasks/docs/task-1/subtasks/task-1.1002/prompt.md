@@ -1,10 +1,24 @@
-Implement subtask 1002: Deploy CloudNative-PG PostgreSQL 16 Cluster CR (sigma1-postgres)
+<identity>
+You are bolt working on subtask 1002 of task 1.
+</identity>
 
-## Objective
-Define and apply the CloudNative-PG Cluster custom resource for sigma1-postgres in the databases namespace with PostgreSQL 16, 1 replica (dev), 50Gi storage, and required extensions.
+<context>
+<scope>
+Create the cto-pay-receipts bucket in the existing SeaweedFS deployment in the cto namespace, and create a K8s Job manifest in infra/gitops/ to ensure idempotent bucket creation.
+</scope>
+</context>
 
-## Steps
-Create sigma1/infra/templates/cnpg-cluster.yaml. Spec: apiVersion: postgresql.cnpg.io/v1, kind: Cluster, metadata.name: sigma1-postgres, metadata.namespace: databases. Set spec.instances: 1, spec.postgresql.version: '16', spec.storage.size: 50Gi. Under spec.bootstrap.initdb: set database: sigma1, owner: sigma1_user, postInitSQL list with: CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS pg_trgm;. Set spec.affinity or tolerations as appropriate for dev cluster. Ensure the CNPG operator is installed in the cluster (document as a prerequisite). Apply via Helm. Wait for cluster to reach Ready phase: kubectl wait cluster/sigma1-postgres -n databases --for=condition=Ready --timeout=300s.
+<implementation_plan>
+1. Connect to the existing SeaweedFS S3 API endpoint at `http://seaweedfs-s3.cto.svc.cluster.local:8333`.
+2. Create bucket `cto-pay-receipts` using either the SeaweedFS S3-compatible API (`aws s3 mb s3://cto-pay-receipts --endpoint-url ...`) or `weed shell` command.
+3. Create a K8s Job YAML manifest at `infra/gitops/cto-pay-receipts-init.yaml` that:
+   - Uses an image with the AWS CLI or a lightweight S3 client.
+   - Runs `aws s3 mb s3://cto-pay-receipts --endpoint-url http://seaweedfs-s3.cto.svc.cluster.local:8333` (idempotent — mb returns success if bucket exists).
+   - Runs in namespace `cto` with appropriate RBAC.
+4. Alternatively, create a shell script at `infra/scripts/create-seaweedfs-bucket.sh` that can be run manually or by the Job.
+5. Verify the bucket is accessible and empty after creation.
+</implementation_plan>
 
-## Validation
-kubectl get cluster sigma1-postgres -n databases -o jsonpath='{.status.phase}' returns Ready. kubectl get pods -n databases shows sigma1-postgres-1 in Running state. psql -U sigma1_user -d sigma1 -c 'SELECT extname FROM pg_extension;' lists uuid-ossp, pgcrypto, pg_trgm.
+<validation>
+Run `aws s3 ls s3://cto-pay-receipts --endpoint-url http://seaweedfs-s3.cto.svc.cluster.local:8333` — returns empty listing (no error). Run `aws s3 cp /dev/null s3://cto-pay-receipts/test-object --endpoint-url ...` then delete — confirms write access. K8s Job manifest passes `kubectl apply --dry-run=client`.
+</validation>

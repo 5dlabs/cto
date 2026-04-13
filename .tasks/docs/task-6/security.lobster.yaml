@@ -3,52 +3,54 @@ metadata:
   task_id: 6
   agent: cipher
   phase: security
-  stack: Node.js 20+/Elysia 1.x/Effect 3.x
-  cli: claude
-  model: claude-opus-4-6
+  stack: TypeScript, Bankrun, @coral-xyz/anchor, @solana/spl-token, Bun
 
-args:
-  task_dir: {}
-  repo_url: {}
-  branch_name: {}
-  pr_url:
+inputs:
+  - name: task_dir
+  - name: repo_url
+  - name: branch_name
+  - name: pr_url
     default: ""
-  cli:
+  - name: cli
     default: "claude"
-  model:
+  - name: model
     default: "claude-opus-4-6"
-  max_retries:
+  - name: max_retries
     default: 2
 
 steps:
-  - id: checkout
+  - name: checkout
     command: >
-      git clone ${repo_url} work && cd work &&
-      git checkout ${branch_name}
+      git clone {{inputs.repo_url}} work && cd work &&
+      git checkout {{inputs.branch_name}}
 
-  - id: dependency-audit
+  - name: dependency-audit
     depends_on: [checkout]
-    retry: { max: "${max_retries}" }
+    retry: { max: "{{inputs.max_retries}}" }
     command: >
-      cd work && echo "No dependency auditor configured"
+      cd work && npm audit --production || bun audit
 
-  - id: secret-scan
+  - name: secret-scan
     depends_on: [checkout]
     command: >
-      cd work && gitleaks detect --source . --no-git
+      cd work && npx gitleaks detect --source . --no-git
 
-  - id: static-analysis
+  - name: static-analysis
     depends_on: [checkout]
-    retry: { max: "${max_retries}" }
+    retry: { max: "{{inputs.max_retries}}" }
     command: >
-      cd work && echo "No security scanner configured"
+      cd work && npx semgrep --config auto --json .
 
-  - id: security-review
+  - name: security-review
     depends_on: [dependency-audit, secret-scan, static-analysis]
     command: >
-      ${cli} -p "You are Cipher, the security agent. Perform a security review of the code changes for task 6. Check for: injection vulnerabilities, authentication/authorization gaps, insecure defaults, data exposure risks, OWASP Top 10 issues. Review the task spec at ${task_dir}/task.md for security-relevant requirements. Output: {pass: boolean, vulnerabilities: [{severity: critical|high|medium|low, category, file, description, remediation}], summary: string}" --model ${model}
+      {{inputs.cli}} --model {{inputs.model}} --prompt
+      "You are Cipher, the security agent. Perform a security review of the code changes for task 6.
+      Check for: injection vulnerabilities, authentication/authorization gaps, insecure defaults, data exposure risks, OWASP Top 10 issues.
+      Review the task spec at {{inputs.task_dir}}/task.md for security-relevant requirements.
+      Output: {pass: boolean, vulnerabilities: [{severity: critical|high|medium|low, category, file, description, remediation}], summary: string}"
 
-  - id: verdict
+  - name: verdict
     depends_on: [security-review]
     command: >
       echo "security-task-6: all checks complete" &&

@@ -1,10 +1,58 @@
-Implement subtask 2002: Implement application entrypoint, AppState, and database/Valkey connection pool setup
+<identity>
+You are rex working on subtask 2002 of task 2.
+</identity>
 
-## Objective
-Write src/main.rs and src/state.rs establishing the Axum application entry point, shared AppState struct containing PgPool and Redis ConnectionManager, and configuration loading from environment variables.
+<context>
+<scope>
+Create the constants module with PDA seeds and SLOTS_PER_DAY, and the error enum with all 12 CtoPayError variants.
+</scope>
+</context>
 
-## Steps
-Create src/main.rs: initialize tracing_subscriber with EnvFilter from RUST_LOG env var. Load config from env: DATABASE_URL (from CNPG_SIGMA1_URL + PGPASSWORD), VALKEY_URL (from VALKEY_SIGMA1_URL), JWT_SECRET. Create sqlx::PgPool via PgPoolOptions with max_connections: 10, connect_lazy: false. Create redis::aio::ConnectionManager from VALKEY_URL. Construct AppState { db: PgPool, redis: ConnectionManager, jwt_secret: String }. Wrap in Arc<AppState>. Build Axum Router (routes added in later subtasks), attach tower-http layers: TraceLayer, CompressionLayer, CorsLayer (permissive for dev). Bind to 0.0.0.0:8080. Create src/state.rs defining pub struct AppState and impl AppState with db(), redis(), jwt_secret() accessors. Create src/config.rs reading all env vars with descriptive errors on missing values.
+<implementation_plan>
+1. Create `programs/cto-pay/src/constants.rs`:
+   ```rust
+   pub const SLOTS_PER_DAY: u64 = 216_000;
+   pub const OPERATOR_CONFIG_SEED: &[u8] = b"operator_config";
+   pub const CUSTOMER_BALANCE_SEED: &[u8] = b"customer_balance";
+   pub const TASK_RECEIPT_SEED: &[u8] = b"task_receipt";
+   pub const VAULT_SEED: &[u8] = b"vault";
+   ```
+   - Add doc comments explaining SLOTS_PER_DAY approximation (400ms/slot, ±10% variance).
+2. Create `programs/cto-pay/src/errors.rs`:
+   ```rust
+   use anchor_lang::prelude::*;
+   
+   #[error_code]
+   pub enum CtoPayError {
+       #[msg("Program is paused")]
+       ProgramPaused,
+       #[msg("Insufficient balance")]
+       InsufficientBalance,
+       #[msg("Amount exceeds per-task spending cap")]
+       SpendingCapPerTaskExceeded,
+       #[msg("Amount exceeds daily spending cap")]
+       SpendingCapDailyExceeded,
+       #[msg("Unauthorized operator")]
+       UnauthorizedOperator,
+       #[msg("Unauthorized customer")]
+       UnauthorizedCustomer,
+       #[msg("Task already settled")]
+       TaskAlreadySettled,
+       #[msg("Task not in settled state for refund")]
+       TaskNotSettled,
+       #[msg("Arithmetic overflow")]
+       ArithmeticOverflow,
+       #[msg("Invalid mint")]
+       InvalidMint,
+       #[msg("Amount must be greater than zero")]
+       ZeroAmount,
+       #[msg("Invalid protocol fee basis points (must be <= 10000)")]
+       InvalidFeeBps,
+   }
+   ```
+3. Ensure both modules are importable and compile without warnings under `clippy::pedantic`.
+</implementation_plan>
 
-## Validation
-cargo build succeeds. Running the binary with valid DATABASE_URL and VALKEY_URL env vars starts without panic and logs 'listening on 0.0.0.0:8080'. curl http://localhost:8080/ returns 404 (router not yet populated — confirming server is alive).
+<validation>
+Run `anchor build` — compiles cleanly. Verify IDL (`target/idl/cto_pay.json`) contains all 12 error codes with correct names and messages. Verify constants are accessible from instruction modules (confirmed in subtask 2003 build).
+</validation>

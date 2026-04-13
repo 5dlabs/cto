@@ -1,11 +1,7 @@
-## Decision Points
+## Decisions for Task 7
 
-- Decision
-- Decision
-- Decision
-- Decision
+- Stack: Anchor Verify, Soteria, Rust Security Analysis
+- Agent: cipher
+- Priority: high
 
-## Coordination Notes
-
-- Agent owner: angie
-- Primary stack: OpenClaw/MCP
+_Fallback doc: LLM generation was unavailable._

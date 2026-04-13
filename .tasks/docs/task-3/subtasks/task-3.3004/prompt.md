@@ -1,10 +1,17 @@
-Implement subtask 3004: Implement OpportunityService gRPC handlers with REST gateway
+<identity>
+You are rex working on subtask 3004 of task 3.
+</identity>
 
-## Objective
-Implement all five OpportunityService methods (CreateOpportunity, GetOpportunity, UpdateOpportunity, ListOpportunities, ScoreLead stub) as gRPC handler structs backed by pgx queries. Wire into grpc-gateway mux on :8080 and gRPC server on :9090.
+<context>
+<scope>
+Create the update_spending_caps instruction that allows a customer to modify their per-task and daily spending caps without resetting the current daily_spent counter.
+</scope>
+</context>
 
-## Steps
-Create internal/opportunity/handler.go implementing the generated OpportunityServiceServer interface. Use pgx/v5 pool for all DB access. CreateOpportunity: INSERT with uuid.New(), status=pending, return created record. GetOpportunity: SELECT by id, return NotFound if missing. UpdateOpportunity: UPDATE with optimistic updated_at check. ListOpportunities: SELECT with optional status filter via query param. ScoreLead: placeholder returning YELLOW until subtask 3007 is wired in. In cmd/server/main.go: register gRPC server on :9090 with reflection enabled (grpc/reflection package). Register grpc-gateway mux on :8080 with ServeMux backed by grpc.Dial to localhost:9090. Run both listeners in goroutines.
+<implementation_plan>
+Create `instructions/update_spending_caps.rs`. Define the `UpdateSpendingCaps` Anchor accounts struct with: `customer` (Signer), `customer_balance` (mut, has_one = customer). Handler args: `max_per_task: u64`, `max_per_day: u64`. Logic: (1) Validate `max_per_task > 0` → InvalidSpendingCap. (2) Validate `max_per_day > 0` → InvalidSpendingCap. (3) Validate `max_per_task <= max_per_day` → InvalidSpendingCap. (4) Set `customer_balance.max_per_task = max_per_task`. (5) Set `customer_balance.max_per_day = max_per_day`. (6) Explicitly do NOT modify daily_spent or daily_reset_slot — add a code comment explaining this design choice: cap changes take effect on next settlement but don't retroactively clear spending history. No pause check needed for this instruction (it doesn't move funds). Export from `instructions/mod.rs`.
+</implementation_plan>
 
-## Validation
-POST /api/v1/opportunities returns 201 with id and status=pending. GET /api/v1/opportunities/:id returns the created record. PUT /api/v1/opportunities/:id updates fields. grpcurl -plaintext localhost:9090 list returns sigma1.rms.v1.OpportunityService.
+<validation>
+Verify `anchor build` compiles. IDL contains `update_spending_caps` instruction with `max_per_task` (u64) and `max_per_day` (u64) args. Code review: validation enforces max_per_task <= max_per_day. Code review: daily_spent is NOT modified. Code review: no pause check present (intentional — this is a non-financial operation).
+</validation>

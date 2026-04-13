@@ -1,9 +1,13 @@
-## Acceptance Criteria
+## Acceptance Criteria for Task 4
 
-- [ ] 1. POST /api/v1/invoices with valid project_id and line items returns 201 with status=draft and computed total_cents = subtotal_cents + tax_cents. 2. POST /api/v1/invoices/:id/paid with amount equal to total_cents returns invoice status=paid. 3. GET /api/v1/finance/reports/aging returns JSON with buckets 0-30, 31-60, 61-90, 90+ each as numeric counts; overdue invoice (created 35 days ago, unpaid) appears in 31-60 bucket. 4. GET /api/v1/currency/rates returns JSON object with at least USD, CAD, AUD keys and non-zero rate values. 5. Stripe webhook POST /api/v1/webhooks/stripe with valid Stripe-Signature header and invoice.paid payload updates invoice status to paid (verify via GET /api/v1/invoices/:id). 6. Overdue reminder task: seed invoice with due_at = NOW()-2d and status=sent; after background task runs, status becomes overdue. 7. GET /health/ready returns 200. 8. cargo test passes with >= 80% coverage.
+1. Run `anchor build` — compiles with zero warnings under pedantic clippy.
+2. IDL contains all 9 instructions: initialize_operator, create_customer_account, deposit, withdraw, settle_task, refund_task, update_spending_caps, pause, unpause.
+3. Verify `settle_task` IDL args include `task_id_hash` (32-byte array), `amount` (u64), `receipt_hash` (32-byte array).
+4. Code review: `settle_task` performs 5 validation checks in order (paused, amount > 0, per-task cap, daily cap with reset, balance).
+5. Code review: fee_amount computed as `amount * protocol_fee_bps / 10_000` using checked arithmetic (multiply first).
+6. Code review: `refund_task` does NOT check paused state.
+7. Code review: `withdraw` (from Task 3) does NOT check paused state.
+8. Code review: daily cap reset uses slot comparison with `SLOTS_PER_DAY = 216_000`.
+9. Program binary size: `ls -la target/deploy/cto_pay.so` — under 1.4MB.
 
-## Verification Notes
-
-- [ ] Confirm dependencies are satisfied before implementation.
-- [ ] Update tests, docs, and configuration touched by this task.
-- [ ] Validate the final behavior against the task objective.
+_Generated from task metadata (LLM fallback)._
