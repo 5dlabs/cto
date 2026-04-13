@@ -24,41 +24,40 @@ steps:
     command: >
       root="${WORKSPACE:-.}";
       "$root/intake/scripts/workflow-step-audio.sh" "codebase-analysis" "pack-repo" "${audio_debug}";
+      PACK_OUT="$root/.intake/packed-repo.json";
       if command -v repomix >/dev/null 2>&1 || openclaw.invoke --tool repomix --action check 2>/dev/null; then
-        openclaw.invoke --tool repomix --action pack_remote_repository --args-json "$(jq -n --arg remote "${repository_url}" --arg branch "${branch}" '{"remote": $remote, "branch": $branch}')"
+        openclaw.invoke --tool repomix --action pack_remote_repository --args-json "$(jq -n --arg remote "${repository_url}" --arg branch "${branch}" '{"remote": $remote, "branch": $branch}')" > "$PACK_OUT"
       else
         echo '{"fallback": "octocode", "message": "Repomix unavailable — using OctoCode structure view"}' >&2 &&
         REPO_PATH=$(echo "${repository_url}" | sed 's|https://github.com/||' | sed 's|\.git$||') &&
         openclaw.invoke --tool octocode --action githubViewRepoStructure --args-json "{
           \"repository\": \"${REPO_PATH}\",
           \"branch\": \"${branch}\"
-        }"
-      fi
+        }" > "$PACK_OUT"
+      fi;
+      echo "{\"packed_file\": \"$PACK_OUT\", \"size_bytes\": $(wc -c < "$PACK_OUT")}"
 
   - id: search-patterns
     command: >
       root="${WORKSPACE:-.}";
+      SEARCH_OUT="$root/.intake/search-patterns.json";
       "$root/intake/scripts/workflow-step-audio.sh" "codebase-analysis" "search-patterns" "${audio_debug}";
       REPO_PATH=$(echo "${repository_url}" | sed 's|https://github.com/||' | sed 's|\.git$||') &&
       timeout 120 openclaw.invoke --tool octocode --action githubSearchCode --args-json "{
         \"repository\": \"${REPO_PATH}\",
         \"query\": \"path:src OR path:lib OR path:app language:rust OR language:go OR language:typescript\",
         \"maxResults\": 50
-      }" || { echo '{"search_skipped": true, "reason": "octocode timeout or unavailable"}'; }
+      }" > "$SEARCH_OUT" || { echo '{"search_skipped": true, "reason": "octocode timeout or unavailable"}' > "$SEARCH_OUT"; };
+      echo "{\"search_file\": \"$SEARCH_OUT\", \"size_bytes\": $(wc -c < "$SEARCH_OUT")}"
 
   - id: summarize-codebase
-    env:
-      CTO_PACK_REPO_OUT: $pack-repo.stdout
-      CTO_SEARCH_PATTERNS_OUT: $search-patterns.stdout
     command: >
       root="${WORKSPACE:-.}";
       "$root/intake/scripts/workflow-step-audio.sh" "codebase-analysis" "summarize-codebase" "${audio_debug}";
-      PACK_FILE=$(mktemp);
-      SEARCH_FILE=$(mktemp);
+      PACK_FILE="$root/.intake/packed-repo.json";
+      SEARCH_FILE="$root/.intake/search-patterns.json";
       ARGS_FILE=$(mktemp);
-      trap 'rm -f "$PACK_FILE" "$SEARCH_FILE" "$ARGS_FILE"' EXIT;
-      printf '%s' "$CTO_PACK_REPO_OUT" > "$PACK_FILE";
-      printf '%s' "$CTO_SEARCH_PATTERNS_OUT" > "$SEARCH_FILE";
+      trap 'rm -f "$ARGS_FILE"' EXIT;
       jq -n \
         --rawfile prompt "$root/intake/prompts/codebase-analysis-system.md" \
         --rawfile prd_content "$root/.intake/run-prd.txt" \
