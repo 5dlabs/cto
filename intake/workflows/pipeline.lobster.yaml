@@ -1525,17 +1525,24 @@ steps:
     command: |
       WS="${WORKSPACE:-.}"
       "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "gateway-health-check" "${audio_debug}" "project ${project_name}"
-      if ! openclaw.invoke --tool llm-task --action json --args-json '{"prompt":"ping","input":{},"provider":"gemini","model":"gemini-2.5-flash"}' >/dev/null 2>&1; then
-        echo "gateway-health-check: OpenClaw gateway unhealthy — restarting..." >&2
-        pkill -f openclaw-gateway 2>/dev/null || true
+      HEALTH_OK=false
+      if curl -sf --max-time 5 http://127.0.0.1:18789/health >/dev/null 2>&1; then
+        HEALTH_OK=true
+        echo "gateway-health-check: OpenClaw gateway healthy (HTTP)" >&2
+      fi
+      if [ "$HEALTH_OK" = "false" ]; then
+        echo "gateway-health-check: gateway HTTP health failed — attempting restart..." >&2
+        for pid in $(ps aux | grep openclaw-gateway | grep -v grep | awk '{print $2}'); do
+          kill -9 "$pid" 2>/dev/null || true
+        done
         sleep 3
-        if ! openclaw.invoke --tool llm-task --action json --args-json '{"prompt":"ping","input":{},"provider":"gemini","model":"gemini-2.5-flash"}' >/dev/null 2>&1; then
-          echo "gateway-health-check: gateway still unhealthy after restart — proceeding anyway" >&2
-        else
+        nohup openclaw gateway > /tmp/openclaw-gateway-restart.log 2>&1 &
+        sleep 5
+        if curl -sf --max-time 5 http://127.0.0.1:18789/health >/dev/null 2>&1; then
           echo "gateway-health-check: gateway recovered after restart" >&2
+        else
+          echo "gateway-health-check: gateway still unhealthy after restart — proceeding anyway" >&2
         fi
-      else
-        echo "gateway-health-check: OpenClaw gateway healthy" >&2
       fi
       printf '{"gateway":"checked"}'
 
