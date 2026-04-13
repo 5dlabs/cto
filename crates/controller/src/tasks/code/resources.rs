@@ -1632,10 +1632,10 @@ impl<'a> CodeResourceManager<'a> {
             }
         }
 
-        // Morgan centralized gateway env vars. The MCP Bridge (openclaw mcp serve)
-        // was removed due to cross-talk (exposes all bot accounts' conversations),
-        // but these vars remain available for future per-agent scoped bridge or
-        // other gateway communication patterns.
+        // Morgan centralized gateway env vars. Currently unused by task pods
+        // (MCP Bridge removed; Discord messaging uses per-agent REST API via the
+        // discord-mcp-server.js MCP tool). Kept for future gateway `send` RPC
+        // migration when we want to route through Morgan instead of direct REST.
         final_env_vars.push(json!({
             "name": "MORGAN_GATEWAY_URL",
             "value": "ws://openclaw-morgan.cto.svc:18789"

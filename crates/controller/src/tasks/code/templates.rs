@@ -1988,11 +1988,17 @@ impl CodeTemplateGenerator {
             mcp_servers["tools"] = tools_server;
         }
 
-        // NOTE: Morgan centralized gateway MCP bridge was removed due to cross-talk.
-        // `openclaw mcp serve` exposes ALL bot accounts' conversations from the
-        // gateway — no per-account scoping exists.  Task pods use direct Discord
-        // REST API (per-agent bot tokens) in the lobster notification step instead.
-        // Re-add when OpenClaw supports per-agent MCP bridge scoping.
+        // Discord MCP server: per-agent scoped messaging tool.
+        // The harness ALWAYS writes /tmp/discord-mcp-server.js (full or stub),
+        // so this entry is safe to add unconditionally for Claude CLI.
+        // When discord is disabled, the stub returns an empty tools list.
+        if cli_type == CLIType::Claude {
+            mcp_servers["discord-gateway"] = json!({
+                "type": "stdio",
+                "command": "node",
+                "args": ["/tmp/discord-mcp-server.js"]
+            });
+        }
 
         let mcp_config = json!({
             "mcpServers": mcp_servers

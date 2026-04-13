@@ -503,10 +503,166 @@ fi
 ) &
 GW_WATCHDOG_PID=$!
 
-# NOTE: MCP Bridge (morgan-gateway) was removed due to cross-talk.
-# `openclaw mcp serve` exposes ALL bot accounts from Morgan's gateway —
-# no per-account scoping.  Discord messaging uses direct REST API with
-# per-agent bot tokens in the lobster notification step instead.
+# ─── Discord MCP Server: per-agent scoped messaging tool ───────────────
+# Writes a minimal MCP stdio server to /tmp/discord-mcp-server.js.
+# Claude CLI spawns it as a subprocess — the agent gets a `discord_send`
+# tool scoped to THIS bot's token and task thread only.
+# No cross-talk: each pod reads its own DISCORD_TOKEN_<AGENT> env var.
+# The script is ALWAYS written (even without a token) so Claude CLI
+# startup never fails due to a missing MCP server file.
+{{#if discord_enabled}}
+AGENT_UPPER="{{agent_name_upper}}"
+DISCORD_TOKEN_VAR="DISCORD_TOKEN_${AGENT_UPPER}"
+DISCORD_CHANNEL_VAR="DISCORD_CHANNEL_${AGENT_UPPER}"
+
+if [ -n "${!DISCORD_TOKEN_VAR:-}" ]; then
+  export DISCORD_MCP_BOT_TOKEN="${!DISCORD_TOKEN_VAR}"
+  export DISCORD_MCP_CHANNEL_ID="${TASK_DISCORD_THREAD_ID:-${!DISCORD_CHANNEL_VAR:-}}"
+  export DISCORD_MCP_AGENT_NAME="${AGENT_UPPER}"
+  echo "[harness] Discord MCP: token found for ${AGENT_UPPER}, thread=${DISCORD_MCP_CHANNEL_ID:-none}"
+else
+  export DISCORD_MCP_BOT_TOKEN=""
+  export DISCORD_MCP_CHANNEL_ID=""
+  export DISCORD_MCP_AGENT_NAME="${AGENT_UPPER}"
+  echo "[harness] ⚠️ ${DISCORD_TOKEN_VAR} not set — discord_send tool will return errors"
+fi
+
+cat > /tmp/discord-mcp-server.js << 'DISCORD_MCP_EOF'
+// Discord MCP Server — per-agent scoped messaging via Discord REST API.
+// Reads: DISCORD_MCP_BOT_TOKEN, DISCORD_MCP_CHANNEL_ID, DISCORD_MCP_AGENT_NAME
+// Enforces single-thread isolation: no channel_id override allowed.
+'use strict';
+const readline = require('readline');
+const BOT_TOKEN = process.env.DISCORD_MCP_BOT_TOKEN || '';
+const CHANNEL = process.env.DISCORD_MCP_CHANNEL_ID || '';
+const AGENT = process.env.DISCORD_MCP_AGENT_NAME || 'AGENT';
+const API = 'https://discord.com/api/v10';
+const MAX_RETRIES = 3;
+
+function reply(obj) { process.stdout.write(JSON.stringify(obj) + '\n'); }
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function discordPost(url, body) {
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bot ' + BOT_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 429) {
+      const retryAfter = parseFloat(res.headers.get('retry-after') || '1') * 1000;
+      const jitter = Math.random() * 500;
+      await sleep(retryAfter + jitter);
+      continue;
+    }
+    return res;
+  }
+  return { ok: false, status: 429, text: async () => 'Rate limited after ' + MAX_RETRIES + ' retries' };
+}
+
+async function discordSend(text) {
+  if (!BOT_TOKEN) return { error: 'No Discord bot token — DISCORD_TOKEN_' + AGENT + ' not set' };
+  if (!CHANNEL) return { error: 'No channel/thread ID — task may not have a Discord thread yet' };
+  const chunks = [];
+  for (let i = 0; i < text.length; i += 2000) chunks.push(text.slice(i, i + 2000));
+  const results = [];
+  for (const chunk of chunks) {
+    const res = await discordPost(API + '/channels/' + CHANNEL + '/messages', { content: chunk });
+    if (!res.ok) {
+      const body = await res.text();
+      return { error: 'Discord API ' + res.status + ': ' + body };
+    }
+    const data = await res.json();
+    results.push(data.id);
+  }
+  return { success: true, messageIds: results, channelId: CHANNEL, agent: AGENT };
+}
+
+const rl = readline.createInterface({ input: process.stdin, terminal: false });
+rl.on('line', async (line) => {
+  let msg;
+  try { msg = JSON.parse(line); } catch { return; }
+  const id = msg.id;
+  const method = msg.method;
+
+  if (method === 'initialize') {
+    reply({ jsonrpc: '2.0', id, result: {
+      protocolVersion: '2024-11-05',
+      capabilities: { tools: {} },
+      serverInfo: { name: 'discord-gateway', version: '1.0.0' },
+    }});
+  } else if (method === 'notifications/initialized') {
+    // no response needed
+  } else if (method === 'ping') {
+    reply({ jsonrpc: '2.0', id, result: {} });
+  } else if (method === 'tools/list') {
+    const status = !BOT_TOKEN ? ' (NO TOKEN — calls will fail)' :
+                   !CHANNEL ? ' (NO THREAD — calls will fail)' : '';
+    reply({ jsonrpc: '2.0', id, result: { tools: [{
+      name: 'discord_send',
+      description: 'Send a message to the task Discord thread as ' + AGENT +
+        '. Use for status updates, questions, or sharing results with the team.' + status,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', description: 'Message text to send (auto-chunked at 2000 chars)' },
+        },
+        required: ['message'],
+      },
+    }]}});
+  } else if (method === 'tools/call') {
+    const params = msg.params || {};
+    const args = params.arguments || {};
+    if (params.name === 'discord_send') {
+      try {
+        const result = await discordSend(args.message || '');
+        reply({ jsonrpc: '2.0', id, result: {
+          content: [{ type: 'text', text: JSON.stringify(result) }],
+          isError: !!result.error,
+        }});
+      } catch (err) {
+        reply({ jsonrpc: '2.0', id, result: {
+          content: [{ type: 'text', text: JSON.stringify({ error: err.message }) }],
+          isError: true,
+        }});
+      }
+    } else {
+      reply({ jsonrpc: '2.0', id, error: { code: -32601, message: 'Unknown tool: ' + params.name }});
+    }
+  } else if (id != null) {
+    reply({ jsonrpc: '2.0', id, error: { code: -32601, message: 'Method not found: ' + method }});
+  }
+});
+DISCORD_MCP_EOF
+chmod 644 /tmp/discord-mcp-server.js
+echo "[harness] Discord MCP server written to /tmp/discord-mcp-server.js"
+{{else}}
+# Discord disabled — write a stub MCP server that reports tools as unavailable
+export DISCORD_MCP_BOT_TOKEN=""
+export DISCORD_MCP_CHANNEL_ID=""
+export DISCORD_MCP_AGENT_NAME="DISABLED"
+cat > /tmp/discord-mcp-server.js << 'DISCORD_MCP_STUB_EOF'
+'use strict';
+const readline = require('readline');
+function reply(obj) { process.stdout.write(JSON.stringify(obj) + '\n'); }
+const rl = readline.createInterface({ input: process.stdin, terminal: false });
+rl.on('line', (line) => {
+  let msg; try { msg = JSON.parse(line); } catch { return; }
+  if (msg.method === 'initialize') {
+    reply({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'discord-gateway', version: '1.0.0' } }});
+  } else if (msg.method === 'tools/list') {
+    reply({ jsonrpc: '2.0', id: msg.id, result: { tools: [] }});
+  } else if (msg.method === 'ping') {
+    reply({ jsonrpc: '2.0', id: msg.id, result: {} });
+  } else if (msg.id != null) {
+    reply({ jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: 'Discord disabled' }});
+  }
+});
+DISCORD_MCP_STUB_EOF
+chmod 644 /tmp/discord-mcp-server.js
+echo "[harness] Discord disabled — stub MCP server written"
+{{/if}}
 
 # ─── Tail OpenClaw gateway + CLI logs to stdout for DD collection ──────
 # Gateway writes structured JSON logs to /tmp/openclaw-*/openclaw-*.log
