@@ -1,0 +1,77 @@
+---
+# Qdrant - High-performance vector database for Mem0 agent memory
+# Replaces cto-openmemory (SQLite + MiniLM) with production vector store
+# License: Apache 2.0
+# Source: https://github.com/qdrant/qdrant
+# Docs: https://qdrant.tech/documentation/
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: qdrant
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: qdrant
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: storage
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://qdrant.github.io/qdrant-helm
+    chart: qdrant
+    targetRevision: 1.17.1
+    helm:
+      values: |
+        replicaCount: 1
+
+        persistence:
+          size: 10Gi
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+
+        livenessProbe:
+          enabled: true
+          initialDelaySeconds: 10
+
+        readinessProbe:
+          enabled: true
+          initialDelaySeconds: 5
+
+        config:
+          cluster:
+            enabled: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+
+  revisionHistoryLimit: 5
