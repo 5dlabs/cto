@@ -101,9 +101,9 @@ steps:
       "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "preflight" "${audio_debug}" "project ${project_name}"
       # Clean stale artifacts from previous runs to prevent cross-contamination
       echo "preflight: cleaning stale intake artifacts..." >&2
-      rm -rf "$root/.intake/tmp" "$root/.intake/step-outputs"
+      rm -rf "$root/.intake/tmp" "$root/.intake/step-outputs" "$root/.intake/checkpoints"
       rm -rf "$root/.tasks/docs" "$root/.tasks/tasks" "$root/.tasks/design"
-      mkdir -p "$root/.intake/tmp" "$root/.intake/step-outputs"
+      mkdir -p "$root/.intake/tmp" "$root/.intake/step-outputs" "$root/.intake/checkpoints"
       "${root}/intake/scripts/pipeline-preflight.sh"
 
   - id: materialize-prd
