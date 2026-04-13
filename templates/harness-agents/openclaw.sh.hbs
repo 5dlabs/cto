@@ -504,53 +504,17 @@ fi
 GW_WATCHDOG_PID=$!
 
 {{#if mcp_bridge_enabled}}
-# ─── MCP Bridge: connect task pod to Morgan's centralized gateway ──────
-# This provides bidirectional Discord messaging through Morgan.
-# The bridge runs as a background process for the task's lifetime.
-if [ -n "${MORGAN_GATEWAY_URL:-}" ]; then
-  echo "[harness] Starting MCP Bridge → ${MORGAN_GATEWAY_URL}..."
-  openclaw mcp serve \
-    --url "${MORGAN_GATEWAY_URL}" \
-    --token "${MORGAN_GATEWAY_TOKEN:-openclaw-internal}" &
-  MCP_BRIDGE_PID=$!
-  echo "$MCP_BRIDGE_PID" > /tmp/mcp_bridge_pid
-
-  # Warmup: MCP Bridge needs ~3s after init before tool calls succeed
-  sleep 3
-  if kill -0 "$MCP_BRIDGE_PID" 2>/dev/null; then
-    echo "[harness] ✅ MCP Bridge started (PID=$MCP_BRIDGE_PID)"
-  else
-    echo "[harness] ⚠️ MCP Bridge exited immediately — Discord messaging unavailable"
-    MCP_BRIDGE_PID=""
-  fi
-
-  # MCP Bridge watchdog: restart if it dies (e.g., Morgan pod restart)
-  if [ -n "$MCP_BRIDGE_PID" ]; then
-    (
-      MB_BACKOFF=5
-      MB_RETRIES=0
-      while [ ! -f /workspace/.agent_done ] && [ "$MB_RETRIES" -lt 5 ]; do
-        sleep 20
-        MB_PID=$(cat /tmp/mcp_bridge_pid 2>/dev/null)
-        if [ -n "$MB_PID" ] && ! kill -0 "$MB_PID" 2>/dev/null; then
-          MB_RETRIES=$(( MB_RETRIES + 1 ))
-          echo "[harness] 🔄 MCP Bridge watchdog: restarting (${MB_RETRIES}/5, backoff=${MB_BACKOFF}s)..."
-          sleep "$MB_BACKOFF"
-          openclaw mcp serve \
-            --url "${MORGAN_GATEWAY_URL}" \
-            --token "${MORGAN_GATEWAY_TOKEN:-openclaw-internal}" &
-          MB_PID=$!
-          echo "$MB_PID" > /tmp/mcp_bridge_pid
-          echo "[harness] MCP Bridge watchdog: new PID=$MB_PID"
-          MB_BACKOFF=$(( MB_BACKOFF * 2 ))
-          sleep 3  # warmup
-        fi
-      done
-    ) &
-    MCP_BRIDGE_WATCHDOG_PID=$!
-  fi
+# ─── MCP Bridge: token file for Claude CLI's stdio MCP server ──────────
+# The controller adds a "morgan-gateway" entry to mcp.json that spawns
+# `openclaw mcp serve --token-file /tmp/morgan-gw-token`.  Claude CLI
+# manages the MCP subprocess lifecycle (spawn/reconnect) itself — we just
+# need the token file to exist before the CLI starts.
+if [ -n "${MORGAN_GATEWAY_TOKEN:-}" ]; then
+  echo -n "${MORGAN_GATEWAY_TOKEN}" > /tmp/morgan-gw-token
+  chmod 600 /tmp/morgan-gw-token
+  echo "[harness] MCP Bridge: token file written for morgan-gateway MCP server"
 else
-  echo "[harness] ⚠️ MORGAN_GATEWAY_URL not set — MCP Bridge disabled"
+  echo "[harness] ⚠️ MORGAN_GATEWAY_TOKEN not set — morgan-gateway MCP server will fail auth"
 fi
 {{/if}}
 

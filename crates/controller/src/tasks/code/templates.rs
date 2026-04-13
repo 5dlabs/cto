@@ -1933,6 +1933,8 @@ impl CodeTemplateGenerator {
     /// This builds the config programmatically (same approach as `generate_cursor_mcp_config`)
     /// rather than using a Handlebars template, since the structure is simple and consistent.
     fn generate_mcp_config(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
+        let cli_type = Self::determine_cli_type(code_run);
+
         // Get CLI config to extract tools URL
         let cli_config_value = code_run
             .spec
@@ -1989,6 +1991,30 @@ impl CodeTemplateGenerator {
             }
 
             mcp_servers["tools"] = tools_server;
+        }
+
+        // Morgan centralized gateway: add as stdio MCP server so the agent CLI
+        // can send Discord messages through Morgan's shared bot accounts.
+        // `openclaw mcp serve` is an MCP stdio transport that bridges to a remote
+        // gateway via WebSocket.  Only enabled for Claude CLI (stdio MCP is
+        // Claude-specific; other CLIs would need their own integration).
+        if cli_type == CLIType::Claude {
+            let gateway_url = "ws://openclaw-morgan.cto.svc:18789";
+            // Token is passed via --token-file to avoid process-listing leaks.
+            // The harness writes it to /tmp/morgan-gw-token at startup.
+            mcp_servers["morgan-gateway"] = json!({
+                "type": "stdio",
+                "command": "openclaw",
+                "args": [
+                    "mcp", "serve",
+                    "--url", gateway_url,
+                    "--token-file", "/tmp/morgan-gw-token",
+                    "--verbose"
+                ],
+                "env": {
+                    "OPENCLAW_ALLOW_INSECURE_PRIVATE_WS": "1"
+                }
+            });
         }
 
         let mcp_config = json!({
