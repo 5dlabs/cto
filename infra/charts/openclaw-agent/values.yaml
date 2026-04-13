@@ -637,7 +637,7 @@ nats:
 # =============================================================================
 # Mem0 Plugin (@mem0/openclaw-mem0)
 # =============================================================================
-# Long-term memory backed by Qdrant. Single shared collection, scoped by agentId.
+# Long-term memory backed by Qdrant. Single shared collection, scoped by userId.
 # https://docs.mem0.ai/integrations/openclaw
 
 mem0Plugin:
@@ -647,15 +647,7 @@ mem0Plugin:
   autoRecall: true
   autoCapture: true
   topK: 5
-  searchThreshold: 0.6
-  metadataSource: "openclaw"
-  customCategories:
-    intake_decision: "Decisions made during project intake"
-    task_summary: "Summary of completed tasks"
-    code_review: "Code review findings and patterns"
-    architecture: "Architecture decisions and rationale"
-    debugging: "Debugging insights and root causes"
-    user_preference: "User preferences and working style"
+  searchThreshold: 0.3
   oss:
     collectionName: "cto_memory"
     vectorStore:

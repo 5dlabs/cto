@@ -286,14 +286,14 @@
         "config": {
           "mode": "open-source",
           "userId": "jonathon",
-          "agentId": "{{agent_name}}",
           "autoRecall": true,
           "autoCapture": true,
           "oss": {
             "vectorStore": {
               "provider": "qdrant",
               "config": {
-                "url": "http://qdrant.cto.svc.cluster.local:6333",
+                "host": "qdrant.cto.svc.cluster.local",
+                "port": 6333,
                 "collectionName": "cto_memory"
               }
             },
@@ -309,20 +309,7 @@
                 "model": "gpt-4.1-nano"
               }
             }
-          },
-          "metadata": {
-            "source": "crd",
-            "project": "{{service}}",
-            "crd_id": "{{coderun_name}}"
-          },
-          "customCategories": [
-            "intake_decision",
-            "task_summary",
-            "code_review",
-            "architecture",
-            "debugging",
-            "user_preference"
-          ]
+          }
         }
       }
     }

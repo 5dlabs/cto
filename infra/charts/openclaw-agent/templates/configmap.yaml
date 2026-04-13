@@ -262,20 +262,10 @@ data:
             "config": {
               "mode": {{ $mem0Plugin.mode | default "open-source" | quote }},
               "userId": {{ $mem0Plugin.userId | default "jonathon" | quote }},
-              "agentId": {{ .Values.agent.id | quote }},
               "autoRecall": {{ $mem0Plugin.autoRecall | default true }},
               "autoCapture": {{ $mem0Plugin.autoCapture | default true }},
               "topK": {{ $mem0Plugin.topK | default 5 }},
-              "searchThreshold": {{ $mem0Plugin.searchThreshold | default 0.6 }}
-              {{- if $mem0Plugin.customCategories }},
-              "customCategories": {
-                {{- $catList := list }}
-                {{- range $name, $desc := $mem0Plugin.customCategories }}
-                {{- $catList = append $catList (printf "%s: %s" ($name | quote) ($desc | quote)) }}
-                {{- end }}
-                {{ join ", " $catList }}
-              }
-              {{- end }},
+              "searchThreshold": {{ $mem0Plugin.searchThreshold | default 0.6 }},
               "oss": {
                 "vectorStore": {
                   "provider": {{ ($mem0Plugin.oss).vectorStore.provider | default "qdrant" | quote }},
@@ -298,9 +288,6 @@ data:
                     "model": {{ ($mem0Plugin.oss).llm.config.model | default "gpt-4.1-nano" | quote }}
                   }
                 }
-              },
-              "metadata": {
-                "source": {{ $mem0Plugin.metadataSource | default "openclaw" | quote }}
               }
             }
           }
