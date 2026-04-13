@@ -261,6 +261,7 @@ spec:
                 git config --global credential.helper 'store --file=/workspace/.git-credentials'
                 git config --global user.email "bot@5dlabs.ai"
                 git config --global user.name "{{ .Values.agent.id }}"
+                git config --global --add safe.directory "*"
                 echo "[git] Credentials configured for github.com"
               else
                 echo "[git] WARNING: GITHUB_TOKEN not set — private repo clones may fail"

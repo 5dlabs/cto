@@ -319,6 +319,27 @@ mem0:
 
 mem0Plugin:
   enabled: true
+  mode: open-source
+  userId: "jonathon"
+  autoRecall: true
+  autoCapture: true
+  topK: 5
+  searchThreshold: 0.3
+  oss:
+    embedder:
+      provider: google
+      config:
+        model: gemini-embedding-001
+    vectorStore:
+      provider: qdrant
+      config:
+        collection_name: cto_memory
+        host: qdrant.cto.svc.cluster.local
+        port: 6333
+    llm:
+      provider: openai
+      config:
+        model: gpt-4.1-nano
 
 session:
   scope: "per-sender"
