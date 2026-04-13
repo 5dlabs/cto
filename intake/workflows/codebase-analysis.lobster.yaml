@@ -38,24 +38,7 @@ steps:
       PACK_SIZE=$(wc -c < "$PACK_OUT");
       if [ "$PACK_SIZE" -gt 500000 ]; then
         echo "pack-repo: output is ${PACK_SIZE} bytes — truncating to ~400KB of priority files" >&2;
-        python3 -c "
-import json, sys
-MAX=400000
-PRIO=['crates/','intake/','docs/','infra/','shared/','config/','scripts/','workflows/','templates/','apps/','Cargo.toml','package.json','justfile','AGENTS.md','IDENTITY.md','SOUL.md','TOOLS.md','README.md']
-with open(sys.argv[1]) as f: data=json.load(f)
-ds=data.get('directoryStructure','')
-if len(ds)>50000: ds=ds[:50000]+'\n... (truncated)'
-files=data.get('files',{})
-sel={}; tot=len(ds)
-for p,c in (files.items() if isinstance(files,dict) else []):
-    cs=str(c) if not isinstance(c,str) else c
-    if any(p.startswith(x) or p==x for x in PRIO) and tot+len(cs)<MAX:
-        sel[p]=cs; tot+=len(cs)
-data['directoryStructure']=ds; data['files']=sel
-data['_truncation']={'original_files':len(files),'selected_files':len(sel),'original_bytes':sum(len(str(v)) for v in files.values()),'selected_bytes':tot}
-with open(sys.argv[1],'w') as f: json.dump(data,f)
-print(f'Truncated {len(files)}->{len(sel)} files, {tot:,} chars',file=sys.stderr)
-" "$PACK_OUT";
+        python3 "$root/intake/scripts/truncate-packed-repo.py" "$PACK_OUT";
       fi;
       echo "{\"packed_file\": \"$PACK_OUT\", \"size_bytes\": $(wc -c < "$PACK_OUT")}"
 
