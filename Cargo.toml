@@ -36,7 +36,7 @@ repository = "https://github.com/5dlabs/cto"
 [workspace.dependencies]
 # Web framework
 axum = "0.8.8"
-tokio = { version = "1.50", features = ["full"] }
+tokio = { version = "1.51", features = ["full"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["trace", "cors", "limit", "timeout"] }
 
@@ -66,7 +66,7 @@ opentelemetry_sdk = { version = "0.31", features = ["rt-tokio"] }
 tracing-opentelemetry = "0.31.0"
 
 # CLI
-clap = { version = "4.5", features = ["derive", "env", "cargo"] }
+clap = { version = "4.6", features = ["derive", "env", "cargo"] }
 dialoguer = "0.12"
 indicatif = "0.18"
 colored = "3.1.1"
@@ -93,14 +93,14 @@ wiremock = "0.6"
 serial_test = "3.4"
 
 # UUID generation
-uuid = { version = "1.22", features = ["v4", "serde"] }
+uuid = { version = "1.23", features = ["v4", "serde"] }
 
 # Cryptography
 sha1 = "0.10"
 hex = "0.4"
 
 # Agent protocols
-agent-client-protocol = "0.10.0"
+agent-client-protocol = "0.10.4"
 
 [profile.release]
 lto = true

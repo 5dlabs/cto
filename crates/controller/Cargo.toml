@@ -75,10 +75,10 @@ dashmap = "5.4"
 base64 = "0.22"
 
 # File system
-tempfile = "3.26"
+tempfile = "3.27"
 
 # UUID generation
-uuid = { version = "1.22", features = ["v4", "serde"] }
+uuid = { version = "1.23", features = ["v4", "serde"] }
 
 # Notifications
 notify = { path = "../notify" }
