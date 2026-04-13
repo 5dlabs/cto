@@ -424,11 +424,7 @@ tools:
     # MCP Servers - proxied through tools service
     servers:
       # --- Memory & Context ---
-      openmemory:
-        name: "OpenMemory"
-        description: "Long-term memory system for AI agents"
-        transport: "http"
-        url: "http://cto-openmemory.cto.svc.cluster.local:8080/mcp"
+      # openmemory: replaced by Mem0 plugin + Qdrant (openclaw-mem0 handles memory natively)
 
       context7:
         name: "Context7"
@@ -758,8 +754,8 @@ healer:
     maxAttempts: 3
     # Time window for deduplication (increased from 10 to 30 mins to prevent rapid re-spawning)
     timeWindowMins: 30
-    memoryUrl: "http://openmemory.cto.svc:3000"
-    memoryEnabled: true
+    memoryUrl: ""  # Replaced by Mem0 plugin (no separate memory service needed)
+    memoryEnabled: false
     # Auto-merge: merge PRs automatically after CI checks pass
     autoMergeEnabled: true
     # Merge method: squash, merge, or rebase
@@ -786,7 +782,6 @@ healer:
         - "mcp_tools_kubernetes_*"
         - "mcp_tools_argocd_*"
         - "mcp_tools_grafana_*"
-        - "mcp_tools_openmemory_*"
       memory:
         enabled: true
         agentName: "healer-server"
@@ -814,7 +809,6 @@ healer:
         - "mcp_tools_context7_*"
         - "mcp_tools_firecrawl_*"
         - "mcp_tools_grafana_*"
-        - "mcp_tools_openmemory_*"
       localTools: []
       cliConfig:
         cliType: "claude"
@@ -889,7 +883,7 @@ healer:
 # OpenMemory - AI Agent Memory
 # =============================================================================
 openmemory:
-  enabled: true
+  enabled: false  # Replaced by Mem0 plugin + Qdrant (see qdrant.yaml)
   replicaCount: 1
 
   image:
