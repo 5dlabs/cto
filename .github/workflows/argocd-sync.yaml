@@ -1,0 +1,361 @@
+---
+# ArgoCD Sync Workflow
+#
+# Automatically syncs ArgoCD applications when GitOps manifests, Helm charts,
+# or Kubernetes manifests are updated on main. Detects which applications
+# changed and syncs them individually, or syncs the full app-of-apps if
+# structural changes are detected.
+#
+# Requires ARGOCD_SERVER and ARGOCD_AUTH_TOKEN secrets.
+
+name: ArgoCD Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/gitops/**'
+      - 'infra/charts/**'
+      - 'infra/manifests/**'
+
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'Specific ArgoCD app to sync (leave empty for auto-detect)'
+        required: false
+        type: string
+      force_sync:
+        description: 'Force sync even if no changes detected'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Dry run - detect changes but do not sync'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ARGOCD_VERSION: v2.9.3
+  SYNC_TIMEOUT: 300
+  APP_OF_APPS_NAME: platform-apps
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Detect which ArgoCD applications were affected by the push
+  # ---------------------------------------------------------------------------
+  detect-changes:
+    name: Detect Changed Applications
+    runs-on: [k8s-runner]
+    outputs:
+      changed_apps: ${{ steps.detect.outputs.changed_apps }}
+      app_count: ${{ steps.detect.outputs.app_count }}
+      sync_app_of_apps: ${{ steps.detect.outputs.sync_app_of_apps }}
+      has_changes: ${{ steps.detect.outputs.has_changes }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed applications
+        id: detect
+        run: |
+          # Manual dispatch with a specific app overrides detection
+          if [ -n "${{ github.event.inputs.app_name }}" ]; then
+            APP="${{ github.event.inputs.app_name }}"
+            echo "Manual dispatch for app: ${APP}"
+            echo "changed_apps=[\"${APP}\"]" >> "$GITHUB_OUTPUT"
+            echo "app_count=1" >> "$GITHUB_OUTPUT"
+            echo "sync_app_of_apps=false" >> "$GITHUB_OUTPUT"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No changed files detected"
+            echo "changed_apps=[]" >> "$GITHUB_OUTPUT"
+            echo "app_count=0" >> "$GITHUB_OUTPUT"
+            echo "sync_app_of_apps=false" >> "$GITHUB_OUTPUT"
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          echo ""
+
+          SYNC_APP_OF_APPS=false
+          APPS=()
+
+          # Check for app-of-apps structural changes
+          if echo "$CHANGED_FILES" | grep -q "^infra/gitops/app-of-apps.yaml"; then
+            echo "App-of-apps definition changed — will sync root application"
+            SYNC_APP_OF_APPS=true
+          fi
+
+          # Check for project-level changes
+          if echo "$CHANGED_FILES" | grep -q "^infra/gitops/projects/"; then
+            echo "ArgoCD project changed — will sync root application"
+            SYNC_APP_OF_APPS=true
+          fi
+
+          # Detect individual application changes from gitops/applications/
+          while IFS= read -r file; do
+            # Extract the application name from the YAML metadata
+            if [ -f "$file" ]; then
+              APP_NAME=$(grep -m1 '^\s*name:' "$file" | awk '{print $2}' | tr -d '"' || true)
+              if [ -n "$APP_NAME" ]; then
+                # Deduplicate
+                if [[ ! " ${APPS[*]} " =~ " ${APP_NAME} " ]]; then
+                  APPS+=("$APP_NAME")
+                  echo "Detected changed app: ${APP_NAME} (from ${file})"
+                fi
+              fi
+            fi
+          done < <(echo "$CHANGED_FILES" | grep "^infra/gitops/applications/.*\.yaml$" || true)
+
+          # Detect chart changes — map chart dirs to ArgoCD apps that reference them
+          CHART_DIRS=$(echo "$CHANGED_FILES" | grep "^infra/charts/" | cut -d'/' -f3 | sort -u || true)
+          for CHART in $CHART_DIRS; do
+            echo "Chart changed: ${CHART}"
+            # Search application YAMLs that reference this chart path
+            while IFS= read -r app_file; do
+              APP_NAME=$(grep -m1 '^\s*name:' "$app_file" | awk '{print $2}' | tr -d '"' || true)
+              if [ -n "$APP_NAME" ] && [[ ! " ${APPS[*]} " =~ " ${APP_NAME} " ]]; then
+                APPS+=("$APP_NAME")
+                echo "  -> mapped to app: ${APP_NAME}"
+              fi
+            done < <(grep -rl "infra/charts/${CHART}" infra/gitops/applications/ 2>/dev/null || true)
+          done
+
+          # Detect manifest changes — map manifest dirs to ArgoCD apps
+          MANIFEST_DIRS=$(echo "$CHANGED_FILES" | grep "^infra/manifests/" | cut -d'/' -f3 | sort -u || true)
+          for MDIR in $MANIFEST_DIRS; do
+            echo "Manifest dir changed: ${MDIR}"
+            while IFS= read -r app_file; do
+              APP_NAME=$(grep -m1 '^\s*name:' "$app_file" | awk '{print $2}' | tr -d '"' || true)
+              if [ -n "$APP_NAME" ] && [[ ! " ${APPS[*]} " =~ " ${APP_NAME} " ]]; then
+                APPS+=("$APP_NAME")
+                echo "  -> mapped to app: ${APP_NAME}"
+              fi
+            done < <(grep -rl "infra/manifests/${MDIR}" infra/gitops/applications/ 2>/dev/null || true)
+          done
+
+          # If charts or manifests changed but couldn't map to specific apps, sync root
+          if [ ${#APPS[@]} -eq 0 ] && [ -n "$CHART_DIRS$MANIFEST_DIRS" ]; then
+            echo "Changed charts/manifests could not be mapped to specific apps — syncing root"
+            SYNC_APP_OF_APPS=true
+          fi
+
+          # Build JSON array of app names
+          APP_JSON="["
+          for i in "${!APPS[@]}"; do
+            if [ "$i" -gt 0 ]; then APP_JSON+=","; fi
+            APP_JSON+="\"${APPS[$i]}\""
+          done
+          APP_JSON+="]"
+
+          HAS_CHANGES="false"
+          if [ ${#APPS[@]} -gt 0 ] || [ "$SYNC_APP_OF_APPS" = "true" ]; then
+            HAS_CHANGES="true"
+          fi
+
+          # Force-sync override
+          if [ "${{ github.event.inputs.force_sync }}" = "true" ]; then
+            HAS_CHANGES="true"
+            if [ ${#APPS[@]} -eq 0 ]; then
+              SYNC_APP_OF_APPS=true
+            fi
+          fi
+
+          echo "changed_apps=${APP_JSON}" >> "$GITHUB_OUTPUT"
+          echo "app_count=${#APPS[@]}" >> "$GITHUB_OUTPUT"
+          echo "sync_app_of_apps=${SYNC_APP_OF_APPS}" >> "$GITHUB_OUTPUT"
+          echo "has_changes=${HAS_CHANGES}" >> "$GITHUB_OUTPUT"
+
+          echo ""
+          echo "=== Detection Summary ==="
+          echo "Changed apps (${#APPS[@]}): ${APP_JSON}"
+          echo "Sync app-of-apps: ${SYNC_APP_OF_APPS}"
+          echo "Has changes: ${HAS_CHANGES}"
+
+  # ---------------------------------------------------------------------------
+  # 2. Sync individual applications that were changed
+  # ---------------------------------------------------------------------------
+  sync-apps:
+    name: Sync Applications
+    runs-on: [k8s-runner]
+    needs: detect-changes
+    if: >-
+      needs.detect-changes.outputs.has_changes == 'true'
+      && github.event.inputs.dry_run != 'true'
+    steps:
+      - name: Install ArgoCD CLI
+        run: |
+          curl -sSL -o argocd \
+            "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-amd64"
+          chmod +x argocd
+          sudo mv argocd /usr/local/bin/argocd
+
+      - name: Authenticate with ArgoCD
+        run: |
+          argocd login "${{ secrets.ARGOCD_SERVER }}" \
+            --auth-token "${{ secrets.ARGOCD_AUTH_TOKEN }}" \
+            --grpc-web
+
+      - name: Sync app-of-apps
+        if: needs.detect-changes.outputs.sync_app_of_apps == 'true'
+        run: |
+          echo "Syncing root application: ${APP_OF_APPS_NAME}"
+          argocd app sync "${APP_OF_APPS_NAME}" \
+            --grpc-web \
+            --force \
+            --timeout "${{ env.SYNC_TIMEOUT }}"
+
+          echo "Waiting for app-of-apps to become healthy..."
+          argocd app wait "${APP_OF_APPS_NAME}" \
+            --grpc-web \
+            --timeout "${{ env.SYNC_TIMEOUT }}" \
+            --health
+
+      - name: Sync individual applications
+        if: needs.detect-changes.outputs.app_count != '0'
+        env:
+          CHANGED_APPS: ${{ needs.detect-changes.outputs.changed_apps }}
+        run: |
+          SYNC_FAILURES=0
+          SYNC_SUCCESSES=0
+          RESULTS=""
+
+          # Parse JSON array
+          APPS=$(echo "$CHANGED_APPS" | tr -d '[]"' | tr ',' '\n')
+
+          for APP in $APPS; do
+            [ -z "$APP" ] && continue
+            echo ""
+            echo "=========================================="
+            echo "Syncing: ${APP}"
+            echo "=========================================="
+
+            # Check if app exists in ArgoCD
+            if ! argocd app get "$APP" --grpc-web > /dev/null 2>&1; then
+              echo "Application '${APP}' not found in ArgoCD — skipping"
+              RESULTS="${RESULTS}\n| ${APP} | skipped | Not found in ArgoCD |"
+              continue
+            fi
+
+            # Trigger sync
+            if argocd app sync "$APP" \
+                --grpc-web \
+                --timeout "${{ env.SYNC_TIMEOUT }}" 2>&1; then
+              echo "Sync initiated for ${APP}"
+            else
+              echo "Sync command failed for ${APP} — will still check status"
+            fi
+
+            # Wait for healthy state
+            if argocd app wait "$APP" \
+                --grpc-web \
+                --timeout "${{ env.SYNC_TIMEOUT }}" \
+                --health 2>&1; then
+              echo "${APP}: Healthy"
+              SYNC_SUCCESSES=$((SYNC_SUCCESSES + 1))
+              RESULTS="${RESULTS}\n| ${APP} | synced | Healthy |"
+            else
+              echo "${APP}: FAILED to reach healthy state"
+              SYNC_FAILURES=$((SYNC_FAILURES + 1))
+              RESULTS="${RESULTS}\n| ${APP} | failed | Did not reach healthy state within timeout |"
+            fi
+          done
+
+          echo ""
+          echo "=== Sync Complete ==="
+          echo "Successes: ${SYNC_SUCCESSES}"
+          echo "Failures:  ${SYNC_FAILURES}"
+
+          # Write results for summary step
+          echo "SYNC_SUCCESSES=${SYNC_SUCCESSES}" >> "$GITHUB_ENV"
+          echo "SYNC_FAILURES=${SYNC_FAILURES}" >> "$GITHUB_ENV"
+          printf "SYNC_RESULTS<<EOFRESULTS\n%b\nEOFRESULTS\n" "$RESULTS" >> "$GITHUB_ENV"
+
+          if [ "$SYNC_FAILURES" -gt 0 ]; then
+            exit 1
+          fi
+
+      - name: Summary
+        if: always()
+        env:
+          APP_COUNT: ${{ needs.detect-changes.outputs.app_count }}
+          SYNCED_ROOT: ${{ needs.detect-changes.outputs.sync_app_of_apps }}
+        run: |
+          {
+            echo "## ArgoCD Sync Results"
+            echo ""
+            echo "**Trigger:** \`${{ github.event_name }}\` on \`${{ github.ref_name }}\`"
+            echo "**Commit:** [\`${GITHUB_SHA::8}\`](${{ github.server_url }}/${{ github.repository }}/commit/${GITHUB_SHA})"
+            echo ""
+
+            if [ "$SYNCED_ROOT" = "true" ]; then
+              echo "### Root Application"
+              echo "- **${APP_OF_APPS_NAME}**: synced (app-of-apps)"
+              echo ""
+            fi
+
+            if [ "${APP_COUNT}" != "0" ]; then
+              echo "### Individual Applications"
+              echo ""
+              echo "| Application | Status | Detail |"
+              echo "|-------------|--------|--------|"
+              printf "%b\n" "${SYNC_RESULTS:-No results}"
+              echo ""
+              echo "**Succeeded:** ${SYNC_SUCCESSES:-0} | **Failed:** ${SYNC_FAILURES:-0}"
+            fi
+
+            if [ "${APP_COUNT}" = "0" ] && [ "$SYNCED_ROOT" != "true" ]; then
+              echo "No individual applications to sync."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # 3. Dry-run report (when dry_run is enabled)
+  # ---------------------------------------------------------------------------
+  dry-run-report:
+    name: Dry Run Report
+    runs-on: [k8s-runner]
+    needs: detect-changes
+    if: >-
+      github.event.inputs.dry_run == 'true'
+      && needs.detect-changes.outputs.has_changes == 'true'
+    steps:
+      - name: Report
+        env:
+          CHANGED_APPS: ${{ needs.detect-changes.outputs.changed_apps }}
+          APP_COUNT: ${{ needs.detect-changes.outputs.app_count }}
+          SYNCED_ROOT: ${{ needs.detect-changes.outputs.sync_app_of_apps }}
+        run: |
+          {
+            echo "## ArgoCD Sync — Dry Run"
+            echo ""
+            echo "The following applications **would** be synced:"
+            echo ""
+
+            if [ "$SYNCED_ROOT" = "true" ]; then
+              echo "- **${APP_OF_APPS_NAME}** (app-of-apps root)"
+            fi
+
+            if [ "${APP_COUNT}" != "0" ]; then
+              echo "$CHANGED_APPS" | tr -d '[]"' | tr ',' '\n' | while read -r app; do
+                [ -n "$app" ] && echo "- **${app}**"
+              done
+            fi
+
+            echo ""
+            echo "> No changes were applied. Re-run without dry-run to sync."
+          } >> "$GITHUB_STEP_SUMMARY"
