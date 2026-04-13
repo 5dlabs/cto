@@ -1,9 +1,14 @@
-Implement subtask 8005: Implement Effect ApiClient service and Effect.Schema type definitions for all backend response shapes
+<identity>
+You are blaze working on subtask 8005 of task 8.
+</identity>
 
-## Objective
+<context>
+<scope>
 Create lib/api.ts with an Effect.Service-based ApiClient and define Effect.Schema schemas for all backend data types used across the site.
+</scope>
+</context>
 
-## Steps
+<implementation_plan>
 1. Create apps/website/lib/api.ts.
 2. Define ApiClient using Effect.Service pattern:
    ```ts
@@ -31,6 +36,8 @@ Create lib/api.ts with an Effect.Service-based ApiClient and define Effect.Schem
    - getPublishedPosts(): Effect.Effect<PublishedPost[]>
 5. Export runApiEffect helper: wraps Effect.runPromise with ApiClient.Default layer.
 6. For client components needing TanStack Query: export queryFn wrappers that call runApiEffect.
+</implementation_plan>
 
-## Validation
+<validation>
 `tsc --noEmit` on lib/api.ts exits 0. Unit test: mock fetch returning valid Product JSON, call getProducts() via runApiEffect, assert decoded array has correct types. Unit test: mock fetch returning invalid JSON (missing day_rate), assert Effect fails with ParseError.
+</validation>
