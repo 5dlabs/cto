@@ -12,11 +12,11 @@
         "tiers": {
           "primary": {
             "provider": "github-copilot",
-            "model": "claude-sonnet-4.6"
+            "model": "claude-opus-4.6"
           },
           "fast": {
             "provider": "github-copilot",
-            "model": "gpt-4.1"
+            "model": "claude-opus-4.6"
           },
           "frontier": {
             "provider": "github-copilot",
@@ -30,15 +30,15 @@
           },
           {
             "provider": "github-copilot",
-            "model": "gpt-5.2"
+            "model": "claude-opus-4.6"
           },
           {
             "provider": "github-copilot",
-            "model": "claude-sonnet-4.6"
+            "model": "claude-opus-4.6"
           },
           {
             "provider": "github-copilot",
-            "model": "gpt-4.1"
+            "model": "claude-opus-4.6"
           },
           {
             "provider": "github-copilot",
