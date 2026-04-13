@@ -1,0 +1,64 @@
+# Repomix ignore — keep packed context focused on architecture, not implementation details
+# This is used by intake codebase-analysis to give LLMs platform context
+
+# Build artifacts & dependencies
+target/
+node_modules/
+.intake/
+_runs/
+logs/
+output/
+archived/
+lab-eco-mvp-r/
+
+# Lock files & generated
+*.lock
+package-lock.json
+deno.lock
+Cargo.lock
+
+# Binary & media
+*.mp3
+*.png
+*.jpg
+*.wav
+*.woff2
+avatar/
+assets/
+
+# Test files (context, not implementation)
+**/tests/
+**/*.test.*
+**/*_test.*
+lifecycle-test/
+test/
+
+# Large generated/config JS (Vite artifacts)
+config-queries-*.js
+mcp-settings-*.js
+use-configuration-*.js
+
+# Infra details (too low-level for deliberation)
+infra/observability/
+infra/charts/twingate-operator/
+
+# Dev-only
+.cursor/
+.codex/
+development/
+memory/
+work/
+skills-lock.json
+
+# Source code that's not relevant for platform understanding
+# (deliberation needs architecture docs, not implementation)
+apps/grok/src/
+apps/grok/tests/
+apps/grok/keywords.json
+apps/grok/doublezero-call-prep.md
+apps/grok/lume-thread-draft.md
+apps/grok/payram-article.md
+apps/discord-bridge/src/
+apps/intake-agent/src/
+apps/pitch-deck/
+crates/cto-lite/tauri/
