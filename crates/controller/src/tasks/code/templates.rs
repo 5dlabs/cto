@@ -1518,7 +1518,6 @@ impl CodeTemplateGenerator {
             "discord_enabled": discord_enabled,
             "discord_channel_id": &discord_thread_id,
             "discord_thread_id": &discord_thread_id,
-            "mcp_bridge_enabled": true,
             "openclaw_providers": openclaw_providers_summary,
             "cli_config": cli_config,
             "skills": skills,
@@ -1620,9 +1619,6 @@ impl CodeTemplateGenerator {
             "cli_config": cli_config,
             "discord_enabled": code_run.spec.openclaw.as_ref()
                 .is_none_or(|oc| oc.discord_enabled),
-            "mcp_bridge_enabled": true,
-            "morgan_gateway_url": "ws://openclaw-morgan.cto.svc:18789",
-            "morgan_gateway_token": "openclaw-internal",
             "openclaw_providers": openclaw_providers,
             "gateway_agents": gateway_agents,
         });
@@ -1670,7 +1666,6 @@ impl CodeTemplateGenerator {
             "service": &code_run.spec.service,
             "discord_enabled": code_run.spec.openclaw.as_ref()
                 .is_none_or(|oc| oc.discord_enabled),
-            "mcp_bridge_enabled": true,
             "gateway_agents": gateway_agents,
             "debug_mode": code_run.spec.debug_mode,
         });
@@ -1993,29 +1988,11 @@ impl CodeTemplateGenerator {
             mcp_servers["tools"] = tools_server;
         }
 
-        // Morgan centralized gateway: add as stdio MCP server so the agent CLI
-        // can send Discord messages through Morgan's shared bot accounts.
-        // `openclaw mcp serve` is an MCP stdio transport that bridges to a remote
-        // gateway via WebSocket.  Only enabled for Claude CLI (stdio MCP is
-        // Claude-specific; other CLIs would need their own integration).
-        if cli_type == CLIType::Claude {
-            let gateway_url = "ws://openclaw-morgan.cto.svc:18789";
-            // Token is passed via --token-file to avoid process-listing leaks.
-            // The harness writes it to /tmp/morgan-gw-token at startup.
-            mcp_servers["morgan-gateway"] = json!({
-                "type": "stdio",
-                "command": "openclaw",
-                "args": [
-                    "mcp", "serve",
-                    "--url", gateway_url,
-                    "--token-file", "/tmp/morgan-gw-token",
-                    "--verbose"
-                ],
-                "env": {
-                    "OPENCLAW_ALLOW_INSECURE_PRIVATE_WS": "1"
-                }
-            });
-        }
+        // NOTE: Morgan centralized gateway MCP bridge was removed due to cross-talk.
+        // `openclaw mcp serve` exposes ALL bot accounts' conversations from the
+        // gateway — no per-account scoping exists.  Task pods use direct Discord
+        // REST API (per-agent bot tokens) in the lobster notification step instead.
+        // Re-add when OpenClaw supports per-agent MCP bridge scoping.
 
         let mcp_config = json!({
             "mcpServers": mcp_servers

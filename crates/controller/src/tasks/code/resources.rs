@@ -1632,9 +1632,10 @@ impl<'a> CodeResourceManager<'a> {
             }
         }
 
-        // Morgan centralized gateway: task pods connect via MCP Bridge instead of
-        // running their own Discord connections. The gateway URL points at Morgan's
-        // ClusterIP service; auth token matches Morgan's gateway.auth.token config.
+        // Morgan centralized gateway env vars. The MCP Bridge (openclaw mcp serve)
+        // was removed due to cross-talk (exposes all bot accounts' conversations),
+        // but these vars remain available for future per-agent scoped bridge or
+        // other gateway communication patterns.
         final_env_vars.push(json!({
             "name": "MORGAN_GATEWAY_URL",
             "value": "ws://openclaw-morgan.cto.svc:18789"

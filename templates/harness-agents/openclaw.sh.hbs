@@ -182,7 +182,7 @@ mkdir -p "$HOME/.openclaw/canvas"
 # Discord REST API tokens are still available via discord-agent-bots secret
 # for the Lobster notification step (will be migrated to MCP Bridge later).
 echo "[harness] Discord gateway: disabled (centralized via Morgan)"
-echo "[harness] MCP Bridge: {{#if mcp_bridge_enabled}}enabled{{else}}disabled{{/if}}"
+echo "[harness] Discord messaging: via REST API with per-agent bot tokens"
 
 cp /task-files/openclaw.json "$HOME/.openclaw/openclaw.json"
 export OPENCLAW_CONFIG="$HOME/.openclaw/openclaw.json"
@@ -503,20 +503,10 @@ fi
 ) &
 GW_WATCHDOG_PID=$!
 
-{{#if mcp_bridge_enabled}}
-# ─── MCP Bridge: token file for Claude CLI's stdio MCP server ──────────
-# The controller adds a "morgan-gateway" entry to mcp.json that spawns
-# `openclaw mcp serve --token-file /tmp/morgan-gw-token`.  Claude CLI
-# manages the MCP subprocess lifecycle (spawn/reconnect) itself — we just
-# need the token file to exist before the CLI starts.
-if [ -n "${MORGAN_GATEWAY_TOKEN:-}" ]; then
-  echo -n "${MORGAN_GATEWAY_TOKEN}" > /tmp/morgan-gw-token
-  chmod 600 /tmp/morgan-gw-token
-  echo "[harness] MCP Bridge: token file written for morgan-gateway MCP server"
-else
-  echo "[harness] ⚠️ MORGAN_GATEWAY_TOKEN not set — morgan-gateway MCP server will fail auth"
-fi
-{{/if}}
+# NOTE: MCP Bridge (morgan-gateway) was removed due to cross-talk.
+# `openclaw mcp serve` exposes ALL bot accounts from Morgan's gateway —
+# no per-account scoping.  Discord messaging uses direct REST API with
+# per-agent bot tokens in the lobster notification step instead.
 
 # ─── Tail OpenClaw gateway + CLI logs to stdout for DD collection ──────
 # Gateway writes structured JSON logs to /tmp/openclaw-*/openclaw-*.log
