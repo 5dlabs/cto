@@ -51,6 +51,25 @@ spec:
         config:
           cluster:
             enabled: false
+          telemetry_disabled: true
+
+        # Datadog autodiscovery — scrapes /metrics via OpenMetrics check
+        podAnnotations:
+          ad.datadoghq.com/qdrant.checks: |
+            {
+              "openmetrics": {
+                "init_config": {},
+                "instances": [
+                  {
+                    "openmetrics_endpoint": "http://%%host%%:6333/metrics",
+                    "namespace": "qdrant",
+                    "metrics": [".*"]
+                  }
+                ]
+              }
+            }
+          ad.datadoghq.com/qdrant.logs: |
+            [{"source": "qdrant", "service": "qdrant"}]
 
   destination:
     server: https://kubernetes.default.svc
