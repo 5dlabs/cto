@@ -53,27 +53,33 @@ steps:
     command: >
       root="${WORKSPACE:-.}";
       "$root/intake/scripts/workflow-step-audio.sh" "codebase-analysis" "summarize-codebase" "${audio_debug}";
-      ANALYSIS_ARGS=$(jq -n \
+      PACK_FILE=$(mktemp);
+      SEARCH_FILE=$(mktemp);
+      ARGS_FILE=$(mktemp);
+      trap 'rm -f "$PACK_FILE" "$SEARCH_FILE" "$ARGS_FILE"' EXIT;
+      printf '%s' "$CTO_PACK_REPO_OUT" > "$PACK_FILE";
+      printf '%s' "$CTO_SEARCH_PATTERNS_OUT" > "$SEARCH_FILE";
+      jq -n \
         --rawfile prompt "$root/intake/prompts/codebase-analysis-system.md" \
         --rawfile prd_content "$root/.intake/run-prd.txt" \
         --arg repo_url "${repository_url}" \
-        --argjson packed_output "$(printf '%s' "$CTO_PACK_REPO_OUT")" \
-        --argjson search_results "$(printf '%s' "$CTO_SEARCH_PATTERNS_OUT")" \
+        --rawfile packed_output_raw "$PACK_FILE" \
+        --rawfile search_results_raw "$SEARCH_FILE" \
         --arg provider "${model_primary_provider}" \
         --arg model "${model_primary}" \
         '{
           "prompt": $prompt,
           "input": {
             "repository_url": $repo_url,
-            "packed_output": $packed_output,
-            "search_results": $search_results,
+            "packed_output": $packed_output_raw,
+            "search_results": $search_results_raw,
             "prd_content": $prd_content
           },
           "provider": $provider,
           "model": $model,
           "temperature": 0.2
-        }')
-      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action text --args-json "$ANALYSIS_ARGS"
+        }' > "$ARGS_FILE";
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action text --args-file "$ARGS_FILE"
 
   - id: save-context
     env:
