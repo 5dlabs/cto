@@ -1,0 +1,19 @@
+---
+# Cloudflare Tunnel binding for Qdrant Web Dashboard
+# Exposes qdrant.5dlabs.ai → qdrant:6333 (built-in dashboard at /dashboard)
+# Also provides REST API access for external tooling
+
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: qdrant-dashboard
+  namespace: cto
+subjects:
+  - kind: Service
+    name: qdrant
+    spec:
+      fqdn: qdrant.5dlabs.ai
+      target: http://qdrant.cto.svc:6333
+tunnelRef:
+  kind: ClusterTunnel
+  name: cto-main
