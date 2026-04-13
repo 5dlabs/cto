@@ -1,9 +1,14 @@
-Implement subtask 7005: Configure Signal-CLI adapter in OpenClaw for Morgan
+<identity>
+You are angie working on subtask 7005 of task 7.
+</identity>
 
-## Objective
+<context>
+<scope>
 Set up the OpenClaw Signal messaging adapter pointing to the signal-cli-svc JSON-RPC endpoint, with phone number from secret and receive loop enabled.
+</scope>
+</context>
 
-## Steps
+<implementation_plan>
 1. In agents/morgan/agent.yaml (or a separate adapters/signal.yaml referenced from agent.yaml), add the signal adapter block:
    adapters:
      signal:
@@ -17,6 +22,8 @@ Set up the OpenClaw Signal messaging adapter pointing to the signal-cli-svc JSON
 3. Configure message routing: all incoming Signal messages route to Morgan's main conversation handler.
 4. Set max_message_length: 1500 to stay within Signal limits.
 5. Document the adapter config in agents/morgan/README.md under 'Signal Integration'.
+</implementation_plan>
 
-## Validation
+<validation>
 After Morgan pod is running: send a test Signal message to the configured phone number from a registered Signal account. Verify `kubectl logs -n openclaw deployment/morgan` shows 'Signal message received' log line within 30 seconds. Verify Morgan's reply appears in the Signal conversation.
+</validation>

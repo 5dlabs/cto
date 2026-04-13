@@ -1,9 +1,14 @@
-Implement subtask 8011: Implement AI-native routes (llms.txt, llms-full) and Schema.org JSON-LD in layout
+<identity>
+You are blaze working on subtask 8011 of task 8.
+</identity>
 
-## Objective
+<context>
+<scope>
 Create the /llms.txt and /llms-full route handlers for AI crawler discoverability, and inject Schema.org Organization/LocalBusiness JSON-LD into the root layout.
+</scope>
+</context>
 
-## Steps
+<implementation_plan>
 1. Create app/llms.txt/route.ts as a Next.js Route Handler:
    - Returns Response with Content-Type: text/plain.
    - Body: multi-line plain text including: company name (Sigma-1 / Perception Events), description of services (event lighting, visual production, equipment rental), contact email, website URL, and a list of equipment categories.
@@ -24,6 +29,8 @@ Create the /llms.txt and /llms-full route handlers for AI crawler discoverabilit
    }
    ```
 4. Add <link rel='ai-content' href='/llms.txt' /> in layout <head>.
+</implementation_plan>
 
-## Validation
+<validation>
 GET /llms.txt returns HTTP 200 with Content-Type: text/plain and body contains 'Sigma-1'. GET /llms-full returns HTTP 200 with Content-Type: application/json and parseable JSON containing company and equipment_categories fields. View page source of / — JSON-LD script tag is present with @type containing 'Organization'.
+</validation>

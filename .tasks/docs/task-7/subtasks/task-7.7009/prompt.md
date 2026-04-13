@@ -1,9 +1,14 @@
-Implement subtask 7009: Execute end-to-end MCP tool connectivity tests for all 12 tools
+<identity>
+You are angie working on subtask 7009 of task 7.
+</identity>
 
-## Objective
+<context>
+<scope>
 Run one interactive CLI test request per MCP tool to verify every tool correctly reaches its backend service, receives a valid response, and is correctly parsed by Morgan.
+</scope>
+</context>
 
-## Steps
+<implementation_plan>
 1. For each of the 12 tools, run `kubectl exec -n openclaw deployment/morgan -- morgan tool-test <tool_id> [params]` and capture output.
 2. sigma1_catalog_search: query=lights → expect array with name and day_rate fields.
 3. sigma1_check_availability: product_id=<known_id> from={today} to={today+7} → expect {quantity_available: integer}.
@@ -18,6 +23,8 @@ Run one interactive CLI test request per MCP tool to verify every tool correctly
 12. sigma1_gdpr_export: customer_id=test-cust-001 → expect aggregated JSON with keys from at least 3 services.
 13. sigma1_gdpr_delete: customer_id=test-cust-gdpr-del-001 (dedicated test customer) → expect per-service status map; verify audit log entry via OpenClaw audit API.
 14. Record pass/fail per tool in a test report file at agents/morgan/test-results/tool-connectivity.json.
+</implementation_plan>
 
-## Validation
+<validation>
 All 12 tool tests return exit code 0 from morgan tool-test. tool-connectivity.json shows 12 entries all with status: pass. No tool times out (default 30s timeout). GDPR delete audit log entry is present and contains customer_id and per-service statuses.
+</validation>

@@ -1,15 +1,17 @@
-Implement task 7: Configure Morgan AI Agent (Angie - OpenClaw/MCP)
+<identity>
+You are angie, the OpenClaw/MCP implementation agent. You own task 7 end-to-end.
+</identity>
 
-## Goal
+<context>
+<task_overview>
+Task 7: Configure Morgan AI Agent (Angie - OpenClaw/MCP)
 Configure and deploy the Morgan AI agent on OpenClaw with all 12 MCP tools (10 business tools + 2 GDPR tools) pointing to the Rust, Go, and Node.js backend services. Define agent skills, system prompt, Signal-CLI integration, ElevenLabs voice config, and web chat widget endpoint. Morgan becomes the single intelligent interface for all customer interactions.
+Priority: high
+Dependencies: 2, 3, 4, 5, 6
+</task_overview>
+</context>
 
-## Task Context
-- Agent owner: angie
-- Stack: OpenClaw/MCP
-- Priority: high
-- Dependencies: 2, 3, 4, 5, 6
-
-## Implementation Plan
+<implementation_plan>
 1. Create OpenClaw agent configuration at agents/morgan/agent.yaml. Set agent_id: morgan, model: openai-api/gpt-4o (use available model, update when gpt-5.4-pro available), namespace: openclaw.
 2. System prompt (agents/morgan/system-prompt.md): Morgan is the AI agent for Sigma-1/Perception Events, a lighting and visual production company. Persona: professional, efficient, friendly. Core responsibilities listed with decision trees for lead qualification, quote generation, vetting, invoicing, social media approval.
 3. MCP tool-server configuration (agents/morgan/tools.yaml). Define tools pointing to in-cluster service URLs:
@@ -31,11 +33,22 @@ Configure and deploy the Morgan AI agent on OpenClaw with all 12 MCP tools (10 b
 7. Web chat: configure OpenClaw web chat adapter on port 3000. Expose as ClusterIP service morgan-chat-svc:3000. Web chat widget JS snippet to be embedded by Blaze in Task 8.
 8. Kubernetes: Morgan Deployment in openclaw namespace, 1 replica, PVC morgan-workspace (10Gi) at /workspace. envFrom sigma1-infra-endpoints + all API key secrets. Liveness probe: GET /health/live on OpenClaw admin port. Cloudflare Tunnel annotation for external Signal webhook access.
 9. Test all MCP tool connections by running Morgan in interactive CLI mode and issuing one request per tool. Verify tool responses are correctly parsed.
+</implementation_plan>
 
-## Acceptance Criteria
-1. kubectl exec into Morgan pod and run morgan tool-test sigma1_catalog_search query=lights — response contains product array with name and day_rate fields. 2. sigma1_check_availability for a known product_id with valid date range returns availability object with quantity_available field. 3. sigma1_generate_quote with customer_id and line items creates opportunity in RMS — verify via GET /api/v1/opportunities/:id returns status=pending. 4. sigma1_vet_customer with valid org data returns 202 and polling returns final_score within 60s. 5. sigma1_create_invoice creates invoice in Finance — verify via GET /api/v1/invoices/:id returns total_cents > 0. 6. sigma1_gdpr_export returns aggregated JSON containing data from at least 3 services. 7. Signal-CLI connectivity: send test message to Morgan's phone number via Signal; verify Morgan pod logs show incoming message received. 8. Web chat endpoint: POST http://morgan-chat-svc:3000/chat with {message: 'hello'} returns {reply: <non-empty string>} within 10 seconds.
+<acceptance_criteria>
+1. kubectl exec into Morgan pod and run morgan tool-test sigma1_catalog_search query=lights — response contains product array with name and day_rate fields.
+2. sigma1_check_availability for a known product_id with valid date range returns availability object with quantity_available field.
+3. sigma1_generate_quote with customer_id and line items creates opportunity in RMS — verify via GET /api/v1/opportunities/:id returns status=pending.
+4. sigma1_vet_customer with valid org data returns 202 and polling returns final_score within 60s.
+5. sigma1_create_invoice creates invoice in Finance — verify via GET /api/v1/invoices/:id returns total_cents >
+0. 6. sigma1_gdpr_export returns aggregated JSON containing data from at least 3 services.
+7. Signal-CLI connectivity: send test message to Morgan's phone number via Signal; verify Morgan pod logs show incoming message received.
+8. Web chat endpoint: POST http://morgan-chat-svc:3000/chat with {message: 'hello'} returns {reply: <non-empty string>} within 10 seconds.
 
-## Subtasks
+See also: acceptance.md in this task directory for the checklist version.
+</acceptance_criteria>
+
+<subtasks>
 - Create OpenClaw agent.yaml and system-prompt.md for Morgan: Author the core OpenClaw agent configuration file at agents/morgan/agent.yaml and the system prompt at agents/morgan/system-prompt.md defining Morgan's persona, responsibilities, and decision trees.
 - Define all 9 skill manifests in agents/morgan/skills/: Create individual YAML skill manifest files for each of the 9 Morgan skills: sales-qual, customer-vet, quote-gen, upsell, finance, social-media, rms-checkout, rms-checkin, and admin.
 - Configure MCP tools.yaml for 10 business tools: Author agents/morgan/tools.yaml defining all 10 business MCP tools with correct in-cluster service URLs, HTTP methods, parameter schemas, and response field descriptions.
@@ -46,8 +59,4 @@ Configure and deploy the Morgan AI agent on OpenClaw with all 12 MCP tools (10 b
 - Create Morgan Kubernetes Deployment with PVC, secrets, and Cloudflare Tunnel annotation: Author the Kubernetes Deployment manifest for Morgan in the openclaw namespace, including the 10Gi PVC, envFrom references to all required secrets and ConfigMaps, liveness probe, and Cloudflare Tunnel annotation for the Signal webhook.
 - Execute end-to-end MCP tool connectivity tests for all 12 tools: Run one interactive CLI test request per MCP tool to verify every tool correctly reaches its backend service, receives a valid response, and is correctly parsed by Morgan.
 - Verify Signal message receipt and web chat endpoint via integration test: Send a real Signal test message to Morgan's number and validate round-trip receipt in pod logs. Also validate the web chat /chat endpoint returns a coherent reply.
-
-## Deliverables
-- Update the relevant code, configuration, and tests.
-- Keep artifacts aligned with the acceptance criteria.
-- Document blockers or assumptions in your final summary.
+</subtasks>

@@ -1,6 +1,6 @@
 {
-  "mode": "stitch",
-  "provider_mode": "stitch",
+  "mode": "ingest",
+  "provider_mode": "both",
   "stitch_api_key": "present",
   "framer_api_key": "present",
   "framer_project": "present",

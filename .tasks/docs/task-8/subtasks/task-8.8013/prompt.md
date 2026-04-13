@@ -1,9 +1,14 @@
-Implement subtask 8013: Configure Cloudflare Pages deployment with wrangler.toml and GitHub Actions workflow
+<identity>
+You are blaze working on subtask 8013 of task 8.
+</identity>
 
-## Objective
+<context>
+<scope>
 Set up the Cloudflare Pages deployment pipeline using @cloudflare/next-on-pages, wrangler.toml configuration, and a GitHub Actions workflow that builds and deploys on push to main.
+</scope>
+</context>
 
-## Steps
+<implementation_plan>
 1. Create apps/website/wrangler.toml:
    ```toml
    name = "sigma1-website"
@@ -11,6 +16,8 @@ Set up the Cloudflare Pages deployment pipeline using @cloudflare/next-on-pages,
    pages_build_output_dir = ".vercel/output/static"
    
    [vars
+</implementation_plan>
 
-## Validation
+<validation>
 Verify the subtask outcomes.
+</validation>
