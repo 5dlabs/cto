@@ -1552,6 +1552,7 @@ impl CodeTemplateGenerator {
 
         let cli_type = Self::determine_cli_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
+        let coderun_name = code_run.metadata.name.as_deref().unwrap_or("unknown");
 
         // Use CRD openclaw providers, or fall back to defaults
         let openclaw_cfg = code_run
@@ -1601,6 +1602,7 @@ impl CodeTemplateGenerator {
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
+            "coderun_name": coderun_name,
             "model": Self::resolve_openclaw_primary_model(code_run, &openclaw_providers),
             "cli_type": cli_type.to_string(),
             "agent_name": &agent_name,
