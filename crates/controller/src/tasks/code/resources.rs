@@ -2241,10 +2241,10 @@ scrape_configs:
         }
 
         // Fix OpenClaw missing peer dependencies (e.g. @buape/carbon).
-        // The agents image installs OpenClaw with --ignore-scripts which skips peer
-        // dep resolution. This init container runs as root, installs the missing
-        // modules into the shared openclaw-node-modules emptyDir volume.
-        // NOTE: containers in a pod do NOT share image filesystem layers, only volumes.
+        // The init container runs as root and installs any additional modules
+        // (like mem0 plugin) into the shared openclaw-node-modules emptyDir.
+        // It first copies the image's existing node_modules into the emptyDir
+        // so they are preserved, then installs extras on top.
         {
             let agent_image = self.select_image_for_cli(code_run).unwrap_or_else(|_| {
                 format!(
@@ -2257,9 +2257,16 @@ scrape_configs:
                 "image": agent_image,
                 "imagePullPolicy": self.resolve_image_pull_policy(&agent_image),
                 "command": ["/bin/sh", "-c",
-                    "cd /usr/local/share/npm-global/lib/node_modules/openclaw && \
-                     npm install --no-audit --no-fund --loglevel=warn 2>&1 | tail -5 && \
-                     npm install @mem0/openclaw-mem0 --no-audit --no-fund --loglevel=warn 2>&1 | tail -5 && \
+                    "set -e && \
+                     OC_DIR=/usr/local/share/npm-global/lib/node_modules/openclaw && \
+                     NM_MOUNT=/mnt/openclaw-nm && \
+                     echo '[fix-openclaw-deps] copying image node_modules into emptyDir...' && \
+                     cp -a $OC_DIR/node_modules/. $NM_MOUNT/ 2>/dev/null || true && \
+                     echo \"[fix-openclaw-deps] copied $(ls $NM_MOUNT | wc -l) packages\" && \
+                     cd $OC_DIR && \
+                     npm install @mem0/openclaw-mem0 --no-audit --no-fund --legacy-peer-deps --loglevel=warn 2>&1 | tail -5 && \
+                     cp -a $OC_DIR/node_modules/. $NM_MOUNT/ 2>/dev/null || true && \
+                     echo \"[fix-openclaw-deps] final: $(ls $NM_MOUNT | wc -l) packages\" && \
                      echo '[fix-openclaw-deps] done'"
                 ],
                 "securityContext": {
@@ -2268,7 +2275,7 @@ scrape_configs:
                     "allowPrivilegeEscalation": false
                 },
                 "volumeMounts": [
-                    {"name": "openclaw-node-modules", "mountPath": openclaw_nm_path}
+                    {"name": "openclaw-node-modules", "mountPath": "/mnt/openclaw-nm"}
                 ]
             }));
             info!(
