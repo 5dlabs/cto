@@ -12,7 +12,7 @@ import { acquireLock, releaseLock, listLocks } from "./process-lock";
 import { synthesize } from "./elevenlabs";
 import { synthesizeOpenAI } from "./openai-tts";
 import { synthesizeXai } from "./xai-tts";
-import { getCached, putCached, pruneExpired } from "./cache";
+import { getCachedPath, putCached, pruneExpired } from "./cache";
 import { playAudio } from "./player";
 import { humanizeStep, humanizeGate, humanizeRaw } from "./humanize";
 import { llmHumanize } from "./llm-humanize";
@@ -251,7 +251,7 @@ async function resolveChunkAudioPath(text: string, voice: VoiceConfig, logPath?:
 
   for (const provider of chain) {
     const effectiveVoice = provider === voice.provider ? voice : fallbackVoice(provider);
-    const cachedPath = getCached(effectiveVoice.voiceId, ttsText);
+    const cachedPath = getCachedPath(effectiveVoice.voiceId, ttsText);
     if (cachedPath) {
       return cachedPath;
     }

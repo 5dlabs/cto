@@ -36,6 +36,25 @@ export function getCached(voiceId: string, text: string): Buffer | null {
   }
 }
 
+export function getCachedPath(voiceId: string, text: string): string | null {
+  const dir = cacheDir();
+  const key = cacheKey(voiceId, text);
+  const path = join(dir, `${key}.mp3`);
+
+  if (!existsSync(path)) return null;
+
+  try {
+    const stat = statSync(path);
+    if (Date.now() - stat.mtimeMs > TTL_MS) {
+      unlinkSync(path);
+      return null;
+    }
+    return path;
+  } catch {
+    return null;
+  }
+}
+
 export function putCached(voiceId: string, text: string, audio: Buffer): string {
   const dir = cacheDir();
   const key = cacheKey(voiceId, text);
