@@ -954,6 +954,8 @@
           "solana-development",
           "anchor-framework",
           "solana-defi",
+          "evm-development",
+          "cross-chain",
           "context-fundamentals",
           "context-degradation",
           "context-optimization",

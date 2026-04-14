@@ -274,6 +274,17 @@ RUN ARCH=$(dpkg --print-architecture) && \
     fi
 
 # =============================================================================
+# Foundry (EVM toolchain — forge, cast, anvil, chisel)
+# =============================================================================
+RUN curl -sSfL https://foundry.paradigm.xyz | bash && \
+    /root/.foundry/bin/foundryup && \
+    cp /root/.foundry/bin/forge /usr/local/bin/ && \
+    cp /root/.foundry/bin/cast /usr/local/bin/ && \
+    cp /root/.foundry/bin/anvil /usr/local/bin/ && \
+    cp /root/.foundry/bin/chisel /usr/local/bin/ && \
+    forge --version
+
+# =============================================================================
 # System packages — SSH server, browser automation, file watcher
 # =============================================================================
 RUN apt-get update && \
@@ -352,6 +363,7 @@ RUN set -e; \
     V_KUBECTL=$(kubectl version --client -o json 2>&1 | grep -oE '"gitVersion":"v[0-9]+\.[0-9]+\.[0-9]+"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown"); \
     V_ARGOCD=$(argocd version --client --short 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_SOLANA=$(solana --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "n/a"); \
+    V_FORGE=$(forge --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_OP=$(op --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_NODE=$(node --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_BUN=$(bun --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
@@ -380,6 +392,8 @@ RUN set -e; \
     echo "gh             $V_GH"; \
     echo "kubectl        $V_KUBECTL"; \
     echo "argocd         $V_ARGOCD"; \
+    echo "solana         $V_SOLANA"; \
+    echo "forge          $V_FORGE"; \
     echo "op             $V_OP"; \
     echo "node           $V_NODE"; \
     echo "bun            $V_BUN"; \
