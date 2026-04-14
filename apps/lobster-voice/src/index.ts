@@ -12,11 +12,12 @@ import { acquireLock, releaseLock, listLocks } from "./process-lock";
 import { synthesize } from "./elevenlabs";
 import { synthesizeOpenAI } from "./openai-tts";
 import { synthesizeXai } from "./xai-tts";
-import { getCachedPath, putCached, pruneExpired } from "./cache";
+import { getCached, putCached, pruneExpired } from "./cache";
 import { playAudio } from "./player";
 import { humanizeStep, humanizeGate, humanizeRaw } from "./humanize";
 import { llmHumanize } from "./llm-humanize";
 import { summarizeForSpeech } from "./summarize";
+import { pronounce } from "./pronunciation";
 
 function parseArgs(argv: string[]): {
   command: string;
@@ -244,26 +245,27 @@ function chunkText(text: string): string[] {
 }
 
 async function resolveChunkAudioPath(text: string, voice: VoiceConfig, logPath?: string): Promise<string> {
+  const ttsText = pronounce(text);
   const chain = buildFallbackChain(voice.provider);
   const testAudio = maybeTestAudio();
 
   for (const provider of chain) {
     const effectiveVoice = provider === voice.provider ? voice : fallbackVoice(provider);
-    const cachedPath = getCachedPath(effectiveVoice.voiceId, text);
+    const cachedPath = getCached(effectiveVoice.voiceId, ttsText);
     if (cachedPath) {
       return cachedPath;
     }
 
     if (testAudio) {
-      return putCached(effectiveVoice.voiceId, text, testAudio);
+      return putCached(effectiveVoice.voiceId, ttsText, testAudio);
     }
 
     const apiKey = getApiKey(provider);
     if (!apiKey) continue;
 
     try {
-      const audio = await synthesizeWithProvider(text, effectiveVoice, apiKey);
-      return putCached(effectiveVoice.voiceId, text, audio);
+      const audio = await synthesizeWithProvider(ttsText, effectiveVoice, apiKey);
+      return putCached(effectiveVoice.voiceId, ttsText, audio);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       logRender(logPath, `${provider} failed for transcript chunk (${msg}), trying next provider`);
