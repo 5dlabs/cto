@@ -234,6 +234,26 @@ RUN (type -p wget >/dev/null || (apt-get update && apt-get install wget -y)) \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
+# kubectl — Kubernetes cluster access for agent operations
+# =============================================================================
+RUN ARCH=$(dpkg --print-architecture) && \
+    KUBE_VERSION=$(curl -sL https://dl.k8s.io/release/stable.txt) && \
+    curl -sLO "https://dl.k8s.io/release/${KUBE_VERSION}/bin/linux/${ARCH}/kubectl" && \
+    install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
+    rm kubectl && \
+    kubectl version --client
+
+# =============================================================================
+# ArgoCD CLI — GitOps application sync and status
+# =============================================================================
+RUN ARCH=$(dpkg --print-architecture) && \
+    ARGOCD_VERSION=$(curl -sL https://raw.githubusercontent.com/argoproj/argo-cd/stable/VERSION) && \
+    curl -sLO "https://github.com/argoproj/argo-cd/releases/download/v${ARGOCD_VERSION}/argocd-linux-${ARCH}" && \
+    install -o root -g root -m 0755 "argocd-linux-${ARCH}" /usr/local/bin/argocd && \
+    rm "argocd-linux-${ARCH}" && \
+    argocd version --client
+
+# =============================================================================
 # System packages — SSH server, browser automation, file watcher
 # =============================================================================
 RUN apt-get update && \
@@ -309,15 +329,17 @@ RUN set -e; \
     V_OPENCODE=$(opencode --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_CLAWHUB=$(clawhub --cli-version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_GH=$(gh --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_KUBECTL=$(kubectl version --client -o json 2>&1 | grep -oE '"gitVersion":"v[0-9]+\.[0-9]+\.[0-9]+"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown"); \
+    V_ARGOCD=$(argocd version --client --short 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_OP=$(op --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_NODE=$(node --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_BUN=$(bun --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ); \
-    printf '{\n  "buildDate": "%s",\n  "clis": {\n    "openclaw": "%s",\n    "acpx": "%s",\n    "claude": "%s",\n    "copilot": "%s",\n    "codex": "%s",\n    "code": "%s",\n    "gemini": "%s",\n    "cursor": "%s",\n    "droid": "%s",\n    "kimi": "%s",\n    "opencode": "%s",\n    "clawhub": "%s"\n  },\n  "tools": {\n    "gh": "%s",\n    "op": "%s",\n    "node": "%s",\n    "bun": "%s"\n  }\n}\n' \
+    printf '{\n  "buildDate": "%s",\n  "clis": {\n    "openclaw": "%s",\n    "acpx": "%s",\n    "claude": "%s",\n    "copilot": "%s",\n    "codex": "%s",\n    "code": "%s",\n    "gemini": "%s",\n    "cursor": "%s",\n    "droid": "%s",\n    "kimi": "%s",\n    "opencode": "%s",\n    "clawhub": "%s"\n  },\n  "tools": {\n    "gh": "%s",\n    "kubectl": "%s",\n    "argocd": "%s",\n    "op": "%s",\n    "node": "%s",\n    "bun": "%s"\n  }\n}\n' \
       "$BUILD_DATE" \
       "$V_OPENCLAW" "$V_ACPX" "$V_CLAUDE" "$V_COPILOT" "$V_CODEX" "$V_CODE" "$V_GEMINI" \
       "$V_CURSOR" "$V_DROID" "$V_KIMI" "$V_OPENCODE" "$V_CLAWHUB" \
-      "$V_GH" "$V_OP" "$V_NODE" "$V_BUN" \
+      "$V_GH" "$V_KUBECTL" "$V_ARGOCD" "$V_OP" "$V_NODE" "$V_BUN" \
       > /etc/cto/versions.json; \
     echo "=== /etc/cto/versions.json ==="; \
     cat /etc/cto/versions.json; \
@@ -335,6 +357,8 @@ RUN set -e; \
     echo "opencode       $V_OPENCODE"; \
     echo "clawhub        $V_CLAWHUB"; \
     echo "gh             $V_GH"; \
+    echo "kubectl        $V_KUBECTL"; \
+    echo "argocd         $V_ARGOCD"; \
     echo "op             $V_OP"; \
     echo "node           $V_NODE"; \
     echo "bun            $V_BUN"; \

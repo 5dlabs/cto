@@ -266,7 +266,7 @@ agent:
   image:
     repository: registry.5dlabs.ai/5dlabs/agents
     tag: latest
-  serviceAccountName: ""
+  serviceAccountName: "cto-agent"
   # Single unified image with all CLIs installed (claude, codex, cursor, gemini, factory, opencode, openclaw)
   cliImages:
     claude:
