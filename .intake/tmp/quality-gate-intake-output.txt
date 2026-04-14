@@ -1,0 +1,75 @@
+project=cto-pay
+
+intake_summary:
+{"project_name":"cto-pay","generated_at":"2026-04-14T20:57:11Z","artifact_counts":{"task_count":8,"subtask_count":47,"decision_point_count":11,"doc_count":24,"prompt_count":63,"workflow_count":32},"delivery":{"issue_count":0,"pr_url":"https://github.com/5dlabs/cto/pull/4628"}}
+
+summary:
+Pipeline intake output for cto-pay: 8 tasks, 47 subtasks. Bundle below includes compact snapshots for every generated task doc/prompt artifact.
+
+task_summaries:
+[{"id":1,"title":"Anchor Program Core Account Structures & Foundation Instructions (Rex - Rust/Anchor/Solana)","agent":"rex","stack":"Rust/Anchor/Solana","priority":"high","dependencies":[],"subtask_count":8,"decision_point_count":0,"description":"Create the Anchor workspace and implement all PDA account structures (OperatorConfig, CustomerBalance, AgentPackage, TaskReceipt) plus all non-settlement instructions. This task produces the program IDL consumed by every","test_strategy":"Run `anchor build` — compiles with zero errors and zero warnings. Verify `target/idl/cto_billing.json` exists and contains instruction definitions for all 9 instructions (initialize_operator, create_customer_account, reg"},{"id":2,"title":"Settlement Engine & Quality-Gated Marketplace Splits (Rex - Rust/Anchor/Solana)","agent":"rex","stack":"Rust/Anchor/Solana","priority":"high","dependencies":[1],"subtask_count":6,"decision_point_count":1,"description":"Implement the settle_task and refund_task instructions — the core billing engine with three-case quality-gated payment splitting. This is the program's primary value proposition: billing and marketplace in one instructio","test_strategy":"Run `anchor build` — zero errors. Write and run targeted unit-level tests for the settle_task instruction covering all three cases:\n(1) Settle with no agent package: deposit 100 USDC, settle task for 10 USDC, verify cust"},{"id":3,"title":"Comprehensive Anchor Program Integration Test Suite (Tess - TypeScript/Anchor/Mocha)","agent":"tess","stack":"Anchor/TypeScript/Mocha","priority":"high","dependencies":[1,2],"subtask_count":5,"decision_point_count":2,"description":"Build a thorough integration test suite validating every instruction, edge case, and error path in the cto-billing program. This suite runs on localnet and serves as the quality gate for CI (Task 9).","test_strategy":"Run `anchor test` (which starts solana-test-validator, deploys the program, and runs the Mocha suite). All test groups (12 groups, 30+ individual test cases) pass with zero failures. Total execution time is under 60 seco"},{"id":4,"title":"Controller Settlement Event Publisher & Receipt Storage (Rex - Rust/Axum)","agent":"rex","stack":"Rust/Axum","priority":"medium","dependencies":[1,2],"subtask_count":5,"decision_point_count":4,"description":"Extend the CTO Kubernetes controller to publish settlement events to a Redis stream when CodeRuns reach terminal states. This is the controller-side half of the decoupled sidecar architecture (D5). All Solana-related cod","test_strategy":"Run `cargo build --features solana-billing` in the controller crate — compiles with zero errors. Run `cargo test --features solana-billing` — unit tests pass for: (1) SettlementEvent serialization/deserialization round-t"},{"id":5,"title":"Settlement Sidecar Service (Rex - Rust/solana-sdk)","agent":"rex","stack":"Rust/solana-sdk/solana-client","priority":"high","dependencies":[1,2,4],"subtask_count":6,"decision_point_count":2,"description":"Build the thin settlement sidecar — an independent Rust binary that reads settlement events from the Redis stream and submits corresponding Solana transactions. This fully decouples the CTO controller from Solana RPC (D5","test_strategy":"Run `cargo build --release --bin settlement-sidecar` — compiles with zero errors. Run `cargo test` in the sidecar crate: (1) PDA derivation unit tests — derive customer_balance, agent_package, task_receipt, and vault PDA"},{"id":6,"title":"End-to-End CLI Demo Script (Stitch - TypeScript/Solana-Web3.js/Anchor)","agent":"stitch","stack":"TypeScript/Solana-Web3.js/@coral-xyz/anchor","priority":"high","dependencies":[1,2],"subtask_count":4,"decision_point_count":0,"description":"Build the hackathon demo script that executes the full billing + marketplace flow end-to-end, producing console output and Solana Explorer links for the demo video (PRD Section 11, Deliverable #2).","test_strategy":"Run `npm run demo:localnet` against a running `solana-test-validator` with the cto-billing program deployed. The script completes all 10 phases without errors in under 120 seconds. Verify specific outputs: (1) Phase 5 sh"},{"id":7,"title":"Hackathon Demo Web Dashboard - Core Setup & Wallet Integration (Blaze - React/Next.js/TypeScript)","agent":"blaze","stack":"React/Next.js 14/TypeScript/Tailwind CSS","priority":"medium","dependencies":[1,2],"subtask_count":8,"decision_point_count":0,"description":"Set up the Next.js 14 web dashboard with Solana wallet adapter integration, dark theme with Solana brand colors, shadcn/ui components, and the split-panel layout skeleton. This is the visual foundation for the hackathon ","test_strategy":"Run `npm run build` — Next.js production build completes with zero errors and zero TypeScript errors. Run `npm run dev` and verify at http://localhost:3000: (1) Page loads in under 3 seconds with dark background and Sola"},{"id":8,"title":"Hackathon Demo Web Dashboard - Settlement Feed & Balance Management (Blaze - React/Next.js/TypeScript)","agent":"blaze","stack":"React/Next.js 14/TypeScript/shadcn-ui","priority":"medium","dependencies":[7],"subtask_count":5,"decision_point_count":2,"description":"Implement the settlement feed DataTable, customer balance card with deposit/withdraw flows, agent package listing, and receipt verification — the interactive features that make the dashboard demo-worthy for judges.","test_strategy":""}]
+
+--- task_id=1 ---
+task_size=5591
+task_excerpt=## Anchor Program Core Account Structures & Foundation Instructions (Rex - Rust/Anchor/Solana)  ### Objective Create the Anchor workspace and implement all PDA account structures (OperatorConfig, CustomerBalance, AgentPa
+acceptance_size=1105
+acceptance_excerpt=## Acceptance Criteria  - [ ] Run `anchor build` — compiles with zero errors and zero warnings. Verify `target/idl/cto_billing.json` exists and contains instruction definitions for all 9 instructions (initialize_operator
+prompt_size=6643
+prompt_excerpt=<identity> You are rex, the Rust/Anchor/Solana implementation agent. You own task 1 end-to-end. </identity>  <context> <task_overview> Task 1: Anchor Program Core Account Structures & Foundation Instructions (Rex - Rust/
+
+--- task_id=2 ---
+task_size=6208
+task_excerpt=## Settlement Engine & Quality-Gated Marketplace Splits (Rex - Rust/Anchor/Solana)  ### Objective Implement the settle_task and refund_task instructions — the core billing engine with three-case quality-gated payment spl
+acceptance_size=1574
+acceptance_excerpt=## Acceptance Criteria  - [ ] Run `anchor build` — zero errors. Write and run targeted unit-level tests for the settle_task instruction covering all three cases: - [ ] (1) Settle with no agent package: deposit 100 USDC, 
+prompt_size=7683
+prompt_excerpt=<identity> You are rex, the Rust/Anchor/Solana implementation agent. You own task 2 end-to-end. </identity>  <context> <task_overview> Task 2: Settlement Engine & Quality-Gated Marketplace Splits (Rex - Rust/Anchor/Solan
+
+--- task_id=3 ---
+task_size=6126
+task_excerpt=## Comprehensive Anchor Program Integration Test Suite (Tess - TypeScript/Anchor/Mocha)  ### Objective Build a thorough integration test suite validating every instruction, edge case, and error path in the cto-billing pr
+acceptance_size=965
+acceptance_excerpt=## Acceptance Criteria  - [ ] Run `anchor test` (which starts solana-test-validator, deploys the program, and runs the Mocha suite). All test groups (12 groups, 30+ individual test cases) pass with zero failures. Total e
+prompt_size=7050
+prompt_excerpt=<identity> You are tess, the Anchor/TypeScript/Mocha implementation agent. You own task 3 end-to-end. </identity>  <context> <task_overview> Task 3: Comprehensive Anchor Program Integration Test Suite (Tess - TypeScript/
+
+--- task_id=4 ---
+task_size=5352
+task_excerpt=## Controller Settlement Event Publisher & Receipt Storage (Rex - Rust/Axum)  ### Objective Extend the CTO Kubernetes controller to publish settlement events to a Redis stream when CodeRuns reach terminal states. This is
+acceptance_size=956
+acceptance_excerpt=## Acceptance Criteria  - [ ] Run `cargo build --features solana-billing` in the controller crate — compiles with zero errors. Run `cargo test --features solana-billing` — unit tests pass for: (1) SettlementEvent seriali
+prompt_size=6267
+prompt_excerpt=<identity> You are rex, the Rust/Axum implementation agent. You own task 4 end-to-end. </identity>  <context> <task_overview> Task 4: Controller Settlement Event Publisher & Receipt Storage (Rex - Rust/Axum) Extend the C
+
+--- task_id=5 ---
+task_size=5405
+task_excerpt=## Settlement Sidecar Service (Rex - Rust/solana-sdk)  ### Objective Build the thin settlement sidecar — an independent Rust binary that reads settlement events from the Redis stream and submits corresponding Solana tran
+acceptance_size=1062
+acceptance_excerpt=## Acceptance Criteria  - [ ] Run `cargo build --release --bin settlement-sidecar` — compiles with zero errors. Run `cargo test` in the sidecar crate: (1) PDA derivation unit tests — derive customer_balance, agent_packag
+prompt_size=6422
+prompt_excerpt=<identity> You are rex, the Rust/solana-sdk/solana-client implementation agent. You own task 5 end-to-end. </identity>  <context> <task_overview> Task 5: Settlement Sidecar Service (Rex - Rust/solana-sdk) Build the thin 
+
+--- task_id=6 ---
+task_size=6011
+task_excerpt=## End-to-End CLI Demo Script (Stitch - TypeScript/Solana-Web3.js/Anchor)  ### Objective Build the hackathon demo script that executes the full billing  marketplace flow end-to-end, producing console output and Solana Ex
+acceptance_size=929
+acceptance_excerpt=## Acceptance Criteria  - [ ] Run `npm run demo:localnet` against a running `solana-test-validator` with the cto-billing program deployed. The script completes all 10 phases without errors in under 120 seconds. Verify sp
+prompt_size=6903
+prompt_excerpt=<identity> You are stitch, the TypeScript/Solana-Web3.js/@coral-xyz/anchor implementation agent. You own task 6 end-to-end. </identity>  <context> <task_overview> Task 6: End-to-End CLI Demo Script (Stitch - TypeScript/S
+
+--- task_id=7 ---
+task_size=5781
+task_excerpt=## Hackathon Demo Web Dashboard - Core Setup & Wallet Integration (Blaze - React/Next.js/TypeScript)  ### Objective Set up the Next.js 14 web dashboard with Solana wallet adapter integration, dark theme with Solana brand
+acceptance_size=1021
+acceptance_excerpt=## Acceptance Criteria  - [ ] Run `npm run build` — Next.js production build completes with zero errors and zero TypeScript errors. Run `npm run dev` and verify at http://localhost:3000: (1) Page loads in under 3 seconds
+prompt_size=6749
+prompt_excerpt=<identity> You are blaze, the React/Next.js 14/TypeScript/Tailwind CSS implementation agent. You own task 7 end-to-end. </identity>  <context> <task_overview> Task 7: Hackathon Demo Web Dashboard - Core Setup & Wallet In
+
+--- task_id=8 ---
+task_size=1991
+task_excerpt=## Hackathon Demo Web Dashboard - Settlement Feed & Balance Management (Blaze - React/Next.js/TypeScript)  ### Objective Implement the settlement feed DataTable, customer balance card with deposit/withdraw flows, agent p
+acceptance_size=246
+acceptance_excerpt=## Acceptance Criteria  - [ ]   ## Verification Notes  - [ ] Confirm dependencies are satisfied before implementation. - [ ] Update tests, docs, and configuration touched by this task. - [ ] Validate the final behavior a
+prompt_size=2196
+prompt_excerpt=<identity> You are blaze, the React/Next.js 14/TypeScript/shadcn-ui implementation agent. You own task 8 end-to-end. </identity>  <context> <task_overview> Task 8: Hackathon Demo Web Dashboard - Settlement Feed & Balance
+

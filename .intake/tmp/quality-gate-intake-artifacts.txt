@@ -1,0 +1,302 @@
+stage=intake-artifacts
+project=cto-pay
+summary:
+Generated 8 tasks with 47 subtasks and 81 documentation artifacts for cto-pay. Bundle below includes sampled summaries and file excerpts for the first 2 tasks.
+
+task_summaries:
+[{"id":1,"title":"Anchor Program Core Account Structures & Foundation Instructions (Rex - Rust/Anchor/Solana)","agent":"rex","stack":"Rust/Anchor/Solana","priority":"high","dependencies":[],"subtask_count":8,"decision_point_count":0,"description":"Create the Anchor workspace and implement all PDA account structures (OperatorConfig, CustomerBalance, AgentPackage, TaskReceipt) plus all non-settlement instructions. This task produces the program IDL consumed by every","test_strategy":"Run `anchor build` — compiles with zero errors and zero warnings. Verify `target/idl/cto_billing.json` exists and contains instruction definitions for all 9 instructions (initialize_operator, create_customer_account, reg"},{"id":2,"title":"Settlement Engine & Quality-Gated Marketplace Splits (Rex - Rust/Anchor/Solana)","agent":"rex","stack":"Rust/Anchor/Solana","priority":"high","dependencies":[1],"subtask_count":6,"decision_point_count":1,"description":"Implement the settle_task and refund_task instructions — the core billing engine with three-case quality-gated payment splitting. This is the program's primary value proposition: billing and marketplace in one instructio","test_strategy":"Run `anchor build` — zero errors. Write and run targeted unit-level tests for the settle_task instruction covering all three cases:\n(1) Settle with no agent package: deposit 100 USDC, settle task for 10 USDC, verify cust"}]
+
+=== .tasks/docs/task-1/task.md ===
+## Anchor Program Core Account Structures & Foundation Instructions (Rex - Rust/Anchor/Solana)
+
+### Objective
+Create the Anchor workspace and implement all PDA account structures (OperatorConfig, CustomerBalance, AgentPackage, TaskReceipt) plus all non-settlement instructions. This task produces the program IDL consumed by every downstream TypeScript task.
+
+### Ownership
+- Agent: rex
+- Stack: Rust/Anchor/Solana
+- Priority: high
+- Status: pending
+- Dependencies: None
+
+### Implementation Details
+1. Initialize Anchor workspace at `programs/cto-billing/` with `anchor init` (Anchor v0.30+). Set program ID placeholder in `lib.rs` and `Anchor.toml`.
+
+2. Define account structures in `state/` modules:
+   - `OperatorConfig` (PDA seed: `[b"operator_config"]`): authority (Pubkey), treasury (Pubkey), mint (Pubkey — mint-agnostic per D4), protocol_fee_bps (u16), paused (bool). Singleton PDA.
+   - `CustomerBalance` (PDA seed: `[b"customer_balance", customer.key().as_ref()]`): customer (Pubkey), balance (u64), total_deposited (u64), total_spent (u64), task_count (u64), max_per_task (u64), max_per_day (u64), daily_spent (u64), daily_reset_day (u64 — renamed from daily_reset_slot per D9), created_at (i64).
+   - `AgentPackage` (PDA seed: `[b"agent_package", sha256(package_id)[..32]]`): package_id (String, #[max_len(64)] per D8), author (Pubkey), split_bps (u16), source_uri (String, #[max_len(256)]), total_earned (u64), task_count (u64), success_count (u64), registered_at (i64), active (bool).
+   - `TaskReceipt` (PDA seed: `[b"task_receipt", sha256(task_id)[..32]]`): task_id (String, #[max_len(64)]), customer (Pubkey), amount (u64), author_earned (u64), quality_met (bool), agent_package (Option<Pubkey>), receipt_hash ([u8; 32]), operator (Pubkey), settled_at (i64), status (TaskStatus enum: Settled/Refunded/Disputed).
+
+3. Implement a `utils/` module with `hash_seed(input: &str) -> [u8; 32]` helper using SHA-256 for PDA derivation (D2).
+
+4. Implement instructions:
+   - `initialize_operator(authority, treasury, mint, protocol_fee_bps)` — Creates OperatorConfig. Validate signer is the initial authority. Store mint Pubkey for token validation.
+   - `create_customer_account(max_per_task, max_per_day)` — Creates CustomerBalance PDA for signing customer. Initialize all counters to 0.
+   - `register_agent_package(package_id, split_bps, source_uri)` — Permissionless. Creates AgentPackage PDA with signer as author. Validate split_bps ≤ 10000. **Also create/verify author's ATA for the configured mint exists (passed as account, validated but NOT created — per D11).** Store registered_at from Clock sysvar.
+   - `update_agent_package(source_uri, split_bps, active)` — Author-only (verify signer == agent_package.author). Update mutable fields.
+   - `deposit(amount)` — Transfer USDC from customer's ATA to program vault (PDA-controlled token account). Increment customer.balance and customer.total_deposited. Emit Deposited event.
+   - `withdraw(amount)` — Transfer from vault to customer's ATA. Validate amount ≤ balance. Decrement balance. Emit Withdrawn event.
+   - `update_spending_caps(max_per_task, max_per_day)` — Customer-only. Update cap fields.
+   - `pause()` / `unpause()` — Operator-only (verify signer == operator_config.authority). Toggle paused flag.
+
+5. Define program vault as a token account PDA (seed: `[b"vault", mint.key().as_ref()]`) with the program as authority.
+
+6. Add comprehensive Anchor error enum: `InsufficientBalance`, `ExceedsPerTaskCap`, `ExceedsDailyCap`, `Unauthorized`, `ProgramPaused`, `InvalidSplitBps`, `DuplicateTaskId`, `InvalidMint`, `PackageInactive`, `InvalidAmount`.
+
+7. Ensure `anchor build` produces `target/idl/cto_billing.json` and `target/types/cto_billing.ts` — these are consumed by Tasks 3, 5, 6, 7, 8.
+
+### Subtasks
+- [ ] Initialize Anchor workspace and project configuration: Scaffold the Anchor workspace at programs/cto-billing/ with Anchor v0.30+, configure Cargo.toml dependencies, Anchor.toml settings, and lib.rs entry point with program ID placeholder and module declarations.
+- [ ] Implement PDA account structures in state/ modules: Define all four PDA account structures (OperatorConfig, CustomerBalance, AgentPackage, TaskReceipt) with correct seeds, fields, space calculations, and the TaskStatus enum.
+- [ ] Implement utils module (hash_seed helper) and program vault PDA definition: Create the utils/ module with the SHA-256 hash_seed helper for PDA derivation and define the program vault token account PDA.
+- [ ] Implement error enum for all program errors: Define the comprehensive Anchor error enum covering all validation failure cases across all instructions.
+- [ ] Implement initialization and account creation instructions: Implement the initialize_operator, create_customer_account, register_agent_package, and update_agent_package instructions with full validation and Anchor constraints.
+- [ ] Implement token flow instructions (deposit, withdraw) with vault PDA: Implement the deposit and withdraw instructions with SPL token transfers between customer ATAs and the program vault PDA, including vault initialization logic.
+- [ ] Implement admin and customer management instructions (update_spending_caps, pause, unpause): Implement the update_spending_caps (customer-only), pause (operator-only), and unpause (operator-only) instructions.
+- [ ] Smoke test suite — 6 integration tests on local validator: Write and execute the 6 smoke tests as specified in the test strategy: initialize operator, create customer, register agent package, deposit, withdraw, and pause.
+=== .tasks/docs/task-1/acceptance.md ===
+## Acceptance Criteria
+
+- [ ] Run `anchor build` — compiles with zero errors and zero warnings. Verify `target/idl/cto_billing.json` exists and contains instruction definitions for all 9 instructions (initialize_operator, create_customer_account, register_agent_package, update_agent_package, deposit, withdraw, update_spending_caps, pause, unpause). Verify `target/types/cto_billing.ts` is generated. Run `anchor test` with a minimal smoke test that: (1) initializes operator config and reads it back with correct authority/treasury/mint, (2) creates a customer account with caps and verifies fields, (3) registers an agent package and verifies author/split_bps/source_uri, (4) deposits 100 USDC and verifies customer balance == 100, (5) withdraws 50 USDC and verifies balance == 50, (6) pauses and verifies paused == true. All 6 smoke tests pass on local validator in under 30 seconds.
+
+## Verification Notes
+
+- [ ] Confirm dependencies are satisfied before implementation.
+- [ ] Update tests, docs, and configuration touched by this task.
+- [ ] Validate the final behavior against the task objective.
+=== .tasks/docs/task-1/prompt.md ===
+<identity>
+You are rex, the Rust/Anchor/Solana implementation agent. You own task 1 end-to-end.
+</identity>
+
+<context>
+<task_overview>
+Task 1: Anchor Program Core Account Structures & Foundation Instructions (Rex - Rust/Anchor/Solana)
+Create the Anchor workspace and implement all PDA account structures (OperatorConfig, CustomerBalance, AgentPackage, TaskReceipt) plus all non-settlement instructions. This task produces the program IDL consumed by every downstream TypeScript task.
+Priority: high
+Dependencies: None
+</task_overview>
+</context>
+
+<implementation_plan>
+1. Initialize Anchor workspace at `programs/cto-billing/` with `anchor init` (Anchor v0.30+). Set program ID placeholder in `lib.rs` and `Anchor.toml`.
+
+2. Define account structures in `state/` modules:
+   - `OperatorConfig` (PDA seed: `[b"operator_config"]`): authority (Pubkey), treasury (Pubkey), mint (Pubkey — mint-agnostic per D4), protocol_fee_bps (u16), paused (bool). Singleton PDA.
+   - `CustomerBalance` (PDA seed: `[b"customer_balance", customer.key().as_ref()]`): customer (Pubkey), balance (u64), total_deposited (u64), total_spent (u64), task_count (u64), max_per_task (u64), max_per_day (u64), daily_spent (u64), daily_reset_day (u64 — renamed from daily_reset_slot per D9), created_at (i64).
+   - `AgentPackage` (PDA seed: `[b"agent_package", sha256(package_id)[..32]]`): package_id (String, #[max_len(64)] per D8), author (Pubkey), split_bps (u16), source_uri (String, #[max_len(256)]), total_earned (u64), task_count (u64), success_count (u64), registered_at (i64), active (bool).
+   - `TaskReceipt` (PDA seed: `[b"task_receipt", sha256(task_id)[..32]]`): task_id (String, #[max_len(64)]), customer (Pubkey), amount (u64), author_earned (u64), quality_met (bool), agent_package (Option<Pubkey>), receipt_hash ([u8; 32]), operator (Pubkey), settled_at (i64), status (TaskStatus enum: Settled/Refunded/Disputed).
+
+3. Implement a `utils/` module with `hash_seed(input: &str) -> [u8; 32]` helper using SHA-256 for PDA derivation (D2).
+
+4. Implement instructions:
+   - `initialize_operator(authority, treasury, mint, protocol_fee_bps)` — Creates OperatorConfig. Validate signer is the initial authority. Store mint Pubkey for token validation.
+   - `create_customer_account(max_per_task, max_per_day)` — Creates CustomerBalance PDA for signing customer. Initialize all counters to 0.
+   - `register_agent_package(package_id, split_bps, source_uri)` — Permissionless. Creates AgentPackage PDA with signer as author. Validate split_bps ≤ 10000. **Also create/verify author's ATA for the configured mint exists (passed as account, validated but NOT created — per D11).** Store registered_at from Clock sysvar.
+   - `update_agent_package(source_uri, split_bps, active)` — Author-only (verify signer == agent_package.author). Update mutable fields.
+   - `deposit(amount)` — Transfer USDC from customer's ATA to program vault (PDA-controlled token account). Increment customer.balance and customer.total_deposited. Emit Deposited event.
+   - `withdraw(amount)` — Transfer from vault to customer's ATA. Validate amount ≤ balance. Decrement balance. Emit Withdrawn event.
+   - `update_spending_caps(max_per_task, max_per_day)` — Customer-only. Update cap fields.
+   - `pause()` / `unpause()` — Operator-only (verify signer == operator_config.authority). Toggle paused flag.
+
+5. Define program vault as a token account PDA (seed: `[b"vault", mint.key().as_ref()]`) with the program as authority.
+
+6. Add comprehensive Anchor error enum: `InsufficientBalance`, `ExceedsPerTaskCap`, `ExceedsDailyCap`, `Unauthorized`, `ProgramPaused`, `InvalidSplitBps`, `DuplicateTaskId`, `InvalidMint`, `PackageInactive`, `InvalidAmount`.
+
+7. Ensure `anchor build` produces `target/idl/cto_billing.json` and `target/types/cto_billing.ts` — these are consumed by Tasks 3, 5, 6, 7, 8.
+</implementation_plan>
+
+<acceptance_criteria>
+Run `anchor build` — compiles with zero errors and zero warnings. Verify `target/idl/cto_billing.json` exists and contains instruction definitions for all 9 instructions (initialize_operator, create_customer_account, register_agent_package, update_agent_package, deposit, withdraw, update_spending_caps, pause, unpause). Verify `target/types/cto_billing.ts` is generated. Run `anchor test` with a minimal smoke test that: (1) initializes operator config and reads it back with correct authority/treasury/mint, (2) creates a customer account with caps and verifies fields, (3) registers an agent package and verifies author/split_bps/source_uri, (4) deposits 100 USDC and verifies customer balance == 100, (5) withdraws 50 USDC and verifies balance == 50, (6) pauses and verifies paused == true. All 6 smoke tests pass on local validator in under 30 seconds.
+
+See also: acceptance.md in this task directory for the checklist version.
+</acceptance_criteria>
+
+<subtasks>
+- Initialize Anchor workspace and project configuration: Scaffold the Anchor workspace at programs/cto-billing/ with Anchor v0.30+, configure Cargo.toml dependencies, Anchor.toml settings, and lib.rs entry point with program ID placeholder and module declarations.
+- Implement PDA account structures in state/ modules: Define all four PDA account structures (OperatorConfig, CustomerBalance, AgentPackage, TaskReceipt) with correct seeds, fields, space calculations, and the TaskStatus enum.
+- Implement utils module (hash_seed helper) and program vault PDA definition: Create the utils/ module with the SHA-256 hash_seed helper for PDA derivation and define the program vault token account PDA.
+- Implement error enum for all program errors: Define the comprehensive Anchor error enum covering all validation failure cases across all instructions.
+- Implement initialization and account creation instructions: Implement the initialize_operator, create_customer_account, register_agent_package, and update_agent_package instructions with full validation and Anchor constraints.
+- Implement token flow instructions (deposit, withdraw) with vault PDA: Implement the deposit and withdraw instructions with SPL token transfers between customer ATAs and the program vault PDA, including vault initialization logic.
+- Implement admin and customer management instructions (update_spending_caps, pause, unpause): Implement the update_spending_caps (customer-only), pause (operator-only), and unpause (operator-only) instructions.
+- Smoke test suite — 6 integration tests on local validator: Write and execute the 6 smoke tests as specified in the test strategy: initialize operator, create customer, register agent package, deposit, withdraw, and pause.
+</subtasks>
+=== .tasks/docs/task-2/task.md ===
+## Settlement Engine & Quality-Gated Marketplace Splits (Rex - Rust/Anchor/Solana)
+
+### Objective
+Implement the settle_task and refund_task instructions — the core billing engine with three-case quality-gated payment splitting. This is the program's primary value proposition: billing and marketplace in one instruction.
+
+### Ownership
+- Agent: rex
+- Stack: Rust/Anchor/Solana
+- Priority: high
+- Status: pending
+- Dependencies: 1
+
+### Implementation Details
+1. Implement `settle_task` instruction in `instructions/settle_task.rs`:
+   - Accounts: operator (signer), operator_config, customer_balance, treasury_ata, vault, vault_authority, task_receipt (init), clock (sysvar). Optional: agent_package, author_ata.
+   - Args: task_id (String), amount (u64), receipt_hash ([u8; 32]), quality_met (bool).
+   - Validation checks (in order):
+     a. `!operator_config.paused` → error ProgramPaused
+     b. `operator.key() == operator_config.authority` → error Unauthorized
+     c. `amount <= customer_balance.max_per_task` → error ExceedsPerTaskCap
+     d. Daily cap logic: compute `current_day = clock.unix_timestamp / 86400`. If `current_day > customer_balance.daily_reset_day`, reset `daily_spent = 0` and `daily_reset_day = current_day`. Then check `daily_spent + amount <= max_per_day` → error ExceedsDailyCap (D9).
+     e. `customer_balance.balance >= amount` → error InsufficientBalance
+
+   - **Case 1: No agent package** (agent_package account not provided or is a sentinel):
+     - Debit `amount` from customer_balance.balance.
+     - Transfer `amount` from vault to treasury_ata via PDA signer seeds.
+     - Write TaskReceipt: amount, author_earned=0, quality_met (passed through), agent_package=None.
+
+   - **Case 2: Agent package provided, quality_met == true**:
+     - Validate agent_package.active == true → error PackageInactive.
+     - Compute `author_amount = (amount * agent_package.split_bps) / 10000`.
+     - Compute `treasury_amount = amount - author_amount`.
+     - Debit `amount` from customer_balance.
+     - Transfer `author_amount` from vault to author_ata.
+     - Transfer `treasury_amount` from vault to treasury_ata.
+     - Update agent_package: total_earned += author_amount, task_count += 1, success_count += 1.
+     - Write TaskReceipt: amount, author_earned=author_amount, quality_met=true, agent_package=Some(package_pda).
+
+   - **Case 3: Agent package provided, quality_met == false**:
+     - No debit from customer (amount effectively = 0 charged).
+     - No transfers.
+     - Update agent_package: task_count += 1 (success_count unchanged).
+     - Write TaskReceipt: amount=0, author_earned=0, quality_met=false, agent_package=Some(package_pda).
+
+   - In all cases: update customer_balance.daily_spent += actual_charged_amount, customer_balance.total_spent += actual_charged_amount, customer_balance.task_count += 1.
+   - Emit `TaskSettled` event: task_id, customer, amount_charged, author_earned, quality_met, agent_package, timestamp.
+
+2. Implement `refund_task` instruction in `instructions/refund_task.rs`:
+   - Accounts: operator (signer), operator_config, task_receipt (mut), customer_balance (mut), vault, treasury_ata.
+   - Validates operator is authorized and program is not paused.
+   - Validates task_receipt.status == Settled → cannot refund already-refunded tasks.
+   - Credits task_receipt.amount back to customer_balance.balance (from treasury — 5D Labs absorbs cost if author was paid, per open question #3).
+   - Transfer task_receipt.amount from treasury_ata to vault.
+   - Sets task_receipt.status = Refunded.
+   - Emit `TaskRefunded` event.
+   - Add code comment: `// HACKATHON SIMPLIFICATION: Refund comes from treasury. If an author was already paid, 5D Labs absorbs the loss. Post-hackathon: implement clawback or delayed settlement window.`
+
+3. Use Anchor's `Optional<>` or remaining accounts pattern to handle the optional agent_package/author_ata. Consider using two separate instruction handlers (`settle_task_default` and `settle_task_with_package`) if Optional accounts add too much complexity — expose both under `settle_task` via a wrapper or let the client choose the right variant.
+
+4. Add Anchor events:
+   - `TaskSettled { task_id, customer, amount_charged, author_earned, quality_met, agent_package, settled_at }`
+   - `TaskRefunded { task_id, customer, amount_refunded, refunded_at }`
+   - `Deposited { customer, amount, new_balance }`
+   - `Withdrawn { customer, amount, new_balance }`
+   - `AgentPackageRegistered { package_id, author, split_bps }`
+
+5. Ensure the TaskReceipt PDA's seed uses `hash_seed(&task_id)` — a duplicate task_id will fail at account creation (Anchor's `init` constraint), providing idempotent settlement at the protocol level.
+
+### Subtasks
+- [ ] settle_task instruction scaffolding — account structs, validation chain, and optional accounts pattern: Define the settle_task account structs (handling optional agent_package/author_ata), implement the full validation chain (paused, auth, per-task cap, daily cap with day rollover, balance check), and decide on the optional accounts strategy.
+- [ ] Settlement Case 1 — no agent package: debit and transfer to treasury: Implement the Case 1 settlement path where no agent package is provided: debit customer balance and transfer full amount from vault to treasury via PDA signing.
+- [ ] Settlement Cases 2 & 3 — quality-gated split logic with agent package: Implement Case 2 (quality_met=true with split payment to author and treasury) and Case 3 (quality_met=false with zero charge and no transfers) in the settle_task handler.
+- [ ] Implement refund_task instruction: Implement the refund_task instruction that reverses a settlement by transferring funds from treasury back to vault and crediting the customer balance.
+- [ ] Define all Anchor events for the program: Define and emit all Anchor event structs: TaskSettled, TaskRefunded, Deposited, Withdrawn, AgentPackageRegistered — used for indexing and off-chain observability.
+- [ ] Comprehensive 8-case test suite for settlement and refund: Write and execute all 8 test cases covering settle_task (3 cases, caps, pause, duplicate) and refund_task as specified in the test strategy.
+=== .tasks/docs/task-2/acceptance.md ===
+## Acceptance Criteria
+
+- [ ] Run `anchor build` — zero errors. Write and run targeted unit-level tests for the settle_task instruction covering all three cases:
+- [ ] (1) Settle with no agent package: deposit 100 USDC, settle task for 10 USDC, verify customer balance is 90, treasury received 10, TaskReceipt shows amount=10, author_earned=0.
+- [ ] (2) Settle with agent package, quality_met=true, split_bps=3000 (30%): deposit 100, settle for 10, verify author_ata received 3 USDC, treasury received 7 USDC, customer balance is 90, AgentPackage.total_earned=3, success_count=1.
+- [ ] (3) Settle with agent package, quality_met=false: deposit 100, settle, verify customer balance remains 100, no transfers, TaskReceipt.amount=0, AgentPackage.task_count incremented but success_count unchanged.
+- [ ] (4) Refund: settle a task, then refund it, verify customer balance restored, TaskReceipt.status=Refunded.
+- [ ] (5) Cap enforcement: set max_per_task=5, attempt settle for 10 → ExceedsPerTaskCap error.
+- [ ] (6) Daily cap: set max_per_day=15, settle 10, then settle 10 → ExceedsDailyCap error.
+- [ ] (7) Paused: pause program, attempt settle → ProgramPaused error.
+- [ ] (8) Duplicate task_id: settle task 'CTO-001', attempt second settle with same task_id → error (PDA already exists).
+- [ ] All 8 tests pass on local validator within 30 seconds.
+
+## Verification Notes
+
+- [ ] Confirm dependencies are satisfied before implementation.
+- [ ] Update tests, docs, and configuration touched by this task.
+- [ ] Validate the final behavior against the task objective.
+=== .tasks/docs/task-2/prompt.md ===
+<identity>
+You are rex, the Rust/Anchor/Solana implementation agent. You own task 2 end-to-end.
+</identity>
+
+<context>
+<task_overview>
+Task 2: Settlement Engine & Quality-Gated Marketplace Splits (Rex - Rust/Anchor/Solana)
+Implement the settle_task and refund_task instructions — the core billing engine with three-case quality-gated payment splitting. This is the program's primary value proposition: billing and marketplace in one instruction.
+Priority: high
+Dependencies: 1
+</task_overview>
+</context>
+
+<implementation_plan>
+1. Implement `settle_task` instruction in `instructions/settle_task.rs`:
+   - Accounts: operator (signer), operator_config, customer_balance, treasury_ata, vault, vault_authority, task_receipt (init), clock (sysvar). Optional: agent_package, author_ata.
+   - Args: task_id (String), amount (u64), receipt_hash ([u8; 32]), quality_met (bool).
+   - Validation checks (in order):
+     a. `!operator_config.paused` → error ProgramPaused
+     b. `operator.key() == operator_config.authority` → error Unauthorized
+     c. `amount <= customer_balance.max_per_task` → error ExceedsPerTaskCap
+     d. Daily cap logic: compute `current_day = clock.unix_timestamp / 86400`. If `current_day > customer_balance.daily_reset_day`, reset `daily_spent = 0` and `daily_reset_day = current_day`. Then check `daily_spent + amount <= max_per_day` → error ExceedsDailyCap (D9).
+     e. `customer_balance.balance >= amount` → error InsufficientBalance
+
+   - **Case 1: No agent package** (agent_package account not provided or is a sentinel):
+     - Debit `amount` from customer_balance.balance.
+     - Transfer `amount` from vault to treasury_ata via PDA signer seeds.
+     - Write TaskReceipt: amount, author_earned=0, quality_met (passed through), agent_package=None.
+
+   - **Case 2: Agent package provided, quality_met == true**:
+     - Validate agent_package.active == true → error PackageInactive.
+     - Compute `author_amount = (amount * agent_package.split_bps) / 10000`.
+     - Compute `treasury_amount = amount - author_amount`.
+     - Debit `amount` from customer_balance.
+     - Transfer `author_amount` from vault to author_ata.
+     - Transfer `treasury_amount` from vault to treasury_ata.
+     - Update agent_package: total_earned += author_amount, task_count += 1, success_count += 1.
+     - Write TaskReceipt: amount, author_earned=author_amount, quality_met=true, agent_package=Some(package_pda).
+
+   - **Case 3: Agent package provided, quality_met == false**:
+     - No debit from customer (amount effectively = 0 charged).
+     - No transfers.
+     - Update agent_package: task_count += 1 (success_count unchanged).
+     - Write TaskReceipt: amount=0, author_earned=0, quality_met=false, agent_package=Some(package_pda).
+
+   - In all cases: update customer_balance.daily_spent += actual_charged_amount, customer_balance.total_spent += actual_charged_amount, customer_balance.task_count += 1.
+   - Emit `TaskSettled` event: task_id, customer, amount_charged, author_earned, quality_met, agent_package, timestamp.
+
+2. Implement `refund_task` instruction in `instructions/refund_task.rs`:
+   - Accounts: operator (signer), operator_config, task_receipt (mut), customer_balance (mut), vault, treasury_ata.
+   - Validates operator is authorized and program is not paused.
+   - Validates task_receipt.status == Settled → cannot refund already-refunded tasks.
+   - Credits task_receipt.amount back to customer_balance.balance (from treasury — 5D Labs absorbs cost if author was paid, per open question #3).
+   - Transfer task_receipt.amount from treasury_ata to vault.
+   - Sets task_receipt.status = Refunded.
+   - Emit `TaskRefunded` event.
+   - Add code comment: `// HACKATHON SIMPLIFICATION: Refund comes from treasury. If an author was already paid, 5D Labs absorbs the loss. Post-hackathon: implement clawback or delayed settlement window.`
+
+3. Use Anchor's `Optional<>` or remaining accounts pattern to handle the optional agent_package/author_ata. Consider using two separate instruction handlers (`settle_task_default` and `settle_task_with_package`) if Optional accounts add too much complexity — expose both under `settle_task` via a wrapper or let the client choose the right variant.
+
+4. Add Anchor events:
+   - `TaskSettled { task_id, customer, amount_charged, author_earned, quality_met, agent_package, settled_at }`
+   - `TaskRefunded { task_id, customer, amount_refunded, refunded_at }`
+   - `Deposited { customer, amount, new_balance }`
+   - `Withdrawn { customer, amount, new_balance }`
+   - `AgentPackageRegistered { package_id, author, split_bps }`
+
+5. Ensure the TaskReceipt PDA's seed uses `hash_seed(&task_id)` — a duplicate task_id will fail at account creation (Anchor's `init` constraint), providing idempotent settlement at the protocol level.
+</implementation_plan>
+
+<acceptance_criteria>
+Run `anchor build` — zero errors. Write and run targeted unit-level tests for the settle_task instruction covering all three cases:
+(1) Settle with no agent package: deposit 100 USDC, settle task for 10 USDC, verify customer balance is 90, treasury received 10, TaskReceipt shows amount=10, author_earned=0.
+(2) Settle with agent package, quality_met=true, split_bps=3000 (30%): deposit 100, settle for 10, verify author_ata received 3 USDC, treasury received 7 USDC, customer balance is 90, AgentPackage.total_earned=3, success_count=1.
+(3) Settle with agent package, quality_met=false: deposit 100, settle, verify customer balance remains 100, no transfers, TaskReceipt.amount=0, AgentPackage.task_count incremented but success_count unchanged.
+(4) Refund: settle a task, then refund it, verify customer balance restored, TaskReceipt.status=Refunded.
+(5) Cap enforcement: set max_per_task=5, attempt settle for 10 → ExceedsPerTaskCap error.
+(6) Daily cap: set max_per_day=15, settle 10, then settle 10 → ExceedsDailyCap error.
+(7) Paused: pause program, attempt settle → ProgramPaused error.
+(8) Duplicate task_id: settle task 'CTO-001', attempt second settle with same task_id → error (PDA already exists).
+
