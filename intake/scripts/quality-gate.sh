@@ -68,7 +68,11 @@ ARGS="$(jq -n \
   --arg model "$MODEL" \
   '{prompt:$prompt,input:($gate_input|fromjson),schema:$schema,provider:$provider,model:$model}')"
 
-OUT="$("$ROOT/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS")"
+OUT="$("$ROOT/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS")" || {
+  echo "quality-gate: LLM infrastructure unavailable for stage=$STAGE" >&2
+  printf '{"skipped":true,"fallback":true,"reason":"llm_unavailable","stage":"%s"}\n' "$STAGE"
+  exit 75
+}
 PASS="$(printf '%s' "$OUT" | jq -r '.pass // false' 2>/dev/null || echo false)"
 SCORE="$(printf '%s' "$OUT" | jq -r '.score // 0' 2>/dev/null || echo 0)"
 
@@ -76,9 +80,9 @@ printf '%s\n' "$OUT"
 
 if [ "$PASS" != "true" ]; then
   echo "quality-gate: FAIL stage=$STAGE pass=$PASS score=$SCORE" >&2
-  exit 1
+  exit 10
 fi
 if ! printf '%s' "$SCORE" | jq -e --argjson min "$MIN_SCORE" 'type=="number" and . >= $min' >/dev/null 2>&1; then
   echo "quality-gate: FAIL stage=$STAGE score=$SCORE min=$MIN_SCORE" >&2
-  exit 1
+  exit 10
 fi
