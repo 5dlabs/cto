@@ -285,9 +285,21 @@
         "enabled": true,
         "config": {
           "mode": "open-source",
-          "userId": "jonathon",
+          "userId": "jonathon:project:{{project_id}}:task:{{task_id}}:{{agent_name}}",
           "autoRecall": true,
           "autoCapture": true,
+          "topK": 5,
+          "searchThreshold": 0.3,
+          "customCategories": {
+            "task_objective": "What this task is trying to accomplish - goals, requirements, acceptance criteria",
+            "task_progress": "Status updates, milestones reached, intermediate results during task execution",
+            "task_completion": "Final outcomes, deliverables, PRs merged, build results when a task finishes",
+            "blocker": "Issues that blocked progress - errors, missing permissions, dependency failures",
+            "handoff": "Structured summary passed back to Morgan after task completion",
+            "architecture": "Architecture decisions, patterns, and system design choices",
+            "debugging": "Root cause analysis, debugging steps, and bug fixes"
+          },
+          "customInstructions": "You are {{agent_name}}, working on task {{task_id}} in project {{project_id}}. Your memories are scoped to this task. When storing important decisions, blockers, or completions, use the appropriate category. At task end, write a handoff summary.",
           "oss": {
             "vectorStore": {
               "provider": "qdrant",
