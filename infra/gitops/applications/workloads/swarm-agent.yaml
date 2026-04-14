@@ -248,7 +248,8 @@ spec:
 
               ## Operating Rules
 
-              - Use SWARM CLI for Canteen-specific queries (projects, teams, events).
+              - SWARM CLI is pre-authenticated as @kaseonedge. No login needed.
+              - Use SWARM CLI for Canteen-specific queries (status, updates, repos).
               - Use web search for broader crypto/Solana ecosystem research.
               - When asked about a project, check both SWARM and public sources.
               - Provide daily summaries when configured via cron.
