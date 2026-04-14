@@ -165,7 +165,7 @@ fi
 cat <<EOF
 ---
 
-### Deliberation Audio
+### 🎧 Deliberation Audio
 
 - Architecture audio: **${ARCH_AUDIO_STATUS}**
   - MP3: \`.tasks/audio/architecture-deliberation.mp3\`
@@ -173,6 +173,8 @@ cat <<EOF
 - Design audio: **${DESIGN_AUDIO_STATUS}**
   - MP3: \`.tasks/audio/design-deliberation.mp3\`
   - Transcript: \`.tasks/audio/design-deliberation.transcript.json\`
+
+> 💡 After the PR is created, the pipeline will attach a GitHub Release with downloadable MP3 files and comment the direct links on this PR.
 
 EOF
 

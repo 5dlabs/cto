@@ -120,6 +120,11 @@ steps:
           /*) SRC="$REL" ;;          # absolute path (e.g. target repo PRD)
           *)  SRC="$WS/$REL" ;;      # relative to workspace
         esac
+        # If not found in workspace, try the target repo (e.g. prd.md lives in cto-pay, not cto)
+        if [ ! -f "$SRC" ] && [ -n "${target_repo_local_path}" ] && [ -f "${target_repo_local_path}/$REL" ]; then
+          SRC="${target_repo_local_path}/$REL"
+          echo "materialize-prd: found PRD in target repo: $SRC" >&2
+        fi
         if [ ! -f "$SRC" ]; then
           echo "materialize-prd: missing PRD file: $SRC (prd_path=${prd_path})" >&2
           exit 1
@@ -1854,6 +1859,63 @@ steps:
       jq -nc --arg pr_url "$PR_URL" --arg branch "$BRANCH_NAME" --arg target "$TARGET" --arg repo_url "$DERIVED_REPO_URL" \
         '{"synced":true,"pr_url":$pr_url,"branch":$branch,"target_repo":$target,"repository_url":$repo_url}'
 
+  - id: upload-deliberation-release
+    env:
+      CTO_SYNC_TARGET_REPO_JSON: $sync-to-target-repo.stdout
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "upload-deliberation-release" "${audio_debug}" "project ${project_name}"
+      SYNC_JSON="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | tail -n 1)"
+      SYNCED="$(printf '%s' "$SYNC_JSON" | jq -r '.synced // false')"
+      if [ "$SYNCED" != "true" ]; then
+        echo "upload-deliberation-release: skipped — target repo not synced" >&2
+        jq -nc '{"release_url":"none","reason":"not_synced"}'
+        exit 0
+      fi
+      TARGET="$(printf '%s' "$SYNC_JSON" | jq -r '.target_repo // empty')"
+      PR_URL="$(printf '%s' "$SYNC_JSON" | jq -r '.pr_url // "none"')"
+      "$root/intake/scripts/upload-deliberation-release.sh" \
+        "$root" "$TARGET" "${project_name}" "$PR_URL"
+
+  - id: update-pr-with-release
+    env:
+      CTO_SYNC_TARGET_REPO_JSON: $sync-to-target-repo.stdout
+      CTO_RELEASE_JSON: $upload-deliberation-release.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "update-pr-with-release" "${audio_debug}" "project ${project_name}"
+      RELEASE_URL="$(printf '%s' "$CTO_RELEASE_JSON" | tail -n 1 | jq -r '.release_url // "none"')"
+      if [ "$RELEASE_URL" = "none" ] || [ -z "$RELEASE_URL" ]; then
+        echo "update-pr-with-release: no release — skipping PR update" >&2
+        jq -nc '{"updated":false}'
+        exit 0
+      fi
+      PR_URL="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | tail -n 1 | jq -r '.pr_url // "none"')"
+      if [ "$PR_URL" = "none" ] || [ -z "$PR_URL" ]; then
+        echo "update-pr-with-release: no PR URL — skipping" >&2
+        jq -nc '{"updated":false}'
+        exit 0
+      fi
+      # Extract PR number from URL
+      PR_NUM="$(printf '%s' "$PR_URL" | grep -o '[0-9]*$')"
+      REPO_SLUG="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | tail -n 1 | jq -r '.repository_url // ""' | sed 's|.*github\.com[:/]||; s|\.git$||')"
+      if [ -z "$PR_NUM" ] || [ -z "$REPO_SLUG" ]; then
+        echo "update-pr-with-release: cannot parse PR number or repo slug" >&2
+        jq -nc '{"updated":false}'
+        exit 0
+      fi
+      # Build asset links
+      ASSET_LINKS="$(printf '%s' "$CTO_RELEASE_JSON" | tail -n 1 | jq -r '
+        (.assets // []) | map("🔊 [**" + .name + "**](" + .url + ")") | join("\n")
+      ')"
+      COMMENT="## 🎧 Deliberation Audio\n\n${ASSET_LINKS}\n\n📦 [Full release →](${RELEASE_URL})"
+      gh pr comment "$PR_NUM" --repo "$REPO_SLUG" --body "$(printf '%b' "$COMMENT")" >&2 || {
+        echo "update-pr-with-release: comment failed — trying issue comment" >&2
+      }
+      echo "update-pr-with-release: commented on PR #${PR_NUM}" >&2
+      jq -nc --arg pr "$PR_NUM" --arg release "$RELEASE_URL" '{"updated":true,"pr":$pr,"release_url":$release}'
+
   - id: fix-linear-urls-for-target
     env:
       CTO_SYNC_TARGET_REPO_JSON: $sync-to-target-repo.stdout
@@ -1974,12 +2036,14 @@ steps:
     env:
       CTO_REGISTER_RUN_JSON: $register-run.stdout
       CTO_SYNC_TARGET_REPO_JSON: $sync-to-target-repo.stdout
+      CTO_RELEASE_JSON: $upload-deliberation-release.stdout
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "notify-pipeline-complete" "${audio_debug}" "project ${project_name}"
       _SYNC_JSON="$(printf '%s' "$CTO_SYNC_TARGET_REPO_JSON" | grep -E '^\{' | tail -1)"
       TARGET_PR="$(printf '%s' "$_SYNC_JSON" | jq -r '.pr_url // empty' 2>/dev/null || true)"
       TARGET_SYNCED="$(printf '%s' "$_SYNC_JSON" | jq -r '.synced // false' 2>/dev/null || echo false)"
+      RELEASE_URL="$(printf '%s' "$CTO_RELEASE_JSON" | tail -n 1 | jq -r '.release_url // "none"' 2>/dev/null || echo none)"
       RUN_ID="$(printf '%s' "$CTO_REGISTER_RUN_JSON" | jq -r '.run_id // empty')"
       if [ -n "$RUN_ID" ]; then
         ACTIVE_COUNT="$(sqlite3 "$root/.intake/bridge-state.db" "select count(*) from runs where run_id = '$RUN_ID';" 2>/dev/null || printf '0')"
@@ -2020,6 +2084,7 @@ steps:
         --arg dur "${MINS}m ${SECS}s" \
         --arg target_synced "$TARGET_SYNCED" \
         --arg target_pr "$TARGET_PR" \
+        --arg release_url "$RELEASE_URL" \
         --argjson summary "$SUMMARY_JSON" \
         '"🎉🎉🎉 **INTAKE HANDOFF READY!** 🎉🎉🎉\n\n" +
         "🏁 Project **" + $pn + "** has finished the full intake handoff.\n" +
@@ -2038,6 +2103,9 @@ steps:
           else "" end) +
         (if ($target_synced == "true") and (($target_pr // "") | length) > 0
           then "🎯 Target repo PR: " + $target_pr + "\n"
+          else "" end) +
+        (if ($release_url != "none") and (($release_url // "") | length) > 0
+          then "🎧 Deliberation audio release: " + $release_url + "\n"
           else "" end) +
         "⏱️ Total time: " + $dur + "\n" +
         "⏰ Finished at " + $ts + "\n\n" +
