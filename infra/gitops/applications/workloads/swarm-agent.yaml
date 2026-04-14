@@ -281,12 +281,14 @@ spec:
               gh repo list 5dlabs --json name,url --jq '.[] | select(.name | startswith("cto")) | .url'
               ```
 
-              ## Updating Local Repos
+              ## Local Repos (Fallback / Deep Analysis Only)
 
-              Before gathering data, always pull the latest:
+              Local repos at `/workspace/repos/` are for deep code analysis only.
+              **Always use `gh` CLI against the remote origin first.** If you need
+              local analysis, pull latest before reading:
               ```bash
               for repo in /workspace/repos/*/; do
-                (cd "$repo" && git pull --ff-only 2>/dev/null || true)
+                (cd "$repo" && git fetch origin && git reset --hard origin/main 2>/dev/null || true)
               done
               ```
 
@@ -294,29 +296,59 @@ spec:
 
               When running the daily digest (via cron or on request):
 
-              ### Step 1: Update Local Repos
-              Pull all repos to get latest commits (see above).
+              ### Step 1: Gather Data via GitHub CLI (PRIMARY)
 
-              ### Step 2: Gather Data
-              For EACH monitored repo, use BOTH local git and `gh` CLI:
+              **Always use the GitHub CLI (`gh`) as the primary data source.**
+              It queries the remote origin directly and is always up-to-date.
+              Local repos are ONLY for fallback or deep code analysis (reading
+              full file contents, understanding architecture, reviewing diffs
+              in detail).
 
-              **Local git analysis (preferred for code understanding):**
+              **For EACH monitored repo, run these `gh` commands:**
               ```bash
-              cd /workspace/repos/<repo>
-              git log --oneline --since="24 hours ago" --no-merges
-              git diff HEAD~5..HEAD --stat   # scope of recent changes
-              git log --since="24 hours ago" --format="%h %s" --no-merges
-              ```
+              # Recent commits (last 24h)
+              gh api repos/5dlabs/{repo}/commits \
+                -f since=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ) \
+                --jq '.[] | "\(.sha[0:7]) \(.commit.message | split("\n")[0])"'
 
-              **GitHub API (for PRs, reviews, broader context):**
-              ```bash
-              gh api repos/{owner}/{repo}/commits -f since=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ) --jq '.[].commit.message'
-              gh pr list -R {owner}/{repo} --state merged --search "merged:>=$(date -u -d '24 hours ago' +%Y-%m-%d)"
+              # Merged PRs (last 24h)
+              gh pr list -R 5dlabs/{repo} --state merged \
+                --search "merged:>=$(date -u -d '24 hours ago' +%Y-%m-%d)" \
+                --json number,title,author,mergedAt
+
+              # Open PRs
+              gh pr list -R 5dlabs/{repo} --state open \
+                --json number,title,author,createdAt
+
+              # Commit details (full diff stats for key commits)
+              gh api repos/5dlabs/{repo}/commits/{sha} \
+                --jq '{message: .commit.message, stats: .stats, files: [.files[].filename]}'
               ```
 
               **Wildcard repos (discover + include any new 5dlabs/cto* repos):**
               ```bash
               gh repo list 5dlabs --json name --jq '.[] | select(.name | startswith("cto")) | .name'
+              ```
+
+              ### Step 2: Deep Analysis via Local Repos (FALLBACK ONLY)
+
+              Only use local repos when you need deeper code-level understanding
+              that the GitHub API can't provide (e.g., reading full file contents,
+              understanding how a change fits into the architecture).
+
+              **Before any local analysis, always pull latest first:**
+              ```bash
+              for repo in /workspace/repos/*/; do
+                (cd "$repo" && git fetch origin && git reset --hard origin/main 2>/dev/null || true)
+              done
+              ```
+
+              **Local analysis examples (when needed):**
+              ```bash
+              cd /workspace/repos/<repo>
+              git diff HEAD~5..HEAD --stat   # scope of recent changes
+              git log --since="24 hours ago" --format="%h %s" --no-merges
+              cat src/some/changed/file.rs   # understand what was changed
               ```
 
               ### Step 3: Check Progress Journal
