@@ -910,6 +910,73 @@
           "kubernetes-mcp"
         ]
       }
+    },
+    "block": {
+      "githubApp": "5DLabs-Block",
+      "cli": "claude",
+      "model": "claude-opus-4-6-20260205",
+      "modelRotation": {
+        "enabled": true,
+        "models": [
+          "claude-opus-4-6-20260205",
+          "claude-opus-4-6-20260205",
+          "claude-opus-4-6-20260205"
+        ]
+      },
+      "tools": {
+        "remote": [
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "octocode_githubSearchCode",
+          "octocode_githubSearchRepositories",
+          "octocode_githubViewRepoStructure",
+          "octocode_githubGetFileContent",
+          "octocode_githubSearchPullRequests",
+          "octocode_packageSearch",
+          "firecrawl_scrape",
+          "firecrawl_crawl",
+          "firecrawl_map",
+          "firecrawl_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "github_create_pull_request",
+          "github_push_files",
+          "github_create_branch",
+          "github_get_file_contents"
+        ],
+        "localServers": {}
+      },
+      "skills": {
+        "default": [
+          "solana-development",
+          "anchor-framework",
+          "solana-defi",
+          "context-fundamentals",
+          "context-degradation",
+          "context-optimization",
+          "openmemory",
+          "context7",
+          "octocode",
+          "llm-docs",
+          "github-mcp",
+          "rust-patterns",
+          "rust-error-handling",
+          "cto-tools"
+        ],
+        "coder": [
+          "tool-design",
+          "firecrawl",
+          "compound-engineering",
+          "verification-before-completion",
+          "systematic-debugging",
+          "subagent-driven-development",
+          "requesting-code-review",
+          "receiving-code-review"
+        ]
+      }
     }
   }
 }

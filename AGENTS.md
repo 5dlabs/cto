@@ -15,6 +15,7 @@
 | **Cipher** | Security | Security audits, vulnerability scanning |
 | **Healer** | Self-Healing | Failure detection, automated remediation |
 | **Bolt** | DevOps | Infrastructure, Helm, Kubernetes |
+| **Block** | Blockchain | Solana, Anchor, DeFi, Token programs |
 | **Angie** | Agent Architecture | OpenClaw-first agent systems and orchestration |
 | **Keeper** | Operations | Cluster maintenance, monitoring |
 | **Nova** | Research | Web research, documentation |
