@@ -330,14 +330,21 @@ mem0Plugin:
     task_objective: "What a task or CodeRun is trying to accomplish — goals, requirements, acceptance criteria"
     task_progress: "Status updates, milestones reached, intermediate results during task execution"
     task_completion: "Final outcomes, deliverables, PRs merged, build results when a task finishes"
-    blocker: "Issues that blocked progress — errors, missing permissions, dependency failures"
-    handoff: "Structured summary passed from a task agent back to Morgan after task completion"
+    task_summary: "Condensed summary of entire task written at completion"
     intake_decision: "Decisions made during project intake and planning"
+    handoff: "Structured summary passed from a task agent back to Morgan after task completion"
+    blocker: "Issues that blocked progress — errors, missing permissions, dependency failures"
+    escalation: "Issues escalated to Morgan or the human user"
     architecture: "Architecture decisions, patterns, and system design choices"
     debugging: "Root cause analysis, debugging steps, and bug fixes"
+    code_review: "Code review findings and feedback"
+    technical: "Technical facts, configurations, dependencies"
+    decision: "Key decisions with rationale"
     user_preference: "User preferences, workflows, and conventions"
+    configuration: "System configuration facts"
+    relationship: "Inter-agent or inter-service relationships"
   customInstructions: |
-    You are Morgan, the CTO platform overseer. You have hierarchical memory access.
+    You are Morgan, the CTO platform overseer. You have hierarchical memory access across all projects and agents.
 
     NAMESPACE CONVENTION (user_id field):
     - Your global namespace: "jonathon" (portfolio-wide memories)
@@ -351,11 +358,24 @@ mem0Plugin:
     - "How's project X?" → search user_id="jonathon:project:X"
     - "Status of task 1?" → search user_id="jonathon:project:X:task:1" category=task_progress
     - "What did Rex do?" → search user_id="jonathon:project:X:task:1:rex"
+    - "What blockers across all?" → search category=blocker (no user_id filter)
+    - "Rex's track record?" → search user_id LIKE "%:rex" category=task_completion
+
+    MEMORY SCHEMA — when using memory_add, ALWAYS include metadata:
+    - category: one of the customCategories
+    - tier: "portfolio" | "project" | "task" | "agent" | "artifact"
+    - project: project identifier
+    - project_name: human-readable project name
+    - task_id: task number (if applicable)
+    - agent: agent name who created the memory
+    - source: "discord" | "coderun" | "intake" | "manual" | "handoff" | "system"
+    - repo: repository path (if applicable)
 
     WHEN STORING MEMORIES from conversations:
-    - Tag with metadata: project, task_id, agent, tier (summary/detail/decision/artifact)
-    - Handoff memories go to project namespace so they're visible at higher tiers
+    - Tag with metadata using the schema above
+    - Handoff memories go to project namespace (tier: "project")
     - Decisions and blockers are high-importance — always store with category
+    - Use task_summary at task completion to write a condensed overview
   oss:
     embedder:
       provider: google

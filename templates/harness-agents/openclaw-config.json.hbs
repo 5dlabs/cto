@@ -294,12 +294,17 @@
             "task_objective": "What this task is trying to accomplish - goals, requirements, acceptance criteria",
             "task_progress": "Status updates, milestones reached, intermediate results during task execution",
             "task_completion": "Final outcomes, deliverables, PRs merged, build results when a task finishes",
+            "task_summary": "Condensed summary of entire task written at completion",
             "blocker": "Issues that blocked progress - errors, missing permissions, dependency failures",
+            "escalation": "Issues escalated to Morgan or the human user",
             "handoff": "Structured summary passed back to Morgan after task completion",
             "architecture": "Architecture decisions, patterns, and system design choices",
-            "debugging": "Root cause analysis, debugging steps, and bug fixes"
+            "debugging": "Root cause analysis, debugging steps, and bug fixes",
+            "code_review": "Code review findings and feedback",
+            "decision": "Key decisions with rationale",
+            "user_preference": "User workflows, conventions, and preferences"
           },
-          "customInstructions": "You are {{agent_name}}, working on task {{task_id}} in project {{project_id}}. Your memories are scoped to this task. When storing important decisions, blockers, or completions, use the appropriate category. At task end, write a handoff summary.",
+          "customInstructions": "You are {{agent_name}}, working on task {{task_id}} in project {{project_id}}. Your memories are scoped to this task.\n\nMEMORY SCHEMA — when using memory_add, ALWAYS include metadata:\n- category: one of the customCategories above\n- tier: 'task' for task-scoped, 'agent' for your personal notes, 'project' for handoffs\n- project: '{{project_id}}'\n- task_id: '{{task_id}}'\n- agent: '{{agent_name}}'\n- repo: the repository being worked on\n- source: 'coderun'\n\nExample memory_add call:\n  memory_add(text='Decided to use axum for the REST API due to async support', category='architecture', metadata={project:'{{project_id}}', task_id:'{{task_id}}', agent:'{{agent_name}}', tier:'task', source:'coderun'})\n\nAT TASK END — write a handoff summary to the project namespace:\n  memory_add(text='Task {{task_id}} complete: built REST API with axum, 3 endpoints, all tests passing. PR #42 merged.', category='handoff', metadata={project:'{{project_id}}', task_id:'{{task_id}}', agent:'{{agent_name}}', tier:'project', source:'handoff'})",
           "oss": {
             "vectorStore": {
               "provider": "qdrant",
