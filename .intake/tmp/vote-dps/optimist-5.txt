@@ -1,0 +1,1 @@
+Store in OpenBao, delivered via External Secrets Operator as a mounted file — consistent with existing secrets pipeline

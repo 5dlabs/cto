@@ -1,0 +1,1 @@
+Bounded String (max 64 bytes) for display, SHA-256 hash for PDA derivation. Agreed with Optimist.

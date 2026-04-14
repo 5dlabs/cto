@@ -1,0 +1,1 @@
+Seed by SHA-256 hash of the string task_id (first 32 bytes), with the human-readable task_id stored as a field inside the TaskReceipt account

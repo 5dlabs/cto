@@ -1,0 +1,1 @@
+S3-compatible storage (or serve from cto-web) for hackathon, with receipt hash on-chain for verification. Arweave is a post-hackathon enhancement.

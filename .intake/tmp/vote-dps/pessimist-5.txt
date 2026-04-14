@@ -1,0 +1,1 @@
+OpenBao via External Secrets Operator, consistent with existing pipeline. Agreed.

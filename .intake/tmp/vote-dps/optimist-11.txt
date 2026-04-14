@@ -1,0 +1,1 @@
+Split-panel view — real-time settlement feed (left) showing quality-gated splits + customer balance overview (right) with deposit/withdraw

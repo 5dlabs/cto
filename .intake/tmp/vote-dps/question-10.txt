@@ -1,0 +1,1 @@
+Should the program auto-create ATAs or require pre-existing accounts?

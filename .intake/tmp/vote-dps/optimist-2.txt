@@ -1,0 +1,1 @@
+Hybrid — localnet (solana-test-validator) for Anchor integration tests (Task 3) and CI (Task 7); devnet for CLI demo (Task 5) and dashboard (Task 6)

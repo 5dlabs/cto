@@ -1,0 +1,1 @@
+Arweave via Irys (formerly Bundlr) for hackathon demo; the program stores only the SHA-256 hash on-chain

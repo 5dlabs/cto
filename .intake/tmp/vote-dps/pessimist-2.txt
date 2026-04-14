@@ -1,0 +1,1 @@
+Hybrid — localnet for tests and CI, devnet for demo only. Agreed.

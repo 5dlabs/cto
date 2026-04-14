@@ -1,0 +1,1 @@
+Hybrid — require pre-existing ATAs for customer deposit/withdraw (customer's responsibility), use init_if_needed for author ATAs in settle_task with the Anchor realloc guard

@@ -1,0 +1,1 @@
+Should task_id be stored as String or fixed-size on-chain?

@@ -1,0 +1,1 @@
+Store task_id as a bounded String (max 64 bytes) for display, use its SHA-256 hash for PDA derivation (complementary to dp-2)

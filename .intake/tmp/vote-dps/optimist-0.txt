@@ -1,0 +1,1 @@
+Anchor framework (v0.30+) with derive macros, IDL generation, and TypeScript client codegen

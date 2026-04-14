@@ -1,0 +1,1 @@
+Mint-agnostic program with configurable mint in OperatorConfig, mock token for hackathon. Agreed.

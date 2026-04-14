@@ -1,0 +1,1 @@
+Require pre-existing ATAs for all accounts. Create author ATAs during register_agent_package, not during settle_task.

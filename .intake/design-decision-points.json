@@ -1,1 +1,51 @@
-[]
+[
+  {
+    "id": "dp-12",
+    "category": "ux-behavior",
+    "description": "What should the demo dashboard display as its primary view — a real-time settlement feed, a customer balance overview, or an agent package leaderboard?",
+    "options": [
+      "Settlement feed view: real-time list of TaskReceipts as they appear on-chain, showing quality-gated splits — best for demonstrating the core billing flow to judges",
+      "Customer dashboard view: balance, deposit/withdraw actions, spending history, and caps — best for showing the customer experience",
+      "Agent marketplace view: registered packages with earnings, success rates, and author stats — best for demonstrating the marketplace angle",
+      "Split-panel view combining settlement feed + customer balance — covers both angles but more complex to build"
+    ],
+    "requires_approval": true,
+    "constraint_type": "escalation",
+    "affected_tasks": [
+      6
+    ],
+    "rationale": "The dashboard is the visual anchor for the demo video. Its primary view determines what story the hackathon submission tells to judges. A settlement feed emphasizes verifiable billing; a customer dashboard emphasizes UX; a marketplace view emphasizes the ecosystem play. This is a product/narrative decision that should be made by the team, not an individual agent."
+  },
+  {
+    "id": "dp-13",
+    "category": "visual-identity",
+    "description": "What visual style should the demo dashboard adopt — Solana ecosystem aesthetic, CTO/5D Labs brand continuity, or a neutral developer tool look?",
+    "options": [
+      "Solana-branded aesthetic: dark theme with Solana purple/green gradients, ecosystem-familiar patterns — appeals to Solana hackathon judges",
+      "CTO/5D Labs brand continuity: match existing cto-web styling and design tokens — professional, consistent with the platform",
+      "Developer tool aesthetic: minimal, terminal-inspired with monospace fonts and high-contrast data display — emphasizes technical credibility"
+    ],
+    "requires_approval": true,
+    "constraint_type": "escalation",
+    "affected_tasks": [
+      6
+    ],
+    "rationale": "The hackathon context creates a tension between brand consistency (CTO already has a web presence) and ecosystem signaling (Solana judges expect Solana-native aesthetics). This is a brand/positioning decision that affects how judges perceive the project."
+  },
+  {
+    "id": "dp-14",
+    "category": "design-system",
+    "description": "Which component library should the demo dashboard use?",
+    "options": [
+      "shadcn/ui with Tailwind CSS — popular in the ecosystem, highly customizable, tree-shakeable",
+      "Chakra UI — good defaults, fast to build with, but heavier bundle",
+      "Plain Tailwind with minimal custom components — lightest weight for a single-page demo dashboard"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      6
+    ],
+    "rationale": "The existing cto-web service is already deployed (visible in infrastructure context). If it uses a specific component library, the dashboard should match for consistency. If not, the choice affects build speed vs. visual quality for a hackathon demo that needs to look polished but ships fast."
+  }
+]

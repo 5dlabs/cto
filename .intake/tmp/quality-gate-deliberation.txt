@@ -18,179 +18,179 @@ design_brief_excerpt:
 
 ## 1. Original Requirements
 
-> # Project: CTO Pay — On-Chain Usage-Based Payments for the CTO Platform
+> # PRD: On-Chain Usage-Based Billing for CTO
 >
-> - **Organization:** 5D Labs
-> - **Status:** Draft
-> - **Target:** Solana Agent Hackathon (April 2026)
-> - **Repo:** https://github.com/5dlabs/cto-pay
->
-> ## Vision
->
-> CTO Pay is the on-chain payment and settlement layer for the CTO platform. It replaces traditional off-chain billing with a Solana program that lets customers pre-pay USDC into an escrow account, have their usage metered per task, and receive verifiable on-chain receipts for every charge. Every payment is transparent, auditable, and composable.
->
-> The long-term goal is a protocol-grade billing rail that supports usage-based payments today, and extends to agent registry royalty splits, attestation-gated settlement, and a full agent marketplace tomorrow — without rewriting the core program.
+> **Author:** 5D Labs
+> **Status:** Draft
+> **Target:** Solana Agent Hackathon (April 2026)
+> **Branch:** `claude/solana-agent-hackathon-oY0EF`
 >
 > ---
 >
-> ## Architecture Overview
+> ## 1. Problem statement
 >
-> ```
-> ┌─────────────────────────────────────────────────────────────────────────┐
-> │                         CTO Pay Platform                                │
-> ├─────────────────────────────────────────────────────────────────────────┤
-> │  Customer                                                               │
-> │  ┌──────────────┐                                                       │
-> │  │ Solana Wallet │  (Phantom, Backpack, Solflare)                       │
-> │  │  USDC deposit │                                                      │
-> │  └──────┬───────┘                                                       │
-> │         │                                                               │
-> ├─────────┴───────────────────────────────────────────────────────────────┤
-> │  Solana Program (Anchor)                                                │
-> │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐      │
-> │  │  OperatorConfig   │  │ CustomerBalance  │  │   TaskReceipt    │      │
-> │  │  (PDA, singleton) │  │ (PDA per cust.)  │  │  (PDA per task)  │      │
-> │  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘      │
-> │           │                     │                      │                │
-> │  ┌────────┴─────────────────────┴──────────────────────┴────────┐      │
-> │  │                     Program Vault (USDC)                      │      │
-> │  │         Holds all customer deposits; program is authority     │      │
-> │  └──────────────────────────────────────────────────────────────┘      │
-> │                                                                         │
-> ├─────────────────────────────────────────────────────────────────────────┤
-> │  CTO Controller (Kubernetes)                                            │
-> │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐      │
-> │  │  Usage Metering   │  │ Receipt Builder  │  │ Settlement Hook  │      │
-> │  │  (pod duration,   │  │ (JSON → hash →   │  │ (submit settle/  │      │
-> │  │   infra tier)     │  │  off-chain store) │  │  refund to chain)│      │
-> │  └──────────────────┘  └──────────────────┘  └──────────────────┘      │
-> │                                                                         │
-> ├─────────────────────────────────────────────────────────────────────────┤
-> │  Off-Chain Storage                                                      │
-> │  ┌──────────┐  ┌──────────┐                                             │
-> │  │  Arweave  │  │   S3     │  (itemized receipt JSON blobs)             │
-> │  └──────────┘  └──────────┘                                             │
-> ├─────────────────────────────────────────────────────────────────────────┤
-> │  Future Extensions (not in scope)                                       │
-> │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  │
-> │  │ Agent Registry│  │ Attestations │  │  Marketplace  │                 │
-> │  │ (royalty      │  │ (Tess/Cipher/│  │  (skill NFTs, │                 │
-> │  │  splits)      │  │  Stitch sigs)│  │   curation)   │                 │
-> │  └──────────────┘  └──────────────┘  └──────────────┘                  │
-> └─────────────────────────────────────────────────────────────────────────┘
-> ```
+> CTO's existing monetization model (defined in `docs/business/saas-monetization.md`)
+> relies on traditional SaaS billing: platform subscription fees, CodeRun overage
+> charges, and optional managed-key token pass-through, all settled off-chain via
+> conventional payment processors.
 >
-> ---
+> This creates three gaps:
 >
-> ## Services (Workstreams)
+> 1. **No verifiable billing.** Customers cannot independently verify that their
+>    usage charges are accurate. They trust 5D Labs' billing system.
+> 2. **No composable payment rail.** If CTO ever opens to third-party skill
+>    authors or an agent marketplace, there is no programmatic way to split
+>    payments across multiple recipients atomically.
+> 3. **No on-chain presence.** CTO's value proposition is autonomous AI agents
+>    running production workloads, but none of that economic activity is visible
+>    or settleable on chain — a missed opportunity in the Solana ecosystem.
 >
-> ### 1. Solana Program — Anchor (Rust)
+> ## 2. Proposed solution
 >
-> **Agent**: Rex
-> **Priority**: Critical
-> **Language**: Rust (Anchor framework)
-> **Target**: Solana devnet (mainnet-beta post-hackathon)
+> Build a **Solana program** that settles CTO usage-based billing on chain,
+> with an integrated quality-gated marketplace for third-party skills.
 >
-> The on-chain program that holds customer deposits, enforces spending caps, settles task payments, and writes verifiable receipts.
+> Customers pre-pay into an escrow account. The CTO runtime reports usage per
+> task. The program debits the customer's balance and writes an itemized
+> on-chain receipt. When a task uses a **public agent package** published by a
+> third-party author, the program conditionally splits payment between 5D Labs
+> and the agent author — but only if the task meets a quality threshold
+> (attestations from CTO's review agents). If quality isn't met, the customer
+> doesn't pay.
 >
-> **Accounts (PDAs)**:
+> The marketplace is not a separate system — it's a conditional split inside
+> the same settlement instruction. Since we're already measuring quality for
+> billing purposes, routing a portion of successful payments to agent authors
+> is one extra branch, not a new project.
 >
-> ```
-> OperatorConfig (PDA, singleton)
-> ├── authority: Pubkey          // 5D Labs operator wallet
-> ├── treasury: Pubkey           // 5D Labs revenue wallet
-> ├── protocol_fee_bps: u16     // protocol fee (basis points)
-> └── paused: bool               // circuit breaker
+> This is not a hackathon toy — it is intended to become a real billing rail
+> that runs alongside (and eventually replaces) traditional payment processing
+> for usage-based charges.
 >
-> CustomerBalance (PDA, seeded by customer pubkey)
-> ├── customer: Pubkey
-> ├── balance: u64               // USDC lamports
-> ├── total_deposited: u64
-> ├── total_spent: u64
-> ├── task_count: u64
-> ├── max_per_task: u64          // spending cap per task
-> ├── max_per_day: u64           // daily spending cap
-> ├── daily_spent: u64
-> ├── daily_reset_slot: u64
-> └── created_at: i64
+> ## 3. Goals
 >
-> TaskReceipt (PDA, seeded by task_id)
-> ├── task_id: String
-> ├── customer: Pubkey
-> ├── amount: u64                // USDC charged
-> ├── receipt_hash: [u8; 32]     // SHA-256 of off-chain receipt JSON
-> ├── operator: Pubkey
-> ├── settled_at: i64
-> └── status: TaskStatus         // Settled | Refunded | Disputed
-> ```
+> - Demonstrate end-to-end on-chain settlement of a CTO task at the hackathon.
+> - Demonstrate quality-gated marketplace splits: a public agent author gets
+>   paid only when the task meets quality thresholds.
+> - Produce a Solana program that can be extended post-hackathon into a
+>   production billing layer with a growing ecosystem of third-party skills.
 >
-> **Instructions**:
+> ## 4. Non-goals (for the hackathon)
 >
-> ```
-> initialize_operator(authority, treasury, protocol_fee_bps)
->   → Creates OperatorConfig PDA. Called once at program deployment.
+> - NFT-based authorship tokens or receipt tokens.
+> - Subscription tier management on chain (subscriptions stay off-chain).
+> - Managed-key LLM token pass-through billing (BYOK customers pay their
+>   LLM provider directly; that cost is out of scope for on-chain settlement).
+> - Full skill discovery UI / leaderboard / search (the on-chain primitive
+>   exists; the frontend comes later).
+> - Production-grade security audit of the Solana program.
 >
-> create_customer_account(max_per_task, max_per_day)
->   → Creates CustomerBalance PDA for the signing customer.
+> ## 5. Background: existing billing model
 >
-> deposit(amount)
->   → Transfers USDC from customer's token account to the program vault.
->      Increments customer balance.
+> From `docs/business/saas-monetization.md`, the chosen model is **hybrid
+> pricing** (platform subscription + usage-based components):
 >
-> withdraw(amount)
->   → Transfers USDC from program vault back to customer.
->      Decrements customer balance. Customer-signed.
+> | Tier | Platform fee | Included CodeRuns | Overage | AI keys |
+> |---|---|---|---|---|
+> | Free | $0 | 50/month | $3.00/run | BYOK only |
+> | Team | $199/month | 200/month | $1.50/run | BYOK or managed (+15%) |
+> | Growth | $499/month | 1,000/month | $0.75/run | BYOK or managed (+10%) |
+> | Enterprise | Custom | Custom | $0.50/run | Flexible |
 >
-> settle_task(task_id, amount, receipt_hash)
->   → Called by operator wallet after CodeRun completion.
->      Validates: operator authorized, sufficient balance, within caps.
->      Debits customer, credits treasury, writes TaskReceipt.
+> **Billing dimensions today (all off-chain):**
 >
-> refund_task(task_id)
->   → Called by operator wallet.
->      Marks TaskReceipt as Refunded. Credits amount back to customer.
+> 1. **CodeRun execution** — time from pod start to completion.
+> 2. **AI tokens** — pass-through + margin when using 5D Labs managed keys.
+> 3. **Infrastructure compute** — bare-metal time (standard / high-mem / GPU).
 >
-> update_spending_caps(max_per_task, max_per_day)
->   → Called by customer. Updates their spending limits.
+> **Key architectural facts:**
 >
-> pause / unpause
->   → Called by operator. Circuit breaker for emergencies.
-> ```
+> - Provider model supports Anthropic, OpenAI, Google, Cursor, Factory,
+>   Moonshot with a 5-level resolution precedence (CRD field → legacy
+>   settings → operator config → model inference → Fireworks fallback).
+>   See `crates/controller/src/tasks/code/resources.rs`.
+> - Secrets flow: 1Password → OpenBao → External Secrets Operator → K8s
+>   Secrets → pod env vars. See `docs/secrets-management.md`.
+> - API keys per provider via `Provider::secret_key()` in
+>   `crates/controller/src/cli/types.rs`.
 >
-> **Testing**:
-> - Anchor integration tests (TypeScript, `anchor test`)
-> - Bankrun for fast local program tests
-> - Devnet deployment and manual verification
+> ## 6. What goes on chain
 >
-> ---
+> ### 6.1. Customer balance (escrow PDA)
 >
-> ### 2. Settlement Hook — CTO Controller Integration (Rust)
+> - Customer tops up a **balance PDA** with USDC (SPL token).
+> - The program is the sole authority over the PDA; no external party holds
+>   the key.
+> - Balance is debitable only by the CTO runtime's authorized signer (the
+>   **operator wallet**, controlled by 5D Labs).
+> - Customer can withdraw unused balance at any time.
 >
-> **Agent**: Rex
-> **Priority**: High
-> **Language**: Rust
-> **Location**: `crates/controller/` in the main CTO repo (integration points documented here)
+> ### 6.2. Agent package registration (public marketplace)
 >
-> The CTO Kubernetes controller submits settlement transactions after each CodeRun reaches a terminal state.
+> Third-party authors can register **agent packages** on chain. An agent
+> package is the full bundle needed to run an agent on CTO's runtime:
 >
-> **Integration Points**:
+> - **Skills** — reusable capabilities from `skills/`
+> - **Tools** — MCP server configs, GitHub repo references
+> - **SOUL.md** — agent personality, identity, and behavioral guidelines
+> - **USER.md** — user context and preferences
+> - **AGENT.md** — agent specification and role definition
+> - **Any other config** relevant to OpenClaw or Hermes (CTO's agent
+>   runtimes)
 >
-> | Point | File (in CTO repo) | Change |
-> |-------|---------------------|--------|
-> | Solana config | `crates/controller/src/tasks/config.rs` | Add RPC endpoint + operator keypair path |
-> | Settlement hook | `crates/controller/src/tasks/code/controller.rs` | After terminal state: compute bill → build receipt → submit `settle_task` |
-> | Wallet mapping | Customer profile model | Add `solana_pubkey` field |
-> | Tx recording | CodeRun CRD status | Add `on_chain_settlement_sig` field |
+> An `AgentPackage` PDA stores the author's wallet, a split percentage
+> (basis points), and a reference to the package source (repo URL, Arweave
+> URI, compressed archive, etc.). Registration is permissionless — anyone
+> can publish.
 >
-> **Settlement Flow**:
+> When a customer's task uses a public agent package, the `settle_task`
+> instruction includes the package's PDA. The program uses it to route a
+> portion of payment to the author — but only if quality is met (see 6.3).
 >
-> 1. CodeRun transitions to terminal state (merged / failed / cancelled).
-> 2. Controller computes billable amount from pod duration + infra tier.
-> 3. Builds itemized receipt JSON (CodeRun minutes, compute, AI tokens if managed-key).
-> 4. Uploads receipt to off-chain storage (Arweave or S3).
-> 5. Hashes the receipt (SHA-256).
-> 6. Submits `settle_task` instruction to Solana program (or `refund_task` on failure).
-> 7. Records the transaction signature on the CodeRun status.
+> Default agents (5D Labs' own roster: Rex, Blaze, Tess, etc.) are
+> registered the same way, with 5D Labs as the author wallet. **One code
+> path for everything.** The only difference between a "default" and a
+> "public" agent is whose wallet the author field points to.
 >
-> **Secrets**: Operator keypair managed via the existing pipeline (1Password → OpenBao → External Secrets Operator → K8s secret → pod env var).
+> ### 6.3. Task settlement (with quality-gated marketplace split)
 >
+> When a `CodeRun` completes, the CTO controller submits a **settle_task**
+> instruction to the program with:
+>
+> - `task_id` — Linear issue ID or internal identifier.
+> - `customer` — customer's pubkey (linked via CTO profile).
+> - `amount` — the billable amount in USDC.
+> - `receipt_hash` — hash of a JSON receipt blob stored off-chain (Arweave
+>   or S3) containing the itemized breakdown.
+> - `skill_author` — (optional) pubkey of the public agent author, if a
+>   third-party skill was used.
+> - `author_split_bps` — (optional) basis points for the author's share
+>   (e.g. 3000 = 30%).
+> - `quality_met` — boolean indicating whether the task passed the quality
+>   threshold (Tess/Cipher/Stitch attestations).
+>
+> The program evaluates three cases:
+>
+> **Case 1: No public agent package (default agents only)**
+> 1. Verifies operator wallet signature.
+> 2. Debits `amount` from customer balance.
+> 3. Credits 100% to operator treasury (5D Labs).
+> 4. Writes `TaskReceipt`.
+>
+> **Case 2: Public skill used, quality threshold MET**
+> 1. Verifies operator wallet signature.
+> 2. Debits `amount` from customer balance.
+> 3. Splits payment: `author_split_bps` to agent author wallet, remainder
+>    to operator treasury.
+> 4. Writes `TaskReceipt` with `author_earned > 0` and `quality_met = true`.
+>
+> **Case 3: Public skill used, quality threshold NOT MET**
+> 1. Customer is **not charged** (no debit). The task effectively costs
+>    nothing.
+> 2. Skill author earns nothing.
+> 3. Writes `TaskReceipt` with `amount = 0`, `author_earned = 0`,
+>    `quality_met = false`.
+>
+> This creates aligned incentives:
+> - **Skill authors** are incentivized to publish high-quality skills —
+>   they only earn when their skill contributes to a successful task.

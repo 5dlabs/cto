@@ -1,0 +1,1 @@
+Mint-agnostic program (configurable mint in OperatorConfig) with a custom-minted mock "USDC" token for hackathon. One field addition to OperatorConfig.

@@ -1,53 +1,53 @@
 [
   {
     "scores": {
-      "task_decomposition": 9,
+      "task_decomposition": 8,
       "dependency_ordering": 8,
       "decision_point_coverage": 7,
-      "test_strategy_quality": 9,
+      "test_strategy_quality": 7,
       "agent_assignment": 9
     },
-    "overall_score": 8.57,
+    "overall_score": 7.9,
     "verdict": "approve",
-    "reasoning": "The architecture follows a clean infrastructure-first → data model → business logic → testing → security audit layering with excellent separation of concerns. Each task owns a single architectural boundary (infra, on-chain state, instructions, tests, audit) and subtasks are well-decomposed to single-responsibility units. Dependency ordering correctly sequences infrastructure (Task 1) before program development (Tasks 2-4) before testing (Tasks 5-6) before audit (Task 7), though Tasks 5 and 6 are unnecessarily sequential on Task 4 when their subtask test infrastructure (5001, 6001-6006) could begin in parallel with Task 4 completion. Decision points cover key infrastructure choices but miss several architectural decisions: the vault authority model (operator_config PDA vs dedicated vault authority PDA — the code shows inconsistency between withdraw using vault_authority and settle_task using operator_config as token authority), the ledger-only refund accounting model's solvency risk, and whether the program should support multiple operators or is singleton.",
+    "reasoning": "The plan demonstrates strong architectural layering: on-chain program (Tasks 1-2), controller integration (Task 4), sidecar (Task 5), CLI demo (Task 6), and web dashboard (Tasks 7-8) follow a clean infrastructure-first ordering. Each top-level task owns a single bounded context and subtasks are well-decomposed within their domains. Task 8 is structurally incomplete — its description is truncated mid-sentence, the test_strategy field is empty, and the details field appears corrupted (a stray 'D12' key exists at the top level), which is a material defect. The dependency graph is largely correct with good parallelism within subtask trees (1002/1003/1004 parallel, 5002/5003/5005 parallel), though Task 3 (integration tests) duplicates coverage already provided by Task 1's subtask 1008 and Task 2's subtask 2006, creating architectural redundancy rather than clean separation of concerns.",
     "suggestions": [
-      "Split Task 1 into two top-level tasks: one for repo scaffolding + devnet tooling (subtasks 1001, 1005, 1006) and one for K8s infrastructure provisioning (subtasks 1002, 1003, 1004) — these span two distinct architectural layers (developer toolchain vs cluster infrastructure) and have different agent skill profiles.",
-      "Add a decision point addressing the vault authority inconsistency: Task 3's withdraw instruction references a separate `vault_authority` UncheckedAccount PDA while Task 2's initialize_operator sets `token::authority = operator_config` on the vault — these are architecturally incompatible patterns that will cause a runtime PDA signing failure if not reconciled before implementation.",
-      "Make Tasks 5 and 6 (test suites) depend on Task 4 at the top level but allow their infrastructure subtasks (5001 test helpers, 6001-6006 test file scaffolding) to begin after Task 2 completes, since test helpers only need the IDL shape — this would increase parallelism in the critical path."
+      "Task 8 is structurally broken: the description is truncated, test_strategy is empty, and there's a malformed 'D12' key at the task root level. Regenerate Task 8 with complete description, full details for all 5 subtasks, and a proper test_strategy covering all interactive components.",
+      "Task 3 (comprehensive integration test suite) substantially overlaps with Task 1 subtask 1008 and Task 2 subtask 2006 which already define 6 and 8 integration tests respectively. Either remove the smoke tests from Tasks 1/2 and consolidate all testing into Task 3, or narrow Task 3's scope to only the cross-cutting edge cases (Groups 8-12) not already covered, eliminating the architectural redundancy.",
+      "Task 4 subtask 4005 (controller reconciliation loop integration) spans receipt generation, S3 upload, quality determination, and Redis publication — these are four distinct concerns. Split into: (a) billing amount computation and quality determination helper, (b) receipt generation and S3 upload orchestration, (c) reconciliation loop hook wiring. This would enable parallel implementation and cleaner unit test boundaries."
     ]
   },
   {
     "scores": {
-      "task_decomposition": 9,
-      "dependency_ordering": 8,
-      "decision_point_coverage": 7,
-      "test_strategy_quality": 9,
-      "agent_assignment": 9
-    },
-    "overall_score": 8.57,
-    "verdict": "approve",
-    "reasoning": "This is an exceptionally detailed plan with well-scoped tasks that map cleanly to single-agent execution. Tasks 2-4 form a serial chain (accounts → customer ops → settlement) which is unavoidable given the Anchor program's additive nature, but within each task, subtasks are parallelized well (e.g., 3001-3004 run in parallel, then 3005 merges). Tasks 5 and 6 (happy-path and edge-case tests) correctly parallelize against each other since both depend only on task 4. The test strategies are remarkably specific with exact integer values, error codes, and measurable assertions. Decision points are present but could be stronger — Task 7's security audit has good open questions, but Tasks 3-4 (the core program logic) have zero decision points despite containing design choices like the ledger-only refund model and vault authority patterns that were resolved inline rather than flagged.",
-    "suggestions": [
-      "Tasks 5 and 6 both depend on Task 4 completion, but their subtasks (5001-5004 and 6001-6006) share test infrastructure (setup.ts/helpers.ts from 5001). Make 6001-6006 explicitly depend on 5001 to avoid duplicating test infrastructure or racing on shared files.",
-      "Task 7 (security audit) has a truncated description field ending mid-sentence at 'soteria -analyzeAll' — complete the task description to avoid ambiguity about the full audit scope, and add a concrete test_strategy (currently null) with measurable acceptance criteria like 'zero Critical/High findings unresolved'.",
-      "The serial chain from Task 1 → 2 → 3 → 4 is 4 tasks deep before any tests can run. Consider whether Task 2's subtasks 2001 (state structs) and 2002 (constants/errors) could be started in parallel with Task 1's subtask 1001 (repo scaffold) since they only need a compilable Cargo workspace, not the full infra provisioning — this would shorten the critical path by ~1 task."
-    ]
-  },
-  {
-    "scores": {
-      "task_decomposition": 6,
+      "task_decomposition": 8,
       "dependency_ordering": 7,
       "decision_point_coverage": 7,
       "test_strategy_quality": 8,
       "agent_assignment": 9
     },
-    "overall_score": 7.0,
-    "verdict": "revise",
-    "reasoning": "The plan is thorough and well-structured for the Anchor program core (Tasks 2-6), but Task 1 is bloated — 6 subtasks for infra bootstrap that mixes repo scaffolding, K8s secrets, SeaweedFS, devnet scripting, and keypair management into a single mega-task. Task 7 (security audit) is premature for a hackathon project — it depends on Tasks 4, 5, and 6 and includes formal audit practices (Soteria, severity-rated reports, bytecode verification) that are v2 scope. Subtask 4005 (doc comments) is pure fluff that doesn't advance the PRD. The plan is missing the CLI/controller service and the off-chain receipt storage that the PRD presumably requires, yet spends budget on audit reports. Total subtask count (~30) is reasonable for the program scope but inflated by unnecessary subtasks.",
+    "overall_score": 7.7,
+    "verdict": "approve",
+    "reasoning": "The plan is executable and well-decomposed into 8 top-level tasks with detailed subtasks sized for 1-3 day implementation windows. Tasks 1-3 form a clean critical path (Anchor program → settlement → integration tests), and Tasks 6-8 can parallelize once the IDL is available from Task 1. The dependency ordering is mostly correct with infrastructure-first sequencing, though Tasks 1 and 2 are large monolithic gates — nearly everything blocks on them, creating a serial bottleneck that could stall the entire timeline. Task 8 has a corrupted/truncated description and empty test_strategy at the top level, which is a data quality issue but the subtasks are complete enough to execute. Decision points are well-identified for the settlement engine (optional accounts pattern) and sidecar (Redis client, S3 client, observability), though Task 8's data refresh strategy decision should have been resolved upfront rather than deferred.",
     "suggestions": [
-      "Remove Task 7 entirely or collapse it into a single lightweight 'security checklist review' subtask — formal audit with Soteria, bytecode verification, and severity-rated reports is not hackathon v1 scope and blocks nothing downstream.",
-      "Remove subtask 4005 (doc comments) — it adds no functional value and is assigned to a 'documenter' subagent for what amounts to adding rustdoc strings. Comments can be written inline during implementation.",
-      "Collapse Task 1 subtasks 1003, 1004, and 1005 into a single 'Provision secrets and ConfigMap' subtask — they are tightly coupled sequential operations on the same K8s namespace and secrets pipeline, and splitting them into 3 separate subtasks with inter-dependencies adds coordination overhead without parallelism benefit."
+      "Task 8's top-level description is truncated mid-sentence and its test_strategy field is empty — regenerate the complete description and add a comprehensive test_strategy covering all 5 subtasks (8001-8005) similar to the pattern used in Tasks 3, 6, and 7.",
+      "Tasks 3's subtasks 3002-3005 all depend only on 3001 and are marked parallelizable, but they test instructions from Tasks 1 and 2 — if the test infrastructure setup (3001) is done, all four test group subtasks can run in parallel, which is good. However, Task 3 itself blocks on both Tasks 1 AND 2, meaning the entire comprehensive test suite waits for settlement to be complete. Consider splitting Task 3 so Groups 1-4 (non-settlement tests) can start as soon as Task 1 finishes, unblocking earlier feedback.",
+      "The sidecar (Task 5) depends on Tasks 1, 2, AND 4, creating a 3-deep serial chain. Subtasks 5001, 5002, 5003, and 5005 have no actual code dependency on Task 4's implementation — they only need the SettlementEvent schema. Extract the shared event schema into a common crate or type definition that both Task 4 and Task 5 can consume independently, allowing sidecar development to start in parallel with the controller billing integration."
+    ]
+  },
+  {
+    "scores": {
+      "task_decomposition": 5,
+      "dependency_ordering": 7,
+      "decision_point_coverage": 7,
+      "test_strategy_quality": 7,
+      "agent_assignment": 8
+    },
+    "overall_score": 6.3,
+    "verdict": "revise",
+    "reasoning": "This plan is massively over-engineered for what appears to be a hackathon project. 8 top-level tasks with 40+ subtasks, many of which are excessively granular (e.g., Task 1 has 8 subtasks for a single Anchor program, including separate subtasks for an error enum and a utils module). Task 3 is an entire standalone comprehensive test suite that largely duplicates the tests already written in Tasks 1 and 2 — this is pure scope bloat. Task 8 has a truncated/malformed description field, and its test_strategy is empty, indicating incomplete generation. The dependency ordering is reasonable (infrastructure first, frontend last) but Task 3 should not exist separately from Tasks 1-2's test suites.",
+    "suggestions": [
+      "Eliminate Task 3 entirely — Tasks 1 and 2 already include comprehensive test suites (6 and 8 test cases respectively). A separate 30+ test integration task duplicates coverage and adds no value for a hackathon. Fold any unique edge cases (Groups 8-12) into Task 2's test subtask 2006.",
+      "Collapse Task 1's subtasks 1001, 1003, and 1004 (workspace init, utils module, error enum) into a single subtask — these are each 15-30 minutes of work and don't warrant independent tracking. Similarly, Task 7's 8 subtasks should be collapsed to 4-5 (merge 7001+7002, merge 7003+7007).",
+      "Task 8 has a truncated description, empty test_strategy, and a stray 'D12' field — this task needs to be regenerated. Additionally, the web dashboard (Tasks 7+8) and CLI demo (Task 6) both serve the same purpose (hackathon demo). Pick one and defer the other."
     ]
   }
 ]

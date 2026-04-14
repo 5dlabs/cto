@@ -1,0 +1,1 @@
+Thin sidecar service reading settlement events from Redis (already deployed), decoupling Solana SDK from the controller binary

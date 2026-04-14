@@ -1,0 +1,1 @@
+Direct integration via solana-sdk and anchor-client crates in the Rust controller, with an async spawned task (not blocking the reconciliation loop)

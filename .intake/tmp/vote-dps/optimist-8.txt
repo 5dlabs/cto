@@ -1,0 +1,1 @@
+Unix timestamp-based reset using Clock sysvar, comparing against UTC day boundaries (unix_timestamp / 86400)

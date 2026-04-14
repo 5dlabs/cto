@@ -29,6 +29,7 @@ This page tracks the current agent roster and where each agent's behavior is def
 | Spark | yes | yes (`spark`) | yes (`spark`) | Rapid prototyping agent with active runtime key. |
 | Tap | yes | yes (`tap`) | yes (`tap`) | AGENTS role is integration/webhooks; runtime key exists and is active. |
 | Vex | yes | yes (`vex`) | yes (`vex`) | Debugging agent now present in both config and mappings. |
+| Block | yes | yes (`block`) | no | Blockchain agent (Solana, EVM, cross-chain, DeFi). Full runtime config with 6 blockchain skills. |
 | Pixel | yes | yes (`pixel`) | no | Desktop app agent with runtime config; no skill-mappings entry yet. |
 
 ## Tool families by configured runtime agent
@@ -49,6 +50,7 @@ Derived from `cto-config.json` `agents.*.tools.remote` prefixes.
 | `tap` | `context7`, `firecrawl`, `github`, `octocode`, `openmemory` |
 | `spark` | `context7`, `firecrawl`, `github`, `octocode`, `openmemory` |
 | `bolt` | `argo`, `argocd`, `context7`, `firecrawl`, `github`, `grafana`, `kubernetes`, `loki`, `octocode`, `openmemory`, `prometheus`, `terraform` |
+| `block` | `context7`, `firecrawl`, `github`, `octocode`, `openmemory` |
 | `atlas` | `context7`, `github`, `octocode`, `openmemory` |
 | `stitch` | `context7`, `github`, `octocode`, `openmemory` |
 | `vex` | `context7`, `firecrawl`, `github`, `octocode`, `openmemory` |

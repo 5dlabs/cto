@@ -1,0 +1,1 @@
+Unix timestamp-based reset via Clock sysvar, integer division by 86400. Agreed.
