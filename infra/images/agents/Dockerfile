@@ -100,6 +100,10 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     # Use --legacy-peer-deps to avoid TS version conflicts with madge.
     cd /usr/local/share/npm-global/lib/node_modules/openclaw && \
     npm install --no-audit --no-fund --ignore-scripts=false --legacy-peer-deps 2>&1 | tail -10 && \
+    # Ensure tslog is installed — npm install above sometimes skips it due to
+    # cache mount + postinstall ordering. Explicit install guarantees it.
+    npm install tslog --no-audit --no-fund --legacy-peer-deps 2>&1 | tail -5 && \
+    ls node_modules/tslog/package.json && \
     cd / && \
     echo "--- OpenClaw (agent CLI) included ---" && \
     openclaw --version
