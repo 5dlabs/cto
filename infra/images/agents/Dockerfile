@@ -87,24 +87,18 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
 
 # =============================================================================
 # OpenClaw (agent CLI) - orchestrator that delegates to claude/codex/cursor/etc.
+# Follow official install: `npm install -g openclaw@latest` (no --ignore-scripts).
+# The postinstall script resolves bundled plugin deps and runtime deps like tslog.
 # =============================================================================
-ARG OPENCLAW_VERSION=2026.3.24
+ARG OPENCLAW_VERSION=latest
 RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     if [ "$OPENCLAW_VERSION" = "latest" ]; then \
-        npm install -g --no-audit --no-fund --ignore-scripts openclaw; \
+        npm install -g --no-audit --no-fund openclaw; \
     else \
-        npm install -g --no-audit --no-fund --ignore-scripts openclaw@${OPENCLAW_VERSION}; \
+        npm install -g --no-audit --no-fund openclaw@${OPENCLAW_VERSION}; \
     fi && \
-    # --ignore-scripts skips postinstall that resolves deps like tslog.
-    # Run a scoped `npm install` inside the package dir to pull missing deps.
-    # Use --legacy-peer-deps to avoid TS version conflicts with madge.
-    cd /usr/local/share/npm-global/lib/node_modules/openclaw && \
-    npm install --no-audit --no-fund --ignore-scripts=false --legacy-peer-deps 2>&1 | tail -10 && \
-    # Ensure tslog is installed — npm install above sometimes skips it due to
-    # cache mount + postinstall ordering. Explicit install guarantees it.
-    npm install tslog --no-audit --no-fund --legacy-peer-deps 2>&1 | tail -5 && \
-    ls node_modules/tslog/package.json && \
-    cd / && \
+    # Verify tslog resolved (openclaw runtime dependency)
+    ls /usr/local/share/npm-global/lib/node_modules/openclaw/node_modules/tslog/package.json && \
     echo "--- OpenClaw (agent CLI) included ---" && \
     openclaw --version
 
