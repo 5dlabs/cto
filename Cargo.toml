@@ -22,9 +22,7 @@ members = [
     "crates/cto-lite/pm-lite-server",
     "crates/dex-indexer",
 ]
-exclude = [
-    "talos-orchestrator",
-]
+exclude = []
 
 [workspace.package]
 version = "0.2.52"
