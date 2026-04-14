@@ -225,6 +225,13 @@ intake/.bridge-logs/
 
 # lobster-voice compiled binary (build artifact)
 apps/lobster-voice/lobster-voice
-work
+work/
 test/cli-matrix/
 .firecrawl/
+
+# Ephemeral/runtime directories (cleanup for public release)
+_runs/
+output/
+memory/
+lifecycle-test/
+lab-eco-mvp-r/

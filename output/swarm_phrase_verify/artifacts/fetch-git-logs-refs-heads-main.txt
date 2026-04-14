@@ -1,6 +1,0 @@
-0000000000000000000000000000000000000000 5705c51d39aef65fa2d4817e664d745e3c2bc8ab Andy <andyprevalsky@yahoo.com> 1774968461 +0000	clone: from https://github.com/anuxhya/SWARM-V1-website
-5705c51d39aef65fa2d4817e664d745e3c2bc8ab 8058113a0df978ed35e7a850b9ecc45127580f57 Andy <andyprevalsky@yahoo.com> 1774981058 +0000	commit: close to initial
-8058113a0df978ed35e7a850b9ecc45127580f57 7e485ce41b5bc934462ae197f59a0efc45b5271d Andy <andyprevalsky@yahoo.com> 1774992989 +0000	commit: initial deployment
-7e485ce41b5bc934462ae197f59a0efc45b5271d 66291c3f876152207d7152c1774336b12c5f43b8 Andy <andyprevalsky@yahoo.com> 1775079600 +0000	pull: Fast-forward
-66291c3f876152207d7152c1774336b12c5f43b8 7ce43ed440f2b45eb4f2f62d38707e66a9ad5bb6 Andy <andyprevalsky@yahoo.com> 1775090210 +0000	commit: v1 of the prod website
-7ce43ed440f2b45eb4f2f62d38707e66a9ad5bb6 678f46bb4e72d7fb0b4df919064ff38dc8b80a5b Andy <andyprevalsky@yahoo.com> 1775354535 +0000	commit: RFB blurb
