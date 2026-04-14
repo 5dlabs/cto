@@ -1,0 +1,1751 @@
+[
+  [
+    {
+      "doc_path": "docs/task-001-anchor-program-core.md",
+      "scaffolds": [
+        {
+          "file_path": "programs/cto-billing/Cargo.toml",
+          "description": "Anchor program crate manifest with anchor-lang, anchor-spl, sha2 dependencies"
+        },
+        {
+          "file_path": "programs/cto-billing/src/lib.rs",
+          "description": "Program entry point with declare_id!, module declarations, and #[program] instruction handlers"
+        },
+        {
+          "file_path": "programs/cto-billing/src/state/mod.rs",
+          "description": "State module barrel export for all account structs"
+        },
+        {
+          "file_path": "programs/cto-billing/src/state/operator_config.rs",
+          "description": "OperatorConfig PDA account struct (singleton, authority/treasury/mint/fee/paused)"
+        },
+        {
+          "file_path": "programs/cto-billing/src/state/customer_balance.rs",
+          "description": "CustomerBalance PDA account struct (per-customer balance, caps, counters)"
+        },
+        {
+          "file_path": "programs/cto-billing/src/state/agent_package.rs",
+          "description": "AgentPackage PDA account struct (package metadata, split_bps, counters)"
+        },
+        {
+          "file_path": "programs/cto-billing/src/state/task_receipt.rs",
+          "description": "TaskReceipt PDA account struct and TaskStatus enum"
+        },
+        {
+          "file_path": "programs/cto-billing/src/instructions/mod.rs",
+          "description": "Instructions module barrel export for all instruction handlers"
+        },
+        {
+          "file_path": "programs/cto-billing/src/instructions/initialize_operator.rs",
+          "description": "initialize_operator instruction: creates singleton OperatorConfig PDA"
+        },
+        {
+          "file_path": "programs/cto-billing/src/instructions/create_customer_account.rs",
+          "description": "create_customer_account instruction: creates CustomerBalance PDA for signer"
+        },
+        {
+          "file_path": "programs/cto-billing/src/instructions/register_agent_package.rs",
+          "description": "register_agent_package instruction: permissionless AgentPackage PDA creation"
+        },
+        {
+          "file_path": "programs/cto-billing/src/instructions/update_agent_package.rs",
+          "description": "update_agent_package instruction: author-only field updates"
+        },
+        {
+          "file_path": "programs/cto-billing/src/instructions/deposit.rs",
+          "description": "deposit instruction: SPL token transfer from customer ATA to vault PDA"
+        },
+        {
+          "file_path": "programs/cto-billing/src/instructions/withdraw.rs",
+          "description": "withdraw instruction: SPL token transfer from vault PDA to customer ATA"
+        },
+        {
+          "file_path": "programs/cto-billing/src/instructions/update_spending_caps.rs",
+          "description": "update_spending_caps instruction: customer-only cap updates"
+        },
+        {
+          "file_path": "programs/cto-billing/src/instructions/pause.rs",
+          "description": "pause instruction: operator-only circuit breaker toggle on"
+        },
+        {
+          "file_path": "programs/cto-billing/src/instructions/unpause.rs",
+          "description": "unpause instruction: operator-only circuit breaker toggle off"
+        },
+        {
+          "file_path": "programs/cto-billing/src/utils/mod.rs",
+          "description": "Utility module with hash_seed SHA-256 helper and PDA seed constants"
+        },
+        {
+          "file_path": "programs/cto-billing/src/errors.rs",
+          "description": "Anchor error_code enum with all program error variants"
+        },
+        {
+          "file_path": "tests/cto-billing.ts",
+          "description": "Anchor Mocha smoke tests: 6 core integration tests"
+        },
+        {
+          "file_path": "Anchor.toml",
+          "description": "Anchor workspace configuration with program ID and cluster settings"
+        }
+      ],
+      "decisions": [
+        {
+          "id": "D-T1-001",
+          "summary": "Anchor v0.30+ workspace initialization with SHA-256 PDA seed derivation",
+          "reasoning": "The program uses SHA-256 hashes of string identifiers (package_id, task_id) as PDA seeds rather than raw strings. This avoids the 32-byte PDA seed length limit for arbitrary-length identifiers while maintaining deterministic derivation across on-chain and off-chain contexts.",
+          "alternatives_considered": "Raw string seeds (limited to 32 bytes), Keccak256 (non-standard for Solana ecosystem)"
+        },
+        {
+          "id": "D-T1-002",
+          "summary": "Mint-agnostic OperatorConfig stores mint Pubkey rather than hardcoding USDC",
+          "reasoning": "Storing the mint Pubkey in OperatorConfig allows the program to work with any SPL token (USDC, USDT, or test tokens) without code changes. The vault PDA is derived from the mint key, ensuring token account isolation.",
+          "alternatives_considered": "Hardcoded USDC mint address, multiple mint support per operator"
+        },
+        {
+          "id": "D-T1-003",
+          "summary": "Vault PDA as program-owned token account with seeds [b\"vault\", mint.key()]",
+          "reasoning": "A single vault PDA per mint simplifies accounting and avoids per-customer token accounts. The program signs transfers out of the vault using PDA authority seeds, which is the standard Anchor pattern for custodial token accounts.",
+          "alternatives_considered": "Per-customer vault accounts, escrow per task"
+        },
+        {
+          "id": "D-T1-004",
+          "summary": "Daily spending cap uses calendar day (daily_reset_day as u64) not slot-based windows",
+          "reasoning": "Calendar-day resets are more intuitive for customers and operators. The daily_reset_day field stores the day number (unix_timestamp / 86400), rolling over when the current day exceeds the stored value. This aligns with D9 decision from the specification.",
+          "alternatives_considered": "Slot-based windows, rolling 24-hour windows"
+        },
+        {
+          "id": "D-T1-005",
+          "summary": "Author ATA validated but NOT created during register_agent_package",
+          "reasoning": "Per D11, the author's associated token account for the configured mint is passed as an account and validated to exist, but the program does not create it. This keeps the instruction simpler and avoids requiring the associated-token-program account in the instruction. Authors must create their ATA before registering a package.",
+          "alternatives_considered": "Program creates ATA via init_if_needed, deferred ATA validation at settlement time"
+        }
+      ],
+      "interfaces": [
+        {
+          "name": "OperatorConfig",
+          "description": "Singleton PDA account holding program-wide operator settings. Seeds: [b\"operator_config\"]. Created once via initialize_operator, mutable only by the authority for pause/unpause. Stores the accepted token mint, treasury destination, and protocol fee in basis points.",
+          "source_file": "programs/cto-billing/src/state/operator_config.rs",
+          "members": [
+            {
+              "name": "authority",
+              "type": "Pubkey",
+              "description": "Operator wallet authorized for admin operations (pause, unpause, settle)"
+            },
+            {
+              "name": "treasury",
+              "type": "Pubkey",
+              "description": "Destination wallet for protocol fee and non-agent-split revenue"
+            },
+            {
+              "name": "mint",
+              "type": "Pubkey",
+              "description": "SPL token mint accepted by this program instance (e.g., USDC)"
+            },
+            {
+              "name": "protocol_fee_bps",
+              "type": "u16",
+              "description": "Protocol fee in basis points (e.g., 500 = 5%)"
+            },
+            {
+              "name": "paused",
+              "type": "bool",
+              "description": "Circuit breaker flag; when true, settlement instructions are blocked"
+            }
+          ]
+        },
+        {
+          "name": "CustomerBalance",
+          "description": "Per-customer PDA tracking deposited balance, spending history, and configurable spending caps. Seeds: [b\"customer_balance\", customer.key().as_ref()]. One per customer wallet. Daily cap resets on calendar day boundary.",
+          "source_file": "programs/cto-billing/src/state/customer_balance.rs",
+          "members": [
+            {
+              "name": "customer",
+              "type": "Pubkey",
+              "description": "Customer wallet public key (also used in PDA seed)"
+            },
+            {
+              "name": "balance",
+              "type": "u64",
+              "description": "Current available balance in token base units"
+            },
+            {
+              "name": "total_deposited",
+              "type": "u64",
+              "description": "Lifetime total deposits"
+            },
+            {
+              "name": "total_spent",
+              "type": "u64",
+              "description": "Lifetime total settled charges"
+            },
+            {
+              "name": "task_count",
+              "type": "u64",
+              "description": "Number of tasks settled against this customer"
+            },
+            {
+              "name": "max_per_task",
+              "type": "u64",
+              "description": "Maximum charge allowed per individual task"
+            },
+            {
+              "name": "max_per_day",
+              "type": "u64",
+              "description": "Maximum aggregate charge allowed per calendar day"
+            },
+            {
+              "name": "daily_spent",
+              "type": "u64",
+              "description": "Amount spent in the current calendar day"
+            },
+            {
+              "name": "daily_reset_day",
+              "type": "u64",
+              "description": "Day number (unix_timestamp / 86400) of last daily reset"
+            },
+            {
+              "name": "created_at",
+              "type": "i64",
+              "description": "Account creation timestamp from Clock sysvar"
+            }
+          ]
+        },
+        {
+          "name": "AgentPackage",
+          "description": "Marketplace listing PDA for an agent package. Seeds: [b\"agent_package\", sha256(package_id)]. Permissionless creation; signer becomes author. Tracks revenue attribution and quality metrics.",
+          "source_file": "programs/cto-billing/src/state/agent_package.rs",
+          "members": [
+            {
+              "name": "package_id",
+              "type": "String (max_len 64)",
+              "description": "Unique human-readable package identifier"
+            },
+            {
+              "name": "author",
+              "type": "Pubkey",
+              "description": "Package author wallet; receives split_bps share on quality settlements"
+            },
+            {
+              "name": "split_bps",
+              "type": "u16",
+              "description": "Author's revenue share in basis points (0-10000)"
+            },
+            {
+              "name": "source_uri",
+              "type": "String (max_len 256)",
+              "description": "URI pointing to package source/metadata"
+            },
+            {
+              "name": "total_earned",
+              "type": "u64",
+              "description": "Lifetime earnings credited to this package's author"
+            },
+            {
+              "name": "task_count",
+              "type": "u64",
+              "description": "Total tasks processed using this package"
+            },
+            {
+              "name": "success_count",
+              "type": "u64",
+              "description": "Tasks where quality_met was true"
+            },
+            {
+              "name": "registered_at",
+              "type": "i64",
+              "description": "Registration timestamp from Clock sysvar"
+            },
+            {
+              "name": "active",
+              "type": "bool",
+              "description": "Whether the package is available for new tasks"
+            }
+          ]
+        },
+        {
+          "name": "TaskReceipt",
+          "description": "Immutable settlement receipt PDA created once per task. Seeds: [b\"task_receipt\", sha256(task_id)]. PDA init constraint prevents duplicate task IDs. Records the full settlement outcome for auditability.",
+          "source_file": "programs/cto-billing/src/state/task_receipt.rs",
+          "members": [
+            {
+              "name": "task_id",
+              "type": "String (max_len 64)",
+              "description": "Unique task identifier matching the off-chain system"
+            },
+            {
+              "name": "customer",
+              "type": "Pubkey",
+              "description": "Customer charged for this task"
+            },
+            {
+              "name": "amount",
+              "type": "u64",
+              "description": "Total amount charged in token base units (0 if quality not met)"
+            },
+            {
+              "name": "author_earned",
+              "type": "u64",
+              "description": "Amount paid to the agent package author"
+            },
+            {
+              "name": "quality_met",
+              "type": "bool",
+              "description": "Whether the task output met quality attestation criteria"
+            },
+            {
+              "name": "agent_package",
+              "type": "Option<Pubkey>",
+              "description": "Associated agent package PDA, if any"
+            },
+            {
+              "name": "receipt_hash",
+              "type": "[u8; 32]",
+              "description": "SHA-256 hash of the off-chain receipt JSON for integrity verification"
+            },
+            {
+              "name": "operator",
+              "type": "Pubkey",
+              "description": "Operator who submitted the settlement"
+            },
+            {
+              "name": "settled_at",
+              "type": "i64",
+              "description": "Settlement timestamp from Clock sysvar"
+            },
+            {
+              "name": "status",
+              "type": "TaskStatus",
+              "description": "Current status: Settled, Refunded, or Disputed"
+            }
+          ]
+        },
+        {
+          "name": "TaskStatus",
+          "description": "Enum representing the lifecycle state of a task settlement receipt.",
+          "source_file": "programs/cto-billing/src/state/task_receipt.rs",
+          "members": [
+            {
+              "name": "Settled",
+              "type": "variant",
+              "description": "Task has been settled and charges applied"
+            },
+            {
+              "name": "Refunded",
+              "type": "variant",
+              "description": "Task settlement was reversed; customer credited back"
+            },
+            {
+              "name": "Disputed",
+              "type": "variant",
+              "description": "Task is under dispute (reserved for future use)"
+            }
+          ]
+        },
+        {
+          "name": "BillingError",
+          "description": "Anchor error_code enum covering all validation failures across the program.",
+          "source_file": "programs/cto-billing/src/errors.rs",
+          "members": [
+            {
+              "name": "InsufficientBalance",
+              "type": "error variant",
+              "description": "Customer balance insufficient for this operation"
+            },
+            {
+              "name": "ExceedsPerTaskCap",
+              "type": "error variant",
+              "description": "Amount exceeds per-task spending cap"
+            },
+            {
+              "name": "ExceedsDailyCap",
+              "type": "error variant",
+              "description": "Amount would exceed daily spending cap"
+            },
+            {
+              "name": "Unauthorized",
+              "type": "error variant",
+              "description": "Signer is not authorized for this operation"
+            },
+            {
+              "name": "ProgramPaused",
+              "type": "error variant",
+              "description": "Program is currently paused"
+            },
+            {
+              "name": "InvalidSplitBps",
+              "type": "error variant",
+              "description": "Split basis points must be <= 10000"
+            },
+            {
+              "name": "DuplicateTaskId",
+              "type": "error variant",
+              "description": "Task ID already exists"
+            },
+            {
+              "name": "InvalidMint",
+              "type": "error variant",
+              "description": "Token mint does not match configured mint"
+            },
+            {
+              "name": "PackageInactive",
+              "type": "error variant",
+              "description": "Agent package is not active"
+            },
+            {
+              "name": "InvalidAmount",
+              "type": "error variant",
+              "description": "Amount must be greater than zero"
+            }
+          ]
+        },
+        {
+          "name": "hash_seed",
+          "description": "SHA-256 hash helper for deterministic PDA seed derivation. Produces a 32-byte digest from an arbitrary-length string input. Used by all string-keyed PDAs (AgentPackage, TaskReceipt) and must match the off-chain TypeScript/Rust implementations in Tasks 3 and 5.",
+          "source_file": "programs/cto-billing/src/utils/mod.rs",
+          "members": [
+            {
+              "name": "input",
+              "type": "&str",
+              "description": "String to hash (package_id or task_id)"
+            },
+            {
+              "name": "return",
+              "type": "[u8; 32]",
+              "description": "SHA-256 digest bytes"
+            }
+          ]
+        },
+        {
+          "name": "PDA Seed Constants",
+          "description": "Canonical seed byte strings used for all PDA derivations, exported from utils/mod.rs for consistency across instructions.",
+          "source_file": "programs/cto-billing/src/utils/mod.rs",
+          "members": [
+            {
+              "name": "OPERATOR_CONFIG_SEED",
+              "type": "&[u8]",
+              "description": "b\"operator_config\""
+            },
+            {
+              "name": "CUSTOMER_BALANCE_SEED",
+              "type": "&[u8]",
+              "description": "b\"customer_balance\""
+            },
+            {
+              "name": "AGENT_PACKAGE_SEED",
+              "type": "&[u8]",
+              "description": "b\"agent_package\""
+            },
+            {
+              "name": "TASK_RECEIPT_SEED",
+              "type": "&[u8]",
+              "description": "b\"task_receipt\""
+            },
+            {
+              "name": "VAULT_SEED",
+              "type": "&[u8]",
+              "description": "b\"vault\""
+            }
+          ]
+        },
+        {
+          "name": "initialize_operator",
+          "description": "Creates the singleton OperatorConfig PDA. Must be called once before any other instruction. The signer becomes the authority. Stores the treasury pubkey, accepted token mint, and protocol fee rate.",
+          "source_file": "programs/cto-billing/src/instructions/initialize_operator.rs",
+          "members": [
+            {
+              "name": "treasury",
+              "type": "Pubkey (arg)",
+              "description": "Treasury wallet to receive protocol fees and non-split revenue"
+            },
+            {
+              "name": "protocol_fee_bps",
+              "type": "u16 (arg)",
+              "description": "Protocol fee in basis points"
+            },
+            {
+              "name": "authority",
+              "type": "Signer (account)",
+              "description": "Becomes operator_config.authority; pays rent"
+            },
+            {
+              "name": "operator_config",
+              "type": "Account<OperatorConfig> (account, init)",
+              "description": "PDA being initialized"
+            },
+            {
+              "name": "mint",
+              "type": "Account<Mint> (account)",
+              "description": "SPL token mint to accept"
+            }
+          ]
+        },
+        {
+          "name": "create_customer_account",
+          "description": "Creates a CustomerBalance PDA for the signing customer wallet. Initializes all counters to zero and sets spending caps from arguments.",
+          "source_file": "programs/cto-billing/src/instructions/create_customer_account.rs",
+          "members": [
+            {
+              "name": "max_per_task",
+              "type": "u64 (arg)",
+              "description": "Maximum allowed charge per task"
+            },
+            {
+              "name": "max_per_day",
+              "type": "u64 (arg)",
+              "description": "Maximum allowed aggregate charge per calendar day"
+            },
+            {
+              "name": "customer",
+              "type": "Signer (account)",
+              "description": "Customer wallet; becomes customer_balance.customer and pays rent"
+            },
+            {
+              "name": "customer_balance",
+              "type": "Account<CustomerBalance> (account, init)",
+              "description": "PDA being initialized"
+            }
+          ]
+        },
+        {
+          "name": "register_agent_package",
+          "description": "Permissionless instruction creating an AgentPackage PDA. The signer becomes the author. Validates split_bps <= 10000 and that the author's ATA for the configured mint exists (but does not create it).",
+          "source_file": "programs/cto-billing/src/instructions/register_agent_package.rs",
+          "members": [
+            {
+              "name": "package_id",
+              "type": "String (arg)",
+              "description": "Unique package identifier; SHA-256 hashed for PDA seed"
+            },
+            {
+              "name": "split_bps",
+              "type": "u16 (arg)",
+              "description": "Author's revenue share in basis points"
+            },
+            {
+              "name": "source_uri",
+              "type": "String (arg)",
+              "description": "URI to package source/metadata"
+            },
+            {
+              "name": "author",
+              "type": "Signer (account)",
+              "description": "Becomes agent_package.author; pays rent"
+            },
+            {
+              "name": "agent_package",
+              "type": "Account<AgentPackage> (account, init)",
+              "description": "PDA being initialized"
+            },
+            {
+              "name": "operator_config",
+              "type": "Account<OperatorConfig> (account)",
+              "description": "Read to get configured mint for ATA validation"
+            },
+            {
+              "name": "author_ata",
+              "type": "Account<TokenAccount> (account)",
+              "description": "Author's existing ATA for the configured mint; validated not created"
+            }
+          ]
+        },
+        {
+          "name": "update_agent_package",
+          "description": "Author-only instruction to update mutable fields on an existing AgentPackage. All arguments are optional; only provided values are applied.",
+          "source_file": "programs/cto-billing/src/instructions/update_agent_package.rs",
+          "members": [
+            {
+              "name": "source_uri",
+              "type": "Option<String> (arg)",
+              "description": "New source URI if provided"
+            },
+            {
+              "name": "split_bps",
+              "type": "Option<u16> (arg)",
+              "description": "New split basis points if provided; must be <= 10000"
+            },
+            {
+              "name": "active",
+              "type": "Option<bool> (arg)",
+              "description": "New active status if provided"
+            },
+            {
+              "name": "author",
+              "type": "Signer (account)",
+              "description": "Must match agent_package.author"
+            },
+            {
+              "name": "agent_package",
+              "type": "Account<AgentPackage> (account, mut)",
+              "description": "Package being updated"
+            }
+          ]
+        },
+        {
+          "name": "deposit",
+          "description": "Transfers SPL tokens from the customer's ATA to the program vault PDA. Increments balance and total_deposited counters on CustomerBalance.",
+          "source_file": "programs/cto-billing/src/instructions/deposit.rs",
+          "members": [
+            {
+              "name": "amount",
+              "type": "u64 (arg)",
+              "description": "Amount to deposit in token base units; must be > 0"
+            },
+            {
+              "name": "customer",
+              "type": "Signer (account)",
+              "description": "Customer wallet authorizing the transfer"
+            },
+            {
+              "name": "customer_balance",
+              "type": "Account<CustomerBalance> (account, mut)",
+              "description": "Customer's balance PDA"
+            },
+            {
+              "name": "customer_ata",
+              "type": "Account<TokenAccount> (account, mut)",
+              "description": "Customer's source token account"
+            },
+            {
+              "name": "vault",
+              "type": "Account<TokenAccount> (account, mut)",
+              "description": "Program vault PDA receiving tokens"
+            },
+            {
+              "name": "operator_config",
+              "type": "Account<OperatorConfig> (account)",
+              "description": "Read for mint validation"
+            },
+            {
+              "name": "mint",
+              "type": "Account<Mint> (account)",
+              "description": "Token mint for validation"
+            }
+          ]
+        },
+        {
+          "name": "withdraw",
+          "description": "Transfers SPL tokens from the program vault PDA back to the customer's ATA. Validates amount <= balance and decrements the balance counter. Uses PDA signer seeds for the vault authority.",
+          "source_file": "programs/cto-billing/src/instructions/withdraw.rs",
+          "members": [
+            {
+              "name": "amount",
+              "type": "u64 (arg)",
+              "description": "Amount to withdraw in token base units; must be > 0 and <= balance"
+            },
+            {
+              "name": "customer",
+              "type": "Signer (account)",
+              "description": "Must match customer_balance.customer"
+            },
+            {
+              "name": "customer_balance",
+              "type": "Account<CustomerBalance> (account, mut)",
+              "description": "Customer's balance PDA"
+            },
+            {
+              "name": "customer_ata",
+              "type": "Account<TokenAccount> (account, mut)",
+              "description": "Customer's destination token account"
+            },
+            {
+              "name": "vault",
+              "type": "Account<TokenAccount> (account, mut)",
+              "description": "Program vault PDA sending tokens"
+            },
+            {
+              "name": "operator_config",
+              "type": "Account<OperatorConfig> (account)",
+              "description": "Read for mint validation"
+            },
+            {
+              "name": "mint",
+              "type": "Account<Mint> (account)",
+              "description": "Token mint for validation"
+            }
+          ]
+        },
+        {
+          "name": "update_spending_caps",
+          "description": "Customer-only instruction to update max_per_task and max_per_day on their CustomerBalance PDA.",
+          "source_file": "programs/cto-billing/src/instructions/update_spending_caps.rs",
+          "members": [
+            {
+              "name": "max_per_task",
+              "type": "u64 (arg)",
+              "description": "New per-task spending cap"
+            },
+            {
+              "name": "max_per_day",
+              "type": "u64 (arg)",
+              "description": "New daily spending cap"
+            },
+            {
+              "name": "customer",
+              "type": "Signer (account)",
+              "description": "Must match customer_balance.customer"
+            },
+            {
+              "name": "customer_balance",
+              "type": "Account<CustomerBalance> (account, mut)",
+              "description": "Customer's balance PDA being updated"
+            }
+          ]
+        },
+        {
+          "name": "pause",
+          "description": "Operator-only instruction that sets operator_config.paused = true, blocking all settlement instructions.",
+          "source_file": "programs/cto-billing/src/instructions/pause.rs",
+          "members": [
+            {
+              "name": "authority",
+              "type": "Signer (account)",
+              "description": "Must match operator_config.authority"
+            },
+            {
+              "name": "operator_config",
+              "type": "Account<OperatorConfig> (account, mut)",
+              "description": "Singleton config PDA being updated"
+            }
+          ]
+        },
+        {
+          "name": "unpause",
+          "description": "Operator-only instruction that sets operator_config.paused = false, re-enabling settlement instructions.",
+          "source_file": "programs/cto-billing/src/instructions/unpause.rs",
+          "members": [
+            {
+              "name": "authority",
+              "type": "Signer (account)",
+              "description": "Must match operator_config.authority"
+            },
+            {
+              "name": "operator_config",
+              "type": "Account<OperatorConfig> (account, mut)",
+              "description": "Singleton config PDA being updated"
+            }
+          ]
+        }
+      ],
+      "related_tasks": {
+        "upstream": [],
+        "downstream": [
+          2,
+          3,
+          5
+        ]
+      },
+      "notes": "This is the foundational task producing the on-chain program and IDL that all downstream tasks depend on. Task 2 adds settle_task and refund_task instructions to this same program. Task 3 writes comprehensive integration tests against this program. Task 5 builds the off-chain sidecar that submits transactions to these instructions — its PDA derivation and hash_seed implementation must exactly match the on-chain logic. The vault PDA initialization approach (whether in initialize_operator or a separate instruction) should be clearly documented as Task 2 will also interact with the vault during settlement. The generated IDL at target/idl/cto_billing.json and TypeScript types at target/types/cto_billing.ts are critical build artifacts consumed by Tasks 3, 5, and other downstream work."
+    }
+  ],
+  {
+    "document_map": {
+      "programs/cto-billing/src/instructions/settle_task.rs": {
+        "purpose": "Implements the settle_task instruction handler with three-case quality-gated payment splitting (no agent/quality met/quality not met), validation chain (pause, auth, caps, balance), PDA-signed vault transfers, and TaskSettled event emission.",
+        "references": [
+          "programs/cto-billing/src/state/operator_config.rs",
+          "programs/cto-billing/src/state/customer_balance.rs",
+          "programs/cto-billing/src/state/agent_package.rs",
+          "programs/cto-billing/src/state/task_receipt.rs",
+          "programs/cto-billing/src/errors.rs",
+          "programs/cto-billing/src/utils/mod.rs",
+          "programs/cto-billing/src/events.rs",
+          "programs/cto-billing/src/lib.rs"
+        ],
+        "decision_notes": [
+          "Optional agent_package and author_ata accounts handled via Anchor's Option<Account<>> (v0.30+) or two separate instruction variants (settle_task_default vs settle_task_with_package) — decision impacts IDL shape and client complexity",
+          "Daily cap rollover computed as current_day = clock.unix_timestamp / 86400; resets daily_spent if day boundary crossed",
+          "Case 3 (quality_met=false) charges zero to customer but still creates TaskReceipt and increments agent task_count",
+          "Vault PDA signer seeds pattern: &[b\"vault\", mint.key().as_ref(), &[vault_bump]] used for all CPI transfers"
+        ],
+        "context": "Core billing engine instruction — the program's primary value proposition. Three settlement cases: (1) no agent → full to treasury, (2) agent + quality_met → split via split_bps, (3) agent + !quality_met → zero charge. TaskReceipt PDA init with hash_seed(&task_id) provides protocol-level idempotency (duplicate task_id fails at account creation)."
+      },
+      "programs/cto-billing/src/instructions/refund_task.rs": {
+        "purpose": "Implements the refund_task instruction that reverses a settled task by crediting customer balance and transferring funds from treasury back to vault, with hackathon simplification where 5D Labs absorbs author payment losses.",
+        "references": [
+          "programs/cto-billing/src/state/operator_config.rs",
+          "programs/cto-billing/src/state/customer_balance.rs",
+          "programs/cto-billing/src/state/task_receipt.rs",
+          "programs/cto-billing/src/errors.rs",
+          "programs/cto-billing/src/events.rs",
+          "programs/cto-billing/src/lib.rs"
+        ],
+        "decision_notes": [
+          "HACKATHON SIMPLIFICATION: Refund comes from treasury — if author was already paid, 5D Labs absorbs the loss; post-hackathon should implement clawback or delayed settlement window",
+          "Validates task_receipt.status == TaskStatus::Settled before allowing refund",
+          "Treasury owner (operator) must sign the transfer from treasury_ata back to vault"
+        ],
+        "context": "Reversal mechanism for settled tasks. Operator-authorized only. Changes TaskReceipt status to Refunded and emits TaskRefunded event. Treasury funds the refund regardless of prior author payouts."
+      },
+      "programs/cto-billing/src/events.rs": {
+        "purpose": "Defines all Anchor #[event] structs for off-chain indexing and observability: TaskSettled, TaskRefunded, Deposited, Withdrawn, AgentPackageRegistered.",
+        "references": [
+          "programs/cto-billing/src/lib.rs",
+          "programs/cto-billing/src/instructions/settle_task.rs",
+          "programs/cto-billing/src/instructions/refund_task.rs",
+          "programs/cto-billing/src/instructions/deposit.rs",
+          "programs/cto-billing/src/instructions/withdraw.rs",
+          "programs/cto-billing/src/instructions/register_agent_package.rs"
+        ],
+        "decision_notes": [
+          "Events appear in generated IDL for client-side parsing",
+          "TaskSettled includes Optional<Pubkey> for agent_package to distinguish Case 1 from Cases 2/3"
+        ],
+        "context": "Event definitions emitted via emit!() macro in instruction handlers. Used by settlement sidecar (Task 5) and off-chain indexers to track billing activity without polling accounts."
+      },
+      "programs/cto-billing/src/instructions/mod.rs": {
+        "purpose": "Barrel export module that re-exports all instruction handler modules including settle_task and refund_task alongside Task 1 instructions.",
+        "references": [
+          "programs/cto-billing/src/instructions/settle_task.rs",
+          "programs/cto-billing/src/instructions/refund_task.rs",
+          "programs/cto-billing/src/instructions/initialize_operator.rs",
+          "programs/cto-billing/src/instructions/create_customer_account.rs",
+          "programs/cto-billing/src/instructions/register_agent_package.rs",
+          "programs/cto-billing/src/instructions/update_agent_package.rs",
+          "programs/cto-billing/src/instructions/deposit.rs",
+          "programs/cto-billing/src/instructions/withdraw.rs",
+          "programs/cto-billing/src/instructions/update_spending_caps.rs",
+          "programs/cto-billing/src/instructions/pause.rs",
+          "programs/cto-billing/src/instructions/unpause.rs"
+        ],
+        "decision_notes": [],
+        "context": "Modified from Task 1 to add pub mod settle_task and pub mod refund_task exports."
+      },
+      "programs/cto-billing/src/lib.rs": {
+        "purpose": "Program entry point with declare_id!, module declarations, and #[program] block registering all instruction handlers including settle_task and refund_task.",
+        "references": [
+          "programs/cto-billing/src/instructions/mod.rs",
+          "programs/cto-billing/src/state/mod.rs",
+          "programs/cto-billing/src/events.rs",
+          "programs/cto-billing/src/errors.rs",
+          "programs/cto-billing/src/utils/mod.rs"
+        ],
+        "decision_notes": [
+          "settle_task and refund_task registered as public instruction handlers in the #[program] module",
+          "Events module imported so emit!() calls in instructions resolve correctly"
+        ],
+        "context": "Modified from Task 1 scaffold to register the two new settlement instructions. The settle_task function signature accepts task_id, amount, receipt_hash, quality_met. The refund_task function takes no additional args beyond accounts."
+      },
+      "tests/settlement.ts": {
+        "purpose": "8-case integration test suite covering all three settlement cases, refund flow, spending cap enforcement, pause blocking, and duplicate task_id rejection on local validator.",
+        "references": [
+          "programs/cto-billing/src/instructions/settle_task.rs",
+          "programs/cto-billing/src/instructions/refund_task.rs",
+          "programs/cto-billing/src/state/task_receipt.rs",
+          "programs/cto-billing/src/state/customer_balance.rs",
+          "programs/cto-billing/src/state/agent_package.rs",
+          "programs/cto-billing/src/state/operator_config.rs",
+          "programs/cto-billing/src/errors.rs",
+          "tests/cto-billing.ts"
+        ],
+        "decision_notes": [
+          "Tests verify on-chain account state after each instruction, not just transaction success",
+          "Error cases verify specific Anchor error codes (ExceedsPerTaskCap, ExceedsDailyCap, ProgramPaused)",
+          "Duplicate task_id test relies on PDA init constraint violation",
+          "All 8 tests must pass within 30 seconds on local validator",
+          "Test setup reuses Task 1's initialization (operator config, customer account, agent package, deposits)"
+        ],
+        "context": "Comprehensive settlement test suite validating the core billing engine. Tests: (1) no agent → treasury, (2) agent + quality → split, (3) agent + !quality → zero charge, (4) refund restores balance, (5) per-task cap, (6) daily cap, (7) pause blocks settlement, (8) duplicate task_id fails."
+      },
+      "programs/cto-billing/src/state/task_receipt.rs": {
+        "purpose": "TaskReceipt PDA account struct storing immutable settlement records and TaskStatus enum (Settled/Refunded/Disputed), with PDA seeds using SHA-256 hash of task_id for idempotent settlement.",
+        "references": [
+          "programs/cto-billing/src/utils/mod.rs",
+          "programs/cto-billing/src/instructions/settle_task.rs",
+          "programs/cto-billing/src/instructions/refund_task.rs"
+        ],
+        "decision_notes": [
+          "PDA seeds: [b\"task_receipt\", hash_seed(&task_id)] — SHA-256 hash ensures deterministic derivation from arbitrary string task IDs",
+          "TaskStatus enum with Settled, Refunded, Disputed variants",
+          "Receipt is init'd during settle_task and mutated only during refund_task (status change)"
+        ],
+        "context": "Defined in Task 1 scaffold, actively used by Task 2's settle_task (init) and refund_task (status mutation). The init constraint on settle_task prevents duplicate task_id settlement at the protocol level."
+      },
+      "programs/cto-billing/src/state/customer_balance.rs": {
+        "purpose": "CustomerBalance PDA account struct tracking per-customer balance, spending caps (max_per_task, max_per_day), daily spending with day rollover, and cumulative counters.",
+        "references": [
+          "programs/cto-billing/src/instructions/settle_task.rs",
+          "programs/cto-billing/src/instructions/refund_task.rs",
+          "programs/cto-billing/src/instructions/deposit.rs",
+          "programs/cto-billing/src/instructions/withdraw.rs"
+        ],
+        "decision_notes": [
+          "Daily cap rollover: daily_reset_day stores the day number (unix_timestamp / 86400); if current_day > daily_reset_day, daily_spent resets to 0",
+          "balance field debited during settlement, credited during refund",
+          "task_count incremented on every settlement regardless of case"
+        ],
+        "context": "Defined in Task 1, critical to Task 2's validation chain and settlement accounting. The daily cap logic with day boundary rollover is implemented in settle_task's validation."
+      },
+      "programs/cto-billing/src/state/agent_package.rs": {
+        "purpose": "AgentPackage PDA account struct storing marketplace package metadata including split_bps for revenue sharing, activity counters (total_earned, task_count, success_count), and active status.",
+        "references": [
+          "programs/cto-billing/src/instructions/settle_task.rs",
+          "programs/cto-billing/src/instructions/register_agent_package.rs",
+          "programs/cto-billing/src/instructions/update_agent_package.rs"
+        ],
+        "decision_notes": [
+          "split_bps determines author's share: author_amount = (amount * split_bps) / 10000",
+          "task_count incremented in both Case 2 and Case 3; success_count only incremented in Case 2 (quality_met=true)",
+          "active field validated in Case 2 — inactive packages cause PackageInactive error"
+        ],
+        "context": "Defined in Task 1, mutated by Task 2's settle_task to track earnings and success metrics per agent package."
+      },
+      "programs/cto-billing/src/errors.rs": {
+        "purpose": "Anchor error_code enum with all program error variants used across settlement validation: InsufficientBalance, ExceedsPerTaskCap, ExceedsDailyCap, Unauthorized, ProgramPaused, InvalidSplitBps, DuplicateTaskId, InvalidMint, PackageInactive, InvalidAmount.",
+        "references": [
+          "programs/cto-billing/src/instructions/settle_task.rs",
+          "programs/cto-billing/src/instructions/refund_task.rs"
+        ],
+        "decision_notes": [
+          "PackageInactive error used when agent_package.active == false in Case 2",
+          "ProgramPaused checked first in validation chain for both settle_task and refund_task"
+        ],
+        "context": "Defined in Task 1, referenced by Task 2 instructions for validation error reporting. Tests verify specific error codes are returned."
+      },
+      "programs/cto-billing/src/utils/mod.rs": {
+        "purpose": "Utility module with SHA-256 hash_seed helper for deterministic PDA seed derivation and PDA seed constants (OPERATOR_CONFIG_SEED, CUSTOMER_BALANCE_SEED, AGENT_PACKAGE_SEED, TASK_RECEIPT_SEED, VAULT_SEED).",
+        "references": [
+          "programs/cto-billing/src/instructions/settle_task.rs",
+          "programs/cto-billing/src/instructions/refund_task.rs",
+          "programs/cto-billing/src/state/task_receipt.rs"
+        ],
+        "decision_notes": [
+          "hash_seed used for TaskReceipt PDA derivation: seeds = [TASK_RECEIPT_SEED, &hash_seed(&task_id)]",
+          "Same hash_seed function used by AgentPackage PDA derivation",
+          "Must match client-side hashSeed implementation in tests/helpers.ts"
+        ],
+        "context": "Defined in Task 1, actively used by Task 2 for TaskReceipt PDA seed computation."
+      },
+      "programs/cto-billing/src/state/operator_config.rs": {
+        "purpose": "OperatorConfig singleton PDA account storing authority pubkey, treasury pubkey, accepted mint, protocol_fee_bps, and paused circuit breaker flag.",
+        "references": [
+          "programs/cto-billing/src/instructions/settle_task.rs",
+          "programs/cto-billing/src/instructions/refund_task.rs"
+        ],
+        "decision_notes": [
+          "authority field checked against operator signer in both settle_task and refund_task",
+          "paused field checked as first validation in settlement chain"
+        ],
+        "context": "Defined in Task 1, read by Task 2 instructions for authorization and pause checks."
+      }
+    }
+  },
+  [
+    {
+      "id": "doc-3-overview",
+      "prefix": "Task 3",
+      "title": "Comprehensive Anchor Program Integration Test Suite — Overview",
+      "content": "## Purpose\nTask 3 builds a thorough Mocha/TypeScript integration test suite for the `cto-billing` Anchor program, exercising every instruction, error path, and edge case on localnet. It is the quality gate that CI (Task 9) will run.\n\n## Architecture\n- **`tests/helpers.ts`** — shared utilities: mock mint creation, ATA helpers, PDA derivation (SHA-256 matching on-chain `hash_seed`), SOL airdrop.\n- **`tests/cto-billing.ts`** — 12 `describe` groups, 30+ `it` cases, covering all 11 instructions and all error codes.\n- **`package.json`** — `test:ci` script (`anchor test -- --timeout 60000`).\n\n## Dependency Chain\nTask 3 depends on **Task 1** (core instructions) and **Task 2** (settle_task, refund_task, events). The test suite validates both tasks' implementations end-to-end.\n\n## File Map\n| File | Action | Role |\n|---|---|---|\n| `tests/helpers.ts` | create | PDA derivation, token helpers, airdrop |\n| `tests/cto-billing.ts` | create | Full 12-group test suite |\n| `package.json` | modify | Add `test:ci` script |\n\n## Key Decisions Pending\n1. **Circuit-breaker scope** — Should `deposit`/`withdraw` be blocked when paused, or only `settle_task`/`refund_task`? Group 9 tests assume only settlement/refund are blocked per PRD language.\n2. **Daily-cap rollover testing** — Local validator may not support clock manipulation; tests may only verify within a single day boundary.",
+      "references": [
+        "tests/helpers.ts",
+        "tests/cto-billing.ts",
+        "package.json"
+      ]
+    },
+    {
+      "id": "doc-3-helpers",
+      "prefix": "Task 3 · helpers.ts",
+      "title": "Test Helper Utilities — Interface & Implementation Guide",
+      "content": "## Module: `tests/helpers.ts`\n\nThis module provides shared test infrastructure consumed by every `describe` group.\n\n### Exported Types\n\n```typescript\nexport interface TestContext {\n  program: Program;\n  connection: Connection;\n  operator: Keypair;\n  customer: Keypair;\n  author: Keypair;\n  secondCustomer: Keypair;\n  secondAuthor: Keypair;\n  mint: PublicKey;\n  treasuryAta: PublicKey;\n  customerAta: PublicKey;\n  authorAta: PublicKey;\n  vaultPda: PublicKey;\n  operatorConfigPda: PublicKey;\n}\n\nexport interface PdaResult {\n  pda: PublicKey;\n  bump: number;\n}\n```\n\n### PDA Derivation Functions\n\nAll PDA helpers must match on-chain seed logic exactly.\n\n| Function | Seeds | Notes |\n|---|---|---|\n| `deriveOperatorConfigPda(programId)` | `[b\"operator_config\"]` | Singleton |\n| `deriveCustomerPda(customer, programId)` | `[b\"customer_balance\", customer.toBytes()]` | Per-customer |\n| `derivePackagePda(packageId, programId)` | `[b\"agent_package\", SHA256(packageId)]` | SHA-256 hash |\n| `deriveReceiptPda(taskId, programId)` | `[b\"task_receipt\", SHA256(taskId)]` | SHA-256 hash |\n| `deriveVaultPda(mint, programId)` | `[b\"vault\", mint.toBytes()]` | Per-mint vault |\n\n### SHA-256 Hashing\n```typescript\nimport { createHash } from \"crypto\";\nexport function hashSeed(input: string): Buffer {\n  return createHash(\"sha256\").update(input).digest();\n}\n```\nThis **must** produce identical bytes to the on-chain `hash_seed` in `utils/mod.rs`.\n\n### Token Helpers\n- `createMockMint(connection, payer, decimals=6)` → `PublicKey` — uses `@solana/spl-token.createMint`.\n- `createAta(connection, payer, mint, owner)` → `PublicKey` — uses `createAssociatedTokenAccount`.\n- `mintTo(connection, payer, mint, ata, amount)` → `void` — mints tokens.\n- `airdropSol(connection, pubkey, amount)` → `void` — confirms airdrop.\n\n### Implementation Notes\n- All helpers are `async` and await confirmation.\n- PDA derivation is synchronous (`PublicKey.findProgramAddressSync`).\n- The `hashSeed` function returns a 32-byte `Buffer` used directly in `findProgramAddressSync` seeds array.",
+      "references": [
+        "tests/helpers.ts",
+        "programs/cto-billing/src/utils/mod.rs"
+      ]
+    },
+    {
+      "id": "doc-3-groups-1-3",
+      "prefix": "Task 3 · Groups 1–3",
+      "title": "Test Groups 1–3: Initialization, Customer Accounts, Agent Packages",
+      "content": "## Subtask 3002 — 10 Test Cases\n\n### Group 1: Initialization (2 tests)\n\n**Test 1 — `initializes operator config with correct fields`**\n- Call `initialize_operator(treasury, protocol_fee_bps=0)` with operator as signer.\n- Accounts: `operator_config` PDA (init), `mint` (mock USDC), `system_program`.\n- Assertions: `authority == operator.publicKey`, `treasury` matches, `mint` matches, `protocol_fee_bps == 0`, `paused == false`.\n\n**Test 2 — `fails on re-initialization`**\n- Call `initialize_operator` again with identical seeds.\n- Assert: Anchor error (PDA already in use / account already initialized).\n- Pattern: `try { await program.methods.initializeOperator(…); assert.fail() } catch (err) { /* verify error */ }`.\n\n### Group 2: Customer Account Management (3 tests)\n\n**Test 3 — `creates customer account with caps`**\n- Call `create_customer_account(max_per_task=50_000_000, max_per_day=200_000_000)`.\n- Seeds: `[b\"customer_balance\", customer.publicKey.toBytes()]`.\n- Assertions: `balance == 0`, `total_deposited == 0`, `total_spent == 0`, `task_count == 0`, caps match.\n\n**Test 4 — `updates spending caps`**\n- Call `update_spending_caps(max_per_task=75_000_000, max_per_day=300_000_000)`.\n- Assertions: both caps updated; other fields unchanged.\n\n**Test 5 — `fails creating duplicate customer account`**\n- Call `create_customer_account` again for same customer → PDA collision error.\n\n### Group 3: Agent Package Registration (5 tests)\n\n**Test 6 — `registers a package`**\n- Call `register_agent_package(package_id=\"test-agent-v1\", split_bps=3000, source_uri=\"https://github.com/test/agent\")`.\n- PDA seed: `[b\"agent_package\", SHA256(\"test-agent-v1\")]`.\n- Assertions: `author == author.publicKey`, `split_bps == 3000`, `active == true`, `total_earned == 0`, `task_count == 0`, `success_count == 0`.\n\n**Test 7 — `updates package split_bps`**\n- Call `update_agent_package(split_bps=Some(2500))`.\n- Assert: `split_bps == 2500`.\n\n**Test 8 — `deactivates package`**\n- Call `update_agent_package(active=Some(false))`.\n- Assert: `active == false`.\n\n**Test 9 — `fails update by non-author`**\n- Sign with `secondAuthor` → `BillingError::Unauthorized`.\n\n**Test 10 — `fails register with split_bps=10001`**\n- Call `register_agent_package` with `split_bps=10001` → `BillingError::InvalidSplitBps`.\n\n### Error Assertion Pattern\n```typescript\ntry {\n  await program.methods.registerAgentPackage(\"bad\", 10001, \"uri\")\n    .accounts({...}).signers([author]).rpc();\n  assert.fail(\"Should have thrown\");\n} catch (err) {\n  expect(err.error.errorCode.code).to.equal(\"InvalidSplitBps\");\n}\n```",
+      "references": [
+        "tests/cto-billing.ts",
+        "programs/cto-billing/src/instructions/initialize_operator.rs",
+        "programs/cto-billing/src/instructions/create_customer_account.rs",
+        "programs/cto-billing/src/instructions/register_agent_package.rs",
+        "programs/cto-billing/src/instructions/update_agent_package.rs",
+        "programs/cto-billing/src/instructions/update_spending_caps.rs",
+        "programs/cto-billing/src/errors.rs"
+      ]
+    },
+    {
+      "id": "doc-3-groups-4-5",
+      "prefix": "Task 3 · Groups 4–5",
+      "title": "Test Groups 4–5: Deposits, Withdrawals, and Settlement Case 1",
+      "content": "## Subtask 3003 — 7 Test Cases\n\n### Group 4: Deposits & Withdrawals (5 tests)\n\n**Setup**: Ensure customer account exists. Create customer ATA, mint 200 USDC to it. Derive vault PDA.\n\n**Test 1 — `deposits 100 USDC`**\n- Call `deposit(amount=100_000_000)`.\n- Accounts: `customer` (signer), `customer_balance` PDA (mut), `customer_ata` (mut), `vault` PDA (mut), `operator_config`, `mint`, `token_program`.\n- Assertions: `customer_balance.balance == 100_000_000`, `customer_balance.total_deposited == 100_000_000`. Vault token account balance increased by 100_000_000.\n\n**Test 2 — `deposits another 50 USDC`**\n- Call `deposit(amount=50_000_000)`.\n- Assertions: `balance == 150_000_000`, `total_deposited == 150_000_000`.\n\n**Test 3 — `withdraws 30 USDC`**\n- Call `withdraw(amount=30_000_000)`.\n- Assertions: `balance == 120_000_000`. Customer ATA received 30 USDC back.\n\n**Test 4 — `fails withdraw exceeding balance`**\n- Call `withdraw(amount=200_000_000)`.\n- Assert: `BillingError::InsufficientBalance`.\n\n**Test 5 — `withdraws remaining balance to zero`**\n- Call `withdraw(amount=120_000_000)`.\n- Assert: `balance == 0`.\n\n### Group 5: Settlement — Case 1, No Agent Package (2 tests)\n\n**Setup**: Deposit 100 USDC. Record treasury ATA balance before settlement.\n\n**Test 6 — `settles TASK-001 for 15 USDC — full to treasury`**\n- Call `settle_task(task_id=\"TASK-001\", amount=15_000_000, receipt_hash=[..32 bytes..], quality_met=true)`.\n- No `agent_package` or `author_ata` passed (or `None`).\n- Assertions:\n  - `customer_balance.balance == 85_000_000`.\n  - Treasury ATA balance increased by 15_000_000.\n  - Fetch `TaskReceipt` PDA via `deriveReceiptPda(\"TASK-001\")`:\n    - `task_id == \"TASK-001\"`, `amount == 15_000_000`, `customer` matches, `author_earned == 0`, `quality_met == true`, `status == Settled`, `agent_package == None`.\n\n**Test 7 — `verifies customer counters`**\n- `customer_balance.task_count == 1`, `customer_balance.total_spent == 15_000_000`.\n\n### Token Balance Verification Pattern\n```typescript\nconst vaultInfo = await getAccount(provider.connection, vaultPda);\nassert.equal(vaultInfo.amount.toString(), \"100000000\");\n```\nUse `getAccount` from `@solana/spl-token` and compare `.amount` (bigint) as strings for precision.",
+      "references": [
+        "tests/cto-billing.ts",
+        "programs/cto-billing/src/instructions/deposit.rs",
+        "programs/cto-billing/src/instructions/withdraw.rs",
+        "programs/cto-billing/src/instructions/settle_task.rs",
+        "programs/cto-billing/src/state/customer_balance.rs",
+        "programs/cto-billing/src/state/task_receipt.rs"
+      ]
+    },
+    {
+      "id": "doc-3-groups-6-8",
+      "prefix": "Task 3 · Groups 6–8",
+      "title": "Test Groups 6–8: Agent Splits, Quality-Not-Met, Spending Caps",
+      "content": "## Subtask 3004 — 8 Test Cases\n\n### Group 6: Settlement — Case 2, Quality Met with Split (3 tests)\n\n**Setup**: Customer has balance ≥ 20 USDC. Agent package `test-agent-v1` is active with `split_bps=3000`. Record author ATA and treasury ATA balances.\n\n**Test 1 — `settles TASK-002 with 30% author split`**\n- Call `settle_task(task_id=\"TASK-002\", amount=20_000_000, receipt_hash=[..], quality_met=true)` with `agent_package` and `author_ata` accounts.\n- Split math: `author_earned = 20_000_000 * 3000 / 10000 = 6_000_000`. Treasury receives `14_000_000`.\n- Assertions:\n  - Customer balance decreased by exactly 20_000_000.\n  - Author ATA increased by 6_000_000.\n  - Treasury ATA increased by 14_000_000.\n\n**Test 2 — `verifies AgentPackage counters`**\n- `agent_package.total_earned == 6_000_000`, `task_count == 1`, `success_count == 1`.\n\n**Test 3 — `verifies TaskReceipt fields`**\n- `amount == 20_000_000`, `author_earned == 6_000_000`, `quality_met == true`, `agent_package == Some(packagePda)`, `status == Settled`.\n\n### Group 7: Settlement — Case 3, Quality Not Met (2 tests)\n\n**Test 4 — `settles TASK-003 with quality_met=false — zero charge`**\n- Call `settle_task(task_id=\"TASK-003\", amount=20_000_000, quality_met=false)` with agent_package.\n- Assertions: Customer balance **unchanged**. Author ATA **unchanged**. Treasury ATA **unchanged**.\n- TaskReceipt: `amount == 0`, `author_earned == 0`, `quality_met == false`.\n\n**Test 5 — `verifies AgentPackage counters after quality-not-met`**\n- `task_count` incremented (now 2). `success_count` unchanged (still 1). `total_earned` unchanged.\n\n### Group 8: Spending Cap Enforcement (3 tests)\n\n**Setup**: Create `secondCustomer` with known caps. Deposit sufficient funds.\n\n**Test 6 — `enforces per-task cap — ExceedsPerTaskCap`**\n- Set `max_per_task=10_000_000` via `update_spending_caps`. Attempt `settle_task` for 15_000_000.\n- Assert: `BillingError::ExceedsPerTaskCap`.\n\n**Test 7 — `enforces daily cap — ExceedsDailyCap`**\n- Set `max_per_day=25_000_000`. Settle successfully for 20_000_000. Then attempt 10_000_000.\n- Assert: `BillingError::ExceedsDailyCap` (20 + 10 = 30 > 25).\n\n**Test 8 — `tests day boundary rollover logic`**\n- If clock warp is available (`bankrun` or validator CLI `warp-slot`), advance by 86400 seconds, verify `daily_spent` resets.\n- If not feasible: document limitation, verify day-number logic in a unit-style assertion (e.g., confirm `daily_reset_day` was set on first settlement and `daily_spent` accumulated correctly within the current day).\n\n### Split Calculation Detail\n```\nauthor_earned = (amount * split_bps) / 10_000\ntreasury_receives = amount - author_earned\n```\nAll arithmetic is in u64 lamports. Integer division — no rounding issues at these amounts.",
+      "references": [
+        "tests/cto-billing.ts",
+        "programs/cto-billing/src/instructions/settle_task.rs",
+        "programs/cto-billing/src/state/agent_package.rs",
+        "programs/cto-billing/src/state/customer_balance.rs",
+        "programs/cto-billing/src/errors.rs"
+      ]
+    },
+    {
+      "id": "doc-3-groups-9-12",
+      "prefix": "Task 3 · Groups 9–12",
+      "title": "Test Groups 9–12: Circuit Breaker, Refunds, Idempotency, Authorization",
+      "content": "## Subtask 3005 — 11 Test Cases\n\n### Group 9: Circuit Breaker (5 tests)\n\n**Test 1 — `pauses the program`**\n- Call `pause()` with operator signer.\n- Fetch `OperatorConfig` PDA → `paused == true`.\n\n**Test 2 — `blocks settlement when paused`**\n- Attempt `settle_task` → `BillingError::ProgramPaused`.\n\n**Test 3 — `allows deposit when paused`**\n- Call `deposit(amount)` → succeeds.\n- Rationale: PRD specifies only settlement/refund are blocked. This is a **decision point** — if the on-chain program also blocks deposits, update this test to expect `ProgramPaused` and add a comment.\n\n**Test 4 — `unpauses the program`**\n- Call `unpause()` with operator → `paused == false`.\n\n**Test 5 — `allows settlement after unpause`**\n- Call `settle_task` → succeeds.\n\n### Group 10: Refund Flow (2 tests)\n\n**Setup**: Deposit funds, settle `TASK-REFUND-001`.\n\n**Test 6 — `refunds a settled task — balance restored`**\n- Record customer balance before refund.\n- Call `refund_task` for `TASK-REFUND-001`.\n- Assertions:\n  - Customer balance restored by the original settlement amount.\n  - `TaskReceipt.status == Refunded`.\n  - Treasury ATA balance reduced (treasury absorbs author payout if any — hackathon simplification).\n\n**Test 7 — `fails refund on already-refunded task`**\n- Call `refund_task` again for `TASK-REFUND-001`.\n- Assert: error (constraint `task_receipt.status == TaskStatus::Settled` fails → `BillingError::Unauthorized` or Anchor constraint error).\n\n### Group 11: Idempotency (1 test)\n\n**Test 8 — `fails settling duplicate task_id`**\n- Attempt `settle_task` with `task_id` already used (e.g., `TASK-001`).\n- Assert: Anchor PDA init error (account already in use). The `init` constraint on `task_receipt` PDA prevents duplicates.\n\n### Group 12: Authorization (3 tests)\n\n**Test 9 — `blocks settle_task by non-operator`**\n- Sign `settle_task` with `customer` keypair instead of `operator`.\n- Assert: `BillingError::Unauthorized` (constraint `operator == operator_config.authority`).\n\n**Test 10 — `blocks pause by non-operator`**\n- Sign `pause()` with `customer` → `BillingError::Unauthorized`.\n\n**Test 11 — `blocks unpause by non-operator`**\n- Sign `unpause()` with `author` → `BillingError::Unauthorized`.\n\n### Test Ordering Strategy\nMocha runs tests sequentially within a `describe` block. The suite is designed so Groups 1-12 can run in order, building on shared on-chain state. Each group's `before` hook ensures prerequisites are met.\n\n### Full Suite Summary\n| Group | Tests | Key Instructions Covered |\n|---|---|---|\n| 1 | 2 | initialize_operator |\n| 2 | 3 | create_customer_account, update_spending_caps |\n| 3 | 5 | register_agent_package, update_agent_package |\n| 4 | 5 | deposit, withdraw |\n| 5 | 2 | settle_task (no agent) |\n| 6 | 3 | settle_task (quality met, split) |\n| 7 | 2 | settle_task (quality not met) |\n| 8 | 3 | settle_task (cap enforcement) |\n| 9 | 5 | pause, unpause, settle_task |\n| 10 | 2 | refund_task |\n| 11 | 1 | settle_task (idempotency) |\n| 12 | 3 | settle_task, pause, unpause (auth) |\n| **Total** | **36** | **All 11 instructions, all error codes** |",
+      "references": [
+        "tests/cto-billing.ts",
+        "programs/cto-billing/src/instructions/pause.rs",
+        "programs/cto-billing/src/instructions/unpause.rs",
+        "programs/cto-billing/src/instructions/refund_task.rs",
+        "programs/cto-billing/src/instructions/settle_task.rs",
+        "programs/cto-billing/src/errors.rs"
+      ]
+    },
+    {
+      "id": "doc-3-subtask-deps",
+      "prefix": "Task 3 · Subtask Dependency Graph",
+      "title": "Subtask Execution Plan and Parallelization",
+      "content": "## Subtask Dependency Graph\n\n```\n3001 (infrastructure)\n  ├──> 3002 (Groups 1-3)   ──┐\n  ├──> 3003 (Groups 4-5)   ──┼──> merge into tests/cto-billing.ts\n  ├──> 3004 (Groups 6-8)   ──┤\n  └──> 3005 (Groups 9-12)  ──┘\n```\n\n- **3001** is the sole blocker — it creates `tests/helpers.ts`, the test file skeleton, and `package.json` changes.\n- **3002, 3003, 3004, 3005** are all parallelizable (each writes distinct `describe` blocks).\n- Final merge combines all groups into a single `tests/cto-billing.ts` file.\n\n## Subtask Summary\n\n| Subtask | Title | Tests | Agent Type | Parallel |\n|---|---|---|---|---|\n| 3001 | Test infrastructure | 0 (setup) | implementer | No (blocker) |\n| 3002 | Groups 1-3 | 10 | tester | Yes |\n| 3003 | Groups 4-5 | 7 | tester | Yes |\n| 3004 | Groups 6-8 | 8 | tester | Yes |\n| 3005 | Groups 9-12 | 11 | tester | Yes |\n\n## CI Integration\n- `npm run test:ci` → `anchor test -- --timeout 60000`\n- Target: all 36 tests pass in < 60 seconds on `solana-test-validator`.\n- `anchor test` handles: validator start → program build/deploy → mocha run → validator stop.",
+      "references": [
+        "tests/cto-billing.ts",
+        "tests/helpers.ts",
+        "package.json",
+        "Anchor.toml"
+      ]
+    },
+    {
+      "id": "doc-3-cross-task",
+      "prefix": "Task 3 · Cross-Task Dependencies",
+      "title": "Cross-Task Integration Points",
+      "content": "## Upstream Dependencies\n\n### Task 1 (Core Program)\nTask 3 tests validate these Task 1 deliverables:\n- `initialize_operator` — Group 1\n- `create_customer_account` — Group 2\n- `register_agent_package`, `update_agent_package` — Group 3\n- `deposit`, `withdraw` — Group 4\n- `update_spending_caps` — Group 2\n- `pause`, `unpause` — Group 9\n- All state account structs (`OperatorConfig`, `CustomerBalance`, `AgentPackage`)\n- Error codes enum (`BillingError`)\n- PDA seed constants and `hash_seed` utility\n\n### Task 2 (Settlement Engine)\nTask 3 tests validate these Task 2 deliverables:\n- `settle_task` (all 3 cases) — Groups 5, 6, 7, 8, 9, 11, 12\n- `refund_task` — Group 10\n- `TaskReceipt` state and `TaskStatus` enum\n- Daily cap validation with day rollover logic\n- Event emissions (`TaskSettled`, `TaskRefunded`) — verified implicitly via state changes\n\n## Downstream Consumers\n- **Task 9 (CI/CD)** — runs `npm run test:ci` as the quality gate.\n- **Task 5 (Settlement Sidecar)** — sidecar PDA derivation must match the same `hash_seed` logic verified by `tests/helpers.ts`.\n\n## Critical Alignment Points\n1. PDA seeds in `helpers.ts` must exactly match `programs/cto-billing/src/utils/mod.rs` constants.\n2. SHA-256 hash function (`hashSeed` in TS) must produce identical output to on-chain `hash_seed` in Rust.\n3. Error code string matching in tests (e.g., `\"InvalidSplitBps\"`) must match `#[error_code]` variant names in `errors.rs`.\n4. Account struct field names in test assertions must match Anchor IDL generation (snake_case → camelCase in TypeScript).",
+      "references": [
+        "tests/helpers.ts",
+        "tests/cto-billing.ts",
+        "programs/cto-billing/src/utils/mod.rs",
+        "programs/cto-billing/src/errors.rs",
+        "programs/cto-billing/src/state/task_receipt.rs"
+      ]
+    }
+  ],
+  [
+    {
+      "task_id": "4",
+      "documentation": {
+        "overview": "## Task 4: Controller Settlement Event Publisher & Receipt Storage (Rex - Rust/Axum)\n\nThis task extends the CTO Kubernetes controller to publish settlement events to a Redis stream when CodeRuns reach terminal states (merged/failed/cancelled). It represents the controller-side half of the decoupled sidecar architecture: the controller computes billing, generates receipts, uploads them to S3, and publishes settlement events to Redis. The settlement sidecar (Task 5) consumes these events and submits Solana transactions.\n\nAll Solana-related code is **feature-gated** behind `solana-billing` to ensure the controller compiles and runs cleanly without any billing dependencies when the feature is disabled.\n\n### Architecture Position\n- **Upstream dependencies**: Tasks 1 & 2 (on-chain program with settlement/refund instructions define the schema this code must match)\n- **Downstream consumer**: Task 5 (settlement sidecar reads from the `cto:settlements` Redis stream)\n- **Integration point**: Controller reconciliation loop in `crates/controller/src/tasks/code/controller.rs`\n- **Infrastructure**: Uses existing `gitlab/gitlab-redis-master` service for Redis streams\n\n### Key Design Principles\n1. **Fire-and-forget**: Settlement publishing must never block or crash the controller\n2. **Feature isolation**: Zero billing code compiled without `solana-billing` feature\n3. **Deterministic hashing**: Receipt SHA-256 must match on-chain `hash_seed` logic exactly\n4. **Idempotency**: Same CodeRun terminal transition produces the same receipt hash",
+        "files_to_create": [
+          {
+            "file_path": "crates/controller/src/billing/mod.rs",
+            "description": "Feature-gated billing module root. Declares submodule exports (`config`, `event`, `receipt`, `publisher`) and defines the shared `BillingError` enum used across all billing operations. The entire module is only compiled when the `solana-billing` feature flag is active.",
+            "purpose_and_role": "Central error type and module organization for the billing subsystem. All billing submodules re-export through here. The `BillingError` enum provides typed error variants for S3 upload failures, Redis publish failures, and serialization errors, enabling callers (particularly `handle_billing`) to distinguish between failure modes and log appropriately.",
+            "how_it_connects": "Imported by `lib.rs` behind `#[cfg(feature = \"solana-billing\")]`. All billing submodules (`event.rs`, `receipt.rs`, `publisher.rs`, `config.rs`) use `BillingError` as their error type. The controller reconciliation loop in `tasks/code/controller.rs` catches `BillingError` variants to decide whether to log-and-continue.",
+            "interfaces_and_types": "```rust\nuse thiserror::Error;\n\npub mod config;\npub mod event;\npub mod receipt;\npub mod publisher;\n\n/// Unified error type for all billing operations.\n/// All variants are non-fatal from the controller's perspective —\n/// the reconciliation loop logs them and continues.\n#[derive(Debug, Error)]\npub enum BillingError {\n    #[error(\"S3 upload failed: {0}\")]\n    S3Upload(String),\n    #[error(\"Redis publish failed: {0}\")]\n    RedisPublish(String),\n    #[error(\"Serialization failed: {0}\")]\n    Serialization(#[from] serde_json::Error),\n}\n```",
+            "implementation_details": "The module file simply declares submodules and the error enum. No complex logic. The `thiserror` derive generates `std::error::Error` and `Display` implementations. The `#[from]` attribute on `Serialization` enables automatic conversion from `serde_json::Error` via the `?` operator.",
+            "testing_notes": "Verify that `cargo build` without the `solana-billing` feature produces no references to this module. Verify `cargo build --features solana-billing` compiles this module and all submodules."
+          },
+          {
+            "file_path": "crates/controller/src/billing/event.rs",
+            "description": "Defines the `SettlementEvent` struct and `EventType` enum — the canonical schema for settlement events published to the `cto:settlements` Redis stream. This schema is consumed by the settlement sidecar (Task 5) and must remain backward-compatible.",
+            "purpose_and_role": "Shared data contract between the controller (publisher) and the settlement sidecar (consumer). The `SettlementEvent` contains all information the sidecar needs to construct and submit a Solana `settle_task` or `refund_task` transaction, including the pre-computed receipt hash that gets written on-chain.",
+            "how_it_connects": "- Created by `handle_billing()` in `tasks/code/controller.rs` after receipt upload\n- Serialized to JSON and published by `publisher::SettlementPublisher::publish()`\n- Deserialized by the settlement sidecar's `types.rs` (Task 5) — schemas must match exactly\n- The `receipt_hash` field must match the on-chain `TaskReceipt.receipt_hash` (32-byte SHA-256)",
+            "interfaces_and_types": "```rust\nuse serde::{Serialize, Deserialize};\n\n/// Settlement action type — maps to on-chain TaskStatus variants.\n#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]\n#[serde(rename_all = \"snake_case\")]\npub enum EventType {\n    /// Normal task settlement (on-chain: settle_task instruction)\n    Settle,\n    /// Refund a previously settled task (on-chain: refund_task instruction)\n    Refund,\n}\n\n/// Event published to the cto:settlements Redis stream.\n/// Contains all data needed for the sidecar to submit a Solana transaction.\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct SettlementEvent {\n    /// Unique task identifier (becomes PDA seed via SHA-256 hash on-chain)\n    pub task_id: String,\n    /// Customer's Solana wallet pubkey (base58-encoded)\n    pub customer_pubkey: String,\n    /// Billable amount in USDC lamports (1 USDC = 1_000_000 lamports for 6 decimals)\n    pub amount_usdc_lamports: u64,\n    /// SHA-256 hash of the receipt JSON (written on-chain for verifiability)\n    pub receipt_hash: [u8; 32],\n    /// S3 URL where the full receipt JSON is stored\n    pub receipt_url: String,\n    /// If a public agent marketplace package was used\n    pub agent_package_id: Option<String>,\n    /// Whether quality attestations (Tess/Cipher/Stitch) passed\n    pub quality_met: bool,\n    /// Settlement action type\n    pub event_type: EventType,\n    /// Name of the CodeRun CR that triggered this event\n    pub coderun_name: String,\n    /// Unix timestamp (seconds) when the event was created\n    pub timestamp: i64,\n}\n```",
+            "implementation_details": "Pure data definitions with serde derives. `EventType` uses `rename_all = \"snake_case\"` so it serializes as `\"settle\"` / `\"refund\"` (matching the sidecar's `event_type: String` field which expects these values). The `receipt_hash` is `[u8; 32]` — serde serializes this as a JSON array of 32 numbers, which the sidecar deserializes identically.\n\n**Backward compatibility note**: New optional fields can be added without breaking the sidecar (serde will ignore unknown fields by default). Required fields must never be removed.",
+            "testing_notes": "Unit tests should verify: (1) serde round-trip — serialize a `SettlementEvent` to JSON string, deserialize back, assert all fields match; (2) `EventType::Settle` serializes to `\"settle\"` and `EventType::Refund` serializes to `\"refund\"`; (3) `receipt_hash` serializes as a 32-element JSON array."
+          },
+          {
+            "file_path": "crates/controller/src/billing/receipt.rs",
+            "description": "Receipt JSON generation, SHA-256 hashing, S3 upload, and billing amount computation. Contains the `ReceiptJson` and `CostLineItem` structs, deterministic hash computation, and the `upload_receipt` async function.",
+            "purpose_and_role": "Generates the off-chain receipt that provides an itemized, human-readable record of what was billed. The receipt is uploaded to S3 for auditability, and its SHA-256 hash is written on-chain in the `TaskReceipt` account, creating a verifiable link between the on-chain settlement and the detailed off-chain record.",
+            "how_it_connects": "- Called by `handle_billing()` in the controller reconciliation loop\n- `ReceiptJson::compute_sha256()` produces the `receipt_hash` that flows into `SettlementEvent` and ultimately into the on-chain `TaskReceipt.receipt_hash`\n- `upload_receipt()` stores the receipt in S3 and returns the URL used in `SettlementEvent.receipt_url`\n- Uses `SolanaBillingConfig` for S3 bucket/prefix configuration\n- The hash computation uses `sha2::Sha256`, matching the on-chain `hash_seed()` function in `programs/cto-billing/src/utils/mod.rs`",
+            "interfaces_and_types": "```rust\nuse serde::{Serialize, Deserialize};\nuse sha2::{Sha256, Digest};\nuse crate::billing::config::SolanaBillingConfig;\nuse crate::billing::BillingError;\n\n/// Tier-based billing rates in USDC lamports (1 USDC = 1_000_000 lamports).\nconst STANDARD_RATE: u64 = 750_000;  // $0.75 per run\nconst HIGH_MEM_RATE: u64 = 1_500_000; // $1.50 per run\nconst GPU_RATE: u64 = 3_000_000;      // $3.00 per run\n\n/// A single line item in the receipt's cost breakdown.\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct CostLineItem {\n    pub description: String,\n    pub amount_usdc: f64,\n}\n\n/// Complete receipt JSON uploaded to S3.\n/// The SHA-256 hash of this struct's canonical JSON serialization\n/// is stored on-chain in TaskReceipt.receipt_hash.\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct ReceiptJson {\n    pub task_id: String,\n    pub customer: String,\n    pub coderun_name: String,\n    pub duration_seconds: u64,\n    pub infra_tier: String,\n    pub provider: String,\n    pub agent_used: String,\n    pub itemized_costs: Vec<CostLineItem>,\n    pub total_usdc: f64,\n    pub timestamp: String, // ISO 8601\n}\n\nimpl ReceiptJson {\n    /// Serialize to canonical JSON bytes for deterministic hashing.\n    pub fn to_json_bytes(&self) -> serde_json::Result<Vec<u8>>;\n\n    /// Compute SHA-256 hash of the canonical JSON representation.\n    /// This hash is stored on-chain and can be used to verify receipt integrity.\n    pub fn compute_sha256(&self) -> [u8; 32];\n}\n\n/// Upload receipt JSON to S3 and return (url, sha256_hash).\n/// S3 key format: {config.receipt_s3_prefix}/{task_id}/{timestamp}.json\npub async fn upload_receipt(\n    receipt: &ReceiptJson,\n    config: &SolanaBillingConfig,\n) -> Result<(String, [u8; 32]), BillingError>;\n\n/// Compute billable amount in USDC lamports from infra tier.\n/// This is a flat per-run rate (not duration-based for hackathon simplicity).\n/// Tier rates: standard=$0.75, high-mem=$1.50, GPU=$3.00.\npub fn compute_billing_amount(duration_seconds: u64, tier: &str) -> u64;\n```",
+            "implementation_details": "**`to_json_bytes()`**: Uses `serde_json::to_vec(self)` for canonical serialization. Important: this must be deterministic — serde_json produces consistent key ordering for structs (fields in declaration order).\n\n**`compute_sha256()`**: Calls `to_json_bytes()`, feeds the bytes into `sha2::Sha256::digest()`, converts the `GenericArray` to `[u8; 32]`. If serialization fails (should never happen for valid data), returns a zero hash rather than panicking.\n\n**`upload_receipt()`**: \n1. Calls `to_json_bytes()` and `compute_sha256()`\n2. Constructs S3 key as `{prefix}/{task_id}/{timestamp}.json`\n3. Uploads JSON bytes to S3 with `Content-Type: application/json`\n4. Returns the full S3 URL and the hash\n5. Uses whatever S3 client is available in the controller workspace; if none exists, uses a minimal HTTP PUT to S3-compatible storage or adds `rust-s3` as an optional dependency\n\n**`compute_billing_amount()`**: Matches tier string to rate constant. Duration is accepted as a parameter for future use but the hackathon implementation uses flat per-run rates. Unknown tiers default to `STANDARD_RATE`.\n\n**Error handling**: All S3 errors are mapped to `BillingError::S3Upload`. The function never panics.",
+            "testing_notes": "Tests should verify: (1) `compute_sha256()` is deterministic — calling twice on the same receipt produces the same hash; (2) `compute_sha256()` produces the correct hash for a known receipt (precompute with `echo -n '<json>' | sha256sum`); (3) `compute_billing_amount(120, \"standard\")` returns `750_000`; (4) `compute_billing_amount(120, \"GPU\")` returns `3_000_000`; (5) S3 key is formatted as `{prefix}/{task_id}/{timestamp}.json`; (6) `upload_receipt` returns `BillingError::S3Upload` when the upload mock fails."
+          },
+          {
+            "file_path": "crates/controller/src/billing/publisher.rs",
+            "description": "Redis stream publisher that publishes `SettlementEvent` JSON to the `cto:settlements` stream using the Redis XADD command. Provides both blocking `publish()` and non-blocking `publish_fire_and_forget()` methods.",
+            "purpose_and_role": "The bridge between the controller and the settlement sidecar. Encapsulates all Redis interaction for the billing subsystem. The publisher is initialized once at controller startup and shared via `Arc` across reconciliation tasks. It must never block or crash the controller — all errors are caught and logged.",
+            "how_it_connects": "- Initialized in the controller startup code, stored in the reconciliation context\n- Called by `handle_billing()` in `tasks/code/controller.rs` after receipt upload\n- Publishes to the `cto:settlements` Redis stream\n- The settlement sidecar (Task 5) reads from this stream via XREADGROUP\n- Uses existing `gitlab/gitlab-redis-master` service (referenced in infrastructure context)",
+            "interfaces_and_types": "```rust\nuse std::sync::Arc;\nuse crate::billing::event::SettlementEvent;\nuse crate::billing::BillingError;\n\n/// Publishes settlement events to the cto:settlements Redis stream.\n/// Thread-safe and designed to be shared via Arc across async tasks.\npub struct SettlementPublisher {\n    client: redis::Client,\n}\n\nimpl SettlementPublisher {\n    /// Create a new publisher connected to the given Redis URL.\n    /// Does not establish a connection immediately — connections are lazy.\n    pub fn new(redis_url: &str) -> Result<Self, BillingError>;\n\n    /// Publish a settlement event to the cto:settlements stream via XADD.\n    /// Returns the Redis stream entry ID (e.g., \"1234567890-0\").\n    ///\n    /// The XADD includes both the full JSON payload and indexed fields:\n    /// - \"event\": full SettlementEvent JSON\n    /// - \"task_id\": event.task_id\n    /// - \"event_type\": \"settle\" or \"refund\"\n    pub async fn publish(&self, event: &SettlementEvent) -> Result<String, BillingError>;\n\n    /// Fire-and-forget publish — spawns a tokio task.\n    /// Logs errors but never blocks or propagates failures.\n    pub fn publish_fire_and_forget(self: Arc<Self>, event: SettlementEvent);\n}\n```",
+            "implementation_details": "**`new()`**: Calls `redis::Client::open(redis_url)` and maps any error to `BillingError::RedisPublish`. Does not establish a connection — the redis crate connects lazily on first command.\n\n**`publish()`**: \n1. Gets a multiplexed async connection via `self.client.get_multiplexed_async_connection().await`\n2. Serializes the `SettlementEvent` to JSON via `serde_json::to_string`\n3. Executes `XADD cto:settlements * event <json> task_id <id> event_type <type>` using `redis::cmd(\"XADD\")`\n4. Returns the stream entry ID string\n5. Maps all errors to `BillingError::RedisPublish`\n6. Logs success with `tracing::info!` including stream_id and task_id\n\n**`publish_fire_and_forget()`**: Spawns a `tokio::spawn` that calls `self.publish(&event).await` and logs any error at `warn` level. The spawned task is detached — the caller immediately returns.\n\n**Connection strategy**: Uses `get_multiplexed_async_connection()` which shares a single TCP connection across concurrent calls. This is appropriate for the controller's reconciliation loop where settlements are relatively infrequent.\n\n**Stream field design**: Including `task_id` and `event_type` as separate XADD fields (in addition to the full JSON in `event`) allows the sidecar to inspect messages without parsing JSON, and enables Redis stream filtering if needed.",
+            "testing_notes": "Tests should verify: (1) `SettlementPublisher::new` succeeds with a valid Redis URL format (does not require actual connection); (2) `publish` formats the XADD command correctly with stream name `cto:settlements`, `*` for auto-ID, and includes `event`, `task_id`, and `event_type` fields; (3) `publish` returns `BillingError::RedisPublish` when the connection fails; (4) With testcontainers: publish an event, XREAD it back, deserialize the `event` field, assert all fields match."
+          },
+          {
+            "file_path": "crates/controller/src/billing/config.rs",
+            "description": "Configuration struct for the Solana billing subsystem, loaded from environment variables or the controller's config file. Controls whether billing is enabled and where receipts/events are stored.",
+            "purpose_and_role": "Centralizes all billing-related configuration. The `enabled` flag provides a runtime kill switch independent of the compile-time feature flag — even with `solana-billing` compiled in, billing can be disabled via config.",
+            "how_it_connects": "- Referenced by `handle_billing()` in the reconciliation loop (checks `enabled` first)\n- Passed to `upload_receipt()` for S3 bucket/prefix\n- Passed to `SettlementPublisher::new()` for Redis URL\n- Added as an optional field on the main controller config struct (feature-gated)",
+            "interfaces_and_types": "```rust\nuse serde::Deserialize;\n\n/// Configuration for the Solana billing integration.\n/// All fields are loaded from environment variables or config file.\n#[derive(Clone, Debug, Deserialize)]\npub struct SolanaBillingConfig {\n    /// Redis connection URL (e.g., redis://gitlab-redis-master.gitlab.svc:6379)\n    pub redis_url: String,\n    /// S3 bucket name for receipt storage\n    pub receipt_s3_bucket: String,\n    /// S3 key prefix for receipts (e.g., \"receipts/solana\")\n    pub receipt_s3_prefix: String,\n    /// Runtime kill switch — if false, handle_billing returns immediately\n    pub enabled: bool,\n}\n```",
+            "implementation_details": "Pure data struct with `Deserialize` derive. The controller's existing config loading mechanism (likely `config` crate or environment variable parsing) should be extended to include this struct as an optional field:\n\n```rust\n#[cfg(feature = \"solana-billing\")]\npub solana_billing: Option<SolanaBillingConfig>,\n```\n\nDefaults (if using config crate or manual defaults): `enabled: false`, `redis_url: \"redis://gitlab-redis-master.gitlab.svc:6379\"`, `receipt_s3_prefix: \"receipts/solana\"`.",
+            "testing_notes": "Test that the struct deserializes correctly from JSON/TOML. Test that missing `enabled` field causes a deserialization error (it's required, not optional, to force explicit configuration)."
+          },
+          {
+            "file_path": "crates/controller/src/events.rs",
+            "description": "Anchor-style event struct definitions for on-chain event emission. While these events are defined in the Solana program (Tasks 1-2), this file documents the expected event schemas for the controller's reference and for any off-chain event parsing.",
+            "purpose_and_role": "Reference documentation and potential deserialization targets for on-chain events. The controller doesn't directly emit these (the Solana program does), but having the types available enables future event monitoring/indexing from the controller side.",
+            "how_it_connects": "- Mirrors the `#[event]` structs defined in `programs/cto-billing/src/events.rs` (Task 2)\n- Could be used by a future event listener/indexer component\n- Referenced by the settlement sidecar for transaction confirmation parsing",
+            "interfaces_and_types": "```rust\nuse serde::{Serialize, Deserialize};\n\n/// Emitted on-chain when a task is settled.\n/// Mirrors the Anchor #[event] in programs/cto-billing/src/events.rs\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct TaskSettled {\n    pub task_id: String,\n    pub customer: String,      // Pubkey as base58\n    pub amount_charged: u64,\n    pub author_earned: u64,\n    pub quality_met: bool,\n    pub agent_package: Option<String>, // Pubkey as base58\n    pub settled_at: i64,\n}\n\n/// Emitted on-chain when a task is refunded.\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct TaskRefunded {\n    pub task_id: String,\n    pub customer: String,\n    pub amount_refunded: u64,\n    pub refunded_at: i64,\n}\n\n/// Emitted on-chain when a deposit occurs.\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct Deposited {\n    pub customer: String,\n    pub amount: u64,\n    pub new_balance: u64,\n}\n\n/// Emitted on-chain when a withdrawal occurs.\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct Withdrawn {\n    pub customer: String,\n    pub amount: u64,\n    pub new_balance: u64,\n}\n\n/// Emitted on-chain when an agent package is registered.\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct AgentPackageRegistered {\n    pub package_id: String,\n    pub author: String,\n    pub split_bps: u16,\n}\n```",
+            "implementation_details": "Pure data definitions with serde derives. These are reference types — they mirror the on-chain Anchor events but use `String` instead of `Pubkey` for portability. No methods needed for the hackathon; they exist primarily as documentation and for potential future use in event parsing.",
+            "testing_notes": "Basic serde round-trip tests to ensure the types serialize/deserialize correctly."
+          }
+        ],
+        "files_to_modify": [
+          {
+            "file_path": "crates/controller/Cargo.toml",
+            "description": "Add the `solana-billing` feature flag with optional dependencies for Redis, SHA-256, and JSON serialization. This is the compile-time gate for all billing functionality.",
+            "nature_of_changes": "Add a `[features]` section (or extend existing one) with `solana-billing = [\"dep:redis\", \"dep:sha2\"]`. Add optional dependencies: `redis = { version = \"0.25\", features = [\"tokio-comp\", \"streams\"], optional = true }` and `sha2 = { version = \"0.10\", optional = true }`. Note: `serde_json` is likely already a non-optional dependency — check before adding. Also add `thiserror` if not already present (for `BillingError`).",
+            "interfaces_affected": "No code interfaces changed. Build system interface: new feature flag `solana-billing` that can be activated via `cargo build --features solana-billing`.",
+            "testing_notes": "Verify `cargo build` (no features) compiles with zero errors and no redis/sha2 references. Verify `cargo build --features solana-billing` compiles with the billing module included. Check that `solana-billing` is NOT in the `default` features list."
+          },
+          {
+            "file_path": "crates/controller/src/lib.rs",
+            "description": "Add feature-gated `pub mod billing` declaration so the billing module is only compiled when the `solana-billing` feature is active.",
+            "nature_of_changes": "Add:\n```rust\n#[cfg(feature = \"solana-billing\")]\npub mod billing;\n```\nThis should be placed alongside other module declarations. No other changes to `lib.rs`.",
+            "interfaces_affected": "Adds `crate::billing` module namespace, only visible when `solana-billing` feature is enabled. All existing code paths are unaffected.",
+            "testing_notes": "Verify `cargo build` without features — no compilation errors, `billing` module not referenced. Verify `cargo build --features solana-billing` — `billing` module compiles."
+          },
+          {
+            "file_path": "crates/controller/src/tasks/code/controller.rs",
+            "description": "Integrate the billing hook into the controller's reconciliation loop. When a CodeRun reaches a terminal state (merged/failed/cancelled), the billing pipeline is triggered behind `#[cfg(feature = \"solana-billing\")]`.",
+            "nature_of_changes": "Add a feature-gated `handle_billing()` async function and three helper functions (`compute_duration`, `determine_quality`, `build_receipt`). Insert a call to `handle_billing()` at the point in the reconciliation loop where CodeRuns transition to terminal states. If it returns `Some(stream_id)`, annotate the CodeRun status with `solana-settlement-event-id`.\n\nThe billing hook follows this pipeline:\n1. Check `config.enabled` — return `None` immediately if disabled\n2. Extract duration from CodeRun status timestamps\n3. Determine infra tier from annotations (default: `\"standard\"`)\n4. Compute billable amount via `compute_billing_amount()`\n5. Extract customer Solana pubkey from annotation `cto.ai/customer-solana-pubkey`\n6. Determine `quality_met` from attestation annotations\n7. Build `ReceiptJson` with itemized costs\n8. Upload receipt to S3 via `upload_receipt()`\n9. Build and publish `SettlementEvent` to Redis\n10. Return stream entry ID for annotation\n\nAll steps are wrapped in error handling — any failure logs a warning and returns `None`.",
+            "interfaces_affected": "New functions (all feature-gated):\n- `async fn handle_billing(coderun: &CodeRun, config: &SolanaBillingConfig, publisher: &Arc<SettlementPublisher>) -> Option<String>`\n- `fn compute_duration(coderun: &CodeRun) -> u64`\n- `fn determine_quality(coderun: &CodeRun) -> bool`\n- `fn build_receipt(coderun: &CodeRun, duration_seconds: u64, tier: &str, agent_used: &Option<String>, amount: u64) -> ReceiptJson`\n\nThe reconciliation loop gains one additional async call at terminal state transitions.",
+            "testing_notes": "Unit tests: (1) `compute_duration` returns correct seconds for known start/completion timestamps; (2) `determine_quality` returns `true` for merged CodeRun with `cto.ai/tess-passed=true` annotation, `false` for failed CodeRun; (3) `handle_billing` with `enabled=false` returns `None` without calling S3 or Redis; (4) End-to-end mock test: `handle_billing` produces a `SettlementEvent` with correct amount, customer_pubkey, quality_met, and receipt_hash."
+          }
+        ],
+        "context_and_dependencies": {
+          "dependencies": [
+            "Task 1: On-chain program state accounts (OperatorConfig, CustomerBalance, AgentPackage, TaskReceipt) — defines the data model this code must be compatible with",
+            "Task 2: On-chain settle_task/refund_task instructions and Anchor events — defines the settlement schema, receipt_hash field, and three-case quality-gated logic that the controller must mirror",
+            "sha2 crate (v0.10) — SHA-256 hashing for receipt integrity verification, must produce identical hashes to the on-chain hash_seed() function",
+            "redis crate (v0.25) with tokio-comp and streams features — async Redis client for XADD to cto:settlements stream",
+            "serde/serde_json — JSON serialization for SettlementEvent (Redis payload) and ReceiptJson (S3 upload)",
+            "thiserror — derive macro for BillingError enum",
+            "Existing controller S3 client or rust-s3/aws-sdk-s3 — for receipt upload to object storage",
+            "chrono — ISO 8601 timestamp generation for receipts",
+            "tracing — structured logging for billing operations"
+          ],
+          "dependents": [
+            "Task 5: Settlement sidecar — consumes SettlementEvent from cto:settlements Redis stream, deserializes using matching schema, and submits Solana transactions"
+          ],
+          "broader_context": "This task sits at the junction between the Kubernetes controller (which orchestrates CodeRun execution) and the Solana blockchain (which records immutable settlement receipts). The controller observes CodeRun lifecycle events and translates them into billing events. The decoupled architecture (Redis stream between controller and sidecar) ensures the controller never needs Solana SDK dependencies and can continue operating if the Solana network is unavailable. The `cto:settlements` Redis stream acts as a reliable message queue with consumer groups enabling at-least-once delivery semantics."
+        },
+        "key_decisions": [
+          {
+            "decision": "Redis client: use redis-rs with get_multiplexed_async_connection()",
+            "reasoning": "The controller's reconciliation loop handles settlements infrequently (one per CodeRun terminal state). A multiplexed connection from redis-rs is simpler than adding deadpool-redis as a dependency. The multiplexed connection shares a single TCP connection across concurrent calls, which is sufficient for this workload. If the billing volume increases significantly, deadpool-redis can be swapped in as a drop-in replacement.",
+            "alternatives_considered": "deadpool-redis (connection pool) — adds a dependency but provides better connection lifecycle management under high load. Not justified for hackathon volume."
+          },
+          {
+            "decision": "Billing rates: hardcoded tier constants",
+            "reasoning": "Hackathon simplicity. Three flat per-run rates (standard=$0.75, high-mem=$1.50, GPU=$3.00) are defined as constants in receipt.rs. This avoids adding configuration complexity for rate management. The constants are clearly named and easy to find for future modification.",
+            "alternatives_considered": "Configurable rates in SolanaBillingConfig — more flexible but adds config complexity and validation logic. Can be added post-hackathon."
+          },
+          {
+            "decision": "Quality determination: annotation-based with fallback",
+            "reasoning": "Quality is determined by checking CodeRun annotations for attestation results (e.g., cto.ai/tess-passed, cto.ai/cipher-approved). If the CodeRun reached 'merged' state with passing attestations, quality_met=true. Failed/cancelled CodeRuns always have quality_met=false. This is the simplest approach that integrates with the existing annotation-based metadata system on CodeRun CRs.",
+            "alternatives_considered": "Separate attestation CRDs — more robust but requires cross-resource queries. Status conditions on CodeRun — depends on controller implementation details that may not exist yet."
+          },
+          {
+            "decision": "Receipt hash uses serde_json canonical serialization",
+            "reasoning": "serde_json serializes struct fields in declaration order, which is deterministic for a given struct definition. This provides a simple canonical form without needing a separate canonicalization library. The hash is computed over the exact bytes that are uploaded to S3, ensuring the on-chain hash matches the stored receipt.",
+            "alternatives_considered": "JSON Canonicalization Scheme (RFC 8785) — more formally correct but adds a dependency. Not needed when we control both the serializer and verifier."
+          }
+        ],
+        "implementation_flow": "The implementation proceeds in five subtasks with a clear dependency chain:\n\n**Subtask 4001: Foundation** — Feature flag in Cargo.toml, billing module skeleton, config struct, customer pubkey annotation. This establishes the compile-time gates and configuration.\n\n**Subtask 4002: Data schemas** — SettlementEvent, EventType, ReceiptJson, CostLineItem, and compute_billing_amount(). Pure data definitions with serde derives and unit tests.\n\n**Subtask 4003: Receipt storage** (parallelizable with 4004) — ReceiptJson methods (to_json_bytes, compute_sha256), upload_receipt() with S3 integration, BillingError enum.\n\n**Subtask 4004: Redis publisher** (parallelizable with 4003) — SettlementPublisher struct with new(), publish(), and publish_fire_and_forget() methods.\n\n**Subtask 4005: Integration** — handle_billing() function in the reconciliation loop, helper functions (compute_duration, determine_quality, build_receipt), CodeRun annotation with settlement event ID. Ties everything together.\n\n```\n4001 → 4002 → ┬─ 4003 ─┬─→ 4005\n               └─ 4004 ─┘\n```\n\nSubtasks 4003 and 4004 can be implemented in parallel since they share only the schema definitions from 4002 and the BillingError from the module root.",
+        "testing_strategy": "**Compile-time verification**:\n- `cargo build` (no features) — zero errors, no billing code\n- `cargo build --features solana-billing` — zero errors, billing module included\n\n**Unit tests** (`cargo test --features solana-billing`):\n1. SettlementEvent serde round-trip — serialize/deserialize, assert field equality\n2. EventType serialization — `Settle` → `\"settle\"`, `Refund` → `\"refund\"`\n3. ReceiptJson SHA-256 determinism — same receipt hashes to same value\n4. ReceiptJson SHA-256 correctness — hash matches precomputed value\n5. compute_billing_amount tier rates — standard=750_000, high-mem=1_500_000, GPU=3_000_000\n6. SettlementPublisher::new with valid URL — succeeds\n7. SettlementPublisher::publish error on connection failure — returns BillingError::RedisPublish\n8. compute_duration with known timestamps — correct seconds\n9. determine_quality with attestation annotations — correct boolean\n10. handle_billing with enabled=false — returns None immediately\n\n**Integration tests** (if testcontainers available):\n11. Redis round-trip: publish event, XREAD, deserialize, assert match\n12. S3 round-trip: upload receipt, download, verify hash\n\n**End-to-end verification**:\n- Build controller with feature, start with billing enabled, trigger a CodeRun to terminal state, verify Redis stream contains the event, verify S3 contains the receipt, verify CodeRun has settlement annotation"
+      }
+    }
+  ],
+  [
+    {
+      "id": "doc-5-overview",
+      "prefix": "cto-billing",
+      "title": "Settlement Sidecar Service — Architecture Overview",
+      "content": "# Settlement Sidecar Service — Architecture Overview\n\nThe settlement sidecar is an independent Rust binary (`settlement-sidecar`) that bridges the CTO controller's billing events to the Solana blockchain. It reads settlement events from a Redis stream (`cto:settlements`) and submits corresponding on-chain transactions to the `cto-billing` Solana program.\n\n## Design Rationale\n\nThe sidecar fully decouples the CTO controller from Solana RPC. The controller publishes a fire-and-forget event to Redis (Task 4); the sidecar consumes it asynchronously. This means:\n- Controller latency is never blocked by Solana confirmation times.\n- The sidecar can be scaled, restarted, or upgraded independently.\n- Failed Solana transactions are retried with exponential backoff without affecting controller operations.\n- A dead-letter queue (`cto:settlements:dlq`) captures permanently failed events for manual review.\n\n## Pipeline Flow\n\n```\nController → Redis XADD → Sidecar XREADGROUP → Build TX → Submit to Solana → XACK\n                                                    ↓ (on permanent failure)\n                                               DLQ (cto:settlements:dlq)\n```\n\n## Key Components\n\n| Module | Responsibility |\n|--------|---------------|\n| `config.rs` | Environment-based configuration loading |\n| `types.rs` | `SettlementEvent` deserialization matching controller schema |\n| `consumer.rs` | Redis stream consumer with consumer groups, pending recovery, DLQ routing |\n| `pda.rs` | PDA derivation using SHA-256 seeds matching on-chain logic |\n| `transaction.rs` | Instruction construction for `settle_task` / `refund_task` |\n| `submitter.rs` | Transaction submission with exponential backoff and error classification |\n| `health.rs` | HTTP `/healthz` endpoint with Redis/Solana connectivity checks |\n\n## Dependencies\n\n- **Task 1 & 2**: The on-chain `cto-billing` program must be deployed (provides the program ID and instruction interfaces).\n- **Task 4**: The controller billing module must publish `SettlementEvent` payloads to the `cto:settlements` Redis stream.\n\n## Configuration\n\nAll settings are loaded from environment variables for Kubernetes deployment. The operator keypair is mounted as a secret file (via External Secrets Operator).\n\n## Deployment\n\nThe sidecar ships as a minimal Docker image (`< 100MB`) built from a multi-stage Dockerfile. It runs as a standalone pod in the `cto` namespace alongside the controller.",
+      "references": [
+        "programs/cto-billing/src/lib.rs",
+        "crates/settlement-sidecar/src/main.rs",
+        "crates/settlement-sidecar/src/config.rs",
+        "crates/settlement-sidecar/Dockerfile"
+      ]
+    },
+    {
+      "id": "doc-5-config",
+      "prefix": "cto-billing",
+      "title": "Settlement Sidecar — Configuration Module",
+      "content": "# Settlement Sidecar — Configuration Module\n\n## File: `crates/settlement-sidecar/src/config.rs`\n\nThe `SidecarConfig` struct holds all runtime configuration, loaded entirely from environment variables.\n\n## Struct Definition\n\n```rust\npub struct SidecarConfig {\n    pub solana_rpc_url: String,          // SOLANA_RPC_URL — e.g. https://api.devnet.solana.com\n    pub operator_keypair_path: String,   // OPERATOR_KEYPAIR_PATH — /secrets/operator-keypair.json\n    pub program_id: Pubkey,              // PROGRAM_ID — base58 encoded\n    pub redis_url: String,               // REDIS_URL — redis://...\n    pub stream_name: String,             // STREAM_NAME — default: \"cto:settlements\"\n    pub consumer_group: String,          // CONSUMER_GROUP — default: \"settlement-sidecar\"\n    pub consumer_name: String,           // CONSUMER_NAME — default: pod hostname\n    pub max_retries: u32,                // MAX_RETRIES — default: 5\n    pub retry_base_delay_ms: u64,        // RETRY_BASE_DELAY_MS — default: 1000\n    pub confirm_timeout_secs: u64,       // CONFIRM_TIMEOUT_SECS — default: 30\n}\n```\n\n## Methods\n\n### `SidecarConfig::from_env() -> Result<Self, Box<dyn Error>>`\n\nReads all fields from environment variables. Required variables (`SOLANA_RPC_URL`, `OPERATOR_KEYPAIR_PATH`, `PROGRAM_ID`, `REDIS_URL`) cause an error if missing. Optional variables fall back to defaults.\n\nThe `consumer_name` defaults to the system hostname, which in Kubernetes maps to the pod name — ensuring unique consumer names for XREADGROUP.\n\n### `SidecarConfig::load_operator_keypair() -> Result<Keypair, Box<dyn Error>>`\n\nReads the JSON file at `operator_keypair_path` and parses it into a `solana_sdk::signer::keypair::Keypair`. The file format is a JSON array of 64 byte values (standard Solana CLI format).\n\n## Kubernetes Deployment Notes\n\n- `OPERATOR_KEYPAIR_PATH` points to a volume mount populated by External Secrets Operator (ESO).\n- `REDIS_URL` should point to the cluster-internal Redis service.\n- `PROGRAM_ID` must match the deployed `cto-billing` program from Tasks 1-2.",
+      "references": [
+        "crates/settlement-sidecar/src/config.rs",
+        "crates/settlement-sidecar/src/main.rs"
+      ]
+    },
+    {
+      "id": "doc-5-types",
+      "prefix": "cto-billing",
+      "title": "Settlement Sidecar — Event Types",
+      "content": "# Settlement Sidecar — Event Types\n\n## File: `crates/settlement-sidecar/src/types.rs`\n\nThe `SettlementEvent` struct deserializes the JSON payloads published to the Redis stream by the controller billing module (Task 4).\n\n## Struct Definition\n\n```rust\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct SettlementEvent {\n    pub task_id: String,\n    pub customer_pubkey: String,         // base58-encoded Pubkey\n    pub amount_usdc_lamports: u64,       // amount in USDC lamports (6 decimals)\n    pub receipt_hash: [u8; 32],          // SHA-256 of the receipt JSON\n    pub receipt_url: String,             // S3 URL of the uploaded receipt\n    pub agent_package_id: Option<String>,// package_id if an agent was used\n    pub quality_met: bool,               // quality gate result\n    pub event_type: String,              // \"settle\" or \"refund\"\n    pub coderun_name: String,            // originating CodeRun name\n    pub timestamp: i64,                  // Unix timestamp\n}\n```\n\n## Schema Contract\n\nThis struct **must** match the `SettlementEvent` defined in `crates/controller/src/billing/event.rs` (Task 4). The `event_type` field is a string (`\"settle\"` or `\"refund\"`) rather than an enum to simplify Redis stream serialization. The sidecar pattern-matches on this field to decide whether to build a `settle_task` or `refund_task` instruction.\n\n## Parsing Notes\n\n- `customer_pubkey` is parsed into a `solana_sdk::pubkey::Pubkey` via `Pubkey::from_str()`.\n- `receipt_hash` is a 32-byte array serialized as a JSON array of integers.\n- If `agent_package_id` is `Some`, the transaction builder includes `AgentPackage` and `author_ata` accounts in the instruction.",
+      "references": [
+        "crates/settlement-sidecar/src/types.rs",
+        "crates/controller/src/billing/event.rs"
+      ]
+    },
+    {
+      "id": "doc-5-consumer",
+      "prefix": "cto-billing",
+      "title": "Settlement Sidecar — Redis Stream Consumer",
+      "content": "# Settlement Sidecar — Redis Stream Consumer\n\n## File: `crates/settlement-sidecar/src/consumer.rs`\n\nThe `StreamConsumer` manages the full lifecycle of consuming settlement events from the `cto:settlements` Redis stream.\n\n## Struct\n\n```rust\npub struct StreamConsumer {\n    // Async Redis connection, stream_name, consumer_group, consumer_name, max_retries\n}\n```\n\n## Lifecycle\n\n### 1. Initialization (`StreamConsumer::init()`)\n\nCreates the consumer group via `XGROUP CREATE <stream> <group> 0 MKSTREAM`. The `BUSYGROUP` error is caught and ignored, making this idempotent across restarts.\n\n### 2. Pending Recovery (`recover_pending()`)\n\nBefore processing new messages, the consumer reads any un-ACKed messages from prior runs:\n```\nXREADGROUP GROUP <group> <consumer> COUNT 100 STREAMS <stream> 0\n```\nThis ensures at-least-once delivery — if the sidecar crashed mid-processing, those messages are reprocessed.\n\n### 3. Main Consumption Loop (`consume()`)\n\nBlocking read for new messages:\n```\nXREADGROUP GROUP <group> <consumer> BLOCK 5000 COUNT 10 STREAMS <stream> >\n```\n\nFor each message:\n1. Parse the payload into a `SettlementEvent`.\n2. Call the provided async handler function (the transaction submission pipeline).\n3. On success: `XACK <stream> <group> <id>`.\n4. On failure after max retries: route to DLQ.\n\n### 4. Dead-Letter Queue (`send_to_dlq()`)\n\nFailed messages are written to `cto:settlements:dlq`:\n```\nXADD cto:settlements:dlq * original_id <id> event <json> error <error_msg> failed_at <timestamp>\n```\nThe original message is then ACKed to prevent infinite reprocessing.\n\n### 5. Graceful Shutdown\n\nOn SIGTERM, the consumer finishes processing the current message before exiting the loop. This prevents partial processing and orphaned pending messages.\n\n## Error Handling\n\nThe consumer itself does not retry Solana transactions — it delegates to the submitter. The consumer's retry responsibility is limited to Redis connectivity issues (reconnect on connection drop).",
+      "references": [
+        "crates/settlement-sidecar/src/consumer.rs",
+        "crates/settlement-sidecar/src/main.rs"
+      ]
+    },
+    {
+      "id": "doc-5-pda",
+      "prefix": "cto-billing",
+      "title": "Settlement Sidecar — PDA Derivation",
+      "content": "# Settlement Sidecar — PDA Derivation\n\n## File: `crates/settlement-sidecar/src/pda.rs`\n\nAll PDA derivation functions use the same SHA-256 seed logic as the on-chain `cto-billing` program to ensure deterministic address computation.\n\n## Seed Constants\n\nMatching `programs/cto-billing/src/utils/mod.rs`:\n\n| PDA | Seeds |\n|-----|-------|\n| OperatorConfig | `[b\"operator_config\"]` |\n| CustomerBalance | `[b\"customer_balance\", customer.key().as_ref()]` |\n| AgentPackage | `[b\"agent_package\", sha256(package_id)]` |\n| TaskReceipt | `[b\"task_receipt\", sha256(task_id)]` |\n| Vault | `[b\"vault\", mint.key().as_ref()]` |\n\n## Functions\n\n### `hash_seed(input: &str) -> [u8; 32]`\n\nComputes SHA-256 hash of the input string, exactly matching the on-chain `hash_seed` utility. This is critical for AgentPackage and TaskReceipt PDAs where the seed is a hash of a string identifier.\n\n### Derivation Functions\n\nEach function returns `(Pubkey, u8)` — the derived PDA address and its bump seed:\n\n- `derive_operator_config(program_id)` — singleton PDA\n- `derive_customer_balance(program_id, customer)` — per-customer PDA\n- `derive_agent_package(program_id, package_id)` — uses `hash_seed(package_id)`\n- `derive_task_receipt(program_id, task_id)` — uses `hash_seed(task_id)`\n- `derive_vault(program_id, mint)` — vault token account PDA\n\nAll use `Pubkey::find_program_address()` with the appropriate seed slices.\n\n## Cross-Validation\n\nThese derivations **must** produce identical addresses to:\n- The on-chain program seeds in `programs/cto-billing/src/utils/mod.rs`\n- The TypeScript helpers in `tests/helpers.ts` (`derivePackagePda`, `deriveCustomerPda`, `deriveReceiptPda`, `deriveVaultPda`, `deriveOperatorConfigPda`)\n\nThe integration test (subtask 5006) cross-validates by deriving PDAs in the sidecar and checking them against on-chain accounts created by the Anchor test suite.",
+      "references": [
+        "crates/settlement-sidecar/src/pda.rs",
+        "programs/cto-billing/src/utils/mod.rs",
+        "tests/helpers.ts"
+      ]
+    },
+    {
+      "id": "doc-5-transaction",
+      "prefix": "cto-billing",
+      "title": "Settlement Sidecar — Transaction Builder",
+      "content": "# Settlement Sidecar — Transaction Builder\n\n## File: `crates/settlement-sidecar/src/transaction.rs`\n\nThe `TransactionBuilder` constructs Solana instructions for `settle_task` and `refund_task` that are compatible with the Anchor-based `cto-billing` program.\n\n## Struct\n\n```rust\npub struct TransactionBuilder {\n    // program_id, operator keypair reference, blockhash cache\n}\n```\n\n## settle_task Instruction\n\n### `build_settle_task(event, mint, treasury_ata) -> Result<Instruction>`\n\nConstructs the full instruction:\n\n1. **Instruction data**: Anchor 8-byte discriminator (SHA-256 of `\"global:settle_task\"` truncated to 8 bytes) + Borsh-serialized args (`task_id: String`, `amount: u64`, `receipt_hash: [u8; 32]`, `quality_met: bool`).\n\n2. **Account list** (order matters for Anchor deserialization):\n   - `operator` — signer, writable\n   - `operator_config` — read-only (derived via `derive_operator_config`)\n   - `customer_balance` — writable (derived via `derive_customer_balance`)\n   - `treasury_ata` — writable (passed in)\n   - `vault` — writable (derived via `derive_vault`)\n   - `vault_authority` — read-only (PDA authority for vault CPI signing)\n   - `task_receipt` — writable (derived via `derive_task_receipt`, will be initialized)\n   - `mint` — read-only\n   - `token_program` — read-only\n   - `system_program` — read-only\n   - `clock` — sysvar\n\n3. **Optional accounts** (when `agent_package_id` is present):\n   - `agent_package` — writable (derived via `derive_agent_package`)\n   - `author_ata` — writable (must be looked up or passed)\n\n## refund_task Instruction\n\n### `build_refund_task(event, mint, treasury_ata) -> Result<Instruction>`\n\nSimilar pattern. The task_receipt PDA already exists (was created during settlement), so it is not initialized — just marked writable.\n\n## Blockhash Cache\n\n```rust\npub struct BlockhashCache { /* cached hash + timestamp */ }\n```\n\n### `get_blockhash() -> Result<Hash>`\n\nReturns the cached blockhash if it's less than 30 seconds old. Otherwise fetches a fresh one via `RpcClient::get_latest_blockhash()` and updates the cache.\n\n### `force_refresh() -> Result<()>`\n\nForces an immediate blockhash refresh. Called by the submitter when a `BlockhashNotFound` error is encountered.\n\n## Decision: anchor-client vs. Manual Construction\n\nThe scaffold uses manual instruction construction rather than the `anchor-client` crate. This avoids a large transitive dependency and gives full control over account ordering. The tradeoff is that instruction discriminators and serialization must exactly match Anchor's conventions.",
+      "references": [
+        "crates/settlement-sidecar/src/transaction.rs",
+        "crates/settlement-sidecar/src/pda.rs",
+        "programs/cto-billing/src/instructions/settle_task.rs",
+        "programs/cto-billing/src/instructions/refund_task.rs"
+      ]
+    },
+    {
+      "id": "doc-5-submitter",
+      "prefix": "cto-billing",
+      "title": "Settlement Sidecar — Transaction Submitter & Retry Logic",
+      "content": "# Settlement Sidecar — Transaction Submitter & Retry Logic\n\n## File: `crates/settlement-sidecar/src/submitter.rs`\n\nThe `TransactionSubmitter` handles the full lifecycle of submitting a signed Solana transaction, including retry with exponential backoff and error classification.\n\n## Error Classification\n\n```rust\npub enum SubmitError {\n    Retryable(String),      // Transient: timeout, connection refused\n    ProgramError(String),   // On-chain error: InsufficientBalance, ExceedsPerTaskCap, etc.\n    BlockhashExpired,       // Blockhash too old — refresh and rebuild\n    InsufficientFees,       // Operator wallet needs SOL funding\n}\n```\n\n### Classification Logic (`classify_error()`)\n\nInspects `solana_client::client_error::ClientError` and `TransactionError`:\n\n| Error Pattern | Classification | Action |\n|---------------|---------------|--------|\n| Connection timeout / refused | `Retryable` | Backoff and retry |\n| `BlockhashNotFound` | `BlockhashExpired` | Refresh blockhash, rebuild TX, retry |\n| `InstructionError` with custom program error codes | `ProgramError` | Route to DLQ, do NOT retry |\n| `InsufficientFundsForFee` | `InsufficientFees` | Halt consumer, alert operator |\n| Unknown errors | `Retryable` | Backoff and retry (up to max) |\n\n## Retry Strategy\n\n### `submit_with_retry(transaction) -> Result<String, SubmitError>`\n\nExponential backoff: `delay = base_delay_ms × 2^attempt`\n\n| Attempt | Delay |\n|---------|-------|\n| 0 | 1s |\n| 1 | 2s |\n| 2 | 4s |\n| 3 | 8s |\n| 4 | 16s |\n\nTotal maximum wait: ~31 seconds across 5 attempts.\n\nSpecial cases:\n- **BlockhashExpired**: Does not count against the retry limit. The blockhash is refreshed via `BlockhashCache::force_refresh()`, the transaction is rebuilt and re-signed, then submission resumes.\n- **ProgramError**: Immediately returned without retry. The consumer routes this to the DLQ.\n- **InsufficientFees**: Immediately returned. The consumer pauses processing and emits a critical alert.\n\n## Wiring with Consumer\n\nThe consumer calls `submit_with_retry()` for each event:\n- `Ok(signature)` → `XACK` the Redis message\n- `ProgramError(_)` → `send_to_dlq()` with error details, then `XACK`\n- `InsufficientFees` → Log critical alert, pause consumer loop\n- `Retryable(_)` after max retries exhausted → `send_to_dlq()`\n\nEvery attempt is logged with structured tracing: attempt number, delay, error details, and transaction signature on success.",
+      "references": [
+        "crates/settlement-sidecar/src/submitter.rs",
+        "crates/settlement-sidecar/src/consumer.rs",
+        "crates/settlement-sidecar/src/transaction.rs"
+      ]
+    },
+    {
+      "id": "doc-5-health",
+      "prefix": "cto-billing",
+      "title": "Settlement Sidecar — Health Endpoint & Observability",
+      "content": "# Settlement Sidecar — Health Endpoint & Observability\n\n## File: `crates/settlement-sidecar/src/health.rs`\n\n## HTTP Health Endpoint\n\nA minimal HTTP server runs on port `8080` serving a single route: `GET /healthz`.\n\n### Response Codes\n\n| Condition | Status | Body |\n|-----------|--------|------|\n| Redis connected AND Solana reachable | `200 OK` | `{\"status\":\"ok\"}` |\n| Either degraded | `503 Service Unavailable` | `{\"status\":\"degraded\",\"redis\":bool,\"solana\":bool}` |\n\n### Shared State\n\n```rust\npub struct HealthState {\n    pub redis_connected: Arc<AtomicBool>,\n    pub solana_reachable: Arc<AtomicBool>,\n}\n```\n\n- `redis_connected` is set to `true` after each successful `XREADGROUP`, `false` on Redis connection failures.\n- `solana_reachable` is set to `true` after each successful RPC call (blockhash fetch or transaction submission), `false` on RPC errors.\n\nThe health server runs as a separate tokio task spawned in `main.rs` and shuts down gracefully on SIGTERM.\n\n## Structured Logging\n\nConfigured via `tracing-subscriber` with JSON format in `main.rs`. All log entries include:\n- `timestamp` — ISO 8601\n- `level` — trace/debug/info/warn/error\n- `target` — module path\n- `span` — current tracing span\n\n### Key Structured Events\n\n| Event | Level | Fields |\n|-------|-------|--------|\n| Event processed successfully | `info` | `task_id`, `signature`, `duration_ms` |\n| Event sent to DLQ | `warn` | `task_id`, `error`, `retry_count` |\n| Solana RPC error | `error` | `error`, `attempt`, `delay_ms` |\n| Operator funding required | `error` | `operator_pubkey`, `sol_balance` |\n| Consumer started | `info` | `consumer_group`, `consumer_name` |\n| Pending recovery | `info` | `recovered_count` |\n\nThese structured logs can be ingested by Datadog (already deployed in the cluster) for dashboarding and alerting.",
+      "references": [
+        "crates/settlement-sidecar/src/health.rs",
+        "crates/settlement-sidecar/src/main.rs"
+      ]
+    },
+    {
+      "id": "doc-5-docker",
+      "prefix": "cto-billing",
+      "title": "Settlement Sidecar — Dockerfile & Deployment",
+      "content": "# Settlement Sidecar — Dockerfile & Deployment\n\n## File: `crates/settlement-sidecar/Dockerfile`\n\n## Multi-Stage Build\n\n### Stage 1: Builder\n\n```dockerfile\nFROM rust:1.78-bookworm as builder\n```\n\n- Copies workspace `Cargo.toml` and sidecar crate source.\n- Runs `cargo build --release --bin settlement-sidecar`.\n- Produces a statically-linked (or dynamically-linked with minimal deps) binary.\n\n### Stage 2: Runtime\n\n```dockerfile\nFROM debian:bookworm-slim\n```\n\n- Installs only `ca-certificates` and `libssl3`.\n- Copies the binary from the builder stage.\n- Sets `ENTRYPOINT [\"./settlement-sidecar\"]`.\n- Target image size: **< 100MB**.\n\n## Build Command\n\n```bash\ndocker build -t settlement-sidecar -f crates/settlement-sidecar/Dockerfile .\n```\n\n## Kubernetes Deployment Notes\n\nThe sidecar runs as a standalone Deployment (not a sidecar container) in the `cto` namespace:\n\n- **Replicas**: 1 (single consumer per consumer group for ordering guarantees; scale by adding consumer groups if needed)\n- **Environment variables**: Configured via ConfigMap and Secret references\n- **Operator keypair**: Mounted as a volume from an ESO-managed Secret at `/secrets/operator-keypair.json`\n- **Health probe**: `httpGet /healthz` on port 8080 with `initialDelaySeconds: 10`\n- **Resource requests**: 128Mi memory, 100m CPU (lightweight binary)\n\n## Cluster Context\n\nRelevant services in the cluster:\n- `cto/cto-controller` — publishes settlement events to Redis\n- Redis — available as a cluster-internal service (used by the controller)\n- Datadog agent — ingests structured JSON logs from the sidecar pod",
+      "references": [
+        "crates/settlement-sidecar/Dockerfile",
+        "crates/settlement-sidecar/src/main.rs"
+      ]
+    },
+    {
+      "id": "doc-5-integration-test",
+      "prefix": "cto-billing",
+      "title": "Settlement Sidecar — Integration Test Strategy",
+      "content": "# Settlement Sidecar — Integration Test Strategy\n\n## File: `crates/settlement-sidecar/tests/integration.rs`\n\nThe integration test validates the complete pipeline: Redis event → sidecar processing → Solana transaction → on-chain TaskReceipt verification.\n\n## Prerequisites\n\n- `solana-test-validator` binary available on PATH\n- Local Redis instance running on port 6379 (or configurable)\n- Built `cto-billing` program `.so` file from Tasks 1-2\n\nTests are annotated with `#[ignore]` so `cargo test` skips them by default. Run with:\n```bash\ncargo test --test integration -- --ignored\n```\n\n## Test 1: Happy Path (settle_task)\n\n1. Start `solana-test-validator` with `--bpf-program <program_id> <path-to-.so>`.\n2. Set up on-chain state via direct RPC calls:\n   - Create OperatorConfig PDA (initialize_operator)\n   - Create CustomerBalance PDA with deposit\n   - Optionally create AgentPackage PDA\n3. Push a `SettlementEvent` JSON to `cto:settlements` via `XADD`.\n4. Start the sidecar binary as a subprocess with env vars pointing to local validator and Redis.\n5. Poll for the TaskReceipt PDA on-chain (up to 15 seconds).\n6. **Assertions**:\n   - TaskReceipt exists with correct `task_id`, `amount`, `quality_met`, `receipt_hash`\n   - Redis message is ACKed (pending count = 0 for the consumer group)\n   - CustomerBalance reflects the deducted amount\n7. Clean up: kill sidecar subprocess, stop validator.\n\n## Test 2: DLQ Routing (duplicate task_id)\n\n1. Using the same on-chain state from Test 1, push a second event with the **same `task_id`**.\n2. The on-chain program will reject the duplicate (PDA already exists).\n3. The sidecar should classify this as a `ProgramError` and route to DLQ.\n4. **Assertions**:\n   - Message appears in `cto:settlements:dlq` stream\n   - Original message is ACKed\n   - Error details include the program error description\n\n## Unit Test Coverage (non-integration)\n\nRun with `cargo test -p settlement-sidecar` (no `--ignored`):\n\n| Module | Tests |\n|--------|-------|\n| `pda.rs` | PDA derivation from known inputs matches expected Pubkeys |\n| `types.rs` | SettlementEvent JSON deserialization round-trip |\n| `submitter.rs` | Error classification, retry delay computation |\n| `config.rs` | Environment variable loading with defaults |\n\n## Timeout\n\nThe integration test suite should complete in under 30 seconds. The sidecar's BLOCK timeout is 5 seconds, and Solana local validator confirmation is near-instant.",
+      "references": [
+        "crates/settlement-sidecar/tests/integration.rs",
+        "crates/settlement-sidecar/src/pda.rs",
+        "crates/settlement-sidecar/src/types.rs",
+        "crates/settlement-sidecar/src/submitter.rs",
+        "crates/settlement-sidecar/src/config.rs"
+      ]
+    },
+    {
+      "id": "doc-5-main-entrypoint",
+      "prefix": "cto-billing",
+      "title": "Settlement Sidecar — Main Entry Point",
+      "content": "# Settlement Sidecar — Main Entry Point\n\n## File: `crates/settlement-sidecar/src/main.rs`\n\nThe `main.rs` orchestrates sidecar startup:\n\n```\n#[tokio::main]\nasync fn main() → Result<()>\n```\n\n## Startup Sequence\n\n1. **Initialize tracing**: Configure `tracing-subscriber` with JSON format for structured logging.\n2. **Load configuration**: `SidecarConfig::from_env()` reads all environment variables.\n3. **Load operator keypair**: `config.load_operator_keypair()` reads the JSON file.\n4. **Create health state**: `Arc<HealthState>` shared across components.\n5. **Spawn health server**: `tokio::spawn(health_state.clone().serve())` — serves `/healthz` on `:8080`.\n6. **Initialize consumer**: `StreamConsumer::init(&config)` — creates Redis consumer group.\n7. **Recover pending**: `consumer.recover_pending()` — reprocess un-ACKed messages from prior runs.\n8. **Create transaction builder**: `TransactionBuilder` with program_id, operator keypair, blockhash cache.\n9. **Create submitter**: `TransactionSubmitter` with RPC client, retry config, blockhash cache.\n10. **Enter main loop**: `consumer.consume(handler)` where `handler` builds and submits transactions.\n\n## Shutdown\n\nOn SIGTERM (via `tokio::signal`), the main loop exits gracefully after finishing the current message. The health server and any background tasks are dropped.\n\n## Error Handling\n\nFatal errors during startup (missing config, invalid keypair, Redis unreachable) cause the process to exit with a non-zero code and a structured error log. Runtime errors (individual message failures) are handled by the consumer/submitter pipeline without crashing the process.",
+      "references": [
+        "crates/settlement-sidecar/src/main.rs",
+        "crates/settlement-sidecar/src/config.rs",
+        "crates/settlement-sidecar/src/consumer.rs",
+        "crates/settlement-sidecar/src/health.rs"
+      ]
+    },
+    {
+      "id": "doc-5-decision-points",
+      "prefix": "cto-billing",
+      "title": "Settlement Sidecar — Decision Points",
+      "content": "# Settlement Sidecar — Decision Points\n\n## Decision 1: anchor-client vs. Manual Instruction Construction\n\n**Context**: The sidecar needs to construct `settle_task` and `refund_task` instructions for the Anchor-based `cto-billing` program.\n\n**Option A — anchor-client crate**: Provides type-safe instruction building directly from the program's IDL. Adds a large transitive dependency tree (anchor-lang, etc.) to the sidecar binary.\n\n**Option B — Manual construction**: Build instructions by computing Anchor discriminators (first 8 bytes of SHA-256 of `\"global:<instruction_name>\"`) and Borsh-serializing arguments manually. Lighter binary, but more error-prone and requires careful alignment with on-chain changes.\n\n**Recommendation**: Manual construction for hackathon scope. The instruction interface is stable (defined in Tasks 1-2), and the lighter dependency tree results in faster builds and smaller Docker images. If the program interface changes frequently post-hackathon, migrate to anchor-client.\n\n## Decision 2: Observability — Structured Logs vs. Prometheus Metrics\n\n**Context**: The sidecar needs to expose operational metrics (events processed, failures, RPC errors, retry counts).\n\n**Option A — Structured tracing logs only**: JSON logs with counters as structured fields. Simple to implement. Ingested by Datadog (already deployed). No additional endpoints or dependencies.\n\n**Option B — Prometheus metrics endpoint**: Add `/metrics` endpoint with `prometheus` crate. Provides richer querying and dashboarding via Grafana/Datadog. Adds complexity and another dependency.\n\n**Recommendation**: Structured tracing logs for hackathon scope. Datadog is already deployed in the cluster and can parse structured JSON logs. Prometheus metrics can be added post-hackathon as a non-breaking enhancement.",
+      "references": [
+        "crates/settlement-sidecar/src/transaction.rs",
+        "crates/settlement-sidecar/src/main.rs",
+        "crates/settlement-sidecar/src/health.rs"
+      ]
+    }
+  ],
+  [
+    {
+      "subtask_id": "6001",
+      "file_path": "demo/cli/package.json",
+      "description": "Package manifest for the demo CLI with all required dependencies and scripts",
+      "dependencies": [],
+      "instructions": "Create the package.json for the demo CLI project. Set type to module for ESM support. Include all dependencies: @coral-xyz/anchor, @solana/web3.js, @solana/spl-token, chalk (v5), ora, commander. Include dev dependencies: typescript, tsx, @types/node. Add scripts: demo:localnet runs 'tsx src/index.ts --cluster localnet', demo:devnet runs 'tsx src/index.ts --cluster devnet', build runs 'tsc', typecheck runs 'tsc --noEmit'.",
+      "estimated_tokens": 800
+    },
+    {
+      "subtask_id": "6001",
+      "file_path": "demo/cli/tsconfig.json",
+      "description": "TypeScript configuration for the demo CLI project",
+      "dependencies": [],
+      "instructions": "Create tsconfig.json with target ES2022, module NodeNext, moduleResolution NodeNext, strict true, outDir dist, rootDir src, esModuleInterop true, resolveJsonModule true, skipLibCheck true, forceConsistentCasingInFileNames true. Include src/**/*.ts in the include array.",
+      "estimated_tokens": 400
+    },
+    {
+      "subtask_id": "6001",
+      "file_path": "demo/cli/src/pda.ts",
+      "description": "PDA derivation helpers matching on-chain SHA-256 seed logic",
+      "dependencies": [
+        "programs/cto-billing/src/utils/mod.rs"
+      ],
+      "instructions": "Implement PDA derivation functions that exactly match the on-chain program's seed logic. Import PublicKey from @solana/web3.js and createHash from crypto.\n\nExport a hashSeed function that takes a string input and returns a Buffer by computing SHA-256: `createHash('sha256').update(input).digest()`.\n\nExport these functions, each returning { pda: PublicKey, bump: number }:\n\n1. deriveOperatorConfig(programId: PublicKey) — seeds: [Buffer.from('operator_config')]. Use PublicKey.findProgramAddressSync.\n\n2. deriveCustomerBalance(programId: PublicKey, customer: PublicKey) — seeds: [Buffer.from('customer_balance'), customer.toBuffer()].\n\n3. deriveAgentPackage(programId: PublicKey, packageId: string) — seeds: [Buffer.from('agent_package'), hashSeed(packageId)]. This is critical: the on-chain program uses SHA-256 hash of the package_id string as the seed, not the raw string.\n\n4. deriveTaskReceipt(programId: PublicKey, taskId: string) — seeds: [Buffer.from('task_receipt'), hashSeed(taskId)]. Same SHA-256 hashing as agent package.\n\n5. deriveVault(programId: PublicKey, mint: PublicKey) — seeds: [Buffer.from('vault'), mint.toBuffer()].\n\nAll seed constants must exactly match those in programs/cto-billing/src/utils/mod.rs: OPERATOR_CONFIG_SEED = b'operator_config', CUSTOMER_BALANCE_SEED = b'customer_balance', AGENT_PACKAGE_SEED = b'agent_package', TASK_RECEIPT_SEED = b'task_receipt', VAULT_SEED = b'vault'.",
+      "estimated_tokens": 1500
+    },
+    {
+      "subtask_id": "6001",
+      "file_path": "demo/cli/src/utils.ts",
+      "description": "Formatting utilities for Explorer links, USDC formatting, and phase headers",
+      "dependencies": [],
+      "instructions": "Import chalk from 'chalk' (v5 ESM default import). Export these functions:\n\n1. explorerLink(signature: string, cluster: string): string — returns `https://explorer.solana.com/tx/${signature}?cluster=${cluster}`. For 'localnet', use cluster='custom&customUrl=http%3A%2F%2Flocalhost%3A8899'.\n\n2. accountExplorerLink(address: string, cluster: string): string — returns `https://explorer.solana.com/address/${address}?cluster=${cluster}` with same localnet handling.\n\n3. formatUsdc(lamports: number): string — divides by 1_000_000 and returns a string with exactly 2 decimal places using .toFixed(2).\n\n4. phaseHeader(num: number, title: string): void — logs a blank line, then a chalk.bold.cyan line like '═══ Phase {num}: {title} ═══'.\n\n5. logSuccess(msg: string): void — logs chalk.green('  ✓ ' + msg).\n\n6. logInfo(msg: string): void — logs chalk.gray('  → ' + msg).\n\n7. logExplorer(label: string, signature: string, cluster: string): void — logs chalk.dim('  🔗 ' + label + ': ' + explorerLink(signature, cluster)).",
+      "estimated_tokens": 1200
+    },
+    {
+      "subtask_id": "6001",
+      "file_path": "demo/cli/src/receipt.ts",
+      "description": "Mock receipt JSON generation and SHA-256 hashing for the receipt_hash parameter",
+      "dependencies": [],
+      "instructions": "Import createHash from 'crypto'. Export an interface ReceiptJson with fields: task_id (string), customer (string), duration_seconds (number), infra_tier (string), provider (string), agent_used (string), itemized_costs (array of {description: string, amount_usdc: number}), total_usdc (number), timestamp (string).\n\nExport function buildMockReceipt(taskId: string, customerPubkey: string, agentUsed: string, totalUsdc: number): ReceiptJson — returns a receipt with:\n- task_id: taskId\n- customer: customerPubkey\n- duration_seconds: 120\n- infra_tier: 'standard'\n- provider: '5D Labs'\n- agent_used: agentUsed\n- itemized_costs: [{description: 'Compute (2 min)', amount_usdc: totalUsdc * 0.6}, {description: 'Storage & I/O', amount_usdc: totalUsdc * 0.3}, {description: 'Network egress', amount_usdc: totalUsdc * 0.1}]\n- total_usdc: totalUsdc\n- timestamp: new Date().toISOString()\n\nExport function computeReceiptHash(receipt: ReceiptJson): Uint8Array — serializes the receipt to JSON using JSON.stringify (with keys sorted for determinism — use a replacer or sort the object), then computes SHA-256 and returns the digest as a Uint8Array (32 bytes). This hash must be passed as the receipt_hash parameter to settle_task on-chain.",
+      "estimated_tokens": 1200
+    },
+    {
+      "subtask_id": "6001",
+      "file_path": "demo/cli/src/cli.ts",
+      "description": "CLI argument parsing with commander and Anchor program/provider setup",
+      "dependencies": [],
+      "instructions": "Import { Command } from 'commander', { Connection, Keypair } from '@solana/web3.js', { AnchorProvider, Program, Wallet } from '@coral-xyz/anchor', and fs.\n\nExport interface CliOptions { cluster: 'localnet' | 'devnet'; keypairPath: string; }.\n\nExport function parseArgs(): CliOptions — use commander to define a program with --cluster option (choices: ['localnet', 'devnet'], default 'localnet') and --keypair option (default '~/.config/solana/id.json'). Parse and return.\n\nExport function getRpcUrl(cluster: string): string — returns 'http://127.0.0.1:8899' for localnet, 'https://api.devnet.solana.com' for devnet.\n\nExport function createProvider(connection: Connection, payer: Keypair): AnchorProvider — creates a wallet from the keypair using the Wallet class, constructs an AnchorProvider with opts { commitment: 'confirmed', preflightCommitment: 'confirmed' }.\n\nExport function loadProgram(provider: AnchorProvider): Program — imports the IDL from '../../target/idl/cto_billing.json' (using createRequire or a JSON import with assert), creates and returns a new Program instance. Use the program ID from the IDL.\n\nHandle the case where the IDL file doesn't exist with a clear error message directing the user to run 'anchor build' first.",
+      "estimated_tokens": 1500
+    },
+    {
+      "subtask_id": "6002",
+      "file_path": "demo/cli/src/phases/phase0.ts",
+      "description": "Phase 0: Setup & Token Provisioning — keypair generation, airdrop, mint, ATAs, token minting",
+      "dependencies": [
+        "demo/cli/src/utils.ts",
+        "demo/cli/src/pda.ts",
+        "demo/cli/src/cli.ts"
+      ],
+      "instructions": "Import Keypair, Connection from @solana/web3.js, createMint/getOrCreateAssociatedTokenAccount/mintTo from @solana/spl-token, and formatting utilities.\n\nExport interface DemoState containing: operator (Keypair), customer (Keypair), agentAuthor (Keypair), mint (PublicKey), customerAta (PublicKey), authorAta (PublicKey), treasuryAta (PublicKey), cluster (string), connection (Connection), program (Program).\n\nExport async function phase0(connection: Connection, program: Program, cluster: string): Promise<DemoState>.\n\nImplementation:\n1. Call phaseHeader(0, 'Setup & Token Provisioning').\n2. Generate 3 keypairs: operator, customer, agentAuthor using Keypair.generate().\n3. If cluster is 'localnet': airdrop 10 SOL to each keypair. Use connection.requestAirdrop with 10 * LAMPORTS_PER_SOL. After each airdrop, call connection.confirmTransaction with the signature. Log each airdrop.\n4. Create mock USDC mint: call createMint(connection, operator, operator.publicKey, null, 6). The operator is both payer and mint authority. Log the mint address.\n5. Create ATAs: call getOrCreateAssociatedTokenAccount for customer (owner=customer.publicKey), agentAuthor (owner=agentAuthor.publicKey), and treasury (owner=operator.publicKey). Payer is operator for all. Log each ATA address.\n6. Mint 1000 USDC to customer ATA: call mintTo(connection, operator, mint, customerAta.address, operator, 1_000_000_000). Log the mint amount.\n7. Log all pubkeys with logInfo, and Explorer links for the mint using accountExplorerLink.\n8. Return the DemoState object with all generated data.\n\nWrap the entire function body in a try/catch. On error, log the error message with chalk.red and re-throw. Use ora spinner for long operations (airdrop, mint creation).",
+      "estimated_tokens": 2500
+    },
+    {
+      "subtask_id": "6002",
+      "file_path": "demo/cli/src/phases/phase1.ts",
+      "description": "Phase 1: Initialize Operator — creates the singleton OperatorConfig PDA",
+      "dependencies": [
+        "demo/cli/src/phases/phase0.ts",
+        "demo/cli/src/pda.ts",
+        "programs/cto-billing/src/instructions/initialize_operator.rs"
+      ],
+      "instructions": "Import DemoState, PDA helpers, formatting utils, and Anchor types.\n\nExport async function phase1(state: DemoState): Promise<void>.\n\nImplementation:\n1. Call phaseHeader(1, 'Initialize Operator').\n2. Derive the OperatorConfig PDA using deriveOperatorConfig(state.program.programId).\n3. Call state.program.methods.initializeOperator(state.treasuryAta, 0).accounts({ authority: state.operator.publicKey, operatorConfig: operatorConfigPda, mint: state.mint, systemProgram: SystemProgram.programId }).signers([state.operator]).rpc().\n4. The protocol_fee_bps is 0 as specified.\n5. After the transaction, fetch the OperatorConfig account: state.program.account.operatorConfig.fetch(operatorConfigPda).\n6. Log: OperatorConfig PDA address, authority, treasury, mint, protocol_fee_bps, paused status.\n7. Log the transaction signature and Explorer link.\n\nNote: The Anchor accounts struct for InitializeOperator requires: authority (signer, mut), operatorConfig (init PDA), mint (Account<Mint>), systemProgram. Ensure the accounts object matches the on-chain struct field names exactly (check the IDL — Anchor auto-converts to camelCase).",
+      "estimated_tokens": 1500
+    },
+    {
+      "subtask_id": "6002",
+      "file_path": "demo/cli/src/phases/phase2.ts",
+      "description": "Phase 2: Register Agent Package — author registers with 30% split",
+      "dependencies": [
+        "demo/cli/src/phases/phase0.ts",
+        "demo/cli/src/pda.ts",
+        "programs/cto-billing/src/instructions/register_agent_package.rs"
+      ],
+      "instructions": "Export async function phase2(state: DemoState): Promise<void>.\n\nImplementation:\n1. Call phaseHeader(2, 'Register Agent Package').\n2. Define packageId = 'smart-debug-agent-v1', splitBps = 3000, sourceUri = 'https://github.com/example/smart-debug-agent'.\n3. Derive AgentPackage PDA using deriveAgentPackage(state.program.programId, packageId).\n4. Derive OperatorConfig PDA for the accounts.\n5. Call state.program.methods.registerAgentPackage(packageId, splitBps, sourceUri).accounts({ author: state.agentAuthor.publicKey, agentPackage: agentPackagePda, operatorConfig: operatorConfigPda, authorAta: state.authorAta, systemProgram: SystemProgram.programId }).signers([state.agentAuthor]).rpc().\n6. Fetch the AgentPackage account and verify fields.\n7. Log: AgentPackage PDA, author wallet (state.agentAuthor.publicKey), '30% revenue split', source_uri, active status.\n8. Log transaction signature and Explorer link.\n\nNote: The RegisterAgentPackage accounts struct includes operatorConfig and authorAta in addition to author and agentPackage. Ensure these are all provided. The author_ata must be the agentAuthor's ATA for the configured mint.",
+      "estimated_tokens": 1500
+    },
+    {
+      "subtask_id": "6002",
+      "file_path": "demo/cli/src/phases/phase3.ts",
+      "description": "Phase 3: Create Customer Account — customer creates balance account with spending caps",
+      "dependencies": [
+        "demo/cli/src/phases/phase0.ts",
+        "demo/cli/src/pda.ts",
+        "programs/cto-billing/src/instructions/create_customer_account.rs"
+      ],
+      "instructions": "Export async function phase3(state: DemoState): Promise<void>.\n\nImplementation:\n1. Call phaseHeader(3, 'Create Customer Account').\n2. Define maxPerTask = 100_000_000 (100 USDC), maxPerDay = 500_000_000 (500 USDC).\n3. Derive CustomerBalance PDA using deriveCustomerBalance(state.program.programId, state.customer.publicKey).\n4. Call state.program.methods.createCustomerAccount(new BN(maxPerTask), new BN(maxPerDay)).accounts({ customer: state.customer.publicKey, customerBalance: customerBalancePda, systemProgram: SystemProgram.programId }).signers([state.customer]).rpc().\n5. Use BN from @coral-xyz/anchor (import { BN } from '@coral-xyz/anchor' or 'bn.js') for the u64 arguments.\n6. Fetch CustomerBalance account and verify fields.\n7. Log: CustomerBalance PDA, max_per_task as formatted USDC ('100.00 USDC'), max_per_day as formatted USDC ('500.00 USDC'), balance (should be 0).\n8. Log transaction signature and Explorer link.",
+      "estimated_tokens": 1200
+    },
+    {
+      "subtask_id": "6003",
+      "file_path": "demo/cli/src/phases/phase4.ts",
+      "description": "Phase 4: Customer Deposits USDC — 200 USDC from customer ATA to vault",
+      "dependencies": [
+        "demo/cli/src/phases/phase0.ts",
+        "demo/cli/src/pda.ts",
+        "programs/cto-billing/src/instructions/deposit.rs"
+      ],
+      "instructions": "Export async function phase4(state: DemoState): Promise<void>.\n\nImplementation:\n1. Call phaseHeader(4, 'Customer Deposits USDC').\n2. Define amount = 200_000_000 (200 USDC).\n3. Derive CustomerBalance PDA and Vault PDA using helpers.\n4. Derive OperatorConfig PDA.\n5. Call state.program.methods.deposit(new BN(amount)).accounts({ customer: state.customer.publicKey, customerBalance: customerBalancePda, customerAta: state.customerAta, vault: vaultPda, operatorConfig: operatorConfigPda, mint: state.mint, tokenProgram: TOKEN_PROGRAM_ID }).signers([state.customer]).rpc().\n6. Import TOKEN_PROGRAM_ID from @solana/spl-token.\n7. After confirmation, fetch CustomerBalance to get the new balance.\n8. Log: deposit amount ('200.00 USDC'), new balance (formatUsdc), Explorer link.\n\nIMPORTANT: The vault PDA is a token account. If the vault doesn't exist yet (first deposit), the program may need to create it. Check if the on-chain deposit instruction initializes the vault or if it must pre-exist. Based on the Deposit accounts struct, the vault has seeds = [VAULT_SEED, mint.key().as_ref()] and is marked mut but NOT init — so the vault token account must already exist. You may need to create it as part of Phase 1 (initialize_operator) or as a separate step. If the program doesn't handle vault creation, add a vault initialization step here using createAccount + initializeAccount or via a separate program instruction. Check the on-chain code carefully. If there's no explicit vault initialization instruction, the vault PDA may need to be created as a token account with the PDA as owner before the first deposit. Use the @solana/spl-token createAccount or a raw transaction to create this.",
+      "estimated_tokens": 2000
+    },
+    {
+      "subtask_id": "6003",
+      "file_path": "demo/cli/src/phases/phase5.ts",
+      "description": "Phase 5: Settle Task — Quality Met with 30/70 author/treasury split",
+      "dependencies": [
+        "demo/cli/src/phases/phase4.ts",
+        "demo/cli/src/receipt.ts",
+        "demo/cli/src/pda.ts",
+        "programs/cto-billing/src/instructions/settle_task.rs"
+      ],
+      "instructions": "Export async function phase5(state: DemoState): Promise<void>.\n\nImplementation:\n1. Call phaseHeader(5, 'Settle Task — Quality Met (Author Gets Paid)').\n2. Define taskId = 'CTO-1234', amount = 10_000_000 (10 USDC), qualityMet = true.\n3. Build mock receipt using buildMockReceipt(taskId, state.customer.publicKey.toBase58(), 'smart-debug-agent-v1', 10.0).\n4. Compute receiptHash using computeReceiptHash(receipt) — returns Uint8Array of 32 bytes. Convert to Array<number> if Anchor expects number[] for [u8; 32].\n5. Derive all required PDAs: OperatorConfig, CustomerBalance (for the customer), TaskReceipt (for taskId), Vault, AgentPackage (for 'smart-debug-agent-v1').\n6. Derive or compute vault_authority PDA if needed (the SettleTask struct has a vault_authority UncheckedAccount).\n7. Build the settle_task call: state.program.methods.settleTask(taskId, new BN(amount), Array.from(receiptHash), qualityMet).accounts({ operator: state.operator.publicKey, operatorConfig: operatorConfigPda, customerBalance: customerBalancePda, treasuryAta: state.treasuryAta, vault: vaultPda, vaultAuthority: vaultAuthorityPda, taskReceipt: taskReceiptPda, mint: state.mint, tokenProgram: TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId, clock: SYSVAR_CLOCK_PUBKEY, agentPackage: agentPackagePda, authorAta: state.authorAta }).signers([state.operator]).rpc().\n8. Fetch TaskReceipt PDA to get actual amount, author_earned, quality_met.\n9. Log with chalk.green.bold: '🟢 Quality MET — Author earned 3.00 USDC (30%), Treasury received 7.00 USDC (70%)'.\n10. Log: task_id, amount_charged, author_earned, TaskReceipt PDA, Explorer link.\n\nNote on vault_authority: This is the PDA that has signing authority over the vault token account. It's typically derived with seeds like [b'vault'] or [b'vault_authority'] or the vault PDA itself acts as authority. Check the on-chain SettleTask struct for the vault_authority seeds. If it's an UncheckedAccount with no explicit seeds constraint, it may be derived as [b'vault', mint.key().as_ref()] with the program ID, or there may be a separate authority seed. Look at how the vault token transfers are signed in the on-chain settle_task implementation. For now, derive it as findProgramAddressSync([Buffer.from('vault'), mint.toBuffer()], programId) if it shares the vault PDA pattern, or as a separate [Buffer.from('vault_authority')] seed.",
+      "estimated_tokens": 3000
+    },
+    {
+      "subtask_id": "6003",
+      "file_path": "demo/cli/src/phases/phase6.ts",
+      "description": "Phase 6: Settle Task — Quality NOT Met (Customer Protected)",
+      "dependencies": [
+        "demo/cli/src/phases/phase5.ts",
+        "programs/cto-billing/src/instructions/settle_task.rs"
+      ],
+      "instructions": "Export async function phase6(state: DemoState): Promise<void>.\n\nImplementation:\n1. Call phaseHeader(6, 'Settle Task — Quality NOT Met (Customer Protected)').\n2. Define taskId = 'CTO-1235', amount = 15_000_000 (15 USDC), qualityMet = false.\n3. Compute a receipt hash (can reuse buildMockReceipt with this task's data).\n4. Derive all required PDAs same as phase5 but with taskId='CTO-1235'.\n5. Fetch CustomerBalance BEFORE the settle to record the pre-settlement balance.\n6. Call settle_task with quality_met=false, including the agent_package PDA.\n7. Fetch CustomerBalance AFTER to verify balance is unchanged.\n8. Fetch TaskReceipt PDA — verify amount=0 (or the original amount but with zero actual charge based on the on-chain Case 3 logic), quality_met=false.\n9. Log with chalk.red.bold: '🔴 Quality NOT MET — Customer not charged. Author earned nothing.'\n10. Log: task_id, amount_charged=0, author_earned=0, customer balance unchanged.\n11. Log Explorer link.\n\nNote: Per the on-chain settlement logic Case 3 (quality_met=false with agent package), the customer is NOT charged and no token transfers occur. The TaskReceipt is still created with amount=0. The AgentPackage.task_count is incremented but success_count is NOT.",
+      "estimated_tokens": 1800
+    },
+    {
+      "subtask_id": "6003",
+      "file_path": "demo/cli/src/phases/phase7.ts",
+      "description": "Phase 7: Settle Task — Default Agent (No Split, full to treasury)",
+      "dependencies": [
+        "demo/cli/src/phases/phase6.ts",
+        "programs/cto-billing/src/instructions/settle_task.rs"
+      ],
+      "instructions": "Export async function phase7(state: DemoState): Promise<void>.\n\nImplementation:\n1. Call phaseHeader(7, 'Settle Task — Default Agent (No Split)').\n2. Define taskId = 'CTO-1236', amount = 5_000_000 (5 USDC), qualityMet = true.\n3. Compute receipt hash.\n4. Derive PDAs — same as before but NO agent_package. The SettleTask struct has agent_package as Option<Account<AgentPackage>> and author_ata as Option<Account<TokenAccount>>. Pass null for both optional accounts.\n5. Call settle_task WITHOUT agent_package and author_ata. In Anchor, optional accounts can be handled by passing null or not including them. Check how Anchor TypeScript client handles Option<Account>: typically you either omit the field or pass null. The approach may require passing the program ID itself as a placeholder for None accounts, or the Anchor client may accept null.\n6. Fetch TaskReceipt — verify amount=5_000_000, author_earned=0, quality_met=true.\n7. Log with chalk.yellow.bold: '💰 Full 5.00 USDC to treasury (no agent split)'.\n8. Log: task_id, amount, treasury received full amount, Explorer link.\n\nNote on Case 1 logic: No agent package means the full amount goes to treasury. The on-chain program should transfer the full amount from vault to treasury_ata.",
+      "estimated_tokens": 1800
+    },
+    {
+      "subtask_id": "6004",
+      "file_path": "demo/cli/src/phases/phase8.ts",
+      "description": "Phase 8: Verify On-Chain Receipts — fetch and display formatted table",
+      "dependencies": [
+        "demo/cli/src/phases/phase7.ts",
+        "demo/cli/src/pda.ts",
+        "demo/cli/src/utils.ts"
+      ],
+      "instructions": "Export async function phase8(state: DemoState): Promise<void>.\n\nImplementation:\n1. Call phaseHeader(8, 'Verify On-Chain Receipts').\n2. Define the three task IDs: ['CTO-1234', 'CTO-1235', 'CTO-1236'].\n3. For each task ID, derive the TaskReceipt PDA and fetch the account using state.program.account.taskReceipt.fetch(pda).\n4. Build a formatted console table. Use string padding (padEnd/padStart) to align columns. Print a header row and separator:\n```\n  | Task ID   | Amount    | Author Earned | Quality      | Status  |\n  |-----------|-----------|---------------|--------------|---------|  \n```\n5. For each receipt, format a row:\n   - Task ID: receipt.taskId\n   - Amount: formatUsdc(receipt.amount.toNumber()) + ' USDC'\n   - Author Earned: formatUsdc(receipt.authorEarned.toNumber()) + ' USDC'\n   - Quality: receipt.qualityMet ? '✅ MET' : '❌ NOT MET'\n   - Status: map receipt.status enum to string (TaskStatus.Settled → 'Settled', etc.)\n6. Print the table using console.log with chalk.white for data rows.\n7. After the receipts table, fetch the AgentPackage PDA for 'smart-debug-agent-v1'.\n8. Log agent package stats: total_earned (formatted USDC), task_count, success_count.\n9. Expected values: total_earned = 3_000_000 (3 USDC from CTO-1234), task_count = 2 (CTO-1234 and CTO-1235 both used the package), success_count = 1 (only CTO-1234 had quality_met=true).\n\nNote on Anchor enum deserialization: The TaskStatus enum in TypeScript will be represented as an object like { settled: {} } or a string. Check the Anchor IDL types file for the exact representation and handle accordingly when mapping to display strings.",
+      "estimated_tokens": 2500
+    },
+    {
+      "subtask_id": "6004",
+      "file_path": "demo/cli/src/phases/phase9.ts",
+      "description": "Phase 9: Customer Withdraws Remaining Balance with final summary",
+      "dependencies": [
+        "demo/cli/src/phases/phase8.ts",
+        "demo/cli/src/pda.ts",
+        "programs/cto-billing/src/instructions/withdraw.rs"
+      ],
+      "instructions": "Export async function phase9(state: DemoState): Promise<void>.\n\nImplementation:\n1. Call phaseHeader(9, 'Customer Withdraws Remaining Balance').\n2. Derive CustomerBalance PDA and fetch it to get the current balance.\n3. The expected remaining balance is 185_000_000 (200 deposited - 10 for CTO-1234 - 5 for CTO-1236 = 185 USDC). CTO-1235 had quality_met=false so no charge.\n4. Call state.program.methods.withdraw(new BN(remainingBalance)).accounts({ customer: state.customer.publicKey, customerBalance: customerBalancePda, customerAta: state.customerAta, vault: vaultPda, operatorConfig: operatorConfigPda, mint: state.mint, tokenProgram: TOKEN_PROGRAM_ID }).signers([state.customer]).rpc().\n5. Fetch CustomerBalance again — verify balance is 0.\n6. Log: withdrawal amount ('185.00 USDC'), final balance ('0.00 USDC'), Explorer link.\n7. Print blank line, then final summary with chalk.bold.green:\n   '🎉 Demo complete! Customer deposited 200 USDC, was charged 15 USDC for 2 successful tasks, was protected from 1 failed task, and withdrew 185 USDC.'\n8. Print another line with chalk.dim showing the total demo execution time if available (passed from index.ts or computed locally).",
+      "estimated_tokens": 1800
+    },
+    {
+      "subtask_id": "6004",
+      "file_path": "demo/cli/src/index.ts",
+      "description": "Main entry point: CLI parsing, provider setup, sequential phase execution, error handling",
+      "dependencies": [
+        "demo/cli/src/cli.ts",
+        "demo/cli/src/phases/phase0.ts",
+        "demo/cli/src/phases/phase1.ts",
+        "demo/cli/src/phases/phase2.ts",
+        "demo/cli/src/phases/phase3.ts",
+        "demo/cli/src/phases/phase4.ts",
+        "demo/cli/src/phases/phase5.ts",
+        "demo/cli/src/phases/phase6.ts",
+        "demo/cli/src/phases/phase7.ts",
+        "demo/cli/src/phases/phase8.ts",
+        "demo/cli/src/phases/phase9.ts"
+      ],
+      "instructions": "This is the main entry point that wires everything together.\n\nImplementation:\n1. Import parseArgs, getRpcUrl, createProvider, loadProgram from './cli.js'.\n2. Import all phase functions from './phases/*.js'.\n3. Import chalk for colored output and Connection/Keypair from @solana/web3.js.\n\n4. Define the main async function:\n   a. Parse CLI args.\n   b. Log a banner with chalk.bold.magenta: '╔══════════════════════════════════════╗\\n║   CTO Billing — End-to-End Demo      ║\\n╚══════════════════════════════════════╝'\n   c. Log cluster and RPC URL.\n   d. Create Connection with getRpcUrl(cluster).\n   e. Record start time with Date.now().\n   f. Execute phase0 — get DemoState back.\n   g. Set up the Anchor provider and program using the operator keypair from DemoState. Call createProvider(connection, state.operator) and loadProgram(provider). Attach program to state.\n   h. Execute phases 1 through 9 sequentially, each receiving the state object.\n   i. After phase 9, compute elapsed time: (Date.now() - startTime) / 1000.\n   j. Log chalk.bold.green: 'All phases completed successfully in {elapsed}s'.\n\n5. Wrap the entire main() call in a .catch handler:\n   a. Log chalk.red.bold: 'Demo failed!'\n   b. If the error is a SendTransactionError (from @solana/web3.js or Anchor), log the transaction logs: error.logs?.forEach(log => console.error(chalk.dim(log))).\n   c. Log the error message and stack.\n   d. Call process.exit(1).\n\n6. Call main() at the bottom of the file.\n\nIMPORTANT: Since this is an ESM module (type: module in package.json), all local imports must use .js extensions (e.g., './cli.js', './phases/phase0.js'). This is required for NodeNext module resolution with TypeScript.",
+      "estimated_tokens": 2500
+    }
+  ],
+  [
+    {
+      "doc_path": "demo/web/README.md",
+      "scaffolds_referenced": [
+        1,
+        2,
+        3
+      ],
+      "decision": "CREATE",
+      "context_type": "setup",
+      "title": "CTO Billing Hackathon Demo Dashboard",
+      "content": "# CTO Billing — Hackathon Demo Dashboard\n\nNext.js 14 web dashboard for the CTO Settlement Protocol on Solana devnet.\n\n## Prerequisites\n\n- Node.js >= 18\n- A Solana wallet browser extension (Phantom or Solflare)\n- The on-chain program deployed to devnet (see `programs/cto-billing/`)\n- Program IDL at `target/idl/cto_billing.json` (generated by `anchor build`)\n\n## Quick Start\n\n```bash\ncd demo/web\nnpm install\nnpm run dev          # http://localhost:3000\n```\n\n## Environment Variables\n\n| Variable | Default | Description |\n|---|---|---|\n| `NEXT_PUBLIC_RPC_ENDPOINT` | `https://api.devnet.solana.com` | Solana JSON-RPC endpoint |\n| `NEXT_PUBLIC_PROGRAM_ID` | Value in `src/lib/constants.ts` | CTO Billing program ID |\n\n## Project Structure\n\n```\nsrc/\n├── app/\n│   ├── layout.tsx              # Root layout with wallet providers\n│   ├── page.tsx                # Split-panel main page\n│   └── globals.css             # Tailwind + shadcn CSS variables\n├── components/\n│   ├── ui/                     # shadcn/ui components (button, card, badge, etc.)\n│   ├── Header.tsx              # Logo, Devnet badge, wallet connect\n│   └── WalletProviderWrapper.tsx  # Client-side wallet provider tree\n├── hooks/\n│   ├── index.ts                # Barrel export\n│   ├── useProgram.ts           # Anchor Program instance hook\n│   ├── usePdaDerivation.ts     # PDA derivation helpers (SHA-256 seeds)\n│   ├── useCustomerBalance.ts   # Fetch CustomerBalance PDA data\n│   └── useOperatorConfig.ts    # Fetch OperatorConfig PDA data\n├── types/\n│   └── index.ts                # On-chain type mirrors\n├── lib/\n│   ├── formatters.ts           # formatUsdc, formatQuality, shortenAddress\n│   └── constants.ts            # PROGRAM_ID, seed prefixes\n└── idl/\n    └── cto_billing.json        # Anchor IDL (copied from target/)\n```\n\n## On-Chain Dependencies\n\nThis dashboard reads from and interacts with the following on-chain PDAs:\n\n| Account | Seeds | Description |\n|---|---|---|\n| `OperatorConfig` | `[\"operator_config\"]` | Singleton: authority, treasury, mint, fee, paused |\n| `CustomerBalance` | `[\"customer_balance\", customer_pubkey]` | Per-wallet: balance, caps, counters |\n| `AgentPackage` | `[\"agent_package\", sha256(package_id)]` | Per-package: author, split, stats |\n| `TaskReceipt` | `[\"task_receipt\", sha256(task_id)]` | Per-task: immutable settlement record |\n| `Vault` | `[\"vault\", mint_pubkey]` | Token account: pooled customer deposits |\n\n## Design System\n\n- **Dark mode only** — Solana brand palette\n- Primary: `#9945FF` (solana-purple)\n- Success accent: `#14F195` (solana-green)\n- Background: `#0E0E1A` (solana-dark)\n- Card surface: `#1A1A2E` (solana-card)\n- Component library: shadcn/ui (New York variant)\n- Font: Inter via next/font/google\n- Optimized for 1920×1080 screen recording\n\n## Build & Verify\n\n```bash\nnpm run build        # Production build — must complete with zero errors\nnpx tsc --noEmit     # Type check — must report zero errors\n```\n\n## Wallet Integration\n\nSupported wallets: Phantom, Solflare. The app shows a \"Not Connected\" landing state with CTO branding when no wallet is connected. After connecting, the split-panel layout renders with a green glow indicator on the wallet button.\n\n## Relationship to On-Chain Program\n\nThe dashboard imports the Anchor IDL generated by `anchor build` in `programs/cto-billing/`. The `useProgram()` hook constructs an Anchor `Program` instance using the connected wallet, enabling RPC reads of all PDA accounts. Task 8 (not in this setup task) will add live settlement feed and transaction submission UI on top of this foundation."
+    },
+    {
+      "doc_path": "demo/web/docs/ARCHITECTURE.md",
+      "scaffolds_referenced": [
+        1,
+        2,
+        3
+      ],
+      "decision": "CREATE",
+      "context_type": "architecture",
+      "title": "Dashboard Architecture & Data Flow",
+      "content": "# Dashboard Architecture\n\n## Component Hierarchy\n\n```\nlayout.tsx\n└── WalletProviderWrapper (client boundary)\n    ├── ConnectionProvider (endpoint from env)\n    ├── WalletProvider (Phantom + Solflare adapters, autoConnect)\n    └── WalletModalProvider\n        └── page.tsx\n            ├── Header\n            │   ├── Logo (text-based CTO / 5D Labs)\n            │   ├── NetworkBadge (\"Devnet\", solana-purple)\n            │   └── WalletMultiButton (green glow when connected)\n            └── MainContent\n                ├── [not connected] → NotConnectedState\n                └── [connected] → SplitPanelLayout\n                    ├── LeftPanel (60%) — SettlementFeed placeholder\n                    └── RightPanel (40%) — CustomerBalance placeholder\n```\n\n## Hook Data Flow\n\n```\nuseConnection() ─────┐\n                      ├──→ useProgram() → Program<CtoBilling> | null\nuseAnchorWallet() ────┘         │\n                                ├──→ useCustomerBalance(wallet)\n                                │      → program.account.customerBalance.fetchNullable(pda)\n                                │      → { data, loading, error, refetch }\n                                │\n                                └──→ useOperatorConfig()\n                                       → program.account.operatorConfig.fetchNullable(pda)\n                                       → { data, loading, error, refetch }\n\nusePdaDerivation()\n  ├── deriveCustomerBalance(wallet)     seeds: [\"customer_balance\", wallet.toBuffer()]\n  ├── deriveAgentPackage(packageId)     seeds: [\"agent_package\", sha256(packageId)]\n  ├── deriveTaskReceipt(taskId)         seeds: [\"task_receipt\", sha256(taskId)]\n  ├── deriveVault(mint)                 seeds: [\"vault\", mint.toBuffer()]\n  └── deriveOperatorConfig()            seeds: [\"operator_config\"]\n```\n\n## PDA Seed Derivation — SHA-256 Alignment\n\nThe on-chain program (Task 1-2) uses `sha2::Sha256` to hash string identifiers into 32-byte seeds for PDA derivation. The dashboard **must** use the identical algorithm:\n\n```typescript\n// Must match: programs/cto-billing/src/utils/mod.rs → hash_seed()\nimport { sha256 } from 'js-sha256'; // or crypto.createHash('sha256')\nconst seed = Buffer.from(sha256(packageId), 'hex'); // 32 bytes\n```\n\nThe `findProgramAddressSync` call is synchronous, so the SHA-256 implementation must also be synchronous.\n\n## Wallet Provider Architecture Decisions\n\n- **Client component boundary**: `WalletProviderWrapper.tsx` has the `'use client'` directive. The root `layout.tsx` remains a server component that delegates to this client wrapper.\n- **Auto-connect**: Enabled via `autoConnect` prop so returning users reconnect automatically.\n- **Adapter list**: Phantom and Solflare only (hackathon scope). The list is static and not dynamically detected.\n- **Endpoint configuration**: Single RPC endpoint, configurable via `NEXT_PUBLIC_RPC_ENDPOINT`. No failover or load balancing for hackathon scope.\n\n## Responsive Layout\n\n| Viewport | Layout | Behavior |\n|---|---|---|\n| ≥ 1024px | Side-by-side 60/40 | Optimized for 1920×1080 recording |\n| < 1024px | Stacked vertically | Settlement feed on top, balance below |\n| < 768px | Stacked, reduced padding | Header elements condensed |\n\n## Integration Points with On-Chain Program\n\n| Frontend Hook | On-Chain Account | Task Reference |\n|---|---|---|\n| `useOperatorConfig()` | `OperatorConfig` PDA | Task 1: `initialize_operator` |\n| `useCustomerBalance()` | `CustomerBalance` PDA | Task 1: `create_customer_account`, `deposit`, `withdraw` |\n| Future: Settlement feed | `TaskReceipt` PDA | Task 2: `settle_task`, `refund_task` |\n| Future: Agent packages | `AgentPackage` PDA | Task 1: `register_agent_package` |\n\n## Error Handling Strategy\n\n- **Account not found**: `fetchNullable` returns null → display \"No account\" UI gracefully.\n- **Wallet disconnected**: `useProgram()` returns null → show NotConnectedState.\n- **RPC errors**: Caught in hooks, surfaced via `error` field. Toast notification for user-facing errors.\n- **Build-time safety**: Strict TypeScript, all on-chain types mirrored as TS interfaces."
+    },
+    {
+      "doc_path": "demo/web/docs/HOOKS_API.md",
+      "scaffolds_referenced": [
+        1,
+        2,
+        3
+      ],
+      "decision": "CREATE",
+      "context_type": "api",
+      "title": "React Hooks API Reference",
+      "content": "# React Hooks API Reference\n\n## useProgram()\n\n**File**: `src/hooks/useProgram.ts`\n\nReturns a memoized Anchor `Program<CtoBilling>` instance, or `null` when wallet is not connected.\n\n```typescript\nfunction useProgram(): Program<CtoBilling> | null;\n```\n\n### Dependencies\n- `useConnection()` from `@solana/wallet-adapter-react`\n- `useAnchorWallet()` from `@solana/wallet-adapter-react`\n- IDL imported from `src/idl/cto_billing.json`\n- `PROGRAM_ID` from `src/lib/constants.ts` (or `NEXT_PUBLIC_PROGRAM_ID` env var)\n\n### Behavior\n- Returns `null` when no wallet is connected.\n- Recreates the `AnchorProvider` and `Program` only when connection or wallet instance changes (`useMemo`).\n- The IDL JSON must match the deployed program (generated by `anchor build` in Task 1).\n\n---\n\n## usePdaDerivation()\n\n**File**: `src/hooks/usePdaDerivation.ts`\n\nReturns memoized PDA derivation helper functions. All use `PublicKey.findProgramAddressSync` and return `[PublicKey, number]` tuples (address + bump).\n\n```typescript\nfunction usePdaDerivation(): {\n  deriveCustomerBalance: (wallet: PublicKey) => [PublicKey, number];\n  deriveAgentPackage: (packageId: string) => [PublicKey, number];\n  deriveTaskReceipt: (taskId: string) => [PublicKey, number];\n  deriveVault: (mint: PublicKey) => [PublicKey, number];\n  deriveOperatorConfig: () => [PublicKey, number];\n};\n```\n\n### Seed Constants (must match on-chain `utils/mod.rs`)\n\n| Function | Seeds |\n|---|---|\n| `deriveCustomerBalance` | `[\"customer_balance\", wallet.toBuffer()]` |\n| `deriveAgentPackage` | `[\"agent_package\", sha256(packageId)]` |\n| `deriveTaskReceipt` | `[\"task_receipt\", sha256(taskId)]` |\n| `deriveVault` | `[\"vault\", mint.toBuffer()]` |\n| `deriveOperatorConfig` | `[\"operator_config\"]` |\n\n### SHA-256 Implementation\nMust be **synchronous** (findProgramAddressSync is synchronous). Use `js-sha256` package or Node.js `crypto.createHash('sha256')`. The output is a 32-byte `Buffer` matching the Rust `sha2::Sha256::digest()` output.\n\n---\n\n## useCustomerBalance(wallet)\n\n**File**: `src/hooks/useCustomerBalance.ts`\n\nFetches the `CustomerBalance` PDA for a given wallet.\n\n```typescript\nfunction useCustomerBalance(wallet: PublicKey | null): {\n  data: CustomerBalance | null;\n  loading: boolean;\n  error: Error | null;\n  refetch: () => void;\n};\n```\n\n### Behavior\n- When `wallet` is `null`, returns `{ data: null, loading: false, error: null }`.\n- Uses `program.account.customerBalance.fetchNullable(pda)` — returns `null` if PDA does not exist on-chain (new user who hasn't called `create_customer_account`).\n- Re-fetches when program instance or wallet changes.\n- `refetch()` triggers an immediate re-fetch.\n\n### On-Chain Account Shape (Task 1)\n```\nCustomerBalance {\n  customer: Pubkey,\n  balance: u64,\n  total_deposited: u64,\n  total_spent: u64,\n  task_count: u64,\n  max_per_task: u64,\n  max_per_day: u64,\n  daily_spent: u64,\n  daily_reset_day: u64,\n  created_at: i64,\n}\n```\n\nAnchor deserializes `u64` fields as `BN` (bn.js) in TypeScript.\n\n---\n\n## useOperatorConfig()\n\n**File**: `src/hooks/useOperatorConfig.ts`\n\nFetches the singleton `OperatorConfig` PDA.\n\n```typescript\nfunction useOperatorConfig(): {\n  data: OperatorConfig | null;\n  loading: boolean;\n  error: Error | null;\n  refetch: () => void;\n};\n```\n\n### On-Chain Account Shape (Task 1)\n```\nOperatorConfig {\n  authority: Pubkey,\n  treasury: Pubkey,\n  mint: Pubkey,\n  protocol_fee_bps: u16,\n  paused: bool,\n}\n```\n\n---\n\n## Utility Functions\n\n**File**: `src/lib/formatters.ts`\n\n```typescript\n// Converts USDC lamports (6 decimals) to display string\nformatUsdc(lamports: BN | number): string\n// formatUsdc(10_000_000) → '10.00 USDC'\n// formatUsdc(0) → '0.00 USDC'\n// formatUsdc(1_500) → '0.00 USDC' (rounds to 2 decimal places)\n\n// Returns badge configuration for quality indicator\nformatQuality(met: boolean): { label: string; variant: 'success' | 'destructive' }\n// formatQuality(true) → { label: 'Met', variant: 'success' }\n// formatQuality(false) → { label: 'Not Met', variant: 'destructive' }\n\n// ISO timestamp from Unix seconds\nformatTimestamp(unixSeconds: BN | number): string\n\n// Truncates Solana address for display\nshortenAddress(address: string, chars?: number): string\n// shortenAddress('7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU') → '7xKX...AsU'\n```"
+    },
+    {
+      "doc_path": "demo/web/docs/THEMING.md",
+      "scaffolds_referenced": [
+        1
+      ],
+      "decision": "CREATE",
+      "context_type": "configuration",
+      "title": "Tailwind Theme & Design Token Configuration",
+      "content": "# Theming & Design Tokens\n\n## Tailwind Configuration\n\n**File**: `tailwind.config.ts`\n\n```typescript\n// Key configuration points:\nexport default {\n  darkMode: 'class',          // Dark mode via class strategy, always dark\n  theme: {\n    extend: {\n      colors: {\n        'solana-purple': '#9945FF',\n        'solana-green': '#14F195',\n        'solana-dark': '#0E0E1A',\n        'solana-card': '#1A1A2E',\n      },\n    },\n  },\n};\n```\n\n## shadcn/ui CSS Variables\n\n**File**: `src/app/globals.css`\n\nThe `.dark` selector maps shadcn's CSS custom properties to the Solana palette:\n\n| shadcn Variable | Solana Mapping | Hex Value |\n|---|---|---|\n| `--background` | solana-dark | `#0E0E1A` |\n| `--card` | solana-card | `#1A1A2E` |\n| `--primary` | solana-purple | `#9945FF` |\n| `--primary-foreground` | white | `#FFFFFF` |\n| `--accent` | solana-green (low opacity) | `#14F195` at 20% |\n| `--destructive` | red-500 | `#EF4444` |\n| `--border` | solana-card lighter | `#2A2A3E` |\n\n## shadcn/ui Components Installed\n\nInitialized with **New York** style variant:\n\n- `button` — Primary uses solana-purple, outline variant for secondary actions\n- `card` — bg-solana-card with subtle border\n- `badge` — Used for Devnet indicator, quality status, task status\n- `table` — Settlement feed display (Task 8)\n- `dialog` — Wallet connect modal overlay\n- `input` — Deposit/withdraw amount fields (Task 8)\n- `tabs` — Panel navigation if needed\n- `separator` — Visual dividers\n- `toast` — Transaction confirmation/error notifications\n\n## Font\n\nInter loaded via `next/font/google` with `subsets: ['latin']`, applied to `<body>` via className.\n\n## Wallet Button Glow Effect\n\nWhen connected, the `WalletMultiButton` receives an additional CSS class that applies:\n\n```css\n.wallet-connected-glow {\n  box-shadow: 0 0 12px rgba(20, 241, 149, 0.4), 0 0 24px rgba(20, 241, 149, 0.2);\n}\n```\n\nThis uses solana-green (`#14F195`) at varying opacities to create a subtle glow indicating active connection."
+    },
+    {
+      "doc_path": "demo/web/docs/TYPE_DEFINITIONS.md",
+      "scaffolds_referenced": [
+        1,
+        2
+      ],
+      "decision": "CREATE",
+      "context_type": "api",
+      "title": "TypeScript Type Definitions — On-Chain Account Mirrors",
+      "content": "# TypeScript Type Definitions\n\n**File**: `src/types/index.ts`\n\nThese interfaces mirror the on-chain Anchor account structs defined in Task 1 (`programs/cto-billing/src/state/`) and Task 2 (`settle_task`, `refund_task`). Field names follow Anchor's camelCase deserialization convention.\n\n## TaskStatus\n\n```typescript\nenum TaskStatus {\n  Settled = 'Settled',\n  Refunded = 'Refunded',\n  Disputed = 'Disputed',\n}\n```\n\nMatches the on-chain `TaskStatus` enum from `state/task_receipt.rs`.\n\n## OperatorConfig\n\n```typescript\ninterface OperatorConfig {\n  authority: PublicKey;\n  treasury: PublicKey;\n  mint: PublicKey;\n  protocolFeeBps: number;   // u16 → number\n  paused: boolean;\n}\n```\n\nSeeds: `[\"operator_config\"]`. Created by `initialize_operator` (Task 1).\n\n## CustomerBalance\n\n```typescript\ninterface CustomerBalance {\n  customer: PublicKey;\n  balance: BN;              // u64 → BN\n  totalDeposited: BN;\n  totalSpent: BN;\n  taskCount: BN;            // u64 → BN\n  maxPerTask: BN;\n  maxPerDay: BN;\n  dailySpent: BN;\n  dailyResetDay: BN;\n  createdAt: BN;            // i64 → BN\n}\n```\n\nSeeds: `[\"customer_balance\", customer_pubkey]`. Created by `create_customer_account` (Task 1). Modified by `deposit`, `withdraw`, `settle_task`, `refund_task`.\n\n## AgentPackage\n\n```typescript\ninterface AgentPackage {\n  packageId: string;        // max 64 chars\n  author: PublicKey;\n  splitBps: number;         // u16 → number, max 10000\n  sourceUri: string;        // max 256 chars\n  totalEarned: BN;\n  taskCount: BN;\n  successCount: BN;\n  registeredAt: BN;\n  active: boolean;\n}\n```\n\nSeeds: `[\"agent_package\", sha256(package_id)]`. Created by `register_agent_package` (Task 1). Referenced by `settle_task` (Task 2).\n\n## TaskReceipt\n\n```typescript\ninterface TaskReceipt {\n  taskId: string;           // max 64 chars\n  customer: PublicKey;\n  amount: BN;\n  authorEarned: BN;\n  qualityMet: boolean;\n  agentPackage: PublicKey | null;  // Option<Pubkey>\n  receiptHash: number[];    // [u8; 32] → number[]\n  operator: PublicKey;\n  settledAt: BN;\n  status: TaskStatus;\n}\n```\n\nSeeds: `[\"task_receipt\", sha256(task_id)]`. Created by `settle_task` (Task 2). Modified by `refund_task` (Task 2).\n\n## BN Handling Note\n\nAnchor deserializes all `u64` and `i64` fields as `BN` instances from the `bn.js` library. The `formatUsdc()` formatter in `src/lib/formatters.ts` accepts both `BN` and `number` for flexibility. When performing arithmetic, use `BN` methods (`.toNumber()`, `.div()`, etc.) to avoid JavaScript number precision issues with values > 2^53."
+    },
+    {
+      "doc_path": "demo/web/docs/ON_CHAIN_INTEGRATION.md",
+      "scaffolds_referenced": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "decision": "CREATE",
+      "context_type": "integration",
+      "title": "On-Chain Program Integration Guide",
+      "content": "# On-Chain Program Integration\n\n## IDL Management\n\nThe Anchor IDL (`cto_billing.json`) is the contract between the on-chain program and the dashboard. It is generated by running `anchor build` in the project root.\n\n**Workflow**:\n1. `anchor build` generates `target/idl/cto_billing.json`\n2. Copy to `demo/web/src/idl/cto_billing.json`\n3. The `useProgram()` hook imports this IDL to construct the Anchor `Program` instance\n\nIf the on-chain program changes (new instructions, modified accounts), the IDL must be regenerated and re-copied.\n\n## Program ID\n\nDefined in `src/lib/constants.ts` and overridable via `NEXT_PUBLIC_PROGRAM_ID`. Must match `declare_id!()` in `programs/cto-billing/src/lib.rs` (Task 1).\n\n## Account Reads (Current Scope — Task 7)\n\nThe dashboard currently performs **read-only** operations via Anchor's `program.account.<name>.fetchNullable(pda)` pattern:\n\n| Hook | Account | Read Pattern |\n|---|---|---|\n| `useOperatorConfig()` | `OperatorConfig` | `program.account.operatorConfig.fetchNullable(pda)` |\n| `useCustomerBalance(wallet)` | `CustomerBalance` | `program.account.customerBalance.fetchNullable(pda)` |\n\n## Account Writes (Future — Task 8)\n\nTask 8 will add transaction submission for:\n- `deposit(amount)` — SPL token transfer from customer ATA to vault\n- `withdraw(amount)` — SPL token transfer from vault to customer ATA\n- `create_customer_account(maxPerTask, maxPerDay)` — First-time customer setup\n\nThese will use `program.methods.<instruction>(...args).accounts({...}).rpc()` with the connected wallet as signer.\n\n## Settlement Pipeline Integration\n\nThe full settlement flow involves multiple system components:\n\n```\n[CodeRun completes] → [Controller billing hook (Task 4)]\n    → Redis XADD \"cto:settlements\"\n    → [Settlement Sidecar (Task 5)] XREADGROUP\n    → Solana settle_task / refund_task transaction\n    → [On-chain TaskReceipt PDA created (Task 2)]\n    → [Dashboard reads TaskReceipt (Task 8)]\n```\n\nThe dashboard sits at the end of this pipeline, reading the immutable `TaskReceipt` PDAs that the settlement sidecar creates on-chain.\n\n## PDA Derivation Consistency\n\nPDA seeds must be byte-identical across all components:\n\n| Component | Language | SHA-256 Source |\n|---|---|---|\n| On-chain program (Task 1) | Rust | `sha2::Sha256::digest()` |\n| Test suite (Task 3) | TypeScript | `crypto.createHash('sha256')` in `tests/helpers.ts` |\n| Dashboard (Task 7) | TypeScript | `js-sha256` or `crypto.createHash('sha256')` in `usePdaDerivation()` |\n| Settlement sidecar (Task 5) | Rust | `sha2::Sha256::digest()` in `crates/settlement-sidecar/src/pda.rs` |\n\nAll implementations hash the **UTF-8 encoded string** and produce a 32-byte digest used as the PDA seed.\n\n## Devnet Testing\n\nTo test the dashboard against real on-chain data:\n1. Deploy program to devnet: `anchor deploy --provider.cluster devnet`\n2. Run initialization: execute `initialize_operator` and `create_customer_account` from tests (Task 3)\n3. Fund customer wallet with devnet SOL and mock USDC\n4. Start dashboard with `npm run dev` and connect the same wallet via Phantom"
+    }
+  ],
+  [
+    {
+      "subtask_id": 8001,
+      "file_path": "src/components/SettlementFeed.tsx",
+      "description": "Settlement feed DataTable component displaying TaskReceipt records from on-chain program with polling, color-coded quality badges, and row selection",
+      "needs_context": [
+        {
+          "path": "programs/cto-billing/src/state/task_receipt.rs",
+          "reason": "Need the TaskReceipt account struct and TaskStatus enum to correctly deserialize and display on-chain receipt data"
+        },
+        {
+          "path": "programs/cto-billing/src/utils/mod.rs",
+          "reason": "Need PDA seed constants (TASK_RECEIPT_SEED) and hash_seed function to derive TaskReceipt PDAs client-side"
+        }
+      ],
+      "needs_from_other_subtasks": [
+        {
+          "subtask_id": 7001,
+          "description": "Need the IDL TypeScript types (CtoBilling type), useProgram() hook, and useCustomerBalance() hook to access the Anchor program instance for fetching TaskReceipt accounts"
+        },
+        {
+          "subtask_id": 7002,
+          "description": "Need formatUsdc() and formatTimestamp() utility functions, shortenAddress() helper, and the TaskReceipt/TaskStatus TypeScript type definitions from the shared types module"
+        },
+        {
+          "subtask_id": 7003,
+          "description": "Need the Tailwind theme configuration (solana-card, solana-green, solana-purple color tokens) and shadcn component library setup to use DataTable, Badge, and other UI primitives"
+        }
+      ],
+      "estimated_loc": 220,
+      "confidence": 0.75,
+      "challenges": [
+        "Fetching all TaskReceipt PDAs via program.account.taskReceipt.all() may be slow on devnet if there are many accounts — may need pagination or filters",
+        "Polling interval (5s) could cause UI flicker if the full account list is re-fetched each time; need to diff state to avoid unnecessary re-renders",
+        "The shadcn DataTable pattern requires defining columns with accessorKey/cell render functions which need careful typing against the Anchor IDL-generated types"
+      ]
+    },
+    {
+      "subtask_id": 8002,
+      "file_path": "src/components/CustomerBalanceCard.tsx",
+      "description": "Customer balance card component showing current balance, deposit/spent totals, task count, and spending cap progress bars with threshold-based color coding",
+      "needs_context": [
+        {
+          "path": "programs/cto-billing/src/state/customer_balance.rs",
+          "reason": "Need the CustomerBalance account struct definition to understand all fields (balance, total_deposited, total_spent, task_count, max_per_task, max_per_day, daily_spent, daily_reset_day)"
+        }
+      ],
+      "needs_from_other_subtasks": [
+        {
+          "subtask_id": 7001,
+          "description": "Need useCustomerBalance(publicKey) hook that fetches the CustomerBalance PDA and returns the deserialized account data, loading state, and refetch function"
+        },
+        {
+          "subtask_id": 7002,
+          "description": "Need formatUsdc() utility for displaying USDC amounts and the CustomerBalance TypeScript type definition"
+        },
+        {
+          "subtask_id": 7003,
+          "description": "Need Tailwind theme tokens (solana-card, solana-green) and shadcn Card, Progress, and Skeleton components set up"
+        }
+      ],
+      "estimated_loc": 180,
+      "confidence": 0.85,
+      "challenges": [
+        "Computing the daily cap reset time from the on-chain daily_reset_day (which is likely a day number, not a timestamp) requires understanding the exact format used by the program's validate_daily_cap function",
+        "Progress bar color thresholds (70%/90%) need smooth CSS transitions that work well with Tailwind's dark theme utility classes"
+      ]
+    },
+    {
+      "subtask_id": 8003,
+      "file_path": "src/components/DepositDialog.tsx",
+      "description": "Deposit and Withdraw dialog components with USDC amount input, Anchor transaction submission, toast notifications, and automatic balance refresh on success",
+      "needs_context": [
+        {
+          "path": "programs/cto-billing/src/instructions/deposit.rs",
+          "reason": "Need the Deposit accounts struct to know which accounts to pass when building the deposit transaction (customer, customer_balance, customer_ata, vault, operator_config, mint, token_program)"
+        },
+        {
+          "path": "programs/cto-billing/src/instructions/withdraw.rs",
+          "reason": "Need the Withdraw accounts struct to know which accounts to pass when building the withdraw transaction"
+        },
+        {
+          "path": "programs/cto-billing/src/utils/mod.rs",
+          "reason": "Need VAULT_SEED, CUSTOMER_BALANCE_SEED, OPERATOR_CONFIG_SEED constants to derive PDAs client-side for transaction account resolution"
+        },
+        {
+          "path": "programs/cto-billing/src/errors.rs",
+          "reason": "Need BillingError variants to map program error codes to user-friendly messages in toast notifications"
+        }
+      ],
+      "needs_from_other_subtasks": [
+        {
+          "subtask_id": 7001,
+          "description": "Need useProgram() hook for accessing the Anchor Program instance, and the PDA derivation utilities (deriveVaultPda, deriveCustomerBalancePda, deriveOperatorConfigPda) for building transaction accounts"
+        },
+        {
+          "subtask_id": 7002,
+          "description": "Need formatUsdc() and any USDC lamport conversion utilities (e.g., parseUsdcToLamports) for converting user input amounts to on-chain u64 values"
+        },
+        {
+          "subtask_id": 7003,
+          "description": "Need shadcn Dialog, Input, Button, and toast/Toaster components configured and available"
+        },
+        {
+          "subtask_id": 8002,
+          "description": "Need the CustomerBalanceCard component's refetch callback or the useCustomerBalance hook's refetch function to trigger balance refresh after successful deposit/withdraw"
+        }
+      ],
+      "estimated_loc": 300,
+      "confidence": 0.7,
+      "challenges": [
+        "Anchor's program.methods.deposit().accounts({...}).rpc() requires precisely matching account names and types from the IDL — any mismatch causes cryptic errors",
+        "Need to fetch the user's USDC ATA address and balance before submitting, using getAssociatedTokenAddress from @solana/spl-token, which adds an async dependency chain",
+        "Converting user-input decimal USDC (e.g., '10.50') to u64 lamports (10_500_000) requires careful handling of floating point precision — should use BN.js or integer math",
+        "The vault PDA is a token account that may need to be initialized separately if it doesn't exist yet — need to handle the first-deposit case"
+      ]
+    },
+    {
+      "subtask_id": 8004,
+      "file_path": "src/components/AgentPackageList.tsx",
+      "description": "Agent package listing component fetching all AgentPackage PDAs and displaying them as cards with author, split percentage, earnings, success rate, and active status",
+      "needs_context": [
+        {
+          "path": "programs/cto-billing/src/state/agent_package.rs",
+          "reason": "Need the AgentPackage account struct to understand all fields (package_id, author, split_bps, source_uri, total_earned, task_count, success_count, active)"
+        }
+      ],
+      "needs_from_other_subtasks": [
+        {
+          "subtask_id": 7001,
+          "description": "Need useProgram() hook for accessing the Anchor Program instance to call program.account.agentPackage.all()"
+        },
+        {
+          "subtask_id": 7002,
+          "description": "Need formatUsdc(), shortenAddress(), and the AgentPackage TypeScript type definition"
+        },
+        {
+          "subtask_id": 7003,
+          "description": "Need shadcn Card, Badge, Tabs, and Skeleton components, plus Tailwind theme tokens (solana-card, solana-purple)"
+        }
+      ],
+      "estimated_loc": 160,
+      "confidence": 0.85,
+      "challenges": [
+        "Success rate calculation must handle zero division (taskCount=0) gracefully and display 'N/A' instead of NaN%",
+        "Copy-to-clipboard for author address requires the navigator.clipboard API which needs secure context — should add fallback and visual feedback"
+      ]
+    },
+    {
+      "subtask_id": 8005,
+      "file_path": "src/components/ReceiptDetail.tsx",
+      "description": "Receipt detail view with full receipt fields, amount breakdown, quality badge, hex receipt hash with copy, explorer link, and shared selection context connected to the SettlementFeed",
+      "needs_context": [
+        {
+          "path": "programs/cto-billing/src/state/task_receipt.rs",
+          "reason": "Need TaskReceipt struct and TaskStatus enum to understand all fields displayed in the detail view, including receipt_hash (byte array to hex conversion)"
+        },
+        {
+          "path": "programs/cto-billing/src/state/operator_config.rs",
+          "reason": "Need OperatorConfig to understand protocol_fee_bps for computing the platform fee portion of the amount breakdown"
+        }
+      ],
+      "needs_from_other_subtasks": [
+        {
+          "subtask_id": 8001,
+          "description": "Need the SettlementFeed's row selection mechanism — either a callback prop pattern or shared SelectedReceiptContext — to receive the selected TaskReceipt when a user clicks a row"
+        },
+        {
+          "subtask_id": 7002,
+          "description": "Need formatUsdc(), formatTimestamp(), shortenAddress() utilities and TaskReceipt/TaskStatus TypeScript types"
+        },
+        {
+          "subtask_id": 7003,
+          "description": "Need shadcn Card, Badge, Button, Dialog (if modal approach), and Tailwind theme tokens"
+        },
+        {
+          "subtask_id": 7001,
+          "description": "Need PDA derivation functions (deriveReceiptPda) to construct the Solana Explorer URL from the task_id"
+        }
+      ],
+      "estimated_loc": 230,
+      "confidence": 0.8,
+      "challenges": [
+        "Converting the on-chain receipt_hash ([u8; 32] → number[] in JS) to a hex string requires mapping each byte to a 2-char hex representation",
+        "Computing the platform fee requires knowing protocol_fee_bps from OperatorConfig, which means either fetching it separately or passing it through context — adds a data dependency",
+        "The SelectedReceiptContext needs to be created and wired into both the parent page layout and both consuming components (SettlementFeed and ReceiptDetail), requiring coordination with the page.tsx structure from Task 7"
+      ]
+    }
+  ]
+]

@@ -258,7 +258,7 @@ spec:
                 You can read source code, review diffs, and understand architecture.
               - **SWARM CLI**: Post product and traction updates to The Canteen platform.
               - **Colosseum Copilot**: Research crypto/Solana startup opportunities via
-                the Colosseum API (requires COLOSSEUM_PAT env var).
+                the colosseum-copilot skill (requires COLOSSEUM_COPILOT_PAT env var).
               - **Web Search**: Find current information about projects, protocols, teams.
               - **Progress Tracking**: Maintain a persistent progress document and record
                 non-code activities reported via Discord.
@@ -421,11 +421,13 @@ spec:
 
               ## Colosseum Copilot API
 
-              If COLOSSEUM_PAT is set, you can query the Colosseum Copilot API:
+              If COLOSSEUM_COPILOT_PAT is set, you can query the Colosseum Copilot API:
               ```bash
-              curl -H "Authorization: Bearer $COLOSSEUM_PAT" \
-                https://copilot.colosseum.com/api/v1/search?q=QUERY
+              curl -H "Authorization: Bearer $COLOSSEUM_COPILOT_PAT" \
+                "$COLOSSEUM_COPILOT_API_BASE/status"
               ```
+              The colosseum-copilot skill is installed and handles API calls automatically.
+              Just ask questions naturally — the skill activates on crypto/Solana research.
               Use this for: researching competing projects, finding builder history,
               analyzing hackathon trends, and competitive intelligence.
 
@@ -489,7 +491,7 @@ spec:
               - SWARM CLI: `swarm --help` (Canteen platform interaction)
               - GitHub CLI: `gh` (repo data, commits, PRs — authenticated via GITHUB_TOKEN)
               - git: local repo analysis, diffs, logs
-              - Colosseum Copilot API: `curl -H "Authorization: Bearer $COLOSSEUM_PAT" https://copilot.colosseum.com/api/v1/...`
+              - Colosseum Copilot: installed skill (auto-activates on crypto/Solana research)
               - Web search via Perplexity (built-in)
               - Context7 MCP server (library docs)
 
