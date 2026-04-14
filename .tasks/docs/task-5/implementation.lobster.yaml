@@ -1,0 +1,130 @@
+name: implement-task-5
+metadata:
+  task_id: 5
+  agent: rex
+  stack: Rust/solana-sdk/solana-client
+  cli: Claude Code
+  model: claude-opus-4-6-20260205
+  depends_on_tasks: [1, 2, 4]
+
+args:
+  task_dir: {}
+  repo_url: {}
+  branch_name:
+    default: "task-5/feature-branch"
+  agent:
+    default: "rex"
+  cli:
+    default: "Claude Code"
+  model:
+    default: "claude-opus-4-6-20260205"
+  fallback_cli:
+    default: "codex"
+  fallback_model:
+    default: "gpt-5.2-codex"
+  max_implementation_retries:
+    default: 10
+  max_quality_retries:
+    default: 5
+
+steps:
+  - id: setup
+    command: >
+      git clone ${repo_url} work && cd work &&
+      git checkout -b ${branch_name}
+
+  - id: scaffold-files
+    depends_on: [setup]
+    command: >
+      cd work && mkdir -p crates/settlement-sidecar crates/settlement-sidecar/src crates/settlement-sidecar/tests
+
+  - id: implement-subtask-5001
+    depends_on: [scaffold-files]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-5.5001/prompt.md)" --model ${model}
+
+  - id: validate-subtask-5001
+    depends_on: [implement-subtask-5001]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - id: implement-subtask-5002
+    depends_on: [validate-subtask-5001]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-5.5002/prompt.md)" --model ${model}
+
+  - id: validate-subtask-5002
+    depends_on: [implement-subtask-5002]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - id: implement-subtask-5003
+    depends_on: [validate-subtask-5001]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-5.5003/prompt.md)" --model ${model}
+
+  - id: validate-subtask-5003
+    depends_on: [implement-subtask-5003]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - id: implement-subtask-5004
+    depends_on: [validate-subtask-5002, validate-subtask-5003]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-5.5004/prompt.md)" --model ${model}
+
+  - id: validate-subtask-5004
+    depends_on: [implement-subtask-5004]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - id: implement-subtask-5005
+    depends_on: [validate-subtask-5001]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-5.5005/prompt.md)" --model ${model}
+
+  - id: validate-subtask-5005
+    depends_on: [implement-subtask-5005]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - id: implement-subtask-5006
+    depends_on: [validate-subtask-5002, validate-subtask-5003, validate-subtask-5004, validate-subtask-5005]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-5.5006/prompt.md)" --model ${model}
+
+  - id: validate-subtask-5006
+    depends_on: [implement-subtask-5006]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && cargo check && cargo test && cargo clippy -- -D warnings
+
+  - id: integration-validation
+    depends_on: [validate-subtask-5001, validate-subtask-5002, validate-subtask-5003, validate-subtask-5004, validate-subtask-5005, validate-subtask-5006]
+    command: >
+      cd work && bun tsc --noEmit && bun test --run && bun lint
+
+  - id: acceptance-check
+    depends_on: [integration-validation]
+    command: >
+      ${cli} -p "Review changes against ${task_dir}/acceptance.md. Output PASS or FAIL." --model ${model}
+
+  - id: create-pr
+    depends_on: [acceptance-check]
+    command: >
+      cd work && git add -A &&
+      git commit -m "feat: task-5" &&
+      git push origin ${branch_name} &&
+      source "${WORKSPACE:-.}/scripts/scm-dispatch.sh" &&
+      scm_create_pr "feat: task-5" "$(cat ${task_dir}/task.md)" "main"

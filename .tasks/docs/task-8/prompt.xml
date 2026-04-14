@@ -1,0 +1,10 @@
+<task id="8">
+  <agent name="blaze" stack="React/Next.js 14/TypeScript/shadcn-ui" />
+  <title>Hackathon Demo Web Dashboard - Settlement Feed & Balance Management (Blaze - React/Next.js/TypeScript)</title>
+  <description>Implement the settlement feed DataTable, customer balance card with deposit/withdraw flows, agent package listing, and receipt verification — the interactive features that make the dashboard demo-worthy for judges.</description>
+  <implementation>
+    <details>1. **Settlement Feed (Left Panel)** — `src/components/SettlementFeed.tsx`:
+   - Use shadcn `DataTable` component with columns: Task ID</details>
+  </implementation>
+  <acceptance_criteria></acceptance_criteria>
+</task>

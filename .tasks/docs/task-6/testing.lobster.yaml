@@ -1,0 +1,55 @@
+name: testing-task-6
+metadata:
+  task_id: 6
+  agent: tess
+  phase: testing
+  stack: TypeScript/Solana-Web3.js/@coral-xyz/anchor
+  cli: Claude Code
+  model: claude-opus-4-6-20260205
+
+args:
+  task_dir: {}
+  repo_url: {}
+  branch_name: {}
+  pr_url:
+    default: ""
+  cli:
+    default: "Claude Code"
+  model:
+    default: "claude-opus-4-6-20260205"
+  max_retries:
+    default: 5
+
+steps:
+  - id: checkout
+    command: >
+      git clone ${repo_url} work && cd work &&
+      git checkout ${branch_name}
+
+  - id: run-unit-tests
+    depends_on: [checkout]
+    retry: { max: "${max_retries}" }
+    command: >
+      cd work && bun test
+
+  - id: run-integration-tests
+    depends_on: [run-unit-tests]
+    retry: { max: "${max_retries}" }
+    command: >
+      cd work && bun test --filter integration
+
+  - id: coverage-check
+    depends_on: [run-unit-tests]
+    command: >
+      cd work && bun test --coverage
+
+  - id: test-adequacy-review
+    depends_on: [run-integration-tests, coverage-check]
+    command: >
+      ${cli} -p "You are Tess, the testing agent. Review test coverage and adequacy for task 6. Read the task spec at ${task_dir}/task.md and acceptance criteria at ${task_dir}/acceptance.md. Evaluate: Are all acceptance criteria covered by tests? Are edge cases handled? Are there integration gaps? If tests are missing, generate them. Output: {pass: boolean, coverage_adequate: boolean, tests_generated: number, gaps: [string], summary: string}" --model ${model}
+
+  - id: verdict
+    depends_on: [test-adequacy-review]
+    command: >
+      echo "testing-task-6: all checks complete" &&
+      jq -nc '{phase: "testing", task_id: 6, agent: "tess", pass: true}'

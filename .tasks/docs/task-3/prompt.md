@@ -1,0 +1,103 @@
+<identity>
+You are tess, the Anchor/TypeScript/Mocha implementation agent. You own task 3 end-to-end.
+</identity>
+
+<context>
+<task_overview>
+Task 3: Comprehensive Anchor Program Integration Test Suite (Tess - TypeScript/Anchor/Mocha)
+Build a thorough integration test suite validating every instruction, edge case, and error path in the cto-billing program. This suite runs on localnet and serves as the quality gate for CI (Task 9).
+Priority: high
+Dependencies: 1, 2
+</task_overview>
+</context>
+
+<implementation_plan>
+1. Set up test infrastructure in `tests/cto-billing.ts`:
+   - Use `@coral-xyz/anchor` test harness with `anchor.workspace.CtoBilling`.
+   - Create helper functions: `createMockMint()`, `createAta(owner, mint)`, `mintTo(ata, amount)`, `derivePackagePda(packageId)`, `deriveCustomerPda(customer)`, `deriveReceiptPda(taskId)`, `deriveVaultPda(mint)`.
+   - All PDA derivation helpers must use SHA-256 hashing consistent with on-chain logic (D2).
+   - Generate test keypairs: operator, customer, author, second_customer, second_author.
+
+2. Test groups (use Mocha `describe` blocks):
+
+   **Group 1: Initialization**
+   - Initialize operator config with treasury, mint, protocol_fee_bps=0.
+   - Verify all fields stored correctly.
+   - Attempt re-initialization → should fail (PDA already exists).
+
+   **Group 2: Customer Account Management**
+   - Create customer account with max_per_task=50_000_000 (50 USDC), max_per_day=200_000_000.
+   - Verify initial balances are 0.
+   - Update spending caps to new values, verify update.
+   - Attempt create with same customer → fail (duplicate PDA).
+
+   **Group 3: Agent Package Registration**
+   - Register package 'test-agent-v1' with split_bps=3000, source_uri='https://github.com/test/agent'.
+   - Verify author, split_bps, active=true, counters=0.
+   - Update package: change split_bps to 2500, verify.
+   - Deactivate package (active=false), verify.
+   - Attempt update by non-author → Unauthorized error.
+   - Register with split_bps=10001 → InvalidSplitBps error.
+
+   **Group 4: Deposits & Withdrawals**
+   - Deposit 100 USDC (100_000_000 lamports). Verify balance, total_deposited.
+   - Deposit another 50 USDC. Verify cumulative totals.
+   - Withdraw 30 USDC. Verify balance=120 USDC.
+   - Attempt withdraw 200 USDC → InsufficientBalance error.
+   - Withdraw remaining balance to 0. Verify.
+
+   **Group 5: Settlement — Case 1 (No Agent Package)**
+   - Deposit 100 USDC. Settle task 'TASK-001' for 15 USDC with no agent package.
+   - Verify: customer balance=85, treasury received 15, TaskReceipt fields correct.
+   - Verify customer.task_count=1, total_spent=15 USDC.
+
+   **Group 6: Settlement — Case 2 (Quality Met, Split)**
+   - Settle task 'TASK-002' for 20 USDC with agent package (split_bps=3000), quality_met=true.
+   - Verify: customer balance deducted by 20, author received 6 USDC, treasury received 14.
+   - Verify AgentPackage: total_earned=6, task_count=1, success_count=1.
+   - Verify TaskReceipt: amount=20, author_earned=6, quality_met=true.
+
+   **Group 7: Settlement — Case 3 (Quality Not Met)**
+   - Settle task 'TASK-003' with agent package, quality_met=false.
+   - Verify: customer balance unchanged, no transfers, TaskReceipt.amount=0.
+   - Verify AgentPackage.task_count incremented but success_count unchanged.
+
+   **Group 8: Spending Cap Enforcement**
+   - Set max_per_task=10 USDC. Attempt settle for 15 → ExceedsPerTaskCap.
+   - Set max_per_day=25 USDC. Settle 20, then attempt 10 → ExceedsDailyCap.
+   - Simulate day rollover by advancing Clock (if possible on local validator) or test the day number logic.
+
+   **Group 9: Circuit Breaker**
+   - Pause program. Attempt settle → ProgramPaused.
+   - Attempt deposit → should still work (or should it be paused too? — check PRD: only settlement/refund).
+   - Unpause. Settle succeeds.
+
+   **Group 10: Refund Flow**
+   - Settle a task, then refund. Verify customer balance restored, receipt status=Refunded.
+   - Attempt refund on already-refunded task → error.
+
+   **Group 11: Idempotency**
+   - Attempt to settle same task_id twice → error (PDA already exists).
+
+   **Group 12: Authorization**
+   - Attempt settle_task with non-operator signer → Unauthorized.
+   - Attempt pause with non-operator → Unauthorized.
+
+3. Add a `test:ci` script in `package.json` that runs the full suite with `--timeout 60000`.
+
+4. Ensure all 30+ test cases complete in under 60 seconds on `solana-test-validator`.
+</implementation_plan>
+
+<acceptance_criteria>
+Run `anchor test` (which starts solana-test-validator, deploys the program, and runs the Mocha suite). All test groups (12 groups, 30+ individual test cases) pass with zero failures. Total execution time is under 60 seconds. Coverage includes: all 11 instructions (initialize_operator, create_customer_account, register_agent_package, update_agent_package, deposit, withdraw, update_spending_caps, pause, unpause, settle_task, refund_task), all 3 settlement cases, all error codes (InsufficientBalance, ExceedsPerTaskCap, ExceedsDailyCap, Unauthorized, ProgramPaused, InvalidSplitBps, DuplicateTaskId, PackageInactive), and the refund lifecycle. Run `npm run test:ci` to verify the CI-compatible invocation also passes.
+
+See also: acceptance.md in this task directory for the checklist version.
+</acceptance_criteria>
+
+<subtasks>
+- Test infrastructure setup: helpers, keypairs, Mocha config, and test:ci script: Set up the complete test infrastructure in tests/cto-billing.ts including all helper functions, PDA derivation utilities, keypair generation, Anchor workspace initialization, and the test:ci npm script. This is the foundation all test groups depend on.
+- Test Groups 1-3: Initialization, Customer Account Management, and Agent Package Registration: Implement Mocha describe blocks for Groups 1-3 covering initialize_operator, create_customer_account, update_spending_caps, register_agent_package, update_agent_package instructions, including all happy paths and error cases (re-init, duplicate PDA, non-author update, invalid split_bps).
+- Test Groups 4-5: Deposits, Withdrawals, and Settlement Case 1 (No Agent Package): Implement Mocha describe blocks for Groups 4 and 5 covering deposit, withdraw, and settle_task (without agent package) instructions, including balance verification, cumulative totals, insufficient balance errors, and TaskReceipt field validation.
+- Test Groups 6-8: Settlement with Agent Splits, Quality-Not-Met, and Spending Cap Enforcement: Implement Mocha describe blocks for Groups 6, 7, and 8 covering settle_task with agent package (quality met and not met), author split verification, AgentPackage counter updates, and spending cap enforcement (per-task and per-day limits).
+- Test Groups 9-12: Circuit Breaker, Refund Flow, Idempotency, and Authorization: Implement Mocha describe blocks for Groups 9-12 covering pause/unpause circuit breaker behavior, refund lifecycle (settle then refund), idempotency protection (duplicate task_id), and authorization checks (non-operator signers).
+</subtasks>

@@ -1,0 +1,55 @@
+<task id="7">
+  <agent name="blaze" stack="React/Next.js 14/TypeScript/Tailwind CSS" />
+  <title>Hackathon Demo Web Dashboard - Core Setup & Wallet Integration (Blaze - React/Next.js/TypeScript)</title>
+  <description>Set up the Next.js 14 web dashboard with Solana wallet adapter integration, dark theme with Solana brand colors, shadcn/ui components, and the split-panel layout skeleton. This is the visual foundation for the hackathon demo (PRD Section 11, Deliverable #3).</description>
+  <implementation>
+    <details>1. Initialize Next.js 14 app at `demo/web/` with App Router, TypeScript, Tailwind CSS:
+   ```bash
+   npx create-next-app@14 demo/web --typescript --tailwind --app --src-dir
+   ```
+
+2. Install dependencies:
+   - `@coral-xyz/anchor`, `@solana/web3.js`, `@solana/spl-token`
+   - `@solana/wallet-adapter-react`, `@solana/wallet-adapter-react-ui`, `@solana/wallet-adapter-phantom`, `@solana/wallet-adapter-solflare` (D10)
+   - `shadcn/ui` via `npx shadcn-ui@latest init` — select dark theme, New York style (D14)
+   - Install shadcn components: `button`, `card`, `badge`, `table`, `dialog`, `input`, `tabs`, `separator`, `toast`
+
+3. Configure Tailwind theme in `tailwind.config.ts`:
+   - Dark mode: `class` strategy, default to dark.
+   - Custom colors: `solana-purple: '#9945FF'`, `solana-green: '#14F195'`, `solana-dark: '#0E0E1A'`, `solana-card: '#1A1A2E'`.
+   - Accent colors mapped to shadcn CSS variables in `globals.css`.
+
+4. Create app layout (`src/app/layout.tsx`):
+   - `<WalletProvider>` wrapping the app with Phantom + Solflare adapters.
+   - `<ConnectionProvider>` with configurable endpoint (default devnet).
+   - `<WalletModalProvider>` for the connect dialog.
+   - Dark background (`bg-solana-dark`), Inter font.
+
+5. Create header component (`src/components/Header.tsx`):
+   - CTO / 5D Labs logo (left).
+   - Network indicator badge: 'Devnet' in solana-purple.
+   - Wallet connect button (right) using `<WalletMultiButton />` from wallet-adapter-react-ui.
+   - Solana-green glow effect on connected state.
+
+6. Create split-panel layout (D12) in `src/app/page.tsx`:
+   - Left panel (60% width): Settlement feed area (placeholder for Task 8).
+   - Right panel (40% width): Customer balance area (placeholder for Task 8).
+   - Responsive: stack vertically on mobile, side-by-side on desktop.
+   - Optimize for 1920×1080 screen recording.
+
+7. Create shared hooks (`src/hooks/`):
+   - `useProgram()` — returns Anchor Program instance initialized with connected wallet and IDL. Import IDL from `../../target/idl/cto_billing.json` (or copy to `src/idl/`).
+   - `usePdaDerivation()` — PDA derivation helpers using SHA-256 (D2): `deriveCustomerBalance(wallet)`, `deriveAgentPackage(packageId)`, `deriveTaskReceipt(taskId)`, `deriveVault(mint)`, `deriveOperatorConfig()`.
+   - `useCustomerBalance(wallet)` — fetches CustomerBalance PDA account data, returns parsed balance/caps/stats.
+   - `useOperatorConfig()` — fetches OperatorConfig, returns mint/treasury/paused state.
+
+8. Create types (`src/types/`):
+   - Mirror on-chain types: OperatorConfig, CustomerBalance, AgentPackage, TaskReceipt, TaskStatus.
+   - Utility formatters: `formatUsdc(lamports: number)` → '10.00 USDC', `formatQuality(met: boolean)` → badge JSX.
+
+9. Create a minimal 'Not Connected' state for the main page that shows the CTO branding and prompts wallet connection.
+
+10. Verify the app runs with `npm run dev` and displays correctly in dark mode with Solana branding at 1920×1080.</details>
+  </implementation>
+  <acceptance_criteria>Run `npm run build` — Next.js production build completes with zero errors and zero TypeScript errors. Run `npm run dev` and verify at http://localhost:3000: (1) Page loads in under 3 seconds with dark background and Solana purple/green accent colors visible, (2) Header shows CTO logo, 'Devnet' badge, and wallet connect button, (3) Clicking wallet connect opens modal showing Phantom and Solflare options, (4) Split-panel layout is visible with left (60%) and right (40%) panels on a 1920×1080 viewport, (5) Panels stack vertically on 375px mobile viewport. Run Lighthouse accessibility audit — score ≥ 80. Run `npx tsc --noEmit` — zero type errors. Verify `useProgram()` hook instantiates without errors when wallet is connected (use Phantom devnet with test SOL).</acceptance_criteria>
+</task>
