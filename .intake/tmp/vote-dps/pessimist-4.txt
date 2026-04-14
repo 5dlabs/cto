@@ -1,1 +1,0 @@
-Tab-based for mobile, sidebar for web (responsive hybrid)

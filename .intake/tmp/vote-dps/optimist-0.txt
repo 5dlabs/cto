@@ -1,1 +1,0 @@
-gRPC for internal service-to-service calls, with REST gateways for external clients (web, mobile, Morgan MCP tools)

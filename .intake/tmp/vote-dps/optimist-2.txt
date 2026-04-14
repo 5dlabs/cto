@@ -1,1 +1,0 @@
-mTLS between services (leveraging Cilium's built-in mutual TLS) + JWT for external client authentication
