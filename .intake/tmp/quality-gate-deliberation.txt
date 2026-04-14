@@ -1,4 +1,4 @@
-project=sigma-1
+project=cto-pay
 deliberate=true
 
 deliberation_stdout:
@@ -18,179 +18,179 @@ design_brief_excerpt:
 
 ## 1. Original Requirements
 
-> # Project: Sigma-1 — Unified AI Business Platform
+> # Project: CTO Pay — On-Chain Usage-Based Payments for the CTO Platform
 >
-> - **Website:** https://sigma-1.com
-> - **Existing Platform:** https://deployiq.maximinimal.ca
+> - **Organization:** 5D Labs
+> - **Status:** Draft
+> - **Target:** Solana Agent Hackathon (April 2026)
+> - **Repo:** https://github.com/5dlabs/cto-pay
 >
 > ## Vision
 >
-> Sigma-1 is a comprehensive AI-powered business platform that replaces fragmented tools, manual processes, and administrative overhead with a single intelligent agent — **Morgan** — accessible through Signal, phone, and web. Built for Sigma-1 / Perception Events, a lighting and visual production company.
+> CTO Pay is the on-chain payment and settlement layer for the CTO platform. It replaces traditional off-chain billing with a Solana program that lets customers pre-pay USDC into an escrow account, have their usage metered per task, and receive verifiable on-chain receipts for every charge. Every payment is transparent, auditable, and composable.
 >
-> Instead of juggling rental software, spreadsheets, phone calls, accounting tools, and social media apps, everything runs through one interface: send Morgan a message, and it handles the rest.
->
-> This is a microservices architecture demonstrating full CTO platform agent utilization across multiple tech stacks, similar to the AlertHub pattern.
+> The long-term goal is a protocol-grade billing rail that supports usage-based payments today, and extends to agent registry royalty splits, attestation-gated settlement, and a full agent marketplace tomorrow — without rewriting the core program.
 >
 > ---
 >
 > ## Architecture Overview
 >
 > ```
-> ┌─────────────────────────────────────────────────────────────────────┐
-> │                     Sigma-1 Platform                                 │
-> ├─────────────────────────────────────────────────────────────────────┤
-> │  Clients                                                             │
-> │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-> │  │  Signal  │  │   Voice  │  │   Web    │  │  Mobile  │        │
-> │  │  (Morgan)│  │ (ElevenLabs│ │ (Next.js)│  │  (Expo)  │        │
-> │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘        │
-> │       │             │             │             │                 │
-> ├───────┴─────────────┴─────────────┴─────────────┴─────────────────┤
-> │  Backend Services                                                    │
-> │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐      │
-> │  │   Equipment    │  │     RMS        │  │    Finance     │      │
-> │  │   Catalog      │  │   Service      │  │    Service     │      │
-> │  │   (Rust/Axum)  │  │   (Go/gRPC)    │  │   (Rust/Axum)  │      │
-> │  │     Rex        │  │     Grizz      │  │     Rex        │      │
-> │  └───────┬────────┘  └───────┬────────┘  └───────┬────────┘      │
-> │          │                    │                    │                 │
-> │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐      │
-> │  │   (Out of      │  │     Social     │  │    Customer    │      │
-> │  │    Scope)      │  │    Engine      │  │    Vetting     │      │
-> │  │  (Phase 2)    │  │(Node/Elysia)  │  │  (Rust/Axum)   │      │
-> │  │                │  │     Nova       │  │     Rex        │      │
-> │  └───────┬────────┘  └───────┬────────┘  └───────┬────────┘      │
-> │          │                    │                    │                 │
-> ├──────────┴────────────────────┴────────────────────┴─────────────────┤
-> │  Infrastructure                                                      │
-> │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐     │
-> │  │PostgreSQL│ │  Redis  │ │  S3/R2  │ │ ElevenLabs│ │ Twilio  │     │
-> │  │         │ │         │ │         │ │          │ │         │     │
-> │  └─────────┘ └─────────┘ └─────────┘ └──────────┘ └─────────┘     │
-> │  ┌─────────┐ ┌─────────┐                                             │
-> │  │SignalCLI│ │OpenCorporates│                                         │
-> │  └─────────┘ └─────────┘                                             │
-> └─────────────────────────────────────────────────────────────────────┘
+> ┌─────────────────────────────────────────────────────────────────────────┐
+> │                         CTO Pay Platform                                │
+> ├─────────────────────────────────────────────────────────────────────────┤
+> │  Customer                                                               │
+> │  ┌──────────────┐                                                       │
+> │  │ Solana Wallet │  (Phantom, Backpack, Solflare)                       │
+> │  │  USDC deposit │                                                      │
+> │  └──────┬───────┘                                                       │
+> │         │                                                               │
+> ├─────────┴───────────────────────────────────────────────────────────────┤
+> │  Solana Program (Anchor)                                                │
+> │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐      │
+> │  │  OperatorConfig   │  │ CustomerBalance  │  │   TaskReceipt    │      │
+> │  │  (PDA, singleton) │  │ (PDA per cust.)  │  │  (PDA per task)  │      │
+> │  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘      │
+> │           │                     │                      │                │
+> │  ┌────────┴─────────────────────┴──────────────────────┴────────┐      │
+> │  │                     Program Vault (USDC)                      │      │
+> │  │         Holds all customer deposits; program is authority     │      │
+> │  └──────────────────────────────────────────────────────────────┘      │
+> │                                                                         │
+> ├─────────────────────────────────────────────────────────────────────────┤
+> │  CTO Controller (Kubernetes)                                            │
+> │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐      │
+> │  │  Usage Metering   │  │ Receipt Builder  │  │ Settlement Hook  │      │
+> │  │  (pod duration,   │  │ (JSON → hash →   │  │ (submit settle/  │      │
+> │  │   infra tier)     │  │  off-chain store) │  │  refund to chain)│      │
+> │  └──────────────────┘  └──────────────────┘  └──────────────────┘      │
+> │                                                                         │
+> ├─────────────────────────────────────────────────────────────────────────┤
+> │  Off-Chain Storage                                                      │
+> │  ┌──────────┐  ┌──────────┐                                             │
+> │  │  Arweave  │  │   S3     │  (itemized receipt JSON blobs)             │
+> │  └──────────┘  └──────────┘                                             │
+> ├─────────────────────────────────────────────────────────────────────────┤
+> │  Future Extensions (not in scope)                                       │
+> │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  │
+> │  │ Agent Registry│  │ Attestations │  │  Marketplace  │                 │
+> │  │ (royalty      │  │ (Tess/Cipher/│  │  (skill NFTs, │                 │
+> │  │  splits)      │  │  Stitch sigs)│  │   curation)   │                 │
+> │  └──────────────┘  └──────────────┘  └──────────────┘                  │
+> └─────────────────────────────────────────────────────────────────────────┘
 > ```
 >
 > ---
 >
 > ## Services (Workstreams)
 >
-> ### 1. Morgan AI Agent (OpenClaw)
+> ### 1. Solana Program — Anchor (Rust)
 >
-> **Agent**: Morgan (OpenClaw agent)
+> **Agent**: Rex
 > **Priority**: Critical
-> **Runtime**: OpenClaw with MCP tools
+> **Language**: Rust (Anchor framework)
+> **Target**: Solana devnet (mainnet-beta post-hackathon)
 >
-> The central AI agent that handles all customer interactions via Signal, voice, and web chat.
+> The on-chain program that holds customer deposits, enforces spending caps, settles task payments, and writes verifiable receipts.
 >
-> **Core Features**:
-> - Signal messenger integration (receive/send messages, photos)
-> - Voice calls via ElevenLabs (SIP/PSTN, natural conversation)
-> - Web chat widget for website
-> - Lead qualification and customer vetting
-> - Quote generation coordination
-> - Social media approval workflow
-> - Natural language queries to all backend services
+> **Accounts (PDAs)**:
 >
-> **MCP Tools** (accesses via tool-server):
 > ```
-> sigma1_catalog_search     — search products by name/category/specs
-> sigma1_check_availability — check date range availability for items
-> sigma1_generate_quote     — create opportunity with line items
-> sigma1_vet_customer       — run background check pipeline
-> sigma1_score_lead         — compute GREEN/YELLOW/RED score
-> sigma1_create_invoice     — generate invoice from project
-> sigma1_finance_report     — pull financial summaries
-> sigma1_social_curate      — trigger photo curation pipeline
-> sigma1_social_publish     — publish approved draft
-> sigma1_equipment_lookup   — search secondary markets for arbitrage
+> OperatorConfig (PDA, singleton)
+> ├── authority: Pubkey          // 5D Labs operator wallet
+> ├── treasury: Pubkey           // 5D Labs revenue wallet
+> ├── protocol_fee_bps: u16     // protocol fee (basis points)
+> └── paused: bool               // circuit breaker
+>
+> CustomerBalance (PDA, seeded by customer pubkey)
+> ├── customer: Pubkey
+> ├── balance: u64               // USDC lamports
+> ├── total_deposited: u64
+> ├── total_spent: u64
+> ├── task_count: u64
+> ├── max_per_task: u64          // spending cap per task
+> ├── max_per_day: u64           // daily spending cap
+> ├── daily_spent: u64
+> ├── daily_reset_slot: u64
+> └── created_at: i64
+>
+> TaskReceipt (PDA, seeded by task_id)
+> ├── task_id: String
+> ├── customer: Pubkey
+> ├── amount: u64                // USDC charged
+> ├── receipt_hash: [u8; 32]     // SHA-256 of off-chain receipt JSON
+> ├── operator: Pubkey
+> ├── settled_at: i64
+> └── status: TaskStatus         // Settled | Refunded | Disputed
 > ```
 >
-> **Skills**:
-> - `sales-qual` — Lead qualification workflow
-> - `customer-vet` — Background research (OpenCorporates, LinkedIn, Google Reviews)
-> - `quote-gen` — Equipment quote generation
-> - `upsell` — Insurance, services, packages recommendations
-> - `finance` — Invoice generation, financial summaries
-> - `social-media` — Photo curation, caption generation
-> - `rms-*` — Rental management operations
-> - `admin` — Calendar, email drafting, document management
+> **Instructions**:
 >
-> **Infrastructure Dependencies**:
-> - Signal-CLI (sidecar or separate pod)
-> - ElevenLabs (voice)
-> - Twilio (phone numbers, SIP/PSTN)
-> - All backend service APIs
+> ```
+> initialize_operator(authority, treasury, protocol_fee_bps)
+>   → Creates OperatorConfig PDA. Called once at program deployment.
+>
+> create_customer_account(max_per_task, max_per_day)
+>   → Creates CustomerBalance PDA for the signing customer.
+>
+> deposit(amount)
+>   → Transfers USDC from customer's token account to the program vault.
+>      Increments customer balance.
+>
+> withdraw(amount)
+>   → Transfers USDC from program vault back to customer.
+>      Decrements customer balance. Customer-signed.
+>
+> settle_task(task_id, amount, receipt_hash)
+>   → Called by operator wallet after CodeRun completion.
+>      Validates: operator authorized, sufficient balance, within caps.
+>      Debits customer, credits treasury, writes TaskReceipt.
+>
+> refund_task(task_id)
+>   → Called by operator wallet.
+>      Marks TaskReceipt as Refunded. Credits amount back to customer.
+>
+> update_spending_caps(max_per_task, max_per_day)
+>   → Called by customer. Updates their spending limits.
+>
+> pause / unpause
+>   → Called by operator. Circuit breaker for emergencies.
+> ```
+>
+> **Testing**:
+> - Anchor integration tests (TypeScript, `anchor test`)
+> - Bankrun for fast local program tests
+> - Devnet deployment and manual verification
 >
 > ---
 >
-> ### 2. Equipment Catalog Service (Rust/Axum)
+> ### 2. Settlement Hook — CTO Controller Integration (Rust)
 >
 > **Agent**: Rex
 > **Priority**: High
-> **Language**: Rust 1.75+
-> **Framework**: Axum 0.7
+> **Language**: Rust
+> **Location**: `crates/controller/` in the main CTO repo (integration points documented here)
 >
-> High-performance API for equipment inventory, availability checking, and self-service quoting.
+> The CTO Kubernetes controller submits settlement transactions after each CodeRun reaches a terminal state.
 >
-> **Endpoints**:
-> ```
-> GET    /api/v1/catalog/categories           — List categories
-> GET    /api/v1/catalog/products             — List products (filterable)
-> GET    /api/v1/catalog/products/:id        — Get product details
-> GET    /api/v1/catalog/products/:id/availability?from=&to= — Check availability
-> POST   /api/v1/catalog/products             — Add product (admin)
-> PATCH  /api/v1/catalog/products/:id         — Update product (admin)
-> GET    /api/v1/equipment-api/catalog       — Machine-readable (for AI agents)
-> POST   /api/v1/equipment-api/checkout      — Programmatic booking
-> GET    /metrics                             — Prometheus metrics
-> GET    /health/live                          — Liveness probe
-> GET    /health/ready                        — Readiness probe
-> ```
+> **Integration Points**:
 >
-> **Core Features**:
-> - 533+ products across 24 categories
-> - Real-time availability checking
-> - Barcode/SKU lookup
-> - Image serving (S3/R2 CDN)
-> - Machine-readable equipment API for other AI agents
-> - Rate limiting per tenant
+> | Point | File (in CTO repo) | Change |
+> |-------|---------------------|--------|
+> | Solana config | `crates/controller/src/tasks/config.rs` | Add RPC endpoint + operator keypair path |
+> | Settlement hook | `crates/controller/src/tasks/code/controller.rs` | After terminal state: compute bill → build receipt → submit `settle_task` |
+> | Wallet mapping | Customer profile model | Add `solana_pubkey` field |
+> | Tx recording | CodeRun CRD status | Add `on_chain_settlement_sig` field |
 >
-> **Data Models**:
-> ```rust
-> struct Product {
->     id: Uuid,
->     name: String,
->     category_id: Uuid,
->     description: String,
->     day_rate: Decimal,
->     weight_kg: Option<f32>,
->     dimensions: Option<Dimensions>,
->     image_urls: Vec<String>,
->     specs: JsonB,
->     created_at: DateTime<Utc>,
-> }
+> **Settlement Flow**:
 >
-> struct Category {
->     id: Uuid,
->     name: String,
->     parent_id: Option<Uuid>,
->     icon: String,
->     sort_order: i32,
-> }
+> 1. CodeRun transitions to terminal state (merged / failed / cancelled).
+> 2. Controller computes billable amount from pod duration + infra tier.
+> 3. Builds itemized receipt JSON (CodeRun minutes, compute, AI tokens if managed-key).
+> 4. Uploads receipt to off-chain storage (Arweave or S3).
+> 5. Hashes the receipt (SHA-256).
+> 6. Submits `settle_task` instruction to Solana program (or `refund_task` on failure).
+> 7. Records the transaction signature on the CodeRun status.
 >
-> struct Availability {
->     product_id: Uuid,
->     date_from: NaiveDate,
->     date_to: NaiveDate,
->     quantity_available: i32,
->     reserved: i32,
->     booked: i32,
-> }
-> ```
+> **Secrets**: Operator keypair managed via the existing pipeline (1Password → OpenBao → External Secrets Operator → K8s secret → pod env var).
 >
-> **Infrastructure Dependencies**:
-> - PostgreSQL (product catalog, availability)
-> - Redis (rate limiting, caching)

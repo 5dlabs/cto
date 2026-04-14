@@ -1,1 +1,0 @@
-JWT for external clients + Kubernetes NetworkPolicies via Cilium for internal service isolation — no application-level mTLS configuration

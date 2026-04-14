@@ -1564,6 +1564,14 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "WORKSPACE_DIR",
                 "value": format!("/workspace/{}", workspace_subdir)
             }),
+            json!({
+                "name": "TASK_ID",
+                "value": code_run.spec.task_id.map_or("0".to_string(), |id| id.to_string())
+            }),
+            json!({
+                "name": "PROJECT_ID",
+                "value": code_run.spec.project_id.clone().unwrap_or_default()
+            }),
         ];
 
         // ── Provider × CLI env vars (replaces scattered if-blocks) ──

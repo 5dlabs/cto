@@ -1,1 +1,0 @@
-Centralized GDPR orchestrator — but implemented as a simple cron-based script that calls each service's deletion endpoint sequentially, not a NATS-based event system

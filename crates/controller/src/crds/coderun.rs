@@ -478,6 +478,10 @@ pub struct CodeRunSpec {
     #[serde(rename = "taskId", default)]
     pub task_id: Option<u32>,
 
+    /// Project identifier for memory isolation — tasks in the same project share a namespace
+    #[serde(rename = "projectId", default)]
+    pub project_id: Option<String>,
+
     /// Target service name
     pub service: String,
 
@@ -666,6 +670,7 @@ impl Default for CodeRunSpec {
         Self {
             run_type: "implementation".to_string(),
             task_id: None,
+            project_id: None,
             service: String::new(),
             repository_url: String::new(),
             docs_repository_url: String::new(),

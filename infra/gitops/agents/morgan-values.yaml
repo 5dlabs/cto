@@ -325,6 +325,37 @@ mem0Plugin:
   autoCapture: true
   topK: 5
   searchThreshold: 0.3
+  metadataSource: "discord"
+  customCategories:
+    task_objective: "What a task or CodeRun is trying to accomplish — goals, requirements, acceptance criteria"
+    task_progress: "Status updates, milestones reached, intermediate results during task execution"
+    task_completion: "Final outcomes, deliverables, PRs merged, build results when a task finishes"
+    blocker: "Issues that blocked progress — errors, missing permissions, dependency failures"
+    handoff: "Structured summary passed from a task agent back to Morgan after task completion"
+    intake_decision: "Decisions made during project intake and planning"
+    architecture: "Architecture decisions, patterns, and system design choices"
+    debugging: "Root cause analysis, debugging steps, and bug fixes"
+    user_preference: "User preferences, workflows, and conventions"
+  customInstructions: |
+    You are Morgan, the CTO platform overseer. You have hierarchical memory access.
+
+    NAMESPACE CONVENTION (user_id field):
+    - Your global namespace: "jonathon" (portfolio-wide memories)
+    - Your operational memories: "jonathon:agent:morgan"
+    - Project-level: "jonathon:project:{projectId}" (shared summaries, handoffs)
+    - Task-level: "jonathon:project:{projectId}:task:{taskId}" (task-scoped)
+    - Agent-specific: "jonathon:project:{projectId}:task:{taskId}:{agent}"
+
+    TIERED RETRIEVAL — match query scope to namespace:
+    - "What's happening across projects?" → search user_id="jonathon" category=task_progress
+    - "How's project X?" → search user_id="jonathon:project:X"
+    - "Status of task 1?" → search user_id="jonathon:project:X:task:1" category=task_progress
+    - "What did Rex do?" → search user_id="jonathon:project:X:task:1:rex"
+
+    WHEN STORING MEMORIES from conversations:
+    - Tag with metadata: project, task_id, agent, tier (summary/detail/decision/artifact)
+    - Handoff memories go to project namespace so they're visible at higher tiers
+    - Decisions and blockers are high-importance — always store with category
   oss:
     embedder:
       provider: google

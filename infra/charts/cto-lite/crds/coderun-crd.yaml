@@ -59,6 +59,9 @@ spec:
               taskId:
                 type: integer
                 description: "Task ID to implement (required for implementation runs, optional for docs/intake)"
+              projectId:
+                type: string
+                description: "Project identifier for memory isolation. Tasks within the same project share a memory namespace."
               service:
                 type: string
                 description: "Target service name"

@@ -758,6 +758,7 @@ impl CodeTemplateGenerator {
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -851,6 +852,7 @@ impl CodeTemplateGenerator {
             "github_app": Self::get_github_app_or_default(code_run),
             "model": model,
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -1163,6 +1165,7 @@ impl CodeTemplateGenerator {
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -1277,6 +1280,7 @@ impl CodeTemplateGenerator {
             "github_app": Self::get_github_app_or_default(code_run),
             "model": render_settings.model,
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -1487,6 +1491,7 @@ impl CodeTemplateGenerator {
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "task_number": code_run.spec.task_id.unwrap_or(0),
             "coderun_name": coderun_name,
             "service": code_run.spec.service,
@@ -1601,6 +1606,7 @@ impl CodeTemplateGenerator {
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "service": code_run.spec.service,
             "coderun_name": coderun_name,
             "model": Self::resolve_openclaw_primary_model(code_run, &openclaw_providers),
@@ -1651,6 +1657,7 @@ impl CodeTemplateGenerator {
             "repository_url": code_run.spec.repository_url,
             "github_app": Self::get_github_app_or_default(code_run),
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "service": &code_run.spec.service,
             "discord_enabled": code_run.spec.openclaw.as_ref()
                 .is_none_or(|oc| oc.discord_enabled),
@@ -1782,6 +1789,7 @@ impl CodeTemplateGenerator {
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "task_language": task_language,
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
@@ -2046,6 +2054,7 @@ impl CodeTemplateGenerator {
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -2150,6 +2159,7 @@ impl CodeTemplateGenerator {
             "github_app": Self::get_github_app_or_default(code_run),
             "model": model,
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -2987,6 +2997,7 @@ Be constructive and explain the "why" behind your suggestions.
             "review_comment_id": review_comment_id,
             "findings_path": findings_path,
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "tools_url": render_settings.tools_url,
             "remote_tools": remote_tools,
         });
@@ -3555,6 +3566,7 @@ Be constructive and explain the "why" behind your suggestions.
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -3652,6 +3664,7 @@ Be constructive and explain the "why" behind your suggestions.
             "github_app": Self::get_github_app_or_default(code_run),
             "model": model,
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -3871,6 +3884,7 @@ Be constructive and explain the "why" behind your suggestions.
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -4022,6 +4036,7 @@ Be constructive and explain the "why" behind your suggestions.
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -4179,6 +4194,7 @@ Be constructive and explain the "why" behind your suggestions.
 
                                             let context = json!({
                                                 "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
                                                 "service": code_run.spec.service,
                                                 "repository_url": code_run.spec.repository_url,
                                                 "docs_repository_url": code_run.spec.docs_repository_url,

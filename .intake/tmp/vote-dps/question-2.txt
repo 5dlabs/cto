@@ -1,1 +1,0 @@
-What authentication mechanism for backend service APIs?

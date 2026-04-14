@@ -1,1 +1,0 @@
-Per-service GDPR endpoints orchestrated by Morgan (an existing component), not a new dedicated service

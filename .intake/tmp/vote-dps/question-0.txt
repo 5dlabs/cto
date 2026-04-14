@@ -1,1 +1,0 @@
-What API paradigm for inter-service communication?

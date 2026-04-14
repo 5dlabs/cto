@@ -337,6 +337,7 @@ pub async fn create_watcher_coderun(
     let watcher_spec = CodeRunSpec {
         run_type: "watcher".to_string(),
         task_id: executor.spec.task_id,
+        project_id: executor.spec.project_id.clone(),
         service: executor.spec.service.clone(),
         repository_url: executor.spec.repository_url.clone(),
         docs_repository_url: executor.spec.docs_repository_url.clone(),

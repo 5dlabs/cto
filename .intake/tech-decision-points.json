@@ -1,1 +1,198 @@
-[]
+[
+  {
+    "id": "dp-1",
+    "category": "platform-choice",
+    "description": "Which off-chain storage backend should be used for itemized receipt JSON blobs?",
+    "options": [
+      "Use the existing SeaweedFS operator (S3-compatible, already deployed in-cluster) for receipt storage",
+      "Use Arweave for permanent, decentralized, content-addressed receipt storage",
+      "Use both: SeaweedFS as primary hot storage with optional Arweave archival for immutability proof"
+    ],
+    "requires_approval": true,
+    "constraint_type": "open",
+    "affected_tasks": [
+      1,
+      4,
+      8
+    ],
+    "rationale": "The PRD lists 'Arweave or S3' as options. SeaweedFS is already deployed in-cluster and aligns with the organizational bias toward self-hosted infrastructure, but Arweave provides cryptographic permanence and immutability that strengthens the 'verifiable receipt' narrative for the hackathon demo. This choice affects the receipt builder implementation, storage provisioning, and demo flow (whether receipts are fetchable from a decentralized URL or an internal S3 endpoint)."
+  },
+  {
+    "id": "dp-2",
+    "category": "architecture",
+    "description": "Where should the CLI/demo tool live — in the new cto-pay repo or in the existing monorepo's apps/ directory?",
+    "options": [
+      "Place the CLI in the cto-pay repo alongside the Anchor program (self-contained hackathon deliverable)",
+      "Place the CLI in the existing monorepo under apps/cto-pay-cli/ (consistent with existing Bun app patterns)"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      1
+    ],
+    "rationale": "The PRD specifies a new cto-pay repo for the Anchor program, and assigns the CLI to Blaze. Colocating the CLI with the Anchor program makes the hackathon submission self-contained and simplifies IDL imports, but the existing monorepo has established patterns for Bun apps (intake-util, intake-agent) and CI/CD. This affects repo structure, CI pipeline design, and how the generated Anchor IDL is consumed."
+  },
+  {
+    "id": "dp-3",
+    "category": "platform-choice",
+    "description": "Which Solana RPC endpoint should the controller use for submitting settlement transactions?",
+    "options": [
+      "Use the existing in-cluster Solana validator/RPC node (agave-rpc in skills/trader/k8s/)",
+      "Use a public devnet RPC endpoint (api.devnet.solana.com)",
+      "Use a commercial RPC provider (Helius, Triton, QuickNode) for reliability"
+    ],
+    "requires_approval": true,
+    "constraint_type": "open",
+    "affected_tasks": [
+      1,
+      8
+    ],
+    "rationale": "An agave-rpc node is already running in the cluster for the trader infrastructure, but it likely connects to mainnet-beta, not devnet. The PRD targets devnet for the hackathon. Using the existing node would require reconfiguration or a second instance. Public devnet RPC is free but rate-limited and unreliable for demo recordings. This affects controller Solana client configuration, network reliability during the demo, and infrastructure provisioning."
+  },
+  {
+    "id": "dp-4",
+    "category": "data-model",
+    "description": "How should the protocol fee be handled in the settle_task instruction?",
+    "options": [
+      "Debit the full amount from customer balance and transfer it all to the treasury (protocol fee is implicit — treasury is the operator)",
+      "Split the settlement amount on-chain: (amount - fee) to a service provider wallet and fee to the treasury wallet",
+      "Debit full amount to treasury now, but design the account structure with a fee_amount field on TaskReceipt to make future splits backward-compatible"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      2,
+      4,
+      5,
+      6
+    ],
+    "rationale": "The OperatorConfig has a protocol_fee_bps field, but the PRD's settle_task description says 'debits customer, credits treasury' without specifying a fee split. For the hackathon, the operator IS the service provider (5D Labs runs everything), so there's no second party to split with. However, the PRD explicitly mentions future 'agent registry royalty splits' as an extension. The account structure and instruction design chosen now determines whether adding splits later is additive or requires program migration."
+  },
+  {
+    "id": "dp-5",
+    "category": "api-design",
+    "description": "How should the controller settlement hook handle Solana transaction submission — synchronously in the reconciliation loop or asynchronously via a queue?",
+    "options": [
+      "Submit the Solana transaction synchronously within the CodeRun reconciliation loop (simpler, blocks reconciler briefly)",
+      "Spawn an async task from the reconciler and update CRD status when the transaction confirms (non-blocking but more complex state management)",
+      "Write a settlement intent to a new CRD or status field and have a separate reconciliation loop process settlements (decoupled, most resilient)"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      8
+    ],
+    "rationale": "The CTO controller uses kube-rs reconciliation loops. Solana transaction submission involves network calls to an external chain with variable confirmation times (400ms-30s+). Blocking the reconciler risks stalling other CodeRun reconciliations. A separate settlement loop is most resilient but adds complexity. For a hackathon this may be over-engineered, but the controller is production code used by other tasks — degrading its reconciliation performance is risky."
+  },
+  {
+    "id": "dp-6",
+    "category": "data-model",
+    "description": "How should the daily spending cap reset mechanism work on-chain?",
+    "options": [
+      "Use Solana slot numbers: store a daily_reset_slot and reset daily_spent when current slot exceeds reset_slot + slots_per_day (approximate, no oracle needed)",
+      "Use Solana Clock sysvar unix_timestamp: store a daily_reset_timestamp and compare against Clock::get().unix_timestamp (more human-readable but Clock can drift)",
+      "Use epoch-based reset: reset daily_spent each Solana epoch (simpler but epoch length doesn't match 24 hours)"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      2,
+      4,
+      5,
+      6
+    ],
+    "rationale": "The PRD specifies daily_reset_slot on CustomerBalance, suggesting slot-based reset. However, Solana slots are ~400ms and slot rate varies, making '1 day in slots' approximate. Using Clock sysvar's unix_timestamp is more intuitive but has its own trust considerations. This choice affects spending cap enforcement logic, test design (Bankrun can manipulate both slots and clock), and user expectations about when their daily limit resets."
+  },
+  {
+    "id": "dp-7",
+    "category": "security",
+    "description": "How should the operator keypair be loaded and used by the controller for signing Solana transactions?",
+    "options": [
+      "Load the keypair from a K8s secret (via the existing 1Password → OpenBao → External Secrets pipeline) as a JSON byte array env var, parse at startup",
+      "Use a file-mounted secret volume with the keypair as a JSON file, reference by path (matches Solana CLI conventions)",
+      "Integrate with a remote signer or HSM-compatible solution for the operator key (more secure but significantly more complex)"
+    ],
+    "requires_approval": false,
+    "constraint_type": "soft",
+    "affected_tasks": [
+      1,
+      8
+    ],
+    "rationale": "The PRD specifies the existing secrets pipeline (1Password → OpenBao → External Secrets → K8s secret → pod env var). The operator keypair signs financial transactions (settle_task, refund_task), making it a high-value secret. Env var injection is the established pattern but exposes the key in process environment. File mount is slightly more secure and matches solana-keygen conventions. For hackathon this is low risk, but the pattern chosen may persist into production."
+  },
+  {
+    "id": "dp-8",
+    "category": "build-vs-buy",
+    "description": "Should the CLI use devnet USDC (requiring a faucet/mint) or a custom SPL token for demo purposes?",
+    "options": [
+      "Use the official devnet USDC mint and airdrop/faucet tokens for demo wallets",
+      "Create a custom SPL token mint controlled by the operator for unlimited test token supply (label it 'USDC' in the demo)",
+      "Use wrapped SOL (native mint) to avoid SPL token mint complexity entirely"
+    ],
+    "requires_approval": true,
+    "constraint_type": "open",
+    "affected_tasks": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "rationale": "The entire program is designed around USDC (SPL token with 6 decimals). On devnet, acquiring USDC requires using Circle's faucet or a known devnet mint, which may have availability issues during a live demo. A custom mint gives full control but means the demo token isn't 'real' USDC. Wrapped SOL simplifies token management but diverges from the USDC narrative. This affects program initialization, test setup, CLI commands, and the credibility of the demo video."
+  },
+  {
+    "id": "dp-9",
+    "category": "architecture",
+    "description": "Should the Anchor program use a single shared USDC vault or per-customer token accounts?",
+    "options": [
+      "Single program-owned USDC vault (PDA-derived ATA) that holds all customer deposits, with balances tracked in CustomerBalance PDAs (as specified in the PRD architecture diagram)",
+      "Per-customer escrow token accounts (PDA-derived ATAs seeded per customer) that physically separate funds"
+    ],
+    "requires_approval": false,
+    "constraint_type": "hard",
+    "affected_tasks": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "rationale": "The PRD architecture diagram explicitly shows a single 'Program Vault (USDC)' that 'holds all customer deposits; program is authority.' This is a hard constraint from the PRD. However, it's worth confirming because per-customer escrow is a common alternative that provides stronger isolation. The single vault is simpler, cheaper (one account vs many), and sufficient when the program tracks balances internally. This decision is recorded to ensure all implementers align on the PRD's stated design."
+  },
+  {
+    "id": "dp-10",
+    "category": "api-design",
+    "description": "How should the task_id be represented on-chain in the TaskReceipt PDA?",
+    "options": [
+      "Use a String (variable-length) for task_id, matching the PRD's account definition and allowing human-readable IDs like 'TASK-42'",
+      "Use a fixed-size [u8; 32] hash of the task_id string to keep PDA seeds deterministic and account size fixed",
+      "Use a [u8; 16] UUID representation (CodeRun IDs may already be UUIDs in the CTO system)"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      2,
+      4,
+      5,
+      6,
+      8
+    ],
+    "rationale": "PDA seeds in Solana have a max length of 32 bytes per seed. If task_id is used as a PDA seed (as implied by 'PDA, seeded by task_id'), long string IDs could exceed seed limits. The PRD shows task_id as String in the account struct, but PDA derivation requires predictable, bounded seeds. The controller's CodeRun CRD likely uses a specific ID format. This affects PDA derivation, account sizing (rent cost), and the interface between the controller and the on-chain program."
+  },
+  {
+    "id": "dp-11",
+    "category": "architecture",
+    "description": "Should the receipt builder and off-chain upload happen in the controller (Rust) or in a separate sidecar/service?",
+    "options": [
+      "Build receipts and upload to storage directly in the controller's settlement hook (keep it simple, single service)",
+      "Create a separate receipt-builder microservice or CRD-driven job that the controller triggers (decoupled, independently scalable)"
+    ],
+    "requires_approval": false,
+    "constraint_type": "open",
+    "affected_tasks": [
+      1,
+      8
+    ],
+    "rationale": "The PRD shows Receipt Builder as a logical component within 'CTO Controller (Kubernetes)'. Building receipt JSON, hashing it, and uploading to S3/Arweave adds I/O and latency to the controller. The controller is a critical operator managing all CodeRun lifecycles. For the hackathon, keeping it in the controller is simpler. But if receipt upload fails (Arweave unavailable), it could block settlement. A separate service adds resilience but more moving parts."
+  }
+]

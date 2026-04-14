@@ -1,1 +1,0 @@
-How should the web chat widget communicate with the backend?

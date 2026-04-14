@@ -1,1 +1,0 @@
-URI-based versioning (/api/v1/...) for all REST endpoints

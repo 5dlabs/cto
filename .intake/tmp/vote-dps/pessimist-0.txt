@@ -1,1 +1,0 @@
-REST (HTTP/JSON) for all services, with RMS exposing gRPC+grpc-gateway as the PRD specifies — other services consume RMS via its REST gateway
