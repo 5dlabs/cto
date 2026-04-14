@@ -254,6 +254,26 @@ RUN ARCH=$(dpkg --print-architecture) && \
     argocd version --client
 
 # =============================================================================
+# Solana CLI — blockchain development toolchain (Block agent)
+# Anchor requires Rust/Cargo which is installed at task time if needed.
+# =============================================================================
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then \
+      SOLANA_VERSION="2.2.14" && \
+      curl -sSfL "https://github.com/anza-xyz/agave/releases/download/v${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2" \
+        -o /tmp/solana.tar.bz2 && \
+      tar xjf /tmp/solana.tar.bz2 -C /tmp && \
+      cp /tmp/solana-release/bin/solana /usr/local/bin/ && \
+      cp /tmp/solana-release/bin/spl-token /usr/local/bin/ && \
+      cp /tmp/solana-release/bin/solana-keygen /usr/local/bin/ && \
+      cp /tmp/solana-release/bin/solana-test-validator /usr/local/bin/ && \
+      rm -rf /tmp/solana.tar.bz2 /tmp/solana-release && \
+      solana --version; \
+    else \
+      echo "Skipping Solana CLI install for ${ARCH} (amd64 only)"; \
+    fi
+
+# =============================================================================
 # System packages — SSH server, browser automation, file watcher
 # =============================================================================
 RUN apt-get update && \
@@ -331,6 +351,7 @@ RUN set -e; \
     V_GH=$(gh --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_KUBECTL=$(kubectl version --client -o json 2>&1 | grep -oE '"gitVersion":"v[0-9]+\.[0-9]+\.[0-9]+"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown"); \
     V_ARGOCD=$(argocd version --client --short 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_SOLANA=$(solana --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "n/a"); \
     V_OP=$(op --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_NODE=$(node --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_BUN=$(bun --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \

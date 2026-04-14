@@ -1724,6 +1724,15 @@ impl<'a> CodeResourceManager<'a> {
             }
         }));
 
+        // Mount solana-api-keys for Helius RPC, Birdeye, and Solana env vars
+        // (HELIUS_API_KEY, SOLANA_RPC_URL, SOLANA_DEVNET_RPC_URL, BIRDEYE_API_KEY)
+        env_from.push(json!({
+            "secretRef": {
+                "name": "solana-api-keys",
+                "optional": serde_json::Value::Bool(true)
+            }
+        }));
+
         // Add envFrom if we have secrets to mount
         if !env_from.is_empty() {
             container_spec["envFrom"] = json!(env_from);
