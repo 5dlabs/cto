@@ -74,6 +74,8 @@ Do NOT debate implementation details (timeouts, retries, logging, test strategy 
 
 When escalating a disagreement to the committee:
 
+**CRITICAL:** Emit `DECISION_POINT:` exactly as shown — plain text, NO markdown formatting (no `**bold**`, no backticks, no headers). The parser matches the literal string.
+
 ```
 DECISION_POINT:
 id: <use the existing DP id from Decision Points (dp-1, dp-2, ...), or dp-N for new cross-cutting DPs>

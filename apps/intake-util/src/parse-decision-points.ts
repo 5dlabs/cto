@@ -15,6 +15,14 @@ const VALID_CATEGORIES = [
   'security',
   'technology-choice',
   'infrastructure',
+  'platform-choice',
+  'build-vs-buy',
+  'language-runtime',
+  'service-topology',
+  'visual-identity',
+  'design-system',
+  'component-library',
+  'layout-pattern',
 ] as const;
 
 type DPCategory = (typeof VALID_CATEGORIES)[number];
@@ -37,10 +45,14 @@ export function parseDecisionPoints(
   speaker: 'optimist' | 'pessimist',
 ): ParsedDecisionPoint[] {
   const points: ParsedDecisionPoint[] = [];
+  // Strip markdown bold/italic/code wrapping around DECISION_POINT labels
+  // LLMs frequently emit **DECISION_POINT:** or *DECISION_POINT:* or `DECISION_POINT:`
+  const cleaned = content.replace(/\*{1,2}(DECISION_POINT:)\*{1,2}/g, '$1')
+                         .replace(/`(DECISION_POINT:)`/g, '$1');
   const blockRegex = /DECISION_POINT:\s*\n([\s\S]+?)(?=\n\nDECISION_POINT:|\n\n(?!\s)|$)/g;
   let blockMatch: RegExpExecArray | null;
 
-  while ((blockMatch = blockRegex.exec(content)) !== null) {
+  while ((blockMatch = blockRegex.exec(cleaned)) !== null) {
     const block = blockMatch[1] ?? '';
     const get = (field: string): string => {
       const m = new RegExp(`^${field}:\\s*(.+?)\\s*$`, 'm').exec(block);
