@@ -362,6 +362,13 @@ spec:
               ```
               ## Daily Progress — {date}
 
+              ### 📊 Activity Summary
+              | Repo | Commits | PRs Merged | PRs Open | Files Changed |
+              |------|---------|------------|----------|---------------|
+              | cto  |    12   |     3      |    1     |      47       |
+              | ...  |   ...   |    ...     |   ...    |     ...       |
+              | **Total** | **XX** | **XX** | **XX** | **XX**        |
+
               ### What was accomplished
               - [repo] Brief summary of key changes (group related commits)
               - Include code-level insight: what area of the codebase, why it matters
@@ -379,6 +386,29 @@ spec:
               ### Next steps
               - Work in progress or planned for tomorrow
               ```
+
+              **To gather the metrics for the Activity Summary table:**
+              ```bash
+              # Per-repo commit count (last 24h)
+              gh api repos/5dlabs/{repo}/commits \
+                -f since=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ) \
+                --jq 'length'
+
+              # Per-repo merged PR count (last 24h)
+              gh pr list -R 5dlabs/{repo} --state merged \
+                --search "merged:>=$(date -u -d '24 hours ago' +%Y-%m-%d)" \
+                --json number --jq 'length'
+
+              # Per-repo open PR count
+              gh pr list -R 5dlabs/{repo} --state open --json number --jq 'length'
+
+              # Files changed across recent commits
+              gh api repos/5dlabs/{repo}/commits \
+                -f since=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ) \
+                --jq '[.[].sha] | length' # then for each: gh api repos/5dlabs/{repo}/commits/{sha} --jq '.files | length'
+              ```
+              Always include the totals row. If a repo has zero activity, still list it
+              with 0s — this shows coverage breadth.
 
               ### Step 5: Approval Gate
               **IMPORTANT**: Approval mode is ENABLED by default.
