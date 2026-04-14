@@ -100,10 +100,10 @@ steps:
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "preflight" "${audio_debug}" "project ${project_name}"
       # Clean stale artifacts from previous runs to prevent cross-contamination
-      echo "preflight: cleaning stale intake artifacts..." >&2
-      rm -rf "$root/.intake/tmp" "$root/.intake/step-outputs" "$root/.intake/checkpoints"
-      rm -rf "$root/.tasks/docs" "$root/.tasks/tasks" "$root/.tasks/design"
-      mkdir -p "$root/.intake/tmp" "$root/.intake/step-outputs" "$root/.intake/checkpoints"
+      echo "preflight: cleaning ALL stale intake artifacts..." >&2
+      rm -rf "$root/.intake/tmp" "$root/.intake/step-outputs" "$root/.intake/checkpoints" "$root/.intake/design"
+      rm -rf "$root/.tasks/docs" "$root/.tasks/tasks" "$root/.tasks/design" "$root/.tasks/audio" "$root/.tasks/workflows"
+      mkdir -p "$root/.intake/tmp" "$root/.intake/step-outputs" "$root/.intake/checkpoints" "$root/.tasks/audio"
       "${root}/intake/scripts/pipeline-preflight.sh"
 
   - id: materialize-prd
@@ -1784,6 +1784,15 @@ steps:
       git pull --ff-only origin main 2>/dev/null || true
       rm -rf "$TARGET/.tasks"
       rsync -a "$root/.tasks/" "$TARGET/.tasks/"
+      # Validate no cross-project contamination in audio transcripts
+      for tf in "$TARGET/.tasks/audio/"*.transcript.json; do
+        [ -f "$tf" ] || continue
+        TSID="$(jq -r '.sessionId // ""' "$tf" 2>/dev/null)"
+        if [ -n "$TSID" ] && ! printf '%s' "$TSID" | grep -qi "${project_name}"; then
+          echo "sync-to-target-repo: WARNING — removing stale transcript $tf (sessionId=$TSID does not match ${project_name})" >&2
+          rm -f "$tf"
+        fi
+      done
       # Generate DESIGN.md from design artifacts
       if [ -x "$root/intake/scripts/generate-design-md.sh" ]; then
         "$root/intake/scripts/generate-design-md.sh" "$root" "${project_name}" > "$TARGET/.tasks/design/DESIGN.md" 2>/dev/null || true
