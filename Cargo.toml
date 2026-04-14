@@ -6,21 +6,17 @@ members = [
     "crates/config",
     "crates/controller",
     "crates/experience",
-    "crates/gpu",
     "crates/healer",
     "crates/intake",
     "crates/linear-sync",
     "crates/metal",
     "crates/notify",
     "crates/pm",
-    "crates/pm-lite",
     "crates/research",
     "crates/scm",
     "crates/tenant-operator",
     "crates/tools",
     "crates/utils",
-    "crates/cto-lite/pm-lite-server",
-    "crates/dex-indexer",
 ]
 exclude = []
 
