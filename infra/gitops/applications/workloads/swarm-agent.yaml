@@ -2,54 +2,273 @@
 # =============================================================================
 # Swarm Agent — ArgoCD Application
 # =============================================================================
-# Deploys the public swarm-openclaw-agent chart for the Canteen hackathon.
-# Uses the OCI chart from ghcr.io/5dlabs/charts with values from this repo.
-#
-# Chart:   ghcr.io/5dlabs/charts/swarm-openclaw-agent (public OCI)
-# Values:  5dlabs/cto → infra/gitops/agents/swarm-values.yaml
+# Deploys the Swarm agent for the Canteen hackathon alongside Morgan.
+# Uses the same openclaw-platform chart with inline values (Morgan pattern).
 # =============================================================================
-
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cto-swarm-agent
+  name: openclaw-swarm
   namespace: argocd
   labels:
-    app.kubernetes.io/name: cto-swarm-agent
-    app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/name: openclaw-swarm
+    app.kubernetes.io/part-of: openclaw
     app.kubernetes.io/component: canteen-hackathon
   annotations:
     argocd.argoproj.io/sync-wave: "3"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
+  project: platform
+  source:
+    repoURL: https://github.com/5dlabs/openclaw-platform
+    path: charts/openclaw
+    targetRevision: main
+    helm:
+      releaseName: openclaw-swarm
+      values: |
+        replicaCount: 1
+        deploymentMode: statefulset
 
-  # Multi-source: OCI chart + values from CTO repo
-  sources:
-    # Source 1: Helm chart from GHCR OCI
-    - repoURL: ghcr.io/5dlabs/charts
-      chart: swarm-openclaw-agent
-      targetRevision: 0.1.0
-      helm:
-        releaseName: cto-swarm
-        valueFiles:
-          - $values/infra/gitops/agents/swarm-values.yaml
+        global:
+          namespace: cto
+          createNamespace: false
 
-    # Source 2: Values file from CTO repo
-    - repoURL: https://gitlab.5dlabs.ai/5dlabs/cto.git
-      targetRevision: main
-      ref: values
+        openclawCompat:
+          schemaVersion: "2026.2"
+
+        image:
+          repository: "ghcr.io/5dlabs/agents"
+          tag: "latest"
+          pullPolicy: Always
+
+        imagePullSecrets:
+          - name: ghcr-secret
+
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+
+        nodeOptions: "--max-old-space-size=2048"
+
+        agent:
+          id: "swarm"
+          name: "Colosseum"
+          model: "openai-api/gpt-5.4-pro"
+          sandbox: "off"
+          heartbeat:
+            every: "12h"
+            target: "last"
+            ackMaxChars: 120
+            prompt: >-
+              If there is no active user request, reply HEARTBEAT_OK and do nothing
+              else. Do not start background work or new tasks on your own.
+
+        agentDefaults:
+          thinkingDefault: "low"
+          typingMode: "instant"
+
+        modelDefaults:
+          primary: "openai-api/gpt-5.4-pro"
+          fallbacks:
+            - "anthropic/claude-sonnet-4-20250514"
+            - "google/gemini-2.5-pro"
+
+        secrets:
+          external:
+            apiKeysSecret: "openclaw-api-keys"
+            messagingSecret: "discord-agent-bots"
+            githubSecret: "openclaw-github"
+
+        messaging:
+          discord:
+            enabled: true
+            accountId: "swarm"
+            tokenSecretKey: "DISCORD_TOKEN_SWARM"
+            allowBots: false
+            dmPolicy: "allowlist"
+            allowFrom:
+              - "444519104808878090"
+              - "1467013771548426291"
+              - "1466937419981918220"
+              - "1466938003451674748"
+              - "1466938424790356253"
+              - "1468829684195135592"
+              - "1466930035356078251"
+              - "1466938744593715210"
+            groupPolicy: "allowlist"
+            guilds:
+              "*":
+                requireMention: true
+                users:
+                  - "444519104808878090"
+                  - "1467013771548426291"
+                  - "1466937419981918220"
+                  - "1466938003451674748"
+                  - "1466938424790356253"
+                  - "1468829684195135592"
+                  - "1466930035356078251"
+                  - "1466938744593715210"
+              "1490117571977019524":
+                requireMention: true
+                slug: "cto-5dlabs"
+                users:
+                  - "444519104808878090"
+                  - "1467013771548426291"
+                  - "1466937419981918220"
+                  - "1466938003451674748"
+                  - "1466938424790356253"
+                  - "1468829684195135592"
+                  - "1466930035356078251"
+                  - "1466938744593715210"
+
+        tools:
+          acp:
+            enabled: false
+          web:
+            search:
+              enabled: true
+              provider: "perplexity"
+              perplexity:
+                apiKey: "${OPENROUTER_API_KEY}"
+                baseUrl: "https://openrouter.ai/api/v1"
+                model: "perplexity/sonar-pro"
+
+        code:
+          clis:
+            claude:
+              mcp:
+                servers:
+                  context7:
+                    type: "sse"
+                    url: "https://mcp.context7.com/mcp"
+                    headers:
+                      CONTEXT7_API_KEY: "ctx7sk-8b294504-6e43-45e2-85a3-26e9b38c4a1c"
+
+        storage:
+          size: 10Gi
+          storageClass: "local-path"
+
+        gateway:
+          auth:
+            token: "openclaw-internal"
+          controlUi:
+            enabled: false
+          http:
+            endpoints:
+              chatCompletions:
+                enabled: true
+              responses:
+                enabled: false
+
+        probes:
+          readiness:
+            enabled: false
+
+        memorySearch:
+          enabled: false
+
+        openmemory:
+          enabled: false
+
+        mem0:
+          enabled: false
+
+        session:
+          scope: "per-sender"
+          dmScope: "per-channel-peer"
+
+        nats:
+          url: "nats://nats.messaging.svc.cluster.local:4222"
+          subchart:
+            enabled: false
+
+        cron:
+          enabled: true
+          store: "/workspace/.openclaw/cron/cron.json"
+          maxConcurrentRuns: 1
+
+        hooks:
+          enabled: true
+          path: "/hooks"
+          token: "${HOOKS_TOKEN}"
+
+        workspace:
+          repos:
+            - name: swarm-openclaw-agent
+              url: "https://github.com/5dlabs/swarm-openclaw-agent.git"
+              branch: "main"
+          files:
+            AGENTS.md: |
+              # AGENTS.md -- Colosseum (Swarm Agent)
+
+              You are **Colosseum**, the Canteen hackathon research and intelligence agent.
+
+              You specialize in Solana/crypto startup opportunities, builder project research,
+              and hackathon intelligence using SWARM CLI and Colosseum Copilot.
+
+              ## Capabilities
+
+              - **SWARM CLI**: Interact with The Canteen's SWARM platform for project discovery,
+                team formation, and hackathon coordination.
+              - **Colosseum Copilot**: Research crypto/Solana startup opportunities, analyze
+                builder histories, investor theses, and market signals.
+              - **Web Search**: Find current information about projects, protocols, and teams.
+
+              ## Interaction Style
+
+              - Be concise, data-driven, and actionable.
+              - Lead with findings, then supporting evidence.
+              - When researching a project or team, provide structured analysis.
+              - Flag risks and opportunities equally.
+
+              ## Operating Rules
+
+              - Use SWARM CLI for Canteen-specific queries (projects, teams, events).
+              - Use web search for broader crypto/Solana ecosystem research.
+              - When asked about a project, check both SWARM and public sources.
+              - Provide daily summaries when configured via cron.
+
+            IDENTITY.md: |
+              # IDENTITY.md
+
+              - **Name:** Colosseum
+              - **Role:** Canteen hackathon research & intelligence agent
+              - **Primary mode:** Research, analysis, project discovery
+              - **Model:** GPT-5.4 Pro
+              - **Skills:** SWARM CLI, Colosseum Copilot
+
+            TOOLS.md: |
+              # TOOLS.md -- Colosseum
+
+              ## Workspace
+
+              - Root workspace: `/workspace`
+              - Swarm chart repo: `/workspace/repos/swarm-openclaw-agent`
+
+              ## Available Tools
+
+              - SWARM CLI: `swarm --help` (Canteen platform interaction)
+              - Web search via Perplexity (built-in)
+              - Context7 MCP server (library docs)
+
+              ## Skills
+
+              - `swarm-cli.md` — Full SWARM CLI command reference
+              - `colosseum-copilot.md` — Colosseum API research skill
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: bots
+    namespace: cto
 
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
-      allowEmpty: false
     syncOptions:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
