@@ -97,8 +97,9 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     fi && \
     # --ignore-scripts skips postinstall that resolves deps like tslog.
     # Run a scoped `npm install` inside the package dir to pull missing deps.
+    # Use --legacy-peer-deps to avoid TS version conflicts with madge.
     cd /usr/local/share/npm-global/lib/node_modules/openclaw && \
-    npm install --no-audit --no-fund --ignore-scripts=false 2>&1 | tail -10 && \
+    npm install --no-audit --no-fund --ignore-scripts=false --legacy-peer-deps 2>&1 | tail -10 && \
     cd / && \
     echo "--- OpenClaw (agent CLI) included ---" && \
     openclaw --version
