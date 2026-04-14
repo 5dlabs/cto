@@ -431,6 +431,14 @@ spec:
               Use this for: researching competing projects, finding builder history,
               analyzing hackathon trends, and competitive intelligence.
 
+              ⚠️ **CRITICAL URL RULE**: DO NOT add `/colosseum_copilot/` to any endpoint.
+              The Colosseum website docs show endpoints as `GET /colosseum_copilot/filters` —
+              the `/colosseum_copilot/` part is a section label, NOT a URL path segment.
+              `$COLOSSEUM_COPILOT_API_BASE` already has the full base. Append directly:
+              - ✅ `$COLOSSEUM_COPILOT_API_BASE/search/projects`
+              - ✅ `$COLOSSEUM_COPILOT_API_BASE/filters`
+              - ❌ `$COLOSSEUM_COPILOT_API_BASE/colosseum_copilot/search/projects` ← WRONG (404)
+
               ## Interaction Style
 
               - Be concise, data-driven, and actionable.
