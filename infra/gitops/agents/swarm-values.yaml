@@ -1,0 +1,127 @@
+---
+# =============================================================================
+# Swarm Agent — 5DLabs internal deployment values
+# =============================================================================
+# Deployed via ArgoCD alongside Morgan in the bots namespace.
+# Uses the public swarm-openclaw-agent chart with our specific config.
+
+agent:
+  id: "swarm"
+  name: "Swarm"
+  model: "openai-api/gpt-5.4-pro"
+  systemPrompt: |
+    You are Swarm, an AI agent for The Canteen hackathon cohort,
+    operated by 5DLabs. You help founders track progress, research
+    Solana/crypto opportunities, and coordinate with their teams.
+    You have access to the SWARM CLI and Colosseum Copilot.
+    You also have visibility over 5DLabs projects and can provide
+    context about the broader ecosystem.
+  heartbeat:
+    every: "15m"
+    target: "last"
+    ackMaxChars: 500
+
+image:
+  repository: ghcr.io/5dlabs/agents
+  tag: "swarm-v1"
+  pullPolicy: Always
+
+imagePullSecrets:
+  - name: ghcr-secret
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "512Mi"
+  limits:
+    memory: "4Gi"
+
+storage:
+  enabled: true
+  storageClass: mayastor
+  size: 10Gi
+
+# Discord — same guild as Morgan
+discord:
+  enabled: true
+  botToken: "${DISCORD_BOT_TOKEN}"
+  accountId: "swarm"
+  guilds:
+    # 5dlabs guild
+    "1409006087331512342":
+      requireMention: true
+      slug: "5dlabs"
+      channels:
+        # Add relevant channel IDs here
+        "1409006087969177735":
+          enabled: true
+          requireMention: true
+      users:
+        - "444519104808878090"
+  allowBots: true
+  dmPolicy: "allowlist"
+  allowFrom:
+    - "444519104808878090"
+
+# API keys — reference the shared openclaw secrets
+# These will be overridden by the ArgoCD Application to use
+# existing cluster secrets instead of inline values.
+apiKeys:
+  openai: "${OPENAI_API_KEY}"
+  anthropic: "${ANTHROPIC_API_KEY}"
+
+colosseum:
+  pat: "${COLOSSEUM_COPILOT_PAT}"
+  apiBase: "https://copilot.colosseum.com/api/v1"
+
+# Model providers
+models:
+  providers:
+    openai-api:
+      api: "openai-responses"
+      baseUrl: "https://api.openai.com/v1"
+      auth: "api-key"
+      authHeader: true
+      models:
+        - id: "gpt-5.4-pro"
+          name: "GPT-5.4 Pro"
+        - id: "gpt-5.4"
+          name: "GPT-5.4"
+        - id: "gpt-4o"
+          name: "GPT-4o"
+    anthropic:
+      api: "anthropic-messages"
+      baseUrl: "https://api.anthropic.com"
+      auth: "api-key"
+      authHeader: true
+      models:
+        - id: "claude-sonnet-4-20250514"
+          name: "Claude Sonnet 4"
+        - id: "claude-3-5-haiku-latest"
+          name: "Claude 3.5 Haiku"
+
+modelDefaults:
+  primary: "openai-api/gpt-5.4-pro"
+  fallbacks:
+    - "openai-api/gpt-5.4"
+    - "anthropic/claude-sonnet-4-20250514"
+    - "openai-api/gpt-4o"
+
+rbac:
+  create: true
+  clusterWide: true
+
+# Daily cron updates enabled for our installation
+cron:
+  enabled: true
+  schedule: "0 9 * * *"
+  discordChannelId: "1409006087969177735"
+  prompt: >-
+    Summarize the 5DLabs team's progress from the last 24 hours.
+    Check SWARM status for tracked repos. Use Colosseum Copilot
+    to note any relevant Solana ecosystem developments.
+    Post a concise update covering:
+    - Active streaks and notable commits
+    - Traction or product updates submitted
+    - Relevant ecosystem news from Colosseum
+    - Upcoming deadlines or action items

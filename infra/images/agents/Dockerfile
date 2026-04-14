@@ -148,6 +148,15 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     clawhub --cli-version
 
 # =============================================================================
+# SWARM CLI — Canteen hackathon cohort progress tracking
+# =============================================================================
+RUN set -eux; \
+    pip install --break-system-packages --no-cache-dir \
+      "swarm-cli @ git+https://github.com/the-canteen-dev/SWARM-cli.git" && \
+    swarm --help >/dev/null 2>&1 && \
+    echo "SWARM CLI installed"
+
+# =============================================================================
 # intake-util — deterministic pipeline operations (tally, sync-linear, write-files)
 # =============================================================================
 COPY apps/intake-util/ /tmp/intake-util-build/
@@ -367,6 +376,7 @@ RUN set -e; \
     V_OP=$(op --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_NODE=$(node --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_BUN=$(bun --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_SWARM=$(swarm --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ); \
     printf '{\n  "buildDate": "%s",\n  "clis": {\n    "openclaw": "%s",\n    "acpx": "%s",\n    "claude": "%s",\n    "copilot": "%s",\n    "codex": "%s",\n    "code": "%s",\n    "gemini": "%s",\n    "cursor": "%s",\n    "droid": "%s",\n    "kimi": "%s",\n    "opencode": "%s",\n    "clawhub": "%s"\n  },\n  "tools": {\n    "gh": "%s",\n    "kubectl": "%s",\n    "argocd": "%s",\n    "op": "%s",\n    "node": "%s",\n    "bun": "%s"\n  }\n}\n' \
       "$BUILD_DATE" \
@@ -397,6 +407,7 @@ RUN set -e; \
     echo "op             $V_OP"; \
     echo "node           $V_NODE"; \
     echo "bun            $V_BUN"; \
+    echo "swarm          $V_SWARM"; \
     intake-util --help >/dev/null 2>&1 && echo "intake-util    OK" || true
 
 # Final ownership sweep — everything under /home/node must be writable by node (uid 1000).

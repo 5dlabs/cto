@@ -1,0 +1,61 @@
+---
+# =============================================================================
+# Swarm Agent — ArgoCD Application
+# =============================================================================
+# Deploys the public swarm-openclaw-agent chart for the Canteen hackathon.
+# Uses the OCI chart from ghcr.io/5dlabs/charts with values from this repo.
+#
+# Chart:   ghcr.io/5dlabs/charts/swarm-openclaw-agent (public OCI)
+# Values:  5dlabs/cto → infra/gitops/agents/swarm-values.yaml
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cto-swarm-agent
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: cto-swarm-agent
+    app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/component: canteen-hackathon
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  # Multi-source: OCI chart + values from CTO repo
+  sources:
+    # Source 1: Helm chart from GHCR OCI
+    - repoURL: ghcr.io/5dlabs/charts
+      chart: swarm-openclaw-agent
+      targetRevision: 0.1.0
+      helm:
+        releaseName: cto-swarm
+        valueFiles:
+          - $values/infra/gitops/agents/swarm-values.yaml
+
+    # Source 2: Values file from CTO repo
+    - repoURL: https://gitlab.5dlabs.ai/5dlabs/cto.git
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bots
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: "5s"
+        factor: 2
+        maxDuration: "3m"
