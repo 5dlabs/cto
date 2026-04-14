@@ -58,7 +58,7 @@ spec:
         agent:
           id: "swarm"
           name: "Colosseum"
-          model: "openai-api/gpt-5.4-pro"
+          model: "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
           sandbox: "off"
           heartbeat:
             every: "12h"
@@ -73,10 +73,30 @@ spec:
           typingMode: "instant"
 
         modelDefaults:
-          primary: "openai-api/gpt-5.4-pro"
+          primary: "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
           fallbacks:
-            - "anthropic/claude-sonnet-4-20250514"
             - "google/gemini-2.5-pro"
+            - "anthropic/claude-sonnet-4-20250514"
+            - "openai-api/gpt-5.4-pro"
+
+        openaiOAuth:
+          enabled: true
+          authProfilesSecretKey: "openai-oauth-auth-profiles"
+          codexAuthSecretKey: "openai-oauth-codex-auth"
+
+        models:
+          providers:
+            fireworks:
+              api: "openai-completions"
+              baseUrl: "https://api.fireworks.ai/inference/v1"
+              enabled: true
+              models:
+                - id: "accounts/fireworks/routers/kimi-k2p5-turbo"
+                  name: "Kimi K2.5 Turbo (Fire Pass)"
+                  contextWindow: 256000
+                  maxTokens: 256000
+                  reasoning: true
+                  input: ["text", "image"]
 
         secrets:
           external:
