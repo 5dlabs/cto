@@ -122,6 +122,10 @@ jobs:
           - name: utils
             binary: utils
             dir: crates/utils
+          - name: play-launcher
+            binary: cto-play
+            dir: crates/play-launcher
+            standalone: true
         target:
           - os: ubuntu-22.04
             triple: x86_64-unknown-linux-gnu
@@ -160,6 +164,10 @@ jobs:
               os: windows-latest
           - package:
               name: tools
+            target:
+              os: windows-latest
+          - package:
+              name: play-launcher
             target:
               os: windows-latest
     runs-on: ${{ matrix.target.os }}
@@ -535,6 +543,9 @@ jobs:
 
           ### 🔨 utils
           Micro-utilities for GitHub operations - CI alerts, PR comments, and more.
+
+          ### 🚀 cto-play
+          Play launcher CLI - merges CTO platform defaults with per-repo config and invokes play.lobster.yaml workflows.
 
           ---
 

@@ -69,6 +69,14 @@ struct Cli {
     #[arg(long)]
     linear_team_id: Option<String>,
 
+    /// Override working directory
+    #[arg(long)]
+    working_directory: Option<String>,
+
+    /// Override auto-merge
+    #[arg(long)]
+    auto_merge: Option<bool>,
+
     /// Show what would be passed to lobster without executing
     #[arg(long)]
     dry_run: bool,
@@ -126,6 +134,12 @@ async fn main() -> Result<()> {
     }
     if let Some(v) = &cli.linear_team_id {
         overrides.insert("linear_team_id".into(), v.clone());
+    }
+    if let Some(v) = &cli.working_directory {
+        overrides.insert("working_directory".into(), v.clone());
+    }
+    if let Some(v) = cli.auto_merge {
+        overrides.insert("auto_merge".into(), v.to_string());
     }
 
     // Merge configs and build args JSON
