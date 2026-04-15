@@ -73,13 +73,12 @@ agentDefaults:
   typingMode: "instant"
 
 modelDefaults:
-  primary: "anthropic/claude-sonnet-4-20250514"
+  primary: "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
   fallbacks:
-    - "anthropic/claude-opus-4-6-20260205"
-    - "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
-    - "fireworks/accounts/fireworks/models/minimax-m2p7"
     - "fireworks/accounts/fireworks/models/qwen3p6-plus"
+    - "fireworks/accounts/fireworks/models/minimax-m2p7"
     - "fireworks/accounts/fireworks/models/glm-5p1"
+    - "openai/gpt-4.1"
 
 # =============================================================================
 # Secrets
