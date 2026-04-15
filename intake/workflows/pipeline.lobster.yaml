@@ -777,11 +777,14 @@ steps:
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "register-run" "${audio_debug}" "project ${project_name}"
       RUN_TS=$(date +%s)
+      RUN_ID="${INTAKE_RUN_ID:-${project_name}-${RUN_TS}}"
+      mkdir -p "$root/.intake"
+      printf '%s' "$RUN_ID" > "$root/.intake/run-id.txt"
       if [ "${INTAKE_PREFLIGHT_BRIDGES_SKIP:-}" = "true" ]; then
-        echo '{"registered":false,"run_id":"'"${project_name}-${RUN_TS}"'","skipped":"bridges_skip"}'
+        echo '{"registered":false,"run_id":"'"${RUN_ID}"'","skipped":"bridges_skip"}'
       else
         intake-util register-run \
-          --run-id "${project_name}-${RUN_TS}" \
+          --run-id "${RUN_ID}" \
           --agent intake \
           --linear-session-id "${linear_session_id}" \
           --issue-id "${linear_issue_id}"
@@ -1527,7 +1530,27 @@ steps:
           echo "__MISSING_OR_EMPTY__"
         fi
       } > "$GATE_IN"
-      "$root/intake/scripts/quality-gate.sh" --stage "pipeline-deliberation" --input-file "$GATE_IN" --prompt "$root/intake/prompts/quality-gate-deliberation-system.md" --provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" --model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')"
+      GATE_EXIT=0
+      GATE_OUT="$("$root/intake/scripts/quality-gate.sh" --stage "pipeline-deliberation" --input-file "$GATE_IN" --prompt "$root/intake/prompts/quality-gate-deliberation-system.md" --provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" --model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')")" || GATE_EXIT=$?
+      case "$GATE_EXIT" in
+        0)
+          printf '%s\n' "$GATE_OUT"
+          ;;
+        75)
+          echo "quality-gate-deliberation: LLM unavailable — skipping gate (non-fatal)" >&2
+          printf '{"skipped":true,"fallback":true,"reason":"llm_unavailable"}\n'
+          ;;
+        10)
+          echo "quality-gate-deliberation: content quality below threshold" >&2
+          printf '%s\n' "$GATE_OUT"
+          exit 1
+          ;;
+        *)
+          echo "quality-gate-deliberation: unexpected exit code $GATE_EXIT" >&2
+          printf '%s\n' "$GATE_OUT"
+          exit 1
+          ;;
+      esac
 
   - id: gateway-health-check
     env:
@@ -1741,7 +1764,27 @@ steps:
           echo
         done
       } > "$GATE_IN"
-      "$root/intake/scripts/quality-gate.sh" --stage "pipeline-intake-output" --input-file "$GATE_IN" --provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" --model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')"
+      GATE_EXIT=0
+      GATE_OUT="$("$root/intake/scripts/quality-gate.sh" --stage "pipeline-intake-output" --input-file "$GATE_IN" --provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" --model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')")" || GATE_EXIT=$?
+      case "$GATE_EXIT" in
+        0)
+          printf '%s\n' "$GATE_OUT"
+          ;;
+        75)
+          echo "quality-gate-intake-output: LLM unavailable — skipping gate (non-fatal)" >&2
+          printf '{"skipped":true,"fallback":true,"reason":"llm_unavailable"}\n'
+          ;;
+        10)
+          echo "quality-gate-intake-output: content quality below threshold" >&2
+          printf '%s\n' "$GATE_OUT"
+          exit 1
+          ;;
+        *)
+          echo "quality-gate-intake-output: unexpected exit code $GATE_EXIT" >&2
+          printf '%s\n' "$GATE_OUT"
+          exit 1
+          ;;
+      esac
 
   - id: sync-to-target-repo
     env:

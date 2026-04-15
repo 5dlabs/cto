@@ -22,7 +22,7 @@ _step_log() {
 
   mkdir -p "$_STEP_LOG_DIR" 2>/dev/null || true
   ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  run_id="${INTAKE_RUN_ID:-unknown}"
+  run_id="${INTAKE_RUN_ID:-$(cat "${WORKSPACE:-.}/.intake/run-id.txt" 2>/dev/null || echo unknown)}"
 
   case "$action" in
     start)

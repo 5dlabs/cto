@@ -14,7 +14,7 @@ _TIMING_FILE="$_STEP_LOG_DIR/.step-timing"
 if mkdir -p "$_STEP_LOG_DIR" 2>/dev/null; then
   _ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   _now=$(date +%s)
-  _run_id="${INTAKE_RUN_ID:-unknown}"
+  _run_id="${INTAKE_RUN_ID:-$(cat "${WORKSPACE:-.}/.intake/run-id.txt" 2>/dev/null || echo unknown)}"
 
   # Close out previous step (emit step_end with duration)
   if [[ -f "$_TIMING_FILE" ]]; then
