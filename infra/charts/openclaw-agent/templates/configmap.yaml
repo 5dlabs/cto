@@ -307,7 +307,7 @@ data:
         {{- $loadPaths = append $loadPaths "/workspace/.openclaw/extensions/nats-messenger" }}
         {{- end }}
         {{- if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }}
-        {{- $loadPaths = append $loadPaths "/workspace/.openclaw/extensions/openclaw-mem0" }}
+        {{- $loadPaths = append $loadPaths "/workspace/.openclaw/extensions/openclaw-mem0/node_modules/@mem0/openclaw-mem0" }}
         {{- end }}
         {{- if $loadPaths }},
         "load": {

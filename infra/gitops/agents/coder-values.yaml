@@ -64,7 +64,9 @@ agent:
       3. Any in-progress work in your workspace that needs continuation.
       If you have active work, continue it. If you received new tasks via NATS,
       acknowledge and begin. If idle, check the cto repo for open issues assigned
-      to you or labeled 'coder'. Report status briefly.
+      to you or labeled 'coder'. On FIRST boot, read /workspace/HANDOFF.md for
+      prior session context and continue from where the previous agent left off.
+      Report status briefly.
   sandbox: "off"
   skipGlobalSkills: false
 
@@ -201,6 +203,11 @@ workspace:
       - Lobster pipelines (workflow definitions, step execution)
       - Work system (task decomposition, agent assignment, completion flows)
       - Desktop app (future: CTO Lite Tauri app)
+
+      ## Starting Point
+
+      Read `/workspace/HANDOFF.md` for context from the previous session.
+      Continue from the outstanding items listed there.
 
     SOUL.md: |
       # Coder -- Soul
@@ -362,6 +369,7 @@ mem0Plugin:
     - Task-level: "jonathon:project:{projectId}:task:{taskId}"
     - Agent-specific: "jonathon:project:{projectId}:task:{taskId}:coder"
   oss:
+    collectionName: coder_memory
     embedder:
       provider: google
       config:
@@ -369,7 +377,6 @@ mem0Plugin:
     vectorStore:
       provider: qdrant
       config:
-        collection_name: cto_memory
         host: qdrant.cto.svc.cluster.local
         port: 6333
     llm:

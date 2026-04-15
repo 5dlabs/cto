@@ -384,6 +384,7 @@ mem0Plugin:
     - Decisions and blockers are high-importance — always store with category
     - Use task_summary at task completion to write a condensed overview
   oss:
+    collectionName: cto_memory
     embedder:
       provider: google
       config:
@@ -391,7 +392,6 @@ mem0Plugin:
     vectorStore:
       provider: qdrant
       config:
-        collection_name: cto_memory
         host: qdrant.cto.svc.cluster.local
         port: 6333
     llm:
