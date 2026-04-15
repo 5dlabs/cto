@@ -178,6 +178,17 @@ spec:
               maxPromptArgChars: 8000
               output: "text"
 
+        swarmCli:
+          enabled: true
+          config: |
+            auth:
+              github_token: "${GITHUB_TOKEN}"
+              github_handle: kaseonedge
+            profile:
+              discord: edge_kase
+              telegram: '@edge_kase'
+              luma_email: jonathan@5dlabs.ai
+
         storage:
           enabled: true
           size: 10Gi
