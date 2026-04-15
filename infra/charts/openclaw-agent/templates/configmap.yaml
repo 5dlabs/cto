@@ -218,7 +218,7 @@ data:
             "enabled": true
           },
           "memory-core": {
-            "enabled": {{ if hasKey $memoryCore "enabled" }}{{ $memoryCore.enabled }}{{ else }}true{{ end }}
+            "enabled": {{ if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }}false{{ else if hasKey $memoryCore "enabled" }}{{ $memoryCore.enabled }}{{ else }}true{{ end }}
           }
           {{- if .Values.tools.acp.enabled }},
           "acpx": {
@@ -288,7 +288,7 @@ data:
         },
         "allow": [
           {{- $pluginEntries := list }}
-          {{- if (or (not (hasKey $memoryCore "enabled")) $memoryCore.enabled) }}
+          {{- if and (or (not (hasKey $memoryCore "enabled")) $memoryCore.enabled) (not (and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled)) }}
           {{- $pluginEntries = append $pluginEntries "\"memory-core\"" }}
           {{- end }}
           {{- if .Values.tools.acp.enabled }}
