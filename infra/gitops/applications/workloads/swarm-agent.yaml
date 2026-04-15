@@ -72,6 +72,13 @@ spec:
         agentDefaults:
           thinkingDefault: "low"
           typingMode: "instant"
+          compaction:
+            model: "google/gemini-2.5-flash"
+            notifyUser: true
+          contextPruning:
+            mode: "cache-ttl"
+            ttl: "5m"
+          bootstrapMaxChars: 50000
 
         modelDefaults:
           primary: "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
@@ -221,6 +228,19 @@ spec:
         session:
           scope: "per-sender"
           dmScope: "per-channel-peer"
+          maintenance:
+            mode: "enforce"
+            pruneAfter: "30d"
+            maxEntries: 500
+
+        memory:
+          enabled: true
+          dailyNotes:
+            enabled: true
+          search:
+            enabled: true
+            provider: "fireworks"
+            model: "nomic-ai/nomic-embed-text-v1.5"
 
         cron:
           enabled: true
