@@ -425,6 +425,10 @@ RUN set -e; \
 # Root-owned dotfiles (e.g. .gitconfig, .npmrc) created during image build break runtime git/npm.
 RUN find /home/node -maxdepth 1 -not -user 1000 -exec chown 1000:1000 {} + 2>/dev/null || true
 
+# Fix node user homedir in /etc/passwd → /workspace (Helm charts set HOME=/workspace
+# and mount a PVC there; OpenClaw's read tool resolves ~ via getpwuid not $HOME).
+RUN sed -i 's|node:x:1001:1000::/home/node:|node:x:1001:1000::/workspace:|' /etc/passwd
+
 # Drop privileges back to non-root user
 USER node
 WORKDIR /workspace
