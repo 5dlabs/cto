@@ -73,6 +73,11 @@ agent:
 agentDefaults:
   thinkingDefault: "medium"
   typingMode: "instant"
+  compaction:
+    mode: "auto"
+    memoryFlush:
+      enabled: true
+      softThresholdTokens: 8000
 
 modelDefaults:
   primary: "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
@@ -149,7 +154,26 @@ models:
   repos: []
 
 memorySearch:
-  enabled: false
+  enabled: true
+  sessionMemory: true
+  model: "accounts/fireworks/routers/kimi-k2p5-turbo"
+  provider: "fireworks"
+  maxResults: 6
+  cache:
+    enabled: true
+    maxEntries: 100
+  hybrid:
+    enabled: true
+    candidateMultiplier: 3
+    textWeight: 0.4
+    vectorWeight: 0.6
+  sources:
+    - "memory"
+    - "session"
+  sync:
+    deltaBytes: 4096
+    deltaMessages: 5
+    watch: true
 
 # =============================================================================
 # Workspace

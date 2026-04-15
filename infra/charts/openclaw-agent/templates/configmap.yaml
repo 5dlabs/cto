@@ -302,6 +302,11 @@ data:
           {{- end }}
           {{- join ", " $pluginEntries }}
         ]
+        {{- if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }},
+        "slots": {
+          "memory": "openclaw-mem0"
+        }
+        {{- end }}
         {{- $loadPaths := list }}
         {{- if .Values.nats.enabled }}
         {{- $loadPaths = append $loadPaths "/workspace/.openclaw/extensions/nats-messenger" }}
