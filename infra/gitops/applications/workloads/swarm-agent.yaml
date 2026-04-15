@@ -79,6 +79,11 @@ spec:
             mode: "cache-ttl"
             ttl: "5m"
           bootstrapMaxChars: 50000
+          memorySearch:
+            provider: "openai"
+            model: "nomic-ai/nomic-embed-text-v1.5"
+            remote:
+              baseUrl: "https://api.fireworks.ai/inference/v1/"
 
         modelDefaults:
           primary: "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
@@ -240,13 +245,14 @@ spec:
           jobs:
             - name: "daily-digest"
               description: "Daily development progress digest for hackathon judges"
-              cron: "0 20 * * *"
+              cron: "0 21 * * *"
               tz: "America/Los_Angeles"
               agent: "swarm"
               announce: true
-              channel: "last"
+              deliveryChannel: "discord"
+              deliveryTo: "channel:1494049471951274014"
               timeoutSeconds: 300
-              message: "Run the daily digest workflow. For each monitored repo, use gh CLI to gather commits and PRs from the last 24 hours. Summarize the progress and save to /workspace/.openclaw/workspace/memory/ with today's date (YYYY-MM-DD.md). Then post a structured update via SWARM CLI. Show me the draft and wait for my approval before posting."
+              message: "Run the daily digest workflow. FIRST check /workspace/.openclaw/workspace/memory/ for any existing digest from today (YYYY-MM-DD.md). If one already exists, summarize what changed since that last digest only — do not repeat prior content. For each monitored repo, use gh CLI to gather commits and PRs from the last 24 hours. Cross-reference against any existing daily notes to avoid duplicating already-reported items. Summarize only NEW progress, then post a structured update via SWARM CLI. Save the digest to memory/YYYY-MM-DD.md (append if file exists, don't overwrite). Show me the draft and wait for my approval before posting."
 
         hooks:
           enabled: true
