@@ -106,4 +106,18 @@ data:
         }
       }
     }
+
+  copilot-config.json: |
+    {
+      "model": "claude-opus-4.6",
+      "trustDirectories": ["/workspace"],
+      "allowAllTools": true,
+      "mcpServers": {
+        "tool-server": {
+          "command": "/workspace/.local/bin/tools",
+          "args": [],
+          "cwd": "/workspace"
+        }
+      }
+    }
 {{- end }}

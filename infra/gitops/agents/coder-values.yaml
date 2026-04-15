@@ -328,7 +328,7 @@ workspace:
       - Codex: Available via `/model codex` (OpenAI Codex harness)
       - Gemini: `gemini --version`
       - Kimi: `kimi --version`
-      - Copilot: `copilot --help`
+      - Copilot: `copilot --model claude-opus-4.6` (GitHub Copilot CLI, uses Claude Opus 4.6)
       - Cursor: `cursor-agent --help`
 
       ## ACP Sessions
@@ -522,7 +522,7 @@ tools:
       gemini:
         command: "gemini --experimental-acp --yolo"
       copilot:
-        command: "copilot --acp --stdio --yolo"
+        command: "copilot --acp --stdio --yolo --model claude-opus-4.6"
       kimi:
         command: "kimi acp"
       cursor:

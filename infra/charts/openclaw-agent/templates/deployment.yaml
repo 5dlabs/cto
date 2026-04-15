@@ -168,7 +168,7 @@ spec:
               chmod +x /workspace/.local/bin/tools
               echo "[tools] tools MCP proxy ready"
 
-              mkdir -p /workspace/.codex /workspace/.gemini /workspace/.factory /workspace/.cursor
+              mkdir -p /workspace/.codex /workspace/.gemini /workspace/.factory /workspace/.cursor /workspace/.copilot
               cp /cli-backend-configs-template/codex-config.toml /workspace/.codex/config.toml
               {{- if and (hasKey .Values "codexPlugin") .Values.codexPlugin.authSecretKey }}
               # Inject Codex OAuth auth.json from secret (headless auth)
@@ -182,6 +182,9 @@ spec:
               cp /cli-backend-configs-template/factory-mcp.json /workspace/.factory/mcp.json
               cp /cli-backend-configs-template/cursor-mcp.json /workspace/.cursor/mcp.json
               cp /cli-backend-configs-template/opencode.json /workspace/opencode.json
+              if [ -f /cli-backend-configs-template/copilot-config.json ]; then
+                cp /cli-backend-configs-template/copilot-config.json /workspace/.copilot/config.json
+              fi
               echo "[cli] backend configs written"
               {{- end }}
 
