@@ -444,6 +444,13 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: github-pat
                   optional: true
+            # Fireworks API key (used by envsubst for mem0 embedder/llm config)
+            - name: FIREWORKS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: fireworks-api-key
+                  optional: true
             {{- if .Values.cloudProviders.bedrock.enabled }}
             # AWS Bedrock credentials (used by OpenClaw gateway + Claude Code CLI)
             - name: AWS_ACCESS_KEY_ID

@@ -285,7 +285,7 @@ data:
                     "apiKey": "${ {{- ($mem0Plugin.oss).embedder.config.apiKeyEnvVar | default "FIREWORKS_API_KEY" -}} }"
                     {{- end }}
                     {{- if ($mem0Plugin.oss).embedder.config.baseUrl }},
-                    "baseUrl": {{ ($mem0Plugin.oss).embedder.config.baseUrl | quote }}
+                    "baseURL": {{ ($mem0Plugin.oss).embedder.config.baseUrl | quote }}
                     {{- end }}
                     {{- if ($mem0Plugin.oss).embedder.config.embeddingDims }},
                     "embeddingDims": {{ ($mem0Plugin.oss).embedder.config.embeddingDims }}
@@ -298,9 +298,11 @@ data:
                     "model": {{ ($mem0Plugin.oss).llm.config.model | default "accounts/fireworks/routers/kimi-k2p5-turbo" | quote }}
                     {{- if ($mem0Plugin.oss).llm.config.apiKey }},
                     "apiKey": {{ ($mem0Plugin.oss).llm.config.apiKey | quote }}
+                    {{- else }},
+                    "apiKey": "${ {{- ($mem0Plugin.oss).llm.config.apiKeyEnvVar | default "FIREWORKS_API_KEY" -}} }"
                     {{- end }}
                     {{- if ($mem0Plugin.oss).llm.config.baseUrl }},
-                    "baseUrl": {{ ($mem0Plugin.oss).llm.config.baseUrl | quote }}
+                    "baseURL": {{ ($mem0Plugin.oss).llm.config.baseUrl | quote }}
                     {{- end }}
                   }
                 }
