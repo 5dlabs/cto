@@ -1,126 +1,114 @@
 # Provider Failover & Credit Recovery
 
-## Overview
-
-When a model provider runs out of credits or returns rate-limit / auth errors,
-you can switch to an alternative provider without losing session context.
-Your session is periodically flushed to mem0 (OpenMemory) so you can recover
-context after a provider switch.
+When a provider runs out of credits or returns errors, switch to an alternative
+without losing context. Session state is flushed to mem0 on every compaction.
 
 ## Available Providers
 
-| Provider | Model ID | Env Var | Notes |
-|----------|----------|---------|-------|
-| Anthropic (OAuth) | claude-sonnet-4-20250514 | `CLAUDE_CODE_OAUTH_TOKEN` | Primary for Claude Code CLI |
-| Fireworks / Kimi K2.5 Turbo | accounts/fireworks/routers/kimi-k2p5-turbo | `FIREWORKS_API_KEY` | Primary gateway model |
+| Provider | Model ID | Auth | Notes |
+|----------|----------|------|-------|
+| Anthropic Sub 1 (OAuth) | claude-sonnet-4-20250514 | `CLAUDE_CODE_OAUTH_TOKEN` | Primary Claude Code |
+| Anthropic Sub 2 (OAuth) | claude-sonnet-4-20250514 | swap `~/.claude/.credentials.json` | Backup Claude |
+| Codex Sub 1 (OAuth) | codex/gpt-5.4 | `~/.codex/auth.json` (sub1) | Primary Codex |
+| Codex Sub 2 (OAuth) | codex/gpt-5.4 | swap `~/.codex/auth.json` (sub2) | Backup Codex |
+| Fireworks / Kimi K2.5 Turbo | accounts/fireworks/routers/kimi-k2p5-turbo | `FIREWORKS_API_KEY` | Primary gateway |
 | Fireworks / Qwen 3.6 Plus | accounts/fireworks/models/qwen3p6-plus | `FIREWORKS_API_KEY` | Fallback 1 |
 | Fireworks / MiniMax M2.7 | accounts/fireworks/models/minimax-m2p7 | `FIREWORKS_API_KEY` | Fallback 2 |
 | Fireworks / GLM 5.1 | accounts/fireworks/models/glm-5p1 | `FIREWORKS_API_KEY` | Fallback 3 |
 
-## Automatic Failover
-
-The gateway's `modelDefaults.fallbacks` chain handles automatic failover:
+## Automatic Failover (gateway)
 
 ```
-primary: fireworks/accounts/fireworks/routers/kimi-k2p5-turbo
-  → fallback 1: fireworks/accounts/fireworks/models/qwen3p6-plus
-  → fallback 2: fireworks/accounts/fireworks/models/minimax-m2p7
-  → fallback 3: fireworks/accounts/fireworks/models/glm-5p1
+primary: fireworks/kimi-k2p5-turbo
+  → fireworks/qwen3p6-plus → fireworks/minimax-m2p7 → fireworks/glm-5p1
 ```
 
-When the primary model returns a 429 (rate limit), 402 (payment required),
-or 401 (auth error), the gateway automatically tries the next fallback.
+429 (rate limit), 402 (payment), or 401 (auth) triggers the next fallback.
 
-## Manual Provider Switch
-
-If all automatic fallbacks are exhausted or you need to switch the **primary**
-model:
-
-### 1. Switch gateway model via config
+## Manual Switch: Gateway Model
 
 ```bash
-# Check current model
 openclaw config get agents.defaults.model
-
-# Switch to a different primary
 openclaw config set agents.defaults.model.primary "fireworks/accounts/fireworks/models/qwen3p6-plus"
-
-# Or switch to Claude (if OAuth token is valid)
-openclaw config set agents.defaults.model.primary "anthropic/claude-sonnet-4-20250514"
 ```
 
-### 2. Switch Claude Code auth token
+## Manual Switch: Claude Code Subscription
 
-If the primary OAuth token runs out of credits, swap to the backup:
+Two OAuth subscriptions are stored as K8s secrets. Switch when credits run out:
 
 ```bash
-# The two tokens are stored in the secret as:
-#   claude-oauth-token-sub1  (primary)
-#   claude-oauth-token-sub2  (backup)
-#
-# To switch, update the env var:
+# Check which sub is active
+echo $CLAUDE_CODE_OAUTH_TOKEN | head -c 30
+
+# Switch to sub 2
 export CLAUDE_CODE_OAUTH_TOKEN="$(cat /run/secrets/claude-oauth-token-sub2)"
+
+# Switch back to sub 1
+export CLAUDE_CODE_OAUTH_TOKEN="$(cat /run/secrets/claude-oauth-token-sub1)"
 ```
 
-### 3. Switch Fireworks API key
+## Manual Switch: Codex CLI Subscription
 
-If the Fireworks account runs out of credits:
+Two ChatGPT OAuth subscriptions stored in K8s secrets as base64-encoded auth.json files.
 
 ```bash
-# Update the API key env var with a backup key
-export FIREWORKS_API_KEY="<new-key>"
+# Check current sub
+cat ~/.codex/auth.json | python3 -c "
+import json,sys,base64
+d=json.load(sys.stdin)
+t=d['tokens']['id_token'].split('.')[1]
+t+='='*(4-len(t)%4)
+c=json.loads(base64.b64decode(t))
+a=c.get('https://api.openai.com/auth',{})
+print(f'Account: {a.get(\"chatgpt_account_id\")}, Plan: {a.get(\"chatgpt_plan_type\")}, Email: {c.get(\"email\")}')
+"
+
+# Switch to sub 2
+echo "$CODEX_AUTH_SUB2" | base64 -d > ~/.codex/auth.json
+chmod 600 ~/.codex/auth.json
+
+# Switch back to sub 1
+echo "$CODEX_AUTH_SUB1" | base64 -d > ~/.codex/auth.json
+chmod 600 ~/.codex/auth.json
 ```
 
-## Session Context Recovery
+**Important:** Codex uses OAuth with refresh tokens. The refresh token auto-renews
+the access token, so auth.json stays valid long-term. If it expires, re-run
+`codex login` locally, copy the new auth.json, and update the K8s secret.
 
-When switching providers mid-session, context may be lost. To recover:
+## Session Recovery After Switch
 
-### Automatic (mem0 memory flush)
+### Automatic (mem0)
 
-The gateway automatically flushes session context to mem0 every time
-compaction triggers (approximately every 8000 tokens of conversation).
-This means:
+Compaction flushes context to mem0 (~every 8000 tokens). After switching:
+- mem0 auto-recall injects recent memories into the next prompt
+- The agent resumes from stored context
 
-- Task status, decisions, and progress are saved to OpenMemory
-- On the next turn after switching providers, mem0 auto-recall injects
-  relevant memories into the prompt context
-- The agent picks up where it left off
-
-### Manual Recovery
-
-If automatic recovery isn't sufficient:
+### Manual
 
 ```
-Use the memory_search tool to find recent task context:
-  memory_search({ query: "current task status" })
-
-Or list recent memories:
-  memory_list({ limit: 10 })
+memory_search({ query: "current task status" })
+memory_list({ limit: 10 })
 ```
 
-### Best Practices
+### Procedure
 
-1. **Before switching:** Finish the current atomic operation if possible.
-   Don't switch mid-file-edit.
-2. **After switching:** Start your next message with context like
-   "Continuing from where we left off on [task]" — mem0 auto-recall
-   will inject relevant memories.
-3. **Verify:** After switching, run a simple test to confirm the new
-   provider works (e.g., ask a basic question).
-4. **Monitor credits:** Check provider dashboards periodically:
-   - Anthropic: https://console.anthropic.com/settings/billing
-   - Fireworks: https://fireworks.ai/account/billing
+1. **Before switching:** Finish the current atomic operation. Don't switch mid-edit.
+2. **Flush to memory:** If possible, tell the agent "save your current progress to memory"
+   before the switch to ensure the latest state is captured.
+3. **Switch the credential** (see commands above).
+4. **After switching:** Start with "Continuing from where we left off" — mem0 recall fills context.
+5. **Verify:** Run a quick test to confirm the new provider responds.
 
-## CLI Backend Session Persistence
+### Credit Dashboards
 
-Each CLI backend (Claude Code, OpenCode) persists its session state:
+- Anthropic: https://console.anthropic.com/settings/billing
+- OpenAI/ChatGPT: https://platform.openai.com/usage (API) or https://chatgpt.com/admin (subscription)
+- Fireworks: https://fireworks.ai/account/billing
 
-- **Claude Code:** Uses `--session-id` for named sessions. The gateway
-  passes thread-bound session IDs automatically.
-- **OpenCode:** Session state stored in `/workspace/.opencode/sessions/`.
-- **Compaction:** When context gets large, the gateway compacts the
-  conversation and flushes key facts to mem0 before truncating.
+## CLI Session Persistence
 
-The combination of compaction + mem0 flush + session memory indexing means
-that even if a provider switch forces a session restart, the agent retains
-its operational context through memory recall.
+- **Claude Code:** Thread-bound `--session-id`, auto-managed by gateway
+- **Codex:** Session in `~/.codex/sessions/`, persists across restarts
+- **OpenCode:** Session in `/workspace/.opencode/sessions/`
+- **Compaction + mem0:** Key facts flushed to memory before context truncation

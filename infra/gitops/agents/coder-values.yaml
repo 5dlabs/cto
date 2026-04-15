@@ -566,6 +566,8 @@ codexPlugin:
   enabled: true
   approvalPolicy: "never"
   sandbox: "workspace-write"
+  authSecretKey: "codex-auth-sub1"
+  authSecretKeySub2: "codex-auth-sub2"
 
 # =============================================================================
 # Cloud Providers (disabled — using direct API keys)

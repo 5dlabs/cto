@@ -170,6 +170,14 @@ spec:
 
               mkdir -p /workspace/.codex /workspace/.gemini /workspace/.factory /workspace/.cursor
               cp /cli-backend-configs-template/codex-config.toml /workspace/.codex/config.toml
+              {{- if .Values.codexPlugin.authSecretKey }}
+              # Inject Codex OAuth auth.json from secret (headless auth)
+              if [ -n "$CODEX_AUTH_SUB1" ]; then
+                echo "$CODEX_AUTH_SUB1" | base64 -d > /workspace/.codex/auth.json
+                chmod 600 /workspace/.codex/auth.json
+                echo "[cli] codex auth.json written from sub1"
+              fi
+              {{- end }}
               cp /cli-backend-configs-template/gemini-settings.json /workspace/.gemini/settings.json
               cp /cli-backend-configs-template/factory-mcp.json /workspace/.factory/mcp.json
               cp /cli-backend-configs-template/cursor-mcp.json /workspace/.cursor/mcp.json
@@ -471,13 +479,16 @@ spec:
                   key: foundry-api-key
                   optional: true
             {{- end }}
+            {{- if .Values.codexPlugin.authSecretKey }}
+            # Codex CLI OAuth auth.json (base64-encoded) for headless setup
+            - name: CODEX_AUTH_SUB1
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: {{ .Values.codexPlugin.authSecretKey }}
+                  optional: true
+            {{- end }}
           volumeMounts:
-            - name: workspace
-              mountPath: /workspace
-            - name: config-template
-              mountPath: /config-template
-            - name: openclaw-skills-template
-              mountPath: /openclaw-skills-template
             {{- if .Values.claudeCode.enabled }}
             - name: claude-settings-template
               mountPath: /claude-settings-template
@@ -673,6 +684,23 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: {{ .Values.claudeCode.oauthTokenSecretKey }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            {{- if .Values.codexPlugin.authSecretKey }}
+            # Codex CLI OAuth auth (two subscriptions for failover)
+            - name: CODEX_AUTH_SUB1
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: {{ .Values.codexPlugin.authSecretKey }}
+                  optional: true
+            {{- if .Values.codexPlugin.authSecretKeySub2 }}
+            - name: CODEX_AUTH_SUB2
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: {{ .Values.codexPlugin.authSecretKeySub2 }}
                   optional: true
             {{- end }}
             {{- end }}
