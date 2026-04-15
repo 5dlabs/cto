@@ -269,20 +269,42 @@ spec:
               # ---------------------------------------------------------------
               # 5. Git credential setup (for private repo access)
               # ---------------------------------------------------------------
+              # Write gitconfig to /workspace so the main container (HOME=/workspace) inherits it
+              export HOME=/workspace
+              export GIT_TERMINAL_PROMPT=0
+
               if [ -n "${GITHUB_TOKEN:-}" ]; then
-                git config --global credential.helper store
+                # Credential store with entries for github.com
                 echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > /workspace/.git-credentials
-                chmod 600 /workspace/.git-credentials
+                chmod 644 /workspace/.git-credentials
                 chown 1001:1000 /workspace/.git-credentials
+
                 git config --global credential.helper 'store --file=/workspace/.git-credentials'
                 git config --global user.email "bot@5dlabs.ai"
                 git config --global user.name "{{ .Values.agent.id }}"
                 git config --global --add safe.directory "*"
-                chown 1001:1000 /workspace/.gitconfig 2>/dev/null || true
-                echo "[git] Credentials configured for github.com"
+                git config --global advice.detachedHead false
+                git config --global init.defaultBranch main
+
+                # Prevent interactive prompts in non-TTY environments
+                git config --global core.askPass ""
+                git config --global credential.interactive never
+
+                chown 1001:1000 /workspace/.gitconfig
+                echo "[git] Credentials configured for github.com (gitconfig at /workspace/.gitconfig)"
               else
+                # Even without a token, configure git basics so ad-hoc clones don't hang
+                git config --global user.email "bot@5dlabs.ai"
+                git config --global user.name "{{ .Values.agent.id }}"
+                git config --global --add safe.directory "*"
+                git config --global core.askPass ""
+                git config --global credential.interactive never
+                chown 1001:1000 /workspace/.gitconfig 2>/dev/null || true
                 echo "[git] WARNING: GITHUB_TOKEN not set — private repo clones may fail"
               fi
+
+              # Reset HOME for remaining init steps (root context)
+              export HOME=/root
 
               # ---------------------------------------------------------------
               # 6. Git repo health checks (idempotent clone + dirty-state audit)
@@ -550,6 +572,14 @@ spec:
               value: production
             - name: OPENCLAW_NO_RESPAWN
               value: "1"
+            # Prevent git from prompting for credentials in non-TTY
+            - name: GIT_TERMINAL_PROMPT
+              value: "0"
+            # Disable mem0 telemetry (prevents HTTP/2 GOAWAY timeouts)
+            - name: ANONYMIZED_TELEMETRY
+              value: "false"
+            - name: MEM0_TELEMETRY
+              value: "false"
             {{- if .Values.tools.acp.enabled }}
             - name: KIMI_SHARE_DIR
               value: /workspace/.kimi
