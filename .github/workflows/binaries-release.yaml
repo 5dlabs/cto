@@ -292,7 +292,7 @@ jobs:
   # Build tools Docker image
   build-docker:
     needs: [plan, build-binaries]
-    if: needs.plan.outputs.publishing == 'true'
+    if: ${{ always() && needs.plan.outputs.publishing == 'true' && !cancelled() }}
     runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v6
@@ -362,7 +362,7 @@ jobs:
   # Build controller Docker image
   build-docker-controller:
     needs: [plan, build-binaries]
-    if: needs.plan.outputs.publishing == 'true'
+    if: ${{ always() && needs.plan.outputs.publishing == 'true' && !cancelled() }}
     runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v6
@@ -426,7 +426,7 @@ jobs:
   # Build healer Docker image
   build-docker-healer:
     needs: [plan, build-binaries]
-    if: needs.plan.outputs.publishing == 'true'
+    if: ${{ always() && needs.plan.outputs.publishing == 'true' && !cancelled() }}
     runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v6
@@ -490,7 +490,7 @@ jobs:
   # Create GitHub Release with all artifacts
   release:
     needs: [plan, build-binaries, build-intake-agent, build-docker, build-docker-controller, build-docker-healer]
-    if: ${{ always() && needs.plan.outputs.publishing == 'true' && needs.build-binaries.result == 'success' }}
+    if: ${{ always() && needs.plan.outputs.publishing == 'true' && needs.build-binaries.result == 'success' && needs.build-intake-agent.result != 'failure' }}
     runs-on: [k8s-runner]
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
