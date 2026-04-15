@@ -7,6 +7,9 @@
 # determined at runtime via environment variables and mounted config, NOT
 # by which image is used.
 
+# Global ARG — must be declared before any FROM to be visible across stages
+ARG BASE_IMAGE=registry.5dlabs.ai/5dlabs/runtime:full
+
 # =============================================================================
 # Stage: Build cto-play (play launcher CLI)
 # =============================================================================
@@ -46,8 +49,8 @@ RUN sed -i 's/version.workspace = true/version = "0.1.0"/' Cargo.toml && \
 #
 # =============================================================================
 
-ARG BASE_IMAGE=registry.5dlabs.ai/5dlabs/runtime:full
-
+# Re-declare ARG after FROM to make it available in this stage
+ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
 LABEL org.opencontainers.image.source="https://github.com/5dlabs/cto"
