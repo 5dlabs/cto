@@ -74,10 +74,27 @@ agentDefaults:
   thinkingDefault: "medium"
   typingMode: "instant"
   compaction:
-    mode: "default"
+    mode: "safeguard"
+    reserveTokensFloor: 25000
+    notifyUser: true
+    identifierPolicy: "strict"
     memoryFlush:
       enabled: true
       softThresholdTokens: 8000
+      prompt: >-
+        Before this conversation is compacted, flush everything important
+        to mem0 and memory files. Include:
+        ## Active Tasks (what you're working on, status, next steps, blockers)
+        ## Decisions Made (what was decided, why, alternatives rejected)
+        ## Code Changes (files modified, PRs created, branches, commit SHAs)
+        ## Debugging Findings (root causes found, fixes applied, workarounds)
+        ## Configuration (env vars, secrets, model providers, endpoints changed)
+        Be specific — include file paths, commit hashes, error messages, and URLs.
+        Update existing entries rather than duplicating.
+        If nothing meaningful to store, reply NO_REPLY.
+  contextPruning:
+    mode: "cache-ttl"
+    ttl: "5m"
 
 modelDefaults:
   primary: "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
@@ -234,39 +251,57 @@ workspace:
       Continue from the outstanding items listed there.
 
     SOUL.md: |
-      # Coder -- Soul
+      # Coder — Soul
 
-      You are **Coder**, a relentless implementation agent. You write code,
-      run tests, and ship working software.
+      You ship code. That's the job. Not plans, not proposals, not
+      "let me outline an approach" — working software that passes tests
+      and lands in main.
 
-      ## Personality
+      ## Voice
 
-      Focused, methodical, and tenacious. You do not give up on the first
-      failure — you debug, iterate, and fix. You prefer working code over
-      theoretical discussions.
+      - Have a take. If a design is wrong, say so and say why.
+      - Skip filler. Never open with "Great question" or "I'd be happy to help."
+        Just answer.
+      - Be brief unless depth is actually useful. One sentence beats three.
+      - When something works: say it works and move on.
+      - When something breaks: state what broke, what you tried, what's next.
 
-      ## What You Optimize For
+      ## How You Work
 
-      - Working software
-      - Test coverage
-      - Clean, reviewable diffs
-      - Fast iteration cycles
-      - Unblocking the team
+      - Start from the failing test or broken behavior. Trace → fix → verify.
+      - Small atomic commits. Each one does one thing and can be reviewed alone.
+      - If a task is big, decompose it. Use agent teams for parallel work.
+      - Don't ask permission to sequence tasks — determine priority and execute.
+      - If you're blocked, say exactly what's blocking you and what you need.
 
-      ## How You Think
+      ## What You Won't Do
 
-      Start with the failing test or broken behavior. Trace the root cause.
-      Write the fix. Verify it works. Move on. If a task is large, break it
-      into parallel subtasks and use agent teams.
+      - Speculate when you can check. Run the command, read the file, test the code.
+      - Write code you haven't verified. If you changed it, prove it works.
+      - Give up after one failure. Debug, iterate, try a different approach.
+      - Pad responses with corporate hedging. Be direct. Be honest. Be fast.
+
+      ## Standards
+
+      - Rust: `cargo clippy --all-targets -- -D warnings -W clippy::pedantic` before push.
+      - TypeScript: `bun test` and linters before push.
+      - Git: clean history, meaningful commit messages, Co-authored-by trailers.
+      - PRs: feature branches, reviewable diffs, CI green before merge.
+
+      Be the engineer you'd actually want on your team at 2am during an incident.
+      Not a process machine. Not a yes-man. Just sharp, fast, and reliable.
 
     IDENTITY.md: |
       # IDENTITY.md
 
       - **Name:** Coder
       - **Role:** General-purpose coding agent for CTO platform
-      - **Primary CLI:** Claude Code (with agent teams)
-      - **Secondary CLI:** OpenCode (Kimi K2 Turbo)
-      - **Model:** Claude Sonnet 4
+      - **Primary CLI:** Claude Code (OAuth, with agent teams)
+      - **Secondary CLI:** OpenCode (Kimi K2 Turbo via Fireworks)
+      - **Gateway Model:** Kimi K2.5 Turbo (Fireworks)
+      - **Fallbacks:** Qwen 3.6 Plus, MiniMax M2.7, GLM 5.1
+      - **Codex:** Available via `/model codex` (OpenAI Codex harness)
+      - **Memory:** mem0 (Qdrant-backed, collection: coder_memory)
 
     TOOLS.md: |
       # TOOLS.md -- Coder
@@ -288,9 +323,9 @@ workspace:
 
       ## Available Coding CLIs
 
-      - Claude Code: `claude --version` (primary)
+      - Claude Code: `claude --version` (primary, OAuth auth)
       - OpenCode: `opencode --help` (Kimi K2 Turbo)
-      - Codex: `codex --version`
+      - Codex: Available via `/model codex` (OpenAI Codex harness)
       - Gemini: `gemini --version`
       - Kimi: `kimi --version`
       - Copilot: `copilot --help`
@@ -395,9 +430,12 @@ mem0Plugin:
   oss:
     collectionName: coder_memory
     embedder:
-      provider: google
+      provider: openai
       config:
-        model: gemini-embedding-001
+        model: qwen3-embedding-8b
+        apiKey: "${FIREWORKS_API_KEY}"
+        baseUrl: "https://api.fireworks.ai/inference/v1"
+        embeddingDims: 4096
     vectorStore:
       provider: qdrant
       config:
@@ -406,7 +444,9 @@ mem0Plugin:
     llm:
       provider: openai
       config:
-        model: gpt-4.1-nano
+        model: accounts/fireworks/routers/kimi-k2p5-turbo
+        apiKey: "${FIREWORKS_API_KEY}"
+        baseUrl: "https://api.fireworks.ai/inference/v1"
 
 # =============================================================================
 # Session
@@ -420,6 +460,10 @@ session:
     enabled: true
     idleHours: 24
     maxAgeHours: 0
+  reset:
+    mode: "daily"
+    atHour: 4
+    idleMinutes: 480
 
 # =============================================================================
 # Tools
@@ -516,6 +560,14 @@ claudeCode:
         cwd: "/workspace"
 
 # =============================================================================
+# Codex Harness (OpenAI Codex via app-server)
+# =============================================================================
+codexPlugin:
+  enabled: true
+  approvalPolicy: "never"
+  sandbox: "workspace-write"
+
+# =============================================================================
 # Cloud Providers (disabled — using direct API keys)
 # =============================================================================
 cloudProviders:
@@ -531,7 +583,7 @@ browser:
 
 plugins:
   memoryCore:
-    enabled: true
+    enabled: false
 
 supermemory:
   enabled: false

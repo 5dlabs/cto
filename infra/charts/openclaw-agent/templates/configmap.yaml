@@ -12,6 +12,7 @@ data:
     {{- $plugins := index .Values "plugins" | default dict }}
     {{- $memoryCore := index $plugins "memoryCore" | default dict }}
     {{- $mem0Plugin := index .Values "mem0Plugin" | default dict }}
+    {{- $codexPlugin := index .Values "codexPlugin" | default dict }}
     {{- $webTools := index .Values.tools "web" | default dict }}
     {{- $webSearch := index $webTools "search" | default dict }}
     {{- $webFetch := index $webTools "fetch" | default dict }}
@@ -77,6 +78,12 @@ data:
           }
           {{- if .Values.cliBackends }},
           "cliBackends": {{ .Values.cliBackends | toJson }}
+          {{- end }}
+          {{- if and (hasKey $codexPlugin "enabled") $codexPlugin.enabled }},
+          "embeddedHarness": {
+            "runtime": "auto",
+            "fallback": "pi"
+          }
           {{- end }}
         },
         "list": [
@@ -269,19 +276,51 @@ data:
                   }
                 },
                 "embedder": {
-                  "provider": {{ ($mem0Plugin.oss).embedder.provider | default "google" | quote }},
+                  "provider": {{ ($mem0Plugin.oss).embedder.provider | default "openai" | quote }},
                   "config": {
-                    "model": {{ ($mem0Plugin.oss).embedder.config.model | default "gemini-embedding-001" | quote }},
-                    "apiKey": "${ {{- ($mem0Plugin.oss).embedder.config.apiKeyEnvVar | default "GOOGLE_API_KEY" -}} }"
+                    "model": {{ ($mem0Plugin.oss).embedder.config.model | default "qwen3-embedding-8b" | quote }}
+                    {{- if ($mem0Plugin.oss).embedder.config.apiKey }},
+                    "apiKey": {{ ($mem0Plugin.oss).embedder.config.apiKey | quote }}
+                    {{- else }},
+                    "apiKey": "${ {{- ($mem0Plugin.oss).embedder.config.apiKeyEnvVar | default "FIREWORKS_API_KEY" -}} }"
+                    {{- end }}
+                    {{- if ($mem0Plugin.oss).embedder.config.baseUrl }},
+                    "baseUrl": {{ ($mem0Plugin.oss).embedder.config.baseUrl | quote }}
+                    {{- end }}
+                    {{- if ($mem0Plugin.oss).embedder.config.embeddingDims }},
+                    "embeddingDims": {{ ($mem0Plugin.oss).embedder.config.embeddingDims }}
+                    {{- end }}
                   }
                 },
                 "llm": {
                   "provider": {{ ($mem0Plugin.oss).llm.provider | default "openai" | quote }},
                   "config": {
-                    "model": {{ ($mem0Plugin.oss).llm.config.model | default "gpt-4.1-nano" | quote }}
+                    "model": {{ ($mem0Plugin.oss).llm.config.model | default "accounts/fireworks/routers/kimi-k2p5-turbo" | quote }}
+                    {{- if ($mem0Plugin.oss).llm.config.apiKey }},
+                    "apiKey": {{ ($mem0Plugin.oss).llm.config.apiKey | quote }}
+                    {{- end }}
+                    {{- if ($mem0Plugin.oss).llm.config.baseUrl }},
+                    "baseUrl": {{ ($mem0Plugin.oss).llm.config.baseUrl | quote }}
+                    {{- end }}
                   }
                 }
               }
+            }
+          }
+          {{- end }}
+          {{- if and (hasKey $codexPlugin "enabled") $codexPlugin.enabled }},
+          "codex": {
+            "enabled": true,
+            "config": {
+              "appServer": {
+                "approvalPolicy": {{ $codexPlugin.approvalPolicy | default "never" | quote }},
+                "sandbox": {{ $codexPlugin.sandbox | default "workspace-write" | quote }}
+              }
+              {{- if hasKey $codexPlugin "discovery" }},
+              "discovery": {
+                "enabled": {{ $codexPlugin.discovery.enabled | default true }}
+              }
+              {{- end }}
             }
           }
           {{- end }}
@@ -299,6 +338,9 @@ data:
           {{- end }}
           {{- if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }}
           {{- $pluginEntries = append $pluginEntries "\"openclaw-mem0\"" }}
+          {{- end }}
+          {{- if and (hasKey $codexPlugin "enabled") $codexPlugin.enabled }}
+          {{- $pluginEntries = append $pluginEntries "\"codex\"" }}
           {{- end }}
           {{- join ", " $pluginEntries }}
         ]
