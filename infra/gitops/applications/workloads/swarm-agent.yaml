@@ -526,6 +526,12 @@ spec:
                 - Python package: `/usr/local/lib/python3.12/dist-packages/swarm/` (NOT site-packages)
                 - Config: `/workspace/.swarm/config.yaml` (NOT /home/node/.swarm/)
                 - Queue: `/workspace/.swarm/queue.yaml`
+              - ⚠️ **NEVER read, edit, or cat `/workspace/.swarm/config.yaml`** — it contains
+                auth tokens (github_token, server_token). Reading/editing it causes tokens to
+                leak into logs on failure. Use `swarm status` or `swarm ls` CLI commands instead.
+                For programmatic access, use `from swarm import config; config.load()`.
+              - **Always use absolute paths** (`/workspace/...`), NEVER use `~` or `~/...` —
+                the `~` shorthand resolves to `/home/node/` not `/workspace/` in some tools.
               - **Do NOT use the `code_execution` tool** — it requires xAI credits we don't have.
                 Use `exec` (shell) for all Python/CLI tasks instead.
               - GitHub CLI (`gh`) is authenticated via `/workspace/.config/gh/hosts.yml`.
