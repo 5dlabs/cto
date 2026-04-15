@@ -74,7 +74,7 @@ agentDefaults:
   thinkingDefault: "medium"
   typingMode: "instant"
   compaction:
-    mode: "auto"
+    mode: "default"
     memoryFlush:
       enabled: true
       softThresholdTokens: 8000
