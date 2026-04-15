@@ -136,11 +136,11 @@ memorySearch:
 workspace:
   repos:
     - name: cto
-      url: "https://gitlab.5dlabs.ai/5dlabs/cto.git"
+      url: "https://github.com/5dlabs/cto.git"
       branch: "main"
       path: "repos/cto"
     - name: openclaw-platform
-      url: "https://gitlab.5dlabs.ai/5dlabs/openclaw-platform.git"
+      url: "https://github.com/5dlabs/openclaw-platform.git"
       branch: "main"
       path: "repos/openclaw-platform"
     - name: openclaw
