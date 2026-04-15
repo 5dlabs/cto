@@ -376,6 +376,7 @@ pub async fn create_watcher_coderun(
         deployment: false,
         acp: None,
         openclaw: None,
+        harness_agent: None,
     };
 
     let watcher = CodeRun {

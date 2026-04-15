@@ -2,6 +2,7 @@ use super::agent::AgentClassifier;
 use super::naming::ResourceNaming;
 use super::watcher::coordination_configmap_name;
 use crate::cli::types::{CLIType, Provider};
+use crate::crds::coderun::HarnessAgent;
 use crate::crds::{CLIConfig, CodeRun};
 use crate::tasks::cleanup::{
     LABEL_CLEANUP_KIND, LABEL_CLEANUP_RUN, LABEL_CLEANUP_SCOPE, SCOPE_RUN,
@@ -1410,15 +1411,18 @@ impl<'a> CodeResourceManager<'a> {
 
         // Shared emptyDir for OpenClaw peer deps — init container installs, main container reads.
         // Must be added before container_spec is built (which consumes volume_mounts).
+        // Skipped for Hermes pods which don't use OpenClaw.
         let openclaw_nm_path = "/usr/local/share/npm-global/lib/node_modules/openclaw/node_modules";
-        volumes.push(json!({
-            "name": "openclaw-node-modules",
-            "emptyDir": {}
-        }));
-        volume_mounts.push(json!({
-            "name": "openclaw-node-modules",
-            "mountPath": openclaw_nm_path
-        }));
+        if !matches!(code_run.spec.effective_harness(), HarnessAgent::Hermes) {
+            volumes.push(json!({
+                "name": "openclaw-node-modules",
+                "emptyDir": {}
+            }));
+            volume_mounts.push(json!({
+                "name": "openclaw-node-modules",
+                "mountPath": openclaw_nm_path
+            }));
+        }
 
         // GitHub App authentication only - no SSH volumes needed
         // Validate github_app is present and non-empty
@@ -1640,6 +1644,20 @@ impl<'a> CodeResourceManager<'a> {
             }
         }
 
+        // HARNESS_AGENT: runtime detection of which harness is running
+        let harness_name = match code_run.spec.effective_harness() {
+            HarnessAgent::OpenClaw => "openclaw",
+            HarnessAgent::Hermes => "hermes",
+        };
+        final_env_vars.push(json!({ "name": "HARNESS_AGENT", "value": harness_name }));
+
+        // Hermes-specific env vars
+        if matches!(code_run.spec.effective_harness(), HarnessAgent::Hermes) {
+            final_env_vars.push(json!({ "name": "NOUS_BASE_URL", "value": "https://inference-api.nousresearch.com/v1" }));
+            final_env_vars.push(json!({ "name": "NOUS_MODEL", "value": "nousresearch/hermes-4-70b" }));
+            // NOUS_API_KEY comes from cto-secrets via envFrom, not hardcoded here
+        }
+
         // Provider env vars are now handled by EffectiveProviderConfig.build_env_vars()
         // above (in the critical_env_vars section). No more model-string detection here.
 
@@ -1707,22 +1725,25 @@ impl<'a> CodeResourceManager<'a> {
             }
         }));
 
-        // Mount discord-pm-bot for DISCORD_PM_BOT_TOKEN (live debate channel posting)
-        env_from.push(json!({
-            "secretRef": {
-                "name": "discord-pm-bot",
-                "optional": serde_json::Value::Bool(true)
-            }
-        }));
+        // Mount Discord secrets only for OpenClaw harness (Hermes doesn't use Discord)
+        if !matches!(code_run.spec.effective_harness(), HarnessAgent::Hermes) {
+            // Mount discord-pm-bot for DISCORD_PM_BOT_TOKEN (live debate channel posting)
+            env_from.push(json!({
+                "secretRef": {
+                    "name": "discord-pm-bot",
+                    "optional": serde_json::Value::Bool(true)
+                }
+            }));
 
-        // Mount discord-agent-bots for per-agent Discord tokens and channels
-        // (DISCORD_TOKEN_<AGENT>, DISCORD_CHANNEL_<AGENT>)
-        env_from.push(json!({
-            "secretRef": {
-                "name": "discord-agent-bots",
-                "optional": serde_json::Value::Bool(true)
-            }
-        }));
+            // Mount discord-agent-bots for per-agent Discord tokens and channels
+            // (DISCORD_TOKEN_<AGENT>, DISCORD_CHANNEL_<AGENT>)
+            env_from.push(json!({
+                "secretRef": {
+                    "name": "discord-agent-bots",
+                    "optional": serde_json::Value::Bool(true)
+                }
+            }));
+        }
 
         // Mount solana-api-keys for Helius RPC, Birdeye, and Solana env vars
         // (HELIUS_API_KEY, SOLANA_RPC_URL, SOLANA_DEVNET_RPC_URL, BIRDEYE_API_KEY)
@@ -2245,7 +2266,8 @@ scrape_configs:
         // dep resolution. This init container runs as root, installs the missing
         // modules into the shared openclaw-node-modules emptyDir volume.
         // NOTE: containers in a pod do NOT share image filesystem layers, only volumes.
-        {
+        // Skipped for Hermes pods which don't use OpenClaw.
+        if !matches!(code_run.spec.effective_harness(), HarnessAgent::Hermes) {
             let agent_image = self.select_image_for_cli(code_run).unwrap_or_else(|_| {
                 format!(
                     "{}:{}",
@@ -2299,7 +2321,8 @@ scrape_configs:
         // calls trigger Discord rate limiting. This init container adds a
         // deterministic delay (0-30s) based on a hash of the CodeRun name,
         // spreading pod startups across time.
-        {
+        // Skipped for Hermes pods which don't use the Discord gateway.
+        if !matches!(code_run.spec.effective_harness(), HarnessAgent::Hermes) {
             use std::collections::hash_map::DefaultHasher;
             use std::hash::{Hash, Hasher};
             let mut hasher = DefaultHasher::new();
