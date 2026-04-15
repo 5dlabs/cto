@@ -216,6 +216,13 @@ spec:
                                   type: integer
                                   format: int32
                                   description: "Performance score 0-100"
+              harnessAgent:
+                type: string
+                description: "Which harness agent orchestrates the task pod. 'openclaw' (default) boots the OpenClaw gateway for Discord, NATS, and plugin support. 'hermes' skips the gateway and runs standalone ACPX + Lobster directly."
+                enum:
+                  - openclaw
+                  - hermes
+                default: openclaw
               openclaw:
                 type: object
                 description: "OpenClaw runtime configuration — rendered into openclaw.json ConfigMap. When absent, default providers (fireworks, google) are used."

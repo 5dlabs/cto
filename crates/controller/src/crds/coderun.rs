@@ -399,6 +399,21 @@ pub struct EscalationPolicy {
     pub deny: Vec<String>,
 }
 
+/// Which harness agent orchestrates the task pod.
+///
+/// `OpenClaw` (default) boots the OpenClaw gateway for Discord, NATS, and
+/// plugin support.  `Hermes` skips the gateway and runs standalone ACPX +
+/// Lobster directly — lighter weight, no Discord/NATS overhead.
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum HarnessAgent {
+    /// OpenClaw gateway — full Discord, NATS, plugin support
+    #[default]
+    OpenClaw,
+    /// Hermes — standalone ACPX + Lobster, no gateway overhead
+    Hermes,
+}
+
 /// CLI-specific configuration
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct CLIConfig {
@@ -663,6 +678,12 @@ pub struct CodeRunSpec {
     /// OpenClaw runtime configuration — maps to OpenClaw gateway provider settings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub openclaw: Option<OpenClawConfig>,
+
+    /// Which harness agent to use for this CodeRun.
+    /// Defaults to `OpenClaw`. Set to `Hermes` to skip the gateway
+    /// and use standalone ACPX + Lobster directly.
+    #[serde(default, rename = "harnessAgent", skip_serializing_if = "Option::is_none")]
+    pub harness_agent: Option<HarnessAgent>,
 }
 
 impl Default for CodeRunSpec {
@@ -709,7 +730,15 @@ impl Default for CodeRunSpec {
             deployment: false,
             acp: None,
             openclaw: None,
+            harness_agent: None,
         }
+    }
+}
+
+impl CodeRunSpec {
+    /// Returns the effective harness agent, defaulting to OpenClaw.
+    pub fn effective_harness(&self) -> HarnessAgent {
+        self.harness_agent.clone().unwrap_or_default()
     }
 }
 
@@ -1043,6 +1072,38 @@ mod tests {
         assert!(spec.implementation_agent.is_none());
         assert!(spec.acp.is_none());
         assert!(spec.openclaw.is_none());
+        assert!(spec.harness_agent.is_none());
+    }
+
+    #[test]
+    fn test_harness_agent_serde() {
+        // Default: absent field → None → effective OpenClaw
+        let json = r#"{"service":"test","repositoryUrl":"https://example.com","docsRepositoryUrl":"","model":"test"}"#;
+        let spec: CodeRunSpec = serde_json::from_str(json).unwrap();
+        assert!(spec.harness_agent.is_none());
+        assert!(matches!(spec.effective_harness(), HarnessAgent::OpenClaw));
+
+        // Explicit hermes
+        let json = r#"{"service":"test","repositoryUrl":"https://example.com","docsRepositoryUrl":"","model":"test","harnessAgent":"hermes"}"#;
+        let spec: CodeRunSpec = serde_json::from_str(json).unwrap();
+        assert!(matches!(spec.harness_agent, Some(HarnessAgent::Hermes)));
+        assert!(matches!(spec.effective_harness(), HarnessAgent::Hermes));
+
+        // Explicit openclaw
+        let json = r#"{"service":"test","repositoryUrl":"https://example.com","docsRepositoryUrl":"","model":"test","harnessAgent":"openclaw"}"#;
+        let spec: CodeRunSpec = serde_json::from_str(json).unwrap();
+        assert!(matches!(spec.harness_agent, Some(HarnessAgent::OpenClaw)));
+        assert!(matches!(spec.effective_harness(), HarnessAgent::OpenClaw));
+
+        // Round-trip: serialize then deserialize
+        let spec = CodeRunSpec {
+            harness_agent: Some(HarnessAgent::Hermes),
+            ..Default::default()
+        };
+        let serialized = serde_json::to_string(&spec).unwrap();
+        assert!(serialized.contains(r#""harnessAgent":"hermes""#));
+        let deserialized: CodeRunSpec = serde_json::from_str(&serialized).unwrap();
+        assert!(matches!(deserialized.harness_agent, Some(HarnessAgent::Hermes)));
     }
 
     #[test]

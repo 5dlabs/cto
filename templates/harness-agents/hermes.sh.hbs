@@ -1,16 +1,15 @@
 #!/bin/bash
 # =========================================================================
-# OpenClaw Harness — CRD Pod Entrypoint
+# Hermes Harness — CRD Pod Entrypoint
 #
-# Single-agent mode: runs lobster directly from harness, gateway in
-# background for Discord presence.  The LLM is only involved at the
-# acpx step (actual coding), not orchestration.
+# Standalone mode: runs lobster + ACPX directly WITHOUT the OpenClaw
+# gateway.  No Discord presence, no gateway process — just the LLM
+# coding step via acpx.
 #
 # Steps:
 #   1. Environment setup (writable HOME, paths)
-#   2. OpenClaw config + state dirs + Discord resolution
-#   3. Workspace identity files (SOUL, IDENTITY, USER, TOOLS, etc.)
-#   4. Start gateway (background) + run lobster workflow directly
+#   2. Workspace identity files (SOUL, IDENTITY, USER, TOOLS, etc.)
+#   3. Run lobster workflow directly
 #
 # Template variables:
 #   agent_name, agent_name_upper, cli_type, model,
@@ -20,22 +19,17 @@
 set -euo pipefail
 
 # ─── Signal handling ───────────────────────────────────────────────────
-GW_PID=""
 TAIL_PIDS=""
 cleanup() {
-  echo "[harness] Caught signal, cleaning up..."
-  # Kill log tailers (parent-tracked + file-tracked CLI tails)
+  echo "[hermes] Caught signal, cleaning up..."
   for pid in $TAIL_PIDS; do kill "$pid" 2>/dev/null || true; done
   if [ -f "/tmp/cli-tail-pids" ]; then
     while read -r pid; do kill "$pid" 2>/dev/null || true; done < "/tmp/cli-tail-pids"
   fi
-  # Always write agent_done sentinel so sidecars can exit
   echo "interrupted" > /workspace/.agent_done 2>/dev/null || true
-  [ -n "$GW_PID" ] && kill "$GW_PID" 2>/dev/null || true
   exit 1
 }
 trap cleanup SIGTERM SIGINT
-# Ensure agent_done sentinel is written even on unexpected exit
 trap 'echo "exited" > /workspace/.agent_done 2>/dev/null || true' EXIT
 
 # ─── Step 0: Clean up stale sentinel from prior runs ──────────────────
@@ -47,13 +41,9 @@ mkdir -p "$HOME"
 mkdir -p /tmp/npm-cache
 export npm_config_cache=/tmp/npm-cache
 
-# Capture the workspace subdir (container starts in /workspace/{subdir})
 WORKSPACE_DIR="$(pwd)"
 
-# Symlink CLI log directories from HOME to workspace so that:
-#   - CLI tools writing to ~/.claude/logs/ land on the workspace PVC
-#   - Promtail sidecar finds them at /workspace/{subdir}/.claude/logs/
-#   - DD stdout tailing finds them at the same path
+# Symlink CLI log directories from HOME to workspace
 for cli_dir in .claude .codex .factory .gemini .cursor-agent .kimi .copilot .pi .local; do
   src="$WORKSPACE_DIR/$cli_dir"
   dest="$HOME/$cli_dir"
@@ -61,6 +51,12 @@ for cli_dir in .claude .codex .factory .gemini .cursor-agent .kimi .copilot .pi 
     ln -sfn "$src" "$dest"
   fi
 done
+
+# ─── Hermes harness info ──────────────────────────────────────────────
+echo "[hermes] Harness: Hermes (standalone ACPX + Lobster)"
+echo "[hermes] Agent: {{agent_name}} | Model: {{model}} | CLI: {{cli_type}}"
+echo "[hermes] NOUS_API_KEY: ${NOUS_API_KEY:+set (${#NOUS_API_KEY} chars)}${NOUS_API_KEY:-NOT SET}"
+echo "[hermes] NOUS_MODEL: ${NOUS_MODEL:-nousresearch/hermes-4-70b}"
 
 # Kimi CLI requires a persisted OAuth token to pass _check_auth.
 # Set KIMI_SHARE_DIR so Kimi finds config+creds at $HOME/.kimi
@@ -70,7 +66,6 @@ if [ "{{cli_type}}" = "kimi" ]; then
   export KIMI_SHARE_DIR="$HOME/.kimi"
   mkdir -p "$HOME/.kimi/credentials"
 
-  # Determine API key and base URL based on resolved provider
   case "$PROVIDER" in
     fireworks)
       KIMI_PROVIDER_KEY="${FIREWORKS_API_KEY:-}"
@@ -118,7 +113,6 @@ if [ "{{cli_type}}" = "codex" ]; then
   mkdir -p /root/.codex
   unset OPENAI_API_KEY
 
-  # Determine provider config for Codex
   case "$PROVIDER" in
     fireworks)
       CODEX_PROVIDER_NAME="Fireworks"
@@ -148,7 +142,7 @@ name = "${CODEX_PROVIDER_NAME}"
 base_url = "${CODEX_PROVIDER_URL}"
 env_key = "${CODEX_ENV_KEY}"
 CODEXCFG
-  echo "[harness] ✅ Codex config installed (${PROVIDER} provider)"
+  echo "[hermes] ✅ Codex config installed (${PROVIDER} provider)"
 fi
 
 # Gemini: configure settings.json for headless API-key auth + yolo approval
@@ -163,74 +157,15 @@ if [ "{{cli_type}}" = "gemini" ]; then
   }
 }
 GEMINICFG
-  echo "[harness] ✅ Gemini settings installed (API key auth)"
+  echo "[hermes] ✅ Gemini settings installed (API key auth)"
 fi
 
 for f in /etc/profile.d/*.sh; do
   [ -f "$f" ] && source "$f"
 done
 
-# ─── Step 2: OpenClaw config + state directories ──────────────────────
-echo "[harness] Step 1: OpenClaw config + state directories..."
-
-mkdir -p "$HOME/.openclaw/credentials"
-mkdir -p "$HOME/.openclaw/agents/main/sessions"
-mkdir -p "$HOME/.openclaw/canvas"
-
-# Runtime Discord gate — check both CRD-level toggle and env var availability
-{{#if discord_enabled}}
-DISCORD_TOKEN_VAR="DISCORD_TOKEN_{{agent_name_upper}}"
-DISCORD_CHANNEL_VAR="DISCORD_CHANNEL_{{agent_name_upper}}"
-if [ -n "${!DISCORD_TOKEN_VAR:-}" ] && [ -n "${!DISCORD_CHANNEL_VAR:-}" ]; then
-  echo "🟢 Discord token + channel found for {{agent_name}}"
-  DISCORD_ACTIVE=true
-else
-  echo "⚠️ Missing Discord ($DISCORD_TOKEN_VAR / $DISCORD_CHANNEL_VAR), disabled"
-  DISCORD_ACTIVE=false
-fi
-{{else}}
-echo "🔴 Discord disabled by CRD (discordEnabled: false)"
-DISCORD_ACTIVE=false
-{{/if}}
-
-cp /task-files/openclaw.json "$HOME/.openclaw/openclaw.json"
-export OPENCLAW_CONFIG="$HOME/.openclaw/openclaw.json"
-
-# Resolve Discord env vars in config (OpenClaw can't substitute in JSON keys)
-if command -v jq >/dev/null 2>&1; then
-  if [ "$DISCORD_ACTIVE" = "true" ]; then
-    RESOLVED_TOKEN="${!DISCORD_TOKEN_VAR}"
-    RESOLVED_CHANNEL="${!DISCORD_CHANNEL_VAR}"
-    jq --arg token "$RESOLVED_TOKEN" --arg channel "$RESOLVED_CHANNEL" --arg old_key "\${$DISCORD_CHANNEL_VAR}" '
-      .channels.discord.accounts.default.token = $token |
-      .channels.discord.accounts.default.guilds["1490117571977019524"].channels =
-        { ($channel): .channels.discord.accounts.default.guilds["1490117571977019524"].channels[$old_key] }
-    ' "$OPENCLAW_CONFIG" > "$OPENCLAW_CONFIG.tmp" && mv "$OPENCLAW_CONFIG.tmp" "$OPENCLAW_CONFIG"
-    echo "✅ Discord config resolved (channel=$RESOLVED_CHANNEL)"
-
-    # Set bot guild nickname to match agent name
-    GUILD_ID="1490117571977019524"
-    AGENT_DISPLAY_NAME="{{agent_name}}"
-    AGENT_DISPLAY_NAME="$(echo "${AGENT_DISPLAY_NAME:0:1}" | tr '[:lower:]' '[:upper:]')${AGENT_DISPLAY_NAME:1}"
-    curl -sf -X PATCH \
-      "https://discord.com/api/v10/guilds/${GUILD_ID}/members/@me" \
-      -H "Authorization: Bot ${RESOLVED_TOKEN}" \
-      -H "Content-Type: application/json" \
-      -d "{\"nick\": \"${AGENT_DISPLAY_NAME}\"}" 2>/dev/null && \
-      echo "✅ Discord nickname → '${AGENT_DISPLAY_NAME}'" || \
-      echo "⚠️ Could not set Discord nickname"
-  else
-    jq '.plugins.entries.discord.enabled = false | del(.channels.discord)' \
-      "$OPENCLAW_CONFIG" > "$OPENCLAW_CONFIG.tmp" && mv "$OPENCLAW_CONFIG.tmp" "$OPENCLAW_CONFIG"
-    echo "🔴 Discord disabled in config"
-  fi
-fi
-
-echo "[harness] Running openclaw doctor --fix..."
-openclaw doctor --fix 2>&1 || echo "[harness] WARNING: doctor --fix reported issues"
-
-# ─── Step 3: Workspace identity files ──────────────────────────────────
-echo "[harness] Step 2: Writing workspace files..."
+# ─── Step 2: Workspace identity files ──────────────────────────────────
+echo "[hermes] Writing workspace files..."
 
 # AGENTS.md — session startup instructions + agent roster
 cat > /workspace/AGENTS.md <<'AGENTSEOF'
@@ -271,8 +206,6 @@ Don't ask permission. Just do it.
 
 ## Coordination
 
-- Use `sessions_send` to message other agents via NATS
-- Use Discord channels for async team communication
 - Check `task/` directory for acceptance criteria and decisions
 - Write `task/decisions.md` for architectural choices
 
@@ -405,8 +338,7 @@ cat > /workspace/USER.md <<'USEREOF'
 - Working on the **CTO Platform**: Kubernetes-native multi-agent system
   with CodeRun CRDs, OpenClaw gateways, and a Lobster workflow engine.
 - Agents are deployed as pods in the `cto` namespace.
-- The team uses **Discord** for agent communication and **Linear** for
-  project management.
+- The team uses **Linear** for project management.
 - Code lives in `github.com/5dlabs/cto` (monorepo: Rust crates, Helm
   charts, TypeScript tools, Lobster workflows).
 USEREOF
@@ -417,7 +349,7 @@ cat > /workspace/TOOLS.md <<'TOOLSEOF'
 
 ## Environment
 
-- **Runtime:** OpenClaw in Kubernetes pod (CRD-deployed)
+- **Runtime:** Hermes harness in Kubernetes pod (CRD-deployed, standalone ACPX + Lobster)
 - **Model:** {{model}}
 - **CLI Backend:** {{cli_type}} (acpx embedded)
 - **Workspace:** /workspace (git repo)
@@ -434,9 +366,7 @@ cat > /workspace/TOOLS.md <<'TOOLSEOF'
 - `read` / `edit` / `write` — file operations
 - `exec` — shell commands (bash, cargo, git, etc.)
 - `lobster` — native workflow runner (run .lobster.yaml files)
-- `message` — post to Discord channels
 - `web_search` / `web_fetch` — internet access
-- `sessions_send` — message other agents via NATS
 
 ## Notes
 
@@ -453,7 +383,6 @@ HEARTBEATEOF
 echo "✅ Workspace files written (AGENTS, SOUL, IDENTITY, USER, TOOLS, HEARTBEAT)"
 
 # Remove stale BOOT.md from previous runs (workspace PVC persists)
-# This prevents the gateway from auto-executing old boot instructions
 rm -f /workspace/BOOT.md /workspace/.agent_done /workspace/.pr-url
 
 # Copy base-task workflow into workspace (.tasks/index.lobster.yaml is lobster's expected entrypoint)
@@ -463,117 +392,10 @@ mkdir -p /workspace/.tasks "$WORKSPACE_DIR/.tasks"
 cp /task-files/base-task.lobster /workspace/.tasks/index.lobster.yaml 2>/dev/null || true
 cp /task-files/base-task.lobster "$WORKSPACE_DIR/.tasks/index.lobster.yaml" 2>/dev/null || true
 
-# ─── Step 4: Start gateway + run lobster workflow ──────────────────────
-echo "[harness] Step 3: Starting gateway + lobster workflow..."
-echo "[harness] Agent: {{agent_name}} | Model: {{model}} | Task: {{task_id}}"
+# ─── Step 3: Run lobster workflow ──────────────────────────────────────
+echo "[hermes] Agent: {{agent_name}} | Model: {{model}} | Task: {{task_id}}"
 
-# Jitter gateway startup to avoid Discord API rate limits when many pods
-# launch simultaneously under the same bot token. Use full 6-char hex
-# suffix for wider distribution (0-30s) to spread Discord API calls.
-GW_JITTER_SEED="${HOSTNAME##*-}"
-GW_JITTER=$(( 0x${GW_JITTER_SEED:-0} % 31 ))
-echo "[harness] Gateway startup jitter: ${GW_JITTER}s (seed=$GW_JITTER_SEED)"
-sleep "$GW_JITTER"
-
-# Start gateway with retry+backoff — Discord /gateway/bot returns 429
-# when many pods connect concurrently; OpenClaw crashes on unhandled
-# rejection, so we restart it with exponential backoff.
-start_gateway() {
-  openclaw gateway &
-  GW_PID=$!
-  echo "[harness] Gateway PID: $GW_PID"
-  echo "$GW_PID" > /tmp/gw_pid
-
-  for _i in $(seq 1 15); do
-    if ! kill -0 "$GW_PID" 2>/dev/null; then
-      echo "[harness] ⚠️ Gateway process exited (likely Discord rate limit)"
-      return 1
-    fi
-    if curl -sf http://127.0.0.1:18789/health >/dev/null 2>&1; then
-      echo "[harness] ✅ Gateway healthy"
-      return 0
-    fi
-    sleep 2
-  done
-  echo "[harness] ⚠️ Gateway not healthy after 30s"
-  return 1
-}
-
-GW_MAX_RETRIES=5
-GW_BACKOFF=5
-GW_HEALTHY=false
-
-for _gw_attempt in $(seq 1 "$GW_MAX_RETRIES"); do
-  echo "[harness] Starting gateway (attempt ${_gw_attempt}/${GW_MAX_RETRIES})..."
-  if start_gateway; then
-    GW_HEALTHY=true
-    break
-  fi
-  kill "$(cat /tmp/gw_pid 2>/dev/null)" 2>/dev/null || true
-  wait "$(cat /tmp/gw_pid 2>/dev/null)" 2>/dev/null || true
-  echo "[harness] ⏳ Retrying gateway in ${GW_BACKOFF}s..."
-  sleep "$GW_BACKOFF"
-  GW_BACKOFF=$(( GW_BACKOFF * 2 ))
-done
-
-if [ "$GW_HEALTHY" = "false" ]; then
-  echo "[harness] ⚠️ Gateway not healthy after ${GW_MAX_RETRIES} attempts, proceeding without Discord"
-fi
-
-# Background gateway watchdog: if gateway crashes after initial health
-# (e.g., Discord WebSocket 429 arrives late), restart with backoff.
-# Discord rate limits can persist 30s+, so we use generous delays.
-(
-  WD_BACKOFF=10
-  WD_RETRIES=0
-  while [ ! -f /workspace/.agent_done ] && [ "$WD_RETRIES" -lt 5 ]; do
-    sleep 15
-    GW_PID=$(cat /tmp/gw_pid 2>/dev/null)
-    if [ -n "$GW_PID" ] && ! kill -0 "$GW_PID" 2>/dev/null; then
-      WD_RETRIES=$(( WD_RETRIES + 1 ))
-      echo "[harness] 🔄 Gateway watchdog: process died, restarting (${WD_RETRIES}/5, backoff=${WD_BACKOFF}s)..."
-      # Clean up stale gateway state before restart
-      openclaw gateway stop 2>/dev/null || true
-      sleep "$WD_BACKOFF"
-      openclaw gateway &
-      GW_PID=$!
-      echo "$GW_PID" > /tmp/gw_pid
-      echo "[harness] Gateway watchdog: new PID=$GW_PID"
-      WD_BACKOFF=$(( WD_BACKOFF * 2 ))
-      # Wait for health before resuming monitoring
-      for _w in $(seq 1 15); do
-        if curl -sf http://127.0.0.1:18789/health >/dev/null 2>&1; then
-          echo "[harness] ✅ Gateway watchdog: healthy after restart"
-          break
-        fi
-        sleep 2
-      done
-    fi
-  done
-) &
-GW_WATCHDOG_PID=$!
-
-# ─── Tail OpenClaw gateway + CLI logs to stdout for DD collection ──────
-# Gateway writes structured JSON logs to /tmp/openclaw-*/openclaw-*.log
-# CLI tools write to /workspace/.claude/logs/ etc.
-# Tailing to stdout lets DD containerCollectAll pick them up.
-GATEWAY_LOG_DIR="/tmp/openclaw-$(id -u)"
-GATEWAY_LOG="${GATEWAY_LOG_DIR}/openclaw-$(date -u +%Y-%m-%d).log"
-
-# Wait briefly for gateway log to appear (it creates on first write)
-for _w in 1 2 3 4 5; do
-  [ -f "$GATEWAY_LOG" ] && break
-  sleep 1
-done
-
-if [ -f "$GATEWAY_LOG" ]; then
-  echo "[harness] 📋 Tailing gateway log → stdout (DD collection)"
-  tail -f "$GATEWAY_LOG" &
-  TAIL_PIDS="$!"
-else
-  echo "[harness] ⚠️ Gateway log not found at $GATEWAY_LOG"
-fi
-
+# ─── Tail CLI logs to stdout for DD collection ─────────────────────────
 # Background watcher: tail ACP CLI logs as they appear during the run.
 # Uses a PID file (not shell variable) so parent can clean up tail processes
 # that are spawned inside the background watcher subshell.
@@ -596,7 +418,6 @@ CLI_TAILED_FILE="/tmp/cli-tailed-files"
 
 (
   while [ ! -f /workspace/.agent_done ]; do
-    # Recursively find .log and .jsonl files under all CLI directories
     find "$WORKSPACE_DIR/.claude" \
          "$WORKSPACE_DIR/.codex" \
          "$WORKSPACE_DIR/.factory" \
@@ -610,7 +431,7 @@ CLI_TAILED_FILE="/tmp/cli-tailed-files"
     while IFS= read -r f; do
       grep -qxF "$f" "$CLI_TAILED_FILE" && continue
       echo "$f" >> "$CLI_TAILED_FILE"
-      echo "[harness] 📋 Tailing ACP log: $f → stdout (DD collection)"
+      echo "[hermes] 📋 Tailing ACP log: $f → stdout (DD collection)"
       tail -f "$f" &
       echo $! >> "$CLI_TAIL_PIDS_FILE"
     done
@@ -621,16 +442,16 @@ CLI_WATCHER_PID=$!
 TAIL_PIDS="$TAIL_PIDS $CLI_WATCHER_PID"
 
 # Run lobster workflow directly (bypasses model orchestration)
-echo "[harness] ════════════════════════════════════════════════════"
-echo "[harness] Running lobster workflow (direct execution)..."
-echo "[harness] ════════════════════════════════════════════════════"
+echo "[hermes] ════════════════════════════════════════════════════"
+echo "[hermes] Running lobster workflow (direct execution)..."
+echo "[hermes] ════════════════════════════════════════════════════"
 cd "$WORKSPACE_DIR"
 
 # Log directory for ACP/lobster output (captured by Datadog via container stdout + file)
 mkdir -p "$WORKSPACE_DIR/.agent-logs"
 LOBSTER_LOG="$WORKSPACE_DIR/.agent-logs/lobster-$(date -u +%Y%m%dT%H%M%SZ).log"
 
-set +e  # Don't exit on lobster failure — we need to shut down gateway
+set +e  # Don't exit on lobster failure — we need to clean up
 set -o pipefail
 # Prefer pre-installed lobster; fall back to npx if not found
 if command -v lobster >/dev/null 2>&1; then
@@ -642,29 +463,21 @@ LOBSTER_EXIT=${PIPESTATUS[0]}
 set +o pipefail
 set -e
 
-echo "[harness] ════════════════════════════════════════════════════"
+echo "[hermes] ════════════════════════════════════════════════════"
 if [ "$LOBSTER_EXIT" -eq 0 ]; then
-  echo "[harness] ✅ Lobster workflow completed successfully"
+  echo "[hermes] ✅ Lobster workflow completed successfully"
   echo "completed" > /workspace/.agent_done
 else
-  echo "[harness] ❌ Lobster workflow failed (exit=$LOBSTER_EXIT)"
+  echo "[hermes] ❌ Lobster workflow failed (exit=$LOBSTER_EXIT)"
   echo "failed" > /workspace/.agent_done
 fi
-echo "[harness] ════════════════════════════════════════════════════"
+echo "[hermes] ════════════════════════════════════════════════════"
 
 # ─── Shutdown ──────────────────────────────────────────────────────────
-echo "[harness] Shutting down gateway..."
-# Stop gateway watchdog first
-kill "$GW_WATCHDOG_PID" 2>/dev/null || true
-# Stop log tailers: parent-tracked PIDs + file-tracked CLI tail PIDs
+echo "[hermes] Cleaning up log tailers..."
 for pid in $TAIL_PIDS; do kill "$pid" 2>/dev/null || true; done
 if [ -f "$CLI_TAIL_PIDS_FILE" ]; then
   while read -r pid; do kill "$pid" 2>/dev/null || true; done < "$CLI_TAIL_PIDS_FILE"
 fi
-openclaw gateway stop 2>/dev/null || true
-sleep 2
-GW_PID=$(cat /tmp/gw_pid 2>/dev/null)
-kill "$GW_PID" 2>/dev/null || true
-wait "$GW_PID" 2>/dev/null || true
-echo "[harness] Done (exit=$LOBSTER_EXIT)"
+echo "[hermes] Done (exit=$LOBSTER_EXIT)"
 exit $LOBSTER_EXIT
