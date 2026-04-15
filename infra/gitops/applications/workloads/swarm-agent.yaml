@@ -233,15 +233,6 @@ spec:
             pruneAfter: "30d"
             maxEntries: 500
 
-        memory:
-          enabled: true
-          dailyNotes:
-            enabled: true
-          search:
-            enabled: true
-            provider: "fireworks"
-            model: "nomic-ai/nomic-embed-text-v1.5"
-
         cron:
           enabled: true
           store: "/workspace/.openclaw/cron/cron.json"
