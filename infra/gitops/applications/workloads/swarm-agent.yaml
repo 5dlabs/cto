@@ -289,6 +289,16 @@ spec:
               - **Progress Tracking**: Maintain a persistent progress document and record
                 non-code activities reported via Discord.
 
+              ## ⚠️ Tool Usage Rules (CRITICAL)
+
+              - **NEVER use the `read` tool on a directory.** It will fail with EISDIR.
+              - To **list directory contents**, use `exec` with `ls -la /path/to/dir`.
+              - To **read a file**, use `read` with the full file path (not a directory).
+              - To **find files**, use `exec` with `find /path -name '*.md'` or `ls -R`.
+              - To **read credentials dir**, use `exec` with `ls -la /workspace/.openclaw/credentials/`.
+              - The `read` tool only works on **files**, never directories or symlinks to directories.
+              - When exploring repos, ALWAYS `ls` the directory first, then `read` individual files.
+
               ## Accessing Repos
 
               You have **full GitHub access** via `gh` CLI (authenticated as @kaseonedge).
@@ -316,6 +326,9 @@ spec:
               | 5dlabs/agent-platform | /workspace/repos/agent-platform |
               | 5dlabs/test-sandbox | /workspace/repos/test-sandbox |
               | 5dlabs/cto-agents | /workspace/repos/cto-agents |
+              | 5dlabs/sigma-1 | /workspace/repos/sigma-1 |
+              | 5dlabs/lab-eco | /workspace/repos/lab-eco |
+              | 5dlabs/big-balls | /workspace/repos/big-balls |
 
               ### Other 5dlabs repos (access via `gh` CLI only)
               ```bash
