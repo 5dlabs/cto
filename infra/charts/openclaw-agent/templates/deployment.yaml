@@ -284,10 +284,151 @@ spec:
               else
                 echo "[tools] kubectl already present"
               fi
+              # ---------------------------------------------------------------
+              # 4f. Docker → kaniko shim (overrides /usr/bin/docker)
+              # ---------------------------------------------------------------
+              cat > /workspace/.local/bin/docker << 'DOCKERSHIM'
+#!/bin/sh
+# Docker CLI shim — translates docker build/push to kaniko executor
+# Runs in the kaniko sidecar via kubectl exec
+set -e
+
+KANIKO_CONTAINER="kaniko"
+KANIKO_EXECUTOR="/kaniko/executor"
+
+# ── detect pod identity ──
+_pod_name="${POD_NAME:-$(hostname)}"
+_pod_ns="${POD_NAMESPACE:-cto}"
+
+_usage() {
+  echo "docker (kaniko shim) — translates docker build/push to kaniko"
+  echo ""
+  echo "Supported commands:"
+  echo "  docker build [-t TAG] [-f DOCKERFILE] [--build-arg K=V] [--target T] [--no-cache] CONTEXT"
+  echo "  docker push TAG            (no-op: kaniko pushes on build)"
+  echo "  docker tag SRC DST         (no-op: use -t on build)"
+  echo "  docker version             (shows shim info)"
+  echo "  docker info                (shows shim info)"
+  echo ""
+  echo "Unsupported: docker run, docker ps, docker exec, etc."
+  exit 0
+}
+
+case "${1:-}" in
+  build|buildx)
+    # Handle both "docker build" and "docker buildx build"
+    shift
+    [ "$1" = "build" ] && shift  # skip extra "build" from buildx
+
+    _tags=""
+    _dockerfile="Dockerfile"
+    _build_args=""
+    _target=""
+    _cache="--cache=true"
+    _context="."
+    _extra=""
+
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        -t|--tag)        _tags="${_tags} --destination=$2"; shift 2 ;;
+        -f|--file)       _dockerfile="$2"; shift 2 ;;
+        --build-arg)     _build_args="${_build_args} --build-arg=$2"; shift 2 ;;
+        --build-arg=*)   _build_args="${_build_args} --build-arg=${1#*=}"; shift ;;
+        --target)        _target="--target=$2"; shift 2 ;;
+        --target=*)      _target="--target=${1#*=}"; shift ;;
+        --no-cache)      _cache="--cache=false"; shift ;;
+        --push)          shift ;;  # kaniko always pushes
+        --platform)      shift 2 ;;  # kaniko doesn't support multi-platform
+        --platform=*)    shift ;;
+        --progress=*)    shift ;;  # display option, ignore
+        --load)          shift ;;  # can't load into daemon, ignore
+        -*)              echo "[docker-shim] warning: ignoring unknown flag: $1" >&2; shift ;;
+        *)               _context="$1"; shift ;;
+      esac
+    done
+
+    if [ -z "${_tags}" ]; then
+      echo "[docker-shim] error: at least one -t/--tag is required for kaniko" >&2
+      exit 1
+    fi
+
+    # Make context and dockerfile absolute (kaniko sees /workspace)
+    case "${_context}" in
+      /*) ;;
+      *)  _context="$(cd "${_context}" 2>/dev/null && pwd)" ;;
+    esac
+    case "${_dockerfile}" in
+      /*) ;;
+      *)  _dockerfile="${_context}/${_dockerfile}" ;;
+    esac
+
+    echo "[docker-shim] building via kaniko sidecar"
+    echo "[docker-shim]   context:    ${_context}"
+    echo "[docker-shim]   dockerfile: ${_dockerfile}"
+    echo "[docker-shim]   tags:      ${_tags}"
+
+    # shellcheck disable=SC2086
+    exec kubectl exec -n "${_pod_ns}" "${_pod_name}" -c "${KANIKO_CONTAINER}" -- \
+      ${KANIKO_EXECUTOR} \
+      --context="${_context}" \
+      --dockerfile="${_dockerfile}" \
+      ${_tags} \
+      ${_cache} \
+      ${_build_args} \
+      ${_target} \
+      ${_extra} \
+      --snapshot-mode=redo \
+      --use-new-run 2>&1
+    ;;
+
+  push)
+    echo "[docker-shim] push is a no-op — kaniko pushes during build"
+    exit 0
+    ;;
+
+  tag)
+    echo "[docker-shim] tag is a no-op — use -t on docker build instead"
+    exit 0
+    ;;
+
+  version|--version|-v)
+    echo "Docker (kaniko shim) version 1.0.0"
+    echo "Translates docker build → kaniko executor via kubectl exec"
+    echo "Pod: ${_pod_name} (ns: ${_pod_ns})"
+    exit 0
+    ;;
+
+  info)
+    echo "Docker (kaniko shim)"
+    echo " Pod:       ${_pod_name}"
+    echo " Namespace: ${_pod_ns}"
+    echo " Kaniko:    ${KANIKO_EXECUTOR}"
+    echo " Registry:  GHCR (via /kaniko/.docker/config.json)"
+    exit 0
+    ;;
+
+  login)
+    echo "[docker-shim] login is pre-configured via mounted GHCR credentials"
+    exit 0
+    ;;
+
+  ""|help|--help|-h)
+    _usage
+    ;;
+
+  *)
+    echo "[docker-shim] error: '${1}' requires a real Docker daemon (not supported)" >&2
+    echo "[docker-shim] This pod uses kaniko for image builds. Only 'docker build' and 'docker push' are supported." >&2
+    exit 1
+    ;;
+esac
+DOCKERSHIM
+              chmod +x /workspace/.local/bin/docker
+              echo "[tools] docker → kaniko shim installed"
               {{- end }}
 
               # ---------------------------------------------------------------
-              # 4e. Log directory setup
+              # 4g. Log directory setup
               # ---------------------------------------------------------------
               mkdir -p "$(dirname "{{ .Values.logging.file }}")"
               echo "[dirs] Log directory OK"
@@ -763,6 +904,15 @@ spec:
             # Docker config for image builds/pushes (GHCR auth)
             - name: DOCKER_CONFIG
               value: /workspace/.docker
+            # Pod identity for docker→kaniko shim (kubectl exec into self)
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
             {{- end }}
             {{- if .Values.cloudProviders.bedrock.enabled }}
             # AWS Bedrock credentials (used by OpenClaw gateway + Claude Code CLI)

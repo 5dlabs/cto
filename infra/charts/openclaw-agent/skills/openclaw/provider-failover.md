@@ -81,17 +81,16 @@ openclaw config set agents.defaults.model.primary "fireworks/accounts/fireworks/
 4. Start with: "Resuming from memory after provider switch"
 5. Use `memory_search({ query: "current task" })` if auto-recall misses context
 
-## Docker builds (kaniko)
+## Docker builds (via kaniko shim)
 
-No Docker daemon. Use kaniko sidecar:
+`docker build` is shimmed to use the kaniko sidecar automatically. Use it like normal:
 
 ```bash
-POD=$(hostname)
-kubectl exec $POD -c kaniko -- /kaniko/executor \
-  --context=/workspace/repos/cto \
-  --dockerfile=Dockerfile \
-  --destination=ghcr.io/5dlabs/cto:latest \
-  --cache=true
+docker build -t ghcr.io/5dlabs/cto:latest -f Dockerfile .
+docker build -t ghcr.io/5dlabs/myimage:v1 --build-arg FOO=bar .
 ```
 
-GHCR auth is pre-configured in kaniko. Agent container also has `$DOCKER_CONFIG` pointing to GHCR credentials.
+- `docker push` is a **no-op** — kaniko pushes during build
+- `docker run`, `docker ps` etc. are **not supported** (no daemon)
+- GHCR auth is pre-configured
+- Use `docker version` to verify the shim is active
