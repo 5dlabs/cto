@@ -631,6 +631,12 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: factory-api-key
                   optional: true
+            - name: FIREWORKS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: fireworks-api-key
+                  optional: true
             # Web tools API keys (Brave search + Firecrawl scraping)
             - name: BRAVE_API_KEY
               valueFrom:

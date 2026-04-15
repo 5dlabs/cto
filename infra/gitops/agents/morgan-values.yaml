@@ -526,6 +526,8 @@ nats:
       role: "code-review"
     - id: tess
       role: "testing"
+    - id: coder
+      role: "general-purpose-coder"
 
 kaniko:
   enabled: true

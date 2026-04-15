@@ -121,6 +121,36 @@
       "provider": "Fireworks",
       "thinkingLevel": "medium"
     },
+    "minimax-m2p7": {
+      "provider": "fireworks",
+      "name": "MiniMax M2P7",
+      "modelId": "accounts/fireworks/models/minimax-m2p7",
+      "contextWindow": 24576,
+      "maxOutput": 24576,
+      "capabilities": ["text"],
+      "tier": "standard",
+      "score": 76
+    },
+    "qwen3p6-plus": {
+      "provider": "fireworks",
+      "name": "Qwen 3.6 Plus",
+      "modelId": "accounts/fireworks/models/qwen3p6-plus",
+      "contextWindow": 32768,
+      "maxOutput": 4000,
+      "capabilities": ["text", "vision"],
+      "tier": "standard",
+      "score": 79
+    },
+    "glm-5p1": {
+      "provider": "fireworks",
+      "name": "GLM 5.1",
+      "modelId": "accounts/fireworks/models/glm-5p1",
+      "contextWindow": 25344,
+      "maxOutput": 25344,
+      "capabilities": ["text"],
+      "tier": "standard",
+      "score": 81
+    },
     "claude-opus-4-6": {
       "enabled": true,
       "displayName": "Claude Opus 4.6 (via Factory)",
@@ -311,6 +341,10 @@
     },
     "cleo": {
       "cli": "Claude Code",
+      "model": "claude-opus-4-6-20260205"
+    },
+    "coder": {
+      "cli": "claude",
       "model": "claude-opus-4-6-20260205"
     },
     "spark": {

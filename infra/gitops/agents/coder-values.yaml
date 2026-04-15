@@ -1,0 +1,567 @@
+---
+# =============================================================================
+# Coder Agent Values
+# =============================================================================
+# General-purpose coding agent for the CTO platform.
+# Primary focus: e2e testing of intake, work, play, and lobster workflows.
+# Primary CLI: Claude Code with agent teams enabled.
+# Secondary: OpenCode (Kimi K2 Turbo via Fireworks).
+# =============================================================================
+namespace: cto
+
+replicaCount: 1
+deploymentMode: statefulset
+
+global:
+  namespace: cto
+  createNamespace: false
+
+image:
+  repository: "ghcr.io/5dlabs/agents"
+  tag: "latest"
+  pullPolicy: Always
+
+imagePullSecrets:
+  - name: ghcr-secret
+
+nodeSelector: {}
+tolerations:
+  - key: "node-role.kubernetes.io/control-plane"
+    operator: "Exists"
+    effect: "NoSchedule"
+  - key: "node-role.kubernetes.io/master"
+    operator: "Exists"
+    effect: "NoSchedule"
+
+resources:
+  requests:
+    cpu: "200m"
+    memory: "1Gi"
+  limits:
+    cpu: "2000m"
+    memory: "4Gi"
+
+nodeOptions: "--max-old-space-size=4096"
+
+telemetry:
+  enabled: false
+
+# =============================================================================
+# Agent Identity
+# =============================================================================
+agent:
+  id: "coder"
+  name: "Coder"
+  model: "anthropic/claude-sonnet-4-20250514"
+  heartbeat:
+    every: "12h"
+    target: "last"
+    ackMaxChars: 120
+    prompt: >-
+      If there is no active user request, reply HEARTBEAT_OK and do nothing
+      else. Do not start background work or new tasks on your own.
+  sandbox: "off"
+  skipGlobalSkills: false
+
+agentDefaults:
+  thinkingDefault: "medium"
+  typingMode: "instant"
+
+modelDefaults:
+  primary: "anthropic/claude-sonnet-4-20250514"
+  fallbacks:
+    - "anthropic/claude-opus-4-6-20260205"
+    - "fireworks/kimi-k2p5-turbo"
+    - "fireworks/minimax-m2p7"
+    - "fireworks/glm-5p1"
+
+# =============================================================================
+# Secrets
+# =============================================================================
+secrets:
+  discordTokensSecret: "openclaw-discord-tokens"
+  apiKeysSecret: "cto-coder-api-keys"
+
+# =============================================================================
+# Discord
+# =============================================================================
+messaging:
+  discord:
+    enabled: true
+    accountId: "coder"
+    tokenSecretKey: "coder"
+    allowBots: "mentions"
+    threadBindings:
+      enabled: true
+      spawnSubagentSessions: true
+      spawnAcpSessions: true
+    dm:
+      policy: "allowlist"
+    allowFrom:
+      - "444519104808878090"
+
+# =============================================================================
+# Model Providers
+# =============================================================================
+models:
+  providers:
+    anthropic:
+      enabled: true
+      apiKeySecretKey: "anthropic-api-key"
+    fireworks:
+      enabled: true
+      api: "openai-compatible"
+      baseUrl: "https://api.fireworks.ai/inference/v1"
+      apiKeySecretKey: "fireworks-api-key"
+      models:
+        - id: "accounts/fireworks/routers/kimi-k2p5-turbo"
+          name: "Kimi K2.5 Turbo"
+        - id: "accounts/fireworks/models/minimax-m2p7"
+          name: "MiniMax M2P7"
+        - id: "accounts/fireworks/models/qwen3p6-plus"
+          name: "Qwen 3.6 Plus"
+        - id: "accounts/fireworks/models/glm-5p1"
+          name: "GLM 5.1"
+    openai:
+      enabled: true
+      apiKeySecretKey: "openai-api-key"
+  repos: []
+
+memorySearch:
+  enabled: false
+
+# =============================================================================
+# Workspace
+# =============================================================================
+workspace:
+  repos:
+    - name: cto
+      url: "https://gitlab.5dlabs.ai/5dlabs/cto.git"
+      branch: "main"
+      path: "repos/cto"
+    - name: openclaw-platform
+      url: "https://gitlab.5dlabs.ai/5dlabs/openclaw-platform.git"
+      branch: "main"
+      path: "repos/openclaw-platform"
+    - name: openclaw
+      url: "https://github.com/openclaw/openclaw.git"
+      branch: "main"
+      path: "repos/openclaw"
+  files:
+    AGENTS.md: |
+      # AGENTS.md -- Coder
+
+      You are **Coder**, the general-purpose coding agent for the CTO platform.
+
+      Your primary mission is end-to-end testing and implementation of the
+      intake, work, play, and lobster workflows. You get the team to the
+      finish line.
+
+      ## Default Interaction Style
+
+      - Be direct, precise, and implementation-focused.
+      - Lead with code, not commentary.
+      - When stuck, state what you tried and what failed.
+      - Prefer small, atomic changes that can be verified immediately.
+
+      ## Operating Rules
+
+      - Treat the current user request as the priority. Do not start side quests.
+      - Use Claude Code agent teams for parallelizable work across modules.
+      - For coding tasks, prefer creating feature branches and submitting PRs.
+      - Run linters and tests before marking work complete.
+      - For Rust code: `cargo clippy --all-targets -- -D warnings -W clippy::pedantic`
+      - For TypeScript: `bun test` and relevant linters.
+      - Use ACP sessions when delegating to other coding CLIs.
+      - Store important decisions and debugging findings in OpenMemory.
+
+      ## Focus Areas
+
+      - Intake pipeline (pipeline.lobster.yaml, intake-agent, OpenClaw gateway)
+      - Play workflows (play-launcher, CodeRun CRD orchestration)
+      - Lobster pipelines (workflow definitions, step execution)
+      - Work system (task decomposition, agent assignment, completion flows)
+      - Desktop app (future: CTO Lite Tauri app)
+
+    SOUL.md: |
+      # Coder -- Soul
+
+      You are **Coder**, a relentless implementation agent. You write code,
+      run tests, and ship working software.
+
+      ## Personality
+
+      Focused, methodical, and tenacious. You do not give up on the first
+      failure — you debug, iterate, and fix. You prefer working code over
+      theoretical discussions.
+
+      ## What You Optimize For
+
+      - Working software
+      - Test coverage
+      - Clean, reviewable diffs
+      - Fast iteration cycles
+      - Unblocking the team
+
+      ## How You Think
+
+      Start with the failing test or broken behavior. Trace the root cause.
+      Write the fix. Verify it works. Move on. If a task is large, break it
+      into parallel subtasks and use agent teams.
+
+    IDENTITY.md: |
+      # IDENTITY.md
+
+      - **Name:** Coder
+      - **Role:** General-purpose coding agent for CTO platform
+      - **Primary CLI:** Claude Code (with agent teams)
+      - **Secondary CLI:** OpenCode (Kimi K2 Turbo)
+      - **Model:** Claude Sonnet 4
+
+    TOOLS.md: |
+      # TOOLS.md -- Coder
+
+      ## Workspace
+
+      - Root workspace: `/workspace`
+      - CTO repo: `/workspace/repos/cto`
+      - OpenClaw platform: `/workspace/repos/openclaw-platform`
+      - OpenClaw core: `/workspace/repos/openclaw`
+
+      ## Operating Principle
+
+      - Write code, run tests, verify behavior.
+      - Use Claude Code agent teams for parallel work across modules.
+      - Prefer ACP sessions for delegating to other coding CLIs.
+      - Run `cargo clippy` before committing Rust changes.
+      - Run `bun test` before committing TypeScript changes.
+
+      ## Available Coding CLIs
+
+      - Claude Code: `claude --version` (primary)
+      - OpenCode: `opencode --help` (Kimi K2 Turbo)
+      - Codex: `codex --version`
+      - Gemini: `gemini --version`
+      - Kimi: `kimi --version`
+      - Copilot: `copilot --help`
+      - Cursor: `cursor-agent --help`
+
+      ## ACP Sessions
+
+      Preferred way to delegate coding work:
+
+      - `sessions_spawn` with `runtime: "acp"`, `mode: "run"`, and explicit
+        `cwd` set to a real repo
+      - Use `agentId: "claude"` first for coding tasks
+      - Use persistent thread-bound ACP sessions for long-lived work
+
+      ## Agent Teams
+
+      Claude Code agent teams for parallel execution:
+
+      - Spawn teammates for independent modules (frontend + backend + tests)
+      - Use plan approval for risky refactors
+      - Self-coordinating task list for multi-file changes
+      - In-process mode (K8s-safe, no tmux needed)
+
+    HEARTBEAT.md: |
+      # HEARTBEAT.md -- Coder
+
+      If there is active user work, continue that work first.
+
+      If idle, keep checks lightweight:
+
+      - Verify the local gateway is healthy.
+      - Verify Discord is connected.
+      - Verify coding CLIs resolve on PATH.
+      - Check for pending PRs that need attention.
+
+      Do not start unrelated projects on your own.
+
+# =============================================================================
+# Storage
+# =============================================================================
+storage:
+  size: 10Gi
+  storageClass: "local-path"
+
+# =============================================================================
+# Gateway
+# =============================================================================
+gateway:
+  auth:
+    token: "openclaw-internal"
+  controlUi:
+    enabled: false
+  http:
+    endpoints:
+      chatCompletions:
+        enabled: true
+      responses:
+        enabled: false
+
+# =============================================================================
+# Memory
+# =============================================================================
+openmemory:
+  enabled: false
+
+mem0:
+  enabled: false
+
+mem0Plugin:
+  enabled: true
+  mode: open-source
+  userId: "jonathon"
+  autoRecall: true
+  autoCapture: true
+  topK: 5
+  searchThreshold: 0.3
+  metadataSource: "discord"
+  customCategories:
+    task_objective: "What a task or CodeRun is trying to accomplish"
+    task_progress: "Status updates, milestones reached, intermediate results"
+    task_completion: "Final outcomes, deliverables, PRs merged, build results"
+    task_summary: "Condensed summary of entire task written at completion"
+    blocker: "Issues that blocked progress — errors, missing permissions, dependency failures"
+    debugging: "Root cause analysis, debugging steps, and bug fixes"
+    code_review: "Code review findings and feedback"
+    technical: "Technical facts, configurations, dependencies"
+    decision: "Key decisions with rationale"
+    architecture: "Architecture decisions, patterns, and system design choices"
+  customInstructions: |
+    You are Coder, the CTO platform's general-purpose coding agent.
+
+    GIT & REPO ACCESS:
+    - Git is ALREADY authenticated via credential store at /workspace/.git-credentials
+    - NEVER try to manually configure git credentials
+    - Just use `git clone https://github.com/...` directly
+
+    NAMESPACE CONVENTION (user_id field):
+    - Your operational memories: "jonathon:agent:coder"
+    - Project-level: "jonathon:project:{projectId}"
+    - Task-level: "jonathon:project:{projectId}:task:{taskId}"
+    - Agent-specific: "jonathon:project:{projectId}:task:{taskId}:coder"
+  oss:
+    embedder:
+      provider: google
+      config:
+        model: gemini-embedding-001
+    vectorStore:
+      provider: qdrant
+      config:
+        collection_name: cto_memory
+        host: qdrant.cto.svc.cluster.local
+        port: 6333
+    llm:
+      provider: openai
+      config:
+        model: gpt-4.1-nano
+
+# =============================================================================
+# Session
+# =============================================================================
+session:
+  scope: "per-sender"
+  dmScope: "per-channel-peer"
+  agentToAgent:
+    maxPingPongTurns: 5
+  threadBindings:
+    enabled: true
+    idleHours: 24
+    maxAgeHours: 0
+
+# =============================================================================
+# Tools
+# =============================================================================
+tools:
+  profile: "full"
+  agentToAgent:
+    enabled: true
+  elevated:
+    enabled: true
+  exec:
+    host: "gateway"
+    security: "full"
+    pathPrepend:
+      - "/usr/local/bin"
+      - "/usr/local/share/npm-global/bin"
+      - "/workspace/.local/bin"
+      - "/root/.local/bin"
+    backgroundMs: 5000
+    cleanupMs: 1800000
+    notifyOnExit: true
+    applyPatch:
+      enabled: true
+  message:
+    broadcast:
+      enabled: true
+  web:
+    search:
+      enabled: true
+    fetch:
+      enabled: true
+  acp:
+    enabled: true
+    backend: "acpx"
+    acpxVersion: "0.1.16"
+    defaultAgent: "claude"
+    allowedAgents: ["claude", "codex", "opencode", "gemini", "kimi", "copilot", "cursor"]
+    maxConcurrentSessions: 8
+    permissionMode: "approve-all"
+    nonInteractivePermissions: "deny"
+    pluginToolsMcpBridge: true
+    dispatch:
+      enabled: true
+    stream:
+      coalesceIdleMs: 300
+      maxChunkChars: 1200
+    runtime:
+      ttlMinutes: 120
+    agentOverrides:
+      claude:
+        command: "claude-agent-acp"
+      codex:
+        command: "codex-acp"
+      opencode:
+        command: "opencode acp"
+      gemini:
+        command: "gemini --experimental-acp --yolo"
+      copilot:
+        command: "copilot --acp --stdio --yolo"
+      kimi:
+        command: "kimi acp"
+      cursor:
+        command: "cursor-agent acp --yolo --trust"
+
+toolServer:
+  url: "http://cto-tools.cto.svc.cluster.local:3000/sse"
+
+# =============================================================================
+# Claude Code CLI
+# =============================================================================
+claudeCode:
+  enabled: true
+  permissions:
+    defaultMode: "bypassPermissions"
+    allow:
+      - "Bash"
+      - "Read"
+      - "Edit"
+      - "Write"
+      - "WebFetch"
+      - "WebSearch"
+      - "Task"
+  agentTeams:
+    enabled: true
+    teammateMode: "in-process"
+  includeCoAuthoredBy: false
+  disableTelemetry: true
+  mcp:
+    servers:
+      tool-server:
+        command: "/workspace/.local/bin/tools"
+        args: []
+        cwd: "/workspace"
+
+# =============================================================================
+# Cloud Providers (disabled — using direct API keys)
+# =============================================================================
+cloudProviders:
+  bedrock:
+    enabled: false
+  vertex:
+    enabled: false
+  foundry:
+    enabled: false
+
+browser:
+  enabled: false
+
+plugins:
+  memoryCore:
+    enabled: true
+
+supermemory:
+  enabled: false
+
+ssh:
+  enabled: false
+
+# =============================================================================
+# NATS Inter-Agent Messaging
+# =============================================================================
+nats:
+  enabled: true
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+  agentRole: "coder"
+  maxPingPongTurns: 10
+  pingPongWindowMs: 300000
+  roster:
+    - id: morgan
+      role: "intake"
+    - id: atlas
+      role: "merge-gate"
+    - id: blaze
+      role: "frontend"
+    - id: bolt
+      role: "devops"
+    - id: cipher
+      role: "security"
+    - id: cleo
+      role: "code-quality"
+    - id: grizz
+      role: "go-implementation"
+    - id: healer
+      role: "self-healing"
+    - id: keeper
+      role: "operations"
+    - id: rex
+      role: "rust-implementation"
+    - id: stitch
+      role: "code-review"
+    - id: tess
+      role: "testing"
+
+kaniko:
+  enabled: false
+
+# =============================================================================
+# Remote Tools
+# =============================================================================
+toolsConfig:
+  remoteTools:
+    - "argocd_*"
+    - "context7_*"
+    - "firecrawl_*"
+    - "github_*"
+    - "kubernetes_*"
+    - "linear_*"
+    - "octocode_*"
+    - "openmemory_*"
+
+# =============================================================================
+# CLI Backends
+# =============================================================================
+cliBackends:
+  claude-cli:
+    command: "/usr/local/share/npm-global/bin/claude"
+  codex-cli:
+    command: "/usr/local/share/npm-global/bin/codex"
+  gemini-cli:
+    command: "/usr/local/share/npm-global/bin/gemini"
+  kimi-cli:
+    command: "/usr/local/bin/kimi"
+  cursor-cli:
+    command: "/usr/local/bin/cursor-agent"
+  opencode-cli:
+    command: "/usr/local/bin/opencode"
+
+# =============================================================================
+# Skills (CTO-relevant only)
+# =============================================================================
+skills:
+  external:
+    openclaw:
+      - configMapName: "cto-coder-external-skills"
+        optional: true
