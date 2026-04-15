@@ -453,7 +453,12 @@ LOBSTER_LOG="$WORKSPACE_DIR/.agent-logs/lobster-$(date -u +%Y%m%dT%H%M%SZ).log"
 
 set +e  # Don't exit on lobster failure — we need to clean up
 set -o pipefail
-npx -y @clawdbot/lobster run .tasks/index.lobster.yaml 2>&1 | tee "$LOBSTER_LOG"
+# Prefer pre-installed lobster; fall back to npx if not found
+if command -v lobster >/dev/null 2>&1; then
+  lobster run .tasks/index.lobster.yaml 2>&1 | tee "$LOBSTER_LOG"
+else
+  npx -y @clawdbot/lobster run .tasks/index.lobster.yaml 2>&1 | tee "$LOBSTER_LOG"
+fi
 LOBSTER_EXIT=${PIPESTATUS[0]}
 set +o pipefail
 set -e

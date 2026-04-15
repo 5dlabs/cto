@@ -111,6 +111,16 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     acpx --version
 
 # =============================================================================
+# Lobster — ACP workflow runner (pre-installed for Hermes standalone mode)
+# Without this, Hermes pods fall back to `npx -y @clawdbot/lobster` which
+# adds ~15s cold-start latency on first run.
+# =============================================================================
+RUN --mount=type=cache,target=/root/.npm,sharing=shared \
+    npm install -g --no-audit --no-fund @clawdbot/lobster@latest && \
+    echo "lobster installed" && \
+    lobster --version || npx @clawdbot/lobster --version || echo "lobster version check skipped"
+
+# =============================================================================
 # ACP adapters — pre-installed so acpx doesn't need runtime npm downloads
 # CLIs with native ACP: droid, cursor, gemini, copilot, kimi, opencode
 # CLIs needing adapters: codex → codex-acp, claude → claude-agent-acp
@@ -367,6 +377,7 @@ RUN set -e; \
     V_KIMI=$(kimi --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_OPENCODE=$(opencode --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_CLAWHUB=$(clawhub --cli-version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
+    V_LOBSTER=$(lobster --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_GH=$(gh --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_KUBECTL=$(kubectl version --client -o json 2>&1 | grep -oE '"gitVersion":"v[0-9]+\.[0-9]+\.[0-9]+"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown"); \
     V_ARGOCD=$(argocd version --client --short 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
@@ -377,10 +388,10 @@ RUN set -e; \
     V_BUN=$(bun --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     V_SWARM=$(swarm --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"); \
     BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ); \
-    printf '{\n  "buildDate": "%s",\n  "clis": {\n    "openclaw": "%s",\n    "acpx": "%s",\n    "claude": "%s",\n    "copilot": "%s",\n    "codex": "%s",\n    "code": "%s",\n    "gemini": "%s",\n    "cursor": "%s",\n    "droid": "%s",\n    "kimi": "%s",\n    "opencode": "%s",\n    "clawhub": "%s"\n  },\n  "tools": {\n    "gh": "%s",\n    "kubectl": "%s",\n    "argocd": "%s",\n    "op": "%s",\n    "node": "%s",\n    "bun": "%s"\n  }\n}\n' \
+    printf '{\n  "buildDate": "%s",\n  "clis": {\n    "openclaw": "%s",\n    "acpx": "%s",\n    "claude": "%s",\n    "copilot": "%s",\n    "codex": "%s",\n    "code": "%s",\n    "gemini": "%s",\n    "cursor": "%s",\n    "droid": "%s",\n    "kimi": "%s",\n    "opencode": "%s",\n    "clawhub": "%s",\n    "lobster": "%s"\n  },\n  "tools": {\n    "gh": "%s",\n    "kubectl": "%s",\n    "argocd": "%s",\n    "op": "%s",\n    "node": "%s",\n    "bun": "%s"\n  }\n}\n' \
       "$BUILD_DATE" \
       "$V_OPENCLAW" "$V_ACPX" "$V_CLAUDE" "$V_COPILOT" "$V_CODEX" "$V_CODE" "$V_GEMINI" \
-      "$V_CURSOR" "$V_DROID" "$V_KIMI" "$V_OPENCODE" "$V_CLAWHUB" \
+      "$V_CURSOR" "$V_DROID" "$V_KIMI" "$V_OPENCODE" "$V_CLAWHUB" "$V_LOBSTER" \
       "$V_GH" "$V_KUBECTL" "$V_ARGOCD" "$V_OP" "$V_NODE" "$V_BUN" \
       > /etc/cto/versions.json; \
     echo "=== /etc/cto/versions.json ==="; \
@@ -398,6 +409,7 @@ RUN set -e; \
     echo "kimi           $V_KIMI"; \
     echo "opencode       $V_OPENCODE"; \
     echo "clawhub        $V_CLAWHUB"; \
+    echo "lobster        $V_LOBSTER"; \
     echo "gh             $V_GH"; \
     echo "kubectl        $V_KUBECTL"; \
     echo "argocd         $V_ARGOCD"; \
@@ -417,9 +429,14 @@ RUN find /home/node -maxdepth 1 -not -user 1000 -exec chown 1000:1000 {} + 2>/de
 USER node
 WORKDIR /workspace
 
-# Health check — confirms the openclaw gateway process is running
+# Health check — harness-aware: OpenClaw checks for gateway process,
+# Hermes checks for lobster or acpx process, fallback checks any node process
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD ps aux | grep -q "[o]penclaw gateway" || exit 1
+  CMD if [ "${HARNESS_AGENT:-openclaw}" = "hermes" ]; then \
+        ps aux | grep -qE '[l]obster|[a]cpx' || exit 1; \
+      else \
+        ps aux | grep -q '[o]penclaw gateway' || exit 1; \
+      fi
 
 # Default: run the agent entrypoint which reads identity from env vars
 ENTRYPOINT ["agent-entrypoint"]
