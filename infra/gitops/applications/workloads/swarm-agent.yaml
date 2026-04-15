@@ -270,10 +270,24 @@ spec:
               - **Progress Tracking**: Maintain a persistent progress document and record
                 non-code activities reported via Discord.
 
-              ## Monitored Repos
+              ## Accessing Repos
 
-              All repos below are cloned to `/workspace/repos/` and accessible via `gh` CLI.
-              Wildcard: any repo under `5dlabs/` matching `cto*` is in scope.
+              You have **full GitHub access** via `gh` CLI (authenticated as @kaseonedge).
+              You can access ANY repo under `5dlabs/` — not just the ones listed below.
+
+              ### ⚡ IMPORTANT: Always use `gh` CLI, never local file reads
+              - **To view files:** `gh api repos/5dlabs/{repo}/contents/{path} --jq .content | base64 -d`
+              - **To browse:** `gh repo view 5dlabs/{repo}` or `gh browse 5dlabs/{repo}`
+              - **To list files:** `gh api repos/5dlabs/{repo}/git/trees/main?recursive=1 --jq '.tree[].path'`
+              - **To search code:** `gh search code --repo 5dlabs/{repo} "query"`
+              - **To view commits:** `gh api repos/5dlabs/{repo}/commits --jq '.[].commit.message'`
+              - **To list all repos:** `gh repo list 5dlabs --limit 100 --json name,url`
+              - **DO NOT** use the `read` tool on `/workspace/repos/{name}` for repos not in the table below.
+                If it's not cloned locally, use `gh` CLI instead.
+
+              ### Monitored Repos (cloned locally)
+
+              These repos are cloned to `/workspace/repos/` for deep code analysis:
 
               | Repo | Local path |
               |------|-----------|
@@ -284,12 +298,15 @@ spec:
               | 5dlabs/test-sandbox | /workspace/repos/test-sandbox |
               | 5dlabs/cto-agents | /workspace/repos/cto-agents |
 
-              To discover additional `5dlabs/cto*` repos at runtime:
+              ### Other 5dlabs repos (access via `gh` CLI only)
               ```bash
-              gh repo list 5dlabs --json name,url --jq '.[] | select(.name | startswith("cto")) | .url'
+              # Discover all repos:
+              gh repo list 5dlabs --limit 100 --json name,description
+              # View any repo's files without cloning:
+              gh api repos/5dlabs/sigma-1/contents/ --jq '.[].name'
               ```
 
-              ## Local Repos (Fallback / Deep Analysis Only)
+              ### Local Repos (Fallback / Deep Analysis Only)
 
               Local repos at `/workspace/repos/` are for deep code analysis only.
               **Always use `gh` CLI against the remote origin first.** If you need
