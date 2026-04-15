@@ -10,26 +10,18 @@
 # =============================================================================
 # Stage: Build cto-play (play launcher CLI)
 # =============================================================================
+# play-launcher has no workspace crate deps, so build standalone for speed
 FROM rust:1.87-bookworm AS play-builder
 WORKDIR /build
-COPY Cargo.toml Cargo.lock ./
 COPY crates/play-launcher crates/play-launcher/
-# Create stub lib.rs for workspace members so cargo resolves deps
-RUN mkdir -p crates/acp-runtime/src crates/cli/src crates/config/src \
-    crates/controller/src crates/experience/src crates/gpu/src \
-    crates/healer/src crates/intake/src crates/linear-sync/src \
-    crates/metal/src crates/notify/src crates/pm/src crates/pm-lite/src \
-    crates/research/src crates/scm/src crates/tenant-operator/src \
-    crates/tools/src crates/utils/src crates/cto-lite/pm-lite-server/src \
-    crates/dex-indexer/src && \
-    for d in crates/*/src crates/cto-lite/*/src; do \
-      [ -f "$d/lib.rs" ] || echo "" > "$d/lib.rs"; \
-      [ -f "$d/../Cargo.toml" ] || echo '[package]\nname = "stub"\nversion = "0.1.0"\nedition = "2021"' > "$d/../Cargo.toml"; \
-    done
-RUN cargo build --release -p play-launcher 2>/dev/null || \
-    (cd crates/play-launcher && cargo build --release) && \
-    cp target/release/cto-play /usr/local/bin/cto-play 2>/dev/null || \
-    cp crates/play-launcher/target/release/cto-play /usr/local/bin/cto-play
+WORKDIR /build/crates/play-launcher
+# Override workspace inheritance for standalone build
+RUN sed -i 's/version.workspace = true/version = "0.1.0"/' Cargo.toml && \
+    sed -i 's/edition.workspace = true/edition = "2021"/' Cargo.toml && \
+    sed -i 's/authors.workspace = true//' Cargo.toml && \
+    sed -i 's/license.workspace = true//' Cargo.toml && \
+    cargo build --release && \
+    cp target/release/cto-play /usr/local/bin/cto-play
 #
 # This replaces the previous per-agent image model (openclaw, claude, cursor,
 # codex, etc.) with a single image that contains every tool an agent might
