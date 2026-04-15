@@ -26,7 +26,9 @@ data:
               "softThresholdTokens": {{ .Values.agentDefaults.compaction.memoryFlush.softThresholdTokens }}
             },
             "mode": {{ .Values.agentDefaults.compaction.mode | quote }},
-            "reserveTokensFloor": {{ .Values.agentDefaults.compaction.reserveTokensFloor }}
+            "reserveTokensFloor": {{ .Values.agentDefaults.compaction.reserveTokensFloor }},
+            "notifyUser": {{ .Values.agentDefaults.compaction.notifyUser | default true }},
+            "identifierPolicy": {{ .Values.agentDefaults.compaction.identifierPolicy | default "strict" | quote }}
           },
           "contextPruning": {
             "mode": {{ .Values.agentDefaults.contextPruning.mode | quote }},
