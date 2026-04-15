@@ -146,17 +146,30 @@ spec:
                   - "1466930035356078251"
                   - "1466938744593715210"
 
+        plugins:
+          entries:
+            xai:
+              enabled: false
+          allow:
+            - "memory-core"
+            - "nats-messenger"
+            - "discord"
+            - "minimax"
+            - "fireworks"
+            - "google"
+            - "anthropic"
+            - "browser"
+            - "brave"
+            - "perplexity"
+
         tools:
           acp:
             enabled: false
           web:
             search:
+              enabled: false
+            fetch:
               enabled: true
-              provider: "perplexity"
-              perplexity:
-                apiKey: "${OPENROUTER_API_KEY}"
-                baseUrl: "https://openrouter.ai/api/v1"
-                model: "perplexity/sonar-pro"
 
         code:
           clis:
@@ -517,6 +530,13 @@ spec:
               ## Operating Rules
 
               - SWARM CLI is pre-authenticated as @kaseonedge. No login needed.
+              - **SWARM paths** (HOME=/workspace, NOT /home/node):
+                - CLI binary: `/usr/local/bin/swarm`
+                - Python package: `/usr/local/lib/python3.12/dist-packages/swarm/` (NOT site-packages)
+                - Config: `/workspace/.swarm/config.yaml` (NOT /home/node/.swarm/)
+                - Queue: `/workspace/.swarm/queue.yaml`
+              - **Do NOT use the `code_execution` tool** — it requires xAI credits we don't have.
+                Use `exec` (shell) for all Python/CLI tasks instead.
               - GitHub CLI (`gh`) is authenticated via `/workspace/.config/gh/hosts.yml`.
                 If `gh auth status` fails, run this to re-configure from the container env:
                 ```bash
