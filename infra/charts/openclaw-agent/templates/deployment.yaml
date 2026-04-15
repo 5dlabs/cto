@@ -227,14 +227,18 @@ spec:
               # 4d. Mem0 plugin (@mem0/openclaw-mem0)
               # ---------------------------------------------------------------
               MEM0_EXT="/workspace/.openclaw/extensions/openclaw-mem0"
-              if [ ! -d "$MEM0_EXT/node_modules" ]; then
-                mkdir -p "$MEM0_EXT"
-                cd "$MEM0_EXT"
-                npm init -y --silent 2>/dev/null
-                npm install @mem0/openclaw-mem0 --production --no-audit --no-fund 2>&1 | tail -3
-                echo "[plugin] openclaw-mem0: installed"
+              mkdir -p "$MEM0_EXT"
+              cd "$MEM0_EXT"
+              # Always write package.json with qdrant client override for server compatibility
+              printf '{"name":"openclaw-mem0-ext","private":true,"dependencies":{"@mem0/openclaw-mem0":"latest"},"overrides":{"@qdrant/js-client-rest":"1.17.0"}}\n' > package.json
+              # Reinstall if missing or if qdrant client version is incompatible with server
+              QDRANT_VER=$(node -e "try{console.log(require('@qdrant/js-client-rest/package.json').version)}catch{console.log('0')}" 2>/dev/null)
+              if [ "$QDRANT_VER" != "1.17.0" ]; then
+                rm -rf node_modules package-lock.json
+                npm install --production --no-audit --no-fund 2>&1 | tail -3
+                echo "[plugin] openclaw-mem0: installed (qdrant client upgraded from ${QDRANT_VER} to 1.17.0)"
               else
-                echo "[plugin] openclaw-mem0: cached"
+                echo "[plugin] openclaw-mem0: cached (qdrant client ${QDRANT_VER} OK)"
               fi
               cd /workspace
               {{- end }}
