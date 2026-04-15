@@ -88,6 +88,20 @@ spec:
               echo "[dirs] Core workspace directories OK"
 
               # ---------------------------------------------------------------
+              # 1b. Fix ~ resolution (getpwuid vs $HOME mismatch)
+              # ---------------------------------------------------------------
+              # Some tools resolve ~ via /etc/passwd (getpwuid) not $HOME.
+              # Ensure /etc/passwd home matches /workspace and create a symlink
+              # from the old home so ~ paths work either way.
+              sed -i 's|node:x:1001:1000::/home/node:|node:x:1001:1000::/workspace:|' /etc/passwd 2>/dev/null || true
+              if [ -d /home/node ] && [ ! -L /home/node/.swarm ]; then
+                chmod 755 /home/node 2>/dev/null || true
+                mkdir -p /workspace/.swarm
+                ln -sf /workspace/.swarm /home/node/.swarm 2>/dev/null || true
+              fi
+              echo "[passwd] home dir fix applied"
+
+              # ---------------------------------------------------------------
               # 2. OpenClaw config (re-rendered every restart with fresh env)
               # ---------------------------------------------------------------
               envsubst < /config-template/openclaw.json > /workspace/.openclaw/openclaw.json

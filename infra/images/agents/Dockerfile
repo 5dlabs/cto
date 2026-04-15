@@ -358,7 +358,7 @@ RUN git config --system user.name "5D Labs Agent" && \
 COPY infra/images/agents/entrypoint.sh /usr/local/bin/agent-entrypoint
 RUN chmod +x /usr/local/bin/agent-entrypoint
 
-ENV HOME=/home/node
+ENV HOME=/workspace
 
 # =============================================================================
 # Version manifest — bake every CLI version into the image
@@ -427,7 +427,10 @@ RUN find /home/node -maxdepth 1 -not -user 1000 -exec chown 1000:1000 {} + 2>/de
 
 # Fix node user homedir in /etc/passwd → /workspace (Helm charts set HOME=/workspace
 # and mount a PVC there; OpenClaw's read tool resolves ~ via getpwuid not $HOME).
-RUN sed -i 's|node:x:1001:1000::/home/node:|node:x:1001:1000::/workspace:|' /etc/passwd
+RUN sed -i 's|node:x:1001:1000::/home/node:|node:x:1001:1000::/workspace:|' /etc/passwd && \
+    chmod 755 /home/node 2>/dev/null || true && \
+    mkdir -p /workspace/.swarm && \
+    ln -sf /workspace/.swarm /home/node/.swarm
 
 # Drop privileges back to non-root user
 USER node
