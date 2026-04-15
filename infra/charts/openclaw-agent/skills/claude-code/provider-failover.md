@@ -1,114 +1,123 @@
 # Provider Failover & Credit Recovery
 
-When a provider runs out of credits or returns errors, switch to an alternative
-without losing context. Session state is flushed to mem0 on every compaction.
+## RULES
 
-## Available Providers
+1. **Always use Claude Code first.** It is your primary CLI. Never say "Claude Code isn't available" or "I can't use Claude Code" — it IS available via OAuth.
+2. **Never use raw API calls to Anthropic.** Use the `claude` CLI with `CLAUDE_CODE_OAUTH_TOKEN`.
+3. **When credits run out on one sub, switch to the other immediately.** Don't wait, don't ask.
+4. **After switching, flush context to mem0** so the next provider can resume.
 
-| Provider | Model ID | Auth | Notes |
-|----------|----------|------|-------|
-| Anthropic Sub 1 (OAuth) | claude-sonnet-4-20250514 | `CLAUDE_CODE_OAUTH_TOKEN` | Primary Claude Code |
-| Anthropic Sub 2 (OAuth) | claude-sonnet-4-20250514 | swap `~/.claude/.credentials.json` | Backup Claude |
-| Codex Sub 1 (OAuth) | codex/gpt-5.4 | `~/.codex/auth.json` (sub1) | Primary Codex |
-| Codex Sub 2 (OAuth) | codex/gpt-5.4 | swap `~/.codex/auth.json` (sub2) | Backup Codex |
-| Fireworks / Kimi K2.5 Turbo | accounts/fireworks/routers/kimi-k2p5-turbo | `FIREWORKS_API_KEY` | Primary gateway |
-| Fireworks / Qwen 3.6 Plus | accounts/fireworks/models/qwen3p6-plus | `FIREWORKS_API_KEY` | Fallback 1 |
-| Fireworks / MiniMax M2.7 | accounts/fireworks/models/minimax-m2p7 | `FIREWORKS_API_KEY` | Fallback 2 |
-| Fireworks / GLM 5.1 | accounts/fireworks/models/glm-5p1 | `FIREWORKS_API_KEY` | Fallback 3 |
+## How credits run out
 
-## Automatic Failover (gateway)
+You'll see errors like:
+- `429 Too Many Requests` / `rate_limit_error`
+- `402 Payment Required`
+- `usage_limit_exceeded`
+- Claude CLI exits with "Usage limit reached"
 
-```
-primary: fireworks/kimi-k2p5-turbo
-  → fireworks/qwen3p6-plus → fireworks/minimax-m2p7 → fireworks/glm-5p1
-```
+When this happens, **switch immediately** — don't retry the same token.
 
-429 (rate limit), 402 (payment), or 401 (auth) triggers the next fallback.
+## Claude Code: Two OAuth Subscriptions
 
-## Manual Switch: Gateway Model
+Two tokens are available as env vars:
 
-```bash
-openclaw config get agents.defaults.model
-openclaw config set agents.defaults.model.primary "fireworks/accounts/fireworks/models/qwen3p6-plus"
-```
+| Env Var | Secret Key | Description |
+|---------|------------|-------------|
+| `CLAUDE_CODE_OAUTH_TOKEN` | `anthropic-sub1-oauth` | Active (loaded at startup) |
+| `CLAUDE_CODE_OAUTH_TOKEN_SUB2` | `anthropic-sub2-oauth` | Backup |
 
-## Manual Switch: Claude Code Subscription
-
-Two OAuth subscriptions are stored as K8s secrets. Switch when credits run out:
+### Switch Claude to Sub 2
 
 ```bash
-# Check which sub is active
-echo $CLAUDE_CODE_OAUTH_TOKEN | head -c 30
-
-# Switch to sub 2
-export CLAUDE_CODE_OAUTH_TOKEN="$(cat /run/secrets/claude-oauth-token-sub2)"
-
-# Switch back to sub 1
-export CLAUDE_CODE_OAUTH_TOKEN="$(cat /run/secrets/claude-oauth-token-sub1)"
+export CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_CODE_OAUTH_TOKEN_SUB2"
+# Verify
+claude -p "Say hello" --max-turns 1
 ```
 
-## Manual Switch: Codex CLI Subscription
-
-Two ChatGPT OAuth subscriptions stored in K8s secrets as base64-encoded auth.json files.
+### Switch Claude back to Sub 1
 
 ```bash
-# Check current sub
-cat ~/.codex/auth.json | python3 -c "
-import json,sys,base64
-d=json.load(sys.stdin)
-t=d['tokens']['id_token'].split('.')[1]
-t+='='*(4-len(t)%4)
-c=json.loads(base64.b64decode(t))
-a=c.get('https://api.openai.com/auth',{})
-print(f'Account: {a.get(\"chatgpt_account_id\")}, Plan: {a.get(\"chatgpt_plan_type\")}, Email: {c.get(\"email\")}')
-"
+# Re-read from original env (requires pod restart, or source from secret)
+# The original value was set at pod startup
+```
 
-# Switch to sub 2
+**Note:** Switching is one-way per pod lifecycle. If both subs are exhausted, fall back to Fireworks gateway models.
+
+## Codex CLI: Two OAuth Subscriptions
+
+Two ChatGPT OAuth auth.json files stored in K8s secrets:
+
+| Env Var | Secret Key | Description |
+|---------|------------|-------------|
+| `CODEX_AUTH_SUB1` | `codex-auth-sub1` | Active (written to ~/.codex/auth.json at init) |
+| `CODEX_AUTH_SUB2` | `codex-auth-sub2` | Backup |
+
+### Switch Codex to Sub 2
+
+```bash
 printf '%s' "$CODEX_AUTH_SUB2" > ~/.codex/auth.json
 chmod 600 ~/.codex/auth.json
+```
 
-# Switch back to sub 1
+### Switch back to Sub 1
+
+```bash
 printf '%s' "$CODEX_AUTH_SUB1" > ~/.codex/auth.json
 chmod 600 ~/.codex/auth.json
 ```
 
-**Important:** Codex uses OAuth with refresh tokens. The refresh token auto-renews
-the access token, so auth.json stays valid long-term. If it expires, re-run
-`codex login` locally, copy the new auth.json, and update the K8s secret.
+## Gateway Automatic Failover
+
+The gateway model chain handles Fireworks failover automatically:
+
+```
+primary: fireworks/kimi-k2p5-turbo
+  → fireworks/qwen3p6-plus
+  → fireworks/minimax-m2p7
+  → fireworks/glm-5p1
+```
+
+No action needed — 429/402/401 triggers the next model.
+
+### Manual gateway model switch
+
+```bash
+openclaw config set agents.defaults.model.primary "fireworks/accounts/fireworks/models/qwen3p6-plus"
+```
 
 ## Session Recovery After Switch
 
-### Automatic (mem0)
+### Before switching
+1. Finish the current atomic operation (don't switch mid-edit)
+2. Tell yourself: "Saving progress to memory before provider switch"
+3. Use `memory_add` to store current task state
 
-Compaction flushes context to mem0 (~every 8000 tokens). After switching:
-- mem0 auto-recall injects recent memories into the next prompt
-- The agent resumes from stored context
+### After switching
+1. Start with: "Resuming from memory after provider switch"
+2. mem0 auto-recall injects recent context
+3. Use `memory_search({ query: "current task" })` if needed
 
-### Manual
+## Docker Builds & GHCR Push
 
+Docker daemon is NOT available. Use **kaniko** sidecar for image builds:
+
+```bash
+# Build and push via kaniko sidecar
+POD=$(hostname)
+kubectl exec $POD -c kaniko -- /kaniko/executor \
+  --context=/workspace/repos/cto \
+  --dockerfile=/workspace/repos/cto/Dockerfile \
+  --destination=ghcr.io/5dlabs/cto:latest \
+  --cache=true
+
+# GHCR auth is pre-configured in kaniko via /kaniko/.docker/config.json
+# DOCKER_CONFIG is also set in agent container at /workspace/.docker
 ```
-memory_search({ query: "current task status" })
-memory_list({ limit: 10 })
-```
 
-### Procedure
+For `docker push` from the agent container, GHCR credentials are mounted at `$DOCKER_CONFIG/config.json`.
 
-1. **Before switching:** Finish the current atomic operation. Don't switch mid-edit.
-2. **Flush to memory:** If possible, tell the agent "save your current progress to memory"
-   before the switch to ensure the latest state is captured.
-3. **Switch the credential** (see commands above).
-4. **After switching:** Start with "Continuing from where we left off" — mem0 recall fills context.
-5. **Verify:** Run a quick test to confirm the new provider responds.
-
-### Credit Dashboards
+## Credit Dashboards
 
 - Anthropic: https://console.anthropic.com/settings/billing
-- OpenAI/ChatGPT: https://platform.openai.com/usage (API) or https://chatgpt.com/admin (subscription)
+- OpenAI/ChatGPT: https://chatgpt.com/admin
 - Fireworks: https://fireworks.ai/account/billing
-
-## CLI Session Persistence
-
-- **Claude Code:** Thread-bound `--session-id`, auto-managed by gateway
-- **Codex:** Session in `~/.codex/sessions/`, persists across restarts
-- **OpenCode:** Session in `/workspace/.opencode/sessions/`
-- **Compaction + mem0:** Key facts flushed to memory before context truncation
