@@ -113,6 +113,8 @@ spec:
               #    Each skill must be a directory containing SKILL.md (AgentSkills convention)
               # ---------------------------------------------------------------
               mkdir -p /workspace/.openclaw/skills
+              # Clean up stale flat .md files from previous format
+              find /workspace/.openclaw/skills -maxdepth 1 -name "*.md" -type f -delete 2>/dev/null || true
               SKILL_COUNT=0
               for md in /openclaw-skills-template/*.md; do
                 [ -f "$md" ] || continue
