@@ -55,9 +55,6 @@ spec:
           - name: COLOSSEUM_COPILOT_PAT
             secretName: discord-agent-bots
             secretKey: COLOSSEUM_COPILOT_PAT
-          - name: COLOSSEUM_COPILOT_API_BASE
-            secretName: discord-agent-bots
-            secretKey: COLOSSEUM_COPILOT_API_BASE
 
         agent:
           id: "swarm"
