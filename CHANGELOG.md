@@ -3,6 +3,48 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.55](https://github.com/5dlabs/cto/compare/v0.2.54...v0.2.55) (2026-04-15)
+
+
+### ✨ Features
+
+* add CLAUDE_CODE_OAUTH_TOKEN support for headless Claude auth ([6cbaa34](https://github.com/5dlabs/cto/commit/6cbaa34e73b73de11dafd7a4070fd5396b2e8f29))
+* add Coder agent deployment with Claude Code teams ([57480c9](https://github.com/5dlabs/cto/commit/57480c92ec4b74b9ada8d5c185ae789232b37cc6))
+* **coder:** Codex headless auth via auth.json + provider failover skill ([24e9f8e](https://github.com/5dlabs/cto/commit/24e9f8ebe086c136caa3c63a25f055043492ea76))
+* **coder:** Copilot CLI with Claude Opus 4.6 + OpenClaw provider-failover skill ([47f9f14](https://github.com/5dlabs/cto/commit/47f9f14468b6ea4938d14bf9c9419cd7bb74c2e8))
+* **coder:** dual OAuth env vars, GHCR docker config, provider-failover skill rewrite ([bf17d18](https://github.com/5dlabs/cto/commit/bf17d183a04b96ff67c9e16ada7cc54ba07eda47))
+* configure Coder Discord guild and channel ([c962100](https://github.com/5dlabs/cto/commit/c962100173a7c5380a67eb789895f4bdcbe280fb))
+* configure Coder for autonomous operation with 30m heartbeat ([e7a7ead](https://github.com/5dlabs/cto/commit/e7a7eadf76395c1c6966e28c8fac590366485cee))
+* enable kaniko sidecar + OpenBao discord token for Coder ([5d6a4fe](https://github.com/5dlabs/cto/commit/5d6a4fe6a9cbdd6294666f9007b5ac52c9607aa1))
+* mem0 slot config, session persistence, provider failover skill ([db9786f](https://github.com/5dlabs/cto/commit/db9786f04374e099f81ff9c7b490aa18717f5951))
+* **play-launcher:** pass agentHarness, openclaw, acp from CTO config ([551cc5d](https://github.com/5dlabs/cto/commit/551cc5de9a37f49bfba137057a572d0c3d565ed3))
+* **skills:** add acp-sessions skill to prevent session_status loops ([2528ec0](https://github.com/5dlabs/cto/commit/2528ec0bdd3864c5f837132844cf8771c6ef081e))
+
+
+### 🐛 Bug Fixes
+
+* **chart:** restore missing init volumeMounts, guard codexPlugin refs ([1bb3a56](https://github.com/5dlabs/cto/commit/1bb3a56cc285831395fb02d846a2f6a1391c8165))
+* **ci:** add cto-play to binaries release, fix job skip cascade ([a062256](https://github.com/5dlabs/cto/commit/a06225665524da312fce892d97aef041360a09a8))
+* **coder:** switch mem0 embedder to Fireworks qwen3-embedding-8b, add codex harness ([1d350e7](https://github.com/5dlabs/cto/commit/1d350e7c559b3ede046b9ad7120996bd9b156f55))
+* **coder:** write codex auth.json directly (not base64), fix skill docs ([e613fea](https://github.com/5dlabs/cto/commit/e613feae3845a132722b86257d4fde819adbd91a))
+* compaction mode 'auto' → 'default' (valid values: default|safeguard) ([880e94f](https://github.com/5dlabs/cto/commit/880e94f33e5712984251d1b388299c7267653aad))
+* disable memory-core when openclaw-mem0 plugin is enabled ([a4aa9a5](https://github.com/5dlabs/cto/commit/a4aa9a594b5cf8d32382580d59298d90bdef8187))
+* empty acpx plugin config + disable mem0 for coder ([27d00a0](https://github.com/5dlabs/cto/commit/27d00a08b9cb8a52832afe6d84f17d7395b8c80e))
+* mem0 plugin load path + dedicated coder collection + handoff doc ([19d037c](https://github.com/5dlabs/cto/commit/19d037c96844dc0baa35fa6e8859cc73a01b0998))
+* **mem0:** add FIREWORKS_API_KEY to init container + fix baseURL casing ([9832e52](https://github.com/5dlabs/cto/commit/9832e5290ab20227fc958753baf6059ef34445d5))
+* **mem0:** share cto_memory collection across all agents ([e0a95ac](https://github.com/5dlabs/cto/commit/e0a95aca5e5a1fa9199bfc9f11db20eeb9a7e9f6))
+* memorySearch source 'session' → 'sessions' ([1e3cb8a](https://github.com/5dlabs/cto/commit/1e3cb8a07304e5296b2f2869c32b67750d9f5654))
+* re-enable mem0 plugin for coder agent ([c509667](https://github.com/5dlabs/cto/commit/c509667b2bb615301dc5c61bdacb72312785b709))
+* set Kimi K2.5 as agent.model, disable expired Anthropic/OpenAI ([1afccd3](https://github.com/5dlabs/cto/commit/1afccd39fb3336aed7f208a7c8ef703622ed763b))
+* **skills:** restructure to directory/SKILL.md format (AgentSkills convention) ([6c93f43](https://github.com/5dlabs/cto/commit/6c93f439d3b0970c764fa10f3b7191671b9f93cb))
+* swarm agent — Fireworks embeddings, explicit delivery channel, 9PM cron ([b802a65](https://github.com/5dlabs/cto/commit/b802a654a80151f4bd4802020f1ce0c22dc5daf6))
+* **swarm:** remove memory block from config (not in openclaw schema) ([96e2535](https://github.com/5dlabs/cto/commit/96e25352588085ebc3cccd968cfe5bb1bd91e5a2))
+* use full Fireworks model paths in fallback chain + add qwen3p6 ([204a12e](https://github.com/5dlabs/cto/commit/204a12ecbdf33f628650a8e386c9a86f667d2d56))
+* use GitHub URL for coder ArgoCD app source ([672542e](https://github.com/5dlabs/cto/commit/672542e99d0796bd6ec28082ce51ff85f9e03415))
+* use GitHub URLs for coder workspace repo clones ([43f94bd](https://github.com/5dlabs/cto/commit/43f94bdbdab347cb62033fbd55ecf222a8357cd7))
+* use Kimi K2.5 Turbo as primary model for Coder gateway ([24ed298](https://github.com/5dlabs/cto/commit/24ed29872179386a0c89d0625ddb728b90e00273))
+* use openai-completions API type for Fireworks provider ([dc1cc40](https://github.com/5dlabs/cto/commit/dc1cc4070e80d510cf8814b705595d88d924c0d7))
+
 ## [0.2.54](https://github.com/5dlabs/cto/compare/v0.2.53...v0.2.54) (2026-04-15)
 
 
