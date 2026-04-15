@@ -70,21 +70,21 @@ spec:
           fallbacks:
             - "google/gemini-2.5-pro"
 
-        openaiOAuth:
-          enabled: true
-          authProfilesSecretKey: "openai-oauth-auth-profiles"
-          codexAuthSecretKey: "openai-oauth-codex-auth"
-
         models:
-          # Embeddings via Fireworks (qwen3-embedding-8b)
-          embeddings:
-            provider: "fireworks"
-            model: "accounts/fireworks/models/qwen3-embedding-8b"
           providers:
+            # Disable default providers (no API credits)
+            openai-api:
+              api: "openai-responses"
+              baseUrl: "https://api.openai.com/v1"
+              models: []
+            anthropic:
+              api: "anthropic-messages"
+              baseUrl: "https://api.anthropic.com"
+              models: []
+            # Active providers
             fireworks:
               api: "openai-completions"
               baseUrl: "https://api.fireworks.ai/inference/v1"
-              enabled: true
               models:
                 - id: "accounts/fireworks/routers/kimi-k2p5-turbo"
                   name: "Kimi K2.5 Turbo (Fire Pass)"
@@ -93,9 +93,10 @@ spec:
                   reasoning: true
                   input: ["text", "image"]
             google:
-              api: "google-genai"
+              api: "google-generative-ai"
               baseUrl: "https://generativelanguage.googleapis.com"
-              enabled: true
+              auth: "api-key"
+              authHeader: true
               models:
                 - id: "gemini-2.5-pro"
                   name: "Gemini 2.5 Pro"
@@ -159,15 +160,6 @@ spec:
             xai:
               enabled: false
 
-        tools:
-          acp:
-            enabled: false
-          web:
-            search:
-              enabled: false
-            fetch:
-              enabled: true
-
         code:
           clis:
             claude:
@@ -200,22 +192,9 @@ spec:
           readiness:
             enabled: false
 
-        memorySearch:
-          enabled: false
-
-        openmemory:
-          enabled: false
-
-        mem0:
-          enabled: false
-
         session:
           scope: "per-sender"
           dmScope: "per-channel-peer"
-
-        nats:
-          enabled: true
-          url: "nats://nats.messaging.svc.cluster.local:4222"
 
         cron:
           enabled: true
