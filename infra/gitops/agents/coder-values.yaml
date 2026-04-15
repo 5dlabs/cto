@@ -310,7 +310,7 @@ mem0:
   enabled: false
 
 mem0Plugin:
-  enabled: true
+  enabled: false
   mode: open-source
   userId: "jonathon"
   autoRecall: true
