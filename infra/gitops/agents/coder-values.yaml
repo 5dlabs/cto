@@ -96,6 +96,21 @@ messaging:
     accountId: "coder"
     tokenSecretKey: "coder"
     allowBots: "mentions"
+    groupPolicy: "allowlist"
+    guilds:
+      "*":
+        requireMention: true
+        users:
+          - "444519104808878090"
+      # 5dlabs guild
+      "1490117571977019524":
+        requireMention: true
+        slug: "5dlabs-coder"
+        channels:
+          # Coder dedicated channel
+          "1494057364301545542":
+            enabled: true
+            requireMention: false
     threadBindings:
       enabled: true
       spawnSubagentSessions: true
