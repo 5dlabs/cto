@@ -461,6 +461,7 @@ toolServer:
 # =============================================================================
 claudeCode:
   enabled: true
+  oauthTokenSecretKey: "anthropic-sub1-oauth"
   permissions:
     defaultMode: "bypassPermissions"
     allow:

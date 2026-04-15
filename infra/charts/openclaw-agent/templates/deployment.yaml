@@ -666,6 +666,15 @@ spec:
             - name: DISABLE_TELEMETRY
               value: "1"
             {{- end }}
+            {{- if .Values.claudeCode.oauthTokenSecretKey }}
+            # Claude Code OAuth token for headless auth (Pro/Max/Teams)
+            - name: CLAUDE_CODE_OAUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: {{ .Values.claudeCode.oauthTokenSecretKey }}
+                  optional: true
+            {{- end }}
             {{- end }}
             {{- if .Values.toolsConfig }}
             # Tools config path for CLI backends
