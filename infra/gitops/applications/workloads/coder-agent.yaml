@@ -23,7 +23,7 @@ spec:
   project: default
 
   sources:
-    - repoURL: https://gitlab.5dlabs.ai/5dlabs/cto.git
+    - repoURL: https://github.com/5dlabs/cto.git
       targetRevision: main
       path: infra/charts/openclaw-agent
       helm:
