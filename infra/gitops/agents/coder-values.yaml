@@ -110,7 +110,7 @@ models:
       apiKeySecretKey: "anthropic-api-key"
     fireworks:
       enabled: true
-      api: "openai-compatible"
+      api: "openai-completions"
       baseUrl: "https://api.fireworks.ai/inference/v1"
       apiKeySecretKey: "fireworks-api-key"
       models:
