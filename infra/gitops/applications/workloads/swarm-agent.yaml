@@ -238,6 +238,9 @@ spec:
             - name: test-sandbox
               url: "https://github.com/5dlabs/test-sandbox.git"
               branch: "main"
+            - name: cto-agents
+              url: "https://github.com/5dlabs/cto-agents.git"
+              branch: "main"
           files:
             AGENTS.md: |
               # AGENTS.md -- Colosseum (Swarm Agent)
@@ -275,6 +278,7 @@ spec:
               | 5dlabs/swarm-openclaw-agent | /workspace/repos/swarm-openclaw-agent |
               | 5dlabs/agent-platform | /workspace/repos/agent-platform |
               | 5dlabs/test-sandbox | /workspace/repos/test-sandbox |
+              | 5dlabs/cto-agents | /workspace/repos/cto-agents |
 
               To discover additional `5dlabs/cto*` repos at runtime:
               ```bash
