@@ -3,6 +3,19 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.56](https://github.com/5dlabs/cto/compare/v0.2.55...v0.2.56) (2026-04-15)
+
+
+### ✨ Features
+
+* **coder:** add GH_TOKEN env var from github-pat-override secret ([d780923](https://github.com/5dlabs/cto/commit/d7809237cdcc7a07881f331e908ad38b4b7e2d66))
+* **coder:** session persistence skill + compaction notifyUser ([6162210](https://github.com/5dlabs/cto/commit/6162210b8dfe3197fb17539d492b6e7bfe45e4b2))
+
+
+### 🐛 Bug Fixes
+
+* **skills:** clean up stale flat .md files from previous format ([7e498e1](https://github.com/5dlabs/cto/commit/7e498e1873ebd6deee446e65f16febd26eb209b7))
+
 ## [0.2.55](https://github.com/5dlabs/cto/compare/v0.2.54...v0.2.55) (2026-04-15)
 
 
