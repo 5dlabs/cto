@@ -110,10 +110,19 @@ spec:
 
               # ---------------------------------------------------------------
               # 3. OpenClaw orchestrator skills (always overwrite from ConfigMap)
+              #    Each skill must be a directory containing SKILL.md (AgentSkills convention)
               # ---------------------------------------------------------------
               mkdir -p /workspace/.openclaw/skills
-              cp /openclaw-skills-template/*.md /workspace/.openclaw/skills/ 2>/dev/null || true
-              echo "[skills] OpenClaw: $(ls /workspace/.openclaw/skills/*.md 2>/dev/null | wc -l) loaded"
+              SKILL_COUNT=0
+              for md in /openclaw-skills-template/*.md; do
+                [ -f "$md" ] || continue
+                SKILL_NAME=$(basename "$md" .md)
+                [ "$SKILL_NAME" = "_placeholder" ] && continue
+                mkdir -p "/workspace/.openclaw/skills/$SKILL_NAME"
+                cp "$md" "/workspace/.openclaw/skills/$SKILL_NAME/SKILL.md"
+                SKILL_COUNT=$((SKILL_COUNT + 1))
+              done
+              echo "[skills] OpenClaw: $SKILL_COUNT skills loaded"
 
               {{- if .Values.claudeCode.enabled }}
               # ---------------------------------------------------------------
