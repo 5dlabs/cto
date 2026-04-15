@@ -513,7 +513,17 @@ spec:
               ## Operating Rules
 
               - SWARM CLI is pre-authenticated as @kaseonedge. No login needed.
-              - GitHub CLI (`gh`) is available and authenticated via GITHUB_TOKEN.
+              - GitHub CLI (`gh`) is authenticated via `/workspace/.config/gh/hosts.yml`.
+                If `gh auth status` fails, run this to re-configure from the container env:
+                ```bash
+                mkdir -p /workspace/.config/gh
+                echo "github.com:" > /workspace/.config/gh/hosts.yml
+                echo "    oauth_token: $GITHUB_TOKEN" >> /workspace/.config/gh/hosts.yml
+                echo "    user: kaseonedge" >> /workspace/.config/gh/hosts.yml
+                echo "    git_protocol: https" >> /workspace/.config/gh/hosts.yml
+                ```
+                NOTE: The `GITHUB_TOKEN` env var may not be available in tool execution.
+                Always rely on the gh config file, not env vars, for authentication.
               - All monitored repos are cloned locally — use them for deep analysis.
               - Always verify SWARM posts after submitting (`swarm ls`).
               - When approval is enabled, NEVER post to SWARM without explicit user approval.
