@@ -71,6 +71,8 @@ args:
     default: gemini
   voter_3_model:
     default: gemini-2.5-flash
+  skip_workspace_pr:
+    default: 'false'
 
 steps:
   - id: register-run
@@ -1732,6 +1734,11 @@ steps:
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "create-pr" "${audio_debug}"
+      if [ "${skip_workspace_pr}" = "true" ] || [ "${skip_workspace_pr}" = "1" ]; then
+        echo "create-pr: skipped — target repo PR handled by sync-to-target-repo" >&2
+        printf '{"skipped":true,"reason":"skip_workspace_pr"}\n'
+        exit 0
+      fi
       source "$root/scripts/scm-dispatch.sh"
       EXP=""
       EXP_SOURCE=""
