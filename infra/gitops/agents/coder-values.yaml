@@ -54,12 +54,17 @@ agent:
   name: "Coder"
   model: "anthropic/claude-sonnet-4-20250514"
   heartbeat:
-    every: "12h"
+    every: "30m"
     target: "last"
-    ackMaxChars: 120
+    ackMaxChars: 500
     prompt: >-
-      If there is no active user request, reply HEARTBEAT_OK and do nothing
-      else. Do not start background work or new tasks on your own.
+      You are an autonomous coding agent. On each heartbeat, check for:
+      1. Pending NATS messages or tasks from Morgan/other agents.
+      2. Open PRs you created that need attention (CI failures, review feedback).
+      3. Any in-progress work in your workspace that needs continuation.
+      If you have active work, continue it. If you received new tasks via NATS,
+      acknowledge and begin. If idle, check the cto repo for open issues assigned
+      to you or labeled 'coder'. Report status briefly.
   sandbox: "off"
   skipGlobalSkills: false
 
