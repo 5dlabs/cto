@@ -48,6 +48,17 @@ spec:
 
         nodeOptions: "--max-old-space-size=2048"
 
+        extraSecretEnv:
+          - name: COLOSSEUM_PAT
+            secretName: discord-agent-bots
+            secretKey: COLOSSEUM_PAT
+          - name: COLOSSEUM_COPILOT_PAT
+            secretName: discord-agent-bots
+            secretKey: COLOSSEUM_COPILOT_PAT
+          - name: COLOSSEUM_COPILOT_API_BASE
+            secretName: discord-agent-bots
+            secretKey: COLOSSEUM_COPILOT_API_BASE
+
         agent:
           id: "swarm"
           name: "Colosseum"
@@ -243,6 +254,15 @@ spec:
               branch: "main"
             - name: cto-agents
               url: "https://github.com/5dlabs/cto-agents.git"
+              branch: "main"
+            - name: sigma-1
+              url: "https://github.com/5dlabs/sigma-1.git"
+              branch: "main"
+            - name: lab-eco
+              url: "https://github.com/5dlabs/lab-eco.git"
+              branch: "main"
+            - name: big-balls
+              url: "https://github.com/5dlabs/big-balls.git"
               branch: "main"
           files:
             AGENTS.md: |
