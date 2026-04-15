@@ -52,7 +52,7 @@ telemetry:
 agent:
   id: "coder"
   name: "Coder"
-  model: "anthropic/claude-sonnet-4-20250514"
+  model: "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
   heartbeat:
     every: "30m"
     target: "last"
@@ -78,7 +78,6 @@ modelDefaults:
     - "fireworks/accounts/fireworks/models/qwen3p6-plus"
     - "fireworks/accounts/fireworks/models/minimax-m2p7"
     - "fireworks/accounts/fireworks/models/glm-5p1"
-    - "openai/gpt-4.1"
 
 # =============================================================================
 # Secrets
@@ -126,7 +125,7 @@ messaging:
 models:
   providers:
     anthropic:
-      enabled: true
+      enabled: false
       apiKeySecretKey: "anthropic-api-key"
     fireworks:
       enabled: true
@@ -137,13 +136,13 @@ models:
         - id: "accounts/fireworks/routers/kimi-k2p5-turbo"
           name: "Kimi K2.5 Turbo"
         - id: "accounts/fireworks/models/minimax-m2p7"
-          name: "MiniMax M2P7"
+          name: "MiniMax M2.7"
         - id: "accounts/fireworks/models/qwen3p6-plus"
           name: "Qwen 3.6 Plus"
         - id: "accounts/fireworks/models/glm-5p1"
           name: "GLM 5.1"
     openai:
-      enabled: true
+      enabled: false
       apiKeySecretKey: "openai-api-key"
   repos: []
 
