@@ -64,11 +64,11 @@ print(f'Account: {a.get(\"chatgpt_account_id\")}, Plan: {a.get(\"chatgpt_plan_ty
 "
 
 # Switch to sub 2
-echo "$CODEX_AUTH_SUB2" | base64 -d > ~/.codex/auth.json
+printf '%s' "$CODEX_AUTH_SUB2" > ~/.codex/auth.json
 chmod 600 ~/.codex/auth.json
 
 # Switch back to sub 1
-echo "$CODEX_AUTH_SUB1" | base64 -d > ~/.codex/auth.json
+printf '%s' "$CODEX_AUTH_SUB1" > ~/.codex/auth.json
 chmod 600 ~/.codex/auth.json
 ```
 

@@ -173,7 +173,7 @@ spec:
               {{- if and (hasKey .Values "codexPlugin") .Values.codexPlugin.authSecretKey }}
               # Inject Codex OAuth auth.json from secret (headless auth)
               if [ -n "$CODEX_AUTH_SUB1" ]; then
-                echo "$CODEX_AUTH_SUB1" | base64 -d > /workspace/.codex/auth.json
+                printf '%s' "$CODEX_AUTH_SUB1" > /workspace/.codex/auth.json
                 chmod 600 /workspace/.codex/auth.json
                 echo "[cli] codex auth.json written from sub1"
               fi
