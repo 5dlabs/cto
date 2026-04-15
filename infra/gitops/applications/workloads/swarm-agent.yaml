@@ -111,6 +111,13 @@ spec:
             messagingSecret: "discord-agent-bots"
             githubSecret: "openclaw-github"
 
+        # Map env var names to actual secret key names in openclaw-api-keys
+        apiKeySecretKeys:
+          OPENAI_API_KEY: "openai-api-key"
+          ANTHROPIC_API_KEY: "anthropic-api-key"
+          FIREWORKS_API_KEY: "FIREWORKS_API_KEY"
+          GOOGLE_API_KEY: "gemini-api-key"
+
         discord:
           enabled: true
           accountId: "swarm"
