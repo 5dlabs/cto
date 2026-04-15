@@ -529,7 +529,7 @@ nats:
       role: "testing"
 
 kaniko:
-  enabled: false
+  enabled: true
 
 # =============================================================================
 # Remote Tools
@@ -538,12 +538,17 @@ toolsConfig:
   remoteTools:
     - "argocd_*"
     - "context7_*"
+    - "exa_*"
     - "firecrawl_*"
     - "github_*"
     - "kubernetes_*"
     - "linear_*"
+    - "loki_*"
     - "octocode_*"
     - "openmemory_*"
+    - "playwright_*"
+    - "shadcn_*"
+    - "tavily_*"
 
 # =============================================================================
 # CLI Backends
