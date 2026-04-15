@@ -147,20 +147,11 @@ spec:
                   - "1466938744593715210"
 
         plugins:
+          deny:
+            - "xai"
           entries:
             xai:
               enabled: false
-          allow:
-            - "memory-core"
-            - "nats-messenger"
-            - "discord"
-            - "minimax"
-            - "fireworks"
-            - "google"
-            - "anthropic"
-            - "browser"
-            - "brave"
-            - "perplexity"
 
         tools:
           acp:
