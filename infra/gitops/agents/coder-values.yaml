@@ -301,7 +301,7 @@ workspace:
       - **Gateway Model:** Kimi K2.5 Turbo (Fireworks)
       - **Fallbacks:** Qwen 3.6 Plus, MiniMax M2.7, GLM 5.1
       - **Codex:** Available via `/model codex` (OpenAI Codex harness)
-      - **Memory:** mem0 (Qdrant-backed, collection: coder_memory)
+      - **Memory:** mem0 (Qdrant-backed, collection: cto_memory, shared with all agents)
 
     TOOLS.md: |
       # TOOLS.md -- Coder
@@ -428,7 +428,7 @@ mem0Plugin:
     - Task-level: "jonathon:project:{projectId}:task:{taskId}"
     - Agent-specific: "jonathon:project:{projectId}:task:{taskId}:coder"
   oss:
-    collectionName: coder_memory
+    collectionName: cto_memory
     embedder:
       provider: openai
       config:
