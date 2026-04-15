@@ -1,11 +1,20 @@
 {
-  "current_urls": [],
-  "current_site_snapshots": [],
+  "current_urls": [
+    "https://5dlabs.github.io/cto-pay/"
+  ],
+  "current_site_snapshots": [
+    {
+      "source_url": "https://5dlabs.github.io/cto-pay/",
+      "asset_url": "https://public.linear.app/62f21f42-ad7b-40f4-94b7-16755f0f4d33/dc43dd8c-9749-40ab-879f-64c735adad6e/3f71f2a7-a09d-431f-91c9-ad45bcfbce2a",
+      "success": true,
+      "error": ""
+    }
+  ],
   "generated_variants": [],
   "selected_variants": [],
   "counts": {
-    "current_urls": 0,
-    "current_site_snapshots": 0,
+    "current_urls": 1,
+    "current_site_snapshots": 1,
     "generated_variants": 0,
     "selected_variants": 0
   }

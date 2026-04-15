@@ -1,0 +1,125 @@
+name: implement-task-10
+metadata:
+  task_id: 10
+  agent: atlas
+  stack: CI/CD Platforms
+  cli: Claude Code
+  model: claude-opus-4-6-20260205
+  depends_on_tasks: [2, 3, 4, 6, 7, 8]
+
+args:
+  task_dir: {}
+  repo_url: {}
+  branch_name:
+    default: "task-10/feature-branch"
+  agent:
+    default: "atlas"
+  cli:
+    default: "Claude Code"
+  model:
+    default: "claude-opus-4-6-20260205"
+  fallback_cli:
+    default: "codex"
+  fallback_model:
+    default: "gpt-5.2-codex"
+  max_implementation_retries:
+    default: 10
+  max_quality_retries:
+    default: 5
+
+steps:
+  - id: setup
+    command: >
+      git clone ${repo_url} work && cd work &&
+      git checkout -b ${branch_name}
+
+  - id: implement-subtask-10001
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10001/prompt.md)" --model ${model}
+
+  - id: validate-subtask-10001
+    depends_on: [implement-subtask-10001]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - id: implement-subtask-10002
+    depends_on: [validate-subtask-10001]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10002/prompt.md)" --model ${model}
+
+  - id: validate-subtask-10002
+    depends_on: [implement-subtask-10002]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - id: implement-subtask-10003
+    depends_on: [validate-subtask-10001]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10003/prompt.md)" --model ${model}
+
+  - id: validate-subtask-10003
+    depends_on: [implement-subtask-10003]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - id: implement-subtask-10004
+    depends_on: [validate-subtask-10002, validate-subtask-10003]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10004/prompt.md)" --model ${model}
+
+  - id: validate-subtask-10004
+    depends_on: [implement-subtask-10004]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - id: implement-subtask-10005
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10005/prompt.md)" --model ${model}
+
+  - id: validate-subtask-10005
+    depends_on: [implement-subtask-10005]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - id: implement-subtask-10006
+    depends_on: [validate-subtask-10001, validate-subtask-10002, validate-subtask-10003]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-10.10006/prompt.md)" --model ${model}
+
+  - id: validate-subtask-10006
+    depends_on: [implement-subtask-10006]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - id: integration-validation
+    depends_on: [validate-subtask-10001, validate-subtask-10002, validate-subtask-10003, validate-subtask-10004, validate-subtask-10005, validate-subtask-10006]
+    command: >
+      cd work && bun tsc --noEmit && bun test --run && bun lint
+
+  - id: acceptance-check
+    depends_on: [integration-validation]
+    command: >
+      ${cli} -p "Review changes against ${task_dir}/acceptance.md. Output PASS or FAIL." --model ${model}
+
+  - id: create-pr
+    depends_on: [acceptance-check]
+    command: >
+      cd work && git add -A &&
+      git commit -m "feat: task-10" &&
+      git push origin ${branch_name} &&
+      source "${WORKSPACE:-.}/scripts/scm-dispatch.sh" &&
+      scm_create_pr "feat: task-10" "$(cat ${task_dir}/task.md)" "main"

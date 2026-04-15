@@ -148,10 +148,10 @@
       "target": "web",
       "provider": "stitch",
       "candidate_id": "stitch-web-1",
-      "screen_id": "5f13e1aeef0a4fb5b858250e98451a07",
+      "screen_id": "44d0ff49186348a69e1b701b032615a6",
       "notes": "Generated web modernization candidate from intake design context."
     }
   ],
   "framer_code_components": [],
-  "generated_at": "2026-04-14T19:23:41.226Z"
+  "generated_at": "2026-04-15T01:18:51.212Z"
 }

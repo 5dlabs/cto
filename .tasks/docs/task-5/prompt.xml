@@ -1,0 +1,35 @@
+<task id="5">
+  <agent name="rex" stack="Rust/Axum" />
+  <title>Integrate Solana Settlement Hook into CTO Controller (Rex - Rust/Axum)</title>
+  <description>Add the settlement hook to the existing CTO Kubernetes controller so that when a CodeRun reaches a terminal state, the controller computes the billable amount, uploads the receipt to Arweave (calling the receipt-uploader module via subprocess or HTTP), and submits settle_task or refund_task to the Solana program. This bridges the off-chain runtime to the on-chain billing rail per PRD §9.</description>
+  <implementation>
+    <details>1. Add Solana dependencies to `crates/controller/Cargo.toml`:
+   - `solana-sdk 1.18.x`, `solana-client 1.18.x`, `anchor-client 0.30.x` (or use raw RPC with `solana-client`).
+   - `sha2` for SHA-256 hashing.
+   - `serde_json` (likely already present) for receipt serialization.
+2. Extend controller config in `crates/controller/src/tasks/config.rs`:
+   - `solana_rpc_url: Option<String>` — Solana RPC endpoint (from ConfigMap).
+   - `solana_operator_keypair_path: Option<String>` — path to operator keypair file (from OpenBao secret mount).
+   - `solana_program_id: Option<String>` — deployed program ID.
+   - `solana_billing_enabled: bool` — feature flag, default false. Allows gradual rollout.
+   - `irys_upload_endpoint: Option<String>` — endpoint for receipt upload (either call the Bun module via CLI subprocess or expose it as a small HTTP service).
+3. Create new module `crates/controller/src/tasks/code/billing.rs`:
+   - `struct BillingConfig` parsed from controller config.
+   - `struct BillableTask` { task_id, customer_pubkey, amount_usdc_lamports, receipt_json, agent_package_id, quality_met }.
+   - `fn compute_billable_amount(coderun: &CodeRun) -> u64`: Calculate USDC lamports from pod duration × tier rate. Use rates from PRD §5 (Free=$3/run, Team=$1.50, Growth=$0.75, Enterprise=$0.50). For hackathon, use a flat metered rate.
+   - `fn build_receipt_json(coderun: &CodeRun, amount: u64) -> serde_json::Value`: Build the itemized receipt matching the schema from Task 4.
+   - `async fn upload_receipt(config: &BillingConfig, receipt: &serde_json::Value) -> Result<(String, [u8; 32])>`: Shell out to `bun packages/receipt-uploader/scripts/upload.ts --receipt '{json}'` or call an HTTP endpoint. Returns (arweave_tx_id, sha256_hash).
+   - `async fn submit_settlement(config: &BillingConfig, task: &BillableTask, receipt_hash: [u8; 32]) -> Result<Signature>`: Build and send the `settle_task` Solana transaction. Construct instruction data matching the Anchor IDL. Sign with operator keypair. Send via `RpcClient::send_and_confirm_transaction`.
+   - `async fn submit_refund(config: &BillingConfig, task_id: &str) -> Result<Signature>`: Build and send `refund_task`.
+4. Integrate into the reconciliation loop in `crates/controller/src/tasks/code/controller.rs`:
+   - After a CodeRun transitions to terminal state (detect via status change in the reconcile function):
+     - If `solana_billing_enabled` and customer has a linked Solana wallet:
+       - On success (merged): compute amount, build receipt, upload, settle.
+       - On failure (failed/cancelled): submit refund or settle with quality_met=false.
+     - Record the Solana transaction signature in the CodeRun status annotations: `cto.dev/solana-tx: <signature>`.
+   - Handle errors gracefully: if Solana submission fails, log error and retry (add to requeue). Do not block the main reconciliation loop.
+5. Add customer wallet mapping: extend the customer profile CRD or config to include `solana_pubkey: Option<String>`. For hackathon, this can be a simple annotation on the namespace or a ConfigMap entry.
+6. Create a standalone test script `crates/controller/src/tasks/code/billing_test.rs` with unit tests for compute_billable_amount and build_receipt_json.</details>
+  </implementation>
+  <acceptance_criteria>Run `cargo build --workspace` — controller compiles with new billing module, zero errors. Run `cargo test -p controller -- billing` — unit tests pass: compute_billable_amount returns 750000 (0.75 USDC in lamports) for a Growth-tier 1-CodeRun task; build_receipt_json produces valid JSON with required fields (task_id, customer_pubkey, billing_items, total_amount_usdc). Integration test against devnet (can be manual or CI): deploy the Anchor program, create a mock CodeRun that transitions to merged state, verify the controller submits a settle_task transaction, confirm the transaction signature is valid on Solana devnet explorer, and the CodeRun annotation `cto.dev/solana-tx` is set. With `solana_billing_enabled=false`, no Solana transactions are submitted (feature flag works).</acceptance_criteria>
+</task>

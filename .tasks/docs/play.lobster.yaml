@@ -1,0 +1,1557 @@
+name: play
+description: >
+  Master play workflow orchestrated by Morgan.
+  Dispatches implementation agents per-task via CodeRun CRDs,
+  then fans out quality/security/testing checks before gating.
+  Morgan selects CLI and provider per-task based on difficulty,
+  available credits, and user-defined provider preferences.
+
+args:
+  tasks_dir:
+    description: Root directory containing per-task folders
+  repo_url:
+    default: "https://github.com/5dlabs/cto-pay"
+  namespace:
+    default: openclaw
+  base_branch:
+    default: main
+  cli:
+    description: Default CLI tool (claude, codex, cursor, gemini, etc.)
+    default: claude
+  model:
+    description: Default LLM model — Morgan may override per-task based on difficulty + credits
+    default: claude-sonnet-4-6
+  linear_session_id:
+    description: Linear agent session for status updates
+    default: ""
+  linear_team_id:
+    default: ""
+  docs_repository_url:
+    default: ""
+  enable_docker:
+    default: "true"
+  discord_channel:
+    description: Discord target channel for play notifications (e.g. play, execution)
+    default: "play"
+
+steps:
+
+  # ── Play start notification ──
+  - id: notify-play-start
+    command: |
+      echo '🎬 Play started — 10 tasks dispatching' | intake-util bridge-notify --from morgan --to ${discord_channel} --metadata '{"step":"play-start","task_count":10,"time_utc":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## 🎬 Play Started\n\n10 tasks dispatching to 1 harnesses.\n\n| Task | Title | Agent | CLI | Model | Type |\n|------|-------|-------|-----|-------|------|\n| 1 | Bootstrap Solana Dev Infrastructure & An | bolt | Claude Code | claude-opus-4-6-20260205 | infra |\n| 2 | Implement Anchor Program Core — Operator | rex | Claude Code | claude-opus-4-6-20260205 | task |\n| 3 | Implement Anchor Program Marketplace — A | rex | Claude Code | claude-opus-4-6-20260205 | task |\n| 4 | Build Arweave/Irys Receipt Upload Module | nova | Claude Code | claude-opus-4-6-20260205 | task |\n| 5 | Integrate Solana Settlement Hook into CT | rex | Claude Code | claude-opus-4-6-20260205 | task |\n| 6 | Build Hackathon Demo CLI Script — Full E | nova | Claude Code | claude-opus-4-6-20260205 | task |\n| 7 | Build Web Dashboard for Receipts, Balanc | blaze | Claude Code | claude-opus-4-6-20260205 | task |\n| 8 | Comprehensive Integration & E2E Test Sui | tess | Claude Code | claude-opus-4-6-20260205 | task |\n| 9 | Security Review of Solana Program — Auth | cipher | Claude Code | claude-opus-4-6-20260205 | task |\n| 10 | CI/CD Pipeline & Devnet Deployment Autom | atlas | Claude Code | claude-opus-4-6-20260205 | task |' >/dev/null || true
+
+
+  # ── Task 1: Bootstrap Solana Dev Infrastructure & Anchor Workspace (Bolt - Kubernetes/Helm) (infra, agent: bolt, cli: Claude Code, model: claude-opus-4-6-20260205, difficulty: 5) ──
+  - id: notify-task-1-start
+    command: |
+      echo '🚀 Task 1: Bootstrap Solana Dev Infrastructure & Anchor Wo... → Claude Code (claude-opus-4-6-20260205) — agent: bolt' | intake-util bridge-notify --from bolt --to ${discord_channel} --metadata '{"step":"task-dispatch","task_id":1,"agent":"bolt","cli":"Claude Code","model":"claude-opus-4-6-20260205","task_type":"infra"}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## 🚀 Task 1 Dispatched\n\n**Bootstrap Solana Dev Infrastructure & Anchor Workspace (Bolt - Kubernetes/Helm)**\n- Agent: `bolt`\n- CLI: `Claude Code` / Model: `claude-opus-4-6-20260205`\n- Type: infra | Difficulty: 5\n- Subtasks: 6' >/dev/null || true
+
+  - id: run-task-1
+    depends_on: [notify-task-1-start]
+    command: |
+      # --- Primary attempt: Claude Code/claude-opus-4-6-20260205 ---
+      PRIMARY_CLI="Claude Code"
+      PRIMARY_MODEL="claude-opus-4-6-20260205"
+      FALLBACK_CLI="codex"
+      FALLBACK_MODEL="gpt-5.2-codex"
+      TASK_ID=1
+      AGENT="bolt"
+      NS="${namespace}"
+      RUN_NAME="play-task-1-bolt"
+      USED_CLI="$PRIMARY_CLI"
+      USED_MODEL="$PRIMARY_MODEL"
+
+      apply_coderun() {
+        local cli="$1" model="$2" run_name="$3"
+        cat <<CODERUN_EOF | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: $run_name
+        namespace: $NS
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "1"
+          cto.5dlabs.ai/agent: "bolt"
+          cto.5dlabs.ai/task-type: "infra"
+          cto.5dlabs.ai/cli: "$cli"
+      spec:
+        runType: implementation
+        taskId: 1
+        service: bolt
+        repositoryUrl: ${repo_url}
+        docsRepositoryUrl: ${docs_repository_url}
+        model: $model
+        githubApp: 5DLabs-Bolt
+        enableDocker: ${enable_docker}
+        cliConfig:
+          cliType: $cli
+          model: $model
+        linearIntegration:
+          enabled: true
+          sessionId: ${linear_session_id}
+          teamId: ${linear_team_id}
+        subtasks:
+          - id: 1001
+            title: "Scaffold Anchor workspace directory structure and configuration files"
+            parallelizable: true
+          - id: 1002
+            title: "Create Kubernetes namespace and Solana local validator deployment"
+            parallelizable: true
+          - id: 1003
+            title: "Generate operator and treasury keypairs and store via OpenBao secrets pipeline"
+            parallelizable: true
+          - id: 1004
+            title: "Create cto-billing-infra-endpoints ConfigMap with all environment references"
+            parallelizable: false
+            dependencies: ["1002", "1003"]
+          - id: 1005
+            title: "Create devnet USDC setup script with SOL airdrop and SPL token minting"
+            parallelizable: false
+            dependencies: ["1001", "1003"]
+          - id: 1006
+            title: "Create build tooling, environment documentation, and end-to-end verification"
+            parallelizable: false
+            dependencies: ["1001", "1002", "1003", "1004", "1005"]
+      CODERUN_EOF
+      }
+
+      wait_coderun() {
+        local run_name="$1"
+        kubectl wait "coderun/$run_name" -n "$NS" \
+          --for=jsonpath='{.status.phase}'=Succeeded \
+          --timeout=3600s
+      }
+
+      # Primary attempt
+      echo "Submitting CodeRun $RUN_NAME ($PRIMARY_CLI/$PRIMARY_MODEL)..." &&
+      apply_coderun "$PRIMARY_CLI" "$PRIMARY_MODEL" "$RUN_NAME" &&
+      if wait_coderun "$RUN_NAME"; then
+        echo "task-1 implementation complete ($PRIMARY_CLI/$PRIMARY_MODEL)"
+      else
+        # --- Fallback attempt: codex/gpt-5.2-codex ---
+        FALLBACK_RUN="play-task-1-bolt-fallback"
+        USED_CLI="$FALLBACK_CLI"
+        USED_MODEL="$FALLBACK_MODEL"
+        echo "⚠️ Primary $PRIMARY_CLI failed for task-1, falling back to $FALLBACK_CLI/$FALLBACK_MODEL..." &&
+        echo '⚠️ Task 1: primary Claude Code failed, falling back to codex/gpt-5.2-codex' | intake-util bridge-notify --from bolt --to ${discord_channel} --metadata '{"step":"fallback-trigger","task_id":1,"agent":"bolt","primary_cli":"Claude Code","fallback_cli":"codex"}' || true
+        kubectl delete "coderun/$RUN_NAME" -n "$NS" --ignore-not-found=true &&
+        apply_coderun "$FALLBACK_CLI" "$FALLBACK_MODEL" "$FALLBACK_RUN" &&
+        wait_coderun "$FALLBACK_RUN" &&
+        echo "task-1 implementation complete via fallback ($FALLBACK_CLI/$FALLBACK_MODEL)"
+      fi &&
+      jq -nc --arg cli "$USED_CLI" --arg model "$USED_MODEL" \
+        '{task_id:1, agent:"bolt", cli:$cli, model:$model, phase:"implementation", status:"complete"}'
+
+  - id: security-task-1
+    depends_on: [run-task-1]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-1/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-1'
+        --arg repo '${repo_url}'
+        --arg branch 'task-1/bolt'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: gate-task-1
+    depends_on: [security-task-1]
+    command: |
+      echo "task-1 [infra] gate passed — Claude Code/claude-opus-4-6-20260205 — all checks complete" &&
+      echo '✅ Task 1: Bootstrap Solana Dev Infrastructure & Anchor Wo... — gate passed (Claude Code/claude-opus-4-6-20260205)' | intake-util bridge-notify --from bolt --to ${discord_channel} --metadata '{"step":"gate-pass","task_id":1,"agent":"bolt","cli":"Claude Code","model":"claude-opus-4-6-20260205","checks":1}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## ✅ Task 1 Gate Passed\n\n**Bootstrap Solana Dev Infrastructure & Anchor Workspace (Bolt - Kubernetes/Helm)**\n- Agent: `bolt` | CLI: `Claude Code`\n- Checks passed: 1 (security-task-1)' >/dev/null || true
+      jq -nc '{task_id: 1, task_type: "infra", agent: "bolt", cli: "Claude Code", model: "claude-opus-4-6-20260205", difficulty: 5, gate: "pass"}'
+
+  # ── Task 2: Implement Anchor Program Core — Operator, Customer & Escrow Instructions (Rex - Rust/Anchor) (task, agent: rex, cli: Claude Code, model: claude-opus-4-6-20260205, difficulty: 5) ──
+  - id: notify-task-2-start
+    depends_on: [gate-task-1]
+    command: |
+      echo '🚀 Task 2: Implement Anchor Program Core — Operator, Custo... → Claude Code (claude-opus-4-6-20260205) — agent: rex' | intake-util bridge-notify --from rex --to ${discord_channel} --metadata '{"step":"task-dispatch","task_id":2,"agent":"rex","cli":"Claude Code","model":"claude-opus-4-6-20260205","task_type":"task"}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## 🚀 Task 2 Dispatched\n\n**Implement Anchor Program Core — Operator, Customer & Escrow Instructions (Rex - Rust/Anchor)**\n- Agent: `rex`\n- CLI: `Claude Code` / Model: `claude-opus-4-6-20260205`\n- Type: task | Difficulty: 5\n- Subtasks: 7' >/dev/null || true
+
+  - id: run-task-2
+    depends_on: [notify-task-2-start]
+    command: |
+      # --- Primary attempt: Claude Code/claude-opus-4-6-20260205 ---
+      PRIMARY_CLI="Claude Code"
+      PRIMARY_MODEL="claude-opus-4-6-20260205"
+      FALLBACK_CLI="codex"
+      FALLBACK_MODEL="gpt-5.2-codex"
+      TASK_ID=2
+      AGENT="rex"
+      NS="${namespace}"
+      RUN_NAME="play-task-2-rex"
+      USED_CLI="$PRIMARY_CLI"
+      USED_MODEL="$PRIMARY_MODEL"
+
+      apply_coderun() {
+        local cli="$1" model="$2" run_name="$3"
+        cat <<CODERUN_EOF | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: $run_name
+        namespace: $NS
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "2"
+          cto.5dlabs.ai/agent: "rex"
+          cto.5dlabs.ai/task-type: "task"
+          cto.5dlabs.ai/cli: "$cli"
+      spec:
+        runType: implementation
+        taskId: 2
+        service: rex
+        repositoryUrl: ${repo_url}
+        docsRepositoryUrl: ${docs_repository_url}
+        model: $model
+        githubApp: 5DLabs-Rex
+        enableDocker: ${enable_docker}
+        cliConfig:
+          cliType: $cli
+          model: $model
+        linearIntegration:
+          enabled: true
+          sessionId: ${linear_session_id}
+          teamId: ${linear_team_id}
+        subtasks:
+          - id: 2001
+            title: "Define account state structures — OperatorConfig, CustomerBalance, and Vault PDA"
+            parallelizable: true
+          - id: 2002
+            title: "Define custom error enum for all billing program errors"
+            parallelizable: true
+          - id: 2003
+            title: "Implement daily spending cap reset helper function"
+            parallelizable: false
+            dependencies: ["2001"]
+          - id: 2004
+            title: "Implement operator instructions — initialize_operator, pause, and unpause"
+            parallelizable: true
+            dependencies: ["2001", "2002"]
+          - id: 2005
+            title: "Implement customer account management — create_customer_account and update_spending_caps"
+            parallelizable: true
+            dependencies: ["2001", "2002"]
+          - id: 2006
+            title: "Implement escrow token operations — deposit and withdraw with SPL transfer_checked"
+            parallelizable: false
+            dependencies: ["2001", "2002", "2003"]
+          - id: 2007
+            title: "Write comprehensive Rust unit tests and verify IDL generation"
+            parallelizable: false
+            dependencies: ["2004", "2005", "2006"]
+      CODERUN_EOF
+      }
+
+      wait_coderun() {
+        local run_name="$1"
+        kubectl wait "coderun/$run_name" -n "$NS" \
+          --for=jsonpath='{.status.phase}'=Succeeded \
+          --timeout=3600s
+      }
+
+      # Primary attempt
+      echo "Submitting CodeRun $RUN_NAME ($PRIMARY_CLI/$PRIMARY_MODEL)..." &&
+      apply_coderun "$PRIMARY_CLI" "$PRIMARY_MODEL" "$RUN_NAME" &&
+      if wait_coderun "$RUN_NAME"; then
+        echo "task-2 implementation complete ($PRIMARY_CLI/$PRIMARY_MODEL)"
+      else
+        # --- Fallback attempt: codex/gpt-5.2-codex ---
+        FALLBACK_RUN="play-task-2-rex-fallback"
+        USED_CLI="$FALLBACK_CLI"
+        USED_MODEL="$FALLBACK_MODEL"
+        echo "⚠️ Primary $PRIMARY_CLI failed for task-2, falling back to $FALLBACK_CLI/$FALLBACK_MODEL..." &&
+        echo '⚠️ Task 2: primary Claude Code failed, falling back to codex/gpt-5.2-codex' | intake-util bridge-notify --from rex --to ${discord_channel} --metadata '{"step":"fallback-trigger","task_id":2,"agent":"rex","primary_cli":"Claude Code","fallback_cli":"codex"}' || true
+        kubectl delete "coderun/$RUN_NAME" -n "$NS" --ignore-not-found=true &&
+        apply_coderun "$FALLBACK_CLI" "$FALLBACK_MODEL" "$FALLBACK_RUN" &&
+        wait_coderun "$FALLBACK_RUN" &&
+        echo "task-2 implementation complete via fallback ($FALLBACK_CLI/$FALLBACK_MODEL)"
+      fi &&
+      jq -nc --arg cli "$USED_CLI" --arg model "$USED_MODEL" \
+        '{task_id:2, agent:"rex", cli:$cli, model:$model, phase:"implementation", status:"complete"}'
+
+  - id: security-task-2
+    depends_on: [run-task-2]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-2/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-2'
+        --arg repo '${repo_url}'
+        --arg branch 'task-2/rex'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: quality-task-2
+    depends_on: [run-task-2]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-2/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-2'
+        --arg repo '${repo_url}'
+        --arg branch 'task-2/rex'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: testing-task-2
+    depends_on: [run-task-2]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-2/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-2'
+        --arg repo '${repo_url}'
+        --arg branch 'task-2/rex'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: gate-task-2
+    depends_on: [security-task-2, quality-task-2, testing-task-2]
+    command: |
+      echo "task-2 [task] gate passed — Claude Code/claude-opus-4-6-20260205 — all checks complete" &&
+      echo '✅ Task 2: Implement Anchor Program Core — Operator, Custo... — gate passed (Claude Code/claude-opus-4-6-20260205)' | intake-util bridge-notify --from rex --to ${discord_channel} --metadata '{"step":"gate-pass","task_id":2,"agent":"rex","cli":"Claude Code","model":"claude-opus-4-6-20260205","checks":3}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## ✅ Task 2 Gate Passed\n\n**Implement Anchor Program Core — Operator, Customer & Escrow Instructions (Rex - Rust/Anchor)**\n- Agent: `rex` | CLI: `Claude Code`\n- Checks passed: 3 (security-task-2, quality-task-2, testing-task-2)' >/dev/null || true
+      jq -nc '{task_id: 2, task_type: "task", agent: "rex", cli: "Claude Code", model: "claude-opus-4-6-20260205", difficulty: 5, gate: "pass"}'
+
+  # ── Task 3: Implement Anchor Program Marketplace — Agent Packages, Settlement & Receipts (Rex - Rust/Anchor) (task, agent: rex, cli: Claude Code, model: claude-opus-4-6-20260205, difficulty: 5) ──
+  - id: notify-task-3-start
+    depends_on: [gate-task-2]
+    command: |
+      echo '🚀 Task 3: Implement Anchor Program Marketplace — Agent Pa... → Claude Code (claude-opus-4-6-20260205) — agent: rex' | intake-util bridge-notify --from rex --to ${discord_channel} --metadata '{"step":"task-dispatch","task_id":3,"agent":"rex","cli":"Claude Code","model":"claude-opus-4-6-20260205","task_type":"task"}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## 🚀 Task 3 Dispatched\n\n**Implement Anchor Program Marketplace — Agent Packages, Settlement & Receipts (Rex - Rust/Anchor)**\n- Agent: `rex`\n- CLI: `Claude Code` / Model: `claude-opus-4-6-20260205`\n- Type: task | Difficulty: 5\n- Subtasks: 7' >/dev/null || true
+
+  - id: run-task-3
+    depends_on: [notify-task-3-start]
+    command: |
+      # --- Primary attempt: Claude Code/claude-opus-4-6-20260205 ---
+      PRIMARY_CLI="Claude Code"
+      PRIMARY_MODEL="claude-opus-4-6-20260205"
+      FALLBACK_CLI="codex"
+      FALLBACK_MODEL="gpt-5.2-codex"
+      TASK_ID=3
+      AGENT="rex"
+      NS="${namespace}"
+      RUN_NAME="play-task-3-rex"
+      USED_CLI="$PRIMARY_CLI"
+      USED_MODEL="$PRIMARY_MODEL"
+
+      apply_coderun() {
+        local cli="$1" model="$2" run_name="$3"
+        cat <<CODERUN_EOF | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: $run_name
+        namespace: $NS
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "3"
+          cto.5dlabs.ai/agent: "rex"
+          cto.5dlabs.ai/task-type: "task"
+          cto.5dlabs.ai/cli: "$cli"
+      spec:
+        runType: implementation
+        taskId: 3
+        service: rex
+        repositoryUrl: ${repo_url}
+        docsRepositoryUrl: ${docs_repository_url}
+        model: $model
+        githubApp: 5DLabs-Rex
+        enableDocker: ${enable_docker}
+        cliConfig:
+          cliType: $cli
+          model: $model
+        linearIntegration:
+          enabled: true
+          sessionId: ${linear_session_id}
+          teamId: ${linear_team_id}
+        subtasks:
+          - id: 3001
+            title: "Define AgentPackage PDA, TaskReceipt PDA, and TaskStatus Enum Account Structures"
+            parallelizable: false
+          - id: 3002
+            title: "Define Custom Error Variants for Marketplace and Settlement Instructions"
+            parallelizable: true
+          - id: 3003
+            title: "Implement register_agent_package and update_agent_package Instructions"
+            parallelizable: true
+            dependencies: ["3001", "3002"]
+          - id: 3004
+            title: "Implement settle_task Instruction — Case 1 (No Agent Package, Full Treasury Transfer)"
+            parallelizable: true
+            dependencies: ["3001", "3002"]
+          - id: 3005
+            title: "Implement settle_task Instruction — Cases 2 & 3 (Agent Package with Quality-Gated Payment Splitting)"
+            parallelizable: false
+            dependencies: ["3001", "3002", "3004"]
+          - id: 3006
+            title: "Implement refund_task Instruction with Balance Restoration and Status Update"
+            parallelizable: true
+            dependencies: ["3001", "3002"]
+          - id: 3007
+            title: "Rust Unit Tests for Split Calculation Edge Cases and Overflow Protection"
+            parallelizable: false
+            dependencies: ["3003", "3004", "3005", "3006"]
+      CODERUN_EOF
+      }
+
+      wait_coderun() {
+        local run_name="$1"
+        kubectl wait "coderun/$run_name" -n "$NS" \
+          --for=jsonpath='{.status.phase}'=Succeeded \
+          --timeout=3600s
+      }
+
+      # Primary attempt
+      echo "Submitting CodeRun $RUN_NAME ($PRIMARY_CLI/$PRIMARY_MODEL)..." &&
+      apply_coderun "$PRIMARY_CLI" "$PRIMARY_MODEL" "$RUN_NAME" &&
+      if wait_coderun "$RUN_NAME"; then
+        echo "task-3 implementation complete ($PRIMARY_CLI/$PRIMARY_MODEL)"
+      else
+        # --- Fallback attempt: codex/gpt-5.2-codex ---
+        FALLBACK_RUN="play-task-3-rex-fallback"
+        USED_CLI="$FALLBACK_CLI"
+        USED_MODEL="$FALLBACK_MODEL"
+        echo "⚠️ Primary $PRIMARY_CLI failed for task-3, falling back to $FALLBACK_CLI/$FALLBACK_MODEL..." &&
+        echo '⚠️ Task 3: primary Claude Code failed, falling back to codex/gpt-5.2-codex' | intake-util bridge-notify --from rex --to ${discord_channel} --metadata '{"step":"fallback-trigger","task_id":3,"agent":"rex","primary_cli":"Claude Code","fallback_cli":"codex"}' || true
+        kubectl delete "coderun/$RUN_NAME" -n "$NS" --ignore-not-found=true &&
+        apply_coderun "$FALLBACK_CLI" "$FALLBACK_MODEL" "$FALLBACK_RUN" &&
+        wait_coderun "$FALLBACK_RUN" &&
+        echo "task-3 implementation complete via fallback ($FALLBACK_CLI/$FALLBACK_MODEL)"
+      fi &&
+      jq -nc --arg cli "$USED_CLI" --arg model "$USED_MODEL" \
+        '{task_id:3, agent:"rex", cli:$cli, model:$model, phase:"implementation", status:"complete"}'
+
+  - id: security-task-3
+    depends_on: [run-task-3]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-3/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-3'
+        --arg repo '${repo_url}'
+        --arg branch 'task-3/rex'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: quality-task-3
+    depends_on: [run-task-3]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-3/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-3'
+        --arg repo '${repo_url}'
+        --arg branch 'task-3/rex'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: testing-task-3
+    depends_on: [run-task-3]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-3/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-3'
+        --arg repo '${repo_url}'
+        --arg branch 'task-3/rex'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: gate-task-3
+    depends_on: [security-task-3, quality-task-3, testing-task-3]
+    command: |
+      echo "task-3 [task] gate passed — Claude Code/claude-opus-4-6-20260205 — all checks complete" &&
+      echo '✅ Task 3: Implement Anchor Program Marketplace — Agent Pa... — gate passed (Claude Code/claude-opus-4-6-20260205)' | intake-util bridge-notify --from rex --to ${discord_channel} --metadata '{"step":"gate-pass","task_id":3,"agent":"rex","cli":"Claude Code","model":"claude-opus-4-6-20260205","checks":3}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## ✅ Task 3 Gate Passed\n\n**Implement Anchor Program Marketplace — Agent Packages, Settlement & Receipts (Rex - Rust/Anchor)**\n- Agent: `rex` | CLI: `Claude Code`\n- Checks passed: 3 (security-task-3, quality-task-3, testing-task-3)' >/dev/null || true
+      jq -nc '{task_id: 3, task_type: "task", agent: "rex", cli: "Claude Code", model: "claude-opus-4-6-20260205", difficulty: 5, gate: "pass"}'
+
+  # ── Task 4: Build Arweave/Irys Receipt Upload Module (Nova - Bun/TypeScript) (task, agent: nova, cli: Claude Code, model: claude-opus-4-6-20260205, difficulty: 5) ──
+  - id: notify-task-4-start
+    depends_on: [gate-task-1]
+    command: |
+      echo '🚀 Task 4: Build Arweave/Irys Receipt Upload Module (Nova ... → Claude Code (claude-opus-4-6-20260205) — agent: nova' | intake-util bridge-notify --from nova --to ${discord_channel} --metadata '{"step":"task-dispatch","task_id":4,"agent":"nova","cli":"Claude Code","model":"claude-opus-4-6-20260205","task_type":"task"}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## 🚀 Task 4 Dispatched\n\n**Build Arweave/Irys Receipt Upload Module (Nova - Bun/TypeScript)**\n- Agent: `nova`\n- CLI: `Claude Code` / Model: `claude-opus-4-6-20260205`\n- Type: task | Difficulty: 5\n- Subtasks: 3' >/dev/null || true
+
+  - id: run-task-4
+    depends_on: [notify-task-4-start]
+    command: |
+      # --- Primary attempt: Claude Code/claude-opus-4-6-20260205 ---
+      PRIMARY_CLI="Claude Code"
+      PRIMARY_MODEL="claude-opus-4-6-20260205"
+      FALLBACK_CLI="codex"
+      FALLBACK_MODEL="gpt-5.2-codex"
+      TASK_ID=4
+      AGENT="nova"
+      NS="${namespace}"
+      RUN_NAME="play-task-4-nova"
+      USED_CLI="$PRIMARY_CLI"
+      USED_MODEL="$PRIMARY_MODEL"
+
+      apply_coderun() {
+        local cli="$1" model="$2" run_name="$3"
+        cat <<CODERUN_EOF | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: $run_name
+        namespace: $NS
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "4"
+          cto.5dlabs.ai/agent: "nova"
+          cto.5dlabs.ai/task-type: "task"
+          cto.5dlabs.ai/cli: "$cli"
+      spec:
+        runType: implementation
+        taskId: 4
+        service: nova
+        repositoryUrl: ${repo_url}
+        docsRepositoryUrl: ${docs_repository_url}
+        model: $model
+        githubApp: 5DLabs-Nova
+        enableDocker: ${enable_docker}
+        cliConfig:
+          cliType: $cli
+          model: $model
+        linearIntegration:
+          enabled: true
+          sessionId: ${linear_session_id}
+          teamId: ${linear_team_id}
+        subtasks:
+          - id: 4001
+            title: "Scaffold Package Structure, TypeScript Configuration, and Core Type Definitions"
+            parallelizable: false
+          - id: 4002
+            title: "Implement Irys Client Initialization, Receipt Upload, Verification, and Funding Utilities"
+            parallelizable: false
+            dependencies: ["4001"]
+          - id: 4003
+            title: "Write Unit and Integration Tests, Validate Build Output and TypeScript Declarations"
+            parallelizable: false
+            dependencies: ["4002"]
+      CODERUN_EOF
+      }
+
+      wait_coderun() {
+        local run_name="$1"
+        kubectl wait "coderun/$run_name" -n "$NS" \
+          --for=jsonpath='{.status.phase}'=Succeeded \
+          --timeout=3600s
+      }
+
+      # Primary attempt
+      echo "Submitting CodeRun $RUN_NAME ($PRIMARY_CLI/$PRIMARY_MODEL)..." &&
+      apply_coderun "$PRIMARY_CLI" "$PRIMARY_MODEL" "$RUN_NAME" &&
+      if wait_coderun "$RUN_NAME"; then
+        echo "task-4 implementation complete ($PRIMARY_CLI/$PRIMARY_MODEL)"
+      else
+        # --- Fallback attempt: codex/gpt-5.2-codex ---
+        FALLBACK_RUN="play-task-4-nova-fallback"
+        USED_CLI="$FALLBACK_CLI"
+        USED_MODEL="$FALLBACK_MODEL"
+        echo "⚠️ Primary $PRIMARY_CLI failed for task-4, falling back to $FALLBACK_CLI/$FALLBACK_MODEL..." &&
+        echo '⚠️ Task 4: primary Claude Code failed, falling back to codex/gpt-5.2-codex' | intake-util bridge-notify --from nova --to ${discord_channel} --metadata '{"step":"fallback-trigger","task_id":4,"agent":"nova","primary_cli":"Claude Code","fallback_cli":"codex"}' || true
+        kubectl delete "coderun/$RUN_NAME" -n "$NS" --ignore-not-found=true &&
+        apply_coderun "$FALLBACK_CLI" "$FALLBACK_MODEL" "$FALLBACK_RUN" &&
+        wait_coderun "$FALLBACK_RUN" &&
+        echo "task-4 implementation complete via fallback ($FALLBACK_CLI/$FALLBACK_MODEL)"
+      fi &&
+      jq -nc --arg cli "$USED_CLI" --arg model "$USED_MODEL" \
+        '{task_id:4, agent:"nova", cli:$cli, model:$model, phase:"implementation", status:"complete"}'
+
+  - id: security-task-4
+    depends_on: [run-task-4]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-4/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-4'
+        --arg repo '${repo_url}'
+        --arg branch 'task-4/nova'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: quality-task-4
+    depends_on: [run-task-4]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-4/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-4'
+        --arg repo '${repo_url}'
+        --arg branch 'task-4/nova'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: testing-task-4
+    depends_on: [run-task-4]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-4/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-4'
+        --arg repo '${repo_url}'
+        --arg branch 'task-4/nova'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: gate-task-4
+    depends_on: [security-task-4, quality-task-4, testing-task-4]
+    command: |
+      echo "task-4 [task] gate passed — Claude Code/claude-opus-4-6-20260205 — all checks complete" &&
+      echo '✅ Task 4: Build Arweave/Irys Receipt Upload Module (Nova ... — gate passed (Claude Code/claude-opus-4-6-20260205)' | intake-util bridge-notify --from nova --to ${discord_channel} --metadata '{"step":"gate-pass","task_id":4,"agent":"nova","cli":"Claude Code","model":"claude-opus-4-6-20260205","checks":3}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## ✅ Task 4 Gate Passed\n\n**Build Arweave/Irys Receipt Upload Module (Nova - Bun/TypeScript)**\n- Agent: `nova` | CLI: `Claude Code`\n- Checks passed: 3 (security-task-4, quality-task-4, testing-task-4)' >/dev/null || true
+      jq -nc '{task_id: 4, task_type: "task", agent: "nova", cli: "Claude Code", model: "claude-opus-4-6-20260205", difficulty: 5, gate: "pass"}'
+
+  # ── Task 5: Integrate Solana Settlement Hook into CTO Controller (Rex - Rust/Axum) (task, agent: rex, cli: Claude Code, model: claude-opus-4-6-20260205, difficulty: 5) ──
+  - id: notify-task-5-start
+    depends_on: [gate-task-2, gate-task-3, gate-task-4]
+    command: |
+      echo '🚀 Task 5: Integrate Solana Settlement Hook into CTO Contr... → Claude Code (claude-opus-4-6-20260205) — agent: rex' | intake-util bridge-notify --from rex --to ${discord_channel} --metadata '{"step":"task-dispatch","task_id":5,"agent":"rex","cli":"Claude Code","model":"claude-opus-4-6-20260205","task_type":"task"}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## 🚀 Task 5 Dispatched\n\n**Integrate Solana Settlement Hook into CTO Controller (Rex - Rust/Axum)**\n- Agent: `rex`\n- CLI: `Claude Code` / Model: `claude-opus-4-6-20260205`\n- Type: task | Difficulty: 5\n- Subtasks: 8' >/dev/null || true
+
+  - id: run-task-5
+    depends_on: [notify-task-5-start]
+    command: |
+      # --- Primary attempt: Claude Code/claude-opus-4-6-20260205 ---
+      PRIMARY_CLI="Claude Code"
+      PRIMARY_MODEL="claude-opus-4-6-20260205"
+      FALLBACK_CLI="codex"
+      FALLBACK_MODEL="gpt-5.2-codex"
+      TASK_ID=5
+      AGENT="rex"
+      NS="${namespace}"
+      RUN_NAME="play-task-5-rex"
+      USED_CLI="$PRIMARY_CLI"
+      USED_MODEL="$PRIMARY_MODEL"
+
+      apply_coderun() {
+        local cli="$1" model="$2" run_name="$3"
+        cat <<CODERUN_EOF | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: $run_name
+        namespace: $NS
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "5"
+          cto.5dlabs.ai/agent: "rex"
+          cto.5dlabs.ai/task-type: "task"
+          cto.5dlabs.ai/cli: "$cli"
+      spec:
+        runType: implementation
+        taskId: 5
+        service: rex
+        repositoryUrl: ${repo_url}
+        docsRepositoryUrl: ${docs_repository_url}
+        model: $model
+        githubApp: 5DLabs-Rex
+        enableDocker: ${enable_docker}
+        cliConfig:
+          cliType: $cli
+          model: $model
+        linearIntegration:
+          enabled: true
+          sessionId: ${linear_session_id}
+          teamId: ${linear_team_id}
+        subtasks:
+          - id: 5001
+            title: "Add Solana, Anchor, and crypto crate dependencies to controller Cargo.toml"
+            parallelizable: true
+          - id: 5002
+            title: "Extend controller config with Solana billing fields"
+            parallelizable: false
+            dependencies: ["5001"]
+          - id: 5003
+            title: "Implement billable amount computation and receipt JSON builder"
+            parallelizable: true
+            dependencies: ["5002"]
+          - id: 5004
+            title: "Implement Arweave receipt upload integration"
+            parallelizable: true
+            dependencies: ["5002"]
+          - id: 5005
+            title: "Implement Solana settle_task and refund_task transaction submission"
+            parallelizable: true
+            dependencies: ["5002"]
+          - id: 5006
+            title: "Add customer wallet mapping to CRD or namespace config"
+            parallelizable: true
+            dependencies: ["5001"]
+          - id: 5007
+            title: "Integrate billing into the controller reconciliation loop"
+            parallelizable: false
+            dependencies: ["5003", "5004", "5005", "5006"]
+          - id: 5008
+            title: "Write unit tests for billing module"
+            parallelizable: true
+            dependencies: ["5003", "5004", "5005"]
+      CODERUN_EOF
+      }
+
+      wait_coderun() {
+        local run_name="$1"
+        kubectl wait "coderun/$run_name" -n "$NS" \
+          --for=jsonpath='{.status.phase}'=Succeeded \
+          --timeout=3600s
+      }
+
+      # Primary attempt
+      echo "Submitting CodeRun $RUN_NAME ($PRIMARY_CLI/$PRIMARY_MODEL)..." &&
+      apply_coderun "$PRIMARY_CLI" "$PRIMARY_MODEL" "$RUN_NAME" &&
+      if wait_coderun "$RUN_NAME"; then
+        echo "task-5 implementation complete ($PRIMARY_CLI/$PRIMARY_MODEL)"
+      else
+        # --- Fallback attempt: codex/gpt-5.2-codex ---
+        FALLBACK_RUN="play-task-5-rex-fallback"
+        USED_CLI="$FALLBACK_CLI"
+        USED_MODEL="$FALLBACK_MODEL"
+        echo "⚠️ Primary $PRIMARY_CLI failed for task-5, falling back to $FALLBACK_CLI/$FALLBACK_MODEL..." &&
+        echo '⚠️ Task 5: primary Claude Code failed, falling back to codex/gpt-5.2-codex' | intake-util bridge-notify --from rex --to ${discord_channel} --metadata '{"step":"fallback-trigger","task_id":5,"agent":"rex","primary_cli":"Claude Code","fallback_cli":"codex"}' || true
+        kubectl delete "coderun/$RUN_NAME" -n "$NS" --ignore-not-found=true &&
+        apply_coderun "$FALLBACK_CLI" "$FALLBACK_MODEL" "$FALLBACK_RUN" &&
+        wait_coderun "$FALLBACK_RUN" &&
+        echo "task-5 implementation complete via fallback ($FALLBACK_CLI/$FALLBACK_MODEL)"
+      fi &&
+      jq -nc --arg cli "$USED_CLI" --arg model "$USED_MODEL" \
+        '{task_id:5, agent:"rex", cli:$cli, model:$model, phase:"implementation", status:"complete"}'
+
+  - id: security-task-5
+    depends_on: [run-task-5]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-5/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-5'
+        --arg repo '${repo_url}'
+        --arg branch 'task-5/rex'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: quality-task-5
+    depends_on: [run-task-5]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-5/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-5'
+        --arg repo '${repo_url}'
+        --arg branch 'task-5/rex'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: testing-task-5
+    depends_on: [run-task-5]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-5/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-5'
+        --arg repo '${repo_url}'
+        --arg branch 'task-5/rex'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: gate-task-5
+    depends_on: [security-task-5, quality-task-5, testing-task-5]
+    command: |
+      echo "task-5 [task] gate passed — Claude Code/claude-opus-4-6-20260205 — all checks complete" &&
+      echo '✅ Task 5: Integrate Solana Settlement Hook into CTO Contr... — gate passed (Claude Code/claude-opus-4-6-20260205)' | intake-util bridge-notify --from rex --to ${discord_channel} --metadata '{"step":"gate-pass","task_id":5,"agent":"rex","cli":"Claude Code","model":"claude-opus-4-6-20260205","checks":3}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## ✅ Task 5 Gate Passed\n\n**Integrate Solana Settlement Hook into CTO Controller (Rex - Rust/Axum)**\n- Agent: `rex` | CLI: `Claude Code`\n- Checks passed: 3 (security-task-5, quality-task-5, testing-task-5)' >/dev/null || true
+      jq -nc '{task_id: 5, task_type: "task", agent: "rex", cli: "Claude Code", model: "claude-opus-4-6-20260205", difficulty: 5, gate: "pass"}'
+
+  # ── Task 6: Build Hackathon Demo CLI Script — Full E2E Flow (Nova - Bun/TypeScript) (task, agent: nova, cli: Claude Code, model: claude-opus-4-6-20260205, difficulty: 5) ──
+  - id: notify-task-6-start
+    depends_on: [gate-task-2, gate-task-3, gate-task-4]
+    command: |
+      echo '🚀 Task 6: Build Hackathon Demo CLI Script — Full E2E Flow... → Claude Code (claude-opus-4-6-20260205) — agent: nova' | intake-util bridge-notify --from nova --to ${discord_channel} --metadata '{"step":"task-dispatch","task_id":6,"agent":"nova","cli":"Claude Code","model":"claude-opus-4-6-20260205","task_type":"task"}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## 🚀 Task 6 Dispatched\n\n**Build Hackathon Demo CLI Script — Full E2E Flow (Nova - Bun/TypeScript)**\n- Agent: `nova`\n- CLI: `Claude Code` / Model: `claude-opus-4-6-20260205`\n- Type: task | Difficulty: 5\n- Subtasks: 4' >/dev/null || true
+
+  - id: run-task-6
+    depends_on: [notify-task-6-start]
+    command: |
+      # --- Primary attempt: Claude Code/claude-opus-4-6-20260205 ---
+      PRIMARY_CLI="Claude Code"
+      PRIMARY_MODEL="claude-opus-4-6-20260205"
+      FALLBACK_CLI="codex"
+      FALLBACK_MODEL="gpt-5.2-codex"
+      TASK_ID=6
+      AGENT="nova"
+      NS="${namespace}"
+      RUN_NAME="play-task-6-nova"
+      USED_CLI="$PRIMARY_CLI"
+      USED_MODEL="$PRIMARY_MODEL"
+
+      apply_coderun() {
+        local cli="$1" model="$2" run_name="$3"
+        cat <<CODERUN_EOF | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: $run_name
+        namespace: $NS
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "6"
+          cto.5dlabs.ai/agent: "nova"
+          cto.5dlabs.ai/task-type: "task"
+          cto.5dlabs.ai/cli: "$cli"
+      spec:
+        runType: implementation
+        taskId: 6
+        service: nova
+        repositoryUrl: ${repo_url}
+        docsRepositoryUrl: ${docs_repository_url}
+        model: $model
+        githubApp: 5DLabs-Nova
+        enableDocker: ${enable_docker}
+        cliConfig:
+          cliType: $cli
+          model: $model
+        linearIntegration:
+          enabled: true
+          sessionId: ${linear_session_id}
+          teamId: ${linear_team_id}
+        subtasks:
+          - id: 6001
+            title: "Scaffold CLI project with dependencies and setup utilities"
+            parallelizable: true
+          - id: 6002
+            title: "Implement demo steps 0-4: Setup, initialize operator, register agent, create customer, deposit"
+            parallelizable: false
+            dependencies: ["6001"]
+          - id: 6003
+            title: "Implement demo steps 5-9: Settle (quality met/not met), verify receipts, withdraw, summary"
+            parallelizable: false
+            dependencies: ["6002"]
+          - id: 6004
+            title: "Implement individual CLI command modules for standalone usage"
+            parallelizable: true
+            dependencies: ["6001"]
+      CODERUN_EOF
+      }
+
+      wait_coderun() {
+        local run_name="$1"
+        kubectl wait "coderun/$run_name" -n "$NS" \
+          --for=jsonpath='{.status.phase}'=Succeeded \
+          --timeout=3600s
+      }
+
+      # Primary attempt
+      echo "Submitting CodeRun $RUN_NAME ($PRIMARY_CLI/$PRIMARY_MODEL)..." &&
+      apply_coderun "$PRIMARY_CLI" "$PRIMARY_MODEL" "$RUN_NAME" &&
+      if wait_coderun "$RUN_NAME"; then
+        echo "task-6 implementation complete ($PRIMARY_CLI/$PRIMARY_MODEL)"
+      else
+        # --- Fallback attempt: codex/gpt-5.2-codex ---
+        FALLBACK_RUN="play-task-6-nova-fallback"
+        USED_CLI="$FALLBACK_CLI"
+        USED_MODEL="$FALLBACK_MODEL"
+        echo "⚠️ Primary $PRIMARY_CLI failed for task-6, falling back to $FALLBACK_CLI/$FALLBACK_MODEL..." &&
+        echo '⚠️ Task 6: primary Claude Code failed, falling back to codex/gpt-5.2-codex' | intake-util bridge-notify --from nova --to ${discord_channel} --metadata '{"step":"fallback-trigger","task_id":6,"agent":"nova","primary_cli":"Claude Code","fallback_cli":"codex"}' || true
+        kubectl delete "coderun/$RUN_NAME" -n "$NS" --ignore-not-found=true &&
+        apply_coderun "$FALLBACK_CLI" "$FALLBACK_MODEL" "$FALLBACK_RUN" &&
+        wait_coderun "$FALLBACK_RUN" &&
+        echo "task-6 implementation complete via fallback ($FALLBACK_CLI/$FALLBACK_MODEL)"
+      fi &&
+      jq -nc --arg cli "$USED_CLI" --arg model "$USED_MODEL" \
+        '{task_id:6, agent:"nova", cli:$cli, model:$model, phase:"implementation", status:"complete"}'
+
+  - id: security-task-6
+    depends_on: [run-task-6]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-6/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-6'
+        --arg repo '${repo_url}'
+        --arg branch 'task-6/nova'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: quality-task-6
+    depends_on: [run-task-6]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-6/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-6'
+        --arg repo '${repo_url}'
+        --arg branch 'task-6/nova'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: testing-task-6
+    depends_on: [run-task-6]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-6/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-6'
+        --arg repo '${repo_url}'
+        --arg branch 'task-6/nova'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: gate-task-6
+    depends_on: [security-task-6, quality-task-6, testing-task-6]
+    command: |
+      echo "task-6 [task] gate passed — Claude Code/claude-opus-4-6-20260205 — all checks complete" &&
+      echo '✅ Task 6: Build Hackathon Demo CLI Script — Full E2E Flow... — gate passed (Claude Code/claude-opus-4-6-20260205)' | intake-util bridge-notify --from nova --to ${discord_channel} --metadata '{"step":"gate-pass","task_id":6,"agent":"nova","cli":"Claude Code","model":"claude-opus-4-6-20260205","checks":3}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## ✅ Task 6 Gate Passed\n\n**Build Hackathon Demo CLI Script — Full E2E Flow (Nova - Bun/TypeScript)**\n- Agent: `nova` | CLI: `Claude Code`\n- Checks passed: 3 (security-task-6, quality-task-6, testing-task-6)' >/dev/null || true
+      jq -nc '{task_id: 6, task_type: "task", agent: "nova", cli: "Claude Code", model: "claude-opus-4-6-20260205", difficulty: 5, gate: "pass"}'
+
+  # ── Task 7: Build Web Dashboard for Receipts, Balances & Agent Packages (Blaze - React/Next.js) (task, agent: blaze, cli: Claude Code, model: claude-opus-4-6-20260205, difficulty: 5) ──
+  - id: notify-task-7-start
+    depends_on: [gate-task-2, gate-task-3]
+    command: |
+      echo '🚀 Task 7: Build Web Dashboard for Receipts, Balances & Ag... → Claude Code (claude-opus-4-6-20260205) — agent: blaze' | intake-util bridge-notify --from blaze --to ${discord_channel} --metadata '{"step":"task-dispatch","task_id":7,"agent":"blaze","cli":"Claude Code","model":"claude-opus-4-6-20260205","task_type":"task"}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## 🚀 Task 7 Dispatched\n\n**Build Web Dashboard for Receipts, Balances & Agent Packages (Blaze - React/Next.js)**\n- Agent: `blaze`\n- CLI: `Claude Code` / Model: `claude-opus-4-6-20260205`\n- Type: task | Difficulty: 5\n- Subtasks: 7' >/dev/null || true
+
+  - id: run-task-7
+    depends_on: [notify-task-7-start]
+    command: |
+      # --- Primary attempt: Claude Code/claude-opus-4-6-20260205 ---
+      PRIMARY_CLI="Claude Code"
+      PRIMARY_MODEL="claude-opus-4-6-20260205"
+      FALLBACK_CLI="codex"
+      FALLBACK_MODEL="gpt-5.2-codex"
+      TASK_ID=7
+      AGENT="blaze"
+      NS="${namespace}"
+      RUN_NAME="play-task-7-blaze"
+      USED_CLI="$PRIMARY_CLI"
+      USED_MODEL="$PRIMARY_MODEL"
+
+      apply_coderun() {
+        local cli="$1" model="$2" run_name="$3"
+        cat <<CODERUN_EOF | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: $run_name
+        namespace: $NS
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "7"
+          cto.5dlabs.ai/agent: "blaze"
+          cto.5dlabs.ai/task-type: "task"
+          cto.5dlabs.ai/cli: "$cli"
+      spec:
+        runType: implementation
+        taskId: 7
+        service: blaze
+        repositoryUrl: ${repo_url}
+        docsRepositoryUrl: ${docs_repository_url}
+        model: $model
+        githubApp: 5DLabs-Blaze
+        enableDocker: ${enable_docker}
+        cliConfig:
+          cliType: $cli
+          model: $model
+        linearIntegration:
+          enabled: true
+          sessionId: ${linear_session_id}
+          teamId: ${linear_team_id}
+        subtasks:
+          - id: 7001
+            title: "Scaffold Next.js 14 app with Solana wallet providers and program hooks"
+            parallelizable: false
+          - id: 7002
+            title: "Build shared UI components library and dark theme Tailwind configuration"
+            parallelizable: false
+            dependencies: ["7001"]
+          - id: 7003
+            title: "Implement dashboard home page with balance summary and wallet state handling"
+            parallelizable: true
+            dependencies: ["7002"]
+          - id: 7004
+            title: "Implement deposit and withdraw pages with wallet transaction submission"
+            parallelizable: true
+            dependencies: ["7002"]
+          - id: 7005
+            title: "Implement receipts list page with on-chain data fetching and filtering"
+            parallelizable: true
+            dependencies: ["7002"]
+          - id: 7006
+            title: "Implement receipt detail page with Arweave verification and hash checking"
+            parallelizable: false
+            dependencies: ["7005"]
+          - id: 7007
+            title: "Implement agent packages list and detail pages with stats display"
+            parallelizable: true
+            dependencies: ["7002"]
+      CODERUN_EOF
+      }
+
+      wait_coderun() {
+        local run_name="$1"
+        kubectl wait "coderun/$run_name" -n "$NS" \
+          --for=jsonpath='{.status.phase}'=Succeeded \
+          --timeout=3600s
+      }
+
+      # Primary attempt
+      echo "Submitting CodeRun $RUN_NAME ($PRIMARY_CLI/$PRIMARY_MODEL)..." &&
+      apply_coderun "$PRIMARY_CLI" "$PRIMARY_MODEL" "$RUN_NAME" &&
+      if wait_coderun "$RUN_NAME"; then
+        echo "task-7 implementation complete ($PRIMARY_CLI/$PRIMARY_MODEL)"
+      else
+        # --- Fallback attempt: codex/gpt-5.2-codex ---
+        FALLBACK_RUN="play-task-7-blaze-fallback"
+        USED_CLI="$FALLBACK_CLI"
+        USED_MODEL="$FALLBACK_MODEL"
+        echo "⚠️ Primary $PRIMARY_CLI failed for task-7, falling back to $FALLBACK_CLI/$FALLBACK_MODEL..." &&
+        echo '⚠️ Task 7: primary Claude Code failed, falling back to codex/gpt-5.2-codex' | intake-util bridge-notify --from blaze --to ${discord_channel} --metadata '{"step":"fallback-trigger","task_id":7,"agent":"blaze","primary_cli":"Claude Code","fallback_cli":"codex"}' || true
+        kubectl delete "coderun/$RUN_NAME" -n "$NS" --ignore-not-found=true &&
+        apply_coderun "$FALLBACK_CLI" "$FALLBACK_MODEL" "$FALLBACK_RUN" &&
+        wait_coderun "$FALLBACK_RUN" &&
+        echo "task-7 implementation complete via fallback ($FALLBACK_CLI/$FALLBACK_MODEL)"
+      fi &&
+      jq -nc --arg cli "$USED_CLI" --arg model "$USED_MODEL" \
+        '{task_id:7, agent:"blaze", cli:$cli, model:$model, phase:"implementation", status:"complete"}'
+
+  - id: security-task-7
+    depends_on: [run-task-7]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-7/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-7'
+        --arg repo '${repo_url}'
+        --arg branch 'task-7/blaze'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: quality-task-7
+    depends_on: [run-task-7]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-7/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-7'
+        --arg repo '${repo_url}'
+        --arg branch 'task-7/blaze'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: testing-task-7
+    depends_on: [run-task-7]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-7/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-7'
+        --arg repo '${repo_url}'
+        --arg branch 'task-7/blaze'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: gate-task-7
+    depends_on: [security-task-7, quality-task-7, testing-task-7]
+    command: |
+      echo "task-7 [task] gate passed — Claude Code/claude-opus-4-6-20260205 — all checks complete" &&
+      echo '✅ Task 7: Build Web Dashboard for Receipts, Balances & Ag... — gate passed (Claude Code/claude-opus-4-6-20260205)' | intake-util bridge-notify --from blaze --to ${discord_channel} --metadata '{"step":"gate-pass","task_id":7,"agent":"blaze","cli":"Claude Code","model":"claude-opus-4-6-20260205","checks":3}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## ✅ Task 7 Gate Passed\n\n**Build Web Dashboard for Receipts, Balances & Agent Packages (Blaze - React/Next.js)**\n- Agent: `blaze` | CLI: `Claude Code`\n- Checks passed: 3 (security-task-7, quality-task-7, testing-task-7)' >/dev/null || true
+      jq -nc '{task_id: 7, task_type: "task", agent: "blaze", cli: "Claude Code", model: "claude-opus-4-6-20260205", difficulty: 5, gate: "pass"}'
+
+  # ── Task 8: Comprehensive Integration & E2E Test Suite (Tess - Test Frameworks) (task, agent: tess, cli: Claude Code, model: claude-opus-4-6-20260205, difficulty: 5) ──
+  - id: notify-task-8-start
+    depends_on: [gate-task-2, gate-task-3, gate-task-4]
+    command: |
+      echo '🚀 Task 8: Comprehensive Integration & E2E Test Suite (Tes... → Claude Code (claude-opus-4-6-20260205) — agent: tess' | intake-util bridge-notify --from tess --to ${discord_channel} --metadata '{"step":"task-dispatch","task_id":8,"agent":"tess","cli":"Claude Code","model":"claude-opus-4-6-20260205","task_type":"task"}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## 🚀 Task 8 Dispatched\n\n**Comprehensive Integration & E2E Test Suite (Tess - Test Frameworks)**\n- Agent: `tess`\n- CLI: `Claude Code` / Model: `claude-opus-4-6-20260205`\n- Type: task | Difficulty: 5\n- Subtasks: 9' >/dev/null || true
+
+  - id: run-task-8
+    depends_on: [notify-task-8-start]
+    command: |
+      # --- Primary attempt: Claude Code/claude-opus-4-6-20260205 ---
+      PRIMARY_CLI="Claude Code"
+      PRIMARY_MODEL="claude-opus-4-6-20260205"
+      FALLBACK_CLI="codex"
+      FALLBACK_MODEL="gpt-5.2-codex"
+      TASK_ID=8
+      AGENT="tess"
+      NS="${namespace}"
+      RUN_NAME="play-task-8-tess"
+      USED_CLI="$PRIMARY_CLI"
+      USED_MODEL="$PRIMARY_MODEL"
+
+      apply_coderun() {
+        local cli="$1" model="$2" run_name="$3"
+        cat <<CODERUN_EOF | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: $run_name
+        namespace: $NS
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "8"
+          cto.5dlabs.ai/agent: "tess"
+          cto.5dlabs.ai/task-type: "task"
+          cto.5dlabs.ai/cli: "$cli"
+      spec:
+        runType: implementation
+        taskId: 8
+        service: tess
+        repositoryUrl: ${repo_url}
+        docsRepositoryUrl: ${docs_repository_url}
+        model: $model
+        githubApp: 5DLabs-Tess
+        enableDocker: ${enable_docker}
+        cliConfig:
+          cliType: $cli
+          model: $model
+        linearIntegration:
+          enabled: true
+          sessionId: ${linear_session_id}
+          teamId: ${linear_team_id}
+        subtasks:
+          - id: 8001
+            title: "Set up test infrastructure with helpers, fixtures, and configuration"
+            parallelizable: false
+          - id: 8002
+            title: "Implement operator lifecycle test suite (01-operator.test.ts)"
+            parallelizable: true
+            dependencies: ["8001"]
+          - id: 8003
+            title: "Implement customer account and escrow test suite (02-customer.test.ts)"
+            parallelizable: true
+            dependencies: ["8001"]
+          - id: 8004
+            title: "Implement agent package registry test suite (03-agent-package.test.ts)"
+            parallelizable: true
+            dependencies: ["8001"]
+          - id: 8005
+            title: "Implement settlement test suite (04-settlement.test.ts)"
+            parallelizable: true
+            dependencies: ["8001"]
+          - id: 8006
+            title: "Implement refund flow test suite (05-refund.test.ts)"
+            parallelizable: true
+            dependencies: ["8001"]
+          - id: 8007
+            title: "Implement daily spending cap reset test suite (06-daily-reset.test.ts)"
+            parallelizable: true
+            dependencies: ["8001"]
+          - id: 8008
+            title: "Implement end-to-end demo flow test (07-e2e-demo-flow.test.ts)"
+            parallelizable: true
+            dependencies: ["8001"]
+          - id: 8009
+            title: "Create test runner script and CI integration configuration"
+            parallelizable: false
+            dependencies: ["8002", "8003", "8004", "8005", "8006", "8007", "8008"]
+      CODERUN_EOF
+      }
+
+      wait_coderun() {
+        local run_name="$1"
+        kubectl wait "coderun/$run_name" -n "$NS" \
+          --for=jsonpath='{.status.phase}'=Succeeded \
+          --timeout=3600s
+      }
+
+      # Primary attempt
+      echo "Submitting CodeRun $RUN_NAME ($PRIMARY_CLI/$PRIMARY_MODEL)..." &&
+      apply_coderun "$PRIMARY_CLI" "$PRIMARY_MODEL" "$RUN_NAME" &&
+      if wait_coderun "$RUN_NAME"; then
+        echo "task-8 implementation complete ($PRIMARY_CLI/$PRIMARY_MODEL)"
+      else
+        # --- Fallback attempt: codex/gpt-5.2-codex ---
+        FALLBACK_RUN="play-task-8-tess-fallback"
+        USED_CLI="$FALLBACK_CLI"
+        USED_MODEL="$FALLBACK_MODEL"
+        echo "⚠️ Primary $PRIMARY_CLI failed for task-8, falling back to $FALLBACK_CLI/$FALLBACK_MODEL..." &&
+        echo '⚠️ Task 8: primary Claude Code failed, falling back to codex/gpt-5.2-codex' | intake-util bridge-notify --from tess --to ${discord_channel} --metadata '{"step":"fallback-trigger","task_id":8,"agent":"tess","primary_cli":"Claude Code","fallback_cli":"codex"}' || true
+        kubectl delete "coderun/$RUN_NAME" -n "$NS" --ignore-not-found=true &&
+        apply_coderun "$FALLBACK_CLI" "$FALLBACK_MODEL" "$FALLBACK_RUN" &&
+        wait_coderun "$FALLBACK_RUN" &&
+        echo "task-8 implementation complete via fallback ($FALLBACK_CLI/$FALLBACK_MODEL)"
+      fi &&
+      jq -nc --arg cli "$USED_CLI" --arg model "$USED_MODEL" \
+        '{task_id:8, agent:"tess", cli:$cli, model:$model, phase:"implementation", status:"complete"}'
+
+  - id: security-task-8
+    depends_on: [run-task-8]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-8/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-8'
+        --arg repo '${repo_url}'
+        --arg branch 'task-8/tess'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: quality-task-8
+    depends_on: [run-task-8]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-8/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-8'
+        --arg repo '${repo_url}'
+        --arg branch 'task-8/tess'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: testing-task-8
+    depends_on: [run-task-8]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-8/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-8'
+        --arg repo '${repo_url}'
+        --arg branch 'task-8/tess'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: gate-task-8
+    depends_on: [security-task-8, quality-task-8, testing-task-8]
+    command: |
+      echo "task-8 [task] gate passed — Claude Code/claude-opus-4-6-20260205 — all checks complete" &&
+      echo '✅ Task 8: Comprehensive Integration & E2E Test Suite (Tes... — gate passed (Claude Code/claude-opus-4-6-20260205)' | intake-util bridge-notify --from tess --to ${discord_channel} --metadata '{"step":"gate-pass","task_id":8,"agent":"tess","cli":"Claude Code","model":"claude-opus-4-6-20260205","checks":3}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## ✅ Task 8 Gate Passed\n\n**Comprehensive Integration & E2E Test Suite (Tess - Test Frameworks)**\n- Agent: `tess` | CLI: `Claude Code`\n- Checks passed: 3 (security-task-8, quality-task-8, testing-task-8)' >/dev/null || true
+      jq -nc '{task_id: 8, task_type: "task", agent: "tess", cli: "Claude Code", model: "claude-opus-4-6-20260205", difficulty: 5, gate: "pass"}'
+
+  # ── Task 9: Security Review of Solana Program — Authority, Overflow & Escrow Safety (Cipher - Security Tooling) (task, agent: cipher, cli: Claude Code, model: claude-opus-4-6-20260205, difficulty: 5) ──
+  - id: notify-task-9-start
+    depends_on: [gate-task-2, gate-task-3]
+    command: |
+      echo '🚀 Task 9: Security Review of Solana Program — Authority, ... → Claude Code (claude-opus-4-6-20260205) — agent: cipher' | intake-util bridge-notify --from cipher --to ${discord_channel} --metadata '{"step":"task-dispatch","task_id":9,"agent":"cipher","cli":"Claude Code","model":"claude-opus-4-6-20260205","task_type":"task"}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## 🚀 Task 9 Dispatched\n\n**Security Review of Solana Program — Authority, Overflow & Escrow Safety (Cipher - Security Tooling)**\n- Agent: `cipher`\n- CLI: `Claude Code` / Model: `claude-opus-4-6-20260205`\n- Type: task | Difficulty: 5\n- Subtasks: 7' >/dev/null || true
+
+  - id: run-task-9
+    depends_on: [notify-task-9-start]
+    command: |
+      # --- Primary attempt: Claude Code/claude-opus-4-6-20260205 ---
+      PRIMARY_CLI="Claude Code"
+      PRIMARY_MODEL="claude-opus-4-6-20260205"
+      FALLBACK_CLI="codex"
+      FALLBACK_MODEL="gpt-5.2-codex"
+      TASK_ID=9
+      AGENT="cipher"
+      NS="${namespace}"
+      RUN_NAME="play-task-9-cipher"
+      USED_CLI="$PRIMARY_CLI"
+      USED_MODEL="$PRIMARY_MODEL"
+
+      apply_coderun() {
+        local cli="$1" model="$2" run_name="$3"
+        cat <<CODERUN_EOF | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: $run_name
+        namespace: $NS
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "9"
+          cto.5dlabs.ai/agent: "cipher"
+          cto.5dlabs.ai/task-type: "task"
+          cto.5dlabs.ai/cli: "$cli"
+      spec:
+        runType: implementation
+        taskId: 9
+        service: cipher
+        repositoryUrl: ${repo_url}
+        docsRepositoryUrl: ${docs_repository_url}
+        model: $model
+        githubApp: 5DLabs-Cipher
+        enableDocker: ${enable_docker}
+        cliConfig:
+          cliType: $cli
+          model: $model
+        linearIntegration:
+          enabled: true
+          sessionId: ${linear_session_id}
+          teamId: ${linear_team_id}
+        subtasks:
+          - id: 9001
+            title: "Run static analysis — cargo-audit and clippy with pedantic Solana lints"
+            parallelizable: true
+          - id: 9002
+            title: "Audit signer and authority checks for all 10 program instructions"
+            parallelizable: true
+          - id: 9003
+            title: "Analyze PDA seed determinism, collision resistance, and bump handling"
+            parallelizable: true
+          - id: 9004
+            title: "Review integer overflow and underflow safety in all arithmetic operations"
+            parallelizable: true
+          - id: 9005
+            title: "Review escrow safety — vault authority, fund flow, and drain vectors"
+            parallelizable: true
+          - id: 9006
+            title: "Audit token account constraints and denial-of-service vectors"
+            parallelizable: true
+          - id: 9007
+            title: "Compile security findings report — docs/security/solana-program-review.md"
+            parallelizable: false
+            dependencies: ["9001", "9002", "9003", "9004", "9005", "9006"]
+      CODERUN_EOF
+      }
+
+      wait_coderun() {
+        local run_name="$1"
+        kubectl wait "coderun/$run_name" -n "$NS" \
+          --for=jsonpath='{.status.phase}'=Succeeded \
+          --timeout=3600s
+      }
+
+      # Primary attempt
+      echo "Submitting CodeRun $RUN_NAME ($PRIMARY_CLI/$PRIMARY_MODEL)..." &&
+      apply_coderun "$PRIMARY_CLI" "$PRIMARY_MODEL" "$RUN_NAME" &&
+      if wait_coderun "$RUN_NAME"; then
+        echo "task-9 implementation complete ($PRIMARY_CLI/$PRIMARY_MODEL)"
+      else
+        # --- Fallback attempt: codex/gpt-5.2-codex ---
+        FALLBACK_RUN="play-task-9-cipher-fallback"
+        USED_CLI="$FALLBACK_CLI"
+        USED_MODEL="$FALLBACK_MODEL"
+        echo "⚠️ Primary $PRIMARY_CLI failed for task-9, falling back to $FALLBACK_CLI/$FALLBACK_MODEL..." &&
+        echo '⚠️ Task 9: primary Claude Code failed, falling back to codex/gpt-5.2-codex' | intake-util bridge-notify --from cipher --to ${discord_channel} --metadata '{"step":"fallback-trigger","task_id":9,"agent":"cipher","primary_cli":"Claude Code","fallback_cli":"codex"}' || true
+        kubectl delete "coderun/$RUN_NAME" -n "$NS" --ignore-not-found=true &&
+        apply_coderun "$FALLBACK_CLI" "$FALLBACK_MODEL" "$FALLBACK_RUN" &&
+        wait_coderun "$FALLBACK_RUN" &&
+        echo "task-9 implementation complete via fallback ($FALLBACK_CLI/$FALLBACK_MODEL)"
+      fi &&
+      jq -nc --arg cli "$USED_CLI" --arg model "$USED_MODEL" \
+        '{task_id:9, agent:"cipher", cli:$cli, model:$model, phase:"implementation", status:"complete"}'
+
+  - id: security-task-9
+    depends_on: [run-task-9]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-9/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-9'
+        --arg repo '${repo_url}'
+        --arg branch 'task-9/cipher'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: quality-task-9
+    depends_on: [run-task-9]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-9/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-9'
+        --arg repo '${repo_url}'
+        --arg branch 'task-9/cipher'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: testing-task-9
+    depends_on: [run-task-9]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-9/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-9'
+        --arg repo '${repo_url}'
+        --arg branch 'task-9/cipher'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: gate-task-9
+    depends_on: [security-task-9, quality-task-9, testing-task-9]
+    command: |
+      echo "task-9 [task] gate passed — Claude Code/claude-opus-4-6-20260205 — all checks complete" &&
+      echo '✅ Task 9: Security Review of Solana Program — Authority, ... — gate passed (Claude Code/claude-opus-4-6-20260205)' | intake-util bridge-notify --from cipher --to ${discord_channel} --metadata '{"step":"gate-pass","task_id":9,"agent":"cipher","cli":"Claude Code","model":"claude-opus-4-6-20260205","checks":3}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## ✅ Task 9 Gate Passed\n\n**Security Review of Solana Program — Authority, Overflow & Escrow Safety (Cipher - Security Tooling)**\n- Agent: `cipher` | CLI: `Claude Code`\n- Checks passed: 3 (security-task-9, quality-task-9, testing-task-9)' >/dev/null || true
+      jq -nc '{task_id: 9, task_type: "task", agent: "cipher", cli: "Claude Code", model: "claude-opus-4-6-20260205", difficulty: 5, gate: "pass"}'
+
+  # ── Task 10: CI/CD Pipeline & Devnet Deployment Automation (Atlas - CI/CD Platforms) (task, agent: atlas, cli: Claude Code, model: claude-opus-4-6-20260205, difficulty: 5) ──
+  - id: notify-task-10-start
+    depends_on: [gate-task-2, gate-task-3, gate-task-4, gate-task-6, gate-task-7, gate-task-8]
+    command: |
+      echo '🚀 Task 10: CI/CD Pipeline & Devnet Deployment Automation (... → Claude Code (claude-opus-4-6-20260205) — agent: atlas' | intake-util bridge-notify --from atlas --to ${discord_channel} --metadata '{"step":"task-dispatch","task_id":10,"agent":"atlas","cli":"Claude Code","model":"claude-opus-4-6-20260205","task_type":"task"}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## 🚀 Task 10 Dispatched\n\n**CI/CD Pipeline & Devnet Deployment Automation (Atlas - CI/CD Platforms)**\n- Agent: `atlas`\n- CLI: `Claude Code` / Model: `claude-opus-4-6-20260205`\n- Type: task | Difficulty: 5\n- Subtasks: 6' >/dev/null || true
+
+  - id: run-task-10
+    depends_on: [notify-task-10-start]
+    command: |
+      # --- Primary attempt: Claude Code/claude-opus-4-6-20260205 ---
+      PRIMARY_CLI="Claude Code"
+      PRIMARY_MODEL="claude-opus-4-6-20260205"
+      FALLBACK_CLI="codex"
+      FALLBACK_MODEL="gpt-5.2-codex"
+      TASK_ID=10
+      AGENT="atlas"
+      NS="${namespace}"
+      RUN_NAME="play-task-10-atlas"
+      USED_CLI="$PRIMARY_CLI"
+      USED_MODEL="$PRIMARY_MODEL"
+
+      apply_coderun() {
+        local cli="$1" model="$2" run_name="$3"
+        cat <<CODERUN_EOF | envsubst | kubectl apply -f -
+      apiVersion: agents.platform/v1
+      kind: CodeRun
+      metadata:
+        name: $run_name
+        namespace: $NS
+        labels:
+          cto.5dlabs.ai/play: "true"
+          cto.5dlabs.ai/task-id: "10"
+          cto.5dlabs.ai/agent: "atlas"
+          cto.5dlabs.ai/task-type: "task"
+          cto.5dlabs.ai/cli: "$cli"
+      spec:
+        runType: implementation
+        taskId: 10
+        service: atlas
+        repositoryUrl: ${repo_url}
+        docsRepositoryUrl: ${docs_repository_url}
+        model: $model
+        githubApp: 5DLabs-Atlas
+        enableDocker: ${enable_docker}
+        cliConfig:
+          cliType: $cli
+          model: $model
+        linearIntegration:
+          enabled: true
+          sessionId: ${linear_session_id}
+          teamId: ${linear_team_id}
+        subtasks:
+          - id: 10001
+            title: "Create Stage 1 CI workflow — build and lint jobs"
+            parallelizable: true
+          - id: 10002
+            title: "Create Stage 2 CI workflow — test jobs with solana-test-validator"
+            parallelizable: false
+            dependencies: ["10001"]
+          - id: 10003
+            title: "Create Stage 3 CI workflow — devnet deployment with smoke test"
+            parallelizable: false
+            dependencies: ["10001"]
+          - id: 10004
+            title: "Create Stage 4 CI workflow — GitHub Release packaging"
+            parallelizable: false
+            dependencies: ["10002", "10003"]
+          - id: 10005
+            title: "Create Makefile with local development targets mirroring CI stages"
+            parallelizable: true
+          - id: 10006
+            title: "Configure CI caching, Anchor.toml devnet section, and write CI documentation"
+            parallelizable: false
+            dependencies: ["10001", "10002", "10003"]
+      CODERUN_EOF
+      }
+
+      wait_coderun() {
+        local run_name="$1"
+        kubectl wait "coderun/$run_name" -n "$NS" \
+          --for=jsonpath='{.status.phase}'=Succeeded \
+          --timeout=3600s
+      }
+
+      # Primary attempt
+      echo "Submitting CodeRun $RUN_NAME ($PRIMARY_CLI/$PRIMARY_MODEL)..." &&
+      apply_coderun "$PRIMARY_CLI" "$PRIMARY_MODEL" "$RUN_NAME" &&
+      if wait_coderun "$RUN_NAME"; then
+        echo "task-10 implementation complete ($PRIMARY_CLI/$PRIMARY_MODEL)"
+      else
+        # --- Fallback attempt: codex/gpt-5.2-codex ---
+        FALLBACK_RUN="play-task-10-atlas-fallback"
+        USED_CLI="$FALLBACK_CLI"
+        USED_MODEL="$FALLBACK_MODEL"
+        echo "⚠️ Primary $PRIMARY_CLI failed for task-10, falling back to $FALLBACK_CLI/$FALLBACK_MODEL..." &&
+        echo '⚠️ Task 10: primary Claude Code failed, falling back to codex/gpt-5.2-codex' | intake-util bridge-notify --from atlas --to ${discord_channel} --metadata '{"step":"fallback-trigger","task_id":10,"agent":"atlas","primary_cli":"Claude Code","fallback_cli":"codex"}' || true
+        kubectl delete "coderun/$RUN_NAME" -n "$NS" --ignore-not-found=true &&
+        apply_coderun "$FALLBACK_CLI" "$FALLBACK_MODEL" "$FALLBACK_RUN" &&
+        wait_coderun "$FALLBACK_RUN" &&
+        echo "task-10 implementation complete via fallback ($FALLBACK_CLI/$FALLBACK_MODEL)"
+      fi &&
+      jq -nc --arg cli "$USED_CLI" --arg model "$USED_MODEL" \
+        '{task_id:10, agent:"atlas", cli:$cli, model:$model, phase:"implementation", status:"complete"}'
+
+  - id: security-task-10
+    depends_on: [run-task-10]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-10/security.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-10'
+        --arg repo '${repo_url}'
+        --arg branch 'task-10/atlas'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: quality-task-10
+    depends_on: [run-task-10]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-10/quality.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-10'
+        --arg repo '${repo_url}'
+        --arg branch 'task-10/atlas'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: testing-task-10
+    depends_on: [run-task-10]
+    command: >
+      lobster run --mode tool
+      "${tasks_dir}/task-10/testing.lobster.yaml"
+      --args-json "$(jq -nc --arg td '${tasks_dir}/task-10'
+        --arg repo '${repo_url}'
+        --arg branch 'task-10/atlas'
+        --arg cli 'Claude Code'
+        --arg model 'claude-opus-4-6-20260205'
+        '{task_dir:$td, repo_url:$repo, branch_name:$branch, cli:$cli, model:$model}')"
+
+  - id: gate-task-10
+    depends_on: [security-task-10, quality-task-10, testing-task-10]
+    command: |
+      echo "task-10 [task] gate passed — Claude Code/claude-opus-4-6-20260205 — all checks complete" &&
+      echo '✅ Task 10: CI/CD Pipeline & Devnet Deployment Automation (... — gate passed (Claude Code/claude-opus-4-6-20260205)' | intake-util bridge-notify --from atlas --to ${discord_channel} --metadata '{"step":"gate-pass","task_id":10,"agent":"atlas","cli":"Claude Code","model":"claude-opus-4-6-20260205","checks":3}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## ✅ Task 10 Gate Passed\n\n**CI/CD Pipeline & Devnet Deployment Automation (Atlas - CI/CD Platforms)**\n- Agent: `atlas` | CLI: `Claude Code`\n- Checks passed: 3 (security-task-10, quality-task-10, testing-task-10)' >/dev/null || true
+      jq -nc '{task_id: 10, task_type: "task", agent: "atlas", cli: "Claude Code", model: "claude-opus-4-6-20260205", difficulty: 5, gate: "pass"}'
+
+  # ── Play complete ──
+  - id: play-complete
+    depends_on: [gate-task-1, gate-task-2, gate-task-3, gate-task-4, gate-task-5, gate-task-6, gate-task-7, gate-task-8, gate-task-9, gate-task-10]
+    command: |
+      echo "play complete — all 10 tasks passed gate checks" &&
+      echo "harness summary: task-1(bolt):Claude Code, task-2(rex):Claude Code, task-3(rex):Claude Code, task-4(nova):Claude Code, task-5(rex):Claude Code, task-6(nova):Claude Code, task-7(blaze):Claude Code, task-8(tess):Claude Code, task-9(cipher):Claude Code, task-10(atlas):Claude Code" &&
+      echo '🏁 Play complete — all 10 tasks passed gate checks' | intake-util bridge-notify --from morgan --to ${discord_channel} --metadata '{"step":"play-complete","task_count":10,"time_utc":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}' || true
+      LINEAR_SID="${linear_session_id}"
+      [ -n "$LINEAR_SID" ] && intake-util linear-activity --session-id "$LINEAR_SID" --type action --body '## 🏁 Play Complete\n\nAll 10 tasks passed gate checks.\n\n### Harness Summary\n| Task | Title | Agent | CLI | Model | Type |\n|------|-------|-------|-----|-------|------|\n| 1 | Bootstrap Solana Dev Infrastructure & An | bolt | Claude Code | claude-opus-4-6-20260205 | infra |\n| 2 | Implement Anchor Program Core — Operator | rex | Claude Code | claude-opus-4-6-20260205 | task |\n| 3 | Implement Anchor Program Marketplace — A | rex | Claude Code | claude-opus-4-6-20260205 | task |\n| 4 | Build Arweave/Irys Receipt Upload Module | nova | Claude Code | claude-opus-4-6-20260205 | task |\n| 5 | Integrate Solana Settlement Hook into CT | rex | Claude Code | claude-opus-4-6-20260205 | task |\n| 6 | Build Hackathon Demo CLI Script — Full E | nova | Claude Code | claude-opus-4-6-20260205 | task |\n| 7 | Build Web Dashboard for Receipts, Balanc | blaze | Claude Code | claude-opus-4-6-20260205 | task |\n| 8 | Comprehensive Integration & E2E Test Sui | tess | Claude Code | claude-opus-4-6-20260205 | task |\n| 9 | Security Review of Solana Program — Auth | cipher | Claude Code | claude-opus-4-6-20260205 | task |\n| 10 | CI/CD Pipeline & Devnet Deployment Autom | atlas | Claude Code | claude-opus-4-6-20260205 | task |' >/dev/null || true
+      jq -nc '{play: "complete", tasks: 10, status: "pass"}'

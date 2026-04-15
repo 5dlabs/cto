@@ -1,0 +1,137 @@
+name: implement-task-9
+metadata:
+  task_id: 9
+  agent: cipher
+  stack: Security Tooling
+  cli: Claude Code
+  model: claude-opus-4-6-20260205
+  depends_on_tasks: [2, 3]
+
+args:
+  task_dir: {}
+  repo_url: {}
+  branch_name:
+    default: "task-9/feature-branch"
+  agent:
+    default: "cipher"
+  cli:
+    default: "Claude Code"
+  model:
+    default: "claude-opus-4-6-20260205"
+  fallback_cli:
+    default: "codex"
+  fallback_model:
+    default: "gpt-5.2-codex"
+  max_implementation_retries:
+    default: 10
+  max_quality_retries:
+    default: 5
+
+steps:
+  - id: setup
+    command: >
+      git clone ${repo_url} work && cd work &&
+      git checkout -b ${branch_name}
+
+  - id: implement-subtask-9001
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9001/prompt.md)" --model ${model}
+
+  - id: validate-subtask-9001
+    depends_on: [implement-subtask-9001]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - id: implement-subtask-9002
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9002/prompt.md)" --model ${model}
+
+  - id: validate-subtask-9002
+    depends_on: [implement-subtask-9002]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - id: implement-subtask-9003
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9003/prompt.md)" --model ${model}
+
+  - id: validate-subtask-9003
+    depends_on: [implement-subtask-9003]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - id: implement-subtask-9004
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9004/prompt.md)" --model ${model}
+
+  - id: validate-subtask-9004
+    depends_on: [implement-subtask-9004]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - id: implement-subtask-9005
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9005/prompt.md)" --model ${model}
+
+  - id: validate-subtask-9005
+    depends_on: [implement-subtask-9005]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - id: implement-subtask-9006
+    depends_on: [setup]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9006/prompt.md)" --model ${model}
+
+  - id: validate-subtask-9006
+    depends_on: [implement-subtask-9006]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - id: implement-subtask-9007
+    depends_on: [validate-subtask-9001, validate-subtask-9002, validate-subtask-9003, validate-subtask-9004, validate-subtask-9005, validate-subtask-9006]
+    retry: { max: "${max_implementation_retries}" }
+    command: >
+      ${cli} -p "$(cat ${task_dir}/subtasks/task-9.9007/prompt.md)" --model ${model}
+
+  - id: validate-subtask-9007
+    depends_on: [implement-subtask-9007]
+    retry: { max: "${max_quality_retries}" }
+    command: >
+      cd work && echo "No type checker configured" && echo "No test runner configured" && echo "No linter configured"
+
+  - id: integration-validation
+    depends_on: [validate-subtask-9001, validate-subtask-9002, validate-subtask-9003, validate-subtask-9004, validate-subtask-9005, validate-subtask-9006, validate-subtask-9007]
+    command: >
+      cd work && bun tsc --noEmit && bun test --run && bun lint
+
+  - id: acceptance-check
+    depends_on: [integration-validation]
+    command: >
+      ${cli} -p "Review changes against ${task_dir}/acceptance.md. Output PASS or FAIL." --model ${model}
+
+  - id: create-pr
+    depends_on: [acceptance-check]
+    command: >
+      cd work && git add -A &&
+      git commit -m "feat: task-9" &&
+      git push origin ${branch_name} &&
+      source "${WORKSPACE:-.}/scripts/scm-dispatch.sh" &&
+      scm_create_pr "feat: task-9" "$(cat ${task_dir}/task.md)" "main"
