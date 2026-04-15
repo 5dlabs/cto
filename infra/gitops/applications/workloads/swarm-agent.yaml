@@ -3,7 +3,8 @@
 # Swarm Agent — ArgoCD Application
 # =============================================================================
 # Deploys the Swarm agent for the Canteen hackathon alongside Morgan.
-# Uses the same openclaw-platform chart with inline values (Morgan pattern).
+# Sources from the PUBLIC chart: 5dlabs/swarm-openclaw-agent
+# All advanced features enabled via values below.
 # =============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -21,21 +22,13 @@ metadata:
 spec:
   project: platform
   source:
-    repoURL: https://github.com/5dlabs/openclaw-platform
-    path: charts/openclaw
+    repoURL: https://github.com/5dlabs/swarm-openclaw-agent
+    path: chart
     targetRevision: main
     helm:
       releaseName: openclaw-swarm
       values: |
-        replicaCount: 1
         deploymentMode: statefulset
-
-        global:
-          namespace: cto
-          createNamespace: false
-
-        openclawCompat:
-          schemaVersion: "2026.2"
 
         image:
           repository: "ghcr.io/5dlabs/agents"
@@ -174,6 +167,7 @@ spec:
                       CONTEXT7_API_KEY: "ctx7sk-8b294504-6e43-45e2-85a3-26e9b38c4a1c"
 
         storage:
+          enabled: true
           size: 10Gi
           storageClass: "local-path"
 
@@ -207,14 +201,9 @@ spec:
           dmScope: "per-channel-peer"
 
         nats:
+          enabled: true
           url: "nats://nats.messaging.svc.cluster.local:4222"
-          subchart:
-            enabled: false
 
-        # Cron scheduler engine — daily-digest job registered & enabled.
-        # Job: daily-digest — 5 PM PST daily, posts draft to Discord for approval.
-        # Cron state stored on PVC; survives ArgoCD syncs but NOT PVC wipes.
-        # Re-register if lost: openclaw cron add --name daily-digest --cron "0 17 * * *" --tz America/Los_Angeles --message "Run the daily digest workflow..." --announce --channel last --timeout-seconds 120 --thinking medium
         cron:
           enabled: true
           store: "/workspace/.openclaw/cron/cron.json"
