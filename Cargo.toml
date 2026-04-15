@@ -12,6 +12,7 @@ members = [
     "crates/linear-sync",
     "crates/metal",
     "crates/notify",
+    "crates/play-launcher",
     "crates/pm",
     "crates/pm-lite",
     "crates/research",

@@ -1,0 +1,19 @@
+[package]
+name = "play-launcher"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "CLI utility to launch CTO play.lobster.yaml workflows with merged defaults"
+
+[[bin]]
+name = "cto-play"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+tokio = { version = "1", features = ["full"] }
