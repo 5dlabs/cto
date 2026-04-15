@@ -207,10 +207,10 @@ spec:
           subchart:
             enabled: false
 
-        # Cron scheduler engine — enabled but no jobs auto-registered.
-        # The daily-digest job is registered manually via `openclaw cron add`
-        # and kept DISABLED until end-to-end testing confirms it works.
-        # To enable: `openclaw cron enable <job-id>`
+        # Cron scheduler engine — daily-digest job registered & enabled.
+        # Job: daily-digest — 5 PM PST daily, posts draft to Discord for approval.
+        # Cron state stored on PVC; survives ArgoCD syncs but NOT PVC wipes.
+        # Re-register if lost: openclaw cron add --name daily-digest --cron "0 17 * * *" --tz America/Los_Angeles --message "Run the daily digest workflow..." --announce --channel last --timeout-seconds 120 --thinking medium
         cron:
           enabled: true
           store: "/workspace/.openclaw/cron/cron.json"
