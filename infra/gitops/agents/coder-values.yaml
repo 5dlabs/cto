@@ -169,7 +169,7 @@ memorySearch:
     vectorWeight: 0.6
   sources:
     - "memory"
-    - "session"
+    - "sessions"
   sync:
     deltaBytes: 4096
     deltaMessages: 5
