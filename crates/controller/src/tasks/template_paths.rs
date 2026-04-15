@@ -20,6 +20,7 @@ pub const LOBSTER_BASE_TASK_TEMPLATE: &str = "lobster/base-task.lobster.yaml.hbs
 // Harness-agent templates (OpenClaw gateway entrypoint)
 pub const HARNESS_OPENCLAW_TEMPLATE: &str = "harness-agents/openclaw.sh.hbs";
 pub const HARNESS_OPENCLAW_CONFIG_TEMPLATE: &str = "harness-agents/openclaw-config.json.hbs";
+pub const HARNESS_HERMES_TEMPLATE: &str = "harness-agents/hermes.sh.hbs";
 
 // Partials directory
 pub const SHARED_PARTIALS_DIR: &str = "_shared/partials";

@@ -1,4 +1,5 @@
 use crate::cli::types::CLIType;
+use crate::crds::coderun::HarnessAgent;
 use crate::crds::CodeRun;
 use crate::tasks::code::agent::AgentClassifier;
 use crate::tasks::config::ControllerConfig;
@@ -7,8 +8,8 @@ use crate::tasks::template_paths::{
     CODE_CODEX_CONTAINER_BASE_TEMPLATE, CODE_CODING_GUIDELINES_TEMPLATE,
     CODE_CURSOR_CONTAINER_BASE_TEMPLATE, CODE_FACTORY_CONTAINER_BASE_TEMPLATE,
     CODE_GEMINI_CONTAINER_BASE_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE,
-    CODE_OPENCODE_CONTAINER_BASE_TEMPLATE, HARNESS_OPENCLAW_CONFIG_TEMPLATE,
-    HARNESS_OPENCLAW_TEMPLATE, LOBSTER_BASE_TASK_TEMPLATE,
+    CODE_OPENCODE_CONTAINER_BASE_TEMPLATE, HARNESS_HERMES_TEMPLATE,
+    HARNESS_OPENCLAW_CONFIG_TEMPLATE, HARNESS_OPENCLAW_TEMPLATE, LOBSTER_BASE_TASK_TEMPLATE,
 };
 use crate::tasks::tool_catalog::resolve_tool_name;
 use crate::tasks::types::Result;
@@ -411,17 +412,27 @@ impl CodeTemplateGenerator {
             Self::generate_lobster_base_task(code_run, &enriched_cli_config, config, &skill_names)?,
         );
 
-        // Render the OpenClaw gateway config (per-CRD)
-        templates.insert(
-            "openclaw.json".to_string(),
-            Self::generate_openclaw_config(code_run, &enriched_cli_config, config)?,
-        );
-
-        // container.sh is the harness-agent launcher: boots OpenClaw gateway
-        templates.insert(
-            "container.sh".to_string(),
-            Self::generate_harness_launcher(code_run, config)?,
-        );
+        // Render harness-specific templates based on the CRD's harnessAgent field
+        match code_run.spec.effective_harness() {
+            HarnessAgent::OpenClaw => {
+                // OpenClaw path: gateway config + gateway launcher
+                templates.insert(
+                    "openclaw.json".to_string(),
+                    Self::generate_openclaw_config(code_run, &enriched_cli_config, config)?,
+                );
+                templates.insert(
+                    "container.sh".to_string(),
+                    Self::generate_harness_launcher(code_run, config)?,
+                );
+            }
+            HarnessAgent::Hermes => {
+                // Hermes path: standalone launcher, no gateway config
+                templates.insert(
+                    "container.sh".to_string(),
+                    Self::generate_hermes_launcher(code_run, config)?,
+                );
+            }
+        }
         templates.insert(
             "CLAUDE.md".to_string(),
             Self::generate_claude_memory(code_run, &enriched_cli_config, &remote_tools)?,
@@ -1668,6 +1679,50 @@ impl CodeTemplateGenerator {
             .map_err(|e| {
                 crate::tasks::types::Error::ConfigError(format!(
                     "Failed to render harness launcher: {e}"
+                ))
+            })
+    }
+
+    /// Render the Hermes harness launcher script (standalone ACPX + Lobster).
+    /// No OpenClaw gateway — runs lobster workflow directly.
+    fn generate_hermes_launcher(code_run: &CodeRun, _config: &ControllerConfig) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
+
+        let template = Self::load_template(HARNESS_HERMES_TEMPLATE)?;
+        handlebars
+            .register_template_string("hermes_launcher", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Hermes launcher template: {e}"
+                ))
+            })?;
+
+        let cli_type = Self::determine_cli_type(code_run);
+        let agent_name = Self::get_agent_name(code_run);
+        let job_type = Self::determine_job_type(code_run);
+
+        let context = json!({
+            "agent_name": &agent_name,
+            "agent_name_upper": agent_name.to_uppercase(),
+            "cli_type": cli_type.to_string(),
+            "job_type": job_type,
+            "model": code_run.spec.model,
+            "prompt_modification": code_run.spec.prompt_modification.as_deref().unwrap_or(""),
+            "repository_url": code_run.spec.repository_url,
+            "github_app": Self::get_github_app_or_default(code_run),
+            "task_id": code_run.spec.task_id.unwrap_or(0),
+            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
+            "service": &code_run.spec.service,
+            "discord_enabled": false, // Hermes doesn't use Discord
+        });
+
+        handlebars
+            .render("hermes_launcher", &context)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render Hermes launcher: {e}"
                 ))
             })
     }
