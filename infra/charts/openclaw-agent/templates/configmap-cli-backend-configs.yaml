@@ -120,4 +120,59 @@ data:
         }
       }
     }
+{{- if .Values.kaniko.enabled }}
+  docker-kaniko-shim.sh: |
+    #!/bin/sh
+    set -e
+    KANIKO_CONTAINER="kaniko"
+    KANIKO_EXECUTOR="/kaniko/executor"
+    _pod_name="${POD_NAME:-$(hostname)}"
+    _pod_ns="${POD_NAMESPACE:-cto}"
+    _usage() {
+      echo "docker (kaniko shim) -- translates docker build/push to kaniko"
+      echo ""
+      echo "Supported: docker build, docker push (no-op), docker version/info/login"
+      echo "Unsupported: docker run, docker ps, docker exec, etc."
+      exit 0
+    }
+    case "${1:-}" in
+      build|buildx)
+        shift; [ "${1:-}" = "build" ] && shift
+        _tags=""; _dockerfile="Dockerfile"; _build_args=""; _target=""; _cache="--cache=true"; _context="."
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            -t|--tag) _tags="${_tags} --destination=$2"; shift 2 ;;
+            -f|--file) _dockerfile="$2"; shift 2 ;;
+            --build-arg) _build_args="${_build_args} --build-arg=$2"; shift 2 ;;
+            --build-arg=*) _build_args="${_build_args} --build-arg=${1#*=}"; shift ;;
+            --target) _target="--target=$2"; shift 2 ;;
+            --target=*) _target="--target=${1#*=}"; shift ;;
+            --no-cache) _cache="--cache=false"; shift ;;
+            --push|--load) shift ;;
+            --platform) shift 2 ;;
+            --platform=*|--progress=*) shift ;;
+            -*) echo "[docker-shim] warning: ignoring $1" >&2; shift ;;
+            *) _context="$1"; shift ;;
+          esac
+        done
+        [ -z "${_tags}" ] && echo "[docker-shim] error: -t/--tag required" >&2 && exit 1
+        case "${_context}" in /*) ;; *) _context="$(cd "${_context}" 2>/dev/null && pwd)" ;; esac
+        case "${_dockerfile}" in /*) ;; *) _dockerfile="${_context}/${_dockerfile}" ;; esac
+        echo "[docker-shim] building via kaniko sidecar"
+        echo "[docker-shim]   context:    ${_context}"
+        echo "[docker-shim]   dockerfile: ${_dockerfile}"
+        echo "[docker-shim]   tags:      ${_tags}"
+        exec kubectl exec -n "${_pod_ns}" "${_pod_name}" -c "${KANIKO_CONTAINER}" -- \
+          ${KANIKO_EXECUTOR} --context="${_context}" --dockerfile="${_dockerfile}" \
+          ${_tags} ${_cache} ${_build_args} ${_target} --snapshot-mode=redo --use-new-run 2>&1
+        ;;
+      push) echo "[docker-shim] push is a no-op -- kaniko pushes during build"; exit 0 ;;
+      tag) echo "[docker-shim] tag is a no-op -- use -t on docker build"; exit 0 ;;
+      version|--version|-v) echo "Docker (kaniko shim) v1.0.0"; echo "Pod: ${_pod_name} (ns: ${_pod_ns})"; exit 0 ;;
+      info) echo "Docker (kaniko shim)"; echo " Pod: ${_pod_name}"; echo " Namespace: ${_pod_ns}"; echo " Kaniko: ${KANIKO_EXECUTOR}"; exit 0 ;;
+      login) echo "[docker-shim] login pre-configured via GHCR creds"; exit 0 ;;
+      ""|help|--help|-h) _usage ;;
+      *) echo "[docker-shim] error: '${1}' needs a real Docker daemon" >&2; echo "[docker-shim] This pod uses kaniko. Only 'docker build' and 'docker push' are supported." >&2; exit 1 ;;
+    esac
+{{- end }}
 {{- end }}

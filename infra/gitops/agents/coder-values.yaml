@@ -430,12 +430,9 @@ mem0Plugin:
   oss:
     collectionName: cto_memory
     embedder:
-      provider: openai
+      provider: google
       config:
-        model: qwen3-embedding-8b
-        apiKey: "${FIREWORKS_API_KEY}"
-        baseUrl: "https://api.fireworks.ai/inference/v1"
-        embeddingDims: 4096
+        model: gemini-embedding-001
     vectorStore:
       provider: qdrant
       config:

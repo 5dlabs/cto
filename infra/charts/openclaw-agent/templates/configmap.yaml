@@ -281,6 +281,7 @@ data:
                   "provider": {{ ($mem0Plugin.oss).embedder.provider | default "openai" | quote }},
                   "config": {
                     "model": {{ ($mem0Plugin.oss).embedder.config.model | default "qwen3-embedding-8b" | quote }}
+                    {{- if ne (($mem0Plugin.oss).embedder.provider | default "openai") "google" }}
                     {{- if ($mem0Plugin.oss).embedder.config.apiKey }},
                     "apiKey": {{ ($mem0Plugin.oss).embedder.config.apiKey | quote }}
                     {{- else }},
@@ -288,6 +289,7 @@ data:
                     {{- end }}
                     {{- if ($mem0Plugin.oss).embedder.config.baseUrl }},
                     "baseURL": {{ ($mem0Plugin.oss).embedder.config.baseUrl | quote }}
+                    {{- end }}
                     {{- end }}
                     {{- if ($mem0Plugin.oss).embedder.config.embeddingDims }},
                     "embeddingDims": {{ ($mem0Plugin.oss).embedder.config.embeddingDims }}
