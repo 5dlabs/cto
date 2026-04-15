@@ -238,6 +238,9 @@ spec:
             - name: test-sandbox
               url: "https://github.com/5dlabs/test-sandbox.git"
               branch: "main"
+            - name: cto-agents
+              url: "https://github.com/5dlabs/cto-agents.git"
+              branch: "main"
           files:
             AGENTS.md: |
               # AGENTS.md -- Colosseum (Swarm Agent)
@@ -275,18 +278,21 @@ spec:
               | 5dlabs/swarm-openclaw-agent | /workspace/repos/swarm-openclaw-agent |
               | 5dlabs/agent-platform | /workspace/repos/agent-platform |
               | 5dlabs/test-sandbox | /workspace/repos/test-sandbox |
+              | 5dlabs/cto-agents | /workspace/repos/cto-agents |
 
               To discover additional `5dlabs/cto*` repos at runtime:
               ```bash
               gh repo list 5dlabs --json name,url --jq '.[] | select(.name | startswith("cto")) | .url'
               ```
 
-              ## Updating Local Repos
+              ## Local Repos (Fallback / Deep Analysis Only)
 
-              Before gathering data, always pull the latest:
+              Local repos at `/workspace/repos/` are for deep code analysis only.
+              **Always use `gh` CLI against the remote origin first.** If you need
+              local analysis, pull latest before reading:
               ```bash
               for repo in /workspace/repos/*/; do
-                (cd "$repo" && git pull --ff-only 2>/dev/null || true)
+                (cd "$repo" && git fetch origin && git reset --hard origin/main 2>/dev/null || true)
               done
               ```
 
@@ -294,29 +300,59 @@ spec:
 
               When running the daily digest (via cron or on request):
 
-              ### Step 1: Update Local Repos
-              Pull all repos to get latest commits (see above).
+              ### Step 1: Gather Data via GitHub CLI (PRIMARY)
 
-              ### Step 2: Gather Data
-              For EACH monitored repo, use BOTH local git and `gh` CLI:
+              **Always use the GitHub CLI (`gh`) as the primary data source.**
+              It queries the remote origin directly and is always up-to-date.
+              Local repos are ONLY for fallback or deep code analysis (reading
+              full file contents, understanding architecture, reviewing diffs
+              in detail).
 
-              **Local git analysis (preferred for code understanding):**
+              **For EACH monitored repo, run these `gh` commands:**
               ```bash
-              cd /workspace/repos/<repo>
-              git log --oneline --since="24 hours ago" --no-merges
-              git diff HEAD~5..HEAD --stat   # scope of recent changes
-              git log --since="24 hours ago" --format="%h %s" --no-merges
-              ```
+              # Recent commits (last 24h)
+              gh api repos/5dlabs/{repo}/commits \
+                -f since=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ) \
+                --jq '.[] | "\(.sha[0:7]) \(.commit.message | split("\n")[0])"'
 
-              **GitHub API (for PRs, reviews, broader context):**
-              ```bash
-              gh api repos/{owner}/{repo}/commits -f since=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ) --jq '.[].commit.message'
-              gh pr list -R {owner}/{repo} --state merged --search "merged:>=$(date -u -d '24 hours ago' +%Y-%m-%d)"
+              # Merged PRs (last 24h)
+              gh pr list -R 5dlabs/{repo} --state merged \
+                --search "merged:>=$(date -u -d '24 hours ago' +%Y-%m-%d)" \
+                --json number,title,author,mergedAt
+
+              # Open PRs
+              gh pr list -R 5dlabs/{repo} --state open \
+                --json number,title,author,createdAt
+
+              # Commit details (full diff stats for key commits)
+              gh api repos/5dlabs/{repo}/commits/{sha} \
+                --jq '{message: .commit.message, stats: .stats, files: [.files[].filename]}'
               ```
 
               **Wildcard repos (discover + include any new 5dlabs/cto* repos):**
               ```bash
               gh repo list 5dlabs --json name --jq '.[] | select(.name | startswith("cto")) | .name'
+              ```
+
+              ### Step 2: Deep Analysis via Local Repos (FALLBACK ONLY)
+
+              Only use local repos when you need deeper code-level understanding
+              that the GitHub API can't provide (e.g., reading full file contents,
+              understanding how a change fits into the architecture).
+
+              **Before any local analysis, always pull latest first:**
+              ```bash
+              for repo in /workspace/repos/*/; do
+                (cd "$repo" && git fetch origin && git reset --hard origin/main 2>/dev/null || true)
+              done
+              ```
+
+              **Local analysis examples (when needed):**
+              ```bash
+              cd /workspace/repos/<repo>
+              git diff HEAD~5..HEAD --stat   # scope of recent changes
+              git log --since="24 hours ago" --format="%h %s" --no-merges
+              cat src/some/changed/file.rs   # understand what was changed
               ```
 
               ### Step 3: Check Progress Journal
@@ -329,6 +365,13 @@ spec:
               Structure the digest as:
               ```
               ## Daily Progress — {date}
+
+              ### 📊 Activity Summary
+              | Repo | Commits | PRs Merged | PRs Open | Files Changed |
+              |------|---------|------------|----------|---------------|
+              | cto  |    12   |     3      |    1     |      47       |
+              | ...  |   ...   |    ...     |   ...    |     ...       |
+              | **Total** | **XX** | **XX** | **XX** | **XX**        |
 
               ### What was accomplished
               - [repo] Brief summary of key changes (group related commits)
@@ -347,6 +390,29 @@ spec:
               ### Next steps
               - Work in progress or planned for tomorrow
               ```
+
+              **To gather the metrics for the Activity Summary table:**
+              ```bash
+              # Per-repo commit count (last 24h)
+              gh api repos/5dlabs/{repo}/commits \
+                -f since=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ) \
+                --jq 'length'
+
+              # Per-repo merged PR count (last 24h)
+              gh pr list -R 5dlabs/{repo} --state merged \
+                --search "merged:>=$(date -u -d '24 hours ago' +%Y-%m-%d)" \
+                --json number --jq 'length'
+
+              # Per-repo open PR count
+              gh pr list -R 5dlabs/{repo} --state open --json number --jq 'length'
+
+              # Files changed across recent commits
+              gh api repos/5dlabs/{repo}/commits \
+                -f since=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ) \
+                --jq '[.[].sha] | length' # then for each: gh api repos/5dlabs/{repo}/commits/{sha} --jq '.files | length'
+              ```
+              Always include the totals row. If a repo has zero activity, still list it
+              with 0s — this shows coverage breadth.
 
               ### Step 5: Approval Gate
               **IMPORTANT**: Approval mode is ENABLED by default.
@@ -431,6 +497,14 @@ spec:
               Use this for: researching competing projects, finding builder history,
               analyzing hackathon trends, and competitive intelligence.
 
+              ⚠️ **CRITICAL URL RULE**: DO NOT add `/colosseum_copilot/` to any endpoint.
+              The Colosseum website docs show endpoints as `GET /colosseum_copilot/filters` —
+              the `/colosseum_copilot/` part is a section label, NOT a URL path segment.
+              `$COLOSSEUM_COPILOT_API_BASE` already has the full base. Append directly:
+              - ✅ `$COLOSSEUM_COPILOT_API_BASE/search/projects`
+              - ✅ `$COLOSSEUM_COPILOT_API_BASE/filters`
+              - ❌ `$COLOSSEUM_COPILOT_API_BASE/colosseum_copilot/search/projects` ← WRONG (404)
+
               ## Interaction Style
 
               - Be concise, data-driven, and actionable.
@@ -443,7 +517,17 @@ spec:
               ## Operating Rules
 
               - SWARM CLI is pre-authenticated as @kaseonedge. No login needed.
-              - GitHub CLI (`gh`) is available and authenticated via GITHUB_TOKEN.
+              - GitHub CLI (`gh`) is authenticated via `/workspace/.config/gh/hosts.yml`.
+                If `gh auth status` fails, run this to re-configure from the container env:
+                ```bash
+                mkdir -p /workspace/.config/gh
+                echo "github.com:" > /workspace/.config/gh/hosts.yml
+                echo "    oauth_token: $GITHUB_TOKEN" >> /workspace/.config/gh/hosts.yml
+                echo "    user: kaseonedge" >> /workspace/.config/gh/hosts.yml
+                echo "    git_protocol: https" >> /workspace/.config/gh/hosts.yml
+                ```
+                NOTE: The `GITHUB_TOKEN` env var may not be available in tool execution.
+                Always rely on the gh config file, not env vars, for authentication.
               - All monitored repos are cloned locally — use them for deep analysis.
               - Always verify SWARM posts after submitting (`swarm ls`).
               - When approval is enabled, NEVER post to SWARM without explicit user approval.
