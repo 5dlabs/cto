@@ -164,6 +164,7 @@ impl CodeTemplateGenerator {
     }
 
     /// Generate all template files for a code task
+    #[allow(clippy::too_many_lines)]
     pub fn generate_all_templates(
         code_run: &CodeRun,
         config: &ControllerConfig,
@@ -234,6 +235,21 @@ impl CodeTemplateGenerator {
                         // Add other persona files directly
                         templates.insert(filename.clone(), content.clone());
                     }
+                }
+            }
+
+            // Inject _config/ files (agent-specific overrides like MCP.md, TOOLS.md).
+            // These are added with a `config/` prefix so they don't collide with
+            // generated top-level files (AGENTS.md, etc.).
+            let config_files = super::skills_cache::get_config_files(&agent_name);
+            if !config_files.is_empty() {
+                debug!(
+                    "Injecting {} config files for agent '{}'",
+                    config_files.len(),
+                    agent_name
+                );
+                for (filename, content) in config_files {
+                    templates.insert(format!("config/{filename}"), content);
                 }
             }
         }
@@ -3153,8 +3169,25 @@ Be constructive and explain the "why" behind your suggestions.
         Ok(templates)
     }
 
-    #[allow(clippy::too_many_lines, clippy::items_after_statements)] // Complex config generation
+    /// Generate client-config.json and merge any tools from the agent package manifest.
     fn generate_client_config(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
+        let raw = Self::generate_client_config_inner(code_run, config)?;
+
+        // Apply package manifest overlay (no-op if manifest doesn't exist)
+        let agent_name = Self::get_agent_name(code_run);
+        let mut value: Value = serde_json::from_str(&raw)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        Self::merge_package_manifest_tools(&mut value, &agent_name);
+
+        serde_json::to_string_pretty(&value).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to re-serialize client config after manifest merge: {e}"
+            ))
+        })
+    }
+
+    #[allow(clippy::too_many_lines, clippy::items_after_statements)] // Complex config generation
+    fn generate_client_config_inner(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
         use serde_json::to_string_pretty;
 
         let github_app = Self::get_github_app_or_default(code_run);
@@ -3550,6 +3583,84 @@ Be constructive and explain the "why" behind your suggestions.
                 "Failed to serialize empty clientConfig: {e}"
             ))
         })
+    }
+
+    /// Merge additional tools from an agent package manifest (produced by intake)
+    /// into an existing client-config value. The manifest's `tools_config` overlay
+    /// is merged union-style: remote tool prefixes are appended (deduplicated),
+    /// local server entries are added if not already present.
+    fn merge_package_manifest_tools(client_config: &mut Value, agent_name: &str) {
+        let Some(manifest_json) = super::skills_cache::load_package_manifest(agent_name) else {
+            return;
+        };
+
+        let manifest: Value = match serde_json::from_str(&manifest_json) {
+            Ok(v) => v,
+            Err(e) => {
+                warn!("Failed to parse package manifest for '{}': {}", agent_name, e);
+                return;
+            }
+        };
+
+        let Some(tools_config) = manifest.get("tools_config") else {
+            return;
+        };
+
+        // Merge additional_remote_tools
+        if let Some(Value::Array(additional)) = tools_config.get("additional_remote_tools") {
+            let existing = client_config
+                .get("remoteTools")
+                .and_then(|v| v.as_array())
+                .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect::<Vec<_>>())
+                .unwrap_or_default();
+
+            let remote_arr = client_config
+                .get_mut("remoteTools")
+                .and_then(|v| v.as_array_mut());
+
+            if let Some(arr) = remote_arr {
+                for tool in additional {
+                    if let Some(name) = tool.as_str() {
+                        if !existing.iter().any(|e| e == name) {
+                            debug!("Package manifest: adding remote tool '{}'", name);
+                            arr.push(json!(name));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Merge local_servers (only add new ones, don't overwrite existing)
+        if let Some(Value::Object(local_servers)) = tools_config.get("local_servers") {
+            let existing_ls = client_config
+                .get_mut("localServers")
+                .and_then(|v| v.as_object_mut());
+
+            if let Some(ls) = existing_ls {
+                for (name, server_cfg) in local_servers {
+                    if !ls.contains_key(name) {
+                        // Convert package manifest format → client-config format
+                        let mut entry = serde_json::Map::new();
+                        if let Some(cmd) = server_cfg.get("command").and_then(|v| v.as_str()) {
+                            entry.insert("command".to_string(), json!(cmd));
+                        }
+                        if let Some(args) = server_cfg.get("args") {
+                            entry.insert("args".to_string(), args.clone());
+                        }
+                        if let Some(env) = server_cfg.get("env") {
+                            entry.insert("env".to_string(), env.clone());
+                        }
+                        debug!("Package manifest: adding local server '{}'", name);
+                        ls.insert(name.clone(), Value::Object(entry));
+                    }
+                }
+            }
+        }
+
+        info!(
+            "Merged package manifest tools_config for agent '{}'",
+            agent_name
+        );
     }
 
     fn normalize_remote_tools(config: &mut Value) {
@@ -4455,9 +4566,7 @@ Be constructive and explain the "why" behind your suggestions.
             return val == "true" || val == "1";
         }
         // Fall back to controller env var, default to true (observability stack is deployed)
-        std::env::var("TELEMETRY_ENABLED")
-            .map(|v| v == "true" || v == "1")
-            .unwrap_or(true)
+        std::env::var("TELEMETRY_ENABLED").map_or(true, |v| v == "true" || v == "1")
     }
 
     /// Get the OTLP gRPC endpoint for telemetry export.
@@ -4472,8 +4581,7 @@ Be constructive and explain the "why" behind your suggestions.
     fn is_datadog_enabled(_config: &ControllerConfig) -> bool {
         std::env::var("DATADOG_ENABLED")
             .or_else(|_| std::env::var("DD_TRACE_ENABLED"))
-            .map(|v| v == "true" || v == "1")
-            .unwrap_or(false)
+            .is_ok_and(|v| v == "true" || v == "1")
     }
 
     /// Get default MCP tools for an agent based on github_app and run_type.

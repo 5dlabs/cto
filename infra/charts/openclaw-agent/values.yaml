@@ -681,3 +681,9 @@ mem0Plugin:
       provider: "openai"
       config:
         model: "gpt-4.1-nano"
+
+# SSH access (disabled by default)
+ssh:
+  enabled: false
+  port: 2222
+  authorizedKeys: []

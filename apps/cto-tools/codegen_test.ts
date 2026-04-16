@@ -3,6 +3,8 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert";
 import {
   buildArgsType,
+  buildCatalogIndex,
+  generateCatalogMd,
   generateJsDoc,
   generateReadme,
   generateServerIndex,
@@ -10,7 +12,7 @@ import {
   jsonSchemaToTsType,
   parseTool,
 } from "./codegen.ts";
-import type { JsonSchema, ParsedTool, ToolDef } from "./codegen.ts";
+import type { CatalogIndex, JsonSchema, ParsedTool, ToolDef } from "./codegen.ts";
 
 // ─── jsonSchemaToTsType ──────────────────────────────────────────────────────
 
@@ -617,4 +619,143 @@ Deno.test("generateJsDoc: tool with no description produces valid JSDoc", () => 
   const jsDoc = generateJsDoc(tool);
   assertStringIncludes(jsDoc, "/**");
   assertStringIncludes(jsDoc, "*/");
+});
+
+// ─── buildCatalogIndex ───────────────────────────────────────────────────────
+
+Deno.test("buildCatalogIndex: groups tools by server with correct source tags", () => {
+  const byServer = new Map<string, ParsedTool[]>([
+    [
+      "github",
+      [
+        { fullName: "github_search_code", serverPrefix: "github", funcName: "search_code", description: "Search code" },
+        { fullName: "github_list_repos", serverPrefix: "github", funcName: "list_repos", description: "List repos" },
+      ],
+    ],
+    [
+      "memory",
+      [
+        { fullName: "memory_create_entities", serverPrefix: "memory", funcName: "create_entities", description: "Create entities" },
+      ],
+    ],
+  ]);
+  const localServerNames = new Set(["memory"]);
+
+  const catalog = buildCatalogIndex(byServer, localServerNames, "test-agent");
+
+  assertEquals(catalog.totalTools, 3);
+  assertEquals(catalog.totalServers, 2);
+  assertEquals(catalog.agentId, "test-agent");
+  assertEquals(catalog.servers.github.source, "remote");
+  assertEquals(catalog.servers.github.toolCount, 2);
+  assertEquals(catalog.servers.memory.source, "local");
+  assertEquals(catalog.servers.memory.toolCount, 1);
+});
+
+Deno.test("buildCatalogIndex: tools are sorted alphabetically within each server", () => {
+  const byServer = new Map<string, ParsedTool[]>([
+    [
+      "github",
+      [
+        { fullName: "github_search_code", serverPrefix: "github", funcName: "search_code" },
+        { fullName: "github_create_issue", serverPrefix: "github", funcName: "create_issue" },
+        { fullName: "github_list_repos", serverPrefix: "github", funcName: "list_repos" },
+      ],
+    ],
+  ]);
+
+  const catalog = buildCatalogIndex(byServer, new Set(), "");
+  const funcs = catalog.tools.map((t) => t.func);
+  assertEquals(funcs, ["create_issue", "list_repos", "search_code"]);
+});
+
+Deno.test("buildCatalogIndex: each tool has correct import path", () => {
+  const byServer = new Map<string, ParsedTool[]>([
+    [
+      "linear",
+      [{ fullName: "linear_create_ticket", serverPrefix: "linear", funcName: "create_ticket" }],
+    ],
+  ]);
+
+  const catalog = buildCatalogIndex(byServer, new Set(), "");
+  assertEquals(catalog.tools[0].import, "./servers/linear/create_ticket.ts");
+});
+
+Deno.test("buildCatalogIndex: empty map produces zero counts", () => {
+  const catalog = buildCatalogIndex(new Map(), new Set(), "empty-agent");
+  assertEquals(catalog.totalTools, 0);
+  assertEquals(catalog.totalServers, 0);
+  assertEquals(catalog.tools.length, 0);
+});
+
+// ─── generateCatalogMd ──────────────────────────────────────────────────────
+
+Deno.test("generateCatalogMd: contains server headings and tool table", () => {
+  const catalog: CatalogIndex = {
+    generated: "2025-01-01T00:00:00Z",
+    agentId: "rex",
+    totalTools: 2,
+    totalServers: 1,
+    servers: { github: { source: "remote", toolCount: 2 } },
+    tools: [
+      { name: "github_search", server: "github", func: "search", description: "Search", import: "./servers/github/search.ts", source: "remote" },
+      { name: "github_list", server: "github", func: "list", description: "List things", import: "./servers/github/list.ts", source: "remote" },
+    ],
+  };
+
+  const md = generateCatalogMd(catalog);
+  assertStringIncludes(md, "# MCP Tool Catalog");
+  assertStringIncludes(md, "**2 tools** across **1 servers**");
+  assertStringIncludes(md, "### github");
+  assertStringIncludes(md, "| `search` |");
+  assertStringIncludes(md, "| `list` |");
+  assertStringIncludes(md, "catalog.json");
+});
+
+Deno.test("generateCatalogMd: local servers get local badge", () => {
+  const catalog: CatalogIndex = {
+    generated: "2025-01-01T00:00:00Z",
+    agentId: "",
+    totalTools: 1,
+    totalServers: 1,
+    servers: { filesystem: { source: "local", toolCount: 1 } },
+    tools: [
+      { name: "filesystem_read", server: "filesystem", func: "read", description: "Read files", import: "./servers/filesystem/read.ts", source: "local" },
+    ],
+  };
+
+  const md = generateCatalogMd(catalog);
+  assertStringIncludes(md, "🖥️ local");
+});
+
+Deno.test("generateCatalogMd: includes agent name when set", () => {
+  const catalog: CatalogIndex = {
+    generated: "2025-01-01T00:00:00Z",
+    agentId: "morgan",
+    totalTools: 0,
+    totalServers: 0,
+    servers: {},
+    tools: [],
+  };
+
+  const md = generateCatalogMd(catalog);
+  assertStringIncludes(md, "agent `morgan`");
+});
+
+Deno.test("generateCatalogMd: truncates long descriptions", () => {
+  const longDesc = "A".repeat(200);
+  const catalog: CatalogIndex = {
+    generated: "2025-01-01T00:00:00Z",
+    agentId: "",
+    totalTools: 1,
+    totalServers: 1,
+    servers: { test: { source: "remote", toolCount: 1 } },
+    tools: [
+      { name: "test_tool", server: "test", func: "tool", description: longDesc, import: "./servers/test/tool.ts", source: "remote" },
+    ],
+  };
+
+  const md = generateCatalogMd(catalog);
+  // Description in table should be truncated to 80 chars
+  assert(!md.includes(longDesc));
 });

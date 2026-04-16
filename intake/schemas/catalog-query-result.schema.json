@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CatalogQueryResult",
+  "description": "Results from querying the Context7 catalog for MCP tools and agent skills matching required capabilities",
+  "type": "object",
+  "properties": {
+    "matched_tools": {
+      "type": "array",
+      "description": "MCP tool servers found in catalog/tools/ that match required capabilities",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Tool server name from the catalog" },
+          "prefix": { "type": "string", "description": "Tool prefix used in mcp-config.json" },
+          "capabilities": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Capabilities this tool provides"
+          },
+          "relevance": {
+            "type": "string",
+            "enum": ["exact", "partial", "potential"],
+            "description": "How well this tool matches the required capability"
+          },
+          "reasoning": { "type": "string", "description": "Why this tool was matched and at this relevance level" }
+        },
+        "required": ["name", "prefix", "capabilities", "relevance"]
+      }
+    },
+    "matched_skills": {
+      "type": "array",
+      "description": "Agent skills found in rex/_default/ that match required capabilities",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Skill name from SKILL.md frontmatter" },
+          "path": { "type": "string", "description": "Path relative to cto-agents repo root" },
+          "capabilities": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Capabilities this skill provides"
+          },
+          "relevance": {
+            "type": "string",
+            "enum": ["exact", "partial", "potential"],
+            "description": "How well this skill matches the required capability"
+          },
+          "reasoning": { "type": "string", "description": "Why this skill was matched and at this relevance level" }
+        },
+        "required": ["name", "path", "capabilities", "relevance"]
+      }
+    },
+    "unresolved_capabilities": {
+      "type": "array",
+      "description": "Capabilities that could not be matched to any existing tool or skill",
+      "items": {
+        "type": "object",
+        "properties": {
+          "capability": { "type": "string", "description": "The required capability that was not matched" },
+          "search_attempted": { "type": "boolean", "description": "Whether a Context7 search was performed" },
+          "suggestion": { "type": "string", "description": "Recommended next step to resolve this gap" }
+        },
+        "required": ["capability", "search_attempted"]
+      }
+    }
+  },
+  "required": ["matched_tools", "matched_skills", "unresolved_capabilities"]
+}

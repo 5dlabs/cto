@@ -1,0 +1,202 @@
+# Capability Registry
+#
+# Maps canonical capability names to known MCP tool servers and skills.
+# Used by the deterministic gap computation step to resolve capabilities
+# without needing LLM or web search.
+#
+# Format:
+#   capability:
+#     tools: list of MCP server prefixes that provide this capability
+#     skills: list of skill slugs that provide this capability
+#     builtin: true if this is always available (no provisioning needed)
+#
+# Tools listed here are on the cluster tool server (remote) unless
+# marked with transport: stdio (local npx packages).
+
+capabilities:
+  # --- Version Control & Code Hosting ---
+  github:
+    tools: [github]
+    skills: [github-mcp]
+    notes: "Always available — every project needs this"
+
+  # --- Project Management ---
+  project-management:
+    tools: [linear]
+    skills: []
+
+  # --- Web Scraping & Research ---
+  web-scraping:
+    tools: []
+    skills: [firecrawl, firecrawl-scrape, firecrawl-crawl]
+    notes: "Firecrawl is skill-based, not MCP"
+
+  web-search:
+    tools: [tavily, exa]
+    skills: [firecrawl-search, tavily]
+
+  deep-research:
+    tools: [modelcontextprotocol]
+    skills: [firecrawl-agent]
+    notes: "Perplexity for AI search, Firecrawl agent for autonomous research"
+
+  # --- Container Orchestration ---
+  kubernetes:
+    tools: [argocd]
+    skills: [kubernetes-mcp]
+
+  # --- Monitoring & Observability ---
+  monitoring:
+    tools: [grafana, loki]
+    skills: [observability]
+
+  # --- Browser Automation ---
+  browser-automation:
+    tools: [playwright]
+    skills: [firecrawl-browser]
+
+  # --- Databases ---
+  database-postgres:
+    tools: [pg_aiguide]
+    skills: []
+    local_fallback:
+      server_name: postgres
+      command: npx
+      args: ["@modelcontextprotocol/server-postgres@0.6.2"]
+      env_vars: [POSTGRES_CONNECTION_STRING]
+
+  database-sqlite:
+    tools: []
+    skills: []
+    local_fallback:
+      server_name: sqlite
+      command: npx
+      args: ["@modelcontextprotocol/server-sqlite@0.6.2"]
+      env_vars: []
+
+  database-redis:
+    tools: []
+    skills: [upstash-redis-kv]
+
+  # --- Memory & Knowledge ---
+  memory:
+    tools: [openmemory]
+    skills: []
+    local_fallback:
+      server_name: memory
+      command: npx
+      args: ["@modelcontextprotocol/server-memory@0.6.2"]
+      env_vars: []
+
+  # --- File System ---
+  filesystem:
+    tools: []
+    skills: []
+    builtin: true
+    local_fallback:
+      server_name: filesystem
+      command: npx
+      args: ["@modelcontextprotocol/server-filesystem@0.6.2"]
+      env_vars: []
+
+  # --- Documentation ---
+  docs-lookup:
+    tools: [context7]
+    skills: [context7, context7-cli, find-docs]
+
+  # --- CI/CD ---
+  cicd:
+    tools: [argocd]
+    skills: []
+    notes: "ArgoCD for GitOps; GitHub Actions via github tools"
+
+  # --- Infrastructure as Code ---
+  terraform:
+    tools: [terraform]
+    skills: []
+
+  # --- Code Search ---
+  code-search:
+    tools: [octocode, github]
+    skills: [mgrep-code-search]
+
+  # --- GraphQL ---
+  graphql:
+    tools: [graphql]
+    skills: []
+
+  # --- Auth ---
+  auth:
+    tools: [better_auth]
+    skills: []
+
+  # --- AI / UI Components ---
+  ui-components:
+    tools: [ai_elements]
+    skills: [shadcn]
+
+  # --- Blockchain / Solana ---
+  solana:
+    tools: [solana]
+    skills: []
+
+  # --- API Testing ---
+  api-testing:
+    tools: []
+    skills: []
+    notes: "No dedicated MCP server; agents use bash/curl"
+
+  # --- Notification / Communication ---
+  notifications:
+    tools: []
+    skills: [notion-api, todoist-api]
+    notes: "Slack MCP available but not default"
+
+# Known MCP servers available via npx (for local provisioning)
+# These can be added as local_servers in client-config.json
+npx_servers:
+  memory:
+    package: "@modelcontextprotocol/server-memory"
+    version: "0.6.2"
+    transport: stdio
+  filesystem:
+    package: "@modelcontextprotocol/server-filesystem"
+    version: "0.6.2"
+    transport: stdio
+  postgres:
+    package: "@modelcontextprotocol/server-postgres"
+    version: "0.6.2"
+    transport: stdio
+    env_vars: [POSTGRES_CONNECTION_STRING]
+  sqlite:
+    package: "@modelcontextprotocol/server-sqlite"
+    version: "0.6.2"
+    transport: stdio
+  puppeteer:
+    package: "@modelcontextprotocol/server-puppeteer"
+    version: "0.6.2"
+    transport: stdio
+  brave-search:
+    package: "@modelcontextprotocol/server-brave-search"
+    version: "0.6.2"
+    transport: stdio
+    env_vars: [BRAVE_API_KEY]
+  github:
+    package: "@modelcontextprotocol/server-github"
+    version: "0.6.2"
+    transport: stdio
+    env_vars: [GITHUB_PERSONAL_ACCESS_TOKEN]
+  slack:
+    package: "@modelcontextprotocol/server-slack"
+    version: "0.6.2"
+    transport: stdio
+    env_vars: [SLACK_BOT_TOKEN, SLACK_TEAM_ID]
+  sequential-thinking:
+    package: "@modelcontextprotocol/server-sequential-thinking"
+    version: "0.6.2"
+    transport: stdio
+  everart:
+    package: "@modelcontextprotocol/server-everart"
+    version: "0.6.2"
+    transport: stdio
+    env_vars: [EVERART_API_KEY]

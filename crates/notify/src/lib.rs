@@ -85,8 +85,7 @@ impl Notifier {
     #[must_use]
     pub fn from_env() -> Self {
         let disabled = std::env::var(ENV_NOTIFY_DISABLED)
-            .map(|v| v.eq_ignore_ascii_case("true") || v == "1")
-            .unwrap_or(false);
+            .is_ok_and(|v| v.eq_ignore_ascii_case("true") || v == "1");
 
         if disabled {
             info!("Notifications disabled via NOTIFY_DISABLED");

@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentPackageManifest",
+  "description": "Contract for agent packages committed to cto-agents. Consumed by controller (skills_cache + templates) and runtime (codegen.ts).",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1",
+      "description": "Manifest schema version"
+    },
+    "agent": {
+      "type": "string",
+      "description": "Agent name (e.g., rex, morgan, bolt)"
+    },
+    "project": {
+      "type": "string",
+      "description": "Project scope (e.g., _default, cto-pay, test-sandbox)"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of package generation"
+    },
+    "generated_by": {
+      "type": "string",
+      "description": "Intake run ID or workflow that produced this package"
+    },
+    "tools_config": {
+      "type": "object",
+      "description": "Client-config overlay merged with defaults at runtime",
+      "properties": {
+        "additional_remote_tools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Remote tool prefixes to add beyond agent defaults (e.g., 'tavily_search')"
+        },
+        "local_servers": {
+          "type": "object",
+          "description": "Local MCP servers to spawn via stdio (merged into client-config.json localServers)",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "command": { "type": "string", "description": "Command to spawn server (e.g., 'npx')" },
+              "args": { "type": "array", "items": { "type": "string" }, "description": "Command arguments" },
+              "version": { "type": "string", "description": "Pinned package version" },
+              "env": {
+                "type": "object",
+                "additionalProperties": { "type": "string" },
+                "description": "Environment variables for the server process"
+              },
+              "tools": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Expected tool names (for pre-validation)"
+              }
+            },
+            "required": ["command", "args"]
+          }
+        }
+      }
+    },
+    "sdk": {
+      "type": "object",
+      "description": "Prebuilt SDK metadata — runtime skips codegen if hash matches live catalog",
+      "properties": {
+        "catalog_hash": {
+          "type": "string",
+          "description": "SHA-256 of the tool catalog at generation time"
+        },
+        "tool_count": {
+          "type": "integer",
+          "description": "Total tools in the prebuilt SDK"
+        },
+        "server_count": {
+          "type": "integer",
+          "description": "Total servers in the prebuilt SDK"
+        },
+        "dir": {
+          "type": "string",
+          "default": "_package/sdk",
+          "description": "Relative path to prebuilt SDK files within the package"
+        }
+      },
+      "required": ["catalog_hash", "tool_count", "server_count"]
+    },
+    "skills": {
+      "type": "object",
+      "description": "Skills installed by this package",
+      "properties": {
+        "installed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "slug": { "type": "string", "description": "Skill identifier (e.g., 'firecrawl', 'kubernetes-mcp')" },
+              "version": { "type": "string", "description": "Pinned version or 'latest' at generation time" },
+              "source": {
+                "type": "string",
+                "enum": ["clawhub", "builtin", "custom"],
+                "description": "Where the skill was sourced from"
+              },
+              "reason": { "type": "string", "description": "Why this skill was added" }
+            },
+            "required": ["slug", "source"]
+          }
+        },
+        "gaps": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Capabilities needed but no skill found — flagged for human review"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "description": "Audit trail for how this package was produced",
+      "properties": {
+        "intake_run_id": { "type": "string" },
+        "tool_manifest": {
+          "type": "object",
+          "description": "Summary of the tool manifest that drove gap analysis",
+          "properties": {
+            "required_count": { "type": "integer" },
+            "recommended_count": { "type": "integer" }
+          }
+        },
+        "gap_analysis": {
+          "type": "object",
+          "properties": {
+            "tools_searched": { "type": "integer", "description": "Number of tool gaps that triggered search" },
+            "tools_resolved": { "type": "integer", "description": "Number successfully resolved" },
+            "skills_searched": { "type": "integer" },
+            "skills_resolved": { "type": "integer" }
+          }
+        }
+      }
+    }
+  },
+  "required": ["version", "agent", "project", "generated_at", "tools_config", "sdk", "skills"]
+}

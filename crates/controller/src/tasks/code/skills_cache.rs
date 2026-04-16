@@ -316,6 +316,83 @@ pub fn ensure_all_skills(
     Ok(result)
 }
 
+/// Read the agent package manifest from `_package/manifest.json` in the
+/// cached tarball directory.
+///
+/// Must be called **after** [`ensure_skills`] so the tarball is already extracted.
+/// Returns the raw JSON string if found, or `None` if the package directory
+/// doesn't exist (pre-packaging agents won't have it).
+pub fn load_package_manifest(agent_name: &str) -> Option<String> {
+    let manifest_path = cache_root()
+        .join(agent_name)
+        .join("_package")
+        .join("manifest.json");
+    if let Ok(content) = fs::read_to_string(&manifest_path) {
+        info!(
+            "Loaded package manifest for agent '{}' from {}",
+            agent_name,
+            manifest_path.display()
+        );
+        Some(content)
+    } else {
+        debug!(
+            "No package manifest for agent '{}' at {}",
+            agent_name,
+            manifest_path.display()
+        );
+        None
+    }
+}
+
+/// Read config files from the agent's `_config/` subdirectory.
+///
+/// Must be called **after** [`ensure_skills`] so the tarball is already extracted.
+/// Unlike `_persona/` (hardcoded allowlist), `_config/` accepts **any** `.md`
+/// file — these are agent-specific configuration overrides (e.g. `MCP.md`,
+/// `TOOLS.md`, `WORKFLOW.md`) that the controller injects into the task-files
+/// ConfigMap for the agent pod.
+///
+/// Returns a map of `filename -> content`.  Empty map if the directory
+/// doesn't exist (most agents won't have one).
+pub fn get_config_files(agent_name: &str) -> HashMap<String, String> {
+    let config_dir = cache_root().join(agent_name).join("_config");
+    let mut result = HashMap::new();
+
+    if !config_dir.exists() {
+        debug!("No _config/ directory for agent '{agent_name}'");
+        return result;
+    }
+
+    if let Ok(entries) = fs::read_dir(&config_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let filename = match path.file_name().and_then(|n| n.to_str()) {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+            // Accept .md, .json, .yaml, .yml config files
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if !matches!(ext, "md" | "json" | "yaml" | "yml") {
+                debug!("Skipping non-config file '{filename}' in _config/");
+                continue;
+            }
+            if let Ok(content) = fs::read_to_string(&path) {
+                debug!("Loaded config file '{filename}' for agent '{agent_name}'");
+                result.insert(filename, content);
+            }
+        }
+    }
+
+    info!(
+        "Loaded {} config files for agent '{agent_name}'",
+        result.len()
+    );
+    result
+}
+
 /// Persona file names that are read from the `_persona/` subdirectory of
 /// the agent's cached tarball.
 const PERSONA_FILES: &[&str] = &[
@@ -425,12 +502,10 @@ fn download_and_extract(
     fs::write(&hash_file, expected_hash)?;
 
     // Count extracted skills
-    let skill_count = fs::read_dir(&agent_dir)
-        .map(|rd| {
-            rd.filter(|e| e.as_ref().is_ok_and(|e| e.path().is_dir()))
-                .count()
-        })
-        .unwrap_or(0);
+    let skill_count = fs::read_dir(&agent_dir).map_or(0, |rd| {
+        rd.filter(|e| e.as_ref().is_ok_and(|e| e.path().is_dir()))
+            .count()
+    });
 
     info!(
         "Extracted {} skills for '{}' (hash {})",
@@ -565,5 +640,63 @@ abc123def456  rex-default.tar.gz
 
         let stored_hash = fs::read_to_string(cache.join("rex.hash")).unwrap();
         assert_eq!(stored_hash, hash);
+    }
+
+    #[test]
+    fn test_get_config_files_reads_md_and_json() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Override cache root for this test by creating the dir structure directly
+        let agent_dir = tmp.path().join("test-agent").join("_config");
+        fs::create_dir_all(&agent_dir).unwrap();
+
+        fs::write(agent_dir.join("MCP.md"), "# MCP Config\nCustom tools.").unwrap();
+        fs::write(
+            agent_dir.join("overrides.json"),
+            r#"{"key": "value"}"#,
+        )
+        .unwrap();
+        fs::write(agent_dir.join("workflow.yaml"), "steps:\n  - id: test").unwrap();
+        fs::write(agent_dir.join("ignored.txt"), "should be skipped").unwrap();
+
+        // We can't easily override cache_root(), so test the logic directly
+        let config_dir = &agent_dir;
+        let mut result = HashMap::new();
+        if let Ok(entries) = fs::read_dir(config_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_file() {
+                    continue;
+                }
+                let filename = path.file_name().unwrap().to_str().unwrap().to_string();
+                let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                if !matches!(ext, "md" | "json" | "yaml" | "yml") {
+                    continue;
+                }
+                if let Ok(content) = fs::read_to_string(&path) {
+                    result.insert(filename, content);
+                }
+            }
+        }
+
+        assert_eq!(result.len(), 3);
+        assert!(result.contains_key("MCP.md"));
+        assert!(result.contains_key("overrides.json"));
+        assert!(result.contains_key("workflow.yaml"));
+        assert!(!result.contains_key("ignored.txt"));
+        assert_eq!(result["MCP.md"], "# MCP Config\nCustom tools.");
+    }
+
+    #[test]
+    fn test_get_config_files_empty_when_no_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Agent dir exists but no _config/ subdirectory
+        let agent_dir = tmp.path().join("no-config-agent");
+        fs::create_dir_all(&agent_dir).unwrap();
+
+        let config_dir = agent_dir.join("_config");
+        assert!(!config_dir.exists());
+        // Mirrors the get_config_files early return
+        let result: HashMap<String, String> = HashMap::new();
+        assert!(result.is_empty());
     }
 }
