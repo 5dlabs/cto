@@ -620,7 +620,10 @@ supermemory:
   enabled: false
 
 ssh:
-  enabled: false
+  enabled: true
+  port: 2222
+  authorizedKeys:
+    - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINUYgmSYtJp5JM5MSJ9tFUhdRpt4LZoZmkWEZKxuvanc generated-key"
 
 # =============================================================================
 # NATS Inter-Agent Messaging

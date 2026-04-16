@@ -925,6 +925,91 @@ spec:
           resources:
             {{- toYaml .Values.telemetry.resources | nindent 12 }}
         {{- end }}
+        {{- if .Values.ssh.enabled }}
+        - name: sshd
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              # Configure SSH
+              mkdir -p /run/sshd /root/.ssh /workspace/.ssh
+              chmod 700 /root/.ssh /workspace/.ssh
+
+              # Generate host keys if missing (persisted on workspace PV)
+              SSH_KEY_DIR=/workspace/.ssh/host_keys
+              mkdir -p "$SSH_KEY_DIR"
+              for type in rsa ed25519; do
+                if [ ! -f "$SSH_KEY_DIR/ssh_host_${type}_key" ]; then
+                  ssh-keygen -t "$type" -f "$SSH_KEY_DIR/ssh_host_${type}_key" -N "" -q
+                fi
+              done
+
+              # Write sshd config
+              cat > /etc/ssh/sshd_config <<'SSHCFG'
+              Port {{ .Values.ssh.port | default 2222 }}
+              HostKey /workspace/.ssh/host_keys/ssh_host_rsa_key
+              HostKey /workspace/.ssh/host_keys/ssh_host_ed25519_key
+              PermitRootLogin yes
+              PubkeyAuthentication yes
+              PasswordAuthentication no
+              ChallengeResponseAuthentication no
+              UsePAM no
+              X11Forwarding no
+              PrintMotd yes
+              AcceptEnv LANG LC_*
+              Subsystem sftp /usr/lib/openssh/sftp-server
+              SSHCFG
+              sed -i 's/^              //' /etc/ssh/sshd_config
+
+              # Set up authorized keys
+              {{- if .Values.ssh.authorizedKeys }}
+              {{- range .Values.ssh.authorizedKeys }}
+              echo "{{ . }}" >> /root/.ssh/authorized_keys
+              {{- end }}
+              {{- end }}
+              chmod 600 /root/.ssh/authorized_keys 2>/dev/null || true
+
+              # Also allow the node user (uid 1001) to SSH in
+              NODE_HOME=$(getent passwd node | cut -d: -f6 || echo "/home/node")
+              mkdir -p "$NODE_HOME/.ssh"
+              cp /root/.ssh/authorized_keys "$NODE_HOME/.ssh/authorized_keys" 2>/dev/null || true
+              chown -R node:node "$NODE_HOME/.ssh" 2>/dev/null || true
+              chmod 700 "$NODE_HOME/.ssh" 2>/dev/null || true
+              chmod 600 "$NODE_HOME/.ssh/authorized_keys" 2>/dev/null || true
+
+              echo "[sshd] Starting on port {{ .Values.ssh.port | default 2222 }}"
+              exec /usr/sbin/sshd -D -e
+          ports:
+            - name: ssh
+              containerPort: {{ .Values.ssh.port | default 2222 }}
+              protocol: TCP
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          readinessProbe:
+            tcpSocket:
+              port: ssh
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: ssh
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+        {{- end }}
       volumes:
         - name: workspace
           persistentVolumeClaim:
