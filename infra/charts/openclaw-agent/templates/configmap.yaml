@@ -541,6 +541,11 @@ data:
         },
         {{- end }}
         "profile": {{ .Values.tools.profile | quote }},
+        {{- if .Values.tools.sessions }}
+        "sessions": {
+          "visibility": {{ .Values.tools.sessions.visibility | default "own" | quote }}
+        },
+        {{- end }}
         "web": {
           "search": { "enabled": {{ if hasKey $webSearch "enabled" }}{{ $webSearch.enabled }}{{ else }}true{{ end }} },
           "fetch": { "enabled": {{ if hasKey $webFetch "enabled" }}{{ $webFetch.enabled }}{{ else }}true{{ end }} }

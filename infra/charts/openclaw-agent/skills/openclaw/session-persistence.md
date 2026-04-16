@@ -71,6 +71,14 @@ After any interruption (compaction, provider switch, pod restart):
 4. Check git: `git log --oneline -5` for recent commits
 5. Resume from where you left off
 
+**CRITICAL: Do NOT try to resume old ACP sessions after a pod restart or compaction.**
+ACP sessions are ephemeral — they are destroyed when the pod restarts.
+If `session_status` fails for a session ID, that session is **gone**. Do not retry it.
+Start a new ACP session with `session_start` instead. Never loop on a dead session.
+
+**Anti-loop rule:** If you call the same tool 3+ times and get the same error, STOP.
+Report the error to the user and ask for guidance. Do not keep retrying.
+
 ## GitHub / Copilot auth
 
 GitHub auth is pre-configured via `GITHUB_TOKEN` environment variable:
