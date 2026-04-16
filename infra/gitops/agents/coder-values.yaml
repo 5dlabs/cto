@@ -357,7 +357,7 @@ workspace:
       - Codex: Available via `/model codex` (OpenAI Codex harness)
       - Gemini: `gemini --version`
       - Kimi: `kimi --version`
-      - Copilot: `copilot --model claude-opus-4.6` (GitHub Copilot CLI, uses Claude Opus 4.6)
+      - Copilot: `copilot --model claude-opus-4.7` (GitHub Copilot CLI, uses Claude Opus 4.7)
       - Cursor: `cursor-agent --help`
 
       ## ACP Sessions
@@ -550,7 +550,7 @@ tools:
       gemini:
         command: "gemini --experimental-acp --yolo"
       copilot:
-        command: "copilot --acp --stdio --yolo --model claude-opus-4.6"
+        command: "copilot --acp --stdio --yolo --model claude-opus-4.7"
       kimi:
         command: "kimi acp"
       cursor:
@@ -566,6 +566,8 @@ claudeCode:
   enabled: true
   oauthTokenSecretKey: "anthropic-sub1-oauth"
   oauthTokenSecretKeySub2: "anthropic-sub2-oauth"
+  # Force Opus 4.7 for Claude Code (ACP path uses claude-agent-acp). Dashed API form.
+  model: "claude-opus-4-7"
   permissions:
     defaultMode: "bypassPermissions"
     allow:

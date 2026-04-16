@@ -60,6 +60,9 @@ data:
         "ANTHROPIC_MODEL": {{ .Values.cloudProviders.foundry.claudeCode.model | quote }},
         {{- end }}
         {{- end }}
+        {{- if and .Values.claudeCode.model (not .Values.cloudProviders.bedrock.enabled) (not .Values.cloudProviders.vertex.enabled) (not .Values.cloudProviders.foundry.enabled) }}
+        "ANTHROPIC_MODEL": {{ .Values.claudeCode.model | quote }},
+        {{- end }}
         "DISABLE_AUTOUPDATER": "1",
         "DISABLE_TELEMETRY": {{ .Values.claudeCode.disableTelemetry | ternary "\"1\"" "\"0\"" }}
       }
