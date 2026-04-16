@@ -24,5 +24,11 @@ spec:
       protocol: TCP
       name: ssh
     {{- end }}
+    {{- if .Values.codeServer.enabled }}
+    - port: {{ .Values.codeServer.port | default 8080 }}
+      targetPort: code-server
+      protocol: TCP
+      name: code-server
+    {{- end }}
   selector:
     {{- include "openclaw-agent.selectorLabels" . | nindent 4 }}

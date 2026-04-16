@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PM Server Audit — CTO Platform</title>
+  <style>
+    :root {
+      --bg: #0a0a0b;
+      --surface: #131316;
+      --surface-2: #1a1a1f;
+      --border: #2a2a30;
+      --text: #e4e4e7;
+      --text-muted: #8b8b94;
+      --accent: #6366f1;
+      --accent-dim: rgba(99,102,241,0.12);
+      --green: #22c55e;
+      --green-dim: rgba(34,197,94,0.12);
+      --amber: #f59e0b;
+      --amber-dim: rgba(245,158,11,0.12);
+      --red: #ef4444;
+      --red-dim: rgba(239,68,68,0.12);
+      --cyan: #06b6d4;
+      --cyan-dim: rgba(6,182,212,0.12);
+      --pink: #ec4899;
+      --pink-dim: rgba(236,72,153,0.12);
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 32px 0;
+      margin-bottom: 40px;
+    }
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+    header h1 code {
+      font-family: var(--mono);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    header p {
+      color: var(--text-muted);
+      font-size: 15px;
+      max-width: 720px;
+    }
+
+    /* Stats bar */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 40px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+    }
+    .stat-card .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .stat-card .value {
+      font-size: 24px;
+      font-weight: 700;
+      font-family: var(--mono);
+    }
+
+    /* Filter tabs */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 32px;
+    }
+    .filter-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 16px;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: var(--sans);
+    }
+    .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+    .filter-btn.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Sections */
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-title .icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    /* Module cards */
+    .module-grid {
+      display: grid;
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+    .module-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+    .module-card:hover { border-color: #3a3a44; }
+    .module-card-header {
+      padding: 20px 24px 16px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .module-card-header .left { flex: 1; }
+    .module-card-header h3 {
+      font-size: 15px;
+      font-weight: 600;
+      font-family: var(--mono);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .module-card-header .desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      max-width: 600px;
+    }
+    .module-card-header .chevron {
+      font-size: 18px;
+      color: var(--text-muted);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .module-card.open .chevron { transform: rotate(90deg); }
+    .module-card-body {
+      display: none;
+      padding: 0 24px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .module-card.open .module-card-body { display: block; padding-top: 16px; }
+
+    /* Tags */
+    .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .tag {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: var(--mono);
+    }
+    .tag.stateful { background: var(--amber-dim); color: var(--amber); }
+    .tag.stateless { background: var(--green-dim); color: var(--green); }
+    .tag.linear { background: var(--accent-dim); color: var(--accent); }
+    .tag.kube { background: var(--cyan-dim); color: var(--cyan); }
+    .tag.github { background: var(--surface-2); color: var(--text-muted); }
+    .tag.gitlab { background: var(--surface-2); color: var(--text-muted); }
+    .tag.openclaw { background: var(--pink-dim); color: var(--pink); }
+    .tag.argo { background: var(--red-dim); color: var(--red); }
+    .tag.category { background: var(--surface-2); color: var(--text-muted); }
+
+    /* Detail tables */
+    .detail-section { margin-top: 16px; }
+    .detail-section h4 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .fn-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .fn-list li {
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 6px 10px;
+      background: var(--surface-2);
+      border-radius: 6px;
+      color: var(--text);
+    }
+    .fn-list li .fn-desc {
+      color: var(--text-muted);
+      font-family: var(--sans);
+      margin-left: 4px;
+    }
+
+    /* Route table */
+    .route-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    .route-table th {
+      text-align: left;
+      padding: 8px 12px;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .route-table td {
+      padding: 8px 12px;
+      border-top: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .route-table td:first-child {
+      font-family: var(--mono);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .route-table .method {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 3px;
+      margin-right: 6px;
+    }
+    .method.post { background: var(--green-dim); color: var(--green); }
+    .method.get { background: var(--accent-dim); color: var(--accent); }
+
+    /* Decision matrix */
+    .decision-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+    @media (max-width: 768px) { .decision-grid { grid-template-columns: 1fr; } }
+    .decision-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .decision-card h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .decision-card .subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+    .decision-card ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .decision-card li {
+      font-size: 13px;
+      padding-left: 18px;
+      position: relative;
+    }
+    .decision-card li::before {
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+    .decision-card .pros li::before { content: '✓'; color: var(--green); }
+    .decision-card .cons li::before { content: '✗'; color: var(--red); }
+
+    /* Dep graph */
+    .dep-graph {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 48px;
+      overflow-x: auto;
+    }
+    .dep-graph pre {
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.8;
+      color: var(--text-muted);
+    }
+    .dep-graph pre .highlight { color: var(--accent); font-weight: 600; }
+    .dep-graph pre .service { color: var(--cyan); }
+    .dep-graph pre .arrow { color: var(--text-muted); }
+
+    /* Infra section */
+    .infra-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+    .infra-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+    }
+    .infra-card h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .infra-card .kv {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 4px 12px;
+      font-size: 13px;
+    }
+    .infra-card .kv dt {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .infra-card .kv dd {
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px 0;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1><code>crates/pm</code> — Full Functionality Audit</h1>
+    <p>Complete inventory of the PM server: every module, route, external dependency, and stateful component. Review this to decide what stays in PM vs. moves to Morgan.</p>
+  </header>
+
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="label">Modules</div>
+      <div class="value">19</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">HTTP Routes</div>
+      <div class="value">26</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Binaries</div>
+      <div class="value">3</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">External Services</div>
+      <div class="value">7</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Stateful Modules</div>
+      <div class="value" style="color: var(--amber);">5</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Lines (est.)</div>
+      <div class="value">~10k</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <button class="filter-btn active" data-filter="all">All Modules</button>
+    <button class="filter-btn" data-filter="webhook">Webhook Handlers</button>
+    <button class="filter-btn" data-filter="oauth">OAuth / Tokens</button>
+    <button class="filter-btn" data-filter="workflow">Intake / Play</button>
+    <button class="filter-btn" data-filter="comms">Agent Comms</button>
+    <button class="filter-btn" data-filter="infra">Infrastructure</button>
+    <button class="filter-btn" data-filter="stateful">⚠ Stateful Only</button>
+    <button class="filter-btn" data-filter="morgan">Morgan-Movable</button>
+  </div>
+
+  <!-- ===== SECTION: WEBHOOK HANDLERS ===== -->
+  <div class="section-title">
+    <div class="icon" style="background: var(--green-dim); color: var(--green);">⚡</div>
+    Webhook Handlers
+  </div>
+  <div class="module-grid">
+
+    <!-- server.rs (linear webhook) -->
+    <div class="module-card" data-categories="webhook,stateful,morgan">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>server.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Main Linear Webhook Router</span></h3>
+          <div class="desc">Core entry point for all Linear webhooks. Verifies HMAC signatures, validates timestamps, identifies which agent app sent the event, then routes by event type (AgentSession, Issue, Comment, Document).</div>
+          <div class="tags">
+            <span class="tag stateful">stateful</span>
+            <span class="tag linear">Linear API</span>
+            <span class="tag kube">Kubernetes</span>
+            <span class="tag openclaw">OpenClaw</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Functions</h4>
+          <ul class="fn-list">
+            <li>linear_webhook_handler() <span class="fn-desc">— POST /webhooks/linear entry, multi-app HMAC verify + dispatch</span></li>
+            <li>handle_session_created() <span class="fn-desc">— Routes Morgan+PRD→intake, task:play→play workflow, else generic ack</span></li>
+            <li>handle_session_prompted() <span class="fn-desc">— Forwards user follow-ups to running agents, handles stop signals</span></li>
+            <li>handle_document_event() <span class="fn-desc">— Syncs cto-config.json and Architecture docs to ConfigMaps</span></li>
+            <li>get_agent_client_with_refresh() <span class="fn-desc">— Token lifecycle: refresh expired → mint client_credentials → fallback</span></li>
+            <li>trigger_intake() <span class="fn-desc">— POST /trigger/intake manual trigger</span></li>
+            <li>handle_intake_setup() <span class="fn-desc">— POST /api/intake/setup full setup (project + PRD + docs)</span></li>
+          </ul>
+        </div>
+        <div class="detail-section">
+          <h4>State Held</h4>
+          <ul class="fn-list">
+            <li>AppState: SessionTracker, AcpRuntimeRegistry, Arc&lt;RwLock&lt;LinearConfig&gt;&gt;</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- github_events.rs -->
+    <div class="module-card" data-categories="webhook,morgan">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>github_events.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Unified GitHub Events</span></h3>
+          <div class="desc">Replaces Argo Events. Routes ALL GitHub webhooks: PR opened/sync → Stitch code review CodeRun, PR merged → task completion, check_run → remediation, issue_comment → @mention routing.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag github">GitHub</span>
+            <span class="tag kube">Kubernetes</span>
+            <span class="tag openclaw">OpenClaw</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Functions</h4>
+          <ul class="fn-list">
+            <li>handle_github_events() <span class="fn-desc">— POST /webhooks/github/events + /github/webhook</span></li>
+            <li>verify_github_signature() <span class="fn-desc">— HMAC-SHA256 with X-Hub-Signature-256</span></li>
+            <li>handle_pr_review_trigger() <span class="fn-desc">— Creates Stitch review CodeRun CRD (allowlisted repos)</span></li>
+            <li>handle_pr_merged() <span class="fn-desc">— Delegates intake PRs to github.rs, else ack</span></li>
+            <li>handle_check_run_event() <span class="fn-desc">— Forwards to agent_interactions</span></li>
+            <li>handle_comment_event() <span class="fn-desc">— Forwards @mentions to agent_interactions</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- gitlab_events.rs -->
+    <div class="module-card" data-categories="webhook,morgan">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>gitlab_events.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— GitLab Webhook Handler</span></h3>
+          <div class="desc">Dual SCM support. Maps GitLab MR, Pipeline, and Note events to GitHub-equivalent shapes and delegates processing. Token-based verification.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag gitlab">GitLab</span>
+            <span class="tag openclaw">OpenClaw</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Functions</h4>
+          <ul class="fn-list">
+            <li>handle_gitlab_events() <span class="fn-desc">— POST /webhooks/gitlab/events</span></li>
+            <li>handle_merge_request_event() <span class="fn-desc">— MR merged → converts to GitHub PR shape → delegates</span></li>
+            <li>handle_pipeline_event() <span class="fn-desc">— CI status → check_run equivalent</span></li>
+            <li>handle_note_event() <span class="fn-desc">— Comments → @mention equivalent</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- webhooks.rs -->
+    <div class="module-card" data-categories="webhook,infra">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>webhooks.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Signature Verification &amp; Payload Types</span></h3>
+          <div class="desc">HMAC-SHA256 webhook verification with constant-time comparison. Multi-app agent identification (tries all 16 agent secrets). Payload types for all Linear webhook events.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag category">security</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Functions</h4>
+          <ul class="fn-list">
+            <li>verify_webhook_signature(body, signature, secret) <span class="fn-desc">— HMAC-SHA256 + constant-time eq</span></li>
+            <li>identify_agent_from_signature(body, sig, config) <span class="fn-desc">— Tries all 16 agent secrets</span></li>
+            <li>identify_agent_or_legacy(body, sig, config, legacy) <span class="fn-desc">— Multi-app with legacy fallback</span></li>
+            <li>validate_webhook_timestamp(ts, max_age) <span class="fn-desc">— Staleness check (default 60s)</span></li>
+          </ul>
+        </div>
+        <div class="detail-section">
+          <h4>Types Defined</h4>
+          <ul class="fn-list">
+            <li>WebhookPayload, WebhookAction, WebhookType, WebhookHeaders</li>
+            <li>WebhookActor, AgentIdentification</li>
+            <li>WebhookAgentActivity, AgentActivityContent (6 variants)</li>
+            <li>DocumentWebhookData, DocumentProject</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- github.rs (legacy) -->
+    <div class="module-card" data-categories="webhook,workflow,morgan">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>github.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Legacy GitHub PR Handler</span></h3>
+          <div class="desc">Legacy endpoint from Argo Events era. Processes merged intake PRs: creates Linear project + issues from PR metadata, then triggers play CodeRun. Being replaced by github_events.rs.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag linear">Linear API</span>
+            <span class="tag github">GitHub</span>
+            <span class="tag openclaw">OpenClaw</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Functions</h4>
+          <ul class="fn-list">
+            <li>handle_github_webhook() <span class="fn-desc">— POST /webhooks/github (legacy Argo Events)</span></li>
+            <li>is_intake_pr() <span class="fn-desc">— Detects intake PRs by label or branch prefix</span></li>
+            <li>create_project_from_intake() <span class="fn-desc">— Full Linear project + issue creation pipeline</span></li>
+            <li>trigger_play_workflow() <span class="fn-desc">— Triggers play after intake PR merge</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- agent_interactions.rs -->
+    <div class="module-card" data-categories="webhook,comms,morgan">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>agent_interactions.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Mentions, CI Failures, Remediation</span></h3>
+          <div class="desc">Handles @5DLabs-Rex style mentions in PR comments, CI failure remediation buttons, and check_run requested actions. Creates CodeRun CRDs or forwards to Morgan.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag github">GitHub</span>
+            <span class="tag kube">Kubernetes</span>
+            <span class="tag openclaw">OpenClaw</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Functions</h4>
+          <ul class="fn-list">
+            <li>handle_mention_webhook() <span class="fn-desc">— POST /webhooks/github/mention</span></li>
+            <li>handle_remediation_webhook() <span class="fn-desc">— POST /webhooks/github/remediation</span></li>
+            <li>handle_ci_failure_webhook() <span class="fn-desc">— POST /webhooks/github/ci-failure</span></li>
+            <li>parse_mentions(comment) <span class="fn-desc">— Regex parsing of @5dlabs-{agent}</span></li>
+            <li>select_agent_for_files(files) <span class="fn-desc">— Language detection → agent routing</span></li>
+          </ul>
+        </div>
+        <div class="detail-section">
+          <h4>Agent Enum (13 agents)</h4>
+          <ul class="fn-list">
+            <li>Rex, Grizz, Nova, Blaze, Tap, Spark, Angie, Vex, Forge, Stitch, Cleo, Cipher, Tess</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION: OAUTH & TOKEN MANAGEMENT ===== -->
+  <div class="section-title">
+    <div class="icon" style="background: var(--amber-dim); color: var(--amber);">🔑</div>
+    OAuth &amp; Token Management
+  </div>
+  <div class="module-grid">
+
+    <!-- oauth.rs -->
+    <div class="module-card" data-categories="oauth,stateful,infra">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>oauth.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Linear OAuth Token Broker</span></h3>
+          <div class="desc">Full OAuth lifecycle for 16 Linear agent apps: authorization_code flow, token refresh, client_credentials minting, and persistent storage in Kubernetes secrets.</div>
+          <div class="tags">
+            <span class="tag stateful">stateful</span>
+            <span class="tag linear">Linear OAuth</span>
+            <span class="tag kube">Kubernetes</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Routes</h4>
+          <ul class="fn-list">
+            <li>GET /oauth/start <span class="fn-desc">— Redirects to Linear OAuth with actor=app</span></li>
+            <li>GET /oauth/callback <span class="fn-desc">— Code→token exchange, stores in K8s secret</span></li>
+            <li>POST /oauth/refresh/{agent} <span class="fn-desc">— Refresh token flow</span></li>
+            <li>POST /oauth/mint/{agent} <span class="fn-desc">— Client credentials flow</span></li>
+            <li>POST /oauth/mint-all <span class="fn-desc">— Mint tokens for all 16 agents</span></li>
+            <li>GET /oauth/token/{agent} <span class="fn-desc">— Current token status</span></li>
+          </ul>
+        </div>
+        <div class="detail-section">
+          <h4>State Mutated</h4>
+          <ul class="fn-list">
+            <li>Arc&lt;RwLock&lt;LinearConfig&gt;&gt; <span class="fn-desc">— In-memory config updated after refresh</span></li>
+            <li>K8s Secret: linear-app-{agent} <span class="fn-desc">— Persistent token storage</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- token_health.rs -->
+    <div class="module-card" data-categories="oauth,stateful,infra">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>state/token_health.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Proactive Token Refresh</span></h3>
+          <div class="desc">Background task running every 5 minutes. Checks all 16 agent tokens for expiry. Proactively refreshes or mints new tokens before they expire. Concurrency-limited to 3 simultaneous refreshes.</div>
+          <div class="tags">
+            <span class="tag stateful">stateful</span>
+            <span class="tag linear">Linear OAuth</span>
+            <span class="tag kube">Kubernetes</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Functions</h4>
+          <ul class="fn-list">
+            <li>TokenHealthManager::run() <span class="fn-desc">— Infinite loop, 5min interval</span></li>
+            <li>refresh_expiring_tokens() <span class="fn-desc">— Checks all agents, queues refresh/mint</span></li>
+            <li>TokenRotationCandidate::Refresh <span class="fn-desc">— Uses existing refresh_token</span></li>
+            <li>TokenRotationCandidate::Mint <span class="fn-desc">— Uses client_credentials grant</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- config.rs (Linear section) -->
+    <div class="module-card" data-categories="oauth,infra">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>config.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Multi-Agent Linear Config</span></h3>
+          <div class="desc">Manages per-agent OAuth credentials for 16 agents (morgan, rex, blaze, grizz, nova, tap, spark, cleo, cipher, tess, atlas, bolt, stitch, vex, angie, pixel). Each has client_id, client_secret, webhook_secret, access_token, refresh_token, expires_at.</div>
+          <div class="tags">
+            <span class="tag stateful">stateful</span>
+            <span class="tag category">config</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Config Types</h4>
+          <ul class="fn-list">
+            <li>LinearConfig <span class="fn-desc">— HashMap&lt;String, LinearAppConfig&gt; for 16 agents</span></li>
+            <li>LinearAppConfig <span class="fn-desc">— client_id, client_secret, webhook_secret, access_token, refresh_token, expires_at</span></li>
+            <li>is_expired() / can_refresh() / can_mint_client_credentials()</li>
+            <li>should_proactively_mint_client_credentials() <span class="fn-desc">— Pre-emptive refresh trigger</span></li>
+            <li>MorganDispatchConfig <span class="fn-desc">— mode, base_url, token, agent_id, session_key_prefix, timeout</span></li>
+            <li>WebhookDispatchMode <span class="fn-desc">— Legacy | Shadow | Morgan</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION: INTAKE & PLAY WORKFLOWS ===== -->
+  <div class="section-title">
+    <div class="icon" style="background: var(--cyan-dim); color: var(--cyan);">🔄</div>
+    Intake &amp; Play Workflows
+  </div>
+  <div class="module-grid">
+
+    <!-- intake.rs -->
+    <div class="module-card" data-categories="workflow,morgan">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>handlers/intake.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Intake Workflow Submission</span></h3>
+          <div class="desc">Handles intake workflow triggered by PRD issue delegation. Creates CodeRun CRDs directly (replaced Argo workflows). Reads project-specific cto-config from ConfigMaps.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag kube">Kubernetes</span>
+            <span class="tag linear">Linear API</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Functions</h4>
+          <ul class="fn-list">
+            <li>extract_intake_request() <span class="fn-desc">— Reads PRD/arch from ConfigMap, builds IntakeRequest</span></li>
+            <li>submit_intake_coderun() <span class="fn-desc">— Creates CodeRun CRD in K8s namespace</span></li>
+          </ul>
+        </div>
+        <div class="detail-section">
+          <h4>Types</h4>
+          <ul class="fn-list">
+            <li>IntakeRequest, IntakeResult, IntakeTask, TasksJson, AgentConfig</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- play.rs -->
+    <div class="module-card" data-categories="workflow,morgan">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>handlers/play.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Play Workflow Submission</span></h3>
+          <div class="desc">Extracts task info from Linear issues, builds Argo workflow parameters, submits via argo CLI. Manages play lifecycle including cancellation.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag argo">Argo Workflows</span>
+            <span class="tag kube">Kubernetes</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Functions</h4>
+          <ul class="fn-list">
+            <li>extract_play_request() <span class="fn-desc">— Parses task ID from title, extracts CTO config from labels</span></li>
+            <li>submit_play_workflow() <span class="fn-desc">— Shells out to `argo submit` with all agent params</span></li>
+            <li>cancel_play_workflow() <span class="fn-desc">— `argo list` + `argo stop`</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- play_state.rs -->
+    <div class="module-card" data-categories="workflow">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>handlers/play_state.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Play Pipeline State Machine</span></h3>
+          <div class="desc">Maps agents to Linear workflow states for visual board (Infrastructure → Implementation → Quality → Security → Testing → Done). Moves issues through states as agents work.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag linear">Linear API</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Agent → State Mapping</h4>
+          <ul class="fn-list">
+            <li>bolt → Infrastructure / Deployment</li>
+            <li>rex / blaze / grizz → Implementation</li>
+            <li>cleo → Quality</li>
+            <li>cipher → Security</li>
+            <li>tess → Testing</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- callbacks.rs -->
+    <div class="module-card" data-categories="workflow,morgan">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>handlers/callbacks.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Workflow Callback Endpoints</span></h3>
+          <div class="desc">Called by Argo workflows on completion. Creates Linear projects + task issues from intake results, updates issue state on play completion, links PRs, syncs status.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag linear">Linear API</span>
+            <span class="tag github">GitHub</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Callback Routes</h4>
+          <ul class="fn-list">
+            <li>POST /callbacks/intake-complete <span class="fn-desc">— Creates Linear project, sub-issues, attachments</span></li>
+            <li>POST /callbacks/tasks-json <span class="fn-desc">— Parses raw tasks.json, delegates to intake_complete</span></li>
+            <li>POST /callbacks/play-complete <span class="fn-desc">— Updates issue to "In Review", sets agent status</span></li>
+            <li>POST /callbacks/pr-created <span class="fn-desc">— Links PR as attachment</span></li>
+            <li>POST /callbacks/agent-work-started <span class="fn-desc">— Sets delegate, moves to started</span></li>
+            <li>POST /status/linear-sync <span class="fn-desc">— Syncs workflow status to Linear</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- document.rs -->
+    <div class="module-card" data-categories="workflow,infra">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>handlers/document.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Linear Doc → ConfigMap Sync</span></h3>
+          <div class="desc">Syncs Linear documents to Kubernetes ConfigMaps. Extracts JSON from markdown code fences in cto-config.json documents. Stores PRD/architecture content during intake setup.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag kube">Kubernetes</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Functions</h4>
+          <ul class="fn-list">
+            <li>sync_document_to_configmap() <span class="fn-desc">— Extracts JSON, patches ConfigMap</span></li>
+            <li>store_intake_content() <span class="fn-desc">— PRD/arch → ConfigMap during initial setup</span></li>
+            <li>sync_architecture_to_configmap() <span class="fn-desc">— Architecture doc sync</span></li>
+            <li>configmap_name_for_project() <span class="fn-desc">— cto-config-project-{sanitized-uuid}</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION: AGENT COMMUNICATION ===== -->
+  <div class="section-title">
+    <div class="icon" style="background: var(--pink-dim); color: var(--pink);">💬</div>
+    Agent Communication
+  </div>
+  <div class="module-grid">
+
+    <!-- agent_comms.rs -->
+    <div class="module-card" data-categories="comms,stateful">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>handlers/agent_comms.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Agent Message Router</span></h3>
+          <div class="desc">Two-way communication router between PM and running agent pods. Routes user messages (from Linear prompts) to running Claude containers via HTTP with K8s fallback.</div>
+          <div class="tags">
+            <span class="tag stateful">stateful</span>
+            <span class="tag kube">Kubernetes</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Functions</h4>
+          <ul class="fn-list">
+            <li>find_running_agents(kube, ns, session_id) <span class="fn-desc">— K8s pod label query</span></li>
+            <li>find_agents_by_issue(kube, ns, issue_id) <span class="fn-desc">— K8s pod query by issue label</span></li>
+            <li>send_message_to_agent(agent, msg) <span class="fn-desc">— HTTP POST to pod_ip:8080/input</span></li>
+            <li>broadcast_to_session(kube, ns, session, text) <span class="fn-desc">— Sends to all pods for session</span></li>
+            <li>init_global_router() / route_message_global() <span class="fn-desc">— Global singleton router</span></li>
+          </ul>
+        </div>
+        <div class="detail-section">
+          <h4>State Held</h4>
+          <ul class="fn-list">
+            <li>SessionCache <span class="fn-desc">— RwLock&lt;HashMap&gt; mapping session IDs → pod IPs (5min TTL)</span></li>
+            <li>Global LazyLock&lt;AgentRouter&gt; <span class="fn-desc">— Singleton message router</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- agent_session.rs -->
+    <div class="module-card" data-categories="comms,webhook,morgan">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>handlers/agent_session.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Session Lifecycle</span></h3>
+          <div class="desc">Handles Linear AgentSessionEvent webhooks. Routes new sessions (Morgan+PRD→intake, else generic), forwards prompted messages, handles stop signals.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag linear">Linear API</span>
+            <span class="tag kube">Kubernetes</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Functions</h4>
+          <ul class="fn-list">
+            <li>handle_agent_session_created() <span class="fn-desc">— New session: check PRD label → intake, else ack</span></li>
+            <li>handle_agent_session_prompted() <span class="fn-desc">— Follow-up: stop signal or forward</span></li>
+            <li>AgentSessionContext::from_payload() <span class="fn-desc">— Extracts agent, session, issue from webhook</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- session_tracker.rs -->
+    <div class="module-card" data-categories="comms,stateful,infra">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>state/session_tracker.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— In-Memory Session State</span></h3>
+          <div class="desc">Thread-safe in-memory tracking of all active Linear agent sessions. Maps session→workflow→pod→issue with reverse lookups. 1-hour expiry with cleanup.</div>
+          <div class="tags">
+            <span class="tag stateful">stateful</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Types</h4>
+          <ul class="fn-list">
+            <li>SessionTracker <span class="fn-desc">— Arc&lt;RwLock&lt;HashMap&gt;&gt;, session→info, issue→sessions, workflow→session</span></li>
+            <li>SessionInfo <span class="fn-desc">— session_id, agent, workflow, pod, issue, status, ACP metadata</span></li>
+            <li>SessionStatus <span class="fn-desc">— Pending, Running, Completed, Failed, TimedOut</span></li>
+          </ul>
+        </div>
+        <div class="detail-section">
+          <h4>Key Functions</h4>
+          <ul class="fn-list">
+            <li>register() / set_workflow() / set_pod() / complete() / fail()</li>
+            <li>get() / get_by_workflow() / get_by_issue() / list_active()</li>
+            <li>cleanup_expired() / stats()</li>
+            <li>ACP: set_acp_runtime() / bind_acp_session() / set_acp_run_state()</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION: LINEAR API CLIENT ===== -->
+  <div class="section-title">
+    <div class="icon" style="background: var(--accent-dim); color: var(--accent);">📡</div>
+    Linear API Client &amp; Activity Emission
+  </div>
+  <div class="module-grid">
+
+    <!-- client.rs -->
+    <div class="module-card" data-categories="infra">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>client.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Linear GraphQL Client (~1650 lines)</span></h3>
+          <div class="desc">Full-featured Linear API client. Typed methods for issues, teams, labels, projects, users, documents, attachments, comments, and agent activities.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag linear">Linear API</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>API Coverage</h4>
+          <ul class="fn-list">
+            <li><strong>Issues:</strong> get, create, update, update_state, create_relation</li>
+            <li><strong>Teams:</strong> get, get_by_key, workflow_states, get_started_state, create/get_or_create state</li>
+            <li><strong>Labels:</strong> get_or_create, ensure_required, set/add/remove, update_agent_status</li>
+            <li><strong>Projects:</strong> create, get, list_templates, find_template, list/find statuses</li>
+            <li><strong>Users:</strong> list_assignable, search_by_name, get_viewer</li>
+            <li><strong>Documents:</strong> get, create</li>
+            <li><strong>Attachments:</strong> create</li>
+            <li><strong>Comments:</strong> create</li>
+            <li><strong>Activities:</strong> emit_thought, emit_action, emit_response, emit_error, update_plan, set_external_link</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- emitter.rs -->
+    <div class="module-card" data-categories="infra">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>emitter.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Activity Emitter Trait</span></h3>
+          <div class="desc">Workflow-agnostic trait for emitting Linear agent activities. Provides AgentActivityEmitter trait + LinearAgentEmitter implementation. Used by workflow containers.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag linear">Linear API</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Types</h4>
+          <ul class="fn-list">
+            <li>AgentActivityEmitter trait <span class="fn-desc">— emit_thought, emit_action, emit_response, emit_error, etc.</span></li>
+            <li>LinearAgentEmitter <span class="fn-desc">— Wraps LinearClient + session_id</span></li>
+            <li>LinearAgentEmitter::from_env() <span class="fn-desc">— Reads LINEAR_API_TOKEN + LINEAR_SESSION_ID</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- activities.rs -->
+    <div class="module-card" data-categories="infra">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>activities.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Activity Type Definitions</span></h3>
+          <div class="desc">Data types for Linear's Agent Activity system. Thought, Action, Elicitation, Response, Error variants. Plan steps for visual checklists. GraphQL mutations.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag category">types</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Types</h4>
+          <ul class="fn-list">
+            <li>ActivityContent <span class="fn-desc">— Thought, Action, Elicitation, Response, Error</span></li>
+            <li>ActivitySignal <span class="fn-desc">— Auth | Select</span></li>
+            <li>PlanStep <span class="fn-desc">— content + Pending/InProgress/Completed/Canceled</span></li>
+            <li>AgentActivityCreateInput, AgentSessionUpdateInput</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION: SUPPORTING MODULES ===== -->
+  <div class="section-title">
+    <div class="icon" style="background: var(--surface-2); color: var(--text-muted);">🧩</div>
+    Supporting Modules
+  </div>
+  <div class="module-grid">
+
+    <!-- detection/ -->
+    <div class="module-card" data-categories="infra">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>detection/ <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Language &amp; Agent Detection</span></h3>
+          <div class="desc">Pure analysis module. Detects languages by file extension, frameworks from package manifests, and selects the correct agent for PR remediation. No external deps.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag category">pure logic</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Detection Pipeline</h4>
+          <ul class="fn-list">
+            <li>detect_from_files(files) → DetectionResult</li>
+            <li>detect_from_package_json(content) → Framework</li>
+            <li>detect_full(files, package_json) → (DetectionResult, Agent)</li>
+            <li>select_agent(result) → Agent <span class="fn-desc">— Maps detection to agent</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- onboarding.rs -->
+    <div class="module-card" data-categories="infra,stateful">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>onboarding.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Tenant Onboarding State Machine</span></h3>
+          <div class="desc">Conversational setup flow: Welcome → GitHubConnect → RepoSelection → ApiKeyEntry → AgentSelection → Provisioning → Complete. Not yet wired to HTTP routes.</div>
+          <div class="tags">
+            <span class="tag stateful">stateful</span>
+            <span class="tag category">WIP</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>States</h4>
+          <ul class="fn-list">
+            <li>Welcome → GitHubConnect → RepoSelection → ApiKeyEntry → AgentSelection → Provisioning → Complete</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- morgan_hooks.rs -->
+    <div class="module-card" data-categories="infra,morgan">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>morgan_hooks.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Morgan/OpenClaw Dispatch</span></h3>
+          <div class="desc">Reversible webhook cutover to Morgan. Builds structured messages with metadata + JSON payload, sends to OpenClaw /hooks/agent with bearer auth and deterministic session keys.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag openclaw">OpenClaw</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Key Functions</h4>
+          <ul class="fn-list">
+            <li>dispatch_to_morgan(http, config, dispatch) <span class="fn-desc">— POST {base}/hooks/agent with bearer</span></li>
+            <li>build_message(dispatch) <span class="fn-desc">— Markdown message with metadata + JSON</span></li>
+            <li>build_session_key(prefix, source, event, delivery) <span class="fn-desc">— Deterministic key, 180 char max</span></li>
+          </ul>
+        </div>
+        <div class="detail-section">
+          <h4>Dispatch Modes</h4>
+          <ul class="fn-list">
+            <li><strong>Legacy</strong> <span class="fn-desc">— PM processes everything, no forwarding</span></li>
+            <li><strong>Shadow</strong> <span class="fn-desc">— Forward to Morgan + continue PM processing</span></li>
+            <li><strong>Morgan</strong> <span class="fn-desc">— Forward to Morgan only, skip PM logic</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- models.rs -->
+    <div class="module-card" data-categories="infra">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>models.rs <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Linear Entity Types</span></h3>
+          <div class="desc">All Linear entity type definitions: Issue, Comment, Label, Team, Project, Document, User, WorkflowState, AgentSession, etc. Shared across the entire crate.</div>
+          <div class="tags">
+            <span class="tag stateless">stateless</span>
+            <span class="tag category">types</span>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body">
+        <div class="detail-section">
+          <h4>Types</h4>
+          <ul class="fn-list">
+            <li>Issue, IssueCreateInput, IssueUpdateInput, IssueRelation</li>
+            <li>Comment, Label, Team, WorkflowState</li>
+            <li>Project, ProjectCreateInput, ProjectStatus</li>
+            <li>Document, DocumentCreateInput</li>
+            <li>User, AgentSession, Attachment</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION: BINARIES ===== -->
+  <div class="section-title">
+    <div class="icon" style="background: var(--red-dim); color: var(--red);">⚙️</div>
+    Binaries Produced
+  </div>
+  <div class="module-grid">
+    <div class="module-card" data-categories="infra">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>bin/pm-server <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Main HTTP Server</span></h3>
+          <div class="desc">Axum server on port 8081. Handles all webhooks, OAuth, callbacks, intake/play triggers. Connects to Kubernetes. Runs TokenHealthManager background task.</div>
+          <div class="tags"><span class="tag category">primary</span></div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body"></div>
+    </div>
+    <div class="module-card" data-categories="infra">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>bin/status-sync <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— Agent Pod Sidecar</span></h3>
+          <div class="desc">Sidecar for agent pods. Monitors status files, streams logs to Linear, polls Linear for user input, whip-cracking for stalled agents.</div>
+          <div class="tags"><span class="tag category">sidecar</span></div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body"></div>
+    </div>
+    <div class="module-card" data-categories="infra">
+      <div class="module-card-header" onclick="toggleCard(this)">
+        <div class="left">
+          <h3>bin/pm-activity <span style="font-weight:400;color:var(--text-muted);font-family:var(--sans);font-size:13px;">— CLI Activity Emitter</span></h3>
+          <div class="desc">CLI tool for containers to emit Linear Agent Activities (thoughts, actions, responses) from within workflow pods.</div>
+          <div class="tags"><span class="tag category">CLI tool</span></div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="module-card-body"></div>
+    </div>
+  </div>
+
+  <!-- ===== ALL ROUTES TABLE ===== -->
+  <div class="section-title">
+    <div class="icon" style="background: var(--green-dim); color: var(--green);">🛣️</div>
+    All HTTP Routes (26)
+  </div>
+  <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 48px;">
+    <table class="route-table">
+      <thead>
+        <tr>
+          <th>Route</th>
+          <th>Handler</th>
+          <th>Category</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="method post">POST</span>/webhooks/linear</td><td>linear_webhook_handler</td><td>Linear webhooks</td></tr>
+        <tr><td><span class="method post">POST</span>/webhooks/github</td><td>handle_github_webhook</td><td>Legacy GitHub</td></tr>
+        <tr><td><span class="method post">POST</span>/webhooks/github/events</td><td>handle_github_events</td><td>Unified GitHub</td></tr>
+        <tr><td><span class="method post">POST</span>/github/webhook</td><td>handle_github_events</td><td>Legacy alias</td></tr>
+        <tr><td><span class="method post">POST</span>/webhooks/gitlab/events</td><td>handle_gitlab_events</td><td>GitLab</td></tr>
+        <tr><td><span class="method post">POST</span>/webhooks/github/mention</td><td>handle_mention_webhook</td><td>Agent interaction</td></tr>
+        <tr><td><span class="method post">POST</span>/webhooks/github/remediation</td><td>handle_remediation_webhook</td><td>Agent interaction</td></tr>
+        <tr><td><span class="method post">POST</span>/webhooks/github/ci-failure</td><td>handle_ci_failure_webhook</td><td>Agent interaction</td></tr>
+        <tr><td><span class="method post">POST</span>/callbacks/intake-complete</td><td>handle_intake_complete</td><td>Workflow callback</td></tr>
+        <tr><td><span class="method post">POST</span>/callbacks/tasks-json</td><td>handle_tasks_json_callback</td><td>Workflow callback</td></tr>
+        <tr><td><span class="method post">POST</span>/callbacks/play-complete</td><td>handle_play_complete</td><td>Workflow callback</td></tr>
+        <tr><td><span class="method post">POST</span>/callbacks/pr-created</td><td>handle_pr_created</td><td>Workflow callback</td></tr>
+        <tr><td><span class="method post">POST</span>/callbacks/agent-work-started</td><td>handle_agent_work_started</td><td>Workflow callback</td></tr>
+        <tr><td><span class="method post">POST</span>/status/linear-sync</td><td>handle_status_sync</td><td>Status sync</td></tr>
+        <tr><td><span class="method post">POST</span>/trigger/intake</td><td>trigger_intake</td><td>Manual trigger</td></tr>
+        <tr><td><span class="method post">POST</span>/api/intake/setup</td><td>handle_intake_setup</td><td>Intake API</td></tr>
+        <tr><td><span class="method post">POST</span>/api/sessions/{id}/input</td><td>send_session_input</td><td>Agent comms</td></tr>
+        <tr><td><span class="method get">GET</span>/oauth/start</td><td>handle_oauth_start</td><td>OAuth</td></tr>
+        <tr><td><span class="method get">GET</span>/oauth/callback</td><td>handle_oauth_callback</td><td>OAuth</td></tr>
+        <tr><td><span class="method post">POST</span>/oauth/refresh/{agent}</td><td>handle_oauth_refresh</td><td>OAuth</td></tr>
+        <tr><td><span class="method post">POST</span>/oauth/mint/{agent}</td><td>handle_oauth_mint</td><td>OAuth</td></tr>
+        <tr><td><span class="method post">POST</span>/oauth/mint-all</td><td>handle_oauth_mint_all</td><td>OAuth</td></tr>
+        <tr><td><span class="method get">GET</span>/oauth/token/{agent}</td><td>handle_oauth_token</td><td>OAuth</td></tr>
+        <tr><td><span class="method get">GET</span>/health</td><td>health_check</td><td>Health</td></tr>
+        <tr><td><span class="method get">GET</span>/health/tokens</td><td>token_health</td><td>Health</td></tr>
+        <tr><td><span class="method get">GET</span>/ready</td><td>readiness_check</td><td>Health</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===== DEPENDENCY FLOW ===== -->
+  <div class="section-title">
+    <div class="icon" style="background: var(--accent-dim); color: var(--accent);">🔗</div>
+    External Service Dependency Map
+  </div>
+  <div class="dep-graph">
+    <pre>
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │                         <span class="highlight">PM Server (port 8081)</span>                        │
+  │                        pm.5dlabs.ai (Cloudflare)                     │
+  └───────┬──────┬──────┬──────┬──────┬──────┬──────┬──────────────────┘
+          │      │      │      │      │      │      │
+          ▼      ▼      ▼      ▼      ▼      ▼      ▼
+  <span class="service">Linear    Linear   Kube    Kube     GitHub   Argo     OpenClaw</span>
+  <span class="service">GraphQL   OAuth    API     Secrets  HMAC     CLI      /hooks/agent</span>
+  <span class="service">API       API</span>
+
+  <span class="arrow">Who sends webhooks TO PM:</span>
+  ├── <span class="service">Linear</span>      → POST /webhooks/linear    (HMAC-SHA256, per-agent secrets)
+  ├── <span class="service">GitHub</span>      → POST /webhooks/github/*  (HMAC-SHA256, single secret)
+  ├── <span class="service">GitLab</span>      → POST /webhooks/gitlab/*  (Token header)
+  ├── <span class="service">Argo Wkflws</span> → POST /callbacks/*        (Internal, no auth)
+  └── <span class="service">Linear</span>      → GET  /oauth/callback      (OAuth redirect)
+
+  <span class="arrow">Who PM calls OUT to:</span>
+  ├── <span class="service">Linear GraphQL</span>    — Issues, projects, labels, activities, comments
+  ├── <span class="service">Linear OAuth</span>      — Token refresh, client_credentials mint
+  ├── <span class="service">Kubernetes API</span>    — ConfigMaps, Secrets, Pods, CodeRun CRDs
+  ├── <span class="service">Argo CLI</span>          — argo submit, argo stop (play workflows)
+  ├── <span class="service">Agent Pods :8080</span>  — Forward user messages to running agents
+  └── <span class="service">OpenClaw</span>          — /hooks/agent (Morgan dispatch, bearer auth)
+    </pre>
+  </div>
+
+  <!-- ===== DEPLOYMENT ===== -->
+  <div class="section-title">
+    <div class="icon" style="background: var(--cyan-dim); color: var(--cyan);">☸️</div>
+    Deployment &amp; Infrastructure
+  </div>
+  <div class="infra-grid">
+    <div class="infra-card">
+      <h3>🐳 Container</h3>
+      <dl class="kv">
+        <dt>Image</dt><dd>registry.5dlabs.ai/5dlabs/pm-server</dd>
+        <dt>Port</dt><dd>8081</dd>
+        <dt>Base</dt><dd>debian:bookworm-slim</dd>
+        <dt>Includes</dt><dd>Argo CLI v3.7.1</dd>
+        <dt>User</dt><dd>app (UID 1000)</dd>
+      </dl>
+    </div>
+    <div class="infra-card">
+      <h3>☸️ Kubernetes</h3>
+      <dl class="kv">
+        <dt>Deployment</dt><dd>cto-pm (1 replica)</dd>
+        <dt>Service</dt><dd>ClusterIP :8081</dd>
+        <dt>Namespace</dt><dd>cto</dd>
+        <dt>RBAC</dt><dd>ConfigMaps, Secrets, Pods, CodeRuns, Argo Workflows</dd>
+      </dl>
+    </div>
+    <div class="infra-card">
+      <h3>🌐 External Access</h3>
+      <dl class="kv">
+        <dt>Prod</dt><dd>pm.5dlabs.ai (Cloudflare Tunnel)</dd>
+        <dt>Dev</dt><dd>pm-dev.5dlabs.ai (cloudflared)</dd>
+        <dt>Resources</dt><dd>100m–500m CPU, 128–256Mi RAM</dd>
+      </dl>
+    </div>
+    <div class="infra-card">
+      <h3>🔐 Secrets (per agent × 16)</h3>
+      <dl class="kv">
+        <dt>Format</dt><dd>linear-app-{agent}</dd>
+        <dt>Fields</dt><dd>client_id, client_secret, webhook_secret, access_token, expires_at</dd>
+        <dt>Also</dt><dd>github-webhook-secret, tools-github-secrets</dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- ===== DECISION MATRIX ===== -->
+  <div class="section-title">
+    <div class="icon" style="background: var(--pink-dim); color: var(--pink);">🤔</div>
+    Migration Decision Matrix
+  </div>
+  <div class="decision-grid">
+    <div class="decision-card" style="border-color: var(--green);">
+      <h3 style="color: var(--green);">✅ Safe to Move to Morgan</h3>
+      <div class="subtitle">Business logic that Morgan should own</div>
+      <ul class="pros">
+        <li>Intake workflow routing (PRD → CodeRun)</li>
+        <li>Play workflow submission &amp; cancellation</li>
+        <li>Agent interaction routing (@mentions, CI failures)</li>
+        <li>GitHub/GitLab event business logic (review triggers, merge handling)</li>
+        <li>Callback processing (intake-complete, play-complete, pr-created)</li>
+        <li>Document → ConfigMap syncing</li>
+        <li>Play state machine (agent → Linear state mapping)</li>
+        <li>Detection module (language/framework/agent selection)</li>
+      </ul>
+    </div>
+    <div class="decision-card" style="border-color: var(--red);">
+      <h3 style="color: var(--red);">🚫 Should Stay in PM</h3>
+      <div class="subtitle">Infrastructure/platform concerns Morgan shouldn't own</div>
+      <ul class="cons">
+        <li>HMAC-SHA256 webhook signature verification</li>
+        <li>Multi-agent OAuth token lifecycle (refresh, mint, store)</li>
+        <li>Background token health manager (5min proactive refresh)</li>
+        <li>Kubernetes secret management for tokens</li>
+        <li>OAuth authorization flow (start, callback)</li>
+        <li>Agent pod communication router (session cache, K8s pod discovery)</li>
+        <li>Session tracker (in-memory state, reverse lookups)</li>
+        <li>Health checks &amp; readiness probes</li>
+      </ul>
+    </div>
+    <div class="decision-card" style="border-color: var(--amber);">
+      <h3 style="color: var(--amber);">⚠️ Shared / Boundary</h3>
+      <div class="subtitle">Could go either way depending on approach</div>
+      <ul class="pros">
+        <li>Linear GraphQL client (lib, used by both)</li>
+        <li>Activity emission (currently used by PM + agent pods)</li>
+        <li>Onboarding state machine (WIP, not yet wired)</li>
+        <li>Morgan dispatch module (becomes unnecessary if Morgan receives directly)</li>
+      </ul>
+    </div>
+    <div class="decision-card" style="border-color: var(--accent);">
+      <h3 style="color: var(--accent);">💡 Recommendation</h3>
+      <div class="subtitle">Complete the existing Shadow → Morgan cutover</div>
+      <ul class="pros">
+        <li>PM shrinks to: auth gateway + token broker + agent router</li>
+        <li>Morgan owns: all business logic decisions</li>
+        <li>Shadow mode lets you dark-launch safely</li>
+        <li>No breaking changes to external webhook URLs</li>
+        <li>OAuth/token management stays centralized</li>
+        <li>Linear client already exists as separate crate (linear-sink)</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    PM Server Audit • crates/pm • Generated from codebase analysis
+  </footer>
+</div>
+
+<script>
+function toggleCard(header) {
+  header.closest('.module-card').classList.toggle('open');
+}
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const filter = btn.dataset.filter;
+    document.querySelectorAll('.module-card').forEach(card => {
+      if (filter === 'all') {
+        card.style.display = '';
+        return;
+      }
+      const cats = card.dataset.categories || '';
+      card.style.display = cats.includes(filter) ? '' : 'none';
+    });
+  });
+});
+</script>
+
+</body>
+</html>

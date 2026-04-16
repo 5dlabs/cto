@@ -1,0 +1,15 @@
+apiVersion: v2
+name: musetalk-worker
+description: MuseTalk avatar rendering worker - NATS-driven lip-sync video generation
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - musetalk
+  - avatar
+  - gpu
+  - video-generation
+  - nats
+maintainers:
+  - name: 5DLabs
+    url: https://5dlabs.ai

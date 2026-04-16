@@ -1,0 +1,87 @@
+---
+# MuseTalk Avatar Rendering Worker
+# =============================================================================
+# GPU-accelerated lip-sync video generation using MuseTalk on V100S.
+# Consumes render requests via NATS JetStream, produces MP4 avatar clips.
+#
+# Prerequisites:
+#   - GPU node with nvidia.com/gpu resource (auto-configured by GPU Operator)
+#   - NATS server accessible at nats.openclaw.svc.cluster.local
+#   - ghcr-secret for image pull
+#
+# GPU Node: OVH t2-45 (V100S 32GB) in GRA9
+# Model: TMElyralab/MuseTalk (MIT license, 30+ FPS on V100)
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: musetalk-worker
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: musetalk-worker
+    app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/component: avatar-rendering
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd-image-updater.argoproj.io/image-list: |
+      worker=registry.5dlabs.ai/5dlabs/musetalk-worker:latest
+    argocd-image-updater.argoproj.io/worker.update-strategy: "digest"
+    argocd-image-updater.argoproj.io/worker.allow-tags: "regexp:^latest$"
+    argocd-image-updater.argoproj.io/write-back-method: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://gitlab.5dlabs.ai/5dlabs/cto.git
+    targetRevision: main
+    path: infra/charts/musetalk-worker
+    helm:
+      valueFiles:
+        - values.yaml
+      values: |
+        image:
+          repository: registry.5dlabs.ai/5dlabs/musetalk-worker
+          tag: latest
+
+        # Storage class for model weights PVC
+        persistence:
+          storageClass: "mayastor"
+          size: 20Gi
+
+        # NATS — adjust if your NATS endpoint differs
+        nats:
+          url: "nats://nats.openclaw.svc.cluster.local:4222"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+
+  revisionHistoryLimit: 5

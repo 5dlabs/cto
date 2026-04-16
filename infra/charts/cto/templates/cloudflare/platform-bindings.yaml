@@ -76,5 +76,26 @@ subjects:
       {{- end }}
 {{- end }}
 
+{{- /* Coder IDE Binding */ -}}
+{{- if $bindings.coder }}
+---
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: coder-tunnel
+  namespace: cto
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudflare-binding
+tunnelRef:
+  kind: ClusterTunnel
+  name: {{ $tunnelName }}
+subjects:
+  - name: openclaw-coder
+    spec:
+      fqdn: {{ $bindings.coder.hostname }}
+      target: {{ $bindings.coder.target }}
+{{- end }}
+
 {{- end }}
 

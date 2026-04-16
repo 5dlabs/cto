@@ -1,0 +1,17 @@
+{{- if .Values.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "musetalk-worker.fullname" . }}-metrics
+  labels:
+    {{- include "musetalk-worker.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "musetalk-worker.selectorLabels" . | nindent 4 }}
+{{- end }}

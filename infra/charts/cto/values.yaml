@@ -1207,3 +1207,7 @@ cloudflare:
       hostname: headscale.5dlabs.ai
       target: https://headscale.headscale.svc:443
       noTlsVerify: true
+    # Coder IDE (code-server via openclaw-coder agent)
+    coder:
+      hostname: coder.5dlabs.ai
+      target: http://openclaw-coder.cto.svc:8080

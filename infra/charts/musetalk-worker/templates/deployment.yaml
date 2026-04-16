@@ -1,0 +1,143 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "musetalk-worker.fullname" . }}
+  labels:
+    {{- include "musetalk-worker.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "musetalk-worker.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
+      labels:
+        {{- include "musetalk-worker.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "musetalk-worker.serviceAccountName" . }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: download-models
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python3", "/app/download_models.py"]
+          env:
+            - name: HF_MODEL_REPO
+              value: {{ .Values.model.repo | quote }}
+            - name: MODEL_CACHE_DIR
+              value: {{ .Values.model.cacheDir | quote }}
+            {{- if .Values.huggingface.existingSecret }}
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.huggingface.existingSecret }}
+                  key: {{ .Values.huggingface.secretKey }}
+            {{- end }}
+          volumeMounts:
+            - name: model-cache
+              mountPath: {{ .Values.model.cacheDir }}
+          resources:
+            requests:
+              cpu: "1"
+              memory: 4Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: health
+              containerPort: 8080
+              protocol: TCP
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+            {{- end }}
+          env:
+            - name: NATS_URL
+              value: {{ .Values.nats.url | quote }}
+            - name: NATS_SUBJECT
+              value: {{ .Values.nats.subject | quote }}
+            - name: NATS_RESULT_SUBJECT
+              value: {{ .Values.nats.resultSubject | quote }}
+            - name: NATS_QUEUE
+              value: {{ .Values.nats.queue | quote }}
+            - name: NATS_STREAM
+              value: {{ .Values.nats.stream | quote }}
+            - name: NATS_CONSUMER
+              value: {{ .Values.nats.consumer | quote }}
+            - name: NATS_ACK_WAIT
+              value: {{ .Values.nats.ackWait | quote }}
+            - name: NATS_MAX_DELIVER
+              value: {{ .Values.nats.maxDeliver | quote }}
+            - name: MODEL_CACHE_DIR
+              value: {{ .Values.model.cacheDir | quote }}
+            - name: MODEL_DTYPE
+              value: {{ .Values.model.dtype | quote }}
+            - name: OUTPUT_BUCKET
+              value: {{ .Values.output.bucket | quote }}
+            - name: OUTPUT_ENDPOINT
+              value: {{ .Values.output.endpoint | quote }}
+            - name: CACHE_ENABLED
+              value: {{ .Values.output.cacheEnabled | quote }}
+            - name: CACHE_TTL_DAYS
+              value: {{ .Values.output.cacheTTLDays | quote }}
+            {{- if .Values.huggingface.existingSecret }}
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.huggingface.existingSecret }}
+                  key: {{ .Values.huggingface.secretKey }}
+            {{- end }}
+          volumeMounts:
+            - name: model-cache
+              mountPath: {{ .Values.model.cacheDir }}
+            - name: render-scratch
+              mountPath: /tmp/renders
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: model-cache
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "musetalk-worker.fullname" . }}-models
+          {{- else }}
+          emptyDir:
+            sizeLimit: 20Gi
+          {{- end }}
+        - name: render-scratch
+          emptyDir:
+            sizeLimit: 10Gi

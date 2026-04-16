@@ -1,0 +1,112 @@
+# MuseTalk Avatar Rendering Worker
+# NATS-driven lip-sync video generation on V100S GPU
+
+replicaCount: 1
+
+image:
+  repository: registry.5dlabs.ai/5dlabs/musetalk-worker
+  tag: latest
+  pullPolicy: Always
+
+imagePullSecrets:
+  - name: ghcr-secret
+
+# GPU resource configuration
+resources:
+  requests:
+    cpu: "2"
+    memory: 8Gi
+    nvidia.com/gpu: "1"
+  limits:
+    cpu: "8"
+    memory: 32Gi
+    nvidia.com/gpu: "1"
+
+# Node scheduling — target GPU nodes
+nodeSelector:
+  feature.node.kubernetes.io/pci-10de.present: "true"
+
+tolerations: []
+
+affinity: {}
+
+# NATS configuration
+nats:
+  url: "nats://nats.openclaw.svc.cluster.local:4222"
+  subject: "avatar.render.request"
+  resultSubject: "avatar.render.result"
+  queue: "musetalk-workers"
+  # JetStream consumer settings
+  stream: "AVATAR"
+  consumer: "musetalk-worker"
+  ackWait: "5m"
+  maxDeliver: 3
+
+# Model configuration
+model:
+  # HuggingFace model ID
+  repo: "TMElyralab/MuseTalk"
+  # Force FP16 for V100 compatibility (no BF16 support)
+  dtype: "float16"
+  # Cache directory inside the container
+  cacheDir: "/models"
+
+# Model weights PVC
+persistence:
+  enabled: true
+  storageClass: "mayastor"
+  size: 20Gi
+  accessModes:
+    - ReadWriteOnce
+
+# Output storage (rendered video clips)
+output:
+  # S3-compatible storage for rendered clips
+  bucket: "avatar-renders"
+  endpoint: ""
+  # Cache rendered clips keyed by hash(persona_id, text)
+  cacheEnabled: true
+  cacheTTLDays: 30
+
+# HuggingFace credentials (for gated model access)
+huggingface:
+  # Reference to existing secret with HF_TOKEN key
+  existingSecret: ""
+  secretKey: "HF_TOKEN"
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8080
+  initialDelaySeconds: 60
+  periodSeconds: 15
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+# Metrics
+metrics:
+  enabled: true
+  port: 9090
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations:
+  logs.platform.5dlabs.io/collect: "true"
+  logs.platform.5dlabs.io/service: musetalk-worker
+
+podLabels:
+  platform.5dlabs.io/log-collection: enabled
+  app.kubernetes.io/component: avatar-rendering
