@@ -28,7 +28,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: livekit
+    namespace: cto
 
   syncPolicy:
     automated:

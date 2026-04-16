@@ -3,36 +3,109 @@
 # session state, distributed coordination if we ever scale beyond one
 # replica). LiveKit only requires a single Redis-protocol endpoint;
 # Valkey is the BSD-3 fork we use cluster-wide.
-apiVersion: redis.redis.opstreelabs.in/v1beta2
-kind: Redis
+#
+# Implemented as a plain StatefulSet rather than the OT-Container-Kit
+# Redis operator CRD: that operator is not installed on this cluster and
+# dragging it in purely for a 1-replica cache is overkill. LiveKit does
+# not require persistence (room state is ephemeral), but we keep a small
+# PVC so pod restarts don't blow away in-flight sessions.
+apiVersion: v1
+kind: Service
 metadata:
   name: livekit-valkey
-  namespace: livekit
+  namespace: cto
   labels:
     app.kubernetes.io/name: livekit-valkey
     app.kubernetes.io/part-of: avatar
     app.kubernetes.io/component: cache
 spec:
-  podSecurityContext:
-    runAsUser: 1000
-    fsGroup: 1000
-
-  kubernetesConfig:
-    image: valkey/valkey:7.2-alpine
-    imagePullPolicy: IfNotPresent
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 500m
-        memory: 512Mi
-
-  redisExporter:
-    enabled: false
-
-  storage:
-    volumeClaimTemplate:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: livekit-valkey
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: livekit-valkey
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: livekit-valkey
+    app.kubernetes.io/part-of: avatar
+    app.kubernetes.io/component: cache
+spec:
+  serviceName: livekit-valkey
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: livekit-valkey
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: livekit-valkey
+        app.kubernetes.io/part-of: avatar
+        app.kubernetes.io/component: cache
+        platform.5dlabs.io/log-collection: enabled
+      annotations:
+        sidecar.istio.io/inject: "false"
+        linkerd.io/inject: disabled
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: valkey
+          image: valkey/valkey:7.2-alpine
+          imagePullPolicy: IfNotPresent
+          args:
+            - valkey-server
+            - --appendonly
+            - "no"
+            - --save
+            - ""
+            - --maxmemory
+            - 256mb
+            - --maxmemory-policy
+            - allkeys-lru
+          ports:
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: redis
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: redis
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
       spec:
         storageClassName: mayastor
         accessModes:
