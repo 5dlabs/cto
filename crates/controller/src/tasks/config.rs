@@ -867,6 +867,7 @@ cleanup:
                 model_rotation: None,
                 frontend_stack: None,
                 subagents: None,
+                use_sdk_path: false,
             },
         );
         config.merge_agent_cli_defaults();

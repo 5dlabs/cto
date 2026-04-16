@@ -6070,6 +6070,7 @@ mod tests {
                 model_rotation: None,
                 frontend_stack: None,
                 subagents: None,
+                use_sdk_path: false,
             },
         );
 
@@ -6106,6 +6107,7 @@ mod tests {
                 })),
                 frontend_stack: None,
                 subagents: None,
+                use_sdk_path: false,
             },
         );
 
@@ -6191,6 +6193,7 @@ mod tests {
                 model_rotation: None,
                 frontend_stack: None,
                 subagents: None,
+                use_sdk_path: false,
             },
         );
 
@@ -6302,6 +6305,7 @@ mod tests {
                     enabled: true,
                     max_concurrent: 8,
                 }),
+                use_sdk_path: false,
             },
         );
 
@@ -6368,6 +6372,7 @@ mod tests {
                 model_rotation: None,
                 frontend_stack: None,
                 subagents: None,
+                use_sdk_path: false,
             },
         );
 
@@ -6443,6 +6448,7 @@ mod tests {
                 model_rotation: None,
                 frontend_stack: None,
                 subagents: None,
+                use_sdk_path: false,
             },
         );
 
@@ -6493,6 +6499,7 @@ mod tests {
                 model_rotation: None,
                 frontend_stack: None,
                 subagents: None,
+                use_sdk_path: false,
             },
         );
 
