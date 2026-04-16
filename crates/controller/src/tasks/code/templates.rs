@@ -236,6 +236,21 @@ impl CodeTemplateGenerator {
                     }
                 }
             }
+
+            // Inject _config/ files (agent-specific overrides like MCP.md, TOOLS.md).
+            // These are added with a `config/` prefix so they don't collide with
+            // generated top-level files (AGENTS.md, etc.).
+            let config_files = super::skills_cache::get_config_files(&agent_name);
+            if !config_files.is_empty() {
+                debug!(
+                    "Injecting {} config files for agent '{}'",
+                    config_files.len(),
+                    agent_name
+                );
+                for (filename, content) in config_files {
+                    templates.insert(format!("config/{filename}"), content);
+                }
+            }
         }
 
         // Inject CLI-specific config files from templates/cli-configs/

@@ -344,6 +344,55 @@ pub fn load_package_manifest(agent_name: &str) -> Option<String> {
     }
 }
 
+/// Read config files from the agent's `_config/` subdirectory.
+///
+/// Must be called **after** [`ensure_skills`] so the tarball is already extracted.
+/// Unlike `_persona/` (hardcoded allowlist), `_config/` accepts **any** `.md`
+/// file — these are agent-specific configuration overrides (e.g. `MCP.md`,
+/// `TOOLS.md`, `WORKFLOW.md`) that the controller injects into the task-files
+/// ConfigMap for the agent pod.
+///
+/// Returns a map of `filename -> content`.  Empty map if the directory
+/// doesn't exist (most agents won't have one).
+pub fn get_config_files(agent_name: &str) -> HashMap<String, String> {
+    let config_dir = cache_root().join(agent_name).join("_config");
+    let mut result = HashMap::new();
+
+    if !config_dir.exists() {
+        debug!("No _config/ directory for agent '{agent_name}'");
+        return result;
+    }
+
+    if let Ok(entries) = fs::read_dir(&config_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let filename = match path.file_name().and_then(|n| n.to_str()) {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+            // Accept .md, .json, .yaml, .yml config files
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if !matches!(ext, "md" | "json" | "yaml" | "yml") {
+                debug!("Skipping non-config file '{filename}' in _config/");
+                continue;
+            }
+            if let Ok(content) = fs::read_to_string(&path) {
+                debug!("Loaded config file '{filename}' for agent '{agent_name}'");
+                result.insert(filename, content);
+            }
+        }
+    }
+
+    info!(
+        "Loaded {} config files for agent '{agent_name}'",
+        result.len()
+    );
+    result
+}
+
 /// Persona file names that are read from the `_persona/` subdirectory of
 /// the agent's cached tarball.
 const PERSONA_FILES: &[&str] = &[
