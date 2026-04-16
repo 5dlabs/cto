@@ -3,6 +3,47 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.57](https://github.com/5dlabs/cto/compare/v0.2.56...v0.2.57) (2026-04-16)
+
+
+### ✨ Features
+
+* **coder:** add SSH sidecar container for remote access ([dcab4c9](https://github.com/5dlabs/cto/commit/dcab4c97d5097289ce023e8e0d518624a2ea2fa5))
+* **coder:** docker→kaniko shim for daemonless image builds ([c33d953](https://github.com/5dlabs/cto/commit/c33d953a00b369c5f9804cfaef74f7f89e9047bc))
+* **coder:** enable Datadog log collection with openclaw-agent pipeline ([32e3ae3](https://github.com/5dlabs/cto/commit/32e3ae366073e7ea8466a8b820d43173a0fcee51))
+* **coder:** enable debug console logging + diagnostics for ACP output ([88fa47e](https://github.com/5dlabs/cto/commit/88fa47e7e190087c7426f2e2f21866f6a579f7e5))
+* **coder:** enable debug-level ACP logging via env var + diagnostics ([80a9109](https://github.com/5dlabs/cto/commit/80a910926199cb9e8ce66f44dd4c9465c4cbc02c))
+* **coder:** enable raw stream logging + ACP diagnostics flags ([8020807](https://github.com/5dlabs/cto/commit/8020807b6d6a92954a2ab4becba2aa7e4c832cab))
+* **coder:** switch primary model to openai-codex/gpt-5.4 via OAuth ([b539618](https://github.com/5dlabs/cto/commit/b53961835d117cfbc0c8a6ebe4dc17066f01d4f9))
+* **coder:** switch primary model to openai-codex/gpt-5.4 via OAuth ([0c29f7e](https://github.com/5dlabs/cto/commit/0c29f7eb4c05f22b5def2215103d0fe844409b80))
+* **datadog:** add application key reference to DatadogAgent CR ([077f1a2](https://github.com/5dlabs/cto/commit/077f1a29b42439a97ca0dee81cfc9d021af41ebb))
+* **datadog:** unified pipeline setup with HTTP status checks ([4357c96](https://github.com/5dlabs/cto/commit/4357c96b0bdc407d00bb2805347c583aa7975fd9))
+* Dynamic MCP SDK v2 — local stdio transport, escalation enforcement, dual-source codegen ([#4637](https://github.com/5dlabs/cto/issues/4637)) ([9e1274c](https://github.com/5dlabs/cto/commit/9e1274c8abcef618dd9cc6f3a636b619de5f75aa))
+* **skills:** add backend-specific emoji reactions for ACP sessions ([23a1674](https://github.com/5dlabs/cto/commit/23a167455b8d9b6faa23c3e01944ffb0d202298b))
+* **skills:** add emoji status reactions for ACP sessions ([15fb96e](https://github.com/5dlabs/cto/commit/15fb96e6b1cd59eab031ab84736ace27666403cf))
+* **skills:** add status reactions and reboot continuity skills ([b15b7f0](https://github.com/5dlabs/cto/commit/b15b7f0a4e9707a7180c42c98e6e9ae9272efdc2))
+
+
+### 🐛 Bug Fixes
+
+* **ci:** remove standalone flag from play-launcher - it uses main workspace ([65390d1](https://github.com/5dlabs/cto/commit/65390d1dc64cfc15affd3b6d9a7eef40bc607114))
+* **coder:** break ACP session loop — add sessions.visibility + anti-loop guard ([4f774f3](https://github.com/5dlabs/cto/commit/4f774f391cd8cf936d981cec765fd460e0639bff))
+* **coder:** switch embeddings to Google, fix docker shim YAML ([ee79e26](https://github.com/5dlabs/cto/commit/ee79e2693c05ee50b95f16eadc36846950876dc5))
+* force agent to use exec tool for gh/swarm commands ([8eb304e](https://github.com/5dlabs/cto/commit/8eb304ec0c92ad876edde977ecf84df8bf1d1714))
+* **healer:** add #[allow(dead_code)] to skills_repo field ([1537411](https://github.com/5dlabs/cto/commit/1537411baf930334871e84134506fd5fdcae7430))
+* **helm:** move ACP config inside tools object in openclaw.json ([32511e1](https://github.com/5dlabs/cto/commit/32511e13f48eeec864967af6d208a38bfefd5f02))
+* **openclaw-chart:** remove invalid tools.acp config block ([5f528ee](https://github.com/5dlabs/cto/commit/5f528eee224addaeb403819e02a1cc19b2d398ff))
+* **skills:** remove messageId/to from reactions — gateway auto-resolves ([a21e9a1](https://github.com/5dlabs/cto/commit/a21e9a16e30b970fb85f8f692f176bc45209221d))
+* **skills:** use proper Discord target format for reactions ([35adb51](https://github.com/5dlabs/cto/commit/35adb516a8d4e9671462c573f1e0dcfedaf7ce72))
+* **sshd:** add StrictModes no, keepalive, and max sessions ([c8f11d8](https://github.com/5dlabs/cto/commit/c8f11d822425cb787bfd4c1b032d9e1d31842552))
+* **sshd:** bump resource limits for Cursor server ([1ff9a9d](https://github.com/5dlabs/cto/commit/1ff9a9d694cfdb744c5a36c1609e3c50ac503e79))
+* swarm cron digest — explicit 5dlabs repos, swarm push command ([f4cf561](https://github.com/5dlabs/cto/commit/f4cf561928d1221e48c5df8f5ebc9f87628d975d))
+
+
+### 📚 Documentation
+
+* PR 3 session transcript & handoff for dynamic MCP SDK ([371e870](https://github.com/5dlabs/cto/commit/371e8700898ec264aac2d432cade2478d2eae8f5))
+
 ## [0.2.56](https://github.com/5dlabs/cto/compare/v0.2.55...v0.2.56) (2026-04-15)
 
 
