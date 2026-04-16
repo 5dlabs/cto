@@ -113,6 +113,11 @@ function serverPrefix(toolName: string): string {
   return idx > 0 ? toolName.slice(0, idx) : toolName;
 }
 
+/** Strip the server prefix from a namespaced tool name (e.g. "memory_search_nodes" → "search_nodes"). */
+function stripPrefix(toolName: string, server: string): string {
+  return toolName.startsWith(server + "_") ? toolName.slice(server.length + 1) : toolName;
+}
+
 /**
  * Find which local server (from clientConfig) owns a given tool name.
  * Returns the server key or null if the tool isn't local.
@@ -120,7 +125,7 @@ function serverPrefix(toolName: string): string {
 function localServerFor(toolName: string): string | null {
   if (!clientConfig) return null;
   for (const [key, cfg] of Object.entries(clientConfig.localServers)) {
-    if (cfg.tools.includes(toolName)) return key;
+    if (cfg.tools?.includes(toolName)) return key;
   }
   // Fallback: check if the server prefix matches a localServers key
   const prefix = serverPrefix(toolName);
@@ -499,9 +504,9 @@ export async function listTools(): Promise<ToolsByServer> {
           "tools/list",
         );
         for (const tool of result.tools) {
-          const prefix = serverPrefix(tool.name);
-          (grouped[prefix] ??= []).push({
-            name: tool.name,
+          const prefixedName = `${serverName}_${tool.name}`;
+          (grouped[serverName] ??= []).push({
+            name: prefixedName,
             description: tool.description,
             inputSchema: tool.inputSchema,
           });
@@ -528,7 +533,10 @@ export async function describeTool(name: string): Promise<ToolInfo> {
     ? await rpcStdio<ToolsListResult>(route.server, "tools/list")
     : await rpc<ToolsListResult>(route.url, "tools/list");
 
-  const tool = tools.find((t) => t.name === name);
+  const lookupName = route.kind === "stdio"
+    ? stripPrefix(name, route.server)
+    : name;
+  const tool = tools.find((t) => t.name === lookupName);
   if (!tool) {
     throw new ToolError(
       ErrorCodes.TOOL_NOT_FOUND,
@@ -536,7 +544,7 @@ export async function describeTool(name: string): Promise<ToolInfo> {
     );
   }
   return {
-    name: tool.name,
+    name,
     description: tool.description,
     inputSchema: tool.inputSchema,
   };
@@ -563,7 +571,7 @@ export async function callTool<T = unknown>(
     ? await rpcStdio<ToolCallResult>(
         route.server,
         "tools/call",
-        { name, arguments: args },
+        { name: stripPrefix(name, route.server), arguments: args },
       )
     : await rpc<ToolCallResult>(
         route.url,

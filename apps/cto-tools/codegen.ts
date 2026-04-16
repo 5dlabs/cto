@@ -478,7 +478,7 @@ async function fetchLocalToolCatalog(): Promise<ToolDef[]> {
       ]);
 
       // Filter tools if the config specifies a subset
-      const allowedSet = config.tools.length > 0 ? new Set(config.tools) : null;
+      const allowedSet = config.tools?.length ? new Set(config.tools) : null;
 
       for (const tool of tools) {
         if (allowedSet && !allowedSet.has(tool.name)) continue;

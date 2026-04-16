@@ -346,7 +346,7 @@ try {
         if (msg.method === "initialize") {
           resp = { jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "echo-test" } } };
         } else if (msg.method === "tools/list") {
-          resp = { jsonrpc: "2.0", id: msg.id, result: { tools: [{ name: "echosvr_ping", description: "Echo ping" }, { name: "echosvr_greet", description: "Echo greet" }] } };
+          resp = { jsonrpc: "2.0", id: msg.id, result: { tools: [{ name: "ping", description: "Echo ping" }, { name: "greet", description: "Echo greet" }] } };
         } else if (msg.method === "tools/call") {
           resp = { jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: JSON.stringify({ echoed: true, tool: msg.params?.name }) }] } };
         } else { continue; }
@@ -622,7 +622,7 @@ Deno.test({
     await withEchoServer(async (mod) => {
       const result = await mod.callTool("echosvr_ping", { data: "hello" });
       assertEquals(result.echoed, true);
-      assertEquals(result.tool, "echosvr_ping");
+      assertEquals(result.tool, "ping");
     }, "calltool");
   },
 });
