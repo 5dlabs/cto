@@ -293,6 +293,23 @@ gateway:
     token: "openclaw-internal"
 
 # =============================================================================
+# Optional SSH sidecar (disabled by default)
+# =============================================================================
+ssh:
+  enabled: false
+  port: 2222
+  authorizedKeys: []
+
+# =============================================================================
+# Optional code-server sidecar (disabled by default)
+# =============================================================================
+codeServer:
+  enabled: false
+  port: 8080
+  password: ""
+  defaultFolder: "/workspace"
+
+# =============================================================================
 # Model Fallback Configuration
 # =============================================================================
 modelDefaults:
