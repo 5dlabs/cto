@@ -1035,8 +1035,22 @@ spec:
               }
               SETTINGS
               sed -i 's/^              //' /workspace/.code-server/User/settings.json
+              {{- if .Values.codeServer.githubToken }}
+              # Pre-seed GitHub Copilot auth with PAT
+              if [ -n "$GITHUB_TOKEN" ]; then
+                GH_USER=$(curl -sf -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/user | grep -o '"login":"[^"]*"' | cut -d'"' -f4)
+                if [ -n "$GH_USER" ]; then
+                  mkdir -p /workspace/.code-server/User/globalStorage/github.copilot
+                  echo "{\"github.com\":{\"user\":\"$GH_USER\",\"oauth_token\":\"$GITHUB_TOKEN\"}}" \
+                    > /workspace/.code-server/User/globalStorage/github.copilot/hosts.json
+                  echo "[code-server] Copilot auth seeded for $GH_USER"
+                fi
+              fi
+              {{- end }}
               # Install Copilot extensions from VS Marketplace if not already present
-              if [ ! -d "/workspace/.code-server/extensions/github.copilot-"* ] 2>/dev/null; then
+              EXTDIR="/workspace/.code-server/extensions"
+              mkdir -p "$EXTDIR"
+              if [ ! -d "$EXTDIR/github.copilot-"* ] 2>/dev/null; then
                 echo "[code-server] Installing GitHub Copilot extensions..."
                 for ext in copilot copilot-chat; do
                   VSIX="/workspace/.code-server-cache/${ext}.vsix"
@@ -1046,7 +1060,7 @@ spec:
                       "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/GitHub/vsextensions/${ext}/latest/vspackage" \
                       -o "${VSIX}.gz" && gunzip -f "${VSIX}.gz" 2>/dev/null || mv "${VSIX}.gz" "$VSIX"
                   fi
-                  code-server --install-extension "$VSIX" 2>/dev/null || true
+                  code-server --extensions-dir "$EXTDIR" --install-extension "$VSIX" 2>/dev/null || true
                 done
               fi
               exec code-server \
@@ -1054,6 +1068,7 @@ spec:
                 --auth password \
                 --disable-telemetry \
                 --user-data-dir /workspace/.code-server \
+                --extensions-dir "$EXTDIR" \
                 {{ .Values.codeServer.defaultFolder | default "/workspace" }}
           env:
             - name: PASSWORD
