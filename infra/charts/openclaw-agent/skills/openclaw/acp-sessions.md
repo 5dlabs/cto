@@ -28,6 +28,24 @@ message({ action: "react", messageId: "<triggering-message-id>", emoji: "❌" })
 message({ action: "react", messageId: "<triggering-message-id>", emoji: "⚙️", remove: true })
 ```
 
+### Backend-specific reaction (ALWAYS add alongside ⚙️):
+Show WHICH coding CLI is running so users can tell at a glance:
+```
+// Claude Code
+message({ action: "react", messageId: "<triggering-message-id>", emoji: "🟣" })
+// Codex (OpenAI)
+message({ action: "react", messageId: "<triggering-message-id>", emoji: "🟢" })
+// Copilot (GitHub)
+message({ action: "react", messageId: "<triggering-message-id>", emoji: "🔵" })
+// OpenCode / Kimi
+message({ action: "react", messageId: "<triggering-message-id>", emoji: "🟠" })
+// Gemini
+message({ action: "react", messageId: "<triggering-message-id>", emoji: "🔴" })
+// Cursor
+message({ action: "react", messageId: "<triggering-message-id>", emoji: "⚪" })
+```
+Remove the backend emoji when done (same as ⚙️ cleanup).
+
 ### Reaction reference:
 | State | Emoji | Meaning |
 |-------|-------|---------|
@@ -39,7 +57,17 @@ message({ action: "react", messageId: "<triggering-message-id>", emoji: "⚙️"
 | Using browser | 🌐 | Browsing web content |
 | Searching code | 🔍 | Searching files or codebase |
 
-Always add the ⚙️ reaction BEFORE spawning the ACP session. Always clean up the ⚙️ when done.
+**Backend identity emojis** (add WITH ⚙️, remove when done):
+| Backend | Emoji | Color |
+|---------|-------|-------|
+| Claude Code | 🟣 | Purple |
+| Codex (OpenAI) | 🟢 | Green |
+| Copilot (GitHub) | 🔵 | Blue |
+| OpenCode / Kimi | 🟠 | Orange |
+| Gemini | 🔴 | Red |
+| Cursor | ⚪ | White |
+
+Always add the ⚙️ AND the backend emoji BEFORE spawning the ACP session. Always clean up both when done.
 
 ## Spawning a coding CLI session
 
