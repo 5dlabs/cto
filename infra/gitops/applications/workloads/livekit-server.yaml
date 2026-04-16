@@ -74,9 +74,21 @@ spec:
         autoscaling:
           enabled: false
 
-        # Pin LiveKit to CPU worker nodes; keep it off the GPU node.
-        nodeSelector:
-          node-role.kubernetes.io/worker: ""
+        # Keep LiveKit off the control-plane (which is schedulable on
+        # this RKE2 cluster) and off the future GPU node. The worker
+        # nodes don't carry an explicit role label, so we select by
+        # exclusion rather than by a positive worker label.
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: node-role.kubernetes.io/control-plane
+                      operator: DoesNotExist
+                    - key: nvidia.com/gpu.present
+                      operator: NotIn
+                      values:
+                        - "true"
 
         resources:
           requests:
