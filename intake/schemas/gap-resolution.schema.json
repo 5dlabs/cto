@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GapResolution",
+  "description": "Results of searching for and resolving tool/skill gaps",
+  "type": "object",
+  "properties": {
+    "resolved_tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "capability": { "type": "string", "description": "The capability gap being resolved" },
+          "server_name": { "type": "string", "description": "MCP server key (e.g., 'puppeteer', 'sqlite')" },
+          "github_url": { "type": "string", "format": "uri", "description": "GitHub repo for the MCP server" },
+          "transport": {
+            "type": "string",
+            "enum": ["stdio", "sse", "http"],
+            "description": "MCP transport type"
+          },
+          "command": { "type": "string", "description": "Command to run (e.g., 'npx')" },
+          "args": { "type": "array", "items": { "type": "string" } },
+          "version": { "type": "string", "description": "Pinned package version" },
+          "env_vars": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Required environment variables"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Confidence this is the right server for the capability"
+          },
+          "readme_summary": { "type": "string", "description": "Brief summary of server capabilities from README" }
+        },
+        "required": ["capability", "server_name", "transport", "command", "args", "confidence"]
+      }
+    },
+    "resolved_skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "capability": { "type": "string" },
+          "skill_slug": { "type": "string" },
+          "source": {
+            "type": "string",
+            "enum": ["clawhub", "custom"],
+            "description": "Where to install from"
+          },
+          "version": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        },
+        "required": ["capability", "skill_slug", "source", "confidence"]
+      }
+    },
+    "unresolved": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "capability": { "type": "string" },
+          "search_attempted": { "type": "boolean" },
+          "reason": { "type": "string", "description": "Why this gap could not be resolved" }
+        },
+        "required": ["capability", "reason"]
+      },
+      "description": "Gaps that could not be resolved — flagged for human review"
+    }
+  },
+  "required": ["resolved_tools", "resolved_skills", "unresolved"]
+}

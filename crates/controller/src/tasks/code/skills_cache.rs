@@ -316,6 +316,37 @@ pub fn ensure_all_skills(
     Ok(result)
 }
 
+/// Read the agent package manifest from `_package/manifest.json` in the
+/// cached tarball directory.
+///
+/// Must be called **after** [`ensure_skills`] so the tarball is already extracted.
+/// Returns the raw JSON string if found, or `None` if the package directory
+/// doesn't exist (pre-packaging agents won't have it).
+pub fn load_package_manifest(agent_name: &str) -> Option<String> {
+    let manifest_path = cache_root()
+        .join(agent_name)
+        .join("_package")
+        .join("manifest.json");
+    match fs::read_to_string(&manifest_path) {
+        Ok(content) => {
+            info!(
+                "Loaded package manifest for agent '{}' from {}",
+                agent_name,
+                manifest_path.display()
+            );
+            Some(content)
+        }
+        Err(_) => {
+            debug!(
+                "No package manifest for agent '{}' at {}",
+                agent_name,
+                manifest_path.display()
+            );
+            None
+        }
+    }
+}
+
 /// Persona file names that are read from the `_persona/` subdirectory of
 /// the agent's cached tarball.
 const PERSONA_FILES: &[&str] = &[

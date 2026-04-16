@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CapabilityAnalysis",
+  "description": "LLM-derived capabilities required by tasks — used for deterministic gap computation",
+  "type": "object",
+  "properties": {
+    "required_capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "capability": {
+            "type": "string",
+            "description": "Capability name matching known categories (e.g., 'github', 'kubernetes', 'web-scraping', 'database-postgres', 'monitoring')"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why this capability is needed, referencing specific task requirements"
+          },
+          "task_ids": {
+            "type": "array",
+            "items": { "type": "number" },
+            "description": "Task IDs that need this capability"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["required", "recommended"],
+            "description": "Whether the capability is essential or nice-to-have"
+          }
+        },
+        "required": ["capability", "reason", "task_ids", "priority"]
+      }
+    },
+    "infrastructure_needs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "need": {
+            "type": "string",
+            "description": "Infrastructure requirement (e.g., 'redis-cache', 'postgres-database', 'object-storage')"
+          },
+          "reason": { "type": "string" },
+          "task_ids": { "type": "array", "items": { "type": "number" } }
+        },
+        "required": ["need", "reason", "task_ids"]
+      },
+      "description": "Infrastructure dependencies beyond MCP tools"
+    }
+  },
+  "required": ["required_capabilities"]
+}

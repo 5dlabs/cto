@@ -635,9 +635,75 @@ async function copyFile(src: string, dest: string): Promise<void> {
   await Deno.writeTextFile(dest, content);
 }
 
+// ─── Prebuilt SDK cache ──────────────────────────────────────────────────────
+
+interface PackageManifest {
+  version: string;
+  sdk: {
+    catalog_hash: string;
+    tool_count: number;
+    server_count: number;
+    dir?: string;
+  };
+}
+
+/**
+ * Check if a prebuilt SDK exists and matches the current live catalog.
+ * Returns true if codegen can be skipped (cache hit).
+ */
+async function checkPrebuiltSdk(): Promise<boolean> {
+  try {
+    const manifestPaths = [
+      `${OUTPUT_DIR}/manifest.json`,
+      `/task-files/_package/manifest.json`,
+    ];
+    let manifest: PackageManifest | null = null;
+    for (const p of manifestPaths) {
+      try {
+        manifest = JSON.parse(await Deno.readTextFile(p));
+        break;
+      } catch { /* try next */ }
+    }
+    if (!manifest?.sdk?.catalog_hash || manifest.sdk.catalog_hash === "pending-generation") {
+      return false;
+    }
+
+    try {
+      const existingCatalog = await Deno.readTextFile(`${OUTPUT_DIR}/catalog.json`);
+      const catalogData = JSON.parse(existingCatalog);
+      if (
+        catalogData.totalTools === manifest.sdk.tool_count &&
+        catalogData.totalServers === manifest.sdk.server_count
+      ) {
+        const serversDir = `${OUTPUT_DIR}/servers`;
+        try {
+          const entries = [];
+          for await (const entry of Deno.readDir(serversDir)) {
+            if (entry.isDirectory) entries.push(entry);
+          }
+          if (entries.length === catalogData.totalServers) {
+            return true;
+          }
+        } catch { /* servers dir missing */ }
+      }
+    } catch { /* no existing catalog */ }
+  } catch { /* any error = no cache */ }
+  return false;
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  const forceRegen = Deno.args.includes("--force");
+
+  if (!forceRegen) {
+    const cached = await checkPrebuiltSdk();
+    if (cached) {
+      console.log("Prebuilt SDK cache hit — skipping codegen (use --force to override)");
+      return;
+    }
+  }
+
   console.log("Fetching tool catalog...");
 
   // Fetch remote and local catalogs concurrently; don't let one block the other
