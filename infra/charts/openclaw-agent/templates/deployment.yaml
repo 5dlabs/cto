@@ -619,6 +619,14 @@ spec:
             - name: OPENCLAW_LOG_LEVEL
               value: {{ .Values.logging.consoleLevel | quote }}
             {{- end }}
+            {{- if .Values.logging.rawStream }}
+            - name: OPENCLAW_RAW_STREAM
+              value: "1"
+            {{- if .Values.logging.rawStreamPath }}
+            - name: OPENCLAW_RAW_STREAM_PATH
+              value: {{ .Values.logging.rawStreamPath | quote }}
+            {{- end }}
+            {{- end }}
             {{- end }}
             {{- if .Values.diagnostics }}
             {{- if .Values.diagnostics.flags }}

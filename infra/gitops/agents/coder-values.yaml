@@ -19,9 +19,14 @@ logging:
   level: "debug"
   file: "/workspace/.openclaw/logs/openclaw.log"
   consoleLevel: "debug"
+  rawStream: true
+  rawStreamPath: "/workspace/.openclaw/logs/raw-stream.jsonl"
 
 diagnostics:
   enabled: true
+  flags:
+    - "acp.*"
+    - "gateway.session"
 
 replicaCount: 1
 deploymentMode: statefulset
