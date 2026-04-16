@@ -37,21 +37,25 @@ spec:
           repository: livekit/livekit-server
           pullPolicy: IfNotPresent
 
-        # API keys are sourced from a separately-managed Secret so we
-        # don't store the API secret in this Helm app's inline values.
+        # livekit-server chart v1.9.0 has a bug where `livekit.key_file`
+        # is used simultaneously as (a) the Secret data key name,
+        # (b) the volumeMount path, and (c) the subPath -- making any
+        # valid value impossible (absolute path fails as a Secret key,
+        # relative path fails as a mountPath). Upstream issue tracked
+        # but unfixed. Workaround: disable the chart's Secret-backed
+        # keys flow entirely and inline the keys into the config.yaml
+        # via `livekit.keys`. The chart's ConfigMap template renders
+        # `toYaml .Values.livekit` directly, so this produces valid
+        # LiveKit config. The standalone `livekit-keys` Secret is kept
+        # -- it's still consumed by the token-mint API and agent env.
         storeKeysInSecret:
-          enabled: true
-          existingSecret: livekit-keys
+          enabled: false
 
         livekit:
           port: 7880
           log_level: info
-          # Required when storeKeysInSecret.enabled=true: the chart uses
-          # this value as both the volumeMount path and the Secret data
-          # key name for the keys file. Without it the rendered
-          # deployment has an empty mountPath and K8s rejects it.
-          # Matches the data key in the livekit-keys Secret.
-          key_file: keys.yaml
+          keys:
+            8e440e77936d058380185b4c94801dbf: 6+FcfjrWZ7bYGBmhHGfnDH+L4wYKdw+KjKTrnPphwf4=
           rtc:
             tcp_port: 7881
             port_range_start: 50000
