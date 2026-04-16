@@ -1054,19 +1054,16 @@ spec:
               # Install Copilot extensions from VS Marketplace if not already present
               EXTDIR="/workspace/.code-server/extensions"
               mkdir -p "$EXTDIR"
-              if [ ! -d "$EXTDIR/github.copilot-"* ] 2>/dev/null; then
-                echo "[code-server] Installing GitHub Copilot extensions..."
-                for ext in copilot copilot-chat; do
-                  VSIX="/workspace/.code-server-cache/${ext}.vsix"
-                  if [ ! -f "$VSIX" ]; then
-                    mkdir -p /workspace/.code-server-cache
-                    curl -sL --compressed \
-                      "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/GitHub/vsextensions/${ext}/latest/vspackage" \
-                      -o "${VSIX}.gz" && gunzip -f "${VSIX}.gz" 2>/dev/null || mv "${VSIX}.gz" "$VSIX"
-                  fi
-                  code-server --extensions-dir "$EXTDIR" --install-extension "$VSIX" 2>/dev/null || true
-                done
-              fi
+              echo "[code-server] Installing GitHub Copilot extensions..."
+              for ext in copilot copilot-chat; do
+                VSIX="/workspace/.code-server-cache/${ext}.vsix"
+                mkdir -p /workspace/.code-server-cache
+                # Always download latest to pick up new model support
+                curl -sL --compressed \
+                  "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/GitHub/vsextensions/${ext}/latest/vspackage" \
+                  -o "${VSIX}.gz" && (gunzip -f "${VSIX}.gz" 2>/dev/null || mv "${VSIX}.gz" "$VSIX")
+                code-server --extensions-dir "$EXTDIR" --install-extension "$VSIX" 2>/dev/null || true
+              done
               # Patch product.json to use MS Marketplace (Copilot not on Open VSX)
               /usr/lib/code-server/lib/node -e "
                 var fs=require('fs'),p='/usr/lib/code-server/lib/vscode/product.json';
