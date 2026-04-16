@@ -959,10 +959,14 @@ spec:
               PubkeyAuthentication yes
               PasswordAuthentication no
               ChallengeResponseAuthentication no
+              StrictModes no
               UsePAM no
-              X11Forwarding no
+              X11Forwarding yes
               PrintMotd yes
               AcceptEnv LANG LC_*
+              ClientAliveInterval 60
+              ClientAliveCountMax 3
+              MaxSessions 10
               Subsystem sftp /usr/lib/openssh/sftp-server
               SSHCFG
               sed -i 's/^              //' /etc/ssh/sshd_config
