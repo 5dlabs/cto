@@ -275,6 +275,122 @@ routing (local sidecar vs. remote), and retries.
 `;
 }
 
+// ─── Catalog generation (CATALOG.md + catalog.json) ─────────────────────────
+
+/** Machine-readable catalog entry for catalog.json. */
+export interface CatalogEntry {
+  name: string;
+  server: string;
+  func: string;
+  description: string;
+  import: string;
+  source: "remote" | "local";
+}
+
+/** Machine-readable catalog index. */
+export interface CatalogIndex {
+  generated: string;
+  agentId: string;
+  totalTools: number;
+  totalServers: number;
+  servers: Record<string, { source: "remote" | "local"; toolCount: number }>;
+  tools: CatalogEntry[];
+}
+
+/**
+ * Build a machine-readable catalog index from discovered tools.
+ * `localServerNames` is the set of server prefixes that came from stdio servers.
+ */
+export function buildCatalogIndex(
+  byServer: Map<string, ParsedTool[]>,
+  localServerNames: Set<string>,
+  agentId: string,
+): CatalogIndex {
+  const tools: CatalogEntry[] = [];
+  const servers: CatalogIndex["servers"] = {};
+
+  for (const [prefix, serverTools] of [...byServer.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const source = localServerNames.has(prefix) ? "local" as const : "remote" as const;
+    servers[prefix] = { source, toolCount: serverTools.length };
+    for (const t of serverTools.sort((a, b) => a.funcName.localeCompare(b.funcName))) {
+      tools.push({
+        name: t.fullName,
+        server: prefix,
+        func: t.funcName,
+        description: t.description ?? "",
+        import: `./servers/${prefix}/${t.funcName}.ts`,
+        source,
+      });
+    }
+  }
+
+  return {
+    generated: new Date().toISOString(),
+    agentId,
+    totalTools: tools.length,
+    totalServers: byServer.size,
+    servers,
+    tools,
+  };
+}
+
+/** Render a human-readable CATALOG.md from the catalog index. */
+export function generateCatalogMd(catalog: CatalogIndex): string {
+  const lines: string[] = [
+    `# MCP Tool Catalog`,
+    ``,
+    `${GENERATED_HEADER.replace("// ", "")}`,
+    ``,
+    `**${catalog.totalTools} tools** across **${catalog.totalServers} servers**` +
+      (catalog.agentId ? ` for agent \`${catalog.agentId}\`` : ""),
+    ``,
+    `## Quick Start`,
+    ``,
+    "```typescript",
+    `// Import only the tools you need`,
+    `import { search_code } from "./servers/github/search_code.ts";`,
+    `const hits = await search_code({ q: "callTool", repo: "5dlabs/cto" });`,
+    "```",
+    ``,
+    `## Servers`,
+    ``,
+  ];
+
+  for (const [prefix, info] of Object.entries(catalog.servers)) {
+    const badge = info.source === "local" ? " 🖥️ local" : "";
+    lines.push(`### ${prefix}${badge} (${info.toolCount} tools)`);
+    lines.push(``);
+    lines.push(`| Tool | Import | Description |`);
+    lines.push(`|------|--------|-------------|`);
+    for (const tool of catalog.tools.filter((t) => t.server === prefix)) {
+      const desc = tool.description
+        ? tool.description.split("\n")[0].slice(0, 80)
+        : "—";
+      lines.push(
+        `| \`${tool.func}\` | \`${tool.import}\` | ${desc} |`,
+      );
+    }
+    lines.push(``);
+  }
+
+  lines.push(
+    `## Machine-Readable Index`,
+    ``,
+    `Full catalog with schemas: [\`catalog.json\`](./catalog.json)`,
+    ``,
+    `## Environment`,
+    ``,
+    `| Variable | Purpose |`,
+    `|----------|---------|`,
+    `| \`CTO_TOOL_CATALOG\` | Path to this file |`,
+    `| \`CTO_TOOLS_SDK_DIR\` | SDK root directory |`,
+    `| \`CLIENT_CONFIG_PATH\` | Machine routing config |`,
+    ``,
+  );
+
+  return lines.join("\n");
+}
+
 // ─── MCP catalog fetch ──────────────────────────────────────────────────────
 
 async function fetchToolCatalog(): Promise<ToolDef[]> {
@@ -548,6 +664,13 @@ async function main(): Promise<void> {
     console.warn(`  ⚠ Local catalog failed: ${msg}`);
   }
 
+  // Collect local server prefixes for catalog source tagging
+  const localServerNames = new Set<string>();
+  for (const tool of localTools) {
+    const idx = tool.name.indexOf("_");
+    if (idx > 0) localServerNames.add(tool.name.slice(0, idx));
+  }
+
   // Merge: remote takes precedence on name conflicts
   const toolsByName = new Map<string, ToolDef>();
   for (const tool of localTools) {
@@ -619,6 +742,15 @@ async function main(): Promise<void> {
   // Generate README.md
   const serverNames = [...byServer.keys()];
   await writeFile(`${OUTPUT_DIR}/README.md`, generateReadme(serverNames));
+
+  // Generate CATALOG.md + catalog.json (runtime-realized tool manifest)
+  const catalogIndex = buildCatalogIndex(byServer, localServerNames, AGENT_ID);
+  await writeFile(`${OUTPUT_DIR}/CATALOG.md`, generateCatalogMd(catalogIndex));
+  await writeFile(
+    `${OUTPUT_DIR}/catalog.json`,
+    JSON.stringify(catalogIndex, null, 2),
+  );
+  console.log(`  ✓ CATALOG.md + catalog.json (${catalogIndex.totalTools} tools, ${catalogIndex.totalServers} servers)`);
 
   console.log(
     `Done. Output at ${OUTPUT_DIR} — ` +

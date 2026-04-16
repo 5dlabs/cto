@@ -135,6 +135,12 @@ if command -v deno >/dev/null 2>&1; then
             CODEGEN_SERVERS="${CODEGEN_SERVERS:-0}"
             CODEGEN_TOOLS="${CODEGEN_TOOLS:-0}"
             echo "  ✓ Codegen complete: ${CODEGEN_SERVERS} server(s), ${CODEGEN_TOOLS} tool(s)"
+
+            # Export catalog path so agents and ACP clients can find the tool catalog
+            if [ -f "${SDK_DIR}/CATALOG.md" ]; then
+                export CTO_TOOL_CATALOG="${SDK_DIR}/CATALOG.md"
+                echo "  ✓ Tool catalog:  ${CTO_TOOL_CATALOG}"
+            fi
         else
             echo "  ⚠️  Codegen failed (non-fatal) — CLI still works without generated files"
             # Log last few lines for debugging (don't spam the whole output)

@@ -42,7 +42,19 @@ triggers:
 
 ## 3. Discovery Flow
 
-**Step 1 — Browse the catalog:**
+**Step 1 — Check the generated catalog (fastest):**
+
+If the SDK has been initialized, a `CATALOG.md` with every available tool is already at:
+
+```bash
+cat "${CTO_TOOL_CATALOG:-/.cto-tools/CATALOG.md}"
+# Or the machine-readable version:
+cat "/.cto-tools/catalog.json"
+```
+
+The catalog is generated at agent startup by `codegen.ts`. It lists every tool grouped by server, with import paths and descriptions. Use it to quickly find what's available without querying the server.
+
+**Step 2 — Browse via CLI (if catalog isn't available):**
 
 ```bash
 cto-tools mcp list
