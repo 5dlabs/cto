@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SkillGenerationResult",
+  "description": "Results from generating custom SKILL.md files using Context7 library documentation",
+  "type": "object",
+  "properties": {
+    "generated_skills": {
+      "type": "array",
+      "description": "SKILL.md files generated from Context7 library documentation",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Skill name matching the SKILL.md frontmatter name field" },
+          "description": { "type": "string", "description": "One-line description of what the skill teaches" },
+          "source_library": { "type": "string", "description": "Library name used to query Context7" },
+          "context7_id": { "type": "string", "description": "Resolved Context7 library ID (e.g. /drizzle-team/drizzle-orm)" },
+          "skill_content": { "type": "string", "description": "Full SKILL.md content including YAML frontmatter and markdown body" },
+          "target_path": { "type": "string", "description": "Destination path in cto-agents repo (e.g. rex/_default/drizzle-orm/SKILL.md)" }
+        },
+        "required": ["name", "description", "source_library", "context7_id", "skill_content", "target_path"]
+      }
+    },
+    "skipped_capabilities": {
+      "type": "array",
+      "description": "Capabilities that could not be turned into skills",
+      "items": {
+        "type": "object",
+        "properties": {
+          "capability": { "type": "string", "description": "The capability that was skipped" },
+          "reason": { "type": "string", "description": "Why skill generation was not possible" }
+        },
+        "required": ["capability", "reason"]
+      }
+    }
+  },
+  "required": ["generated_skills", "skipped_capabilities"]
+}
