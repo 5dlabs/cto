@@ -37,9 +37,19 @@ runs:
         # Check if cc/gcc is available (required for Rust build scripts)
         if ! command -v cc &> /dev/null && ! command -v gcc &> /dev/null; then
           echo "⚠️ C compiler (cc/gcc) not found - installing build-essential..."
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq build-essential pkg-config libssl-dev
-          echo "✅ Build dependencies installed"
+          for attempt in 1 2 3; do
+            if sudo apt-get update -qq && sudo apt-get install -y -qq build-essential pkg-config libssl-dev; then
+              echo "✅ Build dependencies installed (attempt $attempt)"
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "❌ apt-get failed after 3 attempts"
+              exit 1
+            fi
+            echo "⚠️ apt-get attempt $attempt failed (mirror sync?), retrying in $((attempt * 15))s..."
+            sleep $((attempt * 15))
+            sudo rm -rf /var/lib/apt/lists/*
+          done
         else
           echo "✅ C compiler found: $(which cc 2>/dev/null || which gcc)"
         fi
