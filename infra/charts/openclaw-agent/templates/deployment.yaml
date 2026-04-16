@@ -191,35 +191,9 @@ spec:
                 # Generate OpenClaw auth-profiles.json from Codex OAuth tokens
                 AGENT_DIR="/workspace/.openclaw/agents/{{ .Values.agent.name | default "agent" }}/agent"
                 mkdir -p "$AGENT_DIR"
-                node -e '
-const fs = require("fs");
-const codex = JSON.parse(fs.readFileSync("/workspace/.codex/auth.json", "utf8"));
-const t = codex.tokens || codex;
-const accessToken = t.access_token || t.accessToken || "";
-const refreshToken = t.refresh_token || t.refreshToken || "";
-const accountId = t.account_id || t.accountId || "";
-let expires = "";
-try {
-  const payload = JSON.parse(Buffer.from(accessToken.split(".")[1], "base64url").toString());
-  expires = new Date(payload.exp * 1000).toISOString();
-} catch(e) { expires = new Date(Date.now() + 86400000*3).toISOString(); }
-const profiles = {
-  version: 1,
-  profiles: {
-    "openai-codex:default": {
-      provider: "openai-codex", type: "oauth",
-      accessToken, refreshToken, accountId,
-      expires, expiresAt: expires,
-      source: "manual", managedBy: "codex-cli"
-    }
-  },
-  order: ["openai-codex:default"]
-};
-const outPath = process.argv[1] + "/auth-profiles.json";
-fs.writeFileSync(outPath, JSON.stringify(profiles, null, 2));
-fs.chmodSync(outPath, 0o600);
-console.log("[openclaw] auth-profiles.json written with openai-codex:default profile, expires:", expires);
-' "$AGENT_DIR"
+                export AGENT_DIR
+                echo "aW1wb3J0IGpzb24sIG9zLCBiYXNlNjQsIHN5cwp0cnk6CiAgICB3aXRoIG9wZW4oIi93b3Jrc3BhY2UvLmNvZGV4L2F1dGguanNvbiIpIGFzIGY6CiAgICAgICAgY29kZXggPSBqc29uLmxvYWQoZikKICAgIHQgPSBjb2RleC5nZXQoInRva2VucyIsIGNvZGV4KQogICAgYXQgPSB0LmdldCgiYWNjZXNzX3Rva2VuIiwgdC5nZXQoImFjY2Vzc1Rva2VuIiwgIiIpKQogICAgcnQgPSB0LmdldCgicmVmcmVzaF90b2tlbiIsIHQuZ2V0KCJyZWZyZXNoVG9rZW4iLCAiIikpCiAgICBhaWQgPSB0LmdldCgiYWNjb3VudF9pZCIsIHQuZ2V0KCJhY2NvdW50SWQiLCAiIikpCiAgICBleHAgPSAiIgogICAgdHJ5OgogICAgICAgIHBheWxvYWQgPSBqc29uLmxvYWRzKGJhc2U2NC51cmxzYWZlX2I2NGRlY29kZShhdC5zcGxpdCgiLiIpWzFdICsgIj09IikpCiAgICAgICAgZnJvbSBkYXRldGltZSBpbXBvcnQgZGF0ZXRpbWUsIHRpbWV6b25lCiAgICAgICAgZXhwID0gZGF0ZXRpbWUuZnJvbXRpbWVzdGFtcChwYXlsb2FkWyJleHAiXSwgdHo9dGltZXpvbmUudXRjKS5pc29mb3JtYXQoKS5yZXBsYWNlKCIrMDA6MDAiLCJaIikKICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgZnJvbSBkYXRldGltZSBpbXBvcnQgZGF0ZXRpbWUsIHRpbWV6b25lLCB0aW1lZGVsdGEKICAgICAgICBleHAgPSAoZGF0ZXRpbWUubm93KHRpbWV6b25lLnV0YykgKyB0aW1lZGVsdGEoZGF5cz0zKSkuaXNvZm9ybWF0KCkucmVwbGFjZSgiKzAwOjAwIiwiWiIpCiAgICBwcm9maWxlcyA9IHsidmVyc2lvbiI6IDEsICJwcm9maWxlcyI6IHsib3BlbmFpLWNvZGV4OmRlZmF1bHQiOiB7InByb3ZpZGVyIjogIm9wZW5haS1jb2RleCIsICJ0eXBlIjogIm9hdXRoIiwgImFjY2Vzc1Rva2VuIjogYXQsICJyZWZyZXNoVG9rZW4iOiBydCwgImFjY291bnRJZCI6IGFpZCwgImV4cGlyZXMiOiBleHAsICJleHBpcmVzQXQiOiBleHAsICJzb3VyY2UiOiAibWFudWFsIiwgIm1hbmFnZWRCeSI6ICJjb2RleC1jbGkifX0sICJvcmRlciI6IFsib3BlbmFpLWNvZGV4OmRlZmF1bHQiXX0KICAgIGFnZW50X2RpciA9IG9zLmVudmlyb24uZ2V0KCJBR0VOVF9ESVIiLCAiL3dvcmtzcGFjZS8ub3BlbmNsYXcvYWdlbnRzL2FnZW50L2FnZW50IikKICAgIG91dCA9IG9zLnBhdGguam9pbihhZ2VudF9kaXIsICJhdXRoLXByb2ZpbGVzLmpzb24iKQogICAgd2l0aCBvcGVuKG91dCwgInciKSBhcyBmOgogICAgICAgIGpzb24uZHVtcChwcm9maWxlcywgZiwgaW5kZW50PTIpCiAgICBvcy5jaG1vZChvdXQsIDBvNjAwKQogICAgcHJpbnQoIltvcGVuY2xhd10gYXV0aC1wcm9maWxlcy5qc29uIHdyaXR0ZW4sIGV4cGlyZXM6IiwgZXhwKQpleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICBwcmludCgiW29wZW5jbGF3XSBhdXRoLXByb2ZpbGVzLmpzb24gZ2VuZXJhdGlvbiBmYWlsZWQ6IiwgZSwgZmlsZT1zeXMuc3RkZXJyKQo=" | base64 -d | python3
+                echo "[openclaw] auth-profiles init complete"
               fi
               {{- end }}
               cp /cli-backend-configs-template/gemini-settings.json /workspace/.gemini/settings.json
