@@ -797,6 +797,7 @@ impl CodeTemplateGenerator {
             "fresh_start_threshold": fresh_start_threshold,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
+            "use_sdk_path": Self::extract_use_sdk_path(cli_config),
             "cli": {
                 "type": cli_type,
                 "model": model,
@@ -1217,6 +1218,7 @@ impl CodeTemplateGenerator {
             "max_iterations": max_iterations,
             "target_repository": target_repository,
             "namespace": namespace,
+            "use_sdk_path": Self::extract_use_sdk_path(cli_config),
             "cli": {
                 "type": cli_type,
                 "model": render_settings.model,
@@ -2145,6 +2147,7 @@ impl CodeTemplateGenerator {
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
+            "use_sdk_path": Self::extract_use_sdk_path(cli_config),
             "cli": {
                 "type": cli_type,
                 "model": cli_model,
@@ -2298,6 +2301,12 @@ impl CodeTemplateGenerator {
                     "enabled": subagents.enabled,
                     "maxConcurrent": subagents.max_concurrent
                 });
+            }
+
+            // If agent opts into the Dynamic MCP SDK path, inject the flag
+            // so templates can skip the legacy client binary setup.
+            if agent_config.use_sdk_path {
+                enriched["useSdkPath"] = json!(true);
             }
         }
 
@@ -2533,6 +2542,14 @@ impl CodeTemplateGenerator {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// Check whether the enriched cli_config has the Dynamic MCP SDK path enabled.
+    fn extract_use_sdk_path(cli_config: &Value) -> bool {
+        cli_config
+            .get("useSdkPath")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
     }
 
     #[allow(clippy::unnecessary_wraps)] // Keeping Result for consistency with other config generators
@@ -2841,6 +2858,7 @@ impl CodeTemplateGenerator {
             "job_type": "review",
             "default_retries": 3,
             "task_language": "",
+            "use_sdk_path": Self::extract_use_sdk_path(&enriched_cli_config),
         });
 
         // Generate client-config.json for MCP tools
@@ -3055,6 +3073,7 @@ Be constructive and explain the "why" behind your suggestions.
             "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
             "tools_url": render_settings.tools_url,
             "remote_tools": remote_tools,
+            "use_sdk_path": Self::extract_use_sdk_path(&enriched_cli_config),
         });
 
         // Generate client-config.json for MCP tools
@@ -3649,6 +3668,7 @@ Be constructive and explain the "why" behind your suggestions.
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
+            "use_sdk_path": Self::extract_use_sdk_path(cli_config),
             "cli": {
                 "type": cli_type,
                 "model": render_settings.model,
@@ -3963,6 +3983,7 @@ Be constructive and explain the "why" behind your suggestions.
             "default_retries": default_retries,
             "fresh_start_threshold": fresh_start_threshold,
             "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
+            "use_sdk_path": Self::extract_use_sdk_path(cli_config),
         });
 
         handlebars

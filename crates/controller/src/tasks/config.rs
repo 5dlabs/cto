@@ -456,6 +456,12 @@ pub struct AgentDefinition {
     /// multiple subagents to work on subtasks concurrently.
     #[serde(default)]
     pub subagents: Option<SubagentConfig>,
+
+    /// When true, skip the client binary setup and rely entirely on the
+    /// Dynamic MCP SDK (codegen.ts + mcp.ts) for tool access.
+    /// Default false — existing client binary path runs unchanged.
+    #[serde(default, rename = "useSdkPath")]
+    pub use_sdk_path: bool,
 }
 
 /// Subagent configuration for parallel execution

@@ -26,9 +26,43 @@ export CTO_AGENT_PREWARM=""
 # Ensure TOOLS_SERVER_URL is exported (already set by tools-config / mcp-check)
 export TOOLS_SERVER_URL="${TOOLS_SERVER_URL:-http://cto-tools.cto.svc.cluster.local:3000}"
 
+# CLIENT_CONFIG_PATH — tells mcp.ts and codegen.ts where to find the
+# controller-generated client-config.json (localServers + remoteTools).
+if [ -f /task-files/client-config.json ]; then
+    export CLIENT_CONFIG_PATH="/task-files/client-config.json"
+    echo "  ✓ CLIENT_CONFIG_PATH=$CLIENT_CONFIG_PATH"
+
+    # LOCAL_TOOLS — comma-separated localServers keys for HTTP sidecar routing.
+    # Derived at runtime from the config so mcp.ts knows which prefixes are local.
+    if command -v jq >/dev/null 2>&1; then
+        LOCAL_TOOLS=$(jq -r '.localServers // {} | keys | join(",")' /task-files/client-config.json 2>/dev/null)
+    else
+        # Lightweight fallback: extract keys without jq (handles simple configs)
+        LOCAL_TOOLS=$(grep -o '"[^"]*"\s*:' /task-files/client-config.json 2>/dev/null \
+            | sed -n '/localServers/,/}/{ /localServers/d; s/"//g; s/\s*://; p; }' \
+            | paste -sd ',' - 2>/dev/null || echo "")
+    fi
+    if [ -n "$LOCAL_TOOLS" ]; then
+        export LOCAL_TOOLS
+        echo "  ✓ LOCAL_TOOLS=$LOCAL_TOOLS"
+    else
+        export LOCAL_TOOLS=""
+        echo "  ✓ LOCAL_TOOLS=(none)"
+    fi
+else
+    echo "  ⚠️  client-config.json not in /task-files/ — CLIENT_CONFIG_PATH not set"
+    export LOCAL_TOOLS=""
+fi
+
 # ── Step 2: Install cto-tools CLI ────────────────────────────────────────
 
 CTO_CLI_AVAILABLE=false
+{{#if use_sdk_path}}
+# SDK path enabled — skipping legacy client binary install.
+# Tool access is handled by the Dynamic MCP SDK (codegen.ts + mcp.ts).
+echo "  ✓ SDK path enabled — client binary install skipped"
+{{else}}
+# DEPRECATED: Client binary path — migrate to use_sdk_path=true
 if [ -f /task-files/cto-tools ]; then
     cp /task-files/cto-tools /usr/local/bin/cto-tools 2>/dev/null || {
         echo "  ⚠️  Cannot copy cto-tools to /usr/local/bin (read-only?)"
@@ -45,6 +79,7 @@ if [ -f /task-files/cto-tools ]; then
 else
     echo "  ⚠️  /task-files/cto-tools not found — CLI not available"
 fi
+{{/if}}
 
 # ── Step 3: Set up SDK directory ─────────────────────────────────────────
 
@@ -112,7 +147,9 @@ if command -v deno >/dev/null 2>&1; then
     fi
 else
     echo "  ⚠️  Deno not installed — SDK code execution won't be available"
+{{#unless use_sdk_path}}
     echo "     CLI tool invocation still works via cto-tools"
+{{/unless}}
 fi
 
 # ── Step 5: Summary ─────────────────────────────────────────────────────
@@ -120,11 +157,15 @@ fi
 echo ""
 echo "🛠️  CTO Tools SDK Summary:"
 echo "  Agent ID:        ${CTO_AGENT_ID}"
+{{#if use_sdk_path}}
+echo "  ✓ Tool path:     Dynamic MCP SDK (codegen.ts + mcp.ts)"
+{{else}}
 if [ "$CTO_CLI_AVAILABLE" = "true" ]; then
     echo "  ✓ CLI:           available (cto-tools)"
 else
     echo "  ❌ CLI:           not available"
 fi
+{{/if}}
 if [ "$CTO_DENO_AVAILABLE" = "true" ]; then
     echo "  ✓ Code execution: available (Deno)"
 else
