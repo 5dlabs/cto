@@ -19,7 +19,6 @@ logging:
   level: "debug"
   file: "/workspace/.openclaw/logs/openclaw.log"
   consoleLevel: "debug"
-  consoleStyle: "json"
 
 diagnostics:
   enabled: true
