@@ -12,6 +12,18 @@ namespace: cto
 datadog:
   enabled: true
 
+# =============================================================================
+# Logging & Diagnostics
+# =============================================================================
+logging:
+  level: "debug"
+  file: "/workspace/.openclaw/logs/openclaw.log"
+  consoleLevel: "debug"
+  consoleStyle: "json"
+
+diagnostics:
+  enabled: true
+
 replicaCount: 1
 deploymentMode: statefulset
 

@@ -581,6 +581,17 @@ data:
         "level": {{ .Values.logging.level | quote }},
         "file": {{ .Values.logging.file | quote }},
         "consoleLevel": {{ .Values.logging.consoleLevel | quote }}
+        {{- if .Values.logging.consoleStyle }},
+        "consoleStyle": {{ .Values.logging.consoleStyle | quote }}
+        {{- end }}
+      },
+      {{- end }}
+      {{- if .Values.diagnostics }}
+      "diagnostics": {
+        "enabled": {{ .Values.diagnostics.enabled | default true }}
+        {{- if .Values.diagnostics.flags }},
+        "flags": {{ .Values.diagnostics.flags | toJson }}
+        {{- end }}
       },
       {{- end }}
       "wizard": {
