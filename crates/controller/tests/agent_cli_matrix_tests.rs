@@ -819,8 +819,7 @@ fn validate_config(content: &str, cli_type: CLIType) -> (bool, Vec<String>) {
 /// Returns true if AGENT_TEMPLATES_PATH is set and points to valid templates.
 fn templates_available() -> bool {
     std::env::var("AGENT_TEMPLATES_PATH")
-        .map(|p| PathBuf::from(p).join("_shared/container.sh.hbs").exists())
-        .unwrap_or(false)
+        .is_ok_and(|p| PathBuf::from(p).join("_shared/container.sh.hbs").exists())
 }
 
 /// Skip test if templates aren't available
