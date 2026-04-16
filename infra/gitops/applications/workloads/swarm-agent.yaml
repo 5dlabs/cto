@@ -252,7 +252,7 @@ spec:
               deliveryChannel: "discord"
               deliveryTo: "channel:1494049471951274014"
               timeoutSeconds: 300
-              message: "Run the daily digest workflow. FIRST check /workspace/.openclaw/workspace/memory/ for any existing digest from today (YYYY-MM-DD.md). If one already exists, summarize what changed since that last digest only — do not repeat prior content. For each monitored repo, use gh CLI to gather commits and PRs from the last 24 hours. Cross-reference against any existing daily notes to avoid duplicating already-reported items. Summarize only NEW progress, then post a structured update via SWARM CLI. Save the digest to memory/YYYY-MM-DD.md (append if file exists, don't overwrite). Show me the draft and wait for my approval before posting."
+              message: "Run the daily digest workflow. FIRST read /workspace/AGENTS.md to get the list of monitored repos (5dlabs org repos, NOT kaseonedge). Check /workspace/.openclaw/workspace/memory/ for any existing digest from today (YYYY-MM-DD.md) — if one exists, only report NEW activity since then. For each 5dlabs repo, use 'gh api repos/5dlabs/<name>/commits?since=<24h-ago>' to gather commits and 'gh pr list -R 5dlabs/<name> --search created:>=<24h-ago>' for PRs. Summarize only NEW progress. Save to memory/YYYY-MM-DD.md (append if exists). Then run 'swarm update-product' and 'swarm push' to post via SWARM CLI. Show me the draft and wait for my approval before posting."
 
         hooks:
           enabled: true
