@@ -9,7 +9,7 @@ global:
 agent:
   id: "committee-4"
   name: "Committee-4"
-  model: "anthropic/claude-opus-4-6"
+  model: "anthropic/claude-opus-4-7"
   heartbeat: "30s"  # effectively off — ~3 weeks, avoids 32-bit setTimeout overflow
   sandbox: "off"
   fallbacks:
@@ -43,7 +43,7 @@ memorySearch:
   enabled: false
 
 modelDefaults:
-  primary: "anthropic/claude-opus-4-6"
+  primary: "anthropic/claude-opus-4-7"
   fallbacks:
     - "anthropic/claude-sonnet-4-6"
     - "minimax/MiniMax-M2.5"

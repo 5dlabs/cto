@@ -29,7 +29,7 @@
     }
   },
   "models": {
-    "claude-opus-4-6-20260205": {
+    "claude-opus-4-7-20260610": {
       "enabled": true,
       "displayName": "Claude Opus 4.6",
       "provider": "Anthropic",
@@ -151,7 +151,7 @@
       "tier": "standard",
       "score": 81
     },
-    "claude-opus-4-6": {
+    "claude-opus-4-7": {
       "enabled": true,
       "displayName": "Claude Opus 4.6 (via Factory)",
       "provider": "Anthropic",
@@ -217,7 +217,7 @@
       "score": 77,
       "tier": "standard"
     },
-    "opus-4.6": {
+    "opus-4.7": {
       "enabled": true,
       "displayName": "Claude Opus 4.6 (via Cursor)",
       "provider": "Anthropic",
@@ -241,7 +241,7 @@
       "enabled": true,
       "provider": "Anthropic",
       "models": [
-        "claude-opus-4-6-20260205",
+        "claude-opus-4-7-20260610",
         "claude-sonnet-4-6-20260514",
         "claude-haiku-4-5-20251001"
       ]
@@ -261,7 +261,7 @@
       "enabled": true,
       "provider": "ZhipuAI",
       "models": [
-        "claude-opus-4-6",
+        "claude-opus-4-7",
         "claude-sonnet-4-6",
         "claude-haiku-4-5-20251001",
         "gpt-5.4",
@@ -280,7 +280,7 @@
       "provider": "Cursor",
       "models": [
         "auto",
-        "opus-4.6",
+        "opus-4.7",
         "gpt-5.4"
       ]
     }
@@ -305,7 +305,7 @@
     "_description": "Per-agent CLI+model assignment \u2014 references into clis/models above",
     "rex": {
       "cli": "Claude Code",
-      "model": "claude-opus-4-6-20260205"
+      "model": "claude-opus-4-7-20260610"
     },
     "grizz": {
       "cli": "Codex",
@@ -313,7 +313,7 @@
     },
     "blaze": {
       "cli": "Cursor",
-      "model": "opus-4.6"
+      "model": "opus-4.7"
     },
     "bolt": {
       "cli": "Codex",
@@ -321,19 +321,19 @@
     },
     "nova": {
       "cli": "Claude Code",
-      "model": "claude-opus-4-6-20260205"
+      "model": "claude-opus-4-7-20260610"
     },
     "angie": {
       "cli": "Claude Code",
-      "model": "claude-opus-4-6-20260205"
+      "model": "claude-opus-4-7-20260610"
     },
     "tap": {
       "cli": "Cursor",
-      "model": "opus-4.6"
+      "model": "opus-4.7"
     },
     "cipher": {
       "cli": "Claude Code",
-      "model": "claude-opus-4-6-20260205"
+      "model": "claude-opus-4-7-20260610"
     },
     "tess": {
       "cli": "Codex",
@@ -341,11 +341,11 @@
     },
     "cleo": {
       "cli": "Claude Code",
-      "model": "claude-opus-4-6-20260205"
+      "model": "claude-opus-4-7-20260610"
     },
     "coder": {
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205"
+      "model": "claude-opus-4-7-20260610"
     },
     "spark": {
       "cli": "Codex",
@@ -353,19 +353,19 @@
     },
     "stitch": {
       "cli": "Claude Code",
-      "model": "claude-opus-4-6-20260205"
+      "model": "claude-opus-4-7-20260610"
     },
     "vex": {
       "cli": "Claude Code",
-      "model": "claude-opus-4-6-20260205"
+      "model": "claude-opus-4-7-20260610"
     },
     "pixel": {
       "cli": "Cursor",
-      "model": "opus-4.6"
+      "model": "opus-4.7"
     },
     "_default": {
       "cli": "Claude Code",
-      "model": "claude-opus-4-6-20260205"
+      "model": "claude-opus-4-7-20260610"
     }
   }
 }

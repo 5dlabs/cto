@@ -12,47 +12,47 @@
         "tiers": {
           "primary": {
             "provider": "github-copilot",
-            "model": "claude-opus-4.6"
+            "model": "claude-opus-4.7"
           },
           "fast": {
             "provider": "github-copilot",
-            "model": "claude-opus-4.6"
+            "model": "claude-opus-4.7"
           },
           "frontier": {
             "provider": "github-copilot",
-            "model": "claude-opus-4.6"
+            "model": "claude-opus-4.7"
           }
         },
         "committee": [
           {
             "provider": "github-copilot",
-            "model": "claude-opus-4.6"
+            "model": "claude-opus-4.7"
           },
           {
             "provider": "github-copilot",
-            "model": "claude-opus-4.6"
+            "model": "claude-opus-4.7"
           },
           {
             "provider": "github-copilot",
-            "model": "claude-opus-4.6"
+            "model": "claude-opus-4.7"
           },
           {
             "provider": "github-copilot",
-            "model": "claude-opus-4.6"
+            "model": "claude-opus-4.7"
           },
           {
             "provider": "github-copilot",
-            "model": "claude-opus-4.6"
+            "model": "claude-opus-4.7"
           }
         ],
         "cliModels": {
-          "claude": "claude-opus-4-6-20260205",
+          "claude": "claude-opus-4-7-20260610",
           "codex": "gpt-5.2-codex",
-          "cursor": "opus-4.6",
+          "cursor": "opus-4.7",
           "gemini": "gemini-3.1-pro-preview",
           "factory": "gpt-5.2",
           "opencode": "gpt-5.2",
-          "dexter": "claude-opus-4-6-20260205"
+          "dexter": "claude-opus-4-7-20260610"
         }
       }
     },
@@ -107,7 +107,7 @@
       "docsProjectDirectory": "docs",
       "implementationAgent": "5DLabs-Rex",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "maxIterations": 3,
       "template": "watch/factory",
       "syncTimeoutSecs": 300
@@ -122,7 +122,7 @@
     "stitch": {
       "enabled": true,
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "repos": [
         "5dlabs/cto",
         "5dlabs/web"
@@ -158,7 +158,7 @@
     "morgan": {
       "githubApp": "5DLabs-Morgan",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -218,13 +218,13 @@
     "rex": {
       "githubApp": "5DLabs-Rex",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "modelRotation": {
         "enabled": true,
         "models": [
-          "claude-opus-4-6-20260205",
-          "claude-opus-4-6-20260205",
-          "claude-opus-4-6-20260205"
+          "claude-opus-4-7-20260610",
+          "claude-opus-4-7-20260610",
+          "claude-opus-4-7-20260610"
         ]
       },
       "tools": {
@@ -288,7 +288,7 @@
     "cleo": {
       "githubApp": "5DLabs-Cleo",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -345,7 +345,7 @@
     "tess": {
       "githubApp": "5DLabs-Tess",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -380,13 +380,13 @@
     "blaze": {
       "githubApp": "5DLabs-Blaze",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "modelRotation": {
         "enabled": true,
         "models": [
-          "claude-opus-4-6-20260205",
-          "claude-opus-4-6-20260205",
-          "claude-opus-4-6-20260205"
+          "claude-opus-4-7-20260610",
+          "claude-opus-4-7-20260610",
+          "claude-opus-4-7-20260610"
         ]
       },
       "tools": {
@@ -468,7 +468,7 @@
     "cipher": {
       "githubApp": "5DLabs-Cipher",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -501,7 +501,7 @@
     "grizz": {
       "githubApp": "5DLabs-Grizz",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -532,7 +532,7 @@
     "nova": {
       "githubApp": "5DLabs-Nova",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -563,7 +563,7 @@
     "pixel": {
       "githubApp": "5DLabs-Pixel",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -600,7 +600,7 @@
     "tap": {
       "githubApp": "5DLabs-Tap",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -631,7 +631,7 @@
     "spark": {
       "githubApp": "5DLabs-Spark",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -662,7 +662,7 @@
     "bolt": {
       "githubApp": "5DLabs-Bolt",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -727,7 +727,7 @@
         "models": [
           "claude-haiku-4-5-20251001",
           "claude-sonnet-4-6-20260205",
-          "claude-opus-4-6-20260205"
+          "claude-opus-4-7-20260610"
         ]
       },
       "skills": {
@@ -749,7 +749,7 @@
     "atlas": {
       "githubApp": "5DLabs-Atlas",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -779,7 +779,7 @@
     "stitch": {
       "githubApp": "5DLabs-Stitch",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -808,7 +808,7 @@
     "vex": {
       "githubApp": "5DLabs-Vex",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -839,7 +839,7 @@
     "angie": {
       "githubApp": "5DLabs-Angie",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -914,13 +914,13 @@
     "block": {
       "githubApp": "5DLabs-Block",
       "cli": "claude",
-      "model": "claude-opus-4-6-20260205",
+      "model": "claude-opus-4-7-20260610",
       "modelRotation": {
         "enabled": true,
         "models": [
-          "claude-opus-4-6-20260205",
-          "claude-opus-4-6-20260205",
-          "claude-opus-4-6-20260205"
+          "claude-opus-4-7-20260610",
+          "claude-opus-4-7-20260610",
+          "claude-opus-4-7-20260610"
         ]
       },
       "tools": {
