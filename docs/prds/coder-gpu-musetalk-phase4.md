@@ -12,13 +12,57 @@ Bring a V100S GPU node online in our OVH RKE2 cluster (GRA9), confirm the GPU Op
 ## Context & Preconditions
 - Cluster: RKE2 v1.34.5, control plane `https://10.0.0.181:9345`, 4× b3-64 CPU nodes in GRA9, Ubuntu 22.04.
 - Quota: approved via OVH ticket `CS15510375` (100 vm pool, Startup Program).
-- Credentials (1Password, biometric):
-  - OVH CA API: app key `274e538f3a56d176`, app secret + consumer key in 1P (item name "OVH CA API").
-  - SSH key for the node: already generated, public half already uploaded to OVH. Private at `~/.ssh/metal_ovh_gra9_gpu`, 1P item `nt5fdiygmlflxoipmk4oxumoey`. **Reuse it; do not rotate.**
 - Project ID: `6093a51de65b458e8b20a7c570a4f2c1`.
 - GPU Operator + NFD already deployed via ArgoCD, currently in standby.
 - Skills live in `5dlabs/agent-platform` (metal/OVH/RKE2 skills). PR lands in `5dlabs/cto`.
 - Budget ceiling: ~$893 CAD/month from $14,377 startup credit. Stay under $40/day; tear down if idle overnight.
+
+### Credentials — All in 1Password `Automation` vault
+Coder pod has `OP_SERVICE_ACCOUNT_TOKEN` mounted; `op read` works directly. Three items, all confirmed readable from `openclaw-coder` agent container:
+
+```bash
+# OVH CA API (signs every API call)
+OVH_AK=$(op read "op://Automation/OVH CA API/application_key")     # 274e538f3a56d176
+OVH_AS=$(op read "op://Automation/OVH CA API/application_secret")
+OVH_CK=$(op read "op://Automation/OVH CA API/consumer_key")
+OVH_PID=$(op read "op://Automation/OVH CA API/project_id")         # 6093a51de65b458e8b20a7c570a4f2c1
+OVH_EP=$(op read "op://Automation/OVH CA API/endpoint")            # https://ca.api.ovh.com/1.0
+
+# SSH key (already registered with OVH; reuse, do not rotate)
+op read "op://Automation/OVH GRA9 GPU SSH/private_key" > /tmp/gpu_key && chmod 600 /tmp/gpu_key
+op read "op://Automation/OVH GRA9 GPU SSH/public_key"  > /tmp/gpu_key.pub
+SSH_USER=$(op read "op://Automation/OVH GRA9 GPU SSH/ssh_user")    # ubuntu
+SSH_NAME=$(op read "op://Automation/OVH GRA9 GPU SSH/registered_name")  # metal-gra9-gpu-bootstrap-20260416 (already in OVH)
+
+# RKE2 agent join token (Coder pod uses this, no SSH-to-control-plane needed)
+RKE2_TOKEN=$(op read "op://Automation/RKE2 Join Token/token")
+RKE2_SERVER=$(op read "op://Automation/RKE2 Join Token/server_url")    # https://10.0.0.181:9345
+RKE2_VERSION=$(op read "op://Automation/RKE2 Join Token/rke2_version") # v1.34.5+rke2r1
+```
+
+### Inline OVH CA signer (no external script dependency)
+```bash
+ovh_call() {
+  local method="$1" path="$2" body="${3:-}"
+  local url="${OVH_EP}${path}"
+  local ts
+  ts=$(curl -s "${OVH_EP}/auth/time")
+  local sig_input="${OVH_AS}+${OVH_CK}+${method}+${url}+${body}+${ts}"
+  local sig="\$1\$$(printf '%s' "$sig_input" | sha1sum | cut -d' ' -f1)"
+  curl -s -X "$method" "$url" \
+    -H "X-Ovh-Application: ${OVH_AK}" \
+    -H "X-Ovh-Consumer: ${OVH_CK}" \
+    -H "X-Ovh-Timestamp: ${ts}" \
+    -H "X-Ovh-Signature: ${sig}" \
+    -H "Content-Type: application/json" \
+    ${body:+-d "$body"}
+}
+
+# examples:
+# ovh_call GET /cloud/project/$OVH_PID/flavor
+# ovh_call GET /cloud/project/$OVH_PID/instance
+# ovh_call POST /cloud/project/$OVH_PID/instance '{"flavorId":"...","imageId":"...","name":"gpu-1","region":"GRA9","sshKeyId":"..."}'
+```
 
 ## Acceptance Criteria (all must pass)
 1. **Instance provisioned**: 1× `t2-45` (V100S 32GB) in `GRA9`, flavor confirmed via `/cloud/project/$PID/instance`.
@@ -51,14 +95,14 @@ Bring a V100S GPU node online in our OVH RKE2 cluster (GRA9), confirm the GPU Op
 
 ## Handy Commands (saves Coder time)
 ```bash
-# OVH CA signer (already on coordinator box; Coder should have own copy)
-/tmp/ovh_sig.sh GET /cloud/project/6093a51de65b458e8b20a7c570a4f2c1/flavor | jq '.[] | select(.name=="t2-45")'
+# Find V100S flavor (uses inline ovh_call from above)
+ovh_call GET /cloud/project/$OVH_PID/flavor | jq '.[] | select(.name=="t2-45")'
 
-# RKE2 agent join (run on new node)
-curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=v1.34.5+rke2r1 INSTALL_RKE2_TYPE=agent sh -
-# /etc/rancher/rke2/config.yaml:
-#   server: https://10.0.0.181:9345
-#   token: <from control plane /var/lib/rancher/rke2/server/node-token>
+# RKE2 agent join (run on new node via SSH; token comes from 1P, not the control plane)
+curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION="$RKE2_VERSION" INSTALL_RKE2_TYPE=agent sh -
+# Then write /etc/rancher/rke2/config.yaml:
+#   server: $RKE2_SERVER       # https://10.0.0.181:9345
+#   token:  $RKE2_TOKEN        # op read "op://Automation/RKE2 Join Token/token"
 
 # GPU smoke test pod
 kubectl run gpu-smoke --rm -it --restart=Never \
