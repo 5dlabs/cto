@@ -1753,9 +1753,68 @@ steps:
         --skills "$SKILLS_FILE" \
         --registry "$REGISTRY"
 
+  - id: query-tools-catalog
+    env:
+      CTO_GAPS: $compute-capability-gaps.stdout
+      CTO_INVENTORY_TOOLS: $inventory-effective-tools.stdout
+      CTO_INVENTORY_SKILLS: $inventory-effective-skills.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "query-tools-catalog" "${audio_debug}"
+      mkdir -p "$root/.intake/tmp"
+
+      # Extract unresolved capabilities that need catalog lookup
+      GAPS=$(printf '%s' "$CTO_GAPS" | jq -c '.' 2>/dev/null || echo '{"resolvable":[],"needs_search":[]}')
+      NEEDS=$(printf '%s' "$GAPS" | jq -c '.needs_search // []')
+      CAP_COUNT=$(printf '%s' "$NEEDS" | jq 'length')
+
+      if [ "$CAP_COUNT" -eq 0 ]; then
+        echo "query-tools-catalog: no unresolved capabilities, skipping catalog query" >&2
+        printf '{"matched_tools":[],"matched_skills":[],"unresolved_capabilities":[]}\n'
+        exit 0
+      fi
+
+      echo "query-tools-catalog: querying Context7 catalog for $CAP_COUNT capabilities" >&2
+
+      # Write inputs for LLM call
+      CAPS_FILE="$root/.intake/tmp/catalog-query-caps.json"
+      INV_FILE="$root/.intake/tmp/catalog-query-inv.json"
+      printf '%s' "$NEEDS" > "$CAPS_FILE"
+      jq -n --argjson tools "$CTO_INVENTORY_TOOLS" --argjson skills "$CTO_INVENTORY_SKILLS" \
+        '{"available_tools": $tools, "available_skills": $skills}' > "$INV_FILE"
+
+      # Try Context7 API first (direct catalog query)
+      CTX7_RESULT=""
+      if [ -n "${CONTEXT7_API_KEY:-}" ]; then
+        for cap in $(printf '%s' "$NEEDS" | jq -r '.[].capability' | head -10); do
+          echo "  ctx7 query: $cap" >&2
+          CTX7_OUT=$(curl -s --max-time 10 \
+            -H "Authorization: Bearer ${CONTEXT7_API_KEY}" \
+            "https://context7.com/api/v2/context?libraryId=/5dlabs/cto-agents&query=$(printf '%s' "$cap" | jq -sRr @uri)&tokens=2000" 2>/dev/null || true)
+          if [ -n "$CTX7_OUT" ]; then
+            CTX7_RESULT="${CTX7_RESULT}${CTX7_OUT}\n"
+          fi
+        done
+      fi
+
+      # LLM call to match capabilities against catalog
+      ARGS=$(jq -n \
+        --rawfile sys "$root/intake/prompts/catalog-query-system.md" \
+        --slurpfile capabilities "$CAPS_FILE" \
+        --slurpfile inventory "$INV_FILE" \
+        --arg ctx7_context "$CTX7_RESULT" \
+        --arg schema "$root/intake/schemas/catalog-query-result.schema.json" \
+        --arg provider "${model_frontier_provider}" \
+        --arg model "${model_frontier}" \
+        '{ "prompt": $sys,
+           "input": { "unresolved_capabilities": $capabilities[0], "current_inventory": $inventory[0], "context7_snippets": $ctx7_context },
+           "schema": $schema, "provider": $provider, "model": $model }')
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
+
   - id: search-and-resolve-gaps
     env:
       CTO_GAPS: $compute-capability-gaps.stdout
+      CTO_CATALOG_MATCHES: $query-tools-catalog.stdout
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "search-and-resolve-gaps" "${audio_debug}"
@@ -1763,7 +1822,22 @@ steps:
       GAPS=$(printf '%s' "$CTO_GAPS" | jq -c '.' 2>/dev/null || echo '{"resolvable":[],"needs_search":[]}')
       RESOLVABLE=$(printf '%s' "$GAPS" | jq -c '.resolvable // []')
       NEEDS_SEARCH=$(printf '%s' "$GAPS" | jq -c '.needs_search // []')
+
+      # Fold in Context7 catalog matches — any matched tools/skills from the catalog
+      # resolve gaps before we hit the web search fallback.
+      CATALOG_TOOLS=$(printf '%s' "$CTO_CATALOG_MATCHES" | jq -c '.matched_tools // []' 2>/dev/null || echo '[]')
+      CATALOG_SKILLS=$(printf '%s' "$CTO_CATALOG_MATCHES" | jq -c '.matched_skills // []' 2>/dev/null || echo '[]')
+      CATALOG_UNRESOLVED=$(printf '%s' "$CTO_CATALOG_MATCHES" | jq -c '[.unresolved_capabilities // [] | .[] | .capability]' 2>/dev/null || echo '[]')
+
+      # Only web-search capabilities the catalog couldn't resolve
+      if [ "$(printf '%s' "$CATALOG_UNRESOLVED" | jq 'length')" -gt 0 ]; then
+        NEEDS_SEARCH=$(printf '%s' "$NEEDS_SEARCH" | jq -c --argjson unresolved "$CATALOG_UNRESOLVED" \
+          '[.[] | select(.capability as $c | $unresolved | index($c))]')
+      else
+        NEEDS_SEARCH="[]"
+      fi
       SEARCH_COUNT=$(printf '%s' "$NEEDS_SEARCH" | jq 'length')
+
       # Convert resolvable entries directly to resolved format
       RESOLVED_TOOLS=$(printf '%s' "$RESOLVABLE" | jq -c '[.[] | select(.resolution.tools) | .resolution.tools[] | {
         server_name: (.name // .prefix // "unknown"),
@@ -1820,6 +1894,11 @@ steps:
         done
       fi
       UNRESOLVED=$(printf '%s' "$NEEDS_SEARCH" | jq -c '[.[] | {capability: .capability, reason: "no suitable MCP server found via search"}]')
+      # Merge catalog-resolved tools/skills with registry + web-search results
+      ALL_RESOLVED_TOOLS=$(jq -n --argjson existing "$ALL_RESOLVED_TOOLS" --argjson catalog "$CATALOG_TOOLS" \
+        '$existing + [$catalog[] | {server_name: .server_name, source: "context7-catalog", transport: (.transport // "remote"), confidence: (.relevance_score // 0.9), reason: "matched from Context7 tools-catalog"}]')
+      RESOLVED_SKILLS=$(jq -n --argjson existing "$RESOLVED_SKILLS" --argjson catalog "$CATALOG_SKILLS" \
+        '$existing + [$catalog[] | {slug: .name, source: "context7-catalog", reason: "matched from Context7 skills catalog"}]')
       jq -n \
         --argjson resolved_tools "$ALL_RESOLVED_TOOLS" \
         --argjson resolved_skills "$RESOLVED_SKILLS" \
@@ -1857,10 +1936,84 @@ steps:
       fi
       jq -n --argjson installed "$INSTALLED" '{"installed_skills": $installed}'
 
+  # Generate custom SKILL.md files from Context7 library docs for capabilities
+  # that weren't resolved by existing skills or third-party installs.
+  # Prefers generating from fresh documentation over relying on third-party skills.
+  - id: generate-custom-skills
+    env:
+      CTO_RESOLUTION: $search-and-resolve-gaps.stdout
+      CTO_INSTALLED_SKILLS: $install-resolved-skills.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "generate-custom-skills" "${audio_debug}"
+      mkdir -p "$root/.intake/tmp" "$root/.intake/agent-package/_config"
+
+      # Find still-unresolved capabilities after install
+      UNRESOLVED=$(printf '%s' "$CTO_RESOLUTION" | jq -c '.unresolved // []' 2>/dev/null || echo '[]')
+      FAILED=$(printf '%s' "$CTO_INSTALLED_SKILLS" | jq -c '[.installed_skills // [] | .[] | select(.status == "failed")]' 2>/dev/null || echo '[]')
+      ALL_UNRESOLVED=$(jq -n --argjson u "$UNRESOLVED" --argjson f "$FAILED" '$u + [$f[] | {capability: .slug, reason: "install failed"}]')
+      UNRESOLVE_COUNT=$(printf '%s' "$ALL_UNRESOLVED" | jq 'length')
+
+      if [ "$UNRESOLVE_COUNT" -eq 0 ]; then
+        echo "generate-custom-skills: all capabilities resolved, no custom skills needed" >&2
+        printf '{"generated_skills":[],"skipped_capabilities":[]}\n'
+        exit 0
+      fi
+
+      echo "generate-custom-skills: generating custom skills for $UNRESOLVE_COUNT capabilities" >&2
+
+      # Pull Context7 docs for each unresolved capability
+      CTX7_DOCS=""
+      if [ -n "${CONTEXT7_API_KEY:-}" ]; then
+        for cap in $(printf '%s' "$ALL_UNRESOLVED" | jq -r '.[].capability' | head -5); do
+          echo "  fetching Context7 docs for: $cap" >&2
+          DOC=$(curl -s --max-time 15 \
+            -H "Authorization: Bearer ${CONTEXT7_API_KEY}" \
+            "https://context7.com/api/v2/context?libraryId=/5dlabs/cto-agents&query=$(printf '%s' "$cap" | jq -sRr @uri)&tokens=4000" 2>/dev/null || true)
+          if [ -n "$DOC" ]; then
+            CTX7_DOCS="${CTX7_DOCS}--- ${cap} ---\n${DOC}\n\n"
+          fi
+        done
+      fi
+
+      # LLM call to generate SKILL.md files
+      UNRESOLVED_FILE="$root/.intake/tmp/skill-gen-unresolved.json"
+      printf '%s' "$ALL_UNRESOLVED" > "$UNRESOLVED_FILE"
+
+      ARGS=$(jq -n \
+        --rawfile sys "$root/intake/prompts/skill-generation-system.md" \
+        --slurpfile unresolved "$UNRESOLVED_FILE" \
+        --arg ctx7_docs "$CTX7_DOCS" \
+        --arg schema "$root/intake/schemas/skill-generation-result.schema.json" \
+        --arg provider "${model_frontier_provider}" \
+        --arg model "${model_frontier}" \
+        '{ "prompt": $sys,
+           "input": { "unresolved_capabilities": $unresolved[0], "context7_documentation": $ctx7_docs },
+           "schema": $schema, "provider": $provider, "model": $model }')
+      RESULT=$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS")
+
+      # Write generated SKILL.md files to agent-package
+      GENERATED=$(printf '%s' "$RESULT" | jq -c '.generated_skills // []')
+      GEN_COUNT=$(printf '%s' "$GENERATED" | jq 'length')
+      if [ "$GEN_COUNT" -gt 0 ]; then
+        echo "generate-custom-skills: writing $GEN_COUNT generated skills" >&2
+        printf '%s' "$GENERATED" | jq -c '.[]' | while read -r skill; do
+          SKILL_NAME=$(printf '%s' "$skill" | jq -r '.name')
+          SKILL_CONTENT=$(printf '%s' "$skill" | jq -r '.skill_md_content')
+          SKILL_DIR="$root/.intake/agent-package/_config/skills/${SKILL_NAME}"
+          mkdir -p "$SKILL_DIR"
+          printf '%s' "$SKILL_CONTENT" > "$SKILL_DIR/SKILL.md"
+          echo "    ✓ generated: $SKILL_NAME" >&2
+        done
+      fi
+
+      printf '%s' "$RESULT"
+
   - id: generate-agent-package
     env:
       CTO_RESOLUTION: $search-and-resolve-gaps.stdout
       CTO_INSTALLED_SKILLS: $install-resolved-skills.stdout
+      CTO_GENERATED_SKILLS: $generate-custom-skills.stdout
       CTO_INVENTORY_TOOLS: $inventory-effective-tools.stdout
       CTO_INVENTORY_SKILLS: $inventory-effective-skills.stdout
       CTO_CAPABILITIES: $analyze-required-capabilities.stdout
