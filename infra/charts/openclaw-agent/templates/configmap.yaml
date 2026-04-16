@@ -550,32 +550,32 @@ data:
           "search": { "enabled": {{ if hasKey $webSearch "enabled" }}{{ $webSearch.enabled }}{{ else }}true{{ end }} },
           "fetch": { "enabled": {{ if hasKey $webFetch "enabled" }}{{ $webFetch.enabled }}{{ else }}true{{ end }} }
         }
-      },
-      {{- if .Values.tools.acp.enabled }}
-      "acp": {
-        "enabled": true,
-        "backend": {{ .Values.tools.acp.backend | default "acpx" | quote }},
-        "defaultAgent": {{ .Values.tools.acp.defaultAgent | default "codex" | quote }},
-        "allowedAgents": {{ .Values.tools.acp.allowedAgents | default list | toJson }},
-        "maxConcurrentSessions": {{ .Values.tools.acp.maxConcurrentSessions | default 4 }},
-        "dispatch": {
-          "enabled": {{ .Values.tools.acp.dispatch.enabled | default true }}
-        },
-        "stream": {
-          "coalesceIdleMs": {{ .Values.tools.acp.stream.coalesceIdleMs | default 300 }},
-          "maxChunkChars": {{ .Values.tools.acp.stream.maxChunkChars | default 1200 }}
-        },
-        "runtime": {
-          "ttlMinutes": {{ .Values.tools.acp.runtime.ttlMinutes | default 120 }}
+        {{- if .Values.tools.acp.enabled }},
+        "acp": {
+          "enabled": true,
+          "backend": {{ .Values.tools.acp.backend | default "acpx" | quote }},
+          "defaultAgent": {{ .Values.tools.acp.defaultAgent | default "codex" | quote }},
+          "allowedAgents": {{ .Values.tools.acp.allowedAgents | default list | toJson }},
+          "maxConcurrentSessions": {{ .Values.tools.acp.maxConcurrentSessions | default 4 }},
+          "dispatch": {
+            "enabled": {{ .Values.tools.acp.dispatch.enabled | default true }}
+          },
+          "stream": {
+            "coalesceIdleMs": {{ .Values.tools.acp.stream.coalesceIdleMs | default 300 }},
+            "maxChunkChars": {{ .Values.tools.acp.stream.maxChunkChars | default 1200 }}
+          },
+          "runtime": {
+            "ttlMinutes": {{ .Values.tools.acp.runtime.ttlMinutes | default 120 }}
+          }
+          {{- if .Values.tools.acp.wsUrl }},
+          "wsUrl": {{ .Values.tools.acp.wsUrl | quote }}
+          {{- end }}
+          {{- if .Values.tools.acp.tokenFile }},
+          "tokenFile": {{ .Values.tools.acp.tokenFile | quote }}
+          {{- end }}
         }
-        {{- if .Values.tools.acp.wsUrl }},
-        "wsUrl": {{ .Values.tools.acp.wsUrl | quote }}
-        {{- end }}
-        {{- if .Values.tools.acp.tokenFile }},
-        "tokenFile": {{ .Values.tools.acp.tokenFile | quote }}
         {{- end }}
       },
-      {{- end }}
       {{- if .Values.logging }}
       "logging": {
         "level": {{ .Values.logging.level | quote }},

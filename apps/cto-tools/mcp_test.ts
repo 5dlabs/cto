@@ -306,3 +306,385 @@ Deno.test("callTool() routes local tool to LOCAL_TOOLS_URL", async () => {
     restore();
   }
 });
+
+// ── Helpers for config / stdio tests ─────────────────────────────────────────
+
+const testBaseDir = new URL(".", import.meta.url).pathname;
+
+/** Save CLIENT_CONFIG_PATH, set a new value, return a restore function. */
+function setConfigPath(path: string): () => void {
+  const prev = Deno.env.get("CLIENT_CONFIG_PATH");
+  Deno.env.set("CLIENT_CONFIG_PATH", path);
+  return () => {
+    if (prev !== undefined) Deno.env.set("CLIENT_CONFIG_PATH", prev);
+    else Deno.env.delete("CLIENT_CONFIG_PATH");
+  };
+}
+
+/**
+ * Minimal MCP server that speaks JSON-RPC over stdio.
+ * Handles initialize, tools/list, and tools/call.
+ */
+const ECHO_SERVER_CODE = `\
+const encoder = new TextEncoder();
+let buffer = "";
+const reader = Deno.stdin.readable.getReader();
+const writer = Deno.stdout.writable.getWriter();
+try {
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += new TextDecoder().decode(value);
+    let nlIdx;
+    while ((nlIdx = buffer.indexOf("\\n")) !== -1) {
+      const line = buffer.slice(0, nlIdx).trim();
+      buffer = buffer.slice(nlIdx + 1);
+      if (!line) continue;
+      try {
+        const msg = JSON.parse(line);
+        let resp;
+        if (msg.method === "initialize") {
+          resp = { jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "echo-test" } } };
+        } else if (msg.method === "tools/list") {
+          resp = { jsonrpc: "2.0", id: msg.id, result: { tools: [{ name: "echosvr_ping", description: "Echo ping" }, { name: "echosvr_greet", description: "Echo greet" }] } };
+        } else if (msg.method === "tools/call") {
+          resp = { jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: JSON.stringify({ echoed: true, tool: msg.params?.name }) }] } };
+        } else { continue; }
+        await writer.write(encoder.encode(JSON.stringify(resp) + "\\n"));
+      } catch { /* skip non-JSON lines */ }
+    }
+  }
+} catch { /* stdin closed */ }
+`;
+
+const echoServerPath = `${testBaseDir}_test_echo_mcp_server.ts`;
+const echoConfigPath = `${testBaseDir}_test_echo_config.json`;
+
+/** Write the echo server + config, import a fresh mcp module, run fn, clean up. */
+// deno-lint-ignore no-explicit-any
+async function withEchoServer(fn: (mod: any) => Promise<void>, cacheKey: string): Promise<void> {
+  await Deno.writeTextFile(echoServerPath, ECHO_SERVER_CODE);
+  await Deno.writeTextFile(
+    echoConfigPath,
+    JSON.stringify({
+      remoteTools: [],
+      localServers: {
+        echosvr: {
+          command: Deno.execPath(),
+          args: ["run", "--no-check", echoServerPath],
+          tools: ["echosvr_ping", "echosvr_greet"],
+        },
+      },
+    }),
+  );
+
+  const restoreCfg = setConfigPath(echoConfigPath);
+  try {
+    const mod = await import(`./mcp.ts?_stdio=${cacheKey}_${Date.now()}`);
+    await fn(mod);
+  } finally {
+    globalThis.dispatchEvent(new Event("unload"));
+    await new Promise((r) => setTimeout(r, 100));
+    restoreCfg();
+    await Deno.remove(echoServerPath).catch(() => {});
+    await Deno.remove(echoConfigPath).catch(() => {});
+  }
+}
+
+// ── loadClientConfig tests ───────────────────────────────────────────────────
+
+Deno.test({
+  name: "loadClientConfig: valid config routes tool to stdio, not HTTP",
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    const cfgPath = `${testBaseDir}_test_cfg_valid.json`;
+    await Deno.writeTextFile(
+      cfgPath,
+      JSON.stringify({
+        remoteTools: [],
+        localServers: {
+          mysvr: { command: "cat", args: [], tools: ["mysvr_hello"] },
+        },
+      }),
+    );
+    const restoreCfg = setConfigPath(cfgPath);
+
+    try {
+      const mod = await import(`./mcp.ts?_lc=valid_${Date.now()}`);
+
+      let fetchCalled = false;
+      const savedFetch = globalThis.fetch;
+      globalThis.fetch = (() => {
+        fetchCalled = true;
+        return Promise.resolve(new Response("", { status: 500 }));
+      }) as typeof fetch;
+
+      try {
+        await mod.describeTool("mysvr_hello");
+      } catch {
+        // Expected: "cat" is not an MCP server
+      }
+
+      globalThis.fetch = savedFetch;
+      assertEquals(fetchCalled, false, "Tool in localServers should route to stdio, not HTTP");
+    } finally {
+      globalThis.dispatchEvent(new Event("unload"));
+      restoreCfg();
+      await Deno.remove(cfgPath).catch(() => {});
+    }
+  },
+});
+
+Deno.test("loadClientConfig: missing file falls back to HTTP routing", async () => {
+  const restoreCfg = setConfigPath("/nonexistent/no_such_config.json");
+
+  try {
+    const mod = await import(`./mcp.ts?_lc=missing_${Date.now()}`);
+    const { calls, restore } = stubFetch((_url, body) =>
+      jsonRpcOk(body.id as number, { tools: [{ name: "github_test", description: "Test" }] }),
+    );
+
+    try {
+      await mod.describeTool("github_test");
+      assert(calls.length > 0, "With missing config, tool should route to HTTP");
+      assertEquals(calls[0].url, "http://test-server/mcp");
+    } finally {
+      restore();
+    }
+  } finally {
+    restoreCfg();
+  }
+});
+
+Deno.test("loadClientConfig: malformed JSON falls back to HTTP routing", async () => {
+  const cfgPath = `${testBaseDir}_test_cfg_bad.json`;
+  await Deno.writeTextFile(cfgPath, "{NOT VALID JSON!!!");
+  const restoreCfg = setConfigPath(cfgPath);
+
+  try {
+    const mod = await import(`./mcp.ts?_lc=malformed_${Date.now()}`);
+    const { calls, restore } = stubFetch((_url, body) =>
+      jsonRpcOk(body.id as number, { tools: [{ name: "github_test", description: "Test" }] }),
+    );
+
+    try {
+      await mod.describeTool("github_test");
+      assert(calls.length > 0, "With malformed config, tool should route to HTTP");
+    } finally {
+      restore();
+    }
+  } finally {
+    restoreCfg();
+    await Deno.remove(cfgPath).catch(() => {});
+  }
+});
+
+// ── transportFor routing tests ───────────────────────────────────────────────
+
+Deno.test({
+  name: "transportFor: tool matching localServers key prefix → stdio",
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    const cfgPath = `${testBaseDir}_test_cfg_prefix.json`;
+    await Deno.writeTextFile(
+      cfgPath,
+      JSON.stringify({
+        remoteTools: [],
+        localServers: {
+          docker: { command: "cat", args: [], tools: [] },
+        },
+      }),
+    );
+    const restoreCfg = setConfigPath(cfgPath);
+
+    try {
+      const mod = await import(`./mcp.ts?_tf=prefix_${Date.now()}`);
+
+      let fetchCalled = false;
+      const savedFetch = globalThis.fetch;
+      globalThis.fetch = (() => {
+        fetchCalled = true;
+        return Promise.resolve(new Response("", { status: 500 }));
+      }) as typeof fetch;
+
+      try {
+        // "docker_run" prefix "docker" matches a localServers key
+        await mod.describeTool("docker_run");
+      } catch {
+        // Expected failure
+      }
+
+      globalThis.fetch = savedFetch;
+      assertEquals(fetchCalled, false, "Tool prefix matching localServers key should use stdio");
+    } finally {
+      globalThis.dispatchEvent(new Event("unload"));
+      restoreCfg();
+      await Deno.remove(cfgPath).catch(() => {});
+    }
+  },
+});
+
+Deno.test("transportFor: LOCAL_TOOLS match → local HTTP URL", async () => {
+  const restoreCfg = setConfigPath("/nonexistent_routing_test_local");
+
+  try {
+    const mod = await import(`./mcp.ts?_tf=localhttp_${Date.now()}`);
+    const { calls, restore } = stubFetch((_url, body) =>
+      jsonRpcOk(body.id as number, { tools: [{ name: "filesystem_read", description: "Read" }] }),
+    );
+
+    try {
+      await mod.describeTool("filesystem_read");
+      assertEquals(
+        calls[0].url,
+        "http://local-server/mcp",
+        "LOCAL_TOOLS prefix should route to LOCAL_TOOLS_URL",
+      );
+    } finally {
+      restore();
+    }
+  } finally {
+    restoreCfg();
+  }
+});
+
+Deno.test("transportFor: no match → remote HTTP URL", async () => {
+  const restoreCfg = setConfigPath("/nonexistent_routing_test_remote");
+
+  try {
+    const mod = await import(`./mcp.ts?_tf=remote_${Date.now()}`);
+    const { calls, restore } = stubFetch((_url, body) =>
+      jsonRpcOk(body.id as number, { tools: [{ name: "linear_create", description: "Create" }] }),
+    );
+
+    try {
+      await mod.describeTool("linear_create");
+      assertEquals(
+        calls[0].url,
+        "http://test-server/mcp",
+        "Unmatched tool should route to remote TOOLS_SERVER_URL",
+      );
+    } finally {
+      restore();
+    }
+  } finally {
+    restoreCfg();
+  }
+});
+
+// ── StdioTransport integration tests ─────────────────────────────────────────
+
+Deno.test({
+  name: "StdioTransport: handshake and tools/list via echo server",
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    await withEchoServer(async (mod) => {
+      // Stub fetch for the remote HTTP leg of listTools()
+      const savedFetch = globalThis.fetch;
+      globalThis.fetch = ((_input: string | URL | Request, _init?: RequestInit) =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: 1,
+              result: { tools: [{ name: "remote_tool", description: "Remote" }] },
+            }),
+            { status: 200 },
+          ),
+        )) as typeof fetch;
+
+      try {
+        const tools = await mod.listTools();
+
+        // Remote tools present
+        assert("remote" in tools, "Should include remote tools");
+        assertEquals(tools["remote"][0].name, "remote_tool");
+
+        // Local stdio tools from echo server present
+        assert("echosvr" in tools, "Should include echosvr tools");
+        const echoNames = tools["echosvr"].map((t: { name: string }) => t.name).sort();
+        assertEquals(echoNames, ["echosvr_greet", "echosvr_ping"]);
+      } finally {
+        globalThis.fetch = savedFetch;
+      }
+    }, "handshake");
+  },
+});
+
+Deno.test({
+  name: "StdioTransport: callTool routes to stdio and returns parsed result",
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    await withEchoServer(async (mod) => {
+      const result = await mod.callTool("echosvr_ping", { data: "hello" });
+      assertEquals(result.echoed, true);
+      assertEquals(result.tool, "echosvr_ping");
+    }, "calltool");
+  },
+});
+
+Deno.test({
+  name: "StdioTransport: describeTool via stdio returns tool info",
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    await withEchoServer(async (mod) => {
+      const info = await mod.describeTool("echosvr_ping");
+      assertEquals(info.name, "echosvr_ping");
+      assertEquals(info.description, "Echo ping");
+    }, "describe");
+  },
+});
+
+// ── Process cleanup test ─────────────────────────────────────────────────────
+
+Deno.test({
+  name: "StdioTransport: unload event cleans up, subsequent call re-spawns",
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    await Deno.writeTextFile(echoServerPath, ECHO_SERVER_CODE);
+    await Deno.writeTextFile(
+      echoConfigPath,
+      JSON.stringify({
+        remoteTools: [],
+        localServers: {
+          echosvr: {
+            command: Deno.execPath(),
+            args: ["run", "--no-check", echoServerPath],
+            tools: ["echosvr_ping"],
+          },
+        },
+      }),
+    );
+
+    const restoreCfg = setConfigPath(echoConfigPath);
+    try {
+      const mod = await import(`./mcp.ts?_cleanup=${Date.now()}`);
+
+      // First call — spawns a child process
+      const r1 = await mod.callTool("echosvr_ping", {});
+      assertEquals(r1.echoed, true);
+
+      // Dispatch unload — should kill child and clear transport cache
+      globalThis.dispatchEvent(new Event("unload"));
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Second call — must spawn a NEW child process and still succeed
+      const r2 = await mod.callTool("echosvr_ping", {});
+      assertEquals(r2.echoed, true, "Should work after cleanup + re-spawn");
+
+      // Final cleanup
+      globalThis.dispatchEvent(new Event("unload"));
+      await new Promise((r) => setTimeout(r, 100));
+    } finally {
+      restoreCfg();
+      await Deno.remove(echoServerPath).catch(() => {});
+      await Deno.remove(echoConfigPath).catch(() => {});
+    }
+  },
+});

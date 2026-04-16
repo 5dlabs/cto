@@ -293,3 +293,60 @@ cto-tools mcp call grafana_query_prometheus --json '{"query": "rate(http_request
 | **Cursor** | `cto-tools mcp list` | `cto-tools mcp call` | `cto-tools exec` |
 
 The CLI path (`cto-tools mcp *` and `cto-tools exec`) works identically across all runtimes. Claude Code agents can additionally use native `ToolSearch` for on-demand schema loading but all other commands remain the same.
+
+---
+
+## 10. Local Tool Discovery (Dynamic MCP SDK)
+
+When `CLIENT_CONFIG_PATH` is set (pointing to `client-config.json`), the SDK
+discovers **local MCP servers** in addition to the remote tools server.  Local
+servers run via stdio transport — the SDK spawns them on-demand, performs an MCP
+handshake, and exposes their tools as typed TypeScript wrappers alongside
+remote tools.
+
+### How It Works
+
+1. **codegen.ts** reads `client-config.json` → spawns each `localServers` entry → `tools/list` → generates wrappers under `servers/<key>/`
+2. **mcp.ts** `transportFor()` routes calls: local key prefix → `StdioTransport` (spawn + JSON-RPC), else → remote HTTP
+3. Tool names are prefixed with the server key: e.g., `filesystem__read_file`, `memory__store`
+
+### Environment Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `CLIENT_CONFIG_PATH` | Path to controller-generated client-config.json | `/task-files/client-config.json` |
+| `LOCAL_TOOLS` | Comma-separated local server keys for sidecar routing | `filesystem,memory` |
+| `TOOLS_SERVER_URL` | Remote tools server endpoint | `http://cto-tools.cto.svc.cluster.local:3000` |
+
+### Local Tool Examples
+
+**Filesystem server** (read/write files in the workspace):
+```typescript
+import { readFile } from "./servers/filesystem/read_file.ts";
+import { writeFile } from "./servers/filesystem/write_file.ts";
+
+const content = await readFile({ path: "/workspace/src/main.ts" });
+await writeFile({ path: "/workspace/output.txt", content: result });
+```
+
+**Memory server** (persistent key-value store):
+```typescript
+import { store } from "./servers/memory/store.ts";
+import { retrieve } from "./servers/memory/retrieve.ts";
+
+await store({ key: "analysis-result", value: JSON.stringify(data) });
+const saved = await retrieve({ key: "analysis-result" });
+```
+
+### Mixing Local and Remote Tools
+
+```typescript
+import { searchCode } from "./servers/github/search_code.ts";     // remote
+import { readFile } from "./servers/filesystem/read_file.ts";       // local
+import { store } from "./servers/memory/store.ts";                  // local
+
+// Search remote GitHub, read local file, store result locally
+const hits = await searchCode({ query: "handleAuth", repo: "org/app" });
+const localFile = await readFile({ path: "/workspace/src/auth.ts" });
+await store({ key: "auth-context", value: JSON.stringify({ hits, localFile }) });
+```

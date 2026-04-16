@@ -110,7 +110,7 @@ struct WorkflowDefaults {
     acp: cto_config::AcpDefaults,
     #[serde(default)]
     play: PlayDefaults,
-    /// Default skills-release repo URL threaded into every CodeRun spec.
+    /// Default skills-release repo URL threaded into every `CodeRun` spec.
     #[serde(default, rename = "skillsRepo")]
     skills_repo: Option<String>,
 }

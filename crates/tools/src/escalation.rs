@@ -10,6 +10,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::time::{Duration, Instant};
 
 /// How the server should respond to `tools_request_capability` calls.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -77,7 +78,7 @@ pub struct EscalationRecord {
 ///
 /// Keyed in `BridgeState` by the `X-Agent-Id` header. Cleared when the session
 /// TTL expires (PR 2 adds the eviction loop; PR 1 leaves entries in place).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct SessionState {
     /// Tools pre-warmed at session start. These are always eager and never deferred.
     pub prewarm: HashSet<String>,
@@ -85,6 +86,19 @@ pub struct SessionState {
     pub granted: HashSet<String>,
     /// Full audit log of escalations (grants + denies) for this session.
     pub escalations: Vec<EscalationRecord>,
+    /// Timestamp of the last activity on this session (creation, escalation, grant, or query).
+    pub last_activity: Instant,
+}
+
+impl Default for SessionState {
+    fn default() -> Self {
+        Self {
+            prewarm: HashSet::new(),
+            granted: HashSet::new(),
+            escalations: Vec::new(),
+            last_activity: Instant::now(),
+        }
+    }
 }
 
 impl SessionState {
@@ -93,12 +107,31 @@ impl SessionState {
             prewarm,
             granted: HashSet::new(),
             escalations: Vec::new(),
+            last_activity: Instant::now(),
         }
     }
 
     /// True when the tool is already accessible to this session (no escalation needed).
-    pub fn has(&self, tool: &str) -> bool {
+    pub fn has(&mut self, tool: &str) -> bool {
+        self.last_activity = Instant::now();
         self.prewarm.contains(tool) || self.granted.contains(tool)
+    }
+
+    /// Grant access to a tool for this session and touch the activity timestamp.
+    pub fn grant(&mut self, tool: &str) {
+        self.granted.insert(tool.to_string());
+        self.last_activity = Instant::now();
+    }
+
+    /// Record an escalation decision and touch the activity timestamp.
+    pub fn record_escalation(&mut self, record: EscalationRecord) {
+        self.escalations.push(record);
+        self.last_activity = Instant::now();
+    }
+
+    /// Returns `true` when `last_activity` is older than `ttl`.
+    pub fn is_expired(&self, ttl: Duration) -> bool {
+        self.last_activity.elapsed() > ttl
     }
 }
 
@@ -394,7 +427,7 @@ mod tests {
 
     #[test]
     fn session_default_is_empty() {
-        let s = SessionState::default();
+        let mut s = SessionState::default();
         assert!(!s.has("github_search_code"));
         assert!(s.prewarm.is_empty());
         assert!(s.granted.is_empty());

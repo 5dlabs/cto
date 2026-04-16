@@ -166,6 +166,14 @@ impl OpenCodeAdapter {
             .unwrap_or_else(|_| "http://cto-tools.cto.svc.cluster.local:3000/mcp".to_string());
         let tools_url = tools_url.trim_end_matches('/').to_string();
 
+        // Derive agent id from github_app name: strip "5DLabs-" prefix, lowercase.
+        let agent_id = agent_config
+            .github_app
+            .strip_prefix("5DLabs-")
+            .unwrap_or(&agent_config.github_app)
+            .to_lowercase();
+        let prewarm = remote_tools.join(" ");
+
         json!({
             "metadata": {
                 "timestamp": chrono::Utc::now().to_rfc3339(),
@@ -182,6 +190,8 @@ impl OpenCodeAdapter {
                 "local_servers": local_servers,
                 "provider": provider,
                 "tools_url": tools_url,
+                "agent_id": agent_id,
+                "prewarm": prewarm,
             },
             "raw_cli_config": cli_config,
         })

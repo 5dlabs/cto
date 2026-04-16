@@ -68,6 +68,8 @@ pub const PARTIAL_BETTER_AUTH_EXPO: &str = "_shared/partials/better-auth-expo.md
 
 pub const CTO_TOOLS_CLI: &str = "cto-tools/cto-tools";
 pub const CTO_TOOLS_MCP_TS: &str = "cto-tools/mcp.ts";
+pub const CTO_TOOLS_CODEGEN_TS: &str = "cto-tools/codegen.ts";
+pub const CTO_TOOLS_DENO_JSON: &str = "cto-tools/deno.json";
 
 // ============================================================================
 // Skills (modular context loaded just-in-time)

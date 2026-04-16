@@ -1,8 +1,10 @@
 // codegen_test.ts — Tests for codegen.ts pure functions and integration.
 
-import { assertEquals, assertStringIncludes } from "jsr:@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert";
 import {
   buildArgsType,
+  generateJsDoc,
+  generateReadme,
   generateServerIndex,
   generateToolFile,
   jsonSchemaToTsType,
@@ -425,4 +427,194 @@ Deno.test({
       await Deno.remove(outputDir, { recursive: true });
     }
   },
+});
+
+// ── client-config.json / local-server tool parsing ───────────────────────────
+
+Deno.test("parseTool: handles tools from local server namespaces", () => {
+  const localTools: ToolDef[] = [
+    {
+      name: "filesystem_read_file",
+      description: "Read a file",
+      inputSchema: {
+        type: "object",
+        properties: { path: { type: "string" } },
+        required: ["path"],
+      },
+    },
+    {
+      name: "memory_store",
+      description: "Store key-value",
+      inputSchema: {
+        type: "object",
+        properties: { key: { type: "string" }, value: { type: "string" } },
+        required: ["key", "value"],
+      },
+    },
+  ];
+
+  for (const tool of localTools) {
+    const parsed = parseTool(tool);
+    const expectedPrefix = tool.name.split("_")[0];
+    assertEquals(parsed.serverPrefix, expectedPrefix);
+    const expectedFunc = tool.name.slice(expectedPrefix.length + 1);
+    assertEquals(parsed.funcName, expectedFunc);
+    assertEquals(parsed.fullName, tool.name);
+  }
+});
+
+Deno.test("generateToolFile: wrapper for local-server tool calls callTool correctly", () => {
+  const tool: ParsedTool = {
+    fullName: "filesystem_read_file",
+    serverPrefix: "filesystem",
+    funcName: "read_file",
+    description: "Read a local file",
+    inputSchema: {
+      type: "object",
+      properties: { path: { type: "string", description: "File path" } },
+      required: ["path"],
+    },
+  };
+  const output = generateToolFile(tool);
+  assertStringIncludes(output, 'callTool("filesystem_read_file"');
+  assertStringIncludes(output, "export async function read_file(");
+  assertStringIncludes(output, "path: string");
+});
+
+// ── Dual-source merge test ───────────────────────────────────────────────────
+
+Deno.test("integration: mixed remote and local tools generate correct wrappers", async () => {
+  const mixedTools: ToolDef[] = [
+    {
+      name: "github_search_code",
+      description: "Remote: Search code",
+      inputSchema: { type: "object", properties: { q: { type: "string" } }, required: ["q"] },
+    },
+    { name: "linear_list_issues", description: "Remote: List issues" },
+    {
+      name: "filesystem_read_file",
+      description: "Local: Read file",
+      inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+    },
+    {
+      name: "memory_store",
+      description: "Local: Store in memory",
+      inputSchema: {
+        type: "object",
+        properties: { key: { type: "string" }, value: { type: "string" } },
+        required: ["key", "value"],
+      },
+    },
+  ];
+
+  const parsed = mixedTools.map(parseTool);
+  const byServer = new Map<string, ParsedTool[]>();
+  for (const tool of parsed) {
+    const group = byServer.get(tool.serverPrefix) ?? [];
+    group.push(tool);
+    byServer.set(tool.serverPrefix, group);
+  }
+
+  assertEquals(byServer.size, 4);
+  assert(byServer.has("github"));
+  assert(byServer.has("linear"));
+  assert(byServer.has("filesystem"));
+  assert(byServer.has("memory"));
+
+  const outputDir = await Deno.makeTempDir({ prefix: "codegen_merge_" });
+  try {
+    for (const [prefix, tools] of byServer) {
+      const serverDir = `${outputDir}/${prefix}`;
+      await Deno.mkdir(serverDir, { recursive: true });
+
+      const funcNames: string[] = [];
+      for (const tool of tools) {
+        const content = generateToolFile(tool);
+        await Deno.writeTextFile(`${serverDir}/${tool.funcName}.ts`, content);
+        funcNames.push(tool.funcName);
+        assertStringIncludes(content, `callTool("${tool.fullName}"`);
+      }
+
+      const index = generateServerIndex(funcNames);
+      await Deno.writeTextFile(`${serverDir}/index.ts`, index);
+      for (const fn of funcNames) {
+        assertStringIncludes(index, `export { ${fn} }`);
+      }
+    }
+
+    // Verify local-server wrappers have correct content
+    const fsFile = await Deno.readTextFile(`${outputDir}/filesystem/read_file.ts`);
+    assertStringIncludes(fsFile, 'callTool("filesystem_read_file"');
+    assertStringIncludes(fsFile, "path: string");
+
+    const memFile = await Deno.readTextFile(`${outputDir}/memory/store.ts`);
+    assertStringIncludes(memFile, 'callTool("memory_store"');
+    assertStringIncludes(memFile, "key: string");
+
+    // README lists all servers
+    const readme = generateReadme([...byServer.keys()]);
+    assertStringIncludes(readme, "github");
+    assertStringIncludes(readme, "filesystem");
+    assertStringIncludes(readme, "memory");
+  } finally {
+    await Deno.remove(outputDir, { recursive: true });
+  }
+});
+
+// ── Local server failure graceful degradation ────────────────────────────────
+
+Deno.test("graceful degradation: tool with no schema generates valid wrapper", () => {
+  const tool: ToolDef = { name: "broken_no_schema" };
+  const parsed = parseTool(tool);
+  const output = generateToolFile(parsed);
+
+  assertStringIncludes(output, `export async function ${parsed.funcName}(`);
+  assertStringIncludes(output, "Record<string, unknown>");
+  assertStringIncludes(output, 'callTool("broken_no_schema"');
+  assertStringIncludes(output, "Auto-generated by codegen.ts");
+});
+
+Deno.test("graceful degradation: partial tool list still generates wrappers for valid tools", () => {
+  // If a local server fails, only remote tools are available.
+  const remoteOnlyTools: ToolDef[] = [
+    {
+      name: "github_search_code",
+      description: "Search code",
+      inputSchema: { type: "object", properties: { q: { type: "string" } }, required: ["q"] },
+    },
+    { name: "github_get_file", description: "Get file" },
+  ];
+
+  const parsed = remoteOnlyTools.map(parseTool);
+  const byServer = new Map<string, ParsedTool[]>();
+  for (const tool of parsed) {
+    const group = byServer.get(tool.serverPrefix) ?? [];
+    group.push(tool);
+    byServer.set(tool.serverPrefix, group);
+  }
+
+  assertEquals(byServer.size, 1);
+  assert(byServer.has("github"));
+  assertEquals(byServer.get("github")!.length, 2);
+
+  const funcNames = byServer.get("github")!.map((t) => t.funcName);
+  const index = generateServerIndex(funcNames);
+  assertStringIncludes(index, "search_code");
+  assertStringIncludes(index, "get_file");
+
+  const readme = generateReadme(["github"]);
+  assertStringIncludes(readme, "github");
+  // Still produces a valid README with a single server
+  assertStringIncludes(readme, "Available servers");
+});
+
+Deno.test("generateJsDoc: tool with no description produces valid JSDoc", () => {
+  const tool: ParsedTool = {
+    fullName: "test_no_desc",
+    serverPrefix: "test",
+    funcName: "no_desc",
+  };
+  const jsDoc = generateJsDoc(tool);
+  assertStringIncludes(jsDoc, "/**");
+  assertStringIncludes(jsDoc, "*/");
 });

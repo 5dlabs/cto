@@ -1216,6 +1216,29 @@ impl BridgeState {
             default_escalation_policy: Arc::new(default_escalation_policy),
         };
 
+        // Spawn background TTL-based session eviction loop.
+        {
+            let session_states = state.session_states.clone();
+            tokio::spawn(async move {
+                let ttl = std::time::Duration::from_secs(3600); // 1 hour
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(300)); // every 5 min
+                loop {
+                    interval.tick().await;
+                    let mut states = session_states.write().await;
+                    let before = states.len();
+                    states.retain(|_, session| !session.is_expired(ttl));
+                    let evicted = before - states.len();
+                    if evicted > 0 {
+                        tracing::info!(
+                            "🧹 Evicted {} expired sessions ({} remaining)",
+                            evicted,
+                            states.len()
+                        );
+                    }
+                }
+            });
+        }
+
         Ok(state)
     }
 
@@ -3136,11 +3159,11 @@ async fn escalation_handler_inner(
         },
         at: Utc::now().to_rfc3339(),
     };
-    session.escalations.push(record);
+    session.record_escalation(record);
 
     match decision {
         EscalationDecision::Grant => {
-            session.granted.insert(tool_name.clone());
+            session.grant(&tool_name);
             tracing::info!(
                 "🛡️  escalation grant: agent={agent_id} tool={tool_name} reason={reason}"
             );
