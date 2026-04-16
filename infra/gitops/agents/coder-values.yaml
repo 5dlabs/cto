@@ -55,7 +55,7 @@ telemetry:
 agent:
   id: "coder"
   name: "Coder"
-  model: "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
+  model: "openai-codex/gpt-5.4"
   heartbeat:
     every: "30m"
     target: "last"
@@ -100,8 +100,9 @@ agentDefaults:
     ttl: "5m"
 
 modelDefaults:
-  primary: "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
+  primary: "openai-codex/gpt-5.4"
   fallbacks:
+    - "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
     - "fireworks/accounts/fireworks/models/qwen3p6-plus"
     - "fireworks/accounts/fireworks/models/minimax-m2p7"
     - "fireworks/accounts/fireworks/models/glm-5p1"
@@ -151,6 +152,15 @@ messaging:
 # =============================================================================
 models:
   providers:
+    openai-codex:
+      enabled: true
+      api: "openai-codex-responses"
+      auth: "oauth"
+      baseUrl: "https://api.openai.com/v1"
+      models:
+        - id: "gpt-5.4"
+          name: "GPT-5.4"
+          contextTokens: 272000
     anthropic:
       enabled: false
       apiKeySecretKey: "anthropic-api-key"

@@ -187,6 +187,39 @@ spec:
                 printf '%s' "$CODEX_AUTH_SUB1" > /workspace/.codex/auth.json
                 chmod 600 /workspace/.codex/auth.json
                 echo "[cli] codex auth.json written from sub1"
+
+                # Generate OpenClaw auth-profiles.json from Codex OAuth tokens
+                AGENT_DIR="/workspace/.openclaw/agents/{{ .Values.agent.name | default "agent" }}/agent"
+                mkdir -p "$AGENT_DIR"
+                node -e '
+const fs = require("fs");
+const codex = JSON.parse(fs.readFileSync("/workspace/.codex/auth.json", "utf8"));
+const t = codex.tokens || codex;
+const accessToken = t.access_token || t.accessToken || "";
+const refreshToken = t.refresh_token || t.refreshToken || "";
+const accountId = t.account_id || t.accountId || "";
+let expires = "";
+try {
+  const payload = JSON.parse(Buffer.from(accessToken.split(".")[1], "base64url").toString());
+  expires = new Date(payload.exp * 1000).toISOString();
+} catch(e) { expires = new Date(Date.now() + 86400000*3).toISOString(); }
+const profiles = {
+  version: 1,
+  profiles: {
+    "openai-codex:default": {
+      provider: "openai-codex", type: "oauth",
+      accessToken, refreshToken, accountId,
+      expires, expiresAt: expires,
+      source: "manual", managedBy: "codex-cli"
+    }
+  },
+  order: ["openai-codex:default"]
+};
+const outPath = process.argv[1] + "/auth-profiles.json";
+fs.writeFileSync(outPath, JSON.stringify(profiles, null, 2));
+fs.chmodSync(outPath, 0o600);
+console.log("[openclaw] auth-profiles.json written with openai-codex:default profile, expires:", expires);
+' "$AGENT_DIR"
               fi
               {{- end }}
               cp /cli-backend-configs-template/gemini-settings.json /workspace/.gemini/settings.json
