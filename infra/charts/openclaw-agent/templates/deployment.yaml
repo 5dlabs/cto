@@ -1017,6 +1017,8 @@ spec:
         {{- if .Values.codeServer.enabled }}
         - name: code-server
           image: codercom/code-server:latest
+          securityContext:
+            runAsUser: 0
           command:
             - /bin/sh
             - -c
