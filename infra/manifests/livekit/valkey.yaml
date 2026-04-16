@@ -1,0 +1,42 @@
+---
+# Valkey instance for LiveKit room state (participant tracking, ICE
+# session state, distributed coordination if we ever scale beyond one
+# replica). LiveKit only requires a single Redis-protocol endpoint;
+# Valkey is the BSD-3 fork we use cluster-wide.
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: Redis
+metadata:
+  name: livekit-valkey
+  namespace: livekit
+  labels:
+    app.kubernetes.io/name: livekit-valkey
+    app.kubernetes.io/part-of: avatar
+    app.kubernetes.io/component: cache
+spec:
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
+
+  kubernetesConfig:
+    image: valkey/valkey:7.2-alpine
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  redisExporter:
+    enabled: false
+
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: mayastor
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

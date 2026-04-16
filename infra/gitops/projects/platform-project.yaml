@@ -97,6 +97,8 @@ spec:
     - 'https://helm.cilium.io/'
     # Headscale (self-hosted Tailscale control server)
     - 'https://charts.gabe565.com'
+    # LiveKit (self-hosted WebRTC SFU for avatar pipeline)
+    - 'https://helm.livekit.io'
 
   # Destinations that applications in this project can deploy to
   destinations:
@@ -166,6 +168,9 @@ spec:
     - namespace: gitlab
       server: https://kubernetes.default.svc
     - namespace: gitlab-runners
+      server: https://kubernetes.default.svc
+    # Self-hosted LiveKit SFU (avatar pipeline signaling/media)
+    - namespace: livekit
       server: https://kubernetes.default.svc
 
   # Cluster resource whitelist

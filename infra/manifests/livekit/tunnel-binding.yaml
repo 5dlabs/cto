@@ -1,0 +1,20 @@
+---
+# Routes wss://lk.5dlabs.ai to the in-cluster LiveKit signaling port.
+# WebRTC media (UDP 50000-60000) does not traverse this tunnel; clients
+# negotiate ICE candidates pointing at the LiveKit pod's host node IP
+# (use_external_ip=true on the server). Phase 2 will add a direct
+# DNS A record for media if/when needed.
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: livekit-signaling
+  namespace: livekit
+tunnelRef:
+  kind: ClusterTunnel
+  name: livekit
+subjects:
+  - kind: Service
+    name: livekit-server
+    spec:
+      fqdn: lk.5dlabs.ai
+      target: http://livekit-server.livekit.svc:7880
