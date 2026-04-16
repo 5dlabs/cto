@@ -1,0 +1,94 @@
+{
+  "name": "OpenClaw Agent Logs",
+  "is_enabled": true,
+  "filter": {
+    "query": "source:openclaw-agent"
+  },
+  "processors": [
+    {
+      "type": "grok-parser",
+      "name": "Parse OpenClaw structured logs",
+      "is_enabled": true,
+      "source": "message",
+      "grok": {
+        "support_rules": "",
+        "match_rules": "openclaw_log %{date(\"yyyy-MM-dd'T'HH:mm:ss.SSSZ\"):timestamp} \\[%{word:openclaw.subsystem}\\] %{data:openclaw.message}\nopenclaw_log_nested %{date(\"yyyy-MM-dd'T'HH:mm:ss.SSSZ\"):timestamp} \\[%{word:openclaw.subsystem}\\] \\[%{word:openclaw.component}\\] %{data:openclaw.message}\nopenclaw_log_plain %{date(\"yyyy-MM-dd'T'HH:mm:ss.SSSZ\"):timestamp} %{data:openclaw.message}"
+      },
+      "samples": [
+        "2026-04-15T23:48:05.430+00:00 [plugins] openclaw-mem0: initialized (mode: open-source, user: jonathon)",
+        "2026-04-15T23:48:06.121+00:00 [discord] [default] starting provider (@Coder)",
+        "2026-04-15T23:47:46.247+00:00 [gateway] agent model: fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
+      ]
+    },
+    {
+      "type": "status-remapper",
+      "name": "Map log severity",
+      "is_enabled": true,
+      "sources": ["openclaw.level"]
+    },
+    {
+      "type": "date-remapper",
+      "name": "Use parsed timestamp",
+      "is_enabled": true,
+      "sources": ["timestamp"]
+    },
+    {
+      "type": "pipeline",
+      "name": "Error Classification",
+      "is_enabled": true,
+      "filter": {
+        "query": "@openclaw.message:(*error* OR *failed* OR *timeout* OR *overflow*)"
+      },
+      "processors": [
+        {
+          "type": "category-processor",
+          "name": "Classify error types",
+          "is_enabled": true,
+          "target": "openclaw.error_type",
+          "categories": [
+            {
+              "name": "context_overflow",
+              "filter": { "query": "@openclaw.message:*context*overflow*" }
+            },
+            {
+              "name": "mem0_failure",
+              "filter": { "query": "@openclaw.message:(*recall*failed* OR *capture*failed*)" }
+            },
+            {
+              "name": "plugin_error",
+              "filter": { "query": "@openclaw.subsystem:plugins @openclaw.message:*failed*" }
+            },
+            {
+              "name": "tool_error",
+              "filter": { "query": "@openclaw.subsystem:tools @openclaw.message:*failed*" }
+            },
+            {
+              "name": "compaction",
+              "filter": { "query": "@openclaw.message:*compaction*" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "pipeline",
+      "name": "Session Tracking",
+      "is_enabled": true,
+      "filter": {
+        "query": "@openclaw.subsystem:(agent OR \"agent/embedded\")"
+      },
+      "processors": [
+        {
+          "type": "grok-parser",
+          "name": "Extract session and provider info",
+          "is_enabled": true,
+          "source": "openclaw.message",
+          "grok": {
+            "support_rules": "",
+            "match_rules": "session_key sessionKey=%{notSpace:openclaw.session_key} provider=%{notSpace:openclaw.provider} %{data:}\ncompaction_diag \\[context-overflow-diag\\] sessionKey=%{notSpace:openclaw.session_key} provider=%{notSpace:openclaw.provider} source=%{word:openclaw.overflow_source} messages=%{integer:openclaw.message_count} %{data:}"
+          }
+        }
+      ]
+    }
+  ]
+}

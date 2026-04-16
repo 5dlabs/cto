@@ -9,6 +9,9 @@
 # =============================================================================
 namespace: cto
 
+datadog:
+  enabled: true
+
 replicaCount: 1
 deploymentMode: statefulset
 
