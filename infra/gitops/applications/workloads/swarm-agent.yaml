@@ -59,7 +59,7 @@ spec:
         agent:
           id: "swarm"
           name: "Colosseum"
-          model: "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
+          model: "openai-api/gpt-5.4"
           sandbox: "off"
           heartbeat:
             every: "12h"
@@ -86,17 +86,29 @@ spec:
               baseUrl: "https://api.fireworks.ai/inference/v1/"
 
         modelDefaults:
-          primary: "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
+          primary: "openai-api/gpt-5.4"
           fallbacks:
+            - "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
             - "google/gemini-2.5-pro"
 
         models:
           providers:
-            # Disable default providers (no API credits)
             openai-api:
               api: "openai-responses"
               baseUrl: "https://api.openai.com/v1"
-              models: []
+              models:
+                - id: "gpt-5.4"
+                  name: "GPT-5.4"
+                  contextWindow: 1000000
+                  maxTokens: 65536
+                  reasoning: true
+                  input: ["text", "image"]
+                - id: "gpt-5.4-pro"
+                  name: "GPT-5.4 Pro"
+                  contextWindow: 1000000
+                  maxTokens: 65536
+                  reasoning: true
+                  input: ["text", "image"]
             anthropic:
               api: "anthropic-messages"
               baseUrl: "https://api.anthropic.com"
@@ -124,6 +136,12 @@ spec:
                   maxTokens: 65536
                   reasoning: true
                   input: ["text", "image"]
+
+        # OpenAI OAuth — use org-level OAuth tokens
+        openaiOAuth:
+          enabled: true
+          authProfilesSecretKey: "openai-oauth-auth-profiles"
+          codexAuthSecretKey: "openai-oauth-codex-auth"
 
         secrets:
           external:
