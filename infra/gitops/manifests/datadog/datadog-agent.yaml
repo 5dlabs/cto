@@ -12,6 +12,9 @@ spec:
       apiSecret:
         secretName: datadog-secret
         keyName: api-key
+      appSecret:
+        secretName: datadog-secret
+        keyName: app-key
   features:
     orchestratorExplorer:
       enabled: true
