@@ -11,7 +11,7 @@ metadata:
   namespace: cto
 tunnelRef:
   kind: ClusterTunnel
-  name: livekit
+  name: cto-main
 subjects:
   - kind: Service
     name: livekit-server
