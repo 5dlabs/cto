@@ -48,8 +48,8 @@ pub struct FactoryConfig {
 impl Default for FactoryConfig {
     fn default() -> Self {
         Self {
-            health_check_interval: Duration::from_secs(60),
-            max_unhealthy_duration: Duration::from_secs(300), // 5 minutes
+            health_check_interval: Duration::from_mins(1),
+            max_unhealthy_duration: Duration::from_mins(5),
             enable_health_monitoring: true,
             max_concurrent_creations: 10,
         }

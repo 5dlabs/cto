@@ -235,8 +235,7 @@ impl DiscoveryService {
     pub async fn is_available(&self, cli_type: CLIType) -> bool {
         self.check_availability(cli_type)
             .await
-            .map(|avail| avail.available)
-            .unwrap_or(false)
+            .is_ok_and(|avail| avail.available)
     }
 }
 

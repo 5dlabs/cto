@@ -484,7 +484,7 @@ impl GitHubLabelClient {
 
         if self.rate_limit_remaining <= 0 {
             return Err(GitHubLabelError::RateLimitExceeded {
-                reset_in: Duration::from_secs(60), // Conservative fallback
+                reset_in: Duration::from_mins(1), // Conservative fallback
             });
         }
 

@@ -97,7 +97,7 @@ impl CodexAdapter {
         self.base
             .render_template_file(self.memory_template_name, &context)
             .map_err(|e| {
-                AdapterError::TemplateError(format!("Failed to render Codex memory template: {e}",))
+                AdapterError::TemplateError(format!("Failed to render Codex memory template: {e}"))
             })
     }
 

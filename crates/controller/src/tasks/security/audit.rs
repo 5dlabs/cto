@@ -440,26 +440,10 @@ impl AuditLogger {
             .filter(|event| {
                 for (key, value) in &filters {
                     match key.as_str() {
-                        "actor" => {
-                            if event.actor != *value {
-                                return false;
-                            }
-                        }
-                        "action" => {
-                            if event.action != *value {
-                                return false;
-                            }
-                        }
-                        "resource" => {
-                            if event.resource != *value {
-                                return false;
-                            }
-                        }
-                        "event_type" => {
-                            if event.event_type != *value {
-                                return false;
-                            }
-                        }
+                        "actor" if event.actor != *value => return false,
+                        "action" if event.action != *value => return false,
+                        "resource" if event.resource != *value => return false,
+                        "event_type" if event.event_type != *value => return false,
                         "success" => {
                             let success_filter = value.parse::<bool>().unwrap_or(true);
                             if event.success != success_filter {

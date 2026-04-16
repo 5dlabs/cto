@@ -502,12 +502,10 @@ fn download_and_extract(
     fs::write(&hash_file, expected_hash)?;
 
     // Count extracted skills
-    let skill_count = fs::read_dir(&agent_dir)
-        .map(|rd| {
-            rd.filter(|e| e.as_ref().is_ok_and(|e| e.path().is_dir()))
-                .count()
-        })
-        .unwrap_or(0);
+    let skill_count = fs::read_dir(&agent_dir).map_or(0, |rd| {
+        rd.filter(|e| e.as_ref().is_ok_and(|e| e.path().is_dir()))
+            .count()
+    });
 
     info!(
         "Extracted {} skills for '{}' (hash {})",

@@ -74,8 +74,8 @@ impl StateAwareCancellation {
             client,
             namespace: namespace.to_string(),
             lock_manager,
-            cancellation_timeout: Duration::from_secs(300), // 5 minutes
-            grace_period: Duration::from_secs(30),          // 30 seconds
+            cancellation_timeout: Duration::from_mins(5),
+            grace_period: Duration::from_secs(30),
         }
     }
 

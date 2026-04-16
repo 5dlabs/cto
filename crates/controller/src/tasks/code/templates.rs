@@ -164,6 +164,7 @@ impl CodeTemplateGenerator {
     }
 
     /// Generate all template files for a code task
+    #[allow(clippy::too_many_lines)]
     pub fn generate_all_templates(
         code_run: &CodeRun,
         config: &ControllerConfig,
@@ -4565,9 +4566,7 @@ Be constructive and explain the "why" behind your suggestions.
             return val == "true" || val == "1";
         }
         // Fall back to controller env var, default to true (observability stack is deployed)
-        std::env::var("TELEMETRY_ENABLED")
-            .map(|v| v == "true" || v == "1")
-            .unwrap_or(true)
+        std::env::var("TELEMETRY_ENABLED").map_or(true, |v| v == "true" || v == "1")
     }
 
     /// Get the OTLP gRPC endpoint for telemetry export.
@@ -4582,8 +4581,7 @@ Be constructive and explain the "why" behind your suggestions.
     fn is_datadog_enabled(_config: &ControllerConfig) -> bool {
         std::env::var("DATADOG_ENABLED")
             .or_else(|_| std::env::var("DD_TRACE_ENABLED"))
-            .map(|v| v == "true" || v == "1")
-            .unwrap_or(false)
+            .is_ok_and(|v| v == "true" || v == "1")
     }
 
     /// Get default MCP tools for an agent based on github_app and run_type.

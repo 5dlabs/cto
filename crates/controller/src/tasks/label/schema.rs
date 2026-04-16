@@ -385,9 +385,7 @@ impl LabelSchema {
     pub fn validate_label(&self, label: &str, label_type: &LabelType) -> bool {
         if let Some(schema) = self.type_schemas.get(label_type) {
             let regex_pattern = format!("^{}$", schema.pattern);
-            regex::Regex::new(&regex_pattern)
-                .map(|re| re.is_match(label))
-                .unwrap_or(false)
+            regex::Regex::new(&regex_pattern).is_ok_and(|re| re.is_match(label))
         } else {
             false
         }
