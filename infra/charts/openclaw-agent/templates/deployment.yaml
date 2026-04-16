@@ -1014,6 +1014,65 @@ spec:
               cpu: "1"
               memory: 1Gi
         {{- end }}
+        {{- if .Values.codeServer.enabled }}
+        - name: code-server
+          image: codercom/code-server:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              mkdir -p /workspace/.code-server
+              exec code-server \
+                --bind-addr 0.0.0.0:{{ .Values.codeServer.port | default 8080 }} \
+                --auth password \
+                --disable-telemetry \
+                --user-data-dir /workspace/.code-server \
+                /workspace
+          env:
+            - name: PASSWORD
+              value: {{ .Values.codeServer.password | quote }}
+          ports:
+            - name: code-server
+              containerPort: {{ .Values.codeServer.port | default 8080 }}
+              protocol: TCP
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: code-server
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: code-server
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+        - name: cloudflared
+          image: cloudflare/cloudflared:latest
+          command:
+            - cloudflared
+            - tunnel
+            - --url
+            - http://localhost:{{ .Values.codeServer.port | default 8080 }}
+            - --no-autoupdate
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+        {{- end }}
       volumes:
         - name: workspace
           persistentVolumeClaim:

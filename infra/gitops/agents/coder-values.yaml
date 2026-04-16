@@ -619,6 +619,11 @@ plugins:
 supermemory:
   enabled: false
 
+codeServer:
+  enabled: true
+  port: 8080
+  password: "125884c05c03a803"
+
 ssh:
   enabled: true
   port: 2222
