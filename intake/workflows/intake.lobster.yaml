@@ -1646,6 +1646,380 @@ steps:
       } > "$BUNDLE"
       "$root/intake/scripts/quality-gate.sh" --stage "intake-artifacts" --input-file "$BUNDLE"
 
+  # ── Agent Package Provisioning ─────────────────────────────────────────────
+  # Phase 1: Inventory — gather effective tools + skills for this agent
+  # Phase 2: Gap Analysis — LLM identifies capabilities, code computes gaps
+  # Phase 3: Resolve — search for MCP servers, install skills, generate config
+  # Phase 4: Generate & Validate — build SDK, verify integrity
+  # Phase 5: Commit — PR to cto-agents with full package
+  # ──────────────────────────────────────────────────────────────────────────
+
+  - id: inventory-effective-tools
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "inventory-effective-tools" "${audio_debug}"
+      CONFIG="$root/cto-config.json"
+      if [ ! -f "$CONFIG" ]; then
+        echo "inventory-effective-tools: cto-config.json not found, emitting empty inventory" >&2
+        printf '{"remote_tools":[],"local_servers":{}}\n'
+        exit 0
+      fi
+      # Extract all agents' tools into a merged inventory
+      # Each agent may have different tool sets; collect the union for package provisioning
+      REMOTE=$(jq -c '[.agents[].tools.remote // [] | .[]] | unique' "$CONFIG" 2>/dev/null || echo '[]')
+      LOCAL=$(jq -c '
+        reduce (.agents[].tools.localServers // {} | to_entries[]) as $e
+          ({}; .[$e.key] = $e.value)
+      ' "$CONFIG" 2>/dev/null || echo '{}')
+      jq -n --argjson remote "$REMOTE" --argjson local "$LOCAL" \
+        '{"remote_tools": $remote, "local_servers": $local}'
+
+  - id: inventory-effective-skills
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "inventory-effective-skills" "${audio_debug}"
+      CONFIG="$root/cto-config.json"
+      if [ ! -f "$CONFIG" ]; then
+        echo "inventory-effective-skills: cto-config.json not found, emitting empty inventory" >&2
+        printf '{"skills":[]}\n'
+        exit 0
+      fi
+      # Collect all skills across all agents and job types into a flat unique list
+      ALL_SKILLS=$(jq -c '
+        [.agents[].skills // {} | to_entries[].value | .[]] | unique
+      ' "$CONFIG" 2>/dev/null || echo '[]')
+      # Also try to fetch skill-mappings.yaml from cto-agents if gh is available
+      MAPPINGS=""
+      if command -v gh >/dev/null 2>&1; then
+        MAPPINGS=$(gh api "repos/5dlabs/cto-agents/contents/skill-mappings.yaml" --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || true)
+      fi
+      if [ -n "$MAPPINGS" ]; then
+        # Parse YAML mappings (simple grep for skill names under the default section)
+        MAPPED=$(printf '%s' "$MAPPINGS" | grep -E '^\s+-\s+' | sed 's/.*-\s*//' | jq -R -s 'split("\n") | map(select(length>0) | gsub("^\\s+|\\s+$";""))' 2>/dev/null || echo '[]')
+        # Merge with config skills
+        ALL_SKILLS=$(jq -n --argjson cfg "$ALL_SKILLS" --argjson mapped "$MAPPED" '($cfg + $mapped) | unique')
+      fi
+      jq -n --argjson skills "$ALL_SKILLS" '{"skills": $skills}'
+
+  - id: analyze-required-capabilities
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+      CTO_INVENTORY_TOOLS: $inventory-effective-tools.stdout
+      CTO_INVENTORY_SKILLS: $inventory-effective-skills.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "analyze-required-capabilities" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
+      if ! EXP="$(printf '%s' "$EXP" | jq -c '.' 2>/dev/null)"; then
+        EXP="[]"
+      fi
+      mkdir -p "$root/.intake/tmp"
+      EXP_FILE="$root/.intake/tmp/capability-analysis-tasks.json"
+      INV_FILE="$root/.intake/tmp/capability-analysis-inventory.json"
+      printf '%s' "$EXP" > "$EXP_FILE"
+      jq -n --argjson tools "$CTO_INVENTORY_TOOLS" --argjson skills "$CTO_INVENTORY_SKILLS" \
+        '{"available_tools": $tools, "available_skills": $skills}' > "$INV_FILE"
+      ARGS=$(jq -n \
+        --rawfile sys "$root/intake/prompts/capability-analysis-system.md" \
+        --slurpfile expanded_tasks "$EXP_FILE" \
+        --slurpfile inventory "$INV_FILE" \
+        --arg schema "$root/intake/schemas/capability-analysis.schema.json" \
+        --arg provider "${model_frontier_provider}" \
+        --arg model "${model_frontier}" \
+        '{ "prompt": $sys,
+           "input": { "expanded_tasks": $expanded_tasks[0], "current_inventory": $inventory[0] },
+           "schema": $schema, "provider": $provider, "model": $model }')
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
+
+  - id: compute-capability-gaps
+    env:
+      CTO_CAPABILITIES: $analyze-required-capabilities.stdout
+      CTO_INVENTORY_TOOLS: $inventory-effective-tools.stdout
+      CTO_INVENTORY_SKILLS: $inventory-effective-skills.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "compute-capability-gaps" "${audio_debug}"
+      mkdir -p "$root/.intake/tmp"
+      CAPS_FILE="$root/.intake/tmp/required-capabilities.json"
+      TOOLS_FILE="$root/.intake/tmp/effective-tools.json"
+      SKILLS_FILE="$root/.intake/tmp/effective-skills.json"
+      REGISTRY="$root/intake/config/capability-registry.yaml"
+      printf '%s' "$CTO_CAPABILITIES" > "$CAPS_FILE"
+      printf '%s' "$CTO_INVENTORY_TOOLS" > "$TOOLS_FILE"
+      printf '%s' "$CTO_INVENTORY_SKILLS" > "$SKILLS_FILE"
+      python3 "$root/intake/scripts/compute-gaps.py" \
+        --capabilities "$CAPS_FILE" \
+        --tools "$TOOLS_FILE" \
+        --skills "$SKILLS_FILE" \
+        --registry "$REGISTRY"
+
+  - id: search-and-resolve-gaps
+    env:
+      CTO_GAPS: $compute-capability-gaps.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "search-and-resolve-gaps" "${audio_debug}"
+      mkdir -p "$root/.intake/tmp"
+      GAPS=$(printf '%s' "$CTO_GAPS" | jq -c '.' 2>/dev/null || echo '{"resolvable":[],"needs_search":[]}')
+      RESOLVABLE=$(printf '%s' "$GAPS" | jq -c '.resolvable // []')
+      NEEDS_SEARCH=$(printf '%s' "$GAPS" | jq -c '.needs_search // []')
+      SEARCH_COUNT=$(printf '%s' "$NEEDS_SEARCH" | jq 'length')
+      # Convert resolvable entries directly to resolved format
+      RESOLVED_TOOLS=$(printf '%s' "$RESOLVABLE" | jq -c '[.[] | select(.resolution.tools) | .resolution.tools[] | {
+        server_name: (.name // .prefix // "unknown"),
+        source: "registry",
+        transport: "remote",
+        confidence: 0.95,
+        reason: "matched from curated capability registry"
+      }]')
+      RESOLVED_SKILLS=$(printf '%s' "$RESOLVABLE" | jq -c '[.[] | select(.resolution.skills) | .resolution.skills[] | {
+        slug: .,
+        source: "registry",
+        reason: "matched from curated capability registry"
+      }]')
+      RESOLVED_LOCAL=$(printf '%s' "$RESOLVABLE" | jq -c '[.[] | select(.resolution.local_fallback) | .resolution.local_fallback | {
+        server_name: .name,
+        source: "registry",
+        transport: "stdio",
+        command: .command,
+        args: (.args // []),
+        version: (.version // "latest"),
+        confidence: 0.9,
+        reason: "official MCP reference server from registry"
+      }]')
+      # Merge registry-resolved tools with local fallbacks
+      ALL_RESOLVED_TOOLS=$(jq -n --argjson remote "$RESOLVED_TOOLS" --argjson local "$RESOLVED_LOCAL" '$remote + $local')
+      if [ "$SEARCH_COUNT" -gt 0 ]; then
+        echo "search-and-resolve-gaps: $SEARCH_COUNT capabilities need web search" >&2
+        SEARCH_RESULTS="[]"
+        for cap in $(printf '%s' "$NEEDS_SEARCH" | jq -r '.[].capability'); do
+          echo "  searching for MCP server: $cap" >&2
+          # GitHub search
+          GH_RESULTS=""
+          if command -v gh >/dev/null 2>&1; then
+            GH_RESULTS=$(gh search repos "mcp server $cap" --limit 5 --json name,url,description,stargazersCount 2>/dev/null || echo "[]")
+          fi
+          # LLM vet the results
+          if [ -n "$GH_RESULTS" ] && [ "$GH_RESULTS" != "[]" ]; then
+            SEARCH_FILE="$root/.intake/tmp/search-results-${cap}.json"
+            printf '%s' "$GH_RESULTS" > "$SEARCH_FILE"
+            VET_ARGS=$(jq -n \
+              --rawfile sys "$root/intake/prompts/tool-search-system.md" \
+              --slurpfile results "$SEARCH_FILE" \
+              --arg capability "$cap" \
+              --arg schema "$root/intake/schemas/gap-resolution.schema.json" \
+              --arg provider "${model_fast_provider}" \
+              --arg model "${model_fast}" \
+              '{ "prompt": $sys,
+                 "input": { "capability": $capability, "search_results": $results[0] },
+                 "schema": $schema, "provider": $provider, "model": $model }')
+            VET_OUT=$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$VET_ARGS" 2>/dev/null || echo '{}')
+            VET_TOOLS=$(printf '%s' "$VET_OUT" | jq -c '.resolved_tools // []' 2>/dev/null || echo '[]')
+            ALL_RESOLVED_TOOLS=$(jq -n --argjson existing "$ALL_RESOLVED_TOOLS" --argjson new "$VET_TOOLS" '$existing + $new')
+          fi
+        done
+      fi
+      UNRESOLVED=$(printf '%s' "$NEEDS_SEARCH" | jq -c '[.[] | {capability: .capability, reason: "no suitable MCP server found via search"}]')
+      jq -n \
+        --argjson resolved_tools "$ALL_RESOLVED_TOOLS" \
+        --argjson resolved_skills "$RESOLVED_SKILLS" \
+        --argjson unresolved "$UNRESOLVED" \
+        '{"resolved_tools": $resolved_tools, "resolved_skills": $resolved_skills, "unresolved": $unresolved}'
+
+  - id: install-resolved-skills
+    env:
+      CTO_RESOLUTION: $search-and-resolve-gaps.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "install-resolved-skills" "${audio_debug}"
+      SKILLS=$(printf '%s' "$CTO_RESOLUTION" | jq -c '.resolved_skills // []' 2>/dev/null || echo '[]')
+      SKILL_COUNT=$(printf '%s' "$SKILLS" | jq 'length')
+      INSTALLED="[]"
+      if [ "$SKILL_COUNT" -gt 0 ]; then
+        echo "install-resolved-skills: installing $SKILL_COUNT skills" >&2
+        for slug in $(printf '%s' "$SKILLS" | jq -r '.[].slug'); do
+          echo "  installing skill: $slug" >&2
+          if command -v npx >/dev/null 2>&1; then
+            npx clawhub@latest install "$slug" 2>/dev/null && {
+              INSTALLED=$(printf '%s' "$INSTALLED" | jq --arg s "$slug" '. + [{"slug": $s, "status": "installed"}]')
+              echo "    ✓ $slug installed" >&2
+            } || {
+              INSTALLED=$(printf '%s' "$INSTALLED" | jq --arg s "$slug" '. + [{"slug": $s, "status": "failed"}]')
+              echo "    ✗ $slug failed" >&2
+            }
+          else
+            echo "    ⚠ npx not available, skipping $slug" >&2
+            INSTALLED=$(printf '%s' "$INSTALLED" | jq --arg s "$slug" '. + [{"slug": $s, "status": "skipped_no_npx"}]')
+          fi
+        done
+      else
+        echo "install-resolved-skills: no skills to install" >&2
+      fi
+      jq -n --argjson installed "$INSTALLED" '{"installed_skills": $installed}'
+
+  - id: generate-agent-package
+    env:
+      CTO_RESOLUTION: $search-and-resolve-gaps.stdout
+      CTO_INSTALLED_SKILLS: $install-resolved-skills.stdout
+      CTO_INVENTORY_TOOLS: $inventory-effective-tools.stdout
+      CTO_INVENTORY_SKILLS: $inventory-effective-skills.stdout
+      CTO_CAPABILITIES: $analyze-required-capabilities.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "generate-agent-package" "${audio_debug}"
+      mkdir -p "$root/.intake/tmp"
+      RESOLUTION=$(printf '%s' "$CTO_RESOLUTION" | jq -c '.' 2>/dev/null || echo '{}')
+      INSTALLED=$(printf '%s' "$CTO_INSTALLED_SKILLS" | jq -c '.' 2>/dev/null || echo '{}')
+      # Build tools_config overlay from resolution
+      ADDITIONAL_REMOTE=$(printf '%s' "$RESOLUTION" | jq -c '[.resolved_tools[] | select(.transport == "remote") | .server_name] // []')
+      LOCAL_SERVERS=$(printf '%s' "$RESOLUTION" | jq -c '
+        [.resolved_tools[] | select(.transport == "stdio")] |
+        reduce .[] as $s ({}; .[$s.server_name] = {
+          command: $s.command,
+          args: ($s.args // []),
+          version: ($s.version // "latest"),
+          env: ($s.env // {})
+        })
+      ')
+      # Build skills list
+      EXISTING_SKILLS=$(printf '%s' "$CTO_INVENTORY_SKILLS" | jq -c '.skills // []')
+      NEW_SKILLS=$(printf '%s' "$INSTALLED" | jq -c '[.installed_skills[] | select(.status == "installed") | .slug]')
+      ALL_SKILLS=$(jq -n --argjson ex "$EXISTING_SKILLS" --argjson nw "$NEW_SKILLS" '($ex + $nw) | unique')
+      SKILL_ENTRIES=$(jq -n --argjson skills "$ALL_SKILLS" --argjson installed "$INSTALLED" '
+        [$skills[] | {slug: ., source: "config"}] +
+        [($installed.installed_skills // [])[] | select(.status == "installed") | {slug: .slug, source: "intake-provisioned"}]
+        | unique_by(.slug)
+      ')
+      GAPS=$(printf '%s' "$RESOLUTION" | jq -c '.unresolved // []')
+      # Compute tool count from existing + new
+      EXISTING_TOOL_COUNT=$(printf '%s' "$CTO_INVENTORY_TOOLS" | jq '[.remote_tools | length] | .[0] // 0')
+      NEW_TOOL_COUNT=$(printf '%s' "$ADDITIONAL_REMOTE" | jq 'length')
+      LOCAL_COUNT=$(printf '%s' "$LOCAL_SERVERS" | jq 'keys | length')
+      TOTAL_TOOLS=$((EXISTING_TOOL_COUNT + NEW_TOOL_COUNT + LOCAL_COUNT))
+      # Build manifest
+      MANIFEST=$(jq -n \
+        --arg version "1.0.0" \
+        --arg project "${project_name}" \
+        --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --argjson additional_remote "$ADDITIONAL_REMOTE" \
+        --argjson local_servers "$LOCAL_SERVERS" \
+        --argjson skill_entries "$SKILL_ENTRIES" \
+        --argjson gaps "$GAPS" \
+        --argjson total_tools "$TOTAL_TOOLS" \
+        '{
+          "version": $version,
+          "project": { "name": $project },
+          "tools_config": {
+            "additional_remote_tools": $additional_remote,
+            "local_servers": $local_servers
+          },
+          "sdk": {
+            "catalog_hash": "pending-generation",
+            "tool_count": $total_tools,
+            "server_count": ($local_servers | keys | length)
+          },
+          "skills": {
+            "installed": $skill_entries,
+            "gaps": $gaps
+          },
+          "provenance": {
+            "generated_by": "intake-lobster",
+            "generated_at": $timestamp
+          }
+        }')
+      mkdir -p "$root/.intake/agent-package"
+      printf '%s' "$MANIFEST" | jq '.' > "$root/.intake/agent-package/manifest.json"
+      echo "generate-agent-package: manifest written to .intake/agent-package/manifest.json" >&2
+      printf '%s' "$MANIFEST"
+
+  - id: validate-agent-package
+    env:
+      CTO_PACKAGE: $generate-agent-package.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "validate-agent-package" "${audio_debug}"
+      MANIFEST="$root/.intake/agent-package/manifest.json"
+      ERRORS=""
+      if [ ! -f "$MANIFEST" ]; then
+        echo "validate-agent-package: manifest.json not found" >&2
+        printf '{"valid": false, "errors": ["manifest.json not found"]}\n'
+        exit 0
+      fi
+      # Validate JSON structure
+      if ! jq -e '.version' "$MANIFEST" >/dev/null 2>&1; then
+        ERRORS="$ERRORS,\"missing version field\""
+      fi
+      if ! jq -e '.tools_config' "$MANIFEST" >/dev/null 2>&1; then
+        ERRORS="$ERRORS,\"missing tools_config field\""
+      fi
+      if ! jq -e '.sdk' "$MANIFEST" >/dev/null 2>&1; then
+        ERRORS="$ERRORS,\"missing sdk field\""
+      fi
+      if ! jq -e '.skills' "$MANIFEST" >/dev/null 2>&1; then
+        ERRORS="$ERRORS,\"missing skills field\""
+      fi
+      # Check for unresolved gaps
+      GAP_COUNT=$(jq '.skills.gaps | length' "$MANIFEST" 2>/dev/null || echo 0)
+      if [ "$GAP_COUNT" -gt 0 ]; then
+        echo "validate-agent-package: WARNING — $GAP_COUNT unresolved capability gaps" >&2
+      fi
+      TOOL_COUNT=$(jq '.sdk.tool_count // 0' "$MANIFEST")
+      SKILL_COUNT=$(jq '.skills.installed | length' "$MANIFEST" 2>/dev/null || echo 0)
+      if [ -z "$ERRORS" ]; then
+        printf '{"valid": true, "tool_count": %d, "skill_count": %d, "gap_count": %d}\n' "$TOOL_COUNT" "$SKILL_COUNT" "$GAP_COUNT"
+      else
+        printf '{"valid": false, "errors": [%s]}\n' "${ERRORS#,}"
+      fi
+
+  - id: commit-agent-package
+    env:
+      CTO_PACKAGE: $generate-agent-package.stdout
+      CTO_VALIDATION: $validate-agent-package.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "commit-agent-package" "${audio_debug}"
+      # Only commit if validation passed
+      VALID=$(printf '%s' "$CTO_VALIDATION" | jq -r '.valid // false' 2>/dev/null || echo "false")
+      if [ "$VALID" != "true" ]; then
+        echo "commit-agent-package: skipping — validation failed" >&2
+        printf '{"committed": false, "reason": "validation_failed"}\n'
+        exit 0
+      fi
+      # Determine target repo and path
+      AGENTS_REPO="5dlabs/cto-agents"
+      PROJECT=$(printf '%s' "$CTO_PACKAGE" | jq -r '.project.name // "project"')
+      PACKAGE_PATH="_package/manifest.json"
+      MANIFEST_CONTENT=$(cat "$root/.intake/agent-package/manifest.json")
+      # Create PR to cto-agents via GitHub API
+      if ! command -v gh >/dev/null 2>&1; then
+        echo "commit-agent-package: gh CLI not available, writing manifest locally only" >&2
+        printf '{"committed": false, "reason": "gh_not_available", "local_path": ".intake/agent-package/manifest.json"}\n'
+        exit 0
+      fi
+      BRANCH="intake/package-${PROJECT}-$(date +%Y%m%d-%H%M%S)"
+      # Try to push manifest.json to cto-agents
+      ENCODED=$(printf '%s' "$MANIFEST_CONTENT" | base64)
+      TOOL_CT=$(printf '%s' "$CTO_PACKAGE" | jq '.sdk.tool_count // 0')
+      SKILL_CT=$(printf '%s' "$CTO_PACKAGE" | jq '.skills.installed | length')
+      GAP_CT=$(printf '%s' "$CTO_PACKAGE" | jq '.skills.gaps | length')
+      PR_BODY="Auto-generated by intake agent package provisioning. Tools: ${TOOL_CT}, Skills: ${SKILL_CT}, Gaps: ${GAP_CT}"
+      gh api "repos/${AGENTS_REPO}/contents/${PACKAGE_PATH}" \
+        --method PUT \
+        --field message="feat(package): auto-provision agent package for ${PROJECT}" \
+        --field content="$ENCODED" \
+        --field branch="$BRANCH" 2>/dev/null && {
+        PR_URL=$(gh pr create \
+          --repo "$AGENTS_REPO" \
+          --base main \
+          --head "$BRANCH" \
+          --title "feat(package): agent package for ${PROJECT}" \
+          --body "$PR_BODY" 2>/dev/null || echo "")
+        printf '{"committed": true, "pr_url": "%s", "branch": "%s"}\n' "$PR_URL" "$BRANCH"
+      } || {
+        echo "commit-agent-package: GitHub API push failed, saving locally" >&2
+        printf '{"committed": false, "reason": "github_api_failed", "local_path": ".intake/agent-package/manifest.json"}\n'
+      }
+
   - id: sync-linear-issues
     env:
       CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
