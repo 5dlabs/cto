@@ -733,4 +733,9 @@ env:
       secretKeyRef:
         name: github-pat-override
         key: GITHUB_TOKEN
+  - name: COPILOT_GITHUB_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: github-pat-override
+        key: GITHUB_TOKEN
 
