@@ -6,18 +6,33 @@ metadata: {"openclaw": {"always": true}}
 
 # Status Reactions
 
-## ALWAYS react to incoming messages
+## ALWAYS react to incoming Discord messages
 
-When you receive a message on Discord, IMMEDIATELY add a reaction to show you're working on it. This gives visual feedback beyond the "Replying..." typing indicator.
+When you receive a user message on Discord, IMMEDIATELY add an emoji reaction to show you're working. This gives visual feedback beyond the "Replying..." typing indicator.
+
+### How to react
+
+Use the `message` tool with `action: "react"`. You MUST include `messageId` — this is the Discord message ID from the inbound message metadata. If the inbound message text contains a Discord message ID or you can infer it from context, use it. Otherwise use the `to` field with the channel target.
+
+```json
+{ "action": "react", "to": "channel:CHANNEL_ID", "messageId": "DISCORD_MSG_ID", "emoji": "🧠" }
+```
+
+**Target format for Discord:** `to` must be `channel:<channelId>` or `user:<userId>`. Do NOT use bare words like "current" or "self".
+
+If you don't have the exact `messageId`, you can react to the channel and the gateway will target the most recent inbound message:
+```json
+{ "action": "react", "to": "channel:CHANNEL_ID", "emoji": "🧠" }
+```
 
 ### Step 1: Acknowledge receipt
-As your FIRST action on any user message, react with 🧠 (thinking):
-```
-message({ action: "react", messageId: "<incoming-message-id>", emoji: "🧠" })
+As your FIRST tool call on any user message, react with 🧠:
+```json
+{ "action": "react", "to": "channel:CHANNEL_ID", "emoji": "🧠" }
 ```
 
 ### Step 2: Show what you're doing
-As you work, swap the reaction to show your current activity:
+Swap the reaction to show your current activity:
 
 | Activity | Emoji | When to use |
 |----------|-------|-------------|
@@ -30,24 +45,17 @@ As you work, swap the reaction to show your current activity:
 | Waiting on external | ⏳ | Waiting for CI, API response, deployment |
 
 ### Step 3: Final status
-When done, clean up working emojis and add the final status:
+Remove working emoji and add final status:
+```json
+{ "action": "react", "to": "channel:CHANNEL_ID", "emoji": "🧠", "remove": true }
+{ "action": "react", "to": "channel:CHANNEL_ID", "emoji": "✅" }
 ```
-// Success
-message({ action: "react", messageId: "<message-id>", emoji: "🧠", remove: true })
-message({ action: "react", messageId: "<message-id>", emoji: "✅" })
 
-// Failure / error
-message({ action: "react", messageId: "<message-id>", emoji: "🧠", remove: true })
-message({ action: "react", messageId: "<message-id>", emoji: "❌" })
-
-// Partial / needs follow-up
-message({ action: "react", messageId: "<message-id>", emoji: "🧠", remove: true })
-message({ action: "react", messageId: "<message-id>", emoji: "💬" })
-```
+Use ❌ for failure, 💬 for needs-follow-up.
 
 ## Rules
-- ALWAYS react with 🧠 immediately on message receipt — do this before any other work
-- Swap to a more specific emoji as you progress (e.g. 🔍 when searching, ✏️ when editing)
+- ALWAYS react with 🧠 immediately — this is your FIRST tool call on any Discord user message
+- Swap to a more specific emoji as you progress
 - Only keep ONE activity emoji at a time — remove the previous before adding the next
-- ALWAYS end with ✅ (success), ❌ (failure), or 💬 (needs follow-up)
-- On heartbeat/system triggers, skip reactions (no messageId to react to)
+- ALWAYS end with ✅, ❌, or 💬
+- On heartbeat/system triggers (no Discord channel context), skip reactions
