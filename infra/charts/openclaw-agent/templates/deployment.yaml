@@ -1021,13 +1021,23 @@ spec:
             - /bin/sh
             - -c
             - |
-              mkdir -p /workspace/.code-server
+              mkdir -p /workspace/.code-server/User
+              # Dark mode + sensible defaults
+              cat > /workspace/.code-server/User/settings.json << 'SETTINGS'
+              {
+                "workbench.colorTheme": "Default Dark Modern",
+                "workbench.startupEditor": "none",
+                "editor.fontSize": 14,
+                "terminal.integrated.fontSize": 14
+              }
+              SETTINGS
+              sed -i 's/^              //' /workspace/.code-server/User/settings.json
               exec code-server \
                 --bind-addr 0.0.0.0:{{ .Values.codeServer.port | default 8080 }} \
                 --auth password \
                 --disable-telemetry \
                 --user-data-dir /workspace/.code-server \
-                /workspace
+                {{ .Values.codeServer.defaultFolder | default "/workspace" }}
           env:
             - name: PASSWORD
               value: {{ .Values.codeServer.password | quote }}
