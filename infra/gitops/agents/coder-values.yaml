@@ -718,24 +718,3 @@ skills:
     openclaw:
       - configMapName: "cto-coder-external-skills"
         optional: true
-
-# =============================================================================
-# Environment Variables
-# =============================================================================
-env:
-  - name: GH_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: github-pat-override
-        key: GITHUB_TOKEN
-  - name: GITHUB_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: github-pat-override
-        key: GITHUB_TOKEN
-  - name: COPILOT_GITHUB_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: github-pat-override
-        key: GITHUB_TOKEN
-

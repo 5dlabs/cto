@@ -787,6 +787,20 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: github-pat
                   optional: true
+            # gh CLI auth (mirrors GITHUB_TOKEN)
+            - name: GH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: github-pat
+                  optional: true
+            # Copilot CLI headless auth (mirrors GITHUB_TOKEN)
+            - name: COPILOT_GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: github-pat
+                  optional: true
             # 1Password CLI (headless via service account token)
             - name: OP_SERVICE_ACCOUNT_TOKEN
               valueFrom:
