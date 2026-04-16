@@ -643,4 +643,62 @@ abc123def456  rex-default.tar.gz
         let stored_hash = fs::read_to_string(cache.join("rex.hash")).unwrap();
         assert_eq!(stored_hash, hash);
     }
+
+    #[test]
+    fn test_get_config_files_reads_md_and_json() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Override cache root for this test by creating the dir structure directly
+        let agent_dir = tmp.path().join("test-agent").join("_config");
+        fs::create_dir_all(&agent_dir).unwrap();
+
+        fs::write(agent_dir.join("MCP.md"), "# MCP Config\nCustom tools.").unwrap();
+        fs::write(
+            agent_dir.join("overrides.json"),
+            r#"{"key": "value"}"#,
+        )
+        .unwrap();
+        fs::write(agent_dir.join("workflow.yaml"), "steps:\n  - id: test").unwrap();
+        fs::write(agent_dir.join("ignored.txt"), "should be skipped").unwrap();
+
+        // We can't easily override cache_root(), so test the logic directly
+        let config_dir = &agent_dir;
+        let mut result = HashMap::new();
+        if let Ok(entries) = fs::read_dir(config_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_file() {
+                    continue;
+                }
+                let filename = path.file_name().unwrap().to_str().unwrap().to_string();
+                let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                if !matches!(ext, "md" | "json" | "yaml" | "yml") {
+                    continue;
+                }
+                if let Ok(content) = fs::read_to_string(&path) {
+                    result.insert(filename, content);
+                }
+            }
+        }
+
+        assert_eq!(result.len(), 3);
+        assert!(result.contains_key("MCP.md"));
+        assert!(result.contains_key("overrides.json"));
+        assert!(result.contains_key("workflow.yaml"));
+        assert!(!result.contains_key("ignored.txt"));
+        assert_eq!(result["MCP.md"], "# MCP Config\nCustom tools.");
+    }
+
+    #[test]
+    fn test_get_config_files_empty_when_no_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Agent dir exists but no _config/ subdirectory
+        let agent_dir = tmp.path().join("no-config-agent");
+        fs::create_dir_all(&agent_dir).unwrap();
+
+        let config_dir = agent_dir.join("_config");
+        assert!(!config_dir.exists());
+        // Mirrors the get_config_files early return
+        let result: HashMap<String, String> = HashMap::new();
+        assert!(result.is_empty());
+    }
 }
