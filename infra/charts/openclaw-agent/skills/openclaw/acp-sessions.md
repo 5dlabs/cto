@@ -8,41 +8,40 @@ metadata: {"openclaw": {"always": true}}
 
 ## Status reactions (ALWAYS DO THIS)
 
-When you spawn or work with an ACP session, use emoji reactions on the triggering message to show status. This gives visual feedback beyond the "Replying" typing indicator.
+When you spawn or work with an ACP session, use emoji reactions on the triggering message to show status. The gateway automatically targets the current inbound message — you do NOT need `messageId` or `to`.
 
 ### React when ACP starts:
-```
-message({ action: "react", messageId: "<triggering-message-id>", emoji: "⚙️" })
+```json
+{ "action": "react", "emoji": "⚙️" }
 ```
 
 ### React when ACP completes successfully:
-```
-message({ action: "react", messageId: "<triggering-message-id>", emoji: "✅" })
-// Remove the working emoji
-message({ action: "react", messageId: "<triggering-message-id>", emoji: "⚙️", remove: true })
+```json
+{ "action": "react", "emoji": "✅" }
+{ "action": "react", "emoji": "⚙️", "remove": true }
 ```
 
 ### React when ACP fails:
-```
-message({ action: "react", messageId: "<triggering-message-id>", emoji: "❌" })
-message({ action: "react", messageId: "<triggering-message-id>", emoji: "⚙️", remove: true })
+```json
+{ "action": "react", "emoji": "❌" }
+{ "action": "react", "emoji": "⚙️", "remove": true }
 ```
 
 ### Backend-specific reaction (ALWAYS add alongside ⚙️):
 Show WHICH coding CLI is running so users can tell at a glance:
-```
+```json
 // Claude Code
-message({ action: "react", messageId: "<triggering-message-id>", emoji: "🟣" })
+{ "action": "react", "emoji": "🟣" }
 // Codex (OpenAI)
-message({ action: "react", messageId: "<triggering-message-id>", emoji: "🟢" })
+{ "action": "react", "emoji": "🟢" }
 // Copilot (GitHub)
-message({ action: "react", messageId: "<triggering-message-id>", emoji: "🔵" })
+{ "action": "react", "emoji": "🔵" }
 // OpenCode / Kimi
-message({ action: "react", messageId: "<triggering-message-id>", emoji: "🟠" })
+{ "action": "react", "emoji": "🟠" }
 // Gemini
-message({ action: "react", messageId: "<triggering-message-id>", emoji: "🔴" })
+{ "action": "react", "emoji": "🔴" }
 // Cursor
-message({ action: "react", messageId: "<triggering-message-id>", emoji: "⚪" })
+{ "action": "react", "emoji": "⚪" }
 ```
 Remove the backend emoji when done (same as ⚙️ cleanup).
 

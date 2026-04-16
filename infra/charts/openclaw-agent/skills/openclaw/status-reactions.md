@@ -12,27 +12,21 @@ When you receive a user message on Discord, IMMEDIATELY add an emoji reaction to
 
 ### How to react
 
-Use the `message` tool with `action: "react"`. You MUST include `messageId` — this is the Discord message ID from the inbound message metadata. If the inbound message text contains a Discord message ID or you can infer it from context, use it. Otherwise use the `to` field with the channel target.
+Use the `message` tool with `action: "react"`. The gateway automatically targets the current inbound message — you do NOT need to provide `messageId` or `to`.
 
 ```json
-{ "action": "react", "to": "channel:CHANNEL_ID", "messageId": "DISCORD_MSG_ID", "emoji": "🧠" }
-```
-
-**Target format for Discord:** `to` must be `channel:<channelId>` or `user:<userId>`. Do NOT use bare words like "current" or "self".
-
-If you don't have the exact `messageId`, you can react to the channel and the gateway will target the most recent inbound message:
-```json
-{ "action": "react", "to": "channel:CHANNEL_ID", "emoji": "🧠" }
+{ "action": "react", "emoji": "🧠" }
 ```
 
 ### Step 1: Acknowledge receipt
-As your FIRST tool call on any user message, react with 🧠:
+As your VERY FIRST tool call on any user message, react with 🧠:
 ```json
-{ "action": "react", "to": "channel:CHANNEL_ID", "emoji": "🧠" }
+{ "action": "react", "emoji": "🧠" }
 ```
+This MUST be the first tool call you make — before exec, read, web, or any other tool.
 
 ### Step 2: Show what you're doing
-Swap the reaction to show your current activity:
+As you work, swap the reaction to show your current activity:
 
 | Activity | Emoji | When to use |
 |----------|-------|-------------|
@@ -44,18 +38,24 @@ Swap the reaction to show your current activity:
 | ACP session active | 🔄 | Delegated to a coding CLI (see acp-sessions skill) |
 | Waiting on external | ⏳ | Waiting for CI, API response, deployment |
 
+To swap: remove the old emoji, then add the new one:
+```json
+{ "action": "react", "emoji": "🧠", "remove": true }
+{ "action": "react", "emoji": "🔍" }
+```
+
 ### Step 3: Final status
 Remove working emoji and add final status:
 ```json
-{ "action": "react", "to": "channel:CHANNEL_ID", "emoji": "🧠", "remove": true }
-{ "action": "react", "to": "channel:CHANNEL_ID", "emoji": "✅" }
+{ "action": "react", "emoji": "🔍", "remove": true }
+{ "action": "react", "emoji": "✅" }
 ```
 
 Use ❌ for failure, 💬 for needs-follow-up.
 
 ## Rules
-- ALWAYS react with 🧠 immediately — this is your FIRST tool call on any Discord user message
+- ALWAYS react with 🧠 immediately — this MUST be your FIRST tool call on any Discord user message
 - Swap to a more specific emoji as you progress
 - Only keep ONE activity emoji at a time — remove the previous before adding the next
 - ALWAYS end with ✅, ❌, or 💬
-- On heartbeat/system triggers (no Discord channel context), skip reactions
+- On heartbeat/system triggers (no inbound message context), skip reactions — they will fail
