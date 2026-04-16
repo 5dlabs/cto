@@ -3574,9 +3574,8 @@ Be constructive and explain the "why" behind your suggestions.
     /// is merged union-style: remote tool prefixes are appended (deduplicated),
     /// local server entries are added if not already present.
     fn merge_package_manifest_tools(client_config: &mut Value, agent_name: &str) {
-        let manifest_json = match super::skills_cache::load_package_manifest(agent_name) {
-            Some(json) => json,
-            None => return,
+        let Some(manifest_json) = super::skills_cache::load_package_manifest(agent_name) else {
+            return;
         };
 
         let manifest: Value = match serde_json::from_str(&manifest_json) {
@@ -3587,9 +3586,8 @@ Be constructive and explain the "why" behind your suggestions.
             }
         };
 
-        let tools_config = match manifest.get("tools_config") {
-            Some(tc) => tc,
-            None => return,
+        let Some(tools_config) = manifest.get("tools_config") else {
+            return;
         };
 
         // Merge additional_remote_tools

@@ -327,23 +327,20 @@ pub fn load_package_manifest(agent_name: &str) -> Option<String> {
         .join(agent_name)
         .join("_package")
         .join("manifest.json");
-    match fs::read_to_string(&manifest_path) {
-        Ok(content) => {
-            info!(
-                "Loaded package manifest for agent '{}' from {}",
-                agent_name,
-                manifest_path.display()
-            );
-            Some(content)
-        }
-        Err(_) => {
-            debug!(
-                "No package manifest for agent '{}' at {}",
-                agent_name,
-                manifest_path.display()
-            );
-            None
-        }
+    if let Ok(content) = fs::read_to_string(&manifest_path) {
+        info!(
+            "Loaded package manifest for agent '{}' from {}",
+            agent_name,
+            manifest_path.display()
+        );
+        Some(content)
+    } else {
+        debug!(
+            "No package manifest for agent '{}' at {}",
+            agent_name,
+            manifest_path.display()
+        );
+        None
     }
 }
 
