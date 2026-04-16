@@ -761,6 +761,7 @@ struct CtoDefaults {
     monitor: Option<MonitorConfig>,
     /// Default skills-release repo URL threaded into every CodeRun spec.
     #[serde(default, rename = "skillsRepo")]
+    #[allow(dead_code)]
     skills_repo: Option<String>,
 }
 

@@ -270,7 +270,7 @@ spec:
               deliveryChannel: "discord"
               deliveryTo: "channel:1494049471951274014"
               timeoutSeconds: 300
-              message: "Run the daily digest workflow. FIRST check /workspace/.openclaw/workspace/memory/ for any existing digest from today (YYYY-MM-DD.md). If one already exists, summarize what changed since that last digest only — do not repeat prior content. For each monitored repo, use gh CLI to gather commits and PRs from the last 24 hours. Cross-reference against any existing daily notes to avoid duplicating already-reported items. Summarize only NEW progress, then post a structured update via SWARM CLI. Save the digest to memory/YYYY-MM-DD.md (append if file exists, don't overwrite). Show me the draft and wait for my approval before posting."
+              message: "You MUST use the exec tool to run shell commands. You have full GitHub access via gh CLI. Do NOT say you lack access — run the commands. Step 1: exec 'cat /workspace/AGENTS.md' to read monitored repos. Step 2: For EACH 5dlabs repo in that file, exec 'gh api repos/5dlabs/cto/commits?per_page=10 --jq .[].commit.message' (replace cto with each repo name). Step 3: exec 'gh pr list -R 5dlabs/cto --state all --json number,title,state,createdAt --jq .[]' for each repo. Step 4: Write digest to /workspace/.openclaw/workspace/memory/YYYY-MM-DD.md via the edit tool. Step 5: exec 'swarm update-product --body <summary>' and exec 'swarm push'. Post the digest to this channel."
 
         hooks:
           enabled: true
@@ -333,6 +333,9 @@ spec:
 
               ## ⚠️ Tool Usage Rules (CRITICAL)
 
+              - **You HAVE GitHub access.** The `gh` CLI is pre-authenticated. Use `exec` to run it.
+              - **ALWAYS use `exec` tool** to run shell commands like `gh`, `swarm`, `ls`, `find`.
+              - **NEVER say "I don't have access to GitHub".** You DO. Run: `exec gh auth status`
               - **NEVER use the `read` tool on a directory.** It will fail with EISDIR.
               - To **list directory contents**, use `exec` with `ls -la /path/to/dir`.
               - To **read a file**, use `read` with the full file path (not a directory).
@@ -341,20 +344,27 @@ spec:
               - The `read` tool only works on **files**, never directories or symlinks to directories.
               - When exploring repos, ALWAYS `ls` the directory first, then `read` individual files.
 
-              ## Accessing Repos
+              ## GitHub Access (YOU HAVE THIS — USE IT)
 
-              You have **full GitHub access** via `gh` CLI (authenticated as @kaseonedge).
-              You can access ANY repo under `5dlabs/` — not just the ones listed below.
+              You are authenticated as @kaseonedge with full org access.
+              **Run these commands with the `exec` tool:**
 
-              ### ⚡ IMPORTANT: Always use `gh` CLI, never local file reads
-              - **To view files:** `gh api repos/5dlabs/{repo}/contents/{path} --jq .content | base64 -d`
-              - **To browse:** `gh repo view 5dlabs/{repo}` or `gh browse 5dlabs/{repo}`
-              - **To list files:** `gh api repos/5dlabs/{repo}/git/trees/main?recursive=1 --jq '.tree[].path'`
-              - **To search code:** `gh search code --repo 5dlabs/{repo} "query"`
-              - **To view commits:** `gh api repos/5dlabs/{repo}/commits --jq '.[].commit.message'`
-              - **To list all repos:** `gh repo list 5dlabs --limit 100 --json name,url`
-              - **DO NOT** use the `read` tool on `/workspace/repos/{name}` for repos not in the table below.
-                If it's not cloned locally, use `gh` CLI instead.
+              ```bash
+              # Verify auth (run this if you doubt you have access):
+              gh auth status
+
+              # List commits for a repo:
+              gh api repos/5dlabs/cto/commits?per_page=5 --jq '.[].commit.message'
+
+              # List PRs:
+              gh pr list -R 5dlabs/cto --state all --json number,title,state
+
+              # List all 5dlabs repos:
+              gh repo list 5dlabs --limit 100 --json name,url
+              ```
+
+              **DO NOT** tell the user you cannot access GitHub. **DO NOT** generate placeholder data.
+              **ALWAYS** run the actual `gh` commands and report real results.
 
               ### Monitored Repos (cloned locally)
 

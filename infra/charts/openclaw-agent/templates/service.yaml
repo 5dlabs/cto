@@ -18,5 +18,11 @@ spec:
       targetPort: gateway
       protocol: TCP
       name: gateway
+    {{- if .Values.ssh.enabled }}
+    - port: {{ .Values.ssh.port | default 2222 }}
+      targetPort: ssh
+      protocol: TCP
+      name: ssh
+    {{- end }}
   selector:
     {{- include "openclaw-agent.selectorLabels" . | nindent 4 }}

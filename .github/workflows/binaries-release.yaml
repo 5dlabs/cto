@@ -125,7 +125,6 @@ jobs:
           - name: play-launcher
             binary: cto-play
             dir: crates/play-launcher
-            standalone: true
         target:
           - os: ubuntu-22.04
             triple: x86_64-unknown-linux-gnu

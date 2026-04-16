@@ -191,35 +191,9 @@ spec:
                 # Generate OpenClaw auth-profiles.json from Codex OAuth tokens
                 AGENT_DIR="/workspace/.openclaw/agents/{{ .Values.agent.name | default "agent" }}/agent"
                 mkdir -p "$AGENT_DIR"
-                node -e '
-const fs = require("fs");
-const codex = JSON.parse(fs.readFileSync("/workspace/.codex/auth.json", "utf8"));
-const t = codex.tokens || codex;
-const accessToken = t.access_token || t.accessToken || "";
-const refreshToken = t.refresh_token || t.refreshToken || "";
-const accountId = t.account_id || t.accountId || "";
-let expires = "";
-try {
-  const payload = JSON.parse(Buffer.from(accessToken.split(".")[1], "base64url").toString());
-  expires = new Date(payload.exp * 1000).toISOString();
-} catch(e) { expires = new Date(Date.now() + 86400000*3).toISOString(); }
-const profiles = {
-  version: 1,
-  profiles: {
-    "openai-codex:default": {
-      provider: "openai-codex", type: "oauth",
-      accessToken, refreshToken, accountId,
-      expires, expiresAt: expires,
-      source: "manual", managedBy: "codex-cli"
-    }
-  },
-  order: ["openai-codex:default"]
-};
-const outPath = process.argv[1] + "/auth-profiles.json";
-fs.writeFileSync(outPath, JSON.stringify(profiles, null, 2));
-fs.chmodSync(outPath, 0o600);
-console.log("[openclaw] auth-profiles.json written with openai-codex:default profile, expires:", expires);
-' "$AGENT_DIR"
+                export AGENT_DIR
+                echo "aW1wb3J0IGpzb24sIG9zLCBiYXNlNjQsIHN5cwp0cnk6CiAgICB3aXRoIG9wZW4oIi93b3Jrc3BhY2UvLmNvZGV4L2F1dGguanNvbiIpIGFzIGY6CiAgICAgICAgY29kZXggPSBqc29uLmxvYWQoZikKICAgIHQgPSBjb2RleC5nZXQoInRva2VucyIsIGNvZGV4KQogICAgYXQgPSB0LmdldCgiYWNjZXNzX3Rva2VuIiwgdC5nZXQoImFjY2Vzc1Rva2VuIiwgIiIpKQogICAgcnQgPSB0LmdldCgicmVmcmVzaF90b2tlbiIsIHQuZ2V0KCJyZWZyZXNoVG9rZW4iLCAiIikpCiAgICBhaWQgPSB0LmdldCgiYWNjb3VudF9pZCIsIHQuZ2V0KCJhY2NvdW50SWQiLCAiIikpCiAgICBleHAgPSAiIgogICAgdHJ5OgogICAgICAgIHBheWxvYWQgPSBqc29uLmxvYWRzKGJhc2U2NC51cmxzYWZlX2I2NGRlY29kZShhdC5zcGxpdCgiLiIpWzFdICsgIj09IikpCiAgICAgICAgZnJvbSBkYXRldGltZSBpbXBvcnQgZGF0ZXRpbWUsIHRpbWV6b25lCiAgICAgICAgZXhwID0gZGF0ZXRpbWUuZnJvbXRpbWVzdGFtcChwYXlsb2FkWyJleHAiXSwgdHo9dGltZXpvbmUudXRjKS5pc29mb3JtYXQoKS5yZXBsYWNlKCIrMDA6MDAiLCJaIikKICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgZnJvbSBkYXRldGltZSBpbXBvcnQgZGF0ZXRpbWUsIHRpbWV6b25lLCB0aW1lZGVsdGEKICAgICAgICBleHAgPSAoZGF0ZXRpbWUubm93KHRpbWV6b25lLnV0YykgKyB0aW1lZGVsdGEoZGF5cz0zKSkuaXNvZm9ybWF0KCkucmVwbGFjZSgiKzAwOjAwIiwiWiIpCiAgICBwcm9maWxlcyA9IHsidmVyc2lvbiI6IDEsICJwcm9maWxlcyI6IHsib3BlbmFpLWNvZGV4OmRlZmF1bHQiOiB7InByb3ZpZGVyIjogIm9wZW5haS1jb2RleCIsICJ0eXBlIjogIm9hdXRoIiwgImFjY2Vzc1Rva2VuIjogYXQsICJyZWZyZXNoVG9rZW4iOiBydCwgImFjY291bnRJZCI6IGFpZCwgImV4cGlyZXMiOiBleHAsICJleHBpcmVzQXQiOiBleHAsICJzb3VyY2UiOiAibWFudWFsIiwgIm1hbmFnZWRCeSI6ICJjb2RleC1jbGkifX0sICJvcmRlciI6IFsib3BlbmFpLWNvZGV4OmRlZmF1bHQiXX0KICAgIGFnZW50X2RpciA9IG9zLmVudmlyb24uZ2V0KCJBR0VOVF9ESVIiLCAiL3dvcmtzcGFjZS8ub3BlbmNsYXcvYWdlbnRzL2FnZW50L2FnZW50IikKICAgIG91dCA9IG9zLnBhdGguam9pbihhZ2VudF9kaXIsICJhdXRoLXByb2ZpbGVzLmpzb24iKQogICAgd2l0aCBvcGVuKG91dCwgInciKSBhcyBmOgogICAgICAgIGpzb24uZHVtcChwcm9maWxlcywgZiwgaW5kZW50PTIpCiAgICBvcy5jaG1vZChvdXQsIDBvNjAwKQogICAgcHJpbnQoIltvcGVuY2xhd10gYXV0aC1wcm9maWxlcy5qc29uIHdyaXR0ZW4sIGV4cGlyZXM6IiwgZXhwKQpleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICBwcmludCgiW29wZW5jbGF3XSBhdXRoLXByb2ZpbGVzLmpzb24gZ2VuZXJhdGlvbiBmYWlsZWQ6IiwgZSwgZmlsZT1zeXMuc3RkZXJyKQo=" | base64 -d | python3
+                echo "[openclaw] auth-profiles init complete"
               fi
               {{- end }}
               cp /cli-backend-configs-template/gemini-settings.json /workspace/.gemini/settings.json
@@ -647,6 +621,26 @@ console.log("[openclaw] auth-profiles.json written with openai-codex:default pro
               value: "UTC"
             - name: OPENCLAW_CONFIG
               value: /workspace/.openclaw/openclaw.json
+            {{- if .Values.logging }}
+            {{- if .Values.logging.consoleLevel }}
+            - name: OPENCLAW_LOG_LEVEL
+              value: {{ .Values.logging.consoleLevel | quote }}
+            {{- end }}
+            {{- if .Values.logging.rawStream }}
+            - name: OPENCLAW_RAW_STREAM
+              value: "1"
+            {{- if .Values.logging.rawStreamPath }}
+            - name: OPENCLAW_RAW_STREAM_PATH
+              value: {{ .Values.logging.rawStreamPath | quote }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.diagnostics }}
+            {{- if .Values.diagnostics.flags }}
+            - name: OPENCLAW_DIAGNOSTICS
+              value: {{ join "," .Values.diagnostics.flags | quote }}
+            {{- end }}
+            {{- end }}
             {{- if .Values.toolServer.url }}
             - name: TOOL_SERVER_URL
               value: {{ .Values.toolServer.url | quote }}
@@ -930,6 +924,95 @@ console.log("[openclaw] auth-profiles.json written with openai-codex:default pro
               mountPath: /etc/promtail
           resources:
             {{- toYaml .Values.telemetry.resources | nindent 12 }}
+        {{- end }}
+        {{- if .Values.ssh.enabled }}
+        - name: sshd
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              # Configure SSH
+              mkdir -p /run/sshd /root/.ssh /workspace/.ssh
+              chmod 700 /root/.ssh /workspace/.ssh
+
+              # Generate host keys if missing (persisted on workspace PV)
+              SSH_KEY_DIR=/workspace/.ssh/host_keys
+              mkdir -p "$SSH_KEY_DIR"
+              for type in rsa ed25519; do
+                if [ ! -f "$SSH_KEY_DIR/ssh_host_${type}_key" ]; then
+                  ssh-keygen -t "$type" -f "$SSH_KEY_DIR/ssh_host_${type}_key" -N "" -q
+                fi
+              done
+
+              # Write sshd config
+              cat > /etc/ssh/sshd_config <<'SSHCFG'
+              Port {{ .Values.ssh.port | default 2222 }}
+              HostKey /workspace/.ssh/host_keys/ssh_host_rsa_key
+              HostKey /workspace/.ssh/host_keys/ssh_host_ed25519_key
+              PermitRootLogin yes
+              PubkeyAuthentication yes
+              PasswordAuthentication no
+              ChallengeResponseAuthentication no
+              StrictModes no
+              UsePAM no
+              X11Forwarding yes
+              PrintMotd yes
+              AcceptEnv LANG LC_*
+              ClientAliveInterval 60
+              ClientAliveCountMax 3
+              MaxSessions 10
+              Subsystem sftp /usr/lib/openssh/sftp-server
+              SSHCFG
+              sed -i 's/^              //' /etc/ssh/sshd_config
+
+              # Set up authorized keys
+              {{- if .Values.ssh.authorizedKeys }}
+              {{- range .Values.ssh.authorizedKeys }}
+              echo "{{ . }}" >> /root/.ssh/authorized_keys
+              {{- end }}
+              {{- end }}
+              chmod 600 /root/.ssh/authorized_keys 2>/dev/null || true
+
+              # Also allow the node user (uid 1001) to SSH in
+              NODE_HOME=$(getent passwd node | cut -d: -f6 || echo "/home/node")
+              mkdir -p "$NODE_HOME/.ssh"
+              cp /root/.ssh/authorized_keys "$NODE_HOME/.ssh/authorized_keys" 2>/dev/null || true
+              chown -R node:node "$NODE_HOME/.ssh" 2>/dev/null || true
+              chmod 700 "$NODE_HOME/.ssh" 2>/dev/null || true
+              chmod 600 "$NODE_HOME/.ssh/authorized_keys" 2>/dev/null || true
+
+              echo "[sshd] Starting on port {{ .Values.ssh.port | default 2222 }}"
+              exec /usr/sbin/sshd -D -e
+          ports:
+            - name: ssh
+              containerPort: {{ .Values.ssh.port | default 2222 }}
+              protocol: TCP
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          readinessProbe:
+            tcpSocket:
+              port: ssh
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: ssh
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
         {{- end }}
       volumes:
         - name: workspace

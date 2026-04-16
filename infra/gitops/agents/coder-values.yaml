@@ -12,6 +12,22 @@ namespace: cto
 datadog:
   enabled: true
 
+# =============================================================================
+# Logging & Diagnostics
+# =============================================================================
+logging:
+  level: "debug"
+  file: "/workspace/.openclaw/logs/openclaw.log"
+  consoleLevel: "debug"
+  rawStream: true
+  rawStreamPath: "/workspace/.openclaw/logs/raw-stream.jsonl"
+
+diagnostics:
+  enabled: true
+  flags:
+    - "acp.*"
+    - "gateway.session"
+
 replicaCount: 1
 deploymentMode: statefulset
 
@@ -604,7 +620,10 @@ supermemory:
   enabled: false
 
 ssh:
-  enabled: false
+  enabled: true
+  port: 2222
+  authorizedKeys:
+    - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINUYgmSYtJp5JM5MSJ9tFUhdRpt4LZoZmkWEZKxuvanc generated-key"
 
 # =============================================================================
 # NATS Inter-Agent Messaging
