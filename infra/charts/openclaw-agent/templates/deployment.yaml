@@ -1067,6 +1067,18 @@ spec:
                   code-server --extensions-dir "$EXTDIR" --install-extension "$VSIX" 2>/dev/null || true
                 done
               fi
+              # Patch product.json to use MS Marketplace (Copilot not on Open VSX)
+              /usr/lib/code-server/lib/node -e "
+                var fs=require('fs'),p='/usr/lib/code-server/lib/vscode/product.json';
+                var d=JSON.parse(fs.readFileSync(p,'utf8'));
+                d.extensionsGallery={
+                  serviceUrl:'https://marketplace.visualstudio.com/_apis/public/gallery',
+                  cacheUrl:'https://vscode.blob.core.windows.net/gallery/index',
+                  itemUrl:'https://marketplace.visualstudio.com/items',
+                  controlUrl:'',recommendationsUrl:''
+                };
+                fs.writeFileSync(p,JSON.stringify(d,null,2));
+              " 2>/dev/null || true
               exec code-server \
                 --disable-telemetry \
                 --user-data-dir /workspace/.code-server \
