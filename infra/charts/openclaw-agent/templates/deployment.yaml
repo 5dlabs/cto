@@ -1028,10 +1028,25 @@ spec:
                 "workbench.colorTheme": "Default Dark Modern",
                 "workbench.startupEditor": "none",
                 "editor.fontSize": 14,
-                "terminal.integrated.fontSize": 14
+                "terminal.integrated.fontSize": 14,
+                "github.copilot.enable": { "*": true }
               }
               SETTINGS
               sed -i 's/^              //' /workspace/.code-server/User/settings.json
+              # Install Copilot extensions from VS Marketplace if not already present
+              if [ ! -d "/workspace/.code-server/extensions/github.copilot-"* ] 2>/dev/null; then
+                echo "[code-server] Installing GitHub Copilot extensions..."
+                for ext in copilot copilot-chat; do
+                  VSIX="/workspace/.code-server-cache/${ext}.vsix"
+                  if [ ! -f "$VSIX" ]; then
+                    mkdir -p /workspace/.code-server-cache
+                    curl -sL --compressed \
+                      "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/GitHub/vsextensions/${ext}/latest/vspackage" \
+                      -o "${VSIX}.gz" && gunzip -f "${VSIX}.gz" 2>/dev/null || mv "${VSIX}.gz" "$VSIX"
+                  fi
+                  code-server --install-extension "$VSIX" 2>/dev/null || true
+                done
+              fi
               exec code-server \
                 --bind-addr 0.0.0.0:{{ .Values.codeServer.port | default 8080 }} \
                 --auth password \
@@ -1041,6 +1056,15 @@ spec:
           env:
             - name: PASSWORD
               value: {{ .Values.codeServer.password | quote }}
+            {{- if .Values.codeServer.githubToken }}
+            {{- if .Values.codeServer.githubToken.secretName }}
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.codeServer.githubToken.secretName }}
+                  key: {{ .Values.codeServer.githubToken.key | default "token" }}
+            {{- end }}
+            {{- end }}
           ports:
             - name: code-server
               containerPort: {{ .Values.codeServer.port | default 8080 }}

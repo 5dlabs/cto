@@ -624,6 +624,9 @@ codeServer:
   port: 8080
   password: "125884c05c03a803"
   defaultFolder: "/workspace/repos/cto"
+  githubToken:
+    secretName: "code-server-github-token"
+    key: "token"
 
 ssh:
   enabled: true
