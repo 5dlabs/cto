@@ -1036,16 +1036,16 @@ spec:
               SETTINGS
               sed -i 's/^              //' /workspace/.code-server/User/settings.json
               {{- if .Values.codeServer.githubToken }}
-              # Pre-seed GitHub Copilot auth with PAT
-              if [ -n "$GITHUB_TOKEN" ]; then
-                GH_USER=$(curl -sf -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/user | grep -o '"login":"[^"]*"' | cut -d'"' -f4)
-                if [ -n "$GH_USER" ]; then
-                  mkdir -p /workspace/.code-server/User/globalStorage/github.copilot
-                  echo "{\"github.com\":{\"user\":\"$GH_USER\",\"oauth_token\":\"$GITHUB_TOKEN\"}}" \
-                    > /workspace/.code-server/User/globalStorage/github.copilot/hosts.json
-                  echo "[code-server] Copilot auth seeded for $GH_USER"
-                fi
-              fi
+              # Write code-server config with github-auth for Copilot
+              mkdir -p /root/.config/code-server
+              cat > /root/.config/code-server/config.yaml << CSCONF
+              bind-addr: 0.0.0.0:{{ .Values.codeServer.port | default 8080 }}
+              auth: password
+              password: ${PASSWORD}
+              cert: false
+              github-auth: ${GITHUB_TOKEN}
+              CSCONF
+              sed -i 's/^              //' /root/.config/code-server/config.yaml
               {{- end }}
               # Install Copilot extensions from VS Marketplace if not already present
               EXTDIR="/workspace/.code-server/extensions"
@@ -1064,8 +1064,6 @@ spec:
                 done
               fi
               exec code-server \
-                --bind-addr 0.0.0.0:{{ .Values.codeServer.port | default 8080 }} \
-                --auth password \
                 --disable-telemetry \
                 --user-data-dir /workspace/.code-server \
                 --extensions-dir "$EXTDIR" \
