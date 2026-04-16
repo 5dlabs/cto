@@ -46,6 +46,12 @@ spec:
         livekit:
           port: 7880
           log_level: info
+          # Required when storeKeysInSecret.enabled=true: the chart uses
+          # this value as both the volumeMount path and the Secret data
+          # key name for the keys file. Without it the rendered
+          # deployment has an empty mountPath and K8s rejects it.
+          # Matches the data key in the livekit-keys Secret.
+          key_file: keys.yaml
           rtc:
             tcp_port: 7881
             port_range_start: 50000
