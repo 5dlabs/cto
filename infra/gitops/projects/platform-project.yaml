@@ -169,10 +169,6 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: gitlab-runners
       server: https://kubernetes.default.svc
-    # Self-hosted LiveKit SFU (avatar pipeline signaling/media)
-    - namespace: livekit
-      server: https://kubernetes.default.svc
-
   # Cluster resource whitelist
   clusterResourceWhitelist:
     - group: cert-manager.io

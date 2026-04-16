@@ -54,7 +54,7 @@ spec:
             # routable public IP for ICE candidates.
             use_external_ip: true
           redis:
-            address: livekit-valkey.livekit.svc.cluster.local:6379
+            address: livekit-valkey.cto.svc.cluster.local:6379
           turn:
             enabled: false
 
@@ -111,7 +111,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: livekit
+    namespace: cto
 
   syncPolicy:
     automated:
