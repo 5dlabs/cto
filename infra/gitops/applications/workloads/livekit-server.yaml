@@ -1,0 +1,129 @@
+---
+# Self-hosted LiveKit SFU for the Morgan avatar pipeline.
+# Replaces LiveKit Cloud. Runs on CPU worker nodes; the GPU node only
+# runs the avatar agent + MuseTalk inference and connects to this server
+# as a regular client.
+#
+# Phase 1 scope: signaling (WebSocket on :7880) is exposed via the
+# Cloudflare tunnel at wss://lk.5dlabs.ai. UDP media (50000-60000) is
+# NOT exposed in Phase 1 -- WebRTC will fall back to TCP/7881 through
+# the tunnel for initial bring-up. A direct UDP path (hostNetwork on a
+# dedicated public-IP node + DNS A record) is the Phase 2 follow-up.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: livekit-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: livekit-server
+    app.kubernetes.io/part-of: avatar
+    app.kubernetes.io/component: media
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://helm.livekit.io
+    chart: livekit-server
+    targetRevision: 1.9.0
+    helm:
+      values: |
+        replicaCount: 1
+
+        image:
+          repository: livekit/livekit-server
+          pullPolicy: IfNotPresent
+
+        # API keys are sourced from a separately-managed Secret so we
+        # don't store the API secret in this Helm app's inline values.
+        storeKeysInSecret:
+          enabled: true
+          existingSecret: livekit-keys
+
+        livekit:
+          port: 7880
+          log_level: info
+          rtc:
+            tcp_port: 7881
+            port_range_start: 50000
+            port_range_end: 60000
+            # Pod uses host networking, so this picks up the node's
+            # routable public IP for ICE candidates.
+            use_external_ip: true
+          redis:
+            address: livekit-valkey.livekit.svc.cluster.local:6379
+          turn:
+            enabled: false
+
+        # Required for WebRTC: the pod must see the host's network so
+        # ICE candidates use the node's real (public) IP and the UDP
+        # port range is reachable directly.
+        podHostNetwork: true
+
+        # No external LoadBalancer in Phase 1. Cloudflare tunnel
+        # (TunnelBinding) handles WebSocket signaling at lk.5dlabs.ai.
+        loadBalancer:
+          type: disable
+
+        turnLoadbalancer:
+          enable: false
+
+        autoscaling:
+          enabled: false
+
+        # Pin LiveKit to CPU worker nodes; keep it off the GPU node.
+        nodeSelector:
+          node-role.kubernetes.io/worker: ""
+
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+        podAnnotations:
+          sidecar.istio.io/inject: "false"
+          linkerd.io/inject: disabled
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: livekit-server
+
+        serviceAccount:
+          create: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: livekit
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+
+  revisionHistoryLimit: 5
