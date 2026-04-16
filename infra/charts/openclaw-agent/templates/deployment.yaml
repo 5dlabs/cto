@@ -1046,6 +1046,10 @@ spec:
               github-auth: ${GITHUB_TOKEN}
               CSCONF
               sed -i 's/^              //' /root/.config/code-server/config.yaml
+              # Pre-seed Copilot auth via hosts.json (read by the extension at startup)
+              mkdir -p /root/.config/github-copilot
+              echo "{\"github.com\":{\"user\":\"copilot-user\",\"oauth_token\":\"${GITHUB_TOKEN}\"}}" \
+                > /root/.config/github-copilot/hosts.json
               {{- end }}
               # Install Copilot extensions from VS Marketplace if not already present
               EXTDIR="/workspace/.code-server/extensions"
