@@ -58,13 +58,19 @@ impl ClaudeAdapter {
     /// Generate MCP configuration for Claude.
     /// Uses HTTP transport format (type + url) for remote MCP servers.
     #[must_use]
-    fn generate_mcp_config(tools: Option<&ToolConfiguration>) -> Value {
+    fn generate_mcp_config(tools: Option<&ToolConfiguration>, github_app: &str) -> Value {
         let mut mcp_servers = json!({});
 
         // Get MCP server URL from environment variables (configurable, not hardcoded)
         let tools_url = std::env::var("TOOLS_SERVER_URL")
             .unwrap_or_else(|_| "http://cto-tools.cto.svc.cluster.local:3000/mcp".to_string());
         let tools_url = tools_url.trim_end_matches('/').to_string();
+
+        // Derive agent id from github_app name: strip "5DLabs-" prefix, lowercase.
+        let agent_id = github_app
+            .strip_prefix("5DLabs-")
+            .unwrap_or(github_app)
+            .to_lowercase();
 
         if let Some(tool_config) = tools {
             // Add single HTTP MCP server for all remote tools
@@ -79,6 +85,10 @@ impl ClaudeAdapter {
                 // Thread escalation policy + prewarm headers so the tools
                 // server applies per-session policy.
                 let mut headers = serde_json::Map::new();
+                headers.insert(
+                    "X-Agent-Id".to_string(),
+                    json!(agent_id),
+                );
                 headers.insert(
                     "X-Agent-Prewarm".to_string(),
                     json!(tool_config.remote.join(" ")),
@@ -140,7 +150,7 @@ impl CliAdapter for ClaudeAdapter {
         self.base.validate_base_config(agent_config)?;
 
         // Generate MCP configuration
-        let mcp_servers = Self::generate_mcp_config(agent_config.tools.as_ref());
+        let mcp_servers = Self::generate_mcp_config(agent_config.tools.as_ref(), &agent_config.github_app);
 
         // Get default values from environment variables (configurable, not hardcoded)
         let default_max_tokens = std::env::var("CLAUDE_DEFAULT_MAX_TOKENS")

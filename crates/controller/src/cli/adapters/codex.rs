@@ -138,13 +138,15 @@ project_doc_max_bytes = {project_doc_max_bytes}
         // Add tools section if present
         if let Some(tools) = context["tools"].as_object() {
             if let Some(url) = tools.get("url").and_then(|v| v.as_str()) {
+                let agent_id = tools.get("agent_id").and_then(|v| v.as_str()).unwrap_or("default");
+                let prewarm = tools.get("prewarm").and_then(|v| v.as_str()).unwrap_or("");
                 let _ = write!(
                     toml,
                     r#"
 [mcp_servers.tools]
 command = "tools"
 args = ["--url", "{url}", "--working-dir", "/workspace"]
-env = {{ "TOOLS_SERVER_URL" = "{url}" }}
+env = {{ "TOOLS_SERVER_URL" = "{url}", "X_AGENT_ID" = "{agent_id}", "X_AGENT_PREWARM" = "{prewarm}" }}
 "#
                 );
 
@@ -300,6 +302,14 @@ impl CliAdapter for CodexAdapter {
             .map(|tools| tools.remote.clone())
             .unwrap_or_default();
 
+        // Derive agent id from github_app name: strip "5DLabs-" prefix, lowercase.
+        let agent_id = agent_config
+            .github_app
+            .strip_prefix("5DLabs-")
+            .unwrap_or(&agent_config.github_app)
+            .to_lowercase();
+        let prewarm = tools_tools.join(" ");
+
         let model_provider = if let Some(provider_map) =
             cli_config.get("modelProvider").and_then(Value::as_object)
         {
@@ -376,6 +386,8 @@ impl CliAdapter for CodexAdapter {
             "tools": {
                 "url": tools_url,
                 "tools": tools_tools,
+                "agent_id": agent_id,
+                "prewarm": prewarm,
             },
             "model_provider": model_provider,
             "cli_config": cli_config,

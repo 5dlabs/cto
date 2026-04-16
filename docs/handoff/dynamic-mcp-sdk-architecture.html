@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dynamic MCP SDK — Architecture Overview</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --cyan: #79c0ff;
+    --pink: #f778ba;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; padding: 2rem; }
+  h1 { text-align: center; font-size: 1.6rem; margin-bottom: 0.3rem; }
+  .subtitle { text-align: center; color: var(--muted); margin-bottom: 2rem; font-size: 0.95rem; }
+  .subtitle a { color: var(--accent); text-decoration: none; }
+
+  /* === BEFORE / AFTER === */
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 1100px; margin: 0 auto 3rem; }
+  .comparison-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+  .comparison-box h2 { font-size: 1.1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .comparison-box.before h2 { color: var(--red); }
+  .comparison-box.after h2 { color: var(--green); }
+  .token-bar { background: #1c2128; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+  .token-bar .fill { height: 6px; border-radius: 3px; margin-top: 0.4rem; }
+  .token-bar.bad .fill { background: var(--red); width: 95%; }
+  .token-bar.good .fill { background: var(--green); width: 5%; }
+  .savings { text-align: center; color: var(--green); font-size: 1.8rem; font-weight: 700; margin: 1rem 0 0.3rem; }
+  .savings-label { text-align: center; color: var(--muted); font-size: 0.85rem; }
+
+  /* === MAIN DIAGRAM === */
+  .diagram { max-width: 1100px; margin: 0 auto 3rem; }
+  .diagram h2 { font-size: 1.2rem; margin-bottom: 1.5rem; text-align: center; color: var(--accent); }
+
+  .pod-box { background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; padding: 1.5rem; position: relative; }
+  .pod-label { position: absolute; top: -12px; left: 24px; background: var(--accent); color: #0d1117; font-size: 0.75rem; font-weight: 700; padding: 2px 12px; border-radius: 6px; letter-spacing: 0.5px; }
+
+  .pod-inner { display: grid; grid-template-columns: 200px 1fr; gap: 1.5rem; }
+  .runtime-col { display: flex; flex-direction: column; gap: 0.75rem; }
+  .runtime-card { background: #1c2128; border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.8rem; text-align: center; }
+  .runtime-card.active { border-color: var(--green); }
+  .runtime-card .name { font-weight: 600; }
+  .runtime-card .type { color: var(--muted); font-size: 0.7rem; }
+
+  .flow-col { display: flex; flex-direction: column; gap: 1rem; }
+
+  .layer { background: #1c2128; border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }
+  .layer-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 0.6rem; }
+  .layer-content { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .chip { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.35rem 0.7rem; font-size: 0.78rem; font-family: 'SF Mono', Monaco, monospace; }
+  .chip.sdk { border-color: var(--purple); color: var(--purple); }
+  .chip.cli { border-color: var(--cyan); color: var(--cyan); }
+  .chip.gen { border-color: var(--orange); color: var(--orange); }
+  .chip.skill { border-color: var(--pink); color: var(--pink); }
+  .chip.file { border-color: var(--green); color: var(--green); }
+
+  .arrow-down { text-align: center; color: var(--muted); font-size: 1.2rem; line-height: 1; }
+
+  /* === SERVER TARGETS === */
+  .targets { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+  .target-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; text-align: center; }
+  .target-box h3 { font-size: 0.85rem; margin-bottom: 0.3rem; }
+  .target-box .url { color: var(--muted); font-size: 0.75rem; font-family: monospace; }
+  .target-box.local { border-color: var(--orange); }
+  .target-box.local h3 { color: var(--orange); }
+  .target-box.remote { border-color: var(--purple); }
+  .target-box.remote h3 { color: var(--purple); }
+  .target-box .tools { color: var(--muted); font-size: 0.75rem; margin-top: 0.3rem; }
+
+  /* === STARTUP FLOW === */
+  .startup { max-width: 1100px; margin: 0 auto 3rem; }
+  .startup h2 { font-size: 1.2rem; margin-bottom: 1.5rem; text-align: center; color: var(--orange); }
+  .steps { display: flex; gap: 0.5rem; align-items: stretch; }
+  .step { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; text-align: center; position: relative; }
+  .step-num { background: var(--orange); color: #0d1117; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .step-title { font-size: 0.8rem; font-weight: 600; margin-bottom: 0.3rem; }
+  .step-desc { font-size: 0.72rem; color: var(--muted); }
+  .step-arrow { display: flex; align-items: center; color: var(--muted); font-size: 1.2rem; }
+
+  /* === PR STATUS === */
+  .pr-status { max-width: 1100px; margin: 0 auto 2rem; }
+  .pr-status h2 { font-size: 1.2rem; margin-bottom: 1rem; text-align: center; color: var(--green); }
+  .pr-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
+  .pr-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem; text-align: center; }
+  .pr-card .pr-num { font-size: 0.75rem; color: var(--muted); }
+  .pr-card .pr-name { font-size: 0.85rem; font-weight: 600; margin: 0.3rem 0; }
+  .pr-card .pr-desc { font-size: 0.7rem; color: var(--muted); }
+  .pr-card.done { border-color: var(--green); }
+  .pr-card.done .pr-num { color: var(--green); }
+  .pr-card.current { border-color: var(--accent); border-width: 2px; }
+  .pr-card.current .pr-num { color: var(--accent); }
+  .pr-card.future { border-style: dashed; opacity: 0.6; }
+
+  /* === ESCALATION === */
+  .escalation { max-width: 1100px; margin: 0 auto 2rem; }
+  .escalation h2 { font-size: 1.2rem; margin-bottom: 1rem; text-align: center; color: var(--purple); }
+  .esc-flow { display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-wrap: wrap; }
+  .esc-node { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 1rem; font-size: 0.8rem; text-align: center; }
+  .esc-node.agent { border-color: var(--cyan); }
+  .esc-node.sdk { border-color: var(--purple); }
+  .esc-node.server { border-color: var(--orange); }
+  .esc-node.policy { border-color: var(--green); }
+  .esc-arrow { color: var(--muted); font-size: 1.1rem; }
+
+  /* === OBJECTIVE === */
+  .objective { max-width: 1100px; margin: 0 auto 2rem; background: var(--surface); border: 2px solid var(--green); border-radius: 12px; padding: 1.5rem; }
+  .objective h2 { color: var(--green); font-size: 1.1rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem; }
+  .objective ul { list-style: none; padding: 0; }
+  .objective li { padding: 0.4rem 0; font-size: 0.9rem; color: var(--text); display: flex; align-items: flex-start; gap: 0.5rem; }
+  .objective li::before { content: "→"; color: var(--green); font-weight: bold; flex-shrink: 0; }
+
+  @media (max-width: 768px) {
+    .comparison { grid-template-columns: 1fr; }
+    .pod-inner { grid-template-columns: 1fr; }
+    .targets { grid-template-columns: 1fr; }
+    .steps { flex-direction: column; }
+    .step-arrow { transform: rotate(90deg); justify-content: center; }
+    .pr-grid { grid-template-columns: 1fr 1fr; }
+    .esc-flow { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<h1>🔧 Dynamic MCP Tool SDK</h1>
+<p class="subtitle">Anthropic "Code Execution with MCP" pattern · <a href="https://github.com/5dlabs/cto/pull/4610">PR #4610</a></p>
+
+<!-- OBJECTIVE -->
+<div class="objective">
+  <h2>🎯 The Objective</h2>
+  <ul>
+    <li>Agents discover &amp; call 150+ MCP tools <strong>without</strong> loading schemas into context</li>
+    <li>Agents write TypeScript that <code>import</code>s only needed tools → runs in Deno sandbox</li>
+    <li>Intermediate data (10K rows → 5) stays in execution env, never enters model context</li>
+    <li>Works across <strong>all 6 runtimes</strong>: Claude Code, Codex, OpenCode, Factory, Gemini, Cursor</li>
+    <li>Escalation engine controls which tools each agent session can access (allow/deny globs)</li>
+    <li>98.7% token savings on large tool catalogs (Anthropic's measured result)</li>
+  </ul>
+</div>
+
+<!-- BEFORE / AFTER -->
+<div class="comparison">
+  <div class="comparison-box before">
+    <h2>❌ Before (Direct Tool Loading)</h2>
+    <div class="token-bar bad">
+      <span>150 tool schemas loaded upfront</span>
+      <span style="color:var(--red)">~200K tokens</span>
+    </div>
+    <div style="margin-top:0.5rem"><div class="fill" style="background:var(--red);height:6px;border-radius:3px;width:95%"></div></div>
+    <p style="color:var(--muted);font-size:0.8rem;margin-top:0.8rem">Every tool call result flows through model context. A 2-hour meeting transcript through 2 tool calls = ~50K wasted tokens.</p>
+  </div>
+  <div class="comparison-box after">
+    <h2>✅ After (Code Execution Mode)</h2>
+    <div class="token-bar good">
+      <span>File tree listing + agent-written TS</span>
+      <span style="color:var(--green)">~2.5K tokens</span>
+    </div>
+    <div style="margin-top:0.5rem"><div class="fill" style="background:var(--green);height:6px;border-radius:3px;width:5%"></div></div>
+    <p style="color:var(--muted);font-size:0.8rem;margin-top:0.8rem">Agent sees directory tree, imports what it needs, data flows through Deno sandbox. Model only sees final result.</p>
+    <div class="savings">98.7%</div>
+    <div class="savings-label">token reduction on large catalogs</div>
+  </div>
+</div>
+
+<!-- MAIN ARCHITECTURE -->
+<div class="diagram">
+  <h2>Runtime Architecture — Inside an Agent Pod</h2>
+  <div class="pod-box">
+    <div class="pod-label">AGENT POD (K8s)</div>
+    <div class="pod-inner">
+
+      <!-- Left: Agent Runtimes -->
+      <div class="runtime-col">
+        <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-align:center">Agent Runtimes</div>
+        <div class="runtime-card active"><div class="name">Claude Code</div><div class="type">Native tools + SDK</div></div>
+        <div class="runtime-card"><div class="name">Codex</div><div class="type">CLI only</div></div>
+        <div class="runtime-card"><div class="name">OpenCode</div><div class="type">CLI only</div></div>
+        <div class="runtime-card"><div class="name">Factory</div><div class="type">CLI only</div></div>
+        <div class="runtime-card"><div class="name">Gemini</div><div class="type">CLI only</div></div>
+        <div class="runtime-card"><div class="name">Cursor</div><div class="type">CLI only</div></div>
+      </div>
+
+      <!-- Right: SDK layers -->
+      <div class="flow-col">
+
+        <!-- Layer 1: What agents interact with -->
+        <div class="layer">
+          <div class="layer-title">Agent Interface Layer</div>
+          <div class="layer-content">
+            <span class="chip skill">SKILL.md</span>
+            <span class="chip cli">cto-tools mcp list</span>
+            <span class="chip cli">cto-tools mcp call</span>
+            <span class="chip cli">cto-tools mcp escalate</span>
+            <span class="chip cli">cto-tools exec script.ts</span>
+          </div>
+        </div>
+
+        <div class="arrow-down">▼</div>
+
+        <!-- Layer 2: Generated file tree -->
+        <div class="layer">
+          <div class="layer-title">Generated SDK (codegen.ts output at pod startup)</div>
+          <div class="layer-content">
+            <span class="chip file">servers/github/search_code.ts</span>
+            <span class="chip file">servers/github/create_issue.ts</span>
+            <span class="chip file">servers/linear/create_issue.ts</span>
+            <span class="chip file">servers/grafana/query.ts</span>
+            <span class="chip file">servers/argocd/sync.ts</span>
+            <span class="chip file">... 150+ typed wrappers</span>
+          </div>
+        </div>
+
+        <div class="arrow-down">▼</div>
+
+        <!-- Layer 3: Runtime -->
+        <div class="layer">
+          <div class="layer-title">SDK Runtime (mcp.ts)</div>
+          <div class="layer-content">
+            <span class="chip sdk">listTools()</span>
+            <span class="chip sdk">describeTool()</span>
+            <span class="chip sdk">callTool&lt;T&gt;()</span>
+            <span class="chip sdk">escalate()</span>
+            <span class="chip sdk">JSON-RPC 2.0</span>
+            <span class="chip sdk">Retry + Backoff</span>
+          </div>
+        </div>
+
+        <div class="arrow-down">▼ routes by LOCAL_TOOLS env var</div>
+
+        <!-- Targets -->
+        <div class="targets">
+          <div class="target-box local">
+            <h3>🏠 Local Sidecar</h3>
+            <div class="url">localhost:3001/mcp</div>
+            <div class="tools">filesystem, memory</div>
+          </div>
+          <div class="target-box remote">
+            <h3>☁️ Cluster Tools Server</h3>
+            <div class="url">cto-tools.cto.svc.cluster.local:3000/mcp</div>
+            <div class="tools">github, linear, grafana, argocd, slack, jira ...</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STARTUP FLOW -->
+<div class="startup">
+  <h2>Pod Startup Flow (cto-tools-setup.sh.hbs)</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-title">Env Vars</div>
+      <div class="step-desc">Derive CTO_AGENT_ID from github_app_name, set CTO_AGENT_PREWARM from remote_tools</div>
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-title">Install CLI</div>
+      <div class="step-desc">Copy cto-tools bash shim to /usr/local/bin (curl+jq, no Deno needed)</div>
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-title">Copy SDK</div>
+      <div class="step-desc">mcp.ts + codegen.ts + deno.json → /.cto-tools/</div>
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-title">Run Codegen</div>
+      <div class="step-desc">codegen.ts reads tools/list → generates servers/ tree with typed wrappers</div>
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-title">Agent Ready</div>
+      <div class="step-desc">Agent sees file tree, writes TS importing tools, runs via cto-tools exec</div>
+    </div>
+  </div>
+</div>
+
+<!-- ESCALATION FLOW -->
+<div class="escalation">
+  <h2>Escalation Flow (mid-session tool access)</h2>
+  <div class="esc-flow">
+    <div class="esc-node agent">Agent needs<br>restricted tool</div>
+    <div class="esc-arrow">→</div>
+    <div class="esc-node sdk">escalate()<br><small>mcp.ts</small></div>
+    <div class="esc-arrow">→</div>
+    <div class="esc-node server">Tools Server<br><small>X-Agent-Id header</small></div>
+    <div class="esc-arrow">→</div>
+    <div class="esc-node policy">EscalationPolicy<br><small>evaluate() — pure Rust</small></div>
+    <div class="esc-arrow">→</div>
+    <div class="esc-node" style="border-color:var(--green)">Granted ✓<br><small>or Denied ✗</small></div>
+  </div>
+  <p style="text-align:center;color:var(--muted);font-size:0.8rem;margin-top:0.8rem">
+    Policy uses allow/deny glob patterns · Deny always beats allow · SessionState tracks prewarm + granted tools
+  </p>
+</div>
+
+<!-- PR STATUS -->
+<div class="pr-status">
+  <h2>4-PR Implementation Plan</h2>
+  <div class="pr-grid">
+    <div class="pr-card done">
+      <div class="pr-num">✅ PR 1</div>
+      <div class="pr-name">Escalation Engine</div>
+      <div class="pr-desc">Pure Rust: EscalationPolicy, SessionState, evaluate(). 445 lines, fully tested.</div>
+    </div>
+    <div class="pr-card done">
+      <div class="pr-num">✅ PR 2</div>
+      <div class="pr-name">CRD Integration</div>
+      <div class="pr-desc">EscalationPolicy in CodeRunSpec, X-Agent-Id/X-Agent-Prewarm headers.</div>
+    </div>
+    <div class="pr-card done">
+      <div class="pr-num">✅ PR 3 — #4610</div>
+      <div class="pr-name">Dynamic MCP SDK</div>
+      <div class="pr-desc">mcp.ts, codegen.ts, CLI shim, SKILL.md, setup partial. 3,089 lines. 56 tests.</div>
+    </div>
+    <div class="pr-card future">
+      <div class="pr-num">🔲 PR 4</div>
+      <div class="pr-name">Server-Side Handlers</div>
+      <div class="pr-desc">Update tools_request_capability, wire session state, prewarm support, audit.</div>
+    </div>
+  </div>
+</div>
+
+<p style="text-align:center;color:var(--muted);font-size:0.8rem;margin-top:2rem">
+  Built on Anthropic's <a href="https://www.anthropic.com/engineering/code-execution-with-mcp" style="color:var(--accent);text-decoration:none">"Code Execution with MCP"</a> research · 5DLabs CTO Platform · April 2026
+</p>
+
+</body>
+</html>

@@ -144,6 +144,14 @@ impl GeminiAdapter {
             .and_then(|tools| tools.local_servers.clone())
             .unwrap_or_default();
 
+        // Derive agent id from github_app name: strip "5DLabs-" prefix, lowercase.
+        let agent_id = agent_config
+            .github_app
+            .strip_prefix("5DLabs-")
+            .unwrap_or(&agent_config.github_app)
+            .to_lowercase();
+        let prewarm = remote_tools.join(" ");
+
         json!({
             "metadata": {
                 "timestamp": chrono::Utc::now().to_rfc3339(),
@@ -159,6 +167,8 @@ impl GeminiAdapter {
                 "base_url": base_url,
                 "remote_tools": remote_tools,
                 "local_servers": local_servers,
+                "agent_id": agent_id,
+                "prewarm": prewarm,
             },
             "raw_cli_config": cli_config,
         })

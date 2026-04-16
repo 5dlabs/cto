@@ -56,19 +56,47 @@ export const ErrorCodes = {
   SERVER_ERROR: -32000,
 } as const;
 
+// ─── Client Config ───────────────────────────────────────────────────────────
+
+interface LocalServerConfig {
+  command: string;
+  args: string[];
+  tools: string[];
+  workingDirectory?: string;
+  env?: Record<string, string>;
+}
+
+interface ClientConfig {
+  remoteTools: string[];
+  localServers: Record<string, LocalServerConfig>;
+}
+
+function loadClientConfig(): ClientConfig | null {
+  const configPath =
+    Deno.env.get("CLIENT_CONFIG_PATH") ?? "/task-files/client-config.json";
+  try {
+    const text = Deno.readTextFileSync(configPath);
+    return JSON.parse(text) as ClientConfig;
+  } catch {
+    return null;
+  }
+}
+
+const clientConfig = loadClientConfig();
+
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-const env = (key: string, fallback: string): string =>
+const envVar = (key: string, fallback: string): string =>
   Deno.env.get(key) ?? fallback;
 
-const TOOLS_SERVER_URL = env(
+const TOOLS_SERVER_URL = envVar(
   "TOOLS_SERVER_URL",
   "http://cto-tools.cto.svc.cluster.local:3000/mcp",
 );
-const LOCAL_TOOLS_URL = env("LOCAL_TOOLS_URL", "http://localhost:3001/mcp");
+const LOCAL_TOOLS_URL = envVar("LOCAL_TOOLS_URL", "http://localhost:3001/mcp");
 
 const localPrefixes: Set<string> = new Set(
-  env("LOCAL_TOOLS", "filesystem,memory")
+  envVar("LOCAL_TOOLS", "filesystem,memory")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean),
@@ -85,7 +113,39 @@ function serverPrefix(toolName: string): string {
   return idx > 0 ? toolName.slice(0, idx) : toolName;
 }
 
-/** Route a tool call to the local sidecar or the remote MCP server. */
+/**
+ * Find which local server (from clientConfig) owns a given tool name.
+ * Returns the server key or null if the tool isn't local.
+ */
+function localServerFor(toolName: string): string | null {
+  if (!clientConfig) return null;
+  for (const [key, cfg] of Object.entries(clientConfig.localServers)) {
+    if (cfg.tools.includes(toolName)) return key;
+  }
+  // Fallback: check if the server prefix matches a localServers key
+  const prefix = serverPrefix(toolName);
+  if (clientConfig.localServers[prefix]) return prefix;
+  return null;
+}
+
+type TransportRoute =
+  | { kind: "stdio"; server: string }
+  | { kind: "http"; url: string };
+
+/**
+ * Route a tool call to local stdio, local HTTP sidecar, or remote MCP server.
+ */
+function transportFor(toolName: string): TransportRoute {
+  const server = localServerFor(toolName);
+  if (server) return { kind: "stdio", server };
+  // Legacy env-var routing
+  if (localPrefixes.has(serverPrefix(toolName))) {
+    return { kind: "http", url: LOCAL_TOOLS_URL };
+  }
+  return { kind: "http", url: TOOLS_SERVER_URL };
+}
+
+/** Route a tool call to the local sidecar or the remote MCP server (HTTP-only legacy). */
 function endpointFor(toolName: string): string {
   return localPrefixes.has(serverPrefix(toolName))
     ? LOCAL_TOOLS_URL
@@ -107,7 +167,233 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms));
 }
 
-// ─── JSON-RPC transport ──────────────────────────────────────────────────────
+// ─── Stdio Transport ────────────────────────────────────────────────────────
+
+class StdioTransport {
+  #process: Deno.ChildProcess | null = null;
+  #stdin: WritableStreamDefaultWriter<Uint8Array> | null = null;
+  #reader: ReadableStreamDefaultReader<string> | null = null;
+  #buffer = "";
+  #initialized = false;
+  #initPromise: Promise<void> | null = null;
+  #msgId = 0;
+  readonly #serverName: string;
+  readonly #config: LocalServerConfig;
+
+  constructor(serverName: string, config: LocalServerConfig) {
+    this.#serverName = serverName;
+    this.#config = config;
+  }
+
+  /** Spawn the child process if not already running. */
+  #spawn(): void {
+    if (this.#process) return;
+
+    const cwd = this.#config.workingDirectory ?? Deno.cwd();
+
+    const childEnv: Record<string, string> = {};
+    // Inherit parent PATH
+    const parentPath = Deno.env.get("PATH");
+    if (parentPath) childEnv["PATH"] = parentPath;
+    // Match Rust client: set WORKING_DIRECTORY and PROJECT_DIR
+    childEnv["WORKING_DIRECTORY"] = cwd;
+    childEnv["PROJECT_DIR"] = cwd;
+    // Merge server-specific env
+    if (this.#config.env) {
+      Object.assign(childEnv, this.#config.env);
+    }
+
+    const cmd = new Deno.Command(this.#config.command, {
+      args: this.#config.args,
+      cwd,
+      stdin: "piped",
+      stdout: "piped",
+      stderr: "piped",
+      env: childEnv,
+    });
+
+    this.#process = cmd.spawn();
+
+    // Drain stderr so the child process doesn't block
+    this.#process.stderr.pipeTo(
+      new WritableStream({ write(_chunk) { /* discard */ } }),
+    ).catch(() => { /* ignore */ });
+
+    this.#stdin = this.#process.stdin.getWriter();
+
+    // Build a line reader from stdout
+    const decoder = new TextDecoderStream();
+    const readable = this.#process.stdout.pipeThrough(decoder);
+    this.#reader = readable.getReader();
+  }
+
+  /** Read one newline-delimited JSON line from stdout. */
+  async #readLine(): Promise<string> {
+    for (;;) {
+      const nlIdx = this.#buffer.indexOf("\n");
+      if (nlIdx !== -1) {
+        const line = this.#buffer.slice(0, nlIdx);
+        this.#buffer = this.#buffer.slice(nlIdx + 1);
+        if (line.trim().length > 0) return line;
+        continue;
+      }
+      const { value, done } = await this.#reader!.read();
+      if (done) {
+        throw new ToolError(
+          ErrorCodes.SERVER_ERROR,
+          `Stdio stream closed for server '${this.#serverName}'`,
+        );
+      }
+      this.#buffer += value;
+    }
+  }
+
+  /** Read lines until we find a JSON-RPC response matching the given id. */
+  async #readResponse<T>(id: number): Promise<JsonRpcResponse<T>> {
+    for (;;) {
+      const line = await this.#readLine();
+      let msg: Record<string, unknown>;
+      try {
+        msg = JSON.parse(line);
+      } catch {
+        // Skip non-JSON lines (e.g. logging output)
+        continue;
+      }
+      // Skip notifications (no id field)
+      if (!("id" in msg)) continue;
+      if (msg.id === id) return msg as unknown as JsonRpcResponse<T>;
+      // Mismatched id — skip (could be out-of-order notification)
+    }
+  }
+
+  /** Write a JSON-RPC message to stdin (newline-delimited). */
+  async #write(msg: Record<string, unknown>): Promise<void> {
+    const line = JSON.stringify(msg) + "\n";
+    const encoded = new TextEncoder().encode(line);
+    await this.#stdin!.write(encoded);
+  }
+
+  /** Perform the MCP initialize handshake (once). */
+  async #initialize(): Promise<void> {
+    if (this.#initialized) return;
+    if (this.#initPromise) {
+      await this.#initPromise;
+      return;
+    }
+    this.#initPromise = this.#doInitialize();
+    try {
+      await this.#initPromise;
+    } catch (e) {
+      this.#initPromise = null;
+      throw e;
+    }
+  }
+
+  async #doInitialize(): Promise<void> {
+    this.#spawn();
+
+    // Step 1: Send initialize request
+    const initId = ++this.#msgId;
+    await this.#write({
+      jsonrpc: "2.0",
+      id: initId,
+      method: "initialize",
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: { tools: {} },
+        clientInfo: { name: "cto-tools", version: "1.0.0" },
+      },
+    });
+
+    // Step 2: Read initialize response
+    const initResp = await this.#readResponse(initId);
+    if (initResp.error) {
+      throw new ToolError(
+        initResp.error.code,
+        `Initialize failed for '${this.#serverName}': ${initResp.error.message}`,
+        initResp.error.data,
+      );
+    }
+
+    // Step 3: Send initialized notification (no id, no response expected)
+    await this.#write({
+      jsonrpc: "2.0",
+      method: "notifications/initialized",
+    });
+
+    this.#initialized = true;
+  }
+
+  /** Send a JSON-RPC request and return the result. */
+  async request<T>(
+    method: string,
+    params?: Record<string, unknown>,
+  ): Promise<T> {
+    await this.#initialize();
+
+    const id = ++this.#msgId;
+    const msg: Record<string, unknown> = { jsonrpc: "2.0", id, method };
+    if (params !== undefined) msg.params = params;
+    await this.#write(msg);
+
+    const resp = await this.#readResponse<T>(id);
+    if (resp.error) {
+      throw new ToolError(resp.error.code, resp.error.message, resp.error.data);
+    }
+    return resp.result as T;
+  }
+
+  /** Terminate the child process. */
+  shutdown(): void {
+    try {
+      this.#process?.kill();
+    } catch { /* already dead */ }
+    this.#process = null;
+    this.#stdin = null;
+    this.#reader = null;
+    this.#buffer = "";
+    this.#initialized = false;
+    this.#initPromise = null;
+  }
+}
+
+// Per-server transport cache
+const stdioTransports = new Map<string, StdioTransport>();
+
+function getStdioTransport(serverName: string): StdioTransport {
+  let t = stdioTransports.get(serverName);
+  if (t) return t;
+
+  const cfg = clientConfig?.localServers[serverName];
+  if (!cfg) {
+    throw new ToolError(
+      ErrorCodes.SERVER_ERROR,
+      `No local server config for '${serverName}'`,
+    );
+  }
+  t = new StdioTransport(serverName, cfg);
+  stdioTransports.set(serverName, t);
+  return t;
+}
+
+// Clean up child processes on module unload
+globalThis.addEventListener("unload", () => {
+  for (const t of stdioTransports.values()) t.shutdown();
+  stdioTransports.clear();
+});
+
+// ─── Stdio JSON-RPC transport ───────────────────────────────────────────────
+
+async function rpcStdio<T = unknown>(
+  serverName: string,
+  method: string,
+  params?: Record<string, unknown>,
+): Promise<T> {
+  const transport = getStdioTransport(serverName);
+  return transport.request<T>(method, params);
+}
+
+// ─── HTTP JSON-RPC transport ────────────────────────────────────────────────
 
 async function rpc<T = unknown>(
   url: string,
@@ -183,6 +469,7 @@ async function rpc<T = unknown>(
 
 /**
  * List all tools available on the MCP server, grouped by server prefix.
+ * Includes tools from both remote and local stdio servers.
  *
  * @returns An object keyed by server prefix (e.g. `github`, `linear`) whose
  *   values are arrays of `ToolInfo`.
@@ -202,6 +489,29 @@ export async function listTools(): Promise<ToolsByServer> {
       inputSchema: tool.inputSchema,
     });
   }
+
+  // Fetch tools from each local stdio server
+  if (clientConfig) {
+    for (const serverName of Object.keys(clientConfig.localServers)) {
+      try {
+        const result = await rpcStdio<ToolsListResult>(
+          serverName,
+          "tools/list",
+        );
+        for (const tool of result.tools) {
+          const prefix = serverPrefix(tool.name);
+          (grouped[prefix] ??= []).push({
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema,
+          });
+        }
+      } catch {
+        // If a local server fails to respond, skip it gracefully
+      }
+    }
+  }
+
   return grouped;
 }
 
@@ -212,10 +522,11 @@ export async function listTools(): Promise<ToolsByServer> {
  * @throws {ToolError} with code `-32601` if the tool is not found.
  */
 export async function describeTool(name: string): Promise<ToolInfo> {
-  const { tools } = await rpc<ToolsListResult>(
-    endpointFor(name),
-    "tools/list",
-  );
+  const route = transportFor(name);
+
+  const { tools } = route.kind === "stdio"
+    ? await rpcStdio<ToolsListResult>(route.server, "tools/list")
+    : await rpc<ToolsListResult>(route.url, "tools/list");
 
   const tool = tools.find((t) => t.name === name);
   if (!tool) {
@@ -234,8 +545,8 @@ export async function describeTool(name: string): Promise<ToolInfo> {
 /**
  * Invoke an MCP tool by name and return the parsed result.
  *
- * The call is routed to either the local sidecar or the remote MCP server
- * based on the tool's server prefix and the `LOCAL_TOOLS` configuration.
+ * The call is routed to a local stdio server (if configured in client-config),
+ * the local HTTP sidecar, or the remote MCP server based on routing rules.
  *
  * @typeParam T The expected shape of the first text content item, parsed as JSON.
  * @param name Fully-qualified tool name.
@@ -246,11 +557,19 @@ export async function callTool<T = unknown>(
   name: string,
   args: Record<string, unknown>,
 ): Promise<T> {
-  const result = await rpc<ToolCallResult>(
-    endpointFor(name),
-    "tools/call",
-    { name, arguments: args },
-  );
+  const route = transportFor(name);
+
+  const result = route.kind === "stdio"
+    ? await rpcStdio<ToolCallResult>(
+        route.server,
+        "tools/call",
+        { name, arguments: args },
+      )
+    : await rpc<ToolCallResult>(
+        route.url,
+        "tools/call",
+        { name, arguments: args },
+      );
 
   const text = result.content?.find((c) => c.type === "text")?.text;
   if (text === undefined) {

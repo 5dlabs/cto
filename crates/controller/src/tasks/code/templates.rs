@@ -277,6 +277,16 @@ impl CodeTemplateGenerator {
         } else {
             debug!("mcp.ts runtime not found in templates — TS code execution unavailable");
         }
+        if let Ok(codegen_content) = Self::load_template(template_paths::CTO_TOOLS_CODEGEN_TS) {
+            templates.insert("codegen.ts".to_string(), codegen_content);
+        } else {
+            debug!("codegen.ts not found in templates — wrapper generation unavailable");
+        }
+        if let Ok(deno_content) = Self::load_template(template_paths::CTO_TOOLS_DENO_JSON) {
+            templates.insert("deno.json".to_string(), deno_content);
+        } else {
+            debug!("deno.json not found in templates — Deno config unavailable");
+        }
 
         Ok(templates)
     }
