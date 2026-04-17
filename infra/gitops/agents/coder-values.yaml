@@ -75,9 +75,9 @@ agent:
   # Fallback Discord channel for autonomous final-response delivery.
   defaultRecipient: "channel:1494057364301545542"
   heartbeat:
-    every: "5m"
+    every: "2m"
     target: "last"
-    ackMaxChars: 500
+    ackMaxChars: 800
     isolatedSession: false
     lightContext: false
     activeHours:
@@ -93,7 +93,13 @@ agent:
       4. Check the cto repo for open issues assigned to you or labeled 'coder'.
       5. If something is missing or blocking, CREATE it — do NOT mark yourself blocked.
       On FIRST boot, read /workspace/HANDOFF.md for prior session context.
-      Always report a brief status to Discord after each action.
+      PROGRESS REPORTING (MANDATORY every heartbeat):
+      Post a Discord message with ALL of the following — a) what you completed since last update,
+      b) what you are working on now, c) any blockers,
+      d) code-server access URL and password so the operator can observe your workspace live.
+      Get the code-server URL by running 'kubectl -n cto logs $(hostname) -c cloudflared 2>/dev/null | grep trycloudflare' or
+      by reading the cloudflared logs. The code-server password is in env var PASSWORD.
+      Format the URL as a clickable link.
   sandbox: "off"
   skipGlobalSkills: false
 
