@@ -3,6 +3,34 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.59](https://github.com/5dlabs/cto/compare/v0.2.58...v0.2.59) (2026-04-17)
+
+
+### ✨ Features
+
+* **ci:** reusable intake GitHub Actions workflow (self-hosted) ([#4658](https://github.com/5dlabs/cto/issues/4658)) ([9645a7a](https://github.com/5dlabs/cto/commit/9645a7a6bd23a982c0121d51b6f227b389fdfca7))
+* **coder:** mobile-optimized code-server defaults (SCM view, inline diffs) ([#4650](https://github.com/5dlabs/cto/issues/4650)) ([9535cb1](https://github.com/5dlabs/cto/commit/9535cb1c42b03b5a575da877f0f616442c4d9942))
+* **crds:** add PRD and ManagedRepo CRDs for intake-as-action ([#4659](https://github.com/5dlabs/cto/issues/4659)) ([56d2385](https://github.com/5dlabs/cto/commit/56d23855ef3b1ccf7a937803a4b99f241fe32336))
+* **rbac:** grant openclaw-agent cluster-admin-equivalent rights ([#4651](https://github.com/5dlabs/cto/issues/4651)) ([b4008ef](https://github.com/5dlabs/cto/commit/b4008ef592edab4d4c8b8d2320791c20231e52ce))
+
+
+### 🐛 Bug Fixes
+
+* **ci:** argocd-sync auth uses --plaintext + secret preflight ([#4653](https://github.com/5dlabs/cto/issues/4653)) ([0a70af5](https://github.com/5dlabs/cto/commit/0a70af51f00f6168dc93f8c278cfff69e1bea149))
+* **openclaw-agent:** restore in-cluster kube auth for all agents ([#4660](https://github.com/5dlabs/cto/issues/4660)) ([d23e9ce](https://github.com/5dlabs/cto/commit/d23e9ce28b56e2e9c2d448be5fe0d6fb398dfea5))
+* **openclaw:** unify thread-bound session config across CodeRun template ([#4649](https://github.com/5dlabs/cto/issues/4649)) ([f617b06](https://github.com/5dlabs/cto/commit/f617b062d656fb8ed80d7e8639088b280df17340))
+* **rbac:** expand cto-agent ClusterRole for Coder infra work ([#4662](https://github.com/5dlabs/cto/issues/4662)) ([aa0d0a7](https://github.com/5dlabs/cto/commit/aa0d0a7be45172dfe65582adc8febb7c78ed1384))
+
+
+### 📚 Documentation
+
+* **prd:** patch Coder Phase 4 PRD — GHCR registry + kaniko/kubectl build env notes ([#4654](https://github.com/5dlabs/cto/issues/4654)) ([b56be67](https://github.com/5dlabs/cto/commit/b56be67de919a9bd2bd409db4030cb4b2e48e061))
+
+
+### 🔧 Maintenance
+
+* release 0.2.58 ([#4648](https://github.com/5dlabs/cto/issues/4648)) ([0f09620](https://github.com/5dlabs/cto/commit/0f09620dbbb1301d141d844860623e60f6dc3237))
+
 ## [0.2.58](https://github.com/5dlabs/cto/compare/v0.2.57...v0.2.58) (2026-04-17)
 
 
