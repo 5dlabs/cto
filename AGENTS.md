@@ -24,6 +24,36 @@
 | **Vex** | Debugging | Root cause analysis, troubleshooting |
 | **Pixel** | Desktop App | CTO Lite Tauri app |
 
+## Parallel Agent Execution (Orchestrator Pattern)
+
+For complex multi-phase work (e.g., infrastructure provisioning), spawn **parallel Claude Code ACP agents** via `sessions_spawn` with `runtime: "acp"` and `agentId: "claude"`. Each agent handles a scoped slice:
+
+| Pattern | Use Case | Example Agents |
+|---------|----------|----------------|
+| **Infrastructure** | GPU node + CNI + operator + workload | `gpu-rke2-join`, `cilium-verify`, `gpu-operator-prep`, `musetalk-harden` |
+| **Frontend+Backend** | Full-stack feature | `frontend-ui`, `backend-api`, `integration-tests` |
+| **Debug+Monitor** | Real-time troubleshooting | `log-watcher`, `metric-checker`, `probe-tester` |
+
+**Orchestrator Responsibilities:**
+1. Spawn agents with **hard-edged, scoped tasks** (not open-ended)
+2. Monitor via `subagents list` for completion/failure
+3. Collect results and coordinate handoffs
+4. Handle blockers (e.g., SSH keys, credentials) centrally
+5. Report consolidated status to Discord
+
+**Example:** Phase 4 GPU provision used 4 parallel agents completing in ~2.5 min vs. 10+ min serially:
+```bash
+# Spawn parallel agents
+sessions_spawn task="Join RKE2 on GPU node" agentId="claude" runtime="acp" mode="run"
+sessions_spawn task="Verify Cilium CNI" agentId="claude" runtime="acp" mode="run"
+sessions_spawn task="Prep GPU Operator" agentId="claude" runtime="acp" mode="run"
+sessions_spawn task="Harden MuseTalk chart" agentId="claude" runtime="acp" mode="run"
+```
+
+**Key:** Each agent gets **one specific task** with clear success criteria. No "plan and execute" — just execute.
+
+---
+
 ## Cursor ↔ OpenClaw sub-agents (monitoring mesh)
 
 For **multi-agent Plays** or heavy intake runs, use **[Cursor subagents](https://cursor.com/docs/subagents)** in **`.cursor/agents/`** (e.g. **`/morgan-intake-shadow`**, **`/openclaw-line-shadow`**) or Task spawns with the same context. The **intake coordinator** remains the **conductor** for cross-cutting intake, bridges, and workflow. Mapping and best practices: [`docs/cursor-openclaw-subagent-plan.md`](docs/cursor-openclaw-subagent-plan.md).
