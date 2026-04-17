@@ -3,6 +3,14 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.65](https://github.com/5dlabs/cto/compare/v0.2.64...v0.2.65) (2026-04-17)
+
+
+### 🐛 Bug Fixes
+
+* auto-discover cloudflared tunnel URL via shared workspace file ([d191883](https://github.com/5dlabs/cto/commit/d191883fda61b345b0de684096ec370055be5fb7))
+* delivery patch via emptyDir dist overlay (root permissions) ([7172c71](https://github.com/5dlabs/cto/commit/7172c710befa147718c21b2699c1aeffc70c0e8c))
+
 ## [0.2.64](https://github.com/5dlabs/cto/compare/v0.2.63...v0.2.64) (2026-04-17)
 
 
