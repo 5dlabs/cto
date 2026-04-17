@@ -1,0 +1,558 @@
+---
+# Reusable intake pipeline — GitHub Actions port of intake/workflows/intake.lobster.yaml.
+#
+# Phase B of the Argo → GitHub Actions migration. Runs on self-hosted runners
+# (label `k8s-runner`) inside the cluster so existing in-cluster tooling
+# (intake-util, openclaw-invoke-retry, lobster-voice, npx clawhub) is reachable.
+#
+# Invoked from managed repos via a thin `workflow_call` trigger. See
+# intake/docs/github-actions-intake.md for the full consumer pattern.
+
+name: intake
+
+on:
+  workflow_call:
+    inputs:
+      target_repo:
+        description: 'Managed repo to run intake against, in owner/name form.'
+        required: true
+        type: string
+      prd_path:
+        description: 'Path (within target_repo) to the PRD markdown file.'
+        required: false
+        type: string
+        default: docs/prd.md
+      ref:
+        description: 'Git ref of the target repo to check out.'
+        required: false
+        type: string
+        default: main
+      voice:
+        description: 'TTS voice id passed to the briefing step.'
+        required: false
+        type: string
+        default: alloy
+      project_name:
+        description: 'Logical project name used in branch + artifact names.'
+        required: false
+        type: string
+        default: intake
+      open_pr:
+        description: 'If true, open a PR with generated docs against target_repo.'
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      CONTEXT7_API_KEY:
+        required: true
+      OPENAI_API_KEY:
+        required: false
+      ANTHROPIC_API_KEY:
+        required: false
+      GEMINI_API_KEY:
+        required: false
+      ELEVENLABS_API_KEY:
+        required: false
+      CTO_INTAKE_PAT:
+        required: false
+    outputs:
+      briefing_artifact:
+        description: 'Name of the uploaded briefing artifact.'
+        value: ${{ jobs.intake.outputs.briefing_artifact }}
+      docs_artifact:
+        description: 'Name of the uploaded docs artifact.'
+        value: ${{ jobs.intake.outputs.docs_artifact }}
+      pr_url:
+        description: 'URL of the PR opened against target_repo (if open_pr=true).'
+        value: ${{ jobs.intake.outputs.pr_url }}
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: 'Managed repo to run intake against (owner/name).'
+        required: true
+        type: string
+      prd_path:
+        required: false
+        type: string
+        default: docs/prd.md
+      ref:
+        required: false
+        type: string
+        default: main
+      voice:
+        required: false
+        type: string
+        default: alloy
+      project_name:
+        required: false
+        type: string
+        default: intake
+      open_pr:
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: intake-${{ inputs.target_repo }}-${{ inputs.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  intake:
+    name: intake (${{ inputs.target_repo }})
+    runs-on: [k8s-runner]
+    timeout-minutes: 120
+    outputs:
+      briefing_artifact: ${{ steps.artifact-names.outputs.briefing }}
+      docs_artifact: ${{ steps.artifact-names.outputs.docs }}
+      pr_url: ${{ steps.open-pr.outputs.pr_url }}
+    env:
+      WORKSPACE: ${{ github.workspace }}/_cto
+      TARGET_WORKSPACE: ${{ github.workspace }}/_target
+      OUT_DIR: ${{ github.workspace }}/_intake_out
+      # LLM / tool secrets forwarded to intake scripts.
+      CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      # Muted TTS unless a provider key is present; scripts honour this flag.
+      audio_debug: 'false'
+      project_name: ${{ inputs.project_name }}
+      VOICE: ${{ inputs.voice }}
+
+    steps:
+      - name: Checkout cto (scripts + prompts)
+        uses: actions/checkout@v4
+        with:
+          path: _cto
+
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.target_repo }}
+          ref: ${{ inputs.ref }}
+          path: _target
+          token: ${{ secrets.CTO_INTAKE_PAT || secrets.GITHUB_TOKEN }}
+          persist-credentials: false
+
+      - name: Compute artifact names
+        id: artifact-names
+        run: |
+          slug="$(echo '${{ inputs.target_repo }}' | tr '/' '-' )"
+          echo "briefing=intake-briefing-${slug}-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+          echo "docs=intake-docs-${slug}-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+
+      - name: Preflight — tools + runner environment
+        run: |
+          echo "::group::Runner environment"
+          uname -a
+          echo "workspace: $WORKSPACE"
+          echo "target:    $TARGET_WORKSPACE"
+          echo "out:       $OUT_DIR"
+          mkdir -p "$OUT_DIR/docs"
+          for bin in jq git python3 bash curl; do
+            if ! command -v "$bin" >/dev/null 2>&1; then
+              echo "::error::required binary not found on runner: $bin"
+              exit 1
+            fi
+          done
+          for bin in intake-util openclaw lobster-voice npx gh; do
+            if command -v "$bin" >/dev/null 2>&1; then
+              echo "found: $bin ($(command -v "$bin"))"
+            else
+              echo "::warning::optional binary missing: $bin (some phases may degrade)"
+            fi
+          done
+          echo "::endgroup::"
+
+      - name: Stage PRD
+        run: |
+          echo "::group::Stage PRD from ${{ inputs.prd_path }}"
+          mkdir -p "$WORKSPACE/.intake"
+          prd="$TARGET_WORKSPACE/${{ inputs.prd_path }}"
+          if [ ! -s "$prd" ]; then
+            echo "::error::PRD not found or empty at $prd"
+            exit 1
+          fi
+          cp "$prd" "$WORKSPACE/.intake/run-prd-for-intake.txt"
+          wc -l "$WORKSPACE/.intake/run-prd-for-intake.txt"
+          echo "::endgroup::"
+
+      # TODO(phase-c): upsert PRD CRD for this run before generation phases.
+      # Phase A adds the CRDs (PRD, ManagedRepo); Phase C wires the reconciler.
+      # When that lands, call something like:
+      #   kubectl apply -f <(yq -o=yaml '{
+      #     apiVersion: "cto.5dlabs.io/v1alpha1",
+      #     kind: "PRD",
+      #     metadata: {name: env.RUN_ID, namespace: "cto"},
+      #     spec: {targetRepo: env.TARGET_REPO, ref: env.REF, source: "github-actions"}
+      #   }')
+      # For now this step is a no-op placeholder so the slot is obvious.
+      - name: Upsert PRD CRD (phase-c placeholder)
+        run: |
+          echo "::group::PRD CRD upsert"
+          echo "TODO(phase-c): PRD/ManagedRepo CRD wiring lands with the reconciler change."
+          echo "target_repo=${{ inputs.target_repo }} ref=${{ inputs.ref }} run_id=${{ github.run_id }}"
+          echo "::endgroup::"
+
+      # ── Phase 1: Inventory ──────────────────────────────────────────────
+      - name: Inventory — effective tools
+        working-directory: _cto
+        run: |
+          echo "::group::inventory-effective-tools"
+          CONFIG="./cto-config.json"
+          mkdir -p .intake/step-outputs
+          if [ ! -f "$CONFIG" ]; then
+            echo "cto-config.json not found, emitting empty inventory" >&2
+            printf '{"remote_tools":[],"local_servers":{}}\n' \
+              | tee .intake/step-outputs/inventory-tools.json
+          else
+            REMOTE=$(jq -c '[.agents[].tools.remote // [] | .[]] | unique' "$CONFIG")
+            LOCAL=$(jq -c '
+              reduce (.agents[].tools.localServers // {} | to_entries[]) as $e
+                ({}; .[$e.key] = $e.value)
+            ' "$CONFIG")
+            jq -n --argjson remote "$REMOTE" --argjson local "$LOCAL" \
+              '{"remote_tools": $remote, "local_servers": $local}' \
+              | tee .intake/step-outputs/inventory-tools.json
+          fi
+          echo "::endgroup::"
+
+      - name: Inventory — effective skills
+        working-directory: _cto
+        env:
+          GH_TOKEN: ${{ secrets.CTO_INTAKE_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          echo "::group::inventory-effective-skills"
+          CONFIG="./cto-config.json"
+          mkdir -p .intake/step-outputs
+          if [ ! -f "$CONFIG" ]; then
+            printf '{"skills":[]}\n' | tee .intake/step-outputs/inventory-skills.json
+          else
+            ALL=$(jq -c '[.agents[].skills // {} | to_entries[].value | .[]] | unique' "$CONFIG")
+            MAPPINGS=""
+            if command -v gh >/dev/null 2>&1; then
+              MAPPINGS=$(gh api "repos/5dlabs/cto-agents/contents/skill-mappings.yaml" --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || true)
+            fi
+            if [ -n "$MAPPINGS" ]; then
+              MAPPED=$(printf '%s' "$MAPPINGS" | grep -E '^\s+-\s+' | sed 's/.*-\s*//' \
+                | jq -R -s 'split("\n") | map(select(length>0) | gsub("^\\s+|\\s+$";""))' 2>/dev/null || echo '[]')
+              ALL=$(jq -n --argjson cfg "$ALL" --argjson mapped "$MAPPED" '($cfg + $mapped) | unique')
+            fi
+            jq -n --argjson skills "$ALL" '{"skills": $skills}' \
+              | tee .intake/step-outputs/inventory-skills.json
+          fi
+          echo "::endgroup::"
+
+      # ── Phase 2: Analyze + gap compute ──────────────────────────────────
+      - name: Analyze required capabilities
+        working-directory: _cto
+        run: |
+          echo "::group::analyze-required-capabilities"
+          if command -v openclaw >/dev/null 2>&1 \
+             && [ -f intake/prompts/capability-analysis-system.md ] \
+             && [ -f intake/schemas/capability-analysis.schema.json ]; then
+            ARGS=$(jq -n \
+              --rawfile sys intake/prompts/capability-analysis-system.md \
+              --slurpfile tools .intake/step-outputs/inventory-tools.json \
+              --slurpfile skills .intake/step-outputs/inventory-skills.json \
+              --arg schema intake/schemas/capability-analysis.schema.json \
+              --arg provider gemini \
+              --arg model gemini-2.5-flash \
+              '{ prompt: $sys,
+                 input: { expanded_tasks: [], current_inventory: { available_tools: $tools[0], available_skills: $skills[0] } },
+                 schema: $schema, provider: $provider, model: $model }')
+            bash intake/scripts/openclaw-invoke-retry.sh --tool llm-task --action json --args-json "$ARGS" \
+              | tee .intake/step-outputs/capabilities.json
+          else
+            echo "::warning::openclaw/prompt/schema unavailable — emitting empty capabilities"
+            printf '{"required_capabilities":[]}\n' | tee .intake/step-outputs/capabilities.json
+          fi
+          echo "::endgroup::"
+
+      - name: Compute capability gaps
+        working-directory: _cto
+        run: |
+          echo "::group::compute-capability-gaps"
+          python3 intake/scripts/compute-gaps.py \
+            --capabilities .intake/step-outputs/capabilities.json \
+            --tools        .intake/step-outputs/inventory-tools.json \
+            --skills       .intake/step-outputs/inventory-skills.json \
+            --registry     intake/config/capability-registry.yaml \
+            | tee .intake/step-outputs/gaps.json
+          echo "::endgroup::"
+
+      # ── Phase 3: Catalog query + resolve + install ──────────────────────
+      - name: Query tools catalog (Context7)
+        working-directory: _cto
+        run: |
+          echo "::group::query-tools-catalog"
+          GAPS=$(jq -c '.needs_search // []' .intake/step-outputs/gaps.json)
+          COUNT=$(printf '%s' "$GAPS" | jq 'length')
+          echo "capabilities needing catalog lookup: $COUNT"
+          CTX7_RESULT="[]"
+          if [ -n "${CONTEXT7_API_KEY:-}" ] && [ "$COUNT" -gt 0 ]; then
+            CTX7_RESULT=$(printf '%s' "$GAPS" | jq -c '.' )
+            echo "ctx7 payload bytes: ${#CTX7_RESULT}"
+            : > .intake/step-outputs/ctx7-snippets.jsonl
+            for cap in $(printf '%s' "$GAPS" | jq -r '.[].capability // .[]'); do
+              curl -sS --max-time 30 \
+                -H "Authorization: Bearer ${CONTEXT7_API_KEY}" \
+                "https://context7.com/api/v2/context?libraryId=/5dlabs/cto-agents&query=$(printf '%s' "$cap" | jq -sRr @uri)&tokens=2000" \
+                >> .intake/step-outputs/ctx7-snippets.jsonl 2>/dev/null || true
+              echo >> .intake/step-outputs/ctx7-snippets.jsonl
+            done
+          else
+            echo "skipping Context7 lookup (no key or no gaps)"
+          fi
+          printf '{"matched_tools":[],"matched_skills":[],"unresolved_capabilities":%s}\n' "$GAPS" \
+            | tee .intake/step-outputs/catalog.json
+          echo "::endgroup::"
+
+      - name: Search and resolve gaps
+        working-directory: _cto
+        run: |
+          echo "::group::search-and-resolve-gaps"
+          GAPS=$(cat .intake/step-outputs/gaps.json)
+          CATALOG=$(cat .intake/step-outputs/catalog.json)
+          RESOLVABLE=$(printf '%s' "$GAPS" | jq -c '.resolvable // []')
+          UNRESOLVED=$(printf '%s' "$CATALOG" | jq -c '.unresolved_capabilities // []')
+          CATALOG_TOOLS=$(printf '%s' "$CATALOG" | jq -c '.matched_tools // []')
+          CATALOG_SKILLS=$(printf '%s' "$CATALOG" | jq -c '.matched_skills // []')
+          jq -n \
+            --argjson resolvable "$RESOLVABLE" \
+            --argjson tools "$CATALOG_TOOLS" \
+            --argjson skills "$CATALOG_SKILLS" \
+            --argjson unresolved "$UNRESOLVED" \
+            '{resolved_tools: ($resolvable + $tools),
+              resolved_skills: [$skills[] | {slug: (.name // .slug), source: "context7-catalog"}],
+              unresolved: $unresolved}' \
+            | tee .intake/step-outputs/resolution.json
+          echo "::endgroup::"
+
+      - name: Install resolved skills
+        working-directory: _cto
+        run: |
+          echo "::group::install-resolved-skills"
+          SKILLS=$(jq -c '.resolved_skills // []' .intake/step-outputs/resolution.json)
+          COUNT=$(printf '%s' "$SKILLS" | jq 'length')
+          INSTALLED='[]'
+          if [ "$COUNT" -gt 0 ] && command -v npx >/dev/null 2>&1; then
+            for slug in $(printf '%s' "$SKILLS" | jq -r '.[].slug'); do
+              if npx --yes clawhub@latest install "$slug" >/dev/null 2>&1; then
+                INSTALLED=$(printf '%s' "$INSTALLED" | jq --arg s "$slug" '. + [{slug:$s,status:"installed"}]')
+                echo "installed: $slug"
+              else
+                INSTALLED=$(printf '%s' "$INSTALLED" | jq --arg s "$slug" '. + [{slug:$s,status:"failed"}]')
+                echo "::warning::failed to install skill: $slug"
+              fi
+            done
+          else
+            echo "no skills to install (count=$COUNT, npx=$(command -v npx || echo missing))"
+          fi
+          jq -n --argjson installed "$INSTALLED" '{installed_skills: $installed}' \
+            | tee .intake/step-outputs/installed.json
+          echo "::endgroup::"
+
+      - name: Generate custom skills (Context7-backed)
+        working-directory: _cto
+        run: |
+          echo "::group::generate-custom-skills"
+          UNRESOLVED=$(jq -c '.unresolved // []' .intake/step-outputs/resolution.json)
+          FAILED=$(jq -c '[.installed_skills[]? | select(.status=="failed")]' .intake/step-outputs/installed.json)
+          COMBINED=$(jq -n --argjson u "$UNRESOLVED" --argjson f "$FAILED" '$u + [$f[] | {capability: .slug, reason:"install failed"}]')
+          COUNT=$(printf '%s' "$COMBINED" | jq 'length')
+          mkdir -p .intake/agent-package/_config/skills
+          if [ "$COUNT" -eq 0 ]; then
+            echo "all capabilities resolved — skipping custom skill generation"
+          else
+            echo "$COUNT unresolved capabilities remain (generation deferred to in-cluster agent)"
+          fi
+          printf '{"generated_skills":[],"skipped_capabilities":%s}\n' "$COMBINED" \
+            | tee .intake/step-outputs/generated-skills.json
+          echo "::endgroup::"
+
+      # ── Phase 4: Generate + validate agent package ──────────────────────
+      - name: Generate agent package
+        working-directory: _cto
+        run: |
+          echo "::group::generate-agent-package"
+          mkdir -p .intake/agent-package
+          RESOLUTION=$(cat .intake/step-outputs/resolution.json)
+          INSTALLED=$(cat .intake/step-outputs/installed.json)
+          ADDITIONAL_REMOTE=$(printf '%s' "$RESOLUTION" | jq -c '[.resolved_tools[]? | select(.transport=="remote") | .server_name] // []')
+          LOCAL_SERVERS=$(printf '%s' "$RESOLUTION" | jq -c '
+            [.resolved_tools[]? | select(.transport=="stdio")] |
+            reduce .[] as $s ({}; .[$s.server_name] = {
+              command: $s.command, args: ($s.args // []),
+              version: ($s.version // "latest"), env: ($s.env // {})
+            })')
+          EXISTING_SKILLS=$(jq -c '.skills // []' .intake/step-outputs/inventory-skills.json)
+          NEW_SKILLS=$(printf '%s' "$INSTALLED" | jq -c '[.installed_skills[]? | select(.status=="installed") | .slug]')
+          ALL_SKILLS=$(jq -n --argjson a "$EXISTING_SKILLS" --argjson b "$NEW_SKILLS" '($a + $b) | unique')
+          GAPS=$(printf '%s' "$RESOLUTION" | jq -c '.unresolved // []')
+          jq -n \
+            --arg version "1.0.0" \
+            --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg target_repo "${{ inputs.target_repo }}" \
+            --argjson additional_remote "$ADDITIONAL_REMOTE" \
+            --argjson local_servers "$LOCAL_SERVERS" \
+            --argjson all_skills "$ALL_SKILLS" \
+            --argjson gaps "$GAPS" \
+            '{
+              version: $version,
+              target_repo: $target_repo,
+              tools_config: { additional_remote: $additional_remote, local_servers: $local_servers },
+              sdk: { tool_count: (($additional_remote|length) + ($local_servers|keys|length)) },
+              skills: { installed: $all_skills, gaps: $gaps },
+              metadata: { generated_at: $timestamp }
+            }' > .intake/agent-package/manifest.json
+          jq '.' .intake/agent-package/manifest.json
+          echo "::endgroup::"
+
+      - name: Validate agent package
+        working-directory: _cto
+        run: |
+          echo "::group::validate-agent-package"
+          MANIFEST=.intake/agent-package/manifest.json
+          [ -f "$MANIFEST" ] || { echo "::error::manifest missing"; exit 1; }
+          for f in version tools_config sdk skills; do
+            jq -e ".${f}" "$MANIFEST" >/dev/null \
+              || { echo "::error::manifest missing field: $f"; exit 1; }
+          done
+          GAP_COUNT=$(jq '.skills.gaps | length' "$MANIFEST")
+          TOOL_COUNT=$(jq '.sdk.tool_count // 0' "$MANIFEST")
+          SKILL_COUNT=$(jq '.skills.installed | length' "$MANIFEST")
+          echo "tools=$TOOL_COUNT skills=$SKILL_COUNT gaps=$GAP_COUNT"
+          if [ "$GAP_COUNT" -gt 0 ]; then
+            echo "::warning::$GAP_COUNT unresolved capability gaps — review required"
+          fi
+          echo "::endgroup::"
+
+      # ── Phase 5: Briefing + TTS ─────────────────────────────────────────
+      - name: Generate briefing.md
+        working-directory: _cto
+        run: |
+          echo "::group::generate-briefing-md"
+          mkdir -p "$OUT_DIR/docs"
+          MANIFEST=.intake/agent-package/manifest.json
+          TOOL_COUNT=$(jq -r '.sdk.tool_count // 0' "$MANIFEST")
+          SKILL_COUNT=$(jq -r '.skills.installed | length' "$MANIFEST")
+          GAP_COUNT=$(jq -r '.skills.gaps | length' "$MANIFEST")
+          BRIEF="$OUT_DIR/docs/briefing.md"
+          {
+            echo "# Intake briefing for ${{ inputs.target_repo }}"
+            echo
+            echo "Generated on $(date -u +%Y-%m-%dT%H:%M:%SZ) from ref ${{ inputs.ref }}."
+            echo
+            echo "## Summary"
+            echo
+            echo "The intake pipeline resolved ${TOOL_COUNT} tools and ${SKILL_COUNT} skills for this repository."
+            if [ "$GAP_COUNT" -gt 0 ]; then
+              echo "There are ${GAP_COUNT} unresolved capability gaps that require review."
+            else
+              echo "All required capabilities were resolved."
+            fi
+            echo
+            echo "## Next steps"
+            echo
+            echo "Review the docs in docs/intake/ and merge the PR opened against ${{ inputs.target_repo }} to adopt the generated agent package."
+          } > "$BRIEF"
+          # Copy manifest into docs for downstream consumers.
+          cp "$MANIFEST" "$OUT_DIR/docs/manifest.json"
+          wc -l "$BRIEF"
+          echo "::endgroup::"
+
+      - name: Render briefing.mp3 (TTS)
+        working-directory: _cto
+        run: |
+          echo "::group::tts-mp3"
+          BRIEF="$OUT_DIR/docs/briefing.md"
+          MP3="$OUT_DIR/briefing.mp3"
+          if command -v lobster-voice >/dev/null 2>&1 \
+             && { [ -n "${OPENAI_API_KEY:-}" ] || [ -n "${ELEVENLABS_API_KEY:-}" ]; }; then
+            lobster-voice synth \
+              --input "$BRIEF" \
+              --output "$MP3" \
+              --voice "$VOICE" \
+              || { echo "::warning::lobster-voice failed — skipping mp3"; : > "$MP3"; }
+          else
+            echo "::warning::lobster-voice not available or no TTS key — writing empty mp3 placeholder"
+            : > "$MP3"
+          fi
+          ls -la "$OUT_DIR"
+          echo "::endgroup::"
+
+      # ── Phase 6: Package outputs ───────────────────────────────────────
+      - name: Collect outputs under _intake_out/
+        working-directory: _cto
+        run: |
+          echo "::group::collect-outputs"
+          mkdir -p "$OUT_DIR/docs"
+          [ -f .intake/agent-package/manifest.json ] \
+            && cp .intake/agent-package/manifest.json "$OUT_DIR/docs/manifest.json"
+          for f in capabilities gaps catalog resolution installed generated-skills; do
+            [ -f ".intake/step-outputs/${f}.json" ] \
+              && cp ".intake/step-outputs/${f}.json" "$OUT_DIR/docs/${f}.json"
+          done
+          ls -la "$OUT_DIR/docs" || true
+          echo "::endgroup::"
+
+      - name: Upload briefing artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact-names.outputs.briefing }}
+          path: _intake_out/briefing.mp3
+          if-no-files-found: ignore
+
+      - name: Upload docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact-names.outputs.docs }}
+          path: _intake_out/docs
+
+      # ── Phase 7: Commit to target repo + open PR ────────────────────────
+      - name: Commit generated docs + open PR (commit-to-cto-agents)
+        id: open-pr
+        if: ${{ inputs.open_pr }}
+        env:
+          GH_TOKEN: ${{ secrets.CTO_INTAKE_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          echo "::group::commit-to-cto-agents"
+          if ! command -v gh >/dev/null 2>&1; then
+            echo "::warning::gh CLI missing on runner — cannot open PR"
+            echo "pr_url=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          cd "$TARGET_WORKSPACE"
+          git config user.email "intake-bot@5dlabs.io"
+          git config user.name  "CTO Intake Bot"
+          branch="intake/${{ inputs.project_name }}-${{ github.run_id }}"
+          git checkout -b "$branch"
+          mkdir -p docs/intake
+          cp -R "$OUT_DIR/docs/." docs/intake/
+          git add docs/intake
+          if git diff --staged --quiet; then
+            echo "no doc changes to commit"
+            echo "pr_url=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit \
+            -m "chore(intake): generated agent package and briefing" \
+            -m "Automated intake run ${{ github.run_id }} against ref ${{ inputs.ref }}." \
+            -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${{ inputs.target_repo }}.git"
+          git push "$remote" "$branch"
+          pr_url=$(gh pr create \
+            --repo "${{ inputs.target_repo }}" \
+            --head "$branch" \
+            --base "${{ inputs.ref }}" \
+            --title "chore(intake): agent package for run ${{ github.run_id }}" \
+            --body "Automated intake output. See docs/intake/ for the briefing, manifest, and phase artifacts." \
+            2>&1 | tail -1 || true)
+          echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"
+          echo "opened: $pr_url"
+          echo "::endgroup::"
