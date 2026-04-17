@@ -661,9 +661,27 @@ spec:
                     ;;
                 esac
               done
-              # (delivery-patch moved to agent container startup — each container
-              # has its own rootfs, so init patches to /usr/local/... are not visible
-              # from the agent container.)
+              # Copy openclaw dist directory to staging overlay and patch delivery
+              # to honor OPENCLAW_DEFAULT_RECIPIENT (fixes channel:UNKNOWN on boot).
+              # The overlay is mounted at the dist path in the agent container.
+              DIST_SRC="/usr/local/share/npm-global/lib/node_modules/openclaw/dist"
+              DIST_STAGING="/tmp/openclaw-dist-staging"
+              if [ -d "$DIST_SRC" ]; then
+                cp -a "$DIST_SRC/." "$DIST_STAGING/"
+                for f in "$DIST_STAGING"/agent-delivery-*.js; do
+                  [ -f "$f" ] || continue
+                  if grep -q 'OPENCLAW_DEFAULT_RECIPIENT' "$f"; then
+                    echo "[workspace-files] Delivery patch already applied in $f"
+                  else
+                    sed -i 's/\([ \t]*\)let resolvedTo = explicitTo;/\1let resolvedTo = explicitTo;\n\1if (!resolvedTo \&\& process.env.OPENCLAW_DEFAULT_RECIPIENT) resolvedTo = process.env.OPENCLAW_DEFAULT_RECIPIENT;/' "$f" \
+                      && echo "[workspace-files] Patched delivery fallback in $(basename $f)" \
+                      || echo "[workspace-files] WARN: delivery patch sed failed for $(basename $f)"
+                  fi
+                done
+                echo "[workspace-files] Dist overlay ready ($(ls "$DIST_STAGING" | wc -l) files)"
+              else
+                echo "[workspace-files] WARN: openclaw dist not found at $DIST_SRC"
+              fi
               # Increase mem0 recall timeout from 8s to 30s (qdrant can be slow
               # on large collections, especially after pod restarts).
               for f in /workspace/.openclaw/extensions/openclaw-mem0/node_modules/@mem0/openclaw-mem0/dist/index.js; do
@@ -678,6 +696,10 @@ spec:
               mountPath: /workspace
             - name: workspace-files-template
               mountPath: /workspace-files-template
+            {{- if .Values.agent.defaultRecipient }}
+            - name: openclaw-dist-overlay
+              mountPath: /tmp/openclaw-dist-staging
+            {{- end }}
         {{- end }}
       containers:
         - name: agent
@@ -700,16 +722,7 @@ spec:
                 echo "[openclaw] Installing missing @buape/carbon dependency"
                 npm install -g --no-audit --no-fund @buape/carbon 2>&1 | tail -2
               }
-              # Patch agent-delivery to honor OPENCLAW_DEFAULT_RECIPIENT env var
-              # when no explicit recipient is resolved (fixes channel:UNKNOWN on boot).
-              # Must run here (not init container) because each container has its own rootfs.
-              for f in /usr/local/share/npm-global/lib/node_modules/openclaw/dist/agent-delivery-*.js; do
-                [ -f "$f" ] || continue
-                grep -q 'OPENCLAW_DEFAULT_RECIPIENT' "$f" && continue
-                sed -i 's/\([ \t]*\)let resolvedTo = explicitTo;/\1let resolvedTo = explicitTo; if (!resolvedTo \&\& process.env.OPENCLAW_DEFAULT_RECIPIENT) resolvedTo = process.env.OPENCLAW_DEFAULT_RECIPIENT;/' "$f" \
-                  && echo "[openclaw] Patched delivery fallback in $(basename $f)" \
-                  || echo "[openclaw] WARN: delivery patch failed for $(basename $f)"
-              done
+              # Delivery patch: handled via dist overlay from init-workspace-files
               exec openclaw gateway
           lifecycle:
             postStart:
@@ -768,8 +781,8 @@ spec:
             {{- end }}
             {{- if .Values.agent.defaultRecipient }}
             # Fallback delivery target when session has no resolved recipient.
-            # Consumed by postStart patch on agent-delivery-*.js to fix missing
-            # final-response Discord posts.
+            # The init container patches the delivery module in a dist overlay
+            # to fall back to this value when no explicit recipient is set.
             - name: OPENCLAW_DEFAULT_RECIPIENT
               value: {{ .Values.agent.defaultRecipient | quote }}
             {{- end }}
@@ -1019,6 +1032,10 @@ spec:
           volumeMounts:
             - name: workspace
               mountPath: /workspace
+            {{- if .Values.agent.defaultRecipient }}
+            - name: openclaw-dist-overlay
+              mountPath: /usr/local/share/npm-global/lib/node_modules/openclaw/dist
+            {{- end }}
             {{- if .Values.kaniko.enabled }}
             - name: kaniko-docker-config
               mountPath: /workspace/.docker
@@ -1346,6 +1363,10 @@ spec:
         {{- end }}
         {{- if .Values.tools.acp.enabled }}
         - name: acpx-node-modules
+          emptyDir: {}
+        {{- end }}
+        {{- if .Values.agent.defaultRecipient }}
+        - name: openclaw-dist-overlay
           emptyDir: {}
         {{- end }}
         {{- if .Values.nats.enabled }}
