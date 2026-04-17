@@ -97,9 +97,9 @@ agent:
       Post a Discord message with ALL of the following — a) what you completed since last update,
       b) what you are working on now, c) any blockers,
       d) code-server access URL and password so the operator can observe your workspace live.
-      Get the code-server URL by running 'kubectl -n cto logs $(hostname) -c cloudflared 2>/dev/null | grep trycloudflare' or
-      by reading the cloudflared logs. The code-server password is in env var PASSWORD.
-      Format the URL as a clickable link.
+      Get the code-server URL by reading /workspace/.code-server-url (auto-populated by cloudflared sidecar).
+      The code-server password is in env var PASSWORD.
+      Format the URL as a clickable link. IMPORTANT: Always read the file fresh — the URL changes on each pod restart.
   sandbox: "off"
   skipGlobalSkills: false
 

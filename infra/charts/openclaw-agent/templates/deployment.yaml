@@ -1310,11 +1310,24 @@ spec:
         - name: cloudflared
           image: cloudflare/cloudflared:latest
           command:
-            - cloudflared
-            - tunnel
-            - --url
-            - http://localhost:{{ .Values.codeServer.port | default 8080 }}
-            - --no-autoupdate
+            - /bin/sh
+            - -c
+            - |
+              # Start cloudflared and capture the quick-tunnel URL
+              cloudflared tunnel --url http://localhost:{{ .Values.codeServer.port | default 8080 }} --no-autoupdate 2>&1 | tee /dev/stderr | while IFS= read -r line; do
+                case "$line" in
+                  *trycloudflare.com*)
+                    URL=$(echo "$line" | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com')
+                    if [ -n "$URL" ]; then
+                      echo "$URL" > /workspace/.code-server-url
+                      echo "[cloudflared] Wrote tunnel URL to /workspace/.code-server-url: $URL"
+                    fi
+                    ;;
+                esac
+              done
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
           resources:
             requests:
               cpu: 10m
