@@ -665,6 +665,10 @@ codeServer:
   # Stable cluster tunnel URL — bypasses ephemeral quick tunnel for Coder
   tunnelUrl: "https://coder.5dlabs.ai"
   defaultFolder: "/workspace/repos/cto"
+  customExtensions:
+    - name: cto-chat
+      url: "https://raw.githubusercontent.com/5dlabs/cto/main/infra/extensions/cto-chat-0.1.0.vsix"
+      forceUpdate: true
   quickTunnel:
     enabled: false
   githubToken:

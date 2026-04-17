@@ -1252,6 +1252,20 @@ spec:
                   -o "${VSIX}.gz" && (gunzip -f "${VSIX}.gz" 2>/dev/null || mv "${VSIX}.gz" "$VSIX")
                 code-server --extensions-dir "$EXTDIR" --install-extension "$VSIX" 2>/dev/null || true
               done
+              {{- if .Values.codeServer.customExtensions }}
+              # Install custom extensions (vsix URLs or paths)
+              echo "[code-server] Installing custom extensions..."
+              {{- range .Values.codeServer.customExtensions }}
+              CUSTOM_VSIX="/workspace/.code-server-cache/{{ .name }}.vsix"
+              if [ ! -f "$CUSTOM_VSIX" ] || [ "{{ .forceUpdate | default false }}" = "true" ]; then
+                echo "[code-server] Downloading {{ .name }}..."
+                curl -sL "{{ .url }}" -o "$CUSTOM_VSIX" 2>/dev/null || true
+              fi
+              if [ -f "$CUSTOM_VSIX" ]; then
+                code-server --extensions-dir "$EXTDIR" --install-extension "$CUSTOM_VSIX" 2>/dev/null || true
+              fi
+              {{- end }}
+              {{- end }}
               # Patch product.json to use MS Marketplace (Copilot not on Open VSX)
               /usr/lib/code-server/lib/node -e "
                 var fs=require('fs'),p='/usr/lib/code-server/lib/vscode/product.json';

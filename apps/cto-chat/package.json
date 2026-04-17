@@ -1,0 +1,53 @@
+{
+  "name": "cto-chat",
+  "displayName": "CTO Agent Chat",
+  "description": "Chat with your CTO AI agent via the OpenClaw ACP gateway",
+  "version": "0.1.0",
+  "publisher": "5dlabs",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["AI", "Chat"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "cto-chat.cto",
+        "name": "cto",
+        "fullName": "CTO Agent",
+        "description": "Talk to your CTO AI agent powered by OpenClaw",
+        "isSticky": true
+      }
+    ],
+    "configuration": {
+      "title": "CTO Chat",
+      "properties": {
+        "ctoChat.apiBase": {
+          "type": "string",
+          "default": "http://localhost:18789",
+          "description": "OpenClaw gateway base URL"
+        },
+        "ctoChat.apiToken": {
+          "type": "string",
+          "default": "openclaw-internal",
+          "description": "Gateway auth token"
+        },
+        "ctoChat.model": {
+          "type": "string",
+          "default": "openclaw/coder",
+          "description": "Model identifier (openclaw/<agentId>)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.4.0",
+    "@vscode/vsce": "^3.0.0"
+  }
+}
