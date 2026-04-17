@@ -1,0 +1,108 @@
+---
+# PRD CRD - Product Requirements Documents ingested by the intake runner
+# Group: agents.platform, Version: v1alpha1, Kind: PRD
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: prds.agents.platform
+spec:
+  group: agents.platform
+  scope: Namespaced
+  names:
+    plural: prds
+    singular: prd
+    kind: PRD
+    shortNames:
+    - prd
+    - prds
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    additionalPrinterColumns:
+    - name: Repo
+      type: string
+      jsonPath: .spec.repo
+    - name: Phase
+      type: string
+      jsonPath: .status.phase
+    - name: Ref
+      type: string
+      jsonPath: .spec.ref
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    schema:
+      openAPIV3Schema:
+        type: object
+        required: ["spec"]
+        properties:
+          spec:
+            type: object
+            required: ["repo", "ref", "contentHash"]
+            properties:
+              repo:
+                type: string
+                description: "Source repository in owner/name form, e.g. 5dlabs/sigma-1"
+              ref:
+                type: string
+                description: "Git ref or SHA the PRD was extracted from"
+              prdPath:
+                type: string
+                default: "docs/prd.md"
+                description: "Path to the PRD markdown inside the repo"
+              contentHash:
+                type: string
+                description: "SHA-256 of the PRD content — used for dedup"
+              content:
+                type: string
+                description: "Optional inline markdown; omit for large PRDs and rely on repo+ref+prdPath"
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                description: "Current phase"
+                enum:
+                - Pending
+                - Analyzing
+                - BriefingGenerated
+                - DocsGenerated
+                - Complete
+                - Failed
+              observedContentHash:
+                type: string
+                description: "Content hash the controller last reconciled against"
+              briefingArtifactUrl:
+                type: string
+                description: "URL of the generated briefing artifact"
+              lastTransitionTime:
+                type: string
+                description: "RFC3339 timestamp of the last phase transition"
+              message:
+                type: string
+                description: "Human-readable status message"
+              conditions:
+                type: array
+                description: "Conditions for detailed status tracking"
+                items:
+                  type: object
+                  required: ["type", "status"]
+                  properties:
+                    type:
+                      type: string
+                      description: "Type of condition (e.g. 'Ready', 'BriefingGenerated')"
+                    status:
+                      type: string
+                      description: "Status of the condition (True, False, Unknown)"
+                    lastTransitionTime:
+                      type: string
+                      description: "Last time the condition transitioned (RFC3339)"
+                    reason:
+                      type: string
+                      description: "Reason for the condition's last transition"
+                    message:
+                      type: string
+                      description: "Human-readable message about the condition"
