@@ -184,6 +184,11 @@ class AgentConfig:
         )
 
     @property
+    def personas_pvc_path(self) -> Path:
+        """Path to personas PVC mount."""
+        return self.personas_root
+
+    @property
     def avatar_image_url(self) -> str:
         if self.use_placeholder_image and self.placeholder_image_url:
             return self.placeholder_image_url
