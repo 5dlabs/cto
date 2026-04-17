@@ -196,6 +196,10 @@ jobs:
     if: >-
       needs.detect-changes.outputs.has_changes == 'true'
       && github.event.inputs.dry_run != 'true'
+    env:
+      ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+      ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
+      ARGOCD_OPTS: --plaintext --grpc-web
     steps:
       - name: Install ArgoCD CLI
         run: |
@@ -204,11 +208,17 @@ jobs:
           chmod +x argocd
           sudo mv argocd /usr/local/bin/argocd
 
-      - name: Authenticate with ArgoCD
+      - name: Verify ArgoCD credentials
         run: |
-          argocd login "${{ secrets.ARGOCD_SERVER }}" \
-            --auth-token "${{ secrets.ARGOCD_AUTH_TOKEN }}" \
-            --grpc-web
+          if [[ -z "${ARGOCD_SERVER}" || -z "${ARGOCD_AUTH_TOKEN}" ]]; then
+            echo "::error::ARGOCD_SERVER and ARGOCD_AUTH_TOKEN repo secrets must be set"
+            exit 1
+          fi
+          # Use env vars directly instead of argocd login (which hits session endpoint
+          # and falls back to interactive prompt on any error). argocd CLI reads
+          # ARGOCD_SERVER / ARGOCD_AUTH_TOKEN / ARGOCD_OPTS directly.
+          echo "Testing ArgoCD connectivity to ${ARGOCD_SERVER}..."
+          argocd account get-user-info
 
       - name: Sync app-of-apps
         if: needs.detect-changes.outputs.sync_app_of_apps == 'true'
