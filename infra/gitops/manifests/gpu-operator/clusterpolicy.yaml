@@ -1,0 +1,71 @@
+---
+# NVIDIA GPU Operator ClusterPolicy
+# Complete configuration with explicit image paths
+# License: Apache 2.0
+
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+  namespace: operators
+  labels:
+    app.kubernetes.io/name: gpu-cluster-policy
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: gpu
+spec:
+  # Operator configuration
+  operator:
+    defaultRuntime: containerd
+    
+  # Driver DaemonSet - standard installation (compile on node)
+  driver:
+    enabled: true
+    usePrecompiled: false
+    repository: nvcr.io/nvidia
+    image: driver
+    version: "570.133.20"
+    
+  # Device Plugin
+  devicePlugin:
+    enabled: true
+    repository: nvcr.io/nvidia
+    image: k8s-device-plugin
+    version: "v0.17.0"
+    
+  # Container Toolkit
+  toolkit:
+    enabled: true
+    repository: nvcr.io/nvidia
+    image: container-toolkit
+    version: "v1.17.4"
+    
+  # DCGM
+  dcgm:
+    enabled: true
+    repository: nvcr.io/nvidia
+    image: dcgm
+    version: "3.3.8"
+    
+  # DCGM Exporter
+  dcgmExporter:
+    enabled: true
+    repository: nvcr.io/nvidia
+    image: dcgm-exporter
+    version: "3.3.8-3.6.1"
+    
+  # GPU Feature Discovery
+  gfd:
+    enabled: true
+    repository: nvcr.io/nvidia
+    image: gpu-feature-discovery
+    version: "v0.10.0"
+    
+  # Node Status Exporter
+  nodeStatusExporter:
+    enabled: true
+    repository: nvcr.io/nvidia
+    image: gpu-operator-validator
+    version: "v25.3.4"
+    
+  # Daemonset defaults
+  daemonsets: {}

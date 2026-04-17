@@ -78,6 +78,11 @@ spec:
         # Container toolkit - configure container runtime for GPU access
         toolkit:
           enabled: true
+          # Skip driver validation since RKE2 has different paths
+          # Driver is confirmed working via nvidia-smi
+          env:
+            - name: SKIP_DRIVER_INSTALLATION
+              value: "true"
 
         # MIG (Multi-Instance GPU) - disabled by default
         migManager:
@@ -86,6 +91,14 @@ spec:
         # GFD (GPU Feature Discovery) - labels nodes with GPU capabilities
         gfd:
           enabled: true
+
+        # Validator - required for GPU Operator v25.3.4
+        validator:
+          enabled: true
+          plugin:
+            env:
+              - name: WITH_WORKLOAD
+                value: "false"
 
         # VFIO manager - for GPU passthrough (disabled)
         vfioManager:

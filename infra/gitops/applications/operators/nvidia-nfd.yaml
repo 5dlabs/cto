@@ -40,6 +40,16 @@ spec:
               memory: 256Mi
 
         worker:
+          config:
+            core:
+              sources:
+                pci:
+                  deviceClassWhitelist:
+                    - "0300"
+                    - "0302"
+                  deviceLabelFields:
+                    - vendor
+                    - class
           resources:
             requests:
               cpu: 50m
