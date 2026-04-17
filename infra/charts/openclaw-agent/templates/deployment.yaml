@@ -88,6 +88,42 @@ spec:
               echo "[dirs] Core workspace directories OK"
 
               # ---------------------------------------------------------------
+              # 1a. Kubeconfig rewrite (auto-refreshing tokenFile)
+              # ---------------------------------------------------------------
+              # The workspace PVC persists /workspace/.kube/config across pod
+              # reschedules. Any inline bearer token baked into that file is
+              # bound to a prior pod UID (via TokenRequest audience binding),
+              # so after reschedule the apiserver returns Unauthorized.
+              # Overwrite with a tokenFile-based kubeconfig that points at the
+              # projected service-account token; kubelet rotates that file in
+              # place, and kubectl re-reads it on every invocation — so auth
+              # never goes stale.
+              mkdir -p /workspace/.kube
+              cat > /workspace/.kube/config <<EOF
+              apiVersion: v1
+              kind: Config
+              clusters:
+              - name: in-cluster
+                cluster:
+                  server: https://kubernetes.default.svc
+                  certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              users:
+              - name: in-cluster
+                user:
+                  tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+              contexts:
+              - name: in-cluster
+                context:
+                  cluster: in-cluster
+                  user: in-cluster
+                  namespace: {{ .Release.Namespace }}
+              current-context: in-cluster
+              EOF
+              chown 1001:1000 /workspace/.kube/config 2>/dev/null || true
+              chmod 600 /workspace/.kube/config
+              echo "[kube] kubeconfig rewritten with tokenFile (auto-refreshing)"
+
+              # ---------------------------------------------------------------
               # 1b. Fix ~ resolution (getpwuid vs $HOME mismatch)
               # ---------------------------------------------------------------
               # Some tools resolve ~ via /etc/passwd (getpwuid) not $HOME.
