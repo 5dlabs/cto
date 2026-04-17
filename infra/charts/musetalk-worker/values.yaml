@@ -4,12 +4,15 @@
 replicaCount: 1
 
 image:
-  repository: registry.5dlabs.ai/5dlabs/musetalk-worker
-  tag: latest
-  pullPolicy: Always
+  repository: ghcr.io/5dlabs/musetalk-worker
+  tag: phase4-bootstrap
+  pullPolicy: IfNotPresent
 
 imagePullSecrets:
   - name: ghcr-secret
+
+nameOverride: ""
+fullnameOverride: ""
 
 # GPU resource configuration
 resources:
@@ -30,6 +33,17 @@ tolerations: []
 
 affinity: {}
 
+priorityClassName: ""
+
+podSecurityContext: {}
+
+securityContext:
+  runAsNonRoot: false
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+
+terminationGracePeriodSeconds: 120
+
 # NATS configuration
 nats:
   url: "nats://nats.openclaw.svc.cluster.local:4222"
@@ -44,8 +58,8 @@ nats:
 
 # Model configuration
 model:
-  # HuggingFace model ID
-  repo: "TMElyralab/MuseTalk"
+  # MuseTalk upstream source, cloned during init container bootstrap
+  repo: "https://github.com/TMElyralab/MuseTalk.git"
   # Force FP16 for V100 compatibility (no BF16 support)
   dtype: "float16"
   # Cache directory inside the container
@@ -64,8 +78,14 @@ output:
   # S3-compatible storage for rendered clips
   bucket: "avatar-renders"
   endpoint: ""
-  # Cache rendered clips keyed by hash(persona_id, text)
-  cacheEnabled: true
+  region: ""
+  prefix: "musetalk"
+  existingSecret: ""
+  accessKeyKey: "AWS_ACCESS_KEY_ID"
+  secretKeyKey: "AWS_SECRET_ACCESS_KEY"
+  sessionTokenKey: "AWS_SESSION_TOKEN"
+  # Cache rendered clips keyed by hash(persona_id, audio_hash)
+  cacheEnabled: false
   cacheTTLDays: 30
 
 # HuggingFace credentials (for gated model access)
@@ -98,6 +118,10 @@ metrics:
   enabled: true
   port: 9090
 
+service:
+  enabled: true
+  type: ClusterIP
+
 serviceAccount:
   create: true
   name: ""
@@ -110,3 +134,5 @@ podAnnotations:
 podLabels:
   platform.5dlabs.io/log-collection: enabled
   app.kubernetes.io/component: avatar-rendering
+
+extraEnv: []

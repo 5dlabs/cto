@@ -134,45 +134,53 @@ async def entrypoint(ctx: JobContext) -> None:
 
     ctx.add_shutdown_callback(on_shutdown)
 
-    avatar_kwargs = {
-        "agent_prompt": config.avatar_prompt,
-        "idle_timeout": config.avatar_idle_timeout,
-    }
-    if config.has_lemonslice_agent_id:
-        avatar_kwargs["agent_id"] = config.lemonslice_agent_id
-    else:
-        avatar_kwargs["agent_image_url"] = config.avatar_image_url
-
-    avatar = lemonslice.AvatarSession(**avatar_kwargs)
     allow_audio_only_fallback = _env_bool("MORGAN_ALLOW_AUDIO_ONLY_FALLBACK", True)
 
-    try:
-        await avatar.start(session, room=ctx.room)
-    except Exception as exc:
-        root = exc.__cause__ or exc
-        if isinstance(root, APIStatusError):
-            logger.error(
-                "LemonSlice session start failed: status=%s body=%r message=%s",
-                root.status_code,
-                root.body,
-                root.message,
-            )
-            body_text = str(root.body).lower() if root.body is not None else ""
-            if allow_audio_only_fallback and root.status_code == 402 and "insufficient funds" in body_text:
+    if config.avatar_mode == "lemonslice":
+        avatar_kwargs = {
+            "agent_prompt": config.avatar_prompt,
+            "idle_timeout": config.avatar_idle_timeout,
+        }
+        if config.has_lemonslice_agent_id:
+            avatar_kwargs["agent_id"] = config.lemonslice_agent_id
+        else:
+            avatar_kwargs["agent_image_url"] = config.avatar_image_url
+
+        avatar = lemonslice.AvatarSession(**avatar_kwargs)
+
+        try:
+            await avatar.start(session, room=ctx.room)
+        except Exception as exc:
+            root = exc.__cause__ or exc
+            if isinstance(root, APIStatusError):
+                logger.error(
+                    "LemonSlice session start failed: status=%s body=%r message=%s",
+                    root.status_code,
+                    root.body,
+                    root.message,
+                )
+                body_text = str(root.body).lower() if root.body is not None else ""
+                if allow_audio_only_fallback and root.status_code == 402 and "insufficient funds" in body_text:
+                    logger.warning(
+                        "LemonSlice credits unavailable, continuing in audio-only mode "
+                        "(set MORGAN_ALLOW_AUDIO_ONLY_FALLBACK=false to fail hard)"
+                    )
+                else:
+                    raise
+            else:
+                logger.error("LemonSlice session start failed: %r", root)
+                if not allow_audio_only_fallback:
+                    raise
                 logger.warning(
-                    "LemonSlice credits unavailable, continuing in audio-only mode "
+                    "Continuing in audio-only mode after LemonSlice start failure "
                     "(set MORGAN_ALLOW_AUDIO_ONLY_FALLBACK=false to fail hard)"
                 )
-            else:
-                raise
-        else:
-            logger.error("LemonSlice session start failed: %r", root)
-            if not allow_audio_only_fallback:
-                raise
-            logger.warning(
-                "Continuing in audio-only mode after LemonSlice start failure "
-                "(set MORGAN_ALLOW_AUDIO_ONLY_FALLBACK=false to fail hard)"
-            )
+    elif config.avatar_mode == "disabled":
+        logger.info("MORGAN_AVATAR_MODE=disabled, running audio-only session")
+    elif config.avatar_mode == "musetalk":
+        logger.info("MORGAN_AVATAR_MODE=musetalk selected, video pipeline not wired yet, running audio-only fallback")
+    else:
+        raise ValueError(f"Unsupported MORGAN_AVATAR_MODE: {config.avatar_mode}")
 
     audio_input = room_io.AudioInputOptions(
         noise_cancellation=noise_cancellation.BVC() if config.use_noise_cancellation else None,

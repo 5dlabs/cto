@@ -36,6 +36,7 @@ def test_openclaw_validation_requires_base_url_and_api_key(monkeypatch) -> None:
 
 def test_lemonslice_agent_id_satisfies_avatar_validation(monkeypatch) -> None:
     monkeypatch.setenv("MORGAN_LLM_BACKEND", "inference")
+    monkeypatch.setenv("MORGAN_AVATAR_MODE", "lemonslice")
     monkeypatch.setenv("MORGAN_LEMONSLICE_AGENT_ID", "agent_123")
     monkeypatch.delenv("MORGAN_IMAGE_URL", raising=False)
     monkeypatch.delenv("MORGAN_PLACEHOLDER_IMAGE_URL", raising=False)
@@ -44,3 +45,31 @@ def test_lemonslice_agent_id_satisfies_avatar_validation(monkeypatch) -> None:
 
     config.validate()
     assert config.has_lemonslice_agent_id is True
+
+
+def test_disabled_avatar_mode_skips_lemonslice_validation(monkeypatch) -> None:
+    monkeypatch.setenv("MORGAN_LLM_BACKEND", "inference")
+    monkeypatch.setenv("MORGAN_AVATAR_MODE", "disabled")
+    monkeypatch.delenv("MORGAN_LEMONSLICE_AGENT_ID", raising=False)
+    monkeypatch.delenv("MORGAN_IMAGE_URL", raising=False)
+    monkeypatch.delenv("MORGAN_PLACEHOLDER_IMAGE_URL", raising=False)
+
+    config = AgentConfig.from_env(project_root=Path("/tmp/project"))
+
+    config.validate()
+    assert config.avatar_mode == "disabled"
+
+
+def test_invalid_avatar_mode_fails_validation(monkeypatch) -> None:
+    monkeypatch.setenv("MORGAN_LLM_BACKEND", "inference")
+    monkeypatch.setenv("MORGAN_AVATAR_MODE", "broken")
+    monkeypatch.setenv("MORGAN_PLACEHOLDER_IMAGE_URL", "https://example.com/placeholder.png")
+
+    config = AgentConfig.from_env(project_root=Path("/tmp/project"))
+
+    try:
+        config.validate()
+    except ValueError as exc:
+        assert "MORGAN_AVATAR_MODE" in str(exc)
+    else:
+        raise AssertionError("Expected validation to fail for an unsupported avatar mode.")
