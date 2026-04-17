@@ -59,7 +59,7 @@ spec:
         agent:
           id: "swarm"
           name: "Colosseum"
-          model: "openai-api/gpt-5.4"
+          model: "openai-codex/gpt-5.4"
           sandbox: "off"
           heartbeat:
             every: "12h"
@@ -86,13 +86,26 @@ spec:
               baseUrl: "https://api.fireworks.ai/inference/v1/"
 
         modelDefaults:
-          primary: "openai-api/gpt-5.4"
+          primary: "openai-codex/gpt-5.4"
           fallbacks:
+            - "openai-api/gpt-5.4"
             - "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
             - "google/gemini-2.5-pro"
 
         models:
           providers:
+            openai-codex:
+              enabled: true
+              api: "openai-codex-responses"
+              auth: "oauth"
+              baseUrl: "https://api.openai.com/v1"
+              models:
+                - id: "gpt-5.4"
+                  name: "GPT-5.4 (ChatGPT Pro)"
+                  contextWindow: 272000
+                  maxTokens: 65536
+                  reasoning: true
+                  input: ["text", "image"]
             openai-api:
               api: "openai-responses"
               baseUrl: "https://api.openai.com/v1"
