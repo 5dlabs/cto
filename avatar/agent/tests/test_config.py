@@ -73,3 +73,15 @@ def test_invalid_avatar_mode_fails_validation(monkeypatch) -> None:
         assert "MORGAN_AVATAR_MODE" in str(exc)
     else:
         raise AssertionError("Expected validation to fail for an unsupported avatar mode.")
+
+
+def test_musetalk_defaults_are_loaded(monkeypatch) -> None:
+    monkeypatch.setenv("MORGAN_LLM_BACKEND", "inference")
+    monkeypatch.setenv("MORGAN_AVATAR_MODE", "musetalk")
+
+    config = AgentConfig.from_env(project_root=Path("/tmp/project"))
+
+    config.validate()
+    assert config.persona_id == "morgan-v1"
+    assert config.personas_root == Path("/personas")
+    assert config.musetalk_target_fps == 30

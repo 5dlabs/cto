@@ -23,6 +23,8 @@ from livekit.plugins import lemonslice, noise_cancellation, silero
 
 from morgan_avatar_agent.config import AgentConfig
 from morgan_avatar_agent.latency import LatencyRecorder
+from morgan_avatar_agent.musetalk_avatar import MuseTalkAvatarSession
+from morgan_avatar_agent.musetalk_inference import MuseTalkInferenceEngine
 from morgan_avatar_agent.providers import build_llm, build_stt, build_tts, build_turn_detection
 
 load_dotenv()
@@ -178,7 +180,17 @@ async def entrypoint(ctx: JobContext) -> None:
     elif config.avatar_mode == "disabled":
         logger.info("MORGAN_AVATAR_MODE=disabled, running audio-only session")
     elif config.avatar_mode == "musetalk":
-        logger.info("MORGAN_AVATAR_MODE=musetalk selected, video pipeline not wired yet, running audio-only fallback")
+        logger.info("MORGAN_AVATAR_MODE=musetalk selected, starting self-hosted avatar pipeline")
+        musetalk = MuseTalkAvatarSession(
+            MuseTalkInferenceEngine(
+                persona_id=config.persona_id,
+                personas_root=config.personas_root,
+                target_fps=config.musetalk_target_fps,
+                frame_width=config.musetalk_frame_width,
+                frame_height=config.musetalk_frame_height,
+            )
+        )
+        await musetalk.start(session, room=ctx.room)
     else:
         raise ValueError(f"Unsupported MORGAN_AVATAR_MODE: {config.avatar_mode}")
 

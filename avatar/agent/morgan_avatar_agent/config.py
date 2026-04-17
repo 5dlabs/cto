@@ -5,6 +5,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+DEFAULT_PERSONAS_ROOT = Path("/personas")
+
+
 def _env_bool(name: str, default: bool) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -80,6 +83,11 @@ class AgentConfig:
     false_interruption_timeout: float
     aec_warmup_duration: float
     use_tts_aligned_transcript: bool
+    persona_id: str
+    personas_root: Path
+    musetalk_target_fps: int
+    musetalk_frame_width: int
+    musetalk_frame_height: int
 
     @classmethod
     def from_env(cls, project_root: Path | None = None) -> AgentConfig:
@@ -168,6 +176,11 @@ class AgentConfig:
             false_interruption_timeout=_env_float("MORGAN_FALSE_INTERRUPTION_TIMEOUT", 1.0),
             aec_warmup_duration=_env_float("MORGAN_AEC_WARMUP_DURATION", 3.0),
             use_tts_aligned_transcript=_env_bool("MORGAN_USE_TTS_ALIGNED_TRANSCRIPT", True),
+            persona_id=os.getenv("MORGAN_PERSONA_ID", "morgan-v1").strip(),
+            personas_root=Path(os.getenv("MORGAN_PERSONAS_ROOT", str(DEFAULT_PERSONAS_ROOT))),
+            musetalk_target_fps=_env_int("MORGAN_MUSETALK_TARGET_FPS", 30),
+            musetalk_frame_width=_env_int("MORGAN_MUSETALK_FRAME_WIDTH", 512),
+            musetalk_frame_height=_env_int("MORGAN_MUSETALK_FRAME_HEIGHT", 512),
         )
 
     @property
@@ -224,4 +237,9 @@ class AgentConfig:
             "deepgram_keyterms": self.deepgram_keyterms,
             "eleven_chunk_length_schedule": self.eleven_chunk_length_schedule,
             "has_lemonslice_agent_id": self.has_lemonslice_agent_id,
+            "persona_id": self.persona_id,
+            "personas_root": str(self.personas_root),
+            "musetalk_target_fps": self.musetalk_target_fps,
+            "musetalk_frame_width": self.musetalk_frame_width,
+            "musetalk_frame_height": self.musetalk_frame_height,
         }
