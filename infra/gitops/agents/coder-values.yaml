@@ -667,8 +667,7 @@ codeServer:
   defaultFolder: "/workspace/repos/cto"
   customExtensions:
     - name: cto-chat
-      url: "https://raw.githubusercontent.com/5dlabs/cto/main/infra/extensions/cto-chat-0.1.0.vsix"
-      forceUpdate: true
+      repoPath: "infra/extensions/cto-chat-0.1.0.vsix"
   quickTunnel:
     enabled: false
   githubToken:

@@ -1253,16 +1253,23 @@ spec:
                 code-server --extensions-dir "$EXTDIR" --install-extension "$VSIX" 2>/dev/null || true
               done
               {{- if .Values.codeServer.customExtensions }}
-              # Install custom extensions (vsix URLs or paths)
+              # Install custom extensions (vsix from workspace repo path or URL)
               echo "[code-server] Installing custom extensions..."
               {{- range .Values.codeServer.customExtensions }}
+              {{- if .repoPath }}
+              CUSTOM_VSIX="/workspace/repos/cto/{{ .repoPath }}"
+              {{- else }}
               CUSTOM_VSIX="/workspace/.code-server-cache/{{ .name }}.vsix"
               if [ ! -f "$CUSTOM_VSIX" ] || [ "{{ .forceUpdate | default false }}" = "true" ]; then
                 echo "[code-server] Downloading {{ .name }}..."
                 curl -sL "{{ .url }}" -o "$CUSTOM_VSIX" 2>/dev/null || true
               fi
+              {{- end }}
               if [ -f "$CUSTOM_VSIX" ]; then
+                echo "[code-server] Installing {{ .name }}..."
                 code-server --extensions-dir "$EXTDIR" --install-extension "$CUSTOM_VSIX" 2>/dev/null || true
+              else
+                echo "[code-server] WARNING: {{ .name }} vsix not found"
               fi
               {{- end }}
               {{- end }}
