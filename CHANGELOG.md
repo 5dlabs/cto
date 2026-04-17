@@ -3,6 +3,18 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.61](https://github.com/5dlabs/cto/compare/v0.2.60...v0.2.61) (2026-04-17)
+
+
+### ✨ Features
+
+* **colosseum:** switch swarm agent to ChatGPT Pro OAuth (gpt-5.4) ([#4666](https://github.com/5dlabs/cto/issues/4666)) ([c6bcad3](https://github.com/5dlabs/cto/commit/c6bcad35cdcb3118f1f016d1da7bf1ada21e0bdf))
+
+
+### 🐛 Bug Fixes
+
+* **openclaw-agent:** seed BOOT.md on init to auto-resume all agents on pod restart ([#4665](https://github.com/5dlabs/cto/issues/4665)) ([80969a6](https://github.com/5dlabs/cto/commit/80969a64bb16ec6e2a76a318e8505c6ce1383f10))
+
 ## [0.2.60](https://github.com/5dlabs/cto/compare/v0.2.59...v0.2.60) (2026-04-17)
 
 
