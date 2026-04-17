@@ -706,7 +706,7 @@ spec:
               for f in /usr/local/share/npm-global/lib/node_modules/openclaw/dist/agent-delivery-*.js; do
                 [ -f "$f" ] || continue
                 grep -q 'OPENCLAW_DEFAULT_RECIPIENT' "$f" && continue
-                sed -i 's/let resolvedTo = explicitTo;/let resolvedTo = explicitTo; if (!resolvedTo \&\& process.env.OPENCLAW_DEFAULT_RECIPIENT) resolvedTo = process.env.OPENCLAW_DEFAULT_RECIPIENT;/' "$f" \
+                sed -i 's/\([ \t]*\)let resolvedTo = explicitTo;/\1let resolvedTo = explicitTo; if (!resolvedTo \&\& process.env.OPENCLAW_DEFAULT_RECIPIENT) resolvedTo = process.env.OPENCLAW_DEFAULT_RECIPIENT;/' "$f" \
                   && echo "[openclaw] Patched delivery fallback in $(basename $f)" \
                   || echo "[openclaw] WARN: delivery patch failed for $(basename $f)"
               done
