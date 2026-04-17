@@ -661,16 +661,9 @@ spec:
                     ;;
                 esac
               done
-              # Patch OpenClaw agent-delivery to honor OPENCLAW_DEFAULT_RECIPIENT
-              # when no explicit recipient is resolved (fixes channel:UNKNOWN on boot).
-              # Runs in init (root) because dist/ files are root-owned.
-              for f in /usr/local/share/npm-global/lib/node_modules/openclaw/dist/agent-delivery-*.js; do
-                [ -f "$f" ] || continue
-                grep -q 'OPENCLAW_DEFAULT_RECIPIENT' "$f" && continue
-                sed -i 's/let resolvedTo = explicitTo;/let resolvedTo = explicitTo; if (!resolvedTo \&\& process.env.OPENCLAW_DEFAULT_RECIPIENT) resolvedTo = process.env.OPENCLAW_DEFAULT_RECIPIENT;/' "$f" \
-                  && echo "[workspace-files] Patched delivery fallback in $(basename $f)" \
-                  || echo "[workspace-files] WARN: delivery patch failed for $(basename $f)"
-              done
+              # (delivery-patch moved to agent container startup — each container
+              # has its own rootfs, so init patches to /usr/local/... are not visible
+              # from the agent container.)
               # Increase mem0 recall timeout from 8s to 30s (qdrant can be slow
               # on large collections, especially after pod restarts).
               for f in /workspace/.openclaw/extensions/openclaw-mem0/node_modules/@mem0/openclaw-mem0/dist/index.js; do
@@ -707,6 +700,16 @@ spec:
                 echo "[openclaw] Installing missing @buape/carbon dependency"
                 npm install -g --no-audit --no-fund @buape/carbon 2>&1 | tail -2
               }
+              # Patch agent-delivery to honor OPENCLAW_DEFAULT_RECIPIENT env var
+              # when no explicit recipient is resolved (fixes channel:UNKNOWN on boot).
+              # Must run here (not init container) because each container has its own rootfs.
+              for f in /usr/local/share/npm-global/lib/node_modules/openclaw/dist/agent-delivery-*.js; do
+                [ -f "$f" ] || continue
+                grep -q 'OPENCLAW_DEFAULT_RECIPIENT' "$f" && continue
+                sed -i 's/let resolvedTo = explicitTo;/let resolvedTo = explicitTo; if (!resolvedTo \&\& process.env.OPENCLAW_DEFAULT_RECIPIENT) resolvedTo = process.env.OPENCLAW_DEFAULT_RECIPIENT;/' "$f" \
+                  && echo "[openclaw] Patched delivery fallback in $(basename $f)" \
+                  || echo "[openclaw] WARN: delivery patch failed for $(basename $f)"
+              done
               exec openclaw gateway
           lifecycle:
             postStart:
