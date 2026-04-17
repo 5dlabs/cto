@@ -12,7 +12,7 @@ Next.js frontend for the Morgan talking-avatar proof of concept.
 ## Prerequisites
 
 - Node.js 18+
-- Valid LiveKit Cloud (or self-hosted LiveKit) credentials
+- Valid self-hosted LiveKit credentials
 - The Python avatar worker running from `../agent` with agent name `morgan-avatar`
 
 ## Environment
@@ -25,7 +25,7 @@ cp .env.local.example .env.local
 
 Required variables:
 
-- `LIVEKIT_URL` (WebSocket URL, e.g. `wss://<project>.livekit.cloud`)
+- `LIVEKIT_URL` (WebSocket URL, e.g. `wss://lk.5dlabs.ai`)
 - `LIVEKIT_API_KEY`
 - `LIVEKIT_API_SECRET`
 
@@ -64,6 +64,7 @@ Response payload:
 ## Operational constraints
 
 - Worker identity is currently coupled: token route dispatches `morgan-avatar` and the Python worker registers the same agent name.
+- Phase 2 expects the worker env to include `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, and `MORGAN_AVATAR_MODE=disabled` for the audio-only gate.
 - If room creation/dispatch/token mint fails, the UI surfaces the route error message directly.
 - OpenClaw reply latency can be ~10 seconds; use the in-app transcript/telemetry panel to verify progress.
 

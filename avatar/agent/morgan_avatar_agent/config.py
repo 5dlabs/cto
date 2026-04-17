@@ -39,6 +39,7 @@ class AgentConfig:
     greeting: str
     system_instructions: str
     avatar_prompt: str
+    avatar_mode: str
     lemonslice_agent_id: str
     image_url: str
     placeholder_image_url: str
@@ -108,6 +109,7 @@ class AgentConfig:
                     "with calm facial motions."
                 ),
             ),
+            avatar_mode=os.getenv("MORGAN_AVATAR_MODE", "lemonslice").strip().lower(),
             lemonslice_agent_id=os.getenv("MORGAN_LEMONSLICE_AGENT_ID", "").strip(),
             image_url=os.getenv("MORGAN_IMAGE_URL", "").strip(),
             placeholder_image_url=os.getenv("MORGAN_PLACEHOLDER_IMAGE_URL", "").strip(),
@@ -179,7 +181,12 @@ class AgentConfig:
         return bool(self.lemonslice_agent_id)
 
     def validate(self) -> None:
-        if not self.has_lemonslice_agent_id and not self.avatar_image_url:
+        if self.avatar_mode not in {"lemonslice", "disabled", "musetalk"}:
+            raise ValueError(
+                "MORGAN_AVATAR_MODE must be one of: lemonslice, disabled, musetalk."
+            )
+
+        if self.avatar_mode == "lemonslice" and not self.has_lemonslice_agent_id and not self.avatar_image_url:
             raise ValueError(
                 "Set MORGAN_LEMONSLICE_AGENT_ID or MORGAN_IMAGE_URL / "
                 "MORGAN_PLACEHOLDER_IMAGE_URL so LemonSlice can render the avatar."
@@ -199,6 +206,7 @@ class AgentConfig:
     def as_dict(self) -> dict[str, str | int | float | bool | list[int] | list[str]]:
         return {
             "agent_name": self.agent_name,
+            "avatar_mode": self.avatar_mode,
             "llm_backend": self.llm_backend,
             "llm_model": self.llm_model,
             "stt_mode": self.stt_mode,

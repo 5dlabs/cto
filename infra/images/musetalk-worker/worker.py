@@ -29,13 +29,11 @@ import os
 import signal
 import tempfile
 import time
-from hashlib import sha256
-from pathlib import Path
 
 import aiohttp.web
 import nats
-from nats.js.api import ConsumerConfig, DeliverPolicy, AckPolicy
-from prometheus_client import Counter, Histogram, Gauge, generate_latest
+from nats.js.api import AckPolicy, ConsumerConfig, DeliverPolicy
+from prometheus_client import Counter, Gauge, Histogram, generate_latest
 
 logging.basicConfig(
     level=logging.INFO,
@@ -76,13 +74,6 @@ async def handle_message(msg, nc):
 
         result_subject = data.get("callback_subject", os.environ.get("NATS_RESULT_SUBJECT", "avatar.render.result"))
 
-        # Check render cache
-        cache_enabled = os.environ.get("CACHE_ENABLED", "true").lower() == "true"
-        audio_hash = data.get("audio_hash", "")
-        cache_key = f"{persona_id}:{audio_hash}"
-
-        # TODO: check S3/R2 cache for existing render
-
         with tempfile.TemporaryDirectory(dir="/tmp/renders") as tmpdir:
             # Download reference image and audio
             ref_path = os.path.join(tmpdir, "reference.png")
@@ -109,8 +100,9 @@ async def handle_message(msg, nc):
             RENDER_DURATION.observe(duration)
             RENDER_REQUESTS.labels(persona_id=persona_id, status="success").inc()
 
-            # TODO: upload output.mp4 to S3/R2 and get signed URL
-            video_url = f"file://{output_path}"  # placeholder
+            video_url = None
+            if result.get("output_path"):
+                video_url = f"file://{result['output_path']}"
 
             response = {
                 "request_id": request_id,
@@ -118,6 +110,9 @@ async def handle_message(msg, nc):
                 "video_url": video_url,
                 "render_time_s": round(duration, 2),
                 "cached": False,
+                "bootstrap_only": result.get("bootstrap_only", False),
+                "gpu": result.get("gpu"),
+                "dtype": result.get("dtype"),
                 "error": None,
             }
 
@@ -179,7 +174,7 @@ async def run_worker():
     from render import load_model
     load_model()
     _ready = True
-    log.info("Model loaded, worker ready")
+    log.info("Model bootstrap loaded, worker ready")
 
     # Subscribe with durable consumer
     config = ConsumerConfig(

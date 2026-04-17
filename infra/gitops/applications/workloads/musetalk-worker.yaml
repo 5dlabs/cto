@@ -24,9 +24,9 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "3"
     argocd-image-updater.argoproj.io/image-list: |
-      worker=registry.5dlabs.ai/5dlabs/musetalk-worker:latest
+      worker=ghcr.io/5dlabs/musetalk-worker:phase4-bootstrap
     argocd-image-updater.argoproj.io/worker.update-strategy: "digest"
-    argocd-image-updater.argoproj.io/worker.allow-tags: "regexp:^latest$"
+    argocd-image-updater.argoproj.io/worker.allow-tags: "regexp:^phase4-bootstrap$"
     argocd-image-updater.argoproj.io/write-back-method: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -42,13 +42,21 @@ spec:
         - values.yaml
       values: |
         image:
-          repository: registry.5dlabs.ai/5dlabs/musetalk-worker
-          tag: latest
+          repository: ghcr.io/5dlabs/musetalk-worker
+          tag: phase4-bootstrap
 
         # Storage class for model weights PVC
         persistence:
           storageClass: "mayastor"
           size: 20Gi
+
+        model:
+          repo: "https://github.com/TMElyralab/MuseTalk.git"
+          dtype: "float16"
+
+        huggingface:
+          existingSecret: "musetalk-hf-token"
+          secretKey: "HF_TOKEN"
 
         # NATS — adjust if your NATS endpoint differs
         nats:

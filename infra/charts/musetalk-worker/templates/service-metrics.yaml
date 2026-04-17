@@ -14,4 +14,22 @@ spec:
       name: metrics
   selector:
     {{- include "musetalk-worker.selectorLabels" . | nindent 4 }}
+---
+{{- end }}
+{{- if .Values.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "musetalk-worker.fullname" . }}
+  labels:
+    {{- include "musetalk-worker.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: 8080
+      targetPort: health
+      protocol: TCP
+      name: health
+  selector:
+    {{- include "musetalk-worker.selectorLabels" . | nindent 4 }}
 {{- end }}

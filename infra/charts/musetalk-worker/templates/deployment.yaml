@@ -26,6 +26,14 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "musetalk-worker.serviceAccountName" . }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -95,6 +103,8 @@ spec:
               value: {{ .Values.nats.ackWait | quote }}
             - name: NATS_MAX_DELIVER
               value: {{ .Values.nats.maxDeliver | quote }}
+            - name: METRICS_PORT
+              value: {{ .Values.metrics.port | quote }}
             - name: MODEL_CACHE_DIR
               value: {{ .Values.model.cacheDir | quote }}
             - name: MODEL_DTYPE
@@ -103,6 +113,10 @@ spec:
               value: {{ .Values.output.bucket | quote }}
             - name: OUTPUT_ENDPOINT
               value: {{ .Values.output.endpoint | quote }}
+            - name: OUTPUT_REGION
+              value: {{ .Values.output.region | quote }}
+            - name: OUTPUT_PREFIX
+              value: {{ .Values.output.prefix | quote }}
             - name: CACHE_ENABLED
               value: {{ .Values.output.cacheEnabled | quote }}
             - name: CACHE_TTL_DAYS
@@ -114,6 +128,31 @@ spec:
                   name: {{ .Values.huggingface.existingSecret }}
                   key: {{ .Values.huggingface.secretKey }}
             {{- end }}
+            {{- if .Values.output.existingSecret }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.output.existingSecret }}
+                  key: {{ .Values.output.accessKeyKey }}
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.output.existingSecret }}
+                  key: {{ .Values.output.secretKeyKey }}
+                  optional: true
+            - name: AWS_SESSION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.output.existingSecret }}
+                  key: {{ .Values.output.sessionTokenKey }}
+                  optional: true
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
           volumeMounts:
             - name: model-cache
               mountPath: {{ .Values.model.cacheDir }}

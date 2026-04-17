@@ -4,11 +4,11 @@
 # runs the avatar agent + MuseTalk inference and connects to this server
 # as a regular client.
 #
-# Phase 1 scope: signaling (WebSocket on :7880) is exposed via the
-# Cloudflare tunnel at wss://lk.5dlabs.ai. UDP media (50000-60000) is
-# NOT exposed in Phase 1 -- WebRTC will fall back to TCP/7881 through
-# the tunnel for initial bring-up. A direct UDP path (hostNetwork on a
-# dedicated public-IP node + DNS A record) is the Phase 2 follow-up.
+# Phase 1 delivers the production signaling endpoint at wss://lk.5dlabs.ai
+# and keeps the server ready for direct UDP media on 50000-60000 via
+# hostNetworking. We still need OVH firewall + DNS/public-IP follow-up to
+# make the full UDP path reachable from the internet, but the chart shape
+# now matches the PRD instead of relying on tunnel-only TCP fallback.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -44,10 +44,11 @@ spec:
         # relative path fails as a mountPath). Upstream issue tracked
         # but unfixed. Workaround: disable the chart's Secret-backed
         # keys flow entirely and inline the keys into the config.yaml
-        # via `livekit.keys`. The chart's ConfigMap template renders
-        # `toYaml .Values.livekit` directly, so this produces valid
-        # LiveKit config. The standalone `livekit-keys` Secret is kept
-        # -- it's still consumed by the token-mint API and agent env.
+        # via `livekit.keys`.
+        #
+        # The actual key material is sourced from the `livekit-keys`
+        # ExternalSecret in infra/manifests/livekit and must be copied
+        # here before sync. Never commit real credentials to git.
         storeKeysInSecret:
           enabled: false
 
@@ -55,13 +56,14 @@ spec:
           port: 7880
           log_level: info
           keys:
-            8e440e77936d058380185b4c94801dbf: 6+FcfjrWZ7bYGBmhHGfnDH+L4wYKdw+KjKTrnPphwf4=
+            LIVEKIT_API_KEY_FROM_SECRET: LIVEKIT_API_SECRET_FROM_SECRET
           rtc:
             tcp_port: 7881
             port_range_start: 50000
             port_range_end: 60000
             # Pod uses host networking, so this picks up the node's
-            # routable public IP for ICE candidates.
+            # routable public IP for ICE candidates once the node has a
+            # public IP and OVH firewall rules expose the UDP range.
             use_external_ip: true
           redis:
             address: livekit-valkey.cto.svc.cluster.local:6379
@@ -73,8 +75,8 @@ spec:
         # port range is reachable directly.
         podHostNetwork: true
 
-        # No external LoadBalancer in Phase 1. Cloudflare tunnel
-        # (TunnelBinding) handles WebSocket signaling at lk.5dlabs.ai.
+        # No external LoadBalancer. Cloudflare tunnel handles WebSocket
+        # signaling at lk.5dlabs.ai; direct UDP media uses the node IP.
         loadBalancer:
           type: disable
 
@@ -118,6 +120,9 @@ spec:
 
         serviceAccount:
           create: true
+
+        serviceMonitor:
+          enabled: false  # Prometheus Operator CRD is not installed on this cluster yet.
 
   destination:
     server: https://kubernetes.default.svc
