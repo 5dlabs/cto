@@ -27,6 +27,7 @@
 
 * **avatar:** unblock LiveKit GitOps sync (valkey + nodeAffinity) ([#4641](https://github.com/5dlabs/cto/issues/4641)) ([e086a0f](https://github.com/5dlabs/cto/commit/e086a0f0e536a21b03272ba4b20e2b01e21be412))
 * **avatar:** work around livekit-server chart v1.9.0 key_file bug ([#4643](https://github.com/5dlabs/cto/issues/4643)) ([0ced1ab](https://github.com/5dlabs/cto/commit/0ced1ab994d1c7200b72c6fe4e541c07bd37c269))
+* **ci:** have copilot-ci-fix handle push failures via issues ([#4647](https://github.com/5dlabs/cto/issues/4647)) ([9f09bb9](https://github.com/5dlabs/cto/commit/9f09bb9f1ce235f1b0bb729ccce03f35d0bf67ec))
 * clippy 1.95 lints in bin + tests ([#4646](https://github.com/5dlabs/cto/issues/4646)) ([23e0b18](https://github.com/5dlabs/cto/commit/23e0b18c5d3a64080c61f161d7925139d406ca28))
 * **code-server:** always download latest Copilot extensions on startup ([00e2b13](https://github.com/5dlabs/cto/commit/00e2b1309d2d72c4ef97e5ebf62347c21b5ad840))
 * **code-server:** patch product.json to use MS Marketplace for Copilot Chat ([17ed4aa](https://github.com/5dlabs/cto/commit/17ed4aa4db0ba4fc038acb49e44160ad78181fbd))
