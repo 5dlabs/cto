@@ -1,8 +1,7 @@
 ---
 # Path-based ArgoCD app for LiveKit support resources:
 #   - livekit namespace's Valkey instance (room state)
-#   - LiveKit API keys Secret
-#   - Cloudflare ClusterTunnel + TunnelBinding for lk.5dlabs.ai
+#   - LiveKit ExternalSecret + signaling tunnel for lk.5dlabs.ai
 #
 # The livekit-server Helm app deploys the SFU itself; this app
 # provides the surrounding infrastructure that lives in our repo.
@@ -23,7 +22,7 @@ spec:
 
   source:
     repoURL: https://github.com/5dlabs/cto.git
-    targetRevision: main
+    targetRevision: HEAD
     path: infra/manifests/livekit
 
   destination:
@@ -50,6 +49,10 @@ spec:
         maxDuration: 3m
 
   ignoreDifferences:
+    - group: external-secrets.io
+      kind: ExternalSecret
+      jsonPointers:
+        - /status
     - group: ""
       kind: Secret
       jsonPointers:
