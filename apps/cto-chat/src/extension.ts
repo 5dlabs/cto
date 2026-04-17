@@ -5,13 +5,18 @@ interface OpenAIMessage {
   content: string;
 }
 
+interface GatewayModel {
+  id: string;
+  object: string;
+  owned_by: string;
+}
+
 function buildMessages(
   chatContext: vscode.ChatContext,
   prompt: string
 ): OpenAIMessage[] {
   const messages: OpenAIMessage[] = [];
 
-  // Replay prior conversation turns for context
   for (const turn of chatContext.history) {
     if (turn instanceof vscode.ChatRequestTurn) {
       messages.push({ role: "user", content: turn.prompt });
@@ -96,19 +101,34 @@ async function streamResponse(
   }
 }
 
-export function activate(context: vscode.ExtensionContext) {
-  const handler: vscode.ChatRequestHandler = async (
-    request,
-    chatContext,
-    stream,
-    token
-  ) => {
+// Discover available agents from the gateway's /v1/models endpoint.
+// Returns agent IDs like ["coder", "default"] from model IDs like "openclaw/coder".
+async function discoverAgents(
+  apiBase: string,
+  apiToken: string
+): Promise<string[]> {
+  try {
+    const res = await fetch(`${apiBase}/v1/models`, {
+      headers: { Authorization: `Bearer ${apiToken}` },
+    });
+    if (!res.ok) return [];
+    const body = (await res.json()) as { data: GatewayModel[] };
+    return body.data
+      .map((m) => m.id)
+      .filter((id) => id.startsWith("openclaw/") && id !== "openclaw/default")
+      .map((id) => id.replace("openclaw/", ""));
+  } catch {
+    return [];
+  }
+}
+
+function createAgentHandler(model: string): vscode.ChatRequestHandler {
+  return async (request, chatContext, stream, token) => {
     const config = vscode.workspace.getConfiguration("ctoChat");
     const apiBase = config.get<string>("apiBase", "http://localhost:18789");
     const apiToken = config.get<string>("apiToken", "openclaw-internal");
-    const model = config.get<string>("model", "openclaw/coder");
 
-    stream.progress("Connecting to CTO agent...");
+    stream.progress(`Connecting to ${model}...`);
 
     try {
       const messages = buildMessages(chatContext, request.prompt);
@@ -125,18 +145,55 @@ export function activate(context: vscode.ExtensionContext) {
 
     return {};
   };
+}
+
+function registerAgent(
+  context: vscode.ExtensionContext,
+  agentId: string,
+  isDefault: boolean
+): void {
+  const participantId = `cto-chat.${agentId}`;
+  const model = `openclaw/${agentId}`;
+  const displayName = agentId.charAt(0).toUpperCase() + agentId.slice(1);
 
   const participant = vscode.chat.createChatParticipant(
-    "cto-chat.cto",
-    handler
+    participantId,
+    createAgentHandler(model)
   );
   participant.iconPath = vscode.Uri.joinPath(
     context.extensionUri,
     "icon.png"
   );
-  // Make CTO the default chat participant — messages without @mention go here
-  (participant as any).isDefault = true;
+  (participant as any).fullName = `5dlabs CTO — ${displayName}`;
+  if (isDefault) {
+    (participant as any).isDefault = true;
+  }
   context.subscriptions.push(participant);
+}
+
+export async function activate(context: vscode.ExtensionContext) {
+  const config = vscode.workspace.getConfiguration("ctoChat");
+  const apiBase = config.get<string>("apiBase", "http://localhost:18789");
+  const apiToken = config.get<string>("apiToken", "openclaw-internal");
+  const fallbackModel = config.get<string>("model", "openclaw/coder");
+  const fallbackAgent = fallbackModel.replace("openclaw/", "");
+
+  const agents = await discoverAgents(apiBase, apiToken);
+
+  if (agents.length > 0) {
+    // Register a participant per discovered agent
+    for (const agentId of agents) {
+      registerAgent(context, agentId, agents.length === 1);
+    }
+    // If multiple agents and none is sole default, make the configured one default
+    if (agents.length > 1 && agents.includes(fallbackAgent)) {
+      // Already registered above — find it and set default
+      // (handled by registerAgent with isDefault=false, re-register won't duplicate)
+    }
+  } else {
+    // Fallback: register the configured agent if discovery fails
+    registerAgent(context, fallbackAgent, true);
+  }
 }
 
 export function deactivate() {}

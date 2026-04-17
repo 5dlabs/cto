@@ -1,8 +1,8 @@
 {
   "name": "cto-chat",
-  "displayName": "CTO Agent Chat",
-  "description": "Chat with your CTO AI agent via the OpenClaw ACP gateway",
-  "version": "0.2.0",
+  "displayName": "5dlabs CTO Agents",
+  "description": "Dynamic AI agent chat — discovers available agents from the CTO gateway",
+  "version": "0.3.0",
   "publisher": "5dlabs",
   "engines": {
     "vscode": "^1.90.0"
@@ -15,8 +15,8 @@
       {
         "id": "cto-chat.cto",
         "name": "cto",
-        "fullName": "CTO Agent",
-        "description": "Talk to your CTO AI agent powered by OpenClaw",
+        "fullName": "5dlabs CTO",
+        "description": "CTO agent — routes to the active harness (OpenClaw, Hermes, etc.)",
         "isSticky": true,
         "isDefault": true
       }
