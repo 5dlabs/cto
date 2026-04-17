@@ -3,6 +3,43 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.58](https://github.com/5dlabs/cto/compare/v0.2.57...v0.2.58) (2026-04-17)
+
+
+### ✨ Features
+
+* add Copilot CI auto-fix workflow ([16dd168](https://github.com/5dlabs/cto/commit/16dd168571aa8cf06abc1cabbb4e819fcbdf6705))
+* **avatar:** self-hosted LiveKit + avatar stack foundation ([#4642](https://github.com/5dlabs/cto/issues/4642)) ([6778d29](https://github.com/5dlabs/cto/commit/6778d299c09c08784cb990c5e5785f6f4964dc0e))
+* **avatar:** self-hosted LiveKit SFU (Phase 1 — signaling only) ([#4640](https://github.com/5dlabs/cto/issues/4640)) ([b35d6c6](https://github.com/5dlabs/cto/commit/b35d6c6dc37b4e7b611a31abaef5a3fdf03945c6))
+* **code-server:** add GitHub Copilot with PAT auth ([19c9ee2](https://github.com/5dlabs/cto/commit/19c9ee2dd0ea5c3ec6f73ae8cd5e2678f53113a4))
+* **code-server:** dark mode + open CTO repo by default ([c584b80](https://github.com/5dlabs/cto/commit/c584b80354005d89683d34c2bbf003bbe9627a62))
+* **coder:** add code-server + Cloudflare tunnel sidecars ([1d8d94e](https://github.com/5dlabs/cto/commit/1d8d94eace86e27875bd85d2fcc2544116301f1b))
+* **coder:** add COPILOT_GITHUB_TOKEN env for Copilot CLI auth ([b9084e8](https://github.com/5dlabs/cto/commit/b9084e8c13537bff3d46a075709b1289dcbd1e24))
+* **coder:** stable DNS via Cloudflare tunnel binding (coder.5dlabs.ai) ([c6f7245](https://github.com/5dlabs/cto/commit/c6f7245687e09797151b31d43dfb51522b086c6c))
+* **coder:** upgrade Claude/Copilot ACP to Opus 4.7 ([a9728d3](https://github.com/5dlabs/cto/commit/a9728d35beaa2394726e212947be6da888c71a1e))
+* **intake:** Agent Package Provisioning — Phase 0 ([#4639](https://github.com/5dlabs/cto/issues/4639)) ([81dfbe3](https://github.com/5dlabs/cto/commit/81dfbe38f5c754fd54b9b5d3ca4eee924d0041cf))
+* **openclaw-agent:** add GH_TOKEN and COPILOT_GITHUB_TOKEN env vars ([d0f32ec](https://github.com/5dlabs/cto/commit/d0f32ec3161e85cd6353358f399f735c94e69d8e))
+* switch swarm agent to OpenAI GPT-5.4 with OAuth ([2d956f2](https://github.com/5dlabs/cto/commit/2d956f2fb072d4438914db1853e70e087f79d181))
+* upgrade all agents from Claude Opus 4.6 to Opus 4.7 ([58620bc](https://github.com/5dlabs/cto/commit/58620bc7e2893dd89e2748aaac85814e58c365a8))
+
+
+### 🐛 Bug Fixes
+
+* **avatar:** unblock LiveKit GitOps sync (valkey + nodeAffinity) ([#4641](https://github.com/5dlabs/cto/issues/4641)) ([e086a0f](https://github.com/5dlabs/cto/commit/e086a0f0e536a21b03272ba4b20e2b01e21be412))
+* **avatar:** work around livekit-server chart v1.9.0 key_file bug ([#4643](https://github.com/5dlabs/cto/issues/4643)) ([0ced1ab](https://github.com/5dlabs/cto/commit/0ced1ab994d1c7200b72c6fe4e541c07bd37c269))
+* clippy 1.95 lints in bin + tests ([#4646](https://github.com/5dlabs/cto/issues/4646)) ([23e0b18](https://github.com/5dlabs/cto/commit/23e0b18c5d3a64080c61f161d7925139d406ca28))
+* **code-server:** always download latest Copilot extensions on startup ([00e2b13](https://github.com/5dlabs/cto/commit/00e2b1309d2d72c4ef97e5ebf62347c21b5ad840))
+* **code-server:** patch product.json to use MS Marketplace for Copilot Chat ([17ed4aa](https://github.com/5dlabs/cto/commit/17ed4aa4db0ba4fc038acb49e44160ad78181fbd))
+* **code-server:** pre-seed Copilot auth from PAT + persistent extensions dir ([69c1dca](https://github.com/5dlabs/cto/commit/69c1dcaa4546f4376430eace77000ea166f0609d))
+* **code-server:** pre-seed Copilot hosts.json at correct XDG path ([7eb7eae](https://github.com/5dlabs/cto/commit/7eb7eaee9c641323dbaac94cffaf799c923e1dfb))
+* **code-server:** run as root to fix permission issues ([4fdb46d](https://github.com/5dlabs/cto/commit/4fdb46d633c984d4d230a4c4d403e1dcf11db256))
+* **code-server:** write github-auth config for Copilot auth proxy ([e734f18](https://github.com/5dlabs/cto/commit/e734f185fa278d37432b2adb611421083e25d76a))
+
+
+### 📚 Documentation
+
+* **prds:** Coder PRD for Phase 4 GPU + MuseTalk deployment ([#4645](https://github.com/5dlabs/cto/issues/4645)) ([f42974d](https://github.com/5dlabs/cto/commit/f42974dee99aa4b6e61b606970a993b69ef359fe))
+
 ## [0.2.57](https://github.com/5dlabs/cto/compare/v0.2.56...v0.2.57) (2026-04-16)
 
 
