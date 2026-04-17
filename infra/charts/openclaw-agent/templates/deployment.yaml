@@ -1307,14 +1307,36 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
-        {{- if .Values.codeServer.quickTunnel.enabled }}
+        {{- if .Values.codeServer.tunnelUrl }}
+        # Static cluster tunnel — write known URL to shared workspace
+        - name: tunnel-url-writer
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "{{ .Values.codeServer.tunnelUrl }}" > /workspace/.code-server-url
+              echo "[tunnel-url-writer] Static tunnel URL: {{ .Values.codeServer.tunnelUrl }}"
+              # Stay alive so pod doesn't restart (sidecar pattern)
+              sleep infinity
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          resources:
+            requests:
+              cpu: 1m
+              memory: 4Mi
+            limits:
+              cpu: 10m
+              memory: 16Mi
+        {{- else }}
+        # Ephemeral quick tunnel — auto-discover random URL
         - name: cloudflared
           image: cloudflare/cloudflared:latest
           command:
             - /bin/sh
             - -c
             - |
-              # Start cloudflared and capture the quick-tunnel URL
               cloudflared tunnel --url http://localhost:{{ .Values.codeServer.port | default 8080 }} --no-autoupdate 2>&1 | tee /dev/stderr | while IFS= read -r line; do
                 case "$line" in
                   *trycloudflare.com*)
