@@ -1,0 +1,44 @@
+# Personas PVC for MuseTalk avatar pipeline
+# ==========================================
+# ReadWriteMany PVC for storing persona source files and preprocessed artefacts.
+# Backed by OVH block/object storage.
+#
+# Schema:
+#   /personas/<persona_id>/
+#     source.{png,jpg,mp4}
+#     metadata.json
+#     latents/
+#     landmarks/
+#     coords.pkl
+#     mask/
+#     preview.mp4
+#     status.json
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: personas-pvc
+  namespace: avatar
+  labels:
+    app.kubernetes.io/name: personas-pvc
+    app.kubernetes.io/part-of: avatar-platform
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  # Storage class for OVH block/object storage
+  # Adjust based on your cluster's available storage classes
+  storageClassName: mayastor
+
+---
+# Namespace for avatar workloads
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: avatar
+  labels:
+    app.kubernetes.io/name: avatar
+    app.kubernetes.io/part-of: cto-platform
