@@ -211,6 +211,19 @@ secrets:
       baoKey: research-digest
 
 # =============================================================================
+# Intake Runner - Self-hosted GitHub Actions runner for repo-intake pipeline
+# =============================================================================
+# RBAC for the self-hosted runner that creates PRD resources and reads
+# ManagedRepo registry entries. The ServiceAccount lives in the namespace
+# where the runners already run (default: arc-runners). If you change
+# `namespace` to a new value, create that namespace out-of-band — this
+# chart does not auto-create it.
+intakeRunner:
+  enabled: true
+  namespace: arc-runners
+  serviceAccountName: intake-runner
+
+# =============================================================================
 # Controller - Agent Orchestration
 # =============================================================================
 controller:
