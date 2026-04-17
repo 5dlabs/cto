@@ -3,6 +3,21 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.64](https://github.com/5dlabs/cto/compare/v0.2.63...v0.2.64) (2026-04-17)
+
+
+### ✨ Features
+
+* **coder:** 2m heartbeat with progress reporting and code-server URL ([919248c](https://github.com/5dlabs/cto/commit/919248cdf8f2673aac269b56a00393259460428a))
+* **coder:** upgrade to fully autonomous agent config ([22eb9eb](https://github.com/5dlabs/cto/commit/22eb9ebb3f67f5c49c0c44391391ab83850143ac))
+* wire self-hosted livekit and musetalk phase 3 stub ([#4674](https://github.com/5dlabs/cto/issues/4674)) ([0e4dde6](https://github.com/5dlabs/cto/commit/0e4dde650e236292fb10883d0f652f636e0af099))
+
+
+### 🐛 Bug Fixes
+
+* handle leading tab in delivery sed pattern ([fea0ca6](https://github.com/5dlabs/cto/commit/fea0ca6986213164e6c2d76e7442cd7c0880f9c5))
+* move delivery patch to agent container startup ([a9c895a](https://github.com/5dlabs/cto/commit/a9c895a3c9955a3d823c4a981343470fb85f83bc))
+
 ## [0.2.63](https://github.com/5dlabs/cto/compare/v0.2.62...v0.2.63) (2026-04-17)
 
 
