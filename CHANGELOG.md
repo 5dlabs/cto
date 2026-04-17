@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.60](https://github.com/5dlabs/cto/compare/v0.2.59...v0.2.60) (2026-04-17)
+
+
+### 📚 Documentation
+
+* **prd:** expand Coder PRD to full self-hosted avatar autonomy ([#4663](https://github.com/5dlabs/cto/issues/4663)) ([5d7648d](https://github.com/5dlabs/cto/commit/5d7648d5d9efffe60c244aab230e8a5d1bb7a56c))
+
 ## [0.2.59](https://github.com/5dlabs/cto/compare/v0.2.58...v0.2.59) (2026-04-17)
 
 
