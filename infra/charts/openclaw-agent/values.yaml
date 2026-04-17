@@ -41,6 +41,20 @@ storage:
   storageClass: mayastor
   size: 10Gi
 
+# -- Extra environment variables injected into the agent container
+extraEnv: []
+# Example:
+# extraEnv:
+#   - name: MY_FLAG
+#     value: "true"
+
+# -- Extra envFrom sources injected into the agent container
+extraEnvFrom: []
+# Example:
+# extraEnvFrom:
+#   - secretRef:
+#       name: my-secret
+
 # =============================================================================
 # Workspace Initialization
 # =============================================================================

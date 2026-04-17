@@ -1,0 +1,166 @@
+---
+namespace: cto
+replicaCount: 1
+deploymentMode: deployment
+
+global:
+  namespace: cto
+  createNamespace: false
+
+image:
+  repository: "ghcr.io/5dlabs/openclaw"
+  tag: "v2026.2.12"
+  pullPolicy: Always
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "2Gi"
+  limits:
+    cpu: "2"
+    memory: "6Gi"
+
+nodeOptions: "--max-old-space-size=4096"
+
+telemetry:
+  enabled: false
+
+agent:
+  id: "morgan-avatar"
+  name: "Morgan Avatar"
+  model: "google/gemini-2.5-flash"
+  sandbox: "off"
+  defaultRecipient: "channel:1494057364301545542"
+  heartbeat:
+    every: "10m"
+    target: "last"
+    ackMaxChars: 120
+    prompt: >-
+      If there is active self-hosted avatar PRD work, continue it. Otherwise reply HEARTBEAT_OK.
+
+agentDefaults:
+  thinkingDefault: "low"
+  typingMode: "instant"
+
+modelDefaults:
+  primary: "google/gemini-2.5-flash"
+  fallbacks:
+    - "google/gemini-2.5-pro"
+    - "anthropic/claude-sonnet-4-20250514"
+    - "openai-api/gpt-5.4"
+
+secrets:
+  external:
+    apiKeysSecret: "openclaw-api-keys"
+    githubSecret: "openclaw-github"
+
+messaging:
+  discord:
+    enabled: true
+    accountId: "morgan"
+    tokenSecretKey: "henry"
+    allowBots: "mentions"
+    threadBindings:
+      enabled: true
+      spawnSubagentSessions: true
+      spawnAcpSessions: true
+    dm:
+      policy: "allowlist"
+    allowFrom:
+      - "444519104808878090"
+
+models:
+  providers:
+    google:
+      enabled: true
+      api: "google-generative-ai"
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta"
+      apiKeySecretKey: "gemini-api-key"
+      models:
+        - id: "gemini-2.5-flash"
+          name: "Gemini 2.5 Flash"
+        - id: "gemini-2.5-pro"
+          name: "Gemini 2.5 Pro"
+    openai:
+      enabled: true
+      apiKeySecretKey: "openai-api-key"
+    anthropic:
+      enabled: true
+      apiKeySecretKey: "anthropic-api-key"
+
+workspace:
+  repos:
+    - name: cto
+      url: "https://github.com/5dlabs/cto.git"
+      branch: "main"
+      path: "repos/cto"
+  files:
+    AGENTS.md: |
+      # AGENTS.md -- Morgan Avatar
+
+      You are Morgan Avatar, the self-hosted LiveKit avatar runtime agent.
+
+      - Prioritize voice session reliability.
+      - Keep the avatar session alive, concise, and speech-friendly.
+      - Use the self-hosted LiveKit stack, not LiveKit Cloud.
+    SOUL.md: |
+      # Morgan Avatar -- Soul
+
+      You are the runtime voice of Morgan.
+      Short, clear, practical.
+    IDENTITY.md: |
+      # IDENTITY.md
+
+      - Name: Morgan Avatar
+      - Role: Self-hosted avatar runtime agent
+      - LiveKit agent name: morgan-avatar
+    HEARTBEAT.md: |
+      Keep the avatar runtime healthy.
+      If a session is active, protect the session.
+      If idle, do lightweight checks only.
+
+extraEnv:
+  - name: LIVEKIT_URL
+    valueFrom:
+      secretKeyRef:
+        name: livekit-keys
+        key: LIVEKIT_URL
+  - name: LIVEKIT_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: livekit-keys
+        key: LIVEKIT_API_KEY
+  - name: LIVEKIT_API_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: livekit-keys
+        key: LIVEKIT_API_SECRET
+  - name: MORGAN_AVATAR_MODE
+    value: "disabled"
+  - name: MORGAN_AGENT_NAME
+    value: "morgan-avatar"
+  - name: MORGAN_LLM_BACKEND
+    value: "openclaw"
+  - name: MORGAN_LLM_BASE_URL
+    value: "https://morgan.5dlabs.ai/v1"
+  - name: MORGAN_LLM_AGENT_ID
+    value: "morgan"
+  - name: MORGAN_LLM_USER_PREFIX
+    value: "morgan-avatar"
+  - name: MORGAN_USE_NOISE_CANCELLATION
+    value: "true"
+  - name: MORGAN_PREEMPTIVE_GENERATION
+    value: "false"
+  - name: MORGAN_TTS_MODE
+    value: "elevenlabs"
+  - name: MORGAN_ELEVEN_VOICE_ID
+    value: "iP95p4xoKVk53GoZ742B"
+  - name: MORGAN_ELEVEN_MODEL
+    value: "eleven_flash_v2_5"
+
+codeServer:
+  enabled: false
+ssh:
+  enabled: false
+kaniko:
+  enabled: false

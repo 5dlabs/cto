@@ -966,6 +966,13 @@ spec:
                   key: foundry-api-key
                   optional: true
             {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - name: gateway
               containerPort: {{ .Values.gateway.port }}

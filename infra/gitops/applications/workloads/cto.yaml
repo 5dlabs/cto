@@ -139,6 +139,9 @@ spec:
             tag: latest
           # Public URL for OAuth and external access
           publicUrl: "https://app.5dlabs.ai"
+          envFrom:
+            - secretRef:
+                name: livekit-client-config
           # Disable GitHub OAuth until credentials are configured in OpenBao
           # To enable: store client_id and client_secret at secret/web-app/github-oauth
           githubOAuth:
