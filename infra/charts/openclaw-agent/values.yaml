@@ -326,6 +326,8 @@ codeServer:
   port: 8080
   password: ""
   defaultFolder: "/workspace"
+  quickTunnel:
+    enabled: true
 
 # =============================================================================
 # Model Fallback Configuration

@@ -1287,6 +1287,7 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
+        {{- if .Values.codeServer.quickTunnel.enabled }}
         - name: cloudflared
           image: cloudflare/cloudflared:latest
           command:
@@ -1302,6 +1303,7 @@ spec:
             limits:
               cpu: 200m
               memory: 256Mi
+        {{- end }}
         {{- end }}
       volumes:
         - name: workspace
