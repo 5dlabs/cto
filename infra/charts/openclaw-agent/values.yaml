@@ -74,6 +74,10 @@ agent:
     ackMaxChars: 500
   # -- Sandbox mode
   sandbox: "off"
+  # -- Default delivery recipient (e.g. "channel:1234567890" or "user:1234567890")
+  # Used as a fallback when the session has no explicit resolved target. Fixes
+  # silent final-response delivery failures ("Discord recipient is required").
+  defaultRecipient: ""
   # -- Allowed tool groups (empty = all tools available, no restrictions)
   tools:
     allow: []
