@@ -90,11 +90,11 @@ spec:
             # public resolvers follow as fallback for github.com, ghcr.io, etc.
             dnsPolicy: "None"
             dnsConfig:
+              # Kubernetes enforces a hard limit of 3 nameservers.
               nameservers:
                 - "10.43.0.10" # kube-dns (in-cluster service discovery)
                 - "1.1.1.1"    # Cloudflare primary
                 - "8.8.8.8"    # Google primary
-                - "1.0.0.1"    # Cloudflare secondary
               searches:
                 - "arc-runners.svc.cluster.local"
                 - "svc.cluster.local"
