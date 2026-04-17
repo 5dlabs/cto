@@ -225,8 +225,7 @@
           "threadBindings": {
             "enabled": true,
             "spawnSubagentSessions": true,
-            "spawnAcpSessions": true,
-            "idleHours": 24
+            "spawnAcpSessions": true
           }
         }
       },
@@ -344,6 +343,18 @@
       "sampleRate": 1.0,
       "flushIntervalMs": 15000,
       "headers": {}
+    }
+  },
+  "session": {
+    "scope": "per-sender",
+    "dmScope": "per-channel-peer",
+    "agentToAgent": {
+      "maxPingPongTurns": 5
+    },
+    "threadBindings": {
+      "enabled": true,
+      "idleHours": 24,
+      "maxAgeHours": 0
     }
   },
   "tools": {
