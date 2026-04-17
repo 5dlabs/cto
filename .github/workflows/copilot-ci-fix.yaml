@@ -16,39 +16,27 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  issues: write
   actions: read
 
 jobs:
   copilot-fix:
     name: Request Copilot Fix
-    if: >-
-      github.event.workflow_run.conclusion == 'failure' &&
-      github.event.workflow_run.event == 'pull_request'
+    if: github.event.workflow_run.conclusion == 'failure'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Get PR number
-        id: pr
+      - name: Collect failure logs and request fix
         uses: actions/github-script@v7
         with:
           script: |
-            const prs = context.payload.workflow_run.pull_requests;
-            if (!prs || prs.length === 0) {
-              core.info('No PR associated with this workflow run');
-              return;
-            }
-            core.setOutput('number', prs[0].number);
-
-      - name: Collect failure logs and comment on PR
-        if: steps.pr.outputs.number
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prNumber = parseInt('${{ steps.pr.outputs.number }}');
             const runId = context.payload.workflow_run.id;
             const runUrl = context.payload.workflow_run.html_url;
             const runName = context.payload.workflow_run.name;
             const branch = context.payload.workflow_run.head_branch;
+            const event = context.payload.workflow_run.event;
+            const headSha = context.payload.workflow_run.head_sha;
+            const prs = context.payload.workflow_run.pull_requests || [];
 
             const { data: jobs } = await github.rest.actions.listJobsForWorkflowRun({
               owner: context.repo.owner,
@@ -65,7 +53,9 @@ jobs:
 
             let summary = `## CI Failure: ${runName}\n\n`;
             summary += `**Run:** [${runId}](${runUrl})\n`;
-            summary += `**Branch:** \`${branch}\`\n\n`;
+            summary += `**Branch:** \`${branch}\`\n`;
+            summary += `**Commit:** \`${headSha}\`\n`;
+            summary += `**Event:** \`${event}\`\n\n`;
 
             for (const job of failedJobs.slice(0, 3)) {
               try {
@@ -87,20 +77,66 @@ jobs:
               summary = summary.substring(0, 60000) + '\n\n... (truncated)';
             }
 
+            // Case 1: PR failure → comment on the PR
+            if (prs.length > 0) {
+              const prNumber = prs[0].number;
+              const body = [
+                `@copilot The CI workflow **${runName}** failed on this PR.`,
+                'Please analyze the error logs below and push a fix commit.',
+                '',
+                summary,
+                '---',
+                '_Automated by [copilot-ci-fix](.github/workflows/copilot-ci-fix.yaml)_'
+              ].join('\n');
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: body
+              });
+
+              core.info(`Posted @copilot fix request on PR #${prNumber}`);
+              return;
+            }
+
+            // Case 2: push failure (e.g., on main) → open (or reuse) an issue tagging @copilot
+            const issueTitle = `CI failure on \`${branch}\`: ${runName}`;
+
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'ci-failure',
+              per_page: 100
+            });
+
+            const match = existing.find(i => i.title === issueTitle);
+
             const body = [
-              `@copilot The CI workflow **${runName}** failed on this PR.`,
-              'Please analyze the error logs below and push a fix commit.',
+              `@copilot The CI workflow **${runName}** failed on branch \`${branch}\` at commit \`${headSha}\`.`,
+              'Please open a pull request that fixes the failure described below.',
               '',
               summary,
               '---',
               '_Automated by [copilot-ci-fix](.github/workflows/copilot-ci-fix.yaml)_'
             ].join('\n');
 
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body: body
-            });
-
-            core.info(`Posted @copilot fix request on PR #${prNumber}`);
+            if (match) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                body: body
+              });
+              core.info(`Added failure update to existing issue #${match.number}`);
+            } else {
+              const { data: issue } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+                body: body,
+                labels: ['ci-failure']
+              });
+              core.info(`Opened issue #${issue.number} for CI failure`);
+            }
