@@ -72,6 +72,8 @@ agent:
   id: "coder"
   name: "Coder"
   model: "openai-codex/gpt-5.4"
+  # Fallback Discord channel for autonomous final-response delivery.
+  defaultRecipient: "channel:1494057364301545542"
   heartbeat:
     every: "30m"
     target: "last"

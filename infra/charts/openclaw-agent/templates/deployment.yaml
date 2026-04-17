@@ -689,6 +689,21 @@ spec:
                 npm install -g --no-audit --no-fund @buape/carbon 2>&1 | tail -2
               }
               exec openclaw gateway
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/bash
+                  - -c
+                  - |
+                    # Patch OpenClaw agent-delivery to honor OPENCLAW_DEFAULT_RECIPIENT
+                    # when no explicit recipient is resolved (fixes silent final-response
+                    # delivery when session has no lastTo and config fallback is gated).
+                    for f in /usr/local/share/npm-global/lib/node_modules/openclaw/dist/agent-delivery-*.js; do
+                      [ -f "$f" ] || continue
+                      grep -q 'OPENCLAW_DEFAULT_RECIPIENT' "$f" && continue
+                      sed -i 's/\(let resolvedTo = [^;]*;\)/\1 if (!resolvedTo \&\& process.env.OPENCLAW_DEFAULT_RECIPIENT) resolvedTo = process.env.OPENCLAW_DEFAULT_RECIPIENT;/' "$f" || true
+                    done
           env:
             - name: HOME
               value: /workspace
@@ -735,6 +750,13 @@ spec:
             {{- if .Values.tools.acp.enabled }}
             - name: KIMI_SHARE_DIR
               value: /workspace/.kimi
+            {{- end }}
+            {{- if .Values.agent.defaultRecipient }}
+            # Fallback delivery target when session has no resolved recipient.
+            # Consumed by postStart patch on agent-delivery-*.js to fix missing
+            # final-response Discord posts.
+            - name: OPENCLAW_DEFAULT_RECIPIENT
+              value: {{ .Values.agent.defaultRecipient | quote }}
             {{- end }}
             - name: DISCORD_TOKEN
               valueFrom:
