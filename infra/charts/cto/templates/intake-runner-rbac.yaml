@@ -1,0 +1,64 @@
+{{- if .Values.intakeRunner.enabled }}
+---
+# Intake Runner RBAC
+# ServiceAccount for the self-hosted GitHub Actions runner that executes
+# the repo-intake pipeline. The runner assumes this SA via kubectl (or
+# pod spec) to create PRD resources and watch ManagedRepo registry entries.
+#
+# Namespace defaults to `arc-runners` where the self-hosted runners live.
+# Override via `.Values.intakeRunner.namespace`. If a different namespace
+# is chosen and does not yet exist, create it out-of-band — this chart
+# does not auto-create the runner namespace.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.intakeRunner.serviceAccountName | default "intake-runner" }}
+  namespace: {{ .Values.intakeRunner.namespace | default "arc-runners" }}
+  labels:
+    app.kubernetes.io/name: intake-runner
+    app.kubernetes.io/component: intake
+    {{- include "cto.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Values.intakeRunner.serviceAccountName | default "intake-runner" }}
+  labels:
+    app.kubernetes.io/name: intake-runner
+    app.kubernetes.io/component: intake
+    {{- include "cto.labels" . | nindent 4 }}
+rules:
+  # PRDs: the runner creates/patches PRD resources when it detects new
+  # or changed PRD markdown in a managed repo.
+  - apiGroups: ["agents.platform"]
+    resources: ["prds"]
+    verbs: ["get", "list", "watch", "create", "patch"]
+  - apiGroups: ["agents.platform"]
+    resources: ["prds/status"]
+    verbs: ["get", "patch", "update"]
+  # ManagedRepos: read-only — the runner discovers which repos are under
+  # intake management from this cluster-scoped registry.
+  - apiGroups: ["agents.platform"]
+    resources: ["managedrepos"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["agents.platform"]
+    resources: ["managedrepos/status"]
+    verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.intakeRunner.serviceAccountName | default "intake-runner" }}
+  labels:
+    app.kubernetes.io/name: intake-runner
+    app.kubernetes.io/component: intake
+    {{- include "cto.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Values.intakeRunner.serviceAccountName | default "intake-runner" }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.intakeRunner.serviceAccountName | default "intake-runner" }}
+    namespace: {{ .Values.intakeRunner.namespace | default "arc-runners" }}
+{{- end }}
