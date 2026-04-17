@@ -1,0 +1,45 @@
+---
+# Smoke trigger for the reusable intake workflow.
+# Run manually via the Actions tab to validate the pipeline end-to-end
+# against the cto repo itself (or any other repo you specify).
+
+name: intake-smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: 'owner/name to intake (defaults to this repo).'
+        required: false
+        type: string
+        default: 5dlabs/cto
+      prd_path:
+        description: 'Path to PRD within target_repo.'
+        required: false
+        type: string
+        default: docs/prd.md
+      ref:
+        required: false
+        type: string
+        default: main
+      open_pr:
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  smoke:
+    uses: ./.github/workflows/intake.yaml
+    with:
+      target_repo: ${{ inputs.target_repo }}
+      prd_path: ${{ inputs.prd_path }}
+      ref: ${{ inputs.ref }}
+      project_name: smoke
+      open_pr: ${{ inputs.open_pr }}
+    secrets:
+      CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      CTO_INTAKE_PAT: ${{ secrets.CTO_INTAKE_PAT }}
