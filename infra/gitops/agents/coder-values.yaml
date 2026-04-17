@@ -667,7 +667,7 @@ codeServer:
   defaultFolder: "/workspace/repos/cto"
   customExtensions:
     - name: cto-chat
-      repoPath: "infra/extensions/cto-chat-0.1.0.vsix"
+      pvPath: "/workspace/.code-server-cache/cto-chat.vsix"
   quickTunnel:
     enabled: false
   githubToken:

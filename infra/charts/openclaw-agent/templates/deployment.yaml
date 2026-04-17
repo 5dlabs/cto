@@ -1253,11 +1253,12 @@ spec:
                 code-server --extensions-dir "$EXTDIR" --install-extension "$VSIX" 2>/dev/null || true
               done
               {{- if .Values.codeServer.customExtensions }}
-              # Install custom extensions (vsix from workspace repo or URL)
+              # Install custom extensions (vsix from PV path, workspace repo, or URL)
               echo "[code-server] Installing custom extensions..."
               {{- range .Values.codeServer.customExtensions }}
-              {{- if .repoPath }}
-              # Pull latest to ensure extension vsix is present
+              {{- if .pvPath }}
+              CUSTOM_VSIX="{{ .pvPath }}"
+              {{- else if .repoPath }}
               REPO_DIR="/workspace/repos/cto"
               if [ -d "$REPO_DIR/.git" ]; then
                 git config --global --add safe.directory "$REPO_DIR" 2>/dev/null || true
