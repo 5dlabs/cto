@@ -162,6 +162,45 @@ spec:
               done
               echo "[skills] OpenClaw: $SKILL_COUNT skills loaded"
 
+              # ---------------------------------------------------------------
+              # 3a. BOOT.md — fires reboot-continuity on every gateway startup
+              # ---------------------------------------------------------------
+              # The bundled `boot-md` hook (events: gateway:startup) reads
+              # /workspace/BOOT.md on each gateway boot and injects the content
+              # as a user turn. If BOOT.md is absent, the hook logs "skip" and
+              # the agent sits idle until the 15-minute heartbeat. Seeding a
+              # universal resume directive here ensures EVERY agent auto-resumes
+              # in-flight work immediately on pod restart via the
+              # `reboot-continuity` skill (which is always-on in every agent's
+              # system prompt). Overwritten on every boot so agents can't
+              # accidentally stale-out the directive mid-session.
+              cat > /workspace/BOOT.md <<'BOOTEOF'
+              # Boot Resume Directive
+
+              You have just booted (pod restart or gateway reload). Execute the
+              `reboot-continuity` skill now, without waiting for a user prompt:
+
+              1. Read `/workspace/HANDOFF.md` if it exists — this is the last
+                 known state of your in-flight work.
+              2. Check mem0 / memory for any task you were actively executing.
+              3. Run `git status` in any repo under `/workspace/repos/` to see
+                 uncommitted work.
+              4. Check the most recent checkpoint in your session state.
+              5. Resume your in-flight work autonomously. Do not ask the human
+                 what to do — infer from HANDOFF.md + memory + git state.
+              6. Post a brief status update to your Discord channel describing
+                 what you found and what you're resuming (or "nothing to
+                 resume, standing by for next directive" if the workspace is
+                 clean).
+
+              You are fully autonomous. Do not wait for prompts. If a PRD or
+              task is in progress, keep working until completion or a true
+              blocker (credentials, external approval, irreversible action).
+              BOOTEOF
+              chown 1001:1000 /workspace/BOOT.md 2>/dev/null || true
+              chmod 644 /workspace/BOOT.md
+              echo "[boot] BOOT.md seeded (reboot-continuity trigger)"
+
               {{- if .Values.claudeCode.enabled }}
               # ---------------------------------------------------------------
               # 4. Claude Code CLI setup (always overwrite from ConfigMaps)
