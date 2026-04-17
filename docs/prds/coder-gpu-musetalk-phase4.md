@@ -64,11 +64,46 @@ ovh_call() {
 # ovh_call POST /cloud/project/$OVH_PID/instance '{"flavorId":"...","imageId":"...","name":"gpu-1","region":"GRA9","sshKeyId":"..."}'
 ```
 
+## Build Environment — READ BEFORE YOU START
+
+You are running inside the `openclaw-coder` pod in the `cto` namespace. Two quirks will bite you if you don't know about them:
+
+### 1. Image build — use the kaniko sidecar, push to `ghcr.io` only
+- No docker daemon in this pod. Image builds go through the **`kaniko`** sidecar that shares `/workspace` with your `agent` container.
+- Kaniko is pre-authed for `ghcr.io/5dlabs/*` only. Do **not** try to push to `registry.5dlabs.ai` from here — that creds path is not mounted.
+- Canonical build skill lives in the cloned repo (not auto-mounted under `/skills/`):
+  `infra/charts/openclaw-agent/skills/openclaw/container-builds.md`
+  Read it first. TL;DR of the invocation:
+  ```bash
+  kubectl exec -n cto $(hostname) -c kaniko -- /kaniko/executor \
+    --context=/workspace/repos/cto \
+    --dockerfile=infra/docker/musetalk-worker/Dockerfile \
+    --destination=ghcr.io/5dlabs/musetalk-worker:<tag> \
+    --cache=true \
+    --cache-repo=ghcr.io/5dlabs/kaniko-cache
+  ```
+
+### 2. kubectl — ignore the baked kubeconfig, use the live projected SA token
+`~/.kube/config` is a symlink to `/workspace/.kube/config` which carries a **stale token from a prior pod** and will give you `Unauthorized`. Use the live projected ServiceAccount token instead — `openclaw-coder` has cluster-admin-equivalent RBAC:
+
+```bash
+alias kc='KUBECONFIG=/dev/null kubectl \
+  --token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token) \
+  --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+  --server=https://kubernetes.default.svc'
+
+kc get nodes      # works
+kc -n cto get po  # works
+```
+Or regenerate `/workspace/.kube/config` once at session start using the same projected token. Either way: don't trust the baked kubeconfig.
+
+
 ## Acceptance Criteria (all must pass)
+
 1. **Instance provisioned**: 1× `t2-45` (V100S 32GB) in `GRA9`, flavor confirmed via `/cloud/project/$PID/instance`.
 2. **Joined cluster**: `kubectl get nodes` shows the GPU node `Ready`, RKE2 agent v1.34.5, joined to `https://10.0.0.181:9345`.
 3. **GPU Operator healthy**: NFD labels include `feature.node.kubernetes.io/pci-10de.present=true`; `kubectl describe node <gpu-node>` shows `nvidia.com/gpu: 1` allocatable; `nvidia-smi` works in a `nvidia/cuda:11.8.0-base` test pod.
-4. **Image built & pushed**: `registry.5dlabs.ai/5dlabs/musetalk-worker:<tag>` — MuseTalk 1.5 repo baked in, CUDA 11.8 base, PyTorch + torchvision + transformers + opencv + livekit-rtc installed. SBOM or at minimum a `docker inspect` in the PR.
+4. **Image built & pushed**: `ghcr.io/5dlabs/musetalk-worker:<tag>` — MuseTalk 1.5 repo baked in, CUDA 11.8 base, PyTorch + torchvision + transformers + opencv + livekit-rtc installed. SBOM or at minimum a `docker inspect` in the PR. (Kaniko sidecar is pre-authed to `ghcr.io/5dlabs/*` only — `registry.5dlabs.ai` is not authed in this pod.)
 5. **ArgoCD Application deployed**: avatar agent pod scheduled via `nodeSelector: feature.node.kubernetes.io/pci-10de.present: "true"`, `resources.limits.nvidia.com/gpu: 1`. Pod reaches `Running`.
 6. **Smoke test in pod**: `kubectl exec` → `nvidia-smi` + `python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"` both succeed (prints `True, Tesla V100S-PCIE-32GB` or similar).
 
