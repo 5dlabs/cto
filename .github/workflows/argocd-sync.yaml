@@ -206,9 +206,14 @@ jobs:
 
       - name: Authenticate with ArgoCD
         run: |
+          if [[ -z "${{ secrets.ARGOCD_SERVER }}" || -z "${{ secrets.ARGOCD_AUTH_TOKEN }}" ]]; then
+            echo "::error::ARGOCD_SERVER and ARGOCD_AUTH_TOKEN repo secrets must be set"
+            exit 1
+          fi
           argocd login "${{ secrets.ARGOCD_SERVER }}" \
             --auth-token "${{ secrets.ARGOCD_AUTH_TOKEN }}" \
-            --grpc-web
+            --grpc-web \
+            --plaintext
 
       - name: Sync app-of-apps
         if: needs.detect-changes.outputs.sync_app_of_apps == 'true'
