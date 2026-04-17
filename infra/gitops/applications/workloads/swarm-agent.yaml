@@ -251,6 +251,12 @@ spec:
         session:
           scope: "per-sender"
           dmScope: "per-channel-peer"
+          agentToAgent:
+            maxPingPongTurns: 5
+          threadBindings:
+            enabled: true
+            idleHours: 24
+            maxAgeHours: 0
           maintenance:
             mode: "enforce"
             pruneAfter: "30d"
@@ -381,6 +387,23 @@ spec:
               | 5dlabs/sigma-1 | /workspace/repos/sigma-1 |
               | 5dlabs/lab-eco | /workspace/repos/lab-eco |
               | 5dlabs/big-balls | /workspace/repos/big-balls |
+
+              ### Naming Conventions (User-Facing)
+
+              When referencing repos in Discord digests, announcements, user-facing summaries,
+              or any prose communication, use these friendly aliases instead of raw repo names:
+
+              | Repo | User-Facing Name | Short Form |
+              | --- | --- | --- |
+              | 5dlabs/big-balls | **Trading Infrastructure** | Trade-Infra |
+
+              Rules:
+              - Use the friendly name in all Discord messages, digests, status updates, and prose.
+              - Continue to use the raw repo slug (`big-balls`) for `git`, `gh` CLI operations,
+                file paths (`/workspace/repos/big-balls`), and API calls — these MUST match the
+                actual GitHub repo name.
+              - If the user explicitly refers to a repo by its raw name, you may mirror that usage
+                in that reply, but default to the friendly name in proactive communications.
 
               ### Other 5dlabs repos (access via `gh` CLI only)
               ```bash
