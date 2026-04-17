@@ -3,6 +3,18 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.63](https://github.com/5dlabs/cto/compare/v0.2.62...v0.2.63) (2026-04-17)
+
+
+### ✨ Features
+
+* harden livekit phase 1 gitops ([#4672](https://github.com/5dlabs/cto/issues/4672)) ([0585a16](https://github.com/5dlabs/cto/commit/0585a164c64c630e60a0a995b1f1c8c2c541b265))
+
+
+### 🐛 Bug Fixes
+
+* **openclaw-agent:** move delivery+mem0 patches to init container ([5ae0b9b](https://github.com/5dlabs/cto/commit/5ae0b9b299bb66849bd2c96e667b1a609dad89ed))
+
 ## [0.2.62](https://github.com/5dlabs/cto/compare/v0.2.61...v0.2.62) (2026-04-17)
 
 
