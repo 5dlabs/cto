@@ -661,27 +661,16 @@ spec:
                     ;;
                 esac
               done
-              # Copy openclaw dist directory to staging overlay and patch delivery
-              # to honor OPENCLAW_DEFAULT_RECIPIENT (fixes channel:UNKNOWN on boot).
-              # The overlay is mounted at the dist path in the agent container.
-              DIST_SRC="/usr/local/share/npm-global/lib/node_modules/openclaw/dist"
-              DIST_STAGING="/tmp/openclaw-dist-staging"
-              if [ -d "$DIST_SRC" ]; then
-                cp -a "$DIST_SRC/." "$DIST_STAGING/"
-                for f in "$DIST_STAGING"/agent-delivery-*.js; do
-                  [ -f "$f" ] || continue
-                  if grep -q 'OPENCLAW_DEFAULT_RECIPIENT' "$f"; then
-                    echo "[workspace-files] Delivery patch already applied in $f"
-                  else
-                    sed -i 's/\([ \t]*\)let resolvedTo = explicitTo;/\1let resolvedTo = explicitTo;\n\1if (!resolvedTo \&\& process.env.OPENCLAW_DEFAULT_RECIPIENT) resolvedTo = process.env.OPENCLAW_DEFAULT_RECIPIENT;/' "$f" \
-                      && echo "[workspace-files] Patched delivery fallback in $(basename $f)" \
-                      || echo "[workspace-files] WARN: delivery patch sed failed for $(basename $f)"
-                  fi
-                done
-                echo "[workspace-files] Dist overlay ready ($(ls "$DIST_STAGING" | wc -l) files)"
-              else
-                echo "[workspace-files] WARN: openclaw dist not found at $DIST_SRC"
-              fi
+              # Patch OpenClaw agent-delivery to honor OPENCLAW_DEFAULT_RECIPIENT
+              # when no explicit recipient is resolved (fixes channel:UNKNOWN on boot).
+              # Runs in init (root) because dist/ files are root-owned.
+              for f in /usr/local/share/npm-global/lib/node_modules/openclaw/dist/agent-delivery-*.js; do
+                [ -f "$f" ] || continue
+                grep -q 'OPENCLAW_DEFAULT_RECIPIENT' "$f" && continue
+                sed -i 's/let resolvedTo = explicitTo;/let resolvedTo = explicitTo; if (!resolvedTo \&\& process.env.OPENCLAW_DEFAULT_RECIPIENT) resolvedTo = process.env.OPENCLAW_DEFAULT_RECIPIENT;/' "$f" \
+                  && echo "[workspace-files] Patched delivery fallback in $(basename $f)" \
+                  || echo "[workspace-files] WARN: delivery patch failed for $(basename $f)"
+              done
               # Increase mem0 recall timeout from 8s to 30s (qdrant can be slow
               # on large collections, especially after pod restarts).
               for f in /workspace/.openclaw/extensions/openclaw-mem0/node_modules/@mem0/openclaw-mem0/dist/index.js; do
@@ -696,10 +685,6 @@ spec:
               mountPath: /workspace
             - name: workspace-files-template
               mountPath: /workspace-files-template
-            {{- if .Values.agent.defaultRecipient }}
-            - name: openclaw-dist-overlay
-              mountPath: /tmp/openclaw-dist-staging
-            {{- end }}
         {{- end }}
       containers:
         - name: agent
@@ -722,7 +707,6 @@ spec:
                 echo "[openclaw] Installing missing @buape/carbon dependency"
                 npm install -g --no-audit --no-fund @buape/carbon 2>&1 | tail -2
               }
-              # Delivery patch: handled via dist overlay from init-workspace-files
               exec openclaw gateway
           lifecycle:
             postStart:
@@ -781,8 +765,8 @@ spec:
             {{- end }}
             {{- if .Values.agent.defaultRecipient }}
             # Fallback delivery target when session has no resolved recipient.
-            # The init container patches the delivery module in a dist overlay
-            # to fall back to this value when no explicit recipient is set.
+            # Consumed by postStart patch on agent-delivery-*.js to fix missing
+            # final-response Discord posts.
             - name: OPENCLAW_DEFAULT_RECIPIENT
               value: {{ .Values.agent.defaultRecipient | quote }}
             {{- end }}
@@ -1032,10 +1016,6 @@ spec:
           volumeMounts:
             - name: workspace
               mountPath: /workspace
-            {{- if .Values.agent.defaultRecipient }}
-            - name: openclaw-dist-overlay
-              mountPath: /usr/local/share/npm-global/lib/node_modules/openclaw/dist
-            {{- end }}
             {{- if .Values.kaniko.enabled }}
             - name: kaniko-docker-config
               mountPath: /workspace/.docker
@@ -1179,41 +1159,46 @@ spec:
               if [ ! -f /workspace/.code-server/User/settings.json ]; then
               cat > /workspace/.code-server/User/settings.json << 'SETTINGS'
               {
-                "workbench.colorTheme": "Dark Modern",
+                "workbench.colorTheme": "Default Dark Modern",
                 "workbench.startupEditor": "none",
-                "workbench.sideBar.location": "left",
-                "workbench.activityBar.location": "default",
                 "editor.fontSize": 14,
                 "terminal.integrated.fontSize": 14,
                 "github.copilot.enable": { "*": true },
-                "cto.apiBase": "http://localhost:18789",
-                "cto.defaultAgent": "morgan",
-                "diffEditor.renderSideBySide": true,
-                "scm.diffDecorations": "all",
+                "workbench.activityBar.location": "hidden",
+                "workbench.statusBar.visible": true,
+                "workbench.editor.showTabs": "single",
+                "workbench.layoutControl.enabled": false,
+                "window.commandCenter": false,
+                "breadcrumbs.enabled": false,
+                "editor.minimap.enabled": false,
+                "editor.glyphMargin": false,
+                "editor.folding": false,
+                "editor.lineNumbers": "off",
+                "editor.wordWrap": "on",
+                "editor.renderLineHighlight": "none",
+                "diffEditor.renderSideBySide": false,
+                "diffEditor.useInlineViewWhenSpaceIsLimited": true,
+                "diffEditor.ignoreTrimWhitespace": false,
                 "scm.defaultViewMode": "tree",
-                "files.autoSave": "afterDelay",
-                "files.autoSaveDelay": 1000
+                "scm.alwaysShowRepositories": false,
+                "scm.diffDecorations": "gutter",
+                "git.openDiffOnClick": true,
+                "git.autoRepositoryDetection": true,
+                "git.decorations.enabled": true,
+                "explorer.openEditors.visible": 0,
+                "workbench.tree.indent": 12
               }
               SETTINGS
               sed -i 's/^              //' /workspace/.code-server/User/settings.json
               fi
-              # Pre-seed workbench state: CTO sidebar active, hide all other activity bar icons
+              # Pre-seed workbench state to open Source Control view on startup
               mkdir -p /workspace/.code-server/User/globalStorage
               if [ ! -f /workspace/.code-server/User/globalStorage/storage.json ]; then
               cat > /workspace/.code-server/User/globalStorage/storage.json << 'STATE'
               {
-                "lastActiveSideBarViewlet": "workbench.view.extension.cto-sidebar",
+                "lastActiveSideBarViewlet": "workbench.view.scm",
                 "workbench.sideBar.visible": true,
-                "workbench.panel.visible": false,
-                "workbench.sideBar.size": 380,
-                "workbench.activityBar.hidden.workbench.view.explorer": true,
-                "workbench.activityBar.hidden.workbench.view.search": true,
-                "workbench.activityBar.hidden.workbench.view.scm": true,
-                "workbench.activityBar.hidden.workbench.view.debug": true,
-                "workbench.activityBar.hidden.workbench.view.extensions": true,
-                "workbench.activityBar.hidden.workbench.view.extension.github-copilot-chat": true,
-                "workbench.activityBar.hidden.userDataProfiles": true,
-                "workbench.activityBar.hidden.workbench.view.remote": true
+                "workbench.panel.visible": false
               }
               STATE
               sed -i 's/^              //' /workspace/.code-server/User/globalStorage/storage.json
@@ -1223,10 +1208,8 @@ spec:
               mkdir -p /root/.config/code-server
               cat > /root/.config/code-server/config.yaml << CSCONF
               bind-addr: 0.0.0.0:{{ .Values.codeServer.port | default 8080 }}
-              auth: {{ .Values.codeServer.auth | default "password" }}
-              {{- if ne (.Values.codeServer.auth | default "password") "none" }}
+              auth: password
               password: ${PASSWORD}
-              {{- end }}
               cert: false
               github-auth: ${GITHUB_TOKEN}
               CSCONF
@@ -1249,34 +1232,6 @@ spec:
                   -o "${VSIX}.gz" && (gunzip -f "${VSIX}.gz" 2>/dev/null || mv "${VSIX}.gz" "$VSIX")
                 code-server --extensions-dir "$EXTDIR" --install-extension "$VSIX" 2>/dev/null || true
               done
-              {{- if .Values.codeServer.customExtensions }}
-              # Install custom extensions (vsix from PV path, workspace repo, or URL)
-              echo "[code-server] Installing custom extensions..."
-              {{- range .Values.codeServer.customExtensions }}
-              {{- if .pvPath }}
-              CUSTOM_VSIX="{{ .pvPath }}"
-              {{- else if .repoPath }}
-              REPO_DIR="/workspace/repos/cto"
-              if [ -d "$REPO_DIR/.git" ]; then
-                git config --global --add safe.directory "$REPO_DIR" 2>/dev/null || true
-                git -C "$REPO_DIR" pull --ff-only origin main 2>/dev/null || true
-              fi
-              CUSTOM_VSIX="${REPO_DIR}/{{ .repoPath }}"
-              {{- else }}
-              CUSTOM_VSIX="/workspace/.code-server-cache/{{ .name }}.vsix"
-              if [ ! -f "$CUSTOM_VSIX" ] || [ "{{ .forceUpdate | default false }}" = "true" ]; then
-                echo "[code-server] Downloading {{ .name }}..."
-                curl -sL "{{ .url }}" -o "$CUSTOM_VSIX" 2>/dev/null || true
-              fi
-              {{- end }}
-              if [ -f "$CUSTOM_VSIX" ]; then
-                echo "[code-server] Installing {{ .name }}..."
-                code-server --extensions-dir "$EXTDIR" --install-extension "$CUSTOM_VSIX" 2>/dev/null || true
-              else
-                echo "[code-server] WARNING: {{ .name }} vsix not found at $CUSTOM_VSIX"
-              fi
-              {{- end }}
-              {{- end }}
               # Patch product.json to use MS Marketplace (Copilot not on Open VSX)
               /usr/lib/code-server/lib/node -e "
                 var fs=require('fs'),p='/usr/lib/code-server/lib/vscode/product.json';
@@ -1332,50 +1287,15 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
-        {{- if .Values.codeServer.tunnelUrl }}
-        # Static cluster tunnel — write known URL to shared workspace
-        - name: tunnel-url-writer
-          image: busybox:1.36
-          command:
-            - /bin/sh
-            - -c
-            - |
-              echo "{{ .Values.codeServer.tunnelUrl }}" > /workspace/.code-server-url
-              echo "[tunnel-url-writer] Static tunnel URL: {{ .Values.codeServer.tunnelUrl }}"
-              # Stay alive so pod doesn't restart (sidecar pattern)
-              sleep infinity
-          volumeMounts:
-            - name: workspace
-              mountPath: /workspace
-          resources:
-            requests:
-              cpu: 1m
-              memory: 4Mi
-            limits:
-              cpu: 10m
-              memory: 16Mi
-        {{- else }}
-        # Ephemeral quick tunnel — auto-discover random URL
+        {{- if .Values.codeServer.quickTunnel.enabled }}
         - name: cloudflared
           image: cloudflare/cloudflared:latest
           command:
-            - /bin/sh
-            - -c
-            - |
-              cloudflared tunnel --url http://localhost:{{ .Values.codeServer.port | default 8080 }} --no-autoupdate 2>&1 | tee /dev/stderr | while IFS= read -r line; do
-                case "$line" in
-                  *trycloudflare.com*)
-                    URL=$(echo "$line" | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com')
-                    if [ -n "$URL" ]; then
-                      echo "$URL" > /workspace/.code-server-url
-                      echo "[cloudflared] Wrote tunnel URL to /workspace/.code-server-url: $URL"
-                    fi
-                    ;;
-                esac
-              done
-          volumeMounts:
-            - name: workspace
-              mountPath: /workspace
+            - cloudflared
+            - tunnel
+            - --url
+            - http://localhost:{{ .Values.codeServer.port | default 8080 }}
+            - --no-autoupdate
           resources:
             requests:
               cpu: 10m
@@ -1425,10 +1345,6 @@ spec:
         {{- end }}
         {{- if .Values.tools.acp.enabled }}
         - name: acpx-node-modules
-          emptyDir: {}
-        {{- end }}
-        {{- if .Values.agent.defaultRecipient }}
-        - name: openclaw-dist-overlay
           emptyDir: {}
         {{- end }}
         {{- if .Values.nats.enabled }}
