@@ -2,7 +2,7 @@
   "name": "cto-chat",
   "displayName": "CTO Agent Chat",
   "description": "Chat with your CTO AI agent via the OpenClaw ACP gateway",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "5dlabs",
   "engines": {
     "vscode": "^1.90.0"
@@ -17,7 +17,8 @@
         "name": "cto",
         "fullName": "CTO Agent",
         "description": "Talk to your CTO AI agent powered by OpenClaw",
-        "isSticky": true
+        "isSticky": true,
+        "isDefault": true
       }
     ],
     "configuration": {

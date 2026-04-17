@@ -1,9 +1,105 @@
 import * as vscode from "vscode";
 
+interface OpenAIMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+function buildMessages(
+  chatContext: vscode.ChatContext,
+  prompt: string
+): OpenAIMessage[] {
+  const messages: OpenAIMessage[] = [];
+
+  // Replay prior conversation turns for context
+  for (const turn of chatContext.history) {
+    if (turn instanceof vscode.ChatRequestTurn) {
+      messages.push({ role: "user", content: turn.prompt });
+    } else if (turn instanceof vscode.ChatResponseTurn) {
+      const text = turn.response
+        .map((part) =>
+          part instanceof vscode.ChatResponseMarkdownPart
+            ? part.value.value
+            : ""
+        )
+        .join("");
+      if (text) {
+        messages.push({ role: "assistant", content: text });
+      }
+    }
+  }
+
+  messages.push({ role: "user", content: prompt });
+  return messages;
+}
+
+async function streamResponse(
+  apiBase: string,
+  apiToken: string,
+  model: string,
+  messages: OpenAIMessage[],
+  stream: vscode.ChatResponseStream,
+  token: vscode.CancellationToken
+): Promise<void> {
+  const controller = new AbortController();
+  token.onCancellationRequested(() => controller.abort());
+
+  const res = await fetch(`${apiBase}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiToken}`,
+    },
+    body: JSON.stringify({ model, messages, stream: true }),
+    signal: controller.signal,
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    stream.markdown(`**Error ${res.status}**: ${errBody}`);
+    return;
+  }
+
+  if (!res.body) {
+    stream.markdown("No response body received.");
+    return;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    if (token.isCancellationRequested) break;
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const data = line.slice(6).trim();
+      if (data === "[DONE]") continue;
+
+      try {
+        const chunk = JSON.parse(data);
+        const content = chunk.choices?.[0]?.delta?.content;
+        if (content) {
+          stream.markdown(content);
+        }
+      } catch {
+        // skip malformed SSE chunks
+      }
+    }
+  }
+}
+
 export function activate(context: vscode.ExtensionContext) {
   const handler: vscode.ChatRequestHandler = async (
     request,
-    _chatContext,
+    chatContext,
     stream,
     token
   ) => {
@@ -14,64 +110,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     stream.progress("Connecting to CTO agent...");
 
-    const controller = new AbortController();
-    token.onCancellationRequested(() => controller.abort());
-
     try {
-      const res = await fetch(`${apiBase}/v1/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiToken}`,
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: request.prompt }],
-          stream: true,
-        }),
-        signal: controller.signal,
-      });
-
-      if (!res.ok) {
-        const errBody = await res.text();
-        stream.markdown(`**Error ${res.status}**: ${errBody}`);
-        return {};
-      }
-
-      if (!res.body) {
-        stream.markdown("No response body received.");
-        return {};
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        if (token.isCancellationRequested) break;
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6).trim();
-          if (data === "[DONE]") continue;
-
-          try {
-            const chunk = JSON.parse(data);
-            const content = chunk.choices?.[0]?.delta?.content;
-            if (content) {
-              stream.markdown(content);
-            }
-          } catch {
-            // skip malformed chunks
-          }
-        }
-      }
+      const messages = buildMessages(chatContext, request.prompt);
+      await streamResponse(apiBase, apiToken, model, messages, stream, token);
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") {
         stream.markdown("_Request cancelled._");
@@ -93,6 +134,8 @@ export function activate(context: vscode.ExtensionContext) {
     context.extensionUri,
     "icon.png"
   );
+  // Make CTO the default chat participant — messages without @mention go here
+  (participant as any).isDefault = true;
   context.subscriptions.push(participant);
 }
 
