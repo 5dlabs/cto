@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.62](https://github.com/5dlabs/cto/compare/v0.2.61...v0.2.62) (2026-04-17)
+
+
+### 🐛 Bug Fixes
+
+* **openclaw-agent:** default delivery recipient fallback via postStart patch ([#4668](https://github.com/5dlabs/cto/issues/4668)) ([b3033a9](https://github.com/5dlabs/cto/commit/b3033a9d0cfa232b01acff70711f7be32e29b431))
+
 ## [0.2.61](https://github.com/5dlabs/cto/compare/v0.2.60...v0.2.61) (2026-04-17)
 
 
