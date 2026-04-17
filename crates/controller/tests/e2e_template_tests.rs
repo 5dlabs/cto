@@ -448,8 +448,7 @@ mod rendering_tests {
     /// Check if templates are available for testing via AGENT_TEMPLATES_PATH
     fn templates_available() -> bool {
         std::env::var("AGENT_TEMPLATES_PATH")
-            .map(|p| PathBuf::from(p).join("_shared/container.sh.hbs").exists())
-            .unwrap_or(false)
+            .is_ok_and(|p| PathBuf::from(p).join("_shared/container.sh.hbs").exists())
     }
 
     /// Skip test if templates aren't available
