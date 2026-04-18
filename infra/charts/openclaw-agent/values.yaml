@@ -325,6 +325,7 @@ codeServer:
   enabled: false
   port: 8080
   password: ""
+  publicUrl: ""
   defaultFolder: "/workspace"
   quickTunnel:
     enabled: true
