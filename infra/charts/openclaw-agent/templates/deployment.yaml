@@ -1184,7 +1184,7 @@ spec:
                 "editor.fontSize": 14,
                 "terminal.integrated.fontSize": 14,
                 "github.copilot.enable": { "*": true },
-                "workbench.activityBar.location": "hidden",
+                "workbench.activityBar.location": "default",
                 "workbench.statusBar.visible": true,
                 "workbench.editor.showTabs": "single",
                 "workbench.layoutControl.enabled": false,
@@ -1218,7 +1218,7 @@ spec:
               if [ ! -f /workspace/.code-server/User/globalStorage/storage.json ]; then
               cat > /workspace/.code-server/User/globalStorage/storage.json << 'STATE'
               {
-                "lastActiveSideBarViewlet": "workbench.view.scm",
+                "lastActiveSideBarViewlet": "workbench.view.extension.cto-sidebar",
                 "workbench.sideBar.visible": true,
                 "workbench.panel.visible": false
               }
