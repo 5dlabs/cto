@@ -85,10 +85,7 @@ impl ClaudeAdapter {
                 // Thread escalation policy + prewarm headers so the tools
                 // server applies per-session policy.
                 let mut headers = serde_json::Map::new();
-                headers.insert(
-                    "X-Agent-Id".to_string(),
-                    json!(agent_id),
-                );
+                headers.insert("X-Agent-Id".to_string(), json!(agent_id));
                 headers.insert(
                     "X-Agent-Prewarm".to_string(),
                     json!(tool_config.remote.join(" ")),
@@ -150,7 +147,8 @@ impl CliAdapter for ClaudeAdapter {
         self.base.validate_base_config(agent_config)?;
 
         // Generate MCP configuration
-        let mcp_servers = Self::generate_mcp_config(agent_config.tools.as_ref(), &agent_config.github_app);
+        let mcp_servers =
+            Self::generate_mcp_config(agent_config.tools.as_ref(), &agent_config.github_app);
 
         // Get default values from environment variables (configurable, not hardcoded)
         let default_max_tokens = std::env::var("CLAUDE_DEFAULT_MAX_TOKENS")

@@ -7,13 +7,18 @@
     CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
     SCCACHE_DIR: /tmp/sccache
     CARGO_INCREMENTAL: "0"
-    RUSTC_WRAPPER: sccache
   before_script:
     - rustup default stable
     - rustup component add rustfmt clippy
     - |
       if ! command -v sccache &>/dev/null; then
         cargo install sccache --locked 2>/dev/null || true
+      fi
+      if command -v sccache &>/dev/null; then
+        export RUSTC_WRAPPER=sccache
+        echo "sccache enabled"
+      else
+        echo "sccache unavailable; continuing without wrapper"
       fi
     - |
       if ! command -v cargo-nextest &>/dev/null; then

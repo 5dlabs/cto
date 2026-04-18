@@ -228,20 +228,21 @@ pub fn build_args_json(
         .and_then(|d| d.play.as_ref());
 
     // Helper: override > play-config > cto-default > fallback
-    let resolve_str = |key: &str, play_val: &str, cto_val: Option<&str>, fallback: &str| -> String {
-        if let Some(v) = overrides.get(key) {
-            return v.clone();
-        }
-        if !play_val.is_empty() {
-            return play_val.to_string();
-        }
-        if let Some(v) = cto_val {
-            if !v.is_empty() {
-                return v.to_string();
+    let resolve_str =
+        |key: &str, play_val: &str, cto_val: Option<&str>, fallback: &str| -> String {
+            if let Some(v) = overrides.get(key) {
+                return v.clone();
             }
-        }
-        fallback.to_string()
-    };
+            if !play_val.is_empty() {
+                return play_val.to_string();
+            }
+            if let Some(v) = cto_val {
+                if !v.is_empty() {
+                    return v.to_string();
+                }
+            }
+            fallback.to_string()
+        };
 
     let repo_url = resolve_str(
         "repo_url",
@@ -259,7 +260,12 @@ pub fn build_args_json(
         None,
         "accounts/fireworks/routers/kimi-k2p5-turbo",
     );
-    let harness_agent = resolve_str("harness_agent", &pc.defaults.harness_agent, None, "openclaw");
+    let harness_agent = resolve_str(
+        "harness_agent",
+        &pc.defaults.harness_agent,
+        None,
+        "openclaw",
+    );
     let github_app_prefix = resolve_str(
         "github_app_prefix",
         &pc.defaults.github_app_prefix,

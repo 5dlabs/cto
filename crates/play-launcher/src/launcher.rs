@@ -65,7 +65,11 @@ pub async fn run_lobster(
         }
         println!("===============");
         println!("\nWould execute:");
-        println!("  lobster run {} --args-json '{}'", play_yaml.display(), args_str);
+        println!(
+            "  lobster run {} --args-json '{}'",
+            play_yaml.display(),
+            args_str
+        );
         return Ok(());
     }
 

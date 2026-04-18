@@ -181,7 +181,10 @@ model_reasoning_effort = "{reasoning_effort}"
         // Add MCP servers section if tools are present
         if let Some(tools) = context["tools"].as_object() {
             if let Some(url) = tools.get("url").and_then(|v| v.as_str()) {
-                let agent_id = tools.get("agent_id").and_then(|v| v.as_str()).unwrap_or("default");
+                let agent_id = tools
+                    .get("agent_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("default");
                 let prewarm = tools.get("prewarm").and_then(|v| v.as_str()).unwrap_or("");
                 let _ = write!(
                     toml,

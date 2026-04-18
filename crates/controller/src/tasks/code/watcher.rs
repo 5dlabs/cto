@@ -285,7 +285,7 @@ pub async fn create_watcher_coderun(
         model_rotation: None,
         provider: None,
         provider_base_url: None,
-            api_key_env_var: None,
+        api_key_env_var: None,
     };
 
     // Build environment variables

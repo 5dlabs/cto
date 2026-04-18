@@ -148,17 +148,14 @@ async fn main() -> Result<()> {
     // Find and run play.lobster.yaml
     let play_yaml = find_play_yaml(&repo_path)?;
 
-    let kubeconfig_path = cli
-        .kubeconfig
-        .as_deref()
-        .or_else(|| {
-            let kc = &play_config.kubeconfig.path;
-            if kc.is_empty() {
-                None
-            } else {
-                Some(kc.as_str())
-            }
-        });
+    let kubeconfig_path = cli.kubeconfig.as_deref().or_else(|| {
+        let kc = &play_config.kubeconfig.path;
+        if kc.is_empty() {
+            None
+        } else {
+            Some(kc.as_str())
+        }
+    });
 
     run_lobster(&play_yaml, &args_json, kubeconfig_path, cli.dry_run).await?;
 
@@ -184,7 +181,11 @@ fn load_cto_config(explicit_path: &Option<PathBuf>) -> Option<CtoConfig> {
             match CtoConfig::load(&path) {
                 Ok(config) => return Some(config),
                 Err(e) => {
-                    eprintln!("Warning: could not parse CTO config at {}: {}", path.display(), e);
+                    eprintln!(
+                        "Warning: could not parse CTO config at {}: {}",
+                        path.display(),
+                        e
+                    );
                 }
             }
         }

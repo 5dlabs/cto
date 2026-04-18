@@ -399,7 +399,9 @@ impl ResourceNaming {
     pub fn shorten_provider_name(provider: &str) -> String {
         let lower = provider.to_lowercase();
         // Normalize "open router" / "open-router" / "openrouter" variants
-        let normalized = lower.replace("open router", "open-router").replace("openrouter", "open-router");
+        let normalized = lower
+            .replace("open router", "open-router")
+            .replace("openrouter", "open-router");
         normalized
             .replace(' ', "-")
             .chars()
@@ -922,7 +924,10 @@ mod tests {
     fn shorten_model_name_handles_other_models() {
         assert_eq!(ResourceNaming::shorten_model_name("haiku"), "haiku");
         assert_eq!(ResourceNaming::shorten_model_name("gpt-4"), "gpt-4");
-        assert_eq!(ResourceNaming::shorten_model_name("gemini-pro"), "gemini-pro");
+        assert_eq!(
+            ResourceNaming::shorten_model_name("gemini-pro"),
+            "gemini-pro"
+        );
         assert_eq!(
             ResourceNaming::shorten_model_name("some-custom-model"),
             "some-custom-model"
@@ -962,7 +967,7 @@ mod tests {
                     model_rotation: None,
                     provider: None,
                     provider_base_url: None,
-            api_key_env_var: None,
+                    api_key_env_var: None,
                 }),
                 task_id: Some(123),
                 service: "heal".to_string(),
@@ -1052,7 +1057,7 @@ mod tests {
                     model_rotation: None,
                     provider: None,
                     provider_base_url: None,
-            api_key_env_var: None,
+                    api_key_env_var: None,
                 }),
                 task_id: Some(0),
                 service: "prd-alerthub-e2e-test".to_string(),
@@ -1088,7 +1093,10 @@ mod tests {
 
     #[test]
     fn shorten_cli_name_works() {
-        assert_eq!(ResourceNaming::shorten_cli_name("Claude Code"), "claude-code");
+        assert_eq!(
+            ResourceNaming::shorten_cli_name("Claude Code"),
+            "claude-code"
+        );
         // "claude" stays "claude" — generic, no special-casing
         assert_eq!(ResourceNaming::shorten_cli_name("claude"), "claude");
         assert_eq!(ResourceNaming::shorten_cli_name("Codex"), "codex");
@@ -1123,7 +1131,10 @@ mod tests {
     #[test]
     fn shorten_model_name_handles_new_models() {
         // Generic algorithm: strip date, dots to dashes, preserve dashes
-        assert_eq!(ResourceNaming::shorten_model_name("gpt-5.2-codex"), "gpt-5-2-codex");
+        assert_eq!(
+            ResourceNaming::shorten_model_name("gpt-5.2-codex"),
+            "gpt-5-2-codex"
+        );
         assert_eq!(ResourceNaming::shorten_model_name("o4-mini"), "o4-mini");
         assert_eq!(ResourceNaming::shorten_model_name("gpt-4.1"), "gpt-4-1");
         assert_eq!(

@@ -89,7 +89,11 @@ pub struct ACPProviderEntry {
     pub base_url: Option<String>,
     /// Secret key name in cto-secrets for this provider's API key.
     /// Overrides hardcoded defaults so new providers work without Rust changes.
-    #[serde(default, rename = "apiKeyEnvVar", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "apiKeyEnvVar",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub api_key_env_var: Option<String>,
     /// Models available from this provider
     pub models: Vec<ACPModel>,
@@ -113,7 +117,11 @@ pub struct OpenClawModelEntry {
     /// Model identifier (e.g. "accounts/fireworks/routers/kimi-k2p5-turbo")
     pub name: String,
     /// Human-readable display name (e.g. "Kimi K2.5 Turbo")
-    #[serde(default, rename = "displayName", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "displayName",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub display_name: Option<String>,
     /// Thinking level hint: "high", "medium", or "low"
     #[serde(
@@ -129,7 +137,11 @@ pub struct OpenClawModelEntry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input: Option<Vec<String>>,
     /// Context window size in tokens
-    #[serde(default, rename = "contextWindow", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "contextWindow",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub context_window: Option<u64>,
     /// Maximum output tokens
     #[serde(default, rename = "maxTokens", skip_serializing_if = "Option::is_none")]
@@ -146,11 +158,18 @@ pub struct OpenClawProviderEntry {
     #[serde(default, rename = "baseUrl", skip_serializing_if = "Option::is_none")]
     pub base_url: Option<String>,
     /// Environment variable name for the API key (e.g. "FIREWORKS_API_KEY")
-    #[serde(default, rename = "apiKeyEnvVar", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "apiKeyEnvVar",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub api_key_env_var: Option<String>,
     /// OpenClaw API adapter type (e.g. "openai-completions", "google-generative-ai").
     /// Defaults to "openai-completions" when not specified.
-    #[serde(default = "default_openclaw_api", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default = "default_openclaw_api",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub api: Option<String>,
     /// Models available from this provider
     pub models: Vec<OpenClawModelEntry>,
@@ -209,9 +228,7 @@ impl OpenClawConfig {
                 },
                 OpenClawProviderEntry {
                     name: "google".to_string(),
-                    base_url: Some(
-                        "https://generativelanguage.googleapis.com/v1beta".to_string(),
-                    ),
+                    base_url: Some("https://generativelanguage.googleapis.com/v1beta".to_string()),
                     api_key_env_var: Some("GEMINI_API_KEY".to_string()),
                     api: Some("google-generative-ai".to_string()),
                     models: vec![
@@ -682,7 +699,11 @@ pub struct CodeRunSpec {
     /// Which harness agent to use for this CodeRun.
     /// Defaults to `OpenClaw`. Set to `Hermes` to skip the gateway
     /// and use standalone ACPX + Lobster directly.
-    #[serde(default, rename = "harnessAgent", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "harnessAgent",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub harness_agent: Option<HarnessAgent>,
 
     /// Whether to attach a code-server sidecar for browser-based IDE access.
@@ -1050,7 +1071,10 @@ mod tests {
             deserialized.providers[0].base_url.as_deref().unwrap(),
             "https://api.fireworks.ai/inference/v1"
         );
-        assert_eq!(deserialized.providers[0].api.as_deref().unwrap(), "openai-completions");
+        assert_eq!(
+            deserialized.providers[0].api.as_deref().unwrap(),
+            "openai-completions"
+        );
     }
 
     #[test]
@@ -1113,7 +1137,10 @@ mod tests {
         let serialized = serde_json::to_string(&spec).unwrap();
         assert!(serialized.contains(r#""harnessAgent":"hermes""#));
         let deserialized: CodeRunSpec = serde_json::from_str(&serialized).unwrap();
-        assert!(matches!(deserialized.harness_agent, Some(HarnessAgent::Hermes)));
+        assert!(matches!(
+            deserialized.harness_agent,
+            Some(HarnessAgent::Hermes)
+        ));
     }
 
     #[test]
@@ -1166,6 +1193,9 @@ mod tests {
         let oc = spec.openclaw.unwrap();
         assert_eq!(oc.providers.len(), 1);
         assert_eq!(oc.providers[0].name, "fireworks");
-        assert_eq!(oc.providers[0].api.as_deref().unwrap(), "openai-completions");
+        assert_eq!(
+            oc.providers[0].api.as_deref().unwrap(),
+            "openai-completions"
+        );
     }
 }

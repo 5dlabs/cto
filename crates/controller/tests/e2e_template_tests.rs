@@ -490,7 +490,7 @@ mod rendering_tests {
                     model_rotation: None,
                     provider: None,
                     provider_base_url: None,
-                api_key_env_var: None,
+                    api_key_env_var: None,
                 }),
                 task_id: Some(1),
                 service: "test-service".to_string(),

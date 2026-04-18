@@ -650,11 +650,7 @@ abc123def456  rex-default.tar.gz
         fs::create_dir_all(&agent_dir).unwrap();
 
         fs::write(agent_dir.join("MCP.md"), "# MCP Config\nCustom tools.").unwrap();
-        fs::write(
-            agent_dir.join("overrides.json"),
-            r#"{"key": "value"}"#,
-        )
-        .unwrap();
+        fs::write(agent_dir.join("overrides.json"), r#"{"key": "value"}"#).unwrap();
         fs::write(agent_dir.join("workflow.yaml"), "steps:\n  - id: test").unwrap();
         fs::write(agent_dir.join("ignored.txt"), "should be skipped").unwrap();
 

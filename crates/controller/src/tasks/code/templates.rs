@@ -1508,13 +1508,17 @@ impl CodeTemplateGenerator {
             .providers
             .iter()
             .map(|p| {
-                let models: Vec<Value> = p.models.iter().map(|m| {
-                    let display = m.display_name.as_deref().unwrap_or(&m.name);
-                    json!({
-                        "id": m.name,
-                        "name": display,
+                let models: Vec<Value> = p
+                    .models
+                    .iter()
+                    .map(|m| {
+                        let display = m.display_name.as_deref().unwrap_or(&m.name);
+                        json!({
+                            "id": m.name,
+                            "name": display,
+                        })
                     })
-                }).collect();
+                    .collect();
                 json!({
                     "name": p.name,
                     "baseUrl": p.base_url,
@@ -1525,7 +1529,10 @@ impl CodeTemplateGenerator {
             })
             .collect();
 
-        let discord_enabled = code_run.spec.openclaw.as_ref()
+        let discord_enabled = code_run
+            .spec
+            .openclaw
+            .as_ref()
             .is_none_or(|oc| oc.discord_enabled);
 
         let context = json!({
@@ -1616,10 +1623,7 @@ impl CodeTemplateGenerator {
                     .models
                     .iter()
                     .map(|m| {
-                        let input = m
-                            .input
-                            .clone()
-                            .unwrap_or_else(|| vec!["text".to_string()]);
+                        let input = m.input.clone().unwrap_or_else(|| vec!["text".to_string()]);
                         // Pre-serialize input array as JSON string for safe template insertion
                         let input_json =
                             serde_json::to_string(&input).unwrap_or_else(|_| "[\"text\"]".into());
@@ -1746,13 +1750,11 @@ impl CodeTemplateGenerator {
             "discord_enabled": false, // Hermes doesn't use Discord
         });
 
-        handlebars
-            .render("hermes_launcher", &context)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to render Hermes launcher: {e}"
-                ))
-            })
+        handlebars.render("hermes_launcher", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render Hermes launcher: {e}"
+            ))
+        })
     }
 
     #[allow(clippy::too_many_lines, clippy::items_after_statements)] // Complex memory generation
@@ -3187,7 +3189,10 @@ Be constructive and explain the "why" behind your suggestions.
     }
 
     #[allow(clippy::too_many_lines, clippy::items_after_statements)] // Complex config generation
-    fn generate_client_config_inner(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
+    fn generate_client_config_inner(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Result<String> {
         use serde_json::to_string_pretty;
 
         let github_app = Self::get_github_app_or_default(code_run);
@@ -3597,7 +3602,10 @@ Be constructive and explain the "why" behind your suggestions.
         let manifest: Value = match serde_json::from_str(&manifest_json) {
             Ok(v) => v,
             Err(e) => {
-                warn!("Failed to parse package manifest for '{}': {}", agent_name, e);
+                warn!(
+                    "Failed to parse package manifest for '{}': {}",
+                    agent_name, e
+                );
                 return;
             }
         };
@@ -3611,7 +3619,11 @@ Be constructive and explain the "why" behind your suggestions.
             let existing = client_config
                 .get("remoteTools")
                 .and_then(|v| v.as_array())
-                .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect::<Vec<_>>())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect::<Vec<_>>()
+                })
                 .unwrap_or_default();
 
             let remote_arr = client_config
@@ -4390,14 +4402,14 @@ Be constructive and explain the "why" behind your suggestions.
                                             }
 
                                             let context = json!({
-                                                "task_id": code_run.spec.task_id.unwrap_or(0),
-            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
-                                                "service": code_run.spec.service,
-                                                "repository_url": code_run.spec.repository_url,
-                                                "docs_repository_url": code_run.spec.docs_repository_url,
-                                                "working_directory": Self::get_working_directory(code_run),
-                                                "github_app": Self::get_github_app_or_default(code_run),
-                                            });
+                                                                                "task_id": code_run.spec.task_id.unwrap_or(0),
+                                            "project_id": code_run.spec.project_id.clone().unwrap_or_default(),
+                                                                                "service": code_run.spec.service,
+                                                                                "repository_url": code_run.spec.repository_url,
+                                                                                "docs_repository_url": code_run.spec.docs_repository_url,
+                                                                                "working_directory": Self::get_working_directory(code_run),
+                                                                                "github_app": Self::get_github_app_or_default(code_run),
+                                                                            });
 
                                             match handlebars.render("hook", &context) {
                                                 Ok(rendered_script) => {
@@ -4676,11 +4688,7 @@ Be constructive and explain the "why" behind your suggestions.
             let agent = agent_name.clone();
             let proj = project.clone();
             let handle = std::thread::spawn(move || {
-                super::skills_cache::ensure_all_skills(
-                    &url,
-                    &agent,
-                    proj.as_deref(),
-                )
+                super::skills_cache::ensure_all_skills(&url, &agent, proj.as_deref())
             });
             match handle.join() {
                 Ok(Ok(all_skills)) => {
@@ -4923,10 +4931,7 @@ Be constructive and explain the "why" behind your suggestions.
     ///
     /// This function takes the qualified model from `qualify_model_for_openclaw()`
     /// and finds the provider that lists it, then returns `provider/model_id`.
-    fn resolve_openclaw_primary_model(
-        code_run: &CodeRun,
-        openclaw_providers: &[Value],
-    ) -> String {
+    fn resolve_openclaw_primary_model(code_run: &CodeRun, openclaw_providers: &[Value]) -> String {
         let model_id = Self::qualify_model_for_openclaw(code_run);
 
         // Check if any provider lists this model — if so, prefix with provider name
