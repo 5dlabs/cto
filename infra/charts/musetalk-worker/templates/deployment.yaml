@@ -47,6 +47,21 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
+        - name: fix-symlink
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              # Create musetalkV15 symlink for upstream compatibility
+              if [ -d /models/musetalk ] && [ ! -e /models/musetalkV15 ]; then
+                ln -s /models/musetalk /models/musetalkV15
+                echo "Created musetalkV15 -> musetalk symlink"
+              fi
+              ls -la /models/
+          volumeMounts:
+            - name: model-cache
+              mountPath: {{ .Values.model.cacheDir }}
         - name: download-models
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
