@@ -4,8 +4,12 @@
 .semgrep-sast:
   image: semgrep/semgrep:latest
   script:
-    - semgrep ci --config auto --json --output semgrep-results.json || true
-    - semgrep ci --config auto
+    # Focused rulesets (curated high-confidence rules); `.semgrepignore` excludes infra YAML.
+    # Generate SAST report for GitLab UI with all findings; gate CI only on ERROR-severity.
+    - semgrep scan --config p/default --config p/security-audit --config p/secrets
+        --json --output semgrep-results.json --metrics=off || true
+    - semgrep scan --config p/default --config p/security-audit --config p/secrets
+        --severity ERROR --error --metrics=off
   artifacts:
     reports:
       sast: semgrep-results.json

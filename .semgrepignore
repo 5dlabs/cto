@@ -1,0 +1,56 @@
+# Semgrep ignore patterns — align with CodeQL exclusions in GitHub Actions
+# Infra YAML / Helm charts / CRDs generate high-noise k8s-security findings;
+# these are covered by dedicated manifest scanning (trivy-config, kubeaudit) not semgrep.
+
+# Helm charts + CRDs
+infra/charts/**
+infra/**/templates/**
+**/*.crd.yaml
+**/crds/**
+
+# Build / vendored / generated
+target/
+node_modules/
+**/node_modules/**
+dist/
+build/
+**/dist/**
+**/build/**
+.next/
+**/.next/**
+**/vendor/**
+
+# Test fixtures and mocks
+test/fixtures/**
+tests/fixtures/**
+**/__fixtures__/**
+**/__mocks__/**
+**/testdata/**
+
+# Documentation and session artifacts
+docs/
+_runs/
+intake/
+memory/
+archived/
+
+# Package lockfiles (not source)
+**/package-lock.json
+**/yarn.lock
+**/Cargo.lock
+**/bun.lockb
+**/deno.lock
+
+# Generated assets
+**/*.min.js
+**/*.min.css
+assets/
+avatar/
+
+# Git / tooling
+.git/
+.github/
+.gitlab/
+.cursor/
+.claude/
+.codex/
