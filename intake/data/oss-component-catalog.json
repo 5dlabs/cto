@@ -1,0 +1,234 @@
+{
+  "$schema_note": "Curated provider catalog surfaced to design-deliberation. Adding/removing entries is a docs-level change (schemas use open enums).",
+  "version": "1.0.0",
+  "updated_at": "2025-01-01",
+  "categories": {
+    "ai_mockup": {
+      "description": "AI / visual mockup generators producing screens or component candidates.",
+      "providers": [
+        {
+          "id": "stitch",
+          "name": "Gemini Stitch",
+          "url": "https://stitch.withgoogle.com/",
+          "frameworks": ["nextjs", "expo", "shared"],
+          "status": "active",
+          "adapter": "intake-agent design_intake (mode=stitch|ingest_plus_stitch)",
+          "notes": "First-class adapter. Produces candidates.json + variants."
+        },
+        {
+          "id": "claude_design",
+          "name": "Claude Design",
+          "url": "https://support.claude.com/en/articles/14604406-claude-design-admin-guide-for-team-and-enterprise-plans",
+          "frameworks": ["nextjs", "expo", "shared"],
+          "status": "reserved",
+          "adapter": null,
+          "notes": "Reserved enum value. UI-only at launch (no public API). Wire when API ships."
+        }
+      ]
+    },
+    "shadcn_registries": {
+      "description": "shadcn-compatible registries. Selections are surfaced as `npx shadcn add <url>` commands written to .tasks/design/shadcn-selections.json.",
+      "providers": [
+        {
+          "id": "shadcn",
+          "name": "shadcn/ui (core)",
+          "url": "https://ui.shadcn.com/",
+          "frameworks": ["nextjs", "shared"],
+          "status": "active",
+          "registry_base": "https://ui.shadcn.com/r",
+          "notes": "Canonical shadcn primitives. Tailwind + Radix under the hood."
+        },
+        {
+          "id": "magicui",
+          "name": "Magic UI",
+          "url": "https://magicui.design/",
+          "frameworks": ["nextjs"],
+          "status": "active",
+          "registry_base": "https://magicui.design/r",
+          "notes": "Animated marketing components. Pairs well with shadcn core."
+        },
+        {
+          "id": "aceternity",
+          "name": "Aceternity UI",
+          "url": "https://ui.aceternity.com/",
+          "frameworks": ["nextjs"],
+          "status": "active",
+          "notes": "Showcase animations & hero components."
+        },
+        {
+          "id": "tremor",
+          "name": "Tremor",
+          "url": "https://tremor.so/",
+          "frameworks": ["nextjs"],
+          "status": "active",
+          "notes": "Dashboard / analytics primitives."
+        },
+        {
+          "id": "park_ui",
+          "name": "Park UI",
+          "url": "https://park-ui.com/",
+          "frameworks": ["nextjs", "shared"],
+          "status": "active",
+          "notes": "Built on Ark UI primitives. Multi-framework."
+        },
+        {
+          "id": "origin_ui",
+          "name": "Origin UI",
+          "url": "https://originui.com/",
+          "frameworks": ["nextjs"],
+          "status": "active",
+          "notes": "Large set of polished shadcn-compatible components."
+        },
+        {
+          "id": "hexta_ui",
+          "name": "HextaUI",
+          "url": "https://hextaui.com/",
+          "frameworks": ["nextjs"],
+          "status": "active",
+          "notes": "Open-source UI kit with shadcn-style installs."
+        },
+        {
+          "id": "kibo_ui",
+          "name": "kibo-ui",
+          "url": "https://www.kibo-ui.com/",
+          "frameworks": ["nextjs"],
+          "status": "active",
+          "notes": "Composable blocks built on shadcn primitives."
+        },
+        {
+          "id": "twentyfirst_dev",
+          "name": "21st.dev",
+          "url": "https://21st.dev/",
+          "frameworks": ["nextjs"],
+          "status": "active",
+          "notes": "Community marketplace of shadcn-compatible components."
+        },
+        {
+          "id": "skiper_ui",
+          "name": "skiper-ui",
+          "url": "https://skiper-ui.com/",
+          "frameworks": ["nextjs"],
+          "status": "active",
+          "notes": "Interaction-rich shadcn components."
+        },
+        {
+          "id": "hero_ui",
+          "name": "HeroUI",
+          "url": "https://www.heroui.com/",
+          "frameworks": ["nextjs"],
+          "status": "active",
+          "notes": "Formerly NextUI. Full kit available; many shadcn-compatible blocks."
+        }
+      ]
+    },
+    "headless": {
+      "description": "Unstyled / accessibility-first primitives. Recommend pairing with shadcn or as a standalone foundation.",
+      "providers": [
+        {
+          "id": "radix",
+          "name": "Radix UI",
+          "url": "https://www.radix-ui.com/",
+          "frameworks": ["nextjs"],
+          "status": "active",
+          "notes": "Default base for shadcn/ui."
+        },
+        {
+          "id": "ark",
+          "name": "Ark UI",
+          "url": "https://ark-ui.com/",
+          "frameworks": ["nextjs", "shared"],
+          "status": "active",
+          "notes": "Multi-framework headless primitives. Park UI's foundation."
+        },
+        {
+          "id": "react_aria",
+          "name": "React Aria",
+          "url": "https://react-spectrum.adobe.com/react-aria/",
+          "frameworks": ["nextjs"],
+          "status": "active",
+          "notes": "Adobe's a11y-first hooks & components."
+        }
+      ]
+    },
+    "full_kits": {
+      "description": "Opinionated full component kits. Alternative tracks to shadcn (user picks one direction).",
+      "providers": [
+        {
+          "id": "mantine",
+          "name": "Mantine",
+          "url": "https://mantine.dev/",
+          "frameworks": ["nextjs"],
+          "status": "active",
+          "notes": "Rich kit with hooks, forms, charts."
+        },
+        {
+          "id": "chakra",
+          "name": "Chakra UI",
+          "url": "https://chakra-ui.com/",
+          "frameworks": ["nextjs"],
+          "status": "active",
+          "notes": "Style-props based component system."
+        }
+      ]
+    },
+    "tanstack": {
+      "description": "Functional libraries (not visual). Surfaced as recommended companions in TOOLS.md.",
+      "providers": [
+        {
+          "id": "tanstack_query",
+          "name": "TanStack Query",
+          "url": "https://tanstack.com/query",
+          "frameworks": ["nextjs", "expo", "shared"],
+          "status": "active",
+          "notes": "Async server-state."
+        },
+        {
+          "id": "tanstack_table",
+          "name": "TanStack Table",
+          "url": "https://tanstack.com/table",
+          "frameworks": ["nextjs", "expo", "shared"],
+          "status": "active",
+          "notes": "Headless table engine."
+        },
+        {
+          "id": "tanstack_router",
+          "name": "TanStack Router",
+          "url": "https://tanstack.com/router",
+          "frameworks": ["nextjs", "shared"],
+          "status": "active",
+          "notes": "Type-safe router (alternative to Next routing for non-Next apps)."
+        },
+        {
+          "id": "tanstack_form",
+          "name": "TanStack Form",
+          "url": "https://tanstack.com/form",
+          "frameworks": ["nextjs", "expo", "shared"],
+          "status": "active",
+          "notes": "Headless form state."
+        },
+        {
+          "id": "tanstack_virtual",
+          "name": "TanStack Virtual",
+          "url": "https://tanstack.com/virtual",
+          "frameworks": ["nextjs", "expo", "shared"],
+          "status": "active",
+          "notes": "Virtualization primitives."
+        }
+      ]
+    }
+  },
+  "skipped": [
+    {
+      "id": "framer",
+      "reason": "Hard-removed from intake (per locked plan). Code components flow not aligned to per-project Storybook output."
+    },
+    {
+      "id": "effect_ts",
+      "reason": "Not design-relevant; functional/effects library."
+    },
+    {
+      "id": "blazity_next_enterprise",
+      "reason": "Enterprise scaffold, not a per-project component library."
+    }
+  ]
+}

@@ -316,6 +316,9 @@ steps:
       if [ -f "$SRC_DIR/auth-discovery.json" ]; then
         cp "$SRC_DIR/auth-discovery.json" "$OUT_DIR/auth-discovery.json"
       fi
+      if [ -f "$WS/intake/data/oss-component-catalog.json" ]; then
+        cp "$WS/intake/data/oss-component-catalog.json" "$OUT_DIR/oss-catalog.json"
+      fi
       jq -n \
         --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         --arg project_name "${project_name}" \
@@ -348,7 +351,8 @@ steps:
             source_screenshots: ($bundle_dir + "/source-screenshots.json"),
             snapshot_links_json: ($bundle_dir + "/snapshot-links.json"),
             snapshot_links_md: ($bundle_dir + "/snapshot-links.md"),
-            auth_discovery: ($bundle_dir + "/auth-discovery.json")
+            auth_discovery: ($bundle_dir + "/auth-discovery.json"),
+            oss_catalog: ($bundle_dir + "/oss-catalog.json")
           }
         }' > "$OUT_DIR/manifest.json"
       cat "$OUT_DIR/manifest.json"
