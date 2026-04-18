@@ -1,28 +1,37 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "component-library.schema.json",
-  "title": "ComponentLibraryArtifact",
-  "description": "Normalized component library output from intake design processing.",
+  "$id": "https://5dlabs.com/intake/component-library.schema.json",
+  "title": "ComponentLibrary",
+  "description": "Project-scoped component library produced by the design phase. Consolidates tokens, primitives, patterns, screens, and provider selections (Stitch, shadcn registries, headless kits, etc.) into a single artifact that the Storybook generator and frontend agents consume.",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
-    "version": { "type": "string" },
-    "projectName": { "type": "string" },
-    "provider_mode": { "type": "string", "enum": ["stitch", "framer", "both", "auto"] },
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "project_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "provider_mode": {
+      "type": "string",
+      "minLength": 1,
+      "description": "How candidates were sourced. Open string; common values include stitch, shadcn, mixed, auto.",
+      "examples": ["stitch", "shadcn", "mixed", "auto"]
+    },
     "providers": {
       "type": "array",
-      "items": { "type": "string", "enum": ["stitch", "framer"] }
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Identifiers of providers that contributed to this library. Open enum; see intake/data/oss-component-catalog.json for the curated set.",
+      "examples": [
+        ["stitch"],
+        ["shadcn", "magic-ui"],
+        ["stitch", "shadcn", "radix"]
+      ]
     },
-    "tokens": {
-      "type": "object",
-      "properties": {
-        "color": { "type": "array", "items": { "$ref": "#/$defs/tokenItem" } },
-        "typography": { "type": "array", "items": { "$ref": "#/$defs/tokenItem" } },
-        "spacing": { "type": "array", "items": { "$ref": "#/$defs/tokenItem" } },
-        "radius": { "type": "array", "items": { "$ref": "#/$defs/tokenItem" } }
-      },
-      "required": ["color", "typography", "spacing", "radius"],
-      "additionalProperties": false
+    "frameworks": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["nextjs", "expo", "shared"] },
+      "minItems": 1,
+      "description": "Target frameworks. Drives whether web Storybook, native Storybook, or both are generated."
     },
+    "tokens": { "$ref": "#/$defs/tokens" },
     "primitives": {
       "type": "array",
       "items": { "$ref": "#/$defs/componentItem" }
@@ -31,93 +40,136 @@
       "type": "array",
       "items": { "$ref": "#/$defs/componentItem" }
     },
-    "component_map": {
+    "screens": {
       "type": "array",
-      "items": { "$ref": "#/$defs/componentMapItem" }
+      "items": { "$ref": "#/$defs/componentItem" }
     },
-    "framer_code_components": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "name": { "type": "string" },
-          "props": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "name": { "type": "string" },
-                "type": { "type": "string" },
-                "default": {}
-              },
-              "required": ["name", "type"],
-              "additionalProperties": true
-            }
-          },
-          "property_controls": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "notes": { "type": "string" }
+    "shadcn": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "shadcn-compatible selections. The frontend agent runs `npx shadcn add <url>` for each component at implementation time.",
+      "properties": {
+        "registries": {
+          "type": "array",
+          "items": { "type": "string", "format": "uri" },
+          "description": "Registry base URLs (e.g., https://ui.shadcn.com, https://magicui.design)."
         },
-        "required": ["name", "props", "property_controls"],
-        "additionalProperties": false
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "registry"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "registry": { "type": "string", "format": "uri" },
+              "url": { "type": "string", "format": "uri", "description": "Full add URL passed to `shadcn add`." },
+              "notes": { "type": "string" }
+            }
+          }
+        }
       }
     },
-    "generated_at": { "type": "string", "format": "date-time" }
+    "component_map": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/componentMapItem" },
+      "description": "Mapping from semantic component names to their source provider/registry."
+    }
   },
   "required": [
-    "version",
-    "projectName",
+    "schema_version",
+    "project_id",
+    "generated_at",
     "provider_mode",
     "providers",
+    "frameworks",
     "tokens",
     "primitives",
-    "patterns",
-    "component_map",
-    "framer_code_components",
-    "generated_at"
+    "patterns"
   ],
   "$defs": {
-    "tokenItem": {
+    "tokens": {
       "type": "object",
+      "additionalProperties": true,
       "properties": {
-        "name": { "type": "string" },
-        "value": { "type": "string" },
-        "description": { "type": "string" }
-      },
-      "required": ["name", "value"],
-      "additionalProperties": false
+        "color": { "type": "object", "additionalProperties": true },
+        "spacing": { "type": "object", "additionalProperties": true },
+        "radius": { "type": "object", "additionalProperties": true },
+        "typography": { "type": "object", "additionalProperties": true },
+        "shadow": { "type": "object", "additionalProperties": true },
+        "motion": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "propItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "TypeScript-ish type expression. Open string; examples: 'string', 'number', 'boolean', '\"sm\" | \"md\" | \"lg\"', 'ReactNode'."
+        },
+        "default": {},
+        "description": { "type": "string" },
+        "required": { "type": "boolean", "default": false }
+      }
     },
     "componentItem": {
       "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
       "properties": {
-        "name": { "type": "string" },
+        "name": { "type": "string", "minLength": 1 },
+        "category": { "type": "string" },
         "description": { "type": "string" },
         "states": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "type": "string" },
+          "description": "Visual/interaction states. Each becomes a Storybook story."
         },
-        "provider_refs": {
+        "props": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/propItem" }
+        },
+        "tokens_used": {
           "type": "array",
           "items": { "type": "string" }
-        }
-      },
-      "required": ["name", "description", "states"],
-      "additionalProperties": false
+        },
+        "notes": { "type": "string" }
+      }
     },
     "componentMapItem": {
       "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "provider"],
       "properties": {
-        "target": { "type": "string", "enum": ["web", "mobile", "desktop"] },
-        "provider": { "type": "string", "enum": ["stitch", "framer"] },
-        "candidate_id": { "type": "string" },
-        "screen_id": { "type": "string" },
-        "notes": { "type": "string" }
-      },
-      "required": ["target", "provider", "candidate_id"],
-      "additionalProperties": false
+        "name": { "type": "string", "minLength": 1 },
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Provider id from the OSS catalog. Open string.",
+          "examples": ["stitch", "shadcn", "magic-ui", "radix", "mantine"]
+        },
+        "framework": {
+          "type": "string",
+          "enum": ["nextjs", "expo", "shared"],
+          "default": "shared"
+        },
+        "shadcn": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Present when this component is sourced from a shadcn-compatible registry.",
+          "required": ["registry", "name"],
+          "properties": {
+            "registry": { "type": "string", "format": "uri" },
+            "name": { "type": "string", "minLength": 1 },
+            "url": { "type": "string", "format": "uri" }
+          }
+        },
+        "source_ref": { "type": "string", "description": "URL or in-repo path to the source component." }
+      }
     }
-  },
-  "additionalProperties": false
+  }
 }

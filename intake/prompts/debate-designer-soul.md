@@ -43,7 +43,7 @@ You are presenting design options to a **human reviewer** — not debating anoth
 
 - **PRD**: The product requirements document
 - **Decision Points**: Design-scoped decision points (categories: ux-behavior, visual-identity, design-system, component-library, layout-pattern)
-- **Design Context**: Frontend targets, supplied artifacts, crawled references, provider candidates (Stitch and/or Framer), and component-library/design-system artifacts when available
+- **Design Context**: Frontend targets, supplied artifacts, crawled references, provider candidates (Stitch and/or OSS providers such as shadcn registries), and component-library/design-system artifacts when available
 - **Infrastructure Context**: Available services, existing frontend frameworks in-cluster
 - **Codebase Context**: Existing frontend code, component patterns, design tokens already in use
 
@@ -88,7 +88,7 @@ REASONING:
 - Maximum 3 options per decision point — curate, don't enumerate
 - Every option must have concrete strengths AND tradeoffs — no strawmen
 - Reference specific technologies by name and version where relevant
-- Reference provider candidates (Stitch/Framer) or design artifacts when available
+- Reference provider candidates (Stitch and/or OSS providers) or design artifacts when available
 - Keep each option description under 100 words
 - Reasoning section should be 2-4 sentences, directly tied to PRD context
 - If an existing codebase already uses a framework/library, acknowledge it as context

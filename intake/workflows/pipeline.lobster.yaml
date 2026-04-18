@@ -21,9 +21,7 @@ args:
   design_mode:
     default: both
   design_provider:
-    default: both
-  design_framer_project:
-    default: ""
+    default: stitch
   project_name:
     default: project
   num_tasks:
@@ -184,13 +182,9 @@ steps:
       fi
       MODE="${design_mode}"
       PROVIDER_MODE="${design_provider}"
-      FRAMER_PROJECT_TARGET="${design_framer_project}"
-      if [ -z "$FRAMER_PROJECT_TARGET" ]; then
-        FRAMER_PROJECT_TARGET="${FRAMER_PROJECT_URL:-${FRAMER_PROJECT_ID:-}}"
-      fi
       if [ -z "$PROVIDER_MODE" ]; then
         case "$MODE" in
-          stitch|framer|both|auto) PROVIDER_MODE="$MODE" ;;
+          stitch|auto) PROVIDER_MODE="$MODE" ;;
           ingest_only) PROVIDER_MODE="auto" ;;
           *) PROVIDER_MODE="stitch" ;;
         esac
@@ -201,32 +195,20 @@ steps:
       if [ -n "${STITCH_API_KEY:-}" ]; then
         STITCH_KEY_STATE="present"
       fi
-      FRAMER_KEY_STATE="missing"
-      if [ -n "${FRAMER_API_KEY:-}" ]; then
-        FRAMER_KEY_STATE="present"
-      fi
       AUTH_DISCOVERY_JSON="$DESIGN_DIR/auth-discovery.json"
       jq -n \
         --arg mode "$MODE" \
         --arg provider_mode "$PROVIDER_MODE" \
         --arg stitch_api_key_state "$STITCH_KEY_STATE" \
-        --arg framer_api_key_state "$FRAMER_KEY_STATE" \
-        --arg framer_project_state "$( [ -n "${FRAMER_PROJECT_TARGET:-}" ] && printf 'present' || printf 'missing' )" \
-        --arg framer_project_url_state "$( [ -n "${FRAMER_PROJECT_URL:-}" ] && printf 'present' || printf 'missing' )" \
-        --arg framer_project_id_state "$( [ -n "${FRAMER_PROJECT_ID:-}" ] && printf 'present' || printf 'missing' )" \
         --arg stitch_project_id_state "$( [ -n "${STITCH_PROJECT_ID:-}" ] && printf 'present' || printf 'missing' )" \
         --arg stitch_access_token_state "$( [ -n "${STITCH_ACCESS_TOKEN:-}" ] && printf 'present' || printf 'missing' )" \
         --arg google_cloud_project_state "$( [ -n "${GOOGLE_CLOUD_PROJECT:-}" ] && printf 'present' || printf 'missing' )" \
-        '{mode:$mode, provider_mode:$provider_mode, stitch_api_key:$stitch_api_key_state, framer_api_key:$framer_api_key_state, framer_project:$framer_project_state, framer_project_url:$framer_project_url_state, framer_project_id:$framer_project_id_state, stitch_project_id:$stitch_project_id_state, stitch_access_token:$stitch_access_token_state, google_cloud_project:$google_cloud_project_state}' \
+        '{mode:$mode, provider_mode:$provider_mode, stitch_api_key:$stitch_api_key_state, stitch_project_id:$stitch_project_id_state, stitch_access_token:$stitch_access_token_state, google_cloud_project:$google_cloud_project_state}' \
         > "$AUTH_DISCOVERY_JSON"
 
       REQUIRES_STITCH=false
-      REQUIRES_FRAMER=false
       case "$PROVIDER_MODE" in
-        stitch|both|auto) REQUIRES_STITCH=true ;;
-      esac
-      case "$PROVIDER_MODE" in
-        framer|both) REQUIRES_FRAMER=true ;;
+        stitch|auto) REQUIRES_STITCH=true ;;
       esac
 
       if [ "$MODE" = "ingest_plus_stitch" ]; then
@@ -236,12 +218,6 @@ steps:
       if [ "$REQUIRES_STITCH" = "true" ] && [ -z "${STITCH_API_KEY:-}" ]; then
         "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "stitch-credentials" "failed" "${audio_debug}" "error" "design_mode ${MODE}"
         echo "materialize-design-inputs: STITCH_API_KEY is required for provider mode ${PROVIDER_MODE}." >&2
-        echo "credential discovery: $(cat "$AUTH_DISCOVERY_JSON")" >&2
-        exit 1
-      fi
-      if [ "$REQUIRES_FRAMER" = "true" ] && { [ -z "${FRAMER_API_KEY:-}" ] || [ -z "${FRAMER_PROJECT_TARGET:-}" ]; }; then
-        "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "framer-credentials" "failed" "${audio_debug}" "error" "provider_mode ${PROVIDER_MODE}"
-        echo "materialize-design-inputs: FRAMER_API_KEY and a Framer project target are required for provider mode=${PROVIDER_MODE}." >&2
         echo "credential discovery: $(cat "$AUTH_DISCOVERY_JSON")" >&2
         exit 1
       fi
@@ -279,7 +255,6 @@ steps:
         --arg design_urls "$RESOLVED_DESIGN_URLS" \
         --arg design_mode "${design_mode}" \
         --arg design_provider "${PROVIDER_MODE}" \
-        --arg design_framer_project "${FRAMER_PROJECT_TARGET}" \
         --arg project_name "${project_name}" \
         --arg output_dir "$DESIGN_DIR" \
         '{
@@ -291,7 +266,6 @@ steps:
             design_urls: $design_urls,
             design_mode: $design_mode,
             design_provider: $design_provider,
-            design_framer_project: $design_framer_project,
             project_name: $project_name,
             output_dir: $output_dir
           }
@@ -303,7 +277,7 @@ steps:
           --arg project_name "${project_name}" \
           --arg design_mode "${design_mode}" \
           --arg design_prompt "${design_prompt}" \
-          '{"projectName":$project_name,"mode":$design_mode,"providerMode":"stitch","prompt":$design_prompt,"hasFrontend":false,"frontendTargets":[],"confidence":0,"evidence":[],"urls":[],"providers":{"stitch":{"status":"failed","reason":"design_intake_failed","warnings":["intake-agent design_intake failed"],"candidates":[]},"framer":{"status":"skipped","reason":"not_requested","warnings":[],"candidates":[]}},"stitch":{"status":"failed","reason":"design_intake_failed","warnings":["intake-agent design_intake failed"],"candidates":[]},"framer":{"status":"skipped","reason":"not_requested","warnings":[],"candidates":[]},"normalized_candidates":[]}' \
+          '{"projectName":$project_name,"mode":$design_mode,"providerMode":"stitch","prompt":$design_prompt,"hasFrontend":false,"frontendTargets":[],"confidence":0,"evidence":[],"urls":[],"providers":{"stitch":{"status":"failed","reason":"design_intake_failed","warnings":["intake-agent design_intake failed"],"candidates":[]}},"stitch":{"status":"failed","reason":"design_intake_failed","warnings":["intake-agent design_intake failed"],"candidates":[]},"normalized_candidates":[]}' \
           > "$DESIGN_DIR/design-context.json"
       else
         jq -c '.data' "/tmp/design-intake-$$.json" > "$DESIGN_DIR/design-context.json"
@@ -319,7 +293,7 @@ steps:
       "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "save-design-bundle" "${audio_debug}" "project ${project_name}"
       SRC_DIR="$WS/.intake/design"
       OUT_DIR="$WS/.tasks/design"
-      mkdir -p "$OUT_DIR/crawled" "$OUT_DIR/stitch" "$OUT_DIR/framer"
+      mkdir -p "$OUT_DIR/crawled" "$OUT_DIR/stitch"
       cp "$SRC_DIR/design-context.json" "$OUT_DIR/design-context.json"
       if [ -f "$SRC_DIR/crawled/urls.json" ]; then
         cp "$SRC_DIR/crawled/urls.json" "$OUT_DIR/crawled/urls.json"
@@ -329,12 +303,6 @@ steps:
       fi
       if [ -f "$SRC_DIR/stitch/candidates.json" ]; then
         cp "$SRC_DIR/stitch/candidates.json" "$OUT_DIR/stitch/candidates.json"
-      fi
-      if [ -f "$SRC_DIR/framer/framer-run.json" ]; then
-        cp "$SRC_DIR/framer/framer-run.json" "$OUT_DIR/framer/framer-run.json"
-      fi
-      if [ -f "$SRC_DIR/framer/candidates.json" ]; then
-        cp "$SRC_DIR/framer/candidates.json" "$OUT_DIR/framer/candidates.json"
       fi
       if [ -f "$SRC_DIR/candidates.normalized.json" ]; then
         cp "$SRC_DIR/candidates.normalized.json" "$OUT_DIR/candidates.normalized.json"
@@ -355,7 +323,7 @@ steps:
         --arg design_mode "${design_mode}" \
         --arg design_provider "${design_provider}" \
         --arg bundle_dir "$OUT_DIR" \
-        --arg stitch_required "$(if [ "${design_provider}" = "stitch" ] || [ "${design_provider}" = "both" ] || [ "${design_mode}" = "ingest_plus_stitch" ]; then printf 'true'; else printf 'false'; fi)" \
+        --arg stitch_required "$(if [ "${design_provider}" = "stitch" ] || [ "${design_mode}" = "ingest_plus_stitch" ]; then printf 'true'; else printf 'false'; fi)" \
         --argjson context "$(cat "$SRC_DIR/design-context.json" 2>/dev/null || printf '{}')" \
         '{
           generated_at: $generated_at,
@@ -367,14 +335,11 @@ steps:
           bundle_dir: $bundle_dir,
           has_frontend: ($context.hasFrontend // false),
           stitch_status: ($context.stitch.status // "unknown"),
-          framer_status: ($context.framer.status // "unknown"),
           files: {
             design_context: ($bundle_dir + "/design-context.json"),
             crawled_urls: ($bundle_dir + "/crawled/urls.json"),
             stitch_run: ($bundle_dir + "/stitch/stitch-run.json"),
             stitch_candidates: ($bundle_dir + "/stitch/candidates.json"),
-            framer_run: ($bundle_dir + "/framer/framer-run.json"),
-            framer_candidates: ($bundle_dir + "/framer/candidates.json"),
             normalized_candidates: ($bundle_dir + "/candidates.normalized.json"),
             component_library: ($bundle_dir + "/component-library.json"),
             design_system: ($bundle_dir + "/design-system.md"),
@@ -401,13 +366,12 @@ steps:
         --arg project_name "${project_name}" \
         --arg design_mode "${design_mode}" \
         --arg design_provider "${design_provider}" \
-        --arg stitch_required "$(if [ "${design_provider}" = "stitch" ] || [ "${design_provider}" = "both" ] || [ "${design_mode}" = "ingest_plus_stitch" ]; then printf 'true'; else printf 'false'; fi)" \
+        --arg stitch_required "$(if [ "${design_provider}" = "stitch" ] || [ "${design_mode}" = "ingest_plus_stitch" ]; then printf 'true'; else printf 'false'; fi)" \
         --arg stitch_status "$(printf '%s' "$DESIGN_CTX" | jq -r '.stitch.status // "unknown"')" \
-        --arg framer_status "$(printf '%s' "$DESIGN_CTX" | jq -r '.framer.status // "unknown"')" \
         --arg has_frontend "$(printf '%s' "$DESIGN_CTX" | jq -r '.hasFrontend // false')" \
         --arg artifact_bundle_path "$WS/.tasks/design" \
         --argjson context "$DESIGN_CTX" \
-        '{session_id:$session_id,run_id:$run_id,project_name:$project_name,design_mode:$design_mode,design_provider:$design_provider,stitch_required:($stitch_required=="true"),stitch_status:$stitch_status,framer_status:$framer_status,has_frontend:($has_frontend=="true"),artifact_bundle_path:$artifact_bundle_path,context:$context}')"
+        '{session_id:$session_id,run_id:$run_id,project_name:$project_name,design_mode:$design_mode,design_provider:$design_provider,stitch_required:($stitch_required=="true"),stitch_status:$stitch_status,has_frontend:($has_frontend=="true"),artifact_bundle_path:$artifact_bundle_path,context:$context}')"
       LINEAR_URL="${LINEAR_BRIDGE_URL:-http://127.0.0.1:3100}"
       DISCORD_URL="${DISCORD_BRIDGE_URL:-http://127.0.0.1:3200}"
       linear_ok=false
@@ -1403,9 +1367,7 @@ steps:
         "has_frontend=" + ((.hasFrontend // false) | tostring),
         "targets=" + ((.frontendTargets // []) | join("|")),
         "stitch_status=" + (.stitch.status // "unknown"),
-        "stitch_reason=" + (.stitch.reason // ""),
-        "framer_status=" + (.framer.status // "unknown"),
-        "framer_reason=" + (.framer.reason // "")
+        "stitch_reason=" + (.stitch.reason // "")
       ] | join("; ")' "$WS/.intake/design/design-context.json" 2>/dev/null || printf '')";
       INITIAL_TASKS_JSON="$(printf '%s' "$CTO_INITIAL_PARSE_PRD_STDOUT")"
       if [ -z "$INITIAL_TASKS_JSON" ] || ! printf '%s' "$INITIAL_TASKS_JSON" | jq -e 'type' >/dev/null 2>&1; then

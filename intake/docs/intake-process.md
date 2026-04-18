@@ -48,7 +48,7 @@ Design intake accepts any combination of:
 - `design_artifacts_path` - relative path to sketches/mockups/assets
 - `design_urls` - existing site/app URLs for modernization context
 - `design_mode` - legacy toggle (`ingest_only` or `ingest_plus_stitch`) for backward compatibility
-- `design_provider` - provider routing mode: `stitch`, `framer`, `both`, or `auto` (default rollout uses `stitch`)
+- `design_provider` - provider routing mode: open string; built-in adapters: `stitch`; OSS provider catalog surfaced via deliberation. Default: `stitch`
 
 Materialized outputs are written to:
 
@@ -60,9 +60,6 @@ Materialized outputs are written to:
 ├── design-system.md
 ├── assets/
 ├── crawled/urls.json
-├── framer/
-│   ├── framer-run.json
-│   └── candidates.json
 └── stitch/
     ├── stitch-run.json
     └── candidates.json
@@ -159,15 +156,12 @@ Runs immediately after PRD materialization in `pipeline.lobster.yaml`.
 2. Normalizes URL inputs and crawls basic page metadata into `.intake/design/crawled/urls.json`
 3. Detects frontend scope and targets (`web`, `mobile`, `desktop`)
 4. Enforces provider credential gates by mode:
-   - Requires `STITCH_API_KEY`
-   - Requires `FRAMER_API_KEY` + `FRAMER_PROJECT_URL` when `design_provider` is `framer`/`both`
-   - Emits credential discovery state (`STITCH_API_KEY`, `STITCH_PROJECT_ID`, `STITCH_ACCESS_TOKEN`, `GOOGLE_CLOUD_PROJECT`, `FRAMER_API_KEY`, `FRAMER_PROJECT_URL`) to `.intake/design/auth-discovery.json`
+   - Requires `STITCH_API_KEY` when `design_provider` includes `stitch`
+   - Emits credential discovery state (`STITCH_API_KEY`, `STITCH_PROJECT_ID`, `STITCH_ACCESS_TOKEN`, `GOOGLE_CLOUD_PROJECT`) to `.intake/design/auth-discovery.json`
    - Fails fast with explicit gate output if required auth is missing
 5. If enabled and credentials exist, generates provider candidates and saves:
    - `.intake/design/stitch/stitch-run.json`
    - `.intake/design/stitch/candidates.json`
-   - `.intake/design/framer/framer-run.json`
-   - `.intake/design/framer/candidates.json`
    - `.intake/design/candidates.normalized.json`
 6. Writes component artifacts for implementation planning:
    - `.intake/design/component-library.json`
@@ -177,7 +171,6 @@ Runs immediately after PRD materialization in `pipeline.lobster.yaml`.
    - `design-context.json`
    - `crawled/urls.json` (when available)
    - `stitch/stitch-run.json`, `stitch/candidates.json` (when available)
-   - `framer/framer-run.json`, `framer/candidates.json` (when available)
    - `candidates.normalized.json`
    - `component-library.json`, `design-system.md`
    - `auth-discovery.json`
@@ -545,7 +538,7 @@ The core output contract is preserved:
 | **OctoCode** | MCP tool | GitHub code search fallback |
 | **Tavily** | Research via intake-agent MCP | Pre-debate evidence gathering |
 | **Stitch SDK** | `@google/stitch-sdk` (TypeScript) | Visual candidate generation and variant exploration |
-| **Framer Server API** | `framer-api` (Node/Bun runtime import) | Framer project publishing/introspection and component-oriented candidate generation |
+| **OSS Provider Catalog** | `intake/data/oss-component-catalog.json` (curated) | shadcn registries, headless primitives, full kits, TanStack — surfaced as candidates during deliberation |
 
 ---
 
@@ -588,14 +581,11 @@ Output:
 
 ## Provider Authentication and Runtime Notes
 
-For Stitch mode (`design_provider=stitch` or `both`, or legacy `design_mode=ingest_plus_stitch`), set:
+For Stitch mode (`design_provider=stitch`, or legacy `design_mode=ingest_plus_stitch`), set:
 
 - `STITCH_API_KEY`
 
-For Framer mode (`design_provider=framer` or `both`), set:
-
-- `FRAMER_API_KEY`
-- `FRAMER_PROJECT_URL`
+OSS providers (shadcn registries, Radix, React Aria, Mantine, Chakra, TanStack, etc.) require no credentials — they're surfaced from the curated catalog and consumed at frontend implementation time via `shadcn add` / npm install.
 
 The pipeline enforces hard gates for required credentials before deliberation/task generation.
 
