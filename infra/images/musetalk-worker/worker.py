@@ -176,7 +176,7 @@ async def run_worker():
     _ready = True
     log.info("Model bootstrap loaded, worker ready")
 
-    # Subscribe with durable consumer
+    # Subscribe with durable consumer (pull subscription for fetch API)
     config = ConsumerConfig(
         durable_name=consumer_name,
         deliver_policy=DeliverPolicy.ALL,
@@ -185,7 +185,8 @@ async def run_worker():
         max_deliver=max_deliver,
     )
 
-    sub = await js.subscribe(subject, queue=queue, config=config)
+    # Use pull_subscribe for fetch-based message processing
+    sub = await js.pull_subscribe(subject, durable=consumer_name, config=config)
     log.info("Subscribed to %s (queue=%s, consumer=%s)", subject, queue, consumer_name)
 
     try:
