@@ -75,7 +75,7 @@ agent:
   # Fallback Discord channel for autonomous final-response delivery.
   defaultRecipient: "channel:1494057364301545542"
   heartbeat:
-    every: "30m"
+    every: "2m"
     target: "last"
     ackMaxChars: 500
     prompt: >-
