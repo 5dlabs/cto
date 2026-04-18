@@ -5,11 +5,11 @@
   image: rust:latest
   variables:
     CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
-    RUSTUP_HOME: ${CI_PROJECT_DIR}/.rustup
     SCCACHE_DIR: /tmp/sccache
     CARGO_INCREMENTAL: "0"
     RUSTC_WRAPPER: sccache
   before_script:
+    - rustup default stable
     - rustup component add rustfmt clippy
     - |
       if ! command -v sccache &>/dev/null; then
