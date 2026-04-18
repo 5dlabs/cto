@@ -16,7 +16,9 @@ WORKDIR /app
 # Install Python 3.11 and system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
-    && add-apt-repository ppa:deadsnakes/ppa \
+    gnupg \
+    ca-certificates \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
     python3.11 \
@@ -57,6 +59,12 @@ RUN python3 -m pip install --upgrade pip setuptools wheel && \
 
 # Python dependencies — pinned for CUDA 11.8 / V100S bootstrap
 COPY requirements.txt .
+# chumpy (transitive dep, likely from smplx/mmpose) has a broken setup.py that
+# imports `pip` directly, which fails inside PEP 517 build isolation. Pin a
+# legacy setuptools toolchain and pre-install with --no-build-isolation so the
+# main requirements install sees it as already satisfied.
+RUN python3 -m pip install --upgrade "setuptools<70" "wheel<0.43" "pip<24" && \
+    python3 -m pip install --no-build-isolation chumpy==0.70
 RUN python3 -m pip install -r requirements.txt
 
 # Application code
