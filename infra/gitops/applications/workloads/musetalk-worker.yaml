@@ -6,7 +6,7 @@
 #
 # Prerequisites:
 #   - GPU node with nvidia.com/gpu resource (auto-configured by GPU Operator)
-#   - NATS server accessible at nats.openclaw.svc.cluster.local
+#   - NATS server accessible at openclaw-nats.openclaw.svc.cluster.local
 #   - ghcr-secret for image pull
 #
 # GPU Node: OVH t2-45 (V100S 32GB) in GRA9
@@ -60,7 +60,7 @@ spec:
 
         # NATS — adjust if your NATS endpoint differs
         nats:
-          url: "nats://nats.openclaw.svc.cluster.local:4222"
+          url: "nats://openclaw-nats.openclaw.svc.cluster.local:4222"
 
         # Node selector for GPU nodes
         nodeSelector:
