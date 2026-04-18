@@ -1,0 +1,129 @@
+name: CTO Sidebar VSIX Release
+
+# Builds the apps/cto-sidebar VS Code extension into a .vsix and publishes it
+# to a stable GitHub release (tag: cto-sidebar-latest) so the ephemeral CRD
+# controller (crates/controller/src/tasks/code/resources.rs) can fetch it from:
+#   https://github.com/5dlabs/cto/releases/download/cto-sidebar-latest/cto-sidebar.vsix
+#
+# The `cto-sidebar-latest` tag/release is deleted and recreated on each run so
+# the download URL stays stable across rebuilds. A versioned release
+# `cto-sidebar-v${VERSION}` is also produced (on workflow_dispatch and tag
+# pushes) so extension history is preserved.
+#
+# This workflow uses the default GITHUB_TOKEN with `contents: write` to manage
+# releases. No PAT required. If repo settings restrict Actions from creating
+# releases, grant "Read and write permissions" under Settings → Actions →
+# General → Workflow permissions.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/cto-sidebar/**'
+      - '.github/workflows/cto-sidebar-release.yaml'
+    tags:
+      - 'cto-sidebar-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & publish VSIX
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/cto-sidebar
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Compile TypeScript
+        # Override tsconfig lib to include DOM types (fetch / console / setTimeout / TextDecoder).
+        # Sidebar source and tsconfig are out of scope for Stream B (owned by Streams D/E);
+        # this CI-only override keeps the build green without touching committed config.
+        run: bunx --bun tsc -p tsconfig.json --lib ES2022,DOM
+
+      - name: Read extension version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${VERSION}"
+
+      - name: Package VSIX (stable filename)
+        run: |
+          bunx --bun @vscode/vsce package \
+            --no-dependencies \
+            --out cto-sidebar.vsix
+          ls -la cto-sidebar.vsix
+
+      - name: Create versioned copy
+        run: |
+          cp cto-sidebar.vsix "cto-sidebar-${{ steps.version.outputs.version }}.vsix"
+          ls -la cto-sidebar*.vsix
+
+      - name: Verify VSIX contents
+        run: |
+          unzip -l cto-sidebar.vsix | head -40
+          unzip -l cto-sidebar.vsix | grep -q extension.vsixmanifest
+          unzip -l cto-sidebar.vsix | grep -q 'extension/out/extension.js'
+
+      # Delete the existing floating release + tag so the release created below
+      # replaces it cleanly, keeping the download URL stable.
+      - name: Delete existing cto-sidebar-latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete cto-sidebar-latest \
+            --repo "${{ github.repository }}" \
+            --yes --cleanup-tag || true
+
+      - name: Publish latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cto-sidebar-latest
+          name: CTO Sidebar (latest)
+          body: |
+            Floating release for the CTO sidebar VS Code extension.
+
+            This tag is force-updated by the `cto-sidebar-release` workflow on
+            every push to `main` that touches `apps/cto-sidebar/**`. The
+            download URL
+            `https://github.com/${{ github.repository }}/releases/download/cto-sidebar-latest/cto-sidebar.vsix`
+            is consumed by the CRD controller's code-server sidecar bootstrap.
+
+            - Version: `${{ steps.version.outputs.version }}`
+            - Commit: `${{ github.sha }}`
+          prerelease: false
+          make_latest: 'false'
+          files: |
+            apps/cto-sidebar/cto-sidebar.vsix
+            apps/cto-sidebar/cto-sidebar-${{ steps.version.outputs.version }}.vsix
+
+      - name: Publish versioned release
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/cto-sidebar-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cto-sidebar-v${{ steps.version.outputs.version }}
+          name: CTO Sidebar v${{ steps.version.outputs.version }}
+          body: |
+            Versioned release of the CTO sidebar VS Code extension.
+
+            - Version: `${{ steps.version.outputs.version }}`
+            - Commit: `${{ github.sha }}`
+          prerelease: false
+          make_latest: 'false'
+          files: |
+            apps/cto-sidebar/cto-sidebar.vsix
+            apps/cto-sidebar/cto-sidebar-${{ steps.version.outputs.version }}.vsix
