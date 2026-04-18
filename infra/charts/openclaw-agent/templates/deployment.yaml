@@ -1202,6 +1202,7 @@ spec:
               {{- if .Values.codeServer.githubToken }}
               # Write code-server config with github-auth for Copilot
               mkdir -p /root/.config/code-server
+              {{- if .Values.codeServer.password }}
               cat > /root/.config/code-server/config.yaml << CSCONF
               bind-addr: 0.0.0.0:{{ .Values.codeServer.port | default 8080 }}
               auth: password
@@ -1209,6 +1210,14 @@ spec:
               cert: false
               github-auth: ${GITHUB_TOKEN}
               CSCONF
+              {{- else }}
+              cat > /root/.config/code-server/config.yaml << CSCONF
+              bind-addr: 0.0.0.0:{{ .Values.codeServer.port | default 8080 }}
+              auth: none
+              cert: false
+              github-auth: ${GITHUB_TOKEN}
+              CSCONF
+              {{- end }}
               sed -i 's/^              //' /root/.config/code-server/config.yaml
               # Pre-seed Copilot auth via hosts.json (read by the extension at startup)
               mkdir -p /root/.config/github-copilot

@@ -632,7 +632,7 @@ supermemory:
 codeServer:
   enabled: true
   port: 8080
-  password: "125884c05c03a803"
+  password: ""
   publicUrl: "https://coder.5dlabs.ai"
   defaultFolder: "/workspace/repos/cto"
   quickTunnel:
