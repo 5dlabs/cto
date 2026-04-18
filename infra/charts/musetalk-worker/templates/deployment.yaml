@@ -53,12 +53,27 @@ spec:
             - sh
             - -c
             - |
-              # Create musetalkV15 symlink for upstream compatibility
+              # Create proper directory structure for MuseTalk upstream compatibility
+              # The worker chdirs to /models and looks for models/musetalkV15/
+              mkdir -p /models/models
+              
+              # Create musetalkV15 symlink in models/ subdirectory
+              if [ -d /models/musetalk ] && [ ! -e /models/models/musetalkV15 ]; then
+                ln -s /models/musetalk /models/models/musetalkV15
+                echo "Created models/musetalkV15 -> /models/musetalk symlink"
+              fi
+              
+              # Also ensure musetalkV15 exists at root for other lookups
               if [ -d /models/musetalk ] && [ ! -e /models/musetalkV15 ]; then
                 ln -s /models/musetalk /models/musetalkV15
-                echo "Created musetalkV15 -> musetalk symlink"
+                echo "Created musetalkV15 -> musetalk symlink at root"
               fi
+              
+              echo "=== Final /models structure ==="
               ls -la /models/
+              echo ""
+              echo "=== /models/models structure ==="
+              ls -la /models/models/ 2>/dev/null || echo "No models subdirectory"
           volumeMounts:
             - name: model-cache
               mountPath: {{ .Values.model.cacheDir }}
