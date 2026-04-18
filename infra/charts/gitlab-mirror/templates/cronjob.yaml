@@ -45,11 +45,16 @@ data:
       LogLevel ERROR
     EOF
 
-    # Full clone (gitaly rejects shallow pushes)
+    # Full clone (gitaly rejects shallow pushes). Inject PAT into URL.
+    if [ -z "${GH_TOKEN:-}" ]; then
+      echo "ERROR: GH_TOKEN env not set" >&2
+      exit 1
+    fi
+    AUTH_URL=$(printf '%s' "$GITHUB_URL" | sed -E "s#https://#https://x-access-token:${GH_TOKEN}@#")
     cd /tmp
     rm -rf repo
     echo "==> cloning $GITHUB_URL"
-    git clone --branch "$GITHUB_BRANCH" "$GITHUB_URL" repo
+    git clone --branch "$GITHUB_BRANCH" "$AUTH_URL" repo
     cd repo
 
     # Fetch all branches/tags from origin so we can push everything (we only push main + tags below)
@@ -89,7 +94,7 @@ spec:
           labels:
             app.kubernetes.io/name: gitlab-mirror
         spec:
-          restartPolicy: OnFailure
+          restartPolicy: Never
           serviceAccountName: gitlab-mirror
           securityContext:
             runAsUser: 0
@@ -99,6 +104,12 @@ spec:
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
               imagePullPolicy: {{ .Values.image.pullPolicy }}
               command: ["/bin/sh", "/etc/gitlab-mirror/mirror.sh"]
+              env:
+                - name: GH_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.githubTokenSecret.name }}
+                      key: {{ .Values.githubTokenSecret.key }}
               resources:
                 {{- toYaml .Values.resources | nindent 16 }}
               volumeMounts:

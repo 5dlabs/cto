@@ -1,7 +1,14 @@
-# GitHub source repository (public — no auth needed for clone)
+# GitHub source repository (private — clones using PAT injected from secret)
 github:
   url: https://github.com/5dlabs/cto.git
   branch: main
+
+# GitHub PAT secret (must contain key `token`). The mirror script clones via
+# https://x-access-token:${GH_TOKEN}@github.com/...
+# Created out-of-band; see infra/docs/gitlab-mirror.md.
+githubTokenSecret:
+  name: gh-mirror-token
+  key: token
 
 # Internal GitLab SSH endpoint (gitlab-shell service inside cluster)
 gitlab:
