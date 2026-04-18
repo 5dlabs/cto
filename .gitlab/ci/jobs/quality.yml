@@ -15,7 +15,8 @@ duplicate-detection:
     when: always
   allow_failure: true
   rules:
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - apps/web/src/**
         - apps/website/src/**
@@ -65,7 +66,8 @@ intake-step-tests:
     - cd $CI_PROJECT_DIR
     - bash intake/tests/step-tests.sh
   rules:
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - intake/**
         - apps/intake-util/**

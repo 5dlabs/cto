@@ -22,6 +22,7 @@ build-controller:
         - crates/controller/**
         - templates/**
         - infra/images/controller/**
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
   timeout: 45m
 
@@ -43,6 +44,7 @@ build-healer:
       changes:
         - crates/healer/**
         - infra/images/healer/**
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
   timeout: 45m
 
@@ -64,6 +66,7 @@ build-pm-server:
       changes:
         - crates/pm/**
         - infra/images/pm-server/**
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
   timeout: 45m
 
@@ -86,6 +89,7 @@ build-tools:
         - crates/tools/**
         - crates/mcp/**
         - infra/images/tools/**
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
   timeout: 45m
 
@@ -108,6 +112,7 @@ build-research:
         - crates/research/**
         - apps/intake-agent/**
         - infra/images/research/**
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
   timeout: 45m
 
@@ -129,6 +134,7 @@ build-dex-indexer:
       changes:
         - crates/dex-indexer/**
         - skills/trader/docker/Dockerfile.dex-indexer
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
   timeout: 45m
 
@@ -153,6 +159,7 @@ build-web:
       changes:
         - apps/web/**
         - infra/images/web/**
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
   timeout: 30m
 
@@ -175,6 +182,7 @@ build-web-migrate:
       changes:
         - apps/web/**
         - infra/images/web/**
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
   timeout: 30m
 
@@ -195,6 +203,7 @@ build-discord-bridge:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
         - apps/discord-bridge/**
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
   timeout: 15m
 
@@ -215,6 +224,7 @@ build-linear-bridge:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
         - apps/linear-bridge/**
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
   timeout: 15m
 
@@ -238,6 +248,7 @@ build-grok:
       changes:
         - apps/grok/**
         - infra/images/grok/**
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
   timeout: 15m
 
@@ -259,6 +270,7 @@ build-postgresql:
       changes:
         - infra/images/postgresql/**
     - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
   timeout: 15m
 
@@ -280,6 +292,7 @@ build-openmemory:
       changes:
         - infra/images/openmemory/**
     - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
   timeout: 15m
 
@@ -301,5 +314,6 @@ build-tweakcn:
       changes:
         - infra/images/tweakcn/**
     - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
   timeout: 15m

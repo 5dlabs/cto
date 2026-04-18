@@ -16,7 +16,8 @@ cargo-audit:
   # Advisory: matches GitHub Dependabot behavior (alerts, not blocks)
   allow_failure: true
   rules:
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - Cargo.lock
         - crates/**
@@ -30,7 +31,8 @@ npm-audit-web:
   variables:
     NPM_PROJECT_DIR: apps/web
   rules:
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - apps/web/package-lock.json
     - if: $CI_PIPELINE_SOURCE == "schedule"
@@ -43,7 +45,8 @@ npm-audit-website:
   variables:
     NPM_PROJECT_DIR: apps/website
   rules:
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - apps/website/package-lock.json
     - if: $CI_PIPELINE_SOURCE == "schedule"
