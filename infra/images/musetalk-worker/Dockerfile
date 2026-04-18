@@ -45,7 +45,7 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86
     && dpkg -i cuda-keyring_1.0-1_all.deb \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-    cuda-toolkit-11-8 \
+    cuda-libraries-11-8 \
     && rm -rf /var/lib/apt/lists/* cuda-keyring_1.0-1_all.deb
 
 # Set CUDA environment
