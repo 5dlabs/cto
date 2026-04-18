@@ -1,4 +1,28 @@
 import * as vscode from "vscode";
+import * as fs from "fs";
+
+const OFFLINE_AGENTS = [
+  { id: "morgan", name: "Morgan", role: "Intake & PRD" },
+  { id: "rex", name: "Rex", role: "Rust" },
+  { id: "blaze", name: "Blaze", role: "Frontend" },
+  { id: "grizz", name: "Grizz", role: "Go" },
+  { id: "bolt", name: "Bolt", role: "DevOps" },
+  { id: "tess", name: "Tess", role: "Testing" },
+  { id: "cleo", name: "Cleo", role: "Code quality" },
+  { id: "cipher", name: "Cipher", role: "Security" },
+  { id: "nova", name: "Nova", role: "Research" },
+  { id: "vex", name: "Vex", role: "Debugging" },
+];
+
+let inPodLogged = false;
+function isInPod(): boolean {
+  if (process.env.KUBERNETES_SERVICE_HOST) return true;
+  try {
+    return fs.existsSync("/var/run/secrets/kubernetes.io/serviceaccount/token");
+  } catch {
+    return false;
+  }
+}
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
@@ -10,6 +34,22 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   public postMessage(message: unknown) {
     this._view?.webview.postMessage(message);
+  }
+
+  private _gatewayConfig() {
+    const config = vscode.workspace.getConfiguration("cto");
+    const apiBase = config
+      .get<string>("apiBase", "http://localhost:18789")
+      .replace(/\/+$/, "");
+    const apiToken = config.get<string>("apiToken", "openclaw-internal");
+    const defaultAgent = config.get<string>("defaultAgent", "");
+    const requestTimeoutMs = config.get<number>("requestTimeoutMs", 30000);
+    const inPod = isInPod();
+    if (inPod && !inPodLogged) {
+      console.log("[cto-sidebar] detected in-pod environment; using " + apiBase);
+      inPodLogged = true;
+    }
+    return { apiBase, apiToken, defaultAgent, requestTimeoutMs, inPod };
   }
 
   public resolveWebviewView(
@@ -38,11 +78,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           break;
         }
         case "getConfig": {
-          const config = vscode.workspace.getConfiguration("cto");
+          const cfg = this._gatewayConfig();
           this.postMessage({
             type: "config",
-            apiBase: config.get<string>("apiBase", "http://localhost:18789"),
-            defaultAgent: config.get<string>("defaultAgent", ""),
+            apiBase: cfg.apiBase,
+            defaultAgent: cfg.defaultAgent,
+            inPod: cfg.inPod,
           });
           break;
         }
@@ -51,83 +92,209 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private async _fetchAgents() {
-    const config = vscode.workspace.getConfiguration("cto");
-    const apiBase = config.get<string>("apiBase", "http://localhost:18789");
+    const { apiBase, apiToken } = this._gatewayConfig();
 
-    try {
-      const resp = await fetch(`${apiBase}/agents`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const agents = await resp.json();
-      this.postMessage({ type: "agents", agents });
-    } catch {
-      // Fallback agent list when gateway is unreachable
+    const fallback = () => {
       this.postMessage({
         type: "agents",
-        agents: [
-          { id: "morgan", name: "Morgan", role: "Intake & PRD", status: "offline" },
-          { id: "rex", name: "Rex", role: "Rust", status: "offline" },
-          { id: "blaze", name: "Blaze", role: "Frontend", status: "offline" },
-          { id: "bolt", name: "Bolt", role: "DevOps", status: "offline" },
-        ],
+        agents: OFFLINE_AGENTS.map((a) => ({ ...a, status: "offline" })),
         offline: true,
       });
+    };
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+
+    try {
+      const resp = await fetch(`${apiBase}/v1/models`, {
+        headers: { Authorization: `Bearer ${apiToken}` },
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const payload = (await resp.json()) as { data?: Array<{ id: string }> };
+      const ids = (payload.data ?? [])
+        .map((m) => m.id)
+        .filter((id) => typeof id === "string");
+
+      const agents = ids
+        .map((id) => {
+          const stripped = id.startsWith("openclaw/")
+            ? id.slice("openclaw/".length)
+            : id === "openclaw"
+            ? ""
+            : id;
+          return stripped;
+        })
+        .filter((id) => id && id !== "default")
+        .map((id) => {
+          const match = OFFLINE_AGENTS.find((a) => a.id === id);
+          return match
+            ? { ...match, status: "online" as const }
+            : { id, name: id.charAt(0).toUpperCase() + id.slice(1), role: "Agent", status: "online" as const };
+        });
+
+      if (agents.length === 0) {
+        fallback();
+        return;
+      }
+      this.postMessage({ type: "agents", agents, offline: false });
+    } catch {
+      clearTimeout(timer);
+      fallback();
     }
   }
 
   private async _handleChatMessage(text: string, agent: string) {
-    const config = vscode.workspace.getConfiguration("cto");
-    const apiBase = config.get<string>("apiBase", "http://localhost:18789");
+    const { apiBase, apiToken, requestTimeoutMs } = this._gatewayConfig();
 
-    // Stream response from ACP/OpenClaw
+    const editor = vscode.window.activeTextEditor;
+    const parts: string[] = [text];
+    const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (workspace) parts.push(`\n\n_workspace:_ \`${workspace}\``);
+    if (editor) {
+      parts.push(`\n_file:_ \`${editor.document.fileName}\``);
+      const sel = editor.selection;
+      if (sel && !sel.isEmpty) {
+        const selText = editor.document.getText(sel);
+        parts.push(`\n\n_selection:_\n\`\`\`\n${selText}\n\`\`\``);
+      }
+    }
+    const content = parts.join("");
+
+    const model = agent ? `openclaw/${agent}` : "openclaw";
+
+    const controller = new AbortController();
+    let firstByte = false;
+    const firstByteTimer = setTimeout(() => {
+      if (!firstByte) controller.abort();
+    }, requestTimeoutMs);
+
     try {
-      const resp = await fetch(`${apiBase}/chat`, {
+      const resp = await fetch(`${apiBase}/v1/chat/completions`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiToken}`,
+        },
         body: JSON.stringify({
-          message: text,
-          agent,
-          context: {
-            file: vscode.window.activeTextEditor?.document.fileName,
-            selection: vscode.window.activeTextEditor?.selection
-              ? vscode.window.activeTextEditor.document.getText(
-                  vscode.window.activeTextEditor.selection
-                )
-              : undefined,
-            workspace: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
-          },
+          model,
+          messages: [{ role: "user", content }],
+          stream: true,
         }),
+        signal: controller.signal,
       });
 
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      if (!resp.ok) {
+        clearTimeout(firstByteTimer);
+        const body = await resp.text().catch(() => "");
+        this.postMessage({
+          type: "error",
+          text: this._connectionErrorBanner(
+            new Error(`HTTP ${resp.status}${body ? `: ${body.slice(0, 200)}` : ""}`),
+            apiBase,
+            resp.status,
+            requestTimeoutMs
+          ),
+        });
+        return;
+      }
 
-      // Handle streaming response
-      if (resp.body) {
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
+      if (!resp.body) {
+        clearTimeout(firstByteTimer);
+        this.postMessage({
+          type: "error",
+          text: `Gateway at ${apiBase} returned no stream body.`,
+        });
+        return;
+      }
 
-        this.postMessage({ type: "streamStart" });
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let sseBuffer = "";
+      this.postMessage({ type: "streamStart" });
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += (decoder as any).decode(value, { stream: true });
-          this.postMessage({ type: "streamChunk", text: buffer });
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!firstByte) {
+          firstByte = true;
+          clearTimeout(firstByteTimer);
         }
 
-        this.postMessage({ type: "streamEnd", text: buffer });
-      } else {
-        const data = (await resp.json()) as Record<string, unknown>;
-        this.postMessage({ type: "response", text: (data.response ?? data.message ?? JSON.stringify(data)) as string });
+        sseBuffer += (decoder as { decode: (v: Uint8Array, opts?: { stream?: boolean }) => string }).decode(value, { stream: true });
+
+        let sepIdx: number;
+        // SSE events are delimited by a blank line
+        // eslint-disable-next-line no-cond-assign
+        while ((sepIdx = sseBuffer.indexOf("\n\n")) !== -1) {
+          const rawEvent = sseBuffer.slice(0, sepIdx);
+          sseBuffer = sseBuffer.slice(sepIdx + 2);
+          const lines = rawEvent.split("\n");
+          for (const line of lines) {
+            if (!line.startsWith("data:")) continue;
+            const data = line.slice(5).trim();
+            if (!data) continue;
+            if (data === "[DONE]") {
+              this.postMessage({ type: "streamEnd" });
+              return;
+            }
+            try {
+              const evt = JSON.parse(data) as {
+                choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }>;
+              };
+              const delta = evt.choices?.[0]?.delta?.content;
+              if (typeof delta === "string" && delta.length > 0) {
+                this.postMessage({ type: "streamChunk", delta });
+              }
+            } catch {
+              // ignore malformed SSE frames
+            }
+          }
+        }
       }
+
+      this.postMessage({ type: "streamEnd" });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.postMessage({
-        type: "error",
-        text: `Connection failed: ${msg}\n\nMake sure your CTO gateway is running at ${apiBase}`,
-      });
+      clearTimeout(firstByteTimer);
+      if (firstByte) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.postMessage({ type: "error", text: `Stream interrupted: ${msg}` });
+      } else {
+        this.postMessage({
+          type: "error",
+          text: this._connectionErrorBanner(err, apiBase, undefined, requestTimeoutMs),
+        });
+      }
     }
+  }
+
+  private _connectionErrorBanner(
+    err: unknown,
+    apiBase: string,
+    httpStatus: number | undefined,
+    requestTimeoutMs: number
+  ): string {
+    const msg = err instanceof Error ? err.message : String(err);
+    const name = err instanceof Error ? err.name : "";
+    const seconds = Math.round(requestTimeoutMs / 1000);
+
+    if (name === "AbortError" || /abort/i.test(msg)) {
+      return `Gateway did not respond within ${seconds}s at ${apiBase}. Is the OpenClaw sidecar running? Try: kubectl -n cto exec <pod> -c agent -- curl -sS http://localhost:18789/health`;
+    }
+    if (/ECONNREFUSED|fetch failed|ENOTFOUND|network/i.test(msg)) {
+      return `Cannot reach OpenClaw gateway at ${apiBase}. The sidecar may not be running, or the apiBase/port-forward is misconfigured. Check: curl -sS ${apiBase}/health`;
+    }
+    if (httpStatus === 401 || httpStatus === 403) {
+      return `Gateway rejected the bearer token (HTTP ${httpStatus}). Check the cto.apiToken setting — it must match gateway.auth.token in /workspace/.openclaw/openclaw.json.`;
+    }
+    if (httpStatus && httpStatus >= 500) {
+      return `Gateway returned ${httpStatus} at ${apiBase}. Check the agent pod logs (kubectl -n cto logs <pod> -c agent).`;
+    }
+    if (httpStatus && httpStatus >= 400) {
+      return `Gateway error ${httpStatus} at ${apiBase}: ${msg}`;
+    }
+    return `Connection failed: ${msg}. Make sure the OpenClaw gateway is reachable at ${apiBase}.`;
   }
 
   private _getHtml(webview: vscode.Webview): string {
@@ -616,14 +783,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
         case 'streamChunk': {
           if (streamBubble) {
-            streamBubble.textContent = msg.text;
+            const piece = msg.delta ?? msg.text ?? '';
+            streamBubble.textContent = (streamBubble.textContent || '') + piece;
             scrollToBottom();
           }
           break;
         }
 
         case 'streamEnd': {
-          if (streamBubble) streamBubble.textContent = msg.text;
+          if (streamBubble && typeof msg.text === 'string') streamBubble.textContent = msg.text;
           streamBubble = null;
           isStreaming = false;
           sendBtn.disabled = false;

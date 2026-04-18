@@ -2,7 +2,7 @@
   "name": "cto-sidebar",
   "displayName": "5dlabs CTO",
   "description": "CTO agent chat — connects directly to your OpenClaw/ACP harness",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "5dlabs",
   
   "engines": {
@@ -36,12 +36,22 @@
         "cto.apiBase": {
           "type": "string",
           "default": "http://localhost:18789",
-          "description": "OpenClaw gateway base URL"
+          "description": "OpenClaw gateway base URL. In-pod agent sidecars expose it at http://localhost:18789; for host debugging, port-forward the pod (kubectl -n cto port-forward svc/openclaw-coder 18789:18789)."
+        },
+        "cto.apiToken": {
+          "type": "string",
+          "default": "openclaw-internal",
+          "description": "Bearer token for the OpenClaw gateway (matches gateway.auth.token in /workspace/.openclaw/openclaw.json)."
         },
         "cto.defaultAgent": {
           "type": "string",
           "default": "",
-          "description": "Default agent to use (empty = auto-select)"
+          "description": "Default agent id (maps to model openclaw/<agent>). Leave empty to send model 'openclaw' and let the gateway auto-route."
+        },
+        "cto.requestTimeoutMs": {
+          "type": "number",
+          "default": 30000,
+          "description": "Milliseconds to wait for the first streamed byte from the gateway before aborting."
         }
       }
     },
