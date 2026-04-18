@@ -4,6 +4,8 @@
 semgrep-sast:
   extends: .semgrep-sast
   stage: security
+  # Advisory: GitHub has no equivalent; findings visible in UI but do not block pipeline
+  allow_failure: true
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_PIPELINE_SOURCE == "schedule"
@@ -11,6 +13,8 @@ semgrep-sast:
 cargo-audit:
   extends: .cargo-audit
   stage: security
+  # Advisory: matches GitHub Dependabot behavior (alerts, not blocks)
+  allow_failure: true
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
@@ -21,6 +25,8 @@ cargo-audit:
 npm-audit-web:
   extends: .npm-audit
   stage: security
+  # Advisory: matches GitHub Dependabot behavior
+  allow_failure: true
   variables:
     NPM_PROJECT_DIR: apps/web
   rules:
@@ -32,6 +38,8 @@ npm-audit-web:
 npm-audit-website:
   extends: .npm-audit
   stage: security
+  # Advisory: matches GitHub Dependabot behavior
+  allow_failure: true
   variables:
     NPM_PROJECT_DIR: apps/website
   rules:
