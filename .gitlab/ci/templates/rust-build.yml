@@ -18,6 +18,7 @@
           pkg-config build-essential \
           libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
           librsvg2-dev libssl-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+          protobuf-compiler cmake \
           >/dev/null
       fi
     - rustup default stable
@@ -53,18 +54,29 @@
 
 .rust-clippy:
   extends: .rust-setup
+  # Mirror GitHub: per-package clippy pedantic on the same 7 crates.
   script:
-    - cargo clippy --all-targets --all-features -- -D warnings
+    - |
+      set -e
+      for pkg in controller healer pm intake research cto-mcp tools; do
+        echo "🔍 clippy -p $pkg (pedantic)"
+        cargo clippy -p "$pkg" --all-targets -- -D warnings -W clippy::pedantic
+      done
 
 .rust-test:
   extends: .rust-setup
+  # Mirror GitHub: per-package tests on the same 7 crates.
   script:
     - |
+      set -e
+      runner="cargo test"
       if command -v cargo-nextest &>/dev/null; then
-        cargo nextest run --all-targets
-      else
-        cargo test --all-targets
+        runner="cargo nextest run"
       fi
+      for pkg in controller healer pm intake research cto-mcp tools; do
+        echo "🧪 $runner -p $pkg"
+        $runner -p "$pkg" --all-targets
+      done
 
 .rust-build:
   extends: .rust-setup
