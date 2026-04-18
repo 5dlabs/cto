@@ -10,8 +10,12 @@ semantic-release:
     GIT_DEPTH: 0
   before_script:
     - git fetch --tags origin
+    # Mirror is one-way from GitHub → GitLab. Use a GitLab-only config that
+    # does NOT push commits back (no @semantic-release/git, no changelog, no exec)
+    # since those would be overwritten by the next mirror cycle anyway.
+    - cp .releaserc.gitlab.json .releaserc.json
   script:
-    - npm install -g semantic-release @semantic-release/gitlab @semantic-release/changelog @semantic-release/git @semantic-release/exec conventional-changelog-conventionalcommits
+    - npm install -g semantic-release @semantic-release/gitlab conventional-changelog-conventionalcommits
     - semantic-release
   rules:
     - if: $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_TAG == null
@@ -246,5 +250,83 @@ tauri-cdn-upload:
       EOF
   rules:
     - if: $CI_COMMIT_TAG =~ /^cto-lite-v/
+  tags:
+    - k8s
+
+# --- CTO Sidebar VSIX (VS Code extension) ---
+# Mirrors .github/workflows/cto-sidebar-release.yaml.
+# Publishes to the GitLab Generic Package Registry with a fixed version 'latest'
+# so the controller sidecar bootstrap has a stable URL:
+#   ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/cto-sidebar/latest/cto-sidebar.vsix
+# A versioned copy is also uploaded under the extension's package.json version.
+
+cto-sidebar-vsix:
+  stage: release
+  image: oven/bun:latest
+  variables:
+    WORKDIR: apps/cto-sidebar
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends curl unzip ca-certificates
+  script:
+    - cd "$WORKDIR"
+    - bun install --frozen-lockfile
+    # Match the GitHub workflow tsc lib override so DOM types resolve.
+    - bunx --bun tsc -p tsconfig.json --lib ES2022,DOM
+    - VERSION=$(node -p "require('./package.json').version")
+    - echo "cto-sidebar version ${VERSION}"
+    - bunx --bun @vscode/vsce package --no-dependencies --out cto-sidebar.vsix
+    - cp cto-sidebar.vsix "cto-sidebar-${VERSION}.vsix"
+    - ls -la cto-sidebar*.vsix
+    - unzip -l cto-sidebar.vsix | grep -q extension.vsixmanifest
+    - unzip -l cto-sidebar.vsix | grep -q 'extension/out/extension.js'
+    # Publish to Generic Package Registry under 'latest' (stable URL) and versioned.
+    - |
+      PKG_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/cto-sidebar"
+      for ver in "latest" "${VERSION}"; do
+        echo "Uploading cto-sidebar.vsix -> ${PKG_URL}/${ver}/cto-sidebar.vsix"
+        curl -fsSL --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+          --upload-file cto-sidebar.vsix \
+          "${PKG_URL}/${ver}/cto-sidebar.vsix"
+        echo
+      done
+    - echo "VERSION=${VERSION}" > "${CI_PROJECT_DIR}/sidebar.env"
+  artifacts:
+    paths:
+      - apps/cto-sidebar/cto-sidebar.vsix
+      - apps/cto-sidebar/cto-sidebar-*.vsix
+    reports:
+      dotenv: sidebar.env
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - apps/cto-sidebar/**
+        - .gitlab/ci/jobs/release.yml
+    - if: $CI_COMMIT_TAG =~ /^cto-sidebar-v/
+  tags:
+    - k8s
+
+cto-sidebar-release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - job: cto-sidebar-vsix
+      artifacts: true
+  script:
+    - echo "Creating GitLab release for cto-sidebar v${VERSION}"
+  release:
+    tag_name: "cto-sidebar-v${VERSION}"
+    name: "CTO Sidebar v${VERSION}"
+    description: "Versioned release of the CTO sidebar VS Code extension.\n\n- Version: `${VERSION}`\n- Commit: `${CI_COMMIT_SHA}`"
+    assets:
+      links:
+        - name: "cto-sidebar.vsix (latest stable URL)"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/cto-sidebar/latest/cto-sidebar.vsix"
+          link_type: package
+        - name: "cto-sidebar-${VERSION}.vsix"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/cto-sidebar/${VERSION}/cto-sidebar.vsix"
+          link_type: package
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^cto-sidebar-v/
   tags:
     - k8s
