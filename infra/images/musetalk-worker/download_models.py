@@ -17,6 +17,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger("download_models")
 
 
+# Required HuggingFace models for MuseTalk
+REQUIRED_HF_MODELS = [
+    ("stabilityai/sd-vae-ft-mse", "models/sd-vae"),  # VAE for face encoding
+    ("facebook/wav2vec2-base-960h", "models/wav2vec"),  # Audio feature extraction
+]
+
+
 def clone_git_repo(repo: str, dest: Path) -> None:
     if dest.exists() and any(dest.iterdir()):
         log.info("Git repo already present at %s, skipping clone", dest)
@@ -40,16 +47,38 @@ def download_hf_repo(repo: str, dest: Path, token: str | None) -> None:
     )
 
 
+def download_required_models(cache_dir: Path, token: str | None) -> None:
+    """Download required HuggingFace models for MuseTalk."""
+    for repo_id, local_path in REQUIRED_HF_MODELS:
+        dest = cache_dir / local_path
+        if dest.exists() and any(dest.iterdir()):
+            log.info("Model %s already present at %s, skipping", repo_id, dest)
+            continue
+        
+        log.info("Downloading model %s -> %s", repo_id, dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        snapshot_download(
+            repo_id=repo_id,
+            local_dir=str(dest),
+            token=token,
+            ignore_patterns=["*.md", "*.txt", "LICENSE*", ".gitattributes"],
+        )
+
+
 def main():
     repo = os.environ.get("HF_MODEL_REPO", "https://github.com/TMElyralab/MuseTalk.git")
     cache_dir = Path(os.environ.get("MODEL_CACHE_DIR", "/models"))
     token = os.environ.get("HF_TOKEN")
     target = cache_dir / "musetalk"
 
+    # Clone the MuseTalk repo
     if repo.startswith("http://") or repo.startswith("https://") or repo.endswith(".git"):
         clone_git_repo(repo, target)
     else:
         download_hf_repo(repo, target, token)
+
+    # Download required HuggingFace models
+    download_required_models(cache_dir, token)
 
     log.info("Model download complete")
 
