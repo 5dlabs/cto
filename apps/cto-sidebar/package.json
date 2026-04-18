@@ -57,6 +57,11 @@
         "title": "Clear History",
         "icon": "$(clear-all)",
         "category": "CTO"
+      },
+      {
+        "command": "cto-sidebar.resetLayout",
+        "title": "Reset Layout",
+        "category": "CTO"
       }
     ],
     "menus": {

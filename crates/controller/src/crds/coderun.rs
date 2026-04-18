@@ -684,6 +684,11 @@ pub struct CodeRunSpec {
     /// and use standalone ACPX + Lobster directly.
     #[serde(default, rename = "harnessAgent", skip_serializing_if = "Option::is_none")]
     pub harness_agent: Option<HarnessAgent>,
+
+    /// Whether to attach a code-server sidecar for browser-based IDE access.
+    /// When enabled, a cloudflared tunnel provides an ephemeral URL.
+    #[serde(default, rename = "enableCodeServer")]
+    pub enable_code_server: bool,
 }
 
 impl Default for CodeRunSpec {
@@ -731,6 +736,7 @@ impl Default for CodeRunSpec {
             acp: None,
             openclaw: None,
             harness_agent: None,
+            enable_code_server: false,
         }
     }
 }
@@ -816,6 +822,10 @@ pub struct CodeRunStatus {
         skip_serializing_if = "Option::is_none"
     )]
     pub coordination_configmap: Option<String>,
+
+    /// Ephemeral code-server tunnel URL (populated when enableCodeServer is true)
+    #[serde(rename = "codeServerUrl", skip_serializing_if = "Option::is_none")]
+    pub code_server_url: Option<String>,
 }
 
 /// Condition for the `CodeRun`

@@ -2200,6 +2200,169 @@ scrape_configs:
             );
         }
 
+        // Add code-server + cloudflared sidecars if enabled
+        if code_run.spec.enable_code_server {
+            let cs_data_dir = format!("/workspace/{workspace_subdir}/.code-server");
+            let cs_url_path = format!("/workspace/{workspace_subdir}/.code-server-url");
+
+            // Bootstrap script: settings, CTO sidebar state, extension install
+            let bootstrap_script = format!(
+                r#"set -eu
+CS_DIR="{cs_data_dir}"
+mkdir -p "$CS_DIR/User/globalStorage"
+
+# VS Code settings (match persistent coder defaults)
+if [ ! -f "$CS_DIR/User/settings.json" ]; then
+cat > "$CS_DIR/User/settings.json" << 'SETTINGS'
+{{
+  "workbench.colorTheme": "Dark Modern",
+  "workbench.startupEditor": "none",
+  "workbench.sideBar.location": "left",
+  "workbench.activityBar.location": "default",
+  "editor.fontSize": 14,
+  "terminal.integrated.fontSize": 14,
+  "cto.apiBase": "http://localhost:18789",
+  "cto.defaultAgent": "morgan",
+  "diffEditor.renderSideBySide": true,
+  "scm.diffDecorations": "all",
+  "scm.defaultViewMode": "tree",
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000
+}}
+SETTINGS
+fi
+
+# Pre-seed state: CTO sidebar active
+if [ ! -f "$CS_DIR/User/globalStorage/storage.json" ]; then
+cat > "$CS_DIR/User/globalStorage/storage.json" << 'STATE'
+{{
+  "lastActiveSideBarViewlet": "workbench.view.extension.cto-sidebar",
+  "workbench.sideBar.visible": true,
+  "workbench.panel.visible": false
+}}
+STATE
+fi
+
+# Install CTO sidebar extension if available
+EXTDIR="$CS_DIR/extensions"
+mkdir -p "$EXTDIR"
+VSIX_URL="https://github.com/5dlabs/cto/releases/download/cto-sidebar-latest/cto-sidebar.vsix"
+VSIX_PATH="/workspace/.code-server-cache/cto-sidebar.vsix"
+mkdir -p /workspace/.code-server-cache
+if [ ! -f "$VSIX_PATH" ]; then
+  curl -sL "$VSIX_URL" -o "$VSIX_PATH" 2>/dev/null || true
+fi
+if [ -f "$VSIX_PATH" ]; then
+  code-server --extensions-dir "$EXTDIR" --install-extension "$VSIX_PATH" 2>/dev/null || true
+fi
+
+# Start code-server with agent_done watcher
+exec code-server \
+  --disable-telemetry \
+  --user-data-dir "$CS_DIR" \
+  --extensions-dir "$EXTDIR" \
+  --bind-addr 0.0.0.0:8080 \
+  --auth none \
+  /workspace/{workspace_subdir} &
+CS_PID=$!
+
+# Watch for agent completion
+while true; do
+  if [ -f /workspace/.agent_done ]; then
+    echo "[code-server] Agent done, shutting down..."
+    kill -TERM $CS_PID 2>/dev/null || true
+    sleep 2
+    kill -KILL $CS_PID 2>/dev/null || true
+    exit 0
+  fi
+  if ! kill -0 $CS_PID 2>/dev/null; then
+    echo "[code-server] Process exited unexpectedly"
+    exit 1
+  fi
+  sleep 5
+done"#
+            );
+
+            let code_server_spec = json!({
+                "name": "code-server",
+                "image": "codercom/code-server:latest",
+                "command": ["/bin/sh", "-c"],
+                "args": [bootstrap_script],
+                "securityContext": {
+                    "runAsUser": 0
+                },
+                "ports": [{
+                    "name": "code-server",
+                    "containerPort": 8080,
+                    "protocol": "TCP"
+                }],
+                "volumeMounts": [
+                    {"name": "workspace", "mountPath": "/workspace"}
+                ],
+                "resources": {
+                    "requests": {"cpu": "50m", "memory": "256Mi"},
+                    "limits": {"cpu": "1", "memory": "1Gi"}
+                }
+            });
+            containers.push(code_server_spec);
+
+            // Cloudflared sidecar for ephemeral tunnel URL
+            let tunnel_script = format!(
+                r#"cloudflared tunnel --url http://localhost:8080 --no-autoupdate 2>&1 | \
+tee /dev/stderr | while IFS= read -r line; do
+  case "$line" in
+    *trycloudflare.com*)
+      URL=$(echo "$line" | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com')
+      if [ -n "$URL" ]; then
+        echo "$URL" > {cs_url_path}
+        echo "[cloudflared] Tunnel URL: $URL"
+        # Patch pod annotation so controller can read it
+        KUBE_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token 2>/dev/null || echo "")
+        if [ -n "$KUBE_TOKEN" ]; then
+          NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace 2>/dev/null || echo "cto")
+          POD_NAME=$(hostname)
+          curl -sk -X PATCH \
+            -H "Authorization: Bearer $KUBE_TOKEN" \
+            -H "Content-Type: application/merge-patch+json" \
+            -d "{{\\"metadata\":{{\\"annotations\":{{\\"cto.5dlabs.ai/code-server-url\":\"$URL\"}}}}}}" \
+            "https://kubernetes.default.svc/api/v1/namespaces/$NAMESPACE/pods/$POD_NAME" \
+            >/dev/null 2>&1 || true
+        fi
+      fi
+      ;;
+  esac
+done &
+# Watch for agent_done
+while true; do
+  if [ -f /workspace/.agent_done ]; then
+    echo "[cloudflared] Agent done, exiting..."
+    exit 0
+  fi
+  sleep 10
+done"#
+            );
+
+            let cloudflared_spec = json!({
+                "name": "cloudflared",
+                "image": "cloudflare/cloudflared:latest",
+                "command": ["/bin/sh", "-c"],
+                "args": [tunnel_script],
+                "volumeMounts": [
+                    {"name": "workspace", "mountPath": "/workspace"}
+                ],
+                "resources": {
+                    "requests": {"cpu": "10m", "memory": "64Mi"},
+                    "limits": {"cpu": "200m", "memory": "256Mi"}
+                }
+            });
+            containers.push(cloudflared_spec);
+
+            info!(
+                "Added code-server + cloudflared sidecars for CodeRun {}",
+                coderun_name
+            );
+        }
+
         // Build init containers array
         // Always include the workspace setup init container that:
         // 1. Creates a unique subdirectory per CodeRun to prevent git lock conflicts

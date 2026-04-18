@@ -145,6 +145,10 @@ spec:
                 type: boolean
                 description: "Whether to enable Docker-in-Docker support for this CodeRun (defaults to true)"
                 default: true
+              enableCodeServer:
+                type: boolean
+                description: "Whether to attach a code-server sidecar with CTO sidebar for browser-based IDE access (defaults to false)"
+                default: false
               taskRequirements:
                 type: string
                 description: "Base64-encoded YAML containing task requirements (secrets and environment variables)"
@@ -483,3 +487,6 @@ spec:
               workCompleted:
                 type: boolean
                 description: "Tracks whether the code implementation work has been completed successfully (used for TTL safety)"
+              codeServerUrl:
+                type: string
+                description: "Ephemeral code-server tunnel URL (populated when enableCodeServer is true)"

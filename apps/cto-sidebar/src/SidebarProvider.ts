@@ -140,192 +140,131 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
   <style nonce="${nonce}">
-    :root {
-      --cto-accent: #6c5ce7;
-      --cto-accent-hover: #5a4bd1;
-      --cto-green: #00b894;
-      --cto-red: #e17055;
-      --cto-orange: #fdcb6e;
-    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: var(--vscode-font-family);
       font-size: var(--vscode-font-size);
       color: var(--vscode-foreground);
-      background: var(--vscode-sideBar-background);
+      background: var(--vscode-panel-background, var(--vscode-sideBar-background));
       display: flex;
       flex-direction: column;
       height: 100vh;
       overflow: hidden;
     }
 
-    /* Header */
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 12px 8px;
-      border-bottom: 1px solid var(--vscode-panel-border);
-    }
-    .header-logo {
-      width: 22px;
-      height: 22px;
-      background: var(--cto-accent);
-      border-radius: 5px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 11px;
-      color: #fff;
-      flex-shrink: 0;
-    }
-    .header-title {
-      font-weight: 600;
-      font-size: 12px;
-      flex: 1;
-    }
-    .header-status {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .header-status.online { background: var(--cto-green); }
-    .header-status.offline { background: var(--cto-red); }
-    .header-status.connecting { background: var(--cto-orange); animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-    /* Agent selector */
-    .agent-bar {
-      display: flex;
-      gap: 4px;
-      padding: 6px 12px;
-      overflow-x: auto;
-      border-bottom: 1px solid var(--vscode-panel-border);
-      scrollbar-width: none;
-    }
-    .agent-bar::-webkit-scrollbar { display: none; }
-    .agent-chip {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
-      border-radius: 12px;
-      font-size: 11px;
-      cursor: pointer;
-      white-space: nowrap;
-      background: var(--vscode-badge-background);
-      color: var(--vscode-badge-foreground);
-      border: 1px solid transparent;
-      transition: all 0.15s;
-    }
-    .agent-chip:hover { border-color: var(--cto-accent); }
-    .agent-chip.active {
-      background: var(--cto-accent);
-      color: #fff;
-    }
-    .agent-chip .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-    }
-    .agent-chip .dot.online { background: var(--cto-green); }
-    .agent-chip .dot.offline { background: var(--cto-red); }
-
-    /* Messages area */
+    /* Messages / content area */
     .messages {
       flex: 1;
       overflow-y: auto;
-      padding: 12px;
+      padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-    }
-    .message {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      max-width: 95%;
-    }
-    .message.user { align-self: flex-end; }
-    .message.assistant { align-self: flex-start; }
-    .message-meta {
-      font-size: 10px;
-      opacity: 0.6;
-      padding: 0 4px;
-    }
-    .message-bubble {
-      padding: 8px 12px;
-      border-radius: 10px;
-      font-size: 12.5px;
-      line-height: 1.5;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    .message.user .message-bubble {
-      background: var(--cto-accent);
-      color: #fff;
-      border-bottom-right-radius: 3px;
-    }
-    .message.assistant .message-bubble {
-      background: var(--vscode-editor-background);
-      border: 1px solid var(--vscode-panel-border);
-      border-bottom-left-radius: 3px;
-    }
-    .message-bubble code {
-      font-family: var(--vscode-editor-font-family);
-      font-size: 11.5px;
-      background: rgba(0,0,0,0.15);
-      padding: 1px 4px;
-      border-radius: 3px;
-    }
-    .message-bubble pre {
-      background: var(--vscode-textCodeBlock-background);
-      padding: 8px;
-      border-radius: 4px;
-      overflow-x: auto;
-      margin: 6px 0;
     }
 
-    /* Welcome */
+    /* Welcome — matches Copilot chat empty state */
     .welcome {
       flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 12px;
-      padding: 20px;
+      gap: 8px;
+      padding: 40px 20px;
       text-align: center;
-      opacity: 0.7;
     }
     .welcome-icon {
       width: 48px;
       height: 48px;
-      background: var(--cto-accent);
-      border-radius: 12px;
+      opacity: 0.5;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 22px;
+    }
+    .welcome-icon svg { width: 48px; height: 48px; }
+    .welcome-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--vscode-foreground);
+    }
+    .welcome-sub {
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    /* Message blocks — VS Code chat style (no bubbles) */
+    .message {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .message + .message {
+      border-top: 1px solid var(--vscode-panel-border, rgba(255,255,255,0.06));
+    }
+    .message-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .message-avatar {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
       font-weight: 700;
+      flex-shrink: 0;
+    }
+    .message.user .message-avatar {
+      background: var(--vscode-charts-purple, #9d8abf);
       color: #fff;
     }
-    .welcome h3 { font-size: 14px; }
-    .welcome p { font-size: 12px; line-height: 1.5; }
+    .message.assistant .message-avatar {
+      background: var(--vscode-charts-blue, #4fc1ff);
+      color: #fff;
+    }
+    .message-sender {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--vscode-foreground);
+    }
+    .message-body {
+      font-size: 13px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--vscode-foreground);
+      padding-left: 26px;
+    }
+    .message-body code {
+      font-family: var(--vscode-editor-font-family);
+      font-size: 12px;
+      background: var(--vscode-textCodeBlock-background, rgba(255,255,255,0.06));
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+    .message-body pre {
+      background: var(--vscode-textCodeBlock-background, rgba(255,255,255,0.06));
+      padding: 10px 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 8px 0;
+      font-size: 12px;
+      line-height: 1.45;
+    }
 
     /* Typing indicator */
     .typing {
       display: flex;
       gap: 4px;
-      padding: 8px 12px;
-      align-self: flex-start;
+      padding: 12px 16px 12px 42px;
     }
     .typing span {
-      width: 6px;
-      height: 6px;
-      background: var(--cto-accent);
+      width: 5px;
+      height: 5px;
+      background: var(--vscode-descriptionForeground);
       border-radius: 50%;
       animation: bounce 1.4s infinite ease-in-out;
     }
@@ -334,84 +273,198 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     .typing span:nth-child(3) { animation-delay: 0.4s; }
     @keyframes bounce {
       0%,80%,100% { transform: translateY(0); }
-      40% { transform: translateY(-8px); }
+      40% { transform: translateY(-6px); }
     }
 
-    /* Input area */
-    .input-area {
-      border-top: 1px solid var(--vscode-panel-border);
-      padding: 8px 12px;
-      display: flex;
-      gap: 6px;
-      align-items: flex-end;
+    /* Input area — matches Copilot chat input box */
+    .input-wrapper {
+      padding: 0 12px 4px;
     }
-    .input-area textarea {
-      flex: 1;
+    .input-box {
       background: var(--vscode-input-background);
-      color: var(--vscode-input-foreground);
-      border: 1px solid var(--vscode-input-border);
+      border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
       border-radius: 8px;
-      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+    .input-box:focus-within {
+      border-color: var(--vscode-focusBorder);
+    }
+    .input-box textarea {
+      flex: 1;
+      background: transparent;
+      color: var(--vscode-input-foreground);
+      border: none;
+      padding: 10px 12px 4px;
       font-family: var(--vscode-font-family);
-      font-size: 12.5px;
+      font-size: 13px;
       resize: none;
-      min-height: 36px;
-      max-height: 120px;
+      min-height: 24px;
+      max-height: 140px;
       line-height: 1.4;
       outline: none;
     }
-    .input-area textarea:focus {
-      border-color: var(--cto-accent);
-    }
-    .input-area textarea::placeholder {
+    .input-box textarea::placeholder {
       color: var(--vscode-input-placeholderForeground);
     }
-    .send-btn {
-      width: 32px;
-      height: 32px;
+    .input-toolbar {
+      display: flex;
+      align-items: center;
+      padding: 2px 6px 6px;
+      gap: 2px;
+    }
+    .input-toolbar .spacer { flex: 1; }
+    .toolbar-btn {
+      width: 26px;
+      height: 26px;
       border: none;
-      border-radius: 8px;
-      background: var(--cto-accent);
-      color: #fff;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--vscode-descriptionForeground);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-shrink: 0;
-      transition: background 0.15s;
+      transition: background 0.1s, color 0.1s;
     }
-    .send-btn:hover { background: var(--cto-accent-hover); }
-    .send-btn:disabled { opacity: 0.4; cursor: default; }
-    .send-btn svg { width: 16px; height: 16px; }
+    .toolbar-btn:hover {
+      background: var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.1));
+      color: var(--vscode-foreground);
+    }
+    .toolbar-btn:disabled { opacity: 0.3; cursor: default; }
+    .toolbar-btn svg { width: 16px; height: 16px; }
+    .toolbar-btn.send-active {
+      color: var(--vscode-button-foreground, #fff);
+      background: var(--vscode-button-background, #0078d4);
+    }
+    .toolbar-btn.send-active:hover {
+      background: var(--vscode-button-hoverBackground, #026ec1);
+    }
+
+    /* Footer bar — matches Copilot "Local / Default Approvals" bar */
+    .footer-bar {
+      display: flex;
+      align-items: center;
+      padding: 4px 12px 8px;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .footer-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--vscode-descriptionForeground);
+      transition: background 0.1s;
+      user-select: none;
+    }
+    .footer-item:hover {
+      background: var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.1));
+      color: var(--vscode-foreground);
+    }
+    .footer-item .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .footer-item .dot.online { background: #3fb950; }
+    .footer-item .dot.offline { background: #f85149; }
+    .footer-item .dot.connecting { background: #d29922; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+    .footer-item .chevron {
+      font-size: 10px;
+      opacity: 0.6;
+    }
+    .footer-item.spacer { flex: 1; cursor: default; background: none; }
+
+    /* Agent dropdown */
+    .agent-dropdown {
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      margin-bottom: 4px;
+      background: var(--vscode-dropdown-background, var(--vscode-input-background));
+      border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
+      border-radius: 6px;
+      padding: 4px;
+      min-width: 180px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      z-index: 100;
+      display: none;
+    }
+    .agent-dropdown.show { display: block; }
+    .agent-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--vscode-foreground);
+    }
+    .agent-option:hover {
+      background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.06));
+    }
+    .agent-option.active {
+      background: var(--vscode-list-activeSelectionBackground, rgba(255,255,255,0.1));
+    }
+    .agent-option .role {
+      font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+      margin-left: auto;
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="header-logo">5D</div>
-    <div class="header-title">5dlabs CTO</div>
-    <div class="header-status connecting" id="statusDot" title="Connecting..."></div>
-  </div>
-
-  <div class="agent-bar" id="agentBar">
-    <div class="agent-chip active" data-agent="auto">Auto</div>
-  </div>
-
   <div class="messages" id="messages">
     <div class="welcome" id="welcome">
-      <div class="welcome-icon">5D</div>
-      <h3>5dlabs CTO Agents</h3>
-      <p>Ask anything. Your message is routed<br>to the best available agent.</p>
+      <div class="welcome-icon">
+        <svg viewBox="0 0 48 48" fill="none">
+          <rect x="4" y="4" width="40" height="40" rx="10" fill="var(--vscode-descriptionForeground)" opacity="0.15"/>
+          <text x="24" y="30" text-anchor="middle" fill="var(--vscode-descriptionForeground)" font-size="18" font-weight="700" font-family="var(--vscode-font-family)">5D</text>
+        </svg>
+      </div>
+      <div class="welcome-title">Build with CTO Agent</div>
+      <div class="welcome-sub">AI responses may be inaccurate</div>
     </div>
   </div>
 
-  <div class="input-area">
-    <textarea id="input" rows="1" placeholder="Ask CTO agents..."></textarea>
-    <button class="send-btn" id="sendBtn" title="Send">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="22" y1="2" x2="11" y2="13"></line>
-        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-      </svg>
-    </button>
+  <div class="input-wrapper">
+    <div class="input-box">
+      <textarea id="input" rows="1" placeholder="Describe what to build"></textarea>
+      <div class="input-toolbar">
+        <button class="toolbar-btn" title="Attach context" id="attachBtn">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.5 1a3.5 3.5 0 0 1 .59 6.95L12 8v4.5a3.5 3.5 0 0 1-6.95.59L5 13V4.5a2.5 2.5 0 0 1 4.95-.49L10 4.5V12a1.5 1.5 0 0 1-2.95.35L7 12V4.5a.5.5 0 0 0-1 0V13a2.5 2.5 0 0 0 4.95.49L11 13V4.5a3.5 3.5 0 0 0-6.95-.49L4 4.5V13a4.5 4.5 0 0 0 8.95.49L13 13V4.5a3.5 3.5 0 0 0-1.5-3.5z"/></svg>
+        </button>
+        <div class="spacer"></div>
+        <button class="toolbar-btn" id="sendBtn" title="Send (Enter)">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1.724 1.053a.5.5 0 0 1 .54-.068l12 6a.5.5 0 0 1 0 .894l-12 6A.5.5 0 0 1 1.5 13.5v-4.379l6.854-1.027a.125.125 0 0 0 0-.247L1.5 6.82V2.5a.5.5 0 0 1 .224-.447z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <div class="footer-item" id="agentSelector" style="position:relative;">
+      <span class="dot connecting" id="statusDot"></span>
+      <span id="agentLabel">Auto</span>
+      <span class="chevron">▾</span>
+      <div class="agent-dropdown" id="agentDropdown">
+        <div class="agent-option active" data-agent="auto">
+          Auto <span class="role">best match</span>
+        </div>
+      </div>
+    </div>
+    <div class="footer-item spacer"></div>
+    <div class="footer-item" id="connectionStatus">
+      <span id="connectionLabel">Connecting</span>
+    </div>
   </div>
 
   <script nonce="${nonce}">
@@ -420,8 +473,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     const welcomeEl = document.getElementById('welcome');
     const inputEl = document.getElementById('input');
     const sendBtn = document.getElementById('sendBtn');
-    const agentBar = document.getElementById('agentBar');
     const statusDot = document.getElementById('statusDot');
+    const agentLabel = document.getElementById('agentLabel');
+    const agentSelector = document.getElementById('agentSelector');
+    const agentDropdown = document.getElementById('agentDropdown');
+    const connectionLabel = document.getElementById('connectionLabel');
 
     let selectedAgent = 'auto';
     let isStreaming = false;
@@ -434,7 +490,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     // Auto-resize textarea
     inputEl.addEventListener('input', () => {
       inputEl.style.height = 'auto';
-      inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + 'px';
+      // Toggle send button active state
+      sendBtn.classList.toggle('send-active', inputEl.value.trim().length > 0);
     });
 
     // Send on Enter (Shift+Enter for newline)
@@ -447,24 +505,30 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     sendBtn.addEventListener('click', sendMessage);
 
+    // Agent dropdown toggle
+    agentSelector.addEventListener('click', (e) => {
+      e.stopPropagation();
+      agentDropdown.classList.toggle('show');
+    });
+    document.addEventListener('click', () => {
+      agentDropdown.classList.remove('show');
+    });
+
     function sendMessage() {
       const text = inputEl.value.trim();
       if (!text || isStreaming) return;
 
-      // Hide welcome
       if (welcomeEl) welcomeEl.style.display = 'none';
 
-      // Add user message
       addMessage('user', text);
       inputEl.value = '';
       inputEl.style.height = 'auto';
+      sendBtn.classList.remove('send-active');
 
-      // Send to extension
       vscode.postMessage({ type: 'sendMessage', text, agent: selectedAgent });
       isStreaming = true;
       sendBtn.disabled = true;
 
-      // Show typing indicator
       const typing = document.createElement('div');
       typing.className = 'typing';
       typing.id = 'typing';
@@ -477,19 +541,29 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       const div = document.createElement('div');
       div.className = 'message ' + role;
 
-      const meta = document.createElement('div');
-      meta.className = 'message-meta';
-      meta.textContent = role === 'user' ? 'You' : (agentName || 'CTO');
+      const header = document.createElement('div');
+      header.className = 'message-header';
 
-      const bubble = document.createElement('div');
-      bubble.className = 'message-bubble';
-      bubble.textContent = text;
+      const avatar = document.createElement('div');
+      avatar.className = 'message-avatar';
+      avatar.textContent = role === 'user' ? 'U' : '5D';
 
-      div.appendChild(meta);
-      div.appendChild(bubble);
+      const sender = document.createElement('div');
+      sender.className = 'message-sender';
+      sender.textContent = role === 'user' ? 'You' : (agentName || 'CTO Agent');
+
+      header.appendChild(avatar);
+      header.appendChild(sender);
+
+      const body = document.createElement('div');
+      body.className = 'message-body';
+      body.textContent = text;
+
+      div.appendChild(header);
+      div.appendChild(body);
       messagesEl.appendChild(div);
       scrollToBottom();
-      return bubble;
+      return body;
     }
 
     function scrollToBottom() {
@@ -498,32 +572,36 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     let streamBubble = null;
 
-    // Handle messages from extension
     window.addEventListener('message', (event) => {
       const msg = event.data;
 
       switch (msg.type) {
         case 'agents': {
-          agentBar.innerHTML = '<div class="agent-chip active" data-agent="auto">Auto</div>';
           const agentList = Array.isArray(msg.agents) ? msg.agents : [];
+          agentDropdown.innerHTML = '<div class="agent-option active" data-agent="auto">Auto <span class="role">best match</span></div>';
           agentList.forEach(a => {
-            const chip = document.createElement('div');
-            chip.className = 'agent-chip';
-            chip.dataset.agent = a.id || a.name;
-            chip.innerHTML = '<span class="dot ' + (a.status === 'online' ? 'online' : 'offline') + '"></span>' + (a.name || a.id);
-            agentBar.appendChild(chip);
+            const opt = document.createElement('div');
+            opt.className = 'agent-option';
+            opt.dataset.agent = a.id || a.name;
+            opt.innerHTML = '<span class="dot ' + (a.status === 'online' ? 'online' : 'offline') + '"></span>'
+              + (a.name || a.id)
+              + '<span class="role">' + (a.role || '') + '</span>';
+            agentDropdown.appendChild(opt);
           });
 
-          // Update status
-          statusDot.className = 'header-status ' + (msg.offline ? 'offline' : 'online');
-          statusDot.title = msg.offline ? 'Gateway offline' : 'Connected';
+          // Status
+          statusDot.className = 'dot ' + (msg.offline ? 'offline' : 'online');
+          connectionLabel.textContent = msg.offline ? 'Offline' : 'Connected';
 
-          // Click handlers
-          agentBar.querySelectorAll('.agent-chip').forEach(chip => {
-            chip.addEventListener('click', () => {
-              agentBar.querySelectorAll('.agent-chip').forEach(c => c.classList.remove('active'));
-              chip.classList.add('active');
-              selectedAgent = chip.dataset.agent;
+          // Click handlers for agent options
+          agentDropdown.querySelectorAll('.agent-option').forEach(opt => {
+            opt.addEventListener('click', (e) => {
+              e.stopPropagation();
+              agentDropdown.querySelectorAll('.agent-option').forEach(o => o.classList.remove('active'));
+              opt.classList.add('active');
+              selectedAgent = opt.dataset.agent;
+              agentLabel.textContent = opt.textContent.replace(opt.querySelector('.role')?.textContent || '', '').trim();
+              agentDropdown.classList.remove('show');
             });
           });
           break;
@@ -545,9 +623,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }
 
         case 'streamEnd': {
-          if (streamBubble) {
-            streamBubble.textContent = msg.text;
-          }
+          if (streamBubble) streamBubble.textContent = msg.text;
           streamBubble = null;
           isStreaming = false;
           sendBtn.disabled = false;
@@ -568,24 +644,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         case 'error': {
           const typingEl = document.getElementById('typing');
           if (typingEl) typingEl.remove();
-          const bubble = addMessage('assistant', msg.text);
-          bubble.style.borderColor = 'var(--cto-red)';
+          const body = addMessage('assistant', msg.text);
+          body.style.color = 'var(--vscode-errorForeground, #f85149)';
           isStreaming = false;
           sendBtn.disabled = false;
           inputEl.focus();
           break;
         }
 
-        case 'newChat': {
-          messagesEl.innerHTML = '';
-          if (welcomeEl) {
-            messagesEl.appendChild(welcomeEl);
-            welcomeEl.style.display = 'flex';
-          }
-          messages = [];
-          break;
-        }
-
+        case 'newChat':
         case 'clearHistory': {
           messagesEl.innerHTML = '';
           if (welcomeEl) {

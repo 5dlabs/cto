@@ -377,6 +377,7 @@ pub async fn create_watcher_coderun(
         acp: None,
         openclaw: None,
         harness_agent: None,
+        enable_code_server: false, // Watcher doesn't need code-server
     };
 
     let watcher = CodeRun {

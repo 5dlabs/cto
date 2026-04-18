@@ -73,6 +73,19 @@ cargo clippy -p <crate> --all-targets -- -D warnings -W clippy::pedantic
 - Agent expertise docs: `.codex/agents/`
 - Skill mappings: `templates/skills/skill-mappings.yaml`
 
+## Co-change requirements
+
+When modifying code-server or CTO sidebar configuration, changes must be applied to **both** paths:
+
+| Component | Persistent coder (Helm) | Ephemeral CRD (Controller) |
+|-----------|------------------------|---------------------------|
+| **Settings/layout** | `infra/charts/openclaw-agent/templates/deployment.yaml` (code-server init script) | `crates/controller/src/tasks/code/resources.rs` (code-server sidecar bootstrap) |
+| **CTO sidebar extension** | `apps/cto-sidebar/` → VSIX uploaded to PV via `coder-values.yaml` | `apps/cto-sidebar/` → VSIX downloaded from GitHub release in sidecar |
+| **VS Code settings** | `deployment.yaml` settings.json heredoc | `resources.rs` settings.json heredoc |
+| **Activity bar state** | `deployment.yaml` storage.json heredoc + extension `activate()` | `resources.rs` storage.json heredoc + extension `activate()` |
+| **CRD schema** | N/A | `infra/charts/cto/crds/coderun-crd.yaml` AND `infra/charts/cto-lite/crds/coderun-crd.yaml` |
+| **Rust spec** | N/A | `crates/controller/src/crds/coderun.rs` (`CodeRunSpec` + `CodeRunStatus`) |
+
 ## Tools & Skills
 
 All agents have access to the tools and skills documented in [TOOLS.md](TOOLS.md).
