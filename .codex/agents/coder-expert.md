@@ -52,19 +52,73 @@ Does NOT handle:
 GitLab + `registry.5dlabs.ai` is cut over, **do not rely on GHCR pushes** for
 new images.
 
-When you need a container image:
-- **Build locally** in your workspace (Kaniko shim, `docker buildx`, or
-  `nerdctl` against an in-cluster builder — whatever is available).
-- **Load directly into the cluster** (e.g. `kind load`, `ctr -n k8s.io images
-  import`, or push to an in-cluster registry) instead of `ghcr.io/5dlabs/...`.
-- **Do not author new workflows that `docker push ghcr.io/5dlabs/...`**. They
-  will fail. Existing GHCR-push workflows should be considered broken until
-  further notice.
-- If a manifest references `ghcr.io/5dlabs/<image>:<tag>` and the pull fails
-  (`NotFound`), the fix is to build + load locally, not to retry the pull.
+**Local builds are the primary path.** Test locally first whenever the
+environment is healthy — do not rely on GitOps round-trips to validate image
+changes. GitOps lag has repeatedly blocked work; reproduce in your workspace
+before pushing to a cluster.
+
+### Primary workflow: kaniko shim in your pod
+
+Your pod has a `docker` shim at `/workspace/.local/bin/docker` that proxies a
+subset of docker commands to the kaniko sidecar. Use it exactly like docker:
+
+```bash
+docker build \
+  -t registry.5dlabs.ai/5dlabs/<image>:<tag> \
+  --platform linux/amd64 \
+  -f infra/images/<image>/Dockerfile \
+  infra/images/<image>
+# --push is implicit — kaniko pushes when -t matches a registry
+# --load is NOT supported (no local daemon); kaniko streams straight to the registry
+```
+
+**Shim limits** (by design — docs in `configmap-cli-backend-configs.yaml`):
+- One `--platform` at a time (no multi-arch manifests from one call)
+- `--load` errors; `--push` is accepted but ignored (destination drives push)
+- BuildKit-only flags fail loudly: `--secret`, `--ssh`, `--mount=type=cache`
+- `buildx create|use|inspect|rm|ls|bake` are no-ops so wrappers don't crash
+
+**Debug a failing shim build** with `DOCKER_SHIM_DEBUG=1 docker build ...` to
+print the exact `kubectl exec -c kaniko -- /kaniko/executor ...` command.
+
+### Fallback: local buildx on developer workstation
+
+If the cluster is unhealthy, build on the workstation and push to
+`registry.5dlabs.ai`:
+
+```bash
+docker buildx create --name local --use 2>/dev/null || true
+docker buildx build \
+  --platform linux/amd64 \
+  -t registry.5dlabs.ai/5dlabs/<image>:<tag> \
+  --push \
+  -f infra/images/<image>/Dockerfile \
+  infra/images/<image>
+```
+
+### Rules of the road
+
+- **Do not author new workflows that `docker push ghcr.io/5dlabs/...`.** They
+  will fail on quota.
+- If a manifest references `ghcr.io/5dlabs/<image>:<tag>` and pull returns
+  `NotFound`, build locally and push to `registry.5dlabs.ai` — do not retry
+  the GHCR pull.
 - A parallel agent is standing up self-hosted GitLab + `registry.5dlabs.ai`.
-  Once cutover completes, image refs will move to that registry — coordinate
+  Once cutover completes, image refs move to that registry — coordinate
   before introducing new pinned tags.
+- When you see `Debian trixie` or cross-distro apt errors during a build, the
+  mismatch is inside the **Dockerfile you are building**, not the shim or
+  kaniko — fix the base image / apt sources in that Dockerfile.
+
+## Status Cadence During Long Builds
+
+When a build or deploy will run longer than ~2 minutes, post a **2-minute
+status cadence** to Discord (channel configured for your agent):
+- What you are running
+- Current phase / step
+- Any blockers or waiting states
+
+Silent long-runners are treated as stuck. Keep the human in the loop.
 
 ## Agent Teams
 

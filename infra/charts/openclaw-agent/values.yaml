@@ -406,7 +406,10 @@ tools:
 # The agent writes a Dockerfile to /workspace and execs into the sidecar to build.
 kaniko:
   enabled: true
-  image: gcr.io/kaniko-project/executor:debug
+  # Pin to a specific release so shim behavior is reproducible. `:debug` variant
+  # is required (the shim execs into the sidecar and needs busybox / kubectl-exec
+  # compatible environment).
+  image: gcr.io/kaniko-project/executor:v1.23.2-debug
   # Registry to push built images
   registry: "registry.5dlabs.ai/5dlabs"
   # Cache repo for layer caching
