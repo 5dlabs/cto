@@ -163,7 +163,17 @@ spec:
               echo "[skills] OpenClaw: $SKILL_COUNT skills loaded"
 
               # ---------------------------------------------------------------
-              # 3a. BOOT.md — fires reboot-continuity on every gateway startup
+              # 3a. Stable code-server URL marker
+              # ---------------------------------------------------------------
+              {{- if .Values.codeServer.publicUrl }}
+              printf '%s\n' {{ .Values.codeServer.publicUrl | squote }} > /workspace/.code-server-url
+              chown 1001:1000 /workspace/.code-server-url 2>/dev/null || true
+              chmod 644 /workspace/.code-server-url
+              echo "[code-server] stable URL written: {{ .Values.codeServer.publicUrl }}"
+              {{- end }}
+
+              # ---------------------------------------------------------------
+              # 3b. BOOT.md — fires reboot-continuity on every gateway startup
               # ---------------------------------------------------------------
               # The bundled `boot-md` hook (events: gateway:startup) reads
               # /workspace/BOOT.md on each gateway boot and injects the content
@@ -192,6 +202,8 @@ spec:
                  what you found and what you're resuming (or "nothing to
                  resume, standing by for next directive" if the workspace is
                  clean).
+              7. For Coder code-server access, always use the stable hostname
+                 https://coder.5dlabs.ai. Never post a trycloudflare URL.
 
               You are fully autonomous. Do not wait for prompts. If a PRD or
               task is in progress, keep working until completion or a true
@@ -367,12 +379,16 @@ spec:
                 echo "[tools] kubectl already present"
               fi
               # ---------------------------------------------------------------
-              # 4f. Docker kaniko shim (overrides /usr/bin/docker)
+              # 4f. Docker kaniko shim
               # ---------------------------------------------------------------
+              # Stage shim on the shared workspace volume. The agent container's
+              # postStart hook (see lifecycle.postStart below) copies it to
+              # /usr/local/bin/docker so it overrides the real /usr/bin/docker
+              # binary baked into the agent image.
               if [ -f /cli-backend-configs-template/docker-kaniko-shim.sh ]; then
                 cp /cli-backend-configs-template/docker-kaniko-shim.sh /workspace/.local/bin/docker
                 chmod +x /workspace/.local/bin/docker
-                echo "[tools] docker kaniko shim installed"
+                echo "[tools] docker kaniko shim staged at /workspace/.local/bin/docker"
               fi
               {{- end }}
 
@@ -716,6 +732,19 @@ spec:
                   - -c
                   - |
                     # (delivery-patch moved to init-workspace-files — runs as root)
+                    # Install kaniko docker shim into PATH so `docker build`/`docker push`
+                    # from the agent container routes to the kaniko sidecar via /workspace.
+                    # Init container stages the shim at /workspace/.local/bin/docker;
+                    # we copy it into /usr/local/bin (which precedes /usr/bin in PATH)
+                    # using passwordless sudo since /usr/local/bin is owned by ubuntu.
+                    if [ -f /workspace/.local/bin/docker ]; then
+                      sudo cp /workspace/.local/bin/docker /usr/local/bin/docker \
+                        && sudo chmod +x /usr/local/bin/docker \
+                        && echo "[postStart] docker shim installed at /usr/local/bin/docker" \
+                        || echo "[postStart] docker shim install failed"
+                    else
+                      echo "[postStart] /workspace/.local/bin/docker not found; skipping shim install"
+                    fi
           env:
             - name: HOME
               value: /workspace

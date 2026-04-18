@@ -392,6 +392,12 @@ workspace:
       - Verify coding CLIs resolve on PATH.
       - Check for pending PRs that need attention.
 
+      Code-server access for operator updates must always use:
+      - URL: https://coder.5dlabs.ai
+      - Password: read env var PASSWORD in the code-server container
+
+      Never post a `trycloudflare.com` URL for Coder.
+
       Do not start unrelated projects on your own.
 
 # =============================================================================
@@ -627,6 +633,7 @@ codeServer:
   enabled: true
   port: 8080
   password: "125884c05c03a803"
+  publicUrl: "https://coder.5dlabs.ai"
   defaultFolder: "/workspace/repos/cto"
   quickTunnel:
     enabled: false
