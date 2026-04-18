@@ -47,6 +47,41 @@ spec:
       kind: Job
       jqPathExpressions:
         - .spec.template.spec.containers[].env
+    # Gitaly StatefulSet: ignore SSA-defaulted fields the API server adds
+    # so the chart-rendered manifest doesn't perpetually flag OutOfSync.
+    - group: apps
+      kind: StatefulSet
+      name: gitlab-gitaly
+      namespace: gitlab
+      jqPathExpressions:
+        - .metadata.labels."app.kubernetes.io/managed-by"
+        - .metadata.annotations."meta.helm.sh/release-name"
+        - .metadata.annotations."meta.helm.sh/release-namespace"
+        - .spec.revisionHistoryLimit
+        - .spec.persistentVolumeClaimRetentionPolicy
+        - .spec.updateStrategy
+        - .spec.template.spec.dnsPolicy
+        - .spec.template.spec.restartPolicy
+        - .spec.template.spec.schedulerName
+        - .spec.template.spec.containers[].imagePullPolicy
+        - .spec.template.spec.containers[].terminationMessagePath
+        - .spec.template.spec.containers[].terminationMessagePolicy
+        - .spec.template.spec.containers[].ports[].protocol
+        - .spec.template.spec.containers[].env[].valueFrom.resourceFieldRef.divisor
+        - .spec.template.spec.containers[].livenessProbe.grpc.service
+        - .spec.template.spec.containers[].readinessProbe.grpc.service
+        - .spec.template.spec.containers[].startupProbe.grpc.service
+        - .spec.template.spec.initContainers[].imagePullPolicy
+        - .spec.template.spec.initContainers[].terminationMessagePath
+        - .spec.template.spec.initContainers[].terminationMessagePolicy
+        - .spec.template.spec.initContainers[].volumeMounts[].readOnly
+        - .spec.template.spec.volumes[].configMap.defaultMode
+        - .spec.volumeClaimTemplates[].apiVersion
+        - .spec.volumeClaimTemplates[].kind
+        - .spec.volumeClaimTemplates[].metadata.annotations
+        - .spec.volumeClaimTemplates[].spec.volumeMode
+        - .spec.volumeClaimTemplates[].spec.selector
+        - .spec.volumeClaimTemplates[].status
 
   syncPolicy:
     automated:
