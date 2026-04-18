@@ -58,9 +58,9 @@ spec:
           existingSecret: "musetalk-hf-token"
           secretKey: "HF_TOKEN"
 
-        # NATS — adjust if your NATS endpoint differs
+        # NATS — dedicated JetStream-enabled NATS for musetalk (see cto namespace)
         nats:
-          url: "nats://openclaw-nats.openclaw.svc.cluster.local:4222"
+          url: "nats://musetalk-nats.cto.svc.cluster.local:4222"
 
         # Node selector for GPU nodes
         nodeSelector:
