@@ -684,6 +684,13 @@ nats:
 
 kaniko:
   enabled: true
+  resources:
+    requests:
+      cpu: "2"
+      memory: "16Gi"
+    limits:
+      cpu: "8"
+      memory: "48Gi"
 
 # =============================================================================
 # Remote Tools
