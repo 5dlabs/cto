@@ -80,19 +80,26 @@ async function setupLayout(context: vscode.ExtensionContext): Promise<void> {
   );
   console.log("[CTO] Available view commands:", viewCommands);
 
-  // Try multiple approaches to hide unwanted view containers
+  // Try multiple approaches to hide unwanted view containers.
+  // NOTE: None of these commands exist in code-server 4.116 / VS Code 1.116
+  // so every attempt is currently a silent no-op. We keep the loop as a
+  // forward-compatible stub: if future upstream releases ship any of these
+  // commands the extension benefits automatically without a redeploy.
+  // See docs/known-limitations.md for the full approach matrix and the
+  // manual workaround users can apply today.
   for (const viewId of HIDE_VIEW_CONTAINERS) {
-    // Approach 1: Modern VS Code toggle command
     for (const cmd of [
       `${viewId}.toggleVisibility`,
       `workbench.action.toggleViewContainerVisibility.${viewId}`,
+      `workbench.action.hideViewContainer.${viewId}`,
+      `${viewId}.removeView`,
     ]) {
       try {
         await vscode.commands.executeCommand(cmd);
         console.log(`[CTO] Hidden ${viewId} via ${cmd}`);
         break;
       } catch {
-        // Try next approach
+        // Command not available in this code-server / VS Code version.
       }
     }
   }
