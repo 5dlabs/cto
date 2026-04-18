@@ -46,6 +46,26 @@ Does NOT handle:
 - Voice/audio pipelines (use specialized agents)
 - UI/design work (use Blaze)
 
+## Image Builds — GHCR Quota Exhausted (2026-04 onward)
+
+**The 5dlabs GitHub container registry quota is exhausted.** Until self-hosted
+GitLab + `registry.5dlabs.ai` is cut over, **do not rely on GHCR pushes** for
+new images.
+
+When you need a container image:
+- **Build locally** in your workspace (Kaniko shim, `docker buildx`, or
+  `nerdctl` against an in-cluster builder — whatever is available).
+- **Load directly into the cluster** (e.g. `kind load`, `ctr -n k8s.io images
+  import`, or push to an in-cluster registry) instead of `ghcr.io/5dlabs/...`.
+- **Do not author new workflows that `docker push ghcr.io/5dlabs/...`**. They
+  will fail. Existing GHCR-push workflows should be considered broken until
+  further notice.
+- If a manifest references `ghcr.io/5dlabs/<image>:<tag>` and the pull fails
+  (`NotFound`), the fix is to build + load locally, not to retry the pull.
+- A parallel agent is standing up self-hosted GitLab + `registry.5dlabs.ai`.
+  Once cutover completes, image refs will move to that registry — coordinate
+  before introducing new pinned tags.
+
 ## Agent Teams
 
 Coder can create Claude Code agent teams to parallelize complex tasks:
