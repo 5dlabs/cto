@@ -48,6 +48,30 @@ mkdir -p "$OUT"
 WANT_WEB=$(jq -r '(.frameworks // []) | any(. == "nextjs" or . == "shared")' "$LIB")
 WANT_NATIVE=$(jq -r '(.frameworks // []) | any(. == "expo")' "$LIB")
 
+# ---- shadcn-selections.json ----------------------------------------------
+# Derived from component_map[].shadcn entries. Consumed by:
+#   - the TOOLS.md design-context appender (harness templates), and
+#   - frontend agents at implementation time:
+#       jq -r '.components[].url' .tasks/design/shadcn-selections.json \
+#         | xargs -I{} npx shadcn add {}
+# Always emitted (even when empty) so downstream consumers can rely on it.
+jq '{
+  registries: (
+    [ (.component_map // [])[]
+      | .shadcn?.registry // empty ] | unique
+  ),
+  components: [
+    (.component_map // [])[]
+    | select(.shadcn != null)
+    | {
+        name: (.shadcn.name // .name),
+        registry: .shadcn.registry,
+        url: (.shadcn.url // null),
+        framework: (.framework // "shared")
+      }
+  ]
+}' "$LIB" >"$DESIGN_DIR/shadcn-selections.json"
+
 # ---- helpers --------------------------------------------------------------
 
 # pascal-case a name (strip non-alphanum, capitalize words). Falls back to "Component".
