@@ -22,6 +22,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
+// ─── Shared code-server config ────────────────────────────────────────────
+//
+// Canonical VS Code user settings and workbench storage state shared with the
+// persistent Helm deployment (`infra/charts/openclaw-agent`). Edit the source
+// files in `shared/code-server-config/`; both consumers pick up changes at
+// build/render time. See `shared/code-server-config/README.md`.
+const CODE_SERVER_SETTINGS_JSON: &str =
+    include_str!("../../../../../shared/code-server-config/settings.json");
+const CODE_SERVER_STORAGE_JSON: &str =
+    include_str!("../../../../../shared/code-server-config/storage.json");
+
 // ─── Effective Provider Resolution ────────────────────────────────────────
 //
 // Single source of truth for how a CodeRun resolves its provider, base URL,
@@ -1654,7 +1665,8 @@ impl<'a> CodeResourceManager<'a> {
         // Hermes-specific env vars
         if matches!(code_run.spec.effective_harness(), HarnessAgent::Hermes) {
             final_env_vars.push(json!({ "name": "NOUS_BASE_URL", "value": "https://inference-api.nousresearch.com/v1" }));
-            final_env_vars.push(json!({ "name": "NOUS_MODEL", "value": "nousresearch/hermes-4-70b" }));
+            final_env_vars
+                .push(json!({ "name": "NOUS_MODEL", "value": "nousresearch/hermes-4-70b" }));
             // NOUS_API_KEY comes from cto-secrets via envFrom, not hardcoded here
         }
 
@@ -2205,41 +2217,25 @@ scrape_configs:
             let cs_data_dir = format!("/workspace/{workspace_subdir}/.code-server");
             let cs_url_path = format!("/workspace/{workspace_subdir}/.code-server-url");
 
-            // Bootstrap script: settings, CTO sidebar state, extension install
+            // Bootstrap script: settings, CTO sidebar state, extension install.
+            // settings.json and storage.json bodies come from shared/code-server-config/
+            // so drift with the persistent Helm deployment is impossible.
             let bootstrap_script = format!(
                 r#"set -eu
 CS_DIR="{cs_data_dir}"
 mkdir -p "$CS_DIR/User/globalStorage"
 
-# VS Code settings (match persistent coder defaults)
+# VS Code settings (shared/code-server-config/settings.json)
 if [ ! -f "$CS_DIR/User/settings.json" ]; then
 cat > "$CS_DIR/User/settings.json" << 'SETTINGS'
-{{
-  "workbench.colorTheme": "Dark Modern",
-  "workbench.startupEditor": "none",
-  "workbench.sideBar.location": "left",
-  "workbench.activityBar.location": "default",
-  "editor.fontSize": 14,
-  "terminal.integrated.fontSize": 14,
-  "cto.apiBase": "http://localhost:18789",
-  "cto.defaultAgent": "morgan",
-  "diffEditor.renderSideBySide": true,
-  "scm.diffDecorations": "all",
-  "scm.defaultViewMode": "tree",
-  "files.autoSave": "afterDelay",
-  "files.autoSaveDelay": 1000
-}}
+{settings_json}
 SETTINGS
 fi
 
-# Pre-seed state: CTO sidebar active
+# Pre-seed state: CTO sidebar active (shared/code-server-config/storage.json)
 if [ ! -f "$CS_DIR/User/globalStorage/storage.json" ]; then
 cat > "$CS_DIR/User/globalStorage/storage.json" << 'STATE'
-{{
-  "lastActiveSideBarViewlet": "workbench.view.extension.cto-sidebar",
-  "workbench.sideBar.visible": true,
-  "workbench.panel.visible": false
-}}
+{storage_json}
 STATE
 fi
 
@@ -2280,7 +2276,11 @@ while true; do
     exit 1
   fi
   sleep 5
-done"#
+done"#,
+                cs_data_dir = cs_data_dir,
+                workspace_subdir = workspace_subdir,
+                settings_json = CODE_SERVER_SETTINGS_JSON.trim_end(),
+                storage_json = CODE_SERVER_STORAGE_JSON.trim_end(),
             );
 
             let code_server_spec = json!({
@@ -3446,7 +3446,9 @@ done"#
         }
 
         if existing.api_key_env_var.is_none() {
-            existing.api_key_env_var.clone_from(&defaults.api_key_env_var);
+            existing
+                .api_key_env_var
+                .clone_from(&defaults.api_key_env_var);
         }
 
         for (key, value) in &defaults.settings {
@@ -3615,7 +3617,7 @@ mod tests {
                     model_rotation: None,
                     provider: None,
                     provider_base_url: None,
-            api_key_env_var: None,
+                    api_key_env_var: None,
                 }),
                 task_id: Some(1),
                 service: "test-service".to_string(),

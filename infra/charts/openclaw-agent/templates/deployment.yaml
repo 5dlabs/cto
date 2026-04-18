@@ -1154,52 +1154,19 @@ spec:
             - -c
             - |
               mkdir -p /workspace/.code-server/User
-              # Dark mode + sensible defaults
+              # Shared VS Code settings (canonical in shared/code-server-config/settings.json)
               # Only write settings.json if it doesn't exist (preserve user changes)
               if [ ! -f /workspace/.code-server/User/settings.json ]; then
               cat > /workspace/.code-server/User/settings.json << 'SETTINGS'
-              {
-                "workbench.colorTheme": "Default Dark Modern",
-                "workbench.startupEditor": "none",
-                "editor.fontSize": 14,
-                "terminal.integrated.fontSize": 14,
-                "github.copilot.enable": { "*": true },
-                "workbench.activityBar.location": "hidden",
-                "workbench.statusBar.visible": true,
-                "workbench.editor.showTabs": "single",
-                "workbench.layoutControl.enabled": false,
-                "window.commandCenter": false,
-                "breadcrumbs.enabled": false,
-                "editor.minimap.enabled": false,
-                "editor.glyphMargin": false,
-                "editor.folding": false,
-                "editor.lineNumbers": "off",
-                "editor.wordWrap": "on",
-                "editor.renderLineHighlight": "none",
-                "diffEditor.renderSideBySide": false,
-                "diffEditor.useInlineViewWhenSpaceIsLimited": true,
-                "diffEditor.ignoreTrimWhitespace": false,
-                "scm.defaultViewMode": "tree",
-                "scm.alwaysShowRepositories": false,
-                "scm.diffDecorations": "gutter",
-                "git.openDiffOnClick": true,
-                "git.autoRepositoryDetection": true,
-                "git.decorations.enabled": true,
-                "explorer.openEditors.visible": 0,
-                "workbench.tree.indent": 12
-              }
+{{ .Files.Get "files/code-server-config/settings.json" | indent 14 }}
               SETTINGS
               sed -i 's/^              //' /workspace/.code-server/User/settings.json
               fi
-              # Pre-seed workbench state to open Source Control view on startup
+              # Pre-seed workbench state from shared/code-server-config/storage.json
               mkdir -p /workspace/.code-server/User/globalStorage
               if [ ! -f /workspace/.code-server/User/globalStorage/storage.json ]; then
               cat > /workspace/.code-server/User/globalStorage/storage.json << 'STATE'
-              {
-                "lastActiveSideBarViewlet": "workbench.view.scm",
-                "workbench.sideBar.visible": true,
-                "workbench.panel.visible": false
-              }
+{{ .Files.Get "files/code-server-config/storage.json" | indent 14 }}
               STATE
               sed -i 's/^              //' /workspace/.code-server/User/globalStorage/storage.json
               fi
