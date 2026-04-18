@@ -1,16 +1,24 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: {{ .Values.workload.kind }}
 metadata:
   name: {{ include "musetalk-worker.fullname" . }}
   labels:
     {{- include "musetalk-worker.labels" . | nindent 4 }}
 spec:
+  {{- if eq .Values.workload.kind "Deployment" }}
   replicas: {{ .Values.replicaCount }}
   strategy:
     type: Recreate
   selector:
     matchLabels:
       {{- include "musetalk-worker.selectorLabels" . | nindent 6 }}
+  {{- else if eq .Values.workload.kind "StatefulSet" }}
+  serviceName: {{ include "musetalk-worker.fullname" . }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "musetalk-worker.selectorLabels" . | nindent 6 }}
+  {{- end }}
   template:
     metadata:
       annotations:
@@ -47,28 +55,22 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
+        {{- if .Values.initContainers.fixSymlink.enabled }}
         - name: fix-symlink
           image: busybox
           command:
             - sh
             - -c
             - |
-              # Create proper directory structure for MuseTalk upstream compatibility
-              # The worker chdirs to /models and looks for models/musetalkV15/
               mkdir -p /models/models
-              
-              # Create musetalkV15 symlink in models/ subdirectory
               if [ -d /models/musetalk ] && [ ! -e /models/models/musetalkV15 ]; then
                 ln -s /models/musetalk /models/models/musetalkV15
                 echo "Created models/musetalkV15 -> /models/musetalk symlink"
               fi
-              
-              # Also ensure musetalkV15 exists at root for other lookups
               if [ -d /models/musetalk ] && [ ! -e /models/musetalkV15 ]; then
                 ln -s /models/musetalk /models/musetalkV15
                 echo "Created musetalkV15 -> musetalk symlink at root"
               fi
-              
               echo "=== Final /models structure ==="
               ls -la /models/
               echo ""
@@ -77,6 +79,8 @@ spec:
           volumeMounts:
             - name: model-cache
               mountPath: {{ .Values.model.cacheDir }}
+        {{- end }}
+        {{- if .Values.initContainers.downloadModels.enabled }}
         - name: download-models
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -97,16 +101,16 @@ spec:
             - name: model-cache
               mountPath: {{ .Values.model.cacheDir }}
           resources:
-            requests:
-              cpu: "1"
-              memory: 4Gi
-            limits:
-              cpu: "4"
-              memory: 8Gi
+            {{- toYaml .Values.initContainers.downloadModels.resources | nindent 12 }}
+        {{- end }}
       containers:
         - name: worker
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.debug.enabled }}
+          command:
+            {{- toYaml .Values.debug.command | nindent 12 }}
+          {{- end }}
           ports:
             - name: health
               containerPort: 8080
@@ -188,13 +192,19 @@ spec:
               mountPath: {{ .Values.model.cacheDir }}
             - name: render-scratch
               mountPath: /tmp/renders
-          {{- with .Values.livenessProbe }}
+          {{- if and (not .Values.debug.enabled) .Values.livenessProbe }}
           livenessProbe:
-            {{- toYaml . | nindent 12 }}
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          {{- else if .Values.debug.readinessProbe }}
+          livenessProbe:
+            {{- toYaml .Values.debug.livenessProbe | nindent 12 }}
           {{- end }}
-          {{- with .Values.readinessProbe }}
+          {{- if and (not .Values.debug.enabled) .Values.readinessProbe }}
           readinessProbe:
-            {{- toYaml . | nindent 12 }}
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- else if .Values.debug.readinessProbe }}
+          readinessProbe:
+            {{- toYaml .Values.debug.readinessProbe | nindent 12 }}
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

@@ -3,6 +3,20 @@
 
 replicaCount: 1
 
+workload:
+  kind: Deployment
+
+debug:
+  enabled: false
+  command:
+    - sh
+    - -c
+    - |
+      echo "MuseTalk debug pod ready"
+      sleep infinity
+  readinessProbe: null
+  livenessProbe: null
+
 image:
   repository: ghcr.io/5dlabs/musetalk-worker
   tag: 5f91a1e13
@@ -13,6 +27,19 @@ imagePullSecrets:
 
 nameOverride: ""
 fullnameOverride: ""
+
+initContainers:
+  fixSymlink:
+    enabled: true
+  downloadModels:
+    enabled: true
+    resources:
+      requests:
+        cpu: "1"
+        memory: 4Gi
+      limits:
+        cpu: "4"
+        memory: 8Gi
 
 # GPU resource configuration
 resources:

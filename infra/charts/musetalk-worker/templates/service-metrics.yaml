@@ -16,7 +16,7 @@ spec:
     {{- include "musetalk-worker.selectorLabels" . | nindent 4 }}
 ---
 {{- end }}
-{{- if .Values.service.enabled }}
+{{- if and .Values.service.enabled (ne .Values.workload.kind "StatefulSet") }}
 apiVersion: v1
 kind: Service
 metadata:
