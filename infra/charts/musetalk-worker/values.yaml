@@ -28,7 +28,6 @@ resources:
 # Node scheduling — target GPU nodes
 nodeSelector:
   nvidia.com/gpu.present: "true"
-  nvidia.com/gpu.product: "Tesla-V100S-PCIe-32GB"
 
 tolerations: []
 
