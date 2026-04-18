@@ -69,4 +69,3 @@ spec:
 
   # Daemonset defaults
   daemonsets: {}
-

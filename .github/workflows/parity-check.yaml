@@ -1,0 +1,58 @@
+name: code-server config parity
+
+on:
+  pull_request:
+    paths:
+      - "shared/code-server-config/**"
+      - "crates/controller/src/tasks/code/resources.rs"
+      - "infra/charts/openclaw-agent/templates/deployment.yaml"
+      - "infra/charts/openclaw-agent/files/code-server-config"
+      - ".github/workflows/parity-check.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "shared/code-server-config/**"
+      - "crates/controller/src/tasks/code/resources.rs"
+      - "infra/charts/openclaw-agent/templates/deployment.yaml"
+      - "infra/charts/openclaw-agent/files/code-server-config"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate shared JSON files
+        run: |
+          jq empty shared/code-server-config/settings.json
+          jq empty shared/code-server-config/storage.json
+
+      - name: Controller embeds shared settings.json
+        run: |
+          grep -q 'include_str!.*shared/code-server-config/settings.json' \
+            crates/controller/src/tasks/code/resources.rs
+
+      - name: Controller embeds shared storage.json
+        run: |
+          grep -q 'include_str!.*shared/code-server-config/storage.json' \
+            crates/controller/src/tasks/code/resources.rs
+
+      - name: Helm template loads shared settings.json
+        run: |
+          grep -q 'Files.Get.*code-server-config/settings.json' \
+            infra/charts/openclaw-agent/templates/deployment.yaml
+
+      - name: Helm template loads shared storage.json
+        run: |
+          grep -q 'Files.Get.*code-server-config/storage.json' \
+            infra/charts/openclaw-agent/templates/deployment.yaml
+
+      - name: Symlink points at shared config
+        run: |
+          link="infra/charts/openclaw-agent/files/code-server-config"
+          test -L "$link"
+          target=$(readlink "$link")
+          case "$target" in
+            */shared/code-server-config) ;;
+            *) echo "unexpected symlink target: $target" >&2; exit 1 ;;
+          esac
