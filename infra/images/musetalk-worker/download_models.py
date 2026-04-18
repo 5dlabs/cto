@@ -77,6 +77,12 @@ def main():
     else:
         download_hf_repo(repo, target, token)
 
+    # Create symlink for musetalkV15 compatibility (upstream expects this path)
+    musetalk_v15 = cache_dir / "musetalkV15"
+    if not musetalk_v15.exists():
+        log.info("Creating musetalkV15 symlink for upstream compatibility")
+        musetalk_v15.symlink_to(target, target_is_directory=True)
+
     # Download required HuggingFace models
     download_required_models(cache_dir, token)
 
