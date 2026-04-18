@@ -2,6 +2,7 @@
 # Pinned for CUDA 11.8 + V100 compatibility (FP16, no BF16)
 
 # MuseTalk core
+einops==0.7.0
 torchvision==0.16.0
 transformers==4.42.4
 accelerate==0.31.0
