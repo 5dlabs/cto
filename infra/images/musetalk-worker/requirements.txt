@@ -5,6 +5,7 @@
 einops==0.7.0
 torchvision==0.16.0
 transformers==4.42.4
+diffusers==0.30.0
 accelerate==0.31.0
 safetensors==0.4.3
 opencv-python-headless==4.10.0.84
@@ -26,6 +27,13 @@ mmengine==0.10.4
 moviepy==1.0.3
 imageio==2.34.2
 imageio-ffmpeg==0.5.1
+ffmpeg-python==0.2.0
+
+# MuseTalk config loading
+omegaconf==2.3.0
+
+# Model downloads (fallback paths in upstream scripts)
+gdown==5.2.0
 
 # NATS client (JetStream support)
 nats-py==2.7.2
