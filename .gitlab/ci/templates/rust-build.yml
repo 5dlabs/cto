@@ -8,6 +8,18 @@
     SCCACHE_DIR: /tmp/sccache
     CARGO_INCREMENTAL: "0"
   before_script:
+    # Install system deps required by workspace-wide clippy/test.
+    # pm-lite (tauri 2.x) pulls gdk-sys which needs GTK3/webkit2gtk dev headers.
+    - |
+      if ! dpkg -s libgtk-3-dev >/dev/null 2>&1; then
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -qq
+        apt-get install -y --no-install-recommends \
+          pkg-config build-essential \
+          libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+          librsvg2-dev libssl-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+          >/dev/null
+      fi
     - rustup default stable
     - rustup component add rustfmt clippy
     - |
