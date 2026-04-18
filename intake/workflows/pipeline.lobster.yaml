@@ -352,7 +352,8 @@ steps:
             snapshot_links_json: ($bundle_dir + "/snapshot-links.json"),
             snapshot_links_md: ($bundle_dir + "/snapshot-links.md"),
             auth_discovery: ($bundle_dir + "/auth-discovery.json"),
-            oss_catalog: ($bundle_dir + "/oss-catalog.json")
+            oss_catalog: ($bundle_dir + "/oss-catalog.json"),
+            storybook_dir: ($bundle_dir + "/storybook")
           }
         }' > "$OUT_DIR/manifest.json"
       cat "$OUT_DIR/manifest.json"
@@ -1806,6 +1807,10 @@ steps:
       # Generate DESIGN.md from design artifacts
       if [ -x "$root/intake/scripts/generate-design-md.sh" ]; then
         "$root/intake/scripts/generate-design-md.sh" "$root" "${project_name}" > "$TARGET/.tasks/design/DESIGN.md" 2>/dev/null || true
+      fi
+      # Generate per-project Storybook component library scaffold (web + native)
+      if [ -x "$root/intake/scripts/generate-storybook.sh" ]; then
+        "$root/intake/scripts/generate-storybook.sh" "$TARGET" "${project_name}" || true
       fi
       # Remove CTO-platform-internal docs that don't belong in customer repos
       rm -f "$TARGET/.tasks/docs/bridge-consolidation.md"
