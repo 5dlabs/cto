@@ -27,7 +27,8 @@ resources:
 
 # Node scheduling — target GPU nodes
 nodeSelector:
-  feature.node.kubernetes.io/pci-10de.present: "true"
+  nvidia.com/gpu.present: "true"
+  nvidia.com/gpu.product: "Tesla-V100S-PCIe-32GB"
 
 tolerations: []
 

@@ -78,11 +78,20 @@ spec:
         # Container toolkit - configure container runtime for GPU access
         toolkit:
           enabled: true
-          # Skip driver validation since RKE2 has different paths
-          # Driver is confirmed working via nvidia-smi
+          installDir: "/usr/local/nvidia"
+          # RKE2 containerd configuration
           env:
-            - name: SKIP_DRIVER_INSTALLATION
+            - name: CONTAINERD_CONFIG
+              value: "/opt/rke2/agent/etc/containerd/config.toml.tmpl"
+            - name: CONTAINERD_SOCKET
+              value: "/run/k3s/containerd/containerd.sock"
+            - name: CONTAINERD_RUNTIME_CLASS
+              value: "nvidia"
+            - name: CONTAINERD_SET_AS_DEFAULT
               value: "true"
+          # Skip driver validation - driver confirmed working via nvidia-smi
+          validation:
+            disabled: true
 
         # MIG (Multi-Instance GPU) - disabled by default
         migManager:

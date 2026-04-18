@@ -17,6 +17,8 @@ kind: Application
 metadata:
   name: musetalk-worker
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
   labels:
     app.kubernetes.io/name: musetalk-worker
     app.kubernetes.io/part-of: cto-platform
@@ -61,6 +63,10 @@ spec:
         # NATS — adjust if your NATS endpoint differs
         nats:
           url: "nats://nats.openclaw.svc.cluster.local:4222"
+
+        # Node selector for GPU nodes
+        nodeSelector:
+          nvidia.com/gpu.present: "true"
 
   destination:
     server: https://kubernetes.default.svc
