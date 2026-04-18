@@ -40,6 +40,9 @@ impl HealerAcpClient {
     }
 
     /// Execute a one-shot ACP prompt against the configured runtime for Healer.
+    ///
+    /// # Errors
+    /// Returns an error if no ACP runtime is enabled for healer or the prompt run fails.
     pub async fn investigate(
         &self,
         key: impl Into<String>,
@@ -90,7 +93,6 @@ impl HealerAcpClient {
         let run_state = match result.stop_reason {
             StopReason::EndTurn => AcpRunState::Completed,
             StopReason::Cancelled => AcpRunState::Cancelled,
-            StopReason::Refusal => AcpRunState::Failed,
             StopReason::MaxTokens | StopReason::MaxTurnRequests => AcpRunState::Running,
             _ => AcpRunState::Failed,
         };

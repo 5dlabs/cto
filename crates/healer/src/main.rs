@@ -759,7 +759,7 @@ struct CtoDefaults {
     /// Monitor configuration for E2E watch loop
     #[serde(default)]
     monitor: Option<MonitorConfig>,
-    /// Default skills-release repo URL threaded into every CodeRun spec.
+    /// Default skills-release repo URL threaded into every `CodeRun` spec.
     #[serde(default, rename = "skillsRepo")]
     #[allow(dead_code)]
     skills_repo: Option<String>,

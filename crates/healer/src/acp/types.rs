@@ -83,6 +83,11 @@ impl MonitorEventStore {
     pub async fn len(&self) -> usize {
         self.events.read().await.len()
     }
+
+    /// Whether the store is empty.
+    pub async fn is_empty(&self) -> bool {
+        self.events.read().await.is_empty()
+    }
 }
 
 /// Healer's tracked ACP investigation session.

@@ -1,7 +1,7 @@
-//! GitLab pipeline failure sensor.
+//! `GitLab` pipeline failure sensor.
 //!
-//! Polls GitLab CI pipelines for failures and triggers remediation.
-//! Parallel to github_actions.rs for dual SCM support.
+//! Polls `GitLab` CI pipelines for failures and triggers remediation.
+//! Parallel to `github_actions.rs` for dual SCM support.
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,7 @@ pub struct GitLabSensorConfig {
     /// Poll interval in seconds
     #[serde(default = "default_poll_interval")]
     pub poll_interval_secs: u64,
-    /// Kubernetes namespace for CodeRuns
+    /// Kubernetes namespace for `CodeRuns`
     #[serde(default = "default_namespace")]
     pub namespace: String,
 }
@@ -46,12 +46,17 @@ pub struct GitLabPipelineSensor {
 }
 
 impl GitLabPipelineSensor {
+    #[must_use]
     pub fn new(config: GitLabSensorConfig) -> Self {
         let token = std::env::var("GITLAB_TOKEN").ok();
         Self { config, token }
     }
 
-    /// Poll GitLab pipelines for failures.
+    /// Poll `GitLab` pipelines for failures.
+    ///
+    /// # Errors
+    /// Returns an error if the HTTP request to the `GitLab` API fails or the
+    /// response cannot be deserialized.
     pub async fn poll(&self) -> Result<Vec<PipelineFailure>> {
         let Some(ref token) = self.token else {
             warn!("No GITLAB_TOKEN set — skipping GitLab pipeline polling");

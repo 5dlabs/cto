@@ -43,7 +43,7 @@ impl HealerAcpServerState {
     }
 }
 
-/// ACP agent surface for OpenClaw to query Healer state.
+/// ACP agent surface for `OpenClaw` to query Healer state.
 #[derive(Debug, Clone)]
 pub struct HealerAcpAgent {
     state: HealerAcpServerState,
