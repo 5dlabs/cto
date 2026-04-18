@@ -1,0 +1,9 @@
+apiVersion: v2
+name: gitlab-mirror
+description: |
+  In-cluster CronJob that mirrors GitHub 5dlabs/cto -> self-hosted GitLab via SSH.
+  Runs entirely inside the cluster, no external SSH tunnel required.
+  Uses a deploy-key SSH secret (created out-of-band) to push to gitlab-shell.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

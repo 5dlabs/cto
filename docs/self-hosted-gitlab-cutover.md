@@ -1,8 +1,40 @@
 # PRD — Self-Hosted GitLab Cutover & CTO App Parity
 
-**Owner**: TBD (handoff PRD — pick up and drive)
-**Status**: Draft / ready to start
-**Source of truth for sync**: this doc + `infra/charts/gitlab/`, `infra/gitops/applications/platform/gitlab*.yaml`, `infra/gitops/manifests/gitlab/`
+**Owner**: Platform
+**Status**: In progress — mirror live (in-cluster CronJob), pipelines running on self-hosted runners; remaining gap is G1 (cosmetic Argo drift) + G9/G15.
+**Source of truth for sync**: this doc + `infra/charts/gitlab/`, `infra/charts/gitlab-mirror/`, `infra/gitops/applications/platform/gitlab*.yaml`, `infra/gitops/manifests/gitlab/`, `infra/docs/gitlab-mirror.md`
+
+## Status snapshot
+
+| ID | Item | Status |
+|----|------|--------|
+| G1 | Argo `gitlab` app drift | **Open** — `ComparisonError` on duplicate `TZ` env in gitaly STS, masked by `ignoreDifferences`. Live pods are healthy. |
+| G2 | `gitlab-config` chicken-and-egg | **Moot** — Application no longer exists; not needed with the mirror flow below. |
+| G3 | Cloudflare tunnel routes | **Done** — `gitlab.5dlabs.ai` → 302, `registry.5dlabs.ai/v2/` → 401. |
+| G4 | External secrets | **Done** — pods running, smtp/registry/runner secrets present. |
+| G5 | Registry push smoke test | **Done** — pipelines push to `registry.5dlabs.ai/5dlabs/<svc>` via cargo-chef. |
+| G6 | Mirror activation | **Done** — replaced GH Action with in-cluster CronJob (see § Mirror). |
+| G7 | Repo-root `.gitlab-ci.yml` | **Done** — full pipeline at repo root + `.gitlab/ci/` includes. |
+| G8 | Image-build pipelines | **Done** — `.gitlab/ci/jobs/images.yml` builds + pushes. |
+| G9 | Backups | **Open** — no `backups:` section yet. |
+| G10 | Webhooks | Open — handler exists; not exercised end-to-end. |
+| G11 | Buildkit references | **Done** — chart references resolve. |
+| G12 | Repo URL flip | **Done** — `infra/charts/cto/values.yaml` uses GitLab URL. |
+| G13 | Image parity (controller, agents-adapter, sidebar) | **Done** for the components covered by `.gitlab/ci/jobs/images.yml`. |
+| G14 | Runner verification | **Done** — 5 runners on `gitlab-runners` ns picked up pipelines #1+ on `k8s-runner` tag, end-to-end through registry push. |
+| G15 | Runbook | **Open** — partial in `infra/docs/gitlab-mirror.md`; full runbook deferred. |
+
+## Mirror (G6) — final design
+
+**Replaced** the GitHub Actions workflow with an in-cluster Kubernetes CronJob. Cloudflare's 100 MB request limit made HTTPS push of a full clone unworkable; SSH directly to the in-cluster `gitlab-shell` service bypasses the tunnel.
+
+- Helm chart: `infra/charts/gitlab-mirror/`
+- ArgoCD Application: `infra/gitops/applications/platform/gitlab-mirror.yaml`
+- Schedule: every 5 minutes, `concurrencyPolicy: Forbid`, 15-min deadline.
+- Pushes `main` + all tags via SSH (`gitlab-gitlab-shell.gitlab.svc:22`) using deploy key with `can_push: true` registered on `5dlabs/cto`.
+- Secret `gl-mirror-key` (in `gitlab` ns) is **not** managed by Helm. Backup of private key is in 1Password Operations vault, item `ee6p5fqlidbn4lhld3eiz57234`. Recreate procedure in `infra/docs/gitlab-mirror.md`.
+- GitLab project access token (PAT used for setup): 1Password Operations vault, item `nrlr33fxeppprxkxz3tqir6rqi`.
+- Old `.github/workflows/mirror-to-gitlab.yml` is **deleted**.
 
 ---
 
@@ -170,7 +202,7 @@ For each:
 
 ## 10. Handoff Notes
 
-- Mirror is currently **disabled** (`MIRROR_TO_GITLAB` repo Variable unset / not `true`). Re-enable in step G6 above.
+- Mirror is **live** as an in-cluster CronJob (`gitlab-mirror` in `gitlab` ns). See `infra/docs/gitlab-mirror.md` for ops.
 - All commits should include the Copilot co-author trailer (per `AGENTS.md`):
   `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`
 - Co-change rule still applies: any CRD / Helm change must update both paths per the AGENTS.md table.
