@@ -148,9 +148,9 @@ Claude Opus synthesizes the debate result + original PRD into a **Design Brief**
 
 ---
 
-### Phase 0.5: Design Intake *(new, required when Stitch mode is enabled)*
+### Phase 0.5: Design Intake *(runs whenever frontend is detected)*
 
-Runs immediately after PRD materialization in `pipeline.lobster.yaml`.
+Runs immediately after PRD materialization in `pipeline.lobster.yaml`. The design phase fans **wide OSS candidates** in at the top of the funnel and converges on a single per-project **Storybook component library** at the bottom — bundled into the final submission and consumed at implementation time via the **Storybook MCP server**.
 
 1. Copies local design artifacts into `.intake/design/assets/`
 2. Normalizes URL inputs and crawls basic page metadata into `.intake/design/crawled/urls.json`
@@ -175,7 +175,22 @@ Runs immediately after PRD materialization in `pipeline.lobster.yaml`.
    - `component-library.json`, `design-system.md`
    - `auth-discovery.json`
    - `manifest.json`
-9. Persists a design snapshot to bridge SQLite history for audit/evidence reporting
+9. Runs the **OSS candidate** step — joins the curated catalog at `intake/data/oss-component-catalog.json` (shadcn registries, Radix/Ark/React Aria headless primitives, Mantine/Chakra full kits, TanStack companions, plus the Stitch AI track) against PRD component needs and surfaces them through deliberation. `provider_mode` is an **open string** with examples `stitch | shadcn | mixed | auto` (no closed enum — adding a provider is a docs change).
+10. Runs **`generate-storybook`** (`intake/scripts/generate-storybook.sh`) when `hasFrontend && component_map` is non-empty. Reads `.tasks/design/component-library.json` and emits:
+    - `.tasks/design/storybook/web/` — Next.js Storybook scaffold (`@storybook/nextjs-vite` + `@storybook/addon-mcp`) when any `component_map[].framework` is `nextjs` or `shared`
+    - `.tasks/design/storybook/native/` — Expo scaffold + static `manifest.json` when any `component_map[].framework` is `expo` (Storybook MCP unsupported on React Native — frontend agents read `manifest.json` directly)
+    - `.tasks/design/shadcn-selections.json` — `{ registries[], components[] }` for `npx shadcn add <url>` at implementation time
+    - `.tasks/design/storybook/AGENTS.md` — Storybook-MCP usage prompt for the frontend agent
+11. The final-submission bundle includes `.tasks/design/storybook/` and `.tasks/design/shadcn-selections.json` so the implementation worktree has a runnable Storybook (`cd storybook/web && npm install && npm run storybook`).
+12. Persists a design snapshot to bridge SQLite history for audit/evidence reporting.
+
+**Component schema additions** (`intake/schemas/component-library.schema.json`):
+
+- `componentItem.props[]` — `{ name, type, default?, description? }` rendered as Storybook `args`
+- `componentMapItem.framework` — `"nextjs" | "expo" | "shared"` (default `"shared"`); drives which Storybook scaffold gets the component
+- `componentMapItem.shadcn` — `{ registry, name }` for shadcn-sourced components; surfaced in `shadcn-selections.json`
+
+**Runtime hand-off** — `TOOLS.md` (rendered by `templates/harness-agents/{openclaw,hermes}.sh.hbs`) carries a `{{#if design_context}}` block with the Storybook MCP URL (`http://localhost:6006/mcp`), selected frameworks, providers, and shadcn registries. Blaze's task bootstrap starts Storybook, registers the MCP, and calls `list-all-documentation` → `get-documentation` before generating UI.
 
 `design-context.json` is threaded into both deliberation and parse-prd task generation.
 

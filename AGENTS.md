@@ -122,6 +122,23 @@ All agents have access to the tools and skills documented in [TOOLS.md](TOOLS.md
 
 Per-agent tool assignments are defined in `cto-config.json`. See `docs/agent-inventory.md` for the full breakdown of which agent gets which tools.
 
+## Design / Storybook / Component Library (intake → frontend hand-off)
+
+The intake pipeline (`intake/workflows/pipeline.lobster.yaml`) emits a **per-project Storybook component library** during the design phase. Frontend agents (Blaze) consume it at implementation time via the **Storybook MCP server**, so they don't have to invent or re-discover which components exist.
+
+**Top-of-funnel (deliberation)** — wide OSS provider catalog at `intake/data/oss-component-catalog.json` (shadcn registries, Radix/Ark/React Aria headless primitives, Mantine/Chakra full kits, TanStack functional companions, plus Gemini Stitch for AI mockups). User selects winners; `claude_design` is a reserved enum value pending API.
+
+**Per-project output** — `generate-storybook` (`intake/scripts/generate-storybook.sh`) reads `.tasks/design/component-library.json` and writes:
+
+- `.tasks/design/storybook/web/` — Next.js Storybook scaffold (`@storybook/nextjs-vite` + `@storybook/addon-mcp`) when `framework: nextjs|shared` is present in `component_map[]`.
+- `.tasks/design/storybook/native/` — Expo scaffold + static `manifest.json` when `framework: expo` is present (Storybook MCP doesn't yet support React Native; agents read the manifest as a file).
+- `.tasks/design/shadcn-selections.json` — `{ registries[], components[] }` consumed at implementation time via `npx shadcn add <url>`.
+- `.tasks/design/storybook/AGENTS.md` — Storybook-MCP usage prompt for the frontend agent.
+
+**Runtime hand-off (`TOOLS.md`)** — the `templates/harness-agents/{openclaw,hermes}.sh.hbs` heredocs render a `{{#if design_context}}` block listing Storybook MCP URL, frameworks, selected providers, and shadcn registries. Blaze's task bootstrap (`templates/agents/blaze/coder.md.hbs`) starts Storybook, registers the MCP, and instructs the agent to call `list-all-documentation` → `get-documentation` before generating UI.
+
+**Scope** — Next.js (web) + Expo (mobile). Desktop Storybook embedding (CTO-Lite) and Claude Design API integration are tracked separately.
+
 ## Local Discord web login (`discord.env`)
 
 For **optional** Discord **web** sign-in (e.g. Cursor browser tab to watch `#intake`), credentials can live in repo-root **`discord.env`** (gitignored by `*.env`). Use **`discord.env.example`** as the template.
