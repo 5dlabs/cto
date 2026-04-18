@@ -160,7 +160,7 @@ impl InsightCollector {
         }
 
         let mut result: Vec<_> = patterns.into_values().collect();
-        result.sort_by(|a, b| b.occurrences.cmp(&a.occurrences));
+        result.sort_by_key(|r| std::cmp::Reverse(r.occurrences));
         result
     }
 

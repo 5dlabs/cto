@@ -615,11 +615,9 @@ impl EvaluationConfig {
     pub fn from_env() -> Self {
         Self {
             enabled: std::env::var("EVALUATION_ENABLED")
-                .map(|v| v.to_lowercase() == "true" || v == "1")
-                .unwrap_or(true),
+                .map_or(true, |v| v.to_lowercase() == "true" || v == "1"),
             use_llm: std::env::var("EVALUATION_USE_LLM")
-                .map(|v| v.to_lowercase() == "true" || v == "1")
-                .unwrap_or(true),
+                .map_or(true, |v| v.to_lowercase() == "true" || v == "1"),
             llm_endpoint: std::env::var("EVALUATION_LLM_ENDPOINT")
                 .unwrap_or_else(|_| "http://tools-server:8080/v1/chat/completions".to_string()),
             llm_model: std::env::var("EVALUATION_LLM_MODEL")
@@ -629,8 +627,7 @@ impl EvaluationConfig {
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(0.7),
             feedback_enabled: std::env::var("EVALUATION_FEEDBACK_ENABLED")
-                .map(|v| v.to_lowercase() == "true" || v == "1")
-                .unwrap_or(true),
+                .map_or(true, |v| v.to_lowercase() == "true" || v == "1"),
             feedback_threshold: std::env::var("EVALUATION_FEEDBACK_THRESHOLD")
                 .ok()
                 .and_then(|v| v.parse().ok())
@@ -641,8 +638,7 @@ impl EvaluationConfig {
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(20),
             artifact_injection_enabled: std::env::var("ARTIFACT_INJECTION_ENABLED")
-                .map(|v| v.to_lowercase() == "true" || v == "1")
-                .unwrap_or(true),
+                .map_or(true, |v| v.to_lowercase() == "true" || v == "1"),
         }
     }
 
