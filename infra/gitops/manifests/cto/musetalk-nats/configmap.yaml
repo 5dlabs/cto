@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: musetalk-nats-config
+  namespace: cto
+data:
+  nats.conf: |
+    port: 4222
+    http_port: 8222
+    server_name: musetalk-nats
+    jetstream {
+      store_dir: /data/jetstream
+      max_memory_store: 1GB
+      max_file_store: 10GB
+    }

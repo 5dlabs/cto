@@ -46,7 +46,7 @@ terminationGracePeriodSeconds: 120
 
 # NATS configuration
 nats:
-  url: "nats://openclaw-nats.openclaw.svc.cluster.local:4222"
+  url: "nats://musetalk-nats.cto.svc.cluster.local:4222"
   subject: "avatar.render.request"
   resultSubject: "avatar.render.result"
   queue: "musetalk-workers"
