@@ -57,7 +57,7 @@ impl AutoMergeHandler {
         info!(pr = pr_number, "Checking PR status for auto-merge");
 
         // Poll for PR status
-        let timeout = Duration::from_secs(u64::from(self.config.check_timeout_mins) * 60);
+        let timeout = Duration::from_mins(u64::from(self.config.check_timeout_mins));
         let start = std::time::Instant::now();
 
         loop {

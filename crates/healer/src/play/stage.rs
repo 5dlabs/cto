@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 /// Stage timeout - 30 minutes is the target, anything longer is suspicious.
-pub const STAGE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+pub const STAGE_TIMEOUT: Duration = Duration::from_mins(30);
 
 /// Canonical play workflow stages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
