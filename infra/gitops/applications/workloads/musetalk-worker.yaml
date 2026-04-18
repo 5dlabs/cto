@@ -17,8 +17,6 @@ kind: Application
 metadata:
   name: musetalk-worker
   namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "3"
   labels:
     app.kubernetes.io/name: musetalk-worker
     app.kubernetes.io/part-of: cto-platform
