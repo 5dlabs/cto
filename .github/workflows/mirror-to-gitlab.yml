@@ -13,6 +13,11 @@ jobs:
   mirror:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # Disabled until self-hosted GitLab cutover is ready.
+    # To re-enable: set repo variable MIRROR_TO_GITLAB=true and ensure
+    # the GITLAB_PUSH_TOKEN secret is populated. See plan.md → "Self-hosted
+    # GitLab inventory" for the full re-enable checklist.
+    if: ${{ vars.MIRROR_TO_GITLAB == 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:
