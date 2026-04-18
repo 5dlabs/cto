@@ -2,46 +2,51 @@
 name: MuseTalk Worker Build
 
 on:
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Image tag to push'
-        required: false
-        default: 'phase4-bootstrap'
-        type: string
-
   push:
     branches: [main]
     paths:
       - 'infra/images/musetalk-worker/**'
+      - '.github/workflows/musetalk-worker-build.yaml'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag to publish (in addition to commit SHA)'
+        required: false
+        default: 'phase4-bootstrap'
 
 env:
   REGISTRY: ghcr.io
-  IMAGE: ghcr.io/5dlabs/musetalk-worker
+  IMAGE_NAME: 5dlabs/musetalk-worker
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    permissions:
-      contents: read
-      packages: write
-
+    # Large runner needed: nvcr.io/nvidia/pytorch:23.10-py3 base is ~10GB
+    runs-on: ubuntu-latest-large
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98 # v4
 
-      - name: Free disk space
+      - name: Free up disk space
         run: |
-          echo "=== Disk before cleanup ==="
-          df -h /
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/share/swift \
-            /usr/local/share/powershell /usr/local/share/chromium /usr/local/lib/heroku \
-            /usr/local/share/boost /opt/hostedtoolcache/CodeQL 2>/dev/null || true
-          sudo docker image prune -af 2>/dev/null || true
-          echo "=== Disk after cleanup ==="
-          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/.ghcup || true
+          sudo docker image prune --all --force || true
+          df -h
 
-      - name: Log in to GHCR
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=phase4-bootstrap" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -51,35 +56,17 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
-      - name: Resolve tag
-        id: tag
-        run: |
-          TAG="${{ github.event.inputs.tag || 'phase4-bootstrap' }}"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Building with tag: $TAG"
-
-      - name: Build and push
+      - name: Build and push image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
         with:
-          context: ./infra/images/musetalk-worker
-          file: ./infra/images/musetalk-worker/Dockerfile
+          context: infra/images/musetalk-worker
+          file: infra/images/musetalk-worker/Dockerfile
           platforms: linux/amd64
-          pull: true
           push: true
           provenance: false
           sbom: false
           tags: |
-            ${{ env.IMAGE }}:${{ steps.tag.outputs.tag }}
-            ${{ env.IMAGE }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.value }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha,scope=musetalk-worker
-          cache-to: type=gha,scope=musetalk-worker,mode=max
-
-      - name: Summary
-        run: |
-          {
-            echo "## MuseTalk Worker Build Complete"
-            echo ""
-            echo "- **Image**: \`${{ env.IMAGE }}\`"
-            echo "- **Tags**: \`${{ steps.tag.outputs.tag }}\`, \`latest\`"
-            echo "- **Commit**: \`${{ github.sha }}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          cache-to: type=gha,mode=max,scope=musetalk-worker
