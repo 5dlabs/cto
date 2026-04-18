@@ -1179,48 +1179,41 @@ spec:
               if [ ! -f /workspace/.code-server/User/settings.json ]; then
               cat > /workspace/.code-server/User/settings.json << 'SETTINGS'
               {
-                "workbench.colorTheme": "Default Dark Modern",
+                "workbench.colorTheme": "Dark Modern",
                 "workbench.startupEditor": "none",
+                "workbench.sideBar.location": "left",
+                "workbench.activityBar.location": "default",
                 "editor.fontSize": 14,
                 "terminal.integrated.fontSize": 14,
                 "github.copilot.enable": { "*": true },
-                "workbench.activityBar.location": "default",
-                "workbench.statusBar.visible": true,
-                "workbench.editor.showTabs": "single",
-                "workbench.layoutControl.enabled": false,
-                "window.commandCenter": false,
-                "breadcrumbs.enabled": false,
-                "editor.minimap.enabled": false,
-                "editor.glyphMargin": false,
-                "editor.folding": false,
-                "editor.lineNumbers": "off",
-                "editor.wordWrap": "on",
-                "editor.renderLineHighlight": "none",
-                "diffEditor.renderSideBySide": false,
-                "diffEditor.useInlineViewWhenSpaceIsLimited": true,
-                "diffEditor.ignoreTrimWhitespace": false,
-                "scm.defaultViewMode": "tree",
-                "scm.alwaysShowRepositories": false,
-                "scm.diffDecorations": "gutter",
-                "git.openDiffOnClick": true,
-                "git.autoRepositoryDetection": true,
-                "git.decorations.enabled": true,
-                "explorer.openEditors.visible": 0,
-                "workbench.tree.indent": 12,
                 "cto.apiBase": "http://localhost:18789",
-                "cto.defaultAgent": "morgan"
+                "cto.defaultAgent": "morgan",
+                "diffEditor.renderSideBySide": true,
+                "scm.diffDecorations": "all",
+                "scm.defaultViewMode": "tree",
+                "files.autoSave": "afterDelay",
+                "files.autoSaveDelay": 1000
               }
               SETTINGS
               sed -i 's/^              //' /workspace/.code-server/User/settings.json
               fi
-              # Pre-seed workbench state to open Source Control view on startup
+              # Pre-seed workbench state: CTO sidebar active, hide all other activity bar icons
               mkdir -p /workspace/.code-server/User/globalStorage
               if [ ! -f /workspace/.code-server/User/globalStorage/storage.json ]; then
               cat > /workspace/.code-server/User/globalStorage/storage.json << 'STATE'
               {
                 "lastActiveSideBarViewlet": "workbench.view.extension.cto-sidebar",
                 "workbench.sideBar.visible": true,
-                "workbench.panel.visible": false
+                "workbench.panel.visible": false,
+                "workbench.sideBar.size": 380,
+                "workbench.activityBar.hidden.workbench.view.explorer": true,
+                "workbench.activityBar.hidden.workbench.view.search": true,
+                "workbench.activityBar.hidden.workbench.view.scm": true,
+                "workbench.activityBar.hidden.workbench.view.debug": true,
+                "workbench.activityBar.hidden.workbench.view.extensions": true,
+                "workbench.activityBar.hidden.workbench.view.extension.github-copilot-chat": true,
+                "workbench.activityBar.hidden.userDataProfiles": true,
+                "workbench.activityBar.hidden.workbench.view.remote": true
               }
               STATE
               sed -i 's/^              //' /workspace/.code-server/User/globalStorage/storage.json
