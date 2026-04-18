@@ -97,7 +97,6 @@ COMPONENT_LIB="$ROOT/.tasks/design/component-library.json"
 CANDIDATES_JSON="$ROOT/.tasks/design/candidates.normalized.json"
 SOURCE_SCREENSHOTS="$ROOT/.tasks/design/source-screenshots.json"
 DESIGN_CONTEXT="$ROOT/.tasks/design/design-context.json"
-FRAMER_RUN="$ROOT/.tasks/design/framer/framer-run.json"
 
 if [ -f "$CANDIDATES_JSON" ] || [ -f "$COMPONENT_LIB" ]; then
   cat <<'DEOF'
@@ -144,21 +143,8 @@ DEOF
     fi
   fi
 
-  # Framer link
-  if [ -f "$FRAMER_RUN" ]; then
-    FRAMER_URL=$(jq -r '.projectUrl // empty' "$FRAMER_RUN" 2>/dev/null)
-    if [ -n "$FRAMER_URL" ]; then
-      FRAMER_COMPONENTS=$(jq -r '[.framer_code_components[].name] | join(", ")' "$COMPONENT_LIB" 2>/dev/null || true)
-      printf '🔗 **Framer Project:** [%s](%s)\n' "$FRAMER_URL" "$FRAMER_URL"
-      if [ -n "$FRAMER_COMPONENTS" ]; then
-        printf '**Framer Components:** %s\n' "$FRAMER_COMPONENTS"
-      fi
-      printf '\n'
-    fi
-  fi
-
   printf '<details><summary>Full design spec → <code>.tasks/design/DESIGN.md</code></summary>\n\n'
-  printf 'See `DESIGN.md` in the `.tasks/design/` directory for the complete design system reference including tokens, component inventory, Framer code components with property controls, and variant details.\n\n'
+  printf 'See `DESIGN.md` in the `.tasks/design/` directory for the complete design system reference including tokens, component inventory, and variant details.\n\n'
   printf '</details>\n\n'
 fi
 

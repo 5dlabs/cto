@@ -1,149 +1,162 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "design-context.schema.json",
+  "$id": "https://5dlabs.com/intake/design-context.schema.json",
   "title": "DesignContext",
-  "description": "Normalized design intake context with provider-specific generation summaries.",
+  "description": "Per-project design context emitted by intake. Drives the wide-OSS candidate funnel, deliberation, generators, and the per-project component library / Storybook scaffold.",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
-    "projectName": { "type": "string" },
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "project_id": { "type": "string", "minLength": 1 },
     "mode": {
       "type": "string",
-      "enum": ["ingest_only", "ingest_plus_stitch", "stitch", "framer", "both", "auto"]
+      "enum": ["greenfield", "brownfield", "redesign"],
+      "description": "Design situation. Greenfield = new app, brownfield = existing codebase + new design, redesign = existing app refresh."
     },
     "providerMode": {
       "type": "string",
-      "enum": ["stitch", "framer", "both", "auto"]
+      "minLength": 1,
+      "description": "How candidates are sourced. Open string.",
+      "examples": ["stitch", "shadcn", "mixed", "auto"]
     },
-    "prompt": { "type": "string" },
-    "artifactPath": { "type": "string" },
-    "urls": {
+    "frameworks": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": { "type": "string", "enum": ["nextjs", "expo", "shared"] },
+      "minItems": 1
     },
-    "crawledUrls": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "url": { "type": "string" },
-          "status": { "type": "string", "enum": ["ok", "error"] },
-          "title": { "type": "string" },
-          "snippet": { "type": "string" },
-          "error": { "type": "string" }
-        },
-        "required": ["url", "status"],
-        "additionalProperties": false
-      }
-    },
-    "hasFrontend": { "type": "boolean" },
     "frontendTargets": {
       "type": "array",
-      "items": {
-        "type": "string",
-        "enum": ["web", "mobile", "desktop"]
-      }
-    },
-    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
-    "evidence": {
-      "type": "array",
-      "items": { "type": "string" }
+      "items": { "type": "string", "enum": ["web", "mobile", "desktop"] },
+      "description": "Coarse target surfaces. web→nextjs Storybook, mobile→expo Storybook (no MCP), desktop→deferred."
     },
     "providers": {
       "type": "object",
+      "description": "Per-provider settings. Add providers freely; this object intentionally allows additional keys.",
       "properties": {
-        "stitch": { "$ref": "#/$defs/providerSummary" },
-        "framer": { "$ref": "#/$defs/providerSummary" }
+        "stitch": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "workspace": { "type": "string" },
+            "apiKeyEnv": { "type": "string", "examples": ["STITCH_API_KEY"] }
+          },
+          "additionalProperties": true
+        },
+        "shadcn": {
+          "type": "object",
+          "description": "shadcn-compatible registry summary. Detailed selections live in component-library.json#/shadcn.",
+          "properties": {
+            "registries": {
+              "type": "array",
+              "items": { "type": "string", "format": "uri" }
+            },
+            "components": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "registry"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "registry": { "type": "string", "format": "uri" },
+                  "url": { "type": "string", "format": "uri" }
+                },
+                "additionalProperties": true
+              }
+            }
+          },
+          "additionalProperties": true
+        },
+        "claude_design": {
+          "type": "object",
+          "description": "Reserved. Claude Design has no public API yet — value present but adapter is not wired.",
+          "properties": { "enabled": { "type": "boolean", "default": false } },
+          "additionalProperties": true
+        }
       },
-      "additionalProperties": false
+      "additionalProperties": true
     },
-    "stitch": { "$ref": "#/$defs/providerSummary" },
-    "framer": { "$ref": "#/$defs/providerSummary" },
-    "normalized_candidates": {
+    "candidates": {
       "type": "array",
-      "items": { "$ref": "#/$defs/normalizedCandidate" }
+      "description": "Wide-OSS candidate fan-in. One entry per provider considered during deliberation.",
+      "items": { "$ref": "#/$defs/providerCandidate" }
     },
-    "component_library": {
-      "type": "object",
-      "properties": {
-        "path": { "type": "string" },
-        "format": { "type": "string", "enum": ["json"] },
-        "version": { "type": "string" }
-      },
-      "required": ["path", "format"],
-      "additionalProperties": false
-    },
-    "design_system": {
-      "type": "object",
-      "properties": {
-        "path": { "type": "string" },
-        "format": { "type": "string", "enum": ["markdown"] }
-      },
-      "required": ["path", "format"],
-      "additionalProperties": false
+    "decisions": {
+      "type": "array",
+      "description": "Locked decisions made during deliberation (provider winners, swapped components, etc.).",
+      "items": {
+        "type": "object",
+        "required": ["topic", "outcome"],
+        "properties": {
+          "topic": { "type": "string" },
+          "outcome": { "type": "string" },
+          "rationale": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
     }
   },
   "required": [
-    "projectName",
+    "schema_version",
+    "project_id",
     "mode",
     "providerMode",
-    "prompt",
-    "artifactPath",
-    "urls",
-    "crawledUrls",
-    "hasFrontend",
-    "frontendTargets",
-    "confidence",
-    "evidence",
+    "frameworks",
     "providers"
   ],
   "$defs": {
-    "providerSummary": {
-      "type": "object",
-      "properties": {
-        "status": { "type": "string", "enum": ["generated", "skipped", "failed"] },
-        "reason": { "type": "string" },
-        "projectId": { "type": "string" },
-        "warnings": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "candidates": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/providerCandidate" }
-        }
-      },
-      "required": ["status", "warnings", "candidates"],
-      "additionalProperties": false
-    },
     "providerCandidate": {
       "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "category"],
       "properties": {
-        "provider": { "type": "string", "enum": ["stitch", "framer"] },
-        "target": { "type": "string", "enum": ["web", "mobile", "desktop"] },
-        "deviceType": { "type": "string", "enum": ["DESKTOP", "MOBILE", "TABLET", "AGNOSTIC"] },
-        "screenId": { "type": "string" },
-        "htmlUrl": { "type": "string" },
-        "imageUrl": { "type": "string" },
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Provider id from intake/data/oss-component-catalog.json. Open string.",
+          "examples": [
+            "stitch",
+            "shadcn",
+            "magic-ui",
+            "aceternity",
+            "tremor",
+            "park-ui",
+            "origin-ui",
+            "hextaui",
+            "kibo-ui",
+            "21st-dev",
+            "skiper-ui",
+            "heroui",
+            "radix",
+            "ark-ui",
+            "react-aria",
+            "mantine",
+            "chakra",
+            "tanstack-table",
+            "tanstack-query"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "ai-mockup",
+            "shadcn-registry",
+            "headless",
+            "kit",
+            "tanstack",
+            "other"
+          ]
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
         "rationale": { "type": "string" },
-        "prompt": { "type": "string" },
-        "status": { "type": "string", "enum": ["generated", "failed"] },
-        "error": { "type": "string" }
-      },
-      "required": ["provider", "target", "deviceType", "rationale", "prompt", "status"],
-      "additionalProperties": true
-    },
-    "normalizedCandidate": {
-      "allOf": [
-        { "$ref": "#/$defs/providerCandidate" },
-        {
-          "type": "object",
-          "properties": {
-            "candidate_id": { "type": "string" }
-          },
-          "required": ["candidate_id"]
-        }
-      ]
+        "components": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Component names this provider would supply if selected."
+        },
+        "homepage": { "type": "string", "format": "uri" },
+        "registry_url": { "type": "string", "format": "uri" },
+        "install": { "type": "string", "description": "Install or `shadcn add` command." }
+      }
     }
-  },
-  "additionalProperties": false
+  }
 }

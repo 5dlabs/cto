@@ -373,6 +373,37 @@ cat > /workspace/TOOLS.md <<'TOOLSEOF'
 _Add environment-specific notes here as you work._
 TOOLSEOF
 
+# Append per-project design / component-library context if intake produced it.
+# Source files live in $WS/.tasks/design/ (synced from intake bundle by sync-to-target-repo).
+# Graceful no-op if files or jq are missing.
+__design_lib="/workspace/.tasks/design/component-library.json"
+__shadcn_sel="/workspace/.tasks/design/shadcn-selections.json"
+__sb_agents="/workspace/.tasks/design/storybook/AGENTS.md"
+if [ -f "$__design_lib" ] && command -v jq >/dev/null 2>&1; then
+  {
+    echo ""
+    echo "## Design / Component Library (this project)"
+    echo ""
+    echo "- **Storybook MCP**: http://localhost:6006/mcp"
+    echo "  - Start: \`npm --prefix .tasks/design/storybook install && npm --prefix .tasks/design/storybook run storybook\`"
+    echo "  - Addon: \`@storybook/addon-mcp\` (HTTP, React only)"
+    __frameworks=$(jq -r '[.component_map[]?.framework] | unique | map(select(. != null)) | join(", ")' "$__design_lib" 2>/dev/null)
+    [ -n "$__frameworks" ] && [ "$__frameworks" != "null" ] && echo "- **Frameworks**: $__frameworks"
+    __providers=$(jq -r '.providers // [] | join(", ")' "$__design_lib" 2>/dev/null)
+    [ -n "$__providers" ] && [ "$__providers" != "null" ] && echo "- **Selected providers**: $__providers"
+    if [ -f "$__shadcn_sel" ]; then
+      __regs=$(jq -r '.registries // [] | join(", ")' "$__shadcn_sel" 2>/dev/null)
+      [ -n "$__regs" ] && [ "$__regs" != "null" ] && echo "- **shadcn registries**: $__regs"
+      echo "- **shadcn install**: \`xargs -L1 npx shadcn add < <(jq -r '.components[].url' $__shadcn_sel)\`"
+    fi
+    echo "- **Library spec**: \`.tasks/design/component-library.json\`"
+    [ -f "$__sb_agents" ] && echo "- **Storybook agent guide**: \`.tasks/design/storybook/AGENTS.md\`"
+    echo ""
+    echo "Frontend agents: query the Storybook MCP (\`list-all-documentation\` → \`get-documentation\`) before generating UI."
+  } >> /workspace/TOOLS.md
+fi
+unset __design_lib __shadcn_sel __sb_agents __frameworks __providers __regs
+
 # HEARTBEAT.md — empty for CRD pods (task-focused, no periodic checks)
 cat > /workspace/HEARTBEAT.md <<'HEARTBEATEOF'
 # HEARTBEAT.md

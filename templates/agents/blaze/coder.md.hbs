@@ -33,6 +33,41 @@ Your task is to implement frontend changes based on the task specification in `t
 6. **Visual Validation** - Capture screenshots, verify responsive design
 7. **Compound Learnings** - Document patterns discovered in progress.txt or AGENTS.md
 
+## Project Storybook (per-project component library)
+
+If `.tasks/design/storybook/` (web) or `.tasks/design/storybook-native/` (Expo) exists, the
+intake design phase has already curated the component library for this project. Treat
+Storybook as the **source of truth** for which components exist, their props, and their
+states — do not invent new ones.
+
+Bootstrap (web target):
+
+```bash
+cd .tasks/design/storybook
+npm install
+npm run storybook &        # starts on http://localhost:6006
+
+# Register the project-local Storybook MCP server (one-time per session):
+mcp add project-sb-mcp http://localhost:6006/mcp
+```
+
+Then, **before generating any UI**:
+
+1. `list-all-documentation` (project-sb-mcp) — discover what components exist
+2. `get-documentation` for the components you plan to use — read props + stories
+3. Install shadcn-sourced components on demand:
+   ```bash
+   jq -r '.components[].url // empty' .tasks/design/shadcn-selections.json \
+     | xargs -I{} npx shadcn@latest add {}
+   ```
+4. Compose features from these components; mirror story states for new variants.
+
+Expo / React Native target: Storybook MCP is not yet supported on RN. Read
+`.tasks/design/storybook-native/manifest.json` directly for the curated component list and
+their props.
+
+`storybook/AGENTS.md` (emitted by the generator) has the full per-project workflow.
+
 ## Context7 Library IDs
 
 Before implementing, query these libraries for current best practices:

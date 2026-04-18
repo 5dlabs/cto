@@ -5,9 +5,8 @@ WS="${WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 OUT_ROOT="${DESIGN_POC_OUT:-$WS/.intake/optimizer-poc/design-intake/$(date +%Y%m%d-%H%M%S)}"
 RUNS="${DESIGN_POC_RUNS:-1}"
 BASELINE_PROVIDER="${DESIGN_POC_BASELINE_PROVIDER:-stitch}"
-CANDIDATE_PROVIDER="${DESIGN_POC_CANDIDATE_PROVIDER:-both}"
+CANDIDATE_PROVIDER="${DESIGN_POC_CANDIDATE_PROVIDER:-auto}"
 KEEP_THRESHOLD="${DESIGN_POC_KEEP_THRESHOLD:-5}"
-FRAMER_PROJECT_TARGET="${DESIGN_FRAMER_PROJECT:-${FRAMER_PROJECT_URL:-${FRAMER_PROJECT_ID:-}}}"
 INTAKE_AGENT_BIN="${INTAKE_AGENT_BIN:-}"
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -166,7 +165,6 @@ run_variant() {
       --arg prd "$PRD_CONTENT" \
       --arg out "$run_dir" \
       --arg mode "$provider_mode" \
-      --arg framer_project "$FRAMER_PROJECT_TARGET" \
       --arg project_name "optimizer-poc-${variant_name}-${i}" \
       --arg prompt "$DESIGN_PROMPT" \
       --arg urls "$DESIGN_URLS" '
@@ -177,7 +175,6 @@ run_variant() {
           project_name: $project_name,
           design_prompt: $prompt,
           design_provider: $mode,
-          design_framer_project: $framer_project,
           design_urls: $urls,
           output_dir: $out
         }

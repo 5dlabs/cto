@@ -48,7 +48,7 @@ Design intake accepts any combination of:
 - `design_artifacts_path` - relative path to sketches/mockups/assets
 - `design_urls` - existing site/app URLs for modernization context
 - `design_mode` - legacy toggle (`ingest_only` or `ingest_plus_stitch`) for backward compatibility
-- `design_provider` - provider routing mode: `stitch`, `framer`, `both`, or `auto` (default rollout uses `stitch`)
+- `design_provider` - provider routing mode: open string; built-in adapters: `stitch`; OSS provider catalog surfaced via deliberation. Default: `stitch`
 
 Materialized outputs are written to:
 
@@ -60,9 +60,6 @@ Materialized outputs are written to:
 ├── design-system.md
 ├── assets/
 ├── crawled/urls.json
-├── framer/
-│   ├── framer-run.json
-│   └── candidates.json
 └── stitch/
     ├── stitch-run.json
     └── candidates.json
@@ -151,23 +148,20 @@ Claude Opus synthesizes the debate result + original PRD into a **Design Brief**
 
 ---
 
-### Phase 0.5: Design Intake *(new, required when Stitch mode is enabled)*
+### Phase 0.5: Design Intake *(runs whenever frontend is detected)*
 
-Runs immediately after PRD materialization in `pipeline.lobster.yaml`.
+Runs immediately after PRD materialization in `pipeline.lobster.yaml`. The design phase fans **wide OSS candidates** in at the top of the funnel and converges on a single per-project **Storybook component library** at the bottom — bundled into the final submission and consumed at implementation time via the **Storybook MCP server**.
 
 1. Copies local design artifacts into `.intake/design/assets/`
 2. Normalizes URL inputs and crawls basic page metadata into `.intake/design/crawled/urls.json`
 3. Detects frontend scope and targets (`web`, `mobile`, `desktop`)
 4. Enforces provider credential gates by mode:
-   - Requires `STITCH_API_KEY`
-   - Requires `FRAMER_API_KEY` + `FRAMER_PROJECT_URL` when `design_provider` is `framer`/`both`
-   - Emits credential discovery state (`STITCH_API_KEY`, `STITCH_PROJECT_ID`, `STITCH_ACCESS_TOKEN`, `GOOGLE_CLOUD_PROJECT`, `FRAMER_API_KEY`, `FRAMER_PROJECT_URL`) to `.intake/design/auth-discovery.json`
+   - Requires `STITCH_API_KEY` when `design_provider` includes `stitch`
+   - Emits credential discovery state (`STITCH_API_KEY`, `STITCH_PROJECT_ID`, `STITCH_ACCESS_TOKEN`, `GOOGLE_CLOUD_PROJECT`) to `.intake/design/auth-discovery.json`
    - Fails fast with explicit gate output if required auth is missing
 5. If enabled and credentials exist, generates provider candidates and saves:
    - `.intake/design/stitch/stitch-run.json`
    - `.intake/design/stitch/candidates.json`
-   - `.intake/design/framer/framer-run.json`
-   - `.intake/design/framer/candidates.json`
    - `.intake/design/candidates.normalized.json`
 6. Writes component artifacts for implementation planning:
    - `.intake/design/component-library.json`
@@ -177,12 +171,26 @@ Runs immediately after PRD materialization in `pipeline.lobster.yaml`.
    - `design-context.json`
    - `crawled/urls.json` (when available)
    - `stitch/stitch-run.json`, `stitch/candidates.json` (when available)
-   - `framer/framer-run.json`, `framer/candidates.json` (when available)
    - `candidates.normalized.json`
    - `component-library.json`, `design-system.md`
    - `auth-discovery.json`
    - `manifest.json`
-9. Persists a design snapshot to bridge SQLite history for audit/evidence reporting
+9. Runs the **OSS candidate** step — joins the curated catalog at `intake/data/oss-component-catalog.json` (shadcn registries, Radix/Ark/React Aria headless primitives, Mantine/Chakra full kits, TanStack companions, plus the Stitch AI track) against PRD component needs and surfaces them through deliberation. `provider_mode` is an **open string** with examples `stitch | shadcn | mixed | auto` (no closed enum — adding a provider is a docs change).
+10. Runs **`generate-storybook`** (`intake/scripts/generate-storybook.sh`) when `hasFrontend && component_map` is non-empty. Reads `.tasks/design/component-library.json` and emits:
+    - `.tasks/design/storybook/web/` — Next.js Storybook scaffold (`@storybook/nextjs-vite` + `@storybook/addon-mcp`) when any `component_map[].framework` is `nextjs` or `shared`
+    - `.tasks/design/storybook/native/` — Expo scaffold + static `manifest.json` when any `component_map[].framework` is `expo` (Storybook MCP unsupported on React Native — frontend agents read `manifest.json` directly)
+    - `.tasks/design/shadcn-selections.json` — `{ registries[], components[] }` for `npx shadcn add <url>` at implementation time
+    - `.tasks/design/storybook/AGENTS.md` — Storybook-MCP usage prompt for the frontend agent
+11. The final-submission bundle includes `.tasks/design/storybook/` and `.tasks/design/shadcn-selections.json` so the implementation worktree has a runnable Storybook (`cd storybook/web && npm install && npm run storybook`).
+12. Persists a design snapshot to bridge SQLite history for audit/evidence reporting.
+
+**Component schema additions** (`intake/schemas/component-library.schema.json`):
+
+- `componentItem.props[]` — `{ name, type, default?, description? }` rendered as Storybook `args`
+- `componentMapItem.framework` — `"nextjs" | "expo" | "shared"` (default `"shared"`); drives which Storybook scaffold gets the component
+- `componentMapItem.shadcn` — `{ registry, name }` for shadcn-sourced components; surfaced in `shadcn-selections.json`
+
+**Runtime hand-off** — `TOOLS.md` (rendered by `templates/harness-agents/{openclaw,hermes}.sh.hbs`) carries a `{{#if design_context}}` block with the Storybook MCP URL (`http://localhost:6006/mcp`), selected frameworks, providers, and shadcn registries. Blaze's task bootstrap starts Storybook, registers the MCP, and calls `list-all-documentation` → `get-documentation` before generating UI.
 
 `design-context.json` is threaded into both deliberation and parse-prd task generation.
 
@@ -545,7 +553,7 @@ The core output contract is preserved:
 | **OctoCode** | MCP tool | GitHub code search fallback |
 | **Tavily** | Research via intake-agent MCP | Pre-debate evidence gathering |
 | **Stitch SDK** | `@google/stitch-sdk` (TypeScript) | Visual candidate generation and variant exploration |
-| **Framer Server API** | `framer-api` (Node/Bun runtime import) | Framer project publishing/introspection and component-oriented candidate generation |
+| **OSS Provider Catalog** | `intake/data/oss-component-catalog.json` (curated) | shadcn registries, headless primitives, full kits, TanStack — surfaced as candidates during deliberation |
 
 ---
 
@@ -588,14 +596,11 @@ Output:
 
 ## Provider Authentication and Runtime Notes
 
-For Stitch mode (`design_provider=stitch` or `both`, or legacy `design_mode=ingest_plus_stitch`), set:
+For Stitch mode (`design_provider=stitch`, or legacy `design_mode=ingest_plus_stitch`), set:
 
 - `STITCH_API_KEY`
 
-For Framer mode (`design_provider=framer` or `both`), set:
-
-- `FRAMER_API_KEY`
-- `FRAMER_PROJECT_URL`
+OSS providers (shadcn registries, Radix, React Aria, Mantine, Chakra, TanStack, etc.) require no credentials — they're surfaced from the curated catalog and consumed at frontend implementation time via `shadcn add` / npm install.
 
 The pipeline enforces hard gates for required credentials before deliberation/task generation.
 

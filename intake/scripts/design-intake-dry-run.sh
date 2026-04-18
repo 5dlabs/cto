@@ -19,7 +19,6 @@ fi
 
 BASE_DIR="${1:-$WS/.intake/design-dry-run}"
 PRD_CONTENT="${2:-Build a frontend dashboard with reusable components and responsive UX.}"
-FRAMER_PROJECT_TARGET="${DESIGN_FRAMER_PROJECT:-${FRAMER_PROJECT_URL:-${FRAMER_PROJECT_ID:-}}}"
 mkdir -p "$BASE_DIR"
 
 run_mode() {
@@ -31,7 +30,6 @@ run_mode() {
     --arg prd "$PRD_CONTENT" \
     --arg out "$out_dir" \
     --arg mode "$mode" \
-    --arg framer_project "$FRAMER_PROJECT_TARGET" \
     '{
       operation: "design_intake",
       payload: {
@@ -39,7 +37,6 @@ run_mode() {
         project_name: ("dry-run-" + $mode),
         design_prompt: "Validate provider routing and artifact generation.",
         design_provider: $mode,
-        design_framer_project: $framer_project,
         output_dir: $out
       }
     }' | "$INTAKE_AGENT_BIN" > "$out_dir/response.json"
@@ -52,7 +49,6 @@ run_mode() {
 }
 
 run_mode stitch
-run_mode framer
-run_mode both
+run_mode auto
 
 echo "Design intake dry-run complete. Artifacts in: $BASE_DIR"

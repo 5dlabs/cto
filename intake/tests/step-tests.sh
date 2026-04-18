@@ -414,6 +414,125 @@ else
 fi
 
 # =========================================================================
+# T21: generate-storybook produces expected scaffold (web + native)
+# =========================================================================
+echo ""
+echo "=== T21: generate-storybook scaffold ==="
+
+GEN_SB="$INTAKE_DIR/scripts/generate-storybook.sh"
+if [ ! -x "$GEN_SB" ]; then
+  fail "generate-storybook.sh missing or not executable" "$GEN_SB"
+else
+  SB_TMP="$(mktemp -d)"
+  trap 'rm -rf "$SB_TMP"' EXIT
+  mkdir -p "$SB_TMP/.tasks/design"
+
+  # Minimal component-library.json (web + native; one shadcn selection).
+  cat >"$SB_TMP/.tasks/design/component-library.json" <<'JSON'
+{
+  "schema_version": "1.0.0",
+  "project_id": "test-project",
+  "generated_at": "2025-01-01T00:00:00Z",
+  "provider_mode": "mixed",
+  "providers": ["shadcn"],
+  "frameworks": ["nextjs", "expo"],
+  "tokens": {
+    "color": { "primary": "#000000" },
+    "spacing": { "sm": "8px" }
+  },
+  "primitives": [
+    { "name": "Button" }
+  ],
+  "patterns": [],
+  "component_map": [
+    {
+      "name": "Button",
+      "framework": "nextjs",
+      "shadcn": {
+        "registry": "https://ui.shadcn.com",
+        "name": "button",
+        "url": "https://ui.shadcn.com/r/button.json"
+      }
+    }
+  ]
+}
+JSON
+
+  if "$GEN_SB" "$SB_TMP" test-project >/dev/null 2>&1; then
+    SB_OUT="$SB_TMP/.tasks/design/storybook"
+    MISSING=""
+    for path in \
+      "$SB_OUT/AGENTS.md" \
+      "$SB_OUT/web/package.json" \
+      "$SB_OUT/web/.storybook/main.ts" \
+      "$SB_OUT/web/.storybook/preview.ts" \
+      "$SB_OUT/web/src/tokens/tokens.css" \
+      "$SB_OUT/web/src/components" \
+      "$SB_OUT/native/package.json" \
+      "$SB_OUT/native/manifest.json" \
+      "$SB_TMP/.tasks/design/shadcn-selections.json"
+    do
+      [ -e "$path" ] || MISSING="$MISSING\n  - ${path#$SB_TMP/}"
+    done
+
+    if [ -z "$MISSING" ]; then
+      # Verify shadcn-selections.json shape: has registries[] and components[].
+      if jq -e '(.registries | type == "array") and (.components | type == "array") and (.components | length == 1)' \
+            "$SB_TMP/.tasks/design/shadcn-selections.json" >/dev/null 2>&1; then
+        # Verify main.ts registers the MCP addon.
+        if grep -q "@storybook/addon-mcp" "$SB_OUT/web/.storybook/main.ts"; then
+          pass "generate-storybook produces web+native scaffold with MCP addon and shadcn selections"
+        else
+          fail "generate-storybook web main.ts should register @storybook/addon-mcp" "$(cat "$SB_OUT/web/.storybook/main.ts")"
+        fi
+      else
+        fail "shadcn-selections.json shape unexpected" "$(cat "$SB_TMP/.tasks/design/shadcn-selections.json")"
+      fi
+    else
+      fail "generate-storybook missing expected outputs" "$(printf '%b' "$MISSING")"
+    fi
+  else
+    fail "generate-storybook.sh exited non-zero" "$("$GEN_SB" "$SB_TMP" test-project 2>&1 || true)"
+  fi
+fi
+
+# =========================================================================
+# T22: generate-storybook with web-only (no expo) skips native scaffold
+# =========================================================================
+echo ""
+echo "=== T22: generate-storybook web-only ==="
+
+if [ -x "$GEN_SB" ]; then
+  SB2_TMP="$(mktemp -d)"
+  mkdir -p "$SB2_TMP/.tasks/design"
+  cat >"$SB2_TMP/.tasks/design/component-library.json" <<'JSON'
+{
+  "schema_version": "1.0.0",
+  "project_id": "web-only",
+  "generated_at": "2025-01-01T00:00:00Z",
+  "provider_mode": "shadcn",
+  "providers": ["shadcn"],
+  "frameworks": ["nextjs"],
+  "tokens": {},
+  "primitives": [{ "name": "Card" }],
+  "patterns": []
+}
+JSON
+
+  if "$GEN_SB" "$SB2_TMP" web-only >/dev/null 2>&1; then
+    SB2_OUT="$SB2_TMP/.tasks/design/storybook"
+    if [ -f "$SB2_OUT/web/package.json" ] && [ ! -d "$SB2_OUT/native" ]; then
+      pass "generate-storybook web-only emits web/ and skips native/"
+    else
+      fail "web-only scaffold layout unexpected" "web exists: $([ -f "$SB2_OUT/web/package.json" ] && echo yes || echo no); native exists: $([ -d "$SB2_OUT/native" ] && echo yes || echo no)"
+    fi
+  else
+    fail "generate-storybook (web-only) exited non-zero" ""
+  fi
+  rm -rf "$SB2_TMP"
+fi
+
+# =========================================================================
 # Summary
 # =========================================================================
 echo ""

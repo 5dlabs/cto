@@ -1,12 +1,12 @@
 # Design Intake E2E Testing
 
-This document defines how to validate the dual-provider design intake flow end-to-end and how to include it in routine testing.
+This document defines how to validate the design intake flow end-to-end and how to include it in routine testing.
 
 ## Scope
 
 The test coverage in this runbook validates:
 
-- Provider routing: `stitch`, `framer`, `both`
+- Provider routing across the OSS provider catalog (default: `stitch`; open-string for any catalog entry)
 - Artifact generation under `.intake/design/*`
 - Bundle materialization under `.tasks/design/*`
 - Compatibility with downstream `design-review` and `design-deliberation` steps
@@ -26,10 +26,9 @@ Use all three layers for confidence:
 
 - Build or install `intake-agent` binary:
   - `cd apps/intake-agent && bun run build`
-- Required credentials by mode:
+- Required credentials by provider:
   - `stitch`: `STITCH_API_KEY`
-  - `framer`: `FRAMER_API_KEY` + one project target (`design_framer_project` arg, `FRAMER_PROJECT_URL`, or `FRAMER_PROJECT_ID`)
-  - `both`: all of the above
+  - OSS providers (shadcn registries, headless kits, TanStack, etc.): no credentials required (catalog-driven)
 - Optional:
   - `INTAKE_PREFLIGHT_BRIDGES_SKIP=true` for local non-bridge runs
 
@@ -55,7 +54,7 @@ Run:
 bash intake/scripts/design-intake-dry-run.sh
 ```
 
-This executes three runs: `stitch`, `framer`, `both`.
+This executes runs across the supported provider modes (`stitch`, `auto`).
 
 Expected artifacts per mode under `.intake/design-dry-run/<mode>/`:
 
@@ -73,8 +72,7 @@ lobster run --mode tool intake/workflows/pipeline.lobster.yaml --args-json '{
   "project_name": "design-intake-e2e",
   "prd_path": ".intake/run-prd.txt",
   "design_mode": "ingest_plus_stitch",
-  "design_provider": "both",
-  "design_framer_project": "fr_4j04q95j7s8n48kakevderq43c",
+  "design_provider": "stitch",
   "design_prompt": "Modernize UI while preserving product tone",
   "design_urls": "https://example.com",
   "include_codebase": false,
@@ -90,7 +88,6 @@ Expected outputs:
 - `.intake/design/design-system.md`
 - `.tasks/design/manifest.json` containing:
   - `files.stitch_*`
-  - `files.framer_*`
   - `files.normalized_candidates`
   - `files.component_library`
   - `files.design_system`
@@ -137,11 +134,11 @@ Notes:
 Use this checklist after dry-run and E2E:
 
 - [ ] `design-context.json` has `providerMode`
-- [ ] `design-context.json` has `providers.stitch` and `providers.framer`
+- [ ] `design-context.json` has `providers.stitch`
 - [ ] `normalized_candidates` exists and includes `provider` on entries
 - [ ] `component-library.json` exists and has `tokens`, `primitives`, `patterns`
 - [ ] `design-system.md` exists
-- [ ] Pipeline does not fail when one provider fails in `both` mode (graceful degradation)
+- [ ] Pipeline does not fail when a provider returns no candidates (graceful degradation)
 
 ## How to Include in Routine Tests
 
@@ -178,9 +175,6 @@ Suggested path filters for stage 2:
 
 - Missing Stitch key:
   - check `STITCH_API_KEY`
-  - inspect `.intake/design/auth-discovery.json`
-- Missing Framer creds:
-  - check `FRAMER_API_KEY` and one of `design_framer_project` / `FRAMER_PROJECT_URL` / `FRAMER_PROJECT_ID`
   - inspect `.intake/design/auth-discovery.json`
 - Variant generation skipped:
   - verify generated entries in `.intake/design/candidates.normalized.json`

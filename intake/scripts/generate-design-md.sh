@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # generate-design-md.sh — Build a DESIGN.md root document from design artifacts.
-# Aggregates tokens, components, screenshots, provider status, and Framer links.
+# Aggregates tokens, components, screenshots, provider status, and OSS provider links.
 # Usage: generate-design-md.sh <workspace_root> <project_name> > DESIGN.md
 set -euo pipefail
 
@@ -11,7 +11,6 @@ DESIGN_CONTEXT="$ROOT/.tasks/design/design-context.json"
 SNAPSHOT_LINKS="$ROOT/.tasks/design/snapshot-links.md"
 CANDIDATES="$ROOT/.tasks/design/candidates.normalized.json"
 MANIFEST="$ROOT/.tasks/design/manifest.json"
-FRAMER_RUN="$ROOT/.tasks/design/framer/framer-run.json"
 STITCH_RUN="$ROOT/.tasks/design/stitch/stitch-run.json"
 SOURCE_SCREENSHOTS="$ROOT/.tasks/design/source-screenshots.json"
 
@@ -130,28 +129,6 @@ if [ -f "$COMPONENT_LIB" ]; then
   fi
 fi
 
-# --- Framer Code Components ---
-if [ -f "$COMPONENT_LIB" ]; then
-  FRAMER_COUNT=$(jq '.framer_code_components | length' "$COMPONENT_LIB" 2>/dev/null || echo 0)
-  if [ "$FRAMER_COUNT" -gt 0 ]; then
-    printf '## Framer Code Components\n\n'
-    if [ -f "$FRAMER_RUN" ]; then
-      FRAMER_URL=$(jq -r '.projectUrl // empty' "$FRAMER_RUN" 2>/dev/null)
-      if [ -n "$FRAMER_URL" ]; then
-        printf '🔗 **Framer Project:** [%s](%s)\n\n' "$FRAMER_URL" "$FRAMER_URL"
-      fi
-    fi
-    jq -r '.framer_code_components[] |
-      "### `\(.name)`\n\n" +
-      "| Prop | Type | Default |\n|------|------|--------|\n" +
-      ([.props[] | "| `\(.name)` | \(.type) | \(.default // "—") |"] | join("\n")) +
-      "\n\n" +
-      if .notes then "_\(.notes)_\n" else "" end
-    ' "$COMPONENT_LIB" 2>/dev/null
-    printf '\n'
-  fi
-fi
-
 # --- Stitch Variants ---
 STITCH_VARIANTS="$ROOT/.tasks/design/stitch/design-variants.json"
 if [ -f "$STITCH_VARIANTS" ]; then
@@ -187,13 +164,10 @@ fi
 printf '## Artifact Files\n\n'
 printf '| File | Description |\n'
 printf '|------|-------------|\n'
-printf '| `.tasks/design/component-library.json` | Tokens, primitives, patterns, Framer components |\n'
+printf '| `.tasks/design/component-library.json` | Tokens, primitives, patterns, component map |\n'
 printf '| `.tasks/design/design-context.json` | Full design pipeline context |\n'
 printf '| `.tasks/design/design-system.md` | Design system summary |\n'
 printf '| `.tasks/design/candidates.normalized.json` | All design candidates with status |\n'
-if [ -f "$ROOT/.tasks/design/framer/candidates.json" ]; then
-  printf '| `.tasks/design/framer/candidates.json` | Framer-generated candidates |\n'
-fi
 if [ -f "$ROOT/.tasks/design/stitch/candidates.json" ]; then
   printf '| `.tasks/design/stitch/candidates.json` | Stitch-generated candidates |\n'
 fi
