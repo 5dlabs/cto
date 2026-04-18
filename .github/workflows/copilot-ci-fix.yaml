@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Collect failure logs and request fix
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const runId = context.payload.workflow_run.id;

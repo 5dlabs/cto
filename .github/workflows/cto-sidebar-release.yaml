@@ -38,10 +38,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
@@ -90,7 +90,7 @@ jobs:
             --yes --cleanup-tag || true
 
       - name: Publish latest release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: cto-sidebar-latest
           name: CTO Sidebar (latest)
@@ -113,7 +113,7 @@ jobs:
 
       - name: Publish versioned release
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/cto-sidebar-v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: cto-sidebar-v${{ steps.version.outputs.version }}
           name: CTO Sidebar v${{ steps.version.outputs.version }}
