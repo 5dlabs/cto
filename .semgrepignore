@@ -34,6 +34,13 @@ intake/
 memory/
 archived/
 
+# Third-party / bundled skill packages (not our source)
+skills/
+development/
+templates/
+lab-eco-mvp-r/
+lifecycle-test/
+
 # Package lockfiles (not source)
 **/package-lock.json
 **/yarn.lock
