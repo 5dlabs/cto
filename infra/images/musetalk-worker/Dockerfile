@@ -50,6 +50,7 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86
 ENV PATH=/usr/local/cuda-11.8/bin:${PATH}
 ENV LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:${LD_LIBRARY_PATH}
 ENV CUDA_HOME=/usr/local/cuda-11.8
+# Trigger workflow build
 
 # System dependencies for video processing and model bootstrap
 RUN apt-get update && apt-get install -y --no-install-recommends \
