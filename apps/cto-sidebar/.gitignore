@@ -1,0 +1,4 @@
+out/
+*.vsix
+bun.lock
+node_modules/

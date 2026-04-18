@@ -1206,7 +1206,9 @@ spec:
                 "git.autoRepositoryDetection": true,
                 "git.decorations.enabled": true,
                 "explorer.openEditors.visible": 0,
-                "workbench.tree.indent": 12
+                "workbench.tree.indent": 12,
+                "cto.apiBase": "http://localhost:18789",
+                "cto.defaultAgent": "morgan"
               }
               SETTINGS
               sed -i 's/^              //' /workspace/.code-server/User/settings.json
@@ -1228,8 +1230,10 @@ spec:
               mkdir -p /root/.config/code-server
               cat > /root/.config/code-server/config.yaml << CSCONF
               bind-addr: 0.0.0.0:{{ .Values.codeServer.port | default 8080 }}
-              auth: password
+              auth: {{ .Values.codeServer.auth | default "password" }}
+              {{- if ne (.Values.codeServer.auth | default "password") "none" }}
               password: ${PASSWORD}
+              {{- end }}
               cert: false
               github-auth: ${GITHUB_TOKEN}
               CSCONF

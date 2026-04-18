@@ -1,0 +1,85 @@
+{
+  "name": "cto-sidebar",
+  "displayName": "5dlabs CTO",
+  "description": "CTO agent chat — connects directly to your OpenClaw/ACP harness",
+  "version": "0.1.0",
+  "publisher": "5dlabs",
+  
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["AI", "Chat"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "cto-sidebar",
+          "title": "5dlabs CTO",
+          "icon": "media/cto-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "cto-sidebar": [
+        {
+          "type": "webview",
+          "id": "cto-sidebar.chat",
+          "name": "CTO Agents"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "5dlabs CTO",
+      "properties": {
+        "cto.apiBase": {
+          "type": "string",
+          "default": "http://localhost:18789",
+          "description": "OpenClaw gateway base URL"
+        },
+        "cto.defaultAgent": {
+          "type": "string",
+          "default": "",
+          "description": "Default agent to use (empty = auto-select)"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "cto-sidebar.newChat",
+        "title": "New Chat",
+        "icon": "$(add)",
+        "category": "CTO"
+      },
+      {
+        "command": "cto-sidebar.clearHistory",
+        "title": "Clear History",
+        "icon": "$(clear-all)",
+        "category": "CTO"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "cto-sidebar.newChat",
+          "when": "view == cto-sidebar.chat",
+          "group": "navigation"
+        },
+        {
+          "command": "cto-sidebar.clearHistory",
+          "when": "view == cto-sidebar.chat"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -watch -p tsconfig.json",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.4.0"
+  }
+}

@@ -661,6 +661,7 @@ supermemory:
 codeServer:
   enabled: true
   port: 8080
+  auth: "none"
   password: "125884c05c03a803"
   # Stable cluster tunnel URL — bypasses ephemeral quick tunnel for Coder
   tunnelUrl: "https://coder.5dlabs.ai"
@@ -668,6 +669,8 @@ codeServer:
   customExtensions:
     - name: cto-chat
       pvPath: "/workspace/.code-server-cache/cto-chat.vsix"
+    - name: cto-sidebar
+      pvPath: "/workspace/.code-server-cache/cto-sidebar.vsix"
   quickTunnel:
     enabled: false
   githubToken:
