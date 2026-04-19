@@ -1,0 +1,373 @@
+name: Mirror artifacts to GitLab
+
+# Dual-publish artifacts (docker / helm-oci / npm / GH releases) from this
+# repo to the self-hosted GitLab instance at gitlab.5dlabs.ai.
+#
+# Driven by .github/gitlab-mirror.yml in the repo root — that file declares
+# which artifacts exist for this repo and what their GitLab destination is.
+#
+# Gated on:
+#   - repo var GITLAB_MIRROR_ARTIFACTS == 'true'
+#   - org secret GITLAB_PUBLISH_TOKEN (Group Access Token on `5dlabs`:
+#       scopes api, write_registry, write_repository)
+#
+# Triggers:
+#   - release: published        → mirrors the release (incl. asset binaries)
+#                                 and re-mirrors any docker/helm tags that
+#                                 match the release tag.
+#   - workflow_run: completed   → on every source publish workflow
+#                                 (build-image, build-mission-control,
+#                                 release, nats-messenger-release,
+#                                 release-please, etc.). Mirrors any new
+#                                 artifacts produced.
+#   - workflow_dispatch         → manual backfill / re-sync.
+
+on:
+  release:
+    types: [published]
+  workflow_run:
+    # Union of publish workflow names across repos. Unused names are no-ops.
+    workflows:
+      # agent-platform / openclaw
+      - 'Build and Push OpenClaw Images'
+      - 'Build Mission Control Images'
+      - 'Release Charts'
+      - 'NATS Messenger Release'
+      # shared
+      - 'Release Please'
+      # cto
+      - 'Agent Images'
+      - 'Binaries Release'
+      - 'CTO Lite Release'
+      - 'CTO Sidebar VSIX Release'
+      - 'Discord Bridge – Build and Publish Docker Image'
+      - 'GitOps Manifest Publish'
+      - 'Grok – Publish MCP Server & Cron Binary'
+      - 'Linear Bridge – Build and Publish Docker Image'
+      - 'Build and Push MuseTalk Worker Image'
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Override tag to mirror (default: latest release tag or sha)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: gitlab-mirror-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GITLAB_HOST: gitlab.5dlabs.ai
+  GITLAB_REGISTRY: registry.5dlabs.ai
+  GITLAB_GROUP: 5dlabs
+
+jobs:
+  preflight:
+    if: vars.GITLAB_MIRROR_ARTIFACTS == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      config_found: ${{ steps.cfg.outputs.found }}
+      docker_images: ${{ steps.cfg.outputs.docker_images }}
+      helm_charts: ${{ steps.cfg.outputs.helm_charts }}
+      npm_packages: ${{ steps.cfg.outputs.npm_packages }}
+      mirror_releases: ${{ steps.cfg.outputs.mirror_releases }}
+      gitlab_project: ${{ steps.cfg.outputs.gitlab_project }}
+      tag: ${{ steps.tag.outputs.tag }}
+      is_release: ${{ steps.tag.outputs.is_release }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Load .github/gitlab-mirror.yml
+        id: cfg
+        run: |
+          set -euo pipefail
+          CFG=.github/gitlab-mirror.yml
+          if [ ! -f "$CFG" ]; then
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No .github/gitlab-mirror.yml in this repo — nothing to mirror."
+            exit 0
+          fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
+
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os, sys
+          try:
+              import yaml
+          except ImportError:
+              os.system("pip install --quiet pyyaml")
+              import yaml
+          with open(".github/gitlab-mirror.yml") as f:
+              cfg = yaml.safe_load(f) or {}
+          def j(v): return json.dumps(v or [])
+          print(f"docker_images={j(cfg.get('docker_images'))}")
+          print(f"helm_charts={j(cfg.get('helm_charts'))}")
+          print(f"npm_packages={j(cfg.get('npm_packages'))}")
+          print(f"mirror_releases={str(bool(cfg.get('mirror_releases', True))).lower()}")
+          print(f"gitlab_project={cfg.get('gitlab_project', '')}")
+          PY
+
+      - name: Resolve tag to mirror
+        id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          IS_RELEASE=false
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG='${{ github.event.inputs.tag }}'
+          elif [ '${{ github.event_name }}' = 'release' ]; then
+            TAG='${{ github.event.release.tag_name }}'
+            IS_RELEASE=true
+          else
+            # latest published release for workflow_run trigger
+            TAG=$(gh release list --limit 1 --json tagName,isDraft,isPrerelease \
+              --jq 'map(select(.isDraft==false and .isPrerelease==false))[0].tagName' \
+              --repo '${{ github.repository }}' || true)
+            TAG=${TAG:-${{ github.sha }}}
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "is_release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag: $TAG (release=$IS_RELEASE)"
+
+  docker:
+    needs: preflight
+    if: needs.preflight.outputs.config_found == 'true' && needs.preflight.outputs.docker_images != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJson(needs.preflight.outputs.docker_images) }}
+    steps:
+      - name: Install skopeo
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends skopeo
+
+      - name: Login to GHCR
+        run: |
+          echo '${{ secrets.GITHUB_TOKEN }}' | \
+            skopeo login ghcr.io --username '${{ github.actor }}' --password-stdin
+
+      - name: Login to GitLab registry
+        env:
+          GL_TOKEN: ${{ secrets.GITLAB_PUBLISH_TOKEN }}
+        run: |
+          echo "$GL_TOKEN" | \
+            skopeo login "$GITLAB_REGISTRY" --username gh-publish-all --password-stdin
+
+      - name: Mirror image ${{ matrix.image }} @ ${{ needs.preflight.outputs.tag }}
+        env:
+          TAG: ${{ needs.preflight.outputs.tag }}
+          PROJECT: ${{ needs.preflight.outputs.gitlab_project }}
+        run: |
+          set -euo pipefail
+          SRC='${{ matrix.image }}'
+          # strip ghcr.io/ prefix to re-map
+          SHORT=${SRC#ghcr.io/}
+          # Remap owner namespace: ghcr.io/5dlabs/foo → registry/5dlabs/<project>/foo
+          NAME=${SHORT#5dlabs/}
+          DST="$GITLAB_REGISTRY/$GITLAB_GROUP/$PROJECT/$NAME"
+          echo "::notice::copy $SRC:$TAG → $DST:$TAG"
+          skopeo copy --all --retry-times 3 \
+            "docker://$SRC:$TAG" "docker://$DST:$TAG" || {
+              echo "::warning::skopeo copy failed for $SRC:$TAG (image may not exist at this tag — skipping)"
+              exit 0
+            }
+
+  helm:
+    needs: preflight
+    if: needs.preflight.outputs.config_found == 'true' && needs.preflight.outputs.helm_charts != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        chart: ${{ fromJson(needs.preflight.outputs.helm_charts) }}
+    steps:
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Login to GHCR (helm)
+        run: |
+          echo '${{ secrets.GITHUB_TOKEN }}' | \
+            helm registry login ghcr.io --username '${{ github.actor }}' --password-stdin
+
+      - name: Login to GitLab OCI registry (helm)
+        env:
+          GL_TOKEN: ${{ secrets.GITLAB_PUBLISH_TOKEN }}
+        run: |
+          echo "$GL_TOKEN" | \
+            helm registry login "$GITLAB_REGISTRY" --username gh-publish-all --password-stdin
+
+      - name: Mirror chart ${{ matrix.chart }} @ ${{ needs.preflight.outputs.tag }}
+        env:
+          TAG: ${{ needs.preflight.outputs.tag }}
+          PROJECT: ${{ needs.preflight.outputs.gitlab_project }}
+        run: |
+          set -euo pipefail
+          SRC='${{ matrix.chart }}'
+          VERSION=${TAG#v}
+          mkdir -p /tmp/helm && cd /tmp/helm
+          echo "::notice::helm pull $SRC --version $VERSION"
+          if ! helm pull "$SRC" --version "$VERSION"; then
+            echo "::warning::helm pull failed for $SRC:$VERSION — skipping"
+            exit 0
+          fi
+          DST="oci://$GITLAB_REGISTRY/$GITLAB_GROUP/$PROJECT/charts"
+          PKG=$(ls -1 *.tgz | head -1)
+          echo "::notice::helm push $PKG → $DST"
+          helm push "$PKG" "$DST"
+
+  npm:
+    needs: preflight
+    if: needs.preflight.outputs.config_found == 'true' && needs.preflight.outputs.npm_packages != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg: ${{ fromJson(needs.preflight.outputs.npm_packages) }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Mirror npm package ${{ matrix.pkg }} @ ${{ needs.preflight.outputs.tag }}
+        env:
+          TAG: ${{ needs.preflight.outputs.tag }}
+          GL_TOKEN: ${{ secrets.GITLAB_PUBLISH_TOKEN }}
+          GL_PROJECT_ID: ${{ vars.GITLAB_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          PKG='${{ matrix.pkg }}'
+          VERSION=${TAG#v}
+
+          if [ -z "$GL_PROJECT_ID" ]; then
+            echo "::error::repo var GITLAB_PROJECT_ID must be set for npm mirroring"
+            exit 1
+          fi
+
+          # Fetch tarball from public npm or GitHub Packages
+          TARBALL_URL=$(npm view "$PKG@$VERSION" dist.tarball 2>/dev/null || true)
+          if [ -z "$TARBALL_URL" ]; then
+            # Try GitHub Packages
+            echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > ~/.npmrc
+            echo "@5dlabs:registry=https://npm.pkg.github.com" >> ~/.npmrc
+            TARBALL_URL=$(npm view "$PKG@$VERSION" dist.tarball 2>/dev/null || true)
+          fi
+
+          if [ -z "$TARBALL_URL" ]; then
+            echo "::warning::Could not locate tarball for $PKG@$VERSION — skipping"
+            exit 0
+          fi
+
+          mkdir -p /tmp/npm && cd /tmp/npm
+          curl -fsSL -o pkg.tgz "$TARBALL_URL"
+
+          cat > ~/.npmrc <<EOF
+          @5dlabs:registry=https://${GITLAB_HOST}/api/v4/projects/${GL_PROJECT_ID}/packages/npm/
+          //${GITLAB_HOST}/api/v4/projects/${GL_PROJECT_ID}/packages/npm/:_authToken=${GL_TOKEN}
+          EOF
+
+          echo "::notice::npm publish $PKG@$VERSION → gitlab"
+          npm publish pkg.tgz || {
+            echo "::warning::npm publish failed (package may already exist at this version)"
+            exit 0
+          }
+
+  release:
+    needs: preflight
+    if: needs.preflight.outputs.config_found == 'true' && needs.preflight.outputs.mirror_releases == 'true' && needs.preflight.outputs.is_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mirror GitHub Release → GitLab Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GL_TOKEN: ${{ secrets.GITLAB_PUBLISH_TOKEN }}
+          PROJECT: ${{ needs.preflight.outputs.gitlab_project }}
+          TAG: ${{ needs.preflight.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          # Resolve GitLab project id by path
+          GL_PROJECT_PATH="${GITLAB_GROUP}/${PROJECT}"
+          ENC=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1], safe=''))" "$GL_PROJECT_PATH")
+          PROJ_ID=$(curl -fsSL -H "PRIVATE-TOKEN: $GL_TOKEN" \
+            "https://$GITLAB_HOST/api/v4/projects/$ENC" | jq -r '.id')
+          if [ -z "$PROJ_ID" ] || [ "$PROJ_ID" = "null" ]; then
+            echo "::error::could not resolve GitLab project id for $GL_PROJECT_PATH"
+            exit 1
+          fi
+          echo "GitLab project id: $PROJ_ID"
+
+          # Fetch GH release body + asset list
+          RELEASE_JSON=$(gh release view "$TAG" --repo '${{ github.repository }}' --json body,name,assets,isPrerelease)
+          BODY=$(echo "$RELEASE_JSON" | jq -r '.body // ""')
+          NAME=$(echo "$RELEASE_JSON" | jq -r '.name // ""')
+
+          # Download release assets
+          mkdir -p /tmp/assets && cd /tmp/assets
+          gh release download "$TAG" --repo '${{ github.repository }}' --dir . || true
+
+          # Upload each asset to GitLab project uploads and collect URLs
+          ASSET_LINKS=()
+          for f in *; do
+            [ -f "$f" ] || continue
+            echo "Uploading asset: $f"
+            UPLOAD=$(curl -fsSL -H "PRIVATE-TOKEN: $GL_TOKEN" \
+              -F "file=@$f" \
+              "https://$GITLAB_HOST/api/v4/projects/$PROJ_ID/uploads")
+            URL=$(echo "$UPLOAD" | jq -r '.url')
+            FULL_URL="https://$GITLAB_HOST/-/project/$PROJ_ID$URL"
+            ASSET_LINKS+=("{\"name\":\"$f\",\"url\":\"$FULL_URL\",\"link_type\":\"package\"}")
+          done
+          LINKS_JSON=$(printf '%s,' "${ASSET_LINKS[@]}")
+          LINKS_JSON="[${LINKS_JSON%,}]"
+
+          # Check if release already exists — if so, delete and recreate (idempotent)
+          EXISTS=$(curl -fsSL -o /dev/null -w "%{http_code}" -H "PRIVATE-TOKEN: $GL_TOKEN" \
+            "https://$GITLAB_HOST/api/v4/projects/$PROJ_ID/releases/$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1], safe=''))" "$TAG")" || true)
+          if [ "$EXISTS" = "200" ]; then
+            echo "Release $TAG exists on GitLab — deleting for re-create"
+            curl -fsSL -X DELETE -H "PRIVATE-TOKEN: $GL_TOKEN" \
+              "https://$GITLAB_HOST/api/v4/projects/$PROJ_ID/releases/$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1], safe=''))" "$TAG")" || true
+          fi
+
+          jq -n \
+            --arg name "$NAME" \
+            --arg tag "$TAG" \
+            --arg desc "$BODY" \
+            --argjson assets "{\"links\":$LINKS_JSON}" \
+            '{name:$name, tag_name:$tag, description:$desc, assets:$assets}' > /tmp/release-payload.json
+
+          echo "Creating GitLab release $TAG"
+          curl -fsSL -X POST \
+            -H "PRIVATE-TOKEN: $GL_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data @/tmp/release-payload.json \
+            "https://$GITLAB_HOST/api/v4/projects/$PROJ_ID/releases" | jq -C '.'
+
+  summary:
+    needs: [preflight, docker, helm, npm, release]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize
+        run: |
+          {
+            echo "## GitLab mirror summary"
+            echo ""
+            echo "- tag: \`${{ needs.preflight.outputs.tag }}\`"
+            echo "- project: \`${{ needs.preflight.outputs.gitlab_project }}\`"
+            echo "- docker: \`${{ needs.docker.result }}\`"
+            echo "- helm: \`${{ needs.helm.result }}\`"
+            echo "- npm: \`${{ needs.npm.result }}\`"
+            echo "- release: \`${{ needs.release.result }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
