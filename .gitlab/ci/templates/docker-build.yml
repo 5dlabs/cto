@@ -19,6 +19,12 @@
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: ""
     BUILD_PLATFORMS: linux/amd64
+    # Minimize gitaly load when 17 docker-build jobs clone in parallel.
+    # Shallow clone (depth=1) + no submodules keeps pack size small and
+    # prevents gitaly pack-objects from returning early EOF under load.
+    GIT_DEPTH: "1"
+    GIT_STRATEGY: fetch
+    GIT_SUBMODULE_STRATEGY: none
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker buildx create --use --name ci-builder --driver docker-container 2>/dev/null || docker buildx use ci-builder
