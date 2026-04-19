@@ -1,5 +1,37 @@
 # CTO Platform Agents
 
+## Secrets & 1Password (default behavior)
+
+**Always default to the `Automation` vault via the service-account token** exported as `OP_SERVICE_ACCOUNT_TOKEN` in `~/.zshrc`. Do NOT prompt the user for credentials that live in 1Password — look them up yourself.
+
+Canonical items in the `Automation` vault (stable references — update this list when adding new ones):
+
+| Purpose | `op://` reference |
+|---|---|
+| Cloudflare API (zone + DNS edit) | `op://Automation/Cloudflare API/credential` |
+| Cloudflare Pages API (GitHub Actions) | `op://Automation/Cloudflare Pages API Token - GitHub Actions/credential` |
+| ElevenLabs TTS (`say11`) | `op://Automation/p5cretkdu4vcw2qrgfy7eiofta/credential` |
+| Google Vertex AI | `op://Automation/Google Cloud API Key - Vertex AI/credential` |
+| Cloud Agents Token (primary) | `op://Automation/Cloud Agents Token/credential` |
+| Cloud Agents Token 2 | `op://Automation/Cloud Agents Token 2/credential` |
+
+Usage pattern:
+
+```bash
+# read once into env for a shell session
+export CF_TOKEN="$(op read 'op://Automation/Cloudflare API/credential')"
+
+# or inject for a single command (preferred — no disk persistence)
+op run --env-file=<(echo 'CF_TOKEN=op://Automation/Cloudflare API/credential') -- \
+  curl -H "Authorization: Bearer $CF_TOKEN" https://api.cloudflare.com/client/v4/user/tokens/verify
+```
+
+Rules:
+- Never paste secret values into chat, logs, commit messages, or screenshots.
+- If `op read` fails with auth error, `op signin` once; the service-account token should already be in `~/.zshrc`.
+- Discovery: `op item list --vault Automation` when an item isn't in the table above.
+- When a new automated integration is added, append its `op://` path to the table above rather than re-discovering each session.
+
 ## Agent Roster
 
 | Agent | Role | Specialty |

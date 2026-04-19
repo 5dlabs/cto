@@ -6,7 +6,8 @@
 # Download the repository archive using ADD instruction
 # ADD with URLs uses the buildkit daemon's DNS config (from buildkitd.toml)
 # which is properly configured, unlike RUN instruction containers
-FROM alpine:3.21 AS downloader
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}alpine:3.21 AS downloader
 
 WORKDIR /src
 
@@ -22,7 +23,8 @@ RUN unzip /tmp/repo.zip -d /tmp && \
     cp -a /tmp/tweakcn-main/. /src/ && \
     rm -rf /tmp/repo.zip /tmp/tweakcn-main
 
-FROM node:20-alpine AS base
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}node:20-alpine AS base
 
 # Install pnpm globally
 RUN corepack enable && corepack prepare pnpm@latest --activate

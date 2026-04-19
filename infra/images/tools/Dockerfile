@@ -16,7 +16,8 @@
 # =============================================================================
 # BUILD STAGES (used only for local development builds)
 # =============================================================================
-FROM lukemathwalker/cargo-chef:latest-rust-bookworm AS chef
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}lukemathwalker/cargo-chef:latest-rust-bookworm AS chef
 WORKDIR /build
 
 FROM chef AS planner
@@ -53,7 +54,8 @@ WORKDIR /build
 # =============================================================================
 # RUNTIME BASE (shared by all targets)
 # =============================================================================
-FROM ubuntu:24.04 AS runtime-base
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}ubuntu:24.04 AS runtime-base
 
 # Install system dependencies and all runtimes (except Node.js which needs NodeSource)
 # hadolint ignore=DL3008,DL3015

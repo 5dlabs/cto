@@ -22,7 +22,8 @@
 # =============================================================================
 # BUILD STAGES (used only for local development builds)
 # =============================================================================
-FROM lukemathwalker/cargo-chef:latest-rust-bookworm AS chef
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}lukemathwalker/cargo-chef:latest-rust-bookworm AS chef
 WORKDIR /build
 
 FROM chef AS planner
@@ -47,7 +48,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared
 # =============================================================================
 # INTAKE-AGENT BUILD STAGE (for local builds)
 # =============================================================================
-FROM oven/bun:1.1-debian AS intake-builder
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}oven/bun:1.1-debian AS intake-builder
 WORKDIR /build
 COPY apps/intake-agent/package.json apps/intake-agent/bun.lock ./
 RUN bun install --frozen-lockfile
@@ -57,7 +59,8 @@ RUN bun run build
 # =============================================================================
 # RUNTIME BASE (shared by all targets)
 # =============================================================================
-FROM debian:bookworm-slim AS runtime-base
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}debian:bookworm-slim AS runtime-base
 
 # Install runtime dependencies including Chromium and git
 # hadolint ignore=DL3008

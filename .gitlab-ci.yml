@@ -21,6 +21,10 @@ variables:
   # Jobs that need full history (e.g. release) override to GIT_DEPTH: 0.
   GIT_DEPTH: "1"
   GIT_STRATEGY: fetch
+  # Route Docker Hub base image pulls through GitLab dependency proxy
+  # to avoid Docker Hub anonymous rate limits. Passed to every buildx
+  # call via --build-arg; Dockerfiles prefix FROMs with ${BASE_REGISTRY}.
+  BASE_REGISTRY: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/"
 
 # Auto-retry jobs on transient runner/gitaly failures across the whole pipeline.
 default:
@@ -95,6 +99,7 @@ build-runtime:
         --target production \
         --platform linux/amd64,linux/arm64 \
         --pull --push --provenance=false \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --tag "$REGISTRY/$IMAGE_BASE/runtime:latest" \
         --tag "$REGISTRY/$IMAGE_BASE/runtime:full" \
         --tag "$REGISTRY/$IMAGE_BASE/runtime:v${TAG}" \
@@ -129,6 +134,7 @@ build-sidecar:
         --target local \
         --platform linux/amd64,linux/arm64 \
         --push --provenance=false \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --tag "$REGISTRY/$IMAGE_BASE/linear-sidecar:latest" \
         --tag "$REGISTRY/$IMAGE_BASE/linear-sidecar:${VERSION}" \
         .
@@ -173,6 +179,7 @@ build-agents:
         --pull --push --provenance=false \
         --tag "$REGISTRY/$IMAGE_BASE/agents:latest" \
         --tag "$REGISTRY/$IMAGE_BASE/agents:v${TAG}" \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --build-arg "BASE_IMAGE=$REGISTRY/$IMAGE_BASE/runtime:${RUNTIME_TAG:-latest}" \
         --build-arg "OPENCLAW_VERSION=$OPENCLAW_VERSION" \
         --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/runtime:buildcache" \

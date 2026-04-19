@@ -27,7 +27,8 @@
 # =============================================================================
 # BUILD STAGES (used only for local development builds with --target local)
 # =============================================================================
-FROM rust:latest AS intake-builder
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}rust:latest AS intake-builder
 WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates crates
@@ -45,7 +46,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared
 # - GitHub CLI (PR operations, code review)
 # - Basic shell utilities
 # =============================================================================
-FROM ubuntu:24.04 AS minimal-base
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}ubuntu:24.04 AS minimal-base
 SHELL ["/bin/bash", "-lc"]
 
 ARG TZ
@@ -226,7 +228,8 @@ RUN node --version && npm --version && python3 --version && pip3 --version && \
 # =============================================================================
 # MAIN RUNTIME IMAGE (full development environment)
 # =============================================================================
-FROM ubuntu:24.04 AS production
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}ubuntu:24.04 AS production
 
 # Use bash for complex RUN steps
 SHELL ["/bin/bash", "-lc"]

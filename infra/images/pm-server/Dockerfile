@@ -20,7 +20,8 @@
 # =============================================================================
 # BUILD STAGES (used only for local development builds)
 # =============================================================================
-FROM rustlang/rust:nightly-bookworm AS chef
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}rustlang/rust:nightly-bookworm AS chef
 RUN cargo install cargo-chef
 WORKDIR /build
 
@@ -45,7 +46,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared
 # =============================================================================
 # RUNTIME BASE (shared by all targets)
 # =============================================================================
-FROM debian:bookworm-slim AS runtime-base
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}debian:bookworm-slim AS runtime-base
 
 # Install runtime dependencies and argo CLI
 # hadolint ignore=DL3008

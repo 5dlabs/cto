@@ -33,7 +33,7 @@ futures = { workspace = true }
 tokio-stream = { version = "0.1", features = ["net"] }
 
 # QuestDB
-questdb-rs = "6.0"
+questdb-rs = "=6.0.0"
 tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }
 
 # Config & CLI

@@ -58,7 +58,7 @@ global:
     ciSecureFiles:
       enabled: false
     dependencyProxy:
-      enabled: false
+      enabled: true
     sentryDSN: ""
 
     # OAuth / OmniAuth (for future SSO integration)

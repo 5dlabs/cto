@@ -27,6 +27,7 @@
     GIT_SUBMODULE_STRATEGY: none
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker login -u $CI_DEPENDENCY_PROXY_USER -p $CI_DEPENDENCY_PROXY_PASSWORD $CI_DEPENDENCY_PROXY_SERVER
     - docker buildx create --use --name ci-builder --driver docker-container 2>/dev/null || docker buildx use ci-builder
     - docker buildx inspect --bootstrap
   tags:
@@ -67,6 +68,7 @@
         --file "$DOCKERFILE" \
         --platform "$BUILD_PLATFORMS" \
         $TARGET_FLAG \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --push \
         --provenance=false \
         --tag "$REGISTRY/$IMAGE_BASE/$IMAGE_NAME:latest" \

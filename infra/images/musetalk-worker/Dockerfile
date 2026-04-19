@@ -2,7 +2,8 @@
 # Base: Ubuntu 22.04 with Python 3.11 and CUDA 11.8 (V100-compatible)
 # Target: V100S 32GB via PCI passthrough on OVH Public Cloud
 
-FROM ubuntu:22.04 AS base
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}ubuntu:22.04 AS base
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \

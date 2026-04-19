@@ -17,7 +17,8 @@
 # =============================================================================
 # BUILD STAGE (local development only)
 # =============================================================================
-FROM rust:1.86-slim-bookworm AS builder
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}rust:1.86-slim-bookworm AS builder
 
 RUN apt-get update && apt-get install -y \
     pkg-config \
@@ -37,7 +38,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared
 # =============================================================================
 # RUNTIME BASE
 # =============================================================================
-FROM debian:bookworm-slim AS runtime-base
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}debian:bookworm-slim AS runtime-base
 
 RUN apt-get update && apt-get install -y \
     ca-certificates \

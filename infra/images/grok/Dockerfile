@@ -18,7 +18,8 @@
 # =============================================================================
 # LOCAL BUILD TARGET (compiles from source using Bun)
 # =============================================================================
-FROM oven/bun:1-slim AS local
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}oven/bun:1-slim AS local
 
 WORKDIR /app
 
@@ -41,7 +42,8 @@ ENTRYPOINT ["bun", "run", "src/cron.ts"]
 # =============================================================================
 # PRODUCTION TARGET (uses pre-compiled standalone binary from CI)
 # =============================================================================
-FROM debian:bookworm-slim AS production
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}debian:bookworm-slim AS production
 
 # Install minimal runtime dependencies
 # hadolint ignore=DL3008

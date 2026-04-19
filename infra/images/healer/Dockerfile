@@ -18,7 +18,8 @@
 # =============================================================================
 # BUILD STAGES (used only for local development builds)
 # =============================================================================
-FROM lukemathwalker/cargo-chef:latest-rust-bookworm AS chef
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}lukemathwalker/cargo-chef:latest-rust-bookworm AS chef
 WORKDIR /build
 
 FROM chef AS planner
@@ -49,7 +50,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared
 # =============================================================================
 # RUNTIME BASE (shared by all targets)
 # =============================================================================
-FROM debian:bookworm-slim AS runtime-base
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}debian:bookworm-slim AS runtime-base
 
 # Install runtime dependencies including gh CLI and kubectl for CodeRun operations
 # hadolint ignore=DL3008

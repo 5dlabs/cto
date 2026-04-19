@@ -20,7 +20,8 @@
 # =============================================================================
 # BUILD STAGES (used only for local development builds)
 # =============================================================================
-FROM rustlang/rust:nightly-bookworm AS builder
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}rustlang/rust:nightly-bookworm AS builder
 
 WORKDIR /build
 
@@ -35,7 +36,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared
 # =============================================================================
 # RUNTIME BASE (shared by all targets)
 # =============================================================================
-FROM debian:bookworm-slim AS runtime-base
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}debian:bookworm-slim AS runtime-base
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \

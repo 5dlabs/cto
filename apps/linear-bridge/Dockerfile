@@ -1,5 +1,6 @@
 # Build stage
-FROM node:20-alpine AS builder
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -17,7 +18,8 @@ COPY src/ ./src/
 RUN npm run build
 
 # Production stage
-FROM node:20-alpine
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}node:20-alpine
 
 WORKDIR /app
 

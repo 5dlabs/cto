@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}python:3.11-slim
 
 WORKDIR /app
 

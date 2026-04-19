@@ -6,7 +6,8 @@
 # Download the repository archive using ADD instruction
 # ADD with URLs uses the buildkit daemon's DNS config (from buildkitd.toml)
 # which is properly configured, unlike RUN instruction containers
-FROM alpine:3.21 AS downloader
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}alpine:3.21 AS downloader
 
 WORKDIR /src
 
@@ -25,7 +26,8 @@ RUN unzip /tmp/repo.zip -d /tmp && \
 # ===== HEADERS STAGE =====
 # Download Node.js headers using ADD (uses buildkit daemon's DNS config)
 # This is needed because node-gyp (used by native modules like sqlite3) requires headers
-FROM alpine:3.21 AS headers
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}alpine:3.21 AS headers
 
 # Get Node version to download matching headers
 # IMPORTANT: Must match the production stage Node version (node:20-alpine) for ABI compatibility
@@ -38,7 +40,8 @@ RUN mkdir -p /node-headers && \
 
 # ===== BUILD STAGE =====
 # Use official Bun image which has Bun pre-installed (avoids DNS issues from curl install)
-FROM oven/bun:1-alpine AS builder
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}oven/bun:1-alpine AS builder
 
 WORKDIR /app
 
@@ -69,7 +72,8 @@ RUN npm prune --omit=dev
 
 
 # ===== PRODUCTION STAGE =====
-FROM node:20-alpine AS production
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}node:20-alpine AS production
 
 WORKDIR /app
 

@@ -9,6 +9,7 @@ build-controller:
   script:
     - |
       docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file infra/images/controller/Dockerfile \
         --target local \
         --push --provenance=false \
@@ -33,6 +34,7 @@ build-healer:
   script:
     - |
       docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file infra/images/healer/Dockerfile \
         --target local \
         --push --provenance=false \
@@ -56,6 +58,7 @@ build-pm-server:
   script:
     - |
       docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file infra/images/pm-server/Dockerfile \
         --target local \
         --push --provenance=false \
@@ -79,6 +82,7 @@ build-tools:
   script:
     - |
       docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file infra/images/tools/Dockerfile \
         --target local \
         --push --provenance=false \
@@ -103,6 +107,7 @@ build-research:
   script:
     - |
       docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file infra/images/research/Dockerfile \
         --target local \
         --push --provenance=false \
@@ -127,6 +132,7 @@ build-dex-indexer:
   script:
     - |
       docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file skills/trader/docker/Dockerfile.dex-indexer \
         --target local \
         --push --provenance=false \
@@ -152,6 +158,7 @@ build-web:
   script:
     - |
       docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file infra/images/web/Dockerfile \
         --target production \
         --push --provenance=false \
@@ -175,6 +182,7 @@ build-web-migrate:
   script:
     - |
       docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file infra/images/web/Dockerfile \
         --target migrate \
         --push --provenance=false \
@@ -198,6 +206,7 @@ build-discord-bridge:
   script:
     - |
       docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file apps/discord-bridge/Dockerfile \
         --push --provenance=false \
         --tag "$REGISTRY/$IMAGE_BASE/discord-bridge:latest" \
@@ -219,6 +228,7 @@ build-linear-bridge:
   script:
     - |
       docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file apps/linear-bridge/Dockerfile \
         --push --provenance=false \
         --tag "$REGISTRY/$IMAGE_BASE/linear-bridge:latest" \
@@ -242,6 +252,7 @@ build-grok:
   script:
     - |
       docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file infra/images/grok/Dockerfile \
         --target local \
         --push --provenance=false \
@@ -267,6 +278,7 @@ build-postgresql:
   script:
     - |
       docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file infra/images/postgresql/Dockerfile \
         --push --provenance=false \
         --tag "$REGISTRY/$IMAGE_BASE/postgresql:latest" \
@@ -287,6 +299,7 @@ build-openmemory:
   script:
     - |
       docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file infra/images/openmemory/Dockerfile \
         --push --provenance=false \
         --tag "$REGISTRY/$IMAGE_BASE/openmemory:latest" \
@@ -309,6 +322,7 @@ build-tweakcn:
   script:
     - |
       docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file infra/images/tweakcn/Dockerfile \
         --push --provenance=false \
         --tag "$REGISTRY/$IMAGE_BASE/tweakcn:latest" \

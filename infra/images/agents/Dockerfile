@@ -14,7 +14,8 @@ ARG BASE_IMAGE=registry.5dlabs.ai/5dlabs/runtime:full
 # Stage: Build cto-play (play launcher CLI)
 # =============================================================================
 # play-launcher has no workspace crate deps, so build standalone for speed
-FROM rust:1.87-bookworm AS play-builder
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}rust:1.87-bookworm AS play-builder
 WORKDIR /build
 COPY crates/play-launcher crates/play-launcher/
 WORKDIR /build/crates/play-launcher

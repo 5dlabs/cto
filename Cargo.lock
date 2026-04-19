@@ -5653,9 +5653,9 @@ checksum = "7aceffde1cbf8e67f34cdfd70d2436396176d6ff648fa719e0231fb9856ef3e9"
 
 [[package]]
 name = "questdb-rs"
-version = "6.1.0"
+version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1800c5c393af164102970b917daa2620cc60600ad4cada5a314b3083426f0f75"
+checksum = "0d879821f7e4b5a262d9818487b6f9fa5966e1f336c2bdbef3fce8fa6349941d"
 dependencies = [
  "base64ct",
  "dns-lookup",
