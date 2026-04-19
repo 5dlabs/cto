@@ -137,10 +137,10 @@ agentDefaults:
 modelDefaults:
   primary: "openai-codex/gpt-5.4"
   fallbacks:
-    - "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
     - "fireworks/accounts/fireworks/models/qwen3p6-plus"
     - "fireworks/accounts/fireworks/models/minimax-m2p7"
     - "fireworks/accounts/fireworks/models/glm-5p1"
+    - "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
 
 # =============================================================================
 # Secrets
