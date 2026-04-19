@@ -586,8 +586,7 @@ impl Default for Config {
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(60_000),
             enabled: env::var("LINEAR_ENABLED")
-                .map(|v| v == "true" || v == "1")
-                .unwrap_or(false),
+                .is_ok_and(|v| v == "true" || v == "1"),
             oauth_token: env::var("LINEAR_OAUTH_TOKEN")
                 .or_else(|_| env::var("LINEAR_API_KEY"))
                 .ok(),
@@ -597,8 +596,7 @@ impl Default for Config {
             play: PlayConfig::default(),
             linear: Arc::new(RwLock::new(LinearConfig::from_env())),
             skip_signature_verification: env::var("LINEAR_SKIP_SIGNATURE_VERIFICATION")
-                .map(|v| v == "true" || v == "1")
-                .unwrap_or(false),
+                .is_ok_and(|v| v == "true" || v == "1"),
             github_webhook_secret: env::var("GITHUB_WEBHOOK_SECRET")
                 .ok()
                 .filter(|s| !s.is_empty()),
@@ -778,11 +776,9 @@ impl Default for PlayConfig {
                 .unwrap_or_else(|_| "5DLabs-Cipher".to_string()),
             model: env::var("PLAY_MODEL").ok(),
             parallel_execution: env::var("PARALLEL_EXECUTION")
-                .map(|v| v == "true" || v == "1")
-                .unwrap_or(false),
+                .is_ok_and(|v| v == "true" || v == "1"),
             auto_merge: env::var("AUTO_MERGE")
-                .map(|v| v == "true" || v == "1")
-                .unwrap_or(false),
+                .is_ok_and(|v| v == "true" || v == "1"),
         }
     }
 }

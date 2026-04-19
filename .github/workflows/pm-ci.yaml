@@ -168,11 +168,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install hadolint
+        run: |
+          curl -sL https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64 -o /usr/local/bin/hadolint
+          chmod +x /usr/local/bin/hadolint
+
       - name: Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.3.0
-        with:
-          dockerfile: infra/images/pm-server/Dockerfile
-          failure-threshold: error
+        run: |
+          hadolint infra/images/pm-server/Dockerfile
 
   # Build and push Docker image (on push to main or manual dispatch)
   # Note: test-rust removed from needs to avoid blocking on slow/stuck tests

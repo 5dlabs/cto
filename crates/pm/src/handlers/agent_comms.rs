@@ -69,7 +69,7 @@ impl SessionCache {
     pub fn new() -> Self {
         Self {
             entries: RwLock::new(HashMap::new()),
-            ttl: Duration::from_secs(300), // 5 minutes
+            ttl: Duration::from_mins(5),
         }
     }
 

@@ -1269,8 +1269,7 @@ pub async fn linear_webhook_handler(
             .config
             .linear
             .read()
-            .map(|c| !c.apps.is_empty())
-            .unwrap_or(false);
+            .is_ok_and(|c| !c.apps.is_empty());
         if state.config.webhook_secret.is_some() || has_apps {
             // Signature required but missing
             warn!("Missing Linear-Signature header");
