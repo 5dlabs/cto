@@ -937,6 +937,37 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: op-service-account-token
                   optional: true
+            # OVH API credentials (python-ovh SDK)
+            - name: OVH_APPLICATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: ovh-application-key
+                  optional: true
+            - name: OVH_APPLICATION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: ovh-application-secret
+                  optional: true
+            - name: OVH_CONSUMER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: ovh-consumer-key
+                  optional: true
+            - name: OVH_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: ovh-endpoint
+                  optional: true
+            - name: OVH_PROJECT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: ovh-project-id
+                  optional: true
             {{- if .Values.kaniko.enabled }}
             # Docker config for image builds/pushes (GHCR auth)
             - name: DOCKER_CONFIG
