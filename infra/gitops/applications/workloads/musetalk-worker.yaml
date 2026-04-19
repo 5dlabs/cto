@@ -43,7 +43,13 @@ spec:
       values: |
         image:
           repository: ghcr.io/5dlabs/musetalk-worker
-          tag: d36038d32
+          tag: docker-fixed-1776628465
+
+        initContainers:
+          fixSymlink:
+            enabled: true
+          downloadModels:
+            enabled: false
 
         # Storage class for model weights PVC
         persistence:
