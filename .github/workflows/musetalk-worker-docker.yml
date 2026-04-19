@@ -8,6 +8,10 @@ on:
       - '.github/workflows/musetalk-worker-docker.yml'
   workflow_dispatch:
 
+concurrency:
+  group: musetalk-worker-build
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: 5dlabs/musetalk-worker
