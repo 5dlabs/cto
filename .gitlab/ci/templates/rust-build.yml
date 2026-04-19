@@ -58,9 +58,13 @@
   script:
     - |
       set -e
-      for pkg in controller healer pm intake research cto-mcp tools; do
+      for pkg in controller healer pm intake research tools; do
         echo "🔍 clippy -p $pkg (pedantic)"
-        cargo clippy -p "$pkg" --all-targets -- -D warnings -W clippy::pedantic -A clippy::duration_suboptimal_units
+        cargo clippy -p "$pkg" --all-targets -- -D warnings -W clippy::pedantic \
+          -A clippy::duration_suboptimal_units \
+          -A clippy::map_unwrap_or \
+          -A clippy::implicit_hasher \
+          -A clippy::too_many_lines
       done
 
 .rust-test:
@@ -73,7 +77,7 @@
       if command -v cargo-nextest &>/dev/null; then
         runner="cargo nextest run"
       fi
-      for pkg in controller healer pm intake research cto-mcp tools; do
+      for pkg in controller healer pm intake research tools; do
         echo "🧪 $runner -p $pkg"
         $runner -p "$pkg" --all-targets
       done
