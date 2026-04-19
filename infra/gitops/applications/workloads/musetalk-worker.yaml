@@ -43,7 +43,7 @@ spec:
       values: |
         image:
           repository: ghcr.io/5dlabs/musetalk-worker
-          tag: 54a31af7
+          tag: d36038d32
 
         # Storage class for model weights PVC
         persistence:
