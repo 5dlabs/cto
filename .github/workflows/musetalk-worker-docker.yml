@@ -54,7 +54,6 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=phase4-bootstrap
             type=sha,prefix=phase4-
 
       - name: Build and push Docker image
