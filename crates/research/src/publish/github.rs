@@ -82,6 +82,7 @@ impl PrCreator {
 }
 
 /// Create a pull request using the unified SCM client (supports GitHub and GitLab).
+#[allow(dead_code)]
 pub async fn create_pr_via_scm(
     scm_client: &dyn ScmClient,
     owner: &str,

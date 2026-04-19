@@ -529,7 +529,7 @@ async fn run_digest(
     check_and_send: bool,
     test: bool,
     hours_between: u64,
-    model: String,
+    _model: String,
     skip_analysis: bool,
 ) -> Result<()> {
     println!("📬 Research Digest\n");

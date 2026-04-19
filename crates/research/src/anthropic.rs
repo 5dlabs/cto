@@ -3,7 +3,7 @@
 //! Direct Anthropic API calls - no intake-agent dependency.
 
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::fmt;
 
 /// API key error.
@@ -119,7 +119,7 @@ impl AnthropicClient {
                 .text()
                 .await
                 .context("Failed to read error response")?;
-            anyhow::bail!("Anthropic API error: {}", text);
+            anyhow::bail!("Anthropic API error: {text}");
         }
 
         response
@@ -138,18 +138,16 @@ impl Default for AnthropicClient {
 /// Parse JSON from AI response text.
 pub fn parse_json_response<T: for<'de> Deserialize<'de>>(text: &str) -> Result<T> {
     let cleaned = if text.contains("```json") {
-        let start = text.find("```json").map(|i| i + 7).unwrap_or(0);
+        let start = text.find("```json").map_or(0, |i| i + 7);
         let end = text[start..]
             .find("```")
-            .map(|i| start + i)
-            .unwrap_or(text.len());
+            .map_or(text.len(), |i| start + i);
         text[start..end].trim()
     } else if text.contains("```") {
-        let start = text.find("```").map(|i| i + 3).unwrap_or(0);
+        let start = text.find("```").map_or(0, |i| i + 3);
         let end = text[start..]
             .find("```")
-            .map(|i| start + i)
-            .unwrap_or(text.len());
+            .map_or(text.len(), |i| start + i);
         text[start..end].trim()
     } else {
         text.trim()
