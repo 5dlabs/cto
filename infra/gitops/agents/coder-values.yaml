@@ -534,7 +534,7 @@ tools:
   acp:
     enabled: true
     backend: "acpx"
-    acpxVersion: "0.1.16"
+    acpxVersion: "0.5.3"
     defaultAgent: "claude"
     allowedAgents: ["claude", "codex", "opencode", "gemini", "kimi", "copilot", "cursor"]
     maxConcurrentSessions: 8

@@ -295,26 +295,17 @@ spec:
 
               {{- if .Values.tools.acp.enabled }}
               # ---------------------------------------------------------------
-              # 4b3. ACPX runtime binary
+              # 4b3. ACPX runtime binary (installed globally via npm)
               # ---------------------------------------------------------------
-              ACPX_DIR="/usr/local/share/npm-global/lib/node_modules/openclaw/extensions/acpx"
               {{- if .Values.tools.acp.acpxVersion }}
-              echo "[plugin] acpx: upgrading to {{ .Values.tools.acp.acpxVersion }}..."
-              cd "$ACPX_DIR"
-              if sed -i 's/"acpx": "[^"]*"/"acpx": "{{ .Values.tools.acp.acpxVersion }}"/' package.json && \
-                npm install --omit=dev --no-save 2>&1 | tail -3; then
-                echo "[plugin] acpx: $(node_modules/.bin/acpx --version 2>/dev/null || echo installed)"
+              echo "[plugin] acpx: installing acpx@{{ .Values.tools.acp.acpxVersion }} globally..."
+              if npm install -g "acpx@{{ .Values.tools.acp.acpxVersion }}" 2>&1 | tail -3; then
+                echo "[plugin] acpx: $(acpx --version 2>/dev/null || echo installed)"
               else
-                echo "[plugin] acpx: install failed"
+                echo "[plugin] acpx: install failed (baked-in acpx $(acpx --version 2>/dev/null || echo unknown) remains active)"
               fi
               {{- else }}
-              echo "[plugin] acpx: installing binary..."
-              cd "$ACPX_DIR"
-              if npm install --omit=dev --no-save 2>&1 | tail -2; then
-                echo "[plugin] acpx: ready"
-              else
-                echo "[plugin] acpx: install failed"
-              fi
+              echo "[plugin] acpx: using baked-in version $(acpx --version 2>/dev/null || echo unknown)"
               {{- end }}
               echo "[plugin] pi-acp: installing..."
               npm install -g pi-acp 2>&1 | tail -2 && \
