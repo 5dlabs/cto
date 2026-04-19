@@ -14,10 +14,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 WORKDIR /app
 
-# Fix dpkg statoverride issue in Ubuntu 22.04 containers
-RUN rm -f /var/lib/dpkg/info/*.postinst && \
-    rm -f /var/lib/dpkg/statoverride && \
-    touch /var/lib/dpkg/statoverride
+# Fix dpkg issues in Ubuntu 22.04 containers
+# 1. Remove stale statoverride entries
+# 2. Remove broken postinst scripts that fail in containers
+RUN rm -f /var/lib/dpkg/statoverride && \
+    touch /var/lib/dpkg/statoverride && \
+    rm -f /var/lib/dpkg/info/*.postinst
 
 # Install Python 3.11 and system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
