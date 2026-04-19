@@ -43,7 +43,7 @@ spec:
       values: |
         image:
           repository: ghcr.io/5dlabs/musetalk-worker
-          tag: docker-fixed-1776628465
+          tag: d36038d32
 
         initContainers:
           fixSymlink:
