@@ -43,7 +43,7 @@ spec:
       values: |
         image:
           repository: ghcr.io/5dlabs/musetalk-worker
-          tag: d36038d32
+          tag: "60556388"
 
         initContainers:
           fixSymlink:
