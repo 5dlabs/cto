@@ -235,8 +235,7 @@ impl IntakeDomain {
             // then fall back to the default location written by the Lobster workflow
             let brief_path = config
                 .design_brief_path
-                .as_ref()
-                .cloned()
+                .clone()
                 .unwrap_or_else(|| config.output_dir.join("docs/design-brief.md"));
             if brief_path.exists() {
                 let brief = tokio::fs::read_to_string(&brief_path).await.map_err(|e| {
