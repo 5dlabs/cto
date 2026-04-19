@@ -51,6 +51,7 @@ impl TokenHealthManager {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn refresh_expiring_tokens(&self) -> Result<(), String> {
         let now = Utc::now().timestamp();
         let candidates = {

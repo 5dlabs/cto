@@ -46,6 +46,7 @@ use crate::LinearClient;
 ///
 /// This ensures subsequent calls see the fresh token data and don't attempt
 /// to refresh again using stale (potentially rotated) refresh tokens.
+#[allow(clippy::too_many_lines)]
 pub async fn get_agent_client_with_refresh(
     config: &Config,
     kube_client: &kube::Client,

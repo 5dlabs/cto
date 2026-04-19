@@ -11,17 +11,12 @@ use std::sync::{Arc, RwLock};
 // =============================================================================
 
 /// Which source control management platform to use.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ScmProvider {
+    #[default]
     GitHub,
     GitLab,
-}
-
-impl Default for ScmProvider {
-    fn default() -> Self {
-        Self::GitHub
-    }
 }
 
 impl std::fmt::Display for ScmProvider {
@@ -161,21 +156,16 @@ pub struct Config {
 }
 
 /// How PM should route verified webhook deliveries.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum WebhookDispatchMode {
     /// Keep using PM's existing direct-processing logic.
+    #[default]
     Legacy,
     /// Forward to Morgan as a best-effort shadow copy, then continue legacy handling.
     Shadow,
     /// Forward to Morgan and skip PM's legacy direct-processing logic.
     Morgan,
-}
-
-impl Default for WebhookDispatchMode {
-    fn default() -> Self {
-        Self::Legacy
-    }
 }
 
 impl std::str::FromStr for WebhookDispatchMode {

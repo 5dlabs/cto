@@ -517,6 +517,7 @@ pub async fn mint_client_credentials_token(
 /// This is the preferred operational path for service-style agent apps:
 /// read the per-agent client credentials from config, mint a fresh access
 /// token, store it in Kubernetes, and update PM's in-memory config.
+#[allow(clippy::too_many_lines)]
 pub async fn handle_oauth_mint(
     State(state): State<AppState>,
     Path(agent): Path<String>,
@@ -650,6 +651,7 @@ pub async fn handle_oauth_mint(
 }
 
 /// Manually mint and persist client_credentials tokens for every configured agent.
+#[allow(clippy::too_many_lines)]
 pub async fn handle_oauth_mint_all(State(state): State<AppState>) -> impl IntoResponse {
     info!("Bulk client_credentials mint requested");
 

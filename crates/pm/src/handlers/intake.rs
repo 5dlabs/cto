@@ -1522,7 +1522,7 @@ pub async fn create_task_issues(
 ///
 /// If `agent_delegates` is provided, agents are auto-assigned as delegates on their issues.
 /// If not provided, issues are created without delegates (legacy behavior).
-#[allow(clippy::too_many_lines)] // Complex function not easily split
+#[allow(clippy::too_many_lines, clippy::implicit_hasher)] // Complex function not easily split
 pub async fn create_task_issues_with_project(
     client: &LinearClient,
     request: &IntakeRequest,

@@ -142,9 +142,7 @@ fn build_session_key(
     let cleaned_prefix = prefix.trim_end_matches(':');
     let event = sanitize_component(event_type);
     let source = sanitize_component(source);
-    let delivery_seed = delivery_id
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let delivery_seed = delivery_id.map_or_else(|| Uuid::new_v4().to_string(), ToOwned::to_owned);
     let delivery = sanitize_component(&delivery_seed);
     let mut session_key = format!("{cleaned_prefix}:{source}:{event}:{delivery}");
 
