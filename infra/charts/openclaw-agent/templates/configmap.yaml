@@ -232,7 +232,10 @@ data:
           {{- if .Values.tools.acp.enabled }},
           "acpx": {
             "enabled": true,
-            "config": {}
+            "config": {
+              "permissionMode": {{ .Values.tools.acp.permissionMode | default "approve-all" | quote }},
+              "nonInteractivePermissions": {{ .Values.tools.acp.nonInteractivePermissions | default "deny" | quote }}
+            }
           }
           {{- end }}
           {{- if .Values.nats.enabled }},
