@@ -213,7 +213,7 @@ build-discord-bridge:
         --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/discord-bridge:v${CI_COMMIT_SHORT_SHA}" \
         --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/discord-bridge:buildcache" \
         --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/discord-bridge:buildcache,mode=max" \
-        .
+        apps/discord-bridge
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
@@ -235,7 +235,7 @@ build-linear-bridge:
         --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/linear-bridge:v${CI_COMMIT_SHORT_SHA}" \
         --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/linear-bridge:buildcache" \
         --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/linear-bridge:buildcache,mode=max" \
-        .
+        apps/linear-bridge
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
@@ -338,3 +338,161 @@ build-tweakcn:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE =~ /^(web|api|schedule)$/
   timeout: 15m
+
+# --- Parity images (match GitHub Actions) ---
+
+build-agents:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
+        --file infra/images/agents/Dockerfile \
+        --push --provenance=false \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/agents:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/agents:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/agents:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/agents:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - infra/images/agents/**
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE =~ /^(web|api|schedule)$/
+  timeout: 45m
+
+build-agents-runtime:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
+        --file infra/images/runtime/Dockerfile \
+        --push --provenance=false \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/agents/runtime:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/agents/runtime:full" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/agents/runtime:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/agents/runtime:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/agents/runtime:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - infra/images/runtime/**
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE =~ /^(web|api|schedule)$/
+  timeout: 60m
+
+build-agents-linear-sidecar:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
+        --file infra/images/linear-sidecar/Dockerfile \
+        --push --provenance=false \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/agents/linear-sidecar:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/agents/linear-sidecar:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/agents/linear-sidecar:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/agents/linear-sidecar:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - infra/images/linear-sidecar/**
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE =~ /^(web|api|schedule)$/
+  timeout: 30m
+
+build-dex-api:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
+        --file skills/trader/docker/Dockerfile.dex-api \
+        --push --provenance=false \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/dex-api:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/dex-api:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/dex-api:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/dex-api:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - skills/trader/**
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE =~ /^(web|api|schedule)$/
+  timeout: 30m
+
+build-rust-builder:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
+        --file infra/images/builder/Dockerfile \
+        --push --provenance=false \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/rust-builder:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/rust-builder:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/rust-builder:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/rust-builder:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - infra/images/builder/**
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE =~ /^(web|api|schedule)$/
+  timeout: 30m
+
+build-musetalk-worker:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
+        --file infra/images/musetalk-worker/Dockerfile \
+        --push --provenance=false \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/musetalk-worker:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/musetalk-worker:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/musetalk-worker:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/musetalk-worker:buildcache,mode=max" \
+        infra/images/musetalk-worker
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - infra/images/musetalk-worker/**
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE =~ /^(web|api|schedule)$/
+  timeout: 60m
+
+build-cto-controller:
+  extends: .docker-build
+  stage: build
+  script:
+    - |
+      docker buildx build \
+        --build-arg BASE_REGISTRY=$BASE_REGISTRY \
+        --file controller-build.Dockerfile \
+        --push --provenance=false \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/cto-controller:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/cto-controller:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/cto-controller:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/cto-controller:buildcache,mode=max" \
+        .
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - crates/controller/**
+        - controller-build.Dockerfile
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE =~ /^(web|api|schedule)$/
+  timeout: 60m
