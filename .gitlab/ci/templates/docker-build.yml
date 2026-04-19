@@ -12,6 +12,12 @@
   services:
     - name: docker:24-dind
       alias: docker
+      # Allow dind to talk HTTP to the in-cluster registry service
+      # (gitlab-registry.gitlab.svc.cluster.local:5000) so we can bypass
+      # the Cloudflare tunnel 100MB body limit on large layer PUTs.
+      command:
+        - "--tls=false"
+        - "--insecure-registry=gitlab-registry.gitlab.svc.cluster.local:5000"
       variables:
         DOCKER_TLS_CERTDIR: ""
   variables:
@@ -27,8 +33,12 @@
     GIT_SUBMODULE_STRATEGY: none
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    # Second login keyed by internal registry hostname. Same JWT auth
+    # realm (gitlab.5dlabs.ai/jwt/auth) — docker's credential store is
+    # keyed by hostname, so we need both entries.
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $INTERNAL_REGISTRY
     - docker login -u $CI_DEPENDENCY_PROXY_USER -p $CI_DEPENDENCY_PROXY_PASSWORD $CI_DEPENDENCY_PROXY_SERVER
-    - docker buildx create --use --name ci-builder --driver docker-container 2>/dev/null || docker buildx use ci-builder
+    - docker buildx create --use --name ci-builder --driver docker-container --driver-opt network=host --buildkitd-flags '--allow-insecure-entitlement network.host' 2>/dev/null || docker buildx use ci-builder
     - docker buildx inspect --bootstrap
   tags:
     - k8s
@@ -71,8 +81,8 @@
         --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --push \
         --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/$IMAGE_NAME:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/$IMAGE_NAME:v${TAG}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/$IMAGE_NAME:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/$IMAGE_NAME:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/$IMAGE_NAME:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/$IMAGE_NAME:v${TAG}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/$IMAGE_NAME:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/$IMAGE_NAME:buildcache,mode=max" \
         .

@@ -13,10 +13,10 @@ build-controller:
         --file infra/images/controller/Dockerfile \
         --target local \
         --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/controller:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/controller:v${CI_COMMIT_SHORT_SHA}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/controller:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/controller:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/controller:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/controller:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/controller:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/controller:buildcache,mode=max" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -38,10 +38,10 @@ build-healer:
         --file infra/images/healer/Dockerfile \
         --target local \
         --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/healer:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/healer:v${CI_COMMIT_SHORT_SHA}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/healer:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/healer:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/healer:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/healer:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/healer:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/healer:buildcache,mode=max" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -62,10 +62,10 @@ build-pm-server:
         --file infra/images/pm-server/Dockerfile \
         --target local \
         --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/pm-server:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/pm-server:v${CI_COMMIT_SHORT_SHA}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/pm-server:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/pm-server:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/pm-server:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/pm-server:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/pm-server:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/pm-server:buildcache,mode=max" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -86,10 +86,10 @@ build-tools:
         --file infra/images/tools/Dockerfile \
         --target local \
         --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/tools:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/tools:v${CI_COMMIT_SHORT_SHA}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/tools:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/tools:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/tools:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/tools:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/tools:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/tools:buildcache,mode=max" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -111,10 +111,10 @@ build-research:
         --file infra/images/research/Dockerfile \
         --target local \
         --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/research:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/research:v${CI_COMMIT_SHORT_SHA}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/research:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/research:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/research:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/research:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/research:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/research:buildcache,mode=max" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -136,10 +136,10 @@ build-dex-indexer:
         --file skills/trader/docker/Dockerfile.dex-indexer \
         --target local \
         --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/dex-indexer:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/dex-indexer:v${CI_COMMIT_SHORT_SHA}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/dex-indexer:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/dex-indexer:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/dex-indexer:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/dex-indexer:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/dex-indexer:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/dex-indexer:buildcache,mode=max" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -162,10 +162,10 @@ build-web:
         --file infra/images/web/Dockerfile \
         --target production \
         --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/web:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/web:v${CI_COMMIT_SHORT_SHA}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/web:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/web:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/web:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/web:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/web:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/web:buildcache,mode=max" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -186,10 +186,10 @@ build-web-migrate:
         --file infra/images/web/Dockerfile \
         --target migrate \
         --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/web-migrate:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/web-migrate:v${CI_COMMIT_SHORT_SHA}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/web-migrate:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/web-migrate:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/web-migrate:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/web-migrate:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/web-migrate:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/web-migrate:buildcache,mode=max" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -209,10 +209,10 @@ build-discord-bridge:
         --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file apps/discord-bridge/Dockerfile \
         --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/discord-bridge:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/discord-bridge:v${CI_COMMIT_SHORT_SHA}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/discord-bridge:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/discord-bridge:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/discord-bridge:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/discord-bridge:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/discord-bridge:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/discord-bridge:buildcache,mode=max" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -231,10 +231,10 @@ build-linear-bridge:
         --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file apps/linear-bridge/Dockerfile \
         --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/linear-bridge:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/linear-bridge:v${CI_COMMIT_SHORT_SHA}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/linear-bridge:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/linear-bridge:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/linear-bridge:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/linear-bridge:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/linear-bridge:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/linear-bridge:buildcache,mode=max" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -256,10 +256,10 @@ build-grok:
         --file infra/images/grok/Dockerfile \
         --target local \
         --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/grok:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/grok:v${CI_COMMIT_SHORT_SHA}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/grok:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/grok:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/grok:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/grok:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/grok:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/grok:buildcache,mode=max" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -281,8 +281,8 @@ build-postgresql:
         --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file infra/images/postgresql/Dockerfile \
         --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/postgresql:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/postgresql:v${CI_COMMIT_SHORT_SHA}" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/postgresql:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/postgresql:v${CI_COMMIT_SHORT_SHA}" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -302,10 +302,10 @@ build-openmemory:
         --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file infra/images/openmemory/Dockerfile \
         --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/openmemory:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/openmemory:v${CI_COMMIT_SHORT_SHA}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/openmemory:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/openmemory:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/openmemory:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/openmemory:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/openmemory:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/openmemory:buildcache,mode=max" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -325,10 +325,10 @@ build-tweakcn:
         --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --file infra/images/tweakcn/Dockerfile \
         --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/tweakcn:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/tweakcn:v${CI_COMMIT_SHORT_SHA}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/tweakcn:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/tweakcn:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/tweakcn:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/tweakcn:v${CI_COMMIT_SHORT_SHA}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/tweakcn:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/tweakcn:buildcache,mode=max" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"

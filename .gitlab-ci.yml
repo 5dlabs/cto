@@ -13,7 +13,13 @@ stages:
   - release
 
 variables:
+  # External registry hostname (used by k8s pods and humans pulling images).
   REGISTRY: registry.5dlabs.ai
+  # Internal in-cluster registry service. Used by CI push/cache to bypass
+  # the Cloudflare tunnel's ~100MB body limit (which causes 413 errors on
+  # large Docker layer uploads). Same backend storage as $REGISTRY, so
+  # images pushed here are immediately available via $REGISTRY externally.
+  INTERNAL_REGISTRY: gitlab-registry.gitlab.svc.cluster.local:5000
   # Must match the GitLab project path so the CI job token has push scope
   # against the GitLab container registry (realm=gitlab.5dlabs.ai/jwt/auth).
   IMAGE_BASE: 5dlabs/cto
@@ -100,11 +106,11 @@ build-runtime:
         --platform linux/amd64,linux/arm64 \
         --pull --push --provenance=false \
         --build-arg BASE_REGISTRY=$BASE_REGISTRY \
-        --tag "$REGISTRY/$IMAGE_BASE/runtime:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/runtime:full" \
-        --tag "$REGISTRY/$IMAGE_BASE/runtime:v${TAG}" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/runtime:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/runtime:buildcache,mode=max" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/runtime:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/runtime:full" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/runtime:v${TAG}" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/runtime:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/runtime:buildcache,mode=max" \
         .
       echo "RUNTIME_TAG=v${TAG}" >> build.env
   artifacts:
@@ -135,8 +141,8 @@ build-sidecar:
         --platform linux/amd64,linux/arm64 \
         --push --provenance=false \
         --build-arg BASE_REGISTRY=$BASE_REGISTRY \
-        --tag "$REGISTRY/$IMAGE_BASE/linear-sidecar:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/linear-sidecar:${VERSION}" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/linear-sidecar:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/linear-sidecar:${VERSION}" \
         .
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -177,14 +183,14 @@ build-agents:
         --file infra/images/agents/Dockerfile \
         --platform linux/amd64,linux/arm64 \
         --pull --push --provenance=false \
-        --tag "$REGISTRY/$IMAGE_BASE/agents:latest" \
-        --tag "$REGISTRY/$IMAGE_BASE/agents:v${TAG}" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/agents:latest" \
+        --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/agents:v${TAG}" \
         --build-arg BASE_REGISTRY=$BASE_REGISTRY \
         --build-arg "BASE_IMAGE=$REGISTRY/$IMAGE_BASE/runtime:${RUNTIME_TAG:-latest}" \
         --build-arg "OPENCLAW_VERSION=$OPENCLAW_VERSION" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/runtime:buildcache" \
-        --cache-from "type=registry,ref=$REGISTRY/$IMAGE_BASE/agents:buildcache" \
-        --cache-to "type=registry,ref=$REGISTRY/$IMAGE_BASE/agents:buildcache,mode=max" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/runtime:buildcache" \
+        --cache-from "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/agents:buildcache" \
+        --cache-to "type=registry,ref=$INTERNAL_REGISTRY/$IMAGE_BASE/agents:buildcache,mode=max" \
         ./infra/images/agents
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
