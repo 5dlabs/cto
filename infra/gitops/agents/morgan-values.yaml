@@ -463,7 +463,7 @@ tools:
       gemini:
         command: "gemini --experimental-acp --yolo"
       copilot:
-        command: "copilot --acp --stdio --yolo"
+        command: "copilot --acp --yolo --no-ask-user --model claude-opus-4.7"
       kimi:
         command: "kimi acp"
       droid:

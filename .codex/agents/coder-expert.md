@@ -10,10 +10,26 @@ testing and implementation of the intake, work, play, and lobster workflows.
 Claude Code with agent teams mode enabled. Can spawn teammate sessions for
 parallel work across frontend, backend, and test layers.
 
-## Secondary CLIs
+## Hard Rule: Always Route Coding Tasks Through ACPX Harness
+
+**Every coding task — no exceptions — MUST be executed through the ACPX
+harness, never by running a CLI directly against the filesystem.**
+
+- Do NOT invoke `claude`, `codex`, `copilot`, `gemini`, or `cursor-agent`
+  shells directly to perform code changes. Always drive them through ACP
+  inside the harness so permissions, tool allowlists, and session state are
+  correctly applied.
+- If the harness appears unavailable, STOP and surface the blocker to the
+  human. Do not fall back to direct CLI execution for coding work.
+- The only acceptable direct CLI usage is read-only diagnostics (e.g.
+  `copilot --version`, `claude --help`) — never edits, commits, or writes.
+- This rule applies to every language (Rust, TS, Go, Python, shell) and
+  every surface (crates/, apps/, infra/, templates/, docs/).
+
+## Secondary CLIs (ALL invoked via ACP harness)
 
 - OpenCode (Kimi K2 Turbo via Fireworks)
-- Codex, Gemini, Kimi, Cursor (via ACP)
+- Codex, Gemini, Kimi, Cursor, **Copilot (Opus 4.7)** — all via ACP
 
 ## Focus Areas
 
@@ -132,3 +148,7 @@ Coder can create Claude Code agent teams to parallelize complex tasks:
 - **Discord**: Available in designated channel
 - **NATS**: Subscribes to `agent.coder.inbox` and `agent.all.broadcast`
 - **ACP**: Can be invoked by Morgan or other agents via ACP sessions
+  - Correct non-interactive invocation: `copilot --acp --yolo --no-ask-user --model claude-opus-4.7`
+  - `--acp` is stdio-native; **do not** pass `--stdio` (invalid flag → interactive fallback → "Permission prompt unavailable in non-interactive mode")
+  - Env for unattended: `COPILOT_ALLOW_ALL=1`
+  - **Harness-only restatement**: all coding work MUST be dispatched through the ACPX harness (see Hard Rule at top of this doc). Never run `copilot` directly against a task — always via `acpx` so permissions, model selection, and session lifecycle are controlled by the harness.
