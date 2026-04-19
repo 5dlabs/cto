@@ -1,0 +1,32 @@
+# Dual-publish config for cto → gitlab.5dlabs.ai/5dlabs/cto
+#
+# Consumed by .github/workflows/gitlab-artifact-mirror.yml. Artifacts listed
+# here are mirrored from GHCR / GH Releases into the GitLab container
+# registry and Releases API on every publish workflow run and on every
+# release:published event.
+#
+# To enable on this repo:
+#   gh variable set GITLAB_MIRROR_ARTIFACTS --body true --repo 5dlabs/cto
+#   gh variable set GITLAB_PROJECT_ID --body 1 --repo 5dlabs/cto
+# Org secret `GITLAB_PUBLISH_TOKEN` must be set (scopes: api,
+# write_registry, write_repository).
+
+gitlab_project: cto
+
+docker_images:
+  - ghcr.io/5dlabs/agents
+  - ghcr.io/5dlabs/runtime
+  - ghcr.io/5dlabs/linear-sidecar
+  - ghcr.io/5dlabs/tools
+  - ghcr.io/5dlabs/discord-bridge
+  - ghcr.io/5dlabs/linear-bridge
+  - ghcr.io/5dlabs/grok
+  - ghcr.io/5dlabs/musetalk-worker
+
+# cto does not currently publish helm charts or npm packages to public
+# registries — grok publishes to GitHub Packages npm, not npmjs, so it is
+# out of scope for this mirror (GitLab npm expects public-registry tarballs).
+helm_charts: []
+npm_packages: []
+
+mirror_releases: true

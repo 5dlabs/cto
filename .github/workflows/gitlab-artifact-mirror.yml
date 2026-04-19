@@ -26,12 +26,25 @@ on:
   release:
     types: [published]
   workflow_run:
+    # Union of publish workflow names across repos. Unused names are no-ops.
     workflows:
+      # agent-platform / openclaw
       - 'Build and Push OpenClaw Images'
       - 'Build Mission Control Images'
       - 'Release Charts'
       - 'NATS Messenger Release'
+      # shared
       - 'Release Please'
+      # cto
+      - 'Agent Images'
+      - 'Binaries Release'
+      - 'CTO Lite Release'
+      - 'CTO Sidebar VSIX Release'
+      - 'Discord Bridge – Build and Publish Docker Image'
+      - 'GitOps Manifest Publish'
+      - 'Grok – Publish MCP Server & Cron Binary'
+      - 'Linear Bridge – Build and Publish Docker Image'
+      - 'Build and Push MuseTalk Worker Image'
     types: [completed]
   workflow_dispatch:
     inputs:
