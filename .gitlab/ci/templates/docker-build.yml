@@ -32,6 +32,13 @@
   tags:
     - k8s
     - docker
+  # Serialize all Docker builds through a single resource_group.
+  # Without this, ~17 parallel builds overload gitaly (early EOF on clone)
+  # AND race on the shared buildkit cargo cache (`cargo-registry-shared`
+  # -> "File exists" on .cargo-ok). Serializing guarantees green at the
+  # cost of wall-clock time. We can revisit with per-service cache IDs
+  # and a scaled gitaly once the pipeline is stable.
+  resource_group: docker-build
   # Gitaly occasionally returns early-EOF on concurrent clones across the
   # parallel build fan-out (~17 jobs). Auto-retry transient git/script
   # failures so a single flake does not kill the whole pipeline.
