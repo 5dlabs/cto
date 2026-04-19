@@ -31,13 +31,13 @@ semantic-release:
   script:
     - apt-get update && apt-get install -y musl-tools gcc-aarch64-linux-gnu
     - |
-      for PACKAGE in cto-mcp tools-server tools-client healer agent-controller cto-utils cto-cli intake play-monitor; do
+      for PACKAGE in tools-server tools-client healer agent-controller cto-utils cto-cli intake play-monitor; do
         echo "Building $PACKAGE..."
         cargo build --release --package "$PACKAGE" 2>/dev/null || echo "Skipping $PACKAGE (not found)"
       done
     - |
       mkdir -p release-binaries
-      for BIN in cto-mcp tools-server tools-client healer agent-controller cto-utils cto-cli intake play-monitor; do
+      for BIN in tools-server tools-client healer agent-controller cto-utils cto-cli intake play-monitor; do
         if [ -f "target/release/$BIN" ]; then
           cp "target/release/$BIN" "release-binaries/${BIN}-linux-x86_64"
         fi

@@ -2,7 +2,9 @@
 # Includes sccache integration and cargo-nextest for faster test execution.
 
 .rust-setup:
-  image: rust:latest
+  # Pinned to match GitHub rust-builder image (ghcr.io/5dlabs/rust-builder) which
+  # ships Rust 1.94.0. Keeps GitLab clippy in lockstep with GitHub CI; bump both together.
+  image: rust:1.94
   variables:
     CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
     SCCACHE_DIR: /tmp/sccache
@@ -21,7 +23,7 @@
           protobuf-compiler cmake \
           >/dev/null
       fi
-    - rustup default stable
+    - rustup default 1.94
     - rustup component add rustfmt clippy
     - |
       if ! command -v sccache &>/dev/null; then
@@ -60,11 +62,7 @@
       set -e
       for pkg in controller healer pm intake research tools; do
         echo "🔍 clippy -p $pkg (pedantic)"
-        cargo clippy -p "$pkg" --all-targets -- -D warnings -W clippy::pedantic \
-          -A clippy::duration_suboptimal_units \
-          -A clippy::map_unwrap_or \
-          -A clippy::implicit_hasher \
-          -A clippy::too_many_lines
+        cargo clippy -p "$pkg" --all-targets -- -D warnings -W clippy::pedantic
       done
 
 .rust-test:
