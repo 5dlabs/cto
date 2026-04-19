@@ -1,0 +1,67 @@
+---
+# MuseTalk Avatar Test Harness
+# =============================================================================
+# End-to-end test for MuseTalk avatar rendering pipeline.
+# Sends test render request via NATS and verifies video output.
+#
+# Usage:
+#   kubectl apply -f this-file
+#   kubectl logs -n cto job/musetalk-test-harness -f
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: musetalk-test-harness
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: musetalk-test-harness
+    app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/component: test
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/cto.git
+    targetRevision: HEAD
+    path: infra/charts/musetalk-test-harness
+    helm:
+      valueFiles:
+        - values.yaml
+      values: |
+        nats:
+          url: "nats://musetalk-nats.cto.svc.cluster.local:4222"
+        s3:
+          endpoint: "seaweedfs-filer.operators.svc.cluster.local:8333"
+          bucket: "avatar-videos"
+          region: "us-east-1"
+        test:
+          referenceImageURL: "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/images/monalisa.png"
+          audioURL: "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/audio/intro.wav"
+          personaId: "test-monalisa"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 1m
+
+  revisionHistoryLimit: 3
