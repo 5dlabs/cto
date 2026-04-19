@@ -33,7 +33,7 @@ impl Default for PollConfig {
         Self {
             batch_size: 10,
             backoff_multiplier: 2.0,
-            max_backoff: Duration::from_secs(1800), // 30 minutes
+            max_backoff: Duration::from_mins(30), // 30 minutes
             max_age_days: 60,                          // 60 days by default
             max_scroll_attempts: 50,                   // ~50 scrolls max
         }

@@ -83,7 +83,7 @@ pub struct FirecrawlClient {
 impl FirecrawlClient {
     /// Create a new Firecrawl client.
     pub fn new(api_key: String) -> Result<Self> {
-        let client = Client::builder().timeout(Duration::from_secs(60)).build()?;
+        let client = Client::builder().timeout(Duration::from_mins(1)).build()?;
 
         Ok(Self { api_key, client })
     }

@@ -102,7 +102,7 @@ impl TavilyClient {
     pub fn new(api_key: String) -> Self {
         Self {
             client: Client::builder()
-                .timeout(Duration::from_secs(60))
+                .timeout(Duration::from_mins(1))
                 .build()
                 .expect("Failed to build HTTP client"),
             api_key,

@@ -126,8 +126,10 @@ jobs:
 
       - name: Install hadolint
         run: |
-          curl -sSL https://github.com/hadolint/hadolint/releases/download/v2.12.1-beta/hadolint-Linux-x86_64 -o /usr/local/bin/hadolint
-          chmod +x /usr/local/bin/hadolint
+          mkdir -p "$HOME/bin"
+          curl -sSL https://github.com/hadolint/hadolint/releases/download/v2.12.1-beta/hadolint-Linux-x86_64 -o "$HOME/bin/hadolint"
+          chmod +x "$HOME/bin/hadolint"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
 
       - name: Lint Dockerfile
         run: hadolint --no-color --failure-threshold error infra/images/research/Dockerfile
