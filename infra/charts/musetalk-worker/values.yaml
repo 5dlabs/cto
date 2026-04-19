@@ -56,6 +56,9 @@ resources:
 nodeSelector:
   nvidia.com/gpu.present: "true"
 
+# NVIDIA container runtime — required for CUDA libraries/device binding
+runtimeClassName: nvidia
+
 tolerations: []
 
 affinity: {}
