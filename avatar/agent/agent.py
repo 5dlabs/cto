@@ -180,7 +180,34 @@ async def entrypoint(ctx: JobContext) -> None:
     elif config.avatar_mode == "disabled":
         logger.info("MORGAN_AVATAR_MODE=disabled, running audio-only session")
     elif config.avatar_mode == "musetalk":
-        logger.info("MORGAN_AVATAR_MODE=musetalk selected, starting self-hosted avatar pipeline")
+        logger.info(
+            "MORGAN_AVATAR_MODE=musetalk selected, starting self-hosted avatar pipeline "
+            "(use_stub=%s, nats_url=%s)",
+            config.musetalk_use_stub,
+            config.nats_url,
+        )
+        nats_client = None
+        if not config.musetalk_use_stub:
+            from morgan_avatar_agent.musetalk_nats_client import (
+                MuseTalkNatsClient,
+                MuseTalkNatsError,
+            )
+
+            try:
+                nats_client = MuseTalkNatsClient(
+                    url=config.nats_url,
+                    request_subject=config.nats_request_subject,
+                    result_subject=config.nats_result_subject,
+                    stream=config.nats_stream,
+                    request_timeout_s=config.musetalk_request_timeout_s,
+                )
+                await nats_client.connect()
+            except MuseTalkNatsError as exc:
+                logger.warning(
+                    "Failed to connect MuseTalk NATS client (%s); falling back to stub frames",
+                    exc,
+                )
+                nats_client = None
         musetalk = MuseTalkAvatarSession(
             MuseTalkInferenceEngine(
                 persona_id=config.persona_id,
@@ -188,6 +215,9 @@ async def entrypoint(ctx: JobContext) -> None:
                 target_fps=config.musetalk_target_fps,
                 frame_width=config.musetalk_frame_width,
                 frame_height=config.musetalk_frame_height,
+                nats_client=nats_client,
+                reference_image_url=config.musetalk_reference_image_url,
+                use_stub=config.musetalk_use_stub or nats_client is None,
             )
         )
         await musetalk.start(session, room=ctx.room)

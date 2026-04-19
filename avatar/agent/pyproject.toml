@@ -28,6 +28,9 @@ dev = [
 legacy = [
   "livekit-plugins-lemonslice",
 ]
+musetalk = [
+  "nats-py>=2.7.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
