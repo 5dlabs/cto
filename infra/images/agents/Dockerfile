@@ -167,6 +167,19 @@ RUN ACPX_PROMPT_TURN=$(find "$(npm root -g)/acpx/dist" -name 'prompt-turn-*.js' 
       echo "WARNING: acpx prompt-turn file not found, patch skipped"; \
     fi
 
+# Patch acpx: run Copilot with --allow-all so ACP-launched sessions don't hit
+# "Permission prompt unavailable in non-interactive mode". Per `copilot --help`,
+# --allow-all-tools is required for non-interactive mode; --allow-all bundles
+# --allow-all-tools + --allow-all-paths + --allow-all-urls.
+RUN ACPX_PROMPT_TURN=$(find "$(npm root -g)/acpx/dist" -name 'prompt-turn-*.js' ! -name '*.map' -type f | head -1) && \
+    if [ -n "$ACPX_PROMPT_TURN" ]; then \
+      sed -i 's|copilot --acp --stdio|copilot --acp --stdio --allow-all|' "$ACPX_PROMPT_TURN" && \
+      echo "acpx copilot command patched in $ACPX_PROMPT_TURN" && \
+      grep -n 'copilot --acp' "$ACPX_PROMPT_TURN" || true; \
+    else \
+      echo "WARNING: acpx prompt-turn file not found, copilot auto-approve patch skipped"; \
+    fi
+
 # =============================================================================
 # ClawHub CLI — skill registry search and installation
 # =============================================================================
