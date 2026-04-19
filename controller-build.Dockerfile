@@ -16,6 +16,7 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 COPY templates/ templates/
+COPY shared/ shared/
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-controller \
     --mount=type=cache,target=/build/target,id=cargo-target-controller \
