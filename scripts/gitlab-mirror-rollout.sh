@@ -115,29 +115,37 @@ add_file_if_missing() {
     -f branch="$default_branch" >/dev/null
 }
 
+FAILED=()
 for repo in "${TARGETS[@]}"; do
   echo "== $repo =="
-  if ! gh api "repos/${GH_ORG}/${repo}" --jq '.full_name' >/dev/null 2>&1; then
-    echo "  github repo missing; skipping"; continue
-  fi
-  if [[ "$(gh api "repos/${GH_ORG}/${repo}" --jq '.archived')" == "true" ]]; then
-    echo "  archived; skipping"; continue
-  fi
-  ensure_gitlab_project "$repo"
-  mirror_push "$repo"
+  (
+    set -e
+    if ! gh api "repos/${GH_ORG}/${repo}" --jq '.full_name' >/dev/null 2>&1; then
+      echo "  github repo missing; skipping"; exit 0
+    fi
+    if [[ "$(gh api "repos/${GH_ORG}/${repo}" --jq '.archived')" == "true" ]]; then
+      echo "  archived; skipping"; exit 0
+    fi
+    ensure_gitlab_project "$repo"
+    mirror_push "$repo"
 
-  tmp_stub="$WORK/gitlab-ci-stub.yml"
-  printf '%s' "$STUB_CI_BODY" > "$tmp_stub"
+    tmp_stub="$WORK/gitlab-ci-stub.yml"
+    printf '%s' "$STUB_CI_BODY" > "$tmp_stub"
 
-  is_fork="$(gh api "repos/${GH_ORG}/${repo}" --jq '.fork')"
-  if [[ "$is_fork" == "true" ]]; then
-    echo "  fork — skipping workflow/stub commits (avoid diverging from upstream)"
-  else
-    add_file_if_missing "$repo" ".github/workflows/mirror-to-gitlab.yml" \
-      "ci: mirror pushes to gitlab.5dlabs.ai" "$MIRROR_WORKFLOW_SRC"
-    add_file_if_missing "$repo" ".gitlab-ci.yml" \
-      "ci: add GitLab smoke pipeline" "$tmp_stub"
-  fi
+    is_fork="$(gh api "repos/${GH_ORG}/${repo}" --jq '.fork')"
+    if [[ "$is_fork" == "true" ]]; then
+      echo "  fork — skipping workflow/stub commits (avoid diverging from upstream)"
+    else
+      add_file_if_missing "$repo" ".github/workflows/mirror-to-gitlab.yml" \
+        "ci: mirror pushes to gitlab.5dlabs.ai" "$MIRROR_WORKFLOW_SRC"
+      add_file_if_missing "$repo" ".gitlab-ci.yml" \
+        "ci: add GitLab smoke pipeline" "$tmp_stub"
+    fi
+  ) || { echo "  !! repo $repo failed, continuing"; FAILED+=("$repo"); }
 done
 
 echo "done."
+if [[ ${#FAILED[@]} -gt 0 ]]; then
+  echo "FAILED repos:"
+  printf '  %s\n' "${FAILED[@]}"
+fi
