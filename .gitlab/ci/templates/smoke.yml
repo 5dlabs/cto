@@ -1,0 +1,18 @@
+# Minimal GitLab CI for mirrored repos that don't have a bespoke pipeline yet.
+# Verifies the mirror is active and a runner picks the job up. Replace with
+# a real pipeline when the project needs one.
+
+stages:
+  - smoke
+
+smoke:
+  stage: smoke
+  image: alpine:3.19
+  tags:
+    - k8s
+  script:
+    - echo "Mirrored from GitHub — $(git log -1 --oneline)"
+    - echo "CI_PROJECT_PATH=$CI_PROJECT_PATH  CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "web"'

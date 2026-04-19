@@ -1,0 +1,43 @@
+name: Mirror to GitLab
+
+# One-way push mirror: GitHub (source of truth) -> gitlab.5dlabs.ai/5dlabs/<repo>.
+# Activation requires both:
+#   - org variable  MIRROR_TO_GITLAB = "true"
+#   - org secret    GITLAB_PUSH_TOKEN (GitLab group access token, write_repository scope)
+# GitLab project path must match GitHub repo name under the 5dlabs group.
+
+on:
+  push:
+    branches: ['**']
+    tags: ['**']
+  delete:
+  workflow_dispatch:
+
+concurrency:
+  group: mirror-to-gitlab-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    if: vars.MIRROR_TO_GITLAB == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Push all refs to GitLab
+        env:
+          GITLAB_PUSH_TOKEN: ${{ secrets.GITLAB_PUSH_TOKEN }}
+          GITLAB_HOST: gitlab.5dlabs.ai
+          GITLAB_NAMESPACE: 5dlabs
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${GITLAB_PUSH_TOKEN:-}" ]]; then
+            echo "::error::GITLAB_PUSH_TOKEN secret is not set"
+            exit 1
+          fi
+          repo_name="${GITHUB_REPOSITORY##*/}"
+          gitlab_remote="https://oauth2:${GITLAB_PUSH_TOKEN}@${GITLAB_HOST}/${GITLAB_NAMESPACE}/${repo_name}.git"
+          git clone --mirror "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo.git
+          cd repo.git
+          # --mirror pushes all refs and prunes deletions, keeping GitLab an exact copy.
+          git push --mirror "$gitlab_remote"
