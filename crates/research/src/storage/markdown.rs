@@ -415,24 +415,18 @@ impl DigestContent {
                         quote_lines.clear();
                     }
                 }
-                "Analysis" => {
-                    // Capture analysis reasoning (skip metadata lines)
-                    if !line.starts_with("**") && !line.is_empty() && !line.starts_with('#') {
-                        if !self.reasoning.is_empty() {
-                            self.reasoning.push('\n');
-                        }
-                        self.reasoning.push_str(line);
+                "Analysis" if !line.starts_with("**") && !line.is_empty() && !line.starts_with('#') => {
+                    if !self.reasoning.is_empty() {
+                        self.reasoning.push('\n');
                     }
+                    self.reasoning.push_str(line);
                 }
-                "Supporting Content" => {
-                    // Capture enriched content (excluding headers and URLs)
-                    if !line.starts_with('#')
-                        && !line.starts_with("**URL**")
-                        && !line.starts_with("---")
-                        && !line.is_empty()
-                    {
-                        self.enriched_content.push(line.to_string());
-                    }
+                "Supporting Content" if !line.starts_with('#')
+                    && !line.starts_with("**URL**")
+                    && !line.starts_with("---")
+                    && !line.is_empty() =>
+                {
+                    self.enriched_content.push(line.to_string());
                 }
                 _ => {}
             }

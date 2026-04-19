@@ -124,11 +124,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install hadolint
+        run: |
+          curl -sSL https://github.com/hadolint/hadolint/releases/download/v2.12.1-beta/hadolint-Linux-x86_64 -o /usr/local/bin/hadolint
+          chmod +x /usr/local/bin/hadolint
+
       - name: Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.3.0
-        with:
-          dockerfile: infra/images/research/Dockerfile
-          failure-threshold: error
+        run: hadolint --no-color --failure-threshold error infra/images/research/Dockerfile
 
   # Build and push Docker image (only on push to main)
   build-docker:
