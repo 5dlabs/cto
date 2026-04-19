@@ -44,7 +44,7 @@ args:
   voter_2_provider:
     default: openai-api
   voter_2_model:
-    default: gpt-5.4-pro
+    default: gpt-5.3-codex
   voter_3_provider:
     default: gemini
   voter_3_model:
