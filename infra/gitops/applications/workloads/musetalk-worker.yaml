@@ -48,7 +48,7 @@ spec:
           fixSymlink:
             enabled: true
           downloadModels:
-            enabled: false
+            enabled: true
 
         # Storage class for model weights PVC
         persistence:
