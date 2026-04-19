@@ -1,0 +1,44 @@
+# MuseTalk Test Harness Helm Chart
+# Test job for end-to-end avatar rendering validation
+
+nameOverride: ""
+fullnameOverride: ""
+
+nats:
+  url: "nats://musetalk-nats.cto.svc.cluster.local:4222"
+  stream: "AVATAR"
+  subject: "avatar.render.request"
+  resultSubject: "avatar.render.result"
+
+s3:
+  endpoint: "seaweedfs-filer.operators.svc.cluster.local:8333"
+  bucket: "avatar-videos"
+  region: "us-east-1"
+  existingSecret: ""
+  accessKey: ""
+  secretKey: ""
+
+test:
+  referenceImageURL: "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/images/monalisa.png"
+  audioURL: "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/audio/intro.wav"
+  personaId: "test-monalisa"
+  timeout: "300"
+
+image:
+  repository: ghcr.io/5dlabs/musetalk-test-harness
+  tag: latest
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
