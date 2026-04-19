@@ -56,13 +56,12 @@ def load_model():
     if repo_dir not in sys.path:
         sys.path.insert(0, repo_dir)
 
-    # Upstream musetalk loads weights via relative paths like "models/sd-vae".
-    # download_models.py writes them under MODEL_CACHE_DIR (e.g. /models/models/sd-vae),
-    # so chdir into MODEL_CACHE_DIR's parent of those nested model dirs before loading.
-    cache_dir = os.environ.get("MODEL_CACHE_DIR", "/models")
-    if Path(cache_dir).is_dir():
-        os.chdir(cache_dir)
-        log.info("Changed working directory to %s for model resolution", cache_dir)
+    # Upstream musetalk loads weights via relative paths like "models/musetalkV15/musetalk.json".
+    # download_models.py writes them under MODEL_CACHE_DIR (e.g. /models/musetalkV15/).
+    # We chdir to / so that the relative path "models/musetalkV15/..." resolves to
+    # /models/musetalkV15/... correctly.
+    os.chdir("/")
+    log.info("Changed working directory to / for model resolution")
 
     # Importing and initializing the upstream model stack is enough for Phase 4
     # to prove the container can bootstrap on a GPU node.
