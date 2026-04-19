@@ -100,5 +100,12 @@ spec:
       kind: Secret
       jsonPointers:
         - /data
+    # PVC spec.volumeName is set by the binding controller after creation and
+    # is immutable. Chart template doesn't set it, so ArgoCD diff wants to
+    # clear it, which k8s rejects. Ignore this field to allow syncs.
+    - group: ""
+      kind: PersistentVolumeClaim
+      jsonPointers:
+        - /spec/volumeName
 
   revisionHistoryLimit: 5
