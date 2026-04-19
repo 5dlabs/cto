@@ -26,6 +26,17 @@
   tags:
     - k8s
     - docker
+  # Gitaly occasionally returns early-EOF on concurrent clones across the
+  # parallel build fan-out (~17 jobs). Auto-retry transient git/script
+  # failures so a single flake does not kill the whole pipeline.
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - unknown_failure
+      - script_failure
+      - api_failure
 
 # Convenience: standard single-image build+push script
 # Override `script:` in the extending job if you need custom logic.
