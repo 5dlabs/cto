@@ -935,11 +935,31 @@ mod cto_config_tests {
     #[allow(dead_code)]
     struct RootIntakeModels {
         #[serde(default)]
-        primary: String,
+        tiers: RootIntakeModelTiers,
         #[serde(default)]
-        research: String,
+        committee: Vec<RootIntakeModelRef>,
+        #[serde(default, rename = "cliModels")]
+        cli_models: std::collections::HashMap<String, String>,
+    }
+
+    #[derive(Debug, serde::Deserialize, Default)]
+    #[allow(dead_code)]
+    struct RootIntakeModelTiers {
         #[serde(default)]
-        fallback: String,
+        primary: RootIntakeModelRef,
+        #[serde(default)]
+        fast: RootIntakeModelRef,
+        #[serde(default)]
+        frontier: RootIntakeModelRef,
+    }
+
+    #[derive(Debug, serde::Deserialize, Default)]
+    #[allow(dead_code)]
+    struct RootIntakeModelRef {
+        #[serde(default)]
+        provider: String,
+        #[serde(default)]
+        model: String,
     }
 
     #[derive(Debug, serde::Deserialize, Default)]
@@ -1015,7 +1035,7 @@ mod cto_config_tests {
         // Verify intake defaults
         assert_eq!(config.defaults.intake.github_app, "5DLabs-Morgan");
         assert!(!config.defaults.intake.cli.is_empty());
-        assert!(!config.defaults.intake.models.primary.is_empty());
+        assert!(!config.defaults.intake.models.tiers.primary.model.is_empty());
 
         // Verify play defaults - check fields that actually exist in the config
         assert!(

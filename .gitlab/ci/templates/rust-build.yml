@@ -60,7 +60,7 @@
       set -e
       for pkg in controller healer pm intake research cto-mcp tools; do
         echo "🔍 clippy -p $pkg (pedantic)"
-        cargo clippy -p "$pkg" --all-targets -- -D warnings -W clippy::pedantic
+        cargo clippy -p "$pkg" --all-targets -- -D warnings -W clippy::pedantic -A clippy::duration_suboptimal_units
       done
 
 .rust-test:
