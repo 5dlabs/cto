@@ -139,15 +139,11 @@ impl Default for AnthropicClient {
 pub fn parse_json_response<T: for<'de> Deserialize<'de>>(text: &str) -> Result<T> {
     let cleaned = if text.contains("```json") {
         let start = text.find("```json").map_or(0, |i| i + 7);
-        let end = text[start..]
-            .find("```")
-            .map_or(text.len(), |i| start + i);
+        let end = text[start..].find("```").map_or(text.len(), |i| start + i);
         text[start..end].trim()
     } else if text.contains("```") {
         let start = text.find("```").map_or(0, |i| i + 3);
-        let end = text[start..]
-            .find("```")
-            .map_or(text.len(), |i| start + i);
+        let end = text[start..].find("```").map_or(text.len(), |i| start + i);
         text[start..end].trim()
     } else {
         text.trim()
