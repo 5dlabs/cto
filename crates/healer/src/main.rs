@@ -5717,7 +5717,7 @@ async fn run_alert_watch(
 
         loop {
             // Poll every 60 seconds
-            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+            tokio::time::sleep(tokio::time::Duration::from_mins(1)).await;
 
             // Get all pods with kubectl and look for silent failures
             let output = match AsyncCommand::new("kubectl")
