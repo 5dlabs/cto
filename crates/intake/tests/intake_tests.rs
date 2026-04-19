@@ -546,6 +546,8 @@ mod config_tests {
             docs_repository: Some("5dlabs/test".to_string()),
             docs_project_directory: Some("test-service".to_string()),
             auto_append_deploy_task: true,
+            deliberate: false,
+            design_brief_path: None,
         };
 
         assert_eq!(config.num_tasks, 20);
