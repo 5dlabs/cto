@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import logging
 import math
 import time
-from collections.abc import Iterable
+from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .musetalk_nats_client import MuseTalkNatsClient
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -50,12 +57,19 @@ class MuseTalkInferenceEngine:
         target_fps: int = 30,
         frame_width: int = 512,
         frame_height: int = 512,
+        *,
+        nats_client: MuseTalkNatsClient | None = None,
+        reference_image_url: str = "",
+        use_stub: bool = True,
     ) -> None:
         self.persona_id = persona_id
         self.personas_root = personas_root
         self.target_fps = target_fps
         self.frame_width = frame_width
         self.frame_height = frame_height
+        self.nats_client = nats_client
+        self.reference_image_url = reference_image_url
+        self.use_stub = use_stub
         self._persona_path = personas_root / persona_id
         self._latents_path = self._persona_path / "latents"
 
@@ -88,6 +102,75 @@ class MuseTalkInferenceEngine:
         frames = list(self.stream_frames(audio_chunks))
         elapsed = time.perf_counter() - start
         return InferenceStats(frames_rendered=len(frames), elapsed_s=elapsed)
+
+    async def render_and_stream(
+        self,
+        audio_url: str,
+        *,
+        audio_hash: str | None = None,
+        duration_ms: float | None = None,
+    ) -> AsyncIterator[RenderedFrame]:
+        """Render a full utterance via the MuseTalk worker and stream frames.
+
+        When ``use_stub`` is True or no NATS client is configured, this falls
+        back to the deterministic procedural generator so CI/offline paths work.
+        The real GPU path publishes a batch request to the worker and returns
+        a single MP4 ``video_url``; decoding the MP4 back into ``RenderedFrame``s
+        is a follow-up (see ``avatar/agent/contract.md``). For now we log the
+        result and fall back to procedural frames so the LiveKit track keeps
+        moving end-to-end.
+        """
+        if self.use_stub or self.nats_client is None or not audio_url:
+            for frame in self._stub_frames_for_duration(duration_ms or 1000.0):
+                yield frame
+            return
+
+        try:
+            result = await self.nats_client.render(
+                persona_id=self.persona_id,
+                reference_image_url=self.reference_image_url,
+                audio_url=audio_url,
+                fps=self.target_fps,
+                audio_hash=audio_hash,
+            )
+        except Exception:
+            logger.exception("musetalk.render.failed persona=%s", self.persona_id)
+            for frame in self._stub_frames_for_duration(duration_ms or 1000.0):
+                yield frame
+            return
+
+        if result.is_error:
+            logger.warning(
+                "musetalk.render.error persona=%s error=%s", self.persona_id, result.error
+            )
+            return
+        if result.bootstrap_only:
+            logger.info("musetalk.render.bootstrap_only persona=%s", self.persona_id)
+            return
+        if not result.is_renderable:
+            logger.warning(
+                "musetalk.render.unrenderable persona=%s video_url=%s",
+                self.persona_id,
+                result.video_url,
+            )
+            return
+
+        logger.info(
+            "musetalk.render.ok persona=%s video_url=%s cached=%s render_time_s=%s",
+            self.persona_id,
+            result.video_url,
+            result.cached,
+            result.render_time_s,
+        )
+        # TODO(musetalk): decode result.video_url into RenderedFrame tiles and
+        # yield at target_fps. For now yield stub frames so the published track
+        # stays live.
+        for frame in self._stub_frames_for_duration(duration_ms or 1000.0):
+            yield frame
+
+    def _stub_frames_for_duration(self, duration_ms: float) -> Iterable[RenderedFrame]:
+        chunk = AudioChunk(samples=[], sample_rate=16000, duration_ms=duration_ms)
+        return self.stream_frames([chunk])
 
     def _render_rgba(self, frame_index: int, local_index: int, total_frames: int) -> bytes:
         mouth = int(80 + 120 * math.sin((local_index / max(total_frames, 1)) * math.pi))

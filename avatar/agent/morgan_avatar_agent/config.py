@@ -4,7 +4,6 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-
 DEFAULT_PERSONAS_ROOT = Path("/personas")
 
 
@@ -88,6 +87,13 @@ class AgentConfig:
     musetalk_target_fps: int
     musetalk_frame_width: int
     musetalk_frame_height: int
+    musetalk_use_stub: bool
+    musetalk_reference_image_url: str
+    musetalk_request_timeout_s: float
+    nats_url: str
+    nats_request_subject: str
+    nats_result_subject: str
+    nats_stream: str
 
     @classmethod
     def from_env(cls, project_root: Path | None = None) -> AgentConfig:
@@ -181,6 +187,25 @@ class AgentConfig:
             musetalk_target_fps=_env_int("MORGAN_MUSETALK_TARGET_FPS", 30),
             musetalk_frame_width=_env_int("MORGAN_MUSETALK_FRAME_WIDTH", 512),
             musetalk_frame_height=_env_int("MORGAN_MUSETALK_FRAME_HEIGHT", 512),
+            musetalk_use_stub=_env_bool(
+                "MUSETALK_USE_STUB", _env_bool("MORGAN_MUSETALK_USE_STUB", True)
+            ),
+            musetalk_reference_image_url=os.getenv(
+                "MORGAN_MUSETALK_REFERENCE_IMAGE_URL", ""
+            ).strip(),
+            musetalk_request_timeout_s=_env_float(
+                "MORGAN_MUSETALK_REQUEST_TIMEOUT_S", 60.0
+            ),
+            nats_url=os.getenv(
+                "NATS_URL", "nats://musetalk-nats.cto.svc.cluster.local:4222"
+            ).strip(),
+            nats_request_subject=os.getenv(
+                "NATS_REQUEST_SUBJECT", "avatar.render.request"
+            ).strip(),
+            nats_result_subject=os.getenv(
+                "NATS_RESULT_SUBJECT", "avatar.render.result"
+            ).strip(),
+            nats_stream=os.getenv("NATS_STREAM", "AVATAR").strip(),
         )
 
     @property
@@ -247,4 +272,10 @@ class AgentConfig:
             "musetalk_target_fps": self.musetalk_target_fps,
             "musetalk_frame_width": self.musetalk_frame_width,
             "musetalk_frame_height": self.musetalk_frame_height,
+            "musetalk_use_stub": self.musetalk_use_stub,
+            "musetalk_request_timeout_s": self.musetalk_request_timeout_s,
+            "nats_url": self.nats_url,
+            "nats_request_subject": self.nats_request_subject,
+            "nats_result_subject": self.nats_result_subject,
+            "nats_stream": self.nats_stream,
         }
