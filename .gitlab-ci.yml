@@ -14,7 +14,9 @@ stages:
 
 variables:
   REGISTRY: registry.5dlabs.ai
-  IMAGE_BASE: 5dlabs
+  # Must match the GitLab project path so the CI job token has push scope
+  # against the GitLab container registry (realm=gitlab.5dlabs.ai/jwt/auth).
+  IMAGE_BASE: 5dlabs/cto
 
 # --- Include templates and job definitions ---
 
