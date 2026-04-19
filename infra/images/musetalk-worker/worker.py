@@ -54,7 +54,19 @@ _shutdown = asyncio.Event()
 
 
 async def download_file(url: str, dest: str):
-    """Download a file from URL to local path."""
+    """Download a file from URL to local path. Supports http(s):// and file:// schemes."""
+    from urllib.parse import urlparse
+    import shutil
+    parsed = urlparse(url)
+    if parsed.scheme == "file":
+        src = parsed.path
+        if not os.path.exists(src):
+            raise FileNotFoundError(f"file:// source not found: {src}")
+        shutil.copyfile(src, dest)
+        return
+    if parsed.scheme in ("", None) and os.path.exists(url):
+        shutil.copyfile(url, dest)
+        return
     import aiohttp
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
