@@ -17,6 +17,22 @@ variables:
   # Must match the GitLab project path so the CI job token has push scope
   # against the GitLab container registry (realm=gitlab.5dlabs.ai/jwt/auth).
   IMAGE_BASE: 5dlabs/cto
+  # Mitigate gitaly "early EOF" on parallel clones — shallow fetch by default.
+  # Jobs that need full history (e.g. release) override to GIT_DEPTH: 0.
+  GIT_DEPTH: "1"
+  GIT_STRATEGY: fetch
+
+# Auto-retry jobs on transient runner/gitaly failures across the whole pipeline.
+default:
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - scheduler_failure
+      - api_failure
+      - unknown_failure
+      - script_failure
 
 # --- Include templates and job definitions ---
 
