@@ -68,6 +68,18 @@ TARGETS=(
   NemoClaw
   secureclaw
   ironclaw
+  # Phase A backfill (2025-11)
+  sniper
+  web3-message-board
+  solana
+  ingestor
+  golang-grpc-template
+  solana-discovery
+  trader-platform-old
+  trader-platform
+  talos-mcp
+  trader
+  rust-basic-api
 )
 
 gl_api() {
