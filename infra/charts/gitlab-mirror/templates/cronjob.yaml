@@ -57,13 +57,16 @@ data:
     git clone --branch "$GITHUB_BRANCH" "$AUTH_URL" repo
     cd repo
 
-    # Fetch all branches/tags from origin so we can push everything (we only push main + tags below)
-    git fetch --tags origin
+    # Fetch all branches/tags from origin so we can push everything (we only push main + tags below).
+    # Note: `git fetch` updates refs/remotes/origin/* but does NOT fast-forward the local branch,
+    # so we always push from refs/remotes/origin/<branch> to guarantee we push the freshest SHA
+    # (clone can see a slightly stale HEAD due to GitHub replica lag).
+    git fetch --tags --prune origin
 
     git remote add gitlab "ssh://gitlab-mirror/$GITLAB_PROJECT.git"
 
-    echo "==> pushing $GITHUB_BRANCH"
-    git push $FORCE_FLAG gitlab "refs/heads/$GITHUB_BRANCH:refs/heads/$GITHUB_BRANCH"
+    echo "==> pushing $GITHUB_BRANCH (from refs/remotes/origin/$GITHUB_BRANCH)"
+    git push $FORCE_FLAG gitlab "refs/remotes/origin/$GITHUB_BRANCH:refs/heads/$GITHUB_BRANCH"
 
     {{- if .Values.mirrorTags }}
     echo "==> pushing tags"
