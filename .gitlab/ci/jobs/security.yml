@@ -54,6 +54,8 @@ npm-audit-website:
 skills-security-scan:
   extends: .skills-security-scan
   stage: security
+  # Advisory: matches GitHub skills-security-scan behavior (report-only)
+  allow_failure: true
   variables:
     SKILLS_DIRS: ".claude/skills .factory/skills templates/skills"
   before_script:
