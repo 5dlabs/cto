@@ -61,6 +61,8 @@ tech-debt-tracker:
 intake-step-tests:
   stage: quality
   image: oven/bun:1
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq jq python3
   script:
     - cd apps/intake-util && bun install
     - cd $CI_PROJECT_DIR
