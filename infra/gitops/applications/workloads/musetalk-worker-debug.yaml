@@ -1,0 +1,121 @@
+---
+# MuseTalk debug workload
+# Disposable storage-backed debug pod to validate bootstrap/model layout on the same GPU node profile.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: musetalk-worker-debug
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: musetalk-worker-debug
+    app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/component: avatar-rendering-debug
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/cto.git
+    targetRevision: main
+    path: infra/charts/musetalk-worker
+    helm:
+      valueFiles:
+        - values.yaml
+      values: |
+        fullnameOverride: musetalk-worker-debug
+
+        workload:
+          kind: StatefulSet
+
+        debug:
+          enabled: true
+          command:
+            - sh
+            - -c
+            - |
+              echo "MuseTalk debug pod ready"
+              echo "Node: $(hostname)"
+              echo "Inspect /models and run bootstrap tests from here."
+              sleep infinity
+
+        image:
+          repository: ghcr.io/5dlabs/musetalk-worker
+          tag: 5f91a1e13
+          pullPolicy: Always
+
+        initContainers:
+          fixSymlink:
+            enabled: true
+          downloadModels:
+            enabled: true
+            resources:
+              requests:
+                cpu: "1"
+                memory: 4Gi
+              limits:
+                cpu: "4"
+                memory: 8Gi
+
+        persistence:
+          storageClass: "mayastor"
+          size: 20Gi
+
+        model:
+          repo: "https://github.com/TMElyralab/MuseTalk.git"
+          dtype: "float16"
+
+        huggingface:
+          existingSecret: "musetalk-hf-token"
+          secretKey: "HF_TOKEN"
+
+        nats:
+          url: "nats://musetalk-nats.cto.svc.cluster.local:4222"
+
+        nodeSelector:
+          nvidia.com/gpu.present: "true"
+
+        resources:
+          requests:
+            cpu: "2"
+            memory: 8Gi
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "8"
+            memory: 32Gi
+            nvidia.com/gpu: "1"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+
+  revisionHistoryLimit: 5
