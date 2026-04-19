@@ -188,18 +188,40 @@ async def run_worker():
     # Use pull_subscribe for fetch-based message processing
     sub = await js.pull_subscribe(subject, durable=consumer_name, config=config)
     log.info("Subscribed to %s (queue=%s, consumer=%s)", subject, queue, consumer_name)
+    log.info("Entering fetch loop (shutdown_set=%s)", _shutdown.is_set())
 
+    iter_count = 0
+    last_heartbeat = time.time()
     try:
         while not _shutdown.is_set():
+            iter_count += 1
             try:
                 msgs = await sub.fetch(1, timeout=5)
+                log.info("fetch returned %d message(s) (iter=%d)", len(msgs), iter_count)
                 for msg in msgs:
                     await handle_message(msg, nc)
             except nats.errors.TimeoutError:
+                now = time.time()
+                if now - last_heartbeat >= 60:
+                    log.info("fetch loop alive, iter=%d (no messages)", iter_count)
+                    last_heartbeat = now
                 continue
+            except asyncio.CancelledError:
+                log.info("fetch loop cancelled")
+                raise
+            except Exception as e:
+                log.exception("fetch loop error (iter=%d): %s", iter_count, e)
+                await asyncio.sleep(1)
     finally:
-        await sub.unsubscribe()
-        await nc.drain()
+        log.info("Fetch loop exited (iter=%d, shutdown_set=%s)", iter_count, _shutdown.is_set())
+        try:
+            await sub.unsubscribe()
+        except Exception as e:
+            log.warning("unsubscribe failed: %s", e)
+        try:
+            await nc.drain()
+        except Exception as e:
+            log.warning("drain failed: %s", e)
         log.info("Worker shut down")
 
 
