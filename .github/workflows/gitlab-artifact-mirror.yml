@@ -80,7 +80,7 @@ jobs:
       tag: ${{ steps.tag.outputs.tag }}
       is_release: ${{ steps.tag.outputs.is_release }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Load .github/gitlab-mirror.yml
         id: cfg
@@ -189,7 +189,7 @@ jobs:
         chart: ${{ fromJson(needs.preflight.outputs.helm_charts) }}
     steps:
       - name: Install Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@v5
         with:
           version: v3.14.0
 
@@ -233,7 +233,7 @@ jobs:
       matrix:
         pkg: ${{ fromJson(needs.preflight.outputs.npm_packages) }}
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
 
@@ -285,7 +285,7 @@ jobs:
     if: needs.preflight.outputs.config_found == 'true' && needs.preflight.outputs.mirror_releases == 'true' && needs.preflight.outputs.is_release == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Mirror GitHub Release → GitLab Release
         env:
