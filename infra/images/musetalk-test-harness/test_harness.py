@@ -31,13 +31,13 @@ async def run_test():
 
     reference_image_url = os.environ.get(
         "TEST_REFERENCE_IMAGE_URL",
-        "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/images/monalisa.png",
+        "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/video/yongen.mp4",
     )
     audio_url = os.environ.get(
         "TEST_AUDIO_URL",
-        "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/audio/intro.wav",
+        "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/audio/yongen.wav",
     )
-    persona_id = os.environ.get("TEST_PERSONA_ID", "test-monalisa")
+    persona_id = os.environ.get("TEST_PERSONA_ID", "test-yongen")
 
     log.info("Connecting to NATS at %s", nats_url)
     nc = await nats.connect(nats_url)
