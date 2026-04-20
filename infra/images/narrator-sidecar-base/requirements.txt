@@ -13,9 +13,13 @@ openai==1.52.0
 aiortc==1.9.0
 websockets==13.1
 
-# TTS (Coqui XTTS-v2) — CPU-only; torch pulled in as dep
+# TTS (Coqui XTTS-v2) — CPU-only
 # transformers pinned for BeamSearchScorer compatibility (removed in >=4.40)
+# torch pinned <2.6 because PyTorch 2.6 flipped torch.load weights_only default to True,
+# breaking XTTS checkpoint load (UnpicklingError: XttsConfig not an allowed global).
 TTS==0.22.0
+torch==2.2.2
+torchaudio==2.2.2
 transformers==4.36.2
 tokenizers==0.15.2
 

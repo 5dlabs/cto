@@ -10,7 +10,7 @@ import time
 
 import uvicorn
 from aiortc import RTCPeerConnection, RTCSessionDescription
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 
 from app.acp_parser import ACPEvent, parse_line
 from app.config import settings
@@ -54,9 +54,12 @@ async def healthz():
 
 
 @app.get("/readyz")
-async def readyz():
+async def readyz(response: Response):
     tts_ready = _tts.ready if _tts else False
-    return {"status": "ready" if tts_ready else "starting", "tts_ready": tts_ready}
+    if not tts_ready:
+        response.status_code = 503
+        return {"status": "starting", "tts_ready": False}
+    return {"status": "ready", "tts_ready": True}
 
 
 @app.get("/info")
