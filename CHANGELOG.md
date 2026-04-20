@@ -3,6 +3,14 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.70](https://github.com/5dlabs/cto/compare/v0.2.69...v0.2.70) (2026-04-20)
+
+
+### 🔧 Maintenance
+
+* **deps:** bump pulldown-cmark from 0.9.6 to 0.13.1 ([#4527](https://github.com/5dlabs/cto/issues/4527)) ([ba777f8](https://github.com/5dlabs/cto/commit/ba777f863f5bd6ba0631c8cec958dee794fa650b))
+* **deps:** bump schemars from 0.8.22 to 1.2.1 ([#4528](https://github.com/5dlabs/cto/issues/4528)) ([9c94494](https://github.com/5dlabs/cto/commit/9c94494225613990723376afd526a01e8a02738f))
+
 ## [0.2.69](https://github.com/5dlabs/cto/compare/v0.2.68...v0.2.69) (2026-04-20)
 
 
