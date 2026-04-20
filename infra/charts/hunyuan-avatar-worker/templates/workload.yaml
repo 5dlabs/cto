@@ -107,6 +107,7 @@ spec:
                 exit 0
               fi
               echo "Cloning HunyuanVideo repo for inference scripts..."
+              rm -rf "$REPO_DIR"
               git clone --depth 1 https://huggingface.co/tencent/HunyuanVideo "$REPO_DIR"
               echo "Repo cloned successfully"
           volumeMounts:
