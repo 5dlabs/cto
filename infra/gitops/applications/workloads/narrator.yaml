@@ -1,0 +1,85 @@
+---
+# Narrator Service
+# =============================================================================
+# Lipsync and audio processing service.
+# Consumes lipsync requests via NATS JetStream, produces synchronized audio.
+#
+# Prerequisites:
+#   - NATS server accessible at musetalk-nats.cto.svc.cluster.local
+#   - ghcr-secret for image pull
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: narrator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: narrator
+    app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/component: audio-processing
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/cto.git
+    targetRevision: main
+    path: infra/charts/narrator
+    helm:
+      valueFiles:
+        - values.yaml
+      values: |
+        image:
+          repository: ghcr.io/5dlabs/narrator-sidecar-base
+          tag: "latest"
+
+        # Storage class for TTS model cache PVC
+        persistence:
+          storageClass: "mayastor"
+          size: 20Gi
+
+        tts:
+          modelCacheDir: "/models/tts"
+
+        # NATS — dedicated JetStream-enabled NATS for worker traffic
+        nats:
+          url: "nats://musetalk-nats.cto.svc.cluster.local:4222"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+    - group: ""
+      kind: PersistentVolumeClaim
+      jsonPointers:
+        - /spec/volumeName
+
+  revisionHistoryLimit: 5

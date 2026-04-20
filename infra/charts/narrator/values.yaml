@@ -1,0 +1,57 @@
+# Narrator Service
+# NATS-driven lipsync and audio processing
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/5dlabs/narrator-sidecar-base
+  tag: "latest"
+  pullPolicy: Always
+
+imagePullSecrets:
+  - name: ghcr-secret
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 8081
+  metricsPort: 8082
+
+nats:
+  url: "nats://musetalk-nats.cto.svc.cluster.local:4222"
+  subject: "lipsync.request"
+  resultSubject: "lipsync.result"
+  queue: "narrator-workers"
+  stream: "LIPSYNC"
+  consumer: "narrator"
+  ackWait: "300s"
+  maxDeliver: 3
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+podAnnotations: {}
+
+podLabels: {}
+
+persistence:
+  enabled: true
+  storageClass: "mayastor"
+  size: 20Gi
+  mountPath: /models
+
+tts:
+  modelCacheDir: /models/tts
