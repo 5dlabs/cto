@@ -47,7 +47,7 @@ kube.workspace = true
 k8s-openapi.workspace = true
 
 # HMAC signature verification
-hmac = "0.12"
+hmac = "0.13"
 sha2 = "0.10"
 hex = "0.4"
 
