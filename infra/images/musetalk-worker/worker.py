@@ -105,13 +105,17 @@ async def handle_message(msg, nc):
             from render import render_avatar
             loop = asyncio.get_event_loop()
             t0 = time.time()
+            import functools
             result = await loop.run_in_executor(
                 None,
-                render_avatar,
-                ref_path,
-                audio_path,
-                output_path,
-                data.get("fps", 25),
+                functools.partial(
+                    render_avatar,
+                    ref_path,
+                    audio_path,
+                    output_path,
+                    data.get("fps", 25),
+                    persona_id=persona_id if persona_id != "unknown" else None,
+                ),
             )
             duration = time.time() - t0
 
