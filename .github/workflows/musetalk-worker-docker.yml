@@ -60,6 +60,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./infra/images/musetalk-worker
+          file: ./infra/images/musetalk-worker/Dockerfile.optimized
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
