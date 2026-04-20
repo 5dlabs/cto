@@ -13,15 +13,15 @@ spec:
     {{- include "openclaw-agent.selectorLabels" . | nindent 4 }}
   ports:
     {{- if .Values.narrator.musetalk.enabled }}
-    - name: musetalk
+    - name: narr-muse
       port: {{ .Values.narrator.musetalk.port }}
-      targetPort: narrator-musetalk
+      targetPort: narr-muse
       protocol: TCP
     {{- end }}
     {{- if .Values.narrator.hunyuan.enabled }}
-    - name: hunyuan
+    - name: narr-huny
       port: {{ .Values.narrator.hunyuan.port }}
-      targetPort: narrator-hunyuan
+      targetPort: narr-huny
       protocol: TCP
     {{- end }}
 {{- end }}
