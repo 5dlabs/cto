@@ -167,7 +167,7 @@ impl SessionTracker {
             sessions: Arc::new(RwLock::new(HashMap::new())),
             issue_sessions: Arc::new(RwLock::new(HashMap::new())),
             workflow_sessions: Arc::new(RwLock::new(HashMap::new())),
-            timeout: Duration::from_secs(3600),
+            timeout: Duration::from_hours(1),
         }
     }
 

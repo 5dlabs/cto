@@ -700,8 +700,7 @@ impl Default for IntakeConfig {
             github_default_org: env::var("GITHUB_DEFAULT_ORG").ok(),
             // Extended thinking is enabled by default for complex intake tasks
             extended_thinking: env::var("TASKS_EXTENDED_THINKING")
-                .map(|v| v.to_lowercase() == "true" || v == "1")
-                .unwrap_or(true),
+                .map_or(true, |v| v.to_lowercase() == "true" || v == "1"),
             thinking_budget: env::var("TASKS_THINKING_BUDGET")
                 .ok()
                 .and_then(|s| s.parse().ok()),
