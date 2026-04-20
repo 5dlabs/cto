@@ -100,19 +100,23 @@ spec:
             - sh
             - -c
             - |
-              set -e
+              set -ex
               REPO_DIR={{ .Values.model.cacheDir }}/hymm_sp
               if [ -f "$REPO_DIR/sample_gpu_poor.py" ]; then
                 echo "Repo already cloned, skipping"
                 exit 0
               fi
               echo "Cloning HunyuanVideo-Avatar repo for inference scripts..."
-              rm -rf "$REPO_DIR"
-              mkdir -p "$REPO_DIR"
+              rm -rf /tmp/hunyuan-repo
               git clone --depth 1 --filter=blob:none --sparse https://github.com/Tencent-Hunyuan/HunyuanVideo-Avatar.git /tmp/hunyuan-repo
               cd /tmp/hunyuan-repo
               git sparse-checkout set hymm_sp
+              echo "Contents of /tmp/hunyuan-repo/hymm_sp:"
+              ls -la /tmp/hunyuan-repo/hymm_sp/
+              mkdir -p "$REPO_DIR"
               cp -r /tmp/hunyuan-repo/hymm_sp/* "$REPO_DIR/"
+              echo "Contents of $REPO_DIR:"
+              ls -la "$REPO_DIR/"
               rm -rf /tmp/hunyuan-repo
               echo "Repo cloned successfully"
           volumeMounts:
