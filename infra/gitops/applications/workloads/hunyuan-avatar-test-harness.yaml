@@ -30,7 +30,7 @@ spec:
       serviceAccountName: default
       containers:
         - name: verify-worker
-          image: bitnami/kubectl:1.30
+          image: bitnami/kubectl:1.31
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh
