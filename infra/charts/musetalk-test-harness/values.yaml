@@ -19,15 +19,15 @@ s3:
   secretKey: ""
 
 test:
-  referenceImageURL: "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/images/monalisa.png"
-  audioURL: "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/audio/intro.wav"
-  personaId: "test-monalisa"
+  referenceImageURL: "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/video/yongen.mp4"
+  audioURL: "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/audio/yongen.wav"
+  personaId: "test-yongen"
   timeout: "300"
 
 image:
   repository: ghcr.io/5dlabs/musetalk-test-harness
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 imagePullSecrets:
   - name: ghcr-secret
