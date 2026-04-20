@@ -15,7 +15,7 @@ import torch
 log = logging.getLogger("render")
 
 MODEL_DIR = Path(os.environ.get("MODEL_CACHE_DIR", "/models/hunyuan-avatar"))
-REPO_DIR = MODEL_DIR
+REPO_DIR = Path(os.environ.get("HUNYUAN_REPO_DIR", str(MODEL_DIR / "hymm_sp")))
 OUTPUT_ROOT = Path(os.environ.get("OUTPUT_DIR", "/tmp/renders/hunyuan-avatar"))
 CHECKPOINT_PATH = Path(
     os.environ.get(
@@ -23,7 +23,7 @@ CHECKPOINT_PATH = Path(
         str(MODEL_DIR / "weights/ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states_fp8.pt"),
     )
 )
-_SAMPLE_GPU_POOR = REPO_DIR / "hymm_sp" / "sample_gpu_poor.py"
+_SAMPLE_GPU_POOR = REPO_DIR / "sample_gpu_poor.py"
 _PIPELINE_READY = False
 
 

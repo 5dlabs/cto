@@ -93,6 +93,33 @@ spec:
           resources:
             {{- toYaml .Values.initContainers.downloadModels.resources | nindent 12 }}
         {{- end }}
+        {{- if .Values.initContainers.cloneRepo.enabled }}
+        - name: clone-repo
+          image: alpine/git
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              REPO_DIR={{ .Values.model.cacheDir }}/hymm_sp
+              if [ -f "$REPO_DIR/sample_gpu_poor.py" ]; then
+                echo "Repo already cloned, skipping"
+                exit 0
+              fi
+              echo "Cloning HunyuanVideo repo for inference scripts..."
+              git clone --depth 1 https://huggingface.co/tencent/HunyuanVideo "$REPO_DIR"
+              echo "Repo cloned successfully"
+          volumeMounts:
+            - name: model-cache
+              mountPath: {{ .Values.model.cacheDir }}
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+        {{- end }}
       containers:
         - name: worker
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

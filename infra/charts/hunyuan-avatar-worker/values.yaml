@@ -40,6 +40,8 @@ initContainers:
       limits:
         cpu: "4"
         memory: 8Gi
+  cloneRepo:
+    enabled: true
 
 resources:
   requests:
