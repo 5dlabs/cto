@@ -11,29 +11,35 @@ import time
 import uvicorn
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
 
-from app.config import Settings
+from app.acp_parser import ACPEvent, parse_line
+from app.config import settings
 from app.interrupt import write_interrupt
-from app.narrator import generate_phrase
+from app.narrator import Narrator
 from app.session import SessionRegistry, SessionState
 from app.tailer import tail_acp_stream
-from app.tts import synthesize_speech
-from app.webrtc import create_audio_track, create_video_track_placeholder
+from app.tts import TTSEngine
+from app.webrtc import NarratorAudioTrack, WebRTCSession
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 log = logging.getLogger("main")
 
-settings = Settings()
 registry = SessionRegistry()
 app = FastAPI(title="Narrator Sidecar", version="0.1.0")
 
 _shutdown = asyncio.Event()
+_narrator: Narrator | None = None
+_tts: TTSEngine | None = None
 
 
 @app.on_event("startup")
 async def startup():
-    log.info("Narrator sidecar starting (backend=%s, port=%d)", settings.BACKEND, settings.PORT)
+    global _narrator, _tts
+    log.info("Narrator sidecar starting (backend=%s, port=%d)", settings.backend, settings.port)
+    _narrator = Narrator()
+    _tts = TTSEngine(settings.tts_model_path, settings.voice_sample_path)
+    # Preload TTS in background
+    asyncio.create_task(_tts.preload())
 
 
 @app.on_event("shutdown")
@@ -49,13 +55,14 @@ async def healthz():
 
 @app.get("/readyz")
 async def readyz():
-    return {"status": "ready"}
+    tts_ready = _tts.ready if _tts else False
+    return {"status": "ready" if tts_ready else "starting", "tts_ready": tts_ready}
 
 
 @app.get("/info")
 async def info():
     return {
-        "backend": settings.BACKEND,
+        "backend": settings.backend,
         "version": "0.1.0",
         "capabilities": ["audio", "video", "interrupt"],
     }
@@ -73,32 +80,22 @@ async def create_session(req: dict) -> dict:
     state = registry.create(session_id, persona_id)
 
     # Set up WebRTC
-    pc = RTCPeerConnection()
-    state.pc = pc
+    webrtc = WebRTCSession()
+    state.pc = webrtc.pc
 
-    @pc.on("iceconnectionstatechange")
+    @webrtc.pc.on("iceconnectionstatechange")
     async def on_ice_state():
-        log.info("ICE state: %s (session=%s)", pc.iceConnectionState, session_id)
-        if pc.iceConnectionState in ("failed", "closed"):
+        log.info("ICE state: %s (session=%s)", webrtc.pc.iceConnectionState, session_id)
+        if webrtc.pc.iceConnectionState in ("failed", "closed"):
             await registry.delete(session_id)
 
-    # Create media tracks
-    audio_track = create_audio_track()
-    video_track = create_video_track_placeholder()
-    pc.addTrack(audio_track)
-    pc.addTrack(video_track)
-
     # Handle SDP
-    offer = RTCSessionDescription(sdp=webrtc_offer["sdp"], type=webrtc_offer["type"])
-    await pc.setRemoteDescription(offer)
-    answer = await pc.createAnswer()
-    await pc.setLocalDescription(answer)
+    answer = await webrtc.handle_offer(webrtc_offer["sdp"], webrtc_offer["type"])
 
-    # Start tailing ACP stream
-    state.tailer_task = asyncio.create_task(_run_tailer(state))
+    # Start tailing ACP stream and generating narration
+    state.tailer_task = asyncio.create_task(_run_tailer_and_narrate(state, webrtc))
 
-    webrtc_answer = {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
-    return {"session_id": session_id, "webrtc_answer": webrtc_answer}
+    return {"session_id": session_id, "webrtc_answer": answer}
 
 
 @app.delete("/sessions/{session_id}")
@@ -142,22 +139,49 @@ async def get_session_state(session_id: str):
     }
 
 
-async def _run_tailer(state: SessionState):
+async def _run_tailer_and_narrate(state: SessionState, webrtc: WebRTCSession):
     """Tail ACP stream, generate phrases, synthesize TTS, push to WebRTC."""
-    stream_path = os.environ.get("OPENCLAW_RAW_STREAM_PATH", "/workspace/.openclaw/acp-stream.ndjson")
+    narrator = _narrator or Narrator()
+    tts = _tts
+
+    if tts and not tts.ready:
+        await tts.preload()
 
     try:
-        async for line in tail_acp_stream(stream_path):
+        async for line in tail_acp_stream():
             if not state.active:
                 break
-            state.add_acp_event({"raw": line.strip(), "ts": time.time()})
+
+            event = parse_line(line)
+            if event is None:
+                continue
+
+            state.add_acp_event(event)
+
+            # Every N events, generate a narration phrase
+            if len(state.acp_events) % settings.narrator_window_size == 0:
+                events = list(state.acp_events)[-settings.narrator_window_size:]
+                result = await narrator.narrate(events)
+
+                if not result.get("silent") and tts:
+                    phrase = result.get("phrase", "")
+                    urgency = result.get("urgency", "low")
+                    state.set_phrase(phrase, urgency)
+                    log.info("Narrating: %s (urgency=%s)", phrase, urgency)
+
+                    # Synthesize and push to WebRTC
+                    audio = await tts.synthesize(phrase)
+                    await webrtc.push_tts_audio(audio)
+
+    except asyncio.CancelledError:
+        log.info("Tail task cancelled for session %s", state.session_id)
     except Exception as e:
-        log.error("Tail error: %s", e)
+        log.error("Tail error: %s", e, exc_info=True)
 
 
 async def main():
     """Entry point."""
-    config = uvicorn.Config(app, host="0.0.0.0", port=settings.PORT, log_level="info")
+    config = uvicorn.Config(app, host="0.0.0.0", port=settings.port, log_level="info")
     server = uvicorn.Server(config)
 
     loop = asyncio.get_event_loop()

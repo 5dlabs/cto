@@ -26,18 +26,24 @@ Response schema (pick one):
 
 class Narrator:
     def __init__(self):
-        self._client = AsyncOpenAI(api_key=settings.openai_api_key)
+        self._client = AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+        self._last_phrase: str | None = None
+        self._last_phrase_time: float = 0
 
     async def narrate(self, events: list[ACPEvent]) -> dict:
         """
         Given a rolling window of recent ACP events, return a narration dict.
         Returns {"phrase": "...", "urgency": "low|med|high"} or {"silent": true}.
         """
-        if not events:
+        if not events or not self._client:
             return {"silent": True}
 
-        lines = [event_to_narrator_text(e) for e in events]
-        user_content = "Recent agent activity:\n" + "\n".join(lines)
+        # Filter out empty events
+        lines = [event_to_narrator_text(e) for e in events if event_to_narrator_text(e)]
+        if not lines:
+            return {"silent": True}
+
+        user_content = "Recent agent activity:\n" + "\n".join(lines[-20:])  # last 20 events
 
         try:
             response = await self._client.chat.completions.create(
@@ -52,8 +58,8 @@ class Narrator:
             )
             raw = response.choices[0].message.content or "{}"
             result = json.loads(raw)
-        except Exception as exc:
-            return {"silent": True, "_error": str(exc)}
+        except Exception:
+            return {"silent": True}
 
         # Validate shape
         if "silent" in result:
@@ -64,4 +70,8 @@ class Narrator:
             urgency = "low"
         if not phrase:
             return {"silent": True}
+        # Deduplicate: don't repeat the same phrase
+        if phrase == self._last_phrase:
+            return {"silent": True}
+        self._last_phrase = phrase
         return {"phrase": phrase, "urgency": urgency}

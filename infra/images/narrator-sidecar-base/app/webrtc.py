@@ -100,3 +100,14 @@ class WebRTCSession:
         self._closed = True
         if self.pc:
             await self.pc.close()
+
+
+# Backward compatibility exports
+def create_audio_track() -> NarratorAudioTrack:
+    """Create a new audio track for WebRTC."""
+    return NarratorAudioTrack()
+
+
+def create_video_track_placeholder():
+    """Placeholder video track (not implemented for audio-only PoC)."""
+    return None
