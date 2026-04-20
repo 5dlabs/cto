@@ -3,6 +3,21 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.74](https://github.com/5dlabs/cto/compare/v0.2.73...v0.2.74) (2026-04-20)
+
+
+### ✨ Features
+
+* **narrator:** add narrator service Helm chart and ArgoCD application ([f1b63c7](https://github.com/5dlabs/cto/commit/f1b63c7de50ed3904e6021b0fb75c0415797bc6b))
+
+
+### 🐛 Bug Fixes
+
+* **narrator:** add missing asyncio import in tts.py ([d06206e](https://github.com/5dlabs/cto/commit/d06206ef1be9b06c41905f7e5699d37daed929ee))
+* **narrator:** add serviceAccount to ArgoCD inline values ([9fa5e4e](https://github.com/5dlabs/cto/commit/9fa5e4eeb685e48f2ede4a2e289c6321088959bd))
+* **narrator:** add serviceAccount values to fix Helm template error ([e773615](https://github.com/5dlabs/cto/commit/e7736151f711b94c0b735cd0e041d09885a21244))
+* **narrator:** remove duplicate serviceAccount from inline values ([f1dce0f](https://github.com/5dlabs/cto/commit/f1dce0f53987c873c1cf2639ef07b5e214607ed5))
+
 ## [0.2.73](https://github.com/5dlabs/cto/compare/v0.2.72...v0.2.73) (2026-04-20)
 
 
