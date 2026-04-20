@@ -3,7 +3,7 @@ name: cto
 description: CTO Platform - AI Development Orchestration
 type: application
 version: 0.2.9
-appVersion: 0.2.65
+appVersion: 0.2.66
 keywords:
   - ai
   - agents
