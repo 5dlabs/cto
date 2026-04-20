@@ -15,6 +15,9 @@ websockets==13.1
 
 # TTS (Coqui XTTS-v2) — CPU-only; torch pulled in as dep
 TTS==0.22.0
+# Pinned so Coqui TTS 0.22.0's BeamSearchScorer import works (transformers removed it in >=4.40)
+transformers==4.36.2
+tokenizers==0.15.2
 
 # Audio utilities
 numpy==1.26.4
