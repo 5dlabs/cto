@@ -44,6 +44,10 @@ spec:
         tts:
           modelCacheDir: "/models/tts"
 
+        serviceAccount:
+          create: false
+          name: ""
+
         # NATS — dedicated JetStream-enabled NATS for worker traffic
         nats:
           url: "nats://musetalk-nats.cto.svc.cluster.local:4222"
