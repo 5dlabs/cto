@@ -14,8 +14,8 @@ aiortc==1.9.0
 websockets==13.1
 
 # TTS (Coqui XTTS-v2) — CPU-only; torch pulled in as dep
+# transformers pinned for BeamSearchScorer compatibility (removed in >=4.40)
 TTS==0.22.0
-# Pinned so Coqui TTS 0.22.0's BeamSearchScorer import works (transformers removed it in >=4.40)
 transformers==4.36.2
 tokenizers==0.15.2
 
