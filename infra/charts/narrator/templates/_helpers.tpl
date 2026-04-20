@@ -52,9 +52,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Create the name of the service account to use
 */}}
 {{- define "narrator.serviceAccountName" -}}
+{{- if .Values.serviceAccount }}
 {{- if .Values.serviceAccount.create }}
 {{- default (include "narrator.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- else }}
+{{- "default" }}
 {{- end }}
 {{- end }}

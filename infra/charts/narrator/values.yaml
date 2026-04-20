@@ -55,3 +55,7 @@ persistence:
 
 tts:
   modelCacheDir: /models/tts
+
+serviceAccount:
+  create: false
+  name: ""
