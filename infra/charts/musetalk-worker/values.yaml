@@ -19,7 +19,7 @@ debug:
 
 image:
   repository: ghcr.io/5dlabs/musetalk-worker
-  tag: "phase4-bf9d906"
+  tag: "phase4-1a63104"
   pullPolicy: Always
 
 imagePullSecrets:
