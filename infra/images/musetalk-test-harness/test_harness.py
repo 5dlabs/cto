@@ -43,18 +43,34 @@ async def run_test():
     nc = await nats.connect(nats_url)
     js = nc.jetstream()
 
-    # Ensure stream exists
+    # Ensure stream exists. If the stream pre-exists with a different config
+    # (e.g. created by the worker), we accept it as-is rather than trying to
+    # reconcile — the worker owns stream provisioning.
     try:
-        await js.add_stream(
-            name=stream_name,
-            subjects=[subject, result_subject],
-            retention="limits",
-            max_msgs=10000,
-            max_bytes=1073741824,  # 1GB
+        info = await js.stream_info(stream_name)
+        log.info(
+            "Stream %s already exists (subjects=%s)",
+            stream_name,
+            info.config.subjects,
         )
-        log.info("Created stream %s", stream_name)
-    except nats.js.errors.StreamAlreadyExistsError:
-        log.info("Stream %s already exists", stream_name)
+    except Exception:
+        try:
+            await js.add_stream(
+                name=stream_name,
+                subjects=[subject, result_subject],
+                max_msgs=10000,
+                max_bytes=1073741824,  # 1GB
+            )
+            log.info("Created stream %s", stream_name)
+        except nats.js.errors.BadRequestError as e:
+            # err_code 10058 = stream name already in use with different config
+            if getattr(e, "err_code", None) == 10058:
+                log.info(
+                    "Stream %s already exists with different config; using as-is",
+                    stream_name,
+                )
+            else:
+                raise
 
     request_id = str(uuid.uuid4())
     request = {
