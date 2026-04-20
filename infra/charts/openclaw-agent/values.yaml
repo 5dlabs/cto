@@ -722,14 +722,22 @@ narrator:
     repository: ghcr.io/5dlabs/narrator-sidecar-base
     tag: latest
     pullPolicy: Always
+  # Shared NATS endpoint for both lipsync backends. Per-backend subjects
+  # live under .musetalk / .hunyuan so they can target different workers
+  # once the worker charts adopt per-backend subject naming.
+  lipsyncNatsUrl: "nats://musetalk-nats.cto.svc.cluster.local:4222"
   musetalk:
     enabled: true
     port: 8081
     backend: musetalk
+    lipsyncSubject: "avatar.render.request"
+    lipsyncResultSubject: "avatar.render.result"
   hunyuan:
     enabled: false
     port: 8082
     backend: hunyuan
+    lipsyncSubject: "avatar.render.request"
+    lipsyncResultSubject: "avatar.render.result"
   resources:
     requests:
       cpu: 100m
