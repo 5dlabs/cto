@@ -108,9 +108,12 @@ spec:
               fi
               echo "Cloning HunyuanVideo-Avatar repo for inference scripts..."
               rm -rf "$REPO_DIR"
-              git clone --depth 1 --filter=blob:none --sparse https://github.com/Tencent-Hunyuan/HunyuanVideo-Avatar.git "$REPO_DIR"
-              cd "$REPO_DIR"
+              mkdir -p "$REPO_DIR"
+              git clone --depth 1 --filter=blob:none --sparse https://github.com/Tencent-Hunyuan/HunyuanVideo-Avatar.git /tmp/hunyuan-repo
+              cd /tmp/hunyuan-repo
               git sparse-checkout set hymm_sp
+              cp -r /tmp/hunyuan-repo/hymm_sp/* "$REPO_DIR/"
+              rm -rf /tmp/hunyuan-repo
               echo "Repo cloned successfully"
           volumeMounts:
             - name: model-cache
