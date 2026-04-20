@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.67](https://github.com/5dlabs/cto/compare/v0.2.66...v0.2.67) (2026-04-20)
+
+
+### 🔧 Maintenance
+
+* **deps:** bump the actions group across 1 directory with 14 updates ([#4712](https://github.com/5dlabs/cto/issues/4712)) ([4de07b5](https://github.com/5dlabs/cto/commit/4de07b53710dd42bc2287f9237367d02e867eec8))
+
 ## [0.2.66](https://github.com/5dlabs/cto/compare/v0.2.65...v0.2.66) (2026-04-20)
 
 
