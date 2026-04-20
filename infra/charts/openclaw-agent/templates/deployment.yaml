@@ -1332,7 +1332,7 @@ spec:
         {{- end }}
         {{- if .Values.narrator.enabled }}
         {{- if .Values.narrator.musetalk.enabled }}
-        - name: musetalk-narrator
+        - name: narrator-musetalk
           image: "{{ .Values.narrator.image.repository }}:{{ .Values.narrator.image.tag }}"
           imagePullPolicy: {{ .Values.narrator.image.pullPolicy }}
           securityContext:
@@ -1349,13 +1349,25 @@ spec:
             - name: PORT
               value: "{{ .Values.narrator.musetalk.port }}"
             - name: OPENCLAW_RAW_STREAM_PATH
-              value: /workspace/.openclaw/logs/raw-stream.jsonl
+              value: {{ .Values.narrator.rawStreamPath | quote }}
+            - name: NARRATOR_INTERRUPT_PATH
+              value: {{ .Values.narrator.interruptPath | quote }}
+            - name: PERSONA_ID
+              value: {{ .Values.narrator.persona.id | quote }}
+            - name: PERSONA_VOICE_SAMPLE
+              value: {{ .Values.narrator.persona.voiceSamplePath | quote }}
+            - name: LIPSYNC_WORKER_URL
+              value: {{ .Values.narrator.musetalk.workerUrl | quote }}
             - name: LIPSYNC_NATS_URL
               value: {{ .Values.narrator.lipsyncNatsUrl | quote }}
             - name: LIPSYNC_SUBJECT
               value: {{ .Values.narrator.musetalk.lipsyncSubject | quote }}
             - name: LIPSYNC_RESULT_SUBJECT
               value: {{ .Values.narrator.musetalk.lipsyncResultSubject | quote }}
+            {{- if .Values.nats.enabled }}
+            - name: NATS_URL
+              value: {{ .Values.nats.url | quote }}
+            {{- end }}
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -1365,30 +1377,32 @@ spec:
             - name: LLM_MODEL
               value: "gpt-4o-mini"
           ports:
-            - name: narrator-musetalk
+            - name: narr-muse
               containerPort: {{ .Values.narrator.musetalk.port }}
               protocol: TCP
           volumeMounts:
             - name: workspace
               mountPath: /workspace
+            - name: narrator-voice-samples
+              mountPath: /models/voice-samples
               readOnly: true
           readinessProbe:
             httpGet:
-              path: /readyz
-              port: narrator-musetalk
-            initialDelaySeconds: 10
-            periodSeconds: 10
+              path: {{ .Values.narrator.probes.readiness.path | quote }}
+              port: narr-muse
+            initialDelaySeconds: {{ .Values.narrator.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.narrator.probes.readiness.periodSeconds }}
           livenessProbe:
             httpGet:
-              path: /healthz
-              port: narrator-musetalk
-            initialDelaySeconds: 30
-            periodSeconds: 30
+              path: {{ .Values.narrator.probes.liveness.path | quote }}
+              port: narr-muse
+            initialDelaySeconds: {{ .Values.narrator.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.narrator.probes.liveness.periodSeconds }}
           resources:
             {{- toYaml .Values.narrator.resources | nindent 12 }}
         {{- end }}
         {{- if .Values.narrator.hunyuan.enabled }}
-        - name: hunyuan-narrator
+        - name: narrator-hunyuan
           image: "{{ .Values.narrator.image.repository }}:{{ .Values.narrator.image.tag }}"
           imagePullPolicy: {{ .Values.narrator.image.pullPolicy }}
           securityContext:
@@ -1405,13 +1419,25 @@ spec:
             - name: PORT
               value: "{{ .Values.narrator.hunyuan.port }}"
             - name: OPENCLAW_RAW_STREAM_PATH
-              value: /workspace/.openclaw/logs/raw-stream.jsonl
+              value: {{ .Values.narrator.rawStreamPath | quote }}
+            - name: NARRATOR_INTERRUPT_PATH
+              value: {{ .Values.narrator.interruptPath | quote }}
+            - name: PERSONA_ID
+              value: {{ .Values.narrator.persona.id | quote }}
+            - name: PERSONA_VOICE_SAMPLE
+              value: {{ .Values.narrator.persona.voiceSamplePath | quote }}
+            - name: LIPSYNC_WORKER_URL
+              value: {{ .Values.narrator.hunyuan.workerUrl | quote }}
             - name: LIPSYNC_NATS_URL
               value: {{ .Values.narrator.lipsyncNatsUrl | quote }}
             - name: LIPSYNC_SUBJECT
               value: {{ .Values.narrator.hunyuan.lipsyncSubject | quote }}
             - name: LIPSYNC_RESULT_SUBJECT
               value: {{ .Values.narrator.hunyuan.lipsyncResultSubject | quote }}
+            {{- if .Values.nats.enabled }}
+            - name: NATS_URL
+              value: {{ .Values.nats.url | quote }}
+            {{- end }}
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -1421,25 +1447,27 @@ spec:
             - name: LLM_MODEL
               value: "gpt-4o-mini"
           ports:
-            - name: narrator-hunyuan
+            - name: narr-huny
               containerPort: {{ .Values.narrator.hunyuan.port }}
               protocol: TCP
           volumeMounts:
             - name: workspace
               mountPath: /workspace
+            - name: narrator-voice-samples
+              mountPath: /models/voice-samples
               readOnly: true
           readinessProbe:
             httpGet:
-              path: /readyz
-              port: narrator-hunyuan
-            initialDelaySeconds: 10
-            periodSeconds: 10
+              path: {{ .Values.narrator.probes.readiness.path | quote }}
+              port: narr-huny
+            initialDelaySeconds: {{ .Values.narrator.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.narrator.probes.readiness.periodSeconds }}
           livenessProbe:
             httpGet:
-              path: /healthz
-              port: narrator-hunyuan
-            initialDelaySeconds: 30
-            periodSeconds: 30
+              path: {{ .Values.narrator.probes.liveness.path | quote }}
+              port: narr-huny
+            initialDelaySeconds: {{ .Values.narrator.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.narrator.probes.liveness.periodSeconds }}
           resources:
             {{- toYaml .Values.narrator.resources | nindent 12 }}
         {{- end }}
@@ -1503,4 +1531,10 @@ spec:
         - name: promtail-config
           configMap:
             name: {{ include "openclaw-agent.fullname" . }}-promtail
+        {{- end }}
+        {{- if .Values.narrator.enabled }}
+        - name: narrator-voice-samples
+          configMap:
+            name: narrator-voice-samples
+            optional: true
         {{- end }}

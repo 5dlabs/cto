@@ -722,6 +722,15 @@ narrator:
     repository: ghcr.io/5dlabs/narrator-sidecar-base
     tag: latest
     pullPolicy: Always
+  # Path the agent writes ACP NDJSON to (shared PV). Both sidecars tail this.
+  # Must match .Values.logging.rawStreamPath when narrator.enabled=true.
+  rawStreamPath: /workspace/.openclaw/raw-stream.log
+  # Sidecars append interrupt events here; the agent-side ACP bridge (Phase C)
+  # tails this file and calls session/cancel + session/prompt.
+  interruptPath: /workspace/.narrator/interrupt.jsonl
+  persona:
+    id: rex
+    voiceSamplePath: /models/voice-samples/rex.mp3
   # Shared NATS endpoint for both lipsync backends. Per-backend subjects
   # live under .musetalk / .hunyuan so they can target different workers
   # once the worker charts adopt per-backend subject naming.
@@ -730,21 +739,32 @@ narrator:
     enabled: true
     port: 8081
     backend: musetalk
+    workerUrl: "http://musetalk-worker.cto.svc.cluster.local:8080"
     lipsyncSubject: "avatar.render.request"
     lipsyncResultSubject: "avatar.render.result"
   hunyuan:
-    enabled: false
+    enabled: true
     port: 8082
     backend: hunyuan
+    workerUrl: "http://hunyuan-avatar-worker.cto.svc.cluster.local:8080"
     lipsyncSubject: "avatar.render.request"
     lipsyncResultSubject: "avatar.render.result"
   resources:
     requests:
-      cpu: 100m
+      cpu: 200m
       memory: 512Mi
     limits:
-      cpu: 1000m
+      cpu: 1
       memory: 2Gi
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 20
+      periodSeconds: 10
+    readiness:
+      path: /ready
+      initialDelaySeconds: 10
+      periodSeconds: 5
 
 # SSH access (disabled by default)
 ssh:
