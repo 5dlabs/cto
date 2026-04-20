@@ -20,7 +20,7 @@ OUTPUT_ROOT = Path(os.environ.get("OUTPUT_DIR", "/tmp/renders/hunyuan-avatar"))
 CHECKPOINT_PATH = Path(
     os.environ.get(
         "HUNYUAN_CHECKPOINT",
-        str(MODEL_DIR / "weights/ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states_fp8.pt"),
+        str(MODEL_DIR / "ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states_fp8.pt"),
     )
 )
 _SAMPLE_GPU_POOR = REPO_DIR / "sample_gpu_poor.py"
