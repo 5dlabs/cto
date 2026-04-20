@@ -106,9 +106,11 @@ spec:
                 echo "Repo already cloned, skipping"
                 exit 0
               fi
-              echo "Cloning HunyuanVideo repo for inference scripts..."
+              echo "Cloning HunyuanVideo-Avatar repo for inference scripts..."
               rm -rf "$REPO_DIR"
-              git clone --depth 1 https://huggingface.co/tencent/HunyuanVideo "$REPO_DIR"
+              git clone --depth 1 --filter=blob:none --sparse https://github.com/Tencent-Hunyuan/HunyuanVideo-Avatar.git "$REPO_DIR"
+              cd "$REPO_DIR"
+              git sparse-checkout set hymm_sp
               echo "Repo cloned successfully"
           volumeMounts:
             - name: model-cache
