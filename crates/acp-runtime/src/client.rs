@@ -1,3 +1,4 @@
+use crate::interrupt_bridge::{spawn_interrupt_bridge, DEFAULT_INTERRUPT_PATH};
 use crate::types::{AcpImplementationInfo, AcpPermissionPolicy, AcpPromptRequest, AcpPromptResult};
 use agent_client_protocol::{
     Agent, CancelNotification, Client, ClientCapabilities, ClientSideConnection, ContentBlock,
@@ -162,12 +163,32 @@ pub async fn run_oneshot_prompt(
                     tokio::task::spawn_local(future);
                 },
             );
+            let connection = Arc::new(connection);
 
             tokio::task::spawn_local(async move {
                 if let Err(error) = io_task.await {
                     warn!(error = %error, "ACP runtime IO task exited with error");
                 }
             });
+
+            // Optional narrator → ACP interrupt bridge (Phase C). Opt-in until
+            // the controller (Phase D) mounts the narrator sidecar.
+            let interrupt_bridge_handle = if std::env::var("ACP_INTERRUPT_BRIDGE")
+                .ok()
+                .is_some_and(|v| matches!(v.as_str(), "1" | "true" | "TRUE"))
+            {
+                let path = std::env::var("ACP_INTERRUPT_BRIDGE_PATH")
+                    .unwrap_or_else(|_| DEFAULT_INTERRUPT_PATH.to_string());
+                match spawn_interrupt_bridge(connection.clone(), path) {
+                    Ok(handle) => Some(handle),
+                    Err(err) => {
+                        warn!(error = %err, "failed to spawn ACP interrupt bridge");
+                        None
+                    }
+                }
+            } else {
+                None
+            };
 
             let initialize = InitializeRequest::new(ProtocolVersion::LATEST)
                 .client_capabilities(
@@ -213,6 +234,9 @@ pub async fn run_oneshot_prompt(
             let _ = connection
                 .cancel(CancelNotification::new(session_id.clone()))
                 .await;
+            if let Some(handle) = interrupt_bridge_handle {
+                handle.abort();
+            }
             let _ = child.start_kill();
             let _ = child.wait().await;
 
