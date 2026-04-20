@@ -5,7 +5,7 @@ from pydantic import BaseModel
 class Settings(BaseModel):
     backend: str = os.environ.get("BACKEND", "musetalk")  # musetalk | hunyuan
     port: int = int(os.environ.get("PORT", "8081"))
-    voice_id: str = os.environ.get("VOICE_ID", "rex")
+    voice_id: str = os.environ.get("VOICE_ID", "blaze")
     llm_model: str = os.environ.get("LLM_MODEL", "gpt-4o-mini")
     openai_api_key: str = os.environ.get("OPENAI_API_KEY", "")
     tts_model_path: str = os.environ.get("TTS_MODEL_PATH", "/models/tts")

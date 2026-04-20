@@ -74,7 +74,7 @@ async def info():
 @app.post("/sessions")
 async def create_session(req: dict) -> dict:
     session_id = req.get("session_id", f"session-{int(time.time())}")
-    persona_id = req.get("persona_id", "rex")
+    persona_id = req.get("persona_id", "blaze")
     webrtc_offer = req.get("webrtc_offer")
 
     if not webrtc_offer:
