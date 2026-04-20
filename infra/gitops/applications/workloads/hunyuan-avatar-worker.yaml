@@ -39,13 +39,22 @@ spec:
       values: |
         image:
           repository: ghcr.io/5dlabs/hunyuan-avatar-worker
-          tag: "v0.0.1-scaffold"
+          tag: "latest"
 
         initContainers:
           fixSymlink:
-            enabled: true
+            enabled: false
           downloadModels:
             enabled: true
+          cloneRepo:
+            enabled: true
+            resources:
+              requests:
+                cpu: "500m"
+                memory: 2Gi
+              limits:
+                cpu: "2"
+                memory: 8Gi
 
         # Storage class for model weights PVC
         persistence:
