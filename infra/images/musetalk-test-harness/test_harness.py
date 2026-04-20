@@ -136,24 +136,46 @@ async def run_test():
         log.error("Render failed: %s", result_data["error"])
         sys.exit(1)
 
-    video_url = result_data.get("video_url")
-    if not video_url:
-        log.error("No video URL in result")
-        sys.exit(1)
-
+    bootstrap_only = result_data.get("bootstrap_only", False)
     render_time = result_data.get("render_time_s", 0)
 
-    log.info("=" * 60)
-    log.info("TEST PASSED!")
-    log.info("=" * 60)
-    log.info("Request ID: %s", request_id)
-    log.info("Video URL: %s", video_url)
-    log.info("Render time: %.2fs", render_time)
-    log.info("Total time: %.2fs", elapsed)
-    log.info("GPU: %s", result_data.get("gpu", "unknown"))
-    log.info("Dtype: %s", result_data.get("dtype", "unknown"))
-    log.info("Bootstrap only: %s", result_data.get("bootstrap_only", False))
-    log.info("=" * 60)
+    if bootstrap_only:
+        gpu = result_data.get("gpu")
+        dtype = result_data.get("dtype")
+        if not gpu:
+            log.error("Bootstrap-only result missing gpu info (CUDA bootstrap may have failed)")
+            sys.exit(1)
+        if not dtype:
+            log.error("Bootstrap-only result missing dtype info")
+            sys.exit(1)
+
+        log.info("=" * 60)
+        log.info("TEST PASSED (bootstrap-only mode)!")
+        log.info("=" * 60)
+        log.info("Request ID: %s", request_id)
+        log.info("Render time: %.2fs", render_time)
+        log.info("Total time: %.2fs", elapsed)
+        log.info("GPU: %s", gpu)
+        log.info("Dtype: %s", dtype)
+        log.info("Bootstrap only: true")
+        log.info("=" * 60)
+    else:
+        video_url = result_data.get("video_url")
+        if not video_url:
+            log.error("No video URL in result")
+            sys.exit(1)
+
+        log.info("=" * 60)
+        log.info("TEST PASSED!")
+        log.info("=" * 60)
+        log.info("Request ID: %s", request_id)
+        log.info("Video URL: %s", video_url)
+        log.info("Render time: %.2fs", render_time)
+        log.info("Total time: %.2fs", elapsed)
+        log.info("GPU: %s", result_data.get("gpu", "unknown"))
+        log.info("Dtype: %s", result_data.get("dtype", "unknown"))
+        log.info("Bootstrap only: false")
+        log.info("=" * 60)
 
     # Success
     return 0
