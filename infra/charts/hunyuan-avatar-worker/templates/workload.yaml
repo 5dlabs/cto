@@ -114,12 +114,7 @@ spec:
             - name: model-cache
               mountPath: {{ .Values.model.cacheDir }}
           resources:
-            requests:
-              cpu: "500m"
-              memory: 1Gi
-            limits:
-              cpu: "2"
-              memory: 4Gi
+            {{- toYaml .Values.initContainers.cloneRepo.resources | nindent 12 }}
         {{- end }}
       containers:
         - name: worker
