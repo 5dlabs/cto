@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.72](https://github.com/5dlabs/cto/compare/v0.2.71...v0.2.72) (2026-04-20)
+
+
+### 🔧 Maintenance
+
+* **deps:** bump lucide-react from 0.563.0 to 1.8.0 in /apps/website ([#4727](https://github.com/5dlabs/cto/issues/4727)) ([75c138a](https://github.com/5dlabs/cto/commit/75c138ac6d0f9c4a2be09e5cf5aef6ae875c85ef))
+
 ## [0.2.71](https://github.com/5dlabs/cto/compare/v0.2.70...v0.2.71) (2026-04-20)
 
 
