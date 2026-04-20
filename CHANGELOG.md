@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.68](https://github.com/5dlabs/cto/compare/v0.2.67...v0.2.68) (2026-04-20)
+
+
+### 🐛 Bug Fixes
+
+* **hunyuan-docker:** optimize Dockerfile for CI builds ([de601cb](https://github.com/5dlabs/cto/commit/de601cb4fb4edb0821f8b5418be03d74ba157bcf))
+
 ## [0.2.67](https://github.com/5dlabs/cto/compare/v0.2.66...v0.2.67) (2026-04-20)
 
 
