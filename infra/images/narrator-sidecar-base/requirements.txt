@@ -1,0 +1,23 @@
+# Web framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.9.2
+pydantic-settings==2.6.1
+python-dotenv==1.0.1
+
+# HTTP client
+aiohttp==3.10.10
+openai==1.52.0
+
+# WebRTC
+aiortc==1.9.0
+websockets==13.1
+
+# TTS (Coqui XTTS-v2) — CPU-only; torch pulled in as dep
+TTS==0.22.0
+
+# Audio utilities
+numpy==1.26.4
+scipy==1.14.1
+soundfile==0.12.1
+aiofiles==24.1.0
