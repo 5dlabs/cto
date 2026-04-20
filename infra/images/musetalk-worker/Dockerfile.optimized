@@ -80,9 +80,20 @@ RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     python3 -m pip install --upgrade "setuptools<70" "wheel<0.43" "pip<24" && \
     python3 -m pip install --no-build-isolation chumpy==0.70
 
+# Install full mmcv (with compiled _ext CUDA ops) from OpenMMLab's prebuilt
+# wheel index. mmcv-lite is NOT sufficient: mmpose imports mmcv.ops which
+# requires the compiled `mmcv._ext` module. Wheel index path encodes the
+# torch + CUDA combo (torch 2.1.0 + cu118 here).
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    python3 -m pip install mmcv==2.1.0 \
+        -f https://download.openmmlab.com/mmcv/dist/cu118/torch2.1/index.html
+
 # Install remaining requirements with pip cache mount
 RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     python3 -m pip install -r requirements.txt
+
+# Verify mmcv._ext is importable (fail fast at build time, not runtime)
+RUN python3 -c "from mmcv.ops import DeformConv2d; print('mmcv._ext OK')"
 
 # Application code
 COPY download_models.py .

@@ -17,7 +17,9 @@ librosa==0.10.2
 soundfile==0.12.1
 
 # Face detection / alignment (mmlab stack)
-mmcv-lite==2.1.0
+# NOTE: full `mmcv` (with compiled _ext CUDA ops) is installed in the Dockerfile
+# from OpenMMLab's prebuilt wheel index. mmcv-lite is NOT sufficient because
+# mmpose requires mmcv.ops (e.g. DeformConv), which live in mmcv._ext.
 mmdet==3.3.0
 mmpose==1.3.1
 mmengine==0.10.4
