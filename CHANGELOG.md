@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.71](https://github.com/5dlabs/cto/compare/v0.2.70...v0.2.71) (2026-04-20)
+
+
+### 🔧 Maintenance
+
+* **deps:** bump eslint from 9.39.2 to 10.2.1 in /apps/website ([#4729](https://github.com/5dlabs/cto/issues/4729)) ([ab3fdb3](https://github.com/5dlabs/cto/commit/ab3fdb3595c0bc78b514c2b44369927ba6507540))
+
 ## [0.2.70](https://github.com/5dlabs/cto/compare/v0.2.69...v0.2.70) (2026-04-20)
 
 
