@@ -39,9 +39,9 @@ spec:
           bucket: "avatar-videos"
           region: "us-east-1"
         test:
-          referenceImageURL: "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/images/monalisa.png"
-          audioURL: "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/audio/intro.wav"
-          personaId: "test-monalisa"
+          referenceImageURL: "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/video/yongen.mp4"
+          audioURL: "https://raw.githubusercontent.com/TMElyralab/MuseTalk/main/data/audio/yongen.wav"
+          personaId: "test-yongen"
 
   destination:
     server: https://kubernetes.default.svc
