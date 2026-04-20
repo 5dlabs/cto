@@ -68,7 +68,7 @@ async-trait = { workspace = true }
 regex = { workspace = true }
 handlebars = { workspace = true }
 lazy_static = "1.4"
-pulldown-cmark = "0.9"
+pulldown-cmark = "0.13"
 dashmap = "5.4"
 
 # Encoding
