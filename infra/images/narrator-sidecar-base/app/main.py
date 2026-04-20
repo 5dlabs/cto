@@ -119,7 +119,7 @@ async def interrupt_session(session_id: str, req: dict):
     text = req.get("text", "")
     source = req.get("source", "text")
 
-    write_interrupt(session_id, text, source)
+    await write_interrupt(session_id, text, source)
     state.set_phrase("Got it, one sec...", "high")
 
     return {"status": "acknowledged", "session_id": session_id}

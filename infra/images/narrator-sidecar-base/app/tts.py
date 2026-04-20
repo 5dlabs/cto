@@ -1,7 +1,5 @@
 """XTTS-v2 TTS wrapper — CPU-only, Rex voice cloned from sample."""
 
-import asyncio
-import io
 import logging
 import os
 import tempfile
@@ -44,10 +42,9 @@ class TTSEngine:
             if self._ready:
                 return
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
+            self._tts = await loop.run_in_executor(
                 None, _load_tts, self._model_path, self._voice_sample
             )
-            self._tts = _load_tts(self._model_path, self._voice_sample)
             self._ready = True
 
     @property

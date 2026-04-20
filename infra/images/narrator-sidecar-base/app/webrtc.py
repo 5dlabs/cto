@@ -3,13 +3,11 @@
 import asyncio
 import fractions
 import logging
-import time
 from typing import Optional
 
 import av
 import numpy as np
 from aiortc import MediaStreamTrack, RTCPeerConnection, RTCSessionDescription
-from aiortc.contrib.media import MediaPlayer
 from scipy.signal import resample_poly
 
 logger = logging.getLogger(__name__)

@@ -10,13 +10,16 @@ import aiofiles
 from .config import settings
 
 
-async def write_interrupt(session_id: str, payload: dict) -> None:
+async def write_interrupt(session_id: str, text: str, source: str = "text") -> None:
     """Append an interrupt JSON record to interrupt.jsonl."""
-    os.makedirs(os.path.dirname(settings.interrupt_path), exist_ok=True)
+    interrupt_dir = os.path.dirname(settings.interrupt_path)
+    if interrupt_dir:
+        os.makedirs(interrupt_dir, exist_ok=True)
     record = {
         "session_id": session_id,
+        "text": text,
+        "source": source,
         "ts": datetime.now(timezone.utc).isoformat(),
-        **payload,
     }
     line = json.dumps(record) + "\n"
     async with aiofiles.open(settings.interrupt_path, "a") as fh:
