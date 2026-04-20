@@ -1,7 +1,7 @@
 # Hunyuan Avatar Rendering Worker
 # NATS-driven avatar generation on GPU
 
-replicaCount: 0
+replicaCount: 1
 
 workload:
   kind: Deployment
@@ -19,7 +19,7 @@ debug:
 
 image:
   repository: ghcr.io/5dlabs/hunyuan-avatar-worker
-  tag: "v0.0.1-scaffold"
+  tag: "latest"
   pullPolicy: Always
 
 imagePullSecrets:
