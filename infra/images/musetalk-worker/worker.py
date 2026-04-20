@@ -87,12 +87,18 @@ async def handle_message(msg, nc):
         result_subject = data.get("callback_subject", os.environ.get("NATS_RESULT_SUBJECT", "avatar.render.result"))
 
         with tempfile.TemporaryDirectory(dir="/tmp/renders") as tmpdir:
-            # Download reference image and audio
-            ref_path = os.path.join(tmpdir, "reference.png")
+            # Download reference (image or video) and audio. Preserve the
+            # source extension so upstream MuseTalk's get_file_type() can
+            # branch correctly (video vs image).
+            ref_url = data["reference_image_url"]
+            ref_ext = os.path.splitext(ref_url.split("?")[0])[1].lower() or ".png"
+            if ref_ext not in (".png", ".jpg", ".jpeg", ".mp4", ".mov", ".avi", ".mkv", ".webm"):
+                ref_ext = ".png"
+            ref_path = os.path.join(tmpdir, f"reference{ref_ext}")
             audio_path = os.path.join(tmpdir, "audio.wav")
             output_path = os.path.join(tmpdir, "output.mp4")
 
-            await download_file(data["reference_image_url"], ref_path)
+            await download_file(ref_url, ref_path)
             await download_file(data["audio_url"], audio_path)
 
             # Run render (CPU-bound, offload to thread)
