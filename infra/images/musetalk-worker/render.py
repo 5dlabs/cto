@@ -159,8 +159,9 @@ def render_avatar(
         result_dir = os.path.join(work_dir, "results")
         os.makedirs(result_dir, exist_ok=True)
         output_basename = os.path.basename(output_path) or "output.mp4"
-        # Strip extension for output_vid_name (upstream appends .mp4)
+        # Upstream joins args.output_vid_name directly to temp_dir — pass full filename with .mp4
         output_name_noext = os.path.splitext(output_basename)[0]
+        output_vid_name_arg = f"{output_name_noext}.mp4"
 
         args = argparse.Namespace(
             ffmpeg_path="/usr/bin",
@@ -177,7 +178,7 @@ def render_avatar(
             audio_padding_length_right=2,
             batch_size=int(os.environ.get("MUSETALK_BATCH_SIZE", "8")),
             result_dir=result_dir,
-            output_vid_name=output_name_noext,
+            output_vid_name=output_vid_name_arg,
             use_saved_coord=False,
             saved_coord=False,
             use_float16=str(model["dtype"]) == "torch.float16",
@@ -190,7 +191,7 @@ def render_avatar(
         log.info("Invoking MuseTalk main(args) with %s", vars(args))
         musetalk_main(args)
 
-        produced = os.path.join(result_dir, "v15", f"{output_name_noext}.mp4")
+        produced = os.path.join(result_dir, "v15", output_vid_name_arg)
         if not os.path.exists(produced):
             # Upstream fallback layout (when result_name is absent)
             input_basename = os.path.basename(reference_image_path).split(".")[0]
