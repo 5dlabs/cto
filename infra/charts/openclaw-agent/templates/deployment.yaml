@@ -1350,6 +1350,12 @@ spec:
               value: "{{ .Values.narrator.musetalk.port }}"
             - name: OPENCLAW_RAW_STREAM_PATH
               value: /workspace/.openclaw/logs/raw-stream.jsonl
+            - name: LIPSYNC_NATS_URL
+              value: {{ .Values.narrator.lipsyncNatsUrl | quote }}
+            - name: LIPSYNC_SUBJECT
+              value: {{ .Values.narrator.musetalk.lipsyncSubject | quote }}
+            - name: LIPSYNC_RESULT_SUBJECT
+              value: {{ .Values.narrator.musetalk.lipsyncResultSubject | quote }}
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -1400,6 +1406,12 @@ spec:
               value: "{{ .Values.narrator.hunyuan.port }}"
             - name: OPENCLAW_RAW_STREAM_PATH
               value: /workspace/.openclaw/logs/raw-stream.jsonl
+            - name: LIPSYNC_NATS_URL
+              value: {{ .Values.narrator.lipsyncNatsUrl | quote }}
+            - name: LIPSYNC_SUBJECT
+              value: {{ .Values.narrator.hunyuan.lipsyncSubject | quote }}
+            - name: LIPSYNC_RESULT_SUBJECT
+              value: {{ .Values.narrator.hunyuan.lipsyncResultSubject | quote }}
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
