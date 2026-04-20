@@ -1,0 +1,27 @@
+{{- if .Values.narrator.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}-narrator
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: narrator
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "openclaw-agent.selectorLabels" . | nindent 4 }}
+  ports:
+    {{- if .Values.narrator.musetalk.enabled }}
+    - name: musetalk
+      port: {{ .Values.narrator.musetalk.port }}
+      targetPort: narrator-musetalk
+      protocol: TCP
+    {{- end }}
+    {{- if .Values.narrator.hunyuan.enabled }}
+    - name: hunyuan
+      port: {{ .Values.narrator.hunyuan.port }}
+      targetPort: narrator-hunyuan
+      protocol: TCP
+    {{- end }}
+{{- end }}

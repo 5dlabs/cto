@@ -704,6 +704,40 @@ mem0Plugin:
       config:
         model: "gpt-4.1-nano"
 
+# =============================================================================
+# Narrator Sidecars (dual sidecar architecture for live narration)
+# =============================================================================
+# Two CPU-only sidecars that tail the ACP stream, generate narration phrases,
+# synthesize TTS audio, and stream via WebRTC. RPC out to GPU workers for lipsync.
+#
+# musetalk-sidecar: Narration for MuseTalk avatar (port 8081)
+# hunyuan-sidecar: Narration for Hunyuan avatar (port 8082)
+#
+# Both sidecars share the same base image but run as separate containers with
+# different BACKEND env vars.
+
+narrator:
+  enabled: false
+  image:
+    repository: ghcr.io/5dlabs/narrator-sidecar-base
+    tag: latest
+    pullPolicy: Always
+  musetalk:
+    enabled: true
+    port: 8081
+    backend: musetalk
+  hunyuan:
+    enabled: false
+    port: 8082
+    backend: hunyuan
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
 # SSH access (disabled by default)
 ssh:
   enabled: false
