@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.73](https://github.com/5dlabs/cto/compare/v0.2.72...v0.2.73) (2026-04-20)
+
+
+### 🔧 Maintenance
+
+* **deps:** bump the npm-minor group in /apps/web with 18 updates ([#4723](https://github.com/5dlabs/cto/issues/4723)) ([c3d943e](https://github.com/5dlabs/cto/commit/c3d943e190f1a497a7f9b913b65641a3ba14679e))
+
 ## [0.2.72](https://github.com/5dlabs/cto/compare/v0.2.71...v0.2.72) (2026-04-20)
 
 
