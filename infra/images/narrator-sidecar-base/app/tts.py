@@ -1,5 +1,6 @@
 """XTTS-v2 TTS wrapper — CPU-only, Rex voice cloned from sample."""
 
+import asyncio
 import logging
 import os
 import tempfile
