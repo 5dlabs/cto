@@ -803,12 +803,10 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: anthropic-api-key
                   optional: true
-            - name: OPENAI_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.apiKeysSecret }}
-                  key: openai-api-key
-                  optional: true
+            # OPENAI_API_KEY intentionally NOT set — Codex CLI detects it on boot
+            # and rewrites /workspace/.codex/auth.json to apikey-mode, clobbering
+            # the OAuth token. Use PROVIDER_OPENAI_API_KEY (below) for non-Codex
+            # openai/* provider fallback; use codex-auth-sub1/sub2 for OAuth.
             - name: GEMINI_API_KEY
               valueFrom:
                 secretKeyRef:

@@ -1,0 +1,61 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "musetalk-test-harness.fullname" . }}
+  labels:
+    {{- include "musetalk-test-harness.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        {{- include "musetalk-test-harness.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: test-harness
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: NATS_URL
+              value: {{ .Values.nats.url | quote }}
+            - name: NATS_STREAM
+              value: {{ .Values.nats.stream | quote }}
+            - name: NATS_SUBJECT
+              value: {{ .Values.nats.subject | quote }}
+            - name: NATS_RESULT_SUBJECT
+              value: {{ .Values.nats.resultSubject | quote }}
+            - name: TEST_TIMEOUT
+              value: {{ .Values.test.timeout | quote }}
+            - name: TEST_REFERENCE_IMAGE_URL
+              value: {{ .Values.test.referenceImageURL | quote }}
+            - name: TEST_AUDIO_URL
+              value: {{ .Values.test.audioURL | quote }}
+            - name: TEST_PERSONA_ID
+              value: {{ .Values.test.personaId | quote }}
+            - name: S3_ENDPOINT
+              value: {{ .Values.s3.endpoint | quote }}
+            - name: S3_BUCKET
+              value: {{ .Values.s3.bucket | quote }}
+            - name: S3_REGION
+              value: {{ .Values.s3.region | quote }}
+          {{- if .Values.s3.existingSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.s3.existingSecret }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
