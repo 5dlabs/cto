@@ -1,0 +1,98 @@
+---
+# MuseTalk dev pod — same image as prod, command overridden to sleep.
+# NOT managed by ArgoCD (intentionally). Use for in-cluster iteration on
+# render.py via `kubectl cp` instead of rebuild/push/sync loops.
+#
+# Prereqs: prod deployment scaled to 0 (RWO PVC + single GPU).
+#   kubectl -n cto scale deploy/musetalk-worker --replicas=0
+#
+# Usage:
+#   kubectl apply -f infra/images/musetalk-worker/dev-pod.yaml
+#   kubectl -n cto wait --for=condition=Ready pod/musetalk-worker-dev --timeout=5m
+#   kubectl -n cto cp infra/images/musetalk-worker/render.py \
+#     musetalk-worker-dev:/app/worker/render.py
+#   kubectl -n cto exec -it musetalk-worker-dev -- bash
+#
+# Cleanup:
+#   kubectl -n cto delete pod musetalk-worker-dev
+#   kubectl -n cto scale deploy/musetalk-worker --replicas=1
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: musetalk-worker-dev
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: musetalk-worker
+    app.kubernetes.io/component: dev
+    app.kubernetes.io/managed-by: manual
+spec:
+  restartPolicy: Never
+  runtimeClassName: nvidia
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+  imagePullSecrets:
+    - name: ghcr-secret
+  containers:
+    - name: worker
+      image: ghcr.io/5dlabs/musetalk-worker:phase5-56bf068
+      imagePullPolicy: IfNotPresent
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          mkdir -p /renders-persist
+          echo "[dev-pod] musetalk-worker-dev ready for iteration"
+          echo "[dev-pod] render.py: /app/worker/render.py"
+          echo "[dev-pod] models: /models"
+          echo "[dev-pod] persistent outputs: /renders-persist"
+          sleep infinity
+      env:
+        - name: MODEL_CACHE_DIR
+          value: /models
+        - name: MODEL_DTYPE
+          value: float16
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: NATS_URL
+          value: nats://musetalk-nats.cto.svc.cluster.local:4222
+        - name: NATS_SUBJECT
+          value: avatar.render.request
+        - name: NATS_RESULT_SUBJECT
+          value: avatar.render.result
+        - name: NATS_QUEUE
+          value: musetalk-workers-dev
+        - name: NATS_STREAM
+          value: AVATAR
+        - name: NATS_CONSUMER
+          value: musetalk-worker-dev
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: musetalk-hf-token
+              key: HF_TOKEN
+              optional: true
+      resources:
+        limits:
+          cpu: "8"
+          memory: 32Gi
+          nvidia.com/gpu: "1"
+        requests:
+          cpu: "2"
+          memory: 8Gi
+          nvidia.com/gpu: "1"
+      volumeMounts:
+        - name: models
+          mountPath: /models
+        - name: workspace
+          mountPath: /workspace
+        - name: renders-persist
+          mountPath: /renders-persist
+      workingDir: /app
+  volumes:
+    - name: models
+      persistentVolumeClaim:
+        claimName: musetalk-worker-models
+    - name: workspace
+      emptyDir: {}
+    - name: renders-persist
+      emptyDir: {}
