@@ -3,6 +3,43 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.69](https://github.com/5dlabs/cto/compare/v0.2.68...v0.2.69) (2026-04-20)
+
+
+### ✨ Features
+
+* **narrator-sidecar:** add NATS lipsync RPC client ([0b7f305](https://github.com/5dlabs/cto/commit/0b7f305ff09a1d48bf39737660553f5594eb26a4))
+* **narrator-sidecar:** add shared base image for dual sidecars ([c494140](https://github.com/5dlabs/cto/commit/c4941403dd53b8a60c6bf9c2e8c02d2727a35660))
+* **narrator:** add sidecar containers to openclaw-agent chart ([627ba6e](https://github.com/5dlabs/cto/commit/627ba6ed1ee77a39a95abc2b992d8ed718f23403))
+
+
+### 🐛 Bug Fixes
+
+* **gitlab-mirror:** refactor chart to multi-repo CronJob ([#4721](https://github.com/5dlabs/cto/issues/4721)) ([cc6610d](https://github.com/5dlabs/cto/commit/cc6610d118ec363a9c84dbd847d4a031c1f25748))
+* **hunyuan:** add clone-repo init container for HunyuanVideo inference scripts ([6364dd5](https://github.com/5dlabs/cto/commit/6364dd55d5c3366c7843e63e4b3baf0a0eed2dc7))
+* **hunyuan:** add debug logging to clone-repo init container ([a8da951](https://github.com/5dlabs/cto/commit/a8da95191649ffdc4b416c63e48608260367878e))
+* **hunyuan:** clone from GitHub with sparse checkout for hymm_sp ([189a71c](https://github.com/5dlabs/cto/commit/189a71ce84b32c9c49cb29ee29f298fb9010e02c))
+* **hunyuan:** correct checkpoint path (remove extra weights/ prefix) ([bfcc4c9](https://github.com/5dlabs/cto/commit/bfcc4c9d8bb43fadd587d9c8e90b899518d0ba65))
+* **hunyuan:** correct PYTHONPATH for hymm_sp module imports ([eeb8c4c](https://github.com/5dlabs/cto/commit/eeb8c4c7d0285cd0f2c4d567ad8cb6745f30ed19))
+* **hunyuan:** fix sparse checkout path for hymm_sp ([8c368cc](https://github.com/5dlabs/cto/commit/8c368cc05777a815957a75174b932db330c24d61))
+* **hunyuan:** increase clone-repo memory to 8Gi (was OOMKilled at 4Gi) ([4b83885](https://github.com/5dlabs/cto/commit/4b83885440a909aef28d023897e992b6a21bc1b8))
+* **hunyuan:** rm -rf before git clone in clone-repo init container ([7675689](https://github.com/5dlabs/cto/commit/7675689271dcdeb8a47cd2d8eec652468794b7b1))
+* **hunyuan:** scale to 1 replica, use latest image tag ([6e41be3](https://github.com/5dlabs/cto/commit/6e41be346795ed0004f9591c70015eb4e54f4244))
+* **hunyuan:** update ArgoCD app to use latest image tag and clone-repo init container ([f190959](https://github.com/5dlabs/cto/commit/f19095956fca3b8530af1f2911654383a67d77dc))
+* **narrator-sidecar:** fix imports, parser for OpenClaw stream format, narrator loop ([999a90c](https://github.com/5dlabs/cto/commit/999a90ced644ada75091d3aa0901f56fe076354a))
+* **narrator-sidecar:** fix interrupt API signature, config loading, imports ([f8e82c5](https://github.com/5dlabs/cto/commit/f8e82c55a9a81b427c6fe25891b917dff895493c))
+* **workflows:** use correct GHCR username (kaseonedge, not 5dlabs) ([013c1dc](https://github.com/5dlabs/cto/commit/013c1dc41918cea2460a1b275229ba5bc7c9776e))
+
+
+### 🔧 Maintenance
+
+* add narrator sidecar config to coder-values (disabled pending image build) ([ef04ecd](https://github.com/5dlabs/cto/commit/ef04ecdd6394a40a1c19cac61641a4b342954c7c))
+
+
+### 👷 CI/CD
+
+* add narrator sidecar base image workflow ([68f656c](https://github.com/5dlabs/cto/commit/68f656c4d70ab93c78af08c31bd3b5f0845dee3e))
+
 ## [0.2.68](https://github.com/5dlabs/cto/compare/v0.2.67...v0.2.68) (2026-04-20)
 
 
