@@ -35,9 +35,10 @@ def _require_path(path: Path, description: str) -> Path:
 
 def _pipeline_env() -> dict[str, str]:
     env = os.environ.copy()
-    env.setdefault("PYTHONPATH", str(REPO_DIR))
-    env["PYTHONPATH"] = f"{REPO_DIR}:{env['PYTHONPATH']}" if env.get("PYTHONPATH") else str(REPO_DIR)
-    env.setdefault("MODEL_BASE", str(MODEL_DIR / "weights"))
+    # PYTHONPATH should be the parent of hymm_sp so 'import hymm_sp' works
+    env.setdefault("PYTHONPATH", str(MODEL_DIR))
+    env["PYTHONPATH"] = f"{MODEL_DIR}:{env['PYTHONPATH']}" if env.get("PYTHONPATH") else str(MODEL_DIR)
+    env.setdefault("MODEL_BASE", str(MODEL_DIR))
     env.setdefault("CUDA_VISIBLE_DEVICES", "0")
     env.setdefault("DISABLE_SP", "1")
     env.setdefault("CPU_OFFLOAD", "0")
