@@ -4,15 +4,16 @@ version = 4
 
 [[package]]
 name = "acp-runtime"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "agent-client-protocol",
  "anyhow",
  "async-trait",
- "config 0.2.65",
+ "config 0.2.74",
  "futures",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "tokio-util",
  "tracing",
@@ -812,7 +813,7 @@ checksum = "3a822ea5bc7590f9d40f1ba12c0dc3c2760f3482c6984db1573ad11031420831"
 
 [[package]]
 name = "cli"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -882,7 +883,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "serde",
  "serde_json",
@@ -965,7 +966,7 @@ dependencies = [
 
 [[package]]
 name = "controller"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "acp-runtime",
  "anyhow",
@@ -973,7 +974,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "chrono",
- "config 0.2.65",
+ "config 0.2.74",
  "dashmap 5.5.3",
  "flate2",
  "futures",
@@ -1575,7 +1576,7 @@ dependencies = [
 
 [[package]]
 name = "dex-indexer"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "anyhow",
  "bs58",
@@ -2055,7 +2056,7 @@ dependencies = [
 
 [[package]]
 name = "experience"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2637,7 +2638,7 @@ dependencies = [
 
 [[package]]
 name = "gpu"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2847,7 +2848,7 @@ dependencies = [
 
 [[package]]
 name = "healer"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "acp-runtime",
  "agent-client-protocol",
@@ -2857,7 +2858,7 @@ dependencies = [
  "chrono",
  "clap",
  "colored",
- "config 0.2.65",
+ "config 0.2.74",
  "handlebars",
  "notify",
  "regex",
@@ -3393,7 +3394,7 @@ dependencies = [
 
 [[package]]
 name = "intake"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3403,7 +3404,7 @@ dependencies = [
  "cli",
  "colored",
  "comfy-table",
- "config 0.2.65",
+ "config 0.2.74",
  "dialoguer",
  "futures",
  "handlebars",
@@ -3907,7 +3908,7 @@ dependencies = [
 
 [[package]]
 name = "linear-sink"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4053,7 +4054,7 @@ dependencies = [
 
 [[package]]
 name = "metal"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4252,7 +4253,7 @@ dependencies = [
 
 [[package]]
 name = "notify"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5173,7 +5174,7 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
 name = "play-launcher"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "anyhow",
  "clap",
@@ -5198,7 +5199,7 @@ dependencies = [
 
 [[package]]
 name = "pm"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "acp-runtime",
  "anyhow",
@@ -5207,7 +5208,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "clap",
- "config 0.2.65",
+ "config 0.2.74",
  "hex",
  "hmac",
  "k8s-openapi",
@@ -6112,7 +6113,7 @@ dependencies = [
 
 [[package]]
 name = "research"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "anthropic",
  "anyhow",
@@ -6471,7 +6472,7 @@ dependencies = [
 
 [[package]]
 name = "scm"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8305,7 +8306,7 @@ dependencies = [
 
 [[package]]
 name = "tools"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "anyhow",
  "axum",
@@ -8768,7 +8769,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "utils"
-version = "0.2.65"
+version = "0.2.74"
 dependencies = [
  "anyhow",
  "clap",
