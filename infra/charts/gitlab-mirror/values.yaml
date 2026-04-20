@@ -1,6 +1,44 @@
-# GitHub source repository (private — clones using PAT injected from secret)
+# List of repositories to mirror. Each entry renders its own CronJob so the
+# jobs run independently. The legacy top-level `github`/`gitlab` keys below are
+# used as defaults when a repo entry omits them.
+#
+# NOTE: this in-cluster SSH mirror path is the canonical way to cover repos
+# whose tarball exceeds the Cloudflare 100 MB body cap (which breaks the
+# `.github/workflows/mirror-to-gitlab.yml` HTTPS path with HTTP 413).
+repos:
+  - name: cto
+    github:
+      url: https://github.com/5dlabs/cto.git
+      branch: main
+    gitlab:
+      project: 5dlabs/cto
+  - name: cto-pay
+    github:
+      url: https://github.com/5dlabs/cto-pay.git
+      branch: main
+    gitlab:
+      project: 5dlabs/cto-pay
+  - name: mcp-proxy
+    github:
+      url: https://github.com/5dlabs/mcp-proxy.git
+      branch: main
+    gitlab:
+      project: 5dlabs/mcp-proxy
+  - name: sigma-1
+    github:
+      url: https://github.com/5dlabs/sigma-1.git
+      branch: main
+    gitlab:
+      project: 5dlabs/sigma-1
+  - name: solana
+    github:
+      url: https://github.com/5dlabs/solana.git
+      branch: main
+    gitlab:
+      project: 5dlabs/solana
+
+# Defaults applied when a repo entry omits a field.
 github:
-  url: https://github.com/5dlabs/cto.git
   branch: main
 
 # GitHub PAT secret (must contain key `token`). The mirror script clones via
@@ -15,7 +53,6 @@ gitlab:
   sshHost: gitlab-gitlab-shell.gitlab.svc.cluster.local
   sshPort: 22
   sshUser: git
-  project: 5dlabs/cto
 
 # Deploy-key Secret (created out-of-band; see infra/docs/gitlab-mirror.md).
 # Must contain key `id_ed25519` (private key) — same shape as gl-mirror-key.

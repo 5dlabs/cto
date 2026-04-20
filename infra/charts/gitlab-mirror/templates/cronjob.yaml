@@ -17,16 +17,14 @@ data:
     #!/bin/sh
     set -eu
 
-    GITHUB_URL="{{ .Values.github.url }}"
-    GITHUB_BRANCH="{{ .Values.github.branch }}"
-    GITLAB_HOST="{{ .Values.gitlab.sshHost }}"
-    GITLAB_PORT="{{ .Values.gitlab.sshPort }}"
-    GITLAB_USER="{{ .Values.gitlab.sshUser }}"
-    GITLAB_PROJECT="{{ .Values.gitlab.project }}"
-    FORCE_FLAG=""
-    {{- if .Values.forcePush }}
-    FORCE_FLAG="--force"
-    {{- end }}
+    : "${GITHUB_URL:?GITHUB_URL not set}"
+    : "${GITHUB_BRANCH:?GITHUB_BRANCH not set}"
+    : "${GITLAB_HOST:?GITLAB_HOST not set}"
+    : "${GITLAB_PORT:?GITLAB_PORT not set}"
+    : "${GITLAB_USER:?GITLAB_USER not set}"
+    : "${GITLAB_PROJECT:?GITLAB_PROJECT not set}"
+    FORCE_FLAG="${FORCE_FLAG:-}"
+    MIRROR_TAGS="${MIRROR_TAGS:-false}"
 
     echo "==> mirror $GITHUB_URL ($GITHUB_BRANCH) -> $GITLAB_USER@$GITLAB_HOST:$GITLAB_PROJECT.git"
 
@@ -34,7 +32,7 @@ data:
     mkdir -p /root/.ssh
     cp /etc/gitlab-mirror-ssh/{{ .Values.sshSecret.privateKeyFile }} /root/.ssh/id_ed25519
     chmod 600 /root/.ssh/id_ed25519
-    cat >/root/.ssh/config <<EOF
+    cat >/root/.ssh/config <<EOF_SSH
     Host gitlab-mirror
       HostName $GITLAB_HOST
       Port $GITLAB_PORT
@@ -43,7 +41,7 @@ data:
       StrictHostKeyChecking no
       UserKnownHostsFile /dev/null
       LogLevel ERROR
-    EOF
+    EOF_SSH
 
     # Full clone (gitaly rejects shallow pushes). Inject PAT into URL.
     if [ -z "${GH_TOKEN:-}" ]; then
@@ -57,10 +55,9 @@ data:
     git clone --branch "$GITHUB_BRANCH" "$AUTH_URL" repo
     cd repo
 
-    # Fetch all branches/tags from origin so we can push everything (we only push main + tags below).
-    # Note: `git fetch` updates refs/remotes/origin/* but does NOT fast-forward the local branch,
-    # so we always push from refs/remotes/origin/<branch> to guarantee we push the freshest SHA
-    # (clone can see a slightly stale HEAD due to GitHub replica lag).
+    # Fetch all branches/tags from origin so we can push everything.
+    # Always push from refs/remotes/origin/<branch> to guarantee we push the
+    # freshest SHA (clone can see a slightly stale HEAD due to GitHub replica lag).
     git fetch --tags --prune origin
 
     git remote add gitlab "ssh://gitlab-mirror/$GITLAB_PROJECT.git"
@@ -68,34 +65,38 @@ data:
     echo "==> pushing $GITHUB_BRANCH (from refs/remotes/origin/$GITHUB_BRANCH)"
     git push $FORCE_FLAG gitlab "refs/remotes/origin/$GITHUB_BRANCH:refs/heads/$GITHUB_BRANCH"
 
-    {{- if .Values.mirrorTags }}
-    echo "==> pushing tags"
-    git push $FORCE_FLAG --tags gitlab
-    {{- end }}
+    if [ "$MIRROR_TAGS" = "true" ]; then
+      echo "==> pushing tags"
+      git push $FORCE_FLAG --tags gitlab
+    fi
 
     echo "==> mirror complete"
+{{- $root := . }}
+{{- range $repo := .Values.repos }}
 ---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: gitlab-mirror
+  name: gitlab-mirror-{{ $repo.name }}
   labels:
     app.kubernetes.io/name: gitlab-mirror
+    app.kubernetes.io/instance: {{ $repo.name }}
     app.kubernetes.io/managed-by: argocd
 spec:
-  schedule: {{ .Values.schedule | quote }}
-  concurrencyPolicy: {{ .Values.concurrencyPolicy }}
-  successfulJobsHistoryLimit: {{ .Values.successfulJobsHistoryLimit }}
-  failedJobsHistoryLimit: {{ .Values.failedJobsHistoryLimit }}
+  schedule: {{ default $root.Values.schedule $repo.schedule | quote }}
+  concurrencyPolicy: {{ $root.Values.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ $root.Values.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ $root.Values.failedJobsHistoryLimit }}
   jobTemplate:
     spec:
-      backoffLimit: {{ .Values.backoffLimit }}
-      activeDeadlineSeconds: {{ .Values.activeDeadlineSeconds }}
-      ttlSecondsAfterFinished: {{ .Values.ttlSecondsAfterFinished }}
+      backoffLimit: {{ $root.Values.backoffLimit }}
+      activeDeadlineSeconds: {{ $root.Values.activeDeadlineSeconds }}
+      ttlSecondsAfterFinished: {{ $root.Values.ttlSecondsAfterFinished }}
       template:
         metadata:
           labels:
             app.kubernetes.io/name: gitlab-mirror
+            app.kubernetes.io/instance: {{ $repo.name }}
         spec:
           restartPolicy: Never
           serviceAccountName: gitlab-mirror
@@ -104,17 +105,33 @@ spec:
             fsGroup: 0
           containers:
             - name: mirror
-              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              image: "{{ $root.Values.image.repository }}:{{ $root.Values.image.tag }}"
+              imagePullPolicy: {{ $root.Values.image.pullPolicy }}
               command: ["/bin/sh", "/etc/gitlab-mirror/mirror.sh"]
               env:
                 - name: GH_TOKEN
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Values.githubTokenSecret.name }}
-                      key: {{ .Values.githubTokenSecret.key }}
+                      name: {{ $root.Values.githubTokenSecret.name }}
+                      key: {{ $root.Values.githubTokenSecret.key }}
+                - name: GITHUB_URL
+                  value: {{ $repo.github.url | quote }}
+                - name: GITHUB_BRANCH
+                  value: {{ default $root.Values.github.branch $repo.github.branch | quote }}
+                - name: GITLAB_HOST
+                  value: {{ $root.Values.gitlab.sshHost | quote }}
+                - name: GITLAB_PORT
+                  value: {{ $root.Values.gitlab.sshPort | quote }}
+                - name: GITLAB_USER
+                  value: {{ $root.Values.gitlab.sshUser | quote }}
+                - name: GITLAB_PROJECT
+                  value: {{ $repo.gitlab.project | quote }}
+                - name: FORCE_FLAG
+                  value: {{ ternary "--force" "" $root.Values.forcePush | quote }}
+                - name: MIRROR_TAGS
+                  value: {{ $root.Values.mirrorTags | quote }}
               resources:
-                {{- toYaml .Values.resources | nindent 16 }}
+                {{- toYaml $root.Values.resources | nindent 16 }}
               volumeMounts:
                 - name: script
                   mountPath: /etc/gitlab-mirror
@@ -130,8 +147,9 @@ spec:
                 defaultMode: 0755
             - name: ssh-key
               secret:
-                secretName: {{ .Values.sshSecret.name }}
+                secretName: {{ $root.Values.sshSecret.name }}
                 defaultMode: 0400
             - name: tmp
               emptyDir:
                 sizeLimit: 2Gi
+{{- end }}
