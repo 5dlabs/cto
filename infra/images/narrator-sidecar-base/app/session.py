@@ -21,7 +21,7 @@ class SessionState:
     """Holds all state for a single narration session."""
 
     session_id: str
-    persona_id: str = "rex"
+    persona_id: str = "blaze"
     created_at: float = field(default_factory=time.time)
     pc: RTCPeerConnection | None = None
     acp_events: deque[dict[str, Any]] = field(default_factory=lambda: deque(maxlen=ACP_WINDOW_SIZE))
@@ -63,7 +63,7 @@ class SessionRegistry:
     def __init__(self) -> None:
         self._sessions: dict[str, SessionState] = {}
 
-    def create(self, session_id: str, persona_id: str = "rex") -> SessionState:
+    def create(self, session_id: str, persona_id: str = "blaze") -> SessionState:
         state = SessionState(session_id=session_id, persona_id=persona_id)
         self._sessions[session_id] = state
         log.info("Created session %s (persona=%s)", session_id, persona_id)

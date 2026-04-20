@@ -48,7 +48,7 @@ class LipsyncRPC:
         self,
         reference_image_url: str,
         audio_url: str,
-        persona_id: str = "rex",
+        persona_id: str = "blaze",
         fps: int = 25,
         timeout: float = 300.0,
     ) -> dict[str, Any]:
@@ -120,7 +120,7 @@ async def get_lipsync_rpc() -> LipsyncRPC:
 async def render_lipsync(
     reference_image_url: str,
     audio_url: str,
-    persona_id: str = "rex",
+    persona_id: str = "blaze",
     fps: int = 25,
     timeout: float = 300.0,
 ) -> dict[str, Any]:
