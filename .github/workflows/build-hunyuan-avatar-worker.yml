@@ -45,8 +45,8 @@ jobs:
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: kaseonedge
+          password: ${{ secrets.GHCR_PAT }}
 
       - name: Extract metadata
         id: meta
