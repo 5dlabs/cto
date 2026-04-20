@@ -2,7 +2,7 @@
   "name": "cto-sidebar",
   "displayName": "5dlabs CTO",
   "description": "CTO agent chat — connects directly to your OpenClaw/ACP harness",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "5dlabs",
   
   "engines": {
@@ -52,6 +52,27 @@
           "type": "number",
           "default": 30000,
           "description": "Milliseconds to wait for the first streamed byte from the gateway before aborting."
+        },
+        "cto.narrator.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the in-pod avatar narrator tile (Rex voice + lipsync over WebRTC). Requires musetalk/hunyuan sidecars in the agent pod."
+        },
+        "cto.narrator.musetalkUrl": {
+          "type": "string",
+          "default": "/proxy/8081",
+          "description": "Base URL for the MuseTalk narrator sidecar. In-pod default goes through the code-server localhost proxy at port 8081."
+        },
+        "cto.narrator.hunyuanUrl": {
+          "type": "string",
+          "default": "/proxy/8082",
+          "description": "Base URL for the Hunyuan narrator sidecar. In-pod default goes through the code-server localhost proxy at port 8082."
+        },
+        "cto.narrator.defaultBackend": {
+          "type": "string",
+          "enum": ["musetalk", "hunyuan"],
+          "default": "musetalk",
+          "description": "Which lipsync backend to open the AvatarTile against by default. The UI segmented control can flip this live."
         }
       }
     },
