@@ -1,0 +1,15 @@
+apiVersion: v2
+name: hunyuan-avatar-worker
+description: Hunyuan Avatar rendering worker - NATS-driven avatar generation
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - hunyuan
+  - avatar
+  - gpu
+  - video-generation
+  - nats
+maintainers:
+  - name: 5DLabs
+    url: https://5dlabs.ai
