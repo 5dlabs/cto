@@ -5440,11 +5440,33 @@ Be constructive and explain the "why" behind your suggestions.
     #[allow(clippy::too_many_lines)] // Complex function not easily split
     fn register_agent_partials(handlebars: &mut Handlebars) -> Result<()> {
         use crate::tasks::template_paths::{
-            PARTIAL_BETTER_AUTH, PARTIAL_BETTER_AUTH_ELECTRON, PARTIAL_BETTER_AUTH_EXPO,
-            PARTIAL_FRONTEND_TOOLKITS, PARTIAL_INFRASTRUCTURE_OPERATORS,
+            PARTIAL_AUTONOMY, PARTIAL_BETTER_AUTH, PARTIAL_BETTER_AUTH_ELECTRON,
+            PARTIAL_BETTER_AUTH_EXPO, PARTIAL_FRONTEND_TOOLKITS, PARTIAL_INFRASTRUCTURE_OPERATORS,
             PARTIAL_INFRASTRUCTURE_SETUP, PARTIAL_INFRASTRUCTURE_VERIFY, PARTIAL_SHADCN_STACK,
             PARTIAL_TANSTACK_STACK,
         };
+
+        // Autonomy directive — shared across every agent system prompt.
+        // Registered under its templates-relative path so templates can reference
+        // it via {{> _shared/partials/autonomy }}.
+        match Self::load_template(PARTIAL_AUTONOMY) {
+            Ok(content) => {
+                handlebars
+                    .register_partial("_shared/partials/autonomy", content)
+                    .map_err(|e| {
+                        crate::tasks::types::Error::ConfigError(format!(
+                            "Failed to register autonomy partial: {e}"
+                        ))
+                    })?;
+                debug!("Successfully registered autonomy partial");
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to load autonomy partial from ConfigMap (path: {PARTIAL_AUTONOMY}): {e}. \
+                    Coder templates referencing {{{{> _shared/partials/autonomy }}}} will render without the autonomy directive."
+                );
+            }
+        }
 
         // List of shared agent system prompt partials that need to be registered
         let agent_partials = vec![
