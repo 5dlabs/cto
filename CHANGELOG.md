@@ -3,6 +3,27 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.75](https://github.com/5dlabs/cto/compare/v0.2.74...v0.2.75) (2026-04-20)
+
+
+### ✨ Features
+
+* **acp-runtime:** file→ACP interrupt bridge (Phase C) ([#4752](https://github.com/5dlabs/cto/issues/4752)) ([512c06f](https://github.com/5dlabs/cto/commit/512c06f9036b3ae061b756c3b8271c400280692d))
+* **cto-sidebar:** AvatarTile v0.2.0 ([#4749](https://github.com/5dlabs/cto/issues/4749)) ([8eb6df4](https://github.com/5dlabs/cto/commit/8eb6df4040da52c50ec9cf350ce331c203c6f4eb))
+* **narrator:** make lipsync NATS URL + subject configurable via env ([#4759](https://github.com/5dlabs/cto/issues/4759)) ([36e7e04](https://github.com/5dlabs/cto/commit/36e7e0498e93b5e2c37c1add6a67014a4bc31904))
+* **narrator:** Phase B dual-sidecar Helm block for openclaw-agent ([#4751](https://github.com/5dlabs/cto/issues/4751)) ([a9c5ec0](https://github.com/5dlabs/cto/commit/a9c5ec09878e2448a63d242c822e81a369ecf7ef))
+* **narrator:** switch PoC test persona from rex to blaze ([#4754](https://github.com/5dlabs/cto/issues/4754)) ([2eb33b8](https://github.com/5dlabs/cto/commit/2eb33b86f1ef879090459f3ad16df38e8b0499b8))
+* **openclaw-agent:** plumb LIPSYNC_* env into narrator sidecars (Phase B) ([#4761](https://github.com/5dlabs/cto/issues/4761)) ([e35a9ef](https://github.com/5dlabs/cto/commit/e35a9ef93e5a9c4b2fb9dc500a56b516689707d1))
+
+
+### 🐛 Bug Fixes
+
+* **coder:** hard-code autonomy directives into SOUL.md + AGENTS.md ([#4763](https://github.com/5dlabs/cto/issues/4763)) ([51adfff](https://github.com/5dlabs/cto/commit/51adfff81c91d77e49b4902134e65dee364de19e))
+* **narrator:** correct probe paths + allow XTTS preload ([#4755](https://github.com/5dlabs/cto/issues/4755)) ([737c760](https://github.com/5dlabs/cto/commit/737c760815e958a026c4d57fc470edbdd8a7b126))
+* **narrator:** pin torch&lt;2.6 + return 503 from /readyz when not ready ([#4758](https://github.com/5dlabs/cto/issues/4758)) ([905ec47](https://github.com/5dlabs/cto/commit/905ec47efeaea68f3ffc0910f30f0f30ae7c229e))
+* **narrator:** pin transformers&lt;4.47 for TTS BeamSearchScorer compatibility ([1c3df65](https://github.com/5dlabs/cto/commit/1c3df654002fafaef90cfa7ed8020057249f8f89))
+* **narrator:** pin transformers==4.36.2 for TTS 0.22.0 compat ([#4748](https://github.com/5dlabs/cto/issues/4748)) ([9c302c6](https://github.com/5dlabs/cto/commit/9c302c613422baf5f533aa86598ab251aed97a97))
+
 ## [0.2.74](https://github.com/5dlabs/cto/compare/v0.2.73...v0.2.74) (2026-04-20)
 
 
