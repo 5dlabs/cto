@@ -43,6 +43,7 @@ pub const PARTIAL_RETRY_LOOP: &str = "_shared/partials/retry-loop.sh.hbs";
 pub const PARTIAL_COMPLETION: &str = "_shared/partials/completion.sh.hbs";
 pub const PARTIAL_MCP_CHECK: &str = "_shared/partials/mcp-check.sh.hbs";
 pub const PARTIAL_SKILLS_SETUP: &str = "_shared/partials/skills-setup.sh.hbs";
+pub const PARTIAL_AUTONOMY: &str = "_shared/partials/autonomy.md.hbs";
 
 // Frontend stack partials (for Blaze agent)
 pub const PARTIAL_FRONTEND_TOOLKITS: &str = "_shared/partials/frontend-toolkits.md.hbs";

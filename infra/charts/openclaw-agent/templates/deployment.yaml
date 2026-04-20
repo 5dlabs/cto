@@ -1358,8 +1358,12 @@ spec:
               value: {{ .Values.narrator.persona.voiceSamplePath | quote }}
             - name: LIPSYNC_WORKER_URL
               value: {{ .Values.narrator.musetalk.workerUrl | quote }}
+            - name: LIPSYNC_NATS_URL
+              value: {{ .Values.narrator.lipsyncNatsUrl | quote }}
             - name: LIPSYNC_SUBJECT
               value: {{ .Values.narrator.musetalk.lipsyncSubject | quote }}
+            - name: LIPSYNC_RESULT_SUBJECT
+              value: {{ .Values.narrator.musetalk.lipsyncResultSubject | quote }}
             {{- if .Values.nats.enabled }}
             - name: NATS_URL
               value: {{ .Values.nats.url | quote }}
@@ -1424,8 +1428,12 @@ spec:
               value: {{ .Values.narrator.persona.voiceSamplePath | quote }}
             - name: LIPSYNC_WORKER_URL
               value: {{ .Values.narrator.hunyuan.workerUrl | quote }}
+            - name: LIPSYNC_NATS_URL
+              value: {{ .Values.narrator.lipsyncNatsUrl | quote }}
             - name: LIPSYNC_SUBJECT
               value: {{ .Values.narrator.hunyuan.lipsyncSubject | quote }}
+            - name: LIPSYNC_RESULT_SUBJECT
+              value: {{ .Values.narrator.hunyuan.lipsyncResultSubject | quote }}
             {{- if .Values.nats.enabled }}
             - name: NATS_URL
               value: {{ .Values.nats.url | quote }}

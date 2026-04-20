@@ -731,16 +731,24 @@ narrator:
   persona:
     id: rex
     voiceSamplePath: /models/voice-samples/rex.mp3
+  # Shared NATS endpoint for both lipsync backends. Per-backend subjects
+  # live under .musetalk / .hunyuan so they can target different workers
+  # once the worker charts adopt per-backend subject naming.
+  lipsyncNatsUrl: "nats://musetalk-nats.cto.svc.cluster.local:4222"
   musetalk:
     enabled: true
     port: 8081
+    backend: musetalk
     workerUrl: "http://musetalk-worker.cto.svc.cluster.local:8080"
-    lipsyncSubject: "musetalk.stream"
+    lipsyncSubject: "avatar.render.request"
+    lipsyncResultSubject: "avatar.render.result"
   hunyuan:
     enabled: true
     port: 8082
+    backend: hunyuan
     workerUrl: "http://hunyuan-avatar-worker.cto.svc.cluster.local:8080"
-    lipsyncSubject: "hunyuan.stream"
+    lipsyncSubject: "avatar.render.request"
+    lipsyncResultSubject: "avatar.render.result"
   resources:
     requests:
       cpu: 200m

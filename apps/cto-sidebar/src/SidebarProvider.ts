@@ -49,7 +49,17 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       console.log("[cto-sidebar] detected in-pod environment; using " + apiBase);
       inPodLogged = true;
     }
-    return { apiBase, apiToken, defaultAgent, requestTimeoutMs, inPod };
+    const narrator = {
+      enabled: config.get<boolean>("narrator.enabled", false),
+      musetalkUrl: config
+        .get<string>("narrator.musetalkUrl", "/proxy/8081")
+        .replace(/\/+$/, ""),
+      hunyuanUrl: config
+        .get<string>("narrator.hunyuanUrl", "/proxy/8082")
+        .replace(/\/+$/, ""),
+      defaultBackend: config.get<string>("narrator.defaultBackend", "musetalk"),
+    };
+    return { apiBase, apiToken, defaultAgent, requestTimeoutMs, inPod, narrator };
   }
 
   public resolveWebviewView(
@@ -84,6 +94,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             apiBase: cfg.apiBase,
             defaultAgent: cfg.defaultAgent,
             inPod: cfg.inPod,
+            narrator: cfg.narrator,
           });
           break;
         }
@@ -305,7 +316,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; media-src blob: mediastream: https: http://localhost:* http://127.0.0.1:*; img-src data: blob: ${webview.cspSource}; connect-src https: http: ws: wss: http://localhost:* http://127.0.0.1:*;">
   <style nonce="${nonce}">
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -586,9 +597,116 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       color: var(--vscode-descriptionForeground);
       margin-left: auto;
     }
+
+    /* Avatar tile — live narration */
+    .avatar-tile {
+      display: none;
+      flex-direction: column;
+      border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.2));
+      background: var(--vscode-textCodeBlock-background, rgba(0,0,0,0.15));
+    }
+    .avatar-tile.show { display: flex; }
+    .avatar-tile-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+    }
+    .avatar-tile-header .title { font-weight: 600; color: var(--vscode-foreground); }
+    .avatar-tile-header .spacer { flex: 1; }
+    .avatar-tile-toggle {
+      background: transparent;
+      border: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.3));
+      color: var(--vscode-foreground);
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .avatar-tile-toggle.active {
+      background: var(--vscode-list-activeSelectionBackground, rgba(255,255,255,0.08));
+      border-color: var(--vscode-charts-blue, #4da6ff);
+    }
+    .avatar-tile-toggle:hover {
+      background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.05));
+    }
+    .backend-segmented {
+      display: inline-flex;
+      border: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.3));
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .backend-segmented button {
+      background: transparent;
+      border: none;
+      color: var(--vscode-descriptionForeground);
+      padding: 2px 10px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .backend-segmented button.active {
+      background: var(--vscode-charts-blue, #4da6ff);
+      color: var(--vscode-editor-background, #1e1e1e);
+      font-weight: 600;
+    }
+    .avatar-video-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #000;
+      overflow: hidden;
+    }
+    .avatar-video-wrap video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .avatar-status {
+      position: absolute;
+      bottom: 6px;
+      left: 6px;
+      padding: 2px 6px;
+      font-size: 10px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      border-radius: 3px;
+    }
+    .avatar-controls {
+      display: flex;
+      gap: 6px;
+      padding: 6px 10px;
+      border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.15));
+    }
+    .avatar-controls .spacer { flex: 1; }
   </style>
 </head>
 <body>
+  <div class="avatar-tile" id="avatarTile">
+    <div class="avatar-tile-header">
+      <span class="title">Blaze</span>
+      <span class="backend-segmented" role="tablist" aria-label="Lipsync backend">
+        <button id="backendMuseTalk" class="active" data-backend="musetalk">MuseTalk</button>
+        <button id="backendHunyuan" data-backend="hunyuan">Hunyuan</button>
+      </span>
+      <span class="spacer"></span>
+      <button class="avatar-tile-toggle active" id="avatarToggleVid" title="Video on/off">Vid</button>
+      <button class="avatar-tile-toggle" id="avatarToggleMic" title="Voice interrupt">Mic</button>
+      <button class="avatar-tile-toggle" id="avatarToggleTxt" title="Text interrupt">Txt</button>
+    </div>
+    <div class="avatar-video-wrap">
+      <video id="avatarVideo" autoplay playsinline muted></video>
+      <span class="avatar-status" id="avatarStatus">idle</span>
+    </div>
+    <div class="avatar-controls" id="avatarTextRow" style="display:none;">
+      <input id="avatarTextInput" type="text" placeholder="Interrupt Blaze…" style="flex:1; background:transparent; border:1px solid var(--vscode-panel-border, rgba(128,128,128,0.3)); color:var(--vscode-foreground); padding:4px 8px; border-radius:3px; font-family:inherit; font-size:12px;">
+      <button class="avatar-tile-toggle" id="avatarTextSend">Send</button>
+    </div>
+  </div>
   <div class="messages" id="messages">
     <div class="welcome" id="welcome">
       <div class="welcome-icon">
@@ -653,6 +771,133 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     // Request agents on load
     vscode.postMessage({ type: 'getAgents' });
     vscode.postMessage({ type: 'getConfig' });
+
+    // ── Narrator / AvatarTile (Live Narration PoC) ────────────────────
+    const avatarTileEl = document.getElementById('avatarTile');
+    const avatarVideoEl = document.getElementById('avatarVideo');
+    const avatarStatusEl = document.getElementById('avatarStatus');
+    const avatarToggleVid = document.getElementById('avatarToggleVid');
+    const avatarToggleMic = document.getElementById('avatarToggleMic');
+    const avatarToggleTxt = document.getElementById('avatarToggleTxt');
+    const avatarTextRow = document.getElementById('avatarTextRow');
+    const avatarTextInput = document.getElementById('avatarTextInput');
+    const avatarTextSend = document.getElementById('avatarTextSend');
+    const backendMuseTalkBtn = document.getElementById('backendMuseTalk');
+    const backendHunyuanBtn = document.getElementById('backendHunyuan');
+
+    let narratorCfg = null;        // { enabled, musetalkUrl, hunyuanUrl, defaultBackend }
+    let currentBackend = 'musetalk';
+    let pc = null;                 // RTCPeerConnection
+    let narratorSessionId = null;
+    let micStream = null;
+
+    function backendBaseUrl() {
+      if (!narratorCfg) return null;
+      return currentBackend === 'hunyuan' ? narratorCfg.hunyuanUrl : narratorCfg.musetalkUrl;
+    }
+
+    function setAvatarStatus(s) { if (avatarStatusEl) avatarStatusEl.textContent = s; }
+
+    async function startNarrator() {
+      const base = backendBaseUrl();
+      if (!base) { setAvatarStatus('no config'); return; }
+      try {
+        setAvatarStatus('connecting…');
+        await stopNarrator(false);
+        pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+        pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+        pc.ontrack = (e) => { if (avatarVideoEl.srcObject !== e.streams[0]) { avatarVideoEl.srcObject = e.streams[0]; avatarVideoEl.muted = false; } };
+        pc.onconnectionstatechange = () => setAvatarStatus(pc ? pc.connectionState : 'closed');
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        const resp = await fetch(base + '/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona_id: 'blaze', webrtc_offer: { sdp: offer.sdp, type: offer.type } }),
+        });
+        if (!resp.ok) throw new Error('sessions POST ' + resp.status);
+        const data = await resp.json();
+        narratorSessionId = data.session_id || data.id || null;
+        await pc.setRemoteDescription(data.webrtc_answer || data.answer);
+        setAvatarStatus('live · ' + currentBackend);
+      } catch (err) {
+        console.error('[narrator] start failed', err);
+        setAvatarStatus('error');
+      }
+    }
+
+    async function stopNarrator(updateStatus = true) {
+      try {
+        if (narratorSessionId && backendBaseUrl()) {
+          fetch(backendBaseUrl() + '/sessions/' + narratorSessionId, { method: 'DELETE' }).catch(() => {});
+        }
+      } catch {}
+      narratorSessionId = null;
+      if (pc) { try { pc.close(); } catch {} pc = null; }
+      if (avatarVideoEl) avatarVideoEl.srcObject = null;
+      if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+      if (updateStatus) setAvatarStatus('idle');
+    }
+
+    async function sendInterrupt(text, source) {
+      const base = backendBaseUrl();
+      if (!base || !narratorSessionId || !text) return;
+      try {
+        await fetch(base + '/sessions/' + narratorSessionId + '/interrupt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, source: source || 'text' }),
+        });
+      } catch (err) { console.error('[narrator] interrupt failed', err); }
+    }
+
+    function setBackend(b) {
+      if (b !== 'musetalk' && b !== 'hunyuan') return;
+      if (b === currentBackend) return;
+      currentBackend = b;
+      backendMuseTalkBtn.classList.toggle('active', b === 'musetalk');
+      backendHunyuanBtn.classList.toggle('active', b === 'hunyuan');
+      if (pc) startNarrator();
+    }
+
+    backendMuseTalkBtn.addEventListener('click', () => setBackend('musetalk'));
+    backendHunyuanBtn.addEventListener('click', () => setBackend('hunyuan'));
+
+    avatarToggleVid.addEventListener('click', () => {
+      const on = !avatarToggleVid.classList.contains('active');
+      avatarToggleVid.classList.toggle('active', on);
+      if (on) startNarrator(); else stopNarrator();
+    });
+
+    avatarToggleMic.addEventListener('click', async () => {
+      const on = !avatarToggleMic.classList.contains('active');
+      avatarToggleMic.classList.toggle('active', on);
+      if (on) {
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          if (pc) micStream.getAudioTracks().forEach(t => pc.addTrack(t, micStream));
+        } catch (err) { console.error('[narrator] mic denied', err); avatarToggleMic.classList.remove('active'); }
+      } else if (micStream) {
+        micStream.getTracks().forEach(t => t.stop()); micStream = null;
+      }
+    });
+
+    avatarToggleTxt.addEventListener('click', () => {
+      const on = !avatarToggleTxt.classList.contains('active');
+      avatarToggleTxt.classList.toggle('active', on);
+      avatarTextRow.style.display = on ? 'flex' : 'none';
+    });
+
+    avatarTextSend.addEventListener('click', () => {
+      const t = avatarTextInput.value.trim();
+      if (t) { sendInterrupt(t, 'text'); avatarTextInput.value = ''; }
+    });
+    avatarTextInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); avatarTextSend.click(); }
+    });
 
     // Auto-resize textarea
     inputEl.addEventListener('input', () => {
@@ -819,6 +1064,23 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           inputEl.focus();
           break;
         }
+
+        case 'config': {
+          narratorCfg = msg.narrator || null;
+          if (narratorCfg && narratorCfg.enabled) {
+            currentBackend = narratorCfg.defaultBackend === 'hunyuan' ? 'hunyuan' : 'musetalk';
+            backendMuseTalkBtn.classList.toggle('active', currentBackend === 'musetalk');
+            backendHunyuanBtn.classList.toggle('active', currentBackend === 'hunyuan');
+            avatarTileEl.classList.add('show');
+          } else {
+            avatarTileEl.classList.remove('show');
+          }
+          break;
+        }
+
+        case 'narratorStart': { if (narratorCfg && narratorCfg.enabled) startNarrator(); break; }
+        case 'narratorStop': { stopNarrator(); break; }
+        case 'narratorInterrupt': { sendInterrupt(msg.text, msg.source || 'text'); break; }
 
         case 'newChat':
         case 'clearHistory': {
