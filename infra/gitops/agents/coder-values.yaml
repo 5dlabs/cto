@@ -732,6 +732,36 @@ kaniko:
       memory: "48Gi"
 
 # =============================================================================
+# Narrator Sidecars (dual sidecar for live narration)
+# =============================================================================
+# TODO: Enable after narrator-sidecar-base image is built and pushed to GHCR.
+# Currently blocked on GHCR package creation permissions (need PAT with
+# org-level package write access).
+# CPU-only sidecars that tail ACP stream, generate narration phrases,
+# synthesize TTS, and stream via WebRTC. RPC out to GPU workers for lipsync.
+narrator:
+  enabled: false
+  image:
+    repository: ghcr.io/5dlabs/narrator-sidecar-base
+    tag: latest
+    pullPolicy: Always
+  musetalk:
+    enabled: true
+    port: 8081
+    backend: musetalk
+  hunyuan:
+    enabled: false
+    port: 8082
+    backend: hunyuan
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+# =============================================================================
 # Remote Tools
 # =============================================================================
 toolsConfig:
