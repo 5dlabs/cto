@@ -119,7 +119,25 @@ def render_avatar(
     scripts_dir = "/models/musetalk-src/scripts"
     if scripts_dir not in sys.path:
         sys.path.insert(0, scripts_dir)
-    os.chdir("/")
+
+    # musetalk/utils/preprocessing.py does init_model() at module import with two
+    # relative paths:
+    #   ./musetalk/utils/dwpose/rtmpose-l_8xb32-270e_coco-ubody-wholebody-384x288.py
+    #   ./models/dwpose/dw-ll_ucoco_384.pth
+    # The config lives under /models/musetalk/musetalk/..., but the checkpoint is
+    # at /models/dwpose/... (top-level, sibling of musetalk). No single cwd
+    # satisfies both. Symlink /models/musetalk/models -> /models so both resolve
+    # when cwd=/models/musetalk.
+    musetalk_root = "/models/musetalk"
+    models_link = os.path.join(musetalk_root, "models")
+    if not os.path.islink(models_link) and not os.path.exists(models_link):
+        try:
+            os.symlink("/models", models_link)
+            log.info("Created symlink %s -> /models", models_link)
+        except FileExistsError:
+            pass
+    os.chdir(musetalk_root)
+    log.info("Changed working directory to %s for upstream inference import", musetalk_root)
 
     from inference import main as musetalk_main  # noqa: WPS433
 
