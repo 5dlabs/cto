@@ -52,7 +52,7 @@ resources:
     nvidia.com/gpu: "1"
 
 nodeSelector:
-  workload: hunyuan-avatar
+  nvidia.com/gpu.present: "true"
 
 runtimeClassName: nvidia
 

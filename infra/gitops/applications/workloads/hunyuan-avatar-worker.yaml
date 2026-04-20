@@ -63,9 +63,9 @@ spec:
         nats:
           url: "nats://musetalk-nats.cto.svc.cluster.local:4222"
 
-        # Node selector for worker placement
+        # Node selector for GPU worker placement
         nodeSelector:
-          workload: "hunyuan-avatar"
+          nvidia.com/gpu.present: "true"
 
   destination:
     server: https://kubernetes.default.svc
