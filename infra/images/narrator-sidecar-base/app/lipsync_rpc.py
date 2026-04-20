@@ -19,12 +19,12 @@ class LipsyncRPC:
     """Publish lipsync render requests to NATS and await results."""
 
     def __init__(self, nats_url: str | None = None):
-        self._nats_url = nats_url or "nats://nats.messaging.svc.cluster.local:4222"
+        self._nats_url = nats_url or settings.lipsync_nats_url
         self._nc: nats.NATS | None = None
         self._pending: dict[str, asyncio.Future[dict[str, Any]]] = {}
         self._backend = settings.backend  # musetalk or hunyuan
-        self._subject = "avatar.render.request"
-        self._result_subject = "avatar.render.result"
+        self._subject = settings.lipsync_subject
+        self._result_subject = settings.lipsync_result_subject
 
     async def connect(self):
         """Connect to NATS and subscribe to result subject."""
