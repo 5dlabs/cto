@@ -56,7 +56,7 @@
         "cto.narrator.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "Enable the in-pod avatar narrator tile (Rex voice + lipsync over WebRTC). Requires musetalk/hunyuan sidecars in the agent pod."
+          "description": "Enable the in-pod avatar narrator tile (Blaze voice + lipsync over WebRTC). Requires musetalk/hunyuan sidecars in the agent pod."
         },
         "cto.narrator.musetalkUrl": {
           "type": "string",

@@ -688,7 +688,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 <body>
   <div class="avatar-tile" id="avatarTile">
     <div class="avatar-tile-header">
-      <span class="title">Rex</span>
+      <span class="title">Blaze</span>
       <span class="backend-segmented" role="tablist" aria-label="Lipsync backend">
         <button id="backendMuseTalk" class="active" data-backend="musetalk">MuseTalk</button>
         <button id="backendHunyuan" data-backend="hunyuan">Hunyuan</button>
@@ -703,7 +703,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       <span class="avatar-status" id="avatarStatus">idle</span>
     </div>
     <div class="avatar-controls" id="avatarTextRow" style="display:none;">
-      <input id="avatarTextInput" type="text" placeholder="Interrupt Rex…" style="flex:1; background:transparent; border:1px solid var(--vscode-panel-border, rgba(128,128,128,0.3)); color:var(--vscode-foreground); padding:4px 8px; border-radius:3px; font-family:inherit; font-size:12px;">
+      <input id="avatarTextInput" type="text" placeholder="Interrupt Blaze…" style="flex:1; background:transparent; border:1px solid var(--vscode-panel-border, rgba(128,128,128,0.3)); color:var(--vscode-foreground); padding:4px 8px; border-radius:3px; font-family:inherit; font-size:12px;">
       <button class="avatar-tile-toggle" id="avatarTextSend">Send</button>
     </div>
   </div>
@@ -816,7 +816,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         const resp = await fetch(base + '/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ persona_id: 'rex', webrtc_offer: { sdp: offer.sdp, type: offer.type } }),
+          body: JSON.stringify({ persona_id: 'blaze', webrtc_offer: { sdp: offer.sdp, type: offer.type } }),
         });
         if (!resp.ok) throw new Error('sessions POST ' + resp.status);
         const data = await resp.json();
