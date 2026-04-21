@@ -1244,19 +1244,16 @@ spec:
               echo "{\"github.com\":{\"user\":\"copilot-user\",\"oauth_token\":\"${GITHUB_TOKEN}\"}}" \
                 > /root/.config/github-copilot/hosts.json
               {{- end }}
-              # Install Copilot extensions from VS Marketplace if not already present
+              # GitLab workflow extension install (replaces GitHub Copilot — SCM is GitLab-first)
               EXTDIR="/workspace/.code-server/extensions"
               mkdir -p "$EXTDIR"
-              echo "[code-server] Installing GitHub Copilot extensions..."
-              for ext in copilot copilot-chat; do
-                VSIX="/workspace/.code-server-cache/${ext}.vsix"
-                mkdir -p /workspace/.code-server-cache
-                # Always download latest to pick up new model support
-                curl -sL --compressed \
-                  "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/GitHub/vsextensions/${ext}/latest/vspackage" \
-                  -o "${VSIX}.gz" && (gunzip -f "${VSIX}.gz" 2>/dev/null || mv "${VSIX}.gz" "$VSIX")
-                code-server --extensions-dir "$EXTDIR" --install-extension "$VSIX" 2>/dev/null || true
-              done
+              mkdir -p /workspace/.code-server-cache
+              echo "[code-server] Installing GitLab workflow extension..."
+              GITLAB_VSIX="/workspace/.code-server-cache/gitlab-workflow.vsix"
+              curl -sL --compressed \
+                "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/GitLab/vsextensions/gitlab-workflow/latest/vspackage" \
+                -o "${GITLAB_VSIX}.gz" && (gunzip -f "${GITLAB_VSIX}.gz" 2>/dev/null || mv "${GITLAB_VSIX}.gz" "$GITLAB_VSIX")
+              code-server --extensions-dir "$EXTDIR" --install-extension "$GITLAB_VSIX" 2>/dev/null || true
               # Patch product.json to use MS Marketplace (Copilot not on Open VSX)
               /usr/lib/code-server/lib/node -e "
                 var fs=require('fs'),p='/usr/lib/code-server/lib/vscode/product.json';

@@ -2252,6 +2252,15 @@ if [ -f "$VSIX_PATH" ]; then
   code-server --extensions-dir "$EXTDIR" --install-extension "$VSIX_PATH" 2>/dev/null || true
 fi
 
+# Install GitLab workflow extension (replaces GitHub Copilot — SCM is GitLab-first)
+GITLAB_VSIX="/workspace/.code-server-cache/gitlab-workflow.vsix"
+curl -sL --compressed \
+  "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/GitLab/vsextensions/gitlab-workflow/latest/vspackage" \
+  -o "$GITLAB_VSIX.gz" 2>/dev/null && (gunzip -f "$GITLAB_VSIX.gz" 2>/dev/null || mv "$GITLAB_VSIX.gz" "$GITLAB_VSIX")
+if [ -f "$GITLAB_VSIX" ]; then
+  code-server --extensions-dir "$EXTDIR" --install-extension "$GITLAB_VSIX" 2>/dev/null || true
+fi
+
 # Start code-server with agent_done watcher
 exec code-server \
   --disable-telemetry \

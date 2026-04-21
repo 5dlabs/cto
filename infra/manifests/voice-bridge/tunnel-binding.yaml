@@ -1,0 +1,18 @@
+---
+# Cloudflare TunnelBinding — routes morgan-voice.5dlabs.ai to the in-cluster
+# voice-bridge FastAPI service, which proxies STT/TTS and the OpenAI-compatible
+# HTTP gateway on Morgan's StatefulSet.
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: morgan-voice
+  namespace: cto
+tunnelRef:
+  kind: ClusterTunnel
+  name: cto-main
+subjects:
+  - kind: Service
+    name: voice-bridge
+    spec:
+      fqdn: morgan-voice.5dlabs.ai
+      target: http://voice-bridge.cto.svc:8090
