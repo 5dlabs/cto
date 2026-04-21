@@ -28,7 +28,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.2.76"
+version = "0.2.77"
 edition = "2021"
 authors = ["5D team"]
 license = "AGPL-3.0"

@@ -3,6 +3,34 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.77](https://github.com/5dlabs/cto/compare/v0.2.76...v0.2.77) (2026-04-21)
+
+
+### ✨ Features
+
+* **code-server:** add violet skin, GitLab instance URL, SCM hardening ([082b0a2](https://github.com/5dlabs/cto/commit/082b0a20d178a014ad0ec9c42c24ea8f974f3b10))
+* **coder:** suppress GitHub Copilot welcome, swap to GitLab workflow ([3762856](https://github.com/5dlabs/cto/commit/3762856d321441929ba13fdcc9f32adf0933173a))
+* **coder:** suppress GitHub Copilot welcome, swap to GitLab workflow ([39cc320](https://github.com/5dlabs/cto/commit/39cc3204d328905f062ed45dbba5fe8db8efffb0))
+* **cto-sidebar:** bind AvatarTile persona label to selected agent ([6fa2afe](https://github.com/5dlabs/cto/commit/6fa2afeec9e9fbe4ca4711fc2fce803de7951bc8))
+* **cto-sidebar:** bind AvatarTile persona label to selected agent ([19d8dcb](https://github.com/5dlabs/cto/commit/19d8dcb8448735f4553c3a1eb252cc2959f4ca94))
+* **voice-bridge:** HTTP gateway pivot + k8s manifests + build workflow ([352962a](https://github.com/5dlabs/cto/commit/352962a45b7832d77956a1d747c1d06ab2cf0c06))
+* **voice-bridge:** real NATS transport to Morgan agent ([98abea8](https://github.com/5dlabs/cto/commit/98abea8536b97165eefbf013c4828baa75648a5f))
+* **voice-bridge:** scaffold sidecar for in-cluster Morgan voice ([eea7abc](https://github.com/5dlabs/cto/commit/eea7abcff6c806f616442d2b862b42d5f4187f3a))
+* **voice-bridge:** wire to cto-main tunnel + ghcr pull secret ([4dd5417](https://github.com/5dlabs/cto/commit/4dd5417d28eaeb1649088b89e988feeabefaf17a))
+
+
+### 🐛 Bug Fixes
+
+* **hunyuan-avatar-worker:** bake deps, revert gpu:2 drift, add H100 overlay ([fce5894](https://github.com/5dlabs/cto/commit/fce58940800eb00574756cb5385024f230fb080a))
+* **hunyuan-avatar-worker:** bake deps, revert gpu:2 drift, add H100 overlay ([e758b2e](https://github.com/5dlabs/cto/commit/e758b2eac5b4bc861c4421e78808a34b0f93759d))
+
+
+### 📚 Documentation
+
+* **avatar:** add LemonSlice architecture doc + rubber-duck risks ([07cc3f5](https://github.com/5dlabs/cto/commit/07cc3f5b667405a19ac867c4a0bc470ba3dd11ea))
+* **plans:** avatar provider failover plan (Coder — DO + OVH) ([cdd30a9](https://github.com/5dlabs/cto/commit/cdd30a97bf1ca7f18420bc4a202e952f09852ed3))
+* **plans:** avatar provider failover plan for Coder (DO + OVH) ([b92429d](https://github.com/5dlabs/cto/commit/b92429dfcfe59f7cf6fc78ddee03ff1da935d998))
+
 ## [0.2.76](https://github.com/5dlabs/cto/compare/v0.2.75...v0.2.76) (2026-04-21)
 
 
