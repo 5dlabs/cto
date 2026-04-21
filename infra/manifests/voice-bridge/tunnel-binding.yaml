@@ -9,7 +9,7 @@ metadata:
   namespace: cto
 tunnelRef:
   kind: ClusterTunnel
-  name: morgan-avatar
+  name: cto-main
 subjects:
   - kind: Service
     name: voice-bridge

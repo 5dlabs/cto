@@ -18,6 +18,8 @@ spec:
         app.kubernetes.io/name: voice-bridge
         app.kubernetes.io/part-of: morgan-voice
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: voice-bridge
           image: ghcr.io/5dlabs/voice-bridge:latest
