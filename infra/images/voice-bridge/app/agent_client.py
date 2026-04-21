@@ -1,24 +1,3 @@
-"""
-Morgan agent adapter: OpenAI-compatible HTTP streaming client.
-
-Morgan (in-cluster OpenClaw StatefulSet) exposes an OpenAI-compatible HTTP
-gateway on port 18789. We speak `POST /v1/chat/completions` with
-`stream: true` and yield assistant content chunks as they arrive.
-
-This is substantially simpler than the previous NATS request/reply path:
-the gateway already handles session multiplexing and gives us a familiar
-SSE transport.
-
-Env defaults (see main.py):
-
-  MORGAN_GATEWAY_URL   = http://openclaw-morgan.cto.svc.cluster.local:18789
-  MORGAN_GATEWAY_TOKEN = openclaw-internal
-  MORGAN_MODEL         = openclaw/morgan
-
-If the gateway is unreachable we fall back to a single stub token so the
-WS round-trip still completes and the UI can render a clear error state.
-"""
-
 from __future__ import annotations
 
 import json
@@ -27,43 +6,45 @@ from typing import AsyncIterator
 
 import httpx
 
+from .voice_agents import AgentSpec
+
 log = logging.getLogger("voice-bridge.agent")
 
 
 class MorganAgentClient:
     def __init__(
         self,
-        gateway_url: str,
-        gateway_token: str,
-        model: str = "openclaw/morgan",
+        agent: AgentSpec,
         request_timeout_s: float = 120.0,
     ) -> None:
-        self._gateway_url = gateway_url.rstrip("/")
-        self._gateway_token = gateway_token
-        self._model = model
+        self._agent = agent
         self._request_timeout_s = request_timeout_s
 
     @property
     def is_configured(self) -> bool:
-        return bool(self._gateway_url and self._gateway_token and self._model)
+        return bool(
+            self._agent.gateway_url
+            and self._agent.gateway_token
+            and self._agent.model
+        )
 
     async def send_and_stream(self, *, session_id: str, text: str) -> AsyncIterator[str]:
         if not self.is_configured:
-            log.warning("agent stub: gateway not configured")
-            yield "(voice-bridge: Morgan gateway not configured)"
+            log.warning("agent stub: gateway not configured for %s", self._agent.name)
+            yield f"(voice-bridge: {self._agent.name} gateway not configured)"
             return
 
-        url = f"{self._gateway_url}/v1/chat/completions"
+        url = f"{self._agent.gateway_url.rstrip('/')}/v1/chat/completions"
         headers = {
-            "Authorization": f"Bearer {self._gateway_token}",
+            "Authorization": f"Bearer {self._agent.gateway_token}",
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
         }
         payload = {
-            "model": self._model,
+            "model": self._agent.model,
             "stream": True,
             "messages": [{"role": "user", "content": text}],
-            "user": f"voice-bridge:{session_id}",
+            "user": f"voice-bridge:{self._agent.name}:{session_id}",
         }
 
         try:
@@ -71,8 +52,8 @@ class MorganAgentClient:
                 async with client.stream("POST", url, headers=headers, json=payload) as resp:
                     if resp.status_code >= 400:
                         body = (await resp.aread()).decode("utf-8", "replace")[:400]
-                        log.warning("gateway %d: %s", resp.status_code, body)
-                        yield f"(voice-bridge: Morgan returned {resp.status_code})"
+                        log.warning("gateway %s %d: %s", self._agent.name, resp.status_code, body)
+                        yield f"(voice-bridge: {self._agent.name} returned {resp.status_code})"
                         return
                     async for line in resp.aiter_lines():
                         if not line or not line.startswith("data:"):
@@ -92,13 +73,13 @@ class MorganAgentClient:
                                 continue
                             delta = choices[0].get("delta") or choices[0].get("message") or {}
                             chunk = delta.get("content") or ""
-                        except Exception:  # noqa: BLE001
+                        except Exception:
                             chunk = ""
                         if chunk:
                             yield chunk
         except httpx.HTTPError as exc:
-            log.warning("gateway request failed: %s", exc)
-            yield f"(voice-bridge: Morgan unreachable: {exc})"
+            log.warning("gateway request failed for %s: %s", self._agent.name, exc)
+            yield f"(voice-bridge: {self._agent.name} unreachable: {exc})"
 
-    async def close(self) -> None:  # pragma: no cover - nothing to tear down per-request
+    async def close(self) -> None:
         return None

@@ -1,11 +1,3 @@
-"""
-ElevenLabs client: STT (Scribe) + streaming TTS (Flash v2.5).
-
-Deliberately thin. Real network calls are stubbed until we finalise the
-voice ID and Scribe billing posture. Returning a clear placeholder lets the
-WebSocket plumbing above be exercised end-to-end without an API key.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -35,13 +27,6 @@ class ElevenLabsClient:
         filename: str = "turn.webm",
         language_code: str | None = None,
     ) -> str:
-        """ElevenLabs Scribe STT.
-
-        Sends a single turn's audio blob to
-        `POST /v1/speech-to-text` as multipart/form-data with
-        `model_id=scribe_v1`. Accepts any container ffmpeg can decode
-        (opus-webm from MediaRecorder, pcm16 wav, mp3, etc.).
-        """
         if not self._api_key:
             log.warning("transcribe(): no API key; returning empty transcript")
             return ""
@@ -70,7 +55,6 @@ class ElevenLabsClient:
             return ""
 
     async def stream_tts(self, text: str) -> AsyncIterator[bytes]:
-        """ElevenLabs Flash v2.5 streaming TTS → MP3 chunks."""
         if not self.is_configured or not text:
             return
         url = f"{_API_BASE}/text-to-speech/{self._voice_id}/stream"
@@ -90,3 +74,6 @@ class ElevenLabsClient:
                 async for chunk in resp.aiter_bytes():
                     if chunk:
                         yield chunk
+
+    def with_voice(self, voice_id: str) -> "ElevenLabsClient":
+        return ElevenLabsClient(api_key=self._api_key, voice_id=voice_id)
