@@ -14,7 +14,7 @@ You own three deliverables from the plan, and **only those three**:
 
 | Deliverable | What you build | Repo path |
 |---|---|---|
-| **D2** | `avatar-worker` container image (MuseTalk v1.5 MVP; HunyuanVideo-Avatar stretch, gated behind `AVATAR_MODEL=hunyuan`) | `infra/images/avatar-worker/` |
+| **D2** | `avatar-worker` container image. **Pick the highest-quality open-source model that runs at ≥15 fps on a single L40S (48 GB) and delivers lip sync + body/hand gestures + persistent idle animation.** See "Model selection" below. | `infra/images/avatar-worker/` |
 | **D3** | OVH AI Deploy provisioning scripts + docs | `infra/avatar/ovh/` |
 | **D4** | DigitalOcean GPU Droplet provisioning scripts + docs | `infra/avatar/digitalocean/` |
 
@@ -67,12 +67,56 @@ After each of D2, D3, D4:
 3. **Wait for the user to reply "go" before starting the next deliverable.**
    Do not speculatively start D3 while D2 is in review.
 
+## Model selection (D2) — do this BEFORE writing worker code
+
+**Target**: visual quality as close to LemonSlice hosted as possible given our hardware budget.
+
+**Hard requirements** (all three):
+1. **Lip sync** — accurate phoneme-level mouth shape from driving audio.
+2. **Body / hand gestures** — not just head nods. Idle arm motion, gesture on emphasis.
+3. **Persistent animation / natural idle** — avatar stays "alive" between utterances (blinks, micro-motion), not a frozen image.
+
+**Hardware budget** (what we actually have, both OVH and DO):
+- **L40S 48 GB** — primary target. Must run at ≥15 fps on a single card.
+- H100 80 GB available on DO as stretch if a clearly-better model only fits there.
+- Do not target V100S / 24 GB consumer cards.
+
+**Your deliverable**: a table in the D2 PR description comparing the current-generation candidates. Fill real numbers from your own smoke test, not vendor claims. Include at minimum:
+
+| Model | License | Gestures? | fps on L40S 48GB @ 512² | Time-to-first-frame | Quality notes |
+|---|---|---|---|---|---|
+| HunyuanVideo-Avatar | Custom (Tencent) | yes (audio-driven) | measure | measure | |
+| Hallo3 | Academic / Apache-ish | yes | measure | measure | |
+| Sonic (Tencent) | Apache-2 | limited (head-dom) | measure | measure | |
+| OmniHuman-1 (if weights released) | check | yes | measure | measure | |
+| EchoMimic v2 | Apache-2 | hands yes | measure | measure | |
+| MuseTalk v1.5 | — | **no** | — | — | **fails gesture requirement — floor only, do not pick** |
+| LivePortrait | MIT | partial (upper body drive) | measure | measure | |
+
+**Rules for the matrix:**
+- Add any candidate you find during research — list is not exhaustive.
+- Exclude anything that fails the three hard requirements.
+- Prefer Apache-2 / MIT / permissive. Flag custom licenses (Tencent Hunyuan etc.)
+  in the PR and wait for user approval before picking one that needs a license ack.
+- Prefer models that can run audio-driven end-to-end (we only have audio from
+  voice-bridge; no pose/video driver).
+- If two candidates tie on quality, pick the one with smaller weights /
+  faster time-to-first-frame.
+- Anthropomorphic-animal compatibility (see § below) is a tiebreaker, not
+  a hard requirement — our committee avatars are animals, but we can swap
+  to human-styled portraits if no audio-driven model handles non-humans.
+
+**Stop and ask the user before picking** if:
+- No candidate hits ≥15 fps on L40S (we may need to drop resolution or target H100).
+- The best candidate is a custom / non-commercial license.
+- Every audio-driven gesture model fails on the anthropomorphic committee
+  portraits — we'll decide human-swap vs. hosted-only at that point.
+
+---
+
 ## Exit criteria — summary (full details in the plan)
 
-- **D2** passes: image builds in CI; MuseTalk dry-run script outputs frames
-  for a stubbed audio sample locally; `AVATAR_MODEL=hunyuan` path is stubbed
-  with a clear `NotImplementedError("stretch — needs H100")`; image <= 12 GB
-  compressed; README documents env vars.
+- **D2** passes: written model-selection matrix in the PR description (candidates + fps + VRAM + quality notes + chosen winner); image builds in CI; dry-run script renders ≥3s of 512² video with lipsync + at least one visible gesture from a stubbed audio+pose input; image <= 15 GB compressed (weights pulled at runtime, not baked); README documents env vars and the evaluation result.
 - **D3** passes: `make -C infra/avatar/ovh plan` prints a dry-run of the
   `ovhai app run` command with `l40s-1-gpu` default and `$/hr`; `make destroy`
   refuses without `CONFIRM_OVH_APP_ID=<id>`; `README.md` documents the full
@@ -97,10 +141,20 @@ After each of D2, D3, D4:
    `doctl compute size list --format Slug,Regions | grep l40s` and
    comment the output. If TOR1-only, flag and wait for user decision before
    hardcoding region.
-2. **HunyuanVideo weight hosting** (~50 GB). For D2 stretch path, do **not**
-   bake the weights into the image. Document the plan to pull from an object
-   store at runtime, but don't actually implement the pull path until the
-   user approves a hosting target.
+2. **Model weight hosting.** Whichever model you pick, weights likely ≥10 GB
+   and may be ≥50 GB (Hunyuan-class). Do **not** bake weights into the
+   container image. Document the plan to pull from an object store at
+   runtime (OVH Object Storage bucket or DO Spaces — ask the user which),
+   but don't actually implement the pull path until the user approves a
+   hosting target.
+3. **Anthropomorphic-face compatibility.** Our committee portraits
+   (Morgan = dog, Vanguard/Sentinel = stylized animals) have broken every
+   human-face-landmark-based lipsync model we've tried (MuseTalk, SadTalker
+   both confirmed dead via `face_alignment` detector failure). During your
+   D2 smoke test, run the chosen model against `avatar/morgan-512.png`
+   specifically. If the detector bombs, flag immediately — we will either
+   swap to human-styled portraits or fall back to hosted (LemonSlice) for
+   animal avatars. Do not spend cycles trying to fix landmark detection.
 3. **CORS/auth for the worker endpoint.** Worker must not accept public
    internet traffic. Document your assumption (VPC-only, or fronted by
    voice-bridge with a shared secret header) in the D2 README and flag for
