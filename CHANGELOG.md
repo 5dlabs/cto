@@ -3,6 +3,19 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.76](https://github.com/5dlabs/cto/compare/v0.2.75...v0.2.76) (2026-04-21)
+
+
+### ✨ Features
+
+* **infra:** add provisioning script for 2nd GPU node (hunyuan-gpu-1) ([a1c4404](https://github.com/5dlabs/cto/commit/a1c44047b05f004d7003af927b127099b7b123db))
+
+
+### 🔧 Maintenance
+
+* release 0.2.75 ([228ac03](https://github.com/5dlabs/cto/commit/228ac030a6ec29ec4c2871e82db0c46c1bb7e3c1))
+* release 0.2.75 ([edfcb51](https://github.com/5dlabs/cto/commit/edfcb511474c9ed7598e91ae64dc7630fd8e19ab))
+
 ## [0.2.75](https://github.com/5dlabs/cto/compare/v0.2.74...v0.2.75) (2026-04-20)
 
 
