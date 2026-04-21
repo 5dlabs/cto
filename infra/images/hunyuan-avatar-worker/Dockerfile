@@ -29,11 +29,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python deps (skip flash-attn for now, use deepcache instead)
+# Install Python deps
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --upgrade pip && \
     pip install -r /tmp/requirements.txt && \
     pip install aiohttp==3.10.10 prometheus-client==0.21.0 nats-py boto3
+
+# flash_attn prebuilt wheel for torch 2.4 + cu12.1 + cp311.
+# hymm_sp imports flash_attn unconditionally at module load; pure-diffusers
+# fallback is not viable. Wheel is forward-compatible cu123->cu121 runtime.
+# Verified empirically in pod 2026-04-21.
+RUN pip install --no-deps \
+    https://github.com/Dao-AILab/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu123torch2.4cxx11abiFALSE-cp311-cp311-linux_x86_64.whl
 
 # Copy application code
 COPY download_models.py render.py worker.py ./
