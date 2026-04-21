@@ -318,7 +318,7 @@ mod tests {
     #[test]
     fn provider_infer_from_model() {
         assert_eq!(
-            Provider::infer_from_model("accounts/fireworks/routers/kimi-k2p5-turbo"),
+            Provider::infer_from_model("accounts/fireworks/models/kimi-k2p6"),
             Some(Provider::Fireworks)
         );
         assert_eq!(

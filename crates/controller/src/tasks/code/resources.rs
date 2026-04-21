@@ -311,7 +311,7 @@ impl EffectiveProviderConfig {
         // ACPX_MODEL: the model ID acpx should use, with CLI-specific transforms
         let acpx_model = match (self.cli_type, self.provider) {
             (CLIType::OpenCode, Provider::Fireworks) => format!("fireworks-ai/{}", self.raw_model),
-            (CLIType::Kimi, Provider::Fireworks) => "kimi-k2p5-turbo".to_string(),
+            (CLIType::Kimi, Provider::Fireworks) => "kimi-k2p6".to_string(),
             (CLIType::Copilot, _) => "gpt-4.1".to_string(),
             (CLIType::Cursor, _) => String::new(), // cursor resolves internally
             _ => self.raw_model.clone(),

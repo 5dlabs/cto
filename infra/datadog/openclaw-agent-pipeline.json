@@ -17,7 +17,7 @@
       "samples": [
         "2026-04-15T23:48:05.430+00:00 [plugins] openclaw-mem0: initialized (mode: open-source, user: jonathon)",
         "2026-04-15T23:48:06.121+00:00 [discord] [default] starting provider (@Coder)",
-        "2026-04-15T23:47:46.247+00:00 [gateway] agent model: fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
+        "2026-04-15T23:47:46.247+00:00 [gateway] agent model: fireworks/accounts/fireworks/models/kimi-k2p6"
       ]
     },
     {

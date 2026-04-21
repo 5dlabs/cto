@@ -302,7 +302,7 @@ data:
                 "llm": {
                   "provider": {{ ($mem0Plugin.oss).llm.provider | default "openai" | quote }},
                   "config": {
-                    "model": {{ ($mem0Plugin.oss).llm.config.model | default "accounts/fireworks/routers/kimi-k2p5-turbo" | quote }}
+                    "model": {{ ($mem0Plugin.oss).llm.config.model | default "accounts/fireworks/models/kimi-k2p6" | quote }}
                     {{- if ($mem0Plugin.oss).llm.config.apiKey }},
                     "apiKey": {{ ($mem0Plugin.oss).llm.config.apiKey | quote }}
                     {{- else }},

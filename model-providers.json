@@ -109,7 +109,7 @@
       "score": 88,
       "tier": "standard"
     },
-    "accounts/fireworks/routers/kimi-k2p5-turbo": {
+    "accounts/fireworks/models/kimi-k2p6": {
       "enabled": true,
       "displayName": "Kimi K2.5 Turbo (Fireworks)",
       "provider": "Fireworks",
@@ -288,7 +288,7 @@
   "openclaw": {
     "provider": "Fireworks",
     "models": [
-      "accounts/fireworks/routers/kimi-k2p5-turbo",
+      "accounts/fireworks/models/kimi-k2p6",
       "accounts/fireworks/models/llama-v3p3-70b-instruct"
     ]
   },

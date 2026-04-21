@@ -70,7 +70,7 @@ data:
           "models": {
             "kimi-k2-turbo": {
               "name": "Kimi K2 Turbo",
-              "model": "accounts/fireworks/routers/kimi-k2p5-turbo"
+              "model": "accounts/fireworks/models/kimi-k2p6"
             }
           }
         }

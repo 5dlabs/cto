@@ -171,7 +171,7 @@ modelDefaults:
     - "fireworks/accounts/fireworks/models/qwen3p6-plus"
     - "fireworks/accounts/fireworks/models/minimax-m2p7"
     - "fireworks/accounts/fireworks/models/glm-5p1"
-    - "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
+    - "fireworks/accounts/fireworks/models/kimi-k2p6"
 
 # =============================================================================
 # Secrets
@@ -236,7 +236,7 @@ models:
       baseUrl: "https://api.fireworks.ai/inference/v1"
       apiKeySecretKey: "fireworks-api-key"
       models:
-        - id: "accounts/fireworks/routers/kimi-k2p5-turbo"
+        - id: "accounts/fireworks/models/kimi-k2p6"
           name: "Kimi K2.5 Turbo"
         - id: "accounts/fireworks/models/minimax-m2p7"
           name: "MiniMax M2.7"
@@ -252,7 +252,7 @@ models:
 memorySearch:
   enabled: true
   sessionMemory: true
-  model: "accounts/fireworks/routers/kimi-k2p5-turbo"
+  model: "accounts/fireworks/models/kimi-k2p6"
   provider: "fireworks"
   maxResults: 6
   cache:
@@ -560,7 +560,7 @@ mem0Plugin:
     llm:
       provider: openai
       config:
-        model: accounts/fireworks/routers/kimi-k2p5-turbo
+        model: accounts/fireworks/models/kimi-k2p6
         apiKey: "${FIREWORKS_API_KEY}"
         baseUrl: "https://api.fireworks.ai/inference/v1"
 

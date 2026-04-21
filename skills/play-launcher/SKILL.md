@@ -30,7 +30,7 @@ cto-play --repo-path /path/to/repo
 cto-play --repo-path /path/to/repo --dry-run
 
 # Override provider and model
-cto-play --repo-path /path/to/repo --provider fireworks --model accounts/fireworks/routers/kimi-k2p5-turbo
+cto-play --repo-path /path/to/repo --provider fireworks --model accounts/fireworks/models/kimi-k2p6
 
 # Enable Discord notifications
 cto-play --repo-path /path/to/repo --discord true --discord-bridge-url http://discord-bridge:3001
@@ -66,7 +66,7 @@ project:
 
 defaults:
   provider: "fireworks"
-  model: "accounts/fireworks/routers/kimi-k2p5-turbo"
+  model: "accounts/fireworks/models/kimi-k2p6"
   cli: "claude"
   harnessAgent: "openclaw"
   enableDocker: true
@@ -89,7 +89,7 @@ discord:
 | `--kubeconfig` | Override kubeconfig path | From play-config |
 | `--namespace` | Override K8s namespace | `cto` |
 | `--provider` | Override inference provider | `fireworks` |
-| `--model` | Override model | `kimi-k2p5-turbo` |
+| `--model` | Override model | `kimi-k2p6` |
 | `--cli` | Override coding CLI | `claude` |
 | `--harness-agent` | Override harness (openclaw/hermes) | `openclaw` |
 | `--repo-url` | Override repository URL | From play-config |
