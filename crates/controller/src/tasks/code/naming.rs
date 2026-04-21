@@ -1143,8 +1143,8 @@ mod tests {
         );
         // Fireworks path-prefixed models get the base name only
         assert_eq!(
-            ResourceNaming::shorten_model_name("accounts/fireworks/routers/kimi-k2p5-turbo"),
-            "kimi-k2p5-turbo"
+            ResourceNaming::shorten_model_name("accounts/fireworks/models/kimi-k2p6"),
+            "kimi-k2p6"
         );
     }
 

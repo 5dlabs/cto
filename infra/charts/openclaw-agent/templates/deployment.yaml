@@ -562,6 +562,13 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: fireworks-api-key
                   optional: true
+            # DigitalOcean Gradient AI model access key (OpenCode → Claude Opus 4.7 tier-3 fallback)
+            - name: DO_INFERENCE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: DO_INFERENCE_KEY
+                  optional: true
             {{- if .Values.cloudProviders.bedrock.enabled }}
             # AWS Bedrock credentials (used by OpenClaw gateway + Claude Code CLI)
             - name: AWS_ACCESS_KEY_ID
@@ -836,6 +843,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: fireworks-api-key
+                  optional: true
+            # DigitalOcean Gradient AI model access key (OpenCode → Claude Opus 4.7 tier-3 fallback)
+            - name: DO_INFERENCE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: DO_INFERENCE_KEY
                   optional: true
             # Web tools API keys (Brave search + Firecrawl scraping)
             - name: BRAVE_API_KEY

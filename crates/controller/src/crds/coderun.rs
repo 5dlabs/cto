@@ -114,7 +114,7 @@ pub struct ACPEntry {
 /// Model entry inside [`OpenClawProviderEntry`].
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct OpenClawModelEntry {
-    /// Model identifier (e.g. "accounts/fireworks/routers/kimi-k2p5-turbo")
+    /// Model identifier (e.g. "accounts/fireworks/models/kimi-k2p6")
     pub name: String,
     /// Human-readable display name (e.g. "Kimi K2.5 Turbo")
     #[serde(
@@ -207,7 +207,7 @@ impl OpenClawConfig {
                     api: Some("openai-completions".to_string()),
                     models: vec![
                         OpenClawModelEntry {
-                            name: "accounts/fireworks/routers/kimi-k2p5-turbo".to_string(),
+                            name: "accounts/fireworks/models/kimi-k2p6".to_string(),
                             display_name: Some("Kimi K2.5 Turbo (FirePass)".to_string()),
                             thinking_level: None,
                             reasoning: Some(false),
@@ -1051,7 +1051,7 @@ mod tests {
                 api_key_env_var: Some("FIREWORKS_API_KEY".to_string()),
                 api: Some("openai-completions".to_string()),
                 models: vec![OpenClawModelEntry {
-                    name: "accounts/fireworks/routers/kimi-k2p5-turbo".to_string(),
+                    name: "accounts/fireworks/models/kimi-k2p6".to_string(),
                     display_name: Some("Kimi K2.5 Turbo".to_string()),
                     thinking_level: Some("high".to_string()),
                     reasoning: Some(false),
@@ -1173,7 +1173,7 @@ mod tests {
                     "baseUrl": "https://api.fireworks.ai/inference/v1",
                     "apiKeyEnvVar": "FIREWORKS_API_KEY",
                     "api": "openai-completions",
-                    "models": [{ "name": "kimi-k2p5-turbo", "thinkingLevel": "high" }]
+                    "models": [{ "name": "kimi-k2p6", "thinkingLevel": "high" }]
                 }]
             }
         }"#;

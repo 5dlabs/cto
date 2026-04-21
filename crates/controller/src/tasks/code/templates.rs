@@ -4955,7 +4955,7 @@ Be constructive and explain the "why" behind your suggestions.
     /// Priority (pure CRD passthrough — no hard-coded model names):
     ///   1. `cli_config.model` — the actual model the CLI uses (may already be
     ///      a fully-qualified Fireworks/provider path like
-    ///      `accounts/fireworks/routers/kimi-k2p5-turbo`).
+    ///      `accounts/fireworks/models/kimi-k2p6`).
     ///   2. `spec.model` — top-level display/naming model.
     ///
     /// If the resolved value already contains `/` it is passed through as-is.
@@ -4970,7 +4970,7 @@ Be constructive and explain the "why" behind your suggestions.
             .as_ref()
             .map_or(&code_run.spec.model, |c| &c.model);
 
-        // Already provider-qualified (e.g. "accounts/fireworks/routers/kimi-k2p5-turbo")
+        // Already provider-qualified (e.g. "accounts/fireworks/models/kimi-k2p6")
         if model.contains('/') {
             return model.clone();
         }

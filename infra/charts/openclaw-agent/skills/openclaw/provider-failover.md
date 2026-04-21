@@ -59,12 +59,29 @@ printf '%s' "$CODEX_AUTH_SUB1" > ~/.codex/auth.json
 chmod 600 ~/.codex/auth.json
 ```
 
+## Claude Opus 4.7 on DigitalOcean Gradient (third tier, via OpenCode)
+
+After both OAuth subs are exhausted but **before** dropping to the Fireworks gateway (non-Claude), try Claude Opus 4.7 on DO Gradient via the `opencode` CLI. Full details in the `opencode_do_opus47` skill; quick path:
+
+```bash
+# Smoke-test the endpoint
+curl -sS -X POST https://inference.do-ai.run/v1/chat/completions \
+  -H "Authorization: Bearer $DO_INFERENCE_KEY" -H "Content-Type: application/json" \
+  -d '{"model":"anthropic-claude-opus-4.7","max_tokens":16,"messages":[{"role":"user","content":"hi"}]}' \
+  | jq -r '.choices[0].message.content'
+
+# Run task (install with `bun install -g @opencode-ai/opencode` if missing)
+opencode run --provider do-gradient --model anthropic-claude-opus-4.7 "<task>"
+```
+
+DO uses an OpenAI-compatible endpoint, so `claude` CLI cannot talk to it — that is why we switch CLIs here. If DO also 401/403s, drop to the Fireworks gateway chain below.
+
 ## Gateway automatic failover
 
 The model chain handles 429/402/401 automatically:
 
 ```
-fireworks/kimi-k2p5-turbo → qwen3p6-plus → minimax-m2p7 → glm-5p1
+fireworks/kimi-k2p6 → qwen3p6-plus → minimax-m2p7 → glm-5p1
 ```
 
 ### Manual gateway model override

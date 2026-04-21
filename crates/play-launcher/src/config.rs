@@ -258,7 +258,7 @@ pub fn build_args_json(
         "model",
         &pc.defaults.model,
         None,
-        "accounts/fireworks/routers/kimi-k2p5-turbo",
+        "accounts/fireworks/models/kimi-k2p6",
     );
     let harness_agent = resolve_str(
         "harness_agent",

@@ -263,7 +263,7 @@ spec:
                             properties:
                               name:
                                 type: string
-                                description: "Model identifier (e.g. accounts/fireworks/routers/kimi-k2p5-turbo)"
+                                description: "Model identifier (e.g. accounts/fireworks/models/kimi-k2p6)"
                               displayName:
                                 type: string
                                 description: "Human-readable display name"

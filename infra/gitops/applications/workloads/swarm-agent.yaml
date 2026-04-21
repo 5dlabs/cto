@@ -126,7 +126,7 @@ spec:
           primary: "openai-codex/gpt-5.4"
           fallbacks:
             - "openai-api/gpt-5.4"
-            - "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo"
+            - "fireworks/accounts/fireworks/models/kimi-k2p6"
             - "google/gemini-2.5-pro"
 
         models:
@@ -168,7 +168,7 @@ spec:
               api: "openai-completions"
               baseUrl: "https://api.fireworks.ai/inference/v1"
               models:
-                - id: "accounts/fireworks/routers/kimi-k2p5-turbo"
+                - id: "accounts/fireworks/models/kimi-k2p6"
                   name: "Kimi K2.5 Turbo (Fire Pass)"
                   contextWindow: 256000
                   maxTokens: 256000
@@ -205,6 +205,7 @@ spec:
           ANTHROPIC_API_KEY: "anthropic-api-key"
           FIREWORKS_API_KEY: "FIREWORKS_API_KEY"
           GOOGLE_API_KEY: "gemini-api-key"
+          DO_INFERENCE_KEY: "DO_INFERENCE_KEY"
 
         discord:
           enabled: true
