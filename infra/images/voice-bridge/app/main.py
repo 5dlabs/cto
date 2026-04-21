@@ -53,13 +53,15 @@ app.add_middleware(
 
 tts = ElevenLabsClient(
     api_key=os.environ.get("ELEVENLABS_API_KEY", ""),
-    voice_id=os.environ.get("MORGAN_VOICE_ID", ""),
+    voice_id=os.environ.get("MORGAN_VOICE_ID", "iP95p4xoKVk53GoZ742B"),
 )
 agent = MorganAgentClient(
-    nats_url=os.environ.get("NATS_URL", "nats://openclaw-nats.openclaw.svc.cluster.local:4222"),
-    inbox_subject=os.environ.get("MORGAN_INBOX_SUBJECT", "agent.morgan.inbox"),
-    replies_subject=os.environ.get("MORGAN_REPLIES_SUBJECT") or None,
-    agent_name=os.environ.get("VOICE_BRIDGE_AGENT_NAME", "voice-bridge"),
+    gateway_url=os.environ.get(
+        "MORGAN_GATEWAY_URL",
+        "http://openclaw-morgan.cto.svc.cluster.local:18789",
+    ),
+    gateway_token=os.environ.get("MORGAN_GATEWAY_TOKEN", "openclaw-internal"),
+    model=os.environ.get("MORGAN_MODEL", "openclaw/morgan"),
 )
 
 
@@ -128,10 +130,16 @@ async def _handle_turn(
     audio_chunks: list[bytes],
     text_addendum: str,
 ) -> None:
-    # 1. STT — stub: real impl will POST concatenated audio to ElevenLabs Scribe.
+    # 1. STT — send concatenated audio to ElevenLabs Scribe.
     transcript = ""
     if audio_chunks:
-        transcript = await tts.transcribe(b"".join(audio_chunks))
+        content_type = os.environ.get("VOICE_BRIDGE_AUDIO_MIME", "audio/webm")
+        filename = os.environ.get("VOICE_BRIDGE_AUDIO_NAME", "turn.webm")
+        transcript = await tts.transcribe(
+            b"".join(audio_chunks),
+            content_type=content_type,
+            filename=filename,
+        )
     user_text = "\n".join(p for p in (transcript, text_addendum) if p).strip()
     if not user_text:
         await ws.send_json({"type": "error", "error": "empty utterance"})

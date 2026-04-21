@@ -1,0 +1,69 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voice-bridge
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: voice-bridge
+    app.kubernetes.io/part-of: morgan-voice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: voice-bridge
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: voice-bridge
+        app.kubernetes.io/part-of: morgan-voice
+    spec:
+      containers:
+        - name: voice-bridge
+          image: ghcr.io/5dlabs/voice-bridge:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8090
+              protocol: TCP
+          env:
+            - name: LOG_LEVEL
+              value: INFO
+            - name: MORGAN_GATEWAY_URL
+              value: http://openclaw-morgan.cto.svc.cluster.local:18789
+            - name: MORGAN_GATEWAY_TOKEN
+              value: openclaw-internal
+            - name: MORGAN_MODEL
+              value: openclaw/morgan
+            - name: MORGAN_VOICE_ID
+              value: iP95p4xoKVk53GoZ742B
+            - name: VOICE_BRIDGE_AUDIO_MIME
+              value: audio/webm
+            - name: VOICE_BRIDGE_AUDIO_NAME
+              value: turn.webm
+            - name: ELEVENLABS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openclaw-api-keys
+                  key: elevenlabs-api-key
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
