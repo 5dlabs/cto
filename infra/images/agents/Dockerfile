@@ -122,6 +122,24 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     echo "--- OpenClaw (agent CLI) included ---" && \
     openclaw --version
 
+# Prebake bundled-extension deps and fix ownership.
+# The openclaw tarball ships extensions under dist/extensions/<name>/ without
+# node_modules. At runtime the gateway tries `npm install` in each extension
+# dir — that fails with EACCES because the tree is root-owned and the pod
+# runs as uid 1001. Install deps once here (so the image works offline), then
+# chown the whole openclaw tree to the runtime uid/gid (1001:1000).
+RUN --mount=type=cache,target=/root/.npm,sharing=shared \
+    set -eux; \
+    OPENCLAW_ROOT="$(npm root -g)/openclaw"; \
+    for pkg in "$OPENCLAW_ROOT"/dist/extensions/*/package.json; do \
+        [ -f "$pkg" ] || continue; \
+        dir="$(dirname "$pkg")"; \
+        echo "→ prebake $(basename "$dir")"; \
+        (cd "$dir" && npm install --no-audit --no-fund --omit=dev --ignore-scripts) || true; \
+    done; \
+    chown -R 1001:1000 "$OPENCLAW_ROOT"; \
+    if [ -L /usr/local/bin/openclaw ]; then chown -h 1001:1000 /usr/local/bin/openclaw; fi
+
 # =============================================================================
 # acpx — ACP runtime for dispatching to external coding CLIs
 # =============================================================================
