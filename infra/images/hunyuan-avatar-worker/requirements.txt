@@ -1,6 +1,11 @@
 opencv-python==4.9.0.80
 diffusers==0.33.0
-transformers>=4.50.0
+# transformers: hymm_sp uses FLAX_WEIGHTS_NAME (removed in v5.x). 4.46.3 has it
+# and satisfies hymm_sp's loose >=4.50 guard in practice. Verified empirically
+# in pod hunyuan-avatar-worker 2026-04-21.
+transformers==4.46.3
+tokenizers==0.20.3
+huggingface-hub==0.36.2
 accelerate==1.1.1
 pandas==2.0.3
 numpy==1.24.4

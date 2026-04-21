@@ -52,12 +52,12 @@ initContainers:
 
 resources:
   requests:
-    cpu: "2"
-    memory: 24Gi
+    cpu: "4"
+    memory: 32Gi
     nvidia.com/gpu: "1"
   limits:
-    cpu: "8"
-    memory: 32Gi
+    cpu: "12"
+    memory: 38Gi
     nvidia.com/gpu: "1"
 
 nodeSelector:
