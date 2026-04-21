@@ -688,7 +688,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 <body>
   <div class="avatar-tile" id="avatarTile">
     <div class="avatar-tile-header">
-      <span class="title">Blaze</span>
+      <span class="title" id="avatarPersonaLabel">Auto</span>
       <span class="backend-segmented" role="tablist" aria-label="Lipsync backend">
         <button id="backendMuseTalk" class="active" data-backend="musetalk">MuseTalk</button>
         <button id="backendHunyuan" data-backend="hunyuan">Hunyuan</button>
@@ -703,7 +703,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       <span class="avatar-status" id="avatarStatus">idle</span>
     </div>
     <div class="avatar-controls" id="avatarTextRow" style="display:none;">
-      <input id="avatarTextInput" type="text" placeholder="Interrupt Blaze…" style="flex:1; background:transparent; border:1px solid var(--vscode-panel-border, rgba(128,128,128,0.3)); color:var(--vscode-foreground); padding:4px 8px; border-radius:3px; font-family:inherit; font-size:12px;">
+      <input id="avatarTextInput" type="text" placeholder="Interrupt agent…" style="flex:1; background:transparent; border:1px solid var(--vscode-panel-border, rgba(128,128,128,0.3)); color:var(--vscode-foreground); padding:4px 8px; border-radius:3px; font-family:inherit; font-size:12px;">
       <button class="avatar-tile-toggle" id="avatarTextSend">Send</button>
     </div>
   </div>
@@ -1012,7 +1012,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
               agentDropdown.querySelectorAll('.agent-option').forEach(o => o.classList.remove('active'));
               opt.classList.add('active');
               selectedAgent = opt.dataset.agent;
-              agentLabel.textContent = opt.textContent.replace(opt.querySelector('.role')?.textContent || '', '').trim();
+              const personaName = opt.textContent.replace(opt.querySelector('.role')?.textContent || '', '').trim();
+              agentLabel.textContent = personaName;
+              const personaLabelEl = document.getElementById('avatarPersonaLabel');
+              if (personaLabelEl) personaLabelEl.textContent = personaName;
+              const avatarTextInputEl = document.getElementById('avatarTextInput');
+              if (avatarTextInputEl) avatarTextInputEl.setAttribute('placeholder', 'Interrupt ' + personaName + '…');
               agentDropdown.classList.remove('show');
             });
           });
