@@ -56,9 +56,10 @@ tts = ElevenLabsClient(
     voice_id=os.environ.get("MORGAN_VOICE_ID", ""),
 )
 agent = MorganAgentClient(
-    nats_url=os.environ.get("NATS_URL", "nats://nats.cto.svc.cluster.local:4222"),
-    inbox_subject=os.environ.get("MORGAN_INBOX_SUBJECT", "openclaw.morgan.input"),
-    replies_subject=os.environ.get("MORGAN_REPLIES_SUBJECT", "openclaw.morgan.output"),
+    nats_url=os.environ.get("NATS_URL", "nats://openclaw-nats.openclaw.svc.cluster.local:4222"),
+    inbox_subject=os.environ.get("MORGAN_INBOX_SUBJECT", "agent.morgan.inbox"),
+    replies_subject=os.environ.get("MORGAN_REPLIES_SUBJECT") or None,
+    agent_name=os.environ.get("VOICE_BRIDGE_AGENT_NAME", "voice-bridge"),
 )
 
 
