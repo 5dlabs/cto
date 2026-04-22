@@ -1,0 +1,57 @@
+---
+# =============================================================================
+# Morgan Agent — ArgoCD Application
+# =============================================================================
+# Deploys the Morgan agent (technical program manager / avatar PoC persona) as
+# a StatefulSet in the cto namespace, using the shared openclaw-agent chart.
+# Pairs with coder-agent.yaml — only values differ (identity, model, Discord
+# identity, codeServer host).
+#
+# Supersedes the legacy `openclaw-morgan` Application that sourced
+# `5dlabs/openclaw-platform@charts/openclaw`. After this Application rolls out
+# a healthy `openclaw-morgan` StatefulSet + Discord bot, delete the legacy
+# Application and its `openclaw-morgan-openclaw` StatefulSet.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cto-morgan
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: cto-morgan
+    app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/component: morgan
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  sources:
+    - repoURL: https://github.com/5dlabs/cto.git
+      targetRevision: main
+      path: infra/charts/openclaw-agent
+      helm:
+        releaseName: cto-morgan
+        valueFiles:
+          - ../../gitops/agents/morgan-values.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: "5s"
+        factor: 2
+        maxDuration: "3m"

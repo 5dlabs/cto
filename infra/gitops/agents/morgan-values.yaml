@@ -7,7 +7,7 @@
 # instructions (AGENTS.md / SOUL.md / heartbeat prompt), identity, and model
 # defaults differ. See coder-values.yaml for the paired baseline.
 # =============================================================================
-namespace: openclaw
+namespace: cto
 
 datadog:
   enabled: true
@@ -32,7 +32,7 @@ replicaCount: 1
 deploymentMode: statefulset
 
 global:
-  namespace: openclaw
+  namespace: cto
   createNamespace: false
 
 image:
