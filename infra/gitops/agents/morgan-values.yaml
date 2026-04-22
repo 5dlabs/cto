@@ -1,5 +1,32 @@
 ---
+# =============================================================================
+# Morgan Agent Values
+# =============================================================================
+# Technical program manager for the CTO platform and avatar proof-of-concept.
+# Shares the openclaw-agent chart and infra baseline with Coder — only the
+# instructions (AGENTS.md / SOUL.md / heartbeat prompt), identity, and model
+# defaults differ. See coder-values.yaml for the paired baseline.
+# =============================================================================
 namespace: openclaw
+
+datadog:
+  enabled: true
+
+# =============================================================================
+# Logging & Diagnostics (shared infra baseline with Coder)
+# =============================================================================
+logging:
+  level: "debug"
+  file: "/workspace/.openclaw/logs/openclaw.log"
+  consoleLevel: "debug"
+  rawStream: true
+  rawStreamPath: "/workspace/.openclaw/logs/raw-stream.jsonl"
+
+diagnostics:
+  enabled: true
+  flags:
+    - "acp.*"
+    - "gateway.session"
 
 replicaCount: 1
 deploymentMode: statefulset
@@ -9,9 +36,12 @@ global:
   createNamespace: false
 
 image:
-  repository: "cto/openclaw-platform"
-  tag: "beta-local-arm64"
-  pullPolicy: IfNotPresent
+  repository: "ghcr.io/5dlabs/agents"
+  tag: "latest"
+  pullPolicy: Always
+
+imagePullSecrets:
+  - name: ghcr-secret
 
 nodeSelector: {}
 tolerations:
@@ -27,7 +57,7 @@ resources:
     cpu: "200m"
     memory: "1Gi"
   limits:
-    cpu: "1500m"
+    cpu: "2000m"
     memory: "4Gi"
 
 nodeOptions: "--max-old-space-size=4096"
@@ -52,6 +82,35 @@ agent:
 agentDefaults:
   thinkingDefault: "low"
   typingMode: "instant"
+  compaction:
+    mode: "safeguard"
+    reserveTokensFloor: 25000
+    notifyUser: true
+    identifierPolicy: "strict"
+    memoryFlush:
+      enabled: true
+      softThresholdTokens: 8000
+      prompt: >-
+        Before this conversation is compacted, flush everything important
+        to mem0 and memory files. Include:
+        ## Active Tasks (what you're working on, status, next steps, blockers)
+        ## Decisions Made (what was decided, why, alternatives rejected)
+        ## Code Changes (files modified, PRs created, branches, commit SHAs)
+        ## Debugging Findings (root causes found, fixes applied, workarounds)
+        ## Configuration (env vars, secrets, model providers, endpoints changed)
+        Be specific — include file paths, commit hashes, error messages, and URLs.
+        Update existing entries rather than duplicating.
+        If nothing meaningful to store, reply NO_REPLY.
+  contextPruning:
+    mode: "cache-ttl"
+    ttl: "5m"
+  heartbeat:
+    every: "12h"
+    target: "last"
+    ackMaxChars: 120
+    prompt: >-
+      If there is no active user request, reply HEARTBEAT_OK and do nothing
+      else. Do not start background work or new tasks on your own.
 
 modelDefaults:
   primary: "google/gemini-2.5-flash"
@@ -61,17 +120,24 @@ modelDefaults:
     - "openai-api/gpt-5.4"
     - "openai-api/gpt-5.3-codex"
 
+# =============================================================================
+# Secrets (shared infra baseline with Coder — names differ per namespace)
+# =============================================================================
 secrets:
-  external:
-    apiKeysSecret: "openclaw-api-keys"
-    githubSecret: "openclaw-github"
+  discordTokensSecret: "openclaw-discord-tokens"
+  apiKeysSecret: "openclaw-api-keys"
+  githubSecret: "openclaw-github"
 
 messaging:
   discord:
     enabled: true
     accountId: "morgan"
+    # NOTE: Historical key name; the Discord bot token for Morgan lives under
+    # the "henry" key in openclaw-discord-tokens. Rotating to "morgan" is a
+    # follow-up secret-store change.
     tokenSecretKey: "henry"
     allowBots: "mentions"
+    groupPolicy: "allowlist"
     threadBindings:
       enabled: true
       spawnSubagentSessions: true
@@ -107,7 +173,26 @@ models:
   repos: []
 
 memorySearch:
-  enabled: false
+  enabled: true
+  sessionMemory: true
+  model: "accounts/fireworks/models/kimi-k2p6"
+  provider: "fireworks"
+  maxResults: 6
+  cache:
+    enabled: true
+    maxEntries: 100
+  hybrid:
+    enabled: true
+    candidateMultiplier: 3
+    textWeight: 0.4
+    vectorWeight: 0.6
+  sources:
+    - "memory"
+    - "sessions"
+  sync:
+    deltaBytes: 4096
+    deltaMessages: 5
+    watch: true
 
 workspace:
   repos:
@@ -397,7 +482,9 @@ mem0Plugin:
     llm:
       provider: openai
       config:
-        model: gpt-4.1-nano
+        model: accounts/fireworks/models/kimi-k2p6
+        apiKey: "${FIREWORKS_API_KEY}"
+        baseUrl: "https://api.fireworks.ai/inference/v1"
 
 session:
   scope: "per-sender"
@@ -408,6 +495,10 @@ session:
     enabled: true
     idleHours: 24
     maxAgeHours: 0
+  reset:
+    mode: "daily"
+    atHour: 4
+    idleMinutes: 480
 
 tools:
   profile: "full"
@@ -436,12 +527,29 @@ tools:
       enabled: true
     fetch:
       enabled: true
+  sessions:
+    visibility: "all"
   acp:
     enabled: true
     backend: "acpx"
-    acpxVersion: "0.1.16"
-    defaultAgent: "codex"
-    allowedAgents: ["pi", "claude", "copilot", "codex", "opencode", "gemini", "kimi", "droid", "cursor", "kilocode", "kiro", "qwen", "iflow"]
+    acpxVersion: "0.5.3"
+    defaultAgent: "claude"
+    # Union of the allowed-agents lists across Coder and Morgan so both
+    # StatefulSets can hand off to the same ACP backends.
+    allowedAgents:
+      - "claude"
+      - "codex"
+      - "opencode"
+      - "gemini"
+      - "kimi"
+      - "copilot"
+      - "cursor"
+      - "pi"
+      - "droid"
+      - "kilocode"
+      - "kiro"
+      - "qwen"
+      - "iflow"
     maxConcurrentSessions: 8
     permissionMode: "approve-all"
     nonInteractivePermissions: "deny"
@@ -476,13 +584,56 @@ tools:
 toolServer:
   url: "http://cto-tools.cto.svc.cluster.local:3000/sse"
 
+# =============================================================================
+# Claude Code CLI (shared infra baseline with Coder)
+# =============================================================================
 claudeCode:
+  enabled: true
+  oauthTokenSecretKey: "anthropic-sub1-oauth"
+  oauthTokenSecretKeySub2: "anthropic-sub2-oauth"
+  model: "claude-opus-4-7"
+  permissions:
+    defaultMode: "bypassPermissions"
+    allow:
+      - "Bash"
+      - "Read"
+      - "Edit"
+      - "Write"
+      - "WebFetch"
+      - "WebSearch"
+      - "Task"
+  agentTeams:
+    enabled: true
+    teammateMode: "in-process"
+  includeCoAuthoredBy: false
+  disableTelemetry: true
   mcp:
     servers:
       tool-server:
         command: "/workspace/.local/bin/tools"
         args: []
         cwd: "/workspace"
+
+# =============================================================================
+# Codex Harness (shared infra baseline with Coder)
+# =============================================================================
+codexPlugin:
+  enabled: true
+  approvalPolicy: "never"
+  sandbox: "workspace-write"
+  authSecretKey: "codex-auth-sub1"
+  authSecretKeySub2: "codex-auth-sub2"
+
+# =============================================================================
+# Cloud Providers (disabled — direct API keys)
+# =============================================================================
+cloudProviders:
+  bedrock:
+    enabled: false
+  vertex:
+    enabled: false
+  foundry:
+    enabled: false
 
 browser:
   enabled: false
@@ -516,7 +667,10 @@ cloudflare:
     targetPort: 8080
 
 ssh:
-  enabled: false
+  enabled: true
+  port: 2222
+  authorizedKeys:
+    - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINUYgmSYtJp5JM5MSJ9tFUhdRpt4LZoZmkWEZKxuvanc generated-key"
 
 nats:
   enabled: true
@@ -552,6 +706,13 @@ nats:
 
 kaniko:
   enabled: true
+  resources:
+    requests:
+      cpu: "2"
+      memory: "16Gi"
+    limits:
+      cpu: "8"
+      memory: "48Gi"
 
 toolsConfig:
   remoteTools:

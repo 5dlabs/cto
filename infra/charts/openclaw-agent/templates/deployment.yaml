@@ -1,8 +1,9 @@
 {{- $messaging := .Values.messaging | default dict -}}
 {{- $discordConfig := index $messaging "discord" | default .Values.discord -}}
 {{- $mem0Plugin := .Values.mem0Plugin | default dict -}}
+{{- $statefulset := eq (.Values.deploymentMode | default "deployment") "statefulset" -}}
 apiVersion: apps/v1
-kind: Deployment
+kind: {{ if $statefulset }}StatefulSet{{ else }}Deployment{{ end }}
 metadata:
   name: {{ include "openclaw-agent.fullname" . }}
   namespace: {{ .Values.namespace | default .Release.Namespace }}
@@ -10,8 +11,15 @@ metadata:
     {{- include "openclaw-agent.labels" . | nindent 4 }}
 spec:
   replicas: 1
+  {{- if $statefulset }}
+  serviceName: {{ include "openclaw-agent.fullname" . }}
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  {{- else }}
   strategy:
     type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "openclaw-agent.selectorLabels" . | nindent 6 }}

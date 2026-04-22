@@ -10,6 +10,13 @@ namespace: bots
 # -- Create namespace (handled by ArgoCD syncOptions instead)
 createNamespace: false
 
+# -- Workload kind: "deployment" (default) or "statefulset".
+# StatefulSets give each agent a stable pod identity and ordered
+# rollouts — the preferred shape for long-lived, workspace-bound
+# agents like Coder and Morgan. The chart uses the existing PVC
+# (templates/pvc.yaml) as the workspace volume in both modes.
+deploymentMode: deployment
+
 # -- Image configuration
 image:
   repository: registry.5dlabs.ai/5dlabs/openclaw
