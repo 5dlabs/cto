@@ -73,6 +73,20 @@ data:
               "model": "accounts/fireworks/models/kimi-k2p6"
             }
           }
+        },
+        "do-gradient": {
+          "npm": "@ai-sdk/openai-compatible",
+          "name": "DigitalOcean Gradient AI",
+          "options": {
+            "baseURL": "https://inference.do-ai.run/v1",
+            "apiKey": "{env:DO_INFERENCE_KEY}"
+          },
+          "models": {
+            "anthropic-claude-opus-4.7": {
+              "name": "Claude Opus 4.7 (DO Gradient)",
+              "model": "anthropic-claude-opus-4.7"
+            }
+          }
         }
       },
       "mcp": {
