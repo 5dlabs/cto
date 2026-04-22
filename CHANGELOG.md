@@ -3,6 +3,18 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.79](https://github.com/5dlabs/cto/compare/v0.2.78...v0.2.79) (2026-04-22)
+
+
+### 🐛 Bug Fixes
+
+* **networking:** codify platform TunnelBindings in git ([#4778](https://github.com/5dlabs/cto/issues/4778)) ([1a51303](https://github.com/5dlabs/cto/commit/1a51303d0865543f797892d266dcb9d1baa96206))
+
+
+### 📚 Documentation
+
+* **cto-lite:** add Phantom Connect Tauri integration guide ([#4779](https://github.com/5dlabs/cto/issues/4779)) ([8a2e459](https://github.com/5dlabs/cto/commit/8a2e4595eccd55f0f0622083b941f3779f0bd747))
+
 ## [0.2.78](https://github.com/5dlabs/cto/compare/v0.2.77...v0.2.78) (2026-04-22)
 
 
