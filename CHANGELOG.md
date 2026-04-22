@@ -3,6 +3,29 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.78](https://github.com/5dlabs/cto/compare/v0.2.77...v0.2.78) (2026-04-22)
+
+
+### ✨ Features
+
+* **agents:** unify Coder + Morgan as StatefulSets with shared infra baseline ([#4776](https://github.com/5dlabs/cto/issues/4776)) ([f2e50c5](https://github.com/5dlabs/cto/commit/f2e50c54ad42c62cfb6c6615d095acde441fc060))
+* bump Kimi K2.5→K2.6 + wire DO Opus 4.7 via OpenCode ([aff569e](https://github.com/5dlabs/cto/commit/aff569e26a4e6c09169f8bcb4ba9ea9894635dde))
+* bump Kimi K2.5→K2.6 + wire DO Opus 4.7 via OpenCode ([db5234a](https://github.com/5dlabs/cto/commit/db5234a3c77732bbbb9a14dc0f4aa474fc794465))
+* **gitops:** migrate Morgan to openclaw-agent chart ([#4777](https://github.com/5dlabs/cto/issues/4777)) ([1bbfc87](https://github.com/5dlabs/cto/commit/1bbfc87ef35f1cd31530cce410fc3c31f66c71cf))
+
+
+### 🐛 Bug Fixes
+
+* **agents:** prebake openclaw extension deps and chown tree to runtime uid ([#4775](https://github.com/5dlabs/cto/issues/4775)) ([d1c8b5d](https://github.com/5dlabs/cto/commit/d1c8b5d6b2b0d2fd830a54266c943ca279ebb3a9))
+* **morgan:** enable code-server and tunnel config ([3361c4e](https://github.com/5dlabs/cto/commit/3361c4ebc794938b4ba60105279e95045b78d0c1))
+
+
+### 📚 Documentation
+
+* **coder-brief:** require model-selection matrix; target gestures + lipsync on L40S ([95c0503](https://github.com/5dlabs/cto/commit/95c0503a8024caad56f7b9ad3c8af2431e136472))
+* **intake:** Coder brief for avatar OVH + DO deliverables ([c403513](https://github.com/5dlabs/cto/commit/c4035131f12d486166c3dd6bb067c092a4d330c5))
+* **intake:** Coder-only brief for avatar OVH + DO deliverables ([9a1f54a](https://github.com/5dlabs/cto/commit/9a1f54a545073faef176488feaba685124195b2f))
+
 ## [0.2.77](https://github.com/5dlabs/cto/compare/v0.2.76...v0.2.77) (2026-04-21)
 
 
