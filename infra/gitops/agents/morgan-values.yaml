@@ -494,6 +494,27 @@ plugins:
 supermemory:
   enabled: false
 
+codeServer:
+  enabled: true
+  port: 8080
+  password: ""
+  publicUrl: "https://morgan.5dlabs.ai"
+  defaultFolder: "/workspace/repos/cto"
+  quickTunnel:
+    enabled: false
+  githubToken:
+    secretName: "code-server-github-token"
+    key: "token"
+
+cloudflare:
+  tunnel:
+    enabled: true
+    quickTunnel: false
+    tunnelId: "45061e50-c044-4395-b672-1b12197bf9e5"
+    credentialsSecret: "cloudflared-tunnel-credentials"
+    hostname: "morgan.5dlabs.ai"
+    targetPort: 8080
+
 ssh:
   enabled: false
 
