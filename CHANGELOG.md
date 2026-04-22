@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.80](https://github.com/5dlabs/cto/compare/v0.2.79...v0.2.80) (2026-04-22)
+
+
+### 🐛 Bug Fixes
+
+* **morgan:** switch apiKeysSecret to cto-coder-api-keys; feat(coder): CRD-agent mem0 parity ([#4782](https://github.com/5dlabs/cto/issues/4782)) ([ac697c9](https://github.com/5dlabs/cto/commit/ac697c90bfddd9fc1489b45e0fc67e5406e41585))
+
 ## [0.2.79](https://github.com/5dlabs/cto/compare/v0.2.78...v0.2.79) (2026-04-22)
 
 
