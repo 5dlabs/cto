@@ -314,7 +314,46 @@ workspace:
       - For Rust code: `cargo clippy --all-targets -- -D warnings -W clippy::pedantic`
       - For TypeScript: `bun test` and relevant linters.
       - Use ACP sessions when delegating to other coding CLIs.
-      - Store important decisions and debugging findings in OpenMemory.
+
+      ## Memory (OpenMemory / mem0)
+
+      You have hierarchical memory in the same shape a CRD agent would — agent,
+      project, and task tiers. Use it constantly. Assume the next Coder pod (or
+      CRD-spawned per-task agent we graduate to) only knows what you wrote down.
+
+      **Namespace convention** (`user_id` in memory tool calls):
+
+      - Global portfolio: `jonathon`
+      - Your operational memories: `jonathon:agent:coder`
+      - Project-level (shared across agents): `jonathon:project:{projectId}`
+      - Task-level: `jonathon:project:{projectId}:task:{taskId}`
+      - Agent-within-task: `jonathon:project:{projectId}:task:{taskId}:coder`
+
+      **Tiered retrieval** — match query scope to namespace:
+
+      - "What is project X?" → `user_id="jonathon:project:X"`
+      - "Status of task N?" → `user_id="jonathon:project:X:task:N"`, `category=task_progress`
+      - "What did I decide earlier?" → `user_id="jonathon:agent:coder"`, `category=decision`
+      - "Known blockers?" → `category=blocker` (no user_id filter)
+      - "Past implementations of Y?" → `category=technical` + keyword
+
+      **Always attach metadata on writes**: `category` (task_objective,
+      task_progress, task_completion, task_summary, intake_decision, handoff,
+      blocker, escalation, architecture, debugging, code_review, technical,
+      decision, user_preference, configuration, relationship), `tier`
+      (portfolio|project|task|agent|artifact), `project`, `task_id` (when
+      applicable), `agent="coder"`, `source`, `repo`.
+
+      **Write discipline**:
+
+      - Debugging findings → `category=debugging`, `tier=agent`
+      - Architecture/design calls → `category=architecture`, `tier=project`
+        (so other agents pick them up)
+      - Handoffs back to Morgan → `category=handoff`, `tier=project`
+      - CRD-methodology learnings (patterns, anti-patterns, policies you
+        discover while acting as the dev pod) → `category=architecture`,
+        `tier=portfolio` so they survive your own teardown when we cut over
+        to per-task agents.
 
       ## Autonomy — Non-Negotiable
 
@@ -531,21 +570,68 @@ mem0Plugin:
   topK: 5
   searchThreshold: 0.3
   metadataSource: "discord"
+  # Parity with Morgan: full category set so Coder can store/retrieve any
+  # memory class under the same schema (portfolio / project / task / agent).
   customCategories:
-    task_objective: "What a task or CodeRun is trying to accomplish"
-    task_progress: "Status updates, milestones reached, intermediate results"
-    task_completion: "Final outcomes, deliverables, PRs merged, build results"
+    task_objective: "What a task or CodeRun is trying to accomplish — goals, requirements, acceptance criteria"
+    task_progress: "Status updates, milestones reached, intermediate results during task execution"
+    task_completion: "Final outcomes, deliverables, PRs merged, build results when a task finishes"
     task_summary: "Condensed summary of entire task written at completion"
+    intake_decision: "Decisions made during project intake and planning"
+    handoff: "Structured summary passed from a task agent back to Morgan after task completion"
     blocker: "Issues that blocked progress — errors, missing permissions, dependency failures"
+    escalation: "Issues escalated to Morgan or the human user"
+    architecture: "Architecture decisions, patterns, and system design choices"
     debugging: "Root cause analysis, debugging steps, and bug fixes"
     code_review: "Code review findings and feedback"
     technical: "Technical facts, configurations, dependencies"
     decision: "Key decisions with rationale"
-    architecture: "Architecture decisions, patterns, and system design choices"
-  # NOTE: customInstructions is NOT consumed by the openclaw-agent chart
-  # (chart only reads mem0Plugin.enabled and mem0Plugin.categories).
-  # Autonomy directive lives in agent.heartbeat.prompt above, which
-  # actually renders into openclaw-coder-config/openclaw.json.
+    user_preference: "User preferences, workflows, and conventions"
+    configuration: "System configuration facts"
+    relationship: "Inter-agent or inter-service relationships"
+  # NOTE: customInstructions is NOT consumed by the openclaw-agent chart today
+  # (chart only reads mem0Plugin.enabled and mem0Plugin.categories). We land
+  # Coder-adapted namespacing here for future chart plumbing, and mirror the
+  # operational guidance into workspace.files.AGENTS.md above so the runtime
+  # actually reads it through the rendered openclaw.json.
+  customInstructions: |
+    You are Coder, the general-purpose implementation agent and the development
+    pod we use to shake out CRD-agent methodology before spawning ephemeral
+    per-task agents. You have hierarchical memory access in the same shape a
+    CRD agent would — agent-specific and task-/project-specific awareness.
+
+    NAMESPACE CONVENTION (user_id field):
+    - Global portfolio: "jonathon"
+    - Your operational memories: "jonathon:agent:coder"
+    - Project-level: "jonathon:project:{projectId}" (shared summaries, handoffs)
+    - Task-level: "jonathon:project:{projectId}:task:{taskId}"
+    - Agent-within-task: "jonathon:project:{projectId}:task:{taskId}:coder"
+
+    TIERED RETRIEVAL — match query scope to namespace:
+    - "What is project X about?" → user_id="jonathon:project:X"
+    - "Status of task 1?" → user_id="jonathon:project:X:task:1" category=task_progress
+    - "What did I decide earlier?" → user_id="jonathon:agent:coder" category=decision
+    - "Known blockers?" → category=blocker (no user_id filter)
+    - "Past implementations of Y?" → category=technical + keyword
+
+    MEMORY SCHEMA — when using memory_add, ALWAYS include metadata:
+    - category: one of the customCategories
+    - tier: "portfolio" | "project" | "task" | "agent" | "artifact"
+    - project: project identifier (when applicable)
+    - project_name: human-readable project name
+    - task_id: task number (when applicable)
+    - agent: "coder"
+    - source: "discord" | "coderun" | "intake" | "manual" | "handoff" | "system"
+    - repo: repository path (when applicable)
+
+    WHEN STORING MEMORIES from your own work:
+    - Debugging findings → category=debugging, tier=agent
+    - Architecture/design calls → category=architecture, tier=project (so other
+      agents pick it up)
+    - Handoffs back to Morgan → category=handoff, tier=project
+    - CRD-methodology learnings (patterns, anti-patterns, policies you
+      discovered) → category=architecture, tier=portfolio so they survive your
+      own teardown when we graduate to per-task agents.
   oss:
     collectionName: cto_memory
     embedder:
@@ -725,7 +811,7 @@ browser:
 
 plugins:
   memoryCore:
-    enabled: false
+    enabled: true
 
 supermemory:
   enabled: false

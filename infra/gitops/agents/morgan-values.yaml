@@ -125,7 +125,13 @@ modelDefaults:
 # =============================================================================
 secrets:
   discordTokensSecret: "openclaw-discord-tokens"
-  apiKeysSecret: "openclaw-api-keys"
+  # Shared with Coder so Morgan reads the same legacy-style provider key
+  # names (codex-auth-sub1/sub2, anthropic-sub1/sub2-oauth, fireworks-api-key,
+  # github-pat, ovh-*) that Coder's chart expects. `openclaw-api-keys` is
+  # ExternalSecret-managed from OpenBao and does NOT map those key names,
+  # which silently empties provider credentials and surfaces as the gateway
+  # error "Missing API key for the selected provider on the gateway."
+  apiKeysSecret: "cto-coder-api-keys"
   githubSecret: "openclaw-github"
 
 messaging:
