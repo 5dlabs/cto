@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.81](https://github.com/5dlabs/cto/compare/v0.2.80...v0.2.81) (2026-04-22)
+
+
+### ✨ Features
+
+* **openclaw-agent:** add DigitalOcean Gradient provider to opencode.json ([#4784](https://github.com/5dlabs/cto/issues/4784)) ([3ff98bc](https://github.com/5dlabs/cto/commit/3ff98bcc91d1bdae0d7118811cc94339054c016c))
+
 ## [0.2.80](https://github.com/5dlabs/cto/compare/v0.2.79...v0.2.80) (2026-04-22)
 
 
