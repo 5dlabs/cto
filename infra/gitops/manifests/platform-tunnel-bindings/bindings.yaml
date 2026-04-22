@@ -1,0 +1,74 @@
+---
+# Platform-level Cloudflare TunnelBindings
+#
+# Codifies public hostnames that were previously configured only in the
+# Cloudflare remote tunnel config (cto-main). Mirrors those entries into
+# the cluster so the cloudflare-operator renders them into the operator
+# ConfigMap (cloudflare-operator-system/cto-main), enabling us to flip
+# the tunnel from remote-managed to local-managed without losing any
+# public exposure.
+#
+# Pattern intentionally mirrors infra/gitops/manifests/qdrant-tunnel-binding.yaml.
+# All bindings target ClusterTunnel `cto-main`.
+
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: argocd-server
+  namespace: argocd
+subjects:
+  - kind: Service
+    name: argocd-server
+    spec:
+      fqdn: argocd.5dlabs.ai
+      target: http://argocd-server.argocd.svc:80
+tunnelRef:
+  kind: ClusterTunnel
+  name: cto-main
+---
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: cto-web
+  namespace: cto
+subjects:
+  - kind: Service
+    name: cto-web
+    spec:
+      fqdn: app.5dlabs.ai
+      target: http://cto-web.cto.svc:3000
+tunnelRef:
+  kind: ClusterTunnel
+  name: cto-main
+---
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: cto-pm
+  namespace: cto
+subjects:
+  - kind: Service
+    name: cto-pm
+    spec:
+      fqdn: pm.5dlabs.ai
+      target: http://cto-pm.cto.svc:8081
+tunnelRef:
+  kind: ClusterTunnel
+  name: cto-main
+---
+# grafana.5dlabs.ai repoints from the legacy `grafana.observability.svc:80`
+# (which no longer resolves) to the openclaw observability Grafana service.
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: grafana
+  namespace: openclaw
+subjects:
+  - kind: Service
+    name: openclaw-observability-grafana
+    spec:
+      fqdn: grafana.5dlabs.ai
+      target: http://openclaw-observability-grafana.openclaw.svc:80
+tunnelRef:
+  kind: ClusterTunnel
+  name: cto-main
