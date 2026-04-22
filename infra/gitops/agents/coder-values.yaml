@@ -618,7 +618,22 @@ tools:
     backend: "acpx"
     acpxVersion: "0.5.3"
     defaultAgent: "claude"
-    allowedAgents: ["claude", "codex", "opencode", "gemini", "kimi", "copilot", "cursor"]
+    # Union of the allowed-agents lists across Coder and Morgan so both
+    # StatefulSets can hand off to the same ACP backends.
+    allowedAgents:
+      - "claude"
+      - "codex"
+      - "opencode"
+      - "gemini"
+      - "kimi"
+      - "copilot"
+      - "cursor"
+      - "pi"
+      - "droid"
+      - "kilocode"
+      - "kiro"
+      - "qwen"
+      - "iflow"
     maxConcurrentSessions: 8
     permissionMode: "approve-all"
     nonInteractivePermissions: "deny"
@@ -645,6 +660,10 @@ tools:
         command: "kimi acp"
       cursor:
         command: "cursor-agent acp --yolo --trust"
+      droid:
+        command: "droid exec --output-format acp"
+      pi:
+        command: "pi-acp"
 
 toolServer:
   url: "http://cto-tools.cto.svc.cluster.local:3000/sse"
