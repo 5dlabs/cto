@@ -11,6 +11,7 @@ import {
   useTranscriptions,
   useVoiceAssistant,
 } from "@livekit/components-react";
+import DeterministicAvatar from "@/components/DeterministicAvatar";
 import { Track } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -347,11 +348,16 @@ function AgentTelemetry({
             {videoTrack ? (
               <VideoTrack trackRef={videoTrack} className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full items-center justify-center px-8 text-center text-sm text-slate-300">
-                {state === "connecting"
-                  ? "Connecting Morgan to the room."
-                  : "Morgan will appear here as soon as LemonSlice joins the session."}
-              </div>
+              <DeterministicAvatar
+                compact
+                voiceState={
+                  state === "speaking" || state === "listening" || state === "connecting"
+                    ? state
+                    : "idle"
+                }
+                latestUserText={latestUserText}
+                latestAgentText={latestTranscript}
+              />
             )}
           </div>
         </div>
@@ -366,11 +372,15 @@ function AgentTelemetry({
           {videoTrack ? (
             <VideoTrack trackRef={videoTrack} className="h-full w-full object-cover" />
           ) : (
-            <div className="flex h-full items-center justify-center px-8 text-center text-sm text-slate-300">
-              {state === "connecting"
-                ? "Connecting Morgan to the room."
-                : "Avatar video will appear here once LemonSlice joins the session."}
-            </div>
+            <DeterministicAvatar
+              voiceState={
+                state === "speaking" || state === "listening" || state === "connecting"
+                  ? state
+                  : "idle"
+              }
+              latestUserText={latestUserText}
+              latestAgentText={latestTranscript}
+            />
           )}
         </div>
       </div>
