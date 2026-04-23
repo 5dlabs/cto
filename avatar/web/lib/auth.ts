@@ -1,39 +1,36 @@
 /**
  * Better Auth configuration for the avatar web app.
  *
- * Email/password + GitHub OAuth with Postgres session storage.
+ * For the Phase 1 avatar runtime proof, auth is intentionally lightweight so
+ * the app can build and the protected admin surface can still evolve later.
  */
 
 import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
-// Placeholder db import - actual implementation when Postgres is available
-// import { db } from "./db";
 
-// Mock db for development
-const db = {} as any;
+const githubEnabled = Boolean(
+  process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET,
+);
 
 export const auth = betterAuth({
-  database: drizzleAdapter(db, {
-    provider: "pg", // PostgreSQL
-  }),
-  socialProviders: {
-    github: {
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-    },
-  },
+  ...(githubEnabled
+    ? {
+        socialProviders: {
+          github: {
+            clientId: process.env.GITHUB_CLIENT_ID as string,
+            clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
+          },
+        },
+      }
+    : {}),
   session: {
-    // Session stored in Postgres via drizzle adapter
-    expiresIn: 60 * 60 * 24 * 7, // 7 days
-    updateAge: 60 * 60 * 24, // 1 day
+    expiresIn: 60 * 60 * 24 * 7,
+    updateAge: 60 * 60 * 24,
   },
   advanced: {
-    // Allow cross-origin requests from the embed domain
     crossSubDomainCookies: {
       enabled: true,
     },
   },
 });
 
-// Export types for use in API routes
 export type Auth = typeof auth;
