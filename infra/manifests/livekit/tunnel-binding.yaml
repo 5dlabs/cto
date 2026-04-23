@@ -17,4 +17,8 @@ subjects:
     name: livekit-server
     spec:
       fqdn: lk.5dlabs.ai
-      target: http://livekit-server.cto.svc:7880
+      # The in-cluster Service exposes the LiveKit HTTP signaling port
+      # (7880 container-side) on service port 80. Targeting 7880 directly
+      # bypasses the Service (no such ClusterIP port), so the tunnel's
+      # upstream connection fails and Cloudflare serves a bare 404.
+      target: http://livekit-server.cto.svc:80

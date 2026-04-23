@@ -43,6 +43,12 @@ spec:
               value: audio/webm
             - name: VOICE_BRIDGE_AUDIO_NAME
               value: turn.webm
+            - name: VOICE_BRIDGE_ENABLE_ALIGNMENT
+              # HeadAudio drives viseme detection in the browser from the
+              # LiveKit audio stream, so we no longer need ElevenLabs
+              # character alignment frames. Keep this at 0 to avoid the
+              # extra bandwidth + TTS headers.
+              value: "0"
             - name: ELEVENLABS_API_KEY
               valueFrom:
                 secretKeyRef:

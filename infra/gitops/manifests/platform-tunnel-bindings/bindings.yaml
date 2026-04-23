@@ -56,6 +56,21 @@ tunnelRef:
   kind: ClusterTunnel
   name: cto-main
 ---
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: morgan-gateway
+  namespace: cto
+subjects:
+  - kind: Service
+    name: openclaw-morgan
+    spec:
+      fqdn: morgan.5dlabs.ai
+      target: http://openclaw-morgan.cto.svc:18789
+tunnelRef:
+  kind: ClusterTunnel
+  name: cto-main
+---
 # grafana.5dlabs.ai repoints from the legacy `grafana.observability.svc:80`
 # (which no longer resolves) to the openclaw observability Grafana service.
 apiVersion: networking.cfargotunnel.com/v1alpha1

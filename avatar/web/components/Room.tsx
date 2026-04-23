@@ -11,7 +11,8 @@ import {
   useVoiceAssistant,
 } from "@livekit/components-react";
 import AvatarRuntimeSurface from "@/components/AvatarRuntimeSurface";
-import VoiceBridgeIngestion from "@/components/VoiceBridgeIngestion";
+import LiveKitAudioBridge from "@/components/LiveKitAudioBridge";
+import type { TalkingHeadHandle } from "@/components/TalkingHeadView";
 import { pickAvatarAdapter } from "@/lib/avatar-runtime";
 import {
   type AvatarRuntimeAdapter,
@@ -267,15 +268,14 @@ function AgentTelemetry({
     videoReadyAt,
   ]);
 
-  const bridgeUrl = process.env.NEXT_PUBLIC_VOICE_BRIDGE_URL ?? null;
+  const glbUrl = process.env.NEXT_PUBLIC_AVATAR_GLB_URL ?? undefined;
 
   const adapter = useMemo<AvatarRuntimeAdapter>(
     () => pickAvatarAdapter(process.env.NEXT_PUBLIC_AVATAR_RUNTIME),
     [],
   );
 
-  const voiceBridgeEnabled =
-    bridgeUrl !== null && adapter.cueSource !== "none";
+  const talkingHeadRef = useRef<TalkingHeadHandle | null>(null);
 
   const runtimeInput = useMemo<AvatarRuntimeInput>(
     () => ({
@@ -321,17 +321,12 @@ function AgentTelemetry({
     emitHostAvatarState(avatarState);
   }, [avatarState]);
 
-  // Feed voice-bridge frames into the adapter for viseme/gesture cues
-  // (deterministic adapter is a no-op; derived-text adapter uses reply_text/delta)
-
   if (compact) {
     return (
       <>
-        <VoiceBridgeIngestion
-          adapter={adapter}
-          bridgeUrl={bridgeUrl}
-          enabled={voiceBridgeEnabled}
-        />
+        {adapter.kind === "talkinghead" ? (
+          <LiveKitAudioBridge talkingHeadRef={talkingHeadRef} />
+        ) : null}
         <section className="grid gap-5">
         <div className="relative overflow-hidden rounded-[2.2rem] border border-white/10 bg-black/30 shadow-[0_30px_120px_-48px_rgba(14,165,233,0.75)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#155e75_0%,rgba(2,6,23,0.78)_34%,rgba(2,6,23,0.96)_100%)]" />
@@ -377,7 +372,13 @@ function AgentTelemetry({
           </div>
 
           <div className="aspect-[10/13] w-full bg-linear-to-b from-slate-900 via-slate-950 to-black">
-            <AvatarRuntimeSurface compact state={avatarState} videoTrack={videoTrack} />
+            <AvatarRuntimeSurface
+              compact
+              state={avatarState}
+              videoTrack={videoTrack}
+              talkingHeadRef={talkingHeadRef}
+              glbUrl={glbUrl}
+            />
           </div>
         </div>
       </section>
@@ -387,15 +388,18 @@ function AgentTelemetry({
 
   return (
     <>
-      <VoiceBridgeIngestion
-        adapter={adapter}
-        bridgeUrl={bridgeUrl}
-        enabled={voiceBridgeEnabled}
-      />
+      {adapter.kind === "talkinghead" ? (
+        <LiveKitAudioBridge talkingHeadRef={talkingHeadRef} />
+      ) : null}
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 shadow-2xl shadow-black/25">
         <div className="aspect-[9/14] w-full bg-linear-to-b from-slate-900 via-slate-950 to-black">
-          <AvatarRuntimeSurface state={avatarState} videoTrack={videoTrack} />
+          <AvatarRuntimeSurface
+            state={avatarState}
+            videoTrack={videoTrack}
+            talkingHeadRef={talkingHeadRef}
+            glbUrl={glbUrl}
+          />
         </div>
       </div>
 
@@ -517,10 +521,10 @@ function SessionControls({
   );
 }
 
-function AssistantAudioRenderer() {
+function AssistantAudioRenderer({ enabled = true }: { enabled?: boolean }) {
   const { audioTrack } = useVoiceAssistant();
 
-  if (!audioTrack) {
+  if (!enabled || !audioTrack) {
     return null;
   }
 
@@ -770,6 +774,13 @@ export default function Room({
         roomConnectedAt={roomConnectedAt}
       />
       <SessionControls compact={compact} onReset={reset} />
+      {/*
+        LiveKit's native audio element plays Morgan's speech AND keeps
+        the underlying MediaStreamTrack "flowing" in Chrome, which is
+        required for our Web Audio graph (MediaStreamAudioSourceNode →
+        HeadAudio viseme detector) to receive samples. Keep this
+        mounted for every runtime.
+      */}
       <AssistantAudioRenderer />
     </LiveKitRoom>
   );

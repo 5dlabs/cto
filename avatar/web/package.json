@@ -3,26 +3,32 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "copy:headaudio": "mkdir -p public/headaudio && cp node_modules/@met4citizen/headaudio/dist/headworklet.min.mjs public/headaudio/ && cp node_modules/@met4citizen/headaudio/dist/model-en-mixed.bin public/headaudio/",
+    "postinstall": "npm run copy:headaudio"
   },
   "dependencies": {
     "@livekit/components-react": "^2.9.20",
     "@livekit/components-styles": "^1.2.0",
+    "@met4citizen/headaudio": "^0.1.0",
+    "@met4citizen/talkinghead": "^1.7.0",
     "better-auth": "^1.2.0",
     "livekit-client": "^2.17.2",
     "livekit-server-sdk": "^2.15.0",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.184.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
