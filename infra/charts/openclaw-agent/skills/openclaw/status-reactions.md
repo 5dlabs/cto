@@ -56,6 +56,8 @@ Use ❌ for failure, 💬 for needs-follow-up.
 ## Rules
 - ALWAYS react with 🧠 immediately — this MUST be your FIRST tool call on any Discord user message
 - Swap to a more specific emoji as you progress
-- Only keep ONE activity emoji at a time — remove the previous before adding the next
+- Only keep ONE **activity** emoji at a time (🧠/🔍/✏️/⚙️/🌐/🔄/⏳) — remove the previous before adding the next
+- **Exception:** backend-identity color dots (🟣🟢🔵🟠🔴⚪ from the `acp_sessions` skill) are **stackable**
+  and live alongside the activity emoji. They follow their own add/remove rules — see that skill.
 - ALWAYS end with ✅, ❌, or 💬
 - On heartbeat/system triggers (no inbound message context), skip reactions — they will fail
