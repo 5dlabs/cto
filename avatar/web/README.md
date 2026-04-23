@@ -31,6 +31,25 @@ Required variables:
 
 These are read only on the server route (`app/api/token/route.ts`) and are not exposed to the browser.
 
+Optional (TalkingHead runtime):
+
+- `NEXT_PUBLIC_AVATAR_RUNTIME` — set to `talkinghead` to render the 3D WebGL avatar via
+  [met4citizen/TalkingHead](https://github.com/met4citizen/TalkingHead). Omit or set to any other value
+  to fall back to the deterministic portrait.
+- `NEXT_PUBLIC_VOICE_BRIDGE_URL` — WebSocket URL for the voice-bridge (e.g.
+  `wss://morgan-voice.5dlabs.ai/ws`). Required for TalkingHead lip-sync: the bridge supplies MP3 audio
+  chunks plus the ElevenLabs character-alignment frame that drives mouth visemes.
+- `NEXT_PUBLIC_AVATAR_GLB_URL` — URL to a Mixamo-compatible humanoid `.glb` with ARKit 52 + Oculus 15
+  viseme blendshapes. Recommended sources:
+    1. **Ready Player Me** (free; non-commercial / commercial tiers available): create an avatar at
+       <https://readyplayer.me> and append
+       `?morphTargets=ARKit,Oculus%20Visemes&textureAtlas=1024&lod=1` to the generated `.glb` URL.
+    2. **TalkingHead demo sample** (quick start, non-commercial only):
+       `https://met4citizen.github.io/TalkingHead/avatars/brunette.glb`.
+
+  Leaving the variable empty disables the 3D view and the client falls back to the deterministic
+  portrait with a helper message.
+
 ## Run locally
 
 ```bash
@@ -39,6 +58,12 @@ npm run dev
 ```
 
 Open `http://localhost:3000` and click **Talk to Morgan**.
+
+> **Note:** `npm run dev` / `npm run build` use `next --webpack` rather than Turbopack.
+> TalkingHead's bundled module performs a string-constructed `import()` for
+> per-language lipsync plugins, which Turbopack 16 cannot statically resolve.
+> Webpack handles the dynamic import cleanly. This can be reverted once
+> [vercel/next.js#85238](https://github.com/vercel/next.js/issues/85238) ships.
 
 ## Token + dispatch flow
 

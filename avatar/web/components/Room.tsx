@@ -11,6 +11,7 @@ import {
   useVoiceAssistant,
 } from "@livekit/components-react";
 import AvatarRuntimeSurface from "@/components/AvatarRuntimeSurface";
+import type { TalkingHeadHandle } from "@/components/TalkingHeadView";
 import VoiceBridgeIngestion from "@/components/VoiceBridgeIngestion";
 import { pickAvatarAdapter } from "@/lib/avatar-runtime";
 import {
@@ -268,14 +269,18 @@ function AgentTelemetry({
   ]);
 
   const bridgeUrl = process.env.NEXT_PUBLIC_VOICE_BRIDGE_URL ?? null;
+  const glbUrl = process.env.NEXT_PUBLIC_AVATAR_GLB_URL ?? undefined;
 
   const adapter = useMemo<AvatarRuntimeAdapter>(
     () => pickAvatarAdapter(process.env.NEXT_PUBLIC_AVATAR_RUNTIME),
     [],
   );
 
+  const talkingHeadRef = useRef<TalkingHeadHandle | null>(null);
+
   const voiceBridgeEnabled =
-    bridgeUrl !== null && adapter.cueSource !== "none";
+    bridgeUrl !== null &&
+    (adapter.cueSource !== "none" || adapter.kind === "talkinghead");
 
   const runtimeInput = useMemo<AvatarRuntimeInput>(
     () => ({
@@ -331,6 +336,7 @@ function AgentTelemetry({
           adapter={adapter}
           bridgeUrl={bridgeUrl}
           enabled={voiceBridgeEnabled}
+          talkingHeadRef={talkingHeadRef}
         />
         <section className="grid gap-5">
         <div className="relative overflow-hidden rounded-[2.2rem] border border-white/10 bg-black/30 shadow-[0_30px_120px_-48px_rgba(14,165,233,0.75)]">
@@ -377,7 +383,13 @@ function AgentTelemetry({
           </div>
 
           <div className="aspect-[10/13] w-full bg-linear-to-b from-slate-900 via-slate-950 to-black">
-            <AvatarRuntimeSurface compact state={avatarState} videoTrack={videoTrack} />
+            <AvatarRuntimeSurface
+              compact
+              state={avatarState}
+              videoTrack={videoTrack}
+              talkingHeadRef={talkingHeadRef}
+              glbUrl={glbUrl}
+            />
           </div>
         </div>
       </section>
@@ -391,11 +403,17 @@ function AgentTelemetry({
         adapter={adapter}
         bridgeUrl={bridgeUrl}
         enabled={voiceBridgeEnabled}
+        talkingHeadRef={talkingHeadRef}
       />
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 shadow-2xl shadow-black/25">
         <div className="aspect-[9/14] w-full bg-linear-to-b from-slate-900 via-slate-950 to-black">
-          <AvatarRuntimeSurface state={avatarState} videoTrack={videoTrack} />
+          <AvatarRuntimeSurface
+            state={avatarState}
+            videoTrack={videoTrack}
+            talkingHeadRef={talkingHeadRef}
+            glbUrl={glbUrl}
+          />
         </div>
       </div>
 
@@ -517,10 +535,10 @@ function SessionControls({
   );
 }
 
-function AssistantAudioRenderer() {
+function AssistantAudioRenderer({ enabled = true }: { enabled?: boolean }) {
   const { audioTrack } = useVoiceAssistant();
 
-  if (!audioTrack) {
+  if (!enabled || !audioTrack) {
     return null;
   }
 
@@ -770,7 +788,13 @@ export default function Room({
         roomConnectedAt={roomConnectedAt}
       />
       <SessionControls compact={compact} onReset={reset} />
-      <AssistantAudioRenderer />
+      {/*
+        TalkingHead plays audio itself via Web Audio; rendering the LiveKit
+        remote track here would produce a doubled echo. For any other
+        runtime we still want the LiveKit audio so the agent remains
+        audible without depending on the voice-bridge pipeline.
+      */}
+      <AssistantAudioRenderer enabled={adapter.kind !== "talkinghead"} />
     </LiveKitRoom>
   );
 }

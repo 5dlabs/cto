@@ -11,32 +11,7 @@ import {
   type OvrLipSyncViseme,
   type VoiceBridgeFrame,
 } from "@/lib/avatar-state";
-
-/**
- * Map a single character to its closest OVRLipSync viseme.
- *
- * Covers the 15 visemes:
- *   sil, PP, FF, TH, DD, kk, CH, SS, nn, RR, aa, E, I, O, U
- */
-function charToViseme(ch: string): OvrLipSyncViseme {
-  const lower = ch.toLowerCase();
-  if (/[a]/.test(lower)) return "aa";
-  if (/[e]/.test(lower)) return "E";
-  if (/[i]/.test(lower)) return "I";
-  if (/[o]/.test(lower)) return "O";
-  if (/[u]/.test(lower)) return "U";
-  if (/[pbm]/.test(lower)) return "PP";
-  if (/[fv]/.test(lower)) return "FF";
-  if (/[td]/.test(lower)) return "DD";
-  if (/[kghq]/.test(lower)) return "kk";
-  if (/[csz]/.test(lower)) return "SS";
-  if (/[n]/.test(lower)) return "nn";
-  if (/[r]/.test(lower)) return "RR";
-  if (/[l]/.test(lower)) return "nn";
-  if (/[j]/.test(lower)) return "CH";
-  if (/[w]/.test(lower)) return "U";
-  return "sil";
-}
+import { charToViseme } from "@/lib/lipsync/elevenlabs-to-oculus";
 
 export class ElevenLabsAlignmentAdapter implements AvatarRuntimeAdapter {
   readonly kind: AvatarRuntimeKind = "deterministic-fallback";

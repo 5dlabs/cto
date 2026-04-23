@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -212,21 +213,35 @@ async def _handle_turn(
         async for frame in tts_client.stream_tts_with_timestamps(full_reply):
             audio_b64 = frame.get("audio_base64", "")
             if audio_b64:
-                await ws.send_bytes(audio_b64)
+                try:
+                    mp3_bytes = base64.b64decode(audio_b64)
+                except (ValueError, TypeError):
+                    log.warning("skipping malformed audio_base64 frame")
+                    mp3_bytes = b""
+                if mp3_bytes:
+                    # Send decoded MP3 on the binary channel so the client
+                    # can feed AudioContext.decodeAudioData() directly.
+                    await ws.send_bytes(mp3_bytes)
+                    tts_bytes += len(mp3_bytes)
             alignment = frame.get("alignment")
             if alignment:
-                char_start_ms = alignment.get("character_start_times_seconds", [])
-                char_end_ms = alignment.get("character_end_times_seconds", [])
-                chars = list(full_reply)
+                # ElevenLabs returns per-character timings that cover the
+                # characters being spoken in this audio chunk, not the full
+                # reply — align the chars array accordingly so the client
+                # gets a one-to-one map.
+                char_start_s = alignment.get("character_start_times_seconds", [])
+                char_end_s = alignment.get("character_end_times_seconds", [])
+                align_chars = alignment.get("characters")
+                if align_chars is None:
+                    align_chars = list(full_reply)[: len(char_start_s)]
                 await ws.send_json({
                     "type": "alignment",
                     "atMs": round(alignment.get("audio_start_seconds", 0) * 1000),
-                    "chars": chars,
-                    "char_start_ms": [round(t * 1000) for t in char_start_ms],
-                    "char_end_ms": [round(t * 1000) for t in char_end_ms],
+                    "chars": list(align_chars),
+                    "char_start_ms": [round(t * 1000) for t in char_start_s],
+                    "char_end_ms": [round(t * 1000) for t in char_end_s],
                     "agent": agent_spec.name,
                 })
-            tts_bytes += len(frame.get("audio_base64", ""))
     else:
         async for mp3_chunk in tts_client.stream_tts(full_reply):
             tts_bytes += len(mp3_chunk)

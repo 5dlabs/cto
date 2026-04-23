@@ -43,6 +43,8 @@ spec:
               value: audio/webm
             - name: VOICE_BRIDGE_AUDIO_NAME
               value: turn.webm
+            - name: VOICE_BRIDGE_ENABLE_ALIGNMENT
+              value: "1"
             - name: ELEVENLABS_API_KEY
               valueFrom:
                 secretKeyRef:
