@@ -50,6 +50,41 @@ async function ensureStateDir(): Promise<void> {
   await mkdir(CONFIG.stateDir, { recursive: true });
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function cloneWithRetry(
+  cloneUrl: string,
+  path: string,
+  attempts = 4,
+): Promise<void> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await gitOk(["clone", cloneUrl, path]);
+      return;
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) {
+        // GitHub can take a moment to propagate a newly created repo.
+        await sleep(400 * 2 ** i);
+      }
+    }
+  }
+  throw lastErr ?? new Error("git clone failed");
+}
+
+async function initWithRemote(path: string, remote: string): Promise<void> {
+  await mkdir(path, { recursive: true });
+  await initEmptyRepo(path);
+  try {
+    await gitOk(["remote", "add", "origin", remote], { cwd: path });
+  } catch {
+    // Non-fatal; repo is still initialized locally.
+  }
+}
+
 async function describe(path: string, name: string): Promise<ProjectDescriptor> {
   const prdPath = join(path, "prd.md");
   const hasPrd = existsSync(prdPath);
@@ -145,7 +180,7 @@ export async function createProject(name: string): Promise<CreateResult> {
 
   if (info.exists && info.cloneUrl) {
     const cloneUrl = authenticatedCloneUrl(info.cloneUrl);
-    await gitOk(["clone", cloneUrl, path]);
+    await cloneWithRetry(cloneUrl, path);
     return {
       project: await describe(path, name),
       mode: "cloned",
@@ -156,7 +191,13 @@ export async function createProject(name: string): Promise<CreateResult> {
     const created = await createRepo(CONFIG.githubOrg, name);
     if (created.cloneUrl) {
       const cloneUrl = authenticatedCloneUrl(created.cloneUrl);
-      await gitOk(["clone", cloneUrl, path]);
+      try {
+        await cloneWithRetry(cloneUrl, path);
+      } catch {
+        // Last-resort fallback: keep local flow unblocked even if GitHub's
+        // new repo isn't clonable yet in this instant.
+        await initWithRemote(path, created.cloneUrl);
+      }
       return {
         project: await describe(path, name),
         mode: "created",
@@ -164,8 +205,7 @@ export async function createProject(name: string): Promise<CreateResult> {
     }
   }
 
-  await mkdir(path, { recursive: true });
-  await initEmptyRepo(path);
+  await initWithRemote(path, `https://github.com/${CONFIG.githubOrg}/${name}.git`);
   return {
     project: await describe(path, name),
     mode: "initialized",
