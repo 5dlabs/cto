@@ -6,11 +6,18 @@ import {
   AudioTrack,
   LiveKitRoom,
   TrackToggle,
-  VideoTrack,
   useRoomContext,
   useTranscriptions,
   useVoiceAssistant,
 } from "@livekit/components-react";
+import AvatarRuntimeSurface from "@/components/AvatarRuntimeSurface";
+import VoiceBridgeIngestion from "@/components/VoiceBridgeIngestion";
+import { pickAvatarAdapter } from "@/lib/avatar-runtime";
+import {
+  type AvatarRuntimeAdapter,
+  type AvatarRuntimeInput,
+  type AvatarStatePayload,
+} from "@/lib/avatar-state";
 import { Track } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -32,19 +39,7 @@ type AgentTelemetryProps = {
   roomConnectedAt: number | null;
 };
 
-type HostAvatarState = {
-  connectionState: "idle" | "connecting" | "connected" | "error";
-  voiceState: string;
-  latestUserText: string;
-  latestAgentText: string;
-  audioTrackReady: boolean;
-  videoTrackReady: boolean;
-  roomName?: string;
-  identity?: string;
-  error?: string;
-  metrics?: Record<string, unknown>;
-  trackDebug?: Record<string, unknown>;
-};
+
 
 function formatLatency(ms: number | null): string {
   if (ms === null) {
@@ -54,7 +49,7 @@ function formatLatency(ms: number | null): string {
   return `${Math.round(ms)} ms`;
 }
 
-function emitHostAvatarState(payload: HostAvatarState) {
+function emitHostAvatarState(payload: AvatarStatePayload) {
   if (typeof window === "undefined" || window.parent === window) {
     return;
   }
@@ -272,34 +267,72 @@ function AgentTelemetry({
     videoReadyAt,
   ]);
 
-  useEffect(() => {
-    emitHostAvatarState({
-      connectionState: "connected",
-      voiceState: String(state),
+  const bridgeUrl = process.env.NEXT_PUBLIC_VOICE_BRIDGE_URL ?? null;
+
+  const adapter = useMemo<AvatarRuntimeAdapter>(
+    () => pickAvatarAdapter(process.env.NEXT_PUBLIC_AVATAR_RUNTIME),
+    [],
+  );
+
+  const voiceBridgeEnabled =
+    bridgeUrl !== null && adapter.cueSource !== "none";
+
+  const runtimeInput = useMemo<AvatarRuntimeInput>(
+    () => ({
+      lk: {
+        state,
+        audioTrack,
+        videoTrack,
+        latestUserText,
+        latestAgentText: latestTranscript,
+        roomName: room.name || undefined,
+        identity: room.localParticipant.identity || undefined,
+      },
+      timing: {
+        connectionRequestedAt,
+        roomConnectedAt,
+        audioReadyAt,
+        videoReadyAt,
+        speakingAt,
+      },
+    }),
+    [
+      audioTrack,
+      connectionRequestedAt,
+      latestTranscript,
       latestUserText,
-      latestAgentText: latestTranscript,
-      audioTrackReady: Boolean(audioTrack),
-      videoTrackReady: Boolean(videoTrack),
-      roomName: room.name || undefined,
-      identity: room.localParticipant.identity || undefined,
-      metrics,
-      trackDebug,
-    });
-  }, [
-    audioTrack,
-    latestTranscript,
-    latestUserText,
-    metrics,
-    room.localParticipant.identity,
-    room.name,
-    state,
-    trackDebug,
-    videoTrack,
-  ]);
+      room.localParticipant.identity,
+      room.name,
+      roomConnectedAt,
+      speakingAt,
+      state,
+      videoTrack,
+      videoReadyAt,
+      audioReadyAt,
+    ],
+  );
+
+  const avatarState = useMemo<AvatarStatePayload>(
+    () => adapter.project(runtimeInput),
+    [adapter, runtimeInput],
+  );
+
+  useEffect(() => {
+    emitHostAvatarState(avatarState);
+  }, [avatarState]);
+
+  // Feed voice-bridge frames into the adapter for viseme/gesture cues
+  // (deterministic adapter is a no-op; derived-text adapter uses reply_text/delta)
 
   if (compact) {
     return (
-      <section className="grid gap-5">
+      <>
+        <VoiceBridgeIngestion
+          adapter={adapter}
+          bridgeUrl={bridgeUrl}
+          enabled={voiceBridgeEnabled}
+        />
+        <section className="grid gap-5">
         <div className="relative overflow-hidden rounded-[2.2rem] border border-white/10 bg-black/30 shadow-[0_30px_120px_-48px_rgba(14,165,233,0.75)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#155e75_0%,rgba(2,6,23,0.78)_34%,rgba(2,6,23,0.96)_100%)]" />
 
@@ -344,34 +377,25 @@ function AgentTelemetry({
           </div>
 
           <div className="aspect-[10/13] w-full bg-linear-to-b from-slate-900 via-slate-950 to-black">
-            {videoTrack ? (
-              <VideoTrack trackRef={videoTrack} className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full items-center justify-center px-8 text-center text-sm text-slate-300">
-                {state === "connecting"
-                  ? "Connecting Morgan to the room."
-                  : "Morgan will appear here as soon as LemonSlice joins the session."}
-              </div>
-            )}
+            <AvatarRuntimeSurface compact state={avatarState} videoTrack={videoTrack} />
           </div>
         </div>
       </section>
+      </>
     );
   }
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <>
+      <VoiceBridgeIngestion
+        adapter={adapter}
+        bridgeUrl={bridgeUrl}
+        enabled={voiceBridgeEnabled}
+      />
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 shadow-2xl shadow-black/25">
         <div className="aspect-[9/14] w-full bg-linear-to-b from-slate-900 via-slate-950 to-black">
-          {videoTrack ? (
-            <VideoTrack trackRef={videoTrack} className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full items-center justify-center px-8 text-center text-sm text-slate-300">
-              {state === "connecting"
-                ? "Connecting Morgan to the room."
-                : "Avatar video will appear here once LemonSlice joins the session."}
-            </div>
-          )}
+          <AvatarRuntimeSurface state={avatarState} videoTrack={videoTrack} />
         </div>
       </div>
 
@@ -449,6 +473,7 @@ function AgentTelemetry({
         </div>
       </aside>
     </section>
+    </>
   );
 }
 
@@ -585,25 +610,34 @@ export default function Room({
     [failEmbeddedMedia],
   );
 
+  const adapter = useMemo<AvatarRuntimeAdapter>(
+    () => pickAvatarAdapter(process.env.NEXT_PUBLIC_AVATAR_RUNTIME),
+    [],
+  );
+
   useEffect(() => {
-    emitHostAvatarState({
-      connectionState: error
-        ? "error"
-        : connection
-          ? "connected"
-          : connectionRequestedAt !== null
-            ? "connecting"
-            : "idle",
-      voiceState: connection ? "connecting" : "idle",
-      latestUserText: "",
-      latestAgentText: "",
-      audioTrackReady: false,
-      videoTrackReady: false,
-      roomName: connection?.roomName,
-      identity: connection?.identity,
-      error: error ?? undefined,
-    });
-  }, [connection, connectionRequestedAt, error]);
+    emitHostAvatarState(
+      adapter.project({
+        lk: {
+          state: error ? "error" : connection ? "connected" : "idle",
+          audioTrack: null,
+          videoTrack: null,
+          latestUserText: "",
+          latestAgentText: "",
+          roomName: connection?.roomName,
+          identity: connection?.identity,
+        },
+        timing: {
+          connectionRequestedAt,
+          roomConnectedAt: null,
+          audioReadyAt: null,
+          videoReadyAt: null,
+          speakingAt: null,
+        },
+        error: error ?? undefined,
+      }),
+    );
+  }, [adapter, connection, connectionRequestedAt, error]);
 
   useEffect(() => {
     if (

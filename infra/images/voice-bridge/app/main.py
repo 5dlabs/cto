@@ -33,6 +33,7 @@ _BASE_TTS = ElevenLabsClient(
     api_key=os.environ.get("ELEVENLABS_API_KEY", ""),
     voice_id=os.environ.get("MORGAN_VOICE_ID", "iP95p4xoKVk53GoZ742B"),
 )
+_ALIGNMENT_ENABLED = os.environ.get("VOICE_BRIDGE_ENABLE_ALIGNMENT", "0") == "1"
 _AUTH_SHARED_SECRET = os.environ.get("VOICE_BRIDGE_SHARED_SECRET", "")
 _RATE_LIMIT_MAX_TURNS = max(1, int(os.environ.get("VOICE_BRIDGE_MAX_TURNS", "20")))
 _RATE_LIMIT_WINDOW_S = max(1, int(os.environ.get("VOICE_BRIDGE_RATE_WINDOW_S", "60")))
@@ -206,9 +207,30 @@ async def _handle_turn(
 
     tts_client = _BASE_TTS.with_voice(agent_spec.voice_id)
     tts_bytes = 0
-    async for mp3_chunk in tts_client.stream_tts(full_reply):
-        tts_bytes += len(mp3_chunk)
-        await ws.send_bytes(mp3_chunk)
+
+    if _ALIGNMENT_ENABLED:
+        async for frame in tts_client.stream_tts_with_timestamps(full_reply):
+            audio_b64 = frame.get("audio_base64", "")
+            if audio_b64:
+                await ws.send_bytes(audio_b64)
+            alignment = frame.get("alignment")
+            if alignment:
+                char_start_ms = alignment.get("character_start_times_seconds", [])
+                char_end_ms = alignment.get("character_end_times_seconds", [])
+                chars = list(full_reply)
+                await ws.send_json({
+                    "type": "alignment",
+                    "atMs": round(alignment.get("audio_start_seconds", 0) * 1000),
+                    "chars": chars,
+                    "char_start_ms": [round(t * 1000) for t in char_start_ms],
+                    "char_end_ms": [round(t * 1000) for t in char_end_ms],
+                    "agent": agent_spec.name,
+                })
+            tts_bytes += len(frame.get("audio_base64", ""))
+    else:
+        async for mp3_chunk in tts_client.stream_tts(full_reply):
+            tts_bytes += len(mp3_chunk)
+            await ws.send_bytes(mp3_chunk)
 
     _turn_counters[agent_spec.name] += 1
     log.info(

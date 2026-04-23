@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from typing import AsyncIterator
 
@@ -74,6 +75,40 @@ class ElevenLabsClient:
                 async for chunk in resp.aiter_bytes():
                     if chunk:
                         yield chunk
+
+    async def stream_tts_with_timestamps(
+        self, text: str
+    ) -> AsyncIterator[dict]:
+        """Stream TTS with character-level alignment timestamps.
+
+        Yields JSON frames containing:
+        - audio_base64: MP3 chunk as base64
+        - alignment: character timing data from ElevenLabs
+
+        Requires ELEVENLABS_ALIGNMENT=1 in environment.
+        """
+        if not self.is_configured or not text:
+            return
+        url = f"{_API_BASE}/text-to-speech/{self._voice_id}/stream/with-timestamps"
+        headers = {
+            "xi-api-key": self._api_key,
+            "accept": "application/json",
+            "content-type": "application/json",
+        }
+        payload = {
+            "text": text,
+            "model_id": "eleven_flash_v2_5",
+            "output_format": "mp3_22050_32",
+        }
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            async with client.stream("POST", url, headers=headers, json=payload) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if line.strip():
+                        try:
+                            yield json.loads(line)
+                        except json.JSONDecodeError:
+                            log.warning("Failed to parse alignment frame: %s", line[:200])
 
     def with_voice(self, voice_id: str) -> "ElevenLabsClient":
         return ElevenLabsClient(api_key=self._api_key, voice_id=voice_id)
