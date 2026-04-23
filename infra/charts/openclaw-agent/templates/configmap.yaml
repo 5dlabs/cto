@@ -261,6 +261,12 @@ data:
             }
           }
           {{- end }}
+          {{- $tokenjuice := index .Values "tokenjuice" | default dict }}
+          {{- if and (hasKey $tokenjuice "enabled") $tokenjuice.enabled }},
+          "tokenjuice": {
+            "enabled": true
+          }
+          {{- end }}
           {{- if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }},
           "openclaw-mem0": {
             "enabled": true,

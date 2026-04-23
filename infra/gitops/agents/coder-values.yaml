@@ -571,6 +571,9 @@ openmemory:
 mem0:
   enabled: false
 
+tokenjuice:
+  enabled: true
+
 mem0Plugin:
   enabled: true
   mode: open-source
