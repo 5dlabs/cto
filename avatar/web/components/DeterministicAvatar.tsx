@@ -70,7 +70,7 @@ export default function DeterministicAvatar({
           >
             <div className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-black/25 p-2 backdrop-blur-sm">
               <Image
-                src="/morgan.jpg"
+                src="/images/fallback-avatar.jpg"
                 alt="Morgan avatar concept"
                 width={768}
                 height={1024}
