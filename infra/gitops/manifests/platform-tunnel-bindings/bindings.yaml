@@ -92,11 +92,23 @@ tunnelRef:
 # the coder workspace (port 3000 on the openclaw-coder Service, exposed via
 # the chart's optional devServer block). This bypasses coder's /proxy/<port>
 # path, which was returning ECONNREFUSED externally.
+#
+# SECURITY: `next dev` MUST NOT be reachable unauthenticated on the public
+# internet (source maps, HMR, dev-toolchain CVEs). Access to this hostname
+# is gated by a Cloudflare Access Self-Hosted Application configured in the
+# Cloudflare dashboard — see docs/runbooks/cloudflare-access-avatar-demo.md.
+# CF Access applications are not yet codified in this repo (the
+# cloudflare-operator only manages Tunnels/TunnelBindings); until that gap
+# is closed, the Access app must be (re)created manually if the account is
+# ever rebuilt.
 apiVersion: networking.cfargotunnel.com/v1alpha1
 kind: TunnelBinding
 metadata:
   name: avatar-demo
   namespace: cto
+  annotations:
+    # Human-readable pointer to the required out-of-band CF Access config.
+    5dlabs.ai/cloudflare-access-runbook: docs/runbooks/cloudflare-access-avatar-demo.md
 subjects:
   - kind: Service
     name: openclaw-coder
