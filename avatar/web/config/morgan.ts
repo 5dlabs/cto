@@ -21,8 +21,20 @@ const MORGAN_MORPH_TARGETS = [
   "eyesLookDown",
 ].join(",");
 
+// TODO(ws-b2): swap to canine rig when hosted — see avatar/web/docs/canine-rig-spec.md
 export const MORGAN_DEFAULT_GLB_URL =
   `https://models.readyplayer.me/${MORGAN_RPM_ID}.glb` +
   `?morphTargets=${encodeURIComponent(MORGAN_MORPH_TARGETS)}`;
+
+/**
+ * Morgan anthro-canine rig (WS-B2).
+ *
+ * Activates once the asset ships at the hosted URL below and passes the
+ * morph-target validation described in `avatar/web/docs/canine-rig-spec.md`
+ * (ARKit 52 + Oculus visemes + canine add-ons). Commented out until then so
+ * the TalkingHead runtime keeps falling back to the RPM stand-in above.
+ */
+// export const MORGAN_CANINE_GLB_URL =
+//   "https://cdn.5dlabs.ai/avatars/morgan-canine-v1.glb";
 
 export const MORGAN_DEFAULT_BODY: "F" | "M" = "F";
