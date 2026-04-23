@@ -37,8 +37,17 @@ Issues that occur **in the agent tooling** used to develop the avatar:
 - [x] WebSocket connection to voice-bridge established
 - [x] `ingestBridgeFrame` wired to adapter
 - [x] Derived-text adapter produces visemes from `reply_text`/`reply_delta` frames
+- [x] ElevenLabs alignment adapter (`elevenlabs-alignment.ts`)
+- [x] `stream_tts_with_timestamps()` in voice-bridge
+- [x] Alignment frame type added to `VoiceBridgeFrame`
 - [x] Deterministic adapter remains no-op (fallback safe)
 - [x] TypeScript clean
 - [x] Build passing
-- [ ] End-to-end viseme demo with real audio
-- [ ] ElevenLabs alignment integration (optional enhancement)
+- [x] Voice-bridge tests green (4/4)
+- [ ] End-to-end viseme demo with real audio (needs live voice-bridge deployment)
+
+## Phase 3 Readiness
+
+- [ ] Asset standardization (rig/blendshape spec, validation)
+- [ ] TalkingHead runtime integration
+- [ ] Tauri embedding validation
