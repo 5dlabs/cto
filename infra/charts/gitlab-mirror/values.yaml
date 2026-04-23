@@ -2,16 +2,13 @@
 # jobs run independently. The legacy top-level `github`/`gitlab` keys below are
 # used as defaults when a repo entry omits them.
 #
-# NOTE: this in-cluster SSH mirror path is the canonical way to cover repos
-# whose tarball exceeds the Cloudflare 100 MB body cap (which breaks the
-# `.github/workflows/mirror-to-gitlab.yml` HTTPS path with HTTP 413).
+# NOTE: this in-cluster SSH mirror path covers repos whose `git push --mirror`
+# exceeds the Cloudflare 100 MB body cap over HTTPS. `cto` is NOT in this list
+# because it is mirrored by the GitHub Action
+# `.github/workflows/mirror-to-gitlab.yml`, which uses a per-ref push loop to
+# stay under the cap. Keeping `cto` here as well would create a two-writer race
+# on `main`.
 repos:
-  - name: cto
-    github:
-      url: https://github.com/5dlabs/cto.git
-      branch: main
-    gitlab:
-      project: 5dlabs/cto
   - name: cto-pay
     github:
       url: https://github.com/5dlabs/cto-pay.git

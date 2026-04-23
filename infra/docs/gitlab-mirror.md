@@ -1,12 +1,23 @@
-# GitHub → GitLab mirror (in-cluster)
+# GitHub → GitLab mirror
 
-The CronJob `gitlab-mirror` (namespace `gitlab`) pushes `main` and tags from
-`https://github.com/5dlabs/cto.git` into the self-hosted GitLab project
-`5dlabs/cto` every 5 minutes.
+Two paths keep `gitlab.5dlabs.ai/5dlabs/*` in sync with `github.com/5dlabs/*`:
 
-Why in-cluster: external GitHub Actions push hit Cloudflare's 100 MB request
-limit on a full clone. SSH directly to `gitlab-shell` inside the cluster
-bypasses Cloudflare entirely.
+1. **`5dlabs/cto` — GitHub Action**
+   (`.github/workflows/mirror-to-gitlab.yml`). Per-ref push loop with
+   `http.postBuffer=150MB` so each HTTPS POST stays under Cloudflare's 100 MB
+   request-body cap. Gated on org var `MIRROR_TO_GITLAB=true` + org secret
+   `GITLAB_PUSH_TOKEN`. Fires on every push and on workflow_dispatch.
+
+2. **Other 5dlabs repos — in-cluster CronJob** (this document). The CronJob
+   `gitlab-mirror-<repo>` (namespace `gitlab`) pushes `main` and tags from
+   `https://github.com/5dlabs/<repo>.git` into `gitlab.5dlabs.ai/5dlabs/<repo>`
+   every 5 minutes. SSH directly to `gitlab-shell` inside the cluster
+   bypasses Cloudflare entirely — useful for any repo too large or too
+   push-heavy for the HTTPS Action path.
+
+Current CronJob scope: `cto-pay`, `mcp-proxy`, `sigma-1`, `solana`. See
+`infra/charts/gitlab-mirror/values.yaml`. `cto` is deliberately excluded —
+the GitHub Action is authoritative for it.
 
 ## Components
 
@@ -51,8 +62,3 @@ rm /tmp/id_ed25519
 `main` on the GitLab side is protected with `allow_force_push: true` so the
 mirror can rewrite history if GitHub force-pushes (rare but supported). If you
 tighten this, the mirror will fail until you unprotect or relax push perms.
-
-## Replaces
-
-`.github/workflows/mirror-to-gitlab.yml` (deleted) — Cloudflare 100 MB limit
-made it unusable for full clones.

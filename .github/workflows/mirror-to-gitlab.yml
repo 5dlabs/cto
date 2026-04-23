@@ -21,9 +21,10 @@ jobs:
   mirror:
     if: vars.MIRROR_TO_GITLAB == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
-      - name: Push all refs to GitLab
+      - name: Push refs to GitLab (per-ref to clear Cloudflare 100MB cap)
+        shell: bash
         env:
           GITLAB_PUSH_TOKEN: ${{ secrets.GITLAB_PUSH_TOKEN }}
           GITLAB_HOST: gitlab.5dlabs.ai
@@ -37,7 +38,33 @@ jobs:
           fi
           repo_name="${GITHUB_REPOSITORY##*/}"
           gitlab_remote="https://oauth2:${GITLAB_PUSH_TOKEN}@${GITLAB_HOST}/${GITLAB_NAMESPACE}/${repo_name}.git"
-          git clone --mirror "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo.git
+
+          git clone --bare "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo.git
           cd repo.git
-          # --mirror pushes all refs and prunes deletions, keeping GitLab an exact copy.
-          git push --mirror "$gitlab_remote"
+
+          # gitlab.5dlabs.ai is fronted by Cloudflare, which caps request
+          # bodies at 100MB. `git push --mirror` of a large repo produces a
+          # single POST well past that cap (HTTP 413). Push one ref at a time
+          # so each POST carries only that ref's pack, and bump postBuffer so
+          # git sends each ref in a single self-contained request instead of
+          # chunking it across multiple POSTs.
+          git config http.postBuffer 157286400
+          git remote add gitlab "$gitlab_remote"
+
+          push_ref() {
+            local ref="$1"
+            echo "-> $ref"
+            git push --force gitlab "$ref:$ref"
+          }
+
+          echo "::group::push branches"
+          while IFS= read -r ref; do
+            push_ref "$ref"
+          done < <(git for-each-ref --format='%(refname)' refs/heads/)
+          echo "::endgroup::"
+
+          echo "::group::push tags"
+          while IFS= read -r ref; do
+            push_ref "$ref"
+          done < <(git for-each-ref --format='%(refname)' refs/tags/)
+          echo "::endgroup::"
