@@ -11,12 +11,12 @@ import {
   useVoiceAssistant,
 } from "@livekit/components-react";
 import AvatarRuntimeSurface from "@/components/AvatarRuntimeSurface";
+import VoiceBridgeIngestion from "@/components/VoiceBridgeIngestion";
 import { pickAvatarAdapter } from "@/lib/avatar-runtime";
 import {
   type AvatarRuntimeAdapter,
   type AvatarRuntimeInput,
   type AvatarStatePayload,
-  type VoiceBridgeFrame,
 } from "@/lib/avatar-state";
 import { Track } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -267,10 +267,15 @@ function AgentTelemetry({
     videoReadyAt,
   ]);
 
+  const bridgeUrl = process.env.NEXT_PUBLIC_VOICE_BRIDGE_URL ?? null;
+
   const adapter = useMemo<AvatarRuntimeAdapter>(
     () => pickAvatarAdapter(process.env.NEXT_PUBLIC_AVATAR_RUNTIME),
     [],
   );
+
+  const voiceBridgeEnabled =
+    bridgeUrl !== null && adapter.cueSource !== "none";
 
   const runtimeInput = useMemo<AvatarRuntimeInput>(
     () => ({
@@ -316,9 +321,18 @@ function AgentTelemetry({
     emitHostAvatarState(avatarState);
   }, [avatarState]);
 
+  // Feed voice-bridge frames into the adapter for viseme/gesture cues
+  // (deterministic adapter is a no-op; derived-text adapter uses reply_text/delta)
+
   if (compact) {
     return (
-      <section className="grid gap-5">
+      <>
+        <VoiceBridgeIngestion
+          adapter={adapter}
+          bridgeUrl={bridgeUrl}
+          enabled={voiceBridgeEnabled}
+        />
+        <section className="grid gap-5">
         <div className="relative overflow-hidden rounded-[2.2rem] border border-white/10 bg-black/30 shadow-[0_30px_120px_-48px_rgba(14,165,233,0.75)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#155e75_0%,rgba(2,6,23,0.78)_34%,rgba(2,6,23,0.96)_100%)]" />
 
@@ -367,11 +381,18 @@ function AgentTelemetry({
           </div>
         </div>
       </section>
+      </>
     );
   }
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <>
+      <VoiceBridgeIngestion
+        adapter={adapter}
+        bridgeUrl={bridgeUrl}
+        enabled={voiceBridgeEnabled}
+      />
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 shadow-2xl shadow-black/25">
         <div className="aspect-[9/14] w-full bg-linear-to-b from-slate-900 via-slate-950 to-black">
           <AvatarRuntimeSurface state={avatarState} videoTrack={videoTrack} />
@@ -452,6 +473,7 @@ function AgentTelemetry({
         </div>
       </aside>
     </section>
+    </>
   );
 }
 

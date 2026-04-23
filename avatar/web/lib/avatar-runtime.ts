@@ -1,16 +1,4 @@
-import {
-  type AvatarCueSource,
-  type AvatarRuntimeAdapter,
-  type AvatarRuntimeInput,
-  type AvatarRuntimeKind,
-  type AvatarStatePayload,
-  type AvatarVoiceState,
-  type AvatarConnectionState,
-  type VoiceBridgeFrame,
-  createEmptyAvatarState,
-  deriveGestureScaffold,
-  deriveVisemeScaffold,
-} from "@/lib/avatar-state";
+import { createEmptyAvatarState, deriveGestureScaffold, deriveVisemeScaffold, type AvatarCueSource, type AvatarRuntimeAdapter, type AvatarRuntimeInput, type AvatarRuntimeKind, type AvatarStatePayload, type AvatarVoiceState, type AvatarConnectionState, type VoiceBridgeFrame } from "@/lib/avatar-state";
 
 function normalizeVoiceState(state: string): AvatarVoiceState {
   if (
