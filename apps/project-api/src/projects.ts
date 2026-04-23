@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { CONFIG } from "./config";
 import {
+  commitAll,
   currentBranch,
   gitOk,
   initEmptyRepo,
@@ -75,9 +76,29 @@ async function cloneWithRetry(
   throw lastErr ?? new Error("git clone failed");
 }
 
-async function initWithRemote(path: string, remote: string): Promise<void> {
+async function ensureScaffold(path: string, name: string): Promise<void> {
+  const readmePath = join(path, "README.md");
+  if (!existsSync(readmePath)) {
+    await Bun.write(
+      readmePath,
+      `# ${name}\n\nProject scaffold created by Morgan project-api.\n`,
+    );
+  }
+  try {
+    await commitAll(path, "docs: add project scaffold");
+  } catch {
+    // Non-fatal; scaffolding file still exists for immediate workspace visibility.
+  }
+}
+
+async function initWithRemote(
+  path: string,
+  remote: string,
+  name: string,
+): Promise<void> {
   await mkdir(path, { recursive: true });
   await initEmptyRepo(path);
+  await ensureScaffold(path, name);
   try {
     await gitOk(["remote", "add", "origin", remote], { cwd: path });
   } catch {
@@ -196,7 +217,7 @@ export async function createProject(name: string): Promise<CreateResult> {
       } catch {
         // Last-resort fallback: keep local flow unblocked even if GitHub's
         // new repo isn't clonable yet in this instant.
-        await initWithRemote(path, created.cloneUrl);
+        await initWithRemote(path, created.cloneUrl, name);
       }
       return {
         project: await describe(path, name),
@@ -205,7 +226,11 @@ export async function createProject(name: string): Promise<CreateResult> {
     }
   }
 
-  await initWithRemote(path, `https://github.com/${CONFIG.githubOrg}/${name}.git`);
+  await initWithRemote(
+    path,
+    `https://github.com/${CONFIG.githubOrg}/${name}.git`,
+    name,
+  );
   return {
     project: await describe(path, name),
     mode: "initialized",

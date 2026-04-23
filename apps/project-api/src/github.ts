@@ -81,7 +81,7 @@ export async function createRepo(org: string, name: string): Promise<RepoInfo> {
   }>("POST", `/orgs/${encodeURIComponent(org)}/repos`, {
     name,
     private: true,
-    auto_init: false,
+    auto_init: true,
   });
   if (result.status === 422) {
     // Already exists or name conflict; re-check and let caller continue.
