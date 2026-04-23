@@ -35,6 +35,10 @@ spec:
 
         image:
           repository: livekit/livekit-server
+          # Pin to v1.9.12 (latest v1.9 patch) for /rtc/v1 signalling path
+          # support. livekit-client >=2.x uses /rtc/v1; v1.9.0 only serves
+          # /rtc and returns 404 for /rtc/v1 (see server PR #4180).
+          tag: v1.9.12
           pullPolicy: IfNotPresent
 
         # livekit-server chart v1.9.0 has a bug where `livekit.key_file`
