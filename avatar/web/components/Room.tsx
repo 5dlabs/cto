@@ -13,6 +13,7 @@ import {
 import AvatarRuntimeSurface from "@/components/AvatarRuntimeSurface";
 import LiveKitAudioBridge from "@/components/LiveKitAudioBridge";
 import type { TalkingHeadHandle } from "@/components/TalkingHeadView";
+import { MORGAN_DEFAULT_GLB_URL } from "@/config/morgan";
 import { pickAvatarAdapter } from "@/lib/avatar-runtime";
 import {
   type AvatarRuntimeAdapter,
@@ -268,7 +269,8 @@ function AgentTelemetry({
     videoReadyAt,
   ]);
 
-  const glbUrl = process.env.NEXT_PUBLIC_AVATAR_GLB_URL ?? undefined;
+  const glbUrl =
+    process.env.NEXT_PUBLIC_AVATAR_GLB_URL ?? MORGAN_DEFAULT_GLB_URL;
 
   const adapter = useMemo<AvatarRuntimeAdapter>(
     () => pickAvatarAdapter(process.env.NEXT_PUBLIC_AVATAR_RUNTIME),
