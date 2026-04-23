@@ -74,15 +74,29 @@ export async function currentBranch(cwd: string): Promise<string | null> {
 }
 
 /** First remote URL (prefers `origin`). */
+function sanitizeRemoteUrl(raw: string): string {
+  try {
+    const u = new URL(raw);
+    if (u.username || u.password) {
+      u.username = "";
+      u.password = "";
+    }
+    return u.toString();
+  } catch {
+    // Handles non-URL forms like git@github.com:org/repo.git
+    return raw;
+  }
+}
+
 export async function remoteUrl(cwd: string): Promise<string | null> {
   const r = await git(["remote", "get-url", "origin"], { cwd });
-  if (r.code === 0 && r.stdout.trim()) return r.stdout.trim();
+  if (r.code === 0 && r.stdout.trim()) return sanitizeRemoteUrl(r.stdout.trim());
   const all = await git(["remote", "-v"], { cwd });
   if (all.code !== 0) return null;
   const line = all.stdout.split(/\r?\n/)[0];
   if (!line) return null;
   const m = line.match(/^\S+\s+(\S+)\s+\(fetch\)/);
-  return m?.[1] ?? null;
+  return m?.[1] ? sanitizeRemoteUrl(m[1]) : null;
 }
 
 /** Subject of HEAD, or null if unborn. */
