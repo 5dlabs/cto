@@ -87,3 +87,22 @@ subjects:
 tunnelRef:
   kind: ClusterTunnel
   name: cto-main
+---
+# avatar.5dlabs.ai routes directly to the Next.js dev server running inside
+# the coder workspace (port 3000 on the openclaw-coder Service, exposed via
+# the chart's optional devServer block). This bypasses coder's /proxy/<port>
+# path, which was returning ECONNREFUSED externally.
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: avatar-demo
+  namespace: cto
+subjects:
+  - kind: Service
+    name: openclaw-coder
+    spec:
+      fqdn: avatar.5dlabs.ai
+      target: http://openclaw-coder.cto.svc:3000
+tunnelRef:
+  kind: ClusterTunnel
+  name: cto-main
