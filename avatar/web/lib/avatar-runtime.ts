@@ -1,4 +1,38 @@
 import { createEmptyAvatarState, deriveGestureScaffold, deriveVisemeScaffold, type AvatarCueSource, type AvatarRuntimeAdapter, type AvatarRuntimeInput, type AvatarRuntimeKind, type AvatarStatePayload, type AvatarVoiceState, type AvatarConnectionState, type VoiceBridgeFrame } from "@/lib/avatar-state";
+import { createMetricsRecorder, latencyMs, MetricsRecorder } from "@/lib/avatar-metrics";
+
+/**
+ * Build the `metrics` bag for the projected payload. Preserves any fields
+ * already present on `input.timing`, adds derived protocol metrics, then
+ * overlays the recorder snapshot (recorder wins on collision).
+ */
+function buildMetricsBag(
+  input: AvatarRuntimeInput,
+  recorder?: MetricsRecorder,
+): Record<string, unknown> {
+  const base: Record<string, unknown> = { ...(input.timing as Record<string, unknown>) };
+
+  const connLatency = latencyMs(
+    input.timing.connectionRequestedAt,
+    input.timing.roomConnectedAt,
+  );
+  if (connLatency !== null) {
+    base.connection_latency_ms = connLatency;
+  }
+
+  const audioLatency = latencyMs(
+    input.timing.roomConnectedAt,
+    input.timing.audioReadyAt,
+  );
+  if (audioLatency !== null) {
+    base.audio_latency_ms = audioLatency;
+  }
+
+  if (recorder) {
+    Object.assign(base, recorder.snapshot());
+  }
+  return base;
+}
 
 function normalizeVoiceState(state: string): AvatarVoiceState {
   if (
@@ -42,6 +76,11 @@ export function pickAvatarAdapter(
 export class TalkingHeadAdapter implements AvatarRuntimeAdapter {
   readonly kind: AvatarRuntimeKind = "talkinghead";
   readonly cueSource: AvatarCueSource = "none";
+  private readonly metrics: MetricsRecorder;
+
+  constructor(metrics: MetricsRecorder = createMetricsRecorder()) {
+    this.metrics = metrics;
+  }
 
   project(input: AvatarRuntimeInput): AvatarStatePayload {
     const voiceState = normalizeVoiceState(input.lk.state);
@@ -75,7 +114,7 @@ export class TalkingHeadAdapter implements AvatarRuntimeAdapter {
         visemes: [],
         gestures: deriveGestureScaffold(voiceState),
       },
-      metrics: input.timing as Record<string, unknown>,
+      metrics: buildMetricsBag(input, this.metrics),
       trackDebug: {},
     };
   }
@@ -84,6 +123,11 @@ export class TalkingHeadAdapter implements AvatarRuntimeAdapter {
 export class DeterministicAdapter implements AvatarRuntimeAdapter {
   readonly kind: AvatarRuntimeKind = "deterministic-fallback";
   readonly cueSource: AvatarCueSource = "none";
+  private readonly metrics: MetricsRecorder;
+
+  constructor(metrics: MetricsRecorder = createMetricsRecorder()) {
+    this.metrics = metrics;
+  }
 
   project(input: AvatarRuntimeInput): AvatarStatePayload {
     const voiceState = normalizeVoiceState(input.lk.state);
@@ -117,7 +161,7 @@ export class DeterministicAdapter implements AvatarRuntimeAdapter {
         visemes: [],
         gestures: deriveGestureScaffold(voiceState),
       },
-      metrics: input.timing as Record<string, unknown>,
+      metrics: buildMetricsBag(input, this.metrics),
       trackDebug: {},
     };
   }
@@ -132,6 +176,11 @@ export class DerivedTextAdapter implements AvatarRuntimeAdapter {
   readonly cueSource: AvatarCueSource = "derived-text";
   private replyBuffer: string = "";
   private utteranceStart: number | null = null;
+  private readonly metrics: MetricsRecorder;
+
+  constructor(metrics: MetricsRecorder = createMetricsRecorder()) {
+    this.metrics = metrics;
+  }
 
   project(input: AvatarRuntimeInput): AvatarStatePayload {
     const voiceState = normalizeVoiceState(input.lk.state);
@@ -178,7 +227,7 @@ export class DerivedTextAdapter implements AvatarRuntimeAdapter {
         visemes,
         gestures: deriveGestureScaffold(voiceState),
       },
-      metrics: input.timing as Record<string, unknown>,
+      metrics: buildMetricsBag(input, this.metrics),
       trackDebug: {},
     };
   }
