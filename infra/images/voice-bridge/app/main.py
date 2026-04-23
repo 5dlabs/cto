@@ -21,6 +21,7 @@ from .session_errors import (
     TTS_FAILED,
     emit_error_frame,
 )
+from .session_state import AvatarSessionState, build_session_state_frame
 from .voice_agents import AgentSpec, get_agent
 
 log = logging.getLogger("voice-bridge")
@@ -109,6 +110,7 @@ async def voice_ws(ws: WebSocket) -> None:
                 session_id = frame.get("session_id") or "anon"
                 audio_chunks = []
                 text_addendum = ""
+                await _emit_session_state(ws, "connecting", session_id, agent_spec.name)
                 await ws.send_json(
                     {
                         "type": "started",
@@ -116,6 +118,7 @@ async def voice_ws(ws: WebSocket) -> None:
                         "agent": agent_spec.name,
                     }
                 )
+                await _emit_session_state(ws, "connected", session_id, agent_spec.name)
             elif kind == "text":
                 text_addendum = f"{text_addendum}\n{frame.get('text', '')}".strip()
             elif kind == "end_utterance":
@@ -135,6 +138,9 @@ async def voice_ws(ws: WebSocket) -> None:
                 audio_chunks = []
                 text_addendum = ""
             elif kind == "stop":
+                if session_id:
+                    await _emit_session_state(ws, "disconnecting", session_id, agent_spec.name)
+                    await _emit_session_state(ws, "idle", session_id, agent_spec.name)
                 break
             else:
                 log.warning("unknown frame type: %s", kind)
@@ -185,6 +191,27 @@ async def _safe_close(ws: WebSocket) -> None:
         log.debug("websocket close ignored", exc_info=True)
 
 
+async def _emit_session_state(
+    ws: WebSocket,
+    state: AvatarSessionState,
+    session_id: str,
+    agent_name: str,
+) -> None:
+    """Best-effort SESSION_STATE emission — never raise into the call site."""
+    if ws.application_state == WebSocketState.DISCONNECTED:
+        return
+    try:
+        await ws.send_json(
+            build_session_state_frame(
+                state=state,
+                session_id=session_id,
+                agent_name=agent_name,
+            )
+        )
+    except Exception:
+        log.debug("session_state emission ignored", exc_info=True)
+
+
 async def _handle_turn(
     ws: WebSocket,
     *,
@@ -220,6 +247,7 @@ async def _handle_turn(
         return
 
     await ws.send_json({"type": "transcript", "text": user_text, "agent": agent_spec.name})
+    await _emit_session_state(ws, "listening", session_id, agent_spec.name)
 
     reply_text_buf: list[str] = []
     agent_client = MorganAgentClient(agent_spec)
@@ -229,6 +257,7 @@ async def _handle_turn(
 
     full_reply = "".join(reply_text_buf).strip()
     await ws.send_json({"type": "reply_text", "text": full_reply, "agent": agent_spec.name})
+    await _emit_session_state(ws, "speaking", session_id, agent_spec.name)
 
     tts_client = _BASE_TTS.with_voice(agent_spec.voice_id)
     tts_bytes = 0
@@ -308,6 +337,7 @@ async def _handle_turn(
         )
     )
     await ws.send_json({"type": "turn_done", "agent": agent_spec.name})
+    await _emit_session_state(ws, "connected", session_id, agent_spec.name)
 
 
 async def _stream_agent_reply(

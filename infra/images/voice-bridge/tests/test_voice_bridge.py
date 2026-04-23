@@ -39,6 +39,15 @@ class StubTTSClient:
         return StubTTSClient(api_key=self.api_key, voice_id=voice_id)
 
 
+def _recv_non_session(ws):
+    """Drain SESSION_STATE frames and return the next non-session JSON frame."""
+    while True:
+        frame = ws.receive_json()
+        if isinstance(frame, dict) and frame.get("type") == "SESSION_STATE":
+            continue
+        return frame
+
+
 def load_app(monkeypatch, voice_agents_json: str | None = None, shared_secret: str = ""):
     monkeypatch.setenv("ELEVENLABS_API_KEY", "test-key")
     monkeypatch.setenv("VOICE_BRIDGE_MAX_TURNS", "2")
@@ -93,26 +102,29 @@ def test_agent_routing_and_tts_voice(monkeypatch):
 
     with client.websocket_connect("/ws?agent=hermes") as websocket:
         websocket.send_text('{"type":"start","session_id":"s1"}')
-        started = websocket.receive_json()
+        started = _recv_non_session(websocket)
         assert started == {"type": "started", "session_id": "s1", "agent": "hermes"}
 
         websocket.send_text('{"type":"text","text":"typed words"}')
         websocket.send_bytes(b"audio")
         websocket.send_text('{"type":"end_utterance"}')
 
-        transcript = websocket.receive_json()
+        transcript = _recv_non_session(websocket)
         assert transcript == {
             "type": "transcript",
             "text": "spoken words\ntyped words",
             "agent": "hermes",
         }
-        delta = websocket.receive_json()
+        delta = _recv_non_session(websocket)
         assert delta == {"type": "reply_delta", "text": "reply-from-hermes", "agent": "hermes"}
-        reply = websocket.receive_json()
+        reply = _recv_non_session(websocket)
         assert reply == {"type": "reply_text", "text": "reply-from-hermes", "agent": "hermes"}
+        # drain `speaking` SESSION_STATE emitted just before TTS audio
+        speaking = websocket.receive_json()
+        assert speaking.get("type") == "SESSION_STATE"
         audio = websocket.receive_bytes()
         assert audio == b"audio-for-voice-hermes"
-        done = websocket.receive_json()
+        done = _recv_non_session(websocket)
         assert done == {"type": "turn_done", "agent": "hermes"}
 
 
@@ -141,27 +153,71 @@ def test_rate_limit_rejects_excess_turns(monkeypatch):
 
     with client.websocket_connect("/ws") as websocket:
         websocket.send_text('{"type":"start","session_id":"s1"}')
-        websocket.receive_json()
+        _recv_non_session(websocket)
 
         websocket.send_text('{"type":"text","text":"one"}')
         websocket.send_text('{"type":"end_utterance"}')
-        websocket.receive_json()
-        websocket.receive_json()
-        websocket.receive_json()
+        _recv_non_session(websocket)  # transcript
+        _recv_non_session(websocket)  # reply_delta
+        _recv_non_session(websocket)  # reply_text
+        websocket.receive_json()  # speaking SESSION_STATE
         websocket.receive_bytes()
-        websocket.receive_json()
+        _recv_non_session(websocket)  # turn_done
 
         websocket.send_text('{"type":"text","text":"two"}')
         websocket.send_text('{"type":"end_utterance"}')
-        websocket.receive_json()
-        websocket.receive_json()
-        websocket.receive_json()
+        _recv_non_session(websocket)
+        _recv_non_session(websocket)
+        _recv_non_session(websocket)
+        websocket.receive_json()  # speaking SESSION_STATE
         websocket.receive_bytes()
-        websocket.receive_json()
+        _recv_non_session(websocket)
 
         websocket.send_text('{"type":"text","text":"three"}')
         websocket.send_text('{"type":"end_utterance"}')
-        assert websocket.receive_json() == {"type": "error", "error": "rate_limited"}
+        assert _recv_non_session(websocket) == {"type": "error", "error": "rate_limited"}
+
+
+def test_session_state_frames_track_turn_lifecycle(monkeypatch):
+    app = load_app(monkeypatch)
+    client = TestClient(app)
+
+    with client.websocket_connect("/ws") as websocket:
+        def next_session_state():
+            while True:
+                frame = websocket.receive_json()
+                if isinstance(frame, dict) and frame.get("type") == "SESSION_STATE":
+                    assert frame["protocol"] == "cto-avatar-session/v1"
+                    assert frame["session_id"] == "s1"
+                    assert frame["agent_name"] == "morgan"
+                    assert isinstance(frame["timestamp_ms"], int)
+                    return frame["state"]
+
+        websocket.send_text('{"type":"start","session_id":"s1"}')
+        assert next_session_state() == "connecting"
+        # started reply, then connected
+        started = websocket.receive_json()
+        assert started["type"] == "started"
+        assert next_session_state() == "connected"
+
+        websocket.send_text('{"type":"text","text":"hello"}')
+        websocket.send_text('{"type":"end_utterance"}')
+        # transcript, then listening
+        transcript = websocket.receive_json()
+        assert transcript["type"] == "transcript"
+        assert next_session_state() == "listening"
+        # reply_delta, reply_text, then speaking
+        assert websocket.receive_json()["type"] == "reply_delta"
+        assert websocket.receive_json()["type"] == "reply_text"
+        assert next_session_state() == "speaking"
+        # tts audio, turn_done, then connected
+        websocket.receive_bytes()
+        assert websocket.receive_json()["type"] == "turn_done"
+        assert next_session_state() == "connected"
+
+        websocket.send_text('{"type":"stop"}')
+        assert next_session_state() == "disconnecting"
+        assert next_session_state() == "idle"
 
 
 # ---- Structured ERROR frame (session_errors) --------------------------------
