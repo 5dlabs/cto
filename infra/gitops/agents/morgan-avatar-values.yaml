@@ -151,6 +151,17 @@ extraEnv:
     value: "true"
   - name: MORGAN_PREEMPTIVE_GENERATION
     value: "false"
+  # STT: use OpenAI transcribe. Default MORGAN_STT_MODE=livekit-flux routes to
+  # LiveKit Cloud Inference, which 401s against our self-hosted LiveKit keys.
+  # openai-transcribe uses the standard OpenAI API and works with the existing
+  # openclaw-api-keys secret.
+  - name: MORGAN_STT_MODE
+    value: "openai-transcribe"
+  - name: OPENAI_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: openclaw-api-keys
+        key: OPENAI_API_KEY
   - name: MORGAN_TTS_MODE
     value: "elevenlabs"
   - name: MORGAN_ELEVEN_VOICE_ID
