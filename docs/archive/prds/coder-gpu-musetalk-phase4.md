@@ -1,3 +1,6 @@
+# ARCHIVED 2026-04-23
+This PRD is superseded by PR #4790 (client-side TalkingHead + HeadAudio pivot). See docs/avatar/phase4-disposition.md for disposition.
+
 # PRD — Full Self-Hosted Avatar Pipeline (Coder, Autonomous)
 
 > **Scope change (2026-04-17):** This PRD previously covered only Phase 4 (GPU provisioning). It now covers the **entire** self-hosted avatar pipeline, Phases 1–6. Coder owns the full implementation and runs **autonomously to completion** across reboots. Nothing below is out of scope. If you think it's out of scope, you're wrong — read "Autonomous Operation" and keep going.
