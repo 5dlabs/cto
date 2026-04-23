@@ -23,9 +23,11 @@ miss() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; fail=1; }
 
 echo "==> Static assets under public/headaudio/"
 for f in public/headaudio/headworklet.min.mjs public/headaudio/model-en-mixed.bin; do
-  if [[ -f "$f" ]]; then
+  if [[ -s "$f" ]]; then
     size=$(wc -c <"$f" | tr -d ' ')
     pass "$f (${size} bytes)"
+  elif [[ -f "$f" ]]; then
+    miss "$f is empty (0 bytes) — re-run 'pnpm run copy:headaudio'"
   else
     miss "$f missing — run 'pnpm install' or 'pnpm run copy:headaudio'"
   fi
@@ -74,11 +76,29 @@ echo
 echo "==> Voice-bridge deployment has alignment disabled (HeadAudio path)"
 dep=../../infra/manifests/voice-bridge/deployment.yaml
 if [[ -f "$dep" ]]; then
-  if grep -q 'VOICE_BRIDGE_ENABLE_ALIGNMENT' "$dep" \
-     && grep -A1 'VOICE_BRIDGE_ENABLE_ALIGNMENT' "$dep" | grep -q '"0"\|: 0\| 0$'; then
+  alignment_value=""
+  if command -v yq >/dev/null 2>&1; then
+    # Parse YAML properly — comments between `- name:` and `value:` break
+    # line-proximity grep, so use a structured query across all containers.
+    alignment_value=$(yq eval '.spec.template.spec.containers[].env[]? | select(.name == "VOICE_BRIDGE_ENABLE_ALIGNMENT") | .value' "$dep" 2>/dev/null | head -n1)
+  else
+    # Fallback: awk block parser that scans from the matching `- name:` entry
+    # to the next env list item (or end of env block) and extracts `value:`.
+    alignment_value=$(awk '
+      /- name: VOICE_BRIDGE_ENABLE_ALIGNMENT[[:space:]]*$/ { in_block=1; next }
+      in_block && /^[[:space:]]*- name:/ { in_block=0 }
+      in_block && /^[[:space:]]*value:/ {
+        sub(/^[[:space:]]*value:[[:space:]]*/, "")
+        gsub(/"/, "")
+        print
+        exit
+      }
+    ' "$dep")
+  fi
+  if [[ "$alignment_value" == "0" ]]; then
     pass "$dep has VOICE_BRIDGE_ENABLE_ALIGNMENT=0"
   else
-    miss "$dep does not pin VOICE_BRIDGE_ENABLE_ALIGNMENT=0 (WS-A expects alignment OFF)"
+    miss "$dep does not pin VOICE_BRIDGE_ENABLE_ALIGNMENT=0 (got '${alignment_value:-<unset>}'; WS-A expects alignment OFF)"
   fi
 else
   printf '  \033[33mskip\033[0m %s not found (ok if manifests live elsewhere)\n' "$dep"
