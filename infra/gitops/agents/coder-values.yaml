@@ -172,6 +172,7 @@ modelDefaults:
     - "fireworks/accounts/fireworks/models/minimax-m2p7"
     - "fireworks/accounts/fireworks/models/glm-5p1"
     - "fireworks/accounts/fireworks/models/kimi-k2p6"
+    - "do-gradient/anthropic-claude-opus-4.7"
 
 # =============================================================================
 # Secrets
@@ -247,6 +248,15 @@ models:
     openai:
       enabled: false
       apiKeySecretKey: "openai-api-key"
+    do-gradient:
+      enabled: true
+      api: "openai-completions"
+      baseUrl: "https://inference.do-ai.run/v1"
+      apiKeySecretKey: "do-inference-key"
+      models:
+        - id: "anthropic-claude-opus-4.7"
+          name: "Claude Opus 4.7 (DO)"
+          contextTokens: 200000
   repos: []
 
 memorySearch:
