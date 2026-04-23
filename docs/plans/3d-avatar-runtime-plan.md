@@ -90,6 +90,7 @@ This makes the avatar layer behave more like a game/VTuber runtime than a diffus
 4. **Audio sync drift** — WebAudio clock vs. animation clock drift is real in WebView. Use `AudioContext.currentTime` as master clock, lock animation delta to it.
 5. **Cross-device performance** — client hardware is the bottleneck. Aggressive LOD and quality settings are mandatory.
 6. **Animal viseme mapping** — non-human faces may not map cleanly to ARKit 52-shape sets. Need per-species blendshape manifests.
+7. **Multi-avatar floor control** — when multiple agents participate in a shared media/session context, cascading interruptions and competing speech/gesture states can cause visual chaos. Need explicit floor/turn arbitration and gesture state priority rules.
 
 ### Risk mitigations
 
