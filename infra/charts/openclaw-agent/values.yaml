@@ -336,6 +336,18 @@ codeServer:
     enabled: true
 
 # =============================================================================
+# Optional extra dev-server port on the agent Service
+# =============================================================================
+# Exposes an arbitrary TCP port on the agent's ClusterIP service so workloads
+# launched inside the code-server shell (e.g. `next dev -H 0.0.0.0 -p 3000`)
+# can be reached from a Cloudflare TunnelBinding without going through
+# code-server's /proxy/<port> path.
+devServer:
+  enabled: false
+  port: 3000
+  name: dev-server
+
+# =============================================================================
 # Optional project-api sidecar (disabled by default)
 # =============================================================================
 # Bun HTTP service that surfaces the shared /workspace/repos PVC to the

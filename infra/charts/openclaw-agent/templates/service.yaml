@@ -30,6 +30,12 @@ spec:
       protocol: TCP
       name: code-server
     {{- end }}
+    {{- if .Values.devServer.enabled }}
+    - port: {{ .Values.devServer.port | default 3000 }}
+      targetPort: {{ .Values.devServer.port | default 3000 }}
+      protocol: TCP
+      name: {{ .Values.devServer.name | default "dev-server" }}
+    {{- end }}
     {{- if .Values.projectApi.enabled }}
     - port: {{ .Values.projectApi.servicePort | default .Values.projectApi.port }}
       targetPort: project-api

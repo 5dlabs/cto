@@ -838,6 +838,14 @@ codeServer:
     secretName: "code-server-github-token"
     key: "token"
 
+# Expose the Next.js avatar dev server on the agent Service so
+# avatar.5dlabs.ai (TunnelBinding) can reach it directly, bypassing
+# code-server's /proxy/<port> path.
+devServer:
+  enabled: true
+  port: 3000
+  name: dev-server
+
 ssh:
   enabled: true
   port: 2222
