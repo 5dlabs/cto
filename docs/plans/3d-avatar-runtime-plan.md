@@ -43,6 +43,62 @@ Instead, we:
 
 This makes the avatar layer behave more like a game/VTuber runtime than a diffusion video pipeline.
 
+### Component list
+
+| Component | Role |
+|---|---|
+| **Client SPA** | Three.js/WebGL 3D viewer (browser or Tauri) |
+| **3D asset format** | `.glb` with Draco mesh compression + KTX2 texture compression |
+| **Animation system** | Client-side state machine for blending pre-baked animations |
+| **Asset host** | CDN for avatar models, textures, animation packs |
+| **State sync** | Existing WebRTC transport for real-time state coordination |
+| **TalkingHead runtime** | Avatar rendering, viseme/lip sync, gesture orchestration |
+| **HeadAudio** | Real-time audio-driven viseme detection |
+| **HeadTTS** | Timing/viseme-aware speech integration (optional enhancement) |
+| **MotionEngine** | Richer gesture semantics and LLM-driven motion control |
+
+### Data flow
+
+1. Client downloads the 3D viewer SPA and avatar `.glb` from CDN
+2. Browser/Tauri loads model + textures into Three.js/WebGL
+3. All rendering and animation happen **exclusively on the client device**
+4. Existing WebRTC media session provides:
+   - live audio streams
+   - agent state events (listening/thinking/speaking)
+   - TTS audio output
+5. HeadAudio derives visemes from the audio stream in real-time
+6. TalkingHead maps visemes → mouth blendshapes + triggers body gesture states
+7. For multi-avatar scenarios, only small state packets are synced via WebRTC
+8. Server responsibilities remain:
+   - serving static assets (CDN)
+   - relaying minimal avatar state data
+   - hosting LLM/STT/TTS providers
+
+### Why server GPU is eliminated from the primary path
+
+- The rendering workload is delegated entirely to the end-user's device
+- The server only serves static files and relays tiny state packets
+- No real-time per-user GPU rendering is needed on the server side
+- Offline avatar creation/retargeting may use GPU, but it's not in the user-facing runtime path
+- GPU is reserved only for optional self-hosted model inference or generative fallback R&D
+
+### Top risks
+
+1. **Rig universalism trap** — committing to one skeleton before defining a retarget layer will force a rewrite for animal characters. Ship rig families (biped-human, biped-anthro, quadruped) with shared semantic interface.
+2. **WebKitGTK parity** — Linux Tauri builds will differ from Chrome dev experience. Budget testing time on actual Linux WebView.
+3. **Memory ceiling** — without enforced asset budgets + LODs + KTX2 from day one, WebView will OOM before visual quality goals are met.
+4. **Audio sync drift** — WebAudio clock vs. animation clock drift is real in WebView. Use `AudioContext.currentTime` as master clock, lock animation delta to it.
+5. **Cross-device performance** — client hardware is the bottleneck. Aggressive LOD and quality settings are mandatory.
+6. **Animal viseme mapping** — non-human faces may not map cleanly to ARKit 52-shape sets. Need per-species blendshape manifests.
+
+### Risk mitigations
+
+- **LOD system**: 3 levels (gltfpack/meshopt); critical for browser memory ceilings (~2 GB practical cap on 32-bit WASM)
+- **Texture budget**: KTX2 + BasisU (UASTC for normals, ETC1S for albedo) — 5–10× smaller than PNG
+- **Asset versioning**: content-addressed blobs behind manifest; Tauri cache + browser ServiceWorker share strategy
+- **CI validation**: headless `gltf-validator` + visual diff on PR
+- **Tauri custom protocol**: use `asset://` not `file://` to bypass CSP issues and enable streaming
+
 ## Primary component choices
 
 ### Media transport
@@ -70,9 +126,33 @@ This makes the avatar layer behave more like a game/VTuber runtime than a diffus
   - **HeadTTS** for timing/viseme-aware speech integration
   - **MotionEngine** for richer gesture semantics when useful
 
-### Asset format
-- Standardize on **GLB first**
-- Keep VRM compatibility as a possible later extension if helpful
+### Asset format and pipeline
+- **Source format:** **glTF 2.0 (.glb)** — single-file, PBR-native, broad WebGL support
+- **Authoring flow:** DCC (Blender) → FBX/USD intermediate → glTF with KHR extensions (`KHR_materials_*`, `KHR_mesh_quantization`, `KHR_texture_basisu`)
+- **Texture budget:** KTX2 + BasisU (UASTC for normals, ETC1S for albedo) — 5–10× smaller than PNG, GPU-decoded
+- **LODs:** 3 levels via gltfpack/meshopt; critical for browser memory ceilings (~2 GB practical cap)
+- **Versioning:** content-addressed blobs behind manifest; Tauri cache + browser ServiceWorker share strategy
+- **CI:** headless `gltf-validator` + visual diff (Playwright + WebGL screenshot) on PR
+- **VRM compatibility:** keep as later extension if useful for ecosystem
+
+### Rig and blendshape requirements
+- **Skeleton standard:** VRM 1.0 (humanoid-bone-mapped) or Mixamo/Unity Humanoid rig
+- **Bone count:** cap at ~60–80 bones for browser; cloth/hair via spring-bone constraints, not extra skinned bones
+- **Blendshapes (morph targets):**
+  - **ARKit 52-shape standard** for facial — guarantees compat with iPhone face capture, Live Link Face, MediaPipe FaceLandmarker, NVIDIA Audio2Face
+  - **Oculus visemes (15)** or **Preston Blair (10)** for lipsync from TTS/Whisper phonemes
+  - Keep morph target count ≤ 60 active per draw call (WebGL2 attribute limit)
+- **Inverse kinematics:** two-bone IK at runtime (Three.js `CCDIKSolver` / Babylon `IKController`); don't bake
+
+### Humanoid ↔ animal compatibility
+- **Retarget layer is mandatory** — animal rigs (digitigrade legs, tails, extra spines, muzzle) break humanoid-only animation libraries
+- **Strategy:**
+  - Define an **abstract bone map** (Hips, Spine[n], Head, Limb_FL/FR/BL/BR, Tail[n]) — superset of VRM humanoid
+  - Store animations in **bone-agnostic format** (pose deltas keyed by semantic role, not bone name)
+  - Animals use a **reduced + extended ARKit set** (drop brow shapes that need eyebrows, add ear/whisker/muzzle morphs)
+  - Per-species blendshape manifest
+- **Quadruped gait:** procedural foot-placement (raycast IK) is more compatible than baked clips
+- **Risk:** single "universal" rig is a trap — ship **rig families** (biped-human, biped-anthro, quadruped-mammal, quadruped-avian) with shared semantic interface
 
 ### Client targets
 - browser
