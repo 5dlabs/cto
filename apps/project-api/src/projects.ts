@@ -10,7 +10,7 @@ import {
   lastCommitSubject,
   remoteUrl,
 } from "./git";
-import { authenticatedCloneUrl, lookupRepo } from "./github";
+import { authenticatedCloneUrl, createRepo, lookupRepo } from "./github";
 
 export interface ProjectDescriptor {
   name: string;
@@ -119,7 +119,7 @@ export async function getProject(name: string): Promise<ProjectDescriptor | null
   return describe(path, name);
 }
 
-export type CreateMode = "cloned" | "initialized";
+export type CreateMode = "cloned" | "created" | "initialized";
 
 export interface CreateResult {
   project: ProjectDescriptor;
@@ -150,6 +150,18 @@ export async function createProject(name: string): Promise<CreateResult> {
       project: await describe(path, name),
       mode: "cloned",
     };
+  }
+
+  if (CONFIG.githubToken) {
+    const created = await createRepo(CONFIG.githubOrg, name);
+    if (created.cloneUrl) {
+      const cloneUrl = authenticatedCloneUrl(created.cloneUrl);
+      await gitOk(["clone", cloneUrl, path]);
+      return {
+        project: await describe(path, name),
+        mode: "created",
+      };
+    }
   }
 
   await mkdir(path, { recursive: true });

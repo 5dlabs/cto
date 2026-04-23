@@ -7,6 +7,34 @@ export interface RepoInfo {
   private: boolean | null;
 }
 
+async function githubJson<T>(
+  method: "GET" | "POST",
+  path: string,
+  body?: unknown,
+): Promise<{ status: number; data: T | null; text: string }> {
+  const headers: Record<string, string> = {
+    accept: "application/vnd.github+json",
+    "user-agent": "morgan-project-api/0.1",
+    "x-github-api-version": "2022-11-28",
+  };
+  if (CONFIG.githubToken) headers.authorization = `Bearer ${CONFIG.githubToken}`;
+  if (body !== undefined) headers["content-type"] = "application/json";
+
+  const res = await fetch(`https://api.github.com${path}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await res.text().catch(() => "");
+  let data: T | null = null;
+  try {
+    data = text ? (JSON.parse(text) as T) : null;
+  } catch {
+    data = null;
+  }
+  return { status: res.status, data, text };
+}
+
 /**
  * Ask GitHub whether `<org>/<name>` exists. Uses the configured token when
  * available (required for private repos and higher rate limits). Returns a
@@ -16,31 +44,54 @@ export async function lookupRepo(
   org: string,
   name: string,
 ): Promise<RepoInfo> {
-  const url = `https://api.github.com/repos/${encodeURIComponent(
-    org,
-  )}/${encodeURIComponent(name)}`;
-  const headers: Record<string, string> = {
-    accept: "application/vnd.github+json",
-    "user-agent": "morgan-project-api/0.1",
-    "x-github-api-version": "2022-11-28",
-  };
-  if (CONFIG.githubToken) headers.authorization = `Bearer ${CONFIG.githubToken}`;
-
-  const res = await fetch(url, { headers });
-  if (res.status === 404) {
-    return { exists: false, cloneUrl: null, defaultBranch: null, private: null };
-  }
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `github repo lookup failed: ${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 240)}` : ""}`,
-    );
-  }
-  const data = (await res.json()) as {
+  const result = await githubJson<{
     clone_url?: string;
     default_branch?: string;
     private?: boolean;
+  }>("GET", `/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}`);
+  if (result.status === 404) {
+    return { exists: false, cloneUrl: null, defaultBranch: null, private: null };
+  }
+  if (result.status < 200 || result.status >= 300) {
+    throw new Error(
+      `github repo lookup failed: ${result.status}${result.text ? ` — ${result.text.slice(0, 240)}` : ""}`,
+    );
+  }
+  const data = result.data ?? {};
+  return {
+    exists: true,
+    cloneUrl: data.clone_url ?? null,
+    defaultBranch: data.default_branch ?? null,
+    private: data.private ?? null,
   };
+}
+
+/**
+ * Create a repository in `<org>` and return its clone metadata.
+ */
+export async function createRepo(org: string, name: string): Promise<RepoInfo> {
+  if (!CONFIG.githubToken) {
+    throw new Error("github token missing; cannot create remote repository");
+  }
+  const result = await githubJson<{
+    clone_url?: string;
+    default_branch?: string;
+    private?: boolean;
+    message?: string;
+  }>("POST", `/orgs/${encodeURIComponent(org)}/repos`, {
+    name,
+    private: true,
+    auto_init: false,
+  });
+  if (result.status === 422) {
+    // Already exists or name conflict; re-check and let caller continue.
+    return lookupRepo(org, name);
+  }
+  if (result.status < 200 || result.status >= 300) {
+    const msg = result.data?.message || result.text || "unknown github error";
+    throw new Error(`github repo create failed: ${result.status} — ${msg}`);
+  }
+  const data = result.data ?? {};
   return {
     exists: true,
     cloneUrl: data.clone_url ?? null,

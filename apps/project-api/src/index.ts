@@ -66,6 +66,10 @@ async function handle(ctx: RouteCtx): Promise<Response> {
     }
     try {
       const res = await createProject(body.name);
+      // eslint-disable-next-line no-console
+      console.log(
+        `[project-api] create project="${body.name}" mode=${res.mode} path=${res.project.path}`,
+      );
       return json(res, { status: 201, origin });
     } catch (err) {
       return mapError(err, origin);
@@ -80,6 +84,8 @@ async function handle(ctx: RouteCtx): Promise<Response> {
     const body = (await readJson(req)) as { name?: string | null };
     try {
       const res = await setActiveProject(body?.name ?? null);
+      // eslint-disable-next-line no-console
+      console.log(`[project-api] set active project="${res.name ?? "none"}"`);
       return json(res, { origin });
     } catch (err) {
       return mapError(err, origin);
@@ -110,6 +116,10 @@ async function handle(ctx: RouteCtx): Promise<Response> {
       }
       try {
         const res = await writePrd(rawName, body.content);
+        // eslint-disable-next-line no-console
+        console.log(
+          `[project-api] write prd project="${rawName}" bytes=${res.bytesWritten} path=${res.path}`,
+        );
         return json(res, { origin });
       } catch (err) {
         return mapError(err, origin);
@@ -154,7 +164,24 @@ const server = Bun.serve({
   fetch(req) {
     const url = new URL(req.url);
     const origin = req.headers.get("origin");
-    return handle({ req, url, origin }).catch((err) => mapError(err, origin));
+    const startedAt = Date.now();
+    return handle({ req, url, origin })
+      .then((res) => {
+        // eslint-disable-next-line no-console
+        console.log(
+          `[project-api] ${req.method} ${url.pathname} -> ${res.status} (${Date.now() - startedAt}ms)`,
+        );
+        return res;
+      })
+      .catch((err) => {
+        const res = mapError(err, origin);
+        // eslint-disable-next-line no-console
+        console.error(
+          `[project-api] ${req.method} ${url.pathname} -> ${res.status} (${Date.now() - startedAt}ms)`,
+          err,
+        );
+        return res;
+      });
   },
 });
 
