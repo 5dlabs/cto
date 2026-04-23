@@ -204,3 +204,85 @@ export function deriveGestureScaffold(voiceState: AvatarVoiceState): AvatarGestu
       return [];
   }
 }
+
+// ---------------------------------------------------------------------------
+// cto-avatar-session/v1 — host-bound session frames
+// See docs/specs/avatar-session-protocol.md §"Frame Types".
+// Types + type guards only; no emitters or consumers yet.
+// ---------------------------------------------------------------------------
+
+export const AVATAR_SESSION_PROTOCOL = "cto-avatar-session/v1" as const;
+
+export type AvatarSessionState =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "listening"
+  | "speaking"
+  | "reconnecting"
+  | "error"
+  | "disconnecting";
+
+export type SessionStateFrame = {
+  protocol: typeof AVATAR_SESSION_PROTOCOL;
+  type: "SESSION_STATE";
+  session_id: string;
+  state: AvatarSessionState;
+  agent_name: string;
+  timestamp_ms: number;
+};
+
+export type ErrorFrame = {
+  protocol: typeof AVATAR_SESSION_PROTOCOL;
+  type: "ERROR";
+  session_id: string;
+  code: string;
+  message: string;
+  recoverable: boolean;
+  timestamp_ms: number;
+};
+
+export type AvatarSessionFrame = SessionStateFrame | ErrorFrame;
+
+const AVATAR_SESSION_STATES: ReadonlySet<AvatarSessionState> = new Set([
+  "idle",
+  "connecting",
+  "connected",
+  "listening",
+  "speaking",
+  "reconnecting",
+  "error",
+  "disconnecting",
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export function isSessionStateFrame(value: unknown): value is SessionStateFrame {
+  if (!isRecord(value)) return false;
+  if (value.protocol !== AVATAR_SESSION_PROTOCOL) return false;
+  if (value.type !== "SESSION_STATE") return false;
+  if (typeof value.session_id !== "string") return false;
+  if (typeof value.agent_name !== "string") return false;
+  if (typeof value.timestamp_ms !== "number") return false;
+  if (typeof value.state !== "string") return false;
+  if (!AVATAR_SESSION_STATES.has(value.state as AvatarSessionState)) return false;
+  return true;
+}
+
+export function isErrorFrame(value: unknown): value is ErrorFrame {
+  if (!isRecord(value)) return false;
+  if (value.protocol !== AVATAR_SESSION_PROTOCOL) return false;
+  if (value.type !== "ERROR") return false;
+  if (typeof value.session_id !== "string") return false;
+  if (typeof value.code !== "string") return false;
+  if (typeof value.message !== "string") return false;
+  if (typeof value.recoverable !== "boolean") return false;
+  if (typeof value.timestamp_ms !== "number") return false;
+  return true;
+}
+
+export function isAvatarSessionFrame(value: unknown): value is AvatarSessionFrame {
+  return isSessionStateFrame(value) || isErrorFrame(value);
+}

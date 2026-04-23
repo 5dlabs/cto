@@ -7,6 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "copy:headaudio": "mkdir -p public/headaudio && cp node_modules/@met4citizen/headaudio/dist/headworklet.min.mjs public/headaudio/ && cp node_modules/@met4citizen/headaudio/dist/model-en-mixed.bin public/headaudio/",
     "postinstall": "npm run copy:headaudio"
   },
@@ -32,6 +33,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.5"
   }
 }
