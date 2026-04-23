@@ -1,5 +1,4 @@
 import { createEmptyAvatarState, deriveGestureScaffold, deriveVisemeScaffold, type AvatarCueSource, type AvatarRuntimeAdapter, type AvatarRuntimeInput, type AvatarRuntimeKind, type AvatarStatePayload, type AvatarVoiceState, type AvatarConnectionState, type VoiceBridgeFrame } from "@/lib/avatar-state";
-import { ElevenLabsAlignmentAdapter } from "@/lib/runtimes/elevenlabs-alignment";
 
 function normalizeVoiceState(state: string): AvatarVoiceState {
   if (
@@ -23,13 +22,62 @@ export function pickAvatarAdapter(
   kind: string | undefined = process.env.NEXT_PUBLIC_AVATAR_RUNTIME,
 ): AvatarRuntimeAdapter {
   switch (kind) {
-    case "elevenlabs-alignment":
-      return new ElevenLabsAlignmentAdapter();
+    case "talkinghead":
+      return new TalkingHeadAdapter();
     case "derived-text":
       return new DerivedTextAdapter();
     case "deterministic":
     default:
       return new DeterministicAdapter();
+  }
+}
+
+/**
+ * Adapter for the 3D TalkingHead runtime. Lip-sync visemes are driven
+ * in real time by HeadAudio inside `TalkingHeadView` from the incoming
+ * LiveKit audio stream, so we don't emit viseme cues here — the
+ * projected payload only advertises the runtime kind plus agent
+ * transcript/voice state for the telemetry panel.
+ */
+export class TalkingHeadAdapter implements AvatarRuntimeAdapter {
+  readonly kind: AvatarRuntimeKind = "talkinghead";
+  readonly cueSource: AvatarCueSource = "none";
+
+  project(input: AvatarRuntimeInput): AvatarStatePayload {
+    const voiceState = normalizeVoiceState(input.lk.state);
+    const connectionState = deriveConnectionState(input.lk.state);
+
+    return {
+      ...createEmptyAvatarState(),
+      connectionState,
+      voiceState,
+      runtime: {
+        kind: this.kind,
+        ready: Boolean(input.lk.audioTrack),
+        fallbackActive: false,
+        cueSource: this.cueSource,
+      },
+      transcript: {
+        latestUserText: input.lk.latestUserText,
+        latestAgentText: input.lk.latestAgentText,
+      },
+      media: {
+        audioTrackReady: Boolean(input.lk.audioTrack),
+        videoTrackReady: Boolean(input.lk.videoTrack),
+      },
+      room: {
+        roomName: input.lk.roomName,
+        identity: input.lk.identity,
+      },
+      error: input.error,
+      utterance: input.utterance,
+      cues: {
+        visemes: [],
+        gestures: deriveGestureScaffold(voiceState),
+      },
+      metrics: input.timing as Record<string, unknown>,
+      trackDebug: {},
+    };
   }
 }
 

@@ -5,32 +5,25 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
-  useState,
 } from "react";
-// Inside this component we never render with an empty glbUrl — the
-// `AvatarRuntimeSurface` guard handles that case — so we avoid a
-// setState-in-effect lint warning by not surfacing an empty-url error
-// from here.
 import type { TalkingHead as TalkingHeadClass } from "@met4citizen/talkinghead";
-import {
-  alignmentToVisemeTimeline,
-  alignmentToWordTimeline,
-  type AlignmentFrame,
-} from "@/lib/lipsync/elevenlabs-to-oculus";
+import type { HeadAudio as HeadAudioClass } from "@met4citizen/headaudio/dist/headaudio.min.mjs";
 
 export type TalkingHeadHandle = {
   /**
-   * Play a single reply utterance: audio + ElevenLabs alignment frame,
-   * mapped internally to Oculus visemes + word timings.
+   * Pipe a MediaStreamTrack (e.g. LiveKit's RemoteAudioTrack.mediaStreamTrack)
+   * into HeadAudio for real-time viseme detection. Replaces any previous
+   * attached track.
    */
-  speakUtterance(audio: AudioBuffer, alignment: AlignmentFrame | null): void;
+  attachAudio(track: MediaStreamTrack): void;
   /**
-   * Immediately cancel any in-flight audio / lip-sync animation.
+   * Drop the currently attached audio track. Safe to call even if nothing
+   * is attached.
    */
-  interrupt(): void;
+  detachAudio(): void;
   /**
-   * True once the avatar GLB has loaded and the instance is ready to
-   * accept `speakUtterance` calls.
+   * True once the avatar GLB has loaded AND the HeadAudio worklet +
+   * model are ready to process audio.
    */
   isReady(): boolean;
 };
@@ -46,12 +39,30 @@ type TalkingHeadViewProps = {
   onError?: (error: Error) => void;
 };
 
+// HeadAudio's onvalue callback writes into head.mtAvatar[key]. These
+// internal members aren't declared in the ambient TalkingHead types;
+// narrow-cast at the point of use rather than widening the public type.
+type TalkingHeadInternal = TalkingHeadClass & {
+  audioCtx: AudioContext;
+  mtAvatar: Record<string, { newvalue: number; needsUpdate: boolean }>;
+  opt: {
+    update?: ((delta: number) => void) | null;
+  };
+};
+
+const HEADAUDIO_WORKLET_URL = "/headaudio/headworklet.min.mjs";
+const HEADAUDIO_MODEL_URL = "/headaudio/model-en-mixed.bin";
+
 const TalkingHeadView = forwardRef<TalkingHeadHandle, TalkingHeadViewProps>(
   function TalkingHeadView({ glbUrl, body = "F", onReady, onError }, ref) {
     const containerRef = useRef<HTMLDivElement | null>(null);
-    const headRef = useRef<TalkingHeadClass | null>(null);
+    const headRef = useRef<TalkingHeadInternal | null>(null);
+    const headAudioRef = useRef<HeadAudioClass | null>(null);
+    const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
     const readyRef = useRef(false);
-    const [loadError, setLoadError] = useState<string | null>(null);
+    // Track the most recent attach request made before HeadAudio was
+    // ready so we can (re)connect it once the pipeline finishes loading.
+    const pendingTrackRef = useRef<MediaStreamTrack | null>(null);
 
     useEffect(() => {
       const container = containerRef.current;
@@ -60,8 +71,6 @@ const TalkingHeadView = forwardRef<TalkingHeadHandle, TalkingHeadViewProps>(
       }
 
       if (!glbUrl) {
-        // Surface missing-URL state lazily so we don't trip
-        // react-hooks/set-state-in-effect on first render.
         onError?.(new Error("NEXT_PUBLIC_AVATAR_GLB_URL is not set."));
         return;
       }
@@ -70,26 +79,24 @@ const TalkingHeadView = forwardRef<TalkingHeadHandle, TalkingHeadViewProps>(
 
       (async () => {
         try {
-          // Load the TalkingHead module lazily so the bundler doesn't
-          // statically chase its runtime dynamic imports (it pulls in
-          // language-specific lipsync modules by filename at runtime,
-          // which Turbopack can't resolve).
-          const mod = await import("@met4citizen/talkinghead");
+          const [thMod, haMod] = await Promise.all([
+            import("@met4citizen/talkinghead"),
+            import("@met4citizen/headaudio/dist/headaudio.min.mjs"),
+          ]);
           if (cancelled) {
             return;
           }
-          const TalkingHeadCtor = mod.TalkingHead;
 
-          // Empty `lipsyncModules` — we feed Oculus visemes directly
-          // from the voice-bridge, so TalkingHead does not need its
-          // built-in language engine.
-          const head = new TalkingHeadCtor(container, {
+          const head = new thMod.TalkingHead(container, {
             modelFPS: 30,
             dracoEnabled: false,
+            // We drive visemes via HeadAudio, not via TalkingHead's
+            // per-language text-to-lipsync modules. Leaving this empty
+            // keeps the bundle lean.
             lipsyncModules: [],
             cameraView: "upper",
             avatarMood: "neutral",
-          });
+          }) as TalkingHeadInternal;
           headRef.current = head;
 
           await head.showAvatar({
@@ -109,7 +116,63 @@ const TalkingHeadView = forwardRef<TalkingHeadHandle, TalkingHeadViewProps>(
             headRef.current = null;
             return;
           }
+
+          // HeadAudio requires its worklet processor registered on the
+          // same AudioContext that TalkingHead owns.
+          await head.audioCtx.audioWorklet.addModule(HEADAUDIO_WORKLET_URL);
+
+          const headAudio = new haMod.HeadAudio(head.audioCtx, {
+            processorOptions: {},
+            parameterData: {
+              // Slightly permissive VAD: LiveKit audio arriving at
+              // the browser tends to be attenuated after network jitter
+              // buffering; lower thresholds help the detector activate
+              // promptly on agent speech.
+              vadGateActiveDb: -45,
+              vadGateInactiveDb: -60,
+            },
+          });
+
+          await headAudio.loadModel(HEADAUDIO_MODEL_URL);
+          if (cancelled) {
+            return;
+          }
+
+          headAudio.onvalue = (key, value) => {
+            const target = head.mtAvatar[key];
+            if (!target) {
+              return;
+            }
+            target.newvalue = value;
+            target.needsUpdate = true;
+          };
+
+          // Drive the HeadAudio update tick from TalkingHead's animation
+          // loop; it consumes viseme events posted from the audio thread
+          // and applies easing before writing to mtAvatar.
+          head.opt.update = headAudio.update.bind(headAudio);
+
+          headAudioRef.current = headAudio;
           readyRef.current = true;
+
+          // If a track was queued while we were still loading, wire it
+          // up now.
+          const pending = pendingTrackRef.current;
+          pendingTrackRef.current = null;
+          if (pending) {
+            try {
+              const stream = new MediaStream([pending]);
+              const source = head.audioCtx.createMediaStreamSource(stream);
+              source.connect(headAudio);
+              sourceRef.current = source;
+            } catch (cause) {
+              console.warn(
+                "[talkinghead] failed to attach pending MediaStream",
+                cause,
+              );
+            }
+          }
+
           onReady?.();
         } catch (cause) {
           if (cancelled) {
@@ -119,7 +182,6 @@ const TalkingHeadView = forwardRef<TalkingHeadHandle, TalkingHeadViewProps>(
             cause instanceof Error
               ? cause.message
               : "TalkingHead.showAvatar failed";
-          setLoadError(message);
           onError?.(cause instanceof Error ? cause : new Error(message));
         }
       })();
@@ -127,51 +189,71 @@ const TalkingHeadView = forwardRef<TalkingHeadHandle, TalkingHeadViewProps>(
       return () => {
         cancelled = true;
         readyRef.current = false;
+        if (sourceRef.current) {
+          try {
+            sourceRef.current.disconnect();
+          } catch {
+            // ignore
+          }
+          sourceRef.current = null;
+        }
+        headAudioRef.current = null;
         const head = headRef.current;
         if (head) {
           try {
             head.stop();
           } catch {
-            // Ignore teardown errors — the instance may never have started.
+            // ignore teardown errors — instance may never have started
           }
         }
         headRef.current = null;
+        pendingTrackRef.current = null;
       };
     }, [body, glbUrl, onError, onReady]);
 
     useImperativeHandle(
       ref,
       () => ({
-        speakUtterance(audio, alignment) {
+        attachAudio(track) {
           const head = headRef.current;
-          if (!head || !readyRef.current) {
+          const headAudio = headAudioRef.current;
+          if (!head || !headAudio || !readyRef.current) {
+            pendingTrackRef.current = track;
             return;
           }
 
-          const payload: Parameters<typeof head.speakAudio>[0] = { audio };
-
-          if (alignment) {
-            const visemeTimeline = alignmentToVisemeTimeline(alignment);
-            const wordTimeline = alignmentToWordTimeline(alignment);
-            payload.visemes = visemeTimeline.visemes;
-            payload.vtimes = visemeTimeline.vtimes;
-            payload.vdurations = visemeTimeline.vdurations;
-            payload.words = wordTimeline.words;
-            payload.wtimes = wordTimeline.wtimes;
-            payload.wdurations = wordTimeline.wdurations;
+          // Tear down any previous source so we don't fan-in multiple
+          // tracks to the same HeadAudio node.
+          if (sourceRef.current) {
+            try {
+              sourceRef.current.disconnect();
+            } catch {
+              // ignore
+            }
+            sourceRef.current = null;
           }
 
-          head.speakAudio(payload);
-        },
-        interrupt() {
-          const head = headRef.current;
-          if (!head) {
-            return;
-          }
           try {
-            head.stopSpeaking();
-          } catch {
-            // stopSpeaking throws if nothing is queued; safe to ignore.
+            const stream = new MediaStream([track]);
+            const source = head.audioCtx.createMediaStreamSource(stream);
+            source.connect(headAudio);
+            sourceRef.current = source;
+          } catch (cause) {
+            console.warn(
+              "[talkinghead] createMediaStreamSource failed",
+              cause,
+            );
+          }
+        },
+        detachAudio() {
+          pendingTrackRef.current = null;
+          if (sourceRef.current) {
+            try {
+              sourceRef.current.disconnect();
+            } catch {
+              // ignore
+            }
+            sourceRef.current = null;
           }
         },
         isReady() {
@@ -188,11 +270,6 @@ const TalkingHeadView = forwardRef<TalkingHeadHandle, TalkingHeadViewProps>(
           className="h-full w-full"
           aria-label="Morgan 3D avatar"
         />
-        {loadError ? (
-          <div className="absolute inset-x-6 bottom-6 rounded-2xl border border-rose-400/30 bg-rose-950/80 px-4 py-3 text-sm text-rose-100">
-            {loadError}
-          </div>
-        ) : null}
       </div>
     );
   },

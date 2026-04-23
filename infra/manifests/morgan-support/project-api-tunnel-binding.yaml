@@ -16,10 +16,10 @@ tunnelRef:
   name: cto-main
 subjects:
   - kind: Service
-    name: openclaw-morgan
+    name: openclaw-morgan-project-api
     spec:
       fqdn: morgan-project-api.5dlabs.ai
       # Morgan is deployed into the `cto` namespace (see
       # gitops/applications/workloads/morgan-agent.yaml); the Service of
       # the same name exposes the project-api sidecar on port 8091.
-      target: http://openclaw-morgan.cto.svc:8091
+      target: http://openclaw-morgan-project-api.cto.svc:8091

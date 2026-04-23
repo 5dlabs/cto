@@ -6,11 +6,14 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "copy:headaudio": "mkdir -p public/headaudio && cp node_modules/@met4citizen/headaudio/dist/headworklet.min.mjs public/headaudio/ && cp node_modules/@met4citizen/headaudio/dist/model-en-mixed.bin public/headaudio/",
+    "postinstall": "npm run copy:headaudio"
   },
   "dependencies": {
     "@livekit/components-react": "^2.9.20",
     "@livekit/components-styles": "^1.2.0",
+    "@met4citizen/headaudio": "^0.1.0",
     "@met4citizen/talkinghead": "^1.7.0",
     "better-auth": "^1.2.0",
     "livekit-client": "^2.17.2",
