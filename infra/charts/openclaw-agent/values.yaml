@@ -336,6 +336,42 @@ codeServer:
     enabled: true
 
 # =============================================================================
+# Optional project-api sidecar (disabled by default)
+# =============================================================================
+# Bun HTTP service that surfaces the shared /workspace/repos PVC to the
+# cto-app UI and to Morgan's tool layer. Creates/clones repos, tracks the
+# "active project" pointer the agent reads on boot, and writes PRDs. See
+# cto/apps/project-api/README.md for the full endpoint surface.
+projectApi:
+  enabled: false
+  image:
+    repository: ghcr.io/5dlabs/project-api
+    tag: "latest"
+    pullPolicy: Always
+  # HTTP port inside the pod
+  port: 8091
+  # Service port exposed to cluster peers (defaults to port)
+  servicePort: 8091
+  # Filesystem layout on the shared workspace PVC
+  reposRoot: /workspace/repos
+  stateDir: /workspace/.openclaw
+  # GitHub namespace checked by POST /projects
+  githubOrg: "5dlabs"
+  # CORS origins allowed to call the API (comma-separated list or "*").
+  # Prefer explicit origins in production.
+  allowedOrigins: "*"
+  git:
+    commitName: "Morgan"
+    commitEmail: "morgan@5dlabs.ai"
+  resources:
+    requests:
+      cpu: "10m"
+      memory: "64Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# =============================================================================
 # Model Fallback Configuration
 # =============================================================================
 modelDefaults:

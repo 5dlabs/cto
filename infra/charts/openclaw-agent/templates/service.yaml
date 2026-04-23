@@ -30,5 +30,11 @@ spec:
       protocol: TCP
       name: code-server
     {{- end }}
+    {{- if .Values.projectApi.enabled }}
+    - port: {{ .Values.projectApi.servicePort | default .Values.projectApi.port }}
+      targetPort: project-api
+      protocol: TCP
+      name: project-api
+    {{- end }}
   selector:
     {{- include "openclaw-agent.selectorLabels" . | nindent 4 }}

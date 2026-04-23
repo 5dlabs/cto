@@ -1,0 +1,66 @@
+name: Project API - Build and Publish Docker Image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "apps/project-api/**"
+      - ".github/workflows/project-api-publish.yml"
+  pull_request:
+    paths:
+      - "apps/project-api/**"
+      - ".github/workflows/project-api-publish.yml"
+
+permissions:
+  contents: read
+  packages: write
+
+defaults:
+  run:
+    working-directory: apps/project-api
+
+jobs:
+  test:
+    name: Typecheck & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type-check
+        run: bun run typecheck
+
+      - name: Build
+        run: bun run build
+
+  publish-docker:
+    name: Publish Docker Image
+    needs: test
+    if: (github.ref == 'refs/heads/main' && github.event_name == 'push') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Read package version
+        id: version
+        working-directory: apps/project-api
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: ./.github/actions/docker-build-push
+        with:
+          image-name: project-api
+          context: apps/project-api
+          dockerfile: apps/project-api/Dockerfile
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ github.sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

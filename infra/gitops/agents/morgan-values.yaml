@@ -301,6 +301,26 @@ workspace:
       - CTO repo: `/workspace/repos/cto`
       - OpenClaw platform: `/workspace/repos/openclaw-platform`
       - OpenClaw core: `/workspace/repos/openclaw`
+      - All user projects live under `/workspace/repos/<slug>`.
+
+      ## Project API (pod-local sidecar)
+
+      Surfaces `/workspace/repos/` to the cto-app UI and to you. HTTP on
+      `http://localhost:8091`. Use it via `exec` + `curl`:
+
+      - `GET /projects` — list projects on disk
+      - `GET /projects/active` — current active project (pointer you
+        should read on boot to set `cwd`)
+      - `POST /projects/active {"name":"<slug>"}` — set active project
+      - `POST /projects {"name":"<slug>"}` — create project (clone from
+        github.com/5dlabs if present, else `git init`)
+      - `GET /projects/<slug>` — descriptor for one project
+      - `POST /projects/<slug>/prd {"content":"..."}` — write `prd.md`
+        at the repo root and commit as Morgan
+
+      The cto-app UI drives intake via framed chat turns of the form
+      `[project-event] created=<slug>` / `active=<slug>`. When you see
+      those, follow the `intake-prd-authoring` skill.
 
       ## Operating Principle
 
@@ -655,7 +675,7 @@ codeServer:
   enabled: true
   port: 8080
   password: ""
-  publicUrl: "https://morgan.5dlabs.ai"
+  publicUrl: "https://morgan-ide.5dlabs.ai"
   defaultFolder: "/workspace/repos/cto"
   quickTunnel:
     enabled: false
@@ -663,13 +683,38 @@ codeServer:
     secretName: "code-server-github-token"
     key: "token"
 
+# =============================================================================
+# Project API sidecar
+# =============================================================================
+# Surfaces /workspace/repos and the "active project" pointer to the cto-app
+# UI and to Morgan's tool layer. Fronted by cloudflared (see
+# infra/manifests/morgan-support/project-api-tunnel-binding.yaml) at
+# https://morgan-project-api.5dlabs.ai.
+projectApi:
+  enabled: true
+  image:
+    repository: ghcr.io/5dlabs/project-api
+    tag: "latest"
+    pullPolicy: Always
+  port: 8091
+  servicePort: 8091
+  reposRoot: /workspace/repos
+  stateDir: /workspace/.openclaw
+  githubOrg: "5dlabs"
+  # TODO(edge_kase): tighten to the concrete cto-app origins once the desktop
+  # app settles on a canonical public host.
+  allowedOrigins: "*"
+  git:
+    commitName: "Morgan"
+    commitEmail: "morgan@5dlabs.ai"
+
 cloudflare:
   tunnel:
     enabled: true
     quickTunnel: false
     tunnelId: "45061e50-c044-4395-b672-1b12197bf9e5"
     credentialsSecret: "cloudflared-tunnel-credentials"
-    hostname: "morgan.5dlabs.ai"
+    hostname: "morgan-ide.5dlabs.ai"
     targetPort: 8080
 
 ssh:

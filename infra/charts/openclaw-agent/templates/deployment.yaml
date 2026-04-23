@@ -1349,6 +1349,61 @@ spec:
               memory: 256Mi
         {{- end }}
         {{- end }}
+        {{- if .Values.projectApi.enabled }}
+        # ---------------------------------------------------------------
+        # project-api sidecar — HTTP surface for /workspace/repos and the
+        # "active project" pointer. Reads/writes the same PVC the agent
+        # container mounts at /workspace, so changes are immediately
+        # visible to the agent (and vice versa) without IPC.
+        # ---------------------------------------------------------------
+        - name: project-api
+          image: "{{ .Values.projectApi.image.repository }}:{{ .Values.projectApi.image.tag }}"
+          imagePullPolicy: {{ .Values.projectApi.image.pullPolicy }}
+          env:
+            - name: PORT
+              value: {{ .Values.projectApi.port | quote }}
+            - name: REPOS_ROOT
+              value: {{ .Values.projectApi.reposRoot | quote }}
+            - name: STATE_DIR
+              value: {{ .Values.projectApi.stateDir | quote }}
+            - name: GITHUB_ORG
+              value: {{ .Values.projectApi.githubOrg | quote }}
+            - name: ALLOWED_ORIGINS
+              value: {{ .Values.projectApi.allowedOrigins | quote }}
+            - name: GIT_COMMIT_NAME
+              value: {{ .Values.projectApi.git.commitName | quote }}
+            - name: GIT_COMMIT_EMAIL
+              value: {{ .Values.projectApi.git.commitEmail | quote }}
+            # Reuse the same GitHub PAT that powers agent-side clones/pushes
+            # so `/projects` can hit private repos under the configured org.
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: github-pat
+                  optional: true
+          ports:
+            - name: project-api
+              containerPort: {{ .Values.projectApi.port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: project-api
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: project-api
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.projectApi.resources | nindent 12 }}
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+        {{- end }}
         {{- if .Values.narrator.enabled }}
         {{- if .Values.narrator.musetalk.enabled }}
         - name: narrator-musetalk

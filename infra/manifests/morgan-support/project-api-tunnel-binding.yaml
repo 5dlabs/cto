@@ -1,0 +1,25 @@
+---
+# Cloudflare TunnelBinding — routes Morgan's project-api sidecar to the
+# public hostname the cto-app UI points at by default.
+#
+# Pairs with the `project-api` container defined in the openclaw-agent
+# Helm chart (templates/deployment.yaml, gated on Values.projectApi.enabled)
+# and the `project-api` service port exposed on the shared openclaw-morgan
+# Service (templates/service.yaml).
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: morgan-project-api
+  namespace: cto
+tunnelRef:
+  kind: ClusterTunnel
+  name: cto-main
+subjects:
+  - kind: Service
+    name: openclaw-morgan
+    spec:
+      fqdn: morgan-project-api.5dlabs.ai
+      # Morgan is deployed into the `cto` namespace (see
+      # gitops/applications/workloads/morgan-agent.yaml); the Service of
+      # the same name exposes the project-api sidecar on port 8091.
+      target: http://openclaw-morgan.cto.svc:8091
