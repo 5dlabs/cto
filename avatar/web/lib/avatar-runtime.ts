@@ -1,4 +1,5 @@
 import { createEmptyAvatarState, deriveGestureScaffold, deriveVisemeScaffold, type AvatarCueSource, type AvatarRuntimeAdapter, type AvatarRuntimeInput, type AvatarRuntimeKind, type AvatarStatePayload, type AvatarVoiceState, type AvatarConnectionState, type VoiceBridgeFrame } from "@/lib/avatar-state";
+import { ElevenLabsAlignmentAdapter } from "@/lib/runtimes/elevenlabs-alignment";
 
 function normalizeVoiceState(state: string): AvatarVoiceState {
   if (
@@ -22,6 +23,8 @@ export function pickAvatarAdapter(
   kind: string | undefined = process.env.NEXT_PUBLIC_AVATAR_RUNTIME,
 ): AvatarRuntimeAdapter {
   switch (kind) {
+    case "elevenlabs-alignment":
+      return new ElevenLabsAlignmentAdapter();
     case "derived-text":
       return new DerivedTextAdapter();
     case "deterministic":

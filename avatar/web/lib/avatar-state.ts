@@ -3,7 +3,11 @@ export const AVATAR_STATE_PROTOCOL = "cto-avatar-state/v1" as const;
 export type AvatarConnectionState = "idle" | "connecting" | "connected" | "error";
 export type AvatarVoiceState = "idle" | "connecting" | "listening" | "speaking" | "error";
 export type AvatarRuntimeKind = "deterministic-fallback" | "remote-video" | "talkinghead";
-export type AvatarCueSource = "none" | "derived-text" | "elevenlabs-alignment" | "ovrlipsync-wasm";
+export type AvatarCueSource =
+  | "none"
+  | "derived-text"
+  | "elevenlabs-alignment"
+  | "ovrlipsync-wasm";
 
 export type OvrLipSyncViseme =
   | "sil"
@@ -47,7 +51,15 @@ export type VoiceBridgeFrame =
   | { type: "reply_delta"; text: string; agent: string }
   | { type: "reply_text"; text: string; agent: string }
   | { type: "turn_done"; agent: string }
-  | { type: "error"; error: string };
+  | { type: "error"; error: string }
+  | {
+      type: "alignment";
+      atMs: number;
+      chars: string[];
+      char_start_ms: number[];
+      char_end_ms: number[];
+      agent: string;
+    };
 
 export type AvatarStatePayload = {
   protocol: typeof AVATAR_STATE_PROTOCOL;
