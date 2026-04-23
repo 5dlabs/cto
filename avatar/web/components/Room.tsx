@@ -11,12 +11,12 @@ import {
   useVoiceAssistant,
 } from "@livekit/components-react";
 import AvatarRuntimeSurface from "@/components/AvatarRuntimeSurface";
+import { pickAvatarAdapter } from "@/lib/avatar-runtime";
 import {
-  createEmptyAvatarState,
-  deriveGestureScaffold,
-  deriveVisemeScaffold,
+  type AvatarRuntimeAdapter,
+  type AvatarRuntimeInput,
   type AvatarStatePayload,
-  type AvatarVoiceState,
+  type VoiceBridgeFrame,
 } from "@/lib/avatar-state";
 import { Track } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -39,7 +39,7 @@ type AgentTelemetryProps = {
   roomConnectedAt: number | null;
 };
 
-type HostAvatarState = AvatarStatePayload;
+
 
 function formatLatency(ms: number | null): string {
   if (ms === null) {
@@ -49,7 +49,7 @@ function formatLatency(ms: number | null): string {
   return `${Math.round(ms)} ms`;
 }
 
-function emitHostAvatarState(payload: HostAvatarState) {
+function emitHostAvatarState(payload: AvatarStatePayload) {
   if (typeof window === "undefined" || window.parent === window) {
     return;
   }
@@ -61,20 +61,6 @@ function emitHostAvatarState(payload: HostAvatarState) {
     },
     "*",
   );
-}
-
-function normalizeVoiceState(state: string): AvatarVoiceState {
-  if (
-    state === "idle" ||
-    state === "connecting" ||
-    state === "listening" ||
-    state === "speaking" ||
-    state === "error"
-  ) {
-    return state;
-  }
-
-  return "idle";
 }
 
 function StatusPill({
@@ -281,46 +267,50 @@ function AgentTelemetry({
     videoReadyAt,
   ]);
 
-  const avatarState = useMemo<AvatarStatePayload>(() => {
-    const voiceState = normalizeVoiceState(String(state));
-    return {
-      connectionState: "connected",
-      voiceState,
-      runtime: {
-        kind: videoTrack ? "remote-video" : "deterministic-fallback",
-        ready: Boolean(videoTrack) || Boolean(audioTrack),
-        fallbackActive: !videoTrack,
-      },
-      transcript: {
+  const adapter = useMemo<AvatarRuntimeAdapter>(
+    () => pickAvatarAdapter(process.env.NEXT_PUBLIC_AVATAR_RUNTIME),
+    [],
+  );
+
+  const runtimeInput = useMemo<AvatarRuntimeInput>(
+    () => ({
+      lk: {
+        state,
+        audioTrack,
+        videoTrack,
         latestUserText,
         latestAgentText: latestTranscript,
-      },
-      media: {
-        audioTrackReady: Boolean(audioTrack),
-        videoTrackReady: Boolean(videoTrack),
-      },
-      cues: {
-        visemes: deriveVisemeScaffold(latestTranscript, voiceState),
-        gestures: deriveGestureScaffold(voiceState),
-      },
-      room: {
         roomName: room.name || undefined,
         identity: room.localParticipant.identity || undefined,
       },
-      metrics,
-      trackDebug,
-    };
-  }, [
-    audioTrack,
-    latestTranscript,
-    latestUserText,
-    metrics,
-    room.localParticipant.identity,
-    room.name,
-    state,
-    trackDebug,
-    videoTrack,
-  ]);
+      timing: {
+        connectionRequestedAt,
+        roomConnectedAt,
+        audioReadyAt,
+        videoReadyAt,
+        speakingAt,
+      },
+    }),
+    [
+      audioTrack,
+      connectionRequestedAt,
+      latestTranscript,
+      latestUserText,
+      room.localParticipant.identity,
+      room.name,
+      roomConnectedAt,
+      speakingAt,
+      state,
+      videoTrack,
+      videoReadyAt,
+      audioReadyAt,
+    ],
+  );
+
+  const avatarState = useMemo<AvatarStatePayload>(
+    () => adapter.project(runtimeInput),
+    [adapter, runtimeInput],
+  );
 
   useEffect(() => {
     emitHostAvatarState(avatarState);
@@ -598,25 +588,34 @@ export default function Room({
     [failEmbeddedMedia],
   );
 
+  const adapter = useMemo<AvatarRuntimeAdapter>(
+    () => pickAvatarAdapter(process.env.NEXT_PUBLIC_AVATAR_RUNTIME),
+    [],
+  );
+
   useEffect(() => {
-    const nextState = createEmptyAvatarState();
-    nextState.connectionState = error
-      ? "error"
-      : connection
-        ? "connected"
-        : connectionRequestedAt !== null
-          ? "connecting"
-          : "idle";
-    nextState.voiceState = error ? "error" : connection ? "connecting" : "idle";
-    nextState.room = {
-      roomName: connection?.roomName,
-      identity: connection?.identity,
-    };
-    nextState.error = error ?? undefined;
-    nextState.runtime.ready = Boolean(connection);
-    nextState.cues.gestures = deriveGestureScaffold(nextState.voiceState);
-    emitHostAvatarState(nextState);
-  }, [connection, connectionRequestedAt, error]);
+    emitHostAvatarState(
+      adapter.project({
+        lk: {
+          state: error ? "error" : connection ? "connected" : "idle",
+          audioTrack: null,
+          videoTrack: null,
+          latestUserText: "",
+          latestAgentText: "",
+          roomName: connection?.roomName,
+          identity: connection?.identity,
+        },
+        timing: {
+          connectionRequestedAt,
+          roomConnectedAt: null,
+          audioReadyAt: null,
+          videoReadyAt: null,
+          speakingAt: null,
+        },
+        error: error ?? undefined,
+      }),
+    );
+  }, [adapter, connection, connectionRequestedAt, error]);
 
   useEffect(() => {
     if (

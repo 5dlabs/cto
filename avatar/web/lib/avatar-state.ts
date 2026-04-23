@@ -1,10 +1,31 @@
+export const AVATAR_STATE_PROTOCOL = "cto-avatar-state/v1" as const;
+
 export type AvatarConnectionState = "idle" | "connecting" | "connected" | "error";
 export type AvatarVoiceState = "idle" | "connecting" | "listening" | "speaking" | "error";
 export type AvatarRuntimeKind = "deterministic-fallback" | "remote-video" | "talkinghead";
+export type AvatarCueSource = "none" | "derived-text" | "elevenlabs-alignment" | "ovrlipsync-wasm";
+
+export type OvrLipSyncViseme =
+  | "sil"
+  | "PP"
+  | "FF"
+  | "TH"
+  | "DD"
+  | "kk"
+  | "CH"
+  | "SS"
+  | "nn"
+  | "RR"
+  | "aa"
+  | "E"
+  | "I"
+  | "O"
+  | "U";
 
 export type AvatarVisemeCue = {
   atMs: number;
-  value: string;
+  durationMs?: number;
+  value: OvrLipSyncViseme;
   weight?: number;
 };
 
@@ -13,13 +34,30 @@ export type AvatarGestureCue = {
   intensity?: number;
 };
 
+export type AvatarUtterance = {
+  id: string;
+  startedAtMs: number;
+  text: string;
+  isFinal: boolean;
+};
+
+export type VoiceBridgeFrame =
+  | { type: "started"; session_id: string; agent: string }
+  | { type: "transcript"; text: string; agent: string }
+  | { type: "reply_delta"; text: string; agent: string }
+  | { type: "reply_text"; text: string; agent: string }
+  | { type: "turn_done"; agent: string }
+  | { type: "error"; error: string };
+
 export type AvatarStatePayload = {
+  protocol: typeof AVATAR_STATE_PROTOCOL;
   connectionState: AvatarConnectionState;
   voiceState: AvatarVoiceState;
   runtime: {
     kind: AvatarRuntimeKind;
     ready: boolean;
     fallbackActive: boolean;
+    cueSource: AvatarCueSource;
   };
   transcript: {
     latestUserText: string;
@@ -29,6 +67,7 @@ export type AvatarStatePayload = {
     audioTrackReady: boolean;
     videoTrackReady: boolean;
   };
+  utterance?: AvatarUtterance;
   cues: {
     visemes: AvatarVisemeCue[];
     gestures: AvatarGestureCue[];
@@ -42,14 +81,46 @@ export type AvatarStatePayload = {
   trackDebug?: Record<string, unknown>;
 };
 
+export type AvatarRuntimeInput = {
+  lk: {
+    state: string;
+    audioTrack: unknown | null;
+    videoTrack: unknown | null;
+    latestUserText: string;
+    latestAgentText: string;
+    roomName?: string;
+    identity?: string;
+  };
+  timing: {
+    connectionRequestedAt: number | null;
+    roomConnectedAt: number | null;
+    audioReadyAt: number | null;
+    videoReadyAt: number | null;
+    speakingAt: number | null;
+  };
+  utterance?: AvatarUtterance;
+  error?: string;
+};
+
+export interface AvatarRuntimeAdapter {
+  readonly kind: AvatarRuntimeKind;
+  readonly cueSource: AvatarCueSource;
+
+  project(input: AvatarRuntimeInput): AvatarStatePayload;
+
+  ingestBridgeFrame?(frame: VoiceBridgeFrame): void;
+}
+
 export function createEmptyAvatarState(): AvatarStatePayload {
   return {
+    protocol: AVATAR_STATE_PROTOCOL,
     connectionState: "idle",
     voiceState: "idle",
     runtime: {
       kind: "deterministic-fallback",
       ready: false,
       fallbackActive: true,
+      cueSource: "none",
     },
     transcript: {
       latestUserText: "",
@@ -66,20 +137,43 @@ export function createEmptyAvatarState(): AvatarStatePayload {
   };
 }
 
+const VISAME_MAP: Record<string, OvrLipSyncViseme> = {
+  a: "aa",
+  e: "E",
+  i: "I",
+  o: "O",
+  u: "U",
+  p: "PP",
+  b: "PP",
+  m: "PP",
+  f: "FF",
+  v: "FF",
+  t: "TH",
+  d: "DD",
+  k: "kk",
+  g: "kk",
+  s: "SS",
+  z: "SS",
+  n: "nn",
+  l: "nn",
+  r: "RR",
+  ch: "CH",
+  sh: "CH",
+};
+
 export function deriveVisemeScaffold(text: string, voiceState: AvatarVoiceState): AvatarVisemeCue[] {
   if (voiceState !== "speaking" || !text.trim()) {
     return [];
   }
 
-  return text
-    .trim()
-    .slice(0, 8)
-    .split("")
+  const chars = text.trim().split("");
+  return chars
     .map((char, index) => ({
       atMs: index * 120,
-      value: /[aeiou]/i.test(char) ? "open" : /[bmp]/i.test(char) ? "closed" : "mid",
-      weight: 0.55,
-    }));
+      value: (VISAME_MAP[char.toLowerCase()] ?? "sil") as OvrLipSyncViseme,
+      weight: /[aeiou]/i.test(char) ? 0.85 : 0.55,
+    }))
+    .filter((cue, idx, arr) => idx === 0 || cue.value !== arr[idx - 1].value);
 }
 
 export function deriveGestureScaffold(voiceState: AvatarVoiceState): AvatarGestureCue[] {
