@@ -6,12 +6,18 @@ import {
   AudioTrack,
   LiveKitRoom,
   TrackToggle,
-  VideoTrack,
   useRoomContext,
   useTranscriptions,
   useVoiceAssistant,
 } from "@livekit/components-react";
-import DeterministicAvatar from "@/components/DeterministicAvatar";
+import AvatarRuntimeSurface from "@/components/AvatarRuntimeSurface";
+import {
+  createEmptyAvatarState,
+  deriveGestureScaffold,
+  deriveVisemeScaffold,
+  type AvatarStatePayload,
+  type AvatarVoiceState,
+} from "@/lib/avatar-state";
 import { Track } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -33,19 +39,7 @@ type AgentTelemetryProps = {
   roomConnectedAt: number | null;
 };
 
-type HostAvatarState = {
-  connectionState: "idle" | "connecting" | "connected" | "error";
-  voiceState: string;
-  latestUserText: string;
-  latestAgentText: string;
-  audioTrackReady: boolean;
-  videoTrackReady: boolean;
-  roomName?: string;
-  identity?: string;
-  error?: string;
-  metrics?: Record<string, unknown>;
-  trackDebug?: Record<string, unknown>;
-};
+type HostAvatarState = AvatarStatePayload;
 
 function formatLatency(ms: number | null): string {
   if (ms === null) {
@@ -67,6 +61,20 @@ function emitHostAvatarState(payload: HostAvatarState) {
     },
     "*",
   );
+}
+
+function normalizeVoiceState(state: string): AvatarVoiceState {
+  if (
+    state === "idle" ||
+    state === "connecting" ||
+    state === "listening" ||
+    state === "speaking" ||
+    state === "error"
+  ) {
+    return state;
+  }
+
+  return "idle";
 }
 
 function StatusPill({
@@ -273,19 +281,35 @@ function AgentTelemetry({
     videoReadyAt,
   ]);
 
-  useEffect(() => {
-    emitHostAvatarState({
+  const avatarState = useMemo<AvatarStatePayload>(() => {
+    const voiceState = normalizeVoiceState(String(state));
+    return {
       connectionState: "connected",
-      voiceState: String(state),
-      latestUserText,
-      latestAgentText: latestTranscript,
-      audioTrackReady: Boolean(audioTrack),
-      videoTrackReady: Boolean(videoTrack),
-      roomName: room.name || undefined,
-      identity: room.localParticipant.identity || undefined,
+      voiceState,
+      runtime: {
+        kind: videoTrack ? "remote-video" : "deterministic-fallback",
+        ready: Boolean(videoTrack) || Boolean(audioTrack),
+        fallbackActive: !videoTrack,
+      },
+      transcript: {
+        latestUserText,
+        latestAgentText: latestTranscript,
+      },
+      media: {
+        audioTrackReady: Boolean(audioTrack),
+        videoTrackReady: Boolean(videoTrack),
+      },
+      cues: {
+        visemes: deriveVisemeScaffold(latestTranscript, voiceState),
+        gestures: deriveGestureScaffold(voiceState),
+      },
+      room: {
+        roomName: room.name || undefined,
+        identity: room.localParticipant.identity || undefined,
+      },
       metrics,
       trackDebug,
-    });
+    };
   }, [
     audioTrack,
     latestTranscript,
@@ -297,6 +321,10 @@ function AgentTelemetry({
     trackDebug,
     videoTrack,
   ]);
+
+  useEffect(() => {
+    emitHostAvatarState(avatarState);
+  }, [avatarState]);
 
   if (compact) {
     return (
@@ -345,20 +373,7 @@ function AgentTelemetry({
           </div>
 
           <div className="aspect-[10/13] w-full bg-linear-to-b from-slate-900 via-slate-950 to-black">
-            {videoTrack ? (
-              <VideoTrack trackRef={videoTrack} className="h-full w-full object-cover" />
-            ) : (
-              <DeterministicAvatar
-                compact
-                voiceState={
-                  state === "speaking" || state === "listening" || state === "connecting"
-                    ? state
-                    : "idle"
-                }
-                latestUserText={latestUserText}
-                latestAgentText={latestTranscript}
-              />
-            )}
+            <AvatarRuntimeSurface compact state={avatarState} videoTrack={videoTrack} />
           </div>
         </div>
       </section>
@@ -369,19 +384,7 @@ function AgentTelemetry({
     <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 shadow-2xl shadow-black/25">
         <div className="aspect-[9/14] w-full bg-linear-to-b from-slate-900 via-slate-950 to-black">
-          {videoTrack ? (
-            <VideoTrack trackRef={videoTrack} className="h-full w-full object-cover" />
-          ) : (
-            <DeterministicAvatar
-              voiceState={
-                state === "speaking" || state === "listening" || state === "connecting"
-                  ? state
-                  : "idle"
-              }
-              latestUserText={latestUserText}
-              latestAgentText={latestTranscript}
-            />
-          )}
+          <AvatarRuntimeSurface state={avatarState} videoTrack={videoTrack} />
         </div>
       </div>
 
@@ -596,23 +599,23 @@ export default function Room({
   );
 
   useEffect(() => {
-    emitHostAvatarState({
-      connectionState: error
-        ? "error"
-        : connection
-          ? "connected"
-          : connectionRequestedAt !== null
-            ? "connecting"
-            : "idle",
-      voiceState: connection ? "connecting" : "idle",
-      latestUserText: "",
-      latestAgentText: "",
-      audioTrackReady: false,
-      videoTrackReady: false,
+    const nextState = createEmptyAvatarState();
+    nextState.connectionState = error
+      ? "error"
+      : connection
+        ? "connected"
+        : connectionRequestedAt !== null
+          ? "connecting"
+          : "idle";
+    nextState.voiceState = error ? "error" : connection ? "connecting" : "idle";
+    nextState.room = {
       roomName: connection?.roomName,
       identity: connection?.identity,
-      error: error ?? undefined,
-    });
+    };
+    nextState.error = error ?? undefined;
+    nextState.runtime.ready = Boolean(connection);
+    nextState.cues.gestures = deriveGestureScaffold(nextState.voiceState);
+    emitHostAvatarState(nextState);
   }, [connection, connectionRequestedAt, error]);
 
   useEffect(() => {
