@@ -3,6 +3,18 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.81](https://github.com/5dlabs/cto/compare/v0.2.80...v0.2.81) (2026-04-23)
+
+
+### ✨ Features
+
+* **avatar:** Phase 2 — voice-bridge frame ingestion + ElevenLabs alignment ([#4787](https://github.com/5dlabs/cto/issues/4787)) ([a1f0991](https://github.com/5dlabs/cto/commit/a1f099122df6ed2849da7f8f13e22ce58b1016fb))
+
+
+### 📚 Documentation
+
+* **avatar:** add Morgan image generation sample sets ([552e627](https://github.com/5dlabs/cto/commit/552e6275e49faa38eadf7c139962be3240e72888))
+
 ## [0.2.80](https://github.com/5dlabs/cto/compare/v0.2.79...v0.2.80) (2026-04-22)
 
 
