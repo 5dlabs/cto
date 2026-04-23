@@ -99,6 +99,20 @@ This makes the avatar layer behave more like a game/VTuber runtime than a diffus
 - **CI validation**: headless `gltf-validator` + visual diff on PR
 - **Tauri custom protocol**: use `asset://` not `file://` to bypass CSP issues and enable streaming
 
+### Tauri/browser integration specifics
+
+- **Renderer choice:** Three.js + `three-vrm` or Babylon.js; **avoid Unity/Unreal WebGL builds** in Tauri (50+ MB runtime, WebGL2 quirks on macOS WKWebView)
+- **WKWebView (macOS Tauri):** no WebGPU until macOS 14+ stable; WebGL2 only — plan shader complexity accordingly. KTX2 transcoding via Basis WASM works but adds ~500 KB
+- **Linux WebKitGTK:** WebGL2 conformance gaps (especially NVIDIA proprietary drivers); test on Ubuntu 22.04 + Fedora; provide canvas2D fallback message, not broken render
+- **Asset loading:** Tauri `asset://` protocol required for local `.glb` (CSP blocks `file://`); whitelist scope in `tauri.conf.json`; stream large assets via `tauri::api::http` rather than embedding in bundle (keeps installer <30 MB)
+- **WASM size budget:** Draco + Basis + physics ≈ 1.5 MB WASM cold start; lazy-load post-window-paint to keep TTI <2 s
+- **Offscreen canvas:** WKWebView lacks `OffscreenCanvas` in workers — main-thread render only on macOS; budget frame time accordingly (target 16 ms with headroom)
+- **Audio sync drift:** `AudioContext.currentTime` vs `requestAnimationFrame` clock drift causes viseme desync >50 ms; drive blendshape timeline from audio clock, not RAF
+- **Memory pressure:** Tauri webview shares process memory with Rust side; one 25 MB `.glb` decoded ≈ 150 MB GPU+CPU. Cap loaded avatars at 1 active + 1 preloaded; explicit `dispose()` on swap
+- **Codesigning/notarization:** large WASM blobs trigger longer macOS notarization; pre-compile and ship as separate sidecar resource, not embedded in main binary
+- **Hot-reload of avatars:** Three.js GPU resource leaks on `.glb` swap — wrap in disposal helper; leak detector in dev builds
+- **CSP:** `wasm-unsafe-eval` required for Basis transcoder; document and scope tightly to avatar origin only
+
 ## Primary component choices
 
 ### Media transport
@@ -127,32 +141,39 @@ This makes the avatar layer behave more like a game/VTuber runtime than a diffus
   - **MotionEngine** for richer gesture semantics when useful
 
 ### Asset format and pipeline
-- **Source format:** **glTF 2.0 (.glb)** — single-file, PBR-native, broad WebGL support
-- **Authoring flow:** DCC (Blender) → FBX/USD intermediate → glTF with KHR extensions (`KHR_materials_*`, `KHR_mesh_quantization`, `KHR_texture_basisu`)
+- **Source format:** **glTF 2.0 (.glb)** — single-file, PBR-native, broad WebGL support; reject FBX at runtime boundary (license + bloat)
+- **Authoring flow:** DCC (Blender) → FBX/USD intermediate → glTF with KHR extensions (`KHR_draco_mesh_compression`, `KHR_materials_*`, `KHR_mesh_quantization`, `KHR_texture_basisu`)
 - **Texture budget:** KTX2 + BasisU (UASTC for normals, ETC1S for albedo) — 5–10× smaller than PNG, GPU-decoded
-- **LODs:** 3 levels via gltfpack/meshopt; critical for browser memory ceilings (~2 GB practical cap)
-- **Versioning:** content-addressed blobs behind manifest; Tauri cache + browser ServiceWorker share strategy
-- **CI:** headless `gltf-validator` + visual diff (Playwright + WebGL screenshot) on PR
+- **LODs:** 3 levels per character — LOD0 ~30k tris (head-focused), LOD1 ~12k, LOD2 ~5k; auto-generate via `gltfpack`/`meshoptimizer` in CI
+- **Texture budget per asset:** 2K base color / 1K normal+ORM per region (head, body, hair); atlas where possible; enforce **≤25 MB per character `.glb`** post-compression
+- **Versioning:** content-addressed storage (CID) for `.glb` + manifest (`avatar.json`) declaring rig type, blendshape set, LOD map, and license
+- **CI validation gate:** headless `gltf-validator` + custom linter checking bone names, blendshape names, UV channels, material count; fail PR on schema drift
+- **Visual diff:** Playwright + WebGL screenshot on PR for regression detection
 - **VRM compatibility:** keep as later extension if useful for ecosystem
 
 ### Rig and blendshape requirements
 - **Skeleton standard:** VRM 1.0 (humanoid-bone-mapped) or Mixamo/Unity Humanoid rig
-- **Bone count:** cap at ~60–80 bones for browser; cloth/hair via spring-bone constraints, not extra skinned bones
+- **Bone naming contract:** Mixamo/VRM-compatible humanoid base (Hips, Spine, Spine1, Spine2, Neck, Head + standard arms/legs); **≤80 bones** for mobile/Tauri perf
+- **Naming enforcement:** lowerCamelCase ARKit names exactly (`browInnerUp`, not `Brow_Inner_Up`); validate in CI
 - **Blendshapes (morph targets):**
-  - **ARKit 52-shape standard** for facial — guarantees compat with iPhone face capture, Live Link Face, MediaPipe FaceLandmarker, NVIDIA Audio2Face
-  - **Oculus visemes (15)** or **Preston Blair (10)** for lipsync from TTS/Whisper phonemes
+  - **ARKit 52-shape standard (mandatory):** full ARKit shape set so any audio-driven viseme/emotion model (Audio2Face, NVIDIA ACE, Resemble, custom) is plug-in compatible
+  - **Oculus visemes (15):** sil, PP, FF, TH, DD, kk, CH, SS, nn, RR, aa, E, I, O, U — pipeline converts between systems
   - Keep morph target count ≤ 60 active per draw call (WebGL2 attribute limit)
+- **Eye rig:** dedicated `LeftEye`/`RightEye` bones (not blendshape-only) for gaze IK + saccades; jaw bone separate from `jawOpen` blendshape (additive layering)
+- **Tongue:** at least 3 tongue blendshapes (`tongueOut`, `tongueUp`, `tongueCurl`) — frequently missing in cheap assets, blocks realistic dental visemes
 - **Inverse kinematics:** two-bone IK at runtime (Three.js `CCDIKSolver` / Babylon `IKController`); don't bake
+- **Bone count cap:** ≤60–80 bones; cloth/hair via spring-bone constraints, not extra skinned bones
 
 ### Humanoid ↔ animal compatibility
-- **Retarget layer is mandatory** — animal rigs (digitigrade legs, tails, extra spines, muzzle) break humanoid-only animation libraries
-- **Strategy:**
-  - Define an **abstract bone map** (Hips, Spine[n], Head, Limb_FL/FR/BL/BR, Tail[n]) — superset of VRM humanoid
-  - Store animations in **bone-agnostic format** (pose deltas keyed by semantic role, not bone name)
-  - Animals use a **reduced + extended ARKit set** (drop brow shapes that need eyebrows, add ear/whisker/muzzle morphs)
-  - Per-species blendshape manifest
-- **Quadruped gait:** procedural foot-placement (raycast IK) is more compatible than baked clips
+- **Shared rig spec:** define an "anthro humanoid" profile — quadruped-derived characters must be re-rigged to bipedal Mixamo skeleton; tail/ears/wings as **extension bones** under a `aux_*` namespace the runtime can ignore safely
+- **Muzzle/snout problem:** ARKit blendshapes assume flat human face; for muzzled species, author **dual blendshape sets**:
+  - `arkit_*` (semantic, retargetable) — driven by lip-sync model
+  - `species_*` (corrective deltas applied additively) — mask jaw/lip geometry for animal faces
+- **Ear/tail secondary motion:** runtime jiggle physics (spring bones, VRM `SpringBone` style) rather than baked anim, so it composes with body anim
+- **Retargeting:** all animation clips authored on a single reference rig; runtime retargets to species rig via bone-name map. Avoid per-character anim libraries
+- **Proportions:** non-human limb-length ratios break IK; ship per-character IK calibration in `avatar.json` (shoulder width, arm length, eye offset)
 - **Risk:** single "universal" rig is a trap — ship **rig families** (biped-human, biped-anthro, quadruped-mammal, quadruped-avian) with shared semantic interface
+- **Quadruped gait:** procedural foot-placement (raycast IK) is more compatible than baked clips; one system serves both bipeds and quadrupeds
 
 ### Client targets
 - browser
