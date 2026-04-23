@@ -15,6 +15,12 @@ from starlette.websockets import WebSocketState
 
 from .agent_client import MorganAgentClient
 from .elevenlabs_client import ElevenLabsClient
+from .session_errors import (
+    AUTH_FAILED,
+    STT_FAILED,
+    TTS_FAILED,
+    emit_error_frame,
+)
 from .voice_agents import AgentSpec, get_agent
 
 log = logging.getLogger("voice-bridge")
@@ -69,7 +75,14 @@ async def voice_ws(ws: WebSocket) -> None:
 
     if not _is_authorized(ws):
         await ws.accept()
+        # Legacy ad-hoc error frame (back-compat) + structured ERROR frame.
         await ws.send_json({"type": "error", "error": "unauthorized"})
+        await emit_error_frame(
+            ws,
+            session_id=None,
+            code=AUTH_FAILED,
+            message="unauthorized",
+        )
         await ws.close(code=4401, reason="unauthorized")
         return
 
@@ -185,11 +198,22 @@ async def _handle_turn(
     if audio_chunks:
         content_type = os.environ.get("VOICE_BRIDGE_AUDIO_MIME", "audio/webm")
         filename = os.environ.get("VOICE_BRIDGE_AUDIO_NAME", "turn.webm")
-        transcript = await _BASE_TTS.transcribe(
-            b"".join(audio_chunks),
-            content_type=content_type,
-            filename=filename,
-        )
+        try:
+            transcript = await _BASE_TTS.transcribe(
+                b"".join(audio_chunks),
+                content_type=content_type,
+                filename=filename,
+            )
+        except Exception as exc:  # noqa: BLE001 — surface as ERROR frame
+            log.warning("STT transcription failed: %s", exc)
+            await ws.send_json({"type": "error", "error": "stt_failed"})
+            await emit_error_frame(
+                ws,
+                session_id=session_id,
+                code=STT_FAILED,
+                message=str(exc) or "stt_failed",
+            )
+            return
     user_text = "\n".join(part for part in (transcript, text_addendum) if part).strip()
     if not user_text:
         await ws.send_json({"type": "error", "error": "empty_utterance"})
@@ -210,42 +234,62 @@ async def _handle_turn(
     tts_bytes = 0
 
     if _ALIGNMENT_ENABLED:
-        async for frame in tts_client.stream_tts_with_timestamps(full_reply):
-            audio_b64 = frame.get("audio_base64", "")
-            if audio_b64:
-                try:
-                    mp3_bytes = base64.b64decode(audio_b64)
-                except (ValueError, TypeError):
-                    log.warning("skipping malformed audio_base64 frame")
-                    mp3_bytes = b""
-                if mp3_bytes:
-                    # Send decoded MP3 on the binary channel so the client
-                    # can feed AudioContext.decodeAudioData() directly.
-                    await ws.send_bytes(mp3_bytes)
-                    tts_bytes += len(mp3_bytes)
-            alignment = frame.get("alignment")
-            if alignment:
-                # ElevenLabs returns per-character timings that cover the
-                # characters being spoken in this audio chunk, not the full
-                # reply — align the chars array accordingly so the client
-                # gets a one-to-one map.
-                char_start_s = alignment.get("character_start_times_seconds", [])
-                char_end_s = alignment.get("character_end_times_seconds", [])
-                align_chars = alignment.get("characters")
-                if align_chars is None:
-                    align_chars = list(full_reply)[: len(char_start_s)]
-                await ws.send_json({
-                    "type": "alignment",
-                    "atMs": round(alignment.get("audio_start_seconds", 0) * 1000),
-                    "chars": list(align_chars),
-                    "char_start_ms": [round(t * 1000) for t in char_start_s],
-                    "char_end_ms": [round(t * 1000) for t in char_end_s],
-                    "agent": agent_spec.name,
-                })
+        try:
+            async for frame in tts_client.stream_tts_with_timestamps(full_reply):
+                audio_b64 = frame.get("audio_base64", "")
+                if audio_b64:
+                    try:
+                        mp3_bytes = base64.b64decode(audio_b64)
+                    except (ValueError, TypeError):
+                        log.warning("skipping malformed audio_base64 frame")
+                        mp3_bytes = b""
+                    if mp3_bytes:
+                        # Send decoded MP3 on the binary channel so the client
+                        # can feed AudioContext.decodeAudioData() directly.
+                        await ws.send_bytes(mp3_bytes)
+                        tts_bytes += len(mp3_bytes)
+                alignment = frame.get("alignment")
+                if alignment:
+                    # ElevenLabs returns per-character timings that cover the
+                    # characters being spoken in this audio chunk, not the full
+                    # reply — align the chars array accordingly so the client
+                    # gets a one-to-one map.
+                    char_start_s = alignment.get("character_start_times_seconds", [])
+                    char_end_s = alignment.get("character_end_times_seconds", [])
+                    align_chars = alignment.get("characters")
+                    if align_chars is None:
+                        align_chars = list(full_reply)[: len(char_start_s)]
+                    await ws.send_json({
+                        "type": "alignment",
+                        "atMs": round(alignment.get("audio_start_seconds", 0) * 1000),
+                        "chars": list(align_chars),
+                        "char_start_ms": [round(t * 1000) for t in char_start_s],
+                        "char_end_ms": [round(t * 1000) for t in char_end_s],
+                        "agent": agent_spec.name,
+                    })
+        except Exception as exc:  # noqa: BLE001 — surface as ERROR frame
+            log.warning("TTS (aligned) streaming failed: %s", exc)
+            await emit_error_frame(
+                ws,
+                session_id=session_id,
+                code=TTS_FAILED,
+                message=str(exc) or "tts_failed",
+            )
+            return
     else:
-        async for mp3_chunk in tts_client.stream_tts(full_reply):
-            tts_bytes += len(mp3_chunk)
-            await ws.send_bytes(mp3_chunk)
+        try:
+            async for mp3_chunk in tts_client.stream_tts(full_reply):
+                tts_bytes += len(mp3_chunk)
+                await ws.send_bytes(mp3_chunk)
+        except Exception as exc:  # noqa: BLE001 — surface as ERROR frame
+            log.warning("TTS streaming failed: %s", exc)
+            await emit_error_frame(
+                ws,
+                session_id=session_id,
+                code=TTS_FAILED,
+                message=str(exc) or "tts_failed",
+            )
+            return
 
     _turn_counters[agent_spec.name] += 1
     log.info(

@@ -123,6 +123,13 @@ def test_shared_secret_auth_rejects(monkeypatch):
     with client.websocket_connect("/ws") as websocket:
         msg = websocket.receive_json()
         assert msg == {"type": "error", "error": "unauthorized"}
+        # New: structured ERROR frame emitted alongside legacy frame.
+        structured = websocket.receive_json()
+        assert structured["protocol"] == "cto-avatar-session/v1"
+        assert structured["type"] == "ERROR"
+        assert structured["code"] == "AUTH_FAILED"
+        assert structured["recoverable"] is False
+        assert structured["session_id"] == "unknown"
         close = websocket.receive()
         assert close["type"] == "websocket.close"
         assert close["code"] == 4401
@@ -155,3 +162,70 @@ def test_rate_limit_rejects_excess_turns(monkeypatch):
         websocket.send_text('{"type":"text","text":"three"}')
         websocket.send_text('{"type":"end_utterance"}')
         assert websocket.receive_json() == {"type": "error", "error": "rate_limited"}
+
+
+# ---- Structured ERROR frame (session_errors) --------------------------------
+
+def test_build_error_frame_shape_per_code():
+    from app.session_errors import (  # type: ignore
+        AUTH_FAILED,
+        NETWORK_DISCONNECT,
+        SESSION_TIMEOUT,
+        STT_FAILED,
+        TTS_FAILED,
+        build_error_frame,
+    )
+
+    for code, expected_recoverable in (
+        (NETWORK_DISCONNECT, True),
+        (STT_FAILED, True),
+        (TTS_FAILED, True),
+        (AUTH_FAILED, False),
+        (SESSION_TIMEOUT, False),
+    ):
+        frame = build_error_frame(
+            session_id="sess-1",
+            code=code,
+            message="boom",
+            timestamp_ms=123,
+        )
+        assert frame == {
+            "protocol": "cto-avatar-session/v1",
+            "type": "ERROR",
+            "session_id": "sess-1",
+            "code": code,
+            "message": "boom",
+            "recoverable": expected_recoverable,
+            "timestamp_ms": 123,
+        }
+
+
+def test_build_error_frame_defaults_session_id_to_unknown_when_none():
+    from app.session_errors import (  # type: ignore
+        AUTH_FAILED,
+        build_error_frame,
+    )
+
+    frame = build_error_frame(
+        session_id=None,
+        code=AUTH_FAILED,
+        message="nope",
+        timestamp_ms=1,
+    )
+    assert frame["session_id"] == "unknown"
+
+
+def test_build_error_frame_explicit_recoverable_override():
+    from app.session_errors import (  # type: ignore
+        TTS_FAILED,
+        build_error_frame,
+    )
+
+    frame = build_error_frame(
+        session_id="s",
+        code=TTS_FAILED,
+        message="m",
+        recoverable=False,
+        timestamp_ms=1,
+    )
+    assert frame["recoverable"] is False
