@@ -10,7 +10,7 @@
 #
 # Env overrides:
 #   SOURCE_IMG=avatar/morgan.jpg
-#   DRIVING_URL=https://raw.githubusercontent.com/KlingAIResearch/LivePortrait/main/assets/examples/driving/d0.mp4
+#   DRIVING_URL=https://raw.githubusercontent.com/KwaiVGI/LivePortrait/main/assets/examples/driving/d0.mp4
 #   OUT=_runs/gate1-liveportrait.mp4
 
 set -euo pipefail
@@ -19,7 +19,7 @@ set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 SOURCE_IMG="${SOURCE_IMG:-${REPO_ROOT}/avatar/morgan.jpg}"
-DRIVING_URL="${DRIVING_URL:-https://raw.githubusercontent.com/KlingAIResearch/LivePortrait/main/assets/examples/driving/d0.mp4}"
+DRIVING_URL="${DRIVING_URL:-https://raw.githubusercontent.com/KwaiVGI/LivePortrait/main/assets/examples/driving/d0.mp4}"
 OUT="${OUT:-${REPO_ROOT}/_runs/gate1-liveportrait.mp4}"
 
 mkdir -p "$(dirname "$OUT")"
@@ -30,9 +30,9 @@ trap 'rm -f "$driving"' EXIT
 echo "[info] fetching driving clip: $DRIVING_URL"
 curl -fsSL -o "$driving" "$DRIVING_URL"
 
-echo "[info] health check"
-curl -fsS --max-time 15 "${APP_URL%/}/health" | jq . || {
-  echo "[fatal] health check failed"; exit 3;
+echo "[info] reachability check (Kong intercepts /health with 204, so hit /docs instead)"
+curl -fsS --max-time 15 -o /dev/null "${APP_URL%/}/docs" || {
+  echo "[fatal] app not reachable at ${APP_URL}"; exit 3;
 }
 
 echo "[info] POST /animate  source=$SOURCE_IMG  driving=$(basename "$driving")"
