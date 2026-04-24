@@ -131,12 +131,12 @@ async function cloneWithRetry(
 }
 
 /**
- * Write the `.PRD/PRD.md` marker that tells the rest of the system "this is
+ * Write the `.prd/PRD.md` marker that tells the rest of the system "this is
  * a Morgan-managed project". Creates the folder if missing; idempotent when
  * the file already exists with the expected header.
  */
 async function writePrdScaffold(path: string, name: string): Promise<boolean> {
-  const dir = join(path, ".PRD");
+  const dir = join(path, ".prd");
   await mkdir(dir, { recursive: true });
   const prd = join(dir, "PRD.md");
   if (existsSync(prd)) return false;
@@ -148,14 +148,14 @@ async function writePrdScaffold(path: string, name: string): Promise<boolean> {
 }
 
 /**
- * Ensure the GitHub repo has `.PRD/PRD.md`. Writes the scaffold, commits,
+ * Ensure the GitHub repo has `.prd/PRD.md`. Writes the scaffold, commits,
  * and pushes. Throws on push failure — GitHub is the authoritative source
  * of truth for project discovery, so a create that can't push should fail.
  */
 async function ensurePrdOnRemote(path: string, name: string): Promise<void> {
   const wrote = await writePrdScaffold(path, name);
   if (wrote) {
-    await commitAll(path, "docs: add .PRD/PRD.md scaffold");
+    await commitAll(path, "docs: add .prd/PRD.md scaffold");
   }
   await pushCurrentBranch(path);
 }
@@ -185,7 +185,7 @@ async function describeLocal(
   const hasPrd =
     hasPrdHint !== undefined
       ? hasPrdHint
-      : existsSync(join(path, ".PRD", "PRD.md"));
+      : existsSync(join(path, ".prd", "PRD.md"));
 
   const isGitRepo = existsSync(join(path, ".git"));
   const [branch, remote, lastIso, lastSubject] = isGitRepo
@@ -234,7 +234,7 @@ function invalidateListCache(): void {
 
 /**
  * Discover projects by listing the configured GitHub org and keeping any
- * repo that has a `.PRD/PRD.md` marker. Results are cached for 10 minutes;
+ * repo that has a `.prd/PRD.md` marker. Results are cached for 10 minutes;
  * mutating operations (create) invalidate the cache.
  *
  * Caller may pass `{force: true}` to bypass the cache (used on explicit
@@ -358,7 +358,7 @@ export interface CreateResult {
  * Create a new project. Single authoritative sequence:
  *   1. Ensure GitHub repo exists (lookup → create if missing).
  *   2. Clone to PVC (atomic tmp + rename).
- *   3. Write `.PRD/PRD.md` scaffold.
+ *   3. Write `.prd/PRD.md` scaffold.
  *   4. Commit + push.
  *
  * Any step failing surfaces the error to the caller. We do NOT silently

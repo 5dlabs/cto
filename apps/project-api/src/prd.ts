@@ -12,7 +12,7 @@ export interface WritePrdResult {
 }
 
 /**
- * Write (or overwrite) `.PRD/PRD.md` for a project, commit as Morgan, and
+ * Write (or overwrite) `.prd/PRD.md` for a project, commit as Morgan, and
  * push to origin. GitHub is the authoritative source for project
  * discovery, so a write that doesn't make it to GitHub isn't a write we
  * want to acknowledge.
@@ -29,13 +29,13 @@ export async function writePrd(
     });
   }
 
-  const prdDir = join(path, ".PRD");
+  const prdDir = join(path, ".prd");
   await mkdir(prdDir, { recursive: true });
   const prdPath = join(prdDir, "PRD.md");
   const normalized = content.endsWith("\n") ? content : content + "\n";
   const bytes = await Bun.write(prdPath, normalized);
 
-  await commitAll(path, "docs: update .PRD/PRD.md");
+  await commitAll(path, "docs: update .prd/PRD.md");
   await pushCurrentBranch(path);
 
   // A PRD write can turn a "no-PRD" repo into a project — invalidate the
