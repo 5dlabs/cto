@@ -1,17 +1,17 @@
 """
-FastAPI wrapper around EchoMimicV3 inference.
+FastAPI wrapper around EchoMimicV3-Flash inference.
 
 Exposes:
-  GET  /health        -> liveness probe (OVH AI Deploy requires 200 on /health)
-  GET  /              -> basic info
-  POST /animate       -> multipart:
-                           source  (image, required)
-                           audio   (wav/mp3, required)
-                         -> video/mp4
+  GET  /health   -> liveness probe (OVH AI Deploy requires 200 on /health)
+  GET  /         -> basic info + resolved model paths
+  POST /animate  -> multipart:
+                     source   (image, required)   -> --image_path
+                     audio    (wav/mp3, required) -> --audio_path
+                     prompt   (str, optional)
+                   -> video/mp4
 
-NOTE: EchoMimicV3's upstream entrypoint may shift; this wrapper shells out to
-`python infer.py` (or `infer_echomimic.py`) and auto-detects the script. When
-the upstream API stabilizes, swap subprocess for in-process calls.
+Invokes upstream `infer_flash.py` per antgroup/echomimic_v3 @ 7e89489c's run_flash.sh,
+pointing at pretrained weights baked into the image under ECHOMIMIC_PRETRAINED_DIR.
 """
 
 from __future__ import annotations
@@ -20,7 +20,6 @@ import asyncio
 import logging
 import os
 import shutil
-import subprocess
 import tempfile
 import time
 import uuid
@@ -33,38 +32,66 @@ LOG = logging.getLogger("echomimic-server")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 ECHOMIMIC_DIR = Path(os.environ.get("ECHOMIMIC_DIR", "/workspace/EchoMimicV3"))
+PRETRAINED_DIR = Path(os.environ.get("ECHOMIMIC_PRETRAINED_DIR", str(ECHOMIMIC_DIR / "pretrained_weights")))
 
-# Probe common entrypoint names; fall back to first infer*.py
-def _find_inference_script() -> Path | None:
-    for name in ("infer.py", "inference.py", "infer_echomimic.py", "run.py"):
-        p = ECHOMIMIC_DIR / name
-        if p.exists():
-            return p
-    for p in ECHOMIMIC_DIR.glob("infer*.py"):
-        return p
-    return None
+# Resolved at import time — fail fast in logs if layout is wrong.
+INFER_SCRIPT = ECHOMIMIC_DIR / "infer_flash.py"
+CONFIG_PATH = ECHOMIMIC_DIR / "config" / "config.yaml"
+WAN_MODEL_DIR = PRETRAINED_DIR / "Wan2.1-Fun-V1.1-1.3B-InP"
+TRANSFORMER_PATH = PRETRAINED_DIR / "EchoMimicV3" / "transformer" / "diffusion_pytorch_model.safetensors"
+WAV2VEC_DIR = PRETRAINED_DIR / "chinese-wav2vec2-base"
+
+DEFAULT_PROMPT = "A person is speaking."
+
+# Upstream run_flash.sh defaults (do not change without validation runs).
+FLASH_DEFAULTS = {
+    "num_inference_steps": "8",
+    "ckpt_idx": "50000",
+    "sampler_name": "Flow_Unipc",
+    "video_length": "81",
+    "guidance_scale": "6.0",
+    "audio_guidance_scale": "3.0",
+    "audio_scale": "1.0",
+    "neg_scale": "1.0",
+    "neg_steps": "0",
+    "teacache_threshold": "0.1",
+    "num_skip_start_steps": "5",
+    "riflex_k": "6",
+    "ulysses_degree": "1",
+    "ring_degree": "1",
+    "weight_dtype": "bfloat16",
+    "fps": "25",
+    "shift": "5.0",
+}
 
 _GPU_LOCK = asyncio.Lock()
+app = FastAPI(title="EchoMimicV3-Flash", version="0.2.0")
 
-app = FastAPI(title="EchoMimicV3", version="0.1.0")
+
+def _layout_status() -> dict:
+    return {
+        "infer_script": {"path": str(INFER_SCRIPT), "exists": INFER_SCRIPT.exists()},
+        "config": {"path": str(CONFIG_PATH), "exists": CONFIG_PATH.exists()},
+        "wan_base": {"path": str(WAN_MODEL_DIR), "exists": WAN_MODEL_DIR.exists()},
+        "transformer": {"path": str(TRANSFORMER_PATH), "exists": TRANSFORMER_PATH.exists()},
+        "wav2vec": {"path": str(WAV2VEC_DIR), "exists": WAV2VEC_DIR.exists()},
+    }
 
 
 @app.get("/")
 async def root() -> dict:
-    script = _find_inference_script()
     return {
-        "service": "echomimic-v3",
-        "version": "0.1.0",
-        "echomimic_dir": str(ECHOMIMIC_DIR),
-        "inference_script": str(script) if script else None,
+        "service": "echomimic-v3-flash",
+        "version": "0.2.0",
+        "layout": _layout_status(),
         "endpoints": ["/health", "/animate"],
     }
 
 
 @app.get("/health")
 async def health() -> dict:
-    if not ECHOMIMIC_DIR.exists():
-        raise HTTPException(status_code=503, detail=f"ECHOMIMIC_DIR missing: {ECHOMIMIC_DIR}")
+    if not INFER_SCRIPT.exists():
+        raise HTTPException(status_code=503, detail=f"missing infer_flash.py at {INFER_SCRIPT}")
     return {"status": "ok"}
 
 
@@ -85,16 +112,36 @@ async def _save_upload(upload: UploadFile, dest: Path) -> None:
             f.write(chunk)
 
 
+def _build_cmd(image_path: Path, audio_path: Path, save_path: Path, prompt: str, seed: int) -> list[str]:
+    cmd = [
+        "python", str(INFER_SCRIPT),
+        "--image_path", str(image_path),
+        "--audio_path", str(audio_path),
+        "--prompt", prompt,
+        "--config_path", str(CONFIG_PATH),
+        "--model_name", str(WAN_MODEL_DIR),
+        "--transformer_path", str(TRANSFORMER_PATH),
+        "--wav2vec_model_dir", str(WAV2VEC_DIR),
+        "--save_path", str(save_path),
+        "--seed", str(seed),
+        "--enable_teacache",
+        # sample_size requires two ints (h w)
+        "--sample_size", "768", "768",
+    ]
+    for flag, val in FLASH_DEFAULTS.items():
+        cmd.extend([f"--{flag}", val])
+    return cmd
+
+
 @app.post("/animate")
 async def animate(
     source: UploadFile = File(..., description="source portrait image (jpg/png)"),
     audio: UploadFile = File(..., description="driving audio (wav/mp3)"),
-    fps: int = Form(25),
-    seed: int = Form(42),
+    prompt: str = Form(DEFAULT_PROMPT),
+    seed: int = Form(43),
 ) -> FileResponse:
-    script = _find_inference_script()
-    if script is None:
-        raise HTTPException(status_code=503, detail="no EchoMimicV3 inference script found")
+    if not INFER_SCRIPT.exists():
+        raise HTTPException(status_code=503, detail="infer_flash.py not present")
 
     job_id = uuid.uuid4().hex[:12]
     work = Path(tempfile.mkdtemp(prefix=f"em-{job_id}-"))
@@ -107,16 +154,7 @@ async def animate(
         await _save_upload(source, src_path)
         await _save_upload(audio, aud_path)
 
-        # Upstream flag names are TBD until we pin a SHA; pass both common forms.
-        cmd = [
-            "python", str(script),
-            "--source", str(src_path),
-            "--audio", str(aud_path),
-            "--output", str(out_dir),
-            "--fps", str(fps),
-            "--seed", str(seed),
-        ]
-
+        cmd = _build_cmd(src_path, aud_path, out_dir, prompt, seed)
         LOG.info("job=%s cmd=%s", job_id, " ".join(cmd))
 
         async with _GPU_LOCK:
@@ -138,7 +176,8 @@ async def animate(
                 detail={"error": "echomimic failed", "rc": proc.returncode, "log_tail": log_tail},
             )
 
-        candidates = sorted(out_dir.glob("*.mp4"))
+        # infer_flash.py writes mp4s under --save_path (may nest a subdir).
+        candidates = sorted(out_dir.rglob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
         if not candidates:
             raise HTTPException(
                 status_code=500,
@@ -148,7 +187,8 @@ async def animate(
         staged = Path(tempfile.gettempdir()) / f"em-out-{job_id}.mp4"
         shutil.copy2(primary, staged)
 
-        LOG.info("job=%s done elapsed=%.1fs out=%s size=%d", job_id, elapsed, staged.name, staged.stat().st_size)
+        LOG.info("job=%s done elapsed=%.1fs out=%s size=%d",
+                 job_id, elapsed, staged.name, staged.stat().st_size)
         return FileResponse(
             path=str(staged),
             media_type="video/mp4",

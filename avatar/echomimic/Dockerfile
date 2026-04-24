@@ -36,7 +36,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Clone EchoMimicV3 at a pinned commit (update SHA after first successful build)
 ARG ECHOMIMIC_REPO=https://github.com/antgroup/echomimic_v3.git
-ARG ECHOMIMIC_SHA=main
+# Pinned 2026-04 head; update after confirming infer_flash.py API is stable.
+ARG ECHOMIMIC_SHA=7e89489ca51c0d008fc1963ec6c03fc5bd0b9397
 RUN git clone ${ECHOMIMIC_REPO} /workspace/EchoMimicV3 \
  && cd /workspace/EchoMimicV3 \
  && git checkout ${ECHOMIMIC_SHA}
@@ -53,17 +54,35 @@ RUN pip install --index-url https://download.pytorch.org/whl/cu121 \
       python-multipart==0.0.9 \
       soundfile==0.12.1
 
-# Download pretrained weights (HF: BadToBest/EchoMimicV3)
-RUN HF_HUB_ENABLE_HF_TRANSFER=0 huggingface-cli download \
-      BadToBest/EchoMimicV3 \
-      --local-dir /workspace/EchoMimicV3/pretrained_weights \
-      --exclude "*.git*" "README.md" "docs/*" || \
-    echo "weights download failed; will retry at runtime"
+# EchoMimicV3-Flash needs 3 HF repos (see upstream README):
+#   1. BadToBest/EchoMimicV3          — flash pro weights + transformer
+#   2. alibaba-pai/Wan2.1-Fun-V1.1-1.3B-InP — base video diffusion model
+#   3. TencentGameMate/chinese-wav2vec2-base — audio encoder
+# Failures here are non-fatal; server.py retries at runtime so the image still
+# builds if HF is having a bad day.
+ENV PRETRAINED_DIR=/workspace/EchoMimicV3/pretrained_weights
+RUN mkdir -p ${PRETRAINED_DIR} && \
+    ( HF_HUB_ENABLE_HF_TRANSFER=0 huggingface-cli download \
+        BadToBest/EchoMimicV3 \
+        --local-dir ${PRETRAINED_DIR}/EchoMimicV3 \
+        --exclude "*.git*" "README.md" "docs/*" \
+      || echo "[warn] EchoMimicV3 weights failed; retry at runtime" ) && \
+    ( HF_HUB_ENABLE_HF_TRANSFER=0 huggingface-cli download \
+        alibaba-pai/Wan2.1-Fun-V1.1-1.3B-InP \
+        --local-dir ${PRETRAINED_DIR}/Wan2.1-Fun-V1.1-1.3B-InP \
+        --exclude "*.git*" "README.md" \
+      || echo "[warn] Wan2.1 weights failed; retry at runtime" ) && \
+    ( HF_HUB_ENABLE_HF_TRANSFER=0 huggingface-cli download \
+        TencentGameMate/chinese-wav2vec2-base \
+        --local-dir ${PRETRAINED_DIR}/chinese-wav2vec2-base \
+        --exclude "*.git*" "README.md" \
+      || echo "[warn] chinese-wav2vec2-base failed; retry at runtime" )
 
 COPY server.py /workspace/server.py
 
 ENV PORT=8000 \
-    ECHOMIMIC_DIR=/workspace/EchoMimicV3
+    ECHOMIMIC_DIR=/workspace/EchoMimicV3 \
+    ECHOMIMIC_PRETRAINED_DIR=/workspace/EchoMimicV3/pretrained_weights
 
 EXPOSE 8000
 
