@@ -729,6 +729,16 @@ nats:
     - { id: trader, role: "Market research & trading" }
 
 # =============================================================================
+# TokenJuice Plugin (bundled with OpenClaw)
+# =============================================================================
+# Compacts noisy `exec` / `bash` tool_result output before it flows back into
+# the session. Preserves exit codes and file-content reads. Opt-in per agent.
+# https://docs.openclaw.ai/tools/tokenjuice
+
+tokenjuice:
+  enabled: false
+
+# =============================================================================
 # Mem0 Plugin (@mem0/openclaw-mem0)
 # =============================================================================
 # Long-term memory backed by Qdrant. Single shared collection, scoped by userId.

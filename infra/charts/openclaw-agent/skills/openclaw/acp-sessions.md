@@ -43,7 +43,25 @@ Show WHICH coding CLI is running so users can tell at a glance:
 // Cursor
 { "action": "react", "emoji": "⚪" }
 ```
-Remove the backend emoji when done (same as ⚙️ cleanup).
+
+### Multi-backend stacking (concurrent ACP sessions)
+Backend color dots are **stackable** — unlike activity emojis (🧠/🔍/✏️), you may have
+several color dots on the same message at once, one per active ACP backend. Rules:
+
+- When you spawn backend **X**, add its color dot. Do NOT remove any other backend's dot.
+- When backend **X** completes (success or failure), remove **only X's color dot**.
+  Leave dots for backends that are still running.
+- Keep ⚙️ on the message as long as **any** ACP session is still running. Remove ⚙️
+  only when **the last** ACP session completes.
+- Add ✅/❌/💬 only once every spawned backend has reported back.
+
+Example — spawn Claude + Codex in parallel, Claude finishes first:
+```
+spawn claude  → add 🟣, add ⚙️
+spawn codex   → add 🟢   (⚙️ stays, 🟣 stays)
+claude done   → remove 🟣 (⚙️ stays because codex is still running)
+codex done    → remove 🟢, remove ⚙️, add ✅
+```
 
 ### Reaction reference:
 | State | Emoji | Meaning |
@@ -66,7 +84,9 @@ Remove the backend emoji when done (same as ⚙️ cleanup).
 | Gemini | 🔴 | Red |
 | Cursor | ⚪ | White |
 
-Always add the ⚙️ AND the backend emoji BEFORE spawning the ACP session. Always clean up both when done.
+Always add the ⚙️ AND the backend emoji BEFORE calling `sessions_spawn`. When a backend
+completes, remove that backend's color dot immediately; only remove ⚙️ after the last
+ACP session finishes.
 
 ## Spawning a coding CLI session
 
