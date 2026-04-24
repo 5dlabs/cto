@@ -749,7 +749,7 @@ export default function Room({
       token={connection.token}
       serverUrl={connection.serverUrl}
       connect
-      audio
+      audio={false}
       video={false}
       onConnected={() => setRoomConnectedAt(performance.now())}
       onDisconnected={reset}
