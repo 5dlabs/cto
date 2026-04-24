@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { SidebarProvider } from "./SidebarProvider";
 
-const SETUP_KEY = "cto-sidebar.layoutConfigured.v2";
+const SETUP_KEY = "cto-sidebar.layoutConfigured.v3";
 
 // View containers to hide from activity bar (keep Explorer + Search + CTO)
 const HIDE_VIEW_CONTAINERS = [
@@ -48,7 +48,9 @@ async function setupLayout(context: vscode.ExtensionContext): Promise<void> {
   // Wait for VS Code to fully initialize
   await new Promise((r) => setTimeout(r, 2000));
 
-  // Always focus CTO sidebar on startup
+  // Focus the cto-sidebar view. The .focus command works regardless of
+  // which bar the container currently lives in, so this stays correct
+  // after the aux-bar relocation seeded via storage.json.
   try {
     await vscode.commands.executeCommand(
       "workbench.view.extension.cto-sidebar.focus"
@@ -57,9 +59,19 @@ async function setupLayout(context: vscode.ExtensionContext): Promise<void> {
     // View may not be ready
   }
 
-  // Close the Copilot auxiliary bar on the right
+  // Make sure the auxiliary bar is visible — that's where cto-sidebar now
+  // lives (seeded via storage.json views.customizations). We previously
+  // force-closed the aux bar because Copilot lived there; after PR #4821
+  // uninstalled Copilot and we moved our own container into the aux bar,
+  // closing it would hide our own chat panel on every launch.
   try {
-    await vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar");
+    const cfg = vscode.workspace.getConfiguration();
+    const visible = cfg.get<boolean>("workbench.auxiliaryBar.visible");
+    if (visible === false) {
+      await vscode.commands.executeCommand(
+        "workbench.action.toggleAuxiliaryBar"
+      );
+    }
   } catch {
     // Not available in all versions
   }
