@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.86](https://github.com/5dlabs/cto/compare/v0.2.85...v0.2.86) (2026-04-24)
+
+
+### 🐛 Bug Fixes
+
+* **echomimic:** install loudness dependency ([bc5157a](https://github.com/5dlabs/cto/commit/bc5157a659766c414910c985df71c4c5a6dd4870))
+
 ## [0.2.85](https://github.com/5dlabs/cto/compare/v0.2.84...v0.2.85) (2026-04-24)
 
 
