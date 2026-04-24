@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Launch (or refresh) a LivePortrait AI Deploy app on OVH.
+# Launch (or refresh) an avatar AI Deploy app on OVH.
 #
 # Reads OVH creds from 1Password (op://Automation/OVH CA API).
 # Idempotent-ish: if an app with the same name is already running, prints its
 # URL and exits. Otherwise POSTs a new one and polls until RUNNING.
 #
 # Env overrides:
-#   IMAGE=ghcr.io/5dlabs/liveportrait:latest
+#   IMAGE=ghcr.io/5dlabs/echomimic:latest
 #   FLAVOR=ai1-1-gpu                 # single V100S (see /ai/capabilities/region/{REGION}/flavor)
 #   REGION=GRA                       # Gravelines
-#   APP_NAME=liveportrait-gate1
+#   APP_NAME=echomimic-gate2
 #   PORT=8000
-#   PROBE_PATH=/health
+#   PROBE_PATH=/docs                 # Kong may intercept /health on public route
 #   UNSAFE_OBJECT_STORAGE=0          # we bake weights; no volume needed
 #
 # NOTE: OVH AI Deploy POST body is FLAT (fields at top level), not wrapped in `spec:`.
@@ -22,12 +22,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/ovh-api.sh"
 
-IMAGE="${IMAGE:-ghcr.io/5dlabs/liveportrait:latest}"
+IMAGE="${IMAGE:-ghcr.io/5dlabs/echomimic:latest}"
 FLAVOR="${FLAVOR:-ai1-1-gpu}"
 REGION="${REGION:-GRA}"
-APP_NAME="${APP_NAME:-liveportrait-gate1}"
+APP_NAME="${APP_NAME:-echomimic-gate2}"
 PORT="${PORT:-8000}"
-PROBE_PATH="${PROBE_PATH:-/health}"
+PROBE_PATH="${PROBE_PATH:-/docs}"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "missing $1" >&2; exit 1; }; }
 need jq
@@ -54,29 +54,13 @@ else
       name: $name,
       region: $region,
       image: $image,
-<<<<<<< Updated upstream
       resources: { flavor: $flavor, flavorCount: 1 },
       command: [],
       defaultHttpPort: $port,
       probe: { path: $probe, port: $port },
       unsecureHttp: true,
       scalingStrategy: { fixed: { replicas: 1 } },
-=======
-      resources: { flavor: $flavor },
-      command: [],
-      defaultHttpPort: $port,
-      probe: { path: $probe, port: $port },
-      unsecureHttp: false,
-      scalingStrategy: {
-        automatic: {
-          averageUsageTarget: 75,
-          replicasMax: 1,
-          replicasMin: 0,
-          resourceType: "CPU"
-        }
-      },
->>>>>>> Stashed changes
-      labels: { owner: "5dlabs", purpose: "morgan-avatar-gate1", model: "liveportrait" }
+      labels: { owner: "5dlabs", purpose: "morgan-avatar-gate2", model: "echomimic" }
     }')
 
   echo "[info] creating AI Deploy app ${APP_NAME} (image=${IMAGE}, flavor=${FLAVOR}, region=${REGION})"
