@@ -197,7 +197,9 @@ spec:
           external:
             apiKeysSecret: "openclaw-api-keys"
             messagingSecret: "discord-agent-bots"
-            githubSecret: "openclaw-github"
+            # Use the same secret as Coder so Colosseum shares the PAT with
+            # code-server and Copilot CLI (parity fix — keys `github-pat` match).
+            githubSecret: "cto-coder-api-keys"
 
         # Map env var names to actual secret key names in openclaw-api-keys
         apiKeySecretKeys:
