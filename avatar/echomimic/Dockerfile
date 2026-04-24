@@ -66,12 +66,13 @@ RUN pip install --index-url https://download.pytorch.org/whl/cu121 \
       "huggingface_hub[cli]==0.26.2" \
  && if [ -f requirements.txt ]; then pip install -c /tmp/constraints.txt -r requirements.txt; fi \
  && pip install -c /tmp/constraints.txt \
-      fastapi==0.115.0 \
-      "uvicorn[standard]==0.30.6" \
-      python-multipart==0.0.9 \
-      soundfile==0.12.1 \
- && pip check || echo "pip check reported issues (non-fatal)" \
- && python -c "import torch, transformers, huggingface_hub; print('torch=', torch.__version__, 'cuda=', torch.version.cuda); print('transformers=', transformers.__version__, 'huggingface_hub=', huggingface_hub.__version__); from transformers.utils.hub import is_offline_mode; print('is_offline_mode import OK')"
+       fastapi==0.115.0 \
+       "uvicorn[standard]==0.30.6" \
+       python-multipart==0.0.9 \
+       soundfile==0.12.1 \
+       pyloudnorm==0.2.0 \
+  && pip check || echo "pip check reported issues (non-fatal)" \
+ && python -c "import pyloudnorm, torch, transformers, huggingface_hub; print('torch=', torch.__version__, 'cuda=', torch.version.cuda); print('transformers=', transformers.__version__, 'huggingface_hub=', huggingface_hub.__version__); from transformers.utils.hub import is_offline_mode; print('is_offline_mode import OK'); print('pyloudnorm import OK')"
 
 # EchoMimicV3-Flash needs 3 HF repos (see upstream README):
 #   1. BadToBest/EchoMimicV3          — flash pro weights + transformer
