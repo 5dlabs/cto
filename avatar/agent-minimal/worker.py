@@ -45,10 +45,10 @@ def _synthesize_to_pcm() -> bytes:
     client = ElevenLabs(api_key=api_key)
     logger.info("Calling ElevenLabs TTS (voice=%s) …", MORGAN_VOICE_ID)
     audio_bytes = b"".join(
-        client.generate(
+        client.text_to_speech.convert(
+            voice_id=MORGAN_VOICE_ID,
             text=SCRIPT,
-            voice=MORGAN_VOICE_ID,
-            model="eleven_turbo_v2",
+            model_id="eleven_turbo_v2",
             output_format="mp3_44100_128",
         )
     )
