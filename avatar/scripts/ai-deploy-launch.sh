@@ -7,12 +7,15 @@
 #
 # Env overrides:
 #   IMAGE=ghcr.io/5dlabs/liveportrait:latest
-#   FLAVOR=ai1-1-gpu-v100s           # single V100S, covered by credits
+#   FLAVOR=ai1-1-gpu                 # single V100S (see /ai/capabilities/region/{REGION}/flavor)
 #   REGION=GRA                       # Gravelines
 #   APP_NAME=liveportrait-gate1
 #   PORT=8000
 #   PROBE_PATH=/health
 #   UNSAFE_OBJECT_STORAGE=0          # we bake weights; no volume needed
+#
+# NOTE: OVH AI Deploy POST body is FLAT (fields at top level), not wrapped in `spec:`.
+# The `spec` envelope is only present in GET responses.
 
 set -euo pipefail
 
@@ -51,12 +54,28 @@ else
       name: $name,
       region: $region,
       image: $image,
+<<<<<<< Updated upstream
       resources: { flavor: $flavor, flavorCount: 1 },
       command: [],
       defaultHttpPort: $port,
       probe: { path: $probe, port: $port },
       unsecureHttp: true,
       scalingStrategy: { fixed: { replicas: 1 } },
+=======
+      resources: { flavor: $flavor },
+      command: [],
+      defaultHttpPort: $port,
+      probe: { path: $probe, port: $port },
+      unsecureHttp: false,
+      scalingStrategy: {
+        automatic: {
+          averageUsageTarget: 75,
+          replicasMax: 1,
+          replicasMin: 0,
+          resourceType: "CPU"
+        }
+      },
+>>>>>>> Stashed changes
       labels: { owner: "5dlabs", purpose: "morgan-avatar-gate1", model: "liveportrait" }
     }')
 
