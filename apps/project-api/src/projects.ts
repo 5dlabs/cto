@@ -328,6 +328,7 @@ export async function listProjects(
     return local;
   }
 
+  let probeFailures = 0;
   const probes = await Promise.all(
     repos.map(async (repo) => {
       try {
@@ -342,6 +343,7 @@ export async function listProjects(
           state: coerceStatus(prd.fields?.status),
         };
       } catch {
+        probeFailures += 1;
         return { repo, hasPrd: false, hasArchitecture: false, state: "drafting" as PrdStatus };
       }
     }),
@@ -358,7 +360,18 @@ export async function listProjects(
     );
 
   out.sort((a, b) => a.name.localeCompare(b.name));
-  cachedList = { expiresAt: now + LIST_TTL_MS, value: out };
+  // Only cache if we have evidence the probes worked. Caching an empty list
+  // produced entirely by GitHub probe failures (rate limit, outage) would
+  // lock the UI into a phantom "no projects" state for 10 minutes even after
+  // GitHub recovers. If the list is empty AND some probes failed, skip the
+  // cache write so the next request retries against GitHub.
+  if (out.length > 0 || probeFailures === 0) {
+    cachedList = { expiresAt: now + LIST_TTL_MS, value: out };
+  } else {
+    console.warn(
+      `[project-api] list returned empty with ${probeFailures}/${repos.length} probe failures — skipping cache`,
+    );
+  }
   return out;
 }
 
