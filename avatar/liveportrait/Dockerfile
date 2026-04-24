@@ -68,4 +68,4 @@ RUN chmod -R 777 /workspace
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
   CMD curl -fsS http://127.0.0.1:${PORT}/health || exit 1
 
-CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT} --workers 1"]
+CMD ["sh", "-c", "cd /workspace && uvicorn server:app --host 0.0.0.0 --port ${PORT} --workers 1"]

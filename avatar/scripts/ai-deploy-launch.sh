@@ -7,7 +7,7 @@
 #
 # Env overrides:
 #   IMAGE=ghcr.io/5dlabs/liveportrait:latest
-#   FLAVOR=ai1-1-gpu-v100s           # single V100S, covered by credits
+#   FLAVOR=ai1-1-gpu                 # single V100S, covered by credits
 #   REGION=GRA                       # Gravelines
 #   APP_NAME=liveportrait-gate1
 #   PORT=8000
@@ -20,7 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/ovh-api.sh"
 
 IMAGE="${IMAGE:-ghcr.io/5dlabs/liveportrait:latest}"
-FLAVOR="${FLAVOR:-ai1-1-gpu-v100s}"
+FLAVOR="${FLAVOR:-ai1-1-gpu}"
 REGION="${REGION:-GRA}"
 APP_NAME="${APP_NAME:-liveportrait-gate1}"
 PORT="${PORT:-8000}"
@@ -34,7 +34,7 @@ PROJECT_ID="$(op read 'op://Automation/OVH CA API/project_id')"
 [[ -n "$PROJECT_ID" ]] || { echo "project_id missing from op://Automation/OVH CA API" >&2; exit 1; }
 
 existing="$(ovh_api GET "/cloud/project/${PROJECT_ID}/ai/app" \
-  | jq -r --arg n "$APP_NAME" '.[] | select(.spec.name == $n) | .id' | head -1 || true)"
+  | jq -r --arg n "$APP_NAME" '.[] | select((.spec.name // .name) == $n) | .id' | head -1 || true)"
 
 if [[ -n "$existing" ]]; then
   echo "[info] app '${APP_NAME}' already exists (id=${existing}); refreshing status"
@@ -48,27 +48,15 @@ else
     --argjson port "$PORT" \
     --arg probe "$PROBE_PATH" \
     '{
-      spec: {
-        name: $name,
-        region: $region,
-        image: $image,
-        resources: { flavor: $flavor },
-        command: [],
-        defaultHttpPort: $port,
-        probe: { path: $probe, port: $port },
-        unsecureHttp: false,
-        scalingStrategy: {
-          automatic: {
-            averageUsageTarget: 75,
-            replicasMax: 1,
-            replicasMin: 0,
-            resourceType: "CPU"
-          }
-        },
-        partnerId: null,
-        deploymentStrategy: { updateStrategy: { type: "Recreate" } },
-        labels: { owner: "5dlabs", purpose: "morgan-avatar-gate1", model: "liveportrait" }
-      }
+      name: $name,
+      region: $region,
+      image: $image,
+      resources: { flavor: $flavor, flavorCount: 1 },
+      defaultHttpPort: $port,
+      probe: { path: $probe, port: $port },
+      unsecureHttp: false,
+      scalingStrategy: { fixed: { replicas: 1 } },
+      labels: { owner: "5dlabs", purpose: "morgan-avatar-gate1", model: "liveportrait" }
     }')
 
   echo "[info] creating AI Deploy app ${APP_NAME} (image=${IMAGE}, flavor=${FLAVOR}, region=${REGION})"
