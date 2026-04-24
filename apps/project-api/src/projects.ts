@@ -1,4 +1,4 @@
-import { readdir, stat, mkdir, rename, rm } from "node:fs/promises";
+import { readdir, stat, mkdir, rename, rm, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { CONFIG } from "./config";
@@ -15,16 +15,32 @@ import {
 import {
   authenticatedCloneUrl,
   createRepo,
-  hasPrdMarker,
+  fetchPrdInfo,
+  hasArchitectureMarker,
   listOrgRepos,
   lookupRepo,
   type OrgRepoSummary,
+  type PrdInfo,
 } from "./github";
+import { coerceStatus, parseFrontmatter, type PrdStatus } from "./frontmatter";
 
 export interface ProjectDescriptor {
   name: string;
   path: string;
   hasPrd: boolean;
+  /**
+   * `.prd/architecture.md` present? Needed for the "ready to intake"
+   * transition in the Morgan state machine — intake requires both docs.
+   */
+  hasArchitecture: boolean;
+  /**
+   * Workflow state derived from the PRD frontmatter `status:` field.
+   * `"drafting"` = PRD exists but not yet signed off; `"ready"` = Morgan
+   * and the user have agreed the PRD is intake-ready. Defaults to
+   * `"drafting"` whenever a PRD is present but the field is missing or
+   * unrecognized — the Projects board should never silently drop a tile.
+   */
+  state: PrdStatus;
   remoteUrl: string | null;
   updatedAt: string | null;
   branch: string | null;
@@ -131,16 +147,24 @@ async function cloneWithRetry(
 }
 
 /**
- * Write the `.PRD/PRD.md` marker that tells the rest of the system "this is
+ * Write the `.prd/PRD.md` marker that tells the rest of the system "this is
  * a Morgan-managed project". Creates the folder if missing; idempotent when
- * the file already exists with the expected header.
+ * the file already exists with the expected header. The scaffold now
+ * includes a starter frontmatter block so the state field is present from
+ * day one (status: drafting).
  */
 async function writePrdScaffold(path: string, name: string): Promise<boolean> {
-  const dir = join(path, ".PRD");
+  const dir = join(path, ".prd");
   await mkdir(dir, { recursive: true });
   const prd = join(dir, "PRD.md");
   if (existsSync(prd)) return false;
+  const updated = new Date().toISOString();
   const content =
+    `---\n` +
+    `project: ${name}\n` +
+    `status: drafting\n` +
+    `updated: ${updated}\n` +
+    `---\n\n` +
     `# ${name}\n\n` +
     `<!-- Morgan intake placeholder — replace this file with the product brief. -->\n`;
   await Bun.write(prd, content);
@@ -148,19 +172,22 @@ async function writePrdScaffold(path: string, name: string): Promise<boolean> {
 }
 
 /**
- * Ensure the GitHub repo has `.PRD/PRD.md`. Writes the scaffold, commits,
+ * Ensure the GitHub repo has `.prd/PRD.md`. Writes the scaffold, commits,
  * and pushes. Throws on push failure — GitHub is the authoritative source
  * of truth for project discovery, so a create that can't push should fail.
  */
 async function ensurePrdOnRemote(path: string, name: string): Promise<void> {
   const wrote = await writePrdScaffold(path, name);
   if (wrote) {
-    await commitAll(path, "docs: add .PRD/PRD.md scaffold");
+    await commitAll(path, "docs: add .prd/PRD.md scaffold");
   }
   await pushCurrentBranch(path);
 }
 
-function describeFromRepo(repo: OrgRepoSummary, hasPrd: boolean): ProjectDescriptor {
+function describeFromRepo(
+  repo: OrgRepoSummary,
+  flags: { hasPrd: boolean; hasArchitecture: boolean; state: PrdStatus },
+): ProjectDescriptor {
   const localPath = join(CONFIG.reposRoot, repo.name);
   const locality: "cloned" | "remote-only" = existsSync(localPath)
     ? "cloned"
@@ -168,7 +195,9 @@ function describeFromRepo(repo: OrgRepoSummary, hasPrd: boolean): ProjectDescrip
   return {
     name: repo.name,
     path: localPath,
-    hasPrd,
+    hasPrd: flags.hasPrd,
+    hasArchitecture: flags.hasArchitecture,
+    state: flags.state,
     remoteUrl: repo.cloneUrl,
     updatedAt: repo.updatedAt,
     branch: repo.defaultBranch,
@@ -182,10 +211,31 @@ async function describeLocal(
   name: string,
   hasPrdHint?: boolean,
 ): Promise<ProjectDescriptor> {
+  // Resolve canonical `.prd/` first, then fall back to legacy `.PRD/` for
+  // repos cloned before the rename (PR #4820). Once every active repo is
+  // migrated the uppercase branch can be deleted.
+  const prdLower = join(path, ".prd", "PRD.md");
+  const prdUpper = join(path, ".PRD", "PRD.md");
+  const archLower = join(path, ".prd", "architecture.md");
+  const archUpper = join(path, ".PRD", "architecture.md");
+  const prdPath = existsSync(prdLower)
+    ? prdLower
+    : existsSync(prdUpper)
+      ? prdUpper
+      : prdLower;
   const hasPrd =
-    hasPrdHint !== undefined
-      ? hasPrdHint
-      : existsSync(join(path, ".PRD", "PRD.md"));
+    hasPrdHint !== undefined ? hasPrdHint : existsSync(prdPath);
+  const hasArchitecture = existsSync(archLower) || existsSync(archUpper);
+
+  let state: PrdStatus = "drafting";
+  if (hasPrd) {
+    try {
+      const raw = await readFile(prdPath, "utf8");
+      state = coerceStatus(parseFrontmatter(raw).fields.status);
+    } catch {
+      // Unreadable PRD still counts as drafting — don't drop the tile.
+    }
+  }
 
   const isGitRepo = existsSync(join(path, ".git"));
   const [branch, remote, lastIso, lastSubject] = isGitRepo
@@ -211,6 +261,8 @@ async function describeLocal(
     name,
     path,
     hasPrd,
+    hasArchitecture,
+    state,
     remoteUrl: remote,
     updatedAt,
     branch,
@@ -234,7 +286,7 @@ function invalidateListCache(): void {
 
 /**
  * Discover projects by listing the configured GitHub org and keeping any
- * repo that has a `.PRD/PRD.md` marker. Results are cached for 10 minutes;
+ * repo that has a `.prd/PRD.md` marker. Results are cached for 10 minutes;
  * mutating operations (create) invalidate the cache.
  *
  * Caller may pass `{force: true}` to bypass the cache (used on explicit
@@ -275,16 +327,31 @@ export async function listProjects(
   const probes = await Promise.all(
     repos.map(async (repo) => {
       try {
-        return { repo, hasPrd: await hasPrdMarker(CONFIG.githubOrg, repo.name) };
+        const [prd, hasArch] = await Promise.all([
+          fetchPrdInfo(CONFIG.githubOrg, repo.name),
+          hasArchitectureMarker(CONFIG.githubOrg, repo.name).catch(() => false),
+        ]);
+        return {
+          repo,
+          hasPrd: prd.exists,
+          hasArchitecture: hasArch,
+          state: coerceStatus(prd.fields?.status),
+        };
       } catch {
-        return { repo, hasPrd: false };
+        return { repo, hasPrd: false, hasArchitecture: false, state: "drafting" as PrdStatus };
       }
     }),
   );
 
   const out: ProjectDescriptor[] = probes
     .filter((p) => p.hasPrd)
-    .map((p) => describeFromRepo(p.repo, true));
+    .map((p) =>
+      describeFromRepo(p.repo, {
+        hasPrd: true,
+        hasArchitecture: p.hasArchitecture,
+        state: p.state,
+      }),
+    );
 
   out.sort((a, b) => a.name.localeCompare(b.name));
   cachedList = { expiresAt: now + LIST_TTL_MS, value: out };
@@ -329,7 +396,12 @@ export async function getProject(name: string): Promise<ProjectDescriptor | null
   try {
     const info = await lookupRepo(CONFIG.githubOrg, name);
     if (!info.exists) return null;
-    const hasPrd = await hasPrdMarker(CONFIG.githubOrg, name).catch(() => false);
+    const [prd, hasArch] = await Promise.all([
+      fetchPrdInfo(CONFIG.githubOrg, name).catch(
+        (): PrdInfo => ({ exists: false, content: null, fields: {} }),
+      ),
+      hasArchitectureMarker(CONFIG.githubOrg, name).catch(() => false),
+    ]);
     return describeFromRepo(
       {
         name,
@@ -340,7 +412,11 @@ export async function getProject(name: string): Promise<ProjectDescriptor | null
         archived: false,
         private: info.private ?? false,
       },
-      hasPrd,
+      {
+        hasPrd: prd.exists,
+        hasArchitecture: hasArch,
+        state: coerceStatus(prd.fields?.status),
+      },
     );
   } catch {
     return null;
@@ -358,7 +434,7 @@ export interface CreateResult {
  * Create a new project. Single authoritative sequence:
  *   1. Ensure GitHub repo exists (lookup → create if missing).
  *   2. Clone to PVC (atomic tmp + rename).
- *   3. Write `.PRD/PRD.md` scaffold.
+ *   3. Write `.prd/PRD.md` scaffold.
  *   4. Commit + push.
  *
  * Any step failing surfaces the error to the caller. We do NOT silently
@@ -439,6 +515,82 @@ export async function verifyProject(name: string): Promise<ProjectDescriptor> {
     await cloneAtomic(authenticatedCloneUrl(info.cloneUrl), path);
     return describeLocal(path, name);
   });
+}
+
+/**
+ * Flip `.prd/PRD.md` frontmatter to `status: ready`, commit + push, and
+ * return the refreshed descriptor. Used by the Morgan "ready for intake"
+ * action — the state transition is authoritative when the committed
+ * frontmatter lands on the default branch.
+ *
+ * Preconditions: project must be cloned locally AND already have a PRD.
+ * Architecture.md is NOT required (Morgan may still be drafting it), but
+ * the UI typically gates the button on `hasArchitecture`.
+ */
+export async function markProjectReady(
+  name: string,
+): Promise<ProjectDescriptor> {
+  return withProjectLock(name, async () => {
+    const path = safeProjectPath(name);
+    if (!existsSync(path)) {
+      throw Object.assign(new Error(`project "${name}" not found`), {
+        status: 404,
+      });
+    }
+    const prdPath = join(path, ".prd", "PRD.md");
+    if (!existsSync(prdPath)) {
+      throw Object.assign(
+        new Error(`project "${name}" has no .prd/PRD.md to mark ready`),
+        { status: 409 },
+      );
+    }
+
+    const raw = await readFile(prdPath, "utf8");
+    const updated = flipFrontmatterStatus(raw, "ready");
+    if (updated === raw) {
+      // Already ready — treat as a no-op success.
+      return describeLocal(path, name, true);
+    }
+    await Bun.write(prdPath, updated);
+    await commitAll(path, "docs(prd): mark ready for intake");
+    await pushCurrentBranch(path);
+    invalidateListCache();
+    return describeLocal(path, name, true);
+  });
+}
+
+/**
+ * Return `source` with its frontmatter's `status:` set to `next` and
+ * `updated:` refreshed. If no frontmatter is present, prepend a minimal
+ * block so the state field becomes authoritative going forward.
+ */
+function flipFrontmatterStatus(source: string, next: PrdStatus): string {
+  const now = new Date().toISOString();
+  const fm = parseFrontmatter(source);
+  if (!fm.raw) {
+    const block = `---\nstatus: ${next}\nupdated: ${now}\n---\n\n`;
+    return block + source;
+  }
+  const lines = fm.raw.split(/\r?\n/);
+  let sawStatus = false;
+  let sawUpdated = false;
+  const rewritten = lines.map((line) => {
+    const m = /^(\s*)([A-Za-z_][A-Za-z0-9_-]*)(\s*:\s*)(.*)$/.exec(line);
+    if (!m) return line;
+    const key = (m[2] ?? "").toLowerCase();
+    if (key === "status") {
+      sawStatus = true;
+      return `${m[1]}${m[2]}${m[3]}${next}`;
+    }
+    if (key === "updated") {
+      sawUpdated = true;
+      return `${m[1]}${m[2]}${m[3]}${now}`;
+    }
+    return line;
+  });
+  if (!sawStatus) rewritten.push(`status: ${next}`);
+  if (!sawUpdated) rewritten.push(`updated: ${now}`);
+  return `---\n${rewritten.join("\n")}\n---\n${fm.body}`;
 }
 
 const ACTIVE_FILE = () => join(CONFIG.stateDir, "active-project");

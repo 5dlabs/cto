@@ -76,6 +76,27 @@ async function setupLayout(context: vscode.ExtensionContext): Promise<void> {
     // Not available in all versions
   }
 
+  // Hide Outline + Timeline views inside the Explorer viewlet. These are
+  // the two built-in collapsible views that live under the file tree and
+  // make code-server feel like an IDE; we want it to feel like a markdown
+  // editor. Multiple commands attempted — VS Code / code-server versions
+  // expose different names and we want the first one that sticks.
+  for (const viewId of ["outline", "timeline"]) {
+    for (const cmd of [
+      `${viewId}.removeView`,
+      `workbench.action.hideView.${viewId}`,
+      "workbench.action.hideView",
+    ]) {
+      try {
+        await vscode.commands.executeCommand(cmd, viewId);
+        console.log(`[CTO] Hidden ${viewId} via ${cmd}`);
+        break;
+      } catch {
+        // Command not available; try the next shape.
+      }
+    }
+  }
+
   // Only hide views once
   const configured = context.globalState.get<boolean>(SETUP_KEY);
   if (configured) {

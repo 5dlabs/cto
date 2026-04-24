@@ -12,6 +12,8 @@
   "workbench.activityBar.hidden.workbench.view.extension.github-copilot-chat": true,
   "workbench.activityBar.hidden.userDataProfiles": true,
   "workbench.activityBar.hidden.workbench.view.remote": true,
+  "workbench.views.state.workbench.view.explorer.outline.visible": false,
+  "workbench.views.state.workbench.view.explorer.timeline.visible": false,
   "views.customizations": {
     "viewContainerLocations": {
       "workbench.view.extension.cto-sidebar": 2

@@ -5,22 +5,22 @@ import { invalidateListCache, validateSlug } from "./projects";
 import { CONFIG } from "./config";
 import { commitAll, pushCurrentBranch } from "./git";
 
-export interface WritePrdResult {
+export interface WriteArchitectureResult {
   project: string;
   path: string;
   bytesWritten: number;
 }
 
 /**
- * Write (or overwrite) `.prd/PRD.md` for a project, commit as Morgan, and
- * push to origin. GitHub is the authoritative source for project
- * discovery, so a write that doesn't make it to GitHub isn't a write we
- * want to acknowledge.
+ * Write (or overwrite) `.prd/architecture.md` for a project, commit as
+ * Morgan, and push to origin. Parallel to `writePrd` but for the
+ * Sigma-Long architecture sibling doc. We invalidate the list cache so
+ * the `hasArchitecture` flag flips promptly in the UI.
  */
-export async function writePrd(
+export async function writeArchitecture(
   name: string,
   content: string,
-): Promise<WritePrdResult> {
+): Promise<WriteArchitectureResult> {
   validateSlug(name);
   const path = `${CONFIG.reposRoot}/${name}`;
   if (!existsSync(path)) {
@@ -31,16 +31,14 @@ export async function writePrd(
 
   const prdDir = join(path, ".prd");
   await mkdir(prdDir, { recursive: true });
-  const prdPath = join(prdDir, "PRD.md");
+  const archPath = join(prdDir, "architecture.md");
   const normalized = content.endsWith("\n") ? content : content + "\n";
-  const bytes = await Bun.write(prdPath, normalized);
+  const bytes = await Bun.write(archPath, normalized);
 
-  await commitAll(path, "docs: update .prd/PRD.md");
+  await commitAll(path, "docs: update .prd/architecture.md");
   await pushCurrentBranch(path);
 
-  // A PRD write can turn a "no-PRD" repo into a project — invalidate the
-  // discovery cache so the next list call picks it up.
   invalidateListCache();
 
-  return { project: name, path: prdPath, bytesWritten: bytes };
+  return { project: name, path: archPath, bytesWritten: bytes };
 }
