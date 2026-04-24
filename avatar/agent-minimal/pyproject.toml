@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "morgan-avatar-minimal"
+version = "0.1.0"
+description = "Minimal LiveKit audio publisher for animation pipeline validation."
+requires-python = ">=3.11"
+dependencies = [
+  "livekit>=0.14",
+  "livekit-agents>=1.0",
+  "elevenlabs>=1.0",
+  "pydub",
+  "python-dotenv",
+]

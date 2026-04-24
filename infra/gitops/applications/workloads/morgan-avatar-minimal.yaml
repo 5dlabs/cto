@@ -1,0 +1,48 @@
+---
+# =============================================================================
+# morgan-avatar-minimal — audio-only LiveKit worker (animation validation)
+# =============================================================================
+# Temporary worker that registers as agent_name=morgan-avatar and publishes a
+# pre-recorded MP3 track so the client-side TalkingHead/HeadAudio pipeline can
+# be validated without STT/LLM/TTS.  Remove once openclaw-morgan-avatar is fixed.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: morgan-avatar-minimal
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: morgan-avatar-minimal
+    app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/component: avatar-audio
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/cto.git
+    targetRevision: feat/morgan-avatar-minimal
+    path: infra/charts/morgan-avatar-minimal
+    helm:
+      releaseName: morgan-avatar-minimal
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: "5s"
+        factor: 2
+        maxDuration: "3m"
