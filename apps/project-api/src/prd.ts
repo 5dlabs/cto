@@ -12,10 +12,14 @@ export interface WritePrdResult {
 }
 
 /**
- * Write (or overwrite) `.prd/PRD.md` for a project, commit as Morgan, and
+ * Write (or overwrite) `.prd/prd.md` for a project, commit as Morgan, and
  * push to origin. GitHub is the authoritative source for project
  * discovery, so a write that doesn't make it to GitHub isn't a write we
  * want to acknowledge.
+ *
+ * If a legacy uppercase marker exists in the repo (`.prd/PRD.md` or
+ * `.PRD/PRD.md`), we rewrite into that same path to avoid ending up with
+ * two parallel markers. Fresh projects get the canonical lowercase path.
  */
 export async function writePrd(
   name: string,
@@ -29,13 +33,19 @@ export async function writePrd(
     });
   }
 
-  const prdDir = join(path, ".prd");
-  await mkdir(prdDir, { recursive: true });
-  const prdPath = join(prdDir, "PRD.md");
+  // Prefer existing legacy locations to avoid duplicate markers; otherwise
+  // write to the canonical lowercase path.
+  const legacyCandidates = [
+    join(path, ".prd", "PRD.md"),
+    join(path, ".PRD", "PRD.md"),
+  ];
+  const existingLegacy = legacyCandidates.find((p) => existsSync(p));
+  const prdPath = existingLegacy ?? join(path, ".prd", "prd.md");
+  await mkdir(join(path, ".prd"), { recursive: true });
   const normalized = content.endsWith("\n") ? content : content + "\n";
   const bytes = await Bun.write(prdPath, normalized);
 
-  await commitAll(path, "docs: update .prd/PRD.md");
+  await commitAll(path, "docs: update .prd/prd.md");
   await pushCurrentBranch(path);
 
   // A PRD write can turn a "no-PRD" repo into a project — invalidate the

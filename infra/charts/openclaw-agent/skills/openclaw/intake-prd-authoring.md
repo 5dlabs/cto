@@ -3,12 +3,12 @@
 You are running the intake conversation that turns a user's idea into a
 concrete pair of project docs:
 
-- `<repo>/.prd/PRD.md` — product requirements (vision, users, features)
+- `<repo>/.prd/prd.md` — product requirements (vision, users, features)
 - `<repo>/.prd/architecture.md` — technical shape (stack, services, API)
 
 Both live in the `.prd/` folder at the repo root. The folder is how the
 cto-app UI decides a GitHub repo counts as a "project" — without
-`.prd/PRD.md`, the repo is invisible to the Projects board.
+`.prd/prd.md`, the repo is invisible to the Projects board.
 
 This skill applies whenever the cto-app UI or a Discord conversation is
 in "project intake" mode.
@@ -30,7 +30,7 @@ in "project intake" mode.
 
 A back-and-forth conversation where you (Morgan) help the user name the
 problem, shape the scope, and surface technical decisions — drafting
-and pushing revisions of `PRD.md` and `architecture.md` as you go, then
+and pushing revisions of `prd.md` and `architecture.md` as you go, then
 flipping the project state to `ready` when the user signs off.
 
 ## Active project pointer + sidecar API
@@ -45,7 +45,7 @@ POST /projects/active                → { "name": "<slug>" }
 GET  /projects                       → ProjectDescriptor[]
 GET  /projects/<slug>                → ProjectDescriptor
 POST /projects {"name":"<slug>"}     → create (GitHub clone or init)
-POST /projects/<slug>/prd            → write .prd/PRD.md + commit + push
+POST /projects/<slug>/prd            → write .prd/prd.md + commit + push
 POST /projects/<slug>/verify         → clone-on-demand if remote-only
 ```
 
@@ -74,8 +74,8 @@ The cto-app Projects board reads project state from the repo itself:
 | State | Detection | When you set it |
 |---|---|---|
 | `empty` | Repo exists, no `.prd/` folder on default branch | (never — you're authoring, so you always write something) |
-| `drafting` | `.prd/PRD.md` exists, frontmatter `status: drafting` or absent | Your first PRD write |
-| `ready` | `.prd/PRD.md` frontmatter `status: ready` AND `.prd/architecture.md` present | When user says the docs are good to go |
+| `drafting` | `.prd/prd.md` exists, frontmatter `status: drafting` or absent | Your first PRD write |
+| `ready` | `.prd/prd.md` frontmatter `status: ready` AND `.prd/architecture.md` present | When user says the docs are good to go |
 | `intake` | `.prd/tasks.json` exists | Session-2 intake writes this |
 
 The `status:` frontmatter key is authoritative. You manage it. The UI
@@ -83,7 +83,7 @@ just reads and displays.
 
 ### Frontmatter shape
 
-Always include at the top of `.prd/PRD.md`:
+Always include at the top of `.prd/prd.md`:
 
 ```yaml
 ---
@@ -109,7 +109,7 @@ a name, a problem, and at least one user or feature. That's enough.
 ## Iterating
 
 Each `POST /projects/<slug>/prd` overwrites the file, commits as Morgan
-(`docs: update .prd/PRD.md`), and pushes to origin. There is no diff
+(`docs: update .prd/prd.md`), and pushes to origin. There is no diff
 negotiation — you read the existing content, merge your changes, write
 the whole thing back. Never echo user-supplied credentials into the
 body.
@@ -155,7 +155,7 @@ confirmation.
 
 1. Pull running intake state from mem0 (`category=intake_decision`,
    `project=<slug>`). Combine with anything still in context.
-2. Draft a single `PRD.md` body. Aim for a structured doc the team can
+2. Draft a single `prd.md` body. Aim for a structured doc the team can
    actually build from — see the shape below. Use real content, not
    placeholders. If something is unknown, flag it as an open question
    rather than inventing it.
@@ -171,7 +171,7 @@ confirmation.
    PAYLOAD
    ```
 
-   The sidecar writes `/workspace/repos/<slug>/.prd/PRD.md`, commits
+   The sidecar writes `/workspace/repos/<slug>/.prd/prd.md`, commits
    as Morgan, and pushes. You don't run git yourself.
 5. Speak a short confirmation: revision number, main changes, top 1–3
    open questions still to resolve. Don't monologue the whole PRD.
@@ -216,7 +216,7 @@ repo. That's the NotifyCore Sigma-Long sample — the shape to aim for.
 
 Once the PRD has a stable shape — typically after the user has named
 the stack, the primary services, and the data model — draft
-`.prd/architecture.md`. This is the technical sibling of PRD.md.
+`.prd/architecture.md`. This is the technical sibling of prd.md.
 
 Keep it focused on **decisions that are already made**, not speculative
 options. If the user hasn't picked a database, don't invent one; list
@@ -290,7 +290,7 @@ after showing the draft is enough; silence is not.
   `POST /projects {"name":"<slug>"}` and wait for the clone/init.
 - Never echo `GITHUB_TOKEN` or any credential into chat or into either
   doc.
-- If `.prd/PRD.md` already has content, read it first and merge — the
+- If `.prd/prd.md` already has content, read it first and merge — the
   sidecar endpoint always overwrites, so merging is your job.
 - Keep both docs in clean Markdown. No smart quotes. No decorative
   emoji. No "AI wrote this" watermarks.

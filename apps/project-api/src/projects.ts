@@ -147,16 +147,19 @@ async function cloneWithRetry(
 }
 
 /**
- * Write the `.prd/PRD.md` marker that tells the rest of the system "this is
+ * Write the `.prd/prd.md` marker that tells the rest of the system "this is
  * a Morgan-managed project". Creates the folder if missing; idempotent when
  * the file already exists with the expected header. The scaffold now
  * includes a starter frontmatter block so the state field is present from
  * day one (status: drafting).
+ *
+ * Both folder and filename are lowercase so the same path works on case-
+ * sensitive filesystems (Linux pods) and case-preserving ones (dev macs).
  */
 async function writePrdScaffold(path: string, name: string): Promise<boolean> {
   const dir = join(path, ".prd");
   await mkdir(dir, { recursive: true });
-  const prd = join(dir, "PRD.md");
+  const prd = join(dir, "prd.md");
   if (existsSync(prd)) return false;
   const updated = new Date().toISOString();
   const content =
@@ -172,14 +175,14 @@ async function writePrdScaffold(path: string, name: string): Promise<boolean> {
 }
 
 /**
- * Ensure the GitHub repo has `.prd/PRD.md`. Writes the scaffold, commits,
+ * Ensure the GitHub repo has `.prd/prd.md`. Writes the scaffold, commits,
  * and pushes. Throws on push failure — GitHub is the authoritative source
  * of truth for project discovery, so a create that can't push should fail.
  */
 async function ensurePrdOnRemote(path: string, name: string): Promise<void> {
   const wrote = await writePrdScaffold(path, name);
   if (wrote) {
-    await commitAll(path, "docs: add .prd/PRD.md scaffold");
+    await commitAll(path, "docs: add .prd/prd.md scaffold");
   }
   await pushCurrentBranch(path);
 }
@@ -211,18 +214,19 @@ async function describeLocal(
   name: string,
   hasPrdHint?: boolean,
 ): Promise<ProjectDescriptor> {
-  // Resolve canonical `.prd/` first, then fall back to legacy `.PRD/` for
-  // repos cloned before the rename (PR #4820). Once every active repo is
-  // migrated the uppercase branch can be deleted.
-  const prdLower = join(path, ".prd", "PRD.md");
-  const prdUpper = join(path, ".PRD", "PRD.md");
+  // Resolve the PRD marker using the same precedence as the GitHub probe:
+  // fully lowercase canonical → legacy uppercase filename → pre-rename
+  // uppercase folder. First existing path wins. Once every active repo
+  // has been migrated the two fallbacks can be deleted.
+  const prdDefault = join(path, ".prd", "prd.md");
+  const prdCandidates = [
+    prdDefault,
+    join(path, ".prd", "PRD.md"),
+    join(path, ".PRD", "PRD.md"),
+  ];
+  const prdPath = prdCandidates.find((p) => existsSync(p)) ?? prdDefault;
   const archLower = join(path, ".prd", "architecture.md");
   const archUpper = join(path, ".PRD", "architecture.md");
-  const prdPath = existsSync(prdLower)
-    ? prdLower
-    : existsSync(prdUpper)
-      ? prdUpper
-      : prdLower;
   const hasPrd =
     hasPrdHint !== undefined ? hasPrdHint : existsSync(prdPath);
   const hasArchitecture = existsSync(archLower) || existsSync(archUpper);
@@ -537,10 +541,18 @@ export async function markProjectReady(
         status: 404,
       });
     }
-    const prdPath = join(path, ".prd", "PRD.md");
-    if (!existsSync(prdPath)) {
+    // Pick the same marker path describeLocal would have resolved to —
+    // canonical lowercase first, then transitional uppercase filename,
+    // then pre-rename uppercase folder.
+    const prdCandidates = [
+      join(path, ".prd", "prd.md"),
+      join(path, ".prd", "PRD.md"),
+      join(path, ".PRD", "PRD.md"),
+    ];
+    const prdPath = prdCandidates.find((p) => existsSync(p));
+    if (!prdPath) {
       throw Object.assign(
-        new Error(`project "${name}" has no .prd/PRD.md to mark ready`),
+        new Error(`project "${name}" has no .prd/prd.md to mark ready`),
         { status: 409 },
       );
     }
