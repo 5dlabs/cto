@@ -1332,12 +1332,18 @@ spec:
                 };
                 fs.writeFileSync(p,JSON.stringify(d,null,2));
               " 2>/dev/null || true
+              # Remove the bundled GitHub Copilot extension from code-server's
+              # builtin dir. code-server 4.117+ ships Copilot as a builtin that
+              # is immune to `--uninstall-extension`, and code-server has NO
+              # `--disable-extension` CLI flag (that's VS Code Desktop only —
+              # passing it here makes code-server exit with "Unknown option").
+              # Deleting the directory is the only reliable way to keep the
+              # cto-sidebar as our primary agent surface.
+              rm -rf /usr/lib/code-server/lib/vscode/extensions/copilot 2>/dev/null || true
               exec code-server \
                 --disable-telemetry \
                 --user-data-dir /workspace/.code-server \
                 --extensions-dir "$EXTDIR" \
-                --disable-extension GitHub.copilot-chat \
-                --disable-extension GitHub.copilot \
                 {{ .Values.codeServer.defaultFolder | default "/workspace" }}
           env:
             - name: PASSWORD
