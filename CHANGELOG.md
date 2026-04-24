@@ -3,6 +3,29 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.84](https://github.com/5dlabs/cto/compare/v0.2.83...v0.2.84) (2026-04-24)
+
+
+### ✨ Features
+
+* **code-server:** auto-trust + strip chrome ([#4819](https://github.com/5dlabs/cto/issues/4819)) ([1603672](https://github.com/5dlabs/cto/commit/160367253aeb6d4b20b985f22eea829dfee324b0))
+* **cto-sidebar:** hide Outline+Timeline, auxbar closed, Explorer beside 5dlabs ([#4823](https://github.com/5dlabs/cto/issues/4823)) ([ad5b905](https://github.com/5dlabs/cto/commit/ad5b905aaf9c34007476bdac760e158c33f67edb))
+* **cto-sidebar:** move to right auxiliary bar (replace Copilot slot) ([#4827](https://github.com/5dlabs/cto/issues/4827)) ([ae4d486](https://github.com/5dlabs/cto/commit/ae4d486e115375db810d97a5eb189d1d339e6d06))
+* **morgan-skill:** rewrite intake-prd-authoring for .prd/ + architecture + state machine ([#4822](https://github.com/5dlabs/cto/issues/4822)) ([ef41b8e](https://github.com/5dlabs/cto/commit/ef41b8e4599dda9b7354ced8eb421e3011262cfb))
+* **openclaw-agent:** install cto-sidebar vsix, uninstall Copilot ([#4821](https://github.com/5dlabs/cto/issues/4821)) ([30a2fe5](https://github.com/5dlabs/cto/commit/30a2fe57a5ef37bedbe58d17106e3253e0247ef2))
+* **project-api:** PRD frontmatter state machine + architecture endpoint ([#4824](https://github.com/5dlabs/cto/issues/4824)) ([7e2007c](https://github.com/5dlabs/cto/commit/7e2007c562f9ddbb1ef4d6e49acafe11232eb76d))
+
+
+### 🐛 Bug Fixes
+
+* **avatar:** local GLB fallback, disable mic, drop --webpack for Tailwind v4 ([#4817](https://github.com/5dlabs/cto/issues/4817)) ([c464408](https://github.com/5dlabs/cto/commit/c4644083ecfa995a85f3056dc50114e3e7dd0fc9))
+* **project-api:** probe legacy .PRD/ path during discovery ([#4826](https://github.com/5dlabs/cto/issues/4826)) ([720ad9d](https://github.com/5dlabs/cto/commit/720ad9dd12d4bae640f37ff32095b3174c19b5ed))
+
+
+### ♻️ Refactoring
+
+* **project-api:** rename .PRD folder to lowercase .prd ([#4820](https://github.com/5dlabs/cto/issues/4820)) ([502bdad](https://github.com/5dlabs/cto/commit/502bdad9c851086b1166f6d2227339dfec1483cf))
+
 ## [0.2.83](https://github.com/5dlabs/cto/compare/v0.2.82...v0.2.83) (2026-04-24)
 
 
