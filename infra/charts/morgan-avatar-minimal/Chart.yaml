@@ -1,0 +1,9 @@
+apiVersion: v2
+name: morgan-avatar-minimal
+description: Minimal LiveKit audio publisher — animation pipeline validation.
+type: application
+version: 0.1.0
+appVersion: "v0.1.0"
+maintainers:
+  - name: 5dlabs
+    email: ops@5dlabs.ai
