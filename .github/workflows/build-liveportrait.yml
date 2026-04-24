@@ -2,7 +2,9 @@ name: Build and Push LivePortrait Image
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'feat/liveportrait-**'
     paths:
       - 'avatar/liveportrait/**'
       - '.github/workflows/build-liveportrait.yml'
