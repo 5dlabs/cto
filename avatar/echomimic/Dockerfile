@@ -60,7 +60,7 @@ WORKDIR /workspace/EchoMimicV3
 # OVH AI Deploy V100S host ships CUDA 12.4 driver, incompatible with cu128.
 RUN pip install --index-url https://download.pytorch.org/whl/cu121 \
       torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 \
- && printf 'transformers<5\nhuggingface_hub<1\ntorch==2.3.1\ntorchvision==0.18.1\ntorchaudio==2.3.1\n' > /tmp/constraints.txt \
+ && printf 'transformers<5\nhuggingface_hub<1\ntorch==2.3.1\ntorchvision==0.18.1\ntorchaudio==2.3.1\ndiffusers<0.32\n' > /tmp/constraints.txt \
  && pip install -c /tmp/constraints.txt \
       "transformers==4.46.2" \
       "huggingface_hub[cli]==0.26.2" \
