@@ -122,24 +122,29 @@ export function authenticatedCloneUrl(cloneUrl: string): string {
 }
 
 /**
- * Paths we try (in order) when probing for a PRD marker. The lowercase
- * `.prd/prd.md` form is canonical — both folder and filename are lower
- * case so the same path works on case-sensitive filesystems (Linux pods)
- * and case-preserving ones (dev macs). `.prd/PRD.md` is a transitional
- * fallback for repos written between PR #4820 (folder lowercased) and
- * the filename-lowercase migration; `.PRD/PRD.md` is the pre-#4820
- * legacy shape. TODO: remove both fallbacks once every active repo in
- * the org has been migrated.
+ * Paths we try (in order) when probing for a PRD marker. The new canonical
+ * home is `.plan/prd/prd.md` under the `.plan/` sidecar convention — both
+ * folder and filename are lowercase so the same path resolves on case-
+ * sensitive (Linux pods) and case-preserving (dev macs) filesystems. The
+ * `.prd/prd.md` / `.prd/PRD.md` / `.PRD/PRD.md` fallbacks are kept so
+ * repos that predate the `.plan/` migration stay visible on the Projects
+ * board during transition. TODO: remove legacy fallbacks once every
+ * active repo in the org has been migrated.
  */
 const PRD_MARKER_PATHS = [
+  ".plan/prd/prd.md",
   ".prd/prd.md",
   ".prd/PRD.md",
   ".PRD/PRD.md",
 ] as const;
 const ARCHITECTURE_MARKER_PATHS = [
+  ".plan/spec/architecture.md",
   ".prd/architecture.md",
   ".PRD/architecture.md",
 ] as const;
+
+/** Canonical location of the plain-text status sidecar managed by Morgan. */
+export const STATUS_PATH = ".plan/status.txt";
 
 /**
  * Check whether `<org>/<name>` contains a PRD marker at the default branch.
@@ -227,6 +232,80 @@ export async function fetchPrdInfo(
     return { exists: true, content, fields: fm.fields };
   }
   return { exists: false, content: null, fields: {} };
+}
+
+export interface StatusInfo {
+  /** Phase name, e.g. `"intake"`, `"ready"`, `"implementing"`. */
+  phase: string;
+  /** ISO-8601 timestamp of the last phase flip, if present. */
+  updated: string | null;
+  /** Decoded file content, retained for debugging; not returned on the DTO. */
+  raw: string;
+}
+
+/**
+ * Parse a `.plan/status.txt` body. The canonical shape is two `#`-comment
+ * lines (DO-NOT-EDIT header) followed by `phase: <name>` and
+ * `updated: <ISO-8601>`. For compatibility with the bare sigma-1 form the
+ * parser also accepts a file whose first non-blank non-`#` line is the
+ * phase name with no `phase:` prefix. `updated` is optional.
+ */
+export function parseStatus(raw: string): Omit<StatusInfo, "raw"> {
+  let phase: string | null = null;
+  let updated: string | null = null;
+  let firstLoose: string | null = null;
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("#")) continue;
+    const m = /^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.*)$/.exec(trimmed);
+    if (m) {
+      const key = (m[1] ?? "").toLowerCase();
+      const value = (m[2] ?? "").trim();
+      if (key === "phase" && phase === null) phase = value;
+      else if (key === "updated" && updated === null) updated = value || null;
+      continue;
+    }
+    if (firstLoose === null) firstLoose = trimmed;
+  }
+  return { phase: (phase ?? firstLoose ?? "").trim(), updated };
+}
+
+/**
+ * Fetch `.plan/status.txt` from `<org>/<name>`. Returns `null` when the
+ * file is absent (404) — that's the normal shape for legacy `.prd/`-only
+ * projects and should NOT count as a probe failure. Any other non-2xx
+ * propagates as a thrown error so the caller can treat it as transient.
+ */
+export async function readStatus(
+  org: string,
+  name: string,
+  ref?: string,
+): Promise<StatusInfo | null> {
+  const query = ref ? `?ref=${encodeURIComponent(ref)}` : "";
+  const result = await githubJson<{ content?: string; encoding?: string }>(
+    "GET",
+    `/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/contents/${STATUS_PATH}${query}`,
+  );
+  if (result.status === 404) return null;
+  if (result.status < 200 || result.status >= 300 || !result.data) {
+    throw new Error(
+      `github status read failed: ${result.status}${result.text ? ` — ${result.text.slice(0, 240)}` : ""}`,
+    );
+  }
+  let raw = "";
+  if (
+    result.data.encoding === "base64" &&
+    typeof result.data.content === "string"
+  ) {
+    try {
+      raw = atob(result.data.content.replace(/\n/g, ""));
+    } catch {
+      raw = "";
+    }
+  }
+  const parsed = parseStatus(raw);
+  return { ...parsed, raw };
 }
 
 export interface OrgRepoSummary {
