@@ -26,6 +26,7 @@ import {
   listProjects,
   setActiveProject,
   validateSlug,
+  verifyProject,
 } from "./projects";
 import { writePrd } from "./prd";
 
@@ -55,7 +56,8 @@ async function handle(ctx: RouteCtx): Promise<Response> {
   }
 
   if (pathname === "/projects" && req.method === "GET") {
-    const projects = await listProjects();
+    const force = url.searchParams.get("refresh") === "1";
+    const projects = await listProjects({ force });
     return json(projects, { origin });
   }
 
@@ -92,8 +94,8 @@ async function handle(ctx: RouteCtx): Promise<Response> {
     }
   }
 
-  // /projects/:name[/prd]
-  const projectRoute = pathname.match(/^\/projects\/([^/]+)(?:\/(prd))?$/);
+  // /projects/:name[/prd|/verify]
+  const projectRoute = pathname.match(/^\/projects\/([^/]+)(?:\/(prd|verify))?$/);
   if (projectRoute) {
     const rawName = decodeURIComponent(projectRoute[1] ?? "");
     try {
@@ -107,6 +109,18 @@ async function handle(ctx: RouteCtx): Promise<Response> {
       const p = await getProject(rawName);
       if (!p) return problem(404, `project "${rawName}" not found`, origin);
       return json(p, { origin });
+    }
+
+    if (sub === "verify" && req.method === "POST") {
+      try {
+        const p = await verifyProject(rawName);
+        console.log(
+          `[project-api] verify project="${rawName}" locality=${p.locality} path=${p.path}`,
+        );
+        return json(p, { origin });
+      } catch (err) {
+        return mapError(err, origin);
+      }
     }
 
     if (sub === "prd" && req.method === "POST") {

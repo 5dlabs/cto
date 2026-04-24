@@ -141,3 +141,26 @@ export async function commitAll(
   await gitOk(["config", "user.email", CONFIG.commitEmail], { cwd });
   return gitOk(["commit", "-m", message], { cwd });
 }
+
+/**
+ * Push the current branch to `origin`, creating the upstream link on first
+ * push. Throws on non-zero exit — callers decide whether to surface the
+ * failure (we do for project create, where GitHub is authoritative).
+ */
+export async function pushCurrentBranch(cwd: string): Promise<void> {
+  const branch = await currentBranch(cwd);
+  if (!branch) {
+    throw new Error("cannot push: repository has no current branch (unborn HEAD)");
+  }
+  await gitOk(["push", "-u", "origin", branch], { cwd, timeoutMs: 60_000 });
+}
+
+/**
+ * Verify a directory is a healthy git checkout. Confirms `.git` is present
+ * and `git rev-parse --is-inside-work-tree` succeeds. Returns false for
+ * missing dirs, non-repos, or partial/corrupt clones.
+ */
+export async function isHealthyRepo(cwd: string): Promise<boolean> {
+  const r = await git(["rev-parse", "--is-inside-work-tree"], { cwd });
+  return r.code === 0 && r.stdout.trim() === "true";
+}
