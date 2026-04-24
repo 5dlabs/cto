@@ -3,6 +3,14 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.83](https://github.com/5dlabs/cto/compare/v0.2.82...v0.2.83) (2026-04-24)
+
+
+### ✨ Features
+
+* morgan-avatar-minimal — audio-only LiveKit worker for animation validation ([#4814](https://github.com/5dlabs/cto/issues/4814)) ([87f77c2](https://github.com/5dlabs/cto/commit/87f77c205631d0e00600fde17adaf71e0938ce0e))
+* **project-api:** PRD-marker project discovery + clone-on-demand ([#4815](https://github.com/5dlabs/cto/issues/4815)) ([5d90df1](https://github.com/5dlabs/cto/commit/5d90df15b1e04f1924a60a853bd8db12b9da12a3))
+
 ## [0.2.82](https://github.com/5dlabs/cto/compare/v0.2.81...v0.2.82) (2026-04-24)
 
 
