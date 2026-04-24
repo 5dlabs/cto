@@ -10,6 +10,11 @@
 
 set -euo pipefail
 
+# HF Hub: default 10s read timeout is too aggressive for the ~10GB of weights
+# on the xethub CDN. Bump to 5 min; resume is automatic via huggingface-cli.
+export HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-300}"
+export HF_XET_DOWNLOAD_TIMEOUT="${HF_XET_DOWNLOAD_TIMEOUT:-300}"
+
 PRETRAINED_DIR="${ECHOMIMIC_PRETRAINED_DIR:-/workspace/EchoMimicV3/pretrained_weights}"
 mkdir -p "$PRETRAINED_DIR"
 
@@ -22,11 +27,22 @@ download() {
     return 0
   fi
   echo "[bootstrap] downloading $repo -> $dest"
-  HF_HUB_ENABLE_HF_TRANSFER=0 huggingface-cli download \
-    "$repo" \
-    --local-dir "$dest" \
-    --exclude "*.git*" "README.md" "docs/*" \
-    || { echo "[bootstrap][error] $repo download failed"; return 1; }
+  local attempt=1
+  local max_attempts=5
+  while [ $attempt -le $max_attempts ]; do
+    if HF_HUB_ENABLE_HF_TRANSFER=0 huggingface-cli download \
+        "$repo" \
+        --local-dir "$dest" \
+        --exclude "*.git*" "README.md" "docs/*"; then
+      echo "[bootstrap] $repo done"
+      return 0
+    fi
+    echo "[bootstrap][warn] $repo attempt $attempt/$max_attempts failed; retrying in 10s"
+    sleep 10
+    attempt=$((attempt+1))
+  done
+  echo "[bootstrap][error] $repo download failed after $max_attempts attempts"
+  return 1
 }
 
 # EchoMimicV3 flash transformer (~3.4GB)
@@ -47,4 +63,4 @@ download "TencentGameMate/chinese-wav2vec2-base" \
 echo "[bootstrap] layout:"
 ls -la "$PRETRAINED_DIR" || true
 
-exec uvicorn server:app --host 0.0.0.0 --port "${PORT:-8000}" --workers 1
+exec uvicorn server:app --app-dir /workspace --host 0.0.0.0 --port "${PORT:-8000}" --workers 1

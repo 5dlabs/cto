@@ -48,7 +48,7 @@ WORKDIR /workspace/EchoMimicV3
 RUN pip install --index-url https://download.pytorch.org/whl/cu121 \
       torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 \
  && if [ -f requirements.txt ]; then pip install -r requirements.txt; fi \
- && pip install "huggingface_hub[cli]==0.24.0" \
+ && pip install "huggingface_hub[cli]==0.27.1" \
       fastapi==0.115.0 \
       "uvicorn[standard]==0.30.6" \
       python-multipart==0.0.9 \
