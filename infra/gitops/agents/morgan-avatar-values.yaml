@@ -161,13 +161,18 @@ extraEnv:
     valueFrom:
       secretKeyRef:
         name: openclaw-api-keys
-        key: OPENAI_API_KEY
+        key: openai-api-key
   - name: MORGAN_TTS_MODE
     value: "elevenlabs"
   - name: MORGAN_ELEVEN_VOICE_ID
     value: "iP95p4xoKVk53GoZ742B"
   - name: MORGAN_ELEVEN_MODEL
     value: "eleven_flash_v2_5"
+  - name: ELEVENLABS_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: openclaw-api-keys
+        key: elevenlabs-api-key
 
 codeServer:
   enabled: false
