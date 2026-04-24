@@ -44,15 +44,34 @@ RUN git clone ${ECHOMIMIC_REPO} /workspace/EchoMimicV3 \
 
 WORKDIR /workspace/EchoMimicV3
 
-# Torch cu121 first, then upstream requirements
+# Torch cu121 first, then upstream requirements with version family constraints.
+# Root cause of prior `is_offline_mode` ImportError: upstream requirements.txt
+# pins `transformers>=4.46.2` with no upper bound and has no huggingface_hub pin,
+# so pip resolved to transformers 5.x + huggingface_hub 1.x — an incompatible
+# family pair where hub 1.x removed the top-level `is_offline_mode` symbol
+# that transformers 5.x imports. See huggingface/transformers#42757.
+# Fix: install pinned transformers/hub FIRST, then run upstream reqs with a
+# constraints file that prevents resolver upgrades past the 4.x/0.x families.
+#
+# Also pin torch/torchvision/torchaudio in the constraints file. Upstream
+# requirements.txt lists torch with no pin and pip will happily upgrade to
+# the latest PyPI wheel (torch 2.11+cu128) which fails at runtime on V100S
+# with `NVIDIA driver on your system is too old (found version 12040)` — the
+# OVH AI Deploy V100S host ships CUDA 12.4 driver, incompatible with cu128.
 RUN pip install --index-url https://download.pytorch.org/whl/cu121 \
       torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 \
- && if [ -f requirements.txt ]; then pip install -r requirements.txt; fi \
- && pip install "huggingface_hub[cli]==0.27.1" \
+ && printf 'transformers<5\nhuggingface_hub<1\ntorch==2.3.1\ntorchvision==0.18.1\ntorchaudio==2.3.1\n' > /tmp/constraints.txt \
+ && pip install -c /tmp/constraints.txt \
+      "transformers==4.46.2" \
+      "huggingface_hub[cli]==0.26.2" \
+ && if [ -f requirements.txt ]; then pip install -c /tmp/constraints.txt -r requirements.txt; fi \
+ && pip install -c /tmp/constraints.txt \
       fastapi==0.115.0 \
       "uvicorn[standard]==0.30.6" \
       python-multipart==0.0.9 \
-      soundfile==0.12.1
+      soundfile==0.12.1 \
+ && pip check || echo "pip check reported issues (non-fatal)" \
+ && python -c "import torch, transformers, huggingface_hub; print('torch=', torch.__version__, 'cuda=', torch.version.cuda); print('transformers=', transformers.__version__, 'huggingface_hub=', huggingface_hub.__version__); from transformers.utils.hub import is_offline_mode; print('is_offline_mode import OK')"
 
 # EchoMimicV3-Flash needs 3 HF repos (see upstream README):
 #   1. BadToBest/EchoMimicV3          — flash pro weights + transformer
