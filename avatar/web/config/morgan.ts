@@ -22,9 +22,8 @@ const MORGAN_MORPH_TARGETS = [
 ].join(",");
 
 // TODO(ws-b2): swap to canine rig when hosted — see avatar/web/docs/canine-rig-spec.md
-export const MORGAN_DEFAULT_GLB_URL =
-  `https://models.readyplayer.me/${MORGAN_RPM_ID}.glb` +
-  `?morphTargets=${encodeURIComponent(MORGAN_MORPH_TARGETS)}`;
+// Local bundled avatar (brunette-t.glb from TalkingHead repo) — RPM CDN (models.readyplayer.me) is dead (NXDOMAIN).
+export const MORGAN_DEFAULT_GLB_URL = "/morgan.glb";
 
 /**
  * Morgan anthro-canine rig (WS-B2).
