@@ -123,12 +123,19 @@ export function authenticatedCloneUrl(cloneUrl: string): string {
 
 /**
  * Paths we try (in order) when probing for a PRD marker. The lowercase
- * `.prd/` form is canonical after the PR #4820 rename; `.PRD/` is a
- * transitional fallback so repos created before the rename don't silently
- * drop out of discovery. TODO: remove the uppercase fallback once every
- * active repo in the org has been migrated.
+ * `.prd/prd.md` form is canonical — both folder and filename are lower
+ * case so the same path works on case-sensitive filesystems (Linux pods)
+ * and case-preserving ones (dev macs). `.prd/PRD.md` is a transitional
+ * fallback for repos written between PR #4820 (folder lowercased) and
+ * the filename-lowercase migration; `.PRD/PRD.md` is the pre-#4820
+ * legacy shape. TODO: remove both fallbacks once every active repo in
+ * the org has been migrated.
  */
-const PRD_MARKER_PATHS = [".prd/PRD.md", ".PRD/PRD.md"] as const;
+const PRD_MARKER_PATHS = [
+  ".prd/prd.md",
+  ".prd/PRD.md",
+  ".PRD/PRD.md",
+] as const;
 const ARCHITECTURE_MARKER_PATHS = [
   ".prd/architecture.md",
   ".PRD/architecture.md",
