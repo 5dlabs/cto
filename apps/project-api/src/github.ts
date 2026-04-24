@@ -1,4 +1,5 @@
 import { CONFIG } from "./config";
+import { parseFrontmatter } from "./frontmatter";
 
 export interface RepoInfo {
   exists: boolean;
@@ -134,6 +135,65 @@ export async function hasPrdMarker(
     `/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/contents/.prd/PRD.md`,
   );
   return result.status >= 200 && result.status < 300;
+}
+
+/**
+ * Check whether `<org>/<name>` contains `.prd/architecture.md` at the
+ * default branch. Used by discovery to set the `hasArchitecture` flag on
+ * the `ProjectDescriptor` so the UI can differentiate "PRD-only" from
+ * "full intake-ready" projects.
+ */
+export async function hasArchitectureMarker(
+  org: string,
+  name: string,
+): Promise<boolean> {
+  const result = await githubJson<{ type?: string; size?: number }>(
+    "GET",
+    `/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/contents/.prd/architecture.md`,
+  );
+  return result.status >= 200 && result.status < 300;
+}
+
+export interface PrdInfo {
+  exists: boolean;
+  /** Decoded file content, when available. */
+  content: string | null;
+  /** Parsed frontmatter keys (lowercased). */
+  fields: Record<string, string>;
+}
+
+/**
+ * Fetch `.prd/PRD.md` from `<org>/<name>` and parse its YAML frontmatter.
+ * Used by discovery to populate `state` without a second round-trip.
+ *
+ * Returns `{exists:false}` on 404 or any non-2xx — discovery treats that
+ * as "no PRD" and drops the tile from the list.
+ */
+export async function fetchPrdInfo(
+  org: string,
+  name: string,
+): Promise<PrdInfo> {
+  const result = await githubJson<{ content?: string; encoding?: string }>(
+    "GET",
+    `/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/contents/.prd/PRD.md`,
+  );
+  if (result.status < 200 || result.status >= 300 || !result.data) {
+    return { exists: false, content: null, fields: {} };
+  }
+
+  let content: string | null = null;
+  if (result.data.encoding === "base64" && typeof result.data.content === "string") {
+    try {
+      // GitHub's base64 blobs arrive wrapped every 60 chars; atob tolerates
+      // whitespace in modern runtimes (Bun does).
+      content = atob(result.data.content.replace(/\n/g, ""));
+    } catch {
+      content = null;
+    }
+  }
+
+  const fm = content ? parseFrontmatter(content) : { fields: {} };
+  return { exists: true, content, fields: fm.fields };
 }
 
 export interface OrgRepoSummary {
