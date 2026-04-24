@@ -211,11 +211,21 @@ async function describeLocal(
   name: string,
   hasPrdHint?: boolean,
 ): Promise<ProjectDescriptor> {
-  const prdPath = join(path, ".prd", "PRD.md");
-  const archPath = join(path, ".prd", "architecture.md");
+  // Resolve canonical `.prd/` first, then fall back to legacy `.PRD/` for
+  // repos cloned before the rename (PR #4820). Once every active repo is
+  // migrated the uppercase branch can be deleted.
+  const prdLower = join(path, ".prd", "PRD.md");
+  const prdUpper = join(path, ".PRD", "PRD.md");
+  const archLower = join(path, ".prd", "architecture.md");
+  const archUpper = join(path, ".PRD", "architecture.md");
+  const prdPath = existsSync(prdLower)
+    ? prdLower
+    : existsSync(prdUpper)
+      ? prdUpper
+      : prdLower;
   const hasPrd =
     hasPrdHint !== undefined ? hasPrdHint : existsSync(prdPath);
-  const hasArchitecture = existsSync(archPath);
+  const hasArchitecture = existsSync(archLower) || existsSync(archUpper);
 
   let state: PrdStatus = "drafting";
   if (hasPrd) {
