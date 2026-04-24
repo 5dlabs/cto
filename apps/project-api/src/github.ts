@@ -121,7 +121,7 @@ export function authenticatedCloneUrl(cloneUrl: string): string {
 }
 
 /**
- * Check whether `<org>/<name>` contains `.PRD/PRD.md` at the default branch.
+ * Check whether `<org>/<name>` contains `.prd/PRD.md` at the default branch.
  * Returns `false` for 404 (no file) and for any non-2xx response — callers
  * treat "not sure" as "exclude from list", which is fine for discovery.
  */
@@ -131,7 +131,7 @@ export async function hasPrdMarker(
 ): Promise<boolean> {
   const result = await githubJson<{ type?: string; size?: number }>(
     "GET",
-    `/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/contents/.PRD/PRD.md`,
+    `/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/contents/.prd/PRD.md`,
   );
   return result.status >= 200 && result.status < 300;
 }
