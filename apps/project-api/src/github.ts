@@ -122,36 +122,56 @@ export function authenticatedCloneUrl(cloneUrl: string): string {
 }
 
 /**
- * Check whether `<org>/<name>` contains `.prd/PRD.md` at the default branch.
- * Returns `false` for 404 (no file) and for any non-2xx response — callers
- * treat "not sure" as "exclude from list", which is fine for discovery.
+ * Paths we try (in order) when probing for a PRD marker. The lowercase
+ * `.prd/` form is canonical after the PR #4820 rename; `.PRD/` is a
+ * transitional fallback so repos created before the rename don't silently
+ * drop out of discovery. TODO: remove the uppercase fallback once every
+ * active repo in the org has been migrated.
+ */
+const PRD_MARKER_PATHS = [".prd/PRD.md", ".PRD/PRD.md"] as const;
+const ARCHITECTURE_MARKER_PATHS = [
+  ".prd/architecture.md",
+  ".PRD/architecture.md",
+] as const;
+
+/**
+ * Check whether `<org>/<name>` contains a PRD marker at the default branch.
+ * Accepts the canonical `.prd/PRD.md` or the legacy uppercase `.PRD/PRD.md`.
+ * Returns `false` for 404 / any non-2xx — discovery treats "not sure" as
+ * "exclude from list".
  */
 export async function hasPrdMarker(
   org: string,
   name: string,
 ): Promise<boolean> {
-  const result = await githubJson<{ type?: string; size?: number }>(
-    "GET",
-    `/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/contents/.prd/PRD.md`,
-  );
-  return result.status >= 200 && result.status < 300;
+  for (const path of PRD_MARKER_PATHS) {
+    const result = await githubJson<{ type?: string; size?: number }>(
+      "GET",
+      `/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/contents/${path}`,
+    );
+    if (result.status >= 200 && result.status < 300) return true;
+  }
+  return false;
 }
 
 /**
- * Check whether `<org>/<name>` contains `.prd/architecture.md` at the
- * default branch. Used by discovery to set the `hasArchitecture` flag on
- * the `ProjectDescriptor` so the UI can differentiate "PRD-only" from
- * "full intake-ready" projects.
+ * Check whether `<org>/<name>` contains an architecture.md marker at the
+ * default branch. Accepts the legacy uppercase path too. Used by discovery
+ * to set `hasArchitecture` on the `ProjectDescriptor` so the UI can
+ * distinguish "PRD-only" from "intake-ready".
  */
 export async function hasArchitectureMarker(
   org: string,
   name: string,
 ): Promise<boolean> {
-  const result = await githubJson<{ type?: string; size?: number }>(
-    "GET",
-    `/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/contents/.prd/architecture.md`,
-  );
-  return result.status >= 200 && result.status < 300;
+  for (const path of ARCHITECTURE_MARKER_PATHS) {
+    const result = await githubJson<{ type?: string; size?: number }>(
+      "GET",
+      `/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/contents/${path}`,
+    );
+    if (result.status >= 200 && result.status < 300) return true;
+  }
+  return false;
 }
 
 export interface PrdInfo {
@@ -163,37 +183,43 @@ export interface PrdInfo {
 }
 
 /**
- * Fetch `.prd/PRD.md` from `<org>/<name>` and parse its YAML frontmatter.
- * Used by discovery to populate `state` without a second round-trip.
+ * Fetch the PRD marker from `<org>/<name>` and parse its YAML frontmatter.
+ * Tries the canonical `.prd/PRD.md` first, then falls back to the legacy
+ * `.PRD/PRD.md` path for repos that predate PR #4820. Without the fallback
+ * every pre-rename repo silently disappears from the Projects list.
  *
- * Returns `{exists:false}` on 404 or any non-2xx — discovery treats that
- * as "no PRD" and drops the tile from the list.
+ * Returns `{exists:false}` when neither path resolves — discovery drops the
+ * tile from the list in that case.
  */
 export async function fetchPrdInfo(
   org: string,
   name: string,
 ): Promise<PrdInfo> {
-  const result = await githubJson<{ content?: string; encoding?: string }>(
-    "GET",
-    `/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/contents/.prd/PRD.md`,
-  );
-  if (result.status < 200 || result.status >= 300 || !result.data) {
-    return { exists: false, content: null, fields: {} };
-  }
+  for (const path of PRD_MARKER_PATHS) {
+    const result = await githubJson<{ content?: string; encoding?: string }>(
+      "GET",
+      `/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/contents/${path}`,
+    );
+    if (result.status < 200 || result.status >= 300 || !result.data) continue;
 
-  let content: string | null = null;
-  if (result.data.encoding === "base64" && typeof result.data.content === "string") {
-    try {
-      // GitHub's base64 blobs arrive wrapped every 60 chars; atob tolerates
-      // whitespace in modern runtimes (Bun does).
-      content = atob(result.data.content.replace(/\n/g, ""));
-    } catch {
-      content = null;
+    let content: string | null = null;
+    if (
+      result.data.encoding === "base64" &&
+      typeof result.data.content === "string"
+    ) {
+      try {
+        // GitHub's base64 blobs arrive wrapped every 60 chars; atob tolerates
+        // whitespace in modern runtimes (Bun does).
+        content = atob(result.data.content.replace(/\n/g, ""));
+      } catch {
+        content = null;
+      }
     }
-  }
 
-  const fm = content ? parseFrontmatter(content) : { fields: {} };
-  return { exists: true, content, fields: fm.fields };
+    const fm = content ? parseFrontmatter(content) : { fields: {} };
+    return { exists: true, content, fields: fm.fields };
+  }
+  return { exists: false, content: null, fields: {} };
 }
 
 export interface OrgRepoSummary {
