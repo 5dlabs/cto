@@ -24,11 +24,13 @@ import {
   getActiveProject,
   getProject,
   listProjects,
+  markProjectReady,
   setActiveProject,
   validateSlug,
   verifyProject,
 } from "./projects";
 import { writePrd } from "./prd";
+import { writeArchitecture } from "./architecture";
 
 interface RouteCtx {
   req: Request;
@@ -94,8 +96,10 @@ async function handle(ctx: RouteCtx): Promise<Response> {
     }
   }
 
-  // /projects/:name[/prd|/verify]
-  const projectRoute = pathname.match(/^\/projects\/([^/]+)(?:\/(prd|verify))?$/);
+  // /projects/:name[/prd|/architecture|/mark-ready|/verify]
+  const projectRoute = pathname.match(
+    /^\/projects\/([^/]+)(?:\/(prd|architecture|mark-ready|verify))?$/,
+  );
   if (projectRoute) {
     const rawName = decodeURIComponent(projectRoute[1] ?? "");
     try {
@@ -135,6 +139,36 @@ async function handle(ctx: RouteCtx): Promise<Response> {
           `[project-api] write prd project="${rawName}" bytes=${res.bytesWritten} path=${res.path}`,
         );
         return json(res, { origin });
+      } catch (err) {
+        return mapError(err, origin);
+      }
+    }
+
+    if (sub === "architecture" && req.method === "POST") {
+      const body = (await readJson(req)) as { content?: string };
+      if (typeof body?.content !== "string") {
+        return problem(400, "body must include { content: string }", origin);
+      }
+      try {
+        const res = await writeArchitecture(rawName, body.content);
+        // eslint-disable-next-line no-console
+        console.log(
+          `[project-api] write architecture project="${rawName}" bytes=${res.bytesWritten} path=${res.path}`,
+        );
+        return json(res, { origin });
+      } catch (err) {
+        return mapError(err, origin);
+      }
+    }
+
+    if (sub === "mark-ready" && req.method === "POST") {
+      try {
+        const p = await markProjectReady(rawName);
+        // eslint-disable-next-line no-console
+        console.log(
+          `[project-api] mark-ready project="${rawName}" state=${p.state}`,
+        );
+        return json(p, { origin });
       } catch (err) {
         return mapError(err, origin);
       }
