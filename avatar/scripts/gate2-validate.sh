@@ -11,6 +11,11 @@
 #   SOURCE_IMG=avatar/morgan.jpg
 #   AUDIO=voice_clone_sample.mp3
 #   OUT=_runs/gate2-echomimic.mp4
+#   VIDEO_LENGTH=147                 # optional /animate tuning override
+#   SAMPLE_HEIGHT=768                # optional /animate tuning override
+#   SAMPLE_WIDTH=768                 # optional /animate tuning override
+#   WEIGHT_DTYPE=bfloat16            # optional /animate tuning override
+#   PROMPT='A golden retriever...'    # optional identity-preserving prompt
 
 set -euo pipefail
 
@@ -30,11 +35,17 @@ curl -fsS --max-time 15 -o /dev/null "${APP_URL%/}/docs" || {
   echo "[fatal] app not reachable at ${APP_URL}"; exit 3;
 }
 
+form=(-F "source=@${SOURCE_IMG}" -F "audio=@${AUDIO}")
+[[ -z "${VIDEO_LENGTH:-}" ]] || form+=(-F "video_length=${VIDEO_LENGTH}")
+[[ -z "${SAMPLE_HEIGHT:-}" ]] || form+=(-F "sample_height=${SAMPLE_HEIGHT}")
+[[ -z "${SAMPLE_WIDTH:-}" ]] || form+=(-F "sample_width=${SAMPLE_WIDTH}")
+[[ -z "${WEIGHT_DTYPE:-}" ]] || form+=(-F "weight_dtype=${WEIGHT_DTYPE}")
+[[ -z "${PROMPT:-}" ]] || form+=(-F "prompt=${PROMPT}")
+
 echo "[info] POST /animate  source=$SOURCE_IMG  audio=$(basename "$AUDIO")"
 http_code=$(curl -sS -o "$OUT" -w '%{http_code}' \
   --max-time 900 \
-  -F "source=@${SOURCE_IMG}" \
-  -F "audio=@${AUDIO}" \
+  "${form[@]}" \
   "${APP_URL%/}/animate")
 
 if [[ "$http_code" != "200" ]]; then

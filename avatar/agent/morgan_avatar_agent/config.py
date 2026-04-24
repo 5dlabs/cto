@@ -5,6 +5,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DEFAULT_PERSONAS_ROOT = Path("/personas")
+DEFAULT_ECHOMIMIC_PROMPT = (
+    "A golden retriever dog wearing a suit is talking. Keep the face and muzzle clearly canine, "
+    "preserve the dog identity, natural dog mouth motion, no human face."
+)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -94,6 +98,15 @@ class AgentConfig:
     nats_request_subject: str
     nats_result_subject: str
     nats_stream: str
+    echomimic_app_url: str
+    echomimic_prompt: str
+    echomimic_source_image_path: Path
+    echomimic_video_length: int | None
+    echomimic_sample_height: int | None
+    echomimic_sample_width: int | None
+    echomimic_weight_dtype: str
+    echomimic_request_timeout_s: float
+    echomimic_auto_render: bool
 
     @classmethod
     def from_env(cls, project_root: Path | None = None) -> AgentConfig:
@@ -153,9 +166,7 @@ class AgentConfig:
             deepgram_flux_model=os.getenv("MORGAN_DEEPGRAM_FLUX_MODEL", "flux-general-en").strip(),
             deepgram_nova_model=os.getenv("MORGAN_DEEPGRAM_NOVA_MODEL", "nova-3").strip(),
             deepgram_endpointing_ms=_env_int("MORGAN_DEEPGRAM_ENDPOINTING_MS", 25),
-            deepgram_eager_eot_threshold=_env_float(
-                "MORGAN_DEEPGRAM_EAGER_EOT_THRESHOLD", 0.4
-            ),
+            deepgram_eager_eot_threshold=_env_float("MORGAN_DEEPGRAM_EAGER_EOT_THRESHOLD", 0.4),
             deepgram_eot_threshold=_env_float("MORGAN_DEEPGRAM_EOT_THRESHOLD", 0.7),
             deepgram_eot_timeout_ms=_env_int("MORGAN_DEEPGRAM_EOT_TIMEOUT_MS", 1500),
             deepgram_keyterms=_env_list("MORGAN_DEEPGRAM_KEYTERMS"),
@@ -166,8 +177,9 @@ class AgentConfig:
             eleven_streaming_latency=_env_int("MORGAN_ELEVEN_STREAMING_LATENCY", 3),
             eleven_chunk_length_schedule=[
                 int(value)
-                for value in os.getenv("MORGAN_ELEVEN_CHUNK_LENGTH_SCHEDULE", "80,120,200,260")
-                .split(",")
+                for value in os.getenv(
+                    "MORGAN_ELEVEN_CHUNK_LENGTH_SCHEDULE", "80,120,200,260"
+                ).split(",")
                 if value.strip()
             ],
             cartesia_voice_id=os.getenv(
@@ -193,19 +205,29 @@ class AgentConfig:
             musetalk_reference_image_url=os.getenv(
                 "MORGAN_MUSETALK_REFERENCE_IMAGE_URL", ""
             ).strip(),
-            musetalk_request_timeout_s=_env_float(
-                "MORGAN_MUSETALK_REQUEST_TIMEOUT_S", 60.0
-            ),
+            musetalk_request_timeout_s=_env_float("MORGAN_MUSETALK_REQUEST_TIMEOUT_S", 60.0),
             nats_url=os.getenv(
                 "NATS_URL", "nats://musetalk-nats.cto.svc.cluster.local:4222"
             ).strip(),
-            nats_request_subject=os.getenv(
-                "NATS_REQUEST_SUBJECT", "avatar.render.request"
-            ).strip(),
-            nats_result_subject=os.getenv(
-                "NATS_RESULT_SUBJECT", "avatar.render.result"
-            ).strip(),
+            nats_request_subject=os.getenv("NATS_REQUEST_SUBJECT", "avatar.render.request").strip(),
+            nats_result_subject=os.getenv("NATS_RESULT_SUBJECT", "avatar.render.result").strip(),
             nats_stream=os.getenv("NATS_STREAM", "AVATAR").strip(),
+            echomimic_app_url=(
+                os.getenv("MORGAN_ECHOMIMIC_APP_URL") or os.getenv("ECHOMIMIC_APP_URL") or ""
+            ).strip(),
+            echomimic_prompt=os.getenv(
+                "MORGAN_ECHOMIMIC_PROMPT",
+                DEFAULT_ECHOMIMIC_PROMPT,
+            ).strip(),
+            echomimic_source_image_path=Path(
+                os.getenv("MORGAN_ECHOMIMIC_SOURCE_IMAGE", str(root.parent / "morgan.jpg"))
+            ),
+            echomimic_video_length=(_env_int("MORGAN_ECHOMIMIC_VIDEO_LENGTH", 0) or None),
+            echomimic_sample_height=(_env_int("MORGAN_ECHOMIMIC_SAMPLE_HEIGHT", 0) or None),
+            echomimic_sample_width=(_env_int("MORGAN_ECHOMIMIC_SAMPLE_WIDTH", 0) or None),
+            echomimic_weight_dtype=os.getenv("MORGAN_ECHOMIMIC_WEIGHT_DTYPE", "").strip(),
+            echomimic_request_timeout_s=_env_float("MORGAN_ECHOMIMIC_REQUEST_TIMEOUT_S", 900.0),
+            echomimic_auto_render=_env_bool("MORGAN_ECHOMIMIC_AUTO_RENDER", True),
         )
 
     @property
@@ -224,16 +246,29 @@ class AgentConfig:
         return bool(self.lemonslice_agent_id)
 
     def validate(self) -> None:
-        if self.avatar_mode not in {"lemonslice", "disabled", "musetalk"}:
+        if self.avatar_mode not in {"lemonslice", "disabled", "musetalk", "echomimic"}:
             raise ValueError(
-                "MORGAN_AVATAR_MODE must be one of: lemonslice, disabled, musetalk."
+                "MORGAN_AVATAR_MODE must be one of: lemonslice, disabled, musetalk, echomimic."
             )
 
-        if self.avatar_mode == "lemonslice" and not self.has_lemonslice_agent_id and not self.avatar_image_url:
+        if (
+            self.avatar_mode == "lemonslice"
+            and not self.has_lemonslice_agent_id
+            and not self.avatar_image_url
+        ):
             raise ValueError(
                 "Set MORGAN_LEMONSLICE_AGENT_ID or MORGAN_IMAGE_URL / "
                 "MORGAN_PLACEHOLDER_IMAGE_URL so LemonSlice can render the avatar."
             )
+
+        if self.avatar_mode == "echomimic":
+            if not self.echomimic_app_url:
+                raise ValueError("Set MORGAN_ECHOMIMIC_APP_URL or ECHOMIMIC_APP_URL.")
+            if self.echomimic_weight_dtype and self.echomimic_weight_dtype not in {
+                "float16",
+                "bfloat16",
+            }:
+                raise ValueError("MORGAN_ECHOMIMIC_WEIGHT_DTYPE must be float16 or bfloat16.")
 
         if self.llm_backend == "openclaw":
             if not self.llm_base_url:
@@ -278,4 +313,12 @@ class AgentConfig:
             "nats_request_subject": self.nats_request_subject,
             "nats_result_subject": self.nats_result_subject,
             "nats_stream": self.nats_stream,
+            "echomimic_app_url": self.echomimic_app_url,
+            "echomimic_source_image_path": str(self.echomimic_source_image_path),
+            "echomimic_video_length": self.echomimic_video_length or 0,
+            "echomimic_sample_height": self.echomimic_sample_height or 0,
+            "echomimic_sample_width": self.echomimic_sample_width or 0,
+            "echomimic_weight_dtype": self.echomimic_weight_dtype,
+            "echomimic_request_timeout_s": self.echomimic_request_timeout_s,
+            "echomimic_auto_render": self.echomimic_auto_render,
         }

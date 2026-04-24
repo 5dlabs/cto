@@ -1,0 +1,19 @@
+image:
+  repository: ghcr.io/5dlabs/morgan-avatar-agent
+  tag: latest
+  pullPolicy: Always
+
+imagePullSecrets:
+  - name: ghcr-secret
+
+replicaCount: 1
+
+extraEnv: []
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "2Gi"
+  limits:
+    cpu: "2"
+    memory: "6Gi"

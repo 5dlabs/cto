@@ -8,8 +8,8 @@ global:
   createNamespace: false
 
 image:
-  repository: "ghcr.io/5dlabs/openclaw"
-  tag: "v2026.2.12"
+  repository: "ghcr.io/5dlabs/morgan-avatar-agent"
+  tag: "latest"
   pullPolicy: Always
 
 resources:
@@ -136,13 +136,15 @@ extraEnv:
         name: livekit-keys
         key: LIVEKIT_API_SECRET
   - name: MORGAN_AVATAR_MODE
-    value: "disabled"
+    value: "echomimic"
   - name: MORGAN_AGENT_NAME
     value: "morgan-avatar"
   - name: MORGAN_LLM_BACKEND
     value: "openclaw"
   - name: MORGAN_LLM_BASE_URL
-    value: "https://morgan.5dlabs.ai/v1"
+    value: "https://morgan.5dlabs.ai"
+  - name: OPENCLAW_TOKEN
+    value: "openclaw-internal"
   - name: MORGAN_LLM_AGENT_ID
     value: "morgan"
   - name: MORGAN_LLM_USER_PREFIX
@@ -151,6 +153,26 @@ extraEnv:
     value: "true"
   - name: MORGAN_PREEMPTIVE_GENERATION
     value: "false"
+  - name: MORGAN_MUSETALK_FRAME_WIDTH
+    value: "768"
+  - name: MORGAN_MUSETALK_FRAME_HEIGHT
+    value: "768"
+  - name: MORGAN_ECHOMIMIC_APP_URL
+    value: "https://f843f6d7-ec26-4b18-a69f-99f282d4e6fe.app.gra.ai.cloud.ovh.net"
+  - name: MORGAN_ECHOMIMIC_SOURCE_IMAGE
+    value: "/app/assets/morgan.jpg"
+  - name: MORGAN_ECHOMIMIC_VIDEO_LENGTH
+    value: "65"
+  - name: MORGAN_ECHOMIMIC_SAMPLE_HEIGHT
+    value: "768"
+  - name: MORGAN_ECHOMIMIC_SAMPLE_WIDTH
+    value: "768"
+  - name: MORGAN_ECHOMIMIC_WEIGHT_DTYPE
+    value: "float16"
+  - name: MORGAN_ECHOMIMIC_REQUEST_TIMEOUT_S
+    value: "900"
+  - name: MORGAN_ECHOMIMIC_AUTO_RENDER
+    value: "true"
   # STT: use OpenAI transcribe. Default MORGAN_STT_MODE=livekit-flux routes to
   # LiveKit Cloud Inference, which 401s against our self-hosted LiveKit keys.
   # openai-transcribe uses the standard OpenAI API and works with the existing

@@ -17,8 +17,7 @@ def test_musetalk_mocked_stream_sustains_target_fps(tmp_path: Path) -> None:
     engine.warmup()
 
     fixture_audio = [
-        AudioChunk(samples=[0.1] * 1600, sample_rate=16000, duration_ms=100.0)
-        for _ in range(10)
+        AudioChunk(samples=[0.1] * 1600, sample_rate=16000, duration_ms=100.0) for _ in range(10)
     ]
 
     stats = engine.benchmark(fixture_audio)
@@ -47,3 +46,16 @@ def test_musetalk_avatar_session_emits_publishable_frames(tmp_path: Path) -> Non
     assert frames[0].width == 16
     assert frames[0].height == 16
     assert frames[0].payload_size == 16 * 16 * 4
+
+
+def test_musetalk_avatar_push_rgba_frame_noops_without_source(tmp_path: Path) -> None:
+    engine = MuseTalkInferenceEngine(
+        persona_id="morgan-v1",
+        personas_root=tmp_path,
+        target_fps=30,
+        frame_width=2,
+        frame_height=2,
+    )
+    session = MuseTalkAvatarSession(engine)
+
+    assert session.push_rgba_frame(width=2, height=2, rgba=bytes(2 * 2 * 4)) is False

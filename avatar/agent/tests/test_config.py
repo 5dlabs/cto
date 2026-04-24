@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from morgan_avatar_agent.config import AgentConfig
+from morgan_avatar_agent.providers import _openai_compatible_base_url
 
 
 def test_placeholder_image_is_preferred_when_enabled(monkeypatch) -> None:
@@ -85,3 +86,43 @@ def test_musetalk_defaults_are_loaded(monkeypatch) -> None:
     assert config.persona_id == "morgan-v1"
     assert config.personas_root == Path("/personas")
     assert config.musetalk_target_fps == 30
+
+
+def test_echomimic_mode_requires_app_url(monkeypatch) -> None:
+    monkeypatch.setenv("MORGAN_LLM_BACKEND", "inference")
+    monkeypatch.setenv("MORGAN_AVATAR_MODE", "echomimic")
+    monkeypatch.delenv("MORGAN_ECHOMIMIC_APP_URL", raising=False)
+    monkeypatch.delenv("ECHOMIMIC_APP_URL", raising=False)
+
+    config = AgentConfig.from_env(project_root=Path("/tmp/project"))
+
+    try:
+        config.validate()
+    except ValueError as exc:
+        assert "MORGAN_ECHOMIMIC_APP_URL" in str(exc)
+    else:
+        raise AssertionError("Expected validation to fail without EchoMimic app URL.")
+
+
+def test_echomimic_defaults_are_loaded(monkeypatch) -> None:
+    monkeypatch.setenv("MORGAN_LLM_BACKEND", "inference")
+    monkeypatch.setenv("MORGAN_AVATAR_MODE", "echomimic")
+    monkeypatch.setenv("MORGAN_ECHOMIMIC_APP_URL", "https://echomimic.example")
+    monkeypatch.setenv("MORGAN_ECHOMIMIC_VIDEO_LENGTH", "65")
+    monkeypatch.setenv("MORGAN_ECHOMIMIC_WEIGHT_DTYPE", "float16")
+
+    config = AgentConfig.from_env(project_root=Path("/tmp/project"))
+
+    config.validate()
+    assert config.avatar_mode == "echomimic"
+    assert config.echomimic_app_url == "https://echomimic.example"
+    assert config.echomimic_video_length == 65
+    assert config.echomimic_weight_dtype == "float16"
+    assert "golden retriever" in config.echomimic_prompt
+
+
+def test_openai_compatible_base_url_avoids_double_v1() -> None:
+    assert _openai_compatible_base_url("https://morgan.5dlabs.ai") == "https://morgan.5dlabs.ai/v1"
+    assert (
+        _openai_compatible_base_url("https://morgan.5dlabs.ai/v1") == "https://morgan.5dlabs.ai/v1"
+    )

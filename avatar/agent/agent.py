@@ -7,24 +7,22 @@ import os
 from dotenv import load_dotenv
 from livekit import agents
 from livekit.agents import (
-    APIConnectOptions,
     Agent,
     AgentServer,
     AgentSession,
+    APIConnectOptions,
     JobContext,
     JobProcess,
     MetricsCollectedEvent,
     metrics,
     room_io,
 )
-from livekit.agents._exceptions import APIStatusError
 from livekit.agents.voice.agent_session import SessionConnectOptions
-from livekit.plugins import lemonslice, noise_cancellation, silero
+from livekit.plugins import noise_cancellation, silero
 
+from morgan_avatar_agent.avatar_provider import AvatarProvider, build_avatar_provider
 from morgan_avatar_agent.config import AgentConfig
 from morgan_avatar_agent.latency import LatencyRecorder
-from morgan_avatar_agent.musetalk_avatar import MuseTalkAvatarSession
-from morgan_avatar_agent.musetalk_inference import MuseTalkInferenceEngine
 from morgan_avatar_agent.providers import build_llm, build_stt, build_tts, build_turn_detection
 
 load_dotenv()
@@ -130,99 +128,22 @@ async def entrypoint(ctx: JobContext) -> None:
     def on_close(event) -> None:
         latency.handle_close(getattr(event, "error", None))
 
+    avatar_provider: AvatarProvider | None = None
+
     async def on_shutdown() -> None:
+        if avatar_provider is not None:
+            await avatar_provider.stop()
         logger.info("Usage summary: %s", usage_collector.get_summary())
         latency.write_summary()
 
     ctx.add_shutdown_callback(on_shutdown)
 
     allow_audio_only_fallback = _env_bool("MORGAN_ALLOW_AUDIO_ONLY_FALLBACK", True)
-
-    if config.avatar_mode == "lemonslice":
-        avatar_kwargs = {
-            "agent_prompt": config.avatar_prompt,
-            "idle_timeout": config.avatar_idle_timeout,
-        }
-        if config.has_lemonslice_agent_id:
-            avatar_kwargs["agent_id"] = config.lemonslice_agent_id
-        else:
-            avatar_kwargs["agent_image_url"] = config.avatar_image_url
-
-        avatar = lemonslice.AvatarSession(**avatar_kwargs)
-
-        try:
-            await avatar.start(session, room=ctx.room)
-        except Exception as exc:
-            root = exc.__cause__ or exc
-            if isinstance(root, APIStatusError):
-                logger.error(
-                    "LemonSlice session start failed: status=%s body=%r message=%s",
-                    root.status_code,
-                    root.body,
-                    root.message,
-                )
-                body_text = str(root.body).lower() if root.body is not None else ""
-                if allow_audio_only_fallback and root.status_code == 402 and "insufficient funds" in body_text:
-                    logger.warning(
-                        "LemonSlice credits unavailable, continuing in audio-only mode "
-                        "(set MORGAN_ALLOW_AUDIO_ONLY_FALLBACK=false to fail hard)"
-                    )
-                else:
-                    raise
-            else:
-                logger.error("LemonSlice session start failed: %r", root)
-                if not allow_audio_only_fallback:
-                    raise
-                logger.warning(
-                    "Continuing in audio-only mode after LemonSlice start failure "
-                    "(set MORGAN_ALLOW_AUDIO_ONLY_FALLBACK=false to fail hard)"
-                )
-    elif config.avatar_mode == "disabled":
-        logger.info("MORGAN_AVATAR_MODE=disabled, running audio-only session")
-    elif config.avatar_mode == "musetalk":
-        logger.info(
-            "MORGAN_AVATAR_MODE=musetalk selected, starting self-hosted avatar pipeline "
-            "(use_stub=%s, nats_url=%s)",
-            config.musetalk_use_stub,
-            config.nats_url,
-        )
-        nats_client = None
-        if not config.musetalk_use_stub:
-            from morgan_avatar_agent.musetalk_nats_client import (
-                MuseTalkNatsClient,
-                MuseTalkNatsError,
-            )
-
-            try:
-                nats_client = MuseTalkNatsClient(
-                    url=config.nats_url,
-                    request_subject=config.nats_request_subject,
-                    result_subject=config.nats_result_subject,
-                    stream=config.nats_stream,
-                    request_timeout_s=config.musetalk_request_timeout_s,
-                )
-                await nats_client.connect()
-            except MuseTalkNatsError as exc:
-                logger.warning(
-                    "Failed to connect MuseTalk NATS client (%s); falling back to stub frames",
-                    exc,
-                )
-                nats_client = None
-        musetalk = MuseTalkAvatarSession(
-            MuseTalkInferenceEngine(
-                persona_id=config.persona_id,
-                personas_root=config.personas_root,
-                target_fps=config.musetalk_target_fps,
-                frame_width=config.musetalk_frame_width,
-                frame_height=config.musetalk_frame_height,
-                nats_client=nats_client,
-                reference_image_url=config.musetalk_reference_image_url,
-                use_stub=config.musetalk_use_stub or nats_client is None,
-            )
-        )
-        await musetalk.start(session, room=ctx.room)
-    else:
-        raise ValueError(f"Unsupported MORGAN_AVATAR_MODE: {config.avatar_mode}")
+    avatar_provider = build_avatar_provider(
+        config,
+        allow_audio_only_fallback=allow_audio_only_fallback,
+    )
+    await avatar_provider.start(session, room=ctx.room)
 
     audio_input = room_io.AudioInputOptions(
         noise_cancellation=noise_cancellation.BVC() if config.use_noise_cancellation else None,
