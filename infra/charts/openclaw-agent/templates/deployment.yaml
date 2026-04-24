@@ -1233,13 +1233,21 @@ spec:
               SETTINGS
               sed -i 's/^              //' /workspace/.code-server/User/settings.json
               fi
-              # Pre-seed workbench state from shared/code-server-config/storage.json
+              # Pre-seed workbench state from shared/code-server-config/storage.json.
+              # Uses a marker file so we can re-seed when the canonical layout is
+              # bumped without nuking ongoing user customizations every launch.
+              # Bump STORAGE_SEED_VERSION when shared/code-server-config/storage.json
+              # changes in a way that existing pods need to pick up.
               mkdir -p /workspace/.code-server/User/globalStorage
-              if [ ! -f /workspace/.code-server/User/globalStorage/storage.json ]; then
+              STORAGE_SEED_VERSION=v4-auxbar
+              STORAGE_SEED_MARKER=/workspace/.code-server/.storage-seed
+              if [ ! -f /workspace/.code-server/User/globalStorage/storage.json ] || \
+                 [ "$(cat "$STORAGE_SEED_MARKER" 2>/dev/null)" != "$STORAGE_SEED_VERSION" ]; then
               cat > /workspace/.code-server/User/globalStorage/storage.json << 'STATE'
 {{ .Files.Get "files/code-server-config/storage.json" | indent 14 }}
               STATE
               sed -i 's/^              //' /workspace/.code-server/User/globalStorage/storage.json
+              echo "$STORAGE_SEED_VERSION" > "$STORAGE_SEED_MARKER"
               fi
               {{- if .Values.codeServer.githubToken }}
               # Write code-server config with github-auth for Copilot
@@ -1272,14 +1280,34 @@ spec:
               mkdir -p /workspace/.code-server-cache
               # 5dlabs CTO sidebar extension — replaces Copilot Chat as the
               # primary right-rail agent surface. See apps/cto-sidebar/.
+              # Downloaded from the `cto-sidebar-latest` GitHub release. Since
+              # 5dlabs/cto is private, we must authenticate with GITHUB_TOKEN
+              # via the API asset URL (`accept: application/octet-stream`).
+              # We also reject cached files smaller than 1KB so a transient
+              # 404/rate-limit doesn't poison the PVC cache forever.
               echo "[code-server] Installing 5dlabs cto-sidebar extension..."
               CTO_VSIX="/workspace/.code-server-cache/cto-sidebar.vsix"
-              if [ ! -f "$CTO_VSIX" ]; then
-                curl -sL "https://github.com/5dlabs/cto/releases/download/cto-sidebar-latest/cto-sidebar.vsix" \
-                  -o "$CTO_VSIX" 2>/dev/null || true
+              if [ ! -s "$CTO_VSIX" ] || [ "$(stat -c %s "$CTO_VSIX" 2>/dev/null || wc -c < "$CTO_VSIX")" -lt 1024 ]; then
+                rm -f "$CTO_VSIX"
+                if [ -n "${GITHUB_TOKEN:-}" ]; then
+                  CTO_ASSET_URL=$(curl -sf \
+                    -H "authorization: Bearer $GITHUB_TOKEN" \
+                    -H "accept: application/vnd.github+json" \
+                    "https://api.github.com/repos/5dlabs/cto/releases/tags/cto-sidebar-latest" 2>/dev/null \
+                    | grep -oE '"url": *"https://api\.github\.com/repos/5dlabs/cto/releases/assets/[0-9]+"' \
+                    | head -1 | sed 's/.*"\(https:[^"]*\)"/\1/')
+                  if [ -n "$CTO_ASSET_URL" ]; then
+                    curl -sfL \
+                      -H "authorization: Bearer $GITHUB_TOKEN" \
+                      -H "accept: application/octet-stream" \
+                      "$CTO_ASSET_URL" -o "$CTO_VSIX" 2>/dev/null || rm -f "$CTO_VSIX"
+                  fi
+                fi
               fi
-              if [ -f "$CTO_VSIX" ]; then
+              if [ -s "$CTO_VSIX" ] && [ "$(stat -c %s "$CTO_VSIX" 2>/dev/null || wc -c < "$CTO_VSIX")" -ge 1024 ]; then
                 code-server --extensions-dir "$EXTDIR" --install-extension "$CTO_VSIX" 2>/dev/null || true
+              else
+                echo "[code-server] WARN: cto-sidebar.vsix unavailable; extension not installed"
               fi
               # Remove GitHub Copilot extensions — the cto-sidebar above is our
               # agent surface. `code-server --github-auth` auto-installs them on
@@ -1308,6 +1336,8 @@ spec:
                 --disable-telemetry \
                 --user-data-dir /workspace/.code-server \
                 --extensions-dir "$EXTDIR" \
+                --disable-extension GitHub.copilot-chat \
+                --disable-extension GitHub.copilot \
                 {{ .Values.codeServer.defaultFolder | default "/workspace" }}
           env:
             - name: PASSWORD
