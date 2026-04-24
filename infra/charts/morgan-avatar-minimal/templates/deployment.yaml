@@ -28,5 +28,7 @@ spec:
           envFrom:
             - secretRef:
                 name: livekit-keys
+            - secretRef:
+                name: elevenlabs-keys
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

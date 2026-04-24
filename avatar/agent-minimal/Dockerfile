@@ -9,6 +9,6 @@ WORKDIR /app
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir .
 
-COPY worker.py sample.mp3 ./
+COPY worker.py ./
 
 CMD ["python", "worker.py", "start"]
