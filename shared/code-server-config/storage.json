@@ -1,9 +1,10 @@
 {
-  "lastActiveSideBarViewlet": "workbench.view.extension.cto-sidebar",
+  "lastActiveSideBarViewlet": "workbench.view.explorer",
   "workbench.sideBar.visible": true,
-  "workbench.auxiliaryBar.visible": false,
+  "workbench.auxiliaryBar.visible": true,
   "workbench.panel.visible": false,
-  "workbench.sideBar.size": 380,
+  "workbench.sideBar.size": 260,
+  "workbench.auxiliaryBar.size": 380,
   "workbench.activityBar.hidden.workbench.view.search": true,
   "workbench.activityBar.hidden.workbench.view.scm": true,
   "workbench.activityBar.hidden.workbench.view.debug": true,
@@ -12,5 +13,10 @@
   "workbench.activityBar.hidden.userDataProfiles": true,
   "workbench.activityBar.hidden.workbench.view.remote": true,
   "workbench.views.state.workbench.view.explorer.outline.visible": false,
-  "workbench.views.state.workbench.view.explorer.timeline.visible": false
+  "workbench.views.state.workbench.view.explorer.timeline.visible": false,
+  "views.customizations": {
+    "viewContainerLocations": {
+      "workbench.view.extension.cto-sidebar": 2
+    }
+  }
 }
