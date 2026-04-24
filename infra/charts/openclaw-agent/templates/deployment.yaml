@@ -1270,6 +1270,22 @@ spec:
               EXTDIR="/workspace/.code-server/extensions"
               mkdir -p "$EXTDIR"
               mkdir -p /workspace/.code-server-cache
+              # 5dlabs CTO sidebar extension — replaces Copilot Chat as the
+              # primary right-rail agent surface. See apps/cto-sidebar/.
+              echo "[code-server] Installing 5dlabs cto-sidebar extension..."
+              CTO_VSIX="/workspace/.code-server-cache/cto-sidebar.vsix"
+              if [ ! -f "$CTO_VSIX" ]; then
+                curl -sL "https://github.com/5dlabs/cto/releases/download/cto-sidebar-latest/cto-sidebar.vsix" \
+                  -o "$CTO_VSIX" 2>/dev/null || true
+              fi
+              if [ -f "$CTO_VSIX" ]; then
+                code-server --extensions-dir "$EXTDIR" --install-extension "$CTO_VSIX" 2>/dev/null || true
+              fi
+              # Remove GitHub Copilot extensions — the cto-sidebar above is our
+              # agent surface. `code-server --github-auth` auto-installs them on
+              # first start, so we uninstall here after that has happened.
+              code-server --extensions-dir "$EXTDIR" --uninstall-extension GitHub.copilot 2>/dev/null || true
+              code-server --extensions-dir "$EXTDIR" --uninstall-extension GitHub.copilot-chat 2>/dev/null || true
               echo "[code-server] Installing GitLab workflow extension..."
               GITLAB_VSIX="/workspace/.code-server-cache/gitlab-workflow.vsix"
               curl -sL --compressed \
