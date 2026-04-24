@@ -3,6 +3,32 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.85](https://github.com/5dlabs/cto/compare/v0.2.84...v0.2.85) (2026-04-24)
+
+
+### ✨ Features
+
+* **avatar:** scaffold EchoMimic V3 container (Gate 2 prep) ([#4832](https://github.com/5dlabs/cto/issues/4832)) ([3a8d787](https://github.com/5dlabs/cto/commit/3a8d787442fd5d6e942a50afabb4c3696287f0bb))
+* **cto-sidebar:** contribute directly to auxiliary bar + auth private VSIX delivery ([#4834](https://github.com/5dlabs/cto/issues/4834)) ([53d10fe](https://github.com/5dlabs/cto/commit/53d10fec67d7afe0070ba2a38267de7ce02e1540))
+* **project-api:** .plan/ convention — probes, status.txt, scaffold ([#4836](https://github.com/5dlabs/cto/issues/4836)) ([a11b086](https://github.com/5dlabs/cto/commit/a11b0863040803bfccf59a6543e99b9d2250b72d))
+
+
+### 🐛 Bug Fixes
+
+* **avatar/liveportrait:** install cuda-nvrtc-11-8 + Gate 1 scaffolding ([#4831](https://github.com/5dlabs/cto/issues/4831)) ([8936be3](https://github.com/5dlabs/cto/commit/8936be392b0d9102ebaf6d25c393a02cf0909ff2))
+* **colosseum:** repoint GitHub secret to cto-coder-api-keys for parity ([#4840](https://github.com/5dlabs/cto/issues/4840)) ([b546a92](https://github.com/5dlabs/cto/commit/b546a92a9e3d0ecd0f9a7a6e2b695c9928b756dd))
+* **echomimic:** pin diffusers&lt;0.32 to avoid AutoencoderRAE import ([#4839](https://github.com/5dlabs/cto/issues/4839)) ([07c784b](https://github.com/5dlabs/cto/commit/07c784bf76904a193d039040b983138f269be35f))
+* **echomimic:** pin transformers&lt;5 + huggingface_hub&lt;1 via constraints ([#4837](https://github.com/5dlabs/cto/issues/4837)) ([a72bbc2](https://github.com/5dlabs/cto/commit/a72bbc24f06cb77e52253d4615f9d5eeb8cb4bb7))
+* **echomimic:** uvicorn --app-dir + HF timeout/retry ([#4833](https://github.com/5dlabs/cto/issues/4833)) ([4d10964](https://github.com/5dlabs/cto/commit/4d10964a363360fdf7b7f5c3ecd12aabe18945c3))
+* **openclaw-agent:** remove invalid code-server --disable-extension flags ([#4838](https://github.com/5dlabs/cto/issues/4838)) ([690b257](https://github.com/5dlabs/cto/commit/690b257a951d9df313416a756882093cceb2d597))
+* **project-api:** don't cache empty list produced by GitHub probe failures ([#4830](https://github.com/5dlabs/cto/issues/4830)) ([b2139a2](https://github.com/5dlabs/cto/commit/b2139a20fbe1303303333ec96420da0edeaec177))
+* **project-api:** fully-lowercase PRD marker (.prd/prd.md) + migrate smoke repo ([#4828](https://github.com/5dlabs/cto/issues/4828)) ([78f6aaa](https://github.com/5dlabs/cto/commit/78f6aaa9c3789f3883bf6d4a807496994cc745f5))
+
+
+### 📚 Documentation
+
+* **skills:** teach Morgan the .plan/ project-marker convention ([#4835](https://github.com/5dlabs/cto/issues/4835)) ([81d82f0](https://github.com/5dlabs/cto/commit/81d82f0646761be173db501bfc807b0d7cc797aa))
+
 ## [0.2.84](https://github.com/5dlabs/cto/compare/v0.2.83...v0.2.84) (2026-04-24)
 
 
