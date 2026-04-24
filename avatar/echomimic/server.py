@@ -43,12 +43,47 @@ WAV2VEC_DIR = PRETRAINED_DIR / "chinese-wav2vec2-base"
 
 DEFAULT_PROMPT = "A person is speaking."
 
-# Upstream run_flash.sh defaults (do not change without validation runs).
+
+def _env_str(name: str, default: str) -> str:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    value = value.strip()
+    if not value:
+        raise ValueError(f"{name} must not be empty")
+    return value
+
+
+def _env_int_str(name: str, default: int, *, min_value: int = 1) -> str:
+    value = _env_str(name, str(default))
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer, got {value!r}") from exc
+    if parsed < min_value:
+        raise ValueError(f"{name} must be >= {min_value}, got {parsed}")
+    return str(parsed)
+
+
+def _env_choice(name: str, default: str, choices: set[str]) -> str:
+    value = _env_str(name, default)
+    if value not in choices:
+        raise ValueError(f"{name} must be one of {sorted(choices)}, got {value!r}")
+    return value
+
+
+SAMPLE_SIZE = (
+    _env_int_str("ECHOMIMIC_SAMPLE_HEIGHT", 768, min_value=16),
+    _env_int_str("ECHOMIMIC_SAMPLE_WIDTH", 768, min_value=16),
+)
+
+
+# Upstream run_flash.sh defaults, with V100-safe memory/dtype overrides.
 FLASH_DEFAULTS = {
     "num_inference_steps": "8",
     "ckpt_idx": "50000",
     "sampler_name": "Flow_Unipc",
-    "video_length": "81",
+    "video_length": _env_int_str("ECHOMIMIC_VIDEO_LENGTH", 65),
     "guidance_scale": "6.0",
     "audio_guidance_scale": "3.0",
     "audio_scale": "1.0",
@@ -59,7 +94,7 @@ FLASH_DEFAULTS = {
     "riflex_k": "6",
     "ulysses_degree": "1",
     "ring_degree": "1",
-    "weight_dtype": "bfloat16",
+    "weight_dtype": _env_choice("ECHOMIMIC_WEIGHT_DTYPE", "float16", {"float16", "bfloat16"}),
     "fps": "25",
     "shift": "5.0",
 }
@@ -84,6 +119,7 @@ async def root() -> dict:
         "service": "echomimic-v3-flash",
         "version": "0.2.0",
         "layout": _layout_status(),
+        "defaults": {**FLASH_DEFAULTS, "sample_size": list(SAMPLE_SIZE)},
         "endpoints": ["/health", "/animate"],
     }
 
@@ -126,7 +162,7 @@ def _build_cmd(image_path: Path, audio_path: Path, save_path: Path, prompt: str,
         "--seed", str(seed),
         "--enable_teacache",
         # sample_size requires two ints (h w)
-        "--sample_size", "768", "768",
+        "--sample_size", *SAMPLE_SIZE,
     ]
     for flag, val in FLASH_DEFAULTS.items():
         cmd.extend([f"--{flag}", val])
