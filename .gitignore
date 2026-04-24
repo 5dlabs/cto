@@ -228,3 +228,4 @@ apps/lobster-voice/lobster-voice
 work
 test/cli-matrix/
 .firecrawl/
+nohup.out
