@@ -19,10 +19,14 @@ import {
   hasArchitectureMarker,
   listOrgRepos,
   lookupRepo,
+  parseStatus,
+  readStatus,
   type OrgRepoSummary,
   type PrdInfo,
+  type StatusInfo,
 } from "./github";
 import { coerceStatus, parseFrontmatter, type PrdStatus } from "./frontmatter";
+import { writeStatus } from "./prd";
 
 export interface ProjectDescriptor {
   name: string;
@@ -52,6 +56,19 @@ export interface ProjectDescriptor {
    * tile click needs to trigger `/verify` before opening code-server.
    */
   locality: "cloned" | "remote-only";
+  /**
+   * Contents of the `.plan/status.txt` sidecar, if present. `null` for
+   * legacy `.prd/`-only projects that predate the `.plan/` convention.
+   * `phase` is the current workflow phase (e.g. `"intake"`, `"ready"`,
+   * `"implementing"`, `"complete"`); `updated` is an ISO-8601 timestamp
+   * of the last flip when the writer recorded one.
+   */
+  status: ProjectStatus | null;
+}
+
+export interface ProjectStatus {
+  phase: string;
+  updated: string | null;
 }
 
 const SLUG_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
@@ -147,17 +164,18 @@ async function cloneWithRetry(
 }
 
 /**
- * Write the `.prd/prd.md` marker that tells the rest of the system "this is
- * a Morgan-managed project". Creates the folder if missing; idempotent when
- * the file already exists with the expected header. The scaffold now
- * includes a starter frontmatter block so the state field is present from
- * day one (status: drafting).
+ * Write the `.plan/prd/prd.md` marker that tells the rest of the system
+ * "this is a Morgan-managed project". Creates the folder if missing;
+ * idempotent when the file already exists. The scaffold includes a starter
+ * frontmatter block so the state field is present from day one
+ * (status: drafting). Sibling `.plan/status.txt` is written separately
+ * by `writeStatus` so the phase sidecar lives next to the PRD.
  *
  * Both folder and filename are lowercase so the same path works on case-
  * sensitive filesystems (Linux pods) and case-preserving ones (dev macs).
  */
 async function writePrdScaffold(path: string, name: string): Promise<boolean> {
-  const dir = join(path, ".prd");
+  const dir = join(path, ".plan", "prd");
   await mkdir(dir, { recursive: true });
   const prd = join(dir, "prd.md");
   if (existsSync(prd)) return false;
@@ -175,21 +193,34 @@ async function writePrdScaffold(path: string, name: string): Promise<boolean> {
 }
 
 /**
- * Ensure the GitHub repo has `.prd/prd.md`. Writes the scaffold, commits,
- * and pushes. Throws on push failure — GitHub is the authoritative source
- * of truth for project discovery, so a create that can't push should fail.
+ * Ensure the GitHub repo has `.plan/prd/prd.md` + `.plan/status.txt`.
+ * Writes the scaffold, seeds the status sidecar at `phase=intake`,
+ * commits, and pushes. Throws on push failure — GitHub is the
+ * authoritative source of truth for project discovery, so a create that
+ * can't push should fail.
  */
 async function ensurePrdOnRemote(path: string, name: string): Promise<void> {
   const wrote = await writePrdScaffold(path, name);
   if (wrote) {
-    await commitAll(path, "docs: add .prd/prd.md scaffold");
+    await commitAll(path, "docs: add .plan/prd/prd.md scaffold");
+  }
+  // Seed the status sidecar at phase=intake on fresh projects. `writeStatus`
+  // is a no-op when content is unchanged, so this is safe on re-runs.
+  const wroteStatus = await writeStatus(path, "intake");
+  if (wroteStatus) {
+    await commitAll(path, "chore: set .plan/status.txt phase=intake");
   }
   await pushCurrentBranch(path);
 }
 
 function describeFromRepo(
   repo: OrgRepoSummary,
-  flags: { hasPrd: boolean; hasArchitecture: boolean; state: PrdStatus },
+  flags: {
+    hasPrd: boolean;
+    hasArchitecture: boolean;
+    state: PrdStatus;
+    status: ProjectStatus | null;
+  },
 ): ProjectDescriptor {
   const localPath = join(CONFIG.reposRoot, repo.name);
   const locality: "cloned" | "remote-only" = existsSync(localPath)
@@ -206,6 +237,7 @@ function describeFromRepo(
     branch: repo.defaultBranch,
     lastCommit: null,
     locality,
+    status: flags.status,
   };
 }
 
@@ -215,21 +247,25 @@ async function describeLocal(
   hasPrdHint?: boolean,
 ): Promise<ProjectDescriptor> {
   // Resolve the PRD marker using the same precedence as the GitHub probe:
-  // fully lowercase canonical → legacy uppercase filename → pre-rename
-  // uppercase folder. First existing path wins. Once every active repo
-  // has been migrated the two fallbacks can be deleted.
-  const prdDefault = join(path, ".prd", "prd.md");
+  // new `.plan/prd/prd.md` sidecar canonical → legacy lowercase `.prd/prd.md`
+  // → transitional uppercase filename → pre-rename uppercase folder. First
+  // existing path wins. Once every active repo has been migrated the
+  // legacy fallbacks can be deleted.
+  const prdDefault = join(path, ".plan", "prd", "prd.md");
   const prdCandidates = [
     prdDefault,
+    join(path, ".prd", "prd.md"),
     join(path, ".prd", "PRD.md"),
     join(path, ".PRD", "PRD.md"),
   ];
   const prdPath = prdCandidates.find((p) => existsSync(p)) ?? prdDefault;
+  const archPlan = join(path, ".plan", "spec", "architecture.md");
   const archLower = join(path, ".prd", "architecture.md");
   const archUpper = join(path, ".PRD", "architecture.md");
   const hasPrd =
     hasPrdHint !== undefined ? hasPrdHint : existsSync(prdPath);
-  const hasArchitecture = existsSync(archLower) || existsSync(archUpper);
+  const hasArchitecture =
+    existsSync(archPlan) || existsSync(archLower) || existsSync(archUpper);
 
   let state: PrdStatus = "drafting";
   if (hasPrd) {
@@ -238,6 +274,22 @@ async function describeLocal(
       state = coerceStatus(parseFrontmatter(raw).fields.status);
     } catch {
       // Unreadable PRD still counts as drafting — don't drop the tile.
+    }
+  }
+
+  // Read `.plan/status.txt` from disk when present; missing is normal for
+  // legacy `.prd/`-only projects and just yields `status: null`.
+  let status: ProjectStatus | null = null;
+  const statusPath = join(path, ".plan", "status.txt");
+  if (existsSync(statusPath)) {
+    try {
+      const raw = await readFile(statusPath, "utf8");
+      const parsed = parseStatus(raw);
+      if (parsed.phase) {
+        status = { phase: parsed.phase, updated: parsed.updated };
+      }
+    } catch {
+      // Unreadable status file → act as if missing.
     }
   }
 
@@ -272,6 +324,7 @@ async function describeLocal(
     branch,
     lastCommit: lastSubject,
     locality: "cloned",
+    status,
   };
 }
 
@@ -332,19 +385,33 @@ export async function listProjects(
   const probes = await Promise.all(
     repos.map(async (repo) => {
       try {
-        const [prd, hasArch] = await Promise.all([
+        // `readStatus` returns null for a genuine 404 (legacy .prd/-only
+        // projects); we surface that as `status: null` on the DTO without
+        // counting it as a probe failure. Real errors (rate limit, 5xx,
+        // auth) still throw and increment `probeFailures`.
+        const [prd, hasArch, statusInfo] = await Promise.all([
           fetchPrdInfo(CONFIG.githubOrg, repo.name),
           hasArchitectureMarker(CONFIG.githubOrg, repo.name).catch(() => false),
+          readStatus(CONFIG.githubOrg, repo.name),
         ]);
         return {
           repo,
           hasPrd: prd.exists,
           hasArchitecture: hasArch,
           state: coerceStatus(prd.fields?.status),
+          status: statusInfo
+            ? { phase: statusInfo.phase, updated: statusInfo.updated }
+            : null,
         };
       } catch {
         probeFailures += 1;
-        return { repo, hasPrd: false, hasArchitecture: false, state: "drafting" as PrdStatus };
+        return {
+          repo,
+          hasPrd: false,
+          hasArchitecture: false,
+          state: "drafting" as PrdStatus,
+          status: null as ProjectStatus | null,
+        };
       }
     }),
   );
@@ -356,6 +423,7 @@ export async function listProjects(
         hasPrd: true,
         hasArchitecture: p.hasArchitecture,
         state: p.state,
+        status: p.status,
       }),
     );
 
@@ -413,11 +481,14 @@ export async function getProject(name: string): Promise<ProjectDescriptor | null
   try {
     const info = await lookupRepo(CONFIG.githubOrg, name);
     if (!info.exists) return null;
-    const [prd, hasArch] = await Promise.all([
+    const [prd, hasArch, statusInfo] = await Promise.all([
       fetchPrdInfo(CONFIG.githubOrg, name).catch(
         (): PrdInfo => ({ exists: false, content: null, fields: {} }),
       ),
       hasArchitectureMarker(CONFIG.githubOrg, name).catch(() => false),
+      readStatus(CONFIG.githubOrg, name).catch(
+        (): StatusInfo | null => null,
+      ),
     ]);
     return describeFromRepo(
       {
@@ -433,6 +504,9 @@ export async function getProject(name: string): Promise<ProjectDescriptor | null
         hasPrd: prd.exists,
         hasArchitecture: hasArch,
         state: coerceStatus(prd.fields?.status),
+        status: statusInfo
+          ? { phase: statusInfo.phase, updated: statusInfo.updated }
+          : null,
       },
     );
   } catch {
@@ -555,9 +629,10 @@ export async function markProjectReady(
       });
     }
     // Pick the same marker path describeLocal would have resolved to —
-    // canonical lowercase first, then transitional uppercase filename,
-    // then pre-rename uppercase folder.
+    // new `.plan/` canonical first, then legacy lowercase, transitional
+    // uppercase filename, pre-rename uppercase folder.
     const prdCandidates = [
+      join(path, ".plan", "prd", "prd.md"),
       join(path, ".prd", "prd.md"),
       join(path, ".prd", "PRD.md"),
       join(path, ".PRD", "PRD.md"),
@@ -565,19 +640,34 @@ export async function markProjectReady(
     const prdPath = prdCandidates.find((p) => existsSync(p));
     if (!prdPath) {
       throw Object.assign(
-        new Error(`project "${name}" has no .prd/prd.md to mark ready`),
+        new Error(`project "${name}" has no PRD marker to mark ready`),
         { status: 409 },
       );
     }
 
     const raw = await readFile(prdPath, "utf8");
     const updated = flipFrontmatterStatus(raw, "ready");
-    if (updated === raw) {
-      // Already ready — treat as a no-op success.
+    const prdChanged = updated !== raw;
+    if (prdChanged) {
+      await Bun.write(prdPath, updated);
+    }
+    // Flip `.plan/status.txt` to phase=ready alongside the PRD frontmatter.
+    // `writeStatus` no-ops when the phase is already "ready", so re-runs
+    // don't produce empty commits.
+    const statusChanged = await writeStatus(path, "ready");
+
+    if (!prdChanged && !statusChanged) {
+      // Already ready on both sides — treat as a no-op success.
       return describeLocal(path, name, true);
     }
-    await Bun.write(prdPath, updated);
-    await commitAll(path, "docs(prd): mark ready for intake");
+
+    // Single commit captures whichever side(s) moved. `commitAll` is a
+    // no-op when there's nothing staged, so this is safe even if only
+    // one file changed.
+    const message = prdChanged
+      ? "docs(prd): mark ready for intake"
+      : "chore: set .plan/status.txt phase=ready";
+    await commitAll(path, message);
     await pushCurrentBranch(path);
     invalidateListCache();
     return describeLocal(path, name, true);

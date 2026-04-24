@@ -17,12 +17,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
 WORKDIR /workspace
 
 # System deps: python 3.10, ffmpeg, git, build tools for native wheels
+# cuda-nvrtc-11-8 is required by cuDNN kernels at runtime (missing from base runtime image)
 RUN apt-get update && apt-get install -y --no-install-recommends \
       python3.10 python3.10-venv python3.10-dev python3-pip \
       git git-lfs ffmpeg \
       build-essential cmake pkg-config \
       libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
       curl ca-certificates \
+      cuda-nvrtc-11-8 \
  && rm -rf /var/lib/apt/lists/* \
  && git lfs install \
  && ln -sf /usr/bin/python3.10 /usr/local/bin/python \

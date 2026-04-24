@@ -2,7 +2,7 @@
   "name": "cto-sidebar",
   "displayName": "5dlabs CTO",
   "description": "CTO agent chat — connects directly to your OpenClaw/ACP harness",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "5dlabs",
   
   "engines": {
@@ -13,7 +13,7 @@
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
-      "activitybar": [
+      "auxiliarybar": [
         {
           "id": "cto-sidebar",
           "title": "5dlabs CTO",
