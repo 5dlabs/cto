@@ -3,6 +3,55 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.82](https://github.com/5dlabs/cto/compare/v0.2.81...v0.2.82) (2026-04-24)
+
+
+### ✨ Features
+
+* add DigitalOcean Gradient AI as OpenCode provider (Claude Opus 4.7) ([9f02213](https://github.com/5dlabs/cto/commit/9f02213bfbec361b7298d69545ef6cab54491e1b))
+* add DigitalOcean Gradient AI as OpenCode provider (Claude Opus 4.7) ([11fd312](https://github.com/5dlabs/cto/commit/11fd312d56e677c1df7002bc51ff64cdd4e25c4a))
+* **avatar:** add GLB blendshape validation script for canine rig ([63f2b28](https://github.com/5dlabs/cto/commit/63f2b285eddf5dd39e223fdf89227026b4f1fe02)), closes [#4799](https://github.com/5dlabs/cto/issues/4799)
+* **avatar:** add SESSION_STATE and ERROR frame types to avatar-session/v1 protocol ([#4804](https://github.com/5dlabs/cto/issues/4804)) ([72d6589](https://github.com/5dlabs/cto/commit/72d65894546f1f184aed861618661222f1cca652))
+* **avatar:** emit and consume SESSION_STATE frames (cto-avatar-session/v1) ([#4808](https://github.com/5dlabs/cto/issues/4808)) ([9727083](https://github.com/5dlabs/cto/commit/9727083acd794f8ee4745a1e8f5abdec870e3690))
+* **avatar:** gate avatar.5dlabs.ai behind Cloudflare Access ([#4802](https://github.com/5dlabs/cto/issues/4802)) ([51d20c0](https://github.com/5dlabs/cto/commit/51d20c0e105feaea07e9ec191b4e77b40811ab2b))
+* **avatar:** instrument 6 protocol metrics (connection/audio/viseme/frames/recovery/memory) ([#4806](https://github.com/5dlabs/cto/issues/4806)) ([139b80a](https://github.com/5dlabs/cto/commit/139b80a17ed46f5873a926d13238f9bf0f7808f2))
+* **avatar:** pure mapping layer for agent state → avatar state ([#4805](https://github.com/5dlabs/cto/issues/4805)) ([c825a07](https://github.com/5dlabs/cto/commit/c825a07d4950113d1091f86e6f667ae9412622de))
+* **avatar:** Ready Player Me stand-in for Morgan (WS-B1) ([#4795](https://github.com/5dlabs/cto/issues/4795)) ([e861b77](https://github.com/5dlabs/cto/commit/e861b770e9f493313d5f0185a802faf15facd3a9))
+* **avatar:** structured ERROR frames with recoverable reconnect handler ([#4807](https://github.com/5dlabs/cto/issues/4807)) ([9f3fd12](https://github.com/5dlabs/cto/commit/9f3fd128d3521a815a0321d67133b59e67f1a452))
+* **avatar:** TalkingHead runtime + HeadAudio audio-driven lip-sync ([#4790](https://github.com/5dlabs/cto/issues/4790)) ([97c9cbd](https://github.com/5dlabs/cto/commit/97c9cbd5119aba3f63521d110db0c8c4213eecbe))
+* **morgan:** add project-api sidecar and intake PRD workflow ([c15eb6d](https://github.com/5dlabs/cto/commit/c15eb6d5337f95ce2424b359bd830f13656548a8))
+* **project-api:** create missing GitHub repos and log requests ([622851d](https://github.com/5dlabs/cto/commit/622851d29275524b868a340f7774e9deed7ee3a1))
+* **skills:** per-session ACP backend color reactions ([#4809](https://github.com/5dlabs/cto/issues/4809)) ([6fd1b08](https://github.com/5dlabs/cto/commit/6fd1b08e85c75771361a76b05751222956c90413))
+
+
+### 🐛 Bug Fixes
+
+* **avatar:** publicly expose avatar dev server for demos (WS-C) ([520e72a](https://github.com/5dlabs/cto/commit/520e72af995f0e82fc3ae3e8b749c6797868e470))
+* **avatar:** publicly expose avatar dev server for demos (WS-C) ([2724b1f](https://github.com/5dlabs/cto/commit/2724b1f148cb63737bd352a129fa54c7a338daba))
+* **avatar:** smoke-headaudio alignment check and non-empty asset verification ([#4801](https://github.com/5dlabs/cto/issues/4801)) ([9a5986e](https://github.com/5dlabs/cto/commit/9a5986edbfd35d96ec1bc4fde6dd18fd8f7856ac))
+* **gitlab-sync:** make cto Mirror-to-GitLab action clear Cloudflare 100MB cap ([cde2a27](https://github.com/5dlabs/cto/commit/cde2a272362b181daa19018461b8b4202ff1a638))
+* **gitlab-sync:** make cto Mirror-to-GitLab action clear Cloudflare 100MB cap ([#4803](https://github.com/5dlabs/cto/issues/4803)) ([cc57696](https://github.com/5dlabs/cto/commit/cc57696aba59fac0ec9fe7fefa095664955e9411))
+* **infra:** LiveKit ExternalSecret reconciliation + Inference STT auth (WS-E) ([e6a4e58](https://github.com/5dlabs/cto/commit/e6a4e583694025c0b4c63e297ca8b9b0cb844061))
+* **infra:** LiveKit ExternalSecret reconciliation + Inference STT auth (WS-E) ([5d2e001](https://github.com/5dlabs/cto/commit/5d2e001842b25a4b2b443e4903b614f4394e4ea7))
+* **livekit:** pin server image to v1.9.12 for /rtc/v1 signalling path ([#4810](https://github.com/5dlabs/cto/issues/4810)) ([a87731f](https://github.com/5dlabs/cto/commit/a87731ffac5e101976db78538dc9b39095d06c60))
+* **project-api:** ensure new projects are never blank in workspace ([5db3876](https://github.com/5dlabs/cto/commit/5db3876712748c870ecfe7f733d4853979f2027c))
+* **project-api:** harden create flow against clone propagation race ([0844371](https://github.com/5dlabs/cto/commit/0844371fa0bbe7183878ec2720b685103aaddd81))
+* **project-api:** redact credentials from remoteUrl responses ([6b508b6](https://github.com/5dlabs/cto/commit/6b508b628a1b04fc7eb3a1676c4c0e22b41268c8))
+
+
+### 📚 Documentation
+
+* archive MuseTalk Phase 4 PRD (superseded by [#4790](https://github.com/5dlabs/cto/issues/4790)) ([#4797](https://github.com/5dlabs/cto/issues/4797)) ([5377552](https://github.com/5dlabs/cto/commit/53775521673eef8a9a7453c3077e331b32953e56))
+* **avatar:** HeadAudio verification checklist + smoke script (WS-A) ([9402567](https://github.com/5dlabs/cto/commit/9402567e503cf952820e1216d526c0314eae7265))
+* **avatar:** HeadAudio verification checklist + smoke script (WS-A) ([d6b2ace](https://github.com/5dlabs/cto/commit/d6b2ace9a03d4c91808f5b4c20a9e91000a36c10))
+* **avatar:** Phase 4 session protocol disposition (WS-F) ([#4794](https://github.com/5dlabs/cto/issues/4794)) ([cf1149f](https://github.com/5dlabs/cto/commit/cf1149f24e0f076d3bd378095df01bdbc0bbb6d5))
+* **avatar:** refresh session protocol spec to match shipped cto-avatar-state/v1 ([#4798](https://github.com/5dlabs/cto/issues/4798)) ([3d57dea](https://github.com/5dlabs/cto/commit/3d57dead03021183721d2d5c10610ce636320c75))
+
+
+### 🔧 Maintenance
+
+* **gitops:** enable ServerSideApply on all cto-namespace Applications ([#4811](https://github.com/5dlabs/cto/issues/4811)) ([2668596](https://github.com/5dlabs/cto/commit/2668596942eb1e30f5be91641ef375a1d071ced5))
+
 ## [0.2.81](https://github.com/5dlabs/cto/compare/v0.2.80...v0.2.81) (2026-04-23)
 
 
