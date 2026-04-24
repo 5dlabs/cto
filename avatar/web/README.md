@@ -83,6 +83,27 @@ And set `LIVEKIT_URL=ws://localhost:7880` in `.env.local`.
 
 Open `http://localhost:3000` and click **Talk to Morgan**.
 
+### EchoMimic turn demo
+
+Open `http://localhost:3000/echo-turn` to test the batch EchoMimic path in a
+web page:
+
+1. Stream Morgan's text reply through `/api/echo-turn/chat`.
+2. Generate or fall back to MP3 audio through `/api/echo-turn/tts`.
+3. Send that audio plus Morgan's reference image to EchoMimic through
+   `/api/echo-turn/avatar`.
+4. Play the returned MP4 in the browser.
+
+Set `ECHOMIMIC_APP_URL` to the active EchoMimic FastAPI app URL. Optional
+`MORGAN_GATEWAY_*` and `ELEVENLABS_*` variables enable real model and TTS calls;
+without them, the page still runs with deterministic streamed text and the
+checked-in `voice_clone_sample.mp3`. For shared OpenClaw gateways, the chat
+route also accepts `MORGAN_LLM_BASE_URL`, `MORGAN_LLM_AGENT_ID`, and
+`OPENCLAW_TOKEN`, and forwards `x-openclaw-agent-id` server-side. This is a
+turn-based bridge, not true low-latency video streaming: LiveKit/WebRTC remains
+the target transport for live mic/audio, while EchoMimic currently returns
+complete MP4 files per turn.
+
 > **Note:** `npm run dev` / `npm run build` use `next --webpack` rather than Turbopack.
 > TalkingHead's bundled module performs a string-constructed `import()` for
 > per-language lipsync plugins, which Turbopack 16 cannot statically resolve.

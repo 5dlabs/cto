@@ -1,0 +1,9 @@
+apiVersion: v2
+name: morgan-avatar-agent
+description: Morgan LiveKit avatar worker with switchable avatar providers.
+type: application
+version: 0.1.0
+appVersion: "latest"
+maintainers:
+  - name: 5dlabs
+    email: ops@5dlabs.ai

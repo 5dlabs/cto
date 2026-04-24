@@ -280,4 +280,3 @@ export async function POST(request: NextRequest) {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxBodySize = 50 * 1024 * 1024; // 50MB

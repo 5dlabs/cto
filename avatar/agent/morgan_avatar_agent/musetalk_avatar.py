@@ -37,6 +37,7 @@ class MuseTalkAvatarSession:
         self._pump_task: asyncio.Task[None] | None = None
         self._room: Any | None = None
         self._stop_event: asyncio.Event | None = None
+        self._external_video_active = False
 
     def warmup(self) -> None:
         self._inference.warmup()
@@ -117,14 +118,40 @@ class MuseTalkAvatarSession:
             frames_pushed += 1
         return frames_pushed
 
+    def set_external_video_active(self, active: bool) -> None:
+        self._external_video_active = active
+
+    def push_rgba_frame(
+        self,
+        *,
+        width: int,
+        height: int,
+        rgba: bytes,
+        index: int = 0,
+        timestamp_ms: float = 0.0,
+    ) -> bool:
+        if self._source is None:
+            return False
+        self._push_frame(
+            RenderedFrame(
+                index=index,
+                width=width,
+                height=height,
+                rgba=rgba,
+                timestamp_ms=timestamp_ms,
+            )
+        )
+        return True
+
     async def _idle_pump(self, rtc: Any) -> None:
         assert self._stop_event is not None
         frame_interval = 1.0 / max(self._inference.target_fps, 1)
-        idle_chunk = AudioChunk(
-            samples=[], sample_rate=16000, duration_ms=frame_interval * 1000
-        )
+        idle_chunk = AudioChunk(samples=[], sample_rate=16000, duration_ms=frame_interval * 1000)
         frame_index = 0
         while not self._stop_event.is_set():
+            if self._external_video_active:
+                await asyncio.sleep(frame_interval)
+                continue
             for frame in self._inference.stream_frames([idle_chunk]):
                 if self._stop_event.is_set():
                     return

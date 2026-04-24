@@ -8,11 +8,18 @@ from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from .config import AgentConfig
 
 
+def _openai_compatible_base_url(base_url: str) -> str:
+    base = base_url.rstrip("/")
+    if base.endswith("/v1"):
+        return base
+    return base + "/v1"
+
+
 def build_llm(config: AgentConfig, *, session_id: str):
     if config.llm_backend == "inference":
         return inference.LLM(model=config.llm_model)
 
-    base_url = config.llm_base_url.rstrip("/") + "/v1"
+    base_url = _openai_compatible_base_url(config.llm_base_url)
     extra_headers = {}
     if config.llm_agent_id:
         extra_headers["x-openclaw-agent-id"] = config.llm_agent_id

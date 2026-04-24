@@ -24,6 +24,7 @@ import tempfile
 import time
 import uuid
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
@@ -32,16 +33,23 @@ LOG = logging.getLogger("echomimic-server")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 ECHOMIMIC_DIR = Path(os.environ.get("ECHOMIMIC_DIR", "/workspace/EchoMimicV3"))
-PRETRAINED_DIR = Path(os.environ.get("ECHOMIMIC_PRETRAINED_DIR", str(ECHOMIMIC_DIR / "pretrained_weights")))
+PRETRAINED_DIR = Path(
+    os.environ.get("ECHOMIMIC_PRETRAINED_DIR", str(ECHOMIMIC_DIR / "pretrained_weights")),
+)
 
 # Resolved at import time — fail fast in logs if layout is wrong.
 INFER_SCRIPT = ECHOMIMIC_DIR / "infer_flash.py"
 CONFIG_PATH = ECHOMIMIC_DIR / "config" / "config.yaml"
 WAN_MODEL_DIR = PRETRAINED_DIR / "Wan2.1-Fun-V1.1-1.3B-InP"
-TRANSFORMER_PATH = PRETRAINED_DIR / "EchoMimicV3" / "transformer" / "diffusion_pytorch_model.safetensors"
+TRANSFORMER_PATH = (
+    PRETRAINED_DIR / "EchoMimicV3" / "transformer" / "diffusion_pytorch_model.safetensors"
+)
 WAV2VEC_DIR = PRETRAINED_DIR / "chinese-wav2vec2-base"
 
-DEFAULT_PROMPT = "A person is speaking."
+DEFAULT_PROMPT = (
+    "A golden retriever dog wearing a suit is talking. Keep the face and muzzle clearly canine, "
+    "preserve the dog identity, natural dog mouth motion, no human face."
+)
 
 
 def _env_str(name: str, default: str) -> str:
@@ -148,33 +156,103 @@ async def _save_upload(upload: UploadFile, dest: Path) -> None:
             f.write(chunk)
 
 
-def _build_cmd(image_path: Path, audio_path: Path, save_path: Path, prompt: str, seed: int) -> list[str]:
+def _form_int_str(name: str, value: int | None, default: str, *, min_value: int = 1) -> str:
+    if value is None:
+        return default
+    if value < min_value:
+        raise HTTPException(status_code=422, detail=f"{name} must be >= {min_value}, got {value}")
+    return str(value)
+
+
+def _form_choice(name: str, value: str | None, default: str, choices: set[str]) -> str:
+    if value is None:
+        return default
+    value = value.strip()
+    if not value:
+        raise HTTPException(status_code=422, detail=f"{name} must not be empty")
+    if value not in choices:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{name} must be one of {sorted(choices)}, got {value!r}",
+        )
+    return value
+
+
+def _request_options(
+    video_length: int | None,
+    sample_height: int | None,
+    sample_width: int | None,
+    weight_dtype: str | None,
+) -> tuple[dict[str, str], tuple[str, str]]:
+    flash_defaults = FLASH_DEFAULTS.copy()
+    flash_defaults["video_length"] = _form_int_str(
+        "video_length",
+        video_length,
+        FLASH_DEFAULTS["video_length"],
+    )
+    flash_defaults["weight_dtype"] = _form_choice(
+        "weight_dtype",
+        weight_dtype,
+        FLASH_DEFAULTS["weight_dtype"],
+        {"float16", "bfloat16"},
+    )
+    sample_size = (
+        _form_int_str("sample_height", sample_height, SAMPLE_SIZE[0], min_value=16),
+        _form_int_str("sample_width", sample_width, SAMPLE_SIZE[1], min_value=16),
+    )
+    return flash_defaults, sample_size
+
+
+def _build_cmd(
+    image_path: Path,
+    audio_path: Path,
+    save_path: Path,
+    prompt: str,
+    seed: int,
+    flash_defaults: dict[str, str],
+    sample_size: tuple[str, str],
+) -> list[str]:
     cmd = [
-        "python", str(INFER_SCRIPT),
-        "--image_path", str(image_path),
-        "--audio_path", str(audio_path),
-        "--prompt", prompt,
-        "--config_path", str(CONFIG_PATH),
-        "--model_name", str(WAN_MODEL_DIR),
-        "--transformer_path", str(TRANSFORMER_PATH),
-        "--wav2vec_model_dir", str(WAV2VEC_DIR),
-        "--save_path", str(save_path),
-        "--seed", str(seed),
+        "python",
+        str(INFER_SCRIPT),
+        "--image_path",
+        str(image_path),
+        "--audio_path",
+        str(audio_path),
+        "--prompt",
+        prompt,
+        "--config_path",
+        str(CONFIG_PATH),
+        "--model_name",
+        str(WAN_MODEL_DIR),
+        "--transformer_path",
+        str(TRANSFORMER_PATH),
+        "--wav2vec_model_dir",
+        str(WAV2VEC_DIR),
+        "--save_path",
+        str(save_path),
+        "--seed",
+        str(seed),
         "--enable_teacache",
         # sample_size requires two ints (h w)
-        "--sample_size", *SAMPLE_SIZE,
+        "--sample_size",
+        *sample_size,
     ]
-    for flag, val in FLASH_DEFAULTS.items():
+    for flag, val in flash_defaults.items():
         cmd.extend([f"--{flag}", val])
     return cmd
 
 
 @app.post("/animate")
 async def animate(
-    source: UploadFile = File(..., description="source portrait image (jpg/png)"),
-    audio: UploadFile = File(..., description="driving audio (wav/mp3)"),
-    prompt: str = Form(DEFAULT_PROMPT),
-    seed: int = Form(43),
+    source: Annotated[UploadFile, File(description="source portrait image (jpg/png)")],
+    audio: Annotated[UploadFile, File(description="driving audio (wav/mp3)")],
+    prompt: Annotated[str, Form()] = DEFAULT_PROMPT,
+    seed: Annotated[int, Form()] = 43,
+    video_length: Annotated[int | None, Form(description="number of output frames")] = None,
+    sample_height: Annotated[int | None, Form(description="output sample height")] = None,
+    sample_width: Annotated[int | None, Form(description="output sample width")] = None,
+    weight_dtype: Annotated[str | None, Form(description="float16 or bfloat16")] = None,
 ) -> FileResponse:
     if not INFER_SCRIPT.exists():
         raise HTTPException(status_code=503, detail="infer_flash.py not present")
@@ -190,7 +268,13 @@ async def animate(
         await _save_upload(source, src_path)
         await _save_upload(audio, aud_path)
 
-        cmd = _build_cmd(src_path, aud_path, out_dir, prompt, seed)
+        flash_defaults, sample_size = _request_options(
+            video_length,
+            sample_height,
+            sample_width,
+            weight_dtype,
+        )
+        cmd = _build_cmd(src_path, aud_path, out_dir, prompt, seed, flash_defaults, sample_size)
         LOG.info("job=%s cmd=%s", job_id, " ".join(cmd))
 
         async with _GPU_LOCK:
@@ -206,7 +290,13 @@ async def animate(
 
         log_tail = (stdout_bytes or b"").decode("utf-8", errors="replace")[-4000:]
         if proc.returncode != 0:
-            LOG.error("job=%s rc=%s elapsed=%.1fs log_tail=%s", job_id, proc.returncode, elapsed, log_tail)
+            LOG.error(
+                "job=%s rc=%s elapsed=%.1fs log_tail=%s",
+                job_id,
+                proc.returncode,
+                elapsed,
+                log_tail,
+            )
             raise HTTPException(
                 status_code=500,
                 detail={"error": "echomimic failed", "rc": proc.returncode, "log_tail": log_tail},
@@ -223,8 +313,13 @@ async def animate(
         staged = Path(tempfile.gettempdir()) / f"em-out-{job_id}.mp4"
         shutil.copy2(primary, staged)
 
-        LOG.info("job=%s done elapsed=%.1fs out=%s size=%d",
-                 job_id, elapsed, staged.name, staged.stat().st_size)
+        LOG.info(
+            "job=%s done elapsed=%.1fs out=%s size=%d",
+            job_id,
+            elapsed,
+            staged.name,
+            staged.stat().st_size,
+        )
         return FileResponse(
             path=str(staged),
             media_type="video/mp4",
