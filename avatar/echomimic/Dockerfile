@@ -58,27 +58,14 @@ RUN pip install --index-url https://download.pytorch.org/whl/cu121 \
 #   1. BadToBest/EchoMimicV3          — flash pro weights + transformer
 #   2. alibaba-pai/Wan2.1-Fun-V1.1-1.3B-InP — base video diffusion model
 #   3. TencentGameMate/chinese-wav2vec2-base — audio encoder
-# Failures here are non-fatal; server.py retries at runtime so the image still
-# builds if HF is having a bad day.
+# Combined ~10GB; doesn't fit on standard GHA runners. We download at
+# container start (bootstrap.sh) instead — OVH AI Deploy has the disk.
 ENV PRETRAINED_DIR=/workspace/EchoMimicV3/pretrained_weights
-RUN mkdir -p ${PRETRAINED_DIR} && \
-    ( HF_HUB_ENABLE_HF_TRANSFER=0 huggingface-cli download \
-        BadToBest/EchoMimicV3 \
-        --local-dir ${PRETRAINED_DIR}/EchoMimicV3 \
-        --exclude "*.git*" "README.md" "docs/*" \
-      || echo "[warn] EchoMimicV3 weights failed; retry at runtime" ) && \
-    ( HF_HUB_ENABLE_HF_TRANSFER=0 huggingface-cli download \
-        alibaba-pai/Wan2.1-Fun-V1.1-1.3B-InP \
-        --local-dir ${PRETRAINED_DIR}/Wan2.1-Fun-V1.1-1.3B-InP \
-        --exclude "*.git*" "README.md" \
-      || echo "[warn] Wan2.1 weights failed; retry at runtime" ) && \
-    ( HF_HUB_ENABLE_HF_TRANSFER=0 huggingface-cli download \
-        TencentGameMate/chinese-wav2vec2-base \
-        --local-dir ${PRETRAINED_DIR}/chinese-wav2vec2-base \
-        --exclude "*.git*" "README.md" \
-      || echo "[warn] chinese-wav2vec2-base failed; retry at runtime" )
+RUN mkdir -p ${PRETRAINED_DIR}
 
 COPY server.py /workspace/server.py
+COPY bootstrap.sh /workspace/bootstrap.sh
+RUN chmod +x /workspace/bootstrap.sh
 
 ENV PORT=8000 \
     ECHOMIMIC_DIR=/workspace/EchoMimicV3 \
@@ -88,7 +75,7 @@ EXPOSE 8000
 
 RUN chmod -R 777 /workspace
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=3 \
   CMD curl -fsS http://127.0.0.1:${PORT}/health || exit 1
 
-CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT} --workers 1"]
+CMD ["/workspace/bootstrap.sh"]
