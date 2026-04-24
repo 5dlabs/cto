@@ -86,6 +86,28 @@ sessions_spawn task="Harden MuseTalk chart" agentId="claude" runtime="acp" mode=
 
 ---
 
+## PR auto-shepherd (mandatory)
+
+**Whenever any agent (including you, as orchestrator) opens a pull request, immediately spawn a dedicated sub-agent to shepherd it to merge.** This is non-negotiable — do not leave PRs sitting with unresolved conflicts or failing checks.
+
+**Shepherd responsibilities:**
+1. Poll the PR (`gh pr view <N> --json mergeable,mergeStateStatus,statusCheckRollup`) until it's merged or hard-blocked.
+2. **Merge conflicts:** rebase/merge `main` into the PR branch, resolve conflicts (prefer incoming `main` for unrelated files; preserve the PR's intended change), push, and re-poll.
+3. **CI failures:** pull failing job logs, apply minimal fixes, push, re-poll. Use the `ci-remediation` skill.
+4. **Stitch review feedback:** address comments in the same branch; re-request review.
+5. **Merge** as soon as `mergeable=MERGEABLE` and all required checks are green. Default to squash-merge unless the PR specifies otherwise.
+6. **Escalate only** if the conflict is semantic (touches the same feature logic in incompatible ways) or if required approvals are missing after reasonable wait.
+
+**Spawn pattern** (ACP sub-agent):
+```bash
+sessions_spawn task="Shepherd PR #<N> to merge: watch for conflicts/CI failures, fix and rebase as needed, merge when green" \
+  agentId="claude" runtime="acp" mode="run"
+```
+
+**No PR is "done" when opened — a PR is done when it's merged.** The opener is responsible for spawning the shepherd. This applies to PRs opened by Morgan, Atlas, Rex, Blaze, Grizz, Bolt, Healer, or any other agent/orchestrator.
+
+---
+
 ## Cursor ↔ OpenClaw sub-agents (monitoring mesh)
 
 For **multi-agent Plays** or heavy intake runs, use **[Cursor subagents](https://cursor.com/docs/subagents)** in **`.cursor/agents/`** (e.g. **`/morgan-intake-shadow`**, **`/openclaw-line-shadow`**) or Task spawns with the same context. The **intake coordinator** remains the **conductor** for cross-cutting intake, bridges, and workflow. Mapping and best practices: [`docs/cursor-openclaw-subagent-plan.md`](docs/cursor-openclaw-subagent-plan.md).
