@@ -3,12 +3,13 @@
 You are running the intake conversation that turns a user's idea into a
 concrete pair of project docs:
 
-- `<repo>/.prd/prd.md` — product requirements (vision, users, features)
-- `<repo>/.prd/architecture.md` — technical shape (stack, services, API)
+- `<repo>/.plan/prd/prd.md` — product requirements (vision, users, features)
+- `<repo>/.plan/spec/architecture.md` — technical shape (stack, services, API)
 
-Both live in the `.prd/` folder at the repo root. The folder is how the
-cto-app UI decides a GitHub repo counts as a "project" — without
-`.prd/prd.md`, the repo is invisible to the Projects board.
+Both live under the `.plan/` folder at the repo root. The folder is how
+the cto-app UI decides a GitHub repo counts as a "project" — without
+`.plan/prd/prd.md`, the repo is invisible to the Projects board. Extra
+spec material (diagrams, deep-dives) goes under `.plan/spec/docs/`.
 
 This skill applies whenever the cto-app UI or a Discord conversation is
 in "project intake" mode.
@@ -45,7 +46,7 @@ POST /projects/active                → { "name": "<slug>" }
 GET  /projects                       → ProjectDescriptor[]
 GET  /projects/<slug>                → ProjectDescriptor
 POST /projects {"name":"<slug>"}     → create (GitHub clone or init)
-POST /projects/<slug>/prd            → write .prd/prd.md + commit + push
+POST /projects/<slug>/prd            → write .plan/prd/prd.md + commit + push
 POST /projects/<slug>/verify         → clone-on-demand if remote-only
 ```
 
@@ -73,17 +74,18 @@ The cto-app Projects board reads project state from the repo itself:
 
 | State | Detection | When you set it |
 |---|---|---|
-| `empty` | Repo exists, no `.prd/` folder on default branch | (never — you're authoring, so you always write something) |
-| `drafting` | `.prd/prd.md` exists, frontmatter `status: drafting` or absent | Your first PRD write |
-| `ready` | `.prd/prd.md` frontmatter `status: ready` AND `.prd/architecture.md` present | When user says the docs are good to go |
-| `intake` | `.prd/tasks.json` exists | Session-2 intake writes this |
+| `empty` | Repo exists, no `.plan/` folder on default branch | (never — you're authoring, so you always write something) |
+| `drafting` | `.plan/prd/prd.md` exists, frontmatter `status: drafting` or absent | Your first PRD write |
+| `ready` | `.plan/prd/prd.md` frontmatter `status: ready` AND `.plan/spec/architecture.md` present | When user says the docs are good to go |
+| `intake` | `.plan/tasks.json` exists | Session-2 intake writes this |
 
 The `status:` frontmatter key is authoritative. You manage it. The UI
-just reads and displays.
+just reads and displays. The phase of the project as a whole is
+mirrored in `.plan/status.txt` — see "Status file" below.
 
 ### Frontmatter shape
 
-Always include at the top of `.prd/prd.md`:
+Always include at the top of `.plan/prd/prd.md`:
 
 ```yaml
 ---
@@ -109,7 +111,7 @@ a name, a problem, and at least one user or feature. That's enough.
 ## Iterating
 
 Each `POST /projects/<slug>/prd` overwrites the file, commits as Morgan
-(`docs: update .prd/prd.md`), and pushes to origin. There is no diff
+(`docs: update .plan/prd/prd.md`), and pushes to origin. There is no diff
 negotiation — you read the existing content, merge your changes, write
 the whole thing back. Never echo user-supplied credentials into the
 body.
@@ -171,7 +173,7 @@ confirmation.
    PAYLOAD
    ```
 
-   The sidecar writes `/workspace/repos/<slug>/.prd/prd.md`, commits
+   The sidecar writes `/workspace/repos/<slug>/.plan/prd/prd.md`, commits
    as Morgan, and pushes. You don't run git yourself.
 5. Speak a short confirmation: revision number, main changes, top 1–3
    open questions still to resolve. Don't monologue the whole PRD.
@@ -216,7 +218,7 @@ repo. That's the NotifyCore Sigma-Long sample — the shape to aim for.
 
 Once the PRD has a stable shape — typically after the user has named
 the stack, the primary services, and the data model — draft
-`.prd/architecture.md`. This is the technical sibling of prd.md.
+`.plan/spec/architecture.md`. This is the technical sibling of prd.md.
 
 Keep it focused on **decisions that are already made**, not speculative
 options. If the user hasn't picked a database, don't invent one; list
@@ -259,12 +261,12 @@ write it directly:
 
 ```bash
 cd /workspace/repos/${PROJECT}
-mkdir -p .prd
-cat > .prd/architecture.md <<'DOC'
+mkdir -p .plan/spec
+cat > .plan/spec/architecture.md <<'DOC'
 ...content...
 DOC
-git add .prd/architecture.md
-git commit -m "docs: add .prd/architecture.md"
+git add .plan/spec/architecture.md
+git commit -m "docs: add .plan/spec/architecture.md"
 git push
 ```
 
@@ -283,6 +285,72 @@ or immediately via the UI's manual refresh).
 Don't flip to `ready` without an explicit user sign-off. "Looks good"
 after showing the draft is enough; silence is not.
 
+## Status file — `.plan/status.txt`
+
+`.plan/status.txt` is a plain-text, machine-owned marker that records
+the current phase of the whole project. Morgan rewrites it on every
+phase transition — the file is not for humans to edit.
+
+**Exact template (use verbatim, fill in `<phase>` and `<timestamp>`):**
+
+```
+# DO NOT EDIT — managed by Morgan.
+# This file is overwritten automatically as the project moves through phases.
+phase: <phase>
+updated: <ISO-8601 UTC timestamp>
+```
+
+**Phase vocabulary** (in order — no other values allowed):
+
+```
+new → intake → ready → implementing → complete
+```
+
+- `new` — project exists but nothing has been authored yet. You
+  normally won't write this value yourself; the scaffolder does.
+- `intake` — write this the moment you begin drafting the PRD.
+- `ready` — write this once `.plan/prd/prd.md` is signed off AND
+  `.plan/spec/architecture.md` is committed.
+- `implementing` — write this at the handoff to implementation agents
+  (i.e. when task breakdown / build work starts).
+- `complete` — write this when the work closes out.
+
+**Rules:**
+
+- Always **overwrite the entire file** — never append, never edit by
+  hand, never patch in place.
+- `updated:` must be a **fresh UTC ISO-8601 timestamp** on every
+  write (e.g. `2026-04-23T19:30:00Z`), regenerated from the clock at
+  write time. Do not copy the previous value forward.
+- The two `#`-prefixed lines must be present verbatim on every write.
+- Commit the status change with a short message, e.g.
+  `chore(plan): phase → ready`.
+- Do not invent phases outside the vocabulary above.
+
+## Migrating legacy `.prd/` projects
+
+If a repo still has a top-level `.prd/` or `.PRD/` folder from the old
+convention, migrate it to `.plan/` on the next substantive edit to
+that project:
+
+1. `git mv .prd/prd.md .plan/prd/prd.md` (create `.plan/prd/` first).
+2. `git mv .prd/architecture.md .plan/spec/architecture.md` (create
+   `.plan/spec/` first). Move any other files from `.prd/` under
+   `.plan/spec/docs/` as appropriate.
+3. Create `.plan/status.txt` using the template above. Set `phase:`
+   to whatever state the project is actually in (usually `intake` or
+   `ready` for a mid-flight project).
+4. Delete the now-empty `.prd/` (or `.PRD/`) directory.
+5. Commit the migration as a **single dedicated commit** — no other
+   content changes mixed in — titled exactly:
+
+   ```
+   chore: migrate .prd/ to .plan/
+   ```
+
+After that commit lands, resume normal authoring against the new
+paths.
+
 ## Guardrails
 
 - The project must exist on disk before you attempt to write a PRD. If
@@ -290,7 +358,7 @@ after showing the draft is enough; silence is not.
   `POST /projects {"name":"<slug>"}` and wait for the clone/init.
 - Never echo `GITHUB_TOKEN` or any credential into chat or into either
   doc.
-- If `.prd/prd.md` already has content, read it first and merge — the
+- If `.plan/prd/prd.md` already has content, read it first and merge — the
   sidecar endpoint always overwrites, so merging is your job.
 - Keep both docs in clean Markdown. No smart quotes. No decorative
   emoji. No "AI wrote this" watermarks.
