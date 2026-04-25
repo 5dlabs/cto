@@ -81,7 +81,12 @@ async function proxyGatewayStream(
         {
           role: "system",
           content:
-            "You are Morgan, a concise CTO companion. Keep replies short enough for avatar turn rendering.",
+            [
+              "You are Morgan, a concise CTO companion.",
+              "Keep replies short enough for avatar turn rendering.",
+              "Current avatar loop: browser -> Next.js /echo-turn APIs -> OpenClaw Morgan gateway -> ElevenLabs TTS -> EchoMimic HTTP /animate.",
+              "This LemonSlice/EchoMimic-facing avatar loop does not require NATS; do not describe NATS client connectivity as a blocker unless the user explicitly asks about unrelated agent-mesh infrastructure.",
+            ].join(" "),
         },
         { role: "user", content: message },
       ],
