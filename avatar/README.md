@@ -8,7 +8,7 @@ A proof of concept for Morgan as a two-way conversational talking avatar.
 
 - Python 3.11
 - Node.js 18+
-- API keys for: LiveKit, LemonSlice, ElevenLabs (via LiveKit Inference)
+- API keys for: LiveKit, LemonSlice or EchoMimic, ElevenLabs (via LiveKit Inference)
 - Access to `morgan.5dlabs.ai` (OpenClaw gateway with Morgan persona)
 
 ### 1. Agent setup (one time)
@@ -24,10 +24,13 @@ LIVEKIT_URL=
 LIVEKIT_API_KEY=
 LIVEKIT_API_SECRET=
 
-# LemonSlice avatar (set either agent id OR image URL)
+# Avatar provider: use LemonSlice or EchoMimic only.
+MORGAN_AVATAR_MODE=lemonslice
 MORGAN_LEMONSLICE_AGENT_ID=
 # MORGAN_IMAGE_URL=
 # MORGAN_PLACEHOLDER_IMAGE_URL=
+# MORGAN_AVATAR_MODE=echomimic
+# MORGAN_ECHOMIMIC_APP_URL=
 
 # OpenClaw (default backend)
 MORGAN_LLM_BACKEND=openclaw
@@ -89,12 +92,12 @@ Browser -> Next.js /api/token -> LiveKit Cloud
                                      |
                               Python Avatar Agent
                              /        |         \
-                     OpenClaw    LemonSlice   Latency Logs
-                  (morgan.5dlabs.ai)  (avatar video)
+                     OpenClaw    Avatar Provider   Latency Logs
+                  (morgan.5dlabs.ai) (LemonSlice/EchoMimic)
 ```
 
 - **LiveKit** -- real-time WebRTC transport (rooms, tokens, tracks)
-- **LemonSlice** -- lip-synced avatar video from a still image
+- **LemonSlice / EchoMimic** -- the allowed avatar video providers
 - **OpenClaw** -- Morgan persona LLM backend
 - **Deepgram** (via LiveKit Inference) -- speech-to-text
 - **ElevenLabs** (via LiveKit Inference) -- text-to-speech

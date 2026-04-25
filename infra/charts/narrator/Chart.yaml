@@ -1,6 +1,0 @@
-apiVersion: v2
-name: narrator
-description: Narrator service for lipsync and audio processing
-type: application
-version: 0.1.0
-appVersion: "0.1.0"

@@ -13,6 +13,12 @@ type Phase =
 
 const DOG_PROMPT =
   "A golden retriever dog wearing a suit is talking. Keep the face and muzzle clearly canine, preserve the dog identity, natural dog mouth motion, no human face.";
+const DEMO_RENDER_OPTIONS = {
+  sampleHeight: "512",
+  sampleWidth: "512",
+  videoLength: "32",
+  weightDtype: "float16",
+};
 
 async function readMorganStream(response: Response, onDelta: (text: string) => void) {
   if (!response.body) {
@@ -60,7 +66,9 @@ export default function EchoTurnPage() {
   const [error, setError] = useState("");
   const [audioUrl, setAudioUrl] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
+  const [audioStatus, setAudioStatus] = useState("");
   const [metrics, setMetrics] = useState<string[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrls = useRef<string[]>([]);
 
   function rememberObjectUrl(url: string) {
@@ -82,6 +90,7 @@ export default function EchoTurnPage() {
     setVideoUrl("");
     setReply("");
     setError("");
+    setAudioStatus("");
     setMetrics([]);
 
     const startedAt = performance.now();
@@ -115,6 +124,26 @@ export default function EchoTurnPage() {
       const audioBlob = await ttsResponse.blob();
       const audioObjectUrl = rememberObjectUrl(URL.createObjectURL(audioBlob));
       setAudioUrl(audioObjectUrl);
+      setAudioStatus("Morgan's TTS audio is ready. Trying to play it now...");
+      window.setTimeout(() => {
+        const player = audioRef.current;
+        if (!player) {
+          return;
+        }
+        player.currentTime = 0;
+        player
+          .play()
+          .then(() => {
+            setAudioStatus(
+              "Morgan's TTS audio is playing. EchoMimic video is rendering in the background.",
+            );
+          })
+          .catch(() => {
+            setAudioStatus(
+              "Browser blocked autoplay. Press play on the audio control while EchoMimic renders.",
+            );
+          });
+      }, 100);
       const ttsMs = performance.now() - ttsStartedAt;
 
       setPhase("rendering");
@@ -122,6 +151,10 @@ export default function EchoTurnPage() {
       const form = new FormData();
       form.set("audio", audioBlob, "morgan-turn.mp3");
       form.set("prompt", DOG_PROMPT);
+      form.set("video_length", DEMO_RENDER_OPTIONS.videoLength);
+      form.set("sample_height", DEMO_RENDER_OPTIONS.sampleHeight);
+      form.set("sample_width", DEMO_RENDER_OPTIONS.sampleWidth);
+      form.set("weight_dtype", DEMO_RENDER_OPTIONS.weightDtype);
       const avatarResponse = await fetch("/api/echo-turn/avatar", {
         method: "POST",
         body: form,
@@ -149,9 +182,17 @@ export default function EchoTurnPage() {
   }
 
   const busy = phase === "streaming" || phase === "synthesizing" || phase === "rendering";
+  const actionLabel =
+    phase === "streaming"
+      ? "Morgan is writing..."
+      : phase === "synthesizing"
+        ? "Generating Morgan's voice..."
+        : phase === "rendering"
+          ? "Rendering EchoMimic video..."
+          : "Run one conversational turn";
   const avatarStatus =
     phase === "rendering"
-      ? "Rendering the EchoMimic MP4. Morgan stays visible here while the batch job runs."
+      ? "Rendering the EchoMimic MP4. Morgan's voice should already be available above; video usually takes about 3.5 minutes on the current V100."
       : "Morgan's source image stays visible until the generated MP4 is ready.";
 
   return (
@@ -186,7 +227,7 @@ export default function EchoTurnPage() {
               type="submit"
               disabled={busy}
             >
-              {busy ? "Morgan is working..." : "Run one conversational turn"}
+              {actionLabel}
             </button>
           </form>
 
@@ -231,9 +272,16 @@ export default function EchoTurnPage() {
               </span>
             </div>
             {audioUrl ? (
-              <audio className="mt-5 w-full" src={audioUrl} controls />
+              <>
+                <audio ref={audioRef} className="mt-5 w-full" src={audioUrl} controls />
+                {audioStatus ? (
+                  <p className="mt-3 text-sm leading-6 text-cyan-100">{audioStatus}</p>
+                ) : null}
+              </>
             ) : (
-              <p className="mt-4 text-sm text-slate-400">Audio appears after the text stream.</p>
+              <p className="mt-4 text-sm text-slate-400">
+                Audio appears and starts playing after Morgan finishes the text stream.
+              </p>
             )}
           </div>
 

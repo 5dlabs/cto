@@ -11,9 +11,6 @@ import {
   useVoiceAssistant,
 } from "@livekit/components-react";
 import AvatarRuntimeSurface from "@/components/AvatarRuntimeSurface";
-import LiveKitAudioBridge from "@/components/LiveKitAudioBridge";
-import type { TalkingHeadHandle } from "@/components/TalkingHeadView";
-import { MORGAN_DEFAULT_GLB_URL } from "@/config/morgan";
 import { pickAvatarAdapter } from "@/lib/avatar-runtime";
 import {
   type AvatarRuntimeAdapter,
@@ -237,47 +234,10 @@ function AgentTelemetry({
     };
   }, [audioTrack, room, videoTrack]);
 
-  const metrics = useMemo(() => {
-    return {
-      connectionRequestedMs: connectionRequestedAt,
-      roomConnectedMs:
-        connectionRequestedAt !== null && roomConnectedAt
-          ? roomConnectedAt - connectionRequestedAt
-          : null,
-      audioTrackReadyMs:
-        connectionRequestedAt !== null && audioReadyAt
-          ? audioReadyAt - connectionRequestedAt
-          : null,
-      videoTrackReadyMs:
-        connectionRequestedAt !== null && videoReadyAt
-          ? videoReadyAt - connectionRequestedAt
-          : null,
-      firstSpeakingStateMs:
-        connectionRequestedAt !== null && speakingAt
-          ? speakingAt - connectionRequestedAt
-          : null,
-      agentState: state,
-      latestTranscript,
-    };
-  }, [
-    audioReadyAt,
-    connectionRequestedAt,
-    latestTranscript,
-    roomConnectedAt,
-    speakingAt,
-    state,
-    videoReadyAt,
-  ]);
-
-  const glbUrl =
-    process.env.NEXT_PUBLIC_AVATAR_GLB_URL ?? MORGAN_DEFAULT_GLB_URL;
-
   const adapter = useMemo<AvatarRuntimeAdapter>(
     () => pickAvatarAdapter(process.env.NEXT_PUBLIC_AVATAR_RUNTIME),
     [],
   );
-
-  const talkingHeadRef = useRef<TalkingHeadHandle | null>(null);
 
   const runtimeInput = useMemo<AvatarRuntimeInput>(
     () => ({
@@ -326,9 +286,6 @@ function AgentTelemetry({
   if (compact) {
     return (
       <>
-        {adapter.kind === "talkinghead" ? (
-          <LiveKitAudioBridge talkingHeadRef={talkingHeadRef} />
-        ) : null}
         <section className="grid gap-5">
         <div className="relative overflow-hidden rounded-[2.2rem] border border-white/10 bg-black/30 shadow-[0_30px_120px_-48px_rgba(14,165,233,0.75)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#155e75_0%,rgba(2,6,23,0.78)_34%,rgba(2,6,23,0.96)_100%)]" />
@@ -378,8 +335,6 @@ function AgentTelemetry({
               compact
               state={avatarState}
               videoTrack={videoTrack}
-              talkingHeadRef={talkingHeadRef}
-              glbUrl={glbUrl}
             />
           </div>
         </div>
@@ -390,17 +345,12 @@ function AgentTelemetry({
 
   return (
     <>
-      {adapter.kind === "talkinghead" ? (
-        <LiveKitAudioBridge talkingHeadRef={talkingHeadRef} />
-      ) : null}
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 shadow-2xl shadow-black/25">
         <div className="aspect-[9/14] w-full bg-linear-to-b from-slate-900 via-slate-950 to-black">
           <AvatarRuntimeSurface
             state={avatarState}
             videoTrack={videoTrack}
-            talkingHeadRef={talkingHeadRef}
-            glbUrl={glbUrl}
           />
         </div>
       </div>
@@ -685,7 +635,7 @@ export default function Room({
               </h2>
               <p className="mt-4 text-sm leading-7 text-slate-300">
                 {error ??
-                  "LiveKit is connecting and LemonSlice is warming up. Morgan should appear automatically as soon as the session is ready."}
+                  "LiveKit is connecting and the configured avatar provider is warming up. Morgan should appear automatically as soon as the session is ready."}
               </p>
               {error ? (
                 <button
@@ -776,13 +726,7 @@ export default function Room({
         roomConnectedAt={roomConnectedAt}
       />
       <SessionControls compact={compact} onReset={reset} />
-      {/*
-        LiveKit's native audio element plays Morgan's speech AND keeps
-        the underlying MediaStreamTrack "flowing" in Chrome, which is
-        required for our Web Audio graph (MediaStreamAudioSourceNode →
-        HeadAudio viseme detector) to receive samples. Keep this
-        mounted for every runtime.
-      */}
+      {/* Keep LiveKit's native audio renderer mounted so Morgan's speech plays. */}
       <AssistantAudioRenderer />
     </LiveKitRoom>
   );

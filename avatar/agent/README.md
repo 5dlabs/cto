@@ -5,7 +5,7 @@ Python LiveKit agent for the Morgan talking-avatar proof of concept.
 ## What it does
 
 - Connects Morgan to a LiveKit room as a voice agent.
-- Publishes either a LemonSlice avatar or the self-hosted MuseTalk frame pipeline.
+- Publishes either a LemonSlice avatar or the EchoMimic turn-rendered video path.
 - Routes user speech through configurable STT, LLM, and TTS backends.
 - Writes turn-by-turn latency logs to `runs/`.
 
@@ -19,7 +19,7 @@ Python LiveKit agent for the Morgan talking-avatar proof of concept.
 
 ## Run locally
 
-1. Create `agent/.env` and fill in credentials (LiveKit, OpenClaw, optional LemonSlice for rollback, and any non-default STT/TTS provider keys).
+1. Create `agent/.env` and fill in credentials (LiveKit, OpenClaw, LemonSlice or EchoMimic, and any non-default STT/TTS provider keys).
 2. Create a Python 3.11 virtual environment and install:
    ```bash
    python3.11 -m venv .venv
@@ -70,8 +70,13 @@ The summary breaks down:
 - **Conversational turns**: end-of-utterance to first audio
 - **Per-component**: p50/p95 for EOU delay, STT delay, LLM TTFT, TTS TTFB
 
-## MuseTalk mode
+## Avatar modes
 
-Set `MORGAN_AVATAR_MODE=musetalk` to use the self-hosted frame generator.
-Phase 3 keeps the implementation CPU-testable with a deterministic inference stub.
-The runtime publishes generated frames from persona assets rooted at `/personas/<persona_id>/`.
+`MORGAN_AVATAR_MODE` is intentionally limited to:
+
+- `lemonslice` — LiveKit LemonSlice avatar session.
+- `echomimic` — EchoMimic batch MP4 rendering with an internal idle video source.
+- `disabled` — audio-only fallback for local validation.
+
+MuseTalk-named frame helpers remain only as internal EchoMimic idle-video plumbing
+and are not a selectable product provider.

@@ -1,5 +1,9 @@
 # LivePortrait — OVH AI Deploy container
 
+> Archived: LivePortrait was a Gate 1 provider spike and is no longer built,
+> deployed, or part of the active avatar provider set. Use LemonSlice or
+> EchoMimic for current avatar work.
+
 FastAPI wrapper around [LivePortrait](https://github.com/KlingAIResearch/LivePortrait)
 (MIT, KwaiVGI / Kuaishou). Shipped as a single Docker image with the humans-model
 weights baked in so OVH AI Deploy can pull and run with zero extra config.

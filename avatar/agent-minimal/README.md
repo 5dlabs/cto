@@ -1,5 +1,9 @@
 # morgan-avatar-minimal
 
+> Archived: this temporary TalkingHead/HeadAudio validation worker is no longer
+> built or deployed. The active avatar provider surface is limited to
+> LemonSlice and EchoMimic.
+
 **Purpose:** Animation pipeline validation only. Registers as `morgan-avatar` LiveKit worker, streams `sample.mp3` (Morgan's cloned voice) as a raw audio track, then keeps the worker alive. No STT, no LLM, no TTS, no avatar session.
 
 ## What this validates

@@ -7,8 +7,6 @@ from livekit.agents._exceptions import APIStatusError
 
 from .config import AgentConfig
 from .echomimic_avatar import build_echomimic_avatar_session
-from .musetalk_avatar import MuseTalkAvatarSession
-from .musetalk_inference import MuseTalkInferenceEngine
 
 logger = logging.getLogger(__name__)
 
@@ -92,62 +90,6 @@ class LemonSliceAvatarProvider:
             await stop()
 
 
-class MuseTalkProvider:
-    def __init__(self, config: AgentConfig) -> None:
-        self._config = config
-        self._nats_client: Any | None = None
-        self._session: MuseTalkAvatarSession | None = None
-
-    async def start(self, session: Any, room: Any) -> None:
-        logger.info(
-            "MORGAN_AVATAR_MODE=musetalk selected, starting self-hosted avatar pipeline "
-            "(use_stub=%s, nats_url=%s)",
-            self._config.musetalk_use_stub,
-            self._config.nats_url,
-        )
-        nats_client = None
-        if not self._config.musetalk_use_stub:
-            from .musetalk_nats_client import MuseTalkNatsClient, MuseTalkNatsError
-
-            try:
-                nats_client = MuseTalkNatsClient(
-                    url=self._config.nats_url,
-                    request_subject=self._config.nats_request_subject,
-                    result_subject=self._config.nats_result_subject,
-                    stream=self._config.nats_stream,
-                    request_timeout_s=self._config.musetalk_request_timeout_s,
-                )
-                await nats_client.connect()
-            except MuseTalkNatsError as exc:
-                logger.warning(
-                    "Failed to connect MuseTalk NATS client (%s); falling back to stub frames",
-                    exc,
-                )
-                nats_client = None
-
-        self._nats_client = nats_client
-        self._session = MuseTalkAvatarSession(
-            MuseTalkInferenceEngine(
-                persona_id=self._config.persona_id,
-                personas_root=self._config.personas_root,
-                target_fps=self._config.musetalk_target_fps,
-                frame_width=self._config.musetalk_frame_width,
-                frame_height=self._config.musetalk_frame_height,
-                nats_client=nats_client,
-                reference_image_url=self._config.musetalk_reference_image_url,
-                use_stub=self._config.musetalk_use_stub or nats_client is None,
-            )
-        )
-        await self._session.start(session, room)
-
-    async def stop(self) -> None:
-        if self._session is not None:
-            await self._session.stop()
-        close = getattr(self._nats_client, "close", None)
-        if close is not None:
-            await close()
-
-
 def build_avatar_provider(
     config: AgentConfig,
     *,
@@ -161,8 +103,6 @@ def build_avatar_provider(
                 config,
                 allow_audio_only_fallback=allow_audio_only_fallback,
             )
-        case "musetalk":
-            return MuseTalkProvider(config)
         case "echomimic":
             return build_echomimic_avatar_session(config)
         case _:

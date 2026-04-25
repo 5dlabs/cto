@@ -21,7 +21,6 @@ docker_images:
   - ghcr.io/5dlabs/discord-bridge
   - ghcr.io/5dlabs/linear-bridge
   - ghcr.io/5dlabs/grok
-  - ghcr.io/5dlabs/musetalk-worker
 
 # cto does not currently publish helm charts or npm packages to public
 # registries — grok publishes to GitHub Packages npm, not npmjs, so it is

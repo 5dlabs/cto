@@ -1,7 +1,7 @@
 ---
 # Self-hosted LiveKit SFU for the Morgan avatar pipeline.
 # Replaces LiveKit Cloud. Runs on CPU worker nodes; the GPU node only
-# runs the avatar agent + MuseTalk inference and connects to this server
+# runs the avatar provider workload and connects to this server
 # as a regular client.
 #
 # Phase 1 delivers the production signaling endpoint at wss://lk.5dlabs.ai
