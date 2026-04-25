@@ -63,6 +63,39 @@ const interactionMethods = [
   },
 ];
 
+const morganAvatarMode = (
+  process.env.NEXT_PUBLIC_MORGAN_AVATAR_MODE ?? "livekit"
+).toLowerCase();
+const morganLiveKitAvatarUrl =
+  process.env.NEXT_PUBLIC_MORGAN_AVATAR_URL ??
+  "https://app.5dlabs.ai/morgan/avatar/embed";
+
+function MorganConversationSurface() {
+  if (morganAvatarMode === "lemonslice") {
+    return (
+      <LemonSliceWidget
+        initialState="active"
+        inline
+        autoStartConversation={false}
+        customActiveWidth={368}
+        customActiveHeight={560}
+        customMinimizedWidth={120}
+        customMinimizedHeight={187}
+        className="w-full h-full flex items-center justify-center"
+      />
+    );
+  }
+
+  return (
+    <iframe
+      src={morganLiveKitAvatarUrl}
+      title="Talk to Morgan with LiveKit"
+      allow="microphone; camera; autoplay; fullscreen"
+      className="h-full min-h-[640px] w-full rounded-lg border-0 bg-slate-950"
+    />
+  );
+}
+
 export default function MorganPage() {
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -85,7 +118,9 @@ export default function MorganPage() {
                 </span>
               </div>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
-                <span className="gradient-text glow-text-cyan">Meet Morgan</span>
+                <span className="gradient-text glow-text-cyan">
+                  Meet Morgan
+                </span>
               </h1>
               <p className="text-xl text-muted-foreground mb-8 max-w-xl">
                 Your control agent. Chat, voice, or video—from any device. You
@@ -129,9 +164,7 @@ export default function MorganPage() {
               <div className="space-y-8">
                 {interactionMethods.map((method, i) => (
                   <div key={i} className="space-y-2">
-                    <h3 className="text-lg font-semibold">
-                      {method.title}
-                    </h3>
+                    <h3 className="text-lg font-semibold">{method.title}</h3>
                     <p className="text-muted-foreground">
                       {method.description}
                     </p>
@@ -140,16 +173,7 @@ export default function MorganPage() {
               </div>
               <div className="lg:sticky lg:top-28 flex flex-col items-center">
                 <div className="rounded-xl border border-border bg-card/50 p-4 w-full max-w-[420px] min-h-[680px] sm:min-h-[720px] flex items-center justify-center">
-                  <LemonSliceWidget
-                    initialState="active"
-                    inline
-                    autoStartConversation={false}
-                    customActiveWidth={368}
-                    customActiveHeight={560}
-                    customMinimizedWidth={120}
-                    customMinimizedHeight={187}
-                    className="w-full h-full flex items-center justify-center"
-                  />
+                  <MorganConversationSurface />
                 </div>
               </div>
             </div>
@@ -281,9 +305,9 @@ export default function MorganPage() {
               One agent. One conversation.
             </h2>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              You don&apos;t need to manage a dozen tools or remember which agent
-              does what. Morgan is your single point of contact. Chat, voice, or
-              video—from anywhere. Morgan coordinates the rest.
+              You don&apos;t need to manage a dozen tools or remember which
+              agent does what. Morgan is your single point of contact. Chat,
+              voice, or video—from anywhere. Morgan coordinates the rest.
             </p>
           </div>
         </section>
