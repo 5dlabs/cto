@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from morgan_avatar_agent.config import AgentConfig
-from morgan_avatar_agent.providers import _openai_compatible_base_url
+from morgan_avatar_agent.providers import _openai_compatible_base_url, build_turn_detection
 
 
 def test_placeholder_image_is_preferred_when_enabled(monkeypatch) -> None:
@@ -128,3 +129,14 @@ def test_openai_compatible_base_url_avoids_double_v1() -> None:
     assert (
         _openai_compatible_base_url("https://morgan.5dlabs.ai/v1") == "https://morgan.5dlabs.ai/v1"
     )
+
+
+def test_flux_stt_uses_provider_turn_detection_without_local_model(monkeypatch) -> None:
+    sys.modules.pop("livekit.plugins.turn_detector.multilingual", None)
+    monkeypatch.setenv("MORGAN_LLM_BACKEND", "inference")
+    monkeypatch.setenv("MORGAN_STT_MODE", "livekit-flux")
+
+    config = AgentConfig.from_env(project_root=Path("/tmp/project"))
+
+    assert build_turn_detection(config) == "stt"
+    assert "livekit.plugins.turn_detector.multilingual" not in sys.modules

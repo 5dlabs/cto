@@ -11,7 +11,7 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
   "httpx",
   "livekit",
-  "livekit-agents[cartesia,deepgram,elevenlabs,openai,silero,turn-detector]",
+  "livekit-agents[cartesia,deepgram,elevenlabs,openai,silero]",
   "livekit-plugins-noise-cancellation",
   "opencv-python",
   "python-dotenv",
@@ -30,6 +30,9 @@ legacy = [
 ]
 musetalk = [
   "nats-py>=2.7.0",
+]
+turn-detector = [
+  "livekit-agents[turn-detector]",
 ]
 
 [tool.setuptools.packages.find]

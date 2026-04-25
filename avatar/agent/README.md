@@ -26,10 +26,15 @@ Python LiveKit agent for the Morgan talking-avatar proof of concept.
    source .venv/bin/activate
    pip install -e '.[dev]'
    ```
-3. Download required model files (first run only):
+3. If you use a non-Flux STT mode that needs LiveKit's local multilingual
+   turn detector, install the optional extra and download its model files:
    ```bash
+   pip install -e '.[turn-detector]'
    python agent.py download-files
    ```
+   The production default `MORGAN_STT_MODE=livekit-flux` uses STT endpointing
+   (`turn_detection="stt"`) and does not require this local ONNX model or a
+   Kubernetes GPU. EchoMimic GPU work stays on the configured OVH AI Deploy URL.
 4. Start the agent:
    ```bash
    SSL_CERT_FILE="$(python -c 'import certifi; print(certifi.where())')" \
