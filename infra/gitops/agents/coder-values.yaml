@@ -71,7 +71,7 @@ telemetry:
 agent:
   id: "coder"
   name: "Coder"
-  model: "openai-codex/gpt-5.4"
+  model: "fireworks/accounts/fireworks/models/qwen3p6-plus"
   # Fallback Discord channel for autonomous final-response delivery.
   defaultRecipient: "channel:1494057364301545542"
   heartbeat:
@@ -91,7 +91,7 @@ agent:
       unblock (missing credentials, destructive/irreversible action
       without a safe default, external 2FA/billing, or still blocked
       after default + one fallback). For any coding task, ALWAYS
-      delegate to an ACPX harness (claude / codex / copilot) via `acp`
+      delegate to an ACPX harness (claude / copilot / kimi) via `acp`
       or `exec` — do not write substantial code inline yourself. If a
       harness run fails, inspect its logs, adjust config or switch
       backend, and keep iterating without waiting for the human. Batch
@@ -149,7 +149,7 @@ agentDefaults:
       that ONLY a human can unblock (missing credentials, destructive
       action without a safe default, external 2FA/billing, or still blocked
       after default + one fallback). For any coding task, ALWAYS delegate
-      to an ACPX harness (claude / codex / copilot) via `acp` or `exec` —
+      to an ACPX harness (claude / copilot / kimi) via `acp` or `exec` —
       do not write substantial code inline yourself. If a harness run
       fails, inspect its logs, adjust config or switch backend, and keep
       iterating without waiting for the human. Batch tool work; surface
@@ -165,9 +165,8 @@ agentDefaults:
       briefly.
 
 modelDefaults:
-  primary: "openai-codex/gpt-5.4"
+  primary: "fireworks/accounts/fireworks/models/qwen3p6-plus"
   fallbacks:
-    - "openai-api/gpt-5.4"
     - "fireworks/accounts/fireworks/models/qwen3p6-plus"
     - "fireworks/accounts/fireworks/models/minimax-m2p7"
     - "fireworks/accounts/fireworks/models/glm-5p1"
@@ -220,7 +219,8 @@ messaging:
 models:
   providers:
     openai-codex:
-      enabled: true
+      # Disabled: this environment has no working OpenAI/Codex auth.
+      enabled: false
       api: "openai-codex-responses"
       auth: "oauth"
       baseUrl: "https://api.openai.com/v1"
@@ -471,7 +471,6 @@ workspace:
       - **Secondary CLI:** OpenCode (Kimi K2 Turbo via Fireworks)
       - **Gateway Model:** Kimi K2.5 Turbo (Fireworks)
       - **Fallbacks:** Qwen 3.6 Plus, MiniMax M2.7, GLM 5.1
-      - **Codex:** Available via `/model codex` (OpenAI Codex harness)
       - **Memory:** mem0 (Qdrant-backed, collection: cto_memory, shared with all agents)
 
     TOOLS.md: |
@@ -496,7 +495,6 @@ workspace:
 
       - Claude Code: `claude --version` (primary, OAuth auth)
       - OpenCode: `opencode --help` (Kimi K2 Turbo)
-      - Codex: Available via `/model codex` (OpenAI Codex harness)
       - Gemini: `gemini --version`
       - Kimi: `kimi --version`
       - Copilot: `copilot --model claude-opus-4.7` (GitHub Copilot CLI, uses Claude Opus 4.7)
@@ -657,11 +655,10 @@ mem0Plugin:
         host: qdrant.cto.svc.cluster.local
         port: 6333
     llm:
-      provider: openai
+      provider: anthropic
       config:
-        model: accounts/fireworks/models/kimi-k2p6
-        apiKey: "${FIREWORKS_API_KEY}"
-        baseUrl: "https://api.fireworks.ai/inference/v1"
+        model: claude-3-5-haiku-latest
+        apiKey: "${ANTHROPIC_API_KEY}"
 
 # =============================================================================
 # Session
@@ -721,7 +718,6 @@ tools:
     # StatefulSets can hand off to the same ACP backends.
     allowedAgents:
       - "claude"
-      - "codex"
       - "opencode"
       - "gemini"
       - "kimi"
@@ -747,8 +743,6 @@ tools:
     agentOverrides:
       claude:
         command: "claude-agent-acp"
-      codex:
-        command: "codex-acp"
       opencode:
         command: "opencode acp"
       gemini:
@@ -802,7 +796,7 @@ claudeCode:
 # Codex Harness (OpenAI Codex via app-server)
 # =============================================================================
 codexPlugin:
-  enabled: true
+  enabled: false
   approvalPolicy: "never"
   sandbox: "workspace-write"
   authSecretKey: "codex-auth-sub1"

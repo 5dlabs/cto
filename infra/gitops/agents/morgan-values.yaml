@@ -117,8 +117,6 @@ modelDefaults:
   fallbacks:
     - "google/gemini-2.5-pro"
     - "anthropic/claude-sonnet-4-20250514"
-    - "openai-api/gpt-5.4"
-    - "openai-api/gpt-5.3-codex"
 
 # =============================================================================
 # Secrets (shared infra baseline with Coder — names differ per namespace)
@@ -163,7 +161,8 @@ models:
         - id: "gemini-2.5-pro"
           name: "Gemini 2.5 Pro"
     openai:
-      enabled: true
+      # Disabled: this environment has no working OpenAI API key.
+      enabled: false
       apiKeySecretKey: "openai-api-key"
     anthropic:
       enabled: true
@@ -236,8 +235,8 @@ workspace:
         prose. If the user asks whether a coding CLI works, prove it with a real
         check instead of speculating.
       - Do not rely on NATS for the user-facing avatar loop, but do use ACP
-        sessions when the user wants work done with Claude, Codex, Gemini,
-        Kimi, Cursor, OpenCode, Copilot, Droid, or Pi.
+        sessions when the user wants work done with Claude, Gemini, Kimi,
+        Cursor, OpenCode, Copilot, Droid, or Pi.
       - In avatar or web chat conversations, prefer one-shot ACP runs first.
         Do not assume a thread-bound persistent ACP session is needed unless the
         user explicitly asks for a long-running coding session.
@@ -337,8 +336,6 @@ workspace:
 
       - Claude Code: `claude --version`
       - Claude ACP harness: `claude-agent-acp --help`
-      - Codex: `codex --version`
-      - Codex ACP harness: `codex-acp --help`
       - Gemini: `gemini --version`
       - Kimi: `kimi --version`
       - Copilot: `copilot --help`
@@ -354,20 +351,20 @@ workspace:
       - `sessions_spawn` with `runtime: "acp"`, `mode: "run"`, and explicit
         `cwd` set to a real repo such as `/workspace/repos/cto` or
         `/workspace/repos/openclaw-platform`
-      - Use `agentId: "claude"` or `agentId: "codex"` first for coding tasks
+      - Use `agentId: "claude"` first for coding tasks
       - Use persistent thread-bound ACP sessions only when the user explicitly
         asks for a long-lived coding session or wants to monitor it in Discord
 
       Examples:
 
       - `{"task":"Implement the splash page","runtime":"acp","agentId":"claude","mode":"run","cwd":"/workspace/repos/cto"}`
-      - `{"task":"Smoke test the coding harness","runtime":"acp","agentId":"codex","mode":"run","cwd":"/workspace/repos/openclaw-platform"}`
+      - `{"task":"Smoke test the coding harness","runtime":"acp","agentId":"kimi","mode":"run","cwd":"/workspace/repos/openclaw-platform"}`
 
       For quick proof that a harness is wired correctly, a direct command check
       is acceptable:
 
       - `claude-agent-acp --help >/dev/null && echo ACP_OK`
-      - `codex-acp --help >/dev/null && echo ACP_OK`
+      - `kimi acp --help >/dev/null && echo ACP_OK`
 
       ## Web and Research
 
@@ -506,11 +503,10 @@ mem0Plugin:
         host: qdrant.cto.svc.cluster.local
         port: 6333
     llm:
-      provider: openai
+      provider: anthropic
       config:
-        model: accounts/fireworks/models/kimi-k2p6
-        apiKey: "${FIREWORKS_API_KEY}"
-        baseUrl: "https://api.fireworks.ai/inference/v1"
+        model: claude-3-5-haiku-latest
+        apiKey: "${ANTHROPIC_API_KEY}"
 
 session:
   scope: "per-sender"
@@ -564,7 +560,6 @@ tools:
     # StatefulSets can hand off to the same ACP backends.
     allowedAgents:
       - "claude"
-      - "codex"
       - "opencode"
       - "gemini"
       - "kimi"
@@ -590,8 +585,6 @@ tools:
     agentOverrides:
       claude:
         command: "claude-agent-acp"
-      codex:
-        command: "codex-acp"
       opencode:
         command: "opencode acp"
       gemini:
@@ -644,7 +637,7 @@ claudeCode:
 # Codex Harness (shared infra baseline with Coder)
 # =============================================================================
 codexPlugin:
-  enabled: true
+  enabled: false
   approvalPolicy: "never"
   sandbox: "workspace-write"
   authSecretKey: "codex-auth-sub1"
