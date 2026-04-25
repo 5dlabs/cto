@@ -3,7 +3,6 @@ from __future__ import annotations
 import httpx
 from livekit.agents import inference
 from livekit.plugins import cartesia, deepgram, elevenlabs, openai
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from .config import AgentConfig
 
@@ -77,6 +76,12 @@ def build_stt(config: AgentConfig):
 def build_turn_detection(config: AgentConfig):
     if "flux" in config.stt_mode or config.stt_mode == "openai-realtime":
         return "stt"
+
+    # The multilingual turn detector loads a local ONNX model. Production Flux
+    # STT uses provider-side endpointing, so keep this import off the startup
+    # path unless a non-Flux STT mode explicitly needs the local detector.
+    from livekit.plugins.turn_detector.multilingual import MultilingualModel
+
     return MultilingualModel()
 
 
