@@ -138,10 +138,7 @@ messaging:
   discord:
     enabled: true
     accountId: "morgan"
-    # NOTE: Historical key name; the Discord bot token for Morgan lives under
-    # the "henry" key in openclaw-discord-tokens. Rotating to "morgan" is a
-    # follow-up secret-store change.
-    tokenSecretKey: "henry"
+    tokenSecretKey: "morgan"
     allowBots: "mentions"
     groupPolicy: "allowlist"
     threadBindings:
