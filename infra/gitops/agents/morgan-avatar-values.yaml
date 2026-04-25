@@ -176,14 +176,9 @@ extraEnv:
   - name: MORGAN_ECHOMIMIC_AUTO_RENDER
     value: "true"
   # STT: self-hosted LiveKit does not include LiveKit Cloud Inference. Use the
-  # available direct provider key for the demo path.
+  # available direct ElevenLabs provider key for the demo path.
   - name: MORGAN_STT_MODE
-    value: "openai-realtime"
-  - name: OPENAI_API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: openclaw-api-keys
-        key: openai-api-key
+    value: "elevenlabs-scribe"
   - name: MORGAN_TTS_MODE
     value: "elevenlabs"
   - name: MORGAN_ELEVEN_VOICE_ID

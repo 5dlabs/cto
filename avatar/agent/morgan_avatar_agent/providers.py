@@ -67,6 +67,11 @@ def build_stt(config: AgentConfig):
                 endpointing_ms=config.deepgram_endpointing_ms,
                 keyterms=config.deepgram_keyterms,
             )
+        case "elevenlabs-scribe":
+            return elevenlabs.STT(
+                model_id="scribe_v2_realtime",
+                language_code=config.stt_language,
+            )
         case "livekit-nova":
             return inference.STT(model="deepgram/nova-3", language=config.stt_language)
         case _:
@@ -74,7 +79,11 @@ def build_stt(config: AgentConfig):
 
 
 def build_turn_detection(config: AgentConfig):
-    if "flux" in config.stt_mode or config.stt_mode == "openai-realtime":
+    if (
+        "flux" in config.stt_mode
+        or config.stt_mode == "openai-realtime"
+        or config.stt_mode == "elevenlabs-scribe"
+    ):
         return "stt"
 
     # The multilingual turn detector loads a local ONNX model. Production Flux

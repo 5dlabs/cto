@@ -13,7 +13,7 @@ Python LiveKit agent for the Morgan talking-avatar proof of concept.
 
 | Component | Options |
 |-----------|---------|
-| STT | `livekit-flux` (default), `livekit-nova`, `deepgram-flux`, `deepgram-nova` |
+| STT | `livekit-flux` (default), `livekit-nova`, `deepgram-flux`, `deepgram-nova`, `elevenlabs-scribe` |
 | TTS | `elevenlabs` (default), `livekit-elevenlabs`, `cartesia`, `livekit-cartesia` |
 | LLM | `openclaw` (default), `inference` |
 
