@@ -276,7 +276,7 @@ spec:
 
               mkdir -p /workspace/.codex /workspace/.gemini /workspace/.factory /workspace/.cursor /workspace/.copilot
               cp /cli-backend-configs-template/codex-config.toml /workspace/.codex/config.toml
-              {{- if and (hasKey .Values "codexPlugin") .Values.codexPlugin.authSecretKey }}
+              {{- if and (hasKey .Values "codexPlugin") .Values.codexPlugin.enabled .Values.codexPlugin.authSecretKey }}
               # Inject Codex OAuth auth.json from secret (headless auth)
               if [ -n "$CODEX_AUTH_SUB1" ]; then
                 printf '%s' "$CODEX_AUTH_SUB1" > /workspace/.codex/auth.json
@@ -612,7 +612,7 @@ spec:
                   key: foundry-api-key
                   optional: true
             {{- end }}
-            {{- if and (hasKey .Values "codexPlugin") .Values.codexPlugin.authSecretKey }}
+            {{- if and (hasKey .Values "codexPlugin") .Values.codexPlugin.enabled .Values.codexPlugin.authSecretKey }}
             # Codex CLI OAuth auth.json (base64-encoded) for headless setup
             - name: CODEX_AUTH_SUB1
               valueFrom:
@@ -818,10 +818,6 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: anthropic-api-key
                   optional: true
-            # OPENAI_API_KEY intentionally NOT set — Codex CLI detects it on boot
-            # and rewrites /workspace/.codex/auth.json to apikey-mode, clobbering
-            # the OAuth token. Use PROVIDER_OPENAI_API_KEY (below) for non-Codex
-            # openai/* provider fallback; use codex-auth-sub1/sub2 for OAuth.
             - name: GEMINI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -834,12 +830,21 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: gemini-api-key
                   optional: true
+            {{- $providers := .Values.models.providers | default dict }}
+            {{- $openaiProvider := index $providers "openai" | default dict }}
+            {{- $openaiApiProvider := index $providers "openai-api" | default dict }}
+            {{- if or (and (hasKey $providers "openai") (or (not (hasKey $openaiProvider "enabled")) $openaiProvider.enabled)) (and (hasKey $providers "openai-api") (or (not (hasKey $openaiApiProvider "enabled")) $openaiApiProvider.enabled)) }}
+            # OPENAI_API_KEY intentionally NOT set — Codex CLI detects it on boot
+            # and rewrites /workspace/.codex/auth.json to apikey-mode, clobbering
+            # the OAuth token. Use PROVIDER_OPENAI_API_KEY for non-Codex OpenAI
+            # provider fallback; use codex-auth-sub1/sub2 for OAuth.
             - name: PROVIDER_OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: openai-api-key
                   optional: true
+            {{- end }}
             - name: FACTORY_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -907,7 +912,7 @@ spec:
                   optional: true
             {{- end }}
             {{- end }}
-            {{- if and (hasKey .Values "codexPlugin") .Values.codexPlugin.authSecretKey }}
+            {{- if and (hasKey .Values "codexPlugin") .Values.codexPlugin.enabled .Values.codexPlugin.authSecretKey }}
             # Codex CLI OAuth auth (two subscriptions for failover)
             - name: CODEX_AUTH_SUB1
               valueFrom:
