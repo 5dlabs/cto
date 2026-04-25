@@ -519,6 +519,13 @@ spec:
               RUNTIME_GID="$(id -g node 2>/dev/null || echo 1000)"
               chown -R "${RUNTIME_UID}:${RUNTIME_GID}" /workspace
               echo "[dirs] Workspace ownership normalized"
+              # Final declarative render after all init mutations. OpenClaw's
+              # doctor/bootstrap paths may write image defaults; the runtime must
+              # start from the GitOps-rendered config and not rewrite providers.
+              envsubst < /config-template/openclaw.json > /workspace/.openclaw/openclaw.json
+              chown "${RUNTIME_UID}:${RUNTIME_GID}" /workspace/.openclaw/openclaw.json 2>/dev/null || true
+              chmod 444 /workspace/.openclaw/openclaw.json 2>/dev/null || true
+              echo "[config] openclaw.json finalized from GitOps template"
 
               # ---------------------------------------------------------------
               # Summary
