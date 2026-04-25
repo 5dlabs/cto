@@ -151,6 +151,10 @@ spec:
               envsubst < /config-template/openclaw.json > /workspace/.openclaw/openclaw.json
               echo "[config] openclaw.json rendered"
               openclaw doctor --non-interactive >/dev/null 2>&1 || true
+              # doctor can normalize config from the image defaults. Restore the
+              # GitOps-rendered config so provider routing stays declarative.
+              envsubst < /config-template/openclaw.json > /workspace/.openclaw/openclaw.json
+              echo "[config] openclaw.json restored after doctor"
 
               # ---------------------------------------------------------------
               # 3. OpenClaw orchestrator skills (always overwrite from ConfigMap)
