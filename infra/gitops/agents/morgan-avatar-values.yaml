@@ -137,8 +137,8 @@ extraEnv:
         key: LIVEKIT_API_SECRET
   - name: MORGAN_AVATAR_MODE
     value: "lemonslice"
-  - name: MORGAN_LEMONSLICE_AGENT_ID
-    value: "agent_3adc6522f21cc204"
+  - name: MORGAN_IMAGE_URL
+    value: "https://5dlabs.ai/agents/morgan-hero.png"
   - name: MORGAN_AGENT_NAME
     value: "morgan-avatar"
   - name: MORGAN_LLM_BACKEND
