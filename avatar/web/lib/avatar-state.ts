@@ -2,7 +2,7 @@ export const AVATAR_STATE_PROTOCOL = "cto-avatar-state/v1" as const;
 
 export type AvatarConnectionState = "idle" | "connecting" | "connected" | "error";
 export type AvatarVoiceState = "idle" | "connecting" | "listening" | "speaking" | "error";
-export type AvatarRuntimeKind = "deterministic-fallback" | "remote-video" | "talkinghead";
+export type AvatarRuntimeKind = "deterministic-fallback" | "remote-video";
 export type AvatarCueSource =
   | "none"
   | "derived-text"

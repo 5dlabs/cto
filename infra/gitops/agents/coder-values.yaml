@@ -915,7 +915,7 @@ narrator:
     tag: latest
     pullPolicy: Always
   musetalk:
-    enabled: true
+    enabled: false
     port: 8081
     backend: musetalk
   hunyuan:

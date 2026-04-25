@@ -5,7 +5,6 @@ from pathlib import Path
 from morgan_avatar_agent.avatar_provider import (
     DisabledAvatarProvider,
     LemonSliceAvatarProvider,
-    MuseTalkProvider,
     build_avatar_provider,
 )
 from morgan_avatar_agent.config import AgentConfig
@@ -40,15 +39,6 @@ def test_provider_factory_selects_lemonslice(monkeypatch) -> None:
     assert isinstance(provider, LemonSliceAvatarProvider)
 
 
-def test_provider_factory_selects_musetalk(monkeypatch) -> None:
-    provider = build_avatar_provider(
-        _config(monkeypatch, "musetalk"),
-        allow_audio_only_fallback=True,
-    )
-
-    assert isinstance(provider, MuseTalkProvider)
-
-
 def test_provider_factory_selects_echomimic(monkeypatch) -> None:
     provider = build_avatar_provider(
         _config(monkeypatch, "echomimic"),
@@ -56,6 +46,17 @@ def test_provider_factory_selects_echomimic(monkeypatch) -> None:
     )
 
     assert isinstance(provider, EchoMimicAvatarSession)
+
+
+def test_provider_factory_rejects_musetalk_product_mode(monkeypatch) -> None:
+    config = _config(monkeypatch, "musetalk")
+
+    try:
+        build_avatar_provider(config, allow_audio_only_fallback=True)
+    except ValueError as exc:
+        assert "musetalk" in str(exc)
+    else:
+        raise AssertionError("Expected MuseTalk product mode to be disabled.")
 
 
 def test_echomimic_provider_carries_tuning_options(monkeypatch) -> None:

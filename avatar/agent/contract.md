@@ -1,5 +1,9 @@
 # MuseTalk Avatar NATS Contract
 
+> Archived: MuseTalk is no longer a selectable Morgan avatar provider. The
+> active provider set is LemonSlice and EchoMimic; MuseTalk-named frame helpers
+> remain only as internal EchoMimic idle-video plumbing.
+
 > Scope: authoritative request / response schema for talking to the
 > `musetalk-worker` GPU service from the avatar agent (client side).
 > Source of truth: [`infra/images/musetalk-worker/worker.py`](../../infra/images/musetalk-worker/worker.py)

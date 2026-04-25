@@ -246,9 +246,9 @@ class AgentConfig:
         return bool(self.lemonslice_agent_id)
 
     def validate(self) -> None:
-        if self.avatar_mode not in {"lemonslice", "disabled", "musetalk", "echomimic"}:
+        if self.avatar_mode not in {"lemonslice", "disabled", "echomimic"}:
             raise ValueError(
-                "MORGAN_AVATAR_MODE must be one of: lemonslice, disabled, musetalk, echomimic."
+                "MORGAN_AVATAR_MODE must be one of: lemonslice, disabled, echomimic."
             )
 
         if (

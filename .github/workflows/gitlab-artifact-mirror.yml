@@ -44,7 +44,6 @@ on:
       - 'GitOps Manifest Publish'
       - 'Grok – Publish MCP Server & Cron Binary'
       - 'Linear Bridge – Build and Publish Docker Image'
-      - 'Build and Push MuseTalk Worker Image'
     types: [completed]
   workflow_dispatch:
     inputs:

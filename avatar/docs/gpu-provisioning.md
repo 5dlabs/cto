@@ -1,5 +1,8 @@
 # GPU provisioning runbook for MuseTalk Phase 4
 
+> Archived: the MuseTalk GPU worker is no longer built or deployed as an active
+> avatar provider. Current provider work is limited to LemonSlice and EchoMimic.
+
 This runbook covers the GPU node lifecycle for the MuseTalk worker in the OVH GRA9 RKE2 cluster.
 
 ## Credentials and references

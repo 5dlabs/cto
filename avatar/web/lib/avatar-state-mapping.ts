@@ -8,7 +8,7 @@
 // mapAgentStateToAvatar() instead of inlining the projection.
 //
 // TODO(avatar-runtime): migrate DeterministicFallbackRuntime /
-// RemoteVideoRuntime / TalkingHeadRuntime in avatar-runtime.ts to consume
+// RemoteVideoRuntime in avatar-runtime.ts to consume
 // AgentState via mapAgentStateToAvatar rather than re-deriving voiceState +
 // gestures from lk.state directly.
 
