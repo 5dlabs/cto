@@ -64,7 +64,7 @@ const interactionMethods = [
 ];
 
 const morganAvatarMode = (
-  process.env.NEXT_PUBLIC_MORGAN_AVATAR_MODE ?? "livekit"
+  process.env.NEXT_PUBLIC_MORGAN_AVATAR_MODE ?? "lemonslice"
 ).toLowerCase();
 const morganLiveKitAvatarUrl =
   process.env.NEXT_PUBLIC_MORGAN_AVATAR_URL ??
