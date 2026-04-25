@@ -214,8 +214,10 @@ jobs:
   # Build and push Docker image (on push to main)
   build-docker:
     needs: [lint-typescript, build-check, docker-lint, test]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: [k8s-runner]
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    # The Kubernetes runner image has a Docker CLI but no Docker daemon. Use
+    # GitHub-hosted runners for the Docker/BuildKit publish path.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -223,23 +225,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Fetch secrets from OpenBao
+      - name: Set build-time placeholders
         id: secrets
         run: |
-          # Get OpenBao token from Kubernetes secret
-          OPENBAO_TOKEN=$(kubectl get secret openbao-token -n openbao -o jsonpath='{.data.token}' | base64 -d)
-
-          # Fetch DATABASE_URL from OpenBao (or use dummy for Docker build if not exists)
-          # The dummy URL is valid Neon format but won't connect - sufficient for Docker image build
-          DATABASE_URL=$(kubectl exec -n openbao openbao-0 -- env BAO_TOKEN="$OPENBAO_TOKEN" \
-            bao kv get -field=url secret/web-app/database-url 2>/dev/null || \
-            echo "postgresql://dummy:password@ep-dummy-12345678.us-east-2.aws.neon.tech/dbname?sslmode=require")  # pragma: allowlist secret
-          echo "DATABASE_URL=$DATABASE_URL" >> "$GITHUB_OUTPUT"
-
-          # Fetch BETTER_AUTH_SECRET from OpenBao (or generate for CI if not exists)
-          BETTER_AUTH_SECRET=$(kubectl exec -n openbao openbao-0 -- env BAO_TOKEN="$OPENBAO_TOKEN" \
-            bao kv get -field=secret secret/web-app/auth 2>/dev/null || openssl rand -base64 32)
-          echo "BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET" >> "$GITHUB_OUTPUT"
+          # The image build only needs syntactically valid values for Next.js
+          # static analysis. Runtime secrets are injected by Kubernetes.
+          echo "DATABASE_URL=postgresql://dummy:password@ep-dummy-12345678.us-east-2.aws.neon.tech/dbname?sslmode=require" >> "$GITHUB_OUTPUT"  # pragma: allowlist secret
+          echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
