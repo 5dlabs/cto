@@ -58,7 +58,7 @@ messaging:
   discord:
     enabled: true
     accountId: "morgan"
-    tokenSecretKey: "henry"
+    tokenSecretKey: "morgan"
     allowBots: "mentions"
     threadBindings:
       enabled: true
