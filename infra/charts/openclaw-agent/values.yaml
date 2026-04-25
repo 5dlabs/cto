@@ -177,6 +177,8 @@ models:
         - id: "claude-opus-4-6-20260201"
           name: "Claude Opus 4.6"
     openai:
+      # Disabled: this environment has no OPENAI_API_KEY. Block kept for documentation only.
+      enabled: false
       api: "openai-responses"
       baseUrl: "https://api.openai.com/v1"
       auth: "api-key"
@@ -194,7 +196,8 @@ models:
       api: "openai-responses"
       baseUrl: "https://api.openai.com/v1"
       auth: "api-key"
-      enabled: true
+      # Disabled: this environment has no OPENAI_API_KEY. Block kept for documentation only.
+      enabled: false
       apiKey: "${OPENAI_API_KEY}"
       authHeader: true
       headers: {}
@@ -249,8 +252,10 @@ agentDefaults:
 # =============================================================================
 memorySearch:
   enabled: true
-  model: "text-embedding-3-small"
-  provider: "openai"
+  # Switched from openai/text-embedding-3-small: this environment has no OPENAI_API_KEY.
+  # Uses google embedder consistent with mem0 oss embedder block below.
+  model: "gemini-embedding-001"
+  provider: "google"
   maxResults: 6
   timeoutMs: 4000
   sources:
@@ -390,9 +395,9 @@ modelDefaults:
   primary: "anthropic/claude-3-5-haiku-latest"
   fallbacks:
     - "anthropic/claude-sonnet-4-20250514"
-    - "openai-api/gpt-5.4"
-    - "openai-api/gpt-5.3-codex"
     - "anthropic/claude-opus-4-6-20260201"
+  # Removed openai-api/gpt-* fallbacks: this environment has no OPENAI_API_KEY,
+  # which caused production routing to attempt OpenAI before settling on a working provider.
 
 # =============================================================================
 # Tools Configuration (Linux-adapted, no macOS paths)
@@ -435,7 +440,7 @@ tools:
     enabled: false
     backend: "acpx"
     acpxVersion: ""
-    defaultAgent: "codex"
+    defaultAgent: "claude"
     allowedAgents: []
     agentOverrides: {}
     maxConcurrentSessions: 4
@@ -765,9 +770,10 @@ mem0Plugin:
         model: "gemini-embedding-001"
         apiKeyEnvVar: "GOOGLE_API_KEY"
     llm:
-      provider: "openai"
+      # Switched from openai/gpt-4.1-nano: this environment has no OPENAI_API_KEY.
+      provider: "anthropic"
       config:
-        model: "gpt-4.1-nano"
+        model: "claude-3-5-haiku-latest"
 
 # =============================================================================
 # Narrator Sidecars (legacy, disabled)

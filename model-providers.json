@@ -9,7 +9,8 @@
       "credits": 250000
     },
     "OpenAI": {
-      "enabled": true,
+      "_note": "Disabled: this environment has no OPENAI_API_KEY. Kept here for documentation/optional re-enable only — must not be used in default routing.",
+      "enabled": false,
       "baseUrl": "https://api.openai.com/v1",
       "apiKey": "OPENAI_API_KEY",
       "credits": 180000
@@ -127,7 +128,9 @@
       "modelId": "accounts/fireworks/models/minimax-m2p7",
       "contextWindow": 24576,
       "maxOutput": 24576,
-      "capabilities": ["text"],
+      "capabilities": [
+        "text"
+      ],
       "tier": "standard",
       "score": 76
     },
@@ -137,7 +140,10 @@
       "modelId": "accounts/fireworks/models/qwen3p6-plus",
       "contextWindow": 32768,
       "maxOutput": 4000,
-      "capabilities": ["text", "vision"],
+      "capabilities": [
+        "text",
+        "vision"
+      ],
       "tier": "standard",
       "score": 79
     },
@@ -147,7 +153,9 @@
       "modelId": "accounts/fireworks/models/glm-5p1",
       "contextWindow": 25344,
       "maxOutput": 25344,
-      "capabilities": ["text"],
+      "capabilities": [
+        "text"
+      ],
       "tier": "standard",
       "score": 81
     },
@@ -247,7 +255,8 @@
       ]
     },
     "Codex": {
-      "enabled": true,
+      "_note": "Disabled: depends on OpenAI API which is unavailable in this environment.",
+      "enabled": false,
       "provider": "OpenAI",
       "models": [
         "gpt-5.4",
@@ -264,9 +273,6 @@
         "claude-opus-4-7",
         "claude-sonnet-4-6",
         "claude-haiku-4-5-20251001",
-        "gpt-5.4",
-        "gpt-5.3-codex",
-        "gpt-5.2-codex",
         "gemini-3.1-pro-preview",
         "gemini-3-flash-preview",
         "glm-5",
@@ -280,8 +286,7 @@
       "provider": "Cursor",
       "models": [
         "auto",
-        "opus-4.7",
-        "gpt-5.4"
+        "opus-4.7"
       ]
     }
   },
@@ -293,31 +298,30 @@
     ]
   },
   "acp": {
-    "_description": "Default ACP entries for CodeRun CRDs \u2014 references into clis/providers/models above",
+    "_description": "Default ACP entries for CodeRun CRDs — references into clis/providers/models above. Codex omitted: depends on OpenAI which is unavailable in this environment.",
     "entries": [
       "Claude Code",
-      "Codex",
       "Factory",
       "Cursor"
     ]
   },
   "agentHarness": {
-    "_description": "Per-agent CLI+model assignment \u2014 references into clis/models above",
+    "_description": "Per-agent CLI+model assignment — references into clis/models above",
     "rex": {
       "cli": "Claude Code",
       "model": "claude-opus-4-7-20260610"
     },
     "grizz": {
-      "cli": "Codex",
-      "model": "gpt-5.2-codex"
+      "cli": "Claude Code",
+      "model": "claude-opus-4-7-20260610"
     },
     "blaze": {
       "cli": "Cursor",
       "model": "opus-4.7"
     },
     "bolt": {
-      "cli": "Codex",
-      "model": "gpt-5.2-codex"
+      "cli": "Claude Code",
+      "model": "claude-opus-4-7-20260610"
     },
     "nova": {
       "cli": "Claude Code",
@@ -336,8 +340,8 @@
       "model": "claude-opus-4-7-20260610"
     },
     "tess": {
-      "cli": "Codex",
-      "model": "gpt-5.2-codex"
+      "cli": "Claude Code",
+      "model": "claude-opus-4-7-20260610"
     },
     "cleo": {
       "cli": "Claude Code",
@@ -348,8 +352,8 @@
       "model": "claude-opus-4-7-20260610"
     },
     "spark": {
-      "cli": "Codex",
-      "model": "gpt-5.2-codex"
+      "cli": "Claude Code",
+      "model": "claude-opus-4-7-20260610"
     },
     "stitch": {
       "cli": "Claude Code",

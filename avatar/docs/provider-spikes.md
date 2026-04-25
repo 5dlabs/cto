@@ -3,6 +3,11 @@
 These swaps are wired into `avatar/agent/morgan_avatar_agent/providers.py` and `config.py`,
 so latency spikes can happen via environment changes only (no code edits).
 
+> **Scope:** STT / TTS / LLM swaps **inside** the LiveKit + LemonSlice path
+> (the `/` room UI). For switching the avatar **renderer** itself between the
+> current EchoMimic batch path (`/echo-turn`) and the LemonSlice LiveKit
+> participant path, see [`docs/avatar/provider-switch.md`](../../docs/avatar/provider-switch.md).
+
 ## Supported mode values (code-verified)
 
 `MORGAN_STT_MODE`:
