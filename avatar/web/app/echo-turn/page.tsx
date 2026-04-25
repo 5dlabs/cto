@@ -20,6 +20,51 @@ const DEMO_RENDER_OPTIONS = {
   weightDtype: "float16",
 };
 
+const AVATAR_POLL_INTERVAL_MS = 3000;
+const AVATAR_POLL_TIMEOUT_MS = 12 * 60 * 1000;
+
+type AvatarErrorPayload = {
+  error?: string;
+  detail?: string;
+  status?: number | null;
+};
+
+async function pollAvatarJob(jobId: string, onTick: () => void): Promise<Blob> {
+  const deadline = performance.now() + AVATAR_POLL_TIMEOUT_MS;
+  const url = `/api/echo-turn/avatar?jobId=${encodeURIComponent(jobId)}`;
+
+  while (performance.now() < deadline) {
+    onTick();
+    const response = await fetch(url, { method: "GET", cache: "no-store" });
+
+    if (response.status === 202) {
+      await new Promise((resolveTimer) => {
+        window.setTimeout(resolveTimer, AVATAR_POLL_INTERVAL_MS);
+      });
+      continue;
+    }
+
+    if (response.ok) {
+      return await response.blob();
+    }
+
+    let detail = "";
+    try {
+      const payload = (await response.json()) as AvatarErrorPayload;
+      detail = payload.detail || payload.error || "";
+    } catch {
+      detail = await response.text().catch(() => "");
+    }
+    throw new Error(
+      `EchoMimic job ${jobId} failed (${response.status}): ${detail.slice(0, 240) || "no detail"}`,
+    );
+  }
+
+  throw new Error(
+    `EchoMimic job ${jobId} did not finish within ${Math.round(AVATAR_POLL_TIMEOUT_MS / 1000)}s.`,
+  );
+}
+
 async function readMorganStream(response: Response, onDelta: (text: string) => void) {
   if (!response.body) {
     throw new Error("Morgan stream did not include a response body.");
@@ -93,6 +138,7 @@ export default function EchoTurnPage() {
     setAudioStatus("");
     setMetrics([]);
 
+    let audioReady = false;
     const startedAt = performance.now();
     try {
       setPhase("streaming");
@@ -124,6 +170,7 @@ export default function EchoTurnPage() {
       const audioBlob = await ttsResponse.blob();
       const audioObjectUrl = rememberObjectUrl(URL.createObjectURL(audioBlob));
       setAudioUrl(audioObjectUrl);
+      audioReady = true;
       setAudioStatus("Morgan's TTS audio is ready. Trying to play it now...");
       window.setTimeout(() => {
         const player = audioRef.current;
@@ -155,15 +202,28 @@ export default function EchoTurnPage() {
       form.set("sample_height", DEMO_RENDER_OPTIONS.sampleHeight);
       form.set("sample_width", DEMO_RENDER_OPTIONS.sampleWidth);
       form.set("weight_dtype", DEMO_RENDER_OPTIONS.weightDtype);
-      const avatarResponse = await fetch("/api/echo-turn/avatar", {
+      const submitResponse = await fetch("/api/echo-turn/avatar", {
         method: "POST",
         body: form,
       });
-      if (!avatarResponse.ok) {
-        const detail = await avatarResponse.text();
-        throw new Error(`EchoMimic returned ${avatarResponse.status}: ${detail.slice(0, 240)}`);
+      if (submitResponse.status !== 202) {
+        const detail = await submitResponse.text();
+        throw new Error(
+          `EchoMimic submit returned ${submitResponse.status}: ${detail.slice(0, 240)}`,
+        );
       }
-      const videoBlob = await avatarResponse.blob();
+      const submitPayload = (await submitResponse.json()) as { jobId?: string };
+      const jobId = submitPayload.jobId;
+      if (!jobId) {
+        throw new Error("EchoMimic submit response missing jobId.");
+      }
+
+      const videoBlob = await pollAvatarJob(jobId, () => {
+        const elapsedSeconds = Math.round((performance.now() - renderStartedAt) / 1000);
+        setAudioStatus(
+          `EchoMimic is still rendering (${elapsedSeconds}s elapsed). Morgan's voice is available above.`,
+        );
+      });
       const videoObjectUrl = rememberObjectUrl(URL.createObjectURL(videoBlob));
       setVideoUrl(videoObjectUrl);
       const renderMs = performance.now() - renderStartedAt;
@@ -176,8 +236,14 @@ export default function EchoTurnPage() {
       ]);
       setPhase("ready");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Morgan turn failed.");
+      const message = err instanceof Error ? err.message : "Morgan turn failed.";
+      setError(message);
       setPhase("error");
+      if (audioReady) {
+        setAudioStatus(
+          "EchoMimic video failed; Morgan's voice is still available above.",
+        );
+      }
     }
   }
 
@@ -192,7 +258,7 @@ export default function EchoTurnPage() {
           : "Run one conversational turn";
   const avatarStatus =
     phase === "rendering"
-      ? "Rendering the EchoMimic MP4. Morgan's voice should already be available above; video usually takes about 3.5 minutes on the current V100."
+      ? "EchoMimic job submitted. Morgan's voice should already be available above while the MP4 polls in the background; video usually takes about 3.5 minutes on the current V100."
       : "Morgan's source image stays visible until the generated MP4 is ready.";
 
   return (

@@ -6,6 +6,12 @@
 > **Out of scope for you (Coder):** Lemon Slice integration — Jonathon owns
 > `avatar_providers/lemonslice.py` end-to-end. You implement the shared
 > interface and the OVH + DigitalOcean providers only.
+>
+> **Companion:** [`docs/avatar/provider-switch.md`](../avatar/provider-switch.md)
+> documents how the **current EchoMimic** path and the **future LemonSlice/LiveKit**
+> path are wired today (env contract, hook points, ops guidance). Read it before
+> introducing a new provider so the unified `avatar.provider` enum lands in the
+> right files.
 
 ## TL;DR
 

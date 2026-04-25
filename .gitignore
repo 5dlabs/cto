@@ -225,6 +225,9 @@ intake/.bridge-logs/
 
 # lobster-voice compiled binary (build artifact)
 apps/lobster-voice/lobster-voice
+
+# Avatar/demo run artifacts (local only)
+_runs/
 work
 test/cli-matrix/
 .firecrawl/

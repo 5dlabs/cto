@@ -3,6 +3,8 @@
 > **Status**: design-spec update (2026-04). Supersedes nothing yet, extends `avatar-report.md`.
 > **Companion research**: full repo deep-dive lives in session state as `lemonslice-repo-deep-dive.md` (5 repos, ~24KB), summarized here for repo consumers.
 > **Related**: [`agent-avatar-prompts.md`](./agent-avatar-prompts.md), [`morgan-avatar-openclaw-handoff.md`](./morgan-avatar-openclaw-handoff.md), [`../avatar-report.md`](../avatar-report.md) (open-source candidate research), [`../.firecrawl/building-plugins.md`](../.firecrawl/building-plugins.md) (OpenClaw plugin authoring scraped docs).
+>
+> **Operator quick-switch:** for the practical "EchoMimic (current production) ↔ LemonSlice/LiveKit (future)" toggle and env contract, see [`avatar/provider-switch.md`](./avatar/provider-switch.md). This doc covers the design future state; that doc covers what's wired today.
 
 ---
 
