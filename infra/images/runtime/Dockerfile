@@ -256,10 +256,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   # System utilities
   jq ca-certificates curl wget docker.io postgresql-client redis-tools tree \
   # Headless GLB/MP4 preview generation for remote avatar reviews
-  blender ffmpeg \
+  blender ffmpeg libegl1 libgl1 libgles2 \
   build-essential binutils pkg-config libssl-dev lldb lld clang mold libpq-dev \
   # Programming languages
-  python3 python3-venv python3-pip python-is-python3 \
+  python3 python3-venv python3-pip python-is-python3 python3-numpy \
   # Debugging and monitoring
   strace lsof htop psmisc ripgrep fd-find bat httpie openssl \
   # Code quality and linting
@@ -302,7 +302,10 @@ RUN groupadd -g 1000 node 2>/dev/null || groupadd node 2>/dev/null || true && \
     id node && getent group node
 
 # Verify headless preview tooling is present before building higher-level agent images.
-RUN blender --background --version && ffmpeg -version | head -n1
+RUN blender --background --version \
+  && python3 -c 'import numpy; print(numpy.__version__)' \
+  && ldconfig -p | grep -q 'libEGL.so.1' \
+  && ffmpeg -version | head -n1
 
 # Passwordless sudo for the non-root user (node)
 RUN echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-node-nopasswd \
