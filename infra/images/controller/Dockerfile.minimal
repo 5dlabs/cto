@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 # Minimal controller image — builds only `-p controller --bin agent-controller`
 # (skips Tauri/GTK workspace members that the unified Dockerfile's cargo-chef
-# stage tries to compile). Gitignored — recreate locally if missing.
+# stage tries to compile). Used by controller CI (see controller-ci workflow).
+# Context: repository root (`.`).
 
 FROM rust:1.94-bookworm AS builder
 

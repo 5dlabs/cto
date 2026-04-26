@@ -1,3 +1,5 @@
+# Extends the standard agents image with preinstalled ACP adapters and Deno.
+# Optional; not wired to a GitHub job — build manually or from GitLab if needed.
 FROM ghcr.io/5dlabs/agents:latest
 
 USER root

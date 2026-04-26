@@ -199,7 +199,7 @@ jobs:
         with:
           image-name: controller
           context: .
-          dockerfile: ./controller-build.Dockerfile
+          dockerfile: ./infra/images/controller/Dockerfile.minimal
           version: ${{ steps.version.outputs.version }}
           short-sha: ${{ steps.version.outputs.short-sha }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
