@@ -1,7 +1,7 @@
 # Morgan Meet: Hermes Adapter Design
 
-> Companion to [`5dlabs/morgan-meet`](https://github.com/5dlabs/morgan-meet)  
-> Covers Phase 4 of the Morgan Meet architecture: **Hermes sidecar/file transport adapter**  
+> Companion to [`5dlabs/morgan-meet`](https://github.com/5dlabs/morgan-meet)
+> Covers Phase 4 of the Morgan Meet architecture: **Hermes sidecar/file transport adapter**
 > and identifies upstream OpenClaw PR opportunities that benefit both runtimes.
 
 ---
@@ -37,7 +37,7 @@ Kubernetes pod (CodeRun CRD)
   └── [sidecar containers]          ← Kubernetes, not gateway-spawned
 ```
 
-**No gateway process. No `registerGatewayMethod`. No plugin registry.**  
+**No gateway process. No `registerGatewayMethod`. No plugin registry.**
 Hermes coordinates through files, env vars, lobster steps, and MCP tools.
 
 ---
