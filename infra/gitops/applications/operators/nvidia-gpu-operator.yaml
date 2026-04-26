@@ -32,6 +32,14 @@ spec:
     targetRevision: v25.3.4
     helm:
       values: |
+        # Datadog autodiscovery for DCGM exporter GPU metrics.
+        # The annotation is harmless on other GPU Operator DaemonSets because it
+        # targets the nvidia-dcgm-exporter container name.
+        daemonsets:
+          annotations:
+            ad.datadoghq.com/nvidia-dcgm-exporter.checks: >-
+              {"openmetrics":{"init_config":{},"instances":[{"openmetrics_endpoint":"http://%%host%%:9400/metrics","namespace":"nvidia.dcgm","metrics":["DCGM_FI_DEV_.*","DCGM_FI_PROF_.*"],"max_returned_metrics":2000,"send_distribution_buckets":false}]}}
+
         # Use NFD deployed separately (nvidia-nfd app)
         nfd:
           enabled: false
