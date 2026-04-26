@@ -3,6 +3,42 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.87](https://github.com/5dlabs/cto/compare/v0.2.86...v0.2.87) (2026-04-26)
+
+
+### ✨ Features
+
+* **avatar:** expose Morgan LiveKit frontend route ([7d20efc](https://github.com/5dlabs/cto/commit/7d20efcb540c09b45cc73ce79c266aabd5941930))
+* wire EchoMimic avatar provider ([#4845](https://github.com/5dlabs/cto/issues/4845)) ([3f1872c](https://github.com/5dlabs/cto/commit/3f1872ced900460324dea71c1c0adc0a7e806a81))
+
+
+### 🐛 Bug Fixes
+
+* **avatar:** use ElevenLabs Scribe STT for Morgan ([#4861](https://github.com/5dlabs/cto/issues/4861)) ([b600dfb](https://github.com/5dlabs/cto/commit/b600dfbb2da5280e3a96f65523a04ab7f9fb1096))
+* avoid unused LiveKit turn detector preload ([#4854](https://github.com/5dlabs/cto/issues/4854)) ([f68d426](https://github.com/5dlabs/cto/commit/f68d426f7c95646043e0e556c114e73a229ceaae))
+* cache avatar TTS responses ([dffeef8](https://github.com/5dlabs/cto/commit/dffeef8aff77a52eb0f7b54bd779210773158ab8))
+* **ci:** publish web image on Docker runner ([#4860](https://github.com/5dlabs/cto/issues/4860)) ([fca77a4](https://github.com/5dlabs/cto/commit/fca77a47f02ed0a08baadfa3fb4e5ef10d72cd8b))
+* correct EchoMimic demo status context ([#4848](https://github.com/5dlabs/cto/issues/4848)) ([caf2122](https://github.com/5dlabs/cto/commit/caf21223d47bb5a8c01535f1f58d6cbcd1705193))
+* **echomimic:** lower v100 memory defaults ([#4843](https://github.com/5dlabs/cto/issues/4843)) ([f75e2a4](https://github.com/5dlabs/cto/commit/f75e2a477c2fe5bc3b212a332dc72613c25717df))
+* finalize OpenClaw config after init ([ddfb225](https://github.com/5dlabs/cto/commit/ddfb225455d96522525eaef561a5a98ebc14cbe7))
+* remove OpenAI GitOps defaults ([#4850](https://github.com/5dlabs/cto/issues/4850)) ([154995b](https://github.com/5dlabs/cto/commit/154995bea7f34e7a05e535040a1c5ee12a6d70c7))
+* rerender OpenClaw config after doctor ([9ccfbc3](https://github.com/5dlabs/cto/commit/9ccfbc3ddc9909f0e490bffc033491d3e1ac0283))
+* **website:** default Morgan landing page to LemonSlice ([#4862](https://github.com/5dlabs/cto/issues/4862)) ([9d16a40](https://github.com/5dlabs/cto/commit/9d16a4040fbe5e980336ce58b292a3d21bd15c06))
+
+
+### 📚 Documentation
+
+* add avatar agent platform inventory ([cfe1363](https://github.com/5dlabs/cto/commit/cfe1363d77bcdef38dba3591f0bfec7cce237104))
+* group docs by first-add month ([#4865](https://github.com/5dlabs/cto/issues/4865)) ([2875224](https://github.com/5dlabs/cto/commit/2875224fad12668436d62b74100c6416123d3874))
+* organize avatar strategy catalogs ([04421b8](https://github.com/5dlabs/cto/commit/04421b84f94aa5da41c26a290f49972291055f66))
+
+
+### 🔧 Maintenance
+
+* bucket root scripts/ by first-add month ([#4866](https://github.com/5dlabs/cto/issues/4866)) ([66d6617](https://github.com/5dlabs/cto/commit/66d66177ca328c6f86c3301adcb9f2caf63a5511))
+* clean root and archive hidden workspace folders ([#4864](https://github.com/5dlabs/cto/issues/4864)) ([8727e9d](https://github.com/5dlabs/cto/commit/8727e9d5265fd5e152c8097c6882d054396e2ad2))
+* consolidate CI Dockerfiles under infra/images ([#4867](https://github.com/5dlabs/cto/issues/4867)) ([7babae2](https://github.com/5dlabs/cto/commit/7babae2832340a9ba06d381428823083305276af))
+
 ## [0.2.86](https://github.com/5dlabs/cto/compare/v0.2.85...v0.2.86) (2026-04-24)
 
 
