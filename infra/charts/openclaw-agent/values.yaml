@@ -43,6 +43,9 @@ nodeSelector: {}
 # Optional tolerations for clusters that schedule agents on tainted nodes
 tolerations: []
 
+# Optional RuntimeClass for GPU/runtime-specific container setup
+runtimeClassName: ""
+
 # -- Storage configuration
 storage:
   storageClass: mayastor

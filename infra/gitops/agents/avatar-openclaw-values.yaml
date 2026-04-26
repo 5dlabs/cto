@@ -9,7 +9,7 @@
 
 image:
   repository: "ghcr.io/5dlabs/agents"
-  tag: "beta"
+  tag: "latest"
   pullPolicy: Always
 
 nodeSelector:
@@ -28,14 +28,16 @@ tolerations:
     operator: "Exists"
     effect: "NoSchedule"
 
+runtimeClassName: "nvidia"
+
 resources:
   requests:
-    cpu: "500m"
-    memory: "4Gi"
-  limits:
-    cpu: "4000m"
+    cpu: "4"
     memory: "16Gi"
-    nvidia.com/gpu: "1"
+  limits:
+    cpu: "56"
+    memory: "170Gi"
+    nvidia.com/gpu: "8"
 
 agent:
   id: "avatar-openclaw"
