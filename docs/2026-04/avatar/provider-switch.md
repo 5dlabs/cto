@@ -16,7 +16,7 @@
 > - [`docs/avatar-architecture.md`](../avatar-architecture.md) — LemonSlice deep-dive + multi-provider design spec (historical/reference, not the live cutline).
 > - [`avatar/docs/provider-spikes.md`](../../../avatar/docs/provider-spikes.md) — STT/TTS/LLM swaps **inside** the LiveKit path.
 > - [`docs/plans/avatar-provider-failover.md`](../plans/avatar-provider-failover.md) — three-tier failover plan (LemonSlice → OVH → DO).
-> - [`avatar/README.md`](README.md) — LiveKit + LemonSlice PoC quick start.
+> - [`avatar/README.md`](../../../avatar/README.md) — LiveKit + LemonSlice PoC quick start.
 
 ---
 
