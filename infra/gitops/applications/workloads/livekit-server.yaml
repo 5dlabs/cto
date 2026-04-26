@@ -4,11 +4,9 @@
 # runs the avatar provider workload and connects to this server
 # as a regular client.
 #
-# Phase 1 delivers the production signaling endpoint at wss://lk.5dlabs.ai
-# and keeps the server ready for direct UDP media on 50000-60000 via
-# hostNetworking. We still need OVH firewall + DNS/public-IP follow-up to
-# make the full UDP path reachable from the internet, but the chart shape
-# now matches the PRD instead of relying on tunnel-only TCP fallback.
+# Phase 1 delivers the production signaling endpoint at wss://lk.5dlabs.ai.
+# Media uses the direct OVH node path: the pod runs with host networking and
+# exposes UDP 50000-60000 plus TCP 7881 on the node's public interface.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -65,9 +63,19 @@ spec:
             tcp_port: 7881
             port_range_start: 50000
             port_range_end: 60000
-            # Pod uses host networking, so this picks up the node's
-            # routable public IP for ICE candidates once the node has a
-            # public IP and OVH firewall rules expose the UDP range.
+            # Pod uses host networking. Gather ICE through the OVH public
+            # interface and avoid advertising private/Cilium addresses to
+            # browsers that can only reach the direct media path.
+            interfaces:
+              includes:
+                - ens3
+            ips:
+              excludes:
+                - 10.0.0.0/8
+                - 172.16.0.0/12
+                - 192.168.0.0/16
+                - 127.0.0.0/8
+                - 169.254.0.0/16
             use_external_ip: true
           redis:
             address: livekit-valkey.cto.svc.cluster.local:6379

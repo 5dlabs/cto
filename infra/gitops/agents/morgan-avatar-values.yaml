@@ -136,7 +136,9 @@ extraEnv:
         name: livekit-keys
         key: LIVEKIT_API_SECRET
   - name: MORGAN_AVATAR_MODE
-    value: "echomimic"
+    value: "lemonslice"
+  - name: MORGAN_IMAGE_URL
+    value: "https://5dlabs.ai/agents/morgan-hero.png"
   - name: MORGAN_AGENT_NAME
     value: "morgan-avatar"
   - name: MORGAN_LLM_BACKEND
@@ -150,7 +152,7 @@ extraEnv:
   - name: MORGAN_LLM_USER_PREFIX
     value: "morgan-avatar"
   - name: MORGAN_USE_NOISE_CANCELLATION
-    value: "true"
+    value: "false"
   - name: MORGAN_PREEMPTIVE_GENERATION
     value: "false"
   - name: MORGAN_MUSETALK_FRAME_WIDTH
@@ -173,11 +175,10 @@ extraEnv:
     value: "900"
   - name: MORGAN_ECHOMIMIC_AUTO_RENDER
     value: "true"
-  # STT: keep the runtime off OpenAI. The direct EchoMimic /echo-turn bridge does
-  # not require this LiveKit-room STT path; if room STT is reactivated, use a
-  # supported non-OpenAI mode and provide the matching provider key.
+  # STT: self-hosted LiveKit does not include LiveKit Cloud Inference. Use the
+  # available direct ElevenLabs provider key for the demo path.
   - name: MORGAN_STT_MODE
-    value: "livekit-flux"
+    value: "elevenlabs-scribe"
   - name: MORGAN_TTS_MODE
     value: "elevenlabs"
   - name: MORGAN_ELEVEN_VOICE_ID
@@ -189,6 +190,16 @@ extraEnv:
       secretKeyRef:
         name: openclaw-api-keys
         key: elevenlabs-api-key
+  - name: ELEVEN_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: openclaw-api-keys
+        key: elevenlabs-api-key
+  - name: LEMONSLICE_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: lemonslice-api-key
+        key: LEMONSLICE_API_KEY
 
 codeServer:
   enabled: false

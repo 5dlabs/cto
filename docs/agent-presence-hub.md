@@ -1,8 +1,8 @@
 # Agent Presence Hub — Generic Design
 
-> **Status**: design-spec (2026-07).  
-> **Replaces**: `docs/morgan-meet-hermes-design.md` — this doc supersedes the Morgan-only framing.  
-> **Companion**: `morgan-meet/.plan/spec/hermes-adapter.md` (low-level Hermes adapter; still accurate for its scope).  
+> **Status**: design-spec (2026-07).
+> **Replaces**: `docs/morgan-meet-hermes-design.md` — this doc supersedes the Morgan-only framing.
+> **Companion**: `morgan-meet/.plan/spec/hermes-adapter.md` (low-level Hermes adapter; still accurate for its scope).
 > **Related**: [`avatar-architecture.md`](./avatar-architecture.md), [`morgan-avatar-openclaw-handoff.md`](./morgan-avatar-openclaw-handoff.md), [`acp-nats-research.md`](./acp-nats-research.md).
 
 ---
@@ -362,7 +362,7 @@ Agent → hub.turn(text)
 
 ### 9.2 The minimal acpx PR
 
-**Target**: `github.com/openclaw/acpx`  
+**Target**: `github.com/openclaw/acpx`
 **PR title**: `feat: accept --presence-mcp-url to inject a presence MCP server into every new session`
 
 When `--presence-mcp-url <URL>` is passed (or set via `ACPX_PRESENCE_MCP_URL` env var), acpx appends the presence hub's MCP server to the session's `mcpServers` list during `session/new`. The underlying agent then receives `presence_*` tools automatically — without any ACP protocol change, binary streaming, or new event types.
