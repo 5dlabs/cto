@@ -15,6 +15,7 @@ so latency spikes can happen via environment changes only (no code edits).
 - `livekit-nova`
 - `deepgram-flux`
 - `deepgram-nova`
+- `elevenlabs-scribe`
 
 `MORGAN_TTS_MODE`:
 - `elevenlabs` (default)
@@ -56,6 +57,17 @@ MORGAN_ELEVEN_CHUNK_LENGTH_SCHEDULE=80,120,200,260
 
 Why: uses our own ElevenLabs account and credits directly, unlocks custom voice
 work, and enables the direct plugin tuning knobs already wired in this repo.
+
+## STT spike: direct ElevenLabs Scribe
+
+```env
+MORGAN_STT_MODE=elevenlabs-scribe
+ELEVEN_API_KEY=your_elevenlabs_key
+```
+
+Why: uses our own ElevenLabs account directly for Scribe v2 realtime STT when
+self-hosted LiveKit cannot use LiveKit Cloud Inference and no separate Deepgram
+or OpenAI STT key is available.
 
 ## STT spike: direct Deepgram Flux
 
@@ -124,4 +136,5 @@ Do not replace the baseline stack unless the integrated spike wins clearly on me
 - Typos in mode values are silently coerced to defaults for STT/TTS in `providers.py`.
   Keep values exactly as listed above to avoid accidental fallback.
 - `MORGAN_STT_MODE=deepgram-*` requires `DEEPGRAM_API_KEY`.
+- `MORGAN_STT_MODE=elevenlabs-scribe` requires `ELEVEN_API_KEY`.
 - `MORGAN_TTS_MODE=cartesia` requires `CARTESIA_API_KEY`.
