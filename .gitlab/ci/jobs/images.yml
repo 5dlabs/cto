@@ -133,7 +133,7 @@ build-dex-indexer:
     - |
       docker buildx build \
         --build-arg BASE_REGISTRY=$BASE_REGISTRY \
-        --file skills/trader/docker/Dockerfile.dex-indexer \
+        --file infra/images/dex-indexer/Dockerfile \
         --target local \
         --push --provenance=false \
         --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/dex-indexer:latest" \
@@ -145,7 +145,7 @@ build-dex-indexer:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
         - crates/dex-indexer/**
-        - skills/trader/docker/Dockerfile.dex-indexer
+        - infra/images/dex-indexer/**
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE =~ /^(web|api|schedule)$/
   timeout: 45m
@@ -415,7 +415,7 @@ build-dex-api:
     - |
       docker buildx build \
         --build-arg BASE_REGISTRY=$BASE_REGISTRY \
-        --file skills/trader/docker/Dockerfile.dex-api \
+        --file infra/images/dex-api/Dockerfile \
         --push --provenance=false \
         --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/dex-api:latest" \
         --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/dex-api:v${CI_COMMIT_SHORT_SHA}" \
@@ -425,7 +425,8 @@ build-dex-api:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
-        - skills/trader/**
+        - crates/dex-indexer/**
+        - infra/images/dex-api/**
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE =~ /^(web|api|schedule)$/
   timeout: 30m
@@ -481,7 +482,7 @@ build-cto-controller:
     - |
       docker buildx build \
         --build-arg BASE_REGISTRY=$BASE_REGISTRY \
-        --file controller-build.Dockerfile \
+        --file infra/images/controller/Dockerfile.minimal \
         --push --provenance=false \
         --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/cto-controller:latest" \
         --tag "$INTERNAL_REGISTRY/$IMAGE_BASE/cto-controller:v${CI_COMMIT_SHORT_SHA}" \
@@ -492,7 +493,7 @@ build-cto-controller:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
         - crates/controller/**
-        - controller-build.Dockerfile
+        - infra/images/controller/Dockerfile.minimal
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE =~ /^(web|api|schedule)$/
   timeout: 60m
