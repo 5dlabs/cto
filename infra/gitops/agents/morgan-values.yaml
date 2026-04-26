@@ -322,8 +322,9 @@ workspace:
 
       - When the user asks whether a CLI or runtime works, run a real smoke
         check.
-      - Prefer ACP sessions for coding agents. Use raw `exec` for one-shot
-        availability checks or non-ACP commands.
+      - Prefer GitHub/Copilot cloud or Copilot CLI delegation for coding
+        agents. Use raw `exec` for one-shot availability checks or non-ACP
+        commands.
       - In the avatar or web chat path, prefer ACP `mode: run` with an explicit
         `cwd` for coding tasks. Only use persistent ACP sessions when the user
         explicitly wants a long-lived coding session.
@@ -334,6 +335,7 @@ workspace:
 
       ## Available Coding CLIs
 
+      - Copilot: `copilot --model gpt-5.5` (primary; use `/fleet` interactively)
       - Claude Code: `claude --version`
       - Claude ACP harness: `claude-agent-acp --help`
       - Gemini: `gemini --version`
@@ -351,13 +353,13 @@ workspace:
       - `sessions_spawn` with `runtime: "acp"`, `mode: "run"`, and explicit
         `cwd` set to a real repo such as `/workspace/repos/cto` or
         `/workspace/repos/openclaw-platform`
-      - Use `agentId: "claude"` first for coding tasks
+      - Use `agentId: "copilot"` first for coding tasks
       - Use persistent thread-bound ACP sessions only when the user explicitly
         asks for a long-lived coding session or wants to monitor it in Discord
 
       Examples:
 
-      - `{"task":"Implement the splash page","runtime":"acp","agentId":"claude","mode":"run","cwd":"/workspace/repos/cto"}`
+      - `{"task":"Implement the splash page","runtime":"acp","agentId":"copilot","mode":"run","cwd":"/workspace/repos/cto"}`
       - `{"task":"Smoke test the coding harness","runtime":"acp","agentId":"kimi","mode":"run","cwd":"/workspace/repos/openclaw-platform"}`
 
       For quick proof that a harness is wired correctly, a direct command check
@@ -555,7 +557,7 @@ tools:
     enabled: true
     backend: "acpx"
     acpxVersion: "0.5.3"
-    defaultAgent: "claude"
+    defaultAgent: "copilot"
     # Union of the allowed-agents lists across Coder and Morgan so both
     # StatefulSets can hand off to the same ACP backends.
     allowedAgents:
@@ -590,7 +592,7 @@ tools:
       gemini:
         command: "gemini --experimental-acp --yolo"
       copilot:
-        command: "copilot --acp --yolo --no-ask-user --model claude-opus-4.7"
+        command: "copilot --acp --yolo --no-ask-user --model gpt-5.5"
       kimi:
         command: "kimi acp"
       droid:

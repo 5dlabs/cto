@@ -4,7 +4,7 @@
 # =============================================================================
 # General-purpose coding agent for the CTO platform.
 # Primary focus: e2e testing of intake, work, play, and lobster workflows.
-# Primary CLI: Claude Code with agent teams enabled.
+# Primary CLI: Copilot/cloud delegation with Codex GPT-5.5 as the gateway model.
 # Secondary: OpenCode (Kimi K2 Turbo via Fireworks).
 # =============================================================================
 namespace: cto
@@ -71,7 +71,7 @@ telemetry:
 agent:
   id: "coder"
   name: "Coder"
-  model: "fireworks/accounts/fireworks/models/qwen3p6-plus"
+  model: "openai-codex/gpt-5.5"
   # Fallback Discord channel for autonomous final-response delivery.
   defaultRecipient: "channel:1494057364301545542"
   heartbeat:
@@ -91,11 +91,14 @@ agent:
       unblock (missing credentials, destructive/irreversible action
       without a safe default, external 2FA/billing, or still blocked
       after default + one fallback). For any coding task, ALWAYS
-      delegate to an ACPX harness (claude / copilot / kimi) via `acp`
-      or `exec` — do not write substantial code inline yourself. If a
-      harness run fails, inspect its logs, adjust config or switch
-      backend, and keep iterating without waiting for the human. Batch
-      tool work; surface updates only at milestones or real blockers.
+      delegate to GitHub/Copilot cloud or the Copilot CLI via ACP/exec;
+      do not write substantial code inline yourself. For interactive
+      Copilot sessions, enable `/fleet` first when parallel subagents
+      are useful; the installed CLI does not expose a non-interactive
+      fleet startup flag. If a delegated run fails, inspect logs,
+      adjust config or switch backend, and keep iterating without
+      waiting for the human. Batch tool work; surface updates only at
+      milestones or real blockers.
       On each heartbeat, check for: (1) pending NATS messages or tasks
       from Morgan/other agents; (2) open PRs you created that need
       attention (CI failures, review feedback); (3) any in-progress
@@ -149,11 +152,14 @@ agentDefaults:
       that ONLY a human can unblock (missing credentials, destructive
       action without a safe default, external 2FA/billing, or still blocked
       after default + one fallback). For any coding task, ALWAYS delegate
-      to an ACPX harness (claude / copilot / kimi) via `acp` or `exec` —
-      do not write substantial code inline yourself. If a harness run
-      fails, inspect its logs, adjust config or switch backend, and keep
-      iterating without waiting for the human. Batch tool work; surface
-      updates only at milestones or real blockers. On each heartbeat,
+      to GitHub/Copilot cloud or the Copilot CLI via ACP/exec; do not
+      write substantial code inline yourself. For interactive Copilot
+      sessions, enable `/fleet` first when parallel subagents are useful;
+      the installed CLI does not expose a non-interactive fleet startup
+      flag. If a delegated run fails, inspect logs, adjust config or
+      switch backend, and keep iterating without waiting for the human.
+      Batch tool work; surface updates only at milestones or real
+      blockers. On each heartbeat,
       check for: (1) pending NATS messages or tasks from Morgan/other
       agents; (2) open PRs you created that need attention (CI failures,
       review feedback); (3) any in-progress work in your workspace that
@@ -165,8 +171,9 @@ agentDefaults:
       briefly.
 
 modelDefaults:
-  primary: "fireworks/accounts/fireworks/models/qwen3p6-plus"
+  primary: "openai-codex/gpt-5.5"
   fallbacks:
+    - "openai-codex/gpt-5.4"
     - "fireworks/accounts/fireworks/models/qwen3p6-plus"
     - "fireworks/accounts/fireworks/models/minimax-m2p7"
     - "fireworks/accounts/fireworks/models/glm-5p1"
@@ -219,12 +226,14 @@ messaging:
 models:
   providers:
     openai-codex:
-      # Disabled: this environment has no working OpenAI/Codex auth.
-      enabled: false
+      enabled: true
       api: "openai-codex-responses"
       auth: "oauth"
       baseUrl: "https://api.openai.com/v1"
       models:
+        - id: "gpt-5.5"
+          name: "GPT-5.5"
+          contextTokens: 272000
         - id: "gpt-5.4"
           name: "GPT-5.4"
           contextTokens: 272000
@@ -318,7 +327,9 @@ workspace:
       ## Operating Rules
 
       - Treat the current user request as the priority. Do not start side quests.
-      - Use Claude Code agent teams for parallelizable work across modules.
+      - Delegate coding work to GitHub/Copilot cloud or the Copilot CLI.
+      - In interactive Copilot sessions, enable `/fleet` before broad
+        parallel subagent work.
       - For coding tasks, prefer creating feature branches and submitting PRs.
       - Run linters and tests before marking work complete.
       - For Rust code: `cargo clippy --all-targets -- -D warnings -W clippy::pedantic`
@@ -467,10 +478,10 @@ workspace:
 
       - **Name:** Coder
       - **Role:** General-purpose coding agent for CTO platform
-      - **Primary CLI:** Claude Code (OAuth, with agent teams)
+      - **Primary CLI:** GitHub Copilot CLI / Copilot cloud delegation
       - **Secondary CLI:** OpenCode (Kimi K2 Turbo via Fireworks)
-      - **Gateway Model:** Kimi K2.5 Turbo (Fireworks)
-      - **Fallbacks:** Qwen 3.6 Plus, MiniMax M2.7, GLM 5.1
+      - **Gateway Model:** GPT-5.5 via OpenAI Codex OAuth
+      - **Fallbacks:** GPT-5.4 via Codex OAuth, Qwen 3.6 Plus, MiniMax M2.7, GLM 5.1
       - **Memory:** mem0 (Qdrant-backed, collection: cto_memory, shared with all agents)
 
     TOOLS.md: |
@@ -486,18 +497,20 @@ workspace:
       ## Operating Principle
 
       - Write code, run tests, verify behavior.
-      - Use Claude Code agent teams for parallel work across modules.
+      - Delegate coding work to GitHub/Copilot cloud or the Copilot CLI.
+      - For interactive Copilot sessions, run `/fleet` before broad parallel
+        subagent work. There is no installed non-interactive `--fleet` flag.
       - Prefer ACP sessions for delegating to other coding CLIs.
       - Run `cargo clippy` before committing Rust changes.
       - Run `bun test` before committing TypeScript changes.
 
       ## Available Coding CLIs
 
-      - Claude Code: `claude --version` (primary, OAuth auth)
+      - Copilot: `copilot --model gpt-5.5` (primary; use `/fleet` interactively)
+      - Claude Code: `claude --version` (fallback, OAuth auth)
       - OpenCode: `opencode --help` (Kimi K2 Turbo)
       - Gemini: `gemini --version`
       - Kimi: `kimi --version`
-      - Copilot: `copilot --model claude-opus-4.7` (GitHub Copilot CLI, uses Claude Opus 4.7)
       - Cursor: `cursor-agent --help`
 
       ## ACP Sessions
@@ -506,7 +519,7 @@ workspace:
 
       - `sessions_spawn` with `runtime: "acp"`, `mode: "run"`, and explicit
         `cwd` set to a real repo
-      - Use `agentId: "claude"` first for coding tasks
+      - Use `agentId: "copilot"` first for coding tasks
       - Use persistent thread-bound ACP sessions for long-lived work
 
       ## Agent Teams
@@ -713,7 +726,7 @@ tools:
     enabled: true
     backend: "acpx"
     acpxVersion: "0.5.3"
-    defaultAgent: "claude"
+    defaultAgent: "copilot"
     # Union of the allowed-agents lists across Coder and Morgan so both
     # StatefulSets can hand off to the same ACP backends.
     allowedAgents:
@@ -748,7 +761,7 @@ tools:
       gemini:
         command: "gemini --experimental-acp --yolo"
       copilot:
-        command: "copilot --acp --yolo --no-ask-user --model claude-opus-4.7"
+        command: "copilot --acp --yolo --no-ask-user --model gpt-5.5"
       kimi:
         command: "kimi acp"
       cursor:
@@ -796,7 +809,7 @@ claudeCode:
 # Codex Harness (OpenAI Codex via app-server)
 # =============================================================================
 codexPlugin:
-  enabled: false
+  enabled: true
   approvalPolicy: "never"
   sandbox: "workspace-write"
   authSecretKey: "codex-auth-sub1"
