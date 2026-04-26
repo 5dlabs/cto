@@ -31,7 +31,12 @@ on:
         default: false
         type: boolean
       openclaw_version:
-        description: 'Override OpenClaw version (e.g., "2026.2.12"). Defaults to latest.'
+        description: 'Deprecated: OpenClaw image tag to use with ghcr.io/openclaw/openclaw (e.g., "2026.4.25-beta.10-slim"). Defaults to latest slim tag.'
+        required: false
+        default: ''
+        type: string
+      openclaw_image:
+        description: 'Override full OpenClaw image ref (e.g., "ghcr.io/openclaw/openclaw:2026.4.25-beta.10-slim"). Defaults to latest slim tag.'
         required: false
         default: ''
         type: string
@@ -292,39 +297,67 @@ jobs:
           node-version: '20'
           check-latest: true
 
-      - name: Resolve OpenClaw version
-        id: openclaw-version
+      - name: Resolve OpenClaw image
+        id: openclaw-image
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ -n "${{ inputs.openclaw_version }}" ]; then
-            VERSION="${{ inputs.openclaw_version }}"
-            echo "📦 Using OpenClaw override: $VERSION"
+          if [ -n "${{ inputs.openclaw_image }}" ]; then
+            IMAGE="${{ inputs.openclaw_image }}"
+            echo "📦 Using OpenClaw image override: $IMAGE"
+          elif [ -n "${{ inputs.openclaw_version }}" ]; then
+            IMAGE="ghcr.io/openclaw/openclaw:${{ inputs.openclaw_version }}"
+            echo "📦 Using deprecated OpenClaw tag override: $IMAGE"
           else
-            VERSION=$(npm view openclaw version 2>/dev/null || echo "latest")
-            echo "📦 Latest OpenClaw: $VERSION"
+            TAG=$(gh api --paginate /orgs/openclaw/packages/container/openclaw/versions?per_page=100 \
+              --jq '.[] | .metadata.container.tags[]?' \
+              | grep -E '^[0-9][0-9.]+(-[A-Za-z0-9.]+)?-slim$' \
+              | sort -V \
+              | tail -1)
+            if [ -z "$TAG" ]; then
+              echo "No slim OpenClaw image tag found in ghcr.io/openclaw/openclaw" >&2
+              exit 1
+            fi
+            IMAGE="ghcr.io/openclaw/openclaw:$TAG"
+            echo "📦 Discovered latest OpenClaw image: $IMAGE"
           fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          docker pull "$IMAGE"
+          VERSION=$(docker run --rm --entrypoint openclaw "$IMAGE" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9][^[:space:]]*' | head -1 || echo "unknown")
+          DIGEST=$(docker image inspect "$IMAGE" --format '{{index .RepoDigests 0}}' | sed 's/^.*@//')
+          echo "📦 Resolved OpenClaw image: $IMAGE"
+          echo "📦 Resolved OpenClaw version: $VERSION"
+          echo "📦 Resolved OpenClaw digest: $DIGEST"
+          {
+            echo "image=$IMAGE"
+            echo "version=$VERSION"
+            echo "digest=$DIGEST"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Discover npm CLI versions
         id: cli-versions
         run: |
           get_ver() { npm view "$1" version 2>/dev/null || echo "unknown"; }
-          echo "acpx=$(get_ver acpx)" >> "$GITHUB_OUTPUT"
-          echo "claude=$(get_ver @anthropic-ai/claude-code)" >> "$GITHUB_OUTPUT"
-          echo "codex=$(get_ver @openai/codex)" >> "$GITHUB_OUTPUT"
-          echo "copilot=$(get_ver @github/copilot)" >> "$GITHUB_OUTPUT"
-          echo "code=$(get_ver @just-every/code)" >> "$GITHUB_OUTPUT"
-          echo "gemini=$(get_ver @google/gemini-cli)" >> "$GITHUB_OUTPUT"
-          echo "clawhub=$(get_ver clawhub)" >> "$GITHUB_OUTPUT"
-          echo "openai=$(get_ver openai)" >> "$GITHUB_OUTPUT"
+          {
+            echo "acpx=$(get_ver acpx)"
+            echo "claude=$(get_ver @anthropic-ai/claude-code)"
+            echo "codex=$(get_ver @openai/codex)"
+            echo "copilot=$(get_ver @github/copilot)"
+            echo "code=$(get_ver @just-every/code)"
+            echo "gemini=$(get_ver @google/gemini-cli)"
+            echo "clawhub=$(get_ver clawhub)"
+            echo "openai=$(get_ver openai)"
+          } >> "$GITHUB_OUTPUT"
           echo "📦 Discovered npm CLI versions"
 
       - name: Compute agents image tag
         id: tag
         run: |
-          # Tag from Dockerfile hash + openclaw version
+          # Tag from Dockerfile hash + OpenClaw image version
           DOCKERFILE_HASH=$(git log -1 --format="%h" -- infra/images/agents/Dockerfile infra/images/agents/entrypoint.sh)
-          OPENCLAW_VER="${{ steps.openclaw-version.outputs.version }}"
-          TAG="${DOCKERFILE_HASH}-oc$(echo "$OPENCLAW_VER" | tr '.' '-')"
+          OPENCLAW_VER="${{ steps.openclaw-image.outputs.version }}"
+          OPENCLAW_DIGEST="${{ steps.openclaw-image.outputs.digest }}"
+          DIGEST_SHORT=$(echo "$OPENCLAW_DIGEST" | cut -d: -f2 | cut -c1-12)
+          TAG="${DOCKERFILE_HASH}-oc$(echo "$OPENCLAW_VER" | tr '.' '-')-${DIGEST_SHORT:-unknown}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "📦 Computed agents tag: $TAG"
 
@@ -365,7 +398,9 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/agents:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/agents:v${{ steps.tag.outputs.tag }}
           labels: |
-            ai.5dlabs.openclaw.version=${{ steps.openclaw-version.outputs.version }}
+            ai.5dlabs.openclaw.version=${{ steps.openclaw-image.outputs.version }}
+            ai.5dlabs.openclaw.image=${{ steps.openclaw-image.outputs.image }}
+            ai.5dlabs.openclaw.digest=${{ steps.openclaw-image.outputs.digest }}
             ai.5dlabs.cli.acpx=${{ steps.cli-versions.outputs.acpx }}
             ai.5dlabs.cli.claude=${{ steps.cli-versions.outputs.claude }}
             ai.5dlabs.cli.codex=${{ steps.cli-versions.outputs.codex }}
@@ -377,7 +412,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
           build-args: |
             BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }}
-            OPENCLAW_VERSION=${{ steps.openclaw-version.outputs.version }}
+            OPENCLAW_IMAGE=${{ steps.openclaw-image.outputs.image }}
             ${{ inputs.opencode_version != '' && format('OPENCODE_VERSION={0}', inputs.opencode_version) || '' }}
           no-cache: ${{ inputs.no_cache == true }}
           cache-from: |
@@ -397,15 +432,17 @@ jobs:
           echo "$MANIFEST" | tee /tmp/versions.json
           # Extract binary-only versions (not available via npm view)
           get_v() { echo "$MANIFEST" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('clis',d.get('tools',{})).get('$1','unknown'))" 2>/dev/null || echo "unknown"; }
-          echo "droid=$(get_v droid)" >> "$GITHUB_OUTPUT"
-          echo "cursor=$(get_v cursor)" >> "$GITHUB_OUTPUT"
-          echo "kimi=$(get_v kimi)" >> "$GITHUB_OUTPUT"
-          echo "opencode=$(get_v opencode)" >> "$GITHUB_OUTPUT"
-          echo "gh=$(get_v gh)" >> "$GITHUB_OUTPUT"
-          echo "op=$(get_v op)" >> "$GITHUB_OUTPUT"
-          echo "node=$(get_v node)" >> "$GITHUB_OUTPUT"
-          echo "bun=$(get_v bun)" >> "$GITHUB_OUTPUT"
-          echo "build_date=$(echo "$MANIFEST" | python3 -c "import sys,json; print(json.load(sys.stdin).get('buildDate',''))" 2>/dev/null)" >> "$GITHUB_OUTPUT"
+          {
+            echo "droid=$(get_v droid)"
+            echo "cursor=$(get_v cursor)"
+            echo "kimi=$(get_v kimi)"
+            echo "opencode=$(get_v opencode)"
+            echo "gh=$(get_v gh)"
+            echo "op=$(get_v op)"
+            echo "node=$(get_v node)"
+            echo "bun=$(get_v bun)"
+            echo "build_date=$(echo "$MANIFEST" | python3 -c "import sys,json; print(json.load(sys.stdin).get('buildDate',''))" 2>/dev/null)"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Summary
         run: |
@@ -422,7 +459,7 @@ jobs:
             echo ""
             echo "| CLI | Version | Source |"
             echo "|-----|---------|--------|"
-            echo "| OpenClaw | \`${{ steps.openclaw-version.outputs.version }}\` | npm |"
+            echo "| OpenClaw | \`${{ steps.openclaw-image.outputs.version }}\` | Docker: \`${{ steps.openclaw-image.outputs.image }}\` |"
             echo "| acpx | \`${{ steps.cli-versions.outputs.acpx }}\` | npm |"
             echo "| Claude Code | \`${{ steps.cli-versions.outputs.claude }}\` | npm |"
             echo "| Codex | \`${{ steps.cli-versions.outputs.codex }}\` | npm |"

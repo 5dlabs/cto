@@ -3,8 +3,6 @@
 ARG BASE_IMAGE=registry.5dlabs.ai/5dlabs/agents:latest-arm64
 FROM ${BASE_IMAGE}
 
-ARG OPENCLAW_VERSION=beta
-
 LABEL org.opencontainers.image.source="https://gitlab.5dlabs.ai/5dlabs/cto"
 LABEL org.opencontainers.image.description="Local OpenClaw platform image for CTO desktop bootstrap"
 
@@ -16,7 +14,6 @@ ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
 
 RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     npm install -g --ignore-scripts \
-      "openclaw@${OPENCLAW_VERSION}" \
       clawhub@latest \
       @zed-industries/claude-agent-acp \
       @zed-industries/codex-acp \

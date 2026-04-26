@@ -705,12 +705,14 @@ spec:
               # Patch OpenClaw agent-delivery to honor OPENCLAW_DEFAULT_RECIPIENT
               # when no explicit recipient is resolved (fixes channel:UNKNOWN on boot).
               # Runs in init (root) because dist/ files are root-owned.
-              for f in /usr/local/share/npm-global/lib/node_modules/openclaw/dist/agent-delivery-*.js; do
-                [ -f "$f" ] || continue
-                grep -q 'OPENCLAW_DEFAULT_RECIPIENT' "$f" && continue
-                sed -i 's/let resolvedTo = explicitTo;/let resolvedTo = explicitTo; if (!resolvedTo \&\& process.env.OPENCLAW_DEFAULT_RECIPIENT) resolvedTo = process.env.OPENCLAW_DEFAULT_RECIPIENT;/' "$f" \
-                  && echo "[workspace-files] Patched delivery fallback in $(basename $f)" \
-                  || echo "[workspace-files] WARN: delivery patch failed for $(basename $f)"
+              for root in /app /usr/local/share/npm-global/lib/node_modules/openclaw; do
+                for f in "$root"/dist/agent-delivery-*.js; do
+                  [ -f "$f" ] || continue
+                  grep -q 'OPENCLAW_DEFAULT_RECIPIENT' "$f" && continue
+                  sed -i 's/let resolvedTo = explicitTo;/let resolvedTo = explicitTo; if (!resolvedTo \&\& process.env.OPENCLAW_DEFAULT_RECIPIENT) resolvedTo = process.env.OPENCLAW_DEFAULT_RECIPIENT;/' "$f" \
+                    && echo "[workspace-files] Patched delivery fallback in $(basename $f)" \
+                    || echo "[workspace-files] WARN: delivery patch failed for $(basename $f)"
+                done
               done
               # Increase mem0 recall timeout from 8s to 30s (qdrant can be slow
               # on large collections, especially after pod restarts).
