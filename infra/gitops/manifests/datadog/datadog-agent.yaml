@@ -26,13 +26,6 @@ spec:
     apm:
       instrumentation:
         enabled: true
-    otlp:
-      receiver:
-        protocols:
-          http:
-            endpoint: "0.0.0.0:4318"
-      logs:
-        enabled: true
         targets:
           - name: cto-pm-nodejs
             ddTraceVersions:
@@ -70,3 +63,14 @@ spec:
             ddTraceConfigs:
               - name: DD_PROFILING_ENABLED
                 value: "auto"
+    otlp:
+      receiver:
+        protocols:
+          http:
+            endpoint: "0.0.0.0:4318"
+  override:
+    nodeAgent:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule

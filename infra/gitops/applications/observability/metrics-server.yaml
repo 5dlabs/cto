@@ -1,6 +1,7 @@
 ---
-# Argo CD Application for Kubernetes Metrics Server
-# Provides container resource metrics collection API for HPA, kubectl top, and monitoring
+# Argo CD Application for RKE2 Metrics Server configuration.
+# The OVH cluster uses RKE2's bundled metrics-server HelmChart; this app applies
+# the matching HelmChartConfig instead of installing a second metrics-server.
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -16,112 +17,10 @@ spec:
   # Project configuration
   project: platform
 
-  # Source configuration - using official Kubernetes metrics-server Helm chart
   source:
-    repoURL: https://kubernetes-sigs.github.io/metrics-server/
-    targetRevision: 3.12.1
-    chart: metrics-server
-
-    # Helm values
-    helm:
-      values: |
-        # Image configuration
-        image:
-          repository: registry.k8s.io/metrics-server/metrics-server
-          tag: v0.7.1
-          pullPolicy: IfNotPresent
-
-        # Resource allocation
-        resources:
-          requests:
-            cpu: 100m
-            memory: 200Mi
-          limits:
-            cpu: 500m
-            memory: 500Mi
-
-        # Security context
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 1000
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-              - ALL
-
-        # High availability
-        replicas: 2
-        podDisruptionBudget:
-          enabled: true
-          minAvailable: 1
-
-        # Override the default containerPort to match our custom secure-port
-        containerPort: 4443
-
-        # Metrics server arguments
-        args:
-          - --secure-port=4443
-          - --cert-dir=/tmp
-          - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
-          - --kubelet-use-node-status-port
-          # metric-resolution must be > kubelet-request-timeout
-          - --metric-resolution=60s
-          # For development/local clusters that may have self-signed certs
-          - --kubelet-insecure-tls
-          # Increase timeout for kubelet scraping (default 10s is too tight for busy nodes)
-          - --kubelet-request-timeout=30s
-
-        # Override default args to prevent the chart from also setting --secure-port=10250
-        defaultArgs: []
-
-        # Service monitor for Prometheus-compatible monitoring
-        serviceMonitor:
-          enabled: false
-
-        # Update strategy
-        updateStrategy:
-          type: RollingUpdate
-          rollingUpdate:
-            maxUnavailable: 0
-            maxSurge: 1
-
-        # Pod labels for log collection
-        # Note: Don't override app.kubernetes.io/component - it's part of the
-        # selector and can't be changed on existing Deployments
-        podLabels:
-          platform.5dlabs.io/log-collection: enabled
-
-        # Pod annotations for monitoring (for documentation - endpoint discovery is used)
-        podAnnotations:
-          prometheus.io/scrape: "true"
-          prometheus.io/port: "4443"
-          prometheus.io/scheme: "https"
-          logs.platform.5dlabs.io/collect: "true"
-          logs.platform.5dlabs.io/service: metrics-server
-
-        # Use host network to bypass Cilium pod-to-host hairpin issue
-        # This allows metrics-server to reach kubelet on all nodes reliably
-        hostNetwork:
-          enabled: true
-
-        # Tolerate control-plane taint so pods can schedule on all nodes
-        tolerations:
-          - key: node-role.kubernetes.io/control-plane
-            operator: Exists
-            effect: NoSchedule
-
-        # Affinity for pod distribution - require spreading across nodes
-        affinity:
-          podAntiAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              - labelSelector:
-                  matchExpressions:
-                    - key: app.kubernetes.io/name
-                      operator: In
-                      values:
-                        - metrics-server
-                topologyKey: kubernetes.io/hostname
+    repoURL: https://github.com/5dlabs/cto.git
+    targetRevision: main
+    path: infra/gitops/manifests/metrics-server
 
   # Destination configuration - deploy to kube-system namespace
   destination:
@@ -139,6 +38,7 @@ spec:
       - CreateNamespace=false  # kube-system already exists
       - PrunePropagationPolicy=foreground
       - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true
 
     retry:
       limit: 3

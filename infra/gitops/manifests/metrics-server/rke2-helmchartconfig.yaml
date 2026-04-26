@@ -1,0 +1,20 @@
+---
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: rke2-metrics-server
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    # Host networking lets metrics-server reach kubelet :10250 on every OVH node.
+    hostNetwork:
+      enabled: true
+    containerPort: 4443
+    defaultArgs:
+      - --cert-dir=/tmp
+      - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+      - --kubelet-use-node-status-port
+      - --metric-resolution=60s
+    args:
+      - --kubelet-insecure-tls
+      - --kubelet-request-timeout=30s
