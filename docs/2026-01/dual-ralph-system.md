@@ -94,7 +94,7 @@ Tracks agent sessions with auto-reset:
 
 ### 4. Response Analyzer Library
 
-Shared library (`scripts/ralph-response-analyzer.sh`) providing:
+Shared library (`scripts/2026-01/ralph-response-analyzer.sh`) providing:
 
 - `ra_extract_exit_signal()` - Parse EXIT_SIGNAL from output
 - `ra_count_completion_indicators()` - Heuristic completion detection
@@ -116,10 +116,10 @@ Identifies when agents are stuck:
 
 | File | Purpose |
 |------|---------|
-| `scripts/ralph-dual.sh` | Launcher and management CLI |
-| `scripts/ralph-monitor.sh` | Monitor agent script |
-| `scripts/ralph-remediation.sh` | Remediation agent script |
-| `scripts/ralph-response-analyzer.sh` | Shared analysis library |
+| `scripts/2026-01/ralph-dual.sh` | Launcher and management CLI |
+| `scripts/2026-01/ralph-monitor.sh` | Monitor agent script |
+| `scripts/2026-01/ralph-remediation.sh` | Remediation agent script |
+| `scripts/2026-01/ralph-response-analyzer.sh` | Shared analysis library |
 | `lifecycle-test/ralph-coordination.json` | Coordination state |
 | `lifecycle-test/ralph-cto.json` | Configuration (requires `dualAgent` section) |
 | `lifecycle-test/monitor-prompt.md` | Monitor agent system prompt |
@@ -171,37 +171,37 @@ The system requires a `dualAgent` section in `ralph-cto.json`:
 
 ```bash
 # Start both agents
-./scripts/ralph-dual.sh start
+./scripts/2026-01/ralph-dual.sh start
 
 # Stop both agents
-./scripts/ralph-dual.sh stop
+./scripts/2026-01/ralph-dual.sh stop
 
 # Check status (shows circuit breaker, session, stats)
-./scripts/ralph-dual.sh status
+./scripts/2026-01/ralph-dual.sh status
 
 # View issue queue
-./scripts/ralph-dual.sh queue
+./scripts/2026-01/ralph-dual.sh queue
 
 # View recent logs
-./scripts/ralph-dual.sh logs
+./scripts/2026-01/ralph-dual.sh logs
 
 # Attach to monitor screen session
-./scripts/ralph-dual.sh attach monitor
+./scripts/2026-01/ralph-dual.sh attach monitor
 
 # Attach to remediation screen session
-./scripts/ralph-dual.sh attach remediation
+./scripts/2026-01/ralph-dual.sh attach remediation
 
 # Reset everything
-./scripts/ralph-dual.sh reset
+./scripts/2026-01/ralph-dual.sh reset
 
 # Reset session only (start fresh context)
-./scripts/ralph-dual.sh reset-session
+./scripts/2026-01/ralph-dual.sh reset-session
 
 # View circuit breaker details
-./scripts/ralph-dual.sh circuit-status
+./scripts/2026-01/ralph-dual.sh circuit-status
 
 # Reset circuit breaker to closed
-./scripts/ralph-dual.sh circuit-reset
+./scripts/2026-01/ralph-dual.sh circuit-reset
 ```
 
 ## Workflow
@@ -268,11 +268,11 @@ Remediation claims and resolves:
 
 ```bash
 # Check why it opened
-./scripts/ralph-dual.sh circuit-status
+./scripts/2026-01/ralph-dual.sh circuit-status
 
 # Reset and retry
-./scripts/ralph-dual.sh circuit-reset
-./scripts/ralph-dual.sh restart
+./scripts/2026-01/ralph-dual.sh circuit-reset
+./scripts/2026-01/ralph-dual.sh restart
 ```
 
 ### Agents Not Starting
@@ -289,8 +289,8 @@ pkill -f ralph-monitor.sh
 pkill -f ralph-remediation.sh
 
 # Reset and retry
-./scripts/ralph-dual.sh reset
-./scripts/ralph-dual.sh start
+./scripts/2026-01/ralph-dual.sh reset
+./scripts/2026-01/ralph-dual.sh start
 ```
 
 ### Missing dualAgent Config
@@ -311,14 +311,14 @@ Implemented the Dual Ralph improvements plan:
 The system is ready for testing. Start with:
 
 ```bash
-./scripts/ralph-dual.sh start
-./scripts/ralph-dual.sh status
+./scripts/2026-01/ralph-dual.sh start
+./scripts/2026-01/ralph-dual.sh status
 ```
 
 Monitor progress with:
 
 ```bash
-./scripts/ralph-dual.sh logs
+./scripts/2026-01/ralph-dual.sh logs
 # or attach directly
-./scripts/ralph-dual.sh attach monitor
+./scripts/2026-01/ralph-dual.sh attach monitor
 ```

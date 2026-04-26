@@ -5,11 +5,11 @@
 # manages loading/unloading services.
 #
 # Usage:
-#   ./scripts/launchd-setup.sh install   # Generate and load all services
-#   ./scripts/launchd-setup.sh uninstall # Unload and remove all services
-#   ./scripts/launchd-setup.sh status    # Show service status
-#   ./scripts/launchd-setup.sh logs      # Tail all service logs
-#   ./scripts/launchd-setup.sh restart   # Restart all services
+#   ./scripts/2026-01/launchd-setup.sh install   # Generate and load all services
+#   ./scripts/2026-01/launchd-setup.sh uninstall # Unload and remove all services
+#   ./scripts/2026-01/launchd-setup.sh status    # Show service status
+#   ./scripts/2026-01/launchd-setup.sh logs      # Tail all service logs
+#   ./scripts/2026-01/launchd-setup.sh restart   # Restart all services
 # =============================================================================
 
 set -euo pipefail
@@ -192,7 +192,7 @@ EOF
 # Generate plist for the watcher service
 generate_watcher_plist() {
     local label="$PLIST_PREFIX.watcher"
-    local watcher_script="$PROJECT_DIR/scripts/cto-watcher.sh"
+    local watcher_script="$PROJECT_DIR/scripts/2026-01/cto-watcher.sh"
     
     cat << EOF
 <?xml version="1.0" encoding="UTF-8"?>

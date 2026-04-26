@@ -10,7 +10,7 @@ OPENCLAW_OUT="${MODEL_SYNC_OPENCLAW_OUT:-infra/charts/openclaw-agent/files/model
 WEB_OUT="${MODEL_SYNC_WEB_OUT:-apps/web/src/generated/model-catalog.json}"
 
 echo "Syncing model catalog for providers: ${PROVIDERS}"
-python3 scripts/normalize-model-catalog.py \
+python3 scripts/2026-03/normalize-model-catalog.py \
   --providers "${PROVIDERS}" \
   --normalized-out "${NORMALIZED_OUT}" \
   --openclaw-out "${OPENCLAW_OUT}" \

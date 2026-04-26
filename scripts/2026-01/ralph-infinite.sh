@@ -8,7 +8,7 @@
 # 4. Loops forever, never stopping
 #
 # Usage:
-#   ./scripts/ralph-infinite.sh [--config path] [--no-remediation]
+#   ./scripts/2026-01/ralph-infinite.sh [--config path] [--no-remediation]
 #
 #   --config          Path to ralph-cto.json (default: lifecycle-test/ralph-cto.json)
 #   --no-remediation  Skip spawning remediation agent on failure (just cleanup and retry)
@@ -33,7 +33,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     -h|--help)
       cat <<'EOF'
-Usage: scripts/ralph-infinite.sh [--config path] [--no-remediation]
+Usage: scripts/2026-01/ralph-infinite.sh [--config path] [--no-remediation]
 
   --config          Path to ralph-cto.json (default: lifecycle-test/ralph-cto.json)
   --no-remediation  Skip spawning remediation agent on failure
@@ -243,7 +243,7 @@ After you finish, the system will automatically:
 
 4. **Webhook missing** - WEBHOOK_CALLBACK_URL not set
    - Check: launchd environment
-   - Fix: scripts/launchd-setup.sh
+   - Fix: scripts/2026-01/launchd-setup.sh
 
 5. **Service health** - Local services not running
    - Check: \`curl localhost:808X/health\`
@@ -300,7 +300,7 @@ Manual intervention may be required."
 # Check if lifecycle is complete
 check_complete() {
   local result
-  result=$("${ROOT_DIR}/scripts/ralph-cto.sh" --config "$CONFIG_PATH" --check-complete 2>/dev/null || echo '{"complete": false}')
+  result=$("${ROOT_DIR}/scripts/2026-01/ralph-cto.sh" --config "$CONFIG_PATH" --check-complete 2>/dev/null || echo '{"complete": false}')
   echo "$result" | jq -e '.complete == true' >/dev/null 2>&1
 }
 
@@ -327,7 +327,7 @@ main() {
     
     # Run one iteration of ralph-cto.sh
     local exit_code=0
-    "${ROOT_DIR}/scripts/ralph-cto.sh" --config "$CONFIG_PATH" --attended || exit_code=$?
+    "${ROOT_DIR}/scripts/2026-01/ralph-cto.sh" --config "$CONFIG_PATH" --attended || exit_code=$?
     
     if [[ $exit_code -eq 0 ]]; then
       log "Phase completed successfully"

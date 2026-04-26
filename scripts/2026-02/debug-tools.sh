@@ -2,7 +2,7 @@
 # Local debugging script for tools server
 # Tests the stdio semaphore fix
 #
-# Usage: ./scripts/debug-tools.sh
+# Usage: ./scripts/2026-02/debug-tools.sh
 #
 # This will:
 # 1. Build the tools server (if not already built)

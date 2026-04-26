@@ -97,7 +97,7 @@ plan directory:
 2. Upload the canonical Morgan source/ref assets to Scenario or prepare equivalent hosted inputs.
 3. Run the source cleanup/reference-sheet step first.
 4. Run AniGen, Hunyuan 3D 3.1 Pro, and Tripo baseline tests in parallel where possible.
-5. Validate every GLB candidate with `scripts/validate-avatar-glb.py` and `scripts/render-avatar-glb.py`.
+5. Validate every GLB candidate with `scripts/2026-04/validate-avatar-glb.py` and `scripts/render-avatar-glb.py`.
 6. Pick the best head/mesh candidate before spending time on torso/runtime polish.
 
 ## Guardrails

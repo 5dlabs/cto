@@ -1,9 +1,9 @@
 #!/bin/bash
 # ralph-sync-watcher.sh - Watch a local Ralph coordination file and sync to dashboard
 #
-# Usage: ./scripts/ralph-sync-watcher.sh [coordination-file] [progress-file]
+# Usage: ./scripts/2026-01/ralph-sync-watcher.sh [coordination-file] [progress-file]
 #
-# Example: ./scripts/ralph-sync-watcher.sh latitude-install/ralph-coordination.json latitude-install/progress.txt
+# Example: ./scripts/2026-01/ralph-sync-watcher.sh latitude-install/ralph-coordination.json latitude-install/progress.txt
 #
 # This runs in a loop, syncing state every 10 seconds.
 # Run this alongside your Ralph loop to enable mobile monitoring.

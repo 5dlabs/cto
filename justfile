@@ -235,31 +235,31 @@ mp: kill-ports
 launchd-install:
     @echo "Installing CTO services as launchd daemons..."
     @echo "Prerequisites: fswatch (brew install fswatch), release binaries (cargo build --release)"
-    ./scripts/launchd-setup.sh install
+    ./scripts/2026-01/launchd-setup.sh install
 
 # Uninstall launchd services
 launchd-uninstall:
-    ./scripts/launchd-setup.sh uninstall
+    ./scripts/2026-01/launchd-setup.sh uninstall
 
 # Show launchd service status
 launchd-status:
-    ./scripts/launchd-setup.sh status
+    ./scripts/2026-01/launchd-setup.sh status
 
 # Tail launchd service logs
 launchd-logs:
-    ./scripts/launchd-setup.sh logs
+    ./scripts/2026-01/launchd-setup.sh logs
 
 # Restart all launchd services
 launchd-restart:
-    ./scripts/launchd-setup.sh restart
+    ./scripts/2026-01/launchd-setup.sh restart
 
 # Start launchd services (if stopped)
 launchd-start:
-    ./scripts/launchd-setup.sh start
+    ./scripts/2026-01/launchd-setup.sh start
 
 # Stop launchd services (without unloading)
 launchd-stop:
-    ./scripts/launchd-setup.sh stop
+    ./scripts/2026-01/launchd-setup.sh stop
 
 # Build release binaries and let launchd auto-restart (main development workflow)
 build-and-restart: build-release
@@ -277,7 +277,7 @@ launchd-monitor:
     fi
     
     # Show current status first
-    ./scripts/launchd-setup.sh status
+    ./scripts/2026-01/launchd-setup.sh status
     echo ""
     echo "Press Enter to open log viewer (lnav)..."
     read -r
@@ -584,20 +584,20 @@ preflight:
 # Build and push dev runtime image with local intake binary
 dev-runtime-image:
     @echo "Building dev runtime image with local intake..."
-    ./scripts/build-dev-image.sh --binary intake --image runtime --push
+    ./scripts/2026-01/build-dev-image.sh --binary intake --image runtime --push
 
 # Build and push dev Claude image with local intake binary
 dev-claude-image:
     @echo "Building dev Claude image with local intake..."
-    ./scripts/build-dev-image.sh --binary intake --image claude --push
+    ./scripts/2026-01/build-dev-image.sh --binary intake --image claude --push
 
 # Build dev image locally without pushing (for testing)
 dev-image-local:
-    ./scripts/build-dev-image.sh --binary intake --image runtime
+    ./scripts/2026-01/build-dev-image.sh --binary intake --image runtime
 
 # Build and push all binaries to dev runtime
 dev-runtime-all:
-    ./scripts/build-dev-image.sh --binary all --image runtime --push
+    ./scripts/2026-01/build-dev-image.sh --binary all --image runtime --push
 
 
 

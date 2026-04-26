@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # intake-sdk-swarm.sh - TMUX session for monitoring intake SDK migration swarm
 #
-# Usage: ./scripts/intake-sdk-swarm.sh [start|attach|kill]
+# Usage: ./scripts/2026-01/intake-sdk-swarm.sh [start|attach|kill]
 #
 # This script creates a TMUX session with multiple panes for monitoring
 # the parallel swarm agents working on the intake SDK migration.

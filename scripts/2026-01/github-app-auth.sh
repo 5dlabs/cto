@@ -15,9 +15,9 @@
 #   Configures `gh` CLI authentication
 #
 # Usage:
-#   source scripts/github-app-auth.sh
+#   source scripts/2026-01/github-app-auth.sh
 #   # or
-#   eval "$(scripts/github-app-auth.sh)"
+#   eval "$(scripts/2026-01/github-app-auth.sh)"
 # =============================================================================
 
 set -euo pipefail

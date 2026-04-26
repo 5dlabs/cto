@@ -5,13 +5,13 @@
 # swarm with 4 specialized agents.
 #
 # Prerequisites:
-#   1. Services running: ./scripts/launchd-setup.sh status
+#   1. Services running: ./scripts/2026-01/launchd-setup.sh status
 #   2. Linear credentials set (optional, for posting to CTOPA-2608)
-#   3. TMUX session created: ./scripts/e2e-tmux-session.sh
+#   3. TMUX session created: ./scripts/2026-01/e2e-tmux-session.sh
 #
 # Usage:
-#   ./scripts/launch-e2e-swarm.sh           # Interactive mode
-#   ./scripts/launch-e2e-swarm.sh --print   # Non-interactive mode
+#   ./scripts/2026-01/launch-e2e-swarm.sh           # Interactive mode
+#   ./scripts/2026-01/launch-e2e-swarm.sh --print   # Non-interactive mode
 
 set -euo pipefail
 
@@ -31,11 +31,11 @@ echo ""
 # Check services
 echo -e "${YELLOW}Checking services...${NC}"
 if ! curl -sf http://localhost:8081/health > /dev/null 2>&1; then
-    echo -e "${RED}PM Server not healthy. Start with: ./scripts/launchd-setup.sh install${NC}"
+    echo -e "${RED}PM Server not healthy. Start with: ./scripts/2026-01/launchd-setup.sh install${NC}"
     exit 1
 fi
 if ! curl -sf http://localhost:8080/health > /dev/null 2>&1; then
-    echo -e "${RED}Controller not healthy. Start with: ./scripts/launchd-setup.sh install${NC}"
+    echo -e "${RED}Controller not healthy. Start with: ./scripts/2026-01/launchd-setup.sh install${NC}"
     exit 1
 fi
 echo -e "${GREEN}Services healthy${NC}"

@@ -76,12 +76,12 @@ The dev image is pushed to `ghcr.io/5dlabs/<image>:dev`:
 ## Script Options
 
 ```bash
-./scripts/build-dev-image.sh --help
+./scripts/2026-01/build-dev-image.sh --help
 
 # Examples:
-./scripts/build-dev-image.sh --binary intake --image runtime --push
-./scripts/build-dev-image.sh --binary all --image claude --push
-./scripts/build-dev-image.sh --binary intake --image claude --tag my-feature --push
+./scripts/2026-01/build-dev-image.sh --binary intake --image runtime --push
+./scripts/2026-01/build-dev-image.sh --binary all --image claude --push
+./scripts/2026-01/build-dev-image.sh --binary intake --image claude --tag my-feature --push
 ```
 
 ### Parameters

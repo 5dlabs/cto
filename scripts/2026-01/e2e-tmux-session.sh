@@ -3,7 +3,7 @@
 # Creates a multi-pane monitoring session for observing the intake swarm workflow
 #
 # Usage:
-#   ./scripts/e2e-tmux-session.sh        # Create session
+#   ./scripts/2026-01/e2e-tmux-session.sh        # Create session
 #   tmux attach -t e2e-intake-test       # Connect to session
 #
 # Layout:

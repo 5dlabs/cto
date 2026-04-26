@@ -2,7 +2,7 @@
 # ralph-dashboard-sync.sh - Sync Ralph loop state to mobile dashboard
 #
 # Usage: source this file in your Ralph loop scripts
-#   source scripts/ralph-dashboard-sync.sh
+#   source scripts/2026-01/ralph-dashboard-sync.sh
 #
 # Then call the functions to update state:
 #   ralph_init_session "my-session-name"

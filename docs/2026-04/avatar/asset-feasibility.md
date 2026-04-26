@@ -34,7 +34,7 @@ each generated candidate.
 
 ## Mechanical checks
 
-Run `scripts/validate-avatar-glb.py` on every GLB candidate. The validator emits
+Run `scripts/2026-04/validate-avatar-glb.py` on every GLB candidate. The validator emits
 mesh/material/rig/morph coverage and supports three profiles:
 
 - `talkinghead`: Oculus visemes + ARKit blendshapes
@@ -59,7 +59,7 @@ merged into a torso/body rig later.
 Baseline command pattern:
 
 ```bash
-python3 scripts/validate-avatar-glb.py --profile talkinghead --no-fail \
+python3 scripts/2026-04/validate-avatar-glb.py --profile talkinghead --no-fail \
   --output output/avatar-provisioning/baseline/validation/morgan-anigen-preview.talkinghead.json \
   avatar/web/public/avatar-lab/morgan-anigen-preview.glb
 ```

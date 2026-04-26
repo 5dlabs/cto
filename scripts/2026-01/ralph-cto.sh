@@ -11,7 +11,7 @@ CHECK_COMPLETE=0
 
 usage() {
   cat <<'EOF'
-Usage: scripts/ralph-cto.sh [--config path] [--phase id] [--no-run] [--check-complete]
+Usage: scripts/2026-01/ralph-cto.sh [--config path] [--phase id] [--no-run] [--check-complete]
 
   --config         Path to ralph-cto.json (default: lifecycle-test/ralph-cto.json)
   --phase          Start at a specific phase id (e.g., intake, play)

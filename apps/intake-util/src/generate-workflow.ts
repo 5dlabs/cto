@@ -380,7 +380,7 @@ function appendFinalSteps(
   lines.push('      cd work && git add -A &&');
   lines.push(`      git commit -m "feat: task-${taskId}" &&`);
   lines.push('      git push origin ${branch_name} &&');
-  lines.push('      source "${WORKSPACE:-.}/scripts/scm-dispatch.sh" &&');
+  lines.push('      source "${WORKSPACE:-.}/scripts/2026-03/scm-dispatch.sh" &&');
   lines.push(`      scm_create_pr "feat: task-${taskId}" "$(cat ${taskDir}/task.md)" "main"`);
 }
 

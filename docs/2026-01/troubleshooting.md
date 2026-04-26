@@ -28,7 +28,7 @@ kubectl get pods -n cto -l app.kubernetes.io/component=tools
 ### 3. Quick diagnostic script
 
 ```bash
-./scripts/diagnose-cto-pods.sh
+./scripts/2026-02/diagnose-cto-pods.sh
 ```
 
 ---

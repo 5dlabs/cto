@@ -127,7 +127,7 @@ ENV PATH=$PATH:/usr/local/share/npm-global/bin:/home/node/.cargo/bin
 RUN mkdir -p /workspace && chown -R node:node /workspace
 
 # Copy GitHub App authentication script
-COPY scripts/github-app-auth.sh /usr/local/bin/github-app-auth
+COPY scripts/2026-01/github-app-auth.sh /usr/local/bin/github-app-auth
 RUN chmod +x /usr/local/bin/github-app-auth
 
 # =============================================================================
