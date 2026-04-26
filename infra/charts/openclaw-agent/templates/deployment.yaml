@@ -438,8 +438,9 @@ spec:
                 echo "[git] WARNING: GITHUB_TOKEN not set — private repo clones may fail"
               fi
 
-              # Reset HOME for remaining init steps (root context)
-              export HOME=/root
+              # Keep HOME on /workspace through repo cloning so the credential
+              # helper written above is active for first-boot private clones.
+              export HOME=/workspace
 
               # ---------------------------------------------------------------
               # 6. Git repo health checks (idempotent clone + dirty-state audit)
@@ -523,6 +524,13 @@ spec:
               # doctor/bootstrap paths may write image defaults; the runtime must
               # start from the GitOps-rendered config and not rewrite providers.
               envsubst < /config-template/openclaw.json > /workspace/.openclaw/openclaw.json
+              CONFIG_DISCORD_TOKEN_LEN="$(jq -r '.channels.discord.accounts.default.token // "" | length' /workspace/.openclaw/openclaw.json 2>/dev/null || echo 0)"
+              if [ "${CONFIG_DISCORD_TOKEN_LEN:-0}" -gt 0 ]; then
+                cp /workspace/.openclaw/openclaw.json /workspace/.openclaw/openclaw.json.last-good
+                chown "${RUNTIME_UID}:${RUNTIME_GID}" /workspace/.openclaw/openclaw.json.last-good 2>/dev/null || true
+                chmod 644 /workspace/.openclaw/openclaw.json.last-good 2>/dev/null || true
+                echo "[config] openclaw.json.last-good refreshed from GitOps template"
+              fi
               chown "${RUNTIME_UID}:${RUNTIME_GID}" /workspace/.openclaw/openclaw.json 2>/dev/null || true
               chmod 444 /workspace/.openclaw/openclaw.json 2>/dev/null || true
               echo "[config] openclaw.json finalized from GitOps template"
