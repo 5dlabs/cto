@@ -12,12 +12,12 @@
 #   - Registry authentication: echo $GITHUB_TOKEN | docker login registry.5dlabs.ai -u USERNAME --password-stdin
 #
 # Usage:
-#   ./scripts/build-dev-image.sh [--binary intake|pm-activity|all] [--image runtime|claude] [--push]
+#   ./scripts/2026-01/build-dev-image.sh [--binary intake|pm-activity|all] [--image runtime|claude] [--push]
 #
 # Examples:
-#   ./scripts/build-dev-image.sh --binary intake --image runtime --push
-#   ./scripts/build-dev-image.sh --binary all --image claude --push
-#   ./scripts/build-dev-image.sh --binary intake  # Build only, don't push
+#   ./scripts/2026-01/build-dev-image.sh --binary intake --image runtime --push
+#   ./scripts/2026-01/build-dev-image.sh --binary all --image claude --push
+#   ./scripts/2026-01/build-dev-image.sh --binary intake  # Build only, don't push
 #
 # =============================================================================
 

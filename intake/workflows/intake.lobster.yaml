@@ -2312,7 +2312,7 @@ steps:
         printf '{"skipped":true,"reason":"skip_workspace_pr"}\n'
         exit 0
       fi
-      source "$root/scripts/scm-dispatch.sh"
+      source "$root/scripts/2026-03/scm-dispatch.sh"
       EXP=""
       EXP_SOURCE=""
       for candidate in \

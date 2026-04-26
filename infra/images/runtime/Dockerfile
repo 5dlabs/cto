@@ -127,7 +127,7 @@ ENV PATH=$PATH:/usr/local/share/npm-global/bin:/home/node/.cargo/bin
 RUN mkdir -p /workspace && chown -R node:node /workspace
 
 # Copy GitHub App authentication script
-COPY scripts/github-app-auth.sh /usr/local/bin/github-app-auth
+COPY scripts/2026-01/github-app-auth.sh /usr/local/bin/github-app-auth
 RUN chmod +x /usr/local/bin/github-app-auth
 
 # =============================================================================
@@ -255,6 +255,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   mtr-tiny traceroute \
   # System utilities
   jq ca-certificates curl wget docker.io postgresql-client redis-tools tree \
+  # Headless GLB/MP4 preview generation for remote avatar reviews
+  blender ffmpeg \
   build-essential binutils pkg-config libssl-dev lldb lld clang mold libpq-dev \
   # Programming languages
   python3 python3-venv python3-pip python-is-python3 \
@@ -298,6 +300,9 @@ RUN groupadd -g 1000 node 2>/dev/null || groupadd node 2>/dev/null || true && \
     useradd --shell /bin/bash --create-home -g 1000 node 2>/dev/null || \
     useradd --shell /bin/bash --create-home node || true && \
     id node && getent group node
+
+# Verify headless preview tooling is present before building higher-level agent images.
+RUN blender --background --version && ffmpeg -version | head -n1
 
 # Passwordless sudo for the non-root user (node)
 RUN echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-node-nopasswd \

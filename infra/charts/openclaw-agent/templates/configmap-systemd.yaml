@@ -2,7 +2,7 @@
 # CTO Service Manager (shell-based, no systemd required)
 # =============================================================================
 # Provides a lightweight service manager for CTO development services inside
-# agent pods. Mirrors the macOS launchd setup (scripts/launchd-setup.sh) but
+# agent pods. Mirrors the macOS launchd setup (scripts/2026-01/launchd-setup.sh) but
 # uses background processes + PID files instead of systemd (which requires
 # privileges not available in unprivileged containers).
 #
@@ -33,7 +33,7 @@ data:
     #!/bin/bash
     # =============================================================================
     # cto-services — Lightweight service manager for CTO dev services
-    # Linux equivalent of macOS launchd services (scripts/launchd-setup.sh)
+    # Linux equivalent of macOS launchd services (scripts/2026-01/launchd-setup.sh)
     # =============================================================================
     set -euo pipefail
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Diagnose why OpenMemory and/or tools server pods are not running in cto namespace.
-# Usage: ./scripts/diagnose-cto-pods.sh
+# Usage: ./scripts/2026-02/diagnose-cto-pods.sh
 
 set -euo pipefail
 

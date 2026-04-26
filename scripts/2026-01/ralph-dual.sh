@@ -29,7 +29,7 @@ error() { log "${RED}[ERROR]${NC} $*"; }
 
 usage() {
   cat <<'EOF'
-Usage: scripts/ralph-dual.sh <command>
+Usage: scripts/2026-01/ralph-dual.sh <command>
 
 Commands:
   start           Start both monitor and remediation agents
@@ -45,13 +45,13 @@ Commands:
   circuit-reset   Reset circuit breaker to closed state
 
 Examples:
-  ./scripts/ralph-dual.sh start
-  ./scripts/ralph-dual.sh status
-  ./scripts/ralph-dual.sh attach monitor
-  ./scripts/ralph-dual.sh attach remediation
-  ./scripts/ralph-dual.sh circuit-status
-  ./scripts/ralph-dual.sh reset-session
-  ./scripts/ralph-dual.sh stop
+  ./scripts/2026-01/ralph-dual.sh start
+  ./scripts/2026-01/ralph-dual.sh status
+  ./scripts/2026-01/ralph-dual.sh attach monitor
+  ./scripts/2026-01/ralph-dual.sh attach remediation
+  ./scripts/2026-01/ralph-dual.sh circuit-status
+  ./scripts/2026-01/ralph-dual.sh reset-session
+  ./scripts/2026-01/ralph-dual.sh stop
 EOF
 }
 
@@ -172,7 +172,7 @@ start_monitor() {
   : > /tmp/ralph-monitor.log
   
   info "Starting monitor agent in screen session: $MONITOR_SCREEN"
-  screen -dmS "$MONITOR_SCREEN" bash -c "cd '$ROOT_DIR' && ./scripts/ralph-monitor.sh 2>&1 | tee -a /tmp/ralph-monitor.log"
+  screen -dmS "$MONITOR_SCREEN" bash -c "cd '$ROOT_DIR' && ./scripts/2026-01/ralph-monitor.sh 2>&1 | tee -a /tmp/ralph-monitor.log"
   
   # Wait for screen session to be healthy (with timeout)
   if wait_for_screen_healthy "$MONITOR_SCREEN" "/tmp/ralph-monitor.log" 10; then
@@ -195,7 +195,7 @@ start_remediation() {
   : > /tmp/ralph-remediation.log
   
   info "Starting remediation agent in screen session: $REMEDIATION_SCREEN"
-  screen -dmS "$REMEDIATION_SCREEN" bash -c "cd '$ROOT_DIR' && ./scripts/ralph-remediation.sh 2>&1 | tee -a /tmp/ralph-remediation.log"
+  screen -dmS "$REMEDIATION_SCREEN" bash -c "cd '$ROOT_DIR' && ./scripts/2026-01/ralph-remediation.sh 2>&1 | tee -a /tmp/ralph-remediation.log"
   
   # Wait for screen session to be healthy (with timeout)
   if wait_for_screen_healthy "$REMEDIATION_SCREEN" "/tmp/ralph-remediation.log" 10; then

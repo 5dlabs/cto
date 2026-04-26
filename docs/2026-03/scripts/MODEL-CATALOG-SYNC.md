@@ -6,13 +6,13 @@ stable artifacts consumed by CTO infra and web APIs.
 ## Run
 
 ```bash
-./scripts/sync-model-catalog.sh
+./scripts/2026-03/sync-model-catalog.sh
 ```
 
 Optional provider scope:
 
 ```bash
-MODEL_SYNC_PROVIDERS=anthropic,openai ./scripts/sync-model-catalog.sh
+MODEL_SYNC_PROVIDERS=anthropic,openai ./scripts/2026-03/sync-model-catalog.sh
 ```
 
 ## Generated Artifacts

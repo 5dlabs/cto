@@ -192,7 +192,7 @@ value.expect("invariant: value should always be set because...")
 - **4 scripts** potentially missing strict mode
 
 **Scripts to review:**
-- Check `scripts/start-web-dev.sh` and similar for `set -euo pipefail`
+- Check `scripts/2026-01/start-web-dev.sh` and similar for `set -euo pipefail`
 
 **Effort:** Small | **Impact:** Low (script reliability)
 

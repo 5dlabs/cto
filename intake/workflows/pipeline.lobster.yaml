@@ -765,7 +765,7 @@ steps:
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "setup-repo" "${audio_debug}" "project ${project_name}"
-      source "$root/scripts/scm-dispatch.sh"
+      source "$root/scripts/2026-03/scm-dispatch.sh"
       REPO_URL="${repository_url}"
       ORG="${github_org}"
       PROJECT="${project_name}"

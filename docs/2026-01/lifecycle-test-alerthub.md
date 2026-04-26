@@ -174,16 +174,16 @@ kubectl port-forward svc/argo-workflows-server -n automation 2746:2746
 
 ```bash
 # Start dual agent system
-./scripts/ralph-dual.sh start
+./scripts/2026-01/ralph-dual.sh start
 
 # Monitor status
-./scripts/ralph-dual.sh status
+./scripts/2026-01/ralph-dual.sh status
 
 # Watch logs
-./scripts/ralph-dual.sh logs
+./scripts/2026-01/ralph-dual.sh logs
 
 # Or attach to see live output
-./scripts/ralph-dual.sh attach monitor
+./scripts/2026-01/ralph-dual.sh attach monitor
 ```
 
 ### Manual Gate Checking
@@ -277,7 +277,7 @@ kubectl delete pods -n cto --field-selector=status.phase=Failed
 kubectl delete pods -n cto --field-selector=status.phase=Succeeded
 
 # Reset Ralph state
-./scripts/ralph-dual.sh reset
+./scripts/2026-01/ralph-dual.sh reset
 
 # Archive current progress
 mv lifecycle-test/progress.txt lifecycle-test/archive/$(date +%Y%m%d_%H%M%S)/

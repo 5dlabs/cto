@@ -7,7 +7,7 @@ Required morph targets (glTF blendshapes) on the head mesh:
   - 10 Morgan canine-species add-ons
 
 Usage:
-    python3 scripts/validate-avatar-glb.py path/to/avatar.glb
+    python3 scripts/2026-04/validate-avatar-glb.py path/to/avatar.glb
 
 Exit 0 if all required morph targets are present, 1 otherwise.
 """

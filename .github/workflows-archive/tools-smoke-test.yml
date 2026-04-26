@@ -73,7 +73,7 @@ jobs:
           # Run smoke test (expect at least 10 tools from 4 HTTP servers)
           # ai-elements: 2, better-auth: 4, exa-mcp: 3, pg-aiguide: 2 = 11+ tools
           export TOOLS_URL=http://localhost:3000
-          ./scripts/smoke-test-tools.sh 10
+          ./scripts/2026-02/smoke-test-tools.sh 10
       
       - name: Stop tools server
         if: always()

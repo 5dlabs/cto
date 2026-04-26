@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Clear all GitHub Actions workflow runs from the repository
-# Usage: ./scripts/clear-all-workflow-runs.sh [--dry-run]
+# Usage: ./scripts/2026-01/clear-all-workflow-runs.sh [--dry-run]
 #
 # This script deletes ALL workflow runs from the beginning of time.
 # Run with --dry-run first to see what would be deleted.

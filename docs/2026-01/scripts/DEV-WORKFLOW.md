@@ -20,7 +20,7 @@ git pull --ff-only origin "$DEFAULT_BRANCH"
 
 # Create a short-lived sync branch and run the sync script
 git switch -c "chore/model-catalog-sync-$(date +%Y%m%d)"
-./scripts/sync-model-catalog.sh
+./scripts/2026-03/sync-model-catalog.sh
 ```
 
 The sync PR should include model-catalog artifacts and derived config files

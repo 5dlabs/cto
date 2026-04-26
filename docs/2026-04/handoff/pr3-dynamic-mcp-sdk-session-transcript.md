@@ -259,7 +259,7 @@ All 9 components built by parallel sub-agent fleets. Each sub-agent received:
 ### Phase 4: Integration Validation
 
 1. Validated JSON files (cto-config.json)
-2. Validated bash syntax (scripts/cto-tools)
+2. Validated bash syntax (scripts/2026-04/cto-tools)
 3. Verified all files exist with correct permissions
 4. Ran codegen tests: **28/28 pass** ✅
 5. Found 2 TypeScript type errors in mcp_test.ts:
@@ -333,7 +333,7 @@ CI: **18 successful, 2 skipped (build-and-push + security-scan — merge-to-main
 | `apps/cto-tools/codegen_test.ts` | 428 | 28 Deno tests: jsonSchemaToTsType (12 cases), buildArgsType (4), parseTool (4), generateToolFile (4), generateServerIndex (3), integration (1) |
 | `apps/cto-tools/deno.json` | 10 | Deno config with codegen and test tasks |
 | `apps/cto-tools/deno.lock` | — | Auto-generated lock file |
-| `scripts/cto-tools` | 478 | Bash CLI shim: `mcp list/describe/call/escalate`, `exec` (Deno sandbox with locked permissions), `version`. Uses `curl` + `jq`. Exit codes: 0=success, 1=tool-error, 2=policy-denied, 3=not-in-catalog, 4=server-unreachable |
+| `scripts/2026-04/cto-tools` | 478 | Bash CLI shim: `mcp list/describe/call/escalate`, `exec` (Deno sandbox with locked permissions), `version`. Uses `curl` + `jq`. Exit codes: 0=success, 1=tool-error, 2=policy-denied, 3=not-in-catalog, 4=server-unreachable |
 | `skills/cto-tools/SKILL.md` | 295 | Dual-runtime agent skill: trigger conditions, quick reference, discovery flow, simple invocation, code execution pattern, escalation, error handling, anti-patterns |
 | `templates/_shared/partials/cto-tools-setup.sh.hbs` | 141 | Pod startup partial: env vars (CTO_AGENT_ID, CTO_AGENT_PREWARM), CLI install, SDK copy, codegen run, summary. Graceful degradation if Deno/codegen missing. Handlebars conditionals for `remote_tools` |
 | `docs/prompts/dynamic-mcp-sdk-metaprompt.md` | 683 | Full Anthropic-methodology implementation prompt with 9 injectable variables and appendix of default values |
@@ -440,7 +440,7 @@ export async function main(): Promise<void>  // guarded by if (import.meta.main)
   README.md                # agent-readable usage guide
 ```
 
-### 10.3 `scripts/cto-tools` — Bash CLI Shim (478 lines)
+### 10.3 `scripts/2026-04/cto-tools` — Bash CLI Shim (478 lines)
 
 **Purpose**: Provides tool access for non-Claude runtimes that can't natively call MCP tools. Uses only `curl` + `jq`.
 

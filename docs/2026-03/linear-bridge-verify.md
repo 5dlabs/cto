@@ -9,10 +9,10 @@ The intake pipeline’s **`intake-util register-run`** talks to **linear-bridge*
 From the CTO repo root:
 
 ```bash
-chmod +x scripts/verify-linear-bridge.sh
+chmod +x scripts/2026-03/verify-linear-bridge.sh
 export LINEAR_API_KEY=…           # required for HTTP smoke
 export LINEAR_TEAM_ID=CTOPA       # or your team UUID / key (matches `defaults.linear.teamId` in `cto-config.json`)
-./scripts/verify-linear-bridge.sh
+./scripts/2026-03/verify-linear-bridge.sh
 ```
 
 The script runs **`npm ci`**, **`npm test`**, **`npm run build`** in `apps/linear-bridge`, then (if `LINEAR_API_KEY` is set) starts the server with **`ACP_ACTIVITY_ENABLED=false`** and **`AGENT_SESSIONS_ENABLED=false`** so Loki/Discord/agent-session paths are not required for the smoke check. It asserts:

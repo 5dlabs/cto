@@ -62,7 +62,7 @@ Connect to the PostgreSQL database in the Kubernetes cluster via port-forward:
 #### Option 1: Using the Helper Script
 
 ```bash
-./scripts/port-forward-web-db.sh
+./scripts/2026-01/port-forward-web-db.sh
 ```
 
 This script will:
@@ -225,7 +225,7 @@ lsof -ti:5432
 kill -9 $(lsof -ti:5432)
 
 # Or use a different local port
-LOCAL_PORT=5433 ./scripts/port-forward-web-db.sh
+LOCAL_PORT=5433 ./scripts/2026-01/port-forward-web-db.sh
 ```
 
 Then update your `DATABASE_URL` to use port 5433.

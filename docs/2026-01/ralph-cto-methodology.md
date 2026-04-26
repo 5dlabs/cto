@@ -192,7 +192,7 @@ incomplete phase.
 ## Where This Is Implemented
 
 - Wrapper config: `lifecycle-test/ralph-cto.json`
-- Wrapper runner: `scripts/ralph-cto.sh`
+- Wrapper runner: `scripts/2026-01/ralph-cto.sh`
 - Pin file: `lifecycle-test/pin.md`
 - Pin lookup index: `lifecycle-test/pin.lookup.md`
 - Implementation plan: `lifecycle-test/implementation-plan.md`

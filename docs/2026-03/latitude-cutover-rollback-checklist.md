@@ -39,7 +39,7 @@ kubectl rollout restart deployment/dex-api -n solana
 kubectl rollout status deployment/dex-api -n solana --timeout=180s
 
 # BirdEye parity harness
-python3 scripts/birdeye_parity_harness.py \
+python3 scripts/2026-03/birdeye_parity_harness.py \
   --local dex-api.solana.svc.cluster.local:50051 \
   --reference <birdeye-grpc-endpoint:port> \
   --token So11111111111111111111111111111111111111112

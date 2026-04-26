@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-RUNNER_PATH="$PROJECT_DIR/scripts/swarm_puzzle_runner.py"
+RUNNER_PATH="$PROJECT_DIR/scripts/2026-04/swarm_puzzle_runner.py"
 
 LABEL="ai.5dlabs.swarm-puzzle-watcher"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"

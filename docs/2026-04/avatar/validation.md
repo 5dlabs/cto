@@ -18,13 +18,13 @@
 
 ```bash
 # one-shot Datadog check (exits non-zero if blockers detected)
-./scripts/avatar-log-validation.sh validate
+./scripts/2026-04/avatar-log-validation.sh validate
 
 # continuous tail (Ctrl-C to stop) — use during a live readiness test
-./scripts/avatar-log-validation.sh tail
+./scripts/2026-04/avatar-log-validation.sh tail
 
 # widen / narrow the window
-AVATAR_DD_FROM=now-1h ./scripts/avatar-log-validation.sh validate
+AVATAR_DD_FROM=now-1h ./scripts/2026-04/avatar-log-validation.sh validate
 ```
 
 Current production cutline: `/echo-turn` uses OpenClaw Morgan text,
@@ -90,7 +90,7 @@ for `/echo-turn` unless you are explicitly validating the LiveKit agent path.
 | **nats-stale-narration** *(legacy/non-blocking for `/echo-turn`)* | NATS narration/channel errors appear in legacy LiveKit/agent logs. | Not a `/echo-turn` production blocker unless you are explicitly validating the LiveKit agent path. The public avatar/desktop path does not use user-facing NATS. |
 | **browser-stuck-working** | Browser/agent logs show the avatar frozen in a working / stalled state. | Reload tab, re-run gate; if persistent, treat as `echomimic-5xx`. |
 
-The patterns live at the bottom of `scripts/avatar-log-validation.sh`. Add
+The patterns live at the bottom of `scripts/2026-04/avatar-log-validation.sh`. Add
 new blockers there; keep the label kebab-cased so they are easy to grep.
 
 ---
@@ -195,14 +195,14 @@ the gate after the fix.
 
 ## 5. Add a new blocker
 
-1. Confirm the pattern by running `./scripts/avatar-log-validation.sh tail`
+1. Confirm the pattern by running `./scripts/2026-04/avatar-log-validation.sh tail`
    while reproducing the failure.
 2. Add a new entry to `PATTERNS=(…)` at the bottom of
-   `scripts/avatar-log-validation.sh`. Format:
+   `scripts/2026-04/avatar-log-validation.sh`. Format:
    `'<kebab-label>|<egrep pattern>'`. Patterns are matched
    case-insensitively against the redacted log stream.
 3. Add a row to **§ 2 Blocker checklist** above with the fix surface.
-4. Re-run `./scripts/avatar-log-validation.sh validate` and confirm the new
+4. Re-run `./scripts/2026-04/avatar-log-validation.sh validate` and confirm the new
    label fires on the canned failure log line.
 
 ---

@@ -15,7 +15,7 @@ ENV TZ="$TZ"
 USER root
 
 # Copy ralph scripts
-COPY scripts/ralph-cto.sh /usr/local/bin/ralph-cto.sh
+COPY scripts/2026-01/ralph-cto.sh /usr/local/bin/ralph-cto.sh
 COPY infra/images/ralph-runner/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/ralph-cto.sh /usr/local/bin/entrypoint.sh
 

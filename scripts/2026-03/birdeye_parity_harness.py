@@ -4,7 +4,7 @@ BirdEye parity harness for dex_feed gRPC endpoints.
 
 Requires grpcurl installed locally.
 Usage:
-  python3 scripts/birdeye_parity_harness.py \
+  python3 scripts/2026-03/birdeye_parity_harness.py \
     --local localhost:50051 \
     --reference api.birdeye.your-endpoint:443 \
     --token So11111111111111111111111111111111111111112

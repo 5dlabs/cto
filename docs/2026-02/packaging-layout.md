@@ -208,7 +208,7 @@ We need a script that:
 
 ```bash
 #!/bin/bash
-# scripts/build-release.sh
+# scripts/2026-02/build-release.sh
 
 PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)

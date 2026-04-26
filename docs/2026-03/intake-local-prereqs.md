@@ -131,7 +131,7 @@ Workflow steps call **`intake-util`** on `PATH`. A stale copy (e.g. `~/bin/intak
 
 Default URL is in-cluster: `http://linear-bridge.bots.svc:3100`. That **will not resolve** on a laptop unless you tunnel or override.
 
-**Verify the bridge:** build, unit tests, and HTTP smoke — see [`linear-bridge-verify.md`](linear-bridge-verify.md) and `scripts/verify-linear-bridge.sh`.
+**Verify the bridge:** build, unit tests, and HTTP smoke — see [`linear-bridge-verify.md`](linear-bridge-verify.md) and `scripts/2026-03/verify-linear-bridge.sh`.
 
 | Approach | When to use |
 |----------|-------------|

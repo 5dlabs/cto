@@ -2,15 +2,15 @@
 # linear-agent-prompt.sh - Send prompts to Linear agent sessions via GraphQL API
 #
 # Usage:
-#   ./scripts/linear-agent-prompt.sh <session-id> "Your prompt message here"
-#   ./scripts/linear-agent-prompt.sh --list-sessions CTOPA-841
+#   ./scripts/2026-01/linear-agent-prompt.sh <session-id> "Your prompt message here"
+#   ./scripts/2026-01/linear-agent-prompt.sh --list-sessions CTOPA-841
 #
 # Examples:
 #   # Send prompt to a known session ID (requires OAuth token)
-#   ./scripts/linear-agent-prompt.sh dbae4c02-041a-4525-ac64-29cb5990dacd "Please continue"
+#   ./scripts/2026-01/linear-agent-prompt.sh dbae4c02-041a-4525-ac64-29cb5990dacd "Please continue"
 #   
 #   # List sessions for an issue (works with API key)
-#   ./scripts/linear-agent-prompt.sh --list-sessions CTOPA-841
+#   ./scripts/2026-01/linear-agent-prompt.sh --list-sessions CTOPA-841
 #
 # Environment:
 #   LINEAR_API_KEY   - For read-only operations (list sessions, query)
