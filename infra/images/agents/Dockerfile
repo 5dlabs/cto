@@ -10,14 +10,6 @@
 # Global ARG — must be declared before any FROM to be visible across stages
 ARG BASE_IMAGE=registry.5dlabs.ai/5dlabs/runtime:full
 ARG BASE_REGISTRY=""
-ARG OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:2026.4.25-beta.10-slim
-
-# =============================================================================
-# Stage: Official OpenClaw runtime
-# =============================================================================
-# Consume OpenClaw from its published container image instead of npm so the
-# gateway, bundled extensions, and runtime dependencies stay aligned upstream.
-FROM ${OPENCLAW_IMAGE} AS openclaw-runtime
 
 # =============================================================================
 # Stage: Build cto-play (play launcher CLI)
@@ -54,20 +46,20 @@ RUN sed -i 's/version.workspace = true/version = "0.1.0"/' Cargo.toml && \
 #
 # Build:
 #   docker build -t registry.5dlabs.ai/5dlabs/agents .
-#   docker build --build-arg OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest -t registry.5dlabs.ai/5dlabs/agents:openclaw-latest .
+#   docker build --build-arg OPENCLAW_VERSION=1.2.3 -t registry.5dlabs.ai/5dlabs/agents:1.2.3 .
 #
 # =============================================================================
 
 # Re-declare ARG after FROM to make it available in this stage
 ARG BASE_IMAGE
-ARG OPENCLAW_IMAGE
 FROM ${BASE_IMAGE}
-ARG OPENCLAW_IMAGE
+ARG OPENCLAW_VERSION=latest
 
 LABEL org.opencontainers.image.source="https://github.com/5dlabs/cto"
 LABEL org.opencontainers.image.description="CTO AI Agent - Unified multi-agent platform image"
 LABEL org.opencontainers.image.licenses="MIT"
-LABEL ai.5dlabs.openclaw.image="${OPENCLAW_IMAGE}"
+LABEL ai.5dlabs.openclaw.source="npm"
+LABEL ai.5dlabs.openclaw.version="${OPENCLAW_VERSION}"
 
 USER root
 
@@ -118,19 +110,39 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
 
 # =============================================================================
 # OpenClaw (agent CLI) - orchestrator that delegates to claude/codex/cursor/etc.
-# Layer from the official OpenClaw image so Docker, not npm, resolves the
-# upstream runtime. Keep a compatibility symlink for chart hooks that still
-# probe the historical npm-global path.
+# Stable image follows official npm install: `npm install -g openclaw@latest`
+# (no --ignore-scripts). The postinstall script resolves bundled plugin deps
+# and runtime deps like tslog. The beta/canary image layers the official Docker
+# runtime from infra/images/agents/Dockerfile.beta instead.
 # =============================================================================
-COPY --from=openclaw-runtime --chown=1001:1000 /app /app
-RUN set -eux; \
-    ln -sf /app/openclaw.mjs /usr/local/bin/openclaw; \
-    chmod 755 /app/openclaw.mjs; \
-    mkdir -p /usr/local/share/npm-global/lib/node_modules; \
-    ln -sfn /app /usr/local/share/npm-global/lib/node_modules/openclaw; \
-    chown -h 1001:1000 /usr/local/bin/openclaw /usr/local/share/npm-global/lib/node_modules/openclaw; \
-    echo "--- OpenClaw (official image layer) included from ${OPENCLAW_IMAGE} ---"; \
+RUN --mount=type=cache,target=/root/.npm,sharing=shared \
+    if [ "$OPENCLAW_VERSION" = "latest" ]; then \
+        npm install -g --no-audit --no-fund openclaw; \
+    else \
+        npm install -g --no-audit --no-fund openclaw@${OPENCLAW_VERSION}; \
+    fi && \
+    # Verify tslog resolved (openclaw runtime dependency)
+    ls /usr/local/share/npm-global/lib/node_modules/openclaw/node_modules/tslog/package.json && \
+    echo "--- OpenClaw (npm stable) included ---" && \
     openclaw --version
+
+# Prebake bundled-extension deps and fix ownership.
+# The openclaw tarball ships extensions under dist/extensions/<name>/ without
+# node_modules. At runtime the gateway tries `npm install` in each extension
+# dir — that fails with EACCES because the tree is root-owned and the pod
+# runs as uid 1001. Install deps once here (so the image works offline), then
+# chown the whole openclaw tree to the runtime uid/gid (1001:1000).
+RUN --mount=type=cache,target=/root/.npm,sharing=shared \
+    set -eux; \
+    OPENCLAW_ROOT="$(npm root -g)/openclaw"; \
+    for pkg in "$OPENCLAW_ROOT"/dist/extensions/*/package.json; do \
+        [ -f "$pkg" ] || continue; \
+        dir="$(dirname "$pkg")"; \
+        echo "→ prebake $(basename "$dir")"; \
+        (cd "$dir" && npm install --no-audit --no-fund --omit=dev --ignore-scripts) || true; \
+    done; \
+    chown -R 1001:1000 "$OPENCLAW_ROOT"; \
+    if [ -L /usr/local/bin/openclaw ]; then chown -h 1001:1000 /usr/local/bin/openclaw; fi
 
 # =============================================================================
 # acpx — ACP runtime for dispatching to external coding CLIs

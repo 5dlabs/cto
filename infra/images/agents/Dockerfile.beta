@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1
+# =============================================================================
+# Unified Agent Beta Image
+# =============================================================================
+#
+# Thin canary layer over the stable npm-based agents image. It replaces only the
+# OpenClaw runtime with the official ghcr.io/openclaw/openclaw image so agents
+# can opt in via image.tag=beta before we promote the layout to :latest.
+
+ARG BASE_IMAGE=ghcr.io/5dlabs/agents:latest
+ARG OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:2026.4.25-beta.10-slim
+
+FROM ${OPENCLAW_IMAGE} AS openclaw-runtime
+
+FROM ${BASE_IMAGE}
+ARG OPENCLAW_IMAGE
+
+LABEL ai.5dlabs.openclaw.source="docker"
+LABEL ai.5dlabs.openclaw.image="${OPENCLAW_IMAGE}"
+
+USER root
+
+RUN set -eux; \
+    rm -rf /app /usr/local/share/npm-global/lib/node_modules/openclaw /usr/local/bin/openclaw
+
+COPY --from=openclaw-runtime --chown=1001:1000 /app /app
+
+RUN set -eux; \
+    ln -sf /app/openclaw.mjs /usr/local/bin/openclaw; \
+    chmod 755 /app/openclaw.mjs; \
+    mkdir -p /usr/local/share/npm-global/lib/node_modules; \
+    ln -sfn /app /usr/local/share/npm-global/lib/node_modules/openclaw; \
+    chown -h 1001:1000 /usr/local/bin/openclaw /usr/local/share/npm-global/lib/node_modules/openclaw; \
+    echo "--- OpenClaw beta runtime included from ${OPENCLAW_IMAGE} ---"; \
+    openclaw --version; \
+    test -d /app/dist; \
+    test -d /app/extensions; \
+    test -d /usr/local/share/npm-global/lib/node_modules/openclaw/dist; \
+    BETA_OPENCLAW_VERSION="$(openclaw --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9][^[:space:]]*' | head -1 || echo unknown)"; \
+    if [ -f /etc/cto/versions.json ]; then \
+      BETA_OPENCLAW_VERSION="$BETA_OPENCLAW_VERSION" OPENCLAW_IMAGE="$OPENCLAW_IMAGE" node -e 'const fs=require("fs"); const path="/etc/cto/versions.json"; const data=JSON.parse(fs.readFileSync(path,"utf8")); data.clis=data.clis||{}; data.clis.openclaw=process.env.BETA_OPENCLAW_VERSION; data.openclaw={source:"docker",image:process.env.OPENCLAW_IMAGE}; fs.writeFileSync(path, JSON.stringify(data,null,2)+"\n");'; \
+    fi
+
+USER node

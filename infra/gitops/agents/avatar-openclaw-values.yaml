@@ -7,6 +7,11 @@
 # while this agent overrides only identity, prompt surface, and GPU placement.
 # =============================================================================
 
+image:
+  repository: "ghcr.io/5dlabs/agents"
+  tag: "beta"
+  pullPolicy: Always
+
 nodeSelector:
   # Stable label applied to the OVH GPU node; GPU Operator also reports
   # nvidia.com/gpu.present once the device plugin is ready.
