@@ -26,6 +26,24 @@ tunnelRef:
   kind: ClusterTunnel
   name: cto-main
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: avatar-openclaw-ide
+  namespace: cto
+  labels:
+    app.kubernetes.io/component: code-server
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: cto-avatar-openclaw
+    app.kubernetes.io/name: openclaw-avatar-openclaw
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: code-server
+---
 # avatar-openclaw.5dlabs.ai routes to the GPU-backed Avatar OpenClaw
 # code-server port. Keep this hostname behind Cloudflare Access, matching the
 # security posture for coder.5dlabs.ai.
@@ -36,10 +54,10 @@ metadata:
   namespace: cto
 subjects:
   - kind: Service
-    name: openclaw-avatar-openclaw
+    name: avatar-openclaw-ide
     spec:
       fqdn: avatar-openclaw.5dlabs.ai
-      target: http://openclaw-avatar-openclaw.cto.svc:8080
+      target: http://avatar-openclaw-ide.cto.svc:8080
 tunnelRef:
   kind: ClusterTunnel
   name: cto-main
