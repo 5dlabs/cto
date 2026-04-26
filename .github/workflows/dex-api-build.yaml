@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths:
       - 'crates/dex-indexer/**'
-      - 'skills/trader/docker/Dockerfile.dex-api'
+      - 'infra/images/dex-api/**'
   workflow_dispatch:
 
 env:
@@ -50,7 +50,7 @@ jobs:
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v5
         with:
           context: .
-          file: skills/trader/docker/Dockerfile.dex-api
+          file: infra/images/dex-api/Dockerfile
           platforms: linux/amd64
           push: true
           provenance: false
