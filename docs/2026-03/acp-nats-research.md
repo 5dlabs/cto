@@ -326,7 +326,7 @@ streams, persistence, cooperative cancellation -- without adopting ACP as a tran
 
 ## 5. Comparison with Existing Research
 
-The prior research note (`docs/research-notes/agent-protocols.md`, 2026-01-31) recommended
+The prior research note (`docs/2026-02/research-notes/agent-protocols.md)`, 2026-01-31) recommended
 adopting ACP/A2A patterns for Morgan's agent coordination. This research **confirms and
 refines** that recommendation:
 
@@ -422,5 +422,5 @@ refines** that recommendation:
 - [Agent protocol survey (arXiv)](https://arxiv.org/html/2505.02279v1)
 - [ACPex protocol overview (Elixir)](https://hexdocs.pm/acpex/protocol_overview.html)
 - [Top AI Agent Protocols 2026](https://getstream.io/blog/ai-agent-protocols/)
-- [CTO prior research: agent-protocols.md](docs/research-notes/agent-protocols.md)
-- [CTO NATS extraction plan: openclaw-nats-extraction.md](docs/openclaw-nats-extraction.md)
+- [CTO prior research: agent-protocols.md](docs/2026-02/research-notes/agent-protocols.md))
+- [CTO NATS extraction plan: openclaw-nats-extraction.md](docs/2026-03/openclaw-nats-extraction.md))

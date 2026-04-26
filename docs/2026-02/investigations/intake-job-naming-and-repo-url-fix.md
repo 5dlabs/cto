@@ -6,7 +6,7 @@
 
 **Problem**: Intake CodeRuns (e.g., `intake-prd-alerthub-e2e-tes-9tzmk`) created Jobs with generic names like `play-coderun-t0-morgan-claude-20bce7e0-v1`, making it impossible to identify intake jobs at a glance.
 
-**Root Cause**: The `ResourceNaming::job_name()` function in [`crates/controller/src/tasks/code/naming.rs`](../../crates/controller/src/tasks/code/naming.rs) had special prefixes for:
+**Root Cause**: The `ResourceNaming::job_name()` function in [`crates/controller/src/tasks/code/naming.rs`](../../../crates/controller/src/tasks/code/naming.rs) had special prefixes for:
 - `review` → `review-` prefix
 - `remediate` → `remediate-` prefix
 - `heal` → `heal-remediation-` prefix
@@ -14,7 +14,7 @@
 
 But **no special handling for `runType: "intake"`**, so they fell through to the default `play-coderun-` prefix.
 
-**Solution**: Added intake detection logic in [`crates/controller/src/tasks/code/naming.rs`](../../crates/controller/src/tasks/code/naming.rs):
+**Solution**: Added intake detection logic in [`crates/controller/src/tasks/code/naming.rs`](../../../crates/controller/src/tasks/code/naming.rs):
 
 ```rust
 // Handle intake tasks (Morgan PRD processing)
@@ -49,7 +49,7 @@ kubectl get jobs -n cto | grep intake-
 fatal: repository '' does not exist
 ```
 
-**Root Cause**: Line 29 of [`templates/agents/morgan/intake.sh.hbs`](../../templates/agents/morgan/intake.sh.hbs) was reading `REPOSITORY_URL` from the intake ConfigMap JSON file:
+**Root Cause**: Line 29 of [`templates/agents/morgan/intake.sh.hbs`](../../../templates/agents/morgan/intake.sh.hbs) was reading `REPOSITORY_URL` from the intake ConfigMap JSON file:
 
 ```bash
 REPOSITORY_URL=$(jq -r '.repository_url' "$CONFIG_FILE")
@@ -57,7 +57,7 @@ REPOSITORY_URL=$(jq -r '.repository_url' "$CONFIG_FILE")
 
 This **overwrote** the environment variable (which was correctly set by the controller) with an empty value from the ConfigMap.
 
-**Solution**: Modified [`templates/agents/morgan/intake.sh.hbs`](../../templates/agents/morgan/intake.sh.hbs) to prioritize the environment variable:
+**Solution**: Modified [`templates/agents/morgan/intake.sh.hbs`](../../../templates/agents/morgan/intake.sh.hbs) to prioritize the environment variable:
 
 ```bash
 # Use REPOSITORY_URL from environment if set, otherwise read from config
@@ -83,7 +83,7 @@ fi
 
 ### Controller Code
 
-1. **[`crates/controller/src/tasks/code/naming.rs`](../../crates/controller/src/tasks/code/naming.rs)**
+1. **[`crates/controller/src/tasks/code/naming.rs`](../../../crates/controller/src/tasks/code/naming.rs)**
    - Added `INTAKE_JOB_PREFIX` constant (`"intake-"`)
    - Updated doc comment to include intake format
    - Added intake detection logic (lines ~96-108)
@@ -91,7 +91,7 @@ fi
 
 ### Templates
 
-2. **[`templates/agents/morgan/intake.sh.hbs`](../../templates/agents/morgan/intake.sh.hbs)**
+2. **[`templates/agents/morgan/intake.sh.hbs`](../../../templates/agents/morgan/intake.sh.hbs)**
    - Modified repository URL loading to prioritize env var (lines 28-36)
    - Added validation for empty/null repository URL (lines 38-41)
 
@@ -110,7 +110,7 @@ test result: ok. 185 passed; 0 failed; 1 ignored
 
 ### New Test Coverage
 
-Added comprehensive test for intake naming in [`crates/controller/src/tasks/code/naming.rs`](../../crates/controller/src/tasks/code/naming.rs):
+Added comprehensive test for intake naming in [`crates/controller/src/tasks/code/naming.rs`](../../../crates/controller/src/tasks/code/naming.rs):
 
 ```rust
 #[test]

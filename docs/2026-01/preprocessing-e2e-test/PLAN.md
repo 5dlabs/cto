@@ -283,7 +283,7 @@ Each agent checks `issues/issues-{agent}.md` before executing. Format:
    - Full MCP tool support
    - Research phase with web/code search
 
-2. **PRD Preprocessing Pipeline** (`docs/prd_preprocessing_pipeline_39fc3823.plan.md`)
+2. **PRD Preprocessing Pipeline** (`docs/2026-01/prd_preprocessing_pipeline_39fc3823.plan.md)`)
    - Markdown → JSON preprocessing
    - Document classification (frontmatter → naming → AI)
    - Structured PRD output

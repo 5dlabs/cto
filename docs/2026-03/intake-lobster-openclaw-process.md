@@ -25,8 +25,8 @@ This document summarizes how the **intake pipeline** is supposed to run, with em
 | Layer | Role |
 |--------|------|
 | **Human** | Runs OpenClaw gateway locally, points workspace at a checkout (e.g. sigma-1), supplies PRD text and flags as JSON stdin to `openclaw.invoke`. |
-| **`openclaw.invoke`** | Starts `pipeline.lobster.yaml` with that JSON (from repo root or configured workflow path). See [`docs/openclaw-local-setup.md`](openclaw-local-setup.md). |
-| **`intake` OpenClaw agent** | Runtime identity allowed to run **Lobster** + **llm-task** per [`intake/config/openclaw-llm-task.json`](../intake/config/openclaw-llm-task.json). |
+| **`openclaw.invoke`** | Starts `pipeline.lobster.yaml` with that JSON (from repo root or configured workflow path). See [`docs/../2026-02/openclaw-local-setup.md`](../2026-02/openclaw-local-setup.md). |
+| **`intake` OpenClaw agent** | Runtime identity allowed to run **Lobster** + **llm-task** per [`intake/config/openclaw-llm-task.json`](../../intake/config/openclaw-llm-task.json). |
 | **Lobster** | Executes steps in `intake/workflows/*.yaml` (subprocesses, `llm-task`, `intake-util`, …). |
 | **Helpers** | `intake-util`, `intake-agent`, local Discord bridge, etc., as invoked by workflow steps—only what the YAML needs on your machine. |
 
@@ -37,7 +37,7 @@ This document summarizes how the **intake pipeline** is supposed to run, with em
 | Layer | Role |
 |--------|------|
 | **Morgan (`intake.sh.hbs`)** | **Bootstrap only**: repo prep, clone, PRD/arch staging, Linear metadata, logging. |
-| **Then** | Same **`openclaw.invoke --workflow pipeline.lobster.yaml`** as in [`templates/agents/morgan/intake.sh.hbs`](../templates/agents/morgan/intake.sh.hbs)—inputs built from the workspace. |
+| **Then** | Same **`openclaw.invoke --workflow pipeline.lobster.yaml`** as in [`templates/agents/morgan/intake.sh.hbs`](../../templates/agents/morgan/intake.sh.hbs)—inputs built from the workspace. |
 
 Morgan does **not** re-implement the pipeline in bash; it delegates to the **same Lobster graph** after setup.
 
@@ -45,7 +45,7 @@ Morgan does **not** re-implement the pipeline in bash; it delegates to the **sam
 
 ## 3. Top-level workflow file
 
-- **File:** [`intake/workflows/pipeline.lobster.yaml`](../intake/workflows/pipeline.lobster.yaml)  
+- **File:** [`intake/workflows/pipeline.lobster.yaml`](../../intake/workflows/pipeline.lobster.yaml)  
 - **Name:** `pipeline`  
 - **Inputs (conceptual):** PRD text, project name, task count, `deliberate`, `include_codebase`, repo URL/org, Linear metadata, base branch, optional infra context, etc.
 
@@ -62,7 +62,7 @@ Exact step names live in the YAML; a diagram lives in [`templates/skills/workflo
 
 ## 4. How OpenClaw and Lobster fit together
 
-- **Lobster** plugin enabled in [`intake/config/openclaw-llm-task.json`](../intake/config/openclaw-llm-task.json).
+- **Lobster** plugin enabled in [`intake/config/openclaw-llm-task.json`](../../intake/config/openclaw-llm-task.json).
 - **LLM steps** use `llm-task` with `intake/prompts/` and `intake/schemas/`.
 - **Guardrails:** `allowedModels` in that JSON.
 
@@ -76,13 +76,13 @@ Exact step names live in the YAML; a diagram lives in [`templates/skills/workflo
 | **OpenClaw** | Install current stable globally, e.g. `npm install -g openclaw@latest`; optional `openclaw update --channel dev` for prerelease. This repo was smoke-tested with **OpenClaw 2026.3.13**. |
 | **`lobster` CLI** | [`@clawdbot/lobster`](https://www.npmjs.com/package/@clawdbot/lobster) on the **same host** as the gateway (e.g. `npx @clawdbot/lobster` or a global install). **npm `@latest`** was **2026.1.24** — there is no newer standalone CLI on npm today; keep it aligned with whatever OpenClaw bundles or documents. |
 | **Workflow file shape** | The parser in `@clawdbot/lobster` requires every step to have string **`id`** and **`command`**. Top-level **`inputs:`** lists are **not** substituted; use **`args:`** with `{ name: { default: … } }` and **`${arg_name}`** in commands. Sub-workflows are invoked with **`lobster run --mode tool "$WORKSPACE/.../child.lobster.yaml" --args-json "$(jq -n …)"`**. Prefer YAML literal **`command: \|`** (or explicit `\` continuation) for multi-line shell — folded **`command: >`** turns newlines into spaces and can break `python3 multiline -c`, line-broken CLIs, and `if`/`fi` blocks. |
-| **Bulk migration** | [`intake/scripts/lobster_native_convert.py`](../intake/scripts/lobster_native_convert.py) can migrate CTO-style templates (`${{ steps.* }}`, `workflow:` + `inputs:`) toward the native shape; **nested workflows** should pass prior-step JSON via **step `env:`** (e.g. `CTO_*`) so Lobster does not splice raw JSON into `/bin/sh -lc` (see [`pipeline.lobster.yaml`](../intake/workflows/pipeline.lobster.yaml)). LLM steps should build `openclaw.invoke --args-json` with **`jq --rawfile`** from `$WORKSPACE/intake/prompts` (see [`voting.lobster.yaml`](../intake/workflows/voting.lobster.yaml)). |
-| **`intake-util` on PATH** | Prefer a **fresh** build from [`apps/intake-util`](../apps/intake-util) (`bun run build`) and prepend that directory to `PATH` so shell steps do not pick up a stale global binary. See [`intake-local-prereqs.md`](intake-local-prereqs.md). |
-| **Linear secrets** | `LINEAR_API_KEY` may be a **`lin_api_` key** or an **OAuth access token** (injected via 1Password, etc.); see [`sync-linear.ts`](../apps/intake-util/src/sync-linear.ts) for the Authorization header rule. Ensure the gateway child inherits the variable. |
+| **Bulk migration** | [`intake/scripts/lobster_native_convert.py`](../../intake/scripts/lobster_native_convert.py) can migrate CTO-style templates (`${{ steps.* }}`, `workflow:` + `inputs:`) toward the native shape; **nested workflows** should pass prior-step JSON via **step `env:`** (e.g. `CTO_*`) so Lobster does not splice raw JSON into `/bin/sh -lc` (see [`pipeline.lobster.yaml`](../../intake/workflows/pipeline.lobster.yaml)). LLM steps should build `openclaw.invoke --args-json` with **`jq --rawfile`** from `$WORKSPACE/intake/prompts` (see [`voting.lobster.yaml`](../../intake/workflows/voting.lobster.yaml)). |
+| **`intake-util` on PATH** | Prefer a **fresh** build from [`apps/intake-util`](../../apps/intake-util) (`bun run build`) and prepend that directory to `PATH` so shell steps do not pick up a stale global binary. See [`intake-local-prereqs.md`](intake-local-prereqs.md). |
+| **Linear secrets** | `LINEAR_API_KEY` may be a **`lin_api_` key** or an **OAuth access token** (injected via 1Password, etc.); see [`sync-linear.ts`](../../apps/intake-util/src/sync-linear.ts) for the Authorization header rule. Ensure the gateway child inherits the variable. |
 
 Official references: [Lobster / workflow files](https://docs.openclaw.ai/tools/lobster#workflow-files-lobster), [LLM task](https://docs.openclaw.ai/tools/llm-task).
 
-**Quick verify:** run [`intake/scripts/verify-lobster-openclaw.sh`](../intake/scripts/verify-lobster-openclaw.sh) on the gateway host (Node, OpenClaw, lobster PATH, and `openclaw-llm-task.json` shape).
+**Quick verify:** run [`intake/scripts/verify-lobster-openclaw.sh`](../../intake/scripts/verify-lobster-openclaw.sh) on the gateway host (Node, OpenClaw, lobster PATH, and `openclaw-llm-task.json` shape).
 
 ---
 
@@ -103,7 +103,7 @@ These are **stages inside** `pipeline.lobster.yaml`, not separate one-off script
 For local testing toward [`5dlabs/sigma-1`](https://github.com/5dlabs/sigma-1):
 
 1. Clone sigma-1 (or use mono-repo paths) so the workflow’s working directory and `repository_url` / PRD paths match what you pass in JSON.
-2. Start **OpenClaw gateway** locally (see [`docs/openclaw-local-setup.md`](openclaw-local-setup.md)).
+2. Start **OpenClaw gateway** locally (see [`docs/../2026-02/openclaw-local-setup.md`](../2026-02/openclaw-local-setup.md)).
 3. From the **CTO repo** (or wherever workflow files resolve), run **`openclaw.invoke --workflow pipeline.lobster.yaml`** with stdin JSON analogous to the `jq -n` block in Morgan’s template: at minimum `prd_content`, `project_name`, `num_tasks`, `deliberate`, `include_codebase`, `repository_url`, `pr_base_branch`, and optional `intake_metadata` / Linear fields if steps need them.
 4. **Sigma-1 / full surface:** after the graph runs cleanly with `deliberate: false`, re-invoke the intake agent with **`deliberate: true`** (and the same PRD/repo inputs). Watch **#intake** / NATS / Discord if those bridges are enabled; expect longer runtimes and stricter env (see [`intake-local-prereqs.md`](intake-local-prereqs.md)).
 5. Confirm artifacts under `.tasks/` (and any PR/commit steps your local git auth allows).

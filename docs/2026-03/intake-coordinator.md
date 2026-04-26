@@ -152,14 +152,14 @@ Do **not** put secrets in the spoken message.
 
 ## Execution order (summary)
 
-1. **Fast path:** [`go-green.sh`](../intake/scripts/go-green.sh) = `clear` + `feedback-loop-signal start` + `iteration-checkpoints.sh`. Use **`--bridges-skip`** only when bridge `/health` URLs are not routable yet ([`intake-local-prereqs.md`](intake-local-prereqs.md)). **Retry loop:** [`go-green-loop.sh`](../intake/scripts/go-green-loop.sh) — signals **`start` once**, then re-runs only checkpoints until green or max attempts; supports **`INTAKE_OP_ENV_FILE`** for **`op run`** per attempt.
+1. **Fast path:** [`go-green.sh`](../../intake/scripts/go-green.sh) = `clear` + `feedback-loop-signal start` + `iteration-checkpoints.sh`. Use **`--bridges-skip`** only when bridge `/health` URLs are not routable yet ([`intake-local-prereqs.md`](intake-local-prereqs.md)). **Retry loop:** [`go-green-loop.sh`](../../intake/scripts/go-green-loop.sh) — signals **`start` once**, then re-runs only checkpoints until green or max attempts; supports **`INTAKE_OP_ENV_FILE`** for **`op run`** per attempt.
 2. **Spawn monitoring subagents immediately after go-green starts (required):**
    - **Logs watcher:** local OpenClaw + bridge logs (`discord-bridge`, `linear-bridge`) and lobster terminal deltas.
    - **Discord watcher:** `#intake` browser tab snapshots/diffs for new bot messages.
    - **Linear watcher:** session/project/task changes in Linear UI/API.
    Reuse existing watcher agents when available; keep these watchers live until the loop exits.
 3. **`feedback-loop-signal.sh start`** — human hears/sees that the loop began ([`intake-discord-feedback-loop.md`](intake-discord-feedback-loop.md) § Loop status) if not using `go-green.sh`.
-4. Discord baseline → [`iteration-checkpoints.sh`](../intake/scripts/iteration-checkpoints.sh) (preflight + Linear) → `lobster run` pipeline → Discord delta → fix → repeat from first invalidated checkpoint.
+4. Discord baseline → [`iteration-checkpoints.sh`](../../intake/scripts/iteration-checkpoints.sh) (preflight + Linear) → `lobster run` pipeline → Discord delta → fix → repeat from first invalidated checkpoint.
 5. **`feedback-loop-signal.sh waiting`** when blocked on human approval or MFA.
 6. **`feedback-loop-signal.sh broken`** if the loop cannot continue; otherwise **`clear`** when finished successfully.
 

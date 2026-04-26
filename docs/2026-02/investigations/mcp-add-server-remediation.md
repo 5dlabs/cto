@@ -36,7 +36,7 @@ Added built-in default tools based on agent + run_type in the controller. This f
 
 #### 1. Controller: Added `get_default_agent_tools()` function
 
-**File**: [`crates/controller/src/tasks/code/templates.rs`](../../crates/controller/src/tasks/code/templates.rs)
+**File**: [`crates/controller/src/tasks/code/templates.rs`](../../../crates/controller/src/tasks/code/templates.rs)
 
 New function that returns default MCP tools based on agent and run_type:
 
@@ -77,7 +77,7 @@ if !default_tools.is_empty() {
 
 #### 3. Suppressed corepack JavaScript warning
 
-**File**: [`templates/_shared/partials/node-env.sh.hbs`](../../templates/_shared/partials/node-env.sh.hbs)
+**File**: [`templates/_shared/partials/node-env.sh.hbs`](../../../templates/_shared/partials/node-env.sh.hbs)
 
 Changed corepack enable to suppress all output:
 
@@ -105,7 +105,7 @@ After deploying, run a new intake and verify:
 
 ### 4. Fixed tools-client env var mismatch
 
-**File**: [`crates/tools/src/client.rs`](../../crates/tools/src/client.rs)
+**File**: [`crates/tools/src/client.rs`](../../../crates/tools/src/client.rs)
 
 Updated `load_client_config()` to check both legacy and controller-standard paths:
 

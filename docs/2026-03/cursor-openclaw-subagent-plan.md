@@ -97,7 +97,7 @@ Use **Cursor subagents** ([docs](https://cursor.com/docs/subagents)) in **backgr
 
 ## See also
 
-- [`AGENTS.md`](../AGENTS.md) — canonical roster  
+- [`AGENTS.md`](../../AGENTS.md) — canonical roster  
 - [`docs/intake-coordinator.md`](intake-coordinator.md) — conductor protocol  
 - [`docs/intake-observer.md`](intake-observer.md) — observation checklist  
 - [`.cursor/skills/cto-platform/SKILL.md`](../.cursor/skills/cto-platform/SKILL.md) — platform lifecycle  

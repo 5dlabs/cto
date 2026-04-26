@@ -86,9 +86,9 @@ OpenClaw is the runtime that hosts agents, manages tool execution, and provides 
 
 **In-repo docs (start here):**
 
-- [`docs/intake-lobster-openclaw-process.md`](intake-lobster-openclaw-process.md) — how Lobster + OpenClaw + intake fit together (read this first)
-- [`docs/openclaw-local-setup.md`](openclaw-local-setup.md) — running the gateway locally
-- [`docs/intake-local-prereqs.md`](intake-local-prereqs.md) — env vars, secrets, workspace setup
+- [`docs/../2026-03/intake-lobster-openclaw-process.md`](../2026-03/intake-lobster-openclaw-process.md) — how Lobster + OpenClaw + intake fit together (read this first)
+- [`docs/../2026-02/openclaw-local-setup.md`](../2026-02/openclaw-local-setup.md) — running the gateway locally
+- [`docs/../2026-03/intake-local-prereqs.md`](../2026-03/intake-local-prereqs.md) — env vars, secrets, workspace setup
 - `intake/scripts/verify-lobster-openclaw.sh` — runtime verification script (run this to check your setup)
 
 ### Lobster (Workflow Engine)

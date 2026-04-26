@@ -14,9 +14,9 @@
 > **Companion docs:**
 > - [`docs/avatar/validation.md`](validation.md) — Datadog + browser validation gate to run before any readiness test or deploy.
 > - [`docs/avatar-architecture.md`](../avatar-architecture.md) — LemonSlice deep-dive + multi-provider design spec (historical/reference, not the live cutline).
-> - [`avatar/docs/provider-spikes.md`](../../avatar/docs/provider-spikes.md) — STT/TTS/LLM swaps **inside** the LiveKit path.
+> - [`avatar/docs/provider-spikes.md`](../../../avatar/docs/provider-spikes.md) — STT/TTS/LLM swaps **inside** the LiveKit path.
 > - [`docs/plans/avatar-provider-failover.md`](../plans/avatar-provider-failover.md) — three-tier failover plan (LemonSlice → OVH → DO).
-> - [`avatar/README.md`](../../avatar/README.md) — LiveKit + LemonSlice PoC quick start.
+> - [`avatar/README.md`](../../../avatar/README.md) — LiveKit + LemonSlice PoC quick start.
 
 ---
 
@@ -517,7 +517,7 @@ Python agent (`avatar/agent/.env`):
 | `MORGAN_LEMONSLICE_AGENT_ID` *or* `MORGAN_IMAGE_URL` | **Required** | Selects the LemonSlice avatar persona. |
 | `MORGAN_LLM_BACKEND` | Optional | `openclaw` (default) or `inference`. See `provider-spikes.md`. |
 | `MORGAN_LLM_BASE_URL`, `MORGAN_LLM_API_KEY` (or `OPENCLAW_TOKEN`) | Required when backend=`openclaw` | Routes the reasoning hop. |
-| `MORGAN_STT_MODE` / `MORGAN_TTS_MODE` | Optional | Swaps STT/TTS providers. See [`provider-spikes.md`](../../avatar/docs/provider-spikes.md). |
+| `MORGAN_STT_MODE` / `MORGAN_TTS_MODE` | Optional | Swaps STT/TTS providers. See [`provider-spikes.md`](../../../avatar/docs/provider-spikes.md). |
 
 The browser does **not** receive any LiveKit credentials directly — it only
 receives a short-lived participant token from `/api/token`.
@@ -562,7 +562,7 @@ browser hit." The hook points it must integrate with are:
 4. **Helm / Argo values.** `infra/gitops/agents/morgan-avatar-values.yaml`
    is the canonical Helm input for the in-cluster Morgan worker. New
    provider envs must be plumbed there, **and** mirrored in the co-change
-   targets listed in [`AGENTS.md`](../../AGENTS.md) §"Co-change requirements"
+   targets listed in [`AGENTS.md`](../../../AGENTS.md) §"Co-change requirements"
    when ephemeral CodeRun sidecars need them.
 
 Until those hook points exist, treat "provider switch" as **a deployment

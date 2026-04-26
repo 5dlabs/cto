@@ -74,4 +74,4 @@ If Discord is **only** on the desktop app, the human describes new posts; the ag
 ## Related docs
 
 - [`intake-local-prereqs.md`](intake-local-prereqs.md) — env, Twingate, preflight, `notify-pipeline-start`.
-- [`AGENTS.md`](../AGENTS.md) — `discord.env`, preflight summary.
+- [`AGENTS.md`](../../AGENTS.md) — `discord.env`, preflight summary.

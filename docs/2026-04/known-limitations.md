@@ -76,5 +76,5 @@ remove this workaround entry.
 
 ### Related
 
-- Extension code: [`apps/cto-sidebar/src/extension.ts`](../apps/cto-sidebar/src/extension.ts)
+- Extension code: [`apps/cto-sidebar/src/extension.ts`](../../apps/cto-sidebar/src/extension.ts)
 - Parity swarm: Stream D — activity bar cleanup

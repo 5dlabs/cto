@@ -19,7 +19,7 @@ The **intake coordinator** acts as **observer** during intake runs: correlate **
 
 ### 1. OpenClaw gateway (local dev)
 
-When the gateway runs on the laptop ([`openclaw-local-setup.md`](openclaw-local-setup.md)):
+When the gateway runs on the laptop ([`../2026-02/openclaw-local-setup.md`](../2026-02/openclaw-local-setup.md)):
 
 - Run **`openclaw gateway` in the foreground** in a dedicated terminal and **leave it visible** (or tee to a file: `openclaw gateway 2>&1 | tee /tmp/openclaw-gateway.log`).
 - Errors that show as toasts in the Control UI usually appear **first** in this stream.
@@ -66,7 +66,7 @@ The terminal where **`lobster run`** executes is the **source of truth** for ste
 
 ### 5. Optional: Loki / Grafana
 
-If your environment ships logs to **Loki** ([`docs/tools-catalog.md`](tools-catalog.md) Grafana MCP / `grafana_query_loki_logs`), query for:
+If your environment ships logs to **Loki** ([`docs/../2026-02/tools-catalog.md`](../2026-02/tools-catalog.md) Grafana MCP / `grafana_query_loki_logs`), query for:
 
 - `namespace="openclaw"` + pod/agent name  
 - `namespace="bots"` + bridge components  
@@ -112,4 +112,4 @@ Useful flags:
 - [`intake-coordinator.md`](intake-coordinator.md) — autonomy and approval gate.  
 - [`intake-discord-feedback-loop.md`](intake-discord-feedback-loop.md) — checkpoint ordering.  
 - [`cloudflare-tunnel-intake-agent.md`](cloudflare-tunnel-intake-agent.md) — bridge/tunnel path.  
-- [`openclaw-local-setup.md`](openclaw-local-setup.md) — local gateway logging.
+- [`../2026-02/openclaw-local-setup.md`](../2026-02/openclaw-local-setup.md) — local gateway logging.

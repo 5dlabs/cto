@@ -577,7 +577,7 @@ POST /droplets
 | Reinstall | customIPXEScriptURL for Talos iPXE chain |
 | Facilities | e.g. TPA1, DAL1, LAX2 |
 
-- **Regions:** Americas (see [PRD](docs/prds/hivelocity-provider-prd.md) for facility codes)
+- **Regions:** Americas (see [PRD](docs/2026-02/prds/hivelocity-provider-prd.md)) for facility codes)
 - **Docs:** [PRD: Add Hivelocity Provider to Metal](prds/hivelocity-provider-prd.md)
 
 ---

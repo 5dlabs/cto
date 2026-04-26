@@ -11,7 +11,7 @@
 
 > **Note on the requested path.** WS-F pointed at `docs/kimi-k2-6-self-hosting/` for
 > "Phase 4 session protocol" content. That path resolves to a single file
-> (`docs/kimi-k2-6-self-hosting.md`) about Kimi K2.6 GPU/cost sizing — **no Phase 4
+> (`docs/2026-04/kimi-k2-6-self-hosting.md)`) about Kimi K2.6 GPU/cost sizing — **no Phase 4
 > session-protocol material.** The actual Phase-4 artefacts in the repo are:
 >
 > - `docs/specs/avatar-session-protocol.md` — **"Avatar Session Protocol (Phase 4)"** — the

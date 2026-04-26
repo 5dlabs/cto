@@ -1255,7 +1255,7 @@ Current Healer alerts and how they fit into lifecycle monitoring:
 
 ## Related Documentation
 
-- [Play Workflow Guide](play-workflow-guide.html) - Interactive stage visualization
+- [Play Workflow Guide](../2025-12/play-workflow-guide.html) - Interactive stage visualization
 - [Linear Integration](linear-integration-workflow.md) - Linear Agent API integration
 - [Troubleshooting](troubleshooting.md) - Known issues and debugging
-- [Healer Templates](../templates/healer/) - Remediation prompt templates
+- [Healer Templates](../../templates/healer) - Remediation prompt templates

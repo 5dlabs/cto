@@ -370,7 +370,7 @@ from internal to external.
      increases, `TaskReceipt` appears on chain with receipt hash.
    - Customer verifies receipt in Solana explorer.
    - Customer withdraws remaining balance.
-4. **This PRD** and the companion ideas doc (`docs/solana-hackathon-ideas.md`)
+4. **This PRD** and the companion ideas doc (`docs/2026-04/solana-hackathon-ideas.md)`)
    as supporting documentation.
 
 ## 12. Success criteria

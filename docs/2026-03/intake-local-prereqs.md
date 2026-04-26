@@ -1,6 +1,6 @@
 # Local prerequisites: sigma-1 / Lobster intake pipeline
 
-Short checklist before running [`pipeline.lobster.yaml`](../intake/workflows/pipeline.lobster.yaml) via OpenClaw (e.g. first [`5dlabs/sigma-1`](https://github.com/5dlabs/sigma-1) test). See also [`intake-lobster-openclaw-process.md`](intake-lobster-openclaw-process.md).
+Short checklist before running [`pipeline.lobster.yaml`](../../intake/workflows/pipeline.lobster.yaml) via OpenClaw (e.g. first [`5dlabs/sigma-1`](https://github.com/5dlabs/sigma-1) test). See also [`intake-lobster-openclaw-process.md`](intake-lobster-openclaw-process.md).
 
 ---
 
@@ -8,7 +8,7 @@ Short checklist before running [`pipeline.lobster.yaml`](../intake/workflows/pip
 
 | Requirement | Notes |
 |-------------|--------|
-| **`WORKSPACE`** | Export to the **CTO** checkout path so `load-config` / `discover-tools` resolve [`cto-config.json`](../cto-config.json). Example: `export WORKSPACE=/path/to/cto`. |
+| **`WORKSPACE`** | Export to the **CTO** checkout path so `load-config` / `discover-tools` resolve [`cto-config.json`](../../cto-config.json). Example: `export WORKSPACE=/path/to/cto`. |
 | **Workflow cwd** | Run `openclaw.invoke` from a context where `intake/workflows/pipeline.lobster.yaml` is found (usually CTO repo or configured workflow root). |
 | **`repository_url` + `project_name`** | For sigma-1: set `repository_url` to that GitHub URL and a short `project_name` for branches/PR titles. |
 
@@ -22,20 +22,20 @@ Short checklist before running [`pipeline.lobster.yaml`](../intake/workflows/pip
 
 **Default for the team (no per-developer `cp`):**
 
-1. Maintain **[`intake/local.env.op.defaults`](../intake/local.env.op.defaults)** only as a temporary local fallback while intake bootstrap migrates. The preferred path is now: mint a runtime token via PM from the per-agent item (for example **Linear Morgan OAuth** `client_id` / `client_secret`) and read the runtime token from Kubernetes.
-2. On first preflight/checkpoints run, **[`intake/scripts/ensure-local-env-op.sh`](../intake/scripts/ensure-local-env-op.sh)** copies defaults → gitignored **`intake/local.env.op`** if the latter is missing.
-3. **[`intake/scripts/intake-op-auto.sh`](../intake/scripts/intake-op-auto.sh)** then **`op run`** as before.
+1. Maintain **[`intake/local.env.op.defaults`](../../intake/local.env.op.defaults)** only as a temporary local fallback while intake bootstrap migrates. The preferred path is now: mint a runtime token via PM from the per-agent item (for example **Linear Morgan OAuth** `client_id` / `client_secret`) and read the runtime token from Kubernetes.
+2. On first preflight/checkpoints run, **[`intake/scripts/ensure-local-env-op.sh`](../../intake/scripts/ensure-local-env-op.sh)** copies defaults → gitignored **`intake/local.env.op`** if the latter is missing.
+3. **[`intake/scripts/intake-op-auto.sh`](../../intake/scripts/intake-op-auto.sh)** then **`op run`** as before.
 
-**Solo / ad hoc:** set **`INTAKE_BOOTSTRAP_LINEAR_OP_REF=op://…`** once, or copy [`intake/local.env.op.example`](../intake/local.env.op.example).
+**Solo / ad hoc:** set **`INTAKE_BOOTSTRAP_LINEAR_OP_REF=op://…`** once, or copy [`intake/local.env.op.example`](../../intake/local.env.op.example).
 
 When **`intake/local.env.op`** exists and the **1Password CLI** (`op`) is on your PATH, these scripts **re-exec once** under `op run --env-file=…` so secrets resolve **without** you prefixing every command:
 
 | Script | Effect |
 |--------|--------|
-| [`intake/scripts/pipeline-preflight.sh`](../intake/scripts/pipeline-preflight.sh) | Injected env before bridge/Linear/kubectl checks |
-| [`intake/scripts/iteration-checkpoints.sh`](../intake/scripts/iteration-checkpoints.sh) | Same, then Linear GraphQL viewer check |
+| [`intake/scripts/pipeline-preflight.sh`](../../intake/scripts/pipeline-preflight.sh) | Injected env before bridge/Linear/kubectl checks |
+| [`intake/scripts/iteration-checkpoints.sh`](../../intake/scripts/iteration-checkpoints.sh) | Same, then Linear GraphQL viewer check |
 
-Implementation: [`intake/scripts/intake-op-auto.sh`](../intake/scripts/intake-op-auto.sh) (sourced by the scripts above).
+Implementation: [`intake/scripts/intake-op-auto.sh`](../../intake/scripts/intake-op-auto.sh) (sourced by the scripts above).
 
 | Override | Meaning |
 |----------|---------|
@@ -100,15 +100,15 @@ For **Discord-visible iteration** (snapshot → fix → re-run checkpoints), see
 
 ## OpenClaw / intake agent
 
-- Local OpenClaw gateway and **`intake`** agent with **`lobster`** + **`llm-task`** enabled (see [`intake/config/openclaw-llm-task.json`](../intake/config/openclaw-llm-task.json)).
-- Details: [`openclaw-local-setup.md`](openclaw-local-setup.md).
+- Local OpenClaw gateway and **`intake`** agent with **`lobster`** + **`llm-task`** enabled (see [`intake/config/openclaw-llm-task.json`](../../intake/config/openclaw-llm-task.json)).
+- Details: [`../2026-02/openclaw-local-setup.md`](../2026-02/openclaw-local-setup.md).
 - **Node ≥ 22**; **OpenClaw** current stable (or dev channel if you need it); **`@clawdbot/lobster`** on PATH on the gateway host (often **`2026.1.24`** from npm `@latest` — verify with `lobster version` vs `openclaw --version`). See §4a in [`intake-lobster-openclaw-process.md`](intake-lobster-openclaw-process.md).
 
 ---
 
 ## `intake-util` binary (PATH)
 
-Workflow steps call **`intake-util`** on `PATH`. A stale copy (e.g. `~/bin/intake-util`) may be **older than** [`apps/intake-util`](../apps/intake-util) in this repo and **miss** newer flags or behaviors (for example `INTAKE_REGISTER_RUN_SKIP` handling in [`run-registry-client.ts`](../apps/intake-util/src/run-registry-client.ts)).
+Workflow steps call **`intake-util`** on `PATH`. A stale copy (e.g. `~/bin/intake-util`) may be **older than** [`apps/intake-util`](../../apps/intake-util) in this repo and **miss** newer flags or behaviors (for example `INTAKE_REGISTER_RUN_SKIP` handling in [`run-registry-client.ts`](../../apps/intake-util/src/run-registry-client.ts)).
 
 | Approach | Notes |
 |-----------|--------|
@@ -122,7 +122,7 @@ Workflow steps call **`intake-util`** on `PATH`. A stale copy (e.g. `~/bin/intak
 
 | Variable / config | Required | Notes |
 |-------------------|----------|--------|
-| **`LINEAR_API_KEY`** | **Yes** for `intake-util sync-linear init` / project creation | Must be visible in the **same environment** as the OpenClaw gateway / `lobster` process (e.g. inject with **1Password** `op run --env-file=…` when starting the gateway, or export in the parent shell). **Naming:** historically `LINEAR_API_KEY`; value may be a Linear **personal API key** (`lin_api_…`) **or** an **OAuth access token** (see header logic in [`sync-linear.ts`](../apps/intake-util/src/sync-linear.ts): `lin_api_` prefix is sent as-is; otherwise `Authorization: Bearer …`). Use the **access token**, not only the OAuth client secret. Tokens can **expire**; this repo does not refresh OAuth for you. |
+| **`LINEAR_API_KEY`** | **Yes** for `intake-util sync-linear init` / project creation | Must be visible in the **same environment** as the OpenClaw gateway / `lobster` process (e.g. inject with **1Password** `op run --env-file=…` when starting the gateway, or export in the parent shell). **Naming:** historically `LINEAR_API_KEY`; value may be a Linear **personal API key** (`lin_api_…`) **or** an **OAuth access token** (see header logic in [`sync-linear.ts`](../../apps/intake-util/src/sync-linear.ts): `lin_api_` prefix is sent as-is; otherwise `Authorization: Bearer …`). Use the **access token**, not only the OAuth client secret. Tokens can **expire**; this repo does not refresh OAuth for you. |
 | **`defaults.linear.teamId`** in `cto-config.json` | Yes (via `load-config`) | Passed as `--team-id` to `sync-linear init`. Value may be a Linear **team key** (e.g. `CTOPA`) **or** a team **UUID**; `intake-util` resolves keys via the API (`resolveTeamId` in `apps/intake-util/src/sync-linear.ts`). If the key is wrong, the CLI errors with available teams. |
 
 ---
@@ -179,7 +179,7 @@ On the **gateway host** (same machine that runs OpenClaw and invokes workflows):
 ./intake/scripts/verify-lobster-openclaw.sh
 ```
 
-This asserts **Node ≥ 22**, **`openclaw`** and **`lobster`** on PATH, prints npm’s published **`@clawdbot/lobster`** version, and validates [`intake/config/openclaw-llm-task.json`](../intake/config/openclaw-llm-task.json) (**`llm-task`** enabled + **`intake`** allowlist per [LLM Task](https://docs.openclaw.ai/tools/llm-task)). It does **not** verify `intake-util`; use **`which intake-util`** and the table in **§ `intake-util` binary** above.
+This asserts **Node ≥ 22**, **`openclaw`** and **`lobster`** on PATH, prints npm’s published **`@clawdbot/lobster`** version, and validates [`intake/config/openclaw-llm-task.json`](../../intake/config/openclaw-llm-task.json) (**`llm-task`** enabled + **`intake`** allowlist per [LLM Task](https://docs.openclaw.ai/tools/llm-task)). It does **not** verify `intake-util`; use **`which intake-util`** and the table in **§ `intake-util` binary** above.
 
 Install / refresh CLIs:
 

@@ -1,6 +1,6 @@
 # Morgan Avatar / Desktop Handoff
 
-Last updated: March 8, 2026
+Last updated: April 25, 2026
 
 This is the consolidated handoff for Morgan voice/avatar work across 5dlabs.
 It captures:
@@ -34,6 +34,45 @@ The main failures were not raw TTS quality. The real issues were:
 Directionally, the work is now shifting into the CTO desktop app. That is the
 right move. CTO should own the backend session contract and Morgan transport,
 while the avatar layer stays comparatively thin.
+
+## Other Repo / Agent Strategy Prompt
+
+Use this prompt when handing avatar work to another repo or agent handle:
+
+> Do not implement against the current 5dlabs EchoMimic/OpenClaw custom endpoint
+> as a production dependency until the visible HTTPS UI path has passed visual
+> proof and reliability gates. Current evidence is mixed: the terminal API E2E
+> path succeeded once with text, TTS, and EchoMimic `video/mp4` after about
+> 215 seconds, but the visible HTTPS UI test is still blocked because
+> text/audio worked while video polling failed with `502` and no useful detail.
+>
+> Build an avatar adapter boundary instead of binding product code to one
+> provider. The interface must support both a LemonSlice-style live realtime
+> avatar provider and an EchoMimic-style async, turn-rendered MP4 provider. For
+> immediate interactive UI semantics, prefer the LemonSlice instructions as the
+> baseline. Keep EchoMimic behind a feature flag or beta provider until HTTPS
+> visual proof, polling reliability, timeout behavior, and fallback behavior are
+> proven.
+>
+> The desktop or other repo must not embed a NATS client, require an OpenAI key,
+> or assume direct access to a cluster GPU. It should call product APIs through
+> an adapter abstraction and degrade to audio/text when avatar video is not
+> available. The actual other repo path/name is still needed before making code
+> changes there.
+
+Suggested adapter shape:
+
+```ts
+type AvatarMode = "live-realtime" | "async-turn-video";
+
+interface AvatarProvider {
+  readonly mode: AvatarMode;
+  capabilities(): { video: boolean; audio: boolean; streaming: boolean };
+  startSession(input: AvatarSessionInput): Promise<AvatarSession>;
+  renderTurn(input: AvatarTurnInput): Promise<AvatarTurnResult>;
+  stopSession(sessionId: string): Promise<void>;
+}
+```
 
 ## What Has Been Done
 
@@ -368,7 +407,9 @@ References:
 ## Recommended Next Steps
 
 1. Continue active implementation in CTO desktop, not the Next.js web app.
-2. Define the desktop conversation contract and UI state machine.
+2. Implement the desktop conversation contract and UI state machine defined in
+   [provider-switch.md](../2026-04/avatar/provider-switch.md) § "Desktop / CTO Lite
+   integration contract (Pixel)".
 3. Add end-to-end tracing for each turn from microphone to spoken response.
 4. Build the buffered long-conversation pipeline for requirement capture.
 5. Add local Morgan deployment parity for kind so desktop debugging is not tied
@@ -381,4 +422,3 @@ References:
 - [decision-review.md](/Users/jonathon/5dlabs/cto/avatar/docs/decision-review.md)
 - [provider-spikes.md](/Users/jonathon/5dlabs/cto/avatar/docs/provider-spikes.md)
 - [morgan-openclaw-setup.md](/Users/jonathon/5dlabs/cto/avatar/docs/morgan-openclaw-setup.md)
-
