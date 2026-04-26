@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/HoloPart",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/HoloPart.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__HoloPart",
+  "status": "available",
+  "category": "3D part segmentation",
+  "what_it_does": "Generates amodal, semantically meaningful 3D part segmentations for complete object decomposition.",
+  "succinct_summary": "Medium Morgan relevance for part-aware avatar editing, accessories, or segmented asset manipulation.",
+  "possible_use": "Segment Morgan avatar parts or props for editing, materials, or downstream rig constraints.",
+  "important_notes": "Part segmentation support appears research/demo oriented; not a full avatar generator."
+}

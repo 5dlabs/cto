@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/ComfyUI-Tripo",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/ComfyUI-Tripo.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__ComfyUI-Tripo",
+  "status": "available",
+  "category": "ComfyUI integration",
+  "what_it_does": "Adds Tripo text/image-to-3D, animation, conversion, retopology, and preview nodes to ComfyUI.",
+  "succinct_summary": "Useful as a node-based creative front end around Tripo generation rather than a rigging method itself.",
+  "possible_use": "Prototype Morgan avatar prompt/image generation workflows inside ComfyUI.",
+  "important_notes": "Requires Tripo API access and ComfyUI; secondary to direct SDK/MCP/Blender integrations."
+}

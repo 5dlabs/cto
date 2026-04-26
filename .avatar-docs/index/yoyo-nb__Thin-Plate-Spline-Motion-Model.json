@@ -1,0 +1,12 @@
+{
+  "repo": "yoyo-nb/Thin-Plate-Spline-Motion-Model",
+  "group": "already-cloned",
+  "url": "https://github.com/yoyo-nb/Thin-Plate-Spline-Motion-Model.git",
+  "local_path": ".avatar-docs/repos/yoyo-nb__Thin-Plate-Spline-Motion-Model",
+  "status": "cloned-from-prior",
+  "category": "generic image animation",
+  "what_it_does": "[CVPR 2022] Thin-Plate Spline Motion Model for Image Animation.; image+driving video -> video",
+  "succinct_summary": "generic image animation: [CVPR 2022] Thin-Plate Spline Motion Model for Image Animation.",
+  "possible_use": "Motion transfer baseline; no audio-native talking portrait pipeline.",
+  "important_notes": "Motion transfer baseline; no audio-native talking portrait pipeline. Manifests: requirements.txt."
+}

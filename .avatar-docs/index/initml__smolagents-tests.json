@@ -1,0 +1,12 @@
+{
+  "repo": "initml/smolagents-tests",
+  "group": "initml",
+  "url": "https://github.com/initml/smolagents-tests.git",
+  "local_path": ".avatar-docs/repos/initml__smolagents-tests",
+  "status": "cloned",
+  "category": "agent library test fork",
+  "what_it_does": "Fork/snapshot of Hugging Face smolagents, a minimal code-agent library for tool-using Python agents.",
+  "succinct_summary": "Agent orchestration utility, not an avatar/image model.",
+  "possible_use": "Only indirectly useful for demo automation or agent-side orchestration experiments.",
+  "important_notes": "Contains security-sensitive code-execution agent patterns; not relevant to image/background/segmentation work."
+}

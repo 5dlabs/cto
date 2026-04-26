@@ -1,0 +1,2501 @@
+{
+  "source": "Hugging Face public Hub via MCP-guided terms plus public HF API normalization",
+  "generated_at": "2026-04-25T19:16:03-07:00",
+  "recent_filter": "createdAt or lastModified >= 2025-09-01 when available; semantic MCP seed Spaces kept if highly relevant",
+  "search_terms": [
+    "LivePortrait",
+    "MuseTalk",
+    "Wav2Lip",
+    "SadTalker",
+    "Hallo2",
+    "Hallo",
+    "FantasyTalking",
+    "EchoMimic",
+    "LatentSync",
+    "OmniAvatar",
+    "Skyreels talking head",
+    "MoDA talking head",
+    "talking portrait",
+    "talking head",
+    "talking face",
+    "lip sync avatar",
+    "audio driven portrait",
+    "portrait animation",
+    "face animation",
+    "video avatar",
+    "Hunyuan3D",
+    "TripoSR",
+    "TRELLIS",
+    "AniGen",
+    "UniRig",
+    "SkinTokens",
+    "3D avatar",
+    "image to 3D character",
+    "image to 3D avatar",
+    "avatar rigging",
+    "avatar skeleton",
+    "mesh avatar",
+    "SMPL avatar",
+    "VRM avatar",
+    "HY-Motion",
+    "FaceLift",
+    "Sapiens pointmap",
+    "InstantMesh",
+    "Wonder3D",
+    "Rodin 3D",
+    "GFPGAN",
+    "CodeFormer",
+    "face restoration",
+    "portrait enhancement",
+    "RMBG",
+    "BiRefNet",
+    "background removal portrait",
+    "human segmentation",
+    "SAM2 human",
+    "Real-ESRGAN face"
+  ],
+  "count": 98,
+  "candidates": [
+    {
+      "repo_id": "innoai/LivePortrait",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/innoai/LivePortrait",
+      "createdAt": "2024-07-09T07:50:09.000Z",
+      "lastModified": "2026-04-24T19:00:17.000Z",
+      "likes": 52,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "Multimodal",
+        "Motion control",
+        "Image-to-Video",
+        "Video-to-Video",
+        "Portrait Animation",
+        "region:us"
+      ],
+      "matched_queries": [
+        "LivePortrait"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "alexnasa/OmniAvatar",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/alexnasa/OmniAvatar",
+      "createdAt": "2025-08-01T16:26:22.000Z",
+      "lastModified": "2026-04-23T00:26:18.000Z",
+      "likes": 283,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "OmniAvatar"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "yjjuy7/LivePortrait",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/yjjuy7/LivePortrait",
+      "createdAt": "2026-04-16T11:10:39.000Z",
+      "lastModified": "2026-04-16T15:05:30.000Z",
+      "likes": 2,
+      "downloads": null,
+      "sdk": "docker",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "docker",
+        "region:us"
+      ],
+      "matched_queries": [
+        "LivePortrait"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "sohaibdevv/ai-talking-head",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/sohaibdevv/ai-talking-head",
+      "createdAt": "2026-03-27T18:46:13.000Z",
+      "lastModified": "2026-04-04T02:00:39.000Z",
+      "likes": 1,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "talking head"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "elix3r/LTX-2.3-22b-AV-LoRA-talking-head",
+      "repo_type": "model",
+      "url": "https://hf.co/elix3r/LTX-2.3-22b-AV-LoRA-talking-head",
+      "createdAt": "2026-03-24T13:42:52.000Z",
+      "lastModified": "2026-03-24T15:09:53.000Z",
+      "likes": 34,
+      "downloads": 12260,
+      "sdk": null,
+      "pipeline_tag": "image-to-video",
+      "library_name": "diffusers",
+      "tags": [
+        "diffusers",
+        "lora",
+        "ltx-video",
+        "talking-head",
+        "video-generation",
+        "audio-visual",
+        "ltx-2-3",
+        "ltx-2",
+        "image-to-video",
+        "en",
+        "base_model:Lightricks/LTX-2.3",
+        "base_model:adapter:Lightricks/LTX-2.3",
+        "license:openrail",
+        "region:us"
+      ],
+      "matched_queries": [
+        "talking head"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": [
+        "https://github.com/ClownsharkBatwing/RES4LYF"
+      ]
+    },
+    {
+      "repo_id": "ghostai1/halloween1.3b_poltergeist",
+      "repo_type": "model",
+      "url": "https://hf.co/ghostai1/halloween1.3b_poltergeist",
+      "createdAt": "2026-02-02T06:23:14.000Z",
+      "lastModified": "2026-02-03T07:33:32.000Z",
+      "likes": 1,
+      "downloads": 197,
+      "sdk": null,
+      "pipeline_tag": "text-generation",
+      "library_name": null,
+      "tags": [
+        "gguf",
+        "llama.cpp",
+        "qwen",
+        "qwen2.5",
+        "instruct",
+        "lora",
+        "roleplay",
+        "holiday",
+        "storytelling",
+        "local-inference",
+        "quantization",
+        "ggml",
+        "llm",
+        "spooky-fun",
+        "haunted-ai",
+        "text-generation",
+        "en",
+        "license:mit"
+      ],
+      "matched_queries": [
+        "Hallo"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": [
+        "https://github.com/ggerganov/llama.cpp"
+      ]
+    },
+    {
+      "repo_id": "multimodalart/ltx2-audio-to-video",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/multimodalart/ltx2-audio-to-video",
+      "createdAt": "2026-01-29T20:06:41.000Z",
+      "lastModified": "2026-01-30T02:33:27.000Z",
+      "likes": 51,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "manual semantic MCP seed"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "fudan-generative-ai/hallo4",
+      "repo_type": "model",
+      "url": "https://hf.co/fudan-generative-ai/hallo4",
+      "createdAt": "2025-11-30T05:43:39.000Z",
+      "lastModified": "2025-12-01T02:23:02.000Z",
+      "likes": 2,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "onnx",
+        "safetensors",
+        "arxiv:2505.23525",
+        "region:us"
+      ],
+      "matched_queries": [
+        "Hallo"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "MySafeCode/OmniAvatar",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/MySafeCode/OmniAvatar",
+      "createdAt": "2025-12-19T17:10:32.000Z",
+      "lastModified": "2025-11-28T14:11:52.000Z",
+      "likes": 1,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "OmniAvatar"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "alexnasa/OmniAvatar-Clay-Fast",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/alexnasa/OmniAvatar-Clay-Fast",
+      "createdAt": "2025-09-04T11:49:19.000Z",
+      "lastModified": "2025-11-20T01:17:09.000Z",
+      "likes": 48,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "OmniAvatar"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "smartdigitalnetworks/MoDA-fast-talking-head",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/smartdigitalnetworks/MoDA-fast-talking-head",
+      "createdAt": "2025-11-09T07:01:36.000Z",
+      "lastModified": "2025-08-18T17:22:23.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "MoDA talking head",
+        "talking head"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "Muhammad-Qasim/MoDA-fast-talking-head",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/Muhammad-Qasim/MoDA-fast-talking-head",
+      "createdAt": "2026-01-28T08:10:47.000Z",
+      "lastModified": "2025-08-18T17:22:23.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "MoDA talking head",
+        "talking head"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "jkh32499/Plex-v2-MoDA-fast-talking-head",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/jkh32499/Plex-v2-MoDA-fast-talking-head",
+      "createdAt": "2026-02-01T16:21:02.000Z",
+      "lastModified": "2025-08-18T17:22:23.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "MoDA talking head"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "AbuNadirMir/OmniAvatar",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/AbuNadirMir/OmniAvatar",
+      "createdAt": "2026-01-20T12:39:05.000Z",
+      "lastModified": "2025-08-01T08:17:43.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "OmniAvatar"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "Kyryll/OmniAvatar",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/Kyryll/OmniAvatar",
+      "createdAt": "2026-02-06T09:23:33.000Z",
+      "lastModified": "2025-08-01T08:17:43.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "OmniAvatar"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "CKCATIEKLINE/LivePortrait-animal",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/CKCATIEKLINE/LivePortrait-animal",
+      "createdAt": "2026-02-17T22:52:02.000Z",
+      "lastModified": "2025-04-17T14:45:05.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "LivePortrait"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "Abhisheksao/tts-hallo-talking-portrait",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/Abhisheksao/tts-hallo-talking-portrait",
+      "createdAt": "2026-03-22T12:26:00.000Z",
+      "lastModified": "2025-02-08T10:14:57.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "talking portrait"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "mihozzv/tts-hallo-talking-portrait",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/mihozzv/tts-hallo-talking-portrait",
+      "createdAt": "2025-10-12T19:54:38.000Z",
+      "lastModified": "2024-06-27T15:54:01.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "talking portrait"
+      ],
+      "category": "talking head / portrait animation",
+      "relevance": "Can animate a cleaned Morgan portrait or transfer driving motion as a fast Plan B.",
+      "github_links": []
+    },
+    {
+      "repo_id": "fffiloni/LatentSync",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/fffiloni/LatentSync",
+      "createdAt": "2025-01-05T18:15:47.000Z",
+      "lastModified": "2026-04-24T17:13:33.000Z",
+      "likes": 591,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "mcp-server",
+        "region:us"
+      ],
+      "matched_queries": [
+        "LatentSync"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "Adedoyinjames/SadTalker_free-API",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/Adedoyinjames/SadTalker_free-API",
+      "createdAt": "2026-04-16T09:07:54.000Z",
+      "lastModified": "2026-04-16T09:12:03.000Z",
+      "likes": 1,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "SadTalker"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "vinthony/SadTalker",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/vinthony/SadTalker",
+      "createdAt": "2022-12-28T15:07:37.000Z",
+      "lastModified": "2026-03-25T12:41:12.000Z",
+      "likes": 1434,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "SadTalker"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "Kirfol/LatentSync",
+      "repo_type": "model",
+      "url": "https://hf.co/Kirfol/LatentSync",
+      "createdAt": "2026-03-01T12:27:32.000Z",
+      "lastModified": "2026-03-01T12:27:33.000Z",
+      "likes": 1,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": "video-to-video",
+      "library_name": "diffusers",
+      "tags": [
+        "diffusers",
+        "video-to-video",
+        "arxiv:2412.09262",
+        "license:openrail++",
+        "region:us"
+      ],
+      "matched_queries": [
+        "LatentSync"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "Xuttt123/latentsync-pruned",
+      "repo_type": "model",
+      "url": "https://hf.co/Xuttt123/latentsync-pruned",
+      "createdAt": "2026-01-31T15:13:17.000Z",
+      "lastModified": "2026-02-01T13:53:18.000Z",
+      "likes": 1,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "region:us"
+      ],
+      "matched_queries": [
+        "LatentSync"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "nota-ai/compressed-wav2lip",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/nota-ai/compressed-wav2lip",
+      "createdAt": "2023-04-13T00:30:27.000Z",
+      "lastModified": "2026-01-20T11:45:34.000Z",
+      "likes": 82,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "Wav2Lip"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": [
+        "https://github.com/Nota-NetsPresso/nota-wav2lip.git",
+        "https://github.com/orgs/Nota-NetsPresso",
+        "https://github.com/Rudrabha/Wav2Lip"
+      ]
+    },
+    {
+      "repo_id": "mortal9826/wav2lip-weights",
+      "repo_type": "model",
+      "url": "https://hf.co/mortal9826/wav2lip-weights",
+      "createdAt": "2025-05-06T06:11:19.000Z",
+      "lastModified": "2026-01-07T10:17:22.000Z",
+      "likes": 3,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "region:us"
+      ],
+      "matched_queries": [
+        "Wav2Lip"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "DevHimal/Wav2Lip-HD",
+      "repo_type": "model",
+      "url": "https://hf.co/DevHimal/Wav2Lip-HD",
+      "createdAt": "2025-12-04T11:00:50.000Z",
+      "lastModified": "2025-12-04T11:00:50.000Z",
+      "likes": 1,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "license:apache-2.0",
+        "region:us"
+      ],
+      "matched_queries": [
+        "Wav2Lip"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "trymonolith/MuseTalk",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/trymonolith/MuseTalk",
+      "createdAt": "2025-12-04T05:56:06.000Z",
+      "lastModified": "2025-12-04T06:15:21.000Z",
+      "likes": 2,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "MuseTalk"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "shibing624/ai-avatar-wav2lip",
+      "repo_type": "model",
+      "url": "https://hf.co/shibing624/ai-avatar-wav2lip",
+      "createdAt": "2025-11-13T10:51:03.000Z",
+      "lastModified": "2025-11-17T04:57:43.000Z",
+      "likes": 3,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "license:apache-2.0",
+        "region:us"
+      ],
+      "matched_queries": [
+        "Wav2Lip"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": [
+        "https://github.com/shibing624/AIAvatar",
+        "https://github.com/lipku/LiveTalking",
+        "https://github.com/shibing624/AIAvatar.git",
+        "https://github.com/Rudrabha/Wav2Lip",
+        "https://github.com/TMElyralab/MuseTalk"
+      ]
+    },
+    {
+      "repo_id": "fabiolamp/wav2lip_fab_GPU",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/fabiolamp/wav2lip_fab_GPU",
+      "createdAt": "2025-01-24T14:48:39.000Z",
+      "lastModified": "2025-10-24T16:26:52.000Z",
+      "likes": 3,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "Wav2Lip"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "segestic/MusetalkLive",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/segestic/MusetalkLive",
+      "createdAt": "2025-09-18T06:26:44.000Z",
+      "lastModified": "2025-09-18T06:45:10.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "docker",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "docker",
+        "region:us"
+      ],
+      "matched_queries": [
+        "MuseTalk"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "Parvej24/wav2lip-models",
+      "repo_type": "model",
+      "url": "https://hf.co/Parvej24/wav2lip-models",
+      "createdAt": "2025-09-14T01:02:33.000Z",
+      "lastModified": "2025-09-14T01:05:44.000Z",
+      "likes": 0,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "region:us"
+      ],
+      "matched_queries": [
+        "Wav2Lip"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "zackzhang76/sadtalker-weights",
+      "repo_type": "model",
+      "url": "https://hf.co/zackzhang76/sadtalker-weights",
+      "createdAt": "2025-09-02T07:08:54.000Z",
+      "lastModified": "2025-09-02T07:21:30.000Z",
+      "likes": 0,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "license:mit",
+        "region:us"
+      ],
+      "matched_queries": [
+        "SadTalker"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "manavisrani07/gradio-lipsync-wav2lip",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/manavisrani07/gradio-lipsync-wav2lip",
+      "createdAt": "2023-08-17T19:51:08.000Z",
+      "lastModified": "2024-09-07T05:22:32.000Z",
+      "likes": 176,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "manual semantic MCP seed"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "pragnakalp/Wav2lip-ZeroGPU",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/pragnakalp/Wav2lip-ZeroGPU",
+      "createdAt": "2024-05-06T08:05:07.000Z",
+      "lastModified": "2024-05-08T10:25:23.000Z",
+      "likes": 66,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "manual semantic MCP seed"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "sjk4367/MuseTalk",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/sjk4367/MuseTalk",
+      "createdAt": "2025-12-09T19:44:17.000Z",
+      "lastModified": "2024-04-15T21:12:14.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "docker",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "docker",
+        "region:us"
+      ],
+      "matched_queries": [
+        "MuseTalk"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "kevinwang676/SadTalker",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/kevinwang676/SadTalker",
+      "createdAt": "2023-07-19T17:49:22.000Z",
+      "lastModified": "2023-07-19T18:24:48.000Z",
+      "likes": 39,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "manual semantic MCP seed"
+      ],
+      "category": "lip-sync / talking portrait",
+      "relevance": "Can synchronize Morgan speech to face video, especially after a portrait/video base exists.",
+      "github_links": []
+    },
+    {
+      "repo_id": "VAST-AI/AniGen",
+      "repo_type": "model",
+      "url": "https://hf.co/VAST-AI/AniGen",
+      "createdAt": "2026-03-03T21:09:14.000Z",
+      "lastModified": "2026-04-13T16:33:39.000Z",
+      "likes": 10,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": "image-to-3d",
+      "library_name": null,
+      "tags": [
+        "animatable",
+        "rigging",
+        "3D",
+        "Tripo",
+        "VAST",
+        "image-to-3d",
+        "en",
+        "arxiv:2604.08746",
+        "base_model:microsoft/TRELLIS-image-large",
+        "base_model:finetune:microsoft/TRELLIS-image-large",
+        "license:mit",
+        "region:us"
+      ],
+      "matched_queries": [
+        "AniGen"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": []
+    },
+    {
+      "repo_id": "oxide-lab/TripoSR",
+      "repo_type": "model",
+      "url": "https://hf.co/oxide-lab/TripoSR",
+      "createdAt": "2026-04-10T16:26:07.000Z",
+      "lastModified": "2026-04-10T16:41:56.000Z",
+      "likes": 2,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": "image-to-3d",
+      "library_name": null,
+      "tags": [
+        "safetensors",
+        "lux3d",
+        "rust",
+        "candle",
+        "canonical-weights",
+        "3d",
+        "image-to-3d",
+        "mesh-generation",
+        "triposr",
+        "arxiv:2403.02151",
+        "base_model:stabilityai/TripoSR",
+        "base_model:finetune:stabilityai/TripoSR",
+        "license:mit",
+        "region:us"
+      ],
+      "matched_queries": [
+        "TripoSR"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": []
+    },
+    {
+      "repo_id": "Zhzzzzz/Hunyuan3D-2.1",
+      "repo_type": "model",
+      "url": "https://hf.co/Zhzzzzz/Hunyuan3D-2.1",
+      "createdAt": "2026-04-03T11:50:41.000Z",
+      "lastModified": "2026-04-03T11:50:41.000Z",
+      "likes": 1,
+      "downloads": 55,
+      "sdk": null,
+      "pipeline_tag": "image-to-3d",
+      "library_name": "hunyuan3d-2",
+      "tags": [
+        "hunyuan3d-2",
+        "diffusers",
+        "safetensors",
+        "image-to-3d",
+        "text-to-3d",
+        "en",
+        "zh",
+        "arxiv:2506.15442",
+        "arxiv:2501.12202",
+        "arxiv:2411.02293",
+        "license:other",
+        "region:us"
+      ],
+      "matched_queries": [
+        "Hunyuan3D"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": [
+        "https://github.com/Tencent-Hunyuan/Hunyuan3D-2.1",
+        "https://github.com/VAST-AI-Research/TripoSG",
+        "https://github.com/facebookresearch/dinov2",
+        "https://github.com/Stability-AI/stablediffusion",
+        "https://github.com/black-forest-labs/flux"
+      ]
+    },
+    {
+      "repo_id": "AgenticVibes/hunyuan3d-2.1-mlx",
+      "repo_type": "model",
+      "url": "https://hf.co/AgenticVibes/hunyuan3d-2.1-mlx",
+      "createdAt": "2026-04-03T05:36:15.000Z",
+      "lastModified": "2026-04-03T05:38:31.000Z",
+      "likes": 1,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": "mlx",
+      "tags": [
+        "mlx",
+        "3d-generation",
+        "apple-silicon",
+        "hunyuan3d",
+        "texture-generation",
+        "pbr",
+        "base_model:tencent/Hunyuan3D-2.1",
+        "base_model:finetune:tencent/Hunyuan3D-2.1",
+        "license:other",
+        "region:us"
+      ],
+      "matched_queries": [
+        "Hunyuan3D"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": []
+    },
+    {
+      "repo_id": "moeqbadar/Hunyuan3D-2.1",
+      "repo_type": "model",
+      "url": "https://hf.co/moeqbadar/Hunyuan3D-2.1",
+      "createdAt": "2026-04-01T02:53:17.000Z",
+      "lastModified": "2026-04-01T02:53:17.000Z",
+      "likes": 1,
+      "downloads": 58,
+      "sdk": null,
+      "pipeline_tag": "image-to-3d",
+      "library_name": "hunyuan3d-2",
+      "tags": [
+        "hunyuan3d-2",
+        "diffusers",
+        "safetensors",
+        "image-to-3d",
+        "text-to-3d",
+        "en",
+        "zh",
+        "arxiv:2506.15442",
+        "arxiv:2501.12202",
+        "arxiv:2411.02293",
+        "license:other",
+        "region:us"
+      ],
+      "matched_queries": [
+        "Hunyuan3D"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": [
+        "https://github.com/Tencent-Hunyuan/Hunyuan3D-2.1",
+        "https://github.com/VAST-AI-Research/TripoSG",
+        "https://github.com/facebookresearch/dinov2",
+        "https://github.com/Stability-AI/stablediffusion",
+        "https://github.com/black-forest-labs/flux"
+      ]
+    },
+    {
+      "repo_id": "prithivMLmods/TRELLIS.2-Text-to-3D",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/prithivMLmods/TRELLIS.2-Text-to-3D",
+      "createdAt": "2025-12-17T10:43:32.000Z",
+      "lastModified": "2026-03-23T06:46:14.000Z",
+      "likes": 35,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "mcp-server",
+        "region:us"
+      ],
+      "matched_queries": [
+        "TRELLIS"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": []
+    },
+    {
+      "repo_id": "choephix/TRELLIS.2",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/choephix/TRELLIS.2",
+      "createdAt": "2026-03-06T13:30:17.000Z",
+      "lastModified": "2026-03-09T17:20:42.000Z",
+      "likes": 2,
+      "downloads": null,
+      "sdk": "docker",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "docker",
+        "region:us"
+      ],
+      "matched_queries": [
+        "TRELLIS"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": []
+    },
+    {
+      "repo_id": "jc-builds/triposr-ios",
+      "repo_type": "model",
+      "url": "https://hf.co/jc-builds/triposr-ios",
+      "createdAt": "2026-01-27T02:21:01.000Z",
+      "lastModified": "2026-03-08T21:29:01.000Z",
+      "likes": 3,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": "image-to-3d",
+      "library_name": null,
+      "tags": [
+        "onnx",
+        "3d",
+        "ios",
+        "triposr",
+        "3d-reconstruction",
+        "mobile",
+        "coreml",
+        "on-device",
+        "image-to-3d",
+        "arxiv:2403.02151",
+        "license:mit",
+        "region:us"
+      ],
+      "matched_queries": [
+        "TripoSR"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": []
+    },
+    {
+      "repo_id": "hysts-mcp/TRELLIS",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/hysts-mcp/TRELLIS",
+      "createdAt": "2025-05-31T10:18:12.000Z",
+      "lastModified": "2026-02-26T01:03:09.000Z",
+      "likes": 17,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "mcp-server",
+        "region:us"
+      ],
+      "matched_queries": [
+        "TRELLIS"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": []
+    },
+    {
+      "repo_id": "opsiclear-admin/Trellis.2.multiview",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/opsiclear-admin/Trellis.2.multiview",
+      "createdAt": "2026-02-07T05:34:51.000Z",
+      "lastModified": "2026-02-24T22:17:43.000Z",
+      "likes": 10,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "TRELLIS"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": []
+    },
+    {
+      "repo_id": "tencent/HY-Motion-1.0",
+      "repo_type": "model",
+      "url": "https://hf.co/tencent/HY-Motion-1.0",
+      "createdAt": "2025-12-29T09:39:21.000Z",
+      "lastModified": "2025-12-31T10:31:37.000Z",
+      "likes": 402,
+      "downloads": 689,
+      "sdk": null,
+      "pipeline_tag": "text-to-3d",
+      "library_name": "HY-Motion-1.0",
+      "tags": [
+        "HY-Motion-1.0",
+        "text-to-motion",
+        "3d-human-motion",
+        "text-to-3d",
+        "en",
+        "zh",
+        "arxiv:2512.23464",
+        "license:other",
+        "region:us"
+      ],
+      "matched_queries": [
+        "HY-Motion"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": [
+        "https://github.com/Tencent-Hunyuan/HY-Motion-1.0",
+        "https://github.com/Tencent-Hunyuan/HY-Motion-1.0.git",
+        "https://github.com/black-forest-labs/flux",
+        "https://github.com/huggingface/diffusers",
+        "https://github.com/openai/CLIP"
+      ]
+    },
+    {
+      "repo_id": "microsoft/TRELLIS.2",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/microsoft/TRELLIS.2",
+      "createdAt": "2025-12-10T03:50:25.000Z",
+      "lastModified": "2025-12-17T06:32:54.000Z",
+      "likes": 1448,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "manual semantic MCP seed"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": []
+    },
+    {
+      "repo_id": "frogleo/Image-to-3D",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/frogleo/Image-to-3D",
+      "createdAt": "2025-05-09T08:21:00.000Z",
+      "lastModified": "2025-10-24T10:32:29.000Z",
+      "likes": 188,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "manual semantic MCP seed"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": []
+    },
+    {
+      "repo_id": "togawa83/TripoSRSafetensors",
+      "repo_type": "model",
+      "url": "https://hf.co/togawa83/TripoSRSafetensors",
+      "createdAt": "2025-09-21T03:31:15.000Z",
+      "lastModified": "2025-09-21T03:49:00.000Z",
+      "likes": 0,
+      "downloads": 2,
+      "sdk": null,
+      "pipeline_tag": "image-to-3d",
+      "library_name": null,
+      "tags": [
+        "safetensors",
+        "3d",
+        "image-to-3d",
+        "dataset:allenai/objaverse",
+        "arxiv:2311.04400",
+        "arxiv:2403.02151",
+        "license:mit",
+        "region:us"
+      ],
+      "matched_queries": [
+        "TripoSR"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": []
+    },
+    {
+      "repo_id": "casperbankerson/InstantMesh",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/casperbankerson/InstantMesh",
+      "createdAt": "2025-09-08T09:41:18.000Z",
+      "lastModified": "2025-09-08T15:08:46.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "InstantMesh"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": []
+    },
+    {
+      "repo_id": "trellis-community/TRELLIS",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/trellis-community/TRELLIS",
+      "createdAt": "2025-06-04T15:44:04.000Z",
+      "lastModified": "2025-06-25T16:17:19.000Z",
+      "likes": 592,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "mcp-server",
+        "region:us"
+      ],
+      "matched_queries": [
+        "manual semantic MCP seed"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": []
+    },
+    {
+      "repo_id": "tencent/Hunyuan3D-2",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/tencent/Hunyuan3D-2",
+      "createdAt": "2025-01-20T06:59:11.000Z",
+      "lastModified": "2025-06-02T15:04:38.000Z",
+      "likes": 3258,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "manual semantic MCP seed"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": [
+        "https://github.com/Tencent/Hunyuan3D-2",
+        "https://github.com/facebookresearch/dinov2",
+        "https://github.com/Stability-AI/stablediffusion",
+        "https://github.com/black-forest-labs/flux",
+        "https://github.com/huggingface/diffusers"
+      ]
+    },
+    {
+      "repo_id": "8hsbot/InstantMesh",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/8hsbot/InstantMesh",
+      "createdAt": "2026-01-09T04:59:38.000Z",
+      "lastModified": "2025-03-19T06:39:45.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "InstantMesh"
+      ],
+      "category": "image/text-to-3D asset",
+      "relevance": "Candidate for generating or improving Morgan 3D mesh/asset before rigging.",
+      "github_links": []
+    },
+    {
+      "repo_id": "VAST-AI/AniGen",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/VAST-AI/AniGen",
+      "createdAt": "2026-03-04T09:47:23.000Z",
+      "lastModified": "2026-04-24T04:56:21.000Z",
+      "likes": 45,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "AniGen"
+      ],
+      "category": "3D animation / motion",
+      "relevance": "Candidate for animatable 3D asset generation or motion layer after mesh creation.",
+      "github_links": [
+        "https://github.com/VAST-AI-Research/AniGen.git",
+        "https://github.com/baegwangbin/DSINE",
+        "https://github.com/microsoft/TRELLIS",
+        "https://github.com/NVlabs/instant-ngp",
+        "https://github.com/ashawkey/cubvh"
+      ]
+    },
+    {
+      "repo_id": "VAST-AI/SkinTokens",
+      "repo_type": "model",
+      "url": "https://hf.co/VAST-AI/SkinTokens",
+      "createdAt": "2026-04-20T04:07:29.000Z",
+      "lastModified": "2026-04-20T04:07:58.000Z",
+      "likes": 4,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": "pytorch",
+      "tags": [
+        "pytorch",
+        "rigging",
+        "skinning",
+        "skeleton",
+        "autoregressive",
+        "fsq",
+        "vae",
+        "3d",
+        "animation",
+        "VAST",
+        "Tripo",
+        "en",
+        "arxiv:2602.04805",
+        "arxiv:2309.15505",
+        "arxiv:2402.03300",
+        "license:mit",
+        "region:us"
+      ],
+      "matched_queries": [
+        "SkinTokens"
+      ],
+      "category": "3D animation / motion",
+      "relevance": "Candidate for animatable 3D asset generation or motion layer after mesh creation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "williamgoodman/HY-Motion-1.0",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/williamgoodman/HY-Motion-1.0",
+      "createdAt": "2026-02-23T18:32:14.000Z",
+      "lastModified": "2026-02-23T18:32:18.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "docker",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "docker",
+        "region:us"
+      ],
+      "matched_queries": [
+        "HY-Motion"
+      ],
+      "category": "3D animation / motion",
+      "relevance": "Candidate for animatable 3D asset generation or motion layer after mesh creation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "apozz/UniRig-safetensors",
+      "repo_type": "model",
+      "url": "https://hf.co/apozz/UniRig-safetensors",
+      "createdAt": "2026-01-16T10:58:27.000Z",
+      "lastModified": "2026-01-16T10:58:38.000Z",
+      "likes": 3,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "pytorch",
+        "safetensors",
+        "3d",
+        "rigging",
+        "animation",
+        "skeleton",
+        "skinning",
+        "arxiv:2405.02986",
+        "base_model:VAST-AI/UniRig",
+        "base_model:finetune:VAST-AI/UniRig",
+        "license:mit",
+        "region:us"
+      ],
+      "matched_queries": [
+        "UniRig"
+      ],
+      "category": "3D animation / motion",
+      "relevance": "Candidate for animatable 3D asset generation or motion layer after mesh creation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "Heartsync/HY-Motion-1.0",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/Heartsync/HY-Motion-1.0",
+      "createdAt": "2026-01-03T23:24:27.000Z",
+      "lastModified": "2026-01-04T03:48:02.000Z",
+      "likes": 2,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "HY-Motion"
+      ],
+      "category": "3D animation / motion",
+      "relevance": "Candidate for animatable 3D asset generation or motion layer after mesh creation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "tencent/HY-Motion-1.0",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/tencent/HY-Motion-1.0",
+      "createdAt": "2025-12-29T09:14:05.000Z",
+      "lastModified": "2026-01-01T03:17:51.000Z",
+      "likes": 273,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "HY-Motion"
+      ],
+      "category": "3D animation / motion",
+      "relevance": "Candidate for animatable 3D asset generation or motion layer after mesh creation.",
+      "github_links": [
+        "https://github.com/black-forest-labs/flux",
+        "https://github.com/huggingface/diffusers",
+        "https://github.com/openai/CLIP",
+        "https://github.com/QwenLM/Qwen3",
+        "https://github.com/facebookresearch/pytorch3d"
+      ]
+    },
+    {
+      "repo_id": "HechicerIA/HY-Motion-1.0",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/HechicerIA/HY-Motion-1.0",
+      "createdAt": "2026-01-04T06:20:30.000Z",
+      "lastModified": "2026-01-01T03:17:51.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "HY-Motion"
+      ],
+      "category": "3D animation / motion",
+      "relevance": "Candidate for animatable 3D asset generation or motion layer after mesh creation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "KJSlksj/HY-Motion-1.0",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/KJSlksj/HY-Motion-1.0",
+      "createdAt": "2026-01-04T10:10:20.000Z",
+      "lastModified": "2026-01-01T03:17:51.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "HY-Motion"
+      ],
+      "category": "3D animation / motion",
+      "relevance": "Candidate for animatable 3D asset generation or motion layer after mesh creation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "inoculatemedia/HY-Motion-1.0",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/inoculatemedia/HY-Motion-1.0",
+      "createdAt": "2026-01-13T19:01:16.000Z",
+      "lastModified": "2026-01-01T03:17:51.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "HY-Motion"
+      ],
+      "category": "3D animation / motion",
+      "relevance": "Candidate for animatable 3D asset generation or motion layer after mesh creation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "RayDay/HY-Motion-1.0",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/RayDay/HY-Motion-1.0",
+      "createdAt": "2026-01-28T12:49:16.000Z",
+      "lastModified": "2026-01-01T03:17:51.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "HY-Motion"
+      ],
+      "category": "3D animation / motion",
+      "relevance": "Candidate for animatable 3D asset generation or motion layer after mesh creation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "SpyC0der77/HY-Motion-1.0",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/SpyC0der77/HY-Motion-1.0",
+      "createdAt": "2026-04-04T19:26:17.000Z",
+      "lastModified": "2026-01-01T03:17:51.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "HY-Motion"
+      ],
+      "category": "3D animation / motion",
+      "relevance": "Candidate for animatable 3D asset generation or motion layer after mesh creation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "clove1002/anigen",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/clove1002/anigen",
+      "createdAt": "2025-08-26T08:40:56.000Z",
+      "lastModified": "2025-09-01T05:36:20.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "docker",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "docker",
+        "region:us"
+      ],
+      "matched_queries": [
+        "AniGen"
+      ],
+      "category": "3D animation / motion",
+      "relevance": "Candidate for animatable 3D asset generation or motion layer after mesh creation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "xwshi/Seamless-Avatar-Smplx-Model",
+      "repo_type": "model",
+      "url": "https://hf.co/xwshi/Seamless-Avatar-Smplx-Model",
+      "createdAt": "2026-02-26T09:11:38.000Z",
+      "lastModified": "2026-02-28T03:43:52.000Z",
+      "likes": 0,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "avatar",
+        "dataset:xwshi/Seamless-Avatar-Smplx-150h",
+        "license:mit",
+        "region:us"
+      ],
+      "matched_queries": [
+        "SMPL avatar"
+      ],
+      "category": "rigging / skeleton / avatar controls",
+      "relevance": "Potential skeleton/skin/blendshape layer for making a Morgan mesh puppetable.",
+      "github_links": []
+    },
+    {
+      "repo_id": "MajorDaniel/UniRig",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/MajorDaniel/UniRig",
+      "createdAt": "2026-02-08T09:18:45.000Z",
+      "lastModified": "2026-02-10T15:20:35.000Z",
+      "likes": 3,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "UniRig"
+      ],
+      "category": "rigging / skeleton / avatar controls",
+      "relevance": "Potential skeleton/skin/blendshape layer for making a Morgan mesh puppetable.",
+      "github_links": []
+    },
+    {
+      "repo_id": "cynthiayetsko/UniRig",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/cynthiayetsko/UniRig",
+      "createdAt": "2025-11-17T15:51:21.000Z",
+      "lastModified": "2025-11-17T15:51:21.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "docker",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "docker",
+        "region:us"
+      ],
+      "matched_queries": [
+        "UniRig"
+      ],
+      "category": "rigging / skeleton / avatar controls",
+      "relevance": "Potential skeleton/skin/blendshape layer for making a Morgan mesh puppetable.",
+      "github_links": []
+    },
+    {
+      "repo_id": "seungminkwak/UniRig-1",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/seungminkwak/UniRig-1",
+      "createdAt": "2025-10-28T04:28:45.000Z",
+      "lastModified": "2025-10-28T05:00:44.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "UniRig"
+      ],
+      "category": "rigging / skeleton / avatar controls",
+      "relevance": "Potential skeleton/skin/blendshape layer for making a Morgan mesh puppetable.",
+      "github_links": []
+    },
+    {
+      "repo_id": "ivalenzuela/UniRigExtras",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/ivalenzuela/UniRigExtras",
+      "createdAt": "2025-09-09T20:09:36.000Z",
+      "lastModified": "2025-09-10T15:43:29.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "UniRig"
+      ],
+      "category": "rigging / skeleton / avatar controls",
+      "relevance": "Potential skeleton/skin/blendshape layer for making a Morgan mesh puppetable.",
+      "github_links": []
+    },
+    {
+      "repo_id": "netw1z/UniRig",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/netw1z/UniRig",
+      "createdAt": "2025-11-13T06:15:04.000Z",
+      "lastModified": "2025-06-04T13:25:40.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "UniRig"
+      ],
+      "category": "rigging / skeleton / avatar controls",
+      "relevance": "Potential skeleton/skin/blendshape layer for making a Morgan mesh puppetable.",
+      "github_links": []
+    },
+    {
+      "repo_id": "Emilio1955/UniRig",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/Emilio1955/UniRig",
+      "createdAt": "2026-01-04T03:20:48.000Z",
+      "lastModified": "2025-06-04T13:25:40.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "UniRig"
+      ],
+      "category": "rigging / skeleton / avatar controls",
+      "relevance": "Potential skeleton/skin/blendshape layer for making a Morgan mesh puppetable.",
+      "github_links": []
+    },
+    {
+      "repo_id": "jacobyomer/UniRig",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/jacobyomer/UniRig",
+      "createdAt": "2026-03-28T18:51:13.000Z",
+      "lastModified": "2025-06-04T13:25:40.000Z",
+      "likes": 0,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "UniRig"
+      ],
+      "category": "rigging / skeleton / avatar controls",
+      "relevance": "Potential skeleton/skin/blendshape layer for making a Morgan mesh puppetable.",
+      "github_links": []
+    },
+    {
+      "repo_id": "briaai/RMBG-2.0",
+      "repo_type": "model",
+      "url": "https://hf.co/briaai/RMBG-2.0",
+      "createdAt": "2024-10-29T12:14:36.000Z",
+      "lastModified": "2026-04-06T15:27:43.000Z",
+      "likes": 1158,
+      "downloads": 439664,
+      "sdk": null,
+      "pipeline_tag": "image-segmentation",
+      "library_name": "transformers",
+      "tags": [
+        "transformers",
+        "pytorch",
+        "onnx",
+        "safetensors",
+        "image-segmentation",
+        "remove background",
+        "background",
+        "background-removal",
+        "Pytorch",
+        "vision",
+        "legal liability",
+        "transformers.js",
+        "custom_code",
+        "license:other",
+        "region:us"
+      ],
+      "matched_queries": [
+        "RMBG"
+      ],
+      "category": "touch-up / restoration / preprocessing",
+      "relevance": "Useful pre/post-processing: crop cleanup, restoration, background removal, upscaling, segmentation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "briaai/Fibo-Edit-RMBG",
+      "repo_type": "model",
+      "url": "https://hf.co/briaai/Fibo-Edit-RMBG",
+      "createdAt": "2026-02-08T14:30:32.000Z",
+      "lastModified": "2026-03-17T18:47:03.000Z",
+      "likes": 42,
+      "downloads": 125,
+      "sdk": null,
+      "pipeline_tag": "image-to-image",
+      "library_name": "diffusers",
+      "tags": [
+        "diffusers",
+        "safetensors",
+        "art",
+        "image-to-image",
+        "background-removal",
+        "image-segmentation",
+        "en",
+        "arxiv:2511.06876",
+        "base_model:briaai/Fibo-Edit",
+        "base_model:finetune:briaai/Fibo-Edit",
+        "license:other",
+        "diffusers:BriaFiboEditPipeline",
+        "region:us"
+      ],
+      "matched_queries": [
+        "RMBG"
+      ],
+      "category": "touch-up / restoration / preprocessing",
+      "relevance": "Useful pre/post-processing: crop cleanup, restoration, background removal, upscaling, segmentation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "briaai/Fibo-Edit-RMBG",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/briaai/Fibo-Edit-RMBG",
+      "createdAt": "2026-02-08T15:26:32.000Z",
+      "lastModified": "2026-03-17T09:49:17.000Z",
+      "likes": 26,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "image-editing",
+        "background-removal",
+        "image-to-image",
+        "diffusion",
+        "region:us"
+      ],
+      "matched_queries": [
+        "RMBG"
+      ],
+      "category": "touch-up / restoration / preprocessing",
+      "relevance": "Useful pre/post-processing: crop cleanup, restoration, background removal, upscaling, segmentation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "ZhengPeng7/BiRefNet_demo",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/ZhengPeng7/BiRefNet_demo",
+      "createdAt": "2024-03-07T03:05:33.000Z",
+      "lastModified": "2026-02-21T14:38:38.000Z",
+      "likes": 308,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "BiRefNet"
+      ],
+      "category": "touch-up / restoration / preprocessing",
+      "relevance": "Useful pre/post-processing: crop cleanup, restoration, background removal, upscaling, segmentation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "AXERA-TECH/CodeFormer",
+      "repo_type": "model",
+      "url": "https://hf.co/AXERA-TECH/CodeFormer",
+      "createdAt": "2025-11-13T06:05:51.000Z",
+      "lastModified": "2026-01-25T03:50:25.000Z",
+      "likes": 3,
+      "downloads": 16,
+      "sdk": null,
+      "pipeline_tag": "image-to-image",
+      "library_name": null,
+      "tags": [
+        "image-to-image",
+        "license:mit",
+        "region:us"
+      ],
+      "matched_queries": [
+        "CodeFormer"
+      ],
+      "category": "touch-up / restoration / preprocessing",
+      "relevance": "Useful pre/post-processing: crop cleanup, restoration, background removal, upscaling, segmentation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "Xlnk/rmbg",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/Xlnk/rmbg",
+      "createdAt": "2026-01-24T20:35:13.000Z",
+      "lastModified": "2026-01-24T22:20:29.000Z",
+      "likes": 5,
+      "downloads": null,
+      "sdk": "docker",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "docker",
+        "region:us"
+      ],
+      "matched_queries": [
+        "RMBG"
+      ],
+      "category": "touch-up / restoration / preprocessing",
+      "relevance": "Useful pre/post-processing: crop cleanup, restoration, background removal, upscaling, segmentation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "maxorange/GFPGAN-5",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/maxorange/GFPGAN-5",
+      "createdAt": "2025-07-10T00:34:07.000Z",
+      "lastModified": "2025-12-28T18:41:36.000Z",
+      "likes": 16,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "GFPGAN"
+      ],
+      "category": "touch-up / restoration / preprocessing",
+      "relevance": "Useful pre/post-processing: crop cleanup, restoration, background removal, upscaling, segmentation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "sczhou/CodeFormer",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/sczhou/CodeFormer",
+      "createdAt": "2022-09-13T11:42:39.000Z",
+      "lastModified": "2025-12-19T18:43:32.000Z",
+      "likes": 2370,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "CodeFormer"
+      ],
+      "category": "touch-up / restoration / preprocessing",
+      "relevance": "Useful pre/post-processing: crop cleanup, restoration, background removal, upscaling, segmentation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "avans06/Image_Face_Upscale_Restoration-GFPGAN-RestoreFormer-CodeFormer-GPEN",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/avans06/Image_Face_Upscale_Restoration-GFPGAN-RestoreFormer-CodeFormer-GPEN",
+      "createdAt": "2024-11-30T11:24:36.000Z",
+      "lastModified": "2025-11-27T13:12:09.000Z",
+      "likes": 131,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "CodeFormer",
+        "face restoration"
+      ],
+      "category": "touch-up / restoration / preprocessing",
+      "relevance": "Useful pre/post-processing: crop cleanup, restoration, background removal, upscaling, segmentation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "x0x7/Image_Face_Upscale_Restoration-GFPGAN-RestoreFormer-CodeFormer-GPEN",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/x0x7/Image_Face_Upscale_Restoration-GFPGAN-RestoreFormer-CodeFormer-GPEN",
+      "createdAt": "2025-12-26T22:41:10.000Z",
+      "lastModified": "2025-11-27T13:12:09.000Z",
+      "likes": 4,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "face restoration"
+      ],
+      "category": "touch-up / restoration / preprocessing",
+      "relevance": "Useful pre/post-processing: crop cleanup, restoration, background removal, upscaling, segmentation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "jhon19792025/Image_Face_Upscale_Restoration-GFPGAN-RestoreFormer-CodeFormer-GPEN",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/jhon19792025/Image_Face_Upscale_Restoration-GFPGAN-RestoreFormer-CodeFormer-GPEN",
+      "createdAt": "2025-12-12T16:23:10.000Z",
+      "lastModified": "2025-11-27T13:12:09.000Z",
+      "likes": 3,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "face restoration"
+      ],
+      "category": "touch-up / restoration / preprocessing",
+      "relevance": "Useful pre/post-processing: crop cleanup, restoration, background removal, upscaling, segmentation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "dhanraj9543494/Image_Face_Upscale_Restoration-GFPGAN-RestoreFormer-CodeFormer-GPEN",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/dhanraj9543494/Image_Face_Upscale_Restoration-GFPGAN-RestoreFormer-CodeFormer-GPEN",
+      "createdAt": "2025-12-14T07:34:06.000Z",
+      "lastModified": "2025-11-27T13:12:09.000Z",
+      "likes": 3,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "face restoration"
+      ],
+      "category": "touch-up / restoration / preprocessing",
+      "relevance": "Useful pre/post-processing: crop cleanup, restoration, background removal, upscaling, segmentation.",
+      "github_links": []
+    },
+    {
+      "repo_id": "facebook/sapiens2-pointmap",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/facebook/sapiens2-pointmap",
+      "createdAt": "2026-04-23T20:05:06.000Z",
+      "lastModified": "2026-04-24T02:45:24.000Z",
+      "likes": 3,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "manual semantic MCP seed"
+      ],
+      "category": "adjacent / needs triage",
+      "relevance": "Potentially useful later; inspect before adoption.",
+      "github_links": [
+        "https://github.com/facebookresearch/sapiens2"
+      ]
+    },
+    {
+      "repo_id": "Shravani-Limited/VideoAvatar-UK-Voice-Engine",
+      "repo_type": "model",
+      "url": "https://hf.co/Shravani-Limited/VideoAvatar-UK-Voice-Engine",
+      "createdAt": "2026-02-07T22:34:41.000Z",
+      "lastModified": "2026-02-17T23:20:46.000Z",
+      "likes": 2,
+      "downloads": 34,
+      "sdk": null,
+      "pipeline_tag": "text-to-speech",
+      "library_name": "f5-tts",
+      "tags": [
+        "f5-tts",
+        "text-to-speech",
+        "voice-cloning",
+        "regional-accents",
+        "uk",
+        "en",
+        "license:apache-2.0",
+        "region:us"
+      ],
+      "matched_queries": [
+        "video avatar"
+      ],
+      "category": "adjacent / needs triage",
+      "relevance": "Potentially useful later; inspect before adoption.",
+      "github_links": []
+    },
+    {
+      "repo_id": "banao-tech/3D_AI_Avatar",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/banao-tech/3D_AI_Avatar",
+      "createdAt": "2026-02-05T19:08:29.000Z",
+      "lastModified": "2026-02-05T19:47:49.000Z",
+      "likes": 1,
+      "downloads": null,
+      "sdk": "docker",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "docker",
+        "region:us"
+      ],
+      "matched_queries": [
+        "3D avatar"
+      ],
+      "category": "adjacent / needs triage",
+      "relevance": "Potentially useful later; inspect before adoption.",
+      "github_links": []
+    },
+    {
+      "repo_id": "vantagewithai/LongCat-Video-Avatar-ComfyUI-GGUF",
+      "repo_type": "model",
+      "url": "https://hf.co/vantagewithai/LongCat-Video-Avatar-ComfyUI-GGUF",
+      "createdAt": "2026-01-04T13:27:09.000Z",
+      "lastModified": "2026-01-05T03:29:11.000Z",
+      "likes": 18,
+      "downloads": 1740,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": "diffusers",
+      "tags": [
+        "diffusers",
+        "gguf",
+        "audio-text-to-video",
+        "audio-image-text-to-video",
+        "audio-driven-video-continuation",
+        "transformers",
+        "avatar",
+        "video-generation",
+        "en",
+        "zh",
+        "arxiv:2512.01340",
+        "license:mit",
+        "region:us"
+      ],
+      "matched_queries": [
+        "video avatar"
+      ],
+      "category": "adjacent / needs triage",
+      "relevance": "Potentially useful later; inspect before adoption.",
+      "github_links": [
+        "https://github.com/meituan-longcat/LongCat-Video",
+        "https://github.com/meituan-longcat/LongCat-Flash-Chat",
+        "https://github.com/user-attachments/assets",
+        "https://github.com/huggingface/diffusers"
+      ]
+    },
+    {
+      "repo_id": "fjkane/LongCat-Video-Avatar-bf16",
+      "repo_type": "model",
+      "url": "https://hf.co/fjkane/LongCat-Video-Avatar-bf16",
+      "createdAt": "2025-12-18T23:05:45.000Z",
+      "lastModified": "2025-12-19T01:34:21.000Z",
+      "likes": 2,
+      "downloads": 4,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": "diffusers",
+      "tags": [
+        "diffusers",
+        "onnx",
+        "safetensors",
+        "audio-text-to-video",
+        "audio-image-text-to-video",
+        "audio-driven-video-continuation",
+        "transformers",
+        "avatar",
+        "video-generation",
+        "en",
+        "zh",
+        "arxiv:2512.01340",
+        "license:mit",
+        "region:us"
+      ],
+      "matched_queries": [
+        "video avatar"
+      ],
+      "category": "adjacent / needs triage",
+      "relevance": "Potentially useful later; inspect before adoption.",
+      "github_links": []
+    },
+    {
+      "repo_id": "meituan-longcat/LongCat-Video-Avatar",
+      "repo_type": "model",
+      "url": "https://hf.co/meituan-longcat/LongCat-Video-Avatar",
+      "createdAt": "2025-12-13T09:03:08.000Z",
+      "lastModified": "2025-12-17T05:12:35.000Z",
+      "likes": 235,
+      "downloads": 403,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": "diffusers",
+      "tags": [
+        "diffusers",
+        "onnx",
+        "safetensors",
+        "audio-text-to-video",
+        "audio-image-text-to-video",
+        "audio-driven-video-continuation",
+        "transformers",
+        "avatar",
+        "video-generation",
+        "en",
+        "zh",
+        "arxiv:2512.01340",
+        "license:mit",
+        "region:us"
+      ],
+      "matched_queries": [
+        "video avatar"
+      ],
+      "category": "adjacent / needs triage",
+      "relevance": "Potentially useful later; inspect before adoption.",
+      "github_links": [
+        "https://github.com/meituan-longcat/LongCat-Video",
+        "https://github.com/meituan-longcat/LongCat-Flash-Chat",
+        "https://github.com/user-attachments/assets",
+        "https://github.com/huggingface/diffusers"
+      ]
+    },
+    {
+      "repo_id": "cpuai/LongCat-Video-Avatar",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/cpuai/LongCat-Video-Avatar",
+      "createdAt": "2025-12-16T22:16:16.000Z",
+      "lastModified": "2025-12-17T00:52:44.000Z",
+      "likes": 25,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "video avatar"
+      ],
+      "category": "adjacent / needs triage",
+      "relevance": "Potentially useful later; inspect before adoption.",
+      "github_links": []
+    },
+    {
+      "repo_id": "Tabsubject/LongCat-Video-Avatar",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/Tabsubject/LongCat-Video-Avatar",
+      "createdAt": "2025-12-21T05:47:04.000Z",
+      "lastModified": "2025-12-17T00:52:44.000Z",
+      "likes": 2,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "video avatar"
+      ],
+      "category": "adjacent / needs triage",
+      "relevance": "Potentially useful later; inspect before adoption.",
+      "github_links": []
+    },
+    {
+      "repo_id": "vvmarchuk/LongCat-Video-Avatar",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/vvmarchuk/LongCat-Video-Avatar",
+      "createdAt": "2026-02-03T03:21:44.000Z",
+      "lastModified": "2025-12-17T00:52:44.000Z",
+      "likes": 2,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "video avatar"
+      ],
+      "category": "adjacent / needs triage",
+      "relevance": "Potentially useful later; inspect before adoption.",
+      "github_links": []
+    },
+    {
+      "repo_id": "rwgertdthdht/LongCat-Video-Avatar",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/rwgertdthdht/LongCat-Video-Avatar",
+      "createdAt": "2025-12-20T17:18:34.000Z",
+      "lastModified": "2025-12-17T00:52:44.000Z",
+      "likes": 1,
+      "downloads": null,
+      "sdk": "gradio",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "gradio",
+        "region:us"
+      ],
+      "matched_queries": [
+        "video avatar"
+      ],
+      "category": "adjacent / needs triage",
+      "relevance": "Potentially useful later; inspect before adoption.",
+      "github_links": []
+    },
+    {
+      "repo_id": "digital-avatar/ditto-talkinghead",
+      "repo_type": "model",
+      "url": "https://hf.co/digital-avatar/ditto-talkinghead",
+      "createdAt": "2025-01-10T06:46:28.000Z",
+      "lastModified": "2025-11-12T14:15:14.000Z",
+      "likes": 34,
+      "downloads": 0,
+      "sdk": null,
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "onnx",
+        "arxiv:2411.19509",
+        "region:us"
+      ],
+      "matched_queries": [
+        "talking head"
+      ],
+      "category": "adjacent / needs triage",
+      "relevance": "Potentially useful later; inspect before adoption.",
+      "github_links": [
+        "https://github.com/antgroup/ditto-talkinghead",
+        "https://github.com/user-attachments/assets",
+        "https://github.com/thuhcsi/S2G-MDDiffusion",
+        "https://github.com/KwaiVGI/LivePortrait"
+      ]
+    },
+    {
+      "repo_id": "Yashwant0806/avatartalk-3d-chatterbox",
+      "repo_type": "space",
+      "url": "https://hf.co/spaces/Yashwant0806/avatartalk-3d-chatterbox",
+      "createdAt": "2025-10-10T11:06:01.000Z",
+      "lastModified": "2025-10-10T11:10:41.000Z",
+      "likes": 3,
+      "downloads": null,
+      "sdk": "static",
+      "pipeline_tag": null,
+      "library_name": null,
+      "tags": [
+        "static",
+        "deepsite-v3",
+        "region:us"
+      ],
+      "matched_queries": [
+        "3D avatar"
+      ],
+      "category": "adjacent / needs triage",
+      "relevance": "Potentially useful later; inspect before adoption.",
+      "github_links": []
+    }
+  ],
+  "notes": [
+    "GitHub links were extracted from public README/model cards when present; blank github_links means no obvious GitHub URL was found in the card during this pass.",
+    "Canonical older repos already cloned locally may be omitted here because this pass focuses on recent HF artifacts."
+  ]
+}

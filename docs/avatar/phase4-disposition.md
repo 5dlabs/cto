@@ -2,6 +2,13 @@
 
 **Author:** Morgan (intake) · **Branch:** `docs/ws-f-phase4-disposition` · **Related PR:** #4790 (merged)
 
+> **Current production cutline (supersedes this historical disposition for
+> live readiness):** public avatar traffic uses `/echo-turn`:
+> OpenClaw Morgan text → ElevenLabs TTS with cache/backoff → async EchoMimic
+> MP4 on OVH AI Deploy. LemonSlice, TalkingHead/3D, MuseTalk, NATS,
+> Kubernetes/desktop GPU scheduling, OpenAI keys, and `model_q8.onnx` are not
+> live production prerequisites. Keep this memo as WS-F archaeology only.
+
 > **Note on the requested path.** WS-F pointed at `docs/kimi-k2-6-self-hosting/` for
 > "Phase 4 session protocol" content. That path resolves to a single file
 > (`docs/kimi-k2-6-self-hosting.md`) about Kimi K2.6 GPU/cost sizing — **no Phase 4
@@ -25,11 +32,15 @@ dispositions:
    `avatar/web/lib/avatar-state.ts`); the remaining gaps (SESSION_STATE agent→avatar frame,
    explicit agent-state→avatar-state mapping, protocol metrics, Tauri window config) are
    concrete follow-up tasks for the avatar workstream. **Do not spin up a new initiative.**
-2. **`docs/prds/coder-gpu-musetalk-phase4.md` — OBSOLETE. Archive with a pointer.** PR
-   #4790 completes the pivot to a browser-side 3D runtime (TalkingHead + HeadAudio) per
+2. **`docs/prds/coder-gpu-musetalk-phase4.md` — OBSOLETE. Archive with a pointer.** At
+   the time, PR #4790 completed the pivot to a browser-side 3D runtime
+   (TalkingHead + HeadAudio) per
    `docs/plans/3d-avatar-runtime-plan.md` "Option A", which **explicitly eliminates
-   server-side GPU rendering from the primary path.** MuseTalk / V100S provisioning / GPU
-   autoscaling are no longer on the critical path. Phase 1 (self-hosted LiveKit), Phase 2
+   server-side GPU rendering from that historical primary path.** Current
+   production has since cut over to `/echo-turn` + EchoMimic on OVH AI Deploy,
+   so do not read this as saying TalkingHead/3D is live. MuseTalk / V100S
+   provisioning / Kubernetes GPU autoscaling are still not public-avatar prerequisites.
+   Phase 1 (self-hosted LiveKit), Phase 2
    (agent wired to self-hosted LK) and Phase 3.5 (persona admin + Better Auth) already
    shipped and stand on their own — only the GPU/MuseTalk phases are affected.
 
@@ -81,7 +92,7 @@ Key changes (`git show 97c9cbd5 --stat`):
 | `AvatarConnectionState` / `AvatarVoiceState` | **Implemented** | Same file. Matches the spec's lifecycle labels. |
 | Runtime kinds, cue sources, viseme enum (OVR-style) | **Implemented** | Same file — cueSource includes `elevenlabs-alignment`, `ovrlipsync-wasm`, `derived-text`. |
 | `SESSION_STATE` agent→avatar frame | **Not implemented** | No usage of the identifier in `avatar/` or `infra/`. |
-| `VISeme_CUES` push channel (`cto-avatar-visemes/v1`) | **Not implemented / deferred** | Moot for the current TalkingHead path (HeadAudio derives visemes client-side from PCM). Re-opens if/when an alignment-based cue source ships. |
+| `VISeme_CUES` push channel (`cto-avatar-visemes/v1`) | **Not implemented / deferred** | Moot for the then-current TalkingHead path (HeadAudio derives visemes client-side from PCM). Re-opens if/when an alignment-based cue source ships. |
 | Tauri window config, `asset://` loading, memory caps | **Not implemented** | `rg -l tauri avatar/` → no hits. Browser-only today. |
 | Metrics table (`connection_latency_ms`, `viseme_sync_ms`, `frame_drop_rate`…) | **Not instrumented** | No Prom/trace wiring found in the avatar surface. |
 | Agent-state → avatar-state mapping table | **Partial** | Voice states exist; no explicit mapping layer or tests. |
@@ -100,10 +111,12 @@ decision. The 3D Avatar Runtime Plan is explicit:
 > — `docs/plans/3d-avatar-runtime-plan.md` §"Runtime model", §"Why server GPU is
 > eliminated from the primary path"
 
-PR #4790 executes that plan — `TalkingHeadView.tsx` drives a Three.js GLB in the browser,
-HeadAudio runs as a WebAudio worklet on the client, and the voice-bridge pod shrinks to
-STT/LLM/TTS orchestration only. The PRD's Phases 4–6 (V100S provisioning, MuseTalk
-streaming plugin, GPU autoscaling, LemonSlice cutover) are not on this path.
+PR #4790 executed that historical plan — `TalkingHeadView.tsx` drives a Three.js GLB in
+the browser, HeadAudio runs as a WebAudio worklet on the client, and the voice-bridge pod
+shrinks to STT/LLM/TTS orchestration only. This is not the live production cutline now:
+current `/echo-turn` production renders async EchoMimic MP4 on OVH AI Deploy. The PRD's
+Phases 4–6 (V100S provisioning, MuseTalk streaming plugin, Kubernetes GPU autoscaling,
+LemonSlice cutover) are not public-avatar prerequisites.
 
 What the MuseTalk PRD did leave behind that is **still useful** (do not delete):
 
@@ -113,9 +126,9 @@ What the MuseTalk PRD did leave behind that is **still useful** (do not delete):
 - Phase 2 env-driven LiveKit configuration in `avatar/web/app/api/token/route.ts`.
 - Phase 3.5 persona admin (`avatar/web/app/admin/personas/*`,
   `avatar/agent/morgan_avatar_agent/persona_preprocess.py`, Better Auth) — still valid as
-  the source-image pipeline that feeds TalkingHead's deterministic avatar rig (single
-  image → pre-baked GLB / animation pack), even though the runtime no longer runs
-  MuseTalk inference.
+  source-image/persona tooling, even though the current production renderer is
+  EchoMimic MP4 on OVH AI Deploy rather than the historical TalkingHead deterministic
+  avatar rig or MuseTalk inference.
 - `avatar/agent/morgan_avatar_agent/musetalk_*.py` — currently dead code guarded by
   `MORGAN_AVATAR_MODE=musetalk`; archival decision below.
 
@@ -164,7 +177,8 @@ avatar workstream. Suggested IDs are kebab-case and mapped to the ws-F intake st
 
 ## Non-goals
 
-- Re-litigating the 3D vs. generative-video architecture decision. That decision lives in
-  `docs/plans/3d-avatar-runtime-plan.md` and is now ratified by PR #4790.
+- Re-litigating the historical 3D vs. generative-video architecture decision. That
+  decision lives in `docs/plans/3d-avatar-runtime-plan.md` and was ratified by PR #4790,
+  but it is not the current public `/echo-turn` production cutline.
 - Deleting MuseTalk code paths in a single sweep. They can cool off behind
   `MORGAN_AVATAR_MODE=musetalk` until the next avatar-agent cleanup pass.

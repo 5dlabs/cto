@@ -1,0 +1,12 @@
+{
+  "repo": "Seed3D/Puppeteer",
+  "group": "explicit",
+  "url": "https://github.com/Seed3D/Puppeteer.git",
+  "local_path": ".avatar-docs/repos/Seed3D__Puppeteer",
+  "status": "cloned",
+  "category": "3D puppeteering/animation control",
+  "what_it_does": "Seed3D puppeteering reference for controlling or animating 3D avatar-like assets.",
+  "succinct_summary": "Relevant to Morgan if the team chooses a controllable 3D asset over pure video generation.",
+  "possible_use": "Evaluate interaction/control patterns for pose, expression, or animation-driven Morgan puppeteering.",
+  "important_notes": "Inspect README and examples before integration; dependency/model availability may determine usefulness. README hint: <div align=\"center\">"
+}

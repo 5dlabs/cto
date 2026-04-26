@@ -1,0 +1,12 @@
+{
+  "repo": "met4citizen/HeadTTS",
+  "group": "explicit",
+  "url": "https://github.com/met4citizen/HeadTTS.git",
+  "local_path": ".avatar-docs/repos/met4citizen__HeadTTS",
+  "status": "cloned",
+  "category": "web talking-head runtime",
+  "what_it_does": "Browser-oriented talking head / TTS runtime related to morph targets and speech-driven animation.",
+  "succinct_summary": "Potential lightweight web path for a realtime Morgan head if GLB/morph-target assets are available.",
+  "possible_use": "Study web runtime architecture, viseme handling, and audio-driven head animation for Morgan live demos.",
+  "important_notes": "Requires compatible avatar assets and browser performance testing; separate from high-realism diffusion portrait generation. README hint: <img src=\"logo.png\" width=\"100\"/>&nbsp; HeadTTS"
+}

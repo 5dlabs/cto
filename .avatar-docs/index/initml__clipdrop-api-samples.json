@@ -1,0 +1,12 @@
+{
+  "repo": "initml/clipdrop-api-samples",
+  "group": "initml",
+  "url": "https://github.com/initml/clipdrop-api-samples.git",
+  "local_path": ".avatar-docs/repos/initml__clipdrop-api-samples",
+  "status": "cloned",
+  "category": "ClipDrop API demos",
+  "what_it_does": "Sample iOS, Android, and web apps for ClipDrop APIs such as background removal, inpainting/object cleanup, text removal, and layer decomposition.",
+  "succinct_summary": "Useful demo plumbing for image cleanup/background workflows backed by hosted ClipDrop APIs.",
+  "possible_use": "Relevant if Morgan avatar assets need quick background removal, object cleanup, or web demo examples around image preprocessing.",
+  "important_notes": "API-driven samples, not a self-hosted model implementation; expect external service credentials and costs."
+}

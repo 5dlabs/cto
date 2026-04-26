@@ -1,0 +1,12 @@
+{
+  "repo": "lipku/LiveTalking",
+  "group": "already-cloned",
+  "url": "https://github.com/lipku/LiveTalking.git",
+  "local_path": ".avatar-docs/repos/lipku__LiveTalking",
+  "status": "cloned-from-prior",
+  "category": "realtime streaming digital human",
+  "what_it_does": "Real time interactive streaming digital human; ASR/LLM/TTS + avatar backends -> streaming interactive avatar",
+  "succinct_summary": "realtime streaming digital human: Real time interactive streaming digital human",
+  "possible_use": "Operationally relevant: real-time interaction stack with MuseTalk/Wav2Lip/NeRF-style backends.",
+  "important_notes": "Operationally relevant: real-time interaction stack with MuseTalk/Wav2Lip/NeRF-style backends. Manifests: requirements.txt,Dockerfile."
+}

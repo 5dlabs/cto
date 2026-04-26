@@ -1,0 +1,12 @@
+{
+  "repo": "OpenTalker/video-retalking",
+  "group": "already-cloned",
+  "url": "https://github.com/OpenTalker/video-retalking.git",
+  "local_path": ".avatar-docs/repos/OpenTalker__video-retalking",
+  "status": "cloned-from-prior",
+  "category": "face video retalking/refinement",
+  "what_it_does": "[SIGGRAPH Asia 2022] VideoReTalking: Audio-based Lip Synchronization for Talking Head Video Editing In the Wild; video+audio -> retalked video",
+  "succinct_summary": "face video retalking/refinement: [SIGGRAPH Asia 2022] VideoReTalking: Audio-based Lip Synchronization for Talking Head Video Editing In the Wild",
+  "possible_use": "Edits an existing face video to match audio; useful after creating a base Morgan clip.",
+  "important_notes": "Edits an existing face video to match audio; useful after creating a base Morgan clip. Manifests: requirements.txt."
+}

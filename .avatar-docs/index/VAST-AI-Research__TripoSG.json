@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/TripoSG",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/TripoSG.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__TripoSG",
+  "status": "available",
+  "category": "image-to-3D foundation model",
+  "what_it_does": "High-fidelity image-to-3D shape synthesis using large-scale rectified-flow transformers and SDF/normal supervision.",
+  "succinct_summary": "High Morgan relevance as a strong image-to-3D source for avatar base meshes.",
+  "possible_use": "Generate Morgan avatar geometry from concept images before rigging with SkinTokens/UniRig/AniGen.",
+  "important_notes": "Focuses on shape fidelity; still needs texture/material and rigging decisions downstream."
+}

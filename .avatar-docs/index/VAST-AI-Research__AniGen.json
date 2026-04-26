@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/AniGen",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/AniGen.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__AniGen",
+  "status": "available",
+  "category": "animatable 3D asset generation",
+  "what_it_does": "Turns a single image into a fully rigged, animation-ready 3D asset with mesh, skeleton, and skinning weights.",
+  "succinct_summary": "High Morgan relevance: one-image-to-animatable-avatar pipeline that bridges generated geometry and immediate motion use.",
+  "possible_use": "Candidate reference for creating Morgan avatar bodies that are already rigged and ready for animation/simulation.",
+  "important_notes": "Emphasize as a core avatar source; inspect install/model requirements before any implementation run."
+}

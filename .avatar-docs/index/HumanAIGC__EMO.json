@@ -1,0 +1,12 @@
+{
+  "repo": "HumanAIGC/EMO",
+  "group": "already-cloned",
+  "url": "https://github.com/HumanAIGC/EMO.git",
+  "local_path": ".avatar-docs/repos/HumanAIGC__EMO",
+  "status": "cloned-from-prior",
+  "category": "emotive audio portrait video",
+  "what_it_does": "Emote Portrait Alive: Generating Expressive Portrait Videos with Audio2Video Diffusion Model under Weak Conditions; image+audio -> MP4",
+  "succinct_summary": "emotive audio portrait video: Emote Portrait Alive: Generating Expressive Portrait Videos with Audio2Video Diffusion Model under Weak Conditions",
+  "possible_use": "Alibaba EMO family; important high-realism reference, but repo may be less turnkey.",
+  "important_notes": "Alibaba EMO family; important high-realism reference, but repo may be less turnkey."
+}

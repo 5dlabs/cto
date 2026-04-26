@@ -1,0 +1,12 @@
+{
+  "repo": "makehumancommunity/makehuman",
+  "group": "explicit",
+  "url": "https://github.com/makehumancommunity/makehuman.git",
+  "local_path": ".avatar-docs/repos/makehumancommunity__makehuman",
+  "status": "cloned",
+  "category": "3D human character creation",
+  "what_it_does": "Open-source toolchain for creating and exporting configurable human 3D characters.",
+  "succinct_summary": "Strong baseline for generating a riggable Morgan body mesh when pure portrait generation is not enough.",
+  "possible_use": "Create base human body assets, proportions, clothing placeholders, or export targets for Blender/rigging tests.",
+  "important_notes": "Desktop/asset-authoring oriented; check export formats, rig quality, and license constraints for generated assets. README hint: MakeHuman"
+}

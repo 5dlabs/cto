@@ -1,0 +1,12 @@
+{
+  "repo": "hongfz16/AvatarCLIP",
+  "group": "explicit",
+  "url": "https://github.com/hongfz16/AvatarCLIP.git",
+  "local_path": ".avatar-docs/repos/hongfz16__AvatarCLIP",
+  "status": "cloned",
+  "category": "text-driven avatar generation/animation",
+  "what_it_does": "Research code for CLIP-guided 3D avatar generation and text-conditioned avatar edits/animation.",
+  "succinct_summary": "Useful reference for prompt-controllable avatar appearance or motion experiments.",
+  "possible_use": "Explore text-to-style or text-to-motion controls for Morgan identity experiments and expressive variants.",
+  "important_notes": "Older research stack; verify dependencies, assets, and output quality before investing integration time. README hint: <div align=\"center\">"
+}

@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/tripo-mcp",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/tripo-mcp.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__tripo-mcp",
+  "status": "available",
+  "category": "MCP integration",
+  "what_it_does": "MCP server that lets AI assistants call Tripo generation and import results into Blender.",
+  "succinct_summary": "High Morgan relevance because it exposes Tripo 3D generation to agent workflows.",
+  "possible_use": "Let Morgan/agent tooling request 3D asset generation and route outputs into Blender automation.",
+  "important_notes": "Alpha project; currently focused on Blender addon integration and requires Tripo credentials."
+}

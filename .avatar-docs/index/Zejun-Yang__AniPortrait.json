@@ -1,0 +1,12 @@
+{
+  "repo": "Zejun-Yang/AniPortrait",
+  "group": "already-cloned",
+  "url": "https://github.com/Zejun-Yang/AniPortrait.git",
+  "local_path": ".avatar-docs/repos/Zejun-Yang__AniPortrait",
+  "status": "cloned-from-prior",
+  "category": "audio-driven portrait animation",
+  "what_it_does": "AniPortrait: Audio-Driven Synthesis of Photorealistic Portrait Animation; image+audio -> MP4",
+  "succinct_summary": "audio-driven portrait animation: AniPortrait: Audio-Driven Synthesis of Photorealistic Portrait Animation",
+  "possible_use": "AnimateDiff/stable-diffusion style portrait animation; solid Plan B candidate.",
+  "important_notes": "AnimateDiff/stable-diffusion style portrait animation; solid Plan B candidate. Manifests: requirements.txt."
+}
