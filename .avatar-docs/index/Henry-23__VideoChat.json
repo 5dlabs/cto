@@ -1,0 +1,12 @@
+{
+  "repo": "Henry-23/VideoChat",
+  "group": "already-cloned",
+  "url": "https://github.com/Henry-23/VideoChat.git",
+  "local_path": ".avatar-docs/repos/Henry-23__VideoChat",
+  "status": "cloned-from-prior",
+  "category": "realtime voice digital human app",
+  "what_it_does": "实时交互数字人，可自定义形象与音色，支持音色克隆，对话延迟低至3s。Real-time voice interactive digital human, customizable appearance and voice, supporting voice cloning, with initial package delay as low as 3s.; voice/cha…",
+  "succinct_summary": "realtime voice digital human app: 实时交互数字人，可自定义形象与音色，支持音色克隆，对话延迟低至3s。Real-time voice interactive digital human, customizable appearance and voice, supporting voice cloning, with initial pack…",
+  "possible_use": "App-level realtime digital-human reference, likely more integration pattern than model breakthrough.",
+  "important_notes": "App-level realtime digital-human reference, likely more integration pattern than model breakthrough. Manifests: requirements.txt."
+}

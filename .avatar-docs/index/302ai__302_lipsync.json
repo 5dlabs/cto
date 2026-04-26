@@ -1,0 +1,12 @@
+{
+  "repo": "302ai/302_lipsync",
+  "group": "explicit",
+  "url": "https://github.com/302ai/302_lipsync.git",
+  "local_path": ".avatar-docs/repos/302ai__302_lipsync",
+  "status": "cloned",
+  "category": "talking-portrait/lipsync API reference",
+  "what_it_does": "Provides a hosted/API-oriented lip-sync reference for turning speech into synchronized face video.",
+  "succinct_summary": "Useful as an integration sketch for a quick Morgan lip-sync demo backed by external service APIs.",
+  "possible_use": "Prototype a simple audio-to-talking-portrait path or mirror its API/UI shape for Morgan demos.",
+  "important_notes": "Likely depends on 302.AI service credentials and external model availability; verify licensing and latency before adopting. README hint: <p align=\"center\">📷 AI Talking Photo 🚀✨</p>"
+}

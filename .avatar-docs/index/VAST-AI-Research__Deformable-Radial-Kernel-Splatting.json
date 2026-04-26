@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/Deformable-Radial-Kernel-Splatting",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/Deformable-Radial-Kernel-Splatting.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__Deformable-Radial-Kernel-Splatting",
+  "status": "available",
+  "category": "3D representation / splatting research",
+  "what_it_does": "Implements Deformable Radial Kernel Splatting for shape primitives with learnable radial bases and sharper boundaries.",
+  "succinct_summary": "Low-to-medium avatar relevance: representation research that may inform high-quality geometry, not a Morgan avatar pipeline.",
+  "possible_use": "Background reading for future rendering or reconstruction quality improvements.",
+  "important_notes": "Research code with GPU environment needs; not directly about rigging or Tripo API workflows."
+}

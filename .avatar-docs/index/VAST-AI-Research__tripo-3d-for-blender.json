@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/tripo-3d-for-blender",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/tripo-3d-for-blender.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__tripo-3d-for-blender",
+  "status": "available",
+  "category": "Blender integration",
+  "what_it_does": "Blender plugin for Tripo AI text/image/multiview 3D generation with progress tracking and import flow.",
+  "succinct_summary": "High Morgan relevance for artist-friendly avatar generation and review directly inside Blender.",
+  "possible_use": "Use as the Blender-side bridge for generating, importing, and inspecting Morgan 3D assets.",
+  "important_notes": "Requires Blender, internet access, and a Tripo API key; pair with rigging outputs from UniRig/SkinTokens/AniGen."
+}

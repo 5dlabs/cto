@@ -1,0 +1,12 @@
+{
+  "repo": "KwaiVGI/LivePortrait",
+  "group": "already-cloned",
+  "url": "https://github.com/KlingAIResearch/LivePortrait.git",
+  "local_path": ".avatar-docs/repos/KwaiVGI__LivePortrait",
+  "status": "cloned-from-prior",
+  "category": "realtime-ish portrait retargeting",
+  "what_it_does": "Bring portraits to life!; image+driving video -> video",
+  "succinct_summary": "realtime-ish portrait retargeting: Bring portraits to life!",
+  "possible_use": "Excellent portrait retargeter; not audio-native, but useful if paired with generated driver/visemes.",
+  "important_notes": "Excellent portrait retargeter; not audio-native, but useful if paired with generated driver/visemes. Manifests: requirements.txt."
+}

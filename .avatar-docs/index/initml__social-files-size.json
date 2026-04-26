@@ -1,0 +1,12 @@
+{
+  "repo": "initml/social-files-size",
+  "group": "initml",
+  "url": "https://github.com/initml/social-files-size.git",
+  "local_path": ".avatar-docs/repos/initml__social-files-size",
+  "status": "cloned",
+  "category": "social image size data",
+  "what_it_does": "Centralizes social network image dimensions, margins, and accepted formats in JSON with schema/packages.",
+  "succinct_summary": "Small utility dataset for output sizing, not generation.",
+  "possible_use": "Could help size exported avatar/social preview images for platform-specific cards or profile assets.",
+  "important_notes": "No model code; relevance is limited to packaging and presentation constraints."
+}

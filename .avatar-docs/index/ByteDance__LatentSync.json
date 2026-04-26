@@ -1,0 +1,12 @@
+{
+  "repo": "ByteDance/LatentSync",
+  "group": "already-cloned",
+  "url": "https://github.com/bytedance/LatentSync.git",
+  "local_path": ".avatar-docs/repos/ByteDance__LatentSync",
+  "status": "cloned-from-prior",
+  "category": "lip-sync diffusion/refinement",
+  "what_it_does": "Taming Stable Diffusion for Lip Sync!; video+audio -> lip-synced video",
+  "succinct_summary": "lip-sync diffusion/refinement: Taming Stable Diffusion for Lip Sync!",
+  "possible_use": "Great if we already have a Morgan video; not single static portrait generation by itself.",
+  "important_notes": "Great if we already have a Morgan video; not single static portrait generation by itself. Manifests: requirements.txt."
+}

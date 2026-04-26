@@ -1,0 +1,12 @@
+{
+  "repo": "initml/sam-hq",
+  "group": "initml",
+  "url": "https://github.com/initml/sam-hq.git",
+  "local_path": ".avatar-docs/repos/initml__sam-hq",
+  "status": "cloned",
+  "category": "high-quality segmentation",
+  "what_it_does": "HQ-SAM upgrades Segment Anything for higher-quality zero-shot masks, with demos, pip install path, and HQ-SAM 2 notes.",
+  "succinct_summary": "Strongly relevant for clean foreground masks, background separation, and segmentation-assisted avatar asset prep.",
+  "possible_use": "Candidate tool for cutting Morgan out of source imagery, refining masks, or preparing layered portrait/background assets.",
+  "important_notes": "Model checkpoints are external; cloning skipped LFS smudge and does not fetch weights."
+}

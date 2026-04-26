@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/UniRig",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/UniRig.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__UniRig",
+  "status": "available",
+  "category": "automatic avatar rigging",
+  "what_it_does": "SIGGRAPH 2025 framework for automatic 3D model rigging with skeleton prediction and skinning.",
+  "succinct_summary": "Very high Morgan relevance: core auto-rigging reference for making arbitrary Morgan meshes animatable.",
+  "possible_use": "Rig Morgan avatar meshes produced by TripoSR/TripoSG/TripoSF or other generators.",
+  "important_notes": "README points to SkinTokens as successor; keep UniRig for baseline and SkinTokens for latest rig-token approach."
+}

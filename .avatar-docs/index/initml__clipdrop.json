@@ -1,0 +1,12 @@
+{
+  "repo": "initml/clipdrop",
+  "group": "initml",
+  "url": "https://github.com/initml/clipdrop.git",
+  "local_path": ".avatar-docs/repos/initml__clipdrop",
+  "status": "cloned",
+  "category": "placeholder / minimal metadata",
+  "what_it_does": "The cloned snapshot contains only a minimal README title for ClipDrop.",
+  "succinct_summary": "Not enough project content to evaluate beyond being a ClipDrop placeholder.",
+  "possible_use": "Very low direct use; keep only as a pointer to the ClipDrop lineage.",
+  "important_notes": "No API samples or implementation are present here; use clipdrop-api-samples instead."
+}

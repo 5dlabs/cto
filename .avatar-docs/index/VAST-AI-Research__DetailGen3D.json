@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/DetailGen3D",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/DetailGen3D.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__DetailGen3D",
+  "status": "available",
+  "category": "3D geometry enhancement",
+  "what_it_does": "Enhances generated 3D geometry detail using a data-dependent flow approach.",
+  "succinct_summary": "Medium avatar relevance as a post-process for improving mesh detail after avatar generation.",
+  "possible_use": "Potential refinement stage for Morgan avatar meshes before rigging or rendering.",
+  "important_notes": "Check model weights/license and GPU requirements before use."
+}

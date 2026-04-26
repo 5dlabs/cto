@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/TripoSR",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/TripoSR.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__TripoSR",
+  "status": "available",
+  "category": "fast single-image 3D reconstruction",
+  "what_it_does": "Open-source Tripo/Stability model for rapid feed-forward 3D reconstruction from one image.",
+  "succinct_summary": "High Morgan relevance as a fast baseline for turning a Morgan concept image into a 3D mesh.",
+  "possible_use": "Quickly prototype image-to-3D avatar mesh generation before applying rigging/skinning steps.",
+  "important_notes": "Very fast reconstruction but not an animation rig; output likely needs cleanup/rigging."
+}

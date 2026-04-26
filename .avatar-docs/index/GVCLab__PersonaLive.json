@@ -1,0 +1,12 @@
+{
+  "repo": "GVCLab/PersonaLive",
+  "group": "already-cloned",
+  "url": "https://github.com/GVCLab/PersonaLive.git",
+  "local_path": ".avatar-docs/repos/GVCLab__PersonaLive",
+  "status": "cloned-from-prior",
+  "category": "CVPR 2026 live portrait animation",
+  "what_it_does": "[CVPR 2026] PersonaLive! : Expressive Portrait Image Animation for Live Streaming; portrait image + driving/motion controls -> live-style animated portrait",
+  "succinct_summary": "CVPR 2026 live portrait animation: [CVPR 2026] PersonaLive! : Expressive Portrait Image Animation for Live Streaming",
+  "possible_use": "Only >1k-star talking-head topic repo actually created in late 2025; important new Plan B/A candidate.",
+  "important_notes": "Only >1k-star talking-head topic repo actually created in late 2025; important new Plan B/A candidate."
+}

@@ -1,0 +1,12 @@
+{
+  "repo": "dimgerogiannis/Arc2Avatar",
+  "group": "explicit",
+  "url": "https://github.com/dimgerogiannis/Arc2Avatar.git",
+  "local_path": ".avatar-docs/repos/dimgerogiannis__Arc2Avatar",
+  "status": "cloned",
+  "category": "single-image-to-avatar reconstruction",
+  "what_it_does": "Research code for reconstructing an avatar-like 3D head/body representation from limited portrait input.",
+  "succinct_summary": "A candidate reference for moving from a Morgan portrait into a controllable 3D avatar asset.",
+  "possible_use": "Study reconstruction assumptions, preprocessing, and asset outputs for a Morgan 3D avatar pipeline.",
+  "important_notes": "Research repo; check model weights, runtime requirements, and output rig compatibility before planning integration. README hint: <div align=\"center\">"
+}

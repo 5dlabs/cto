@@ -1,0 +1,12 @@
+{
+  "repo": "antgroup/echomimic_v3",
+  "group": "already-cloned",
+  "url": "https://github.com/antgroup/echomimic_v3.git",
+  "local_path": ".avatar-docs/repos/antgroup__echomimic_v3",
+  "status": "cloned-from-prior",
+  "category": "quality-first portrait diffusion",
+  "what_it_does": "[AAAI 2026] EchoMimicV3: 1.3B Parameters are All You Need for Unified Multi-Modal and Multi-Task Human Animation; image+audio -> MP4",
+  "succinct_summary": "quality-first portrait diffusion: [AAAI 2026] EchoMimicV3: 1.3B Parameters are All You Need for Unified Multi-Modal and Multi-Task Human Animation",
+  "possible_use": "Current EchoMimic V3 path; high quality but very slow on V100 in our tests.",
+  "important_notes": "Current EchoMimic V3 path; high quality but very slow on V100 in our tests. Manifests: requirements.txt."
+}

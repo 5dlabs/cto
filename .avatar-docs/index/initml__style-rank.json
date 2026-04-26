@@ -1,0 +1,12 @@
+{
+  "repo": "initml/style-rank",
+  "group": "initml",
+  "url": "https://github.com/initml/style-rank.git",
+  "local_path": ".avatar-docs/repos/initml__style-rank",
+  "status": "cloned",
+  "category": "generative styling benchmark",
+  "what_it_does": "Benchmark framework for evaluating generative styling models with image-quality and style metrics over a curated dataset.",
+  "succinct_summary": "Evaluation harness for styled image outputs, not a production avatar generator.",
+  "possible_use": "Potentially useful to compare avatar style-transfer or illustration variants if objective metrics are needed.",
+  "important_notes": "README labels it internal; depends on heavyweight image metric/model packages and external datasets."
+}

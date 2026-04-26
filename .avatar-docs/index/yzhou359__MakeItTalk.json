@@ -1,0 +1,12 @@
+{
+  "repo": "yzhou359/MakeItTalk",
+  "group": "already-cloned",
+  "url": "https://github.com/yzhou359/MakeItTalk.git",
+  "local_path": ".avatar-docs/repos/yzhou359__MakeItTalk",
+  "status": "cloned-from-prior",
+  "category": "legacy landmark talking head",
+  "what_it_does": "MakeItTalk: Speaker-Aware Talking-Head Animation; image+audio -> MP4",
+  "succinct_summary": "legacy landmark talking head: MakeItTalk: Speaker-Aware Talking-Head Animation",
+  "possible_use": "Older lightweight baseline; useful fallback, lower realism.",
+  "important_notes": "Older lightweight baseline; useful fallback, lower realism. Manifests: requirements.txt."
+}

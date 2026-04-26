@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/MIDI-3D",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/MIDI-3D.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__MIDI-3D",
+  "status": "available",
+  "category": "single-image 3D scene generation",
+  "what_it_does": "Generates compositional 3D scenes with multiple instances and spatial relationships from a single image.",
+  "succinct_summary": "Useful for Morgan avatar environments and multi-object scenes, less for the character rig itself.",
+  "possible_use": "Create contextual 3D scenes or props around Morgan from concept images.",
+  "important_notes": "Requires segmentation/image inputs and model weights; not primarily an avatar rigging repo."
+}

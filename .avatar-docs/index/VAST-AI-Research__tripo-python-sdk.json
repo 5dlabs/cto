@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/tripo-python-sdk",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/tripo-python-sdk.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__tripo-python-sdk",
+  "status": "available",
+  "category": "Python SDK",
+  "what_it_does": "Official Python client for Tripo 3D API, including text/image/multiview generation, mesh editing, conversion, rigging, and retargeting APIs.",
+  "succinct_summary": "High Morgan relevance as the direct programmable interface to Tripo avatar generation and processing.",
+  "possible_use": "Build automated Morgan avatar generation jobs, asset conversion, rigging calls, or retargeting pipelines.",
+  "important_notes": "Requires Tripo API key; inspect SDK method coverage before wiring production scripts."
+}

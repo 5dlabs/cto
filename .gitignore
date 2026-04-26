@@ -232,3 +232,13 @@ work
 test/cli-matrix/
 .firecrawl/
 nohup.out
+
+# Avatar research/cache artifacts (local only)
+.avatar-docs/repos/
+.avatar-docs/sources/legacy/
+output/avatar-provisioning/
+output/echo-turn-*/
+output/morgan-crop-*.jpg
+scripts/__pycache__/
+.copilot/
+.github/lsp.json

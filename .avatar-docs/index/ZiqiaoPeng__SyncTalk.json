@@ -1,0 +1,12 @@
+{
+  "repo": "ZiqiaoPeng/SyncTalk",
+  "group": "already-cloned",
+  "url": "https://github.com/ZiqiaoPeng/SyncTalk.git",
+  "local_path": ".avatar-docs/repos/ZiqiaoPeng__SyncTalk",
+  "status": "cloned-from-prior",
+  "category": "3D/NeRF talking head",
+  "what_it_does": "[CVPR 2024] This is the official source for our paper \"SyncTalk: The Devil is in the Synchronization for Talking Head Synthesis\"; audio -> rendered talking head/video",
+  "succinct_summary": "3D/NeRF talking head: [CVPR 2024] This is the official source for our paper \"SyncTalk: The Devil is in the Synchronization for Talking Head Synthesis\"",
+  "possible_use": "Synchronization research baseline; less immediate for a single Morgan image crop.",
+  "important_notes": "Researchy synchronization-focused 3D talking head; less immediate for Morgan portrait crop. Manifests: requirements.txt."
+}

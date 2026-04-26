@@ -1,0 +1,374 @@
+[
+  {
+    "full_name": "VAST-AI-Research/.github",
+    "url": "https://github.com/VAST-AI-Research/.github.git",
+    "group": "VAST-AI-Research",
+    "note": ""
+  },
+  {
+    "full_name": "VAST-AI-Research/AniGen",
+    "url": "https://github.com/VAST-AI-Research/AniGen.git",
+    "group": "VAST-AI-Research",
+    "note": "animatable 3D asset generation"
+  },
+  {
+    "full_name": "VAST-AI-Research/ComfyUI-Tripo",
+    "url": "https://github.com/VAST-AI-Research/ComfyUI-Tripo.git",
+    "group": "VAST-AI-Research",
+    "note": "Official custom nodes for using Tripo in ComfyUI."
+  },
+  {
+    "full_name": "VAST-AI-Research/Deformable-Radial-Kernel-Splatting",
+    "url": "https://github.com/VAST-AI-Research/Deformable-Radial-Kernel-Splatting.git",
+    "group": "VAST-AI-Research",
+    "note": "[CVPR 2025] Code for Deformable Radial Kernel Splatting"
+  },
+  {
+    "full_name": "VAST-AI-Research/DetailGen3D",
+    "url": "https://github.com/VAST-AI-Research/DetailGen3D.git",
+    "group": "VAST-AI-Research",
+    "note": ""
+  },
+  {
+    "full_name": "VAST-AI-Research/HoloPart",
+    "url": "https://github.com/VAST-AI-Research/HoloPart.git",
+    "group": "VAST-AI-Research",
+    "note": "HoloPart: Generative 3D Part Amodal Segmentation"
+  },
+  {
+    "full_name": "VAST-AI-Research/MIDI-3D",
+    "url": "https://github.com/VAST-AI-Research/MIDI-3D.git",
+    "group": "VAST-AI-Research",
+    "note": "[CVPR 2025] MIDI: Multi-Instance Diffusion for Single Image to 3D Scene Generation"
+  },
+  {
+    "full_name": "VAST-AI-Research/SeqTex",
+    "url": "https://github.com/VAST-AI-Research/SeqTex.git",
+    "group": "VAST-AI-Research",
+    "note": "[SIGGRAPH Asia 2025] Official github repo of SeqTex, an end-to-end 3D texture generation method using video diffusion priors."
+  },
+  {
+    "full_name": "VAST-AI-Research/SkinTokens",
+    "url": "https://github.com/VAST-AI-Research/SkinTokens.git",
+    "group": "VAST-AI-Research",
+    "note": "SkinTokens: A Learned Compact Representation for Unified Autoregressive Rigging"
+  },
+  {
+    "full_name": "VAST-AI-Research/TriplaneGaussian",
+    "url": "https://github.com/VAST-AI-Research/TriplaneGaussian.git",
+    "group": "VAST-AI-Research",
+    "note": "TriplaneGaussian: A new hybrid representation for single-view 3D reconstruction."
+  },
+  {
+    "full_name": "VAST-AI-Research/tripo-3d-for-blender",
+    "url": "https://github.com/VAST-AI-Research/tripo-3d-for-blender.git",
+    "group": "VAST-AI-Research",
+    "note": "Official extension for Blender"
+  },
+  {
+    "full_name": "VAST-AI-Research/tripo-mcp",
+    "url": "https://github.com/VAST-AI-Research/tripo-mcp.git",
+    "group": "VAST-AI-Research",
+    "note": "Official MCP server for Tripo"
+  },
+  {
+    "full_name": "VAST-AI-Research/tripo-python-sdk",
+    "url": "https://github.com/VAST-AI-Research/tripo-python-sdk.git",
+    "group": "VAST-AI-Research",
+    "note": "Official Tripo3d Python SDK"
+  },
+  {
+    "full_name": "VAST-AI-Research/TripoSF",
+    "url": "https://github.com/VAST-AI-Research/TripoSF.git",
+    "group": "VAST-AI-Research",
+    "note": "SparseFlex: High-Resolution and Arbitrary-Topology 3D Shape Modeling"
+  },
+  {
+    "full_name": "VAST-AI-Research/TripoSG",
+    "url": "https://github.com/VAST-AI-Research/TripoSG.git",
+    "group": "VAST-AI-Research",
+    "note": "TripoSG: High-Fidelity 3D Shape Synthesis using Large-Scale Rectified Flow Models"
+  },
+  {
+    "full_name": "VAST-AI-Research/TripoSR",
+    "url": "https://github.com/VAST-AI-Research/TripoSR.git",
+    "group": "VAST-AI-Research",
+    "note": "TripoSR: Fast 3D Object Reconstruction from a Single Image"
+  },
+  {
+    "full_name": "VAST-AI-Research/UniRig",
+    "url": "https://github.com/VAST-AI-Research/UniRig.git",
+    "group": "VAST-AI-Research",
+    "note": "auto-rigging candidate"
+  },
+  {
+    "full_name": "VAST-AI-Research/VAST-AI-Research.github.io",
+    "url": "https://github.com/VAST-AI-Research/VAST-AI-Research.github.io.git",
+    "group": "VAST-AI-Research",
+    "note": ""
+  },
+  {
+    "full_name": "ali-vilab/dreamtalk",
+    "url": "https://github.com/ali-vilab/dreamtalk.git",
+    "group": "already-cloned",
+    "note": "Older diffusion talking-head candidate; useful baseline."
+  },
+  {
+    "full_name": "antgroup/echomimic",
+    "url": "https://github.com/antgroup/echomimic.git",
+    "group": "already-cloned",
+    "note": "Known EchoMimic family; already partly integrated in our production bridge."
+  },
+  {
+    "full_name": "antgroup/echomimic_v2",
+    "url": "https://github.com/antgroup/echomimic_v2.git",
+    "group": "already-cloned",
+    "note": "High-quality body/portrait generation family; relevant if Morgan needs upper-body movement."
+  },
+  {
+    "full_name": "antgroup/echomimic_v3",
+    "url": "https://github.com/antgroup/echomimic_v3.git",
+    "group": "already-cloned",
+    "note": "Current EchoMimic V3 path; high quality but very slow on V100 in our tests."
+  },
+  {
+    "full_name": "ByteDance/LatentSync",
+    "url": "https://github.com/bytedance/LatentSync.git",
+    "group": "already-cloned",
+    "note": "Great if we already have a Morgan video; not single static portrait generation by itself."
+  },
+  {
+    "full_name": "Fantasy-AMAP/fantasy-talking",
+    "url": "https://github.com/Fantasy-AMAP/fantasy-talking.git",
+    "group": "already-cloned",
+    "note": "New high-quality Plan B for talking portrait from cleaned Morgan crop; heavy A100/20G+ path."
+  },
+  {
+    "full_name": "fudan-generative-vision/hallo",
+    "url": "https://github.com/fudan-generative-vision/hallo.git",
+    "group": "already-cloned",
+    "note": "Strong open portrait animation candidate."
+  },
+  {
+    "full_name": "fudan-generative-vision/hallo2",
+    "url": "https://github.com/fudan-generative-vision/hallo2.git",
+    "group": "already-cloned",
+    "note": "Updated Hallo path; likely better candidate than Hallo v1."
+  },
+  {
+    "full_name": "GVCLab/PersonaLive",
+    "url": "https://github.com/GVCLab/PersonaLive.git",
+    "group": "already-cloned",
+    "note": "Only >1k-star talking-head topic repo actually created in late 2025; important new Plan B/A candidate."
+  },
+  {
+    "full_name": "harlanhong/awesome-talking-head-generation",
+    "url": "https://github.com/harlanhong/awesome-talking-head-generation.git",
+    "group": "already-cloned",
+    "note": "Reference list for expanding the catalog."
+  },
+  {
+    "full_name": "Henry-23/VideoChat",
+    "url": "https://github.com/Henry-23/VideoChat.git",
+    "group": "already-cloned",
+    "note": "App-level realtime digital-human reference, likely more integration pattern than model breakthrough."
+  },
+  {
+    "full_name": "HumanAIGC/EMO",
+    "url": "https://github.com/HumanAIGC/EMO.git",
+    "group": "already-cloned",
+    "note": "Alibaba EMO family; important high-realism reference, but repo may be less turnkey."
+  },
+  {
+    "full_name": "Kedreamix/Awesome-Talking-Head-Synthesis",
+    "url": "https://github.com/Kedreamix/Awesome-Talking-Head-Synthesis.git",
+    "group": "already-cloned",
+    "note": "Useful source list for expanding options; not a runtime."
+  },
+  {
+    "full_name": "KwaiVGI/LivePortrait",
+    "url": "https://github.com/KlingAIResearch/LivePortrait.git",
+    "group": "already-cloned",
+    "note": "Excellent portrait retargeter; not audio-native, but useful if paired with generated driver/visemes."
+  },
+  {
+    "full_name": "lipku/LiveTalking",
+    "url": "https://github.com/lipku/LiveTalking.git",
+    "group": "already-cloned",
+    "note": "Operationally relevant: real-time interaction stack with MuseTalk/Wav2Lip/NeRF-style backends."
+  },
+  {
+    "full_name": "met4citizen/TalkingHead",
+    "url": "https://github.com/met4citizen/TalkingHead.git",
+    "group": "already-cloned",
+    "note": "Closest to our GLB/runtime line; not a portrait generator, but useful if Morgan becomes a rigged GLB."
+  },
+  {
+    "full_name": "OpenTalker/SadTalker",
+    "url": "https://github.com/OpenTalker/SadTalker.git",
+    "group": "already-cloned",
+    "note": "Popular Apache baseline; 3DMM/coefficient style, easier than Wan diffusion, lower realism ceiling."
+  },
+  {
+    "full_name": "OpenTalker/video-retalking",
+    "url": "https://github.com/OpenTalker/video-retalking.git",
+    "group": "already-cloned",
+    "note": "Edits an existing face video to match audio; useful after creating a base Morgan clip."
+  },
+  {
+    "full_name": "Rudrabha/Wav2Lip",
+    "url": "https://github.com/Rudrabha/Wav2Lip.git",
+    "group": "already-cloned",
+    "note": "Classic lip-sync; best as refinement/compositor, not full body expression generator."
+  },
+  {
+    "full_name": "tencent-ailab/V-Express",
+    "url": "https://github.com/tencent-ailab/V-Express.git",
+    "group": "already-cloned",
+    "note": "Tencent portrait animation with progressive conditional dropout; likely high-quality batch candidate."
+  },
+  {
+    "full_name": "TMElyralab/MuseTalk",
+    "url": "https://github.com/TMElyralab/MuseTalk.git",
+    "group": "already-cloned",
+    "note": "Fast/realtime-oriented; already considered, good for latency but visual ceiling may trail newest diffusion."
+  },
+  {
+    "full_name": "yoyo-nb/Thin-Plate-Spline-Motion-Model",
+    "url": "https://github.com/yoyo-nb/Thin-Plate-Spline-Motion-Model.git",
+    "group": "already-cloned",
+    "note": "Motion transfer baseline; no audio-native talking portrait pipeline."
+  },
+  {
+    "full_name": "yzhou359/MakeItTalk",
+    "url": "https://github.com/yzhou359/MakeItTalk.git",
+    "group": "already-cloned",
+    "note": "Older lightweight baseline; useful fallback, lower realism."
+  },
+  {
+    "full_name": "Zejun-Yang/AniPortrait",
+    "url": "https://github.com/Zejun-Yang/AniPortrait.git",
+    "group": "already-cloned",
+    "note": "AnimateDiff/stable-diffusion style portrait animation; solid Plan B candidate."
+  },
+  {
+    "full_name": "ZiqiaoPeng/SyncTalk",
+    "url": "https://github.com/ZiqiaoPeng/SyncTalk.git",
+    "group": "already-cloned",
+    "note": "Synchronization research baseline; less immediate for a single Morgan image crop."
+  },
+  {
+    "full_name": "302ai/302_lipsync",
+    "url": "https://github.com/302ai/302_lipsync.git",
+    "group": "explicit",
+    "note": "hosted/API lip-sync reference"
+  },
+  {
+    "full_name": "dimgerogiannis/Arc2Avatar",
+    "url": "https://github.com/dimgerogiannis/Arc2Avatar.git",
+    "group": "explicit",
+    "note": "single-image/avatar reconstruction candidate"
+  },
+  {
+    "full_name": "DRiVEAvatar/DRiVEAvatar.github.io",
+    "url": "https://github.com/DRiVEAvatar/DRiVEAvatar.github.io.git",
+    "group": "explicit",
+    "note": "DRiVEAvatar project/docs"
+  },
+  {
+    "full_name": "fagenorn/handcrafted-persona-engine",
+    "url": "https://github.com/fagenorn/handcrafted-persona-engine.git",
+    "group": "explicit",
+    "note": "persona/behavior engine candidate"
+  },
+  {
+    "full_name": "gradio-app/gradio",
+    "url": "https://github.com/gradio-app/gradio.git",
+    "group": "explicit",
+    "note": "UI layer for puppeteering/model demos"
+  },
+  {
+    "full_name": "hongfz16/AvatarCLIP",
+    "url": "https://github.com/hongfz16/AvatarCLIP.git",
+    "group": "explicit",
+    "note": "text-driven avatar animation/generation reference"
+  },
+  {
+    "full_name": "makehumancommunity/makehuman",
+    "url": "https://github.com/makehumancommunity/makehuman.git",
+    "group": "explicit",
+    "note": "open human character modeling baseline"
+  },
+  {
+    "full_name": "met4citizen/HeadTTS",
+    "url": "https://github.com/met4citizen/HeadTTS.git",
+    "group": "explicit",
+    "note": "browser HeadTTS/TalkingHead related runtime"
+  },
+  {
+    "full_name": "Seed3D/Puppeteer",
+    "url": "https://github.com/Seed3D/Puppeteer.git",
+    "group": "explicit",
+    "note": "puppeteering/animation candidate"
+  },
+  {
+    "full_name": "summertight/TexAvatars_repo",
+    "url": "https://github.com/summertight/TexAvatars_repo.git",
+    "group": "explicit",
+    "note": "textured avatars candidate"
+  },
+  {
+    "full_name": "ValyrianTech/AgentRig",
+    "url": "https://github.com/ValyrianTech/AgentRig.git",
+    "group": "explicit",
+    "note": "agent/persona rigging candidate"
+  },
+  {
+    "full_name": "initml/clipdrop",
+    "url": "https://github.com/initml/clipdrop.git",
+    "group": "initml",
+    "note": ""
+  },
+  {
+    "full_name": "initml/clipdrop-api-samples",
+    "url": "https://github.com/initml/clipdrop-api-samples.git",
+    "group": "initml",
+    "note": "Public samples using the ClipDrop API"
+  },
+  {
+    "full_name": "initml/diffusers",
+    "url": "https://github.com/initml/diffusers.git",
+    "group": "initml",
+    "note": "\ud83e\udd17 Diffusers: State-of-the-art diffusion models for image and audio generation in PyTorch"
+  },
+  {
+    "full_name": "initml/sam-hq",
+    "url": "https://github.com/initml/sam-hq.git",
+    "group": "initml",
+    "note": "Segment Anything in High Quality [NeurIPS 2023]"
+  },
+  {
+    "full_name": "initml/smolagents-tests",
+    "url": "https://github.com/initml/smolagents-tests.git",
+    "group": "initml",
+    "note": "\ud83e\udd17 smolagents: a barebones library for agents. Agents write python code to call tools and orchestrate other agents."
+  },
+  {
+    "full_name": "initml/social-files-size",
+    "url": "https://github.com/initml/social-files-size.git",
+    "group": "initml",
+    "note": ""
+  },
+  {
+    "full_name": "initml/style-rank",
+    "url": "https://github.com/initml/style-rank.git",
+    "group": "initml",
+    "note": "A unified benchmarking framework for generative styling models in PyTorch"
+  },
+  {
+    "full_name": "initml/wasmedge-nodejs-starter",
+    "url": "https://github.com/initml/wasmedge-nodejs-starter.git",
+    "group": "initml",
+    "note": "A template project to run Rust functions in Node.js through the Second State WebAssembly engine."
+  }
+]

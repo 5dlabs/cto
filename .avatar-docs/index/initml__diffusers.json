@@ -1,0 +1,12 @@
+{
+  "repo": "initml/diffusers",
+  "group": "initml",
+  "url": "https://github.com/initml/diffusers.git",
+  "local_path": ".avatar-docs/repos/initml__diffusers",
+  "status": "cloned",
+  "category": "diffusion model library fork",
+  "what_it_does": "Fork of Hugging Face Diffusers for pretrained diffusion pipelines, schedulers, and model building blocks for image/audio generation.",
+  "succinct_summary": "Broad diffusion toolkit; relevant conceptually for generation but not avatar-specific by itself.",
+  "possible_use": "Useful reference for image generation/inpainting pipeline code if the avatar stack needs custom diffusion integration.",
+  "important_notes": "Large general-purpose library fork; prefer upstream docs unless this fork has ClipDrop-specific changes."
+}

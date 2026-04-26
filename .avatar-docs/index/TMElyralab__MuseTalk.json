@@ -1,0 +1,12 @@
+{
+  "repo": "TMElyralab/MuseTalk",
+  "group": "already-cloned",
+  "url": "https://github.com/TMElyralab/MuseTalk.git",
+  "local_path": ".avatar-docs/repos/TMElyralab__MuseTalk",
+  "status": "cloned-from-prior",
+  "category": "realtime lip-sync/talking face",
+  "what_it_does": "MuseTalk: Real-Time High Quality Lip Synchorization with Latent Space Inpainting; image/video+audio -> video",
+  "succinct_summary": "realtime lip-sync/talking face: MuseTalk: Real-Time High Quality Lip Synchorization with Latent Space Inpainting",
+  "possible_use": "Fast/realtime-oriented; already considered, good for latency but visual ceiling may trail newest diffusion.",
+  "important_notes": "Fast/realtime-oriented; already considered, good for latency but visual ceiling may trail newest diffusion. Manifests: requirements.txt."
+}
