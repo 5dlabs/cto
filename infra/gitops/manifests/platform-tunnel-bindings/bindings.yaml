@@ -26,6 +26,24 @@ tunnelRef:
   kind: ClusterTunnel
   name: cto-main
 ---
+# avatar-openclaw.5dlabs.ai routes to the GPU-backed Avatar OpenClaw
+# code-server port. Keep this hostname behind Cloudflare Access, matching the
+# security posture for coder.5dlabs.ai.
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: avatar-openclaw-code-server
+  namespace: cto
+subjects:
+  - kind: Service
+    name: openclaw-avatar-openclaw
+    spec:
+      fqdn: avatar-openclaw.5dlabs.ai
+      target: http://openclaw-avatar-openclaw.cto.svc:8080
+tunnelRef:
+  kind: ClusterTunnel
+  name: cto-main
+---
 apiVersion: networking.cfargotunnel.com/v1alpha1
 kind: TunnelBinding
 metadata:

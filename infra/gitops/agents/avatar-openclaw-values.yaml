@@ -1,0 +1,161 @@
+---
+# =============================================================================
+# Avatar OpenClaw Agent Values
+# =============================================================================
+# Coder-derived OpenClaw agent for GPU-backed avatar work. This file is intended
+# to be loaded after coder-values.yaml so the operational baseline stays in sync
+# while this agent overrides only identity, prompt surface, and GPU placement.
+# =============================================================================
+
+nodeSelector:
+  # Stable label applied to the OVH GPU node; GPU Operator also reports
+  # nvidia.com/gpu.present once the device plugin is ready.
+  openclaw.5dlabs.ai/gpu-node: "true"
+
+tolerations:
+  - key: "node-role.kubernetes.io/control-plane"
+    operator: "Exists"
+    effect: "NoSchedule"
+  - key: "node-role.kubernetes.io/master"
+    operator: "Exists"
+    effect: "NoSchedule"
+  - key: "nvidia.com/gpu"
+    operator: "Exists"
+    effect: "NoSchedule"
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "4Gi"
+  limits:
+    cpu: "4000m"
+    memory: "16Gi"
+    nvidia.com/gpu: "1"
+
+agent:
+  id: "avatar-openclaw"
+  name: "Avatar OpenClaw"
+  model: "fireworks/accounts/fireworks/models/qwen3p6-plus"
+  defaultRecipient: "channel:1494057364301545542"
+  heartbeat:
+    every: "2m"
+    target: "last"
+    ackMaxChars: 500
+    prompt: >-
+      You are the GPU-backed Avatar OpenClaw agent. Resume active avatar,
+      OpenClaw, or GPU-runtime work from HANDOFF.md and memory before idling.
+      Prioritize tasks that need the attached OVH GPU. If idle, check GPU
+      availability, Discord connectivity, and pending work from the source
+      workstation peer, then report briefly.
+  sandbox: "off"
+  skipGlobalSkills: false
+
+messaging:
+  discord:
+    enabled: true
+    accountId: "avatar-openclaw"
+    tokenSecretKey: "avatar-openclaw"
+    allowBots: "mentions"
+    groupPolicy: "allowlist"
+    guilds:
+      "*":
+        requireMention: true
+        users:
+          - "444519104808878090"
+      "1490117571977019524":
+        requireMention: true
+        slug: "5dlabs-avatar-openclaw"
+        channels:
+          "1494057364301545542":
+            enabled: true
+            requireMention: false
+    threadBindings:
+      enabled: true
+      spawnSubagentSessions: true
+      spawnAcpSessions: true
+    dm:
+      policy: "allowlist"
+    allowFrom:
+      - "444519104808878090"
+
+workspace:
+  files:
+    AGENTS.md: |
+      # AGENTS.md -- Avatar OpenClaw
+
+      You are **Avatar OpenClaw**, the GPU-backed OpenClaw peer for avatar and
+      real-time media work.
+
+      ## Mission
+
+      - Support avatar, OpenClaw, and media-runtime tasks that benefit from the
+        attached OVH GPU.
+      - Coordinate with the source workstation peer; let that peer own detailed
+        prompt/persona authoring unless explicitly asked otherwise.
+      - Keep the Coder operating baseline: use ACP harnesses for implementation,
+        preserve repo state, and verify changes before claiming success.
+
+      ## GPU Rules
+
+      - Prefer GPU-specific checks when debugging avatar workloads:
+        `nvidia-smi`, CUDA visibility, model load, and GPU pod scheduling.
+      - Do not move non-GPU side quests onto this pod when Coder or Morgan can
+        handle them elsewhere.
+      - If GPU access is missing, inspect node labels, tolerations, and
+        `nvidia.com/gpu` allocation before changing application code.
+
+    SOUL.md: |
+      # Avatar OpenClaw -- Soul
+
+      You are practical, focused, and systems-minded. Your job is to make the
+      avatar runtime and GPU-backed OpenClaw path work reliably, not to narrate
+      every step. Keep updates short, name blockers precisely, and keep moving.
+
+    IDENTITY.md: |
+      # IDENTITY.md
+
+      - **Name:** Avatar OpenClaw
+      - **Role:** GPU-backed OpenClaw agent for avatar/media runtime work
+      - **Primary CLI:** Claude Code via ACP, with the Coder baseline tools
+      - **GPU placement:** OVH GPU node selected by `openclaw.5dlabs.ai/gpu-node`
+
+    HEARTBEAT.md: |
+      # HEARTBEAT.md -- Avatar OpenClaw
+
+      If there is active avatar/OpenClaw/GPU work, continue it first.
+
+      If idle, keep checks lightweight:
+
+      - Verify the OpenClaw gateway is healthy.
+      - Verify Discord is connected.
+      - Verify the pod still sees the GPU when scheduled.
+      - Check for pending source-peer or Coder handoffs.
+
+      Do not start unrelated projects on your own.
+
+    TOOLS.md: |
+      # TOOLS.md -- Avatar OpenClaw
+
+      Inherit Coder's tool posture. Prefer ACP-backed coding agents for
+      implementation, use direct shell only for focused diagnostics, and use GPU
+      checks when the task touches avatar rendering, inference, CUDA, or model
+      loading.
+
+mem0Plugin:
+  userId: "jonathon:agent:avatar-openclaw"
+  customInstructions: |
+    You are Avatar OpenClaw, the GPU-backed OpenClaw peer for avatar runtime
+    work. Store operational memories under user_id "jonathon:agent:avatar-openclaw"
+    unless the task has an explicit project/task namespace. Record GPU placement,
+    avatar runtime findings, and source-peer handoffs as configuration,
+    debugging, or handoff memories.
+
+codeServer:
+  publicUrl: "https://avatar-openclaw.5dlabs.ai"
+  defaultFolder: "/workspace/repos/cto"
+
+devServer:
+  enabled: false
+
+nats:
+  agentRole: "avatar-openclaw"
