@@ -1,0 +1,12 @@
+{
+  "repo": "DRiVEAvatar/DRiVEAvatar.github.io",
+  "group": "explicit",
+  "url": "https://github.com/DRiVEAvatar/DRiVEAvatar.github.io.git",
+  "local_path": ".avatar-docs/repos/DRiVEAvatar__DRiVEAvatar.github.io",
+  "status": "cloned",
+  "category": "avatar driving project metadata",
+  "what_it_does": "Project website/docs for DRiVEAvatar-style driven avatar animation.",
+  "succinct_summary": "Best treated as method and demo reference rather than a direct runtime dependency.",
+  "possible_use": "Mine the project page for papers, demos, and implementation links relevant to driving Morgan motion.",
+  "important_notes": "Website repo may not contain executable training/inference code; follow upstream links if deeper evaluation is needed. README hint: DRiVEAvatar.github.io"
+}

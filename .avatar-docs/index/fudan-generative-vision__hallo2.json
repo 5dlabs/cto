@@ -1,0 +1,12 @@
+{
+  "repo": "fudan-generative-vision/hallo2",
+  "group": "already-cloned",
+  "url": "https://github.com/fudan-generative-vision/hallo2.git",
+  "local_path": ".avatar-docs/repos/fudan-generative-vision__hallo2",
+  "status": "cloned-from-prior",
+  "category": "audio-driven portrait animation v2",
+  "what_it_does": "[ICLR 2025] Hallo2: Long-Duration and High-Resolution Audio-driven Portrait Image Animation; image+audio -> MP4",
+  "succinct_summary": "audio-driven portrait animation v2: [ICLR 2025] Hallo2: Long-Duration and High-Resolution Audio-driven Portrait Image Animation",
+  "possible_use": "Updated Hallo path; likely better candidate than Hallo v1.",
+  "important_notes": "Updated Hallo path; likely better candidate than Hallo v1. Manifests: requirements.txt."
+}

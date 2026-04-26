@@ -1,0 +1,12 @@
+{
+  "repo": "tencent-ailab/V-Express",
+  "group": "already-cloned",
+  "url": "https://github.com/tencent-ailab/V-Express.git",
+  "local_path": ".avatar-docs/repos/tencent-ailab__V-Express",
+  "status": "cloned-from-prior",
+  "category": "portrait video diffusion",
+  "what_it_does": "V-Express aims to generate a talking head video under the control of a reference image, an audio, and a sequence of V-Kps images.; image+audio -> MP4",
+  "succinct_summary": "portrait video diffusion: V-Express aims to generate a talking head video under the control of a reference image, an audio, and a sequence of V-Kps images.",
+  "possible_use": "Tencent portrait animation with progressive conditional dropout; likely high-quality batch candidate.",
+  "important_notes": "Tencent portrait animation with progressive conditional dropout; likely high-quality batch candidate. Manifests: requirements.txt."
+}

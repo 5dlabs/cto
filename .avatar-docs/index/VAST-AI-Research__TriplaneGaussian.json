@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/TriplaneGaussian",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/TriplaneGaussian.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__TriplaneGaussian",
+  "status": "available",
+  "category": "single-view 3D reconstruction",
+  "what_it_does": "Fast single-image 3D reconstruction using a hybrid triplane/Gaussian representation.",
+  "succinct_summary": "Medium Morgan relevance as an older fast reconstruction baseline for image-to-3D avatar geometry.",
+  "possible_use": "Reference for quick image-to-3D experiments when TripoSR/SG/SF are not appropriate.",
+  "important_notes": "Research model, not rigging; generated geometry would still need rig/skin pipeline."
+}

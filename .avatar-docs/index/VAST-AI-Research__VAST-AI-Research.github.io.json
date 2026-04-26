@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/VAST-AI-Research.github.io",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/VAST-AI-Research.github.io.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__VAST-AI-Research.github.io",
+  "status": "available",
+  "category": "project website",
+  "what_it_does": "Static GitHub Pages site for the VAST-AI-Research organization/projects.",
+  "succinct_summary": "Low direct Morgan avatar relevance; useful only as a landing-page index to related projects.",
+  "possible_use": "Source links or project-page cross references for the final docs index.",
+  "important_notes": "No implementation pipeline; do not treat as an avatar generation repo."
+}

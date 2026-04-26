@@ -1,0 +1,12 @@
+{
+  "repo": "fudan-generative-vision/hallo",
+  "group": "already-cloned",
+  "url": "https://github.com/fudan-generative-vision/hallo.git",
+  "local_path": ".avatar-docs/repos/fudan-generative-vision__hallo",
+  "status": "cloned-from-prior",
+  "category": "audio-driven portrait animation",
+  "what_it_does": "Hallo: Hierarchical Audio-Driven Visual Synthesis for Portrait Image Animation; image+audio -> MP4",
+  "succinct_summary": "audio-driven portrait animation: Hallo: Hierarchical Audio-Driven Visual Synthesis for Portrait Image Animation",
+  "possible_use": "Strong open portrait animation candidate.",
+  "important_notes": "Strong open portrait animation candidate. Manifests: requirements.txt."
+}

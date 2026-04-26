@@ -1,0 +1,174 @@
+{
+  "source": "Public Scenario.com model, app, help, and blog pages scraped/searched 2026-04-26; no login-only app content captured.",
+  "status": "complete_public_notes; 20 candidates cataloged. Direct public OmniHuman model page was not found, but OmniHuman remains noted via Scenario's lip-sync blog and plan list.",
+  "candidates": [
+    {
+      "name": "Kling AI Avatar 2 (Pro)",
+      "url": "https://www.scenario.com/models/kling-ai-avatar-2-pro",
+      "category": "talking portrait",
+      "what_it_does": "Generates a lifelike talking video from one static image plus an audio track, with precise lip-sync and facial animation.",
+      "possible_use": "Fast Morgan speaking-head clips from a approved portrait and generated voiceover.",
+      "notes": "Pro-plan model per Scenario plan list; best fit when we need a direct image+audio avatar rather than a full 3D rig."
+    },
+    {
+      "name": "HeyGen Avatar 4",
+      "url": "https://www.scenario.com/models/heygen-avatar-4",
+      "category": "talking portrait",
+      "what_it_does": "Creates realistic talking-avatar videos from a photo and text prompt with built-in TTS voices.",
+      "possible_use": "Alternative Morgan presenter workflow when we want turnkey photo-to-spokesperson output.",
+      "notes": "Starter-plan model per Scenario plan list; useful benchmark against Kling Avatar."
+    },
+    {
+      "name": "Veed Fabric Lipsync 1.0",
+      "url": "https://www.scenario.com/models/veed-fabric-lipsync-10",
+      "category": "talking portrait",
+      "what_it_does": "Turns static images into high-fidelity talking videos with audio-driven mouth movement and facial expressions.",
+      "possible_use": "Compare against Kling Avatar for Morgan head-and-shoulders messages where mouth accuracy matters most.",
+      "notes": "Pro-plan model per Scenario plan list; supports 480p/720p according to public page."
+    },
+    {
+      "name": "Sync-3 Lipsync",
+      "url": "https://www.scenario.com/models/sync-3-lipsync",
+      "category": "talking portrait",
+      "what_it_does": "Professional-grade video lip synchronization that aligns audio with facial movement.",
+      "possible_use": "Polish or redub Morgan clips after a video take already exists.",
+      "notes": "Pro-plan model per Scenario plan list; good for production comparison passes."
+    },
+    {
+      "name": "Pixverse Lipsync",
+      "url": "https://www.scenario.com/models/pixverse-lipsync",
+      "category": "talking portrait",
+      "what_it_does": "Synchronizes an audio track to a speaker's mouth movement in video for realistic dialogue.",
+      "possible_use": "Stylized Morgan avatar/dialogue tests, especially if a painterly or cinematic look is desired.",
+      "notes": "Scenario blog positions Pixverse as stronger for art-directed lip sync; Pro-plan video editing model."
+    },
+    {
+      "name": "Kling Lipsync",
+      "url": "https://www.scenario.com/models/kling-lipsync",
+      "category": "talking portrait",
+      "what_it_does": "Applies accurate lip-sync to an existing video using a separate audio track while leaving the rest of the clip mostly untouched.",
+      "possible_use": "Quickly re-time Morgan dialogue in an existing generated or composited clip.",
+      "notes": "Scenario blog calls Kling the fast iteration option for short lip-sync lines; Pro-plan video editing model."
+    },
+    {
+      "name": "Add characters into your video",
+      "url": "https://www.scenario.com/apps/add-characters-into-your-video",
+      "category": "image/video avatar",
+      "what_it_does": "Workflow app that composites one or two uploaded characters naturally into a reference video using Kling V3 Omni Video.",
+      "possible_use": "Drop Morgan into existing background footage or announcements without green-screen setup.",
+      "notes": "Useful if Morgan needs to appear in a scene rather than as a cropped talking portrait."
+    },
+    {
+      "name": "Kling V3 Omni Video",
+      "url": "https://www.scenario.com/models/kling-v3-omni-video",
+      "category": "image/video avatar",
+      "what_it_does": "Top-tier video generation with cinematic visuals, fluid motion, native audio generation, and multi-shot support.",
+      "possible_use": "Broader Morgan motion/video scene tests beyond lipsync-only head shots.",
+      "notes": "Listed on models index and used by the add-characters app; Pro-plan model per current plan list."
+    },
+    {
+      "name": "Tripo 3.1",
+      "url": "https://www.scenario.com/models/tripo-31",
+      "category": "3D model generation",
+      "what_it_does": "Converts a single image into a textured, game-ready 3D asset with high-quality PBR textures and low-poly/high-detail options.",
+      "possible_use": "Convert Morgan concept art into a draft 3D model for testing silhouettes, turntables, or downstream rigging.",
+      "notes": "Free-plan 3D model per Scenario plan list; blog notes Multi View can use front/back/left/right for stronger 360 consistency."
+    },
+    {
+      "name": "Tripo 3.0",
+      "url": "https://www.scenario.com/models/tripo-30",
+      "category": "3D model generation",
+      "what_it_does": "Generates high-fidelity 3D models from text, sketches, or images with PBR maps, quad mesh options, and face-limit controls.",
+      "possible_use": "Baseline 3D generation benchmark for Morgan before paying for newer/higher-tier models.",
+      "notes": "Free-plan model; public blog emphasizes clean, usable game/animation/AR outputs."
+    },
+    {
+      "name": "Hunyuan 3D 3.1 Pro",
+      "url": "https://www.scenario.com/models/hunyuan-3d-31-pro",
+      "category": "3D model generation",
+      "what_it_does": "Tencent image-to-3D model with 1536\u00b3 resolution, hierarchical 3D-DiT carving, 4K PBR textures, and face-count controls.",
+      "possible_use": "Higher-fidelity Morgan 3D starting point once the 2D identity/turnaround is locked.",
+      "notes": "Starter-plan model per current plan list; public page says generation takes several minutes and supports 50k-1.5M polygon targets."
+    },
+    {
+      "name": "Hunyuan/HY 3D Pro family (Standard, Multiview, Sketch)",
+      "url": "https://www.scenario.com/blog/from-2d-to-3d-quickly-hunyuan-3d-pro",
+      "category": "3D model generation",
+      "what_it_does": "Family workflow for single-image, multi-view turnaround, or sketch-to-3D generation, with optimized mesh controls.",
+      "possible_use": "Use Standard for a Morgan hero portrait, Multiview for model sheets, or Sketch for early avatar concept volume tests.",
+      "notes": "Blog explains Hunyuan was renamed HY and emphasizes these outputs as starting points, not final production rigs."
+    },
+    {
+      "name": "Image to Rigged Low Poly Character",
+      "url": "https://www.scenario.com/apps/image-to-rigged-low-poly-character",
+      "category": "3D model generation",
+      "what_it_does": "App chain that turns one 2D character image into an optimized 3D asset using Tripo 3.1, retopology, texturing, and rigging tools.",
+      "possible_use": "End-to-end Morgan proof of concept from portrait/concept art to low-poly rigged character.",
+      "notes": "Uses Tripo 3.1, Tripo Rigging 1.0, Tripo Retopology, Tripo 3.0 Texturing, Photoroom, Gemini, SeedVR2, and Scenario LLM."
+    },
+    {
+      "name": "Game 3D Assets - Concept to 3D Model",
+      "url": "https://www.scenario.com/apps/game-3d-assets-concept-to-3d-model",
+      "category": "3D model generation",
+      "what_it_does": "Workflow app that turns text prompts and style references into high-quality 3D game assets using Gemini 3.1 and Tripo 3.1.",
+      "possible_use": "Generate Morgan props/accessories or alternate style-matched 3D avatar concepts.",
+      "notes": "Less rig-focused than the low-poly character app, but useful for style-to-asset iteration."
+    },
+    {
+      "name": "3D Model Auto-Rigging: Biped Character",
+      "url": "https://www.scenario.com/apps/3d-model-auto-rigging-biped-character",
+      "category": "rigging",
+      "what_it_does": "Workflow app for adding professional bone skeletons and rigging to 3D biped models using Tripo Rigging 1.0.",
+      "possible_use": "Rig an imported Morgan humanoid mesh after Tripo/Hunyuan generation.",
+      "notes": "Directly aligned with biped avatar animation readiness."
+    },
+    {
+      "name": "Tripo Rigging 1.0",
+      "url": "https://www.scenario.com/models/tripo-rigging-10",
+      "category": "rigging",
+      "what_it_does": "Automatically detects skeletons and applies bones, skin weights, and retargetable preset animations to 3D meshes.",
+      "possible_use": "Turn Morgan 3D mesh into an animation-ready asset for walk/talk/gesture tests.",
+      "notes": "Pro-plan model per current plan list; supports multiple rig types, not just bipeds."
+    },
+    {
+      "name": "Tripo Retopology",
+      "url": "https://www.scenario.com/models/tripo-retopology",
+      "category": "rigging",
+      "what_it_does": "Converts complex meshes into cleaner, lower-poly geometry with face limits, quad mesh option, and texture baking.",
+      "possible_use": "Clean up Morgan meshes before rigging or realtime rendering.",
+      "notes": "Pro-plan model per current plan list; important if Hunyuan/Tripo output is too dense."
+    },
+    {
+      "name": "2D Animation Rigging Sheet",
+      "url": "https://www.scenario.com/apps/2d-animation-rigging-sheet",
+      "category": "rigging",
+      "what_it_does": "Generates separated 2D character parts sheets for Spine, Live2D, Moho, or similar 2D rigging tools.",
+      "possible_use": "Alternative Morgan Live2D-style path if full 3D is overkill for speaking avatar needs.",
+      "notes": "Uses Gemini 3.1; useful for testing a lightweight animated-avatar pipeline."
+    },
+    {
+      "name": "Generate Turnarounds in Scenario",
+      "url": "https://www.scenario.com/blog/generate-character-turnarounds-scenario",
+      "category": "evaluation",
+      "what_it_does": "Guide for creating consistent front/side/back character views using prompt edits, Pixverse rotation capture, or custom-trained models with pose control.",
+      "possible_use": "Preparation step before 3D Morgan generation, especially for Hunyuan/Tripo multiview inputs.",
+      "notes": "Public blog recommends retouch/upscale and ControlNet/Pose-style structure to reduce identity drift."
+    },
+    {
+      "name": "How to Choose the Right Model(s)",
+      "url": "https://help.scenario.com/articles/4037837468-how-to-choose-the-right-model-s",
+      "category": "evaluation",
+      "what_it_does": "Scenario decision guide for image, video, generative 3D, and texture model selection.",
+      "possible_use": "Use as evaluation rubric for Morgan experiments: start simple, compare models, then move to specialized or trained models.",
+      "notes": "Mentions testing Seedance/Kling/PixVerse for video and Hunyuan/Rodin/Multiview for 3D."
+    },
+    {
+      "name": "Current plan model availability",
+      "url": "https://help.scenario.com/articles/8354216901-what-models-are-available-on-my-current-plan",
+      "category": "evaluation",
+      "what_it_does": "Plan-tier list of Scenario models across image, video, 3D, audio, and text.",
+      "possible_use": "Subscription planning for Morgan avatar tests: identify whether Free, Starter, Pro, Max, or Enterprise is needed.",
+      "notes": "Key subscription signal: Tripo 3.0/3.1 are Free; Hunyuan 3.1 Pro is Starter; Kling Avatar, Veed Fabric, Sync-3, Tripo Rigging, and Retopology are Pro."
+    }
+  ]
+}

@@ -27,6 +27,11 @@
 AVATAR_DD_FROM=now-1h ./scripts/avatar-log-validation.sh validate
 ```
 
+Current production cutline: `/echo-turn` uses OpenClaw Morgan text,
+ElevenLabs TTS with cache/backoff, and async EchoMimic MP4 on OVH AI Deploy.
+It does **not** require an OpenAI key, user-facing NATS, a Kubernetes/desktop
+GPU, LemonSlice/TalkingHead, or `model_q8.onnx`.
+
 The wrapper script auto-discovers the session-local
 `dd-avatar-tail.sh` helper under
 `~/.copilot/session-state/*/files/`. It reads Datadog credentials from the
@@ -41,7 +46,8 @@ Run **`validate`** (one-shot) immediately before:
 1. Any **remote readiness test** that hits `/echo-turn` (manual or scripted).
 2. Any **deploy** of `morgan-avatar-agent`, `openclaw-morgan`, or the
    EchoMimic FastAPI app.
-3. Any **provider switch** (EchoMimic ↔ LemonSlice, OpenAI ↔ fallback).
+3. Any **provider switch** (EchoMimic ↔ LemonSlice/reference) or gateway/TTS
+   fallback behavior change.
 4. Reopening an avatar session after the prior browser/CDP session expired.
 
 > **Restart / redeploy caveat (3-day production bridge).** The async
@@ -62,23 +68,26 @@ see blocker hits in real time.
 
 The gate does **not** require a live EchoMimic render — that is the whole
 point. Skip the live render unless the gate is green and a render is
-explicitly required.
+explicitly required. When a live production render is required, budget for
+the latest observed latency: ~205s upstream EchoMimic time and ~215s total
+public `/echo-turn` E2E before the final `video/mp4`.
 
 ---
 
 ## 2. Blocker checklist
 
-The wrapper grep-scans the Datadog window for these classes of blocker.
-Each must be **absent** for the gate to pass; if any are present, fix
-upstream before any render.
+The wrapper grep-scans the Datadog window for these classes of issue.
+Production blockers must be **absent** for the gate to pass; if any are
+present, fix upstream before any render. Legacy NATS hits are informational
+for `/echo-turn` unless you are explicitly validating the LiveKit agent path.
 
 | Label | What it means | Typical fix surface |
 |---|---|---|
-| **cloudflare-524** | Origin (EchoMimic / Next.js) exceeded Cloudflare's 100s timeout. | EchoMimic GPU saturation, queue depth, or a stuck `/animate` request. |
-| **openai-auth-fallback** | OpenAI returned 401/403 or the gateway logged a fallback to a non-OpenAI path. | Rotate / re-bind `OPENAI_API_KEY`; do **not** silently fall back during a readiness test. |
-| **tts-fallback-header** | `/api/echo-turn/tts` served the canned `voice_clone_sample.mp3` (header `x-tts-fallback`) or ElevenLabs returned 401/403. | Rotate `ELEVENLABS_API_KEY` or unblock egress. |
-| **echomimic-5xx** | `/animate` returned 5xx, timed out, or logged an internal error. | EchoMimic pod / GPU; verify model weights and queue. |
-| **nats-stale-narration** | NATS narration channel stale, disconnected, "no responders", or narration logged stuck. | Restart `morgan-avatar-agent`; verify NATS connectivity. |
+| **cloudflare-524** | Origin (EchoMimic / Next.js) exceeded Cloudflare's 100s timeout. | EchoMimic OVH AI Deploy saturation, queue depth, or a stuck `/animate` request. |
+| **openai-auth-fallback** *(legacy script label)* | Historical scanner label. For current `/echo-turn`, treat it as an OpenClaw Morgan routing/auth issue only if `/api/echo-turn/chat` returned 401/403 or fell back to the canned reply. | Verify `MORGAN_GATEWAY_URL`, `OPENCLAW_TOKEN`, and `MORGAN_LLM_AGENT_ID=morgan`; do **not** add or rotate `OPENAI_API_KEY` for this path. |
+| **tts-fallback-header** | `/api/echo-turn/tts` served the canned `voice_clone_sample.mp3` (header `X-Morgan-TTS-Fallback`) or ElevenLabs returned 401/403/429. Cache hits use `X-Morgan-TTS-Cache: hit` and are healthy. | Rotate `ELEVENLABS_API_KEY`, check ElevenLabs egress/rate limits, or wait for the route's `Retry-After` backoff to expire. |
+| **echomimic-5xx** | `/animate` returned 5xx, timed out, or logged an internal error. | Check the EchoMimic OVH AI Deploy worker and queue. Do not block on Kubernetes GPU scheduling or `model_q8.onnx`; neither is required by the production cutline. |
+| **nats-stale-narration** *(legacy/non-blocking for `/echo-turn`)* | NATS narration/channel errors appear in legacy LiveKit/agent logs. | Not a `/echo-turn` production blocker unless you are explicitly validating the LiveKit agent path. The public avatar/desktop path does not use user-facing NATS. |
 | **browser-stuck-working** | Browser/agent logs show the avatar frozen in a working / stalled state. | Reload tab, re-run gate; if persistent, treat as `echomimic-5xx`. |
 
 The patterns live at the bottom of `scripts/avatar-log-validation.sh`. Add
@@ -143,33 +152,40 @@ catch most regressions.
    **Treat as failure:**
    - `Failed to load resource: the server responded with a status of 5xx`.
    - Any `Refused to connect to … because it violates the … Content
-     Security Policy` line touching `*.openai.com`, `*.elevenlabs.io`, the
-     EchoMimic origin, or our gateway.
+     Security Policy` line touching `*.elevenlabs.io`, the EchoMimic origin,
+     or our gateway.
    - Uncaught `TypeError` / `SyntaxError` from `app/echo-turn/*`.
 
 3. **Network — actionable failures:**
    - `POST /api/echo-turn/chat` should be `200` with an SSE stream. `401`
-     here = OpenAI / gateway auth (cross-check `openai-auth-fallback`
-     blocker).
+     here = OpenClaw gateway auth/routing (cross-check the legacy
+     `openai-auth-fallback` scanner label, but do not add an OpenAI key).
    - `POST /api/echo-turn/tts` should be `200` and the response **must
-     not** carry `x-tts-fallback: 1` for a real readiness test.
-     Cross-check `tts-fallback-header` blocker.
+     not** carry `X-Morgan-TTS-Fallback` for a real readiness test.
+     `X-Morgan-TTS-Cache: hit` is fine. Cross-check
+     `tts-fallback-header` blocker.
    - `POST /api/echo-turn/avatar` is the only request expected to be
      long-running. If you are doing a **non-rendering** validation, you can
      stop before clicking the run-turn button — the prior two requests are
      enough to prove the upstreams are healthy.
 
 4. **No-stuck-state check.** The "working…" indicator must clear within a
-   second after a chat-only interaction (no avatar render). If it sticks,
-   reload, re-run the Datadog gate, and look for `browser-stuck-working` /
-   `nats-stale-narration`.
+    second after a chat-only interaction (no avatar render). If it sticks,
+    reload, re-run the Datadog gate, and look for `browser-stuck-working` /
+    `echomimic-5xx`. Do not treat NATS as a user-facing `/echo-turn`
+    dependency.
 
 ### 4.3 Rendering check (only when required)
 
 Click run-turn once, then watch:
 - The continuous `tail` window (separate terminal).
-- DevTools Network for `/api/echo-turn/avatar` — expect `200` with
+- DevTools Network for `/api/echo-turn/avatar` — expect the submit request to
+  return `202` with a `jobId`, polling to continue while the page says
+  Morgan's voice is available, and the final poll to return `200` with
   `Content-Type: video/mp4`. A `524` here = `cloudflare-524` blocker.
+- Headers on the final MP4 should include `X-EchoMimic-Elapsed-S` and
+  `X-EchoMimic-Job-Id`; latest good public E2E was ~215s total / ~205s
+  upstream.
 - DevTools Console for `<video>` decode errors.
 
 If any blocker fires mid-render, **abort the readiness test** and re-run

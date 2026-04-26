@@ -1,0 +1,12 @@
+{
+  "repo": "antgroup/echomimic",
+  "group": "already-cloned",
+  "url": "https://github.com/antgroup/echomimic.git",
+  "local_path": ".avatar-docs/repos/antgroup__echomimic",
+  "status": "cloned-from-prior",
+  "category": "audio-driven portrait animation",
+  "what_it_does": "[AAAI 2025] EchoMimic: Lifelike Audio-Driven Portrait Animations through Editable Landmark Conditioning; image+audio -> MP4",
+  "succinct_summary": "audio-driven portrait animation: [AAAI 2025] EchoMimic: Lifelike Audio-Driven Portrait Animations through Editable Landmark Conditioning",
+  "possible_use": "Known EchoMimic family; already partly integrated in our production bridge.",
+  "important_notes": "EchoMimic v1 baseline; already in our family of experiments. Manifests: requirements.txt."
+}

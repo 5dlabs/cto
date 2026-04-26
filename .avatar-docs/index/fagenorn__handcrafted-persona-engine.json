@@ -1,0 +1,12 @@
+{
+  "repo": "fagenorn/handcrafted-persona-engine",
+  "group": "explicit",
+  "url": "https://github.com/fagenorn/handcrafted-persona-engine.git",
+  "local_path": ".avatar-docs/repos/fagenorn__handcrafted-persona-engine",
+  "status": "cloned",
+  "category": "persona behavior engine",
+  "what_it_does": "Implements a handcrafted persona/behavior layer for agent-like character responses.",
+  "succinct_summary": "Relevant to Morgan as a lightweight persona-state and behavior orchestration reference.",
+  "possible_use": "Adapt concepts for Morgan voice, mood, response style, or avatar behavior rules independent of rendering.",
+  "important_notes": "Treat as design inspiration unless its license and architecture fit the CTO agent stack. README hint: <div align=\"center\">"
+}

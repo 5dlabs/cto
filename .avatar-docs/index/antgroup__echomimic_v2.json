@@ -1,0 +1,12 @@
+{
+  "repo": "antgroup/echomimic_v2",
+  "group": "already-cloned",
+  "url": "https://github.com/antgroup/echomimic_v2.git",
+  "local_path": ".avatar-docs/repos/antgroup__echomimic_v2",
+  "status": "cloned-from-prior",
+  "category": "CVPR 2025 semi-body portrait animation",
+  "what_it_does": "[CVPR 2025] EchoMimicV2: Towards Striking, Simplified, and Semi-Body Human Animation; image+audio -> semi-body MP4",
+  "succinct_summary": "CVPR 2025 semi-body portrait animation: [CVPR 2025] EchoMimicV2: Towards Striking, Simplified, and Semi-Body Human Animation",
+  "possible_use": "High-quality body/portrait generation family; relevant if Morgan needs upper-body movement.",
+  "important_notes": "Better body/half-body motion than v1; heavier diffusion path. Manifests: requirements.txt."
+}

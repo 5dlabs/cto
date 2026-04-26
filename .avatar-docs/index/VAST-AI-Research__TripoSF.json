@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/TripoSF",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/TripoSF.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__TripoSF",
+  "status": "available",
+  "category": "high-resolution 3D shape modeling",
+  "what_it_does": "SparseFlex-based high-resolution, arbitrary-topology 3D shape modeling and differentiable mesh extraction.",
+  "succinct_summary": "High geometry relevance for detailed Morgan avatar shapes, especially complex/open topology assets.",
+  "possible_use": "Reference or model source for higher-resolution avatar geometry generation/refinement.",
+  "important_notes": "Research model with likely heavy dependencies; not a full rigging stack by itself."
+}

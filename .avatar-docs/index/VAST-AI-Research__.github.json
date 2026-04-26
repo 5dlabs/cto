@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/.github",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/.github.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__.github",
+  "status": "available",
+  "category": "org profile / metadata",
+  "what_it_does": "Organization-level GitHub profile and research metadata.",
+  "succinct_summary": "Low direct Morgan avatar relevance; keep only as provenance for VAST/Tripo research links.",
+  "possible_use": "Reference org context if the final index needs a source umbrella.",
+  "important_notes": "No avatar pipeline code; do not prioritize over UniRig, SkinTokens, AniGen, or Tripo tools."
+}

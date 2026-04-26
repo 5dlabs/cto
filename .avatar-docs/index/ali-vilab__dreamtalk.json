@@ -1,0 +1,12 @@
+{
+  "repo": "ali-vilab/dreamtalk",
+  "group": "already-cloned",
+  "url": "https://github.com/ali-vilab/dreamtalk.git",
+  "local_path": ".avatar-docs/repos/ali-vilab__dreamtalk",
+  "status": "cloned-from-prior",
+  "category": "diffusion talking head",
+  "what_it_does": "Official implementations for paper: DreamTalk: When Expressive Talking Head Generation Meets Diffusion Probabilistic Models; image+audio -> MP4",
+  "succinct_summary": "diffusion talking head: Official implementations for paper: DreamTalk: When Expressive Talking Head Generation Meets Diffusion Probabilistic Models",
+  "possible_use": "Older diffusion talking-head candidate; useful baseline.",
+  "important_notes": "Older diffusion talking-head candidate; useful baseline. Manifests: requirements.txt."
+}

@@ -1,0 +1,12 @@
+{
+  "repo": "initml/wasmedge-nodejs-starter",
+  "group": "initml",
+  "url": "https://github.com/initml/wasmedge-nodejs-starter.git",
+  "local_path": ".avatar-docs/repos/initml__wasmedge-nodejs-starter",
+  "status": "cloned",
+  "category": "Node.js + Rust WebAssembly starter",
+  "what_it_does": "Template for calling Rust-compiled WebAssembly functions from a Node.js app and optional FaaS deployment.",
+  "succinct_summary": "Generic demo plumbing unrelated to avatar generation or segmentation.",
+  "possible_use": "Only relevant if a tiny Rust/WASM helper needs to be embedded in a Node demo.",
+  "important_notes": "Old starter template; no direct image, background, or avatar capability."
+}

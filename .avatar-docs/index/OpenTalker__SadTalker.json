@@ -1,0 +1,12 @@
+{
+  "repo": "OpenTalker/SadTalker",
+  "group": "already-cloned",
+  "url": "https://github.com/OpenTalker/SadTalker.git",
+  "local_path": ".avatar-docs/repos/OpenTalker__SadTalker",
+  "status": "cloned-from-prior",
+  "category": "legacy single-image talking head",
+  "what_it_does": "[CVPR 2023] SadTalker：Learning Realistic 3D Motion Coefficients for Stylized Audio-Driven Single Image Talking Face Animation; image+audio -> MP4",
+  "succinct_summary": "legacy single-image talking head: [CVPR 2023] SadTalker：Learning Realistic 3D Motion Coefficients for Stylized Audio-Driven Single Image Talking Face Animation",
+  "possible_use": "Popular Apache baseline; 3DMM/coefficient style, easier than Wan diffusion, lower realism ceiling.",
+  "important_notes": "Popular Apache baseline; 3DMM/coefficient style, easier than Wan diffusion, lower realism ceiling. Manifests: requirements.txt."
+}

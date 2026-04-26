@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/SeqTex",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/SeqTex.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__SeqTex",
+  "status": "available",
+  "category": "texture generation / sequencing",
+  "what_it_does": "Research code for sequential/large-scale 3D texture generation with heavy GPU training requirements.",
+  "succinct_summary": "Medium relevance for Morgan avatar surface appearance if generated meshes need better textures.",
+  "possible_use": "Explore as a texture refinement stage for avatar clothing, skin, or props.",
+  "important_notes": "README notes very large GPU needs for training; likely use inference/demo only if available."
+}

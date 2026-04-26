@@ -1,0 +1,12 @@
+{
+  "repo": "VAST-AI-Research/SkinTokens",
+  "group": "VAST-AI-Research",
+  "url": "https://github.com/VAST-AI-Research/SkinTokens.git",
+  "local_path": ".avatar-docs/repos/VAST-AI-Research__SkinTokens",
+  "status": "available",
+  "category": "rigging tokens / skin weights",
+  "what_it_does": "Learns compact discrete skin-weight tokens and uses TokenRig to generate skeleton hierarchy plus dense skinning weights from a mesh.",
+  "succinct_summary": "Very high Morgan relevance: successor to UniRig that unifies skeleton and skin weights for automated avatar rigging.",
+  "possible_use": "Primary reference for converting Morgan meshes into clean, animatable rigs with skin weights.",
+  "important_notes": "Prioritize for rig quality; verify model availability, inference scripts, and license before integration."
+}

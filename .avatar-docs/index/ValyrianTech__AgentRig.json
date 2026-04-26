@@ -1,0 +1,12 @@
+{
+  "repo": "ValyrianTech/AgentRig",
+  "group": "explicit",
+  "url": "https://github.com/ValyrianTech/AgentRig.git",
+  "local_path": ".avatar-docs/repos/ValyrianTech__AgentRig",
+  "status": "cloned",
+  "category": "agent rig/persona orchestration",
+  "what_it_does": "Agent/persona rigging reference focused on structuring controllable agent behavior or presentation.",
+  "succinct_summary": "Potentially useful for Morgan as the bridge between persona logic and avatar presentation controls.",
+  "possible_use": "Study how agent state, prompts, tools, and presentation hooks can be organized around an embodied Morgan.",
+  "important_notes": "Confirm scope from project docs before adopting; may be more orchestration pattern than avatar graphics code. README hint: Agent Rig"
+}

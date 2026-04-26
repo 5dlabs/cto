@@ -1,0 +1,12 @@
+{
+  "repo": "met4citizen/TalkingHead",
+  "group": "already-cloned",
+  "url": "https://github.com/met4citizen/TalkingHead.git",
+  "local_path": ".avatar-docs/repos/met4citizen__TalkingHead",
+  "status": "cloned-from-prior",
+  "category": "3D browser/avatar runtime",
+  "what_it_does": "Talking Head (3D): A JavaScript class for real-time lip-sync using full-body 3D avatars.; GLB/VRM/avatar + text/audio -> realtime lipsync in browser",
+  "succinct_summary": "3D browser/avatar runtime: Talking Head (3D): A JavaScript class for real-time lip-sync using full-body 3D avatars.",
+  "possible_use": "Closest to our GLB/runtime line; not a portrait generator, but useful if Morgan becomes a rigged GLB.",
+  "important_notes": "Closest to our GLB/runtime line; not a portrait generator, but useful if Morgan becomes a rigged GLB. Manifests: package.json."
+}

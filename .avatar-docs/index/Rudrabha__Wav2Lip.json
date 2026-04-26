@@ -1,0 +1,12 @@
+{
+  "repo": "Rudrabha/Wav2Lip",
+  "group": "already-cloned",
+  "url": "https://github.com/Rudrabha/Wav2Lip.git",
+  "local_path": ".avatar-docs/repos/Rudrabha__Wav2Lip",
+  "status": "cloned-from-prior",
+  "category": "lip-sync refinement",
+  "what_it_does": "This repository contains the codes of \"A Lip Sync Expert Is All You Need for Speech to Lip Generation In the Wild\", published at ACM Multimedia 2020. For HD commercial model, please try out…",
+  "succinct_summary": "lip-sync refinement: This repository contains the codes of \"A Lip Sync Expert Is All You Need for Speech to Lip Generation In the Wild\", published at ACM Multimedia 2020. For HD commercial…",
+  "possible_use": "Classic lip-sync; best as refinement/compositor, not full body expression generator.",
+  "important_notes": "Classic lip-sync; best as refinement/compositor, not full body expression generator. Manifests: requirements.txt."
+}

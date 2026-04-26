@@ -1,0 +1,12 @@
+{
+  "repo": "summertight/TexAvatars_repo",
+  "group": "explicit",
+  "url": "https://github.com/summertight/TexAvatars_repo.git",
+  "local_path": ".avatar-docs/repos/summertight__TexAvatars_repo",
+  "status": "cloned",
+  "category": "textured avatar reconstruction",
+  "what_it_does": "Research reference for creating textured avatar representations.",
+  "succinct_summary": "Useful for understanding texture quality and avatar asset generation paths for Morgan-like 3D humans.",
+  "possible_use": "Compare texture reconstruction or avatar export ideas against MakeHuman and newer single-image pipelines.",
+  "important_notes": "Likely research-oriented; verify data requirements, checkpoints, and whether outputs are riggable. README hint: <h1 align='center'>TexAvatars: Hybrid Texel–3D Representations for Stable Rigging of Photorealistic Gaussian Head Avatars</h1>"
+}
