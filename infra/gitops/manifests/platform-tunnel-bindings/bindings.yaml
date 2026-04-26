@@ -57,6 +57,11 @@ subjects:
     name: avatar-openclaw-ide
     spec:
       fqdn: avatar-openclaw.5dlabs.ai
+      http2Origin: false
+      noTlsVerify: false
+      proxyAddress: 127.0.0.1
+      proxyPort: 0
+      proxyType: ""
       target: http://avatar-openclaw-ide.cto.svc:8080
 tunnelRef:
   kind: ClusterTunnel
