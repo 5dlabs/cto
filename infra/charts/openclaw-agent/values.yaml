@@ -631,6 +631,12 @@ secrets:
   # -- Name of the Secret containing shared API keys (Anthropic, OpenAI, etc.)
   apiKeysSecret: "openclaw-api-keys"
 
+copilot:
+  # -- Key in secrets.apiKeysSecret containing a Copilot-compatible token.
+  # Keep separate from github-pat so git/gh can use a PAT while Copilot uses
+  # a fine-grained PAT with Copilot Requests or an OAuth token.
+  githubTokenSecretKey: "github-pat"
+
 # =============================================================================
 # Probes
 # =============================================================================

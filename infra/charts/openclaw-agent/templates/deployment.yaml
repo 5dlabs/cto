@@ -972,12 +972,13 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: github-pat
                   optional: true
-            # Copilot CLI headless auth (mirrors GITHUB_TOKEN)
+            # Copilot CLI/OpenClaw provider headless auth. This may differ from
+            # github-pat because classic PATs are not accepted by Copilot.
             - name: COPILOT_GITHUB_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.apiKeysSecret }}
-                  key: github-pat
+                  key: {{ .Values.copilot.githubTokenSecretKey | default "github-pat" }}
                   optional: true
             # Hugging Face Hub/MCP headless auth.
             - name: HF_TOKEN

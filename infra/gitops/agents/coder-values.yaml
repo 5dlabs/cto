@@ -188,6 +188,9 @@ secrets:
   discordTokensSecret: "openclaw-discord-tokens"
   apiKeysSecret: "cto-coder-api-keys"
 
+copilot:
+  githubTokenSecretKey: "copilot-github-token"
+
 # =============================================================================
 # Discord
 # =============================================================================
