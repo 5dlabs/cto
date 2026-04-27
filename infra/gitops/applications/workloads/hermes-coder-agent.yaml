@@ -1,0 +1,53 @@
+---
+# =============================================================================
+# Hermes Coder Agent — ArgoCD Application
+# =============================================================================
+# Deploys a persistent Hermes harness debug bot in the cto namespace.
+# The pod runs `sleep infinity` and ships the raw Handlebars-templated
+# Hermes harness script at /etc/hermes/container.sh.hbs so a human can
+# `kubectl exec` in and render/run it manually.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cto-hermes-coder
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: cto-hermes-coder
+    app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/component: hermes-coder
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  sources:
+    - repoURL: https://github.com/5dlabs/cto.git
+      targetRevision: main
+      path: infra/charts/hermes-agent
+      helm:
+        releaseName: cto-hermes-coder
+        valueFiles:
+          - ../../gitops/agents/hermes-coder-values.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: "5s"
+        factor: 2
+        maxDuration: "3m"

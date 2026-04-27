@@ -1,0 +1,27 @@
+# =============================================================================
+# Hermes Coder Agent — Per-Agent Values Override
+# =============================================================================
+# Persistent debug bot for the Hermes harness. The pod runs `sleep infinity`
+# with the raw Handlebars-templated harness script mounted at
+# /etc/hermes/container.sh.hbs (and staged at /workspace/.harness/).
+# A human `kubectl exec`s in and renders/runs the script manually.
+#
+# This override disables OpenClaw's gateway-mode messaging (NATS, Discord)
+# since the bot is not participating in the agent mesh — it's a manual
+# debugging surface for the harness itself.
+# =============================================================================
+
+namespace: cto
+
+agent:
+  id: hermes-coder
+  name: "Hermes Coder"
+
+# Disable cross-pod agent messaging — this is a standalone debug bot.
+nats:
+  enabled: false
+
+# Disable Discord/web messaging — debug bot doesn't need a chat surface.
+messaging:
+  discord:
+    enabled: false

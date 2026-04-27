@@ -1,0 +1,9 @@
+apiVersion: v2
+name: hermes-agent
+description: Hermes harness debug bot — sleep-infinity StatefulSet for manual harness execution
+type: application
+version: 0.1.2
+appVersion: "1.0.0"
+maintainers:
+  - name: Jonathon Fritz
+    email: jonathon@5dlabs.ai

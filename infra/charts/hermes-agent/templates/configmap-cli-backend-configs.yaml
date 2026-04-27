@@ -1,0 +1,316 @@
+{{- if .Values.toolServer.url }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}-cli-backend-configs
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cli-configs
+data:
+  codex-config.toml: |
+    model = "gpt-5.3-codex"
+    approval_policy = "never"
+    sandbox_mode = "danger-full-access"
+
+    [mcp_servers.tool-server]
+    command = "/workspace/.local/bin/tools"
+    args = []
+    cwd = "/workspace"
+
+  gemini-settings.json: |
+    {
+      "model": {
+        "name": "gemini-2.5-pro",
+        "maxSessionTurns": -1,
+        "fallback": "gemini-2.0-flash"
+      },
+      "general": {
+        "defaultApprovalMode": "auto_edit",
+        "enableAutoUpdate": false,
+        "enableNotifications": false
+      },
+      "context": {
+        "fileName": ["GEMINI.md", "AGENTS.md", "CLAUDE.md"]
+      },
+      "tools": {
+        "useRipgrep": true
+      },
+      "security": {
+        "disableYoloMode": false
+      },
+      "skills": {
+        "enabled": true
+      },
+      "mcpServers": {
+        "tool-server": {
+          "command": "/workspace/.local/bin/tools",
+          "args": [],
+          "cwd": "/workspace",
+          "trust": true,
+          "timeout": 60000
+        }
+      }
+    }
+
+  opencode.json: |
+    {
+      "$schema": "https://opencode.ai/config.json",
+      "autoupdate": false,
+      "share": "manual",
+      "model": "fireworks/kimi-k2-turbo",
+      "provider": {
+        "fireworks": {
+          "npm": "@ai-sdk/openai-compatible",
+          "name": "Fireworks AI (Kimi K2 Turbo)",
+          "options": {
+            "baseURL": "https://api.fireworks.ai/inference/v1",
+            "apiKey": "{env:FIREWORKS_API_KEY}"
+          },
+          "models": {
+            "kimi-k2-turbo": {
+              "name": "Kimi K2 Turbo",
+              "model": "accounts/fireworks/models/kimi-k2p6"
+            }
+          }
+        }
+      },
+      "mcp": {
+        "tool-server": {
+          "type": "local",
+          "command": ["/workspace/.local/bin/tools"],
+          "enabled": true
+        }
+      }
+    }
+
+  cursor-mcp.json: |
+    {
+      "mcpServers": {
+        "tool-server": {
+          "command": "/workspace/.local/bin/tools",
+          "args": [],
+          "cwd": "/workspace"
+        }
+      }
+    }
+
+  factory-mcp.json: |
+    {
+      "mcpServers": {
+        "tool-server": {
+          "type": "stdio",
+          "command": "/workspace/.local/bin/tools",
+          "args": [],
+          "cwd": "/workspace"
+        }
+      }
+    }
+
+  copilot-config.json: |
+    {
+      "model": "claude-opus-4.7",
+      "trustDirectories": ["/workspace"],
+      "allowAllTools": true,
+      "mcpServers": {
+        "tool-server": {
+          "command": "/workspace/.local/bin/tools",
+          "args": [],
+          "cwd": "/workspace"
+        }
+      }
+    }
+{{- if .Values.kaniko.enabled }}
+  docker-kaniko-shim.sh: |
+    #!/bin/sh
+    # docker-kaniko-shim: translates a subset of `docker` CLI calls into
+    # `kubectl exec -c kaniko -- /kaniko/executor ...` against this pod's
+    # kaniko sidecar. See .codex/agents/coder-expert.md for usage.
+    set -eu
+    KANIKO_CONTAINER="kaniko"
+    KANIKO_EXECUTOR="/kaniko/executor"
+    _pod_name="${POD_NAME:-$(hostname)}"
+    _pod_ns="${POD_NAMESPACE:-cto}"
+    _shim_log() { echo "[docker-shim] $*" >&2; }
+    _usage() {
+      cat >&2 <<'EOF'
+    docker (kaniko shim) — limited docker CLI emulation over kaniko sidecar
+
+    Supported subcommands:
+      docker build [opts] CONTEXT
+      docker buildx build [opts] CONTEXT     (alias for docker build)
+      docker buildx create|use|inspect|rm|ls|version   (no-ops, exit 0)
+      docker push IMG                        (no-op — kaniko already pushed via --destination)
+      docker tag                             (no-op — use -t on build)
+      docker login                           (no-op — creds come from mounted config)
+      docker version | info | help
+
+    Supported build flags:
+      -t, --tag IMG                          (one or more; pushed to registry)
+      -f, --file PATH                        (Dockerfile path)
+      --build-arg K=V                        (repeatable)
+      --target NAME                          (multi-stage target)
+      --no-cache                             (disable layer cache)
+      --platform linux/amd64                 (single platform only; passed as kaniko --custom-platform)
+      --push                                 (accepted; kaniko always pushes when --destination is set)
+
+    Unsupported (errors clearly):
+      --load                                 (kaniko cannot load into a local daemon)
+      multi-platform --platform a,b          (one --platform only; run twice for multiple)
+      docker run / exec / ps / compose       (no daemon in this pod)
+
+    Debug:
+      DOCKER_SHIM_DEBUG=1                    echoes the kaniko command before exec
+    EOF
+      exit 0
+    }
+    _do_build() {
+      _tags=""; _dockerfile="Dockerfile"; _build_args=""; _target=""
+      _cache="--cache=true"; _context="."; _platform=""; _extra=""
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          -t|--tag) [ $# -ge 2 ] || { _shim_log "error: -t requires an argument"; exit 2; }
+                    _tags="${_tags} --destination=$2"; shift 2 ;;
+          --tag=*) _tags="${_tags} --destination=${1#*=}"; shift ;;
+          -f|--file) [ $# -ge 2 ] || { _shim_log "error: -f requires an argument"; exit 2; }
+                     _dockerfile="$2"; shift 2 ;;
+          --file=*) _dockerfile="${1#*=}"; shift ;;
+          --build-arg) [ $# -ge 2 ] || { _shim_log "error: --build-arg requires an argument"; exit 2; }
+                       _build_args="${_build_args} --build-arg=$2"; shift 2 ;;
+          --build-arg=*) _build_args="${_build_args} --build-arg=${1#*=}"; shift ;;
+          --target) [ $# -ge 2 ] || { _shim_log "error: --target requires an argument"; exit 2; }
+                    _target="--target=$2"; shift 2 ;;
+          --target=*) _target="--target=${1#*=}"; shift ;;
+          --no-cache) _cache="--cache=false"; shift ;;
+          --cache-from|--cache-to) shift 2 ;;
+          --cache-from=*|--cache-to=*) shift ;;
+          --push) shift ;;
+          --load)
+            _shim_log "error: --load is not supported (no local daemon in this pod);"
+            _shim_log "       the image is pushed to the destination registry instead."
+            exit 2 ;;
+          --platform)
+            [ $# -ge 2 ] || { _shim_log "error: --platform requires an argument"; exit 2; }
+            case "$2" in *,*) _shim_log "error: multi-platform --platform '$2' unsupported (single platform only)"; exit 2 ;; esac
+            _platform="--custom-platform=$2"; shift 2 ;;
+          --platform=*)
+            _pval="${1#*=}"
+            case "${_pval}" in *,*) _shim_log "error: multi-platform --platform '${_pval}' unsupported"; exit 2 ;; esac
+            _platform="--custom-platform=${_pval}"; shift ;;
+          --progress|--progress=*) shift ;;
+          --pull) shift ;;
+          --network|--network=*) shift ;;
+          --label) shift 2 ;;
+          --label=*) shift ;;
+          --iidfile|--iidfile=*) shift ;;
+          --secret|--secret=*)
+            _shim_log "error: BuildKit --secret is not supported by kaniko"; exit 2 ;;
+          --ssh|--ssh=*)
+            _shim_log "error: BuildKit --ssh is not supported by kaniko"; exit 2 ;;
+          -q|--quiet) shift ;;
+          --) shift; [ $# -gt 0 ] && _context="$1"; shift || true ;;
+          -*)
+            _shim_log "warning: ignoring unknown flag '$1'"
+            # consume a following value if it does not look like another flag
+            if [ $# -ge 2 ]; then
+              case "$2" in -*) shift ;; *) shift 2 ;; esac
+            else
+              shift
+            fi
+            ;;
+          *) _context="$1"; shift ;;
+        esac
+      done
+      [ -z "${_tags}" ] && { _shim_log "error: -t/--tag IMAGE required (kaniko needs --destination)"; exit 2; }
+      case "${_context}" in
+        /*) ;;
+        *)  _abs="$(cd "${_context}" 2>/dev/null && pwd || true)"
+            [ -n "${_abs}" ] || { _shim_log "error: context '${_context}' does not exist"; exit 2; }
+            _context="${_abs}" ;;
+      esac
+      case "${_dockerfile}" in /*) ;; *) _dockerfile="${_context}/${_dockerfile}" ;; esac
+      [ -f "${_dockerfile}" ] || { _shim_log "error: dockerfile '${_dockerfile}' not found"; exit 2; }
+      _shim_log "building via kaniko sidecar (pod=${_pod_name} ns=${_pod_ns})"
+      _shim_log "  context:    ${_context}"
+      _shim_log "  dockerfile: ${_dockerfile}"
+      _shim_log "  tags:      ${_tags}"
+      [ -n "${_platform}" ] && _shim_log "  platform:   ${_platform}"
+      if [ "${DOCKER_SHIM_DEBUG:-0}" = "1" ]; then
+        _shim_log "exec: kubectl exec -n ${_pod_ns} ${_pod_name} -c ${KANIKO_CONTAINER} -- ${KANIKO_EXECUTOR} --context=${_context} --dockerfile=${_dockerfile}${_tags} ${_cache}${_build_args} ${_target} ${_platform} --snapshot-mode=redo --use-new-run"
+      fi
+      # shellcheck disable=SC2086
+      exec kubectl exec -n "${_pod_ns}" "${_pod_name}" -c "${KANIKO_CONTAINER}" -- \
+        ${KANIKO_EXECUTOR} --context="${_context}" --dockerfile="${_dockerfile}" \
+        ${_tags} ${_cache} ${_build_args} ${_target} ${_platform} \
+        --snapshot-mode=redo --use-new-run
+    }
+    case "${1:-}" in
+      build)
+        shift
+        _do_build "$@"
+        ;;
+      buildx)
+        shift
+        case "${1:-}" in
+          build)
+            shift
+            _do_build "$@"
+            ;;
+          create|use|rm|inspect|ls|version|bake|stop|du|prune)
+            _shim_log "buildx ${1:-} is a no-op in the kaniko shim"
+            exit 0
+            ;;
+          ""|--help|-h|help)
+            _usage
+            ;;
+          *)
+            _shim_log "error: 'buildx ${1}' is not supported by the kaniko shim"
+            exit 2
+            ;;
+        esac
+        ;;
+      push)
+        _shim_log "push is a no-op — kaniko already pushed during build (if -t matched the registry)"
+        exit 0
+        ;;
+      tag)
+        _shim_log "tag is a no-op — pass -t on 'docker build' instead"
+        exit 0
+        ;;
+      version|--version|-v)
+        echo "Docker (kaniko shim) v1.1.0"
+        echo "Pod: ${_pod_name} (ns: ${_pod_ns})"
+        echo "Kaniko: $(kubectl exec -n "${_pod_ns}" "${_pod_name}" -c "${KANIKO_CONTAINER}" -- ${KANIKO_EXECUTOR} version 2>/dev/null | head -1 || echo unknown)"
+        exit 0
+        ;;
+      info)
+        echo "Docker (kaniko shim)"
+        echo " Pod:       ${_pod_name}"
+        echo " Namespace: ${_pod_ns}"
+        echo " Kaniko:    ${KANIKO_EXECUTOR}"
+        exit 0
+        ;;
+      login)
+        _shim_log "login is a no-op — registry creds are mounted at /kaniko/.docker/config.json"
+        exit 0
+        ;;
+      logout)
+        _shim_log "logout is a no-op"
+        exit 0
+        ;;
+      pull)
+        _shim_log "pull is a no-op in this shim — kaniko pulls base images during build"
+        exit 0
+        ;;
+      ""|help|--help|-h)
+        _usage
+        ;;
+      *)
+        _shim_log "error: 'docker ${1}' needs a real daemon (none in this pod)."
+        _shim_log "       Supported: build, buildx build, push (no-op), tag (no-op),"
+        _shim_log "       login/logout (no-op), pull (no-op), version, info, help."
+        exit 2
+        ;;
+    esac
+{{- end }}
+{{- end }}

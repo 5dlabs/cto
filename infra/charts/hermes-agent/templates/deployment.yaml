@@ -1,0 +1,1674 @@
+{{- $messaging := .Values.messaging | default dict -}}
+{{- $discordConfig := index $messaging "discord" | default .Values.discord -}}
+{{- $mem0Plugin := .Values.mem0Plugin | default dict -}}
+{{- $statefulset := eq (.Values.deploymentMode | default "deployment") "statefulset" -}}
+apiVersion: apps/v1
+kind: {{ if $statefulset }}StatefulSet{{ else }}Deployment{{ end }}
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  {{- if $statefulset }}
+  serviceName: {{ include "openclaw-agent.fullname" . }}
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  {{- else }}
+  strategy:
+    type: Recreate
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "openclaw-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "openclaw-agent.labels" . | nindent 8 }}
+      annotations:
+        {{- include "openclaw-agent.podAnnotations" . | nindent 8 }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/hermes-harness: {{ include (print $.Template.BasePath "/configmap-hermes-harness.yaml") . | sha256sum }}
+        {{- if .Values.workspace.files }}
+        checksum/workspace-files: {{ include (print $.Template.BasePath "/configmap-workspace-files.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.toolsConfig }}
+        checksum/tools-config: {{ include (print $.Template.BasePath "/configmap-tools-config.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.telemetry.enabled }}
+        checksum/promtail: {{ include (print $.Template.BasePath "/configmap-promtail.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.claudeCode.enabled }}
+        checksum/claude-settings: {{ include (print $.Template.BasePath "/configmap-claude-settings.yaml") . | sha256sum }}
+        checksum/claude-skills: {{ include (print $.Template.BasePath "/configmap-claude-skills.yaml") . | sha256sum }}
+        {{- if .Values.claudeCode.mcp.servers }}
+        checksum/claude-mcp: {{ include (print $.Template.BasePath "/configmap-claude-mcp.yaml") . | sha256sum }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.toolServer.url }}
+        checksum/cli-backend-configs: {{ include (print $.Template.BasePath "/configmap-cli-backend-configs.yaml") . | sha256sum }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "openclaw-agent.fullname" . }}
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      {{- with .Values.runtimeClassName }}
+      runtimeClassName: {{ . | quote }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        # Ensure workspace directories exist and resolve the config with env vars
+        - name: init-workspace
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "=== Init: {{ .Values.agent.id }} ($(date -u +%Y-%m-%dT%H:%M:%SZ)) ==="
+
+              # ---------------------------------------------------------------
+              # 1. Core workspace directories (idempotent)
+              # ---------------------------------------------------------------
+              mkdir -p /workspace/.openclaw/agents/{{ .Values.agent.id }}/agent
+              mkdir -p /workspace/.openclaw/extensions
+              mkdir -p /workspace/.local/bin
+              mkdir -p /workspace/memory
+              mkdir -p /workspace/sessions
+              echo "[dirs] Core workspace directories OK"
+
+              # ---------------------------------------------------------------
+              # 1a. Kubeconfig rewrite (auto-refreshing tokenFile)
+              # ---------------------------------------------------------------
+              # The workspace PVC persists /workspace/.kube/config across pod
+              # reschedules. Any inline bearer token baked into that file is
+              # bound to a prior pod UID (via TokenRequest audience binding),
+              # so after reschedule the apiserver returns Unauthorized.
+              # Overwrite with a tokenFile-based kubeconfig that points at the
+              # projected service-account token; kubelet rotates that file in
+              # place, and kubectl re-reads it on every invocation — so auth
+              # never goes stale.
+              mkdir -p /workspace/.kube
+              cat > /workspace/.kube/config <<EOF
+              apiVersion: v1
+              kind: Config
+              clusters:
+              - name: in-cluster
+                cluster:
+                  server: https://kubernetes.default.svc
+                  certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              users:
+              - name: in-cluster
+                user:
+                  tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+              contexts:
+              - name: in-cluster
+                context:
+                  cluster: in-cluster
+                  user: in-cluster
+                  namespace: {{ .Release.Namespace }}
+              current-context: in-cluster
+              EOF
+              chown 1001:1000 /workspace/.kube/config 2>/dev/null || true
+              chmod 600 /workspace/.kube/config
+              echo "[kube] kubeconfig rewritten with tokenFile (auto-refreshing)"
+
+              # ---------------------------------------------------------------
+              # 1b. Fix ~ resolution (getpwuid vs $HOME mismatch)
+              # ---------------------------------------------------------------
+              # Some tools resolve ~ via /etc/passwd (getpwuid) not $HOME.
+              # Ensure /etc/passwd home matches /workspace and create a symlink
+              # from the old home so ~ paths work either way.
+              sed -i 's|node:x:1001:1000::/home/node:|node:x:1001:1000::/workspace:|' /etc/passwd 2>/dev/null || true
+              if [ -d /home/node ] && [ ! -L /home/node/.swarm ]; then
+                chmod 755 /home/node 2>/dev/null || true
+                mkdir -p /workspace/.swarm
+                ln -sf /workspace/.swarm /home/node/.swarm 2>/dev/null || true
+              fi
+              echo "[passwd] home dir fix applied"
+
+              # ---------------------------------------------------------------
+              # 2. OpenClaw config (re-rendered every restart with fresh env)
+              # ---------------------------------------------------------------
+              envsubst < /config-template/openclaw.json > /workspace/.openclaw/openclaw.json
+              echo "[config] openclaw.json rendered"
+              openclaw doctor --non-interactive >/dev/null 2>&1 || true
+              # doctor can normalize config from the image defaults. Restore the
+              # GitOps-rendered config so provider routing stays declarative.
+              envsubst < /config-template/openclaw.json > /workspace/.openclaw/openclaw.json
+              echo "[config] openclaw.json restored after doctor"
+
+              # ---------------------------------------------------------------
+              # 3. OpenClaw orchestrator skills (always overwrite from ConfigMap)
+              #    Each skill must be a directory containing SKILL.md (AgentSkills convention)
+              # ---------------------------------------------------------------
+              mkdir -p /workspace/.openclaw/skills
+              # Clean up stale flat .md files from previous format
+              find /workspace/.openclaw/skills -maxdepth 1 -name "*.md" -type f -delete 2>/dev/null || true
+              SKILL_COUNT=0
+              for md in /openclaw-skills-template/*.md; do
+                [ -f "$md" ] || continue
+                SKILL_NAME=$(basename "$md" .md)
+                [ "$SKILL_NAME" = "_placeholder" ] && continue
+                mkdir -p "/workspace/.openclaw/skills/$SKILL_NAME"
+                cp "$md" "/workspace/.openclaw/skills/$SKILL_NAME/SKILL.md"
+                SKILL_COUNT=$((SKILL_COUNT + 1))
+              done
+              echo "[skills] OpenClaw: $SKILL_COUNT skills loaded"
+
+              # ---------------------------------------------------------------
+              # 3a. Stable code-server URL marker
+              # ---------------------------------------------------------------
+              {{- if .Values.codeServer.publicUrl }}
+              printf '%s\n' {{ .Values.codeServer.publicUrl | squote }} > /workspace/.code-server-url
+              chown 1001:1000 /workspace/.code-server-url 2>/dev/null || true
+              chmod 644 /workspace/.code-server-url
+              echo "[code-server] stable URL written: {{ .Values.codeServer.publicUrl }}"
+              {{- end }}
+
+              # ---------------------------------------------------------------
+              # 3b. BOOT.md — fires reboot-continuity on every gateway startup
+              # ---------------------------------------------------------------
+              # The bundled `boot-md` hook (events: gateway:startup) reads
+              # /workspace/BOOT.md on each gateway boot and injects the content
+              # as a user turn. If BOOT.md is absent, the hook logs "skip" and
+              # the agent sits idle until the 15-minute heartbeat. Seeding a
+              # universal resume directive here ensures EVERY agent auto-resumes
+              # in-flight work immediately on pod restart via the
+              # `reboot-continuity` skill (which is always-on in every agent's
+              # system prompt). Overwritten on every boot so agents can't
+              # accidentally stale-out the directive mid-session.
+              cat > /workspace/BOOT.md <<'BOOTEOF'
+              # Boot Resume Directive
+
+              You have just booted (pod restart or gateway reload). Execute the
+              `reboot-continuity` skill now, without waiting for a user prompt:
+
+              1. Read `/workspace/HANDOFF.md` if it exists — this is the last
+                 known state of your in-flight work.
+              2. Check mem0 / memory for any task you were actively executing.
+              3. Run `git status` in any repo under `/workspace/repos/` to see
+                 uncommitted work.
+              4. Check the most recent checkpoint in your session state.
+              5. Resume your in-flight work autonomously. Do not ask the human
+                 what to do — infer from HANDOFF.md + memory + git state.
+              6. Post a brief status update to your Discord channel describing
+                 what you found and what you're resuming (or "nothing to
+                 resume, standing by for next directive" if the workspace is
+                 clean).
+              7. For Coder code-server access, always use the stable hostname
+                 https://coder.5dlabs.ai. Never post a trycloudflare URL.
+
+              You are fully autonomous. Do not wait for prompts. If a PRD or
+              task is in progress, keep working until completion or a true
+              blocker (credentials, external approval, irreversible action).
+              BOOTEOF
+              chown 1001:1000 /workspace/BOOT.md 2>/dev/null || true
+              chmod 644 /workspace/BOOT.md
+              echo "[boot] BOOT.md seeded (reboot-continuity trigger)"
+
+              {{- if .Values.claudeCode.enabled }}
+              # ---------------------------------------------------------------
+              # 4. Claude Code CLI setup (always overwrite from ConfigMaps)
+              # ---------------------------------------------------------------
+              mkdir -p /workspace/.claude/skills
+
+              cp /claude-settings-template/settings.json /workspace/.claude/settings.json
+              echo "[claude] settings.json written"
+
+              cp /claude-skills-template/*.md /workspace/.claude/skills/ 2>/dev/null || true
+              echo "[skills] Claude Code: $(ls /workspace/.claude/skills/*.md 2>/dev/null | wc -l) loaded"
+
+              {{- if .Values.claudeCode.mcp.servers }}
+              cp /claude-mcp-template/claude.json /workspace/.claude.json
+              cp /claude-mcp-template/mcp.json /workspace/.mcp.json
+              echo "[claude] .claude.json (MCP config) written"
+              {{- end }}
+              {{- end }}
+
+              {{- if .Values.tools.acp.agentOverrides }}
+              # ---------------------------------------------------------------
+              # 4a. ACPX agent registry overrides (.acpxrc.json)
+              # ---------------------------------------------------------------
+              rm -f /workspace/.acpxrc.json /workspace/.acpxrc.json.chart 2>/dev/null || true
+              printf '%s\n' {{ dict "agents" .Values.tools.acp.agentOverrides | toJson | squote }} > /workspace/.acpxrc.json
+              cp /workspace/.acpxrc.json /workspace/.acpxrc.json.chart
+              chmod 444 /workspace/.acpxrc.json.chart
+              echo "[acpx] .acpxrc.json written"
+              {{- end }}
+
+              {{- if .Values.toolsConfig }}
+              # ---------------------------------------------------------------
+              # 4b. Tools config (MCP tools for CLI backends)
+              # ---------------------------------------------------------------
+              cp /tools-config-template/tools-config.json /workspace/tools-config.json
+              echo "[tools] tools-config.json written"
+              {{- end }}
+
+              {{- if .Values.toolServer.url }}
+              # ---------------------------------------------------------------
+              # 4b2. tools-client proxy for CLI MCP stdio integrations
+              # ---------------------------------------------------------------
+              mkdir -p /workspace/.npm-global
+              if [ ! -f /workspace/.npm-global/bin/supergateway ]; then
+                npm install -g --prefix /workspace/.npm-global --no-audit --no-fund supergateway 2>&1 | tail -2
+                echo "[tools] supergateway installed"
+              else
+                echo "[tools] supergateway already present"
+              fi
+              printf '#!/bin/sh\nBASE_URL="${TOOL_SERVER_URL:-{{ .Values.toolServer.url }}}"\nBASE_URL="${BASE_URL%%/sse}"\nexec /workspace/.npm-global/bin/supergateway --streamableHttp "${BASE_URL}/mcp" "$@"\n' > /workspace/.local/bin/tools
+              chmod +x /workspace/.local/bin/tools
+              echo "[tools] tools MCP proxy ready"
+
+              mkdir -p /workspace/.codex /workspace/.gemini /workspace/.factory /workspace/.cursor /workspace/.copilot
+              cp /cli-backend-configs-template/codex-config.toml /workspace/.codex/config.toml
+              {{- if and (hasKey .Values "codexPlugin") .Values.codexPlugin.enabled .Values.codexPlugin.authSecretKey }}
+              # Inject Codex OAuth auth.json from secret (headless auth)
+              if [ -n "$CODEX_AUTH_SUB1" ]; then
+                printf '%s' "$CODEX_AUTH_SUB1" > /workspace/.codex/auth.json
+                chmod 600 /workspace/.codex/auth.json
+                echo "[cli] codex auth.json written from sub1"
+
+                # Generate OpenClaw auth-profiles.json from Codex OAuth tokens
+                AGENT_DIR="/workspace/.openclaw/agents/{{ .Values.agent.name | default "agent" }}/agent"
+                mkdir -p "$AGENT_DIR"
+                export AGENT_DIR
+                echo "aW1wb3J0IGpzb24sIG9zLCBiYXNlNjQsIHN5cwp0cnk6CiAgICB3aXRoIG9wZW4oIi93b3Jrc3BhY2UvLmNvZGV4L2F1dGguanNvbiIpIGFzIGY6CiAgICAgICAgY29kZXggPSBqc29uLmxvYWQoZikKICAgIHQgPSBjb2RleC5nZXQoInRva2VucyIsIGNvZGV4KQogICAgYXQgPSB0LmdldCgiYWNjZXNzX3Rva2VuIiwgdC5nZXQoImFjY2Vzc1Rva2VuIiwgIiIpKQogICAgcnQgPSB0LmdldCgicmVmcmVzaF90b2tlbiIsIHQuZ2V0KCJyZWZyZXNoVG9rZW4iLCAiIikpCiAgICBhaWQgPSB0LmdldCgiYWNjb3VudF9pZCIsIHQuZ2V0KCJhY2NvdW50SWQiLCAiIikpCiAgICBleHAgPSAiIgogICAgdHJ5OgogICAgICAgIHBheWxvYWQgPSBqc29uLmxvYWRzKGJhc2U2NC51cmxzYWZlX2I2NGRlY29kZShhdC5zcGxpdCgiLiIpWzFdICsgIj09IikpCiAgICAgICAgZnJvbSBkYXRldGltZSBpbXBvcnQgZGF0ZXRpbWUsIHRpbWV6b25lCiAgICAgICAgZXhwID0gZGF0ZXRpbWUuZnJvbXRpbWVzdGFtcChwYXlsb2FkWyJleHAiXSwgdHo9dGltZXpvbmUudXRjKS5pc29mb3JtYXQoKS5yZXBsYWNlKCIrMDA6MDAiLCJaIikKICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgZnJvbSBkYXRldGltZSBpbXBvcnQgZGF0ZXRpbWUsIHRpbWV6b25lLCB0aW1lZGVsdGEKICAgICAgICBleHAgPSAoZGF0ZXRpbWUubm93KHRpbWV6b25lLnV0YykgKyB0aW1lZGVsdGEoZGF5cz0zKSkuaXNvZm9ybWF0KCkucmVwbGFjZSgiKzAwOjAwIiwiWiIpCiAgICBwcm9maWxlcyA9IHsidmVyc2lvbiI6IDEsICJwcm9maWxlcyI6IHsib3BlbmFpLWNvZGV4OmRlZmF1bHQiOiB7InByb3ZpZGVyIjogIm9wZW5haS1jb2RleCIsICJ0eXBlIjogIm9hdXRoIiwgImFjY2Vzc1Rva2VuIjogYXQsICJyZWZyZXNoVG9rZW4iOiBydCwgImFjY291bnRJZCI6IGFpZCwgImV4cGlyZXMiOiBleHAsICJleHBpcmVzQXQiOiBleHAsICJzb3VyY2UiOiAibWFudWFsIiwgIm1hbmFnZWRCeSI6ICJjb2RleC1jbGkifX0sICJvcmRlciI6IFsib3BlbmFpLWNvZGV4OmRlZmF1bHQiXX0KICAgIGFnZW50X2RpciA9IG9zLmVudmlyb24uZ2V0KCJBR0VOVF9ESVIiLCAiL3dvcmtzcGFjZS8ub3BlbmNsYXcvYWdlbnRzL2FnZW50L2FnZW50IikKICAgIG91dCA9IG9zLnBhdGguam9pbihhZ2VudF9kaXIsICJhdXRoLXByb2ZpbGVzLmpzb24iKQogICAgd2l0aCBvcGVuKG91dCwgInciKSBhcyBmOgogICAgICAgIGpzb24uZHVtcChwcm9maWxlcywgZiwgaW5kZW50PTIpCiAgICBvcy5jaG1vZChvdXQsIDBvNjAwKQogICAgcHJpbnQoIltvcGVuY2xhd10gYXV0aC1wcm9maWxlcy5qc29uIHdyaXR0ZW4sIGV4cGlyZXM6IiwgZXhwKQpleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICBwcmludCgiW29wZW5jbGF3XSBhdXRoLXByb2ZpbGVzLmpzb24gZ2VuZXJhdGlvbiBmYWlsZWQ6IiwgZSwgZmlsZT1zeXMuc3RkZXJyKQo=" | base64 -d | python3
+                echo "[openclaw] auth-profiles init complete"
+              fi
+              {{- end }}
+              cp /cli-backend-configs-template/gemini-settings.json /workspace/.gemini/settings.json
+              cp /cli-backend-configs-template/factory-mcp.json /workspace/.factory/mcp.json
+              cp /cli-backend-configs-template/cursor-mcp.json /workspace/.cursor/mcp.json
+              cp /cli-backend-configs-template/opencode.json /workspace/opencode.json
+              if [ -f /cli-backend-configs-template/copilot-config.json ]; then
+                cp /cli-backend-configs-template/copilot-config.json /workspace/.copilot/config.json
+              fi
+              echo "[cli] backend configs written"
+              {{- end }}
+
+              {{- if .Values.tools.acp.enabled }}
+              # ---------------------------------------------------------------
+              # 4b3. ACPX runtime binary (installed globally via npm)
+              # ---------------------------------------------------------------
+              {{- if .Values.tools.acp.acpxVersion }}
+              echo "[plugin] acpx: installing acpx@{{ .Values.tools.acp.acpxVersion }} globally..."
+              if npm install -g "acpx@{{ .Values.tools.acp.acpxVersion }}" 2>&1 | tail -3; then
+                echo "[plugin] acpx: $(acpx --version 2>/dev/null || echo installed)"
+              else
+                echo "[plugin] acpx: install failed (baked-in acpx $(acpx --version 2>/dev/null || echo unknown) remains active)"
+              fi
+              {{- else }}
+              echo "[plugin] acpx: using baked-in version $(acpx --version 2>/dev/null || echo unknown)"
+              {{- end }}
+              echo "[plugin] pi-acp: installing..."
+              npm install -g pi-acp 2>&1 | tail -2 && \
+                echo "[plugin] pi-acp: ready" || echo "[plugin] pi-acp: install failed"
+              cd /workspace
+              {{- end }}
+
+              {{- if .Values.nats.enabled }}
+              # ---------------------------------------------------------------
+              # 4c. NATS Messenger plugin
+              # ---------------------------------------------------------------
+              NATS_EXT="/workspace/.openclaw/extensions/nats-messenger"
+              mkdir -p "$NATS_EXT"
+              cp /nats-plugin-template/* "$NATS_EXT/"
+              if [ ! -d "$NATS_EXT/node_modules/nats" ]; then
+                cd "$NATS_EXT" && npm install --production --no-audit --no-fund 2>&1 | tail -3
+                echo "[plugin] nats-messenger: installed"
+              else
+                echo "[plugin] nats-messenger: cached"
+              fi
+              cd /workspace
+              {{- end }}
+
+              {{- if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }}
+              # ---------------------------------------------------------------
+              # 4d. Mem0 plugin (@mem0/openclaw-mem0)
+              # ---------------------------------------------------------------
+              MEM0_EXT="/workspace/.openclaw/extensions/openclaw-mem0"
+              mkdir -p "$MEM0_EXT"
+              cd "$MEM0_EXT"
+              # Always write package.json with qdrant client override for server compatibility
+              printf '{"name":"openclaw-mem0-ext","private":true,"dependencies":{"@mem0/openclaw-mem0":"latest"},"overrides":{"@qdrant/js-client-rest":"1.17.0"}}\n' > package.json
+              # Reinstall if missing or if qdrant client version is incompatible with server
+              QDRANT_VER=$(node -e "try{console.log(require('@qdrant/js-client-rest/package.json').version)}catch{console.log('0')}" 2>/dev/null)
+              if [ "$QDRANT_VER" != "1.17.0" ]; then
+                rm -rf node_modules package-lock.json
+                npm install --production --no-audit --no-fund 2>&1 | tail -3
+                echo "[plugin] openclaw-mem0: installed (qdrant client upgraded from ${QDRANT_VER} to 1.17.0)"
+              else
+                echo "[plugin] openclaw-mem0: cached (qdrant client ${QDRANT_VER} OK)"
+              fi
+              cd /workspace
+              {{- end }}
+
+              {{- if .Values.kaniko.enabled }}
+              # ---------------------------------------------------------------
+              # 4e. kubectl (for kaniko sidecar exec)
+              # ---------------------------------------------------------------
+              if [ ! -f /workspace/.local/bin/kubectl ]; then
+                mkdir -p /workspace/.local/bin
+                KUBECTL_ARCH="amd64"
+                case "$(uname -m)" in
+                  aarch64|arm64)
+                    KUBECTL_ARCH="arm64"
+                    ;;
+                esac
+                curl -sLo /workspace/.local/bin/kubectl \
+                  "https://dl.k8s.io/release/v1.35.0/bin/linux/${KUBECTL_ARCH}/kubectl"
+                chmod +x /workspace/.local/bin/kubectl
+                echo "[tools] kubectl v1.35.0 installed (${KUBECTL_ARCH})"
+              else
+                echo "[tools] kubectl already present"
+              fi
+              # ---------------------------------------------------------------
+              # 4f. Docker kaniko shim
+              # ---------------------------------------------------------------
+              # Stage shim on the shared workspace volume. The agent container's
+              # postStart hook (see lifecycle.postStart below) copies it to
+              # /usr/local/bin/docker so it overrides the real /usr/bin/docker
+              # binary baked into the agent image.
+              if [ -f /cli-backend-configs-template/docker-kaniko-shim.sh ]; then
+                cp /cli-backend-configs-template/docker-kaniko-shim.sh /workspace/.local/bin/docker
+                chmod +x /workspace/.local/bin/docker
+                echo "[tools] docker kaniko shim staged at /workspace/.local/bin/docker"
+              fi
+              {{- end }}
+
+              # ---------------------------------------------------------------
+              # 4g. Log directory setup
+              # ---------------------------------------------------------------
+              mkdir -p "$(dirname "{{ .Values.logging.file }}")"
+              echo "[dirs] Log directory OK"
+
+              # ---------------------------------------------------------------
+              # 5. Git credential setup (for private repo access)
+              # ---------------------------------------------------------------
+              # Write gitconfig to /workspace so the main container (HOME=/workspace) inherits it
+              export HOME=/workspace
+              export GIT_TERMINAL_PROMPT=0
+
+              if [ -n "${GITHUB_TOKEN:-}" ]; then
+                # Credential store with entries for github.com
+                echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > /workspace/.git-credentials
+                chmod 644 /workspace/.git-credentials
+                chown 1001:1000 /workspace/.git-credentials
+
+                git config --global credential.helper 'store --file=/workspace/.git-credentials'
+                git config --global user.email "bot@5dlabs.ai"
+                git config --global user.name "{{ .Values.agent.id }}"
+                git config --global --add safe.directory "*"
+                git config --global advice.detachedHead false
+                git config --global init.defaultBranch main
+
+                # Prevent interactive prompts in non-TTY environments
+                git config --global core.askPass ""
+                git config --global credential.interactive never
+
+                chown 1001:1000 /workspace/.gitconfig
+                echo "[git] Credentials configured for github.com (gitconfig at /workspace/.gitconfig)"
+              else
+                # Even without a token, configure git basics so ad-hoc clones don't hang
+                git config --global user.email "bot@5dlabs.ai"
+                git config --global user.name "{{ .Values.agent.id }}"
+                git config --global --add safe.directory "*"
+                git config --global core.askPass ""
+                git config --global credential.interactive never
+                chown 1001:1000 /workspace/.gitconfig 2>/dev/null || true
+                echo "[git] WARNING: GITHUB_TOKEN not set — private repo clones may fail"
+              fi
+
+              # Reset HOME for remaining init steps (root context)
+              export HOME=/root
+
+              # ---------------------------------------------------------------
+              # 6. Git repo health checks (idempotent clone + dirty-state audit)
+              # ---------------------------------------------------------------
+              WARNINGS=0
+              {{- range .Values.workspace.repos }}
+              REPO_DIR="/workspace/{{ .path }}"
+              echo ""
+              echo "[repo] Checking {{ .name }} → $REPO_DIR"
+
+              if [ -d "$REPO_DIR/.git" ]; then
+                echo "[repo] {{ .name }}: already cloned"
+
+                # Check for uncommitted changes
+                cd "$REPO_DIR"
+                git config --global --add safe.directory "$REPO_DIR" 2>/dev/null || true
+                DESIRED_BRANCH="{{ .branch | default "main" }}"
+                if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+                  echo "⚠ WARNING: {{ .name }} has uncommitted changes!"
+                  git status --short 2>/dev/null || true
+                  WARNINGS=$((WARNINGS + 1))
+                fi
+
+                # Check for detached HEAD
+                BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "DETACHED")
+                if [ "$BRANCH" = "DETACHED" ]; then
+                  echo "⚠ WARNING: {{ .name }} is in detached HEAD state ($(git rev-parse --short HEAD))"
+                  WARNINGS=$((WARNINGS + 1))
+                else
+                  echo "[repo] {{ .name }}: on branch $BRANCH"
+                  if [ "$BRANCH" != "$DESIRED_BRANCH" ]; then
+                    if git diff --quiet 2>/dev/null && git diff --cached --quiet 2>/dev/null; then
+                  echo "[repo] {{ .name }}: switching branch $BRANCH -> $DESIRED_BRANCH"
+                  if git fetch origin "$DESIRED_BRANCH":"refs/remotes/origin/$DESIRED_BRANCH" --depth=1 >/dev/null 2>&1; then
+                    if git show-ref --verify --quiet "refs/heads/$DESIRED_BRANCH"; then
+                      git checkout "$DESIRED_BRANCH" >/dev/null 2>&1 || true
+                    elif git show-ref --verify --quiet "refs/remotes/origin/$DESIRED_BRANCH"; then
+                      git checkout -B "$DESIRED_BRANCH" "origin/$DESIRED_BRANCH" >/dev/null 2>&1 || true
+                    fi
+                  else
+                    echo "⚠ WARNING: {{ .name }} remote branch $DESIRED_BRANCH not found; staying on $BRANCH"
+                    WARNINGS=$((WARNINGS + 1))
+                  fi
+                  BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "DETACHED")
+                  echo "[repo] {{ .name }}: now on branch $BRANCH"
+                    else
+                      echo "⚠ WARNING: {{ .name }} left on $BRANCH because the workspace is dirty (wanted $DESIRED_BRANCH)"
+                      WARNINGS=$((WARNINGS + 1))
+                    fi
+                  fi
+                fi
+
+                # Check for unpushed commits
+                UNPUSHED=$(git log @{upstream}..HEAD --oneline 2>/dev/null | wc -l || echo "0")
+                if [ "$UNPUSHED" -gt 0 ] 2>/dev/null; then
+                  echo "⚠ WARNING: {{ .name }} has $UNPUSHED unpushed commit(s)"
+                  WARNINGS=$((WARNINGS + 1))
+                fi
+
+                cd /workspace
+              else
+                echo "[repo] {{ .name }}: cloning {{ .url }} (branch: {{ .branch | default "main" }})"
+                mkdir -p "$(dirname "$REPO_DIR")"
+                if git clone --branch {{ .branch | default "main" }} --single-branch {{ .url }} "$REPO_DIR"; then
+                  echo "[repo] {{ .name }}: clone complete"
+                else
+                  echo "⚠ WARNING: {{ .name }} clone failed; continuing without local mirror"
+                  WARNINGS=$((WARNINGS + 1))
+                fi
+              fi
+              {{- end }}
+
+              # ---------------------------------------------------------------
+              # 7. Normalize ownership for the runtime user
+              # ---------------------------------------------------------------
+              RUNTIME_UID="$(id -u node 2>/dev/null || echo 1000)"
+              RUNTIME_GID="$(id -g node 2>/dev/null || echo 1000)"
+              chown -R "${RUNTIME_UID}:${RUNTIME_GID}" /workspace
+              echo "[dirs] Workspace ownership normalized"
+              # Final declarative render after all init mutations. OpenClaw's
+              # doctor/bootstrap paths may write image defaults; the runtime must
+              # start from the GitOps-rendered config and not rewrite providers.
+              envsubst < /config-template/openclaw.json > /workspace/.openclaw/openclaw.json
+              chown "${RUNTIME_UID}:${RUNTIME_GID}" /workspace/.openclaw/openclaw.json 2>/dev/null || true
+              chmod 444 /workspace/.openclaw/openclaw.json 2>/dev/null || true
+              echo "[config] openclaw.json finalized from GitOps template"
+
+              # ---------------------------------------------------------------
+              # Summary
+              # ---------------------------------------------------------------
+              echo ""
+              if [ "$WARNINGS" -gt 0 ]; then
+                echo "=== Init complete with $WARNINGS warning(s) — review above ==="
+              else
+                echo "=== Init complete for {{ .Values.agent.id }} — all clean ==="
+              fi
+          env:
+            # Discord token
+            - name: DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.discordTokensSecret }}
+                  key: {{ $discordConfig.tokenSecretKey | default .Values.agent.id }}
+            # Provider API keys used when init renders openclaw.json via envsubst.
+            {{- range $name, $provider := .Values.models.providers }}
+            {{- if and (or (not (hasKey $provider "enabled")) $provider.enabled) $provider.apiKeySecretKey }}
+            - name: PROVIDER_{{ $name | upper | replace "-" "_" }}_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.secrets.apiKeysSecret }}
+                  key: {{ $provider.apiKeySecretKey }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            # Web tools API keys
+            - name: BRAVE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: brave-api-key
+                  optional: true
+            - name: FIRECRAWL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: firecrawl-api-key
+                  optional: true
+            # GitHub PAT for private repo cloning
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: github-pat
+                  optional: true
+            # Fireworks API key (used by envsubst for mem0 embedder/llm config)
+            - name: FIREWORKS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: fireworks-api-key
+                  optional: true
+            # DigitalOcean Gradient AI model access key (OpenCode → Claude Opus 4.7 tier-3 fallback)
+            - name: DO_INFERENCE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: DO_INFERENCE_KEY
+                  optional: true
+            {{- if .Values.cloudProviders.bedrock.enabled }}
+            # AWS Bedrock credentials (used by OpenClaw gateway + Claude Code CLI)
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: aws-access-key-id
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: aws-secret-access-key
+                  optional: true
+            - name: AWS_REGION
+              value: {{ .Values.cloudProviders.bedrock.region | quote }}
+            {{- end }}
+            {{- if .Values.cloudProviders.vertex.enabled }}
+            # GCP Vertex AI credentials
+            - name: CLOUD_ML_REGION
+              value: {{ .Values.cloudProviders.vertex.region | quote }}
+            - name: ANTHROPIC_VERTEX_PROJECT_ID
+              value: {{ .Values.cloudProviders.vertex.projectId | quote }}
+            {{- end }}
+            {{- if .Values.cloudProviders.foundry.enabled }}
+            # Microsoft Foundry credentials
+            - name: ANTHROPIC_FOUNDRY_RESOURCE
+              value: {{ .Values.cloudProviders.foundry.resource | quote }}
+            - name: ANTHROPIC_FOUNDRY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: foundry-api-key
+                  optional: true
+            {{- end }}
+            {{- if and (hasKey .Values "codexPlugin") .Values.codexPlugin.enabled .Values.codexPlugin.authSecretKey }}
+            # Codex CLI OAuth auth.json (base64-encoded) for headless setup
+            - name: CODEX_AUTH_SUB1
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: {{ .Values.codexPlugin.authSecretKey }}
+                  optional: true
+            {{- end }}
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: config-template
+              mountPath: /config-template
+            {{- if .Values.claudeCode.enabled }}
+            - name: claude-settings-template
+              mountPath: /claude-settings-template
+            - name: claude-skills-template
+              mountPath: /claude-skills-template
+            {{- if .Values.claudeCode.mcp.servers }}
+            - name: claude-mcp-template
+              mountPath: /claude-mcp-template
+            {{- end }}
+            {{- end }}
+            {{- if .Values.toolServer.url }}
+            - name: cli-backend-configs-template
+              mountPath: /cli-backend-configs-template
+            {{- end }}
+            {{- if .Values.toolsConfig }}
+            - name: tools-config-template
+              mountPath: /tools-config-template
+            {{- end }}
+            {{- if .Values.tools.acp.enabled }}
+            - name: acpx-node-modules
+              mountPath: /usr/local/share/npm-global/lib/node_modules/openclaw/extensions/acpx/node_modules
+            {{- end }}
+        {{- if .Values.workspace.files }}
+        - name: init-workspace-files
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+          command:
+            - /bin/sh
+            - -c
+            - |
+              for src in /workspace-files-template/*; do
+                [ -f "$src" ] || continue
+                name="$(basename "$src")"
+                dest="/workspace/$name"
+                case "$name" in
+                  AGENTS.md|HEARTBEAT.md|IDENTITY.md|SOUL.md|TOOLS.md)
+                    cp "$src" "$dest" && echo "[workspace-files] Updated $dest"
+                    ;;
+                  *)
+                    if [ ! -f "$dest" ]; then
+                      cp "$src" "$dest" && echo "[workspace-files] Created $dest"
+                    else
+                      echo "[workspace-files] Skipped $dest (exists)"
+                    fi
+                    ;;
+                esac
+              done
+              # Patch OpenClaw agent-delivery to honor OPENCLAW_DEFAULT_RECIPIENT
+              # when no explicit recipient is resolved (fixes channel:UNKNOWN on boot).
+              # Runs in init (root) because dist/ files are root-owned.
+              for f in /usr/local/share/npm-global/lib/node_modules/openclaw/dist/agent-delivery-*.js; do
+                [ -f "$f" ] || continue
+                grep -q 'OPENCLAW_DEFAULT_RECIPIENT' "$f" && continue
+                sed -i 's/let resolvedTo = explicitTo;/let resolvedTo = explicitTo; if (!resolvedTo \&\& process.env.OPENCLAW_DEFAULT_RECIPIENT) resolvedTo = process.env.OPENCLAW_DEFAULT_RECIPIENT;/' "$f" \
+                  && echo "[workspace-files] Patched delivery fallback in $(basename $f)" \
+                  || echo "[workspace-files] WARN: delivery patch failed for $(basename $f)"
+              done
+              # Increase mem0 recall timeout from 8s to 30s (qdrant can be slow
+              # on large collections, especially after pod restarts).
+              for f in /workspace/.openclaw/extensions/openclaw-mem0/node_modules/@mem0/openclaw-mem0/dist/index.js; do
+                [ -f "$f" ] || continue
+                grep -q 'RECALL_TIMEOUT_MS = 3e4' "$f" && continue
+                sed -i 's/RECALL_TIMEOUT_MS = 8e3/RECALL_TIMEOUT_MS = 3e4/' "$f" \
+                  && echo "[workspace-files] Patched mem0 recall timeout to 30s" \
+                  || echo "[workspace-files] WARN: mem0 timeout patch failed"
+              done
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: workspace-files-template
+              mountPath: /workspace-files-template
+        {{- end }}
+      containers:
+        - name: agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cd /workspace
+              export HOME=/workspace
+              export PATH="/workspace/.local/bin:/usr/local/share/npm-global/bin:/usr/local/bin:$PATH"
+              # Hermes harness debug bot:
+              # The raw Handlebars-templated harness script is mounted at
+              # /etc/hermes/container.sh.hbs. We stage a copy under
+              # /workspace/.harness/ for easy iteration and then sleep so a
+              # human can `kubectl exec` in and run/render it manually.
+              mkdir -p /workspace/.harness
+              cp -f /etc/hermes/container.sh.hbs /workspace/.harness/container.sh.hbs
+              echo "[hermes] Harness staged at /workspace/.harness/container.sh.hbs"
+              echo "[hermes] Render with: npx -y handlebars /workspace/.harness/container.sh.hbs --output /workspace/.harness/container.sh"
+              echo "[hermes] Pod is sleeping; exec in with: kubectl exec -it <pod> -- /bin/bash"
+              exec sleep infinity
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/bash
+                  - -c
+                  - |
+                    # (delivery-patch moved to init-workspace-files — runs as root)
+                    # Install kaniko docker shim into PATH so `docker build`/`docker push`
+                    # from the agent container routes to the kaniko sidecar via /workspace.
+                    # Init container stages the shim at /workspace/.local/bin/docker;
+                    # we copy it into /usr/local/bin (which precedes /usr/bin in PATH)
+                    # using passwordless sudo since /usr/local/bin is owned by ubuntu.
+                    if [ -f /workspace/.local/bin/docker ]; then
+                      sudo cp /workspace/.local/bin/docker /usr/local/bin/docker \
+                        && sudo chmod +x /usr/local/bin/docker \
+                        && echo "[postStart] docker shim installed at /usr/local/bin/docker" \
+                        || echo "[postStart] docker shim install failed"
+                    else
+                      echo "[postStart] /workspace/.local/bin/docker not found; skipping shim install"
+                    fi
+          env:
+            - name: HOME
+              value: /workspace
+            - name: TZ
+              value: "UTC"
+            - name: OPENCLAW_CONFIG
+              value: /workspace/.openclaw/openclaw.json
+            {{- if .Values.logging }}
+            {{- if .Values.logging.consoleLevel }}
+            - name: OPENCLAW_LOG_LEVEL
+              value: {{ .Values.logging.consoleLevel | quote }}
+            {{- end }}
+            {{- if .Values.logging.rawStream }}
+            - name: OPENCLAW_RAW_STREAM
+              value: "1"
+            {{- if .Values.logging.rawStreamPath }}
+            - name: OPENCLAW_RAW_STREAM_PATH
+              value: {{ .Values.logging.rawStreamPath | quote }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.diagnostics }}
+            {{- if .Values.diagnostics.flags }}
+            - name: OPENCLAW_DIAGNOSTICS
+              value: {{ join "," .Values.diagnostics.flags | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.toolServer.url }}
+            - name: TOOL_SERVER_URL
+              value: {{ .Values.toolServer.url | quote }}
+            {{- end }}
+            - name: NODE_ENV
+              value: production
+            - name: OPENCLAW_NO_RESPAWN
+              value: "1"
+            # Prevent git from prompting for credentials in non-TTY
+            - name: GIT_TERMINAL_PROMPT
+              value: "0"
+            # Disable mem0 telemetry (prevents HTTP/2 GOAWAY timeouts)
+            - name: ANONYMIZED_TELEMETRY
+              value: "false"
+            - name: MEM0_TELEMETRY
+              value: "false"
+            {{- if .Values.tools.acp.enabled }}
+            - name: KIMI_SHARE_DIR
+              value: /workspace/.kimi
+            {{- end }}
+            {{- if .Values.agent.defaultRecipient }}
+            # Fallback delivery target when session has no resolved recipient.
+            # Consumed by postStart patch on agent-delivery-*.js to fix missing
+            # final-response Discord posts.
+            - name: OPENCLAW_DEFAULT_RECIPIENT
+              value: {{ .Values.agent.defaultRecipient | quote }}
+            {{- end }}
+            - name: DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.discordTokensSecret }}
+                  key: {{ $discordConfig.tokenSecretKey | default .Values.agent.id }}
+                  optional: true
+            # Provider API keys (available at runtime for dynamic use)
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: anthropic-api-key
+                  optional: true
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: gemini-api-key
+                  optional: true
+            - name: GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: gemini-api-key
+                  optional: true
+            {{- $providers := .Values.models.providers | default dict }}
+            {{- $openaiProvider := index $providers "openai" | default dict }}
+            {{- $openaiApiProvider := index $providers "openai-api" | default dict }}
+            {{- if or (and (hasKey $providers "openai") (or (not (hasKey $openaiProvider "enabled")) $openaiProvider.enabled)) (and (hasKey $providers "openai-api") (or (not (hasKey $openaiApiProvider "enabled")) $openaiApiProvider.enabled)) }}
+            # OPENAI_API_KEY intentionally NOT set — Codex CLI detects it on boot
+            # and rewrites /workspace/.codex/auth.json to apikey-mode, clobbering
+            # the OAuth token. Use PROVIDER_OPENAI_API_KEY for non-Codex OpenAI
+            # provider fallback; use codex-auth-sub1/sub2 for OAuth.
+            - name: PROVIDER_OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: openai-api-key
+                  optional: true
+            {{- end }}
+            - name: FACTORY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: factory-api-key
+                  optional: true
+            - name: FIREWORKS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: fireworks-api-key
+                  optional: true
+            # DigitalOcean Gradient AI model access key (OpenCode → Claude Opus 4.7 tier-3 fallback)
+            - name: DO_INFERENCE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: DO_INFERENCE_KEY
+                  optional: true
+            # Web tools API keys (Brave search + Firecrawl scraping)
+            - name: BRAVE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: brave-api-key
+                  optional: true
+            - name: FIRECRAWL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: firecrawl-api-key
+                  optional: true
+            {{- if .Values.claudeCode.enabled }}
+            # Claude Code CLI settings path (settings.json with permissions + teams)
+            - name: CLAUDE_CONFIG_DIR
+              value: /workspace/.claude
+            {{- if .Values.claudeCode.agentTeams.enabled }}
+            # Enable Agent Teams experimental feature
+            - name: CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
+              value: "1"
+            {{- end }}
+            # Disable auto-updater (version pinned in Docker image)
+            - name: DISABLE_AUTOUPDATER
+              value: "1"
+            {{- if .Values.claudeCode.disableTelemetry }}
+            - name: DISABLE_TELEMETRY
+              value: "1"
+            {{- end }}
+            {{- if .Values.claudeCode.oauthTokenSecretKey }}
+            # Claude Code OAuth token for headless auth (Pro/Max/Teams) - Sub 1
+            - name: CLAUDE_CODE_OAUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: {{ .Values.claudeCode.oauthTokenSecretKey }}
+                  optional: true
+            {{- end }}
+            {{- if .Values.claudeCode.oauthTokenSecretKeySub2 }}
+            # Claude Code OAuth token - Sub 2 (for failover when credits run out)
+            - name: CLAUDE_CODE_OAUTH_TOKEN_SUB2
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: {{ .Values.claudeCode.oauthTokenSecretKeySub2 }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            {{- if and (hasKey .Values "codexPlugin") .Values.codexPlugin.enabled .Values.codexPlugin.authSecretKey }}
+            # Codex CLI OAuth auth (two subscriptions for failover)
+            - name: CODEX_AUTH_SUB1
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: {{ .Values.codexPlugin.authSecretKey }}
+                  optional: true
+            {{- if .Values.codexPlugin.authSecretKeySub2 }}
+            - name: CODEX_AUTH_SUB2
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: {{ .Values.codexPlugin.authSecretKeySub2 }}
+                  optional: true
+            {{- end }}
+            {{- end }}
+            {{- if .Values.toolsConfig }}
+            # Tools config path for CLI backends
+            - name: MCP_TOOLS_CONFIG
+              value: /workspace/tools-config.json
+            {{- end }}
+            # GitHub PAT for git operations at runtime (push, pull, etc.)
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: github-pat
+                  optional: true
+            # gh CLI auth (mirrors GITHUB_TOKEN)
+            - name: GH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: github-pat
+                  optional: true
+            # Copilot CLI headless auth (mirrors GITHUB_TOKEN)
+            - name: COPILOT_GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: github-pat
+                  optional: true
+            # 1Password CLI (headless via service account token)
+            - name: OP_SERVICE_ACCOUNT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: op-service-account-token
+                  optional: true
+            # OVH API credentials (python-ovh SDK)
+            - name: OVH_APPLICATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: ovh-application-key
+                  optional: true
+            - name: OVH_APPLICATION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: ovh-application-secret
+                  optional: true
+            - name: OVH_CONSUMER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: ovh-consumer-key
+                  optional: true
+            - name: OVH_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: ovh-endpoint
+                  optional: true
+            - name: OVH_PROJECT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: ovh-project-id
+                  optional: true
+            {{- if .Values.kaniko.enabled }}
+            # Docker config for image builds/pushes (GHCR auth)
+            - name: DOCKER_CONFIG
+              value: /workspace/.docker
+            # Pod identity for docker→kaniko shim (kubectl exec into self)
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- end }}
+            {{- if .Values.cloudProviders.bedrock.enabled }}
+            # AWS Bedrock credentials (used by OpenClaw gateway + Claude Code CLI)
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: aws-access-key-id
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: aws-secret-access-key
+                  optional: true
+            - name: AWS_REGION
+              value: {{ .Values.cloudProviders.bedrock.region | quote }}
+            {{- end }}
+            {{- if .Values.cloudProviders.vertex.enabled }}
+            # GCP Vertex AI credentials
+            - name: CLOUD_ML_REGION
+              value: {{ .Values.cloudProviders.vertex.region | quote }}
+            - name: ANTHROPIC_VERTEX_PROJECT_ID
+              value: {{ .Values.cloudProviders.vertex.projectId | quote }}
+            {{- end }}
+            {{- if .Values.cloudProviders.foundry.enabled }}
+            # Microsoft Foundry credentials
+            - name: ANTHROPIC_FOUNDRY_RESOURCE
+              value: {{ .Values.cloudProviders.foundry.resource | quote }}
+            - name: ANTHROPIC_FOUNDRY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: foundry-api-key
+                  optional: true
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: gateway
+              containerPort: {{ .Values.gateway.port }}
+              protocol: TCP
+          {{- if .Values.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: gateway
+            initialDelaySeconds: {{ .Values.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+          {{- end }}
+          {{- if .Values.probes.liveness.enabled }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: gateway
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          {{- end }}
+          {{- if .Values.probes.readiness.enabled }}
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  HEALTH=$(curl -sf --max-time 3 http://localhost:{{ .Values.gateway.port }}/healthz 2>/dev/null) || exit 1
+                  echo "$HEALTH" | grep -q '"ok":true' || exit 1
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: hermes-harness
+              mountPath: /etc/hermes
+              readOnly: true
+            {{- if .Values.kaniko.enabled }}
+            - name: kaniko-docker-config
+              mountPath: /workspace/.docker
+              readOnly: true
+            {{- end }}
+            {{- if .Values.tools.acp.enabled }}
+            - name: acpx-node-modules
+              mountPath: /usr/local/share/npm-global/lib/node_modules/openclaw/extensions/acpx/node_modules
+            {{- end }}
+        {{- if .Values.kaniko.enabled }}
+        - name: kaniko
+          image: {{ .Values.kaniko.image }}
+          command: ["/busybox/sleep", "infinity"]
+          env:
+            - name: DOCKER_CONFIG
+              value: /kaniko/.docker
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: kaniko-docker-config
+              mountPath: /kaniko/.docker
+              readOnly: true
+          resources:
+            {{- toYaml .Values.kaniko.resources | nindent 12 }}
+        {{- end }}
+        {{- if .Values.telemetry.enabled }}
+        - name: promtail
+          image: {{ .Values.telemetry.promtail.image }}
+          args:
+            - -config.file=/etc/promtail/promtail.yaml
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+              readOnly: true
+            - name: promtail-config
+              mountPath: /etc/promtail
+          resources:
+            {{- toYaml .Values.telemetry.resources | nindent 12 }}
+        {{- end }}
+        {{- if .Values.ssh.enabled }}
+        - name: sshd
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              # Configure SSH
+              mkdir -p /run/sshd /root/.ssh /workspace/.ssh
+              chmod 700 /root/.ssh /workspace/.ssh
+
+              # Generate host keys if missing (persisted on workspace PV)
+              SSH_KEY_DIR=/workspace/.ssh/host_keys
+              mkdir -p "$SSH_KEY_DIR"
+              for type in rsa ed25519; do
+                if [ ! -f "$SSH_KEY_DIR/ssh_host_${type}_key" ]; then
+                  ssh-keygen -t "$type" -f "$SSH_KEY_DIR/ssh_host_${type}_key" -N "" -q
+                fi
+              done
+
+              # Write sshd config
+              cat > /etc/ssh/sshd_config <<'SSHCFG'
+              Port {{ .Values.ssh.port | default 2222 }}
+              HostKey /workspace/.ssh/host_keys/ssh_host_rsa_key
+              HostKey /workspace/.ssh/host_keys/ssh_host_ed25519_key
+              PermitRootLogin yes
+              PubkeyAuthentication yes
+              PasswordAuthentication no
+              ChallengeResponseAuthentication no
+              StrictModes no
+              UsePAM no
+              X11Forwarding yes
+              PrintMotd yes
+              AcceptEnv LANG LC_*
+              ClientAliveInterval 60
+              ClientAliveCountMax 3
+              MaxSessions 10
+              Subsystem sftp /usr/lib/openssh/sftp-server
+              SSHCFG
+              sed -i 's/^              //' /etc/ssh/sshd_config
+
+              # Set up authorized keys
+              {{- if .Values.ssh.authorizedKeys }}
+              {{- range .Values.ssh.authorizedKeys }}
+              echo "{{ . }}" >> /root/.ssh/authorized_keys
+              {{- end }}
+              {{- end }}
+              chmod 600 /root/.ssh/authorized_keys 2>/dev/null || true
+
+              # Also allow the node user (uid 1001) to SSH in
+              NODE_HOME=$(getent passwd node | cut -d: -f6 || echo "/home/node")
+              mkdir -p "$NODE_HOME/.ssh"
+              cp /root/.ssh/authorized_keys "$NODE_HOME/.ssh/authorized_keys" 2>/dev/null || true
+              chown -R node:node "$NODE_HOME/.ssh" 2>/dev/null || true
+              chmod 700 "$NODE_HOME/.ssh" 2>/dev/null || true
+              chmod 600 "$NODE_HOME/.ssh/authorized_keys" 2>/dev/null || true
+
+              echo "[sshd] Starting on port {{ .Values.ssh.port | default 2222 }}"
+              exec /usr/sbin/sshd -D -e
+          ports:
+            - name: ssh
+              containerPort: {{ .Values.ssh.port | default 2222 }}
+              protocol: TCP
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          readinessProbe:
+            tcpSocket:
+              port: ssh
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: ssh
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+        {{- end }}
+        {{- if .Values.codeServer.enabled }}
+        - name: code-server
+          image: codercom/code-server:latest
+          securityContext:
+            runAsUser: 0
+          command:
+            - /bin/sh
+            - -c
+            - |
+              mkdir -p /workspace/.code-server/User
+              # Shared VS Code settings (canonical in shared/code-server-config/settings.json)
+              # Only write settings.json if it doesn't exist (preserve user changes)
+              if [ ! -f /workspace/.code-server/User/settings.json ]; then
+              cat > /workspace/.code-server/User/settings.json << 'SETTINGS'
+{{ .Files.Get "files/code-server-config/settings.json" | indent 14 }}
+              SETTINGS
+              sed -i 's/^              //' /workspace/.code-server/User/settings.json
+              fi
+              # Pre-seed workbench state from shared/code-server-config/storage.json.
+              # Uses a marker file so we can re-seed when the canonical layout is
+              # bumped without nuking ongoing user customizations every launch.
+              # Bump STORAGE_SEED_VERSION when shared/code-server-config/storage.json
+              # changes in a way that existing pods need to pick up.
+              mkdir -p /workspace/.code-server/User/globalStorage
+              STORAGE_SEED_VERSION=v4-auxbar
+              STORAGE_SEED_MARKER=/workspace/.code-server/.storage-seed
+              if [ ! -f /workspace/.code-server/User/globalStorage/storage.json ] || \
+                 [ "$(cat "$STORAGE_SEED_MARKER" 2>/dev/null)" != "$STORAGE_SEED_VERSION" ]; then
+              cat > /workspace/.code-server/User/globalStorage/storage.json << 'STATE'
+{{ .Files.Get "files/code-server-config/storage.json" | indent 14 }}
+              STATE
+              sed -i 's/^              //' /workspace/.code-server/User/globalStorage/storage.json
+              echo "$STORAGE_SEED_VERSION" > "$STORAGE_SEED_MARKER"
+              fi
+              {{- if .Values.codeServer.githubToken }}
+              # Write code-server config with github-auth for Copilot
+              mkdir -p /root/.config/code-server
+              {{- if .Values.codeServer.password }}
+              cat > /root/.config/code-server/config.yaml << CSCONF
+              bind-addr: 0.0.0.0:{{ .Values.codeServer.port | default 8080 }}
+              auth: password
+              password: ${PASSWORD}
+              cert: false
+              github-auth: ${GITHUB_TOKEN}
+              CSCONF
+              {{- else }}
+              cat > /root/.config/code-server/config.yaml << CSCONF
+              bind-addr: 0.0.0.0:{{ .Values.codeServer.port | default 8080 }}
+              auth: none
+              cert: false
+              github-auth: ${GITHUB_TOKEN}
+              CSCONF
+              {{- end }}
+              sed -i 's/^              //' /root/.config/code-server/config.yaml
+              # Pre-seed Copilot auth via hosts.json (read by the extension at startup)
+              mkdir -p /root/.config/github-copilot
+              echo "{\"github.com\":{\"user\":\"copilot-user\",\"oauth_token\":\"${GITHUB_TOKEN}\"}}" \
+                > /root/.config/github-copilot/hosts.json
+              {{- end }}
+              # GitLab workflow extension install (replaces GitHub Copilot — SCM is GitLab-first)
+              EXTDIR="/workspace/.code-server/extensions"
+              mkdir -p "$EXTDIR"
+              mkdir -p /workspace/.code-server-cache
+              # 5dlabs CTO sidebar extension — replaces Copilot Chat as the
+              # primary right-rail agent surface. See apps/cto-sidebar/.
+              # Downloaded from the `cto-sidebar-latest` GitHub release. Since
+              # 5dlabs/cto is private, we must authenticate with GITHUB_TOKEN
+              # via the API asset URL (`accept: application/octet-stream`).
+              # We also reject cached files smaller than 1KB so a transient
+              # 404/rate-limit doesn't poison the PVC cache forever.
+              echo "[code-server] Installing 5dlabs cto-sidebar extension..."
+              CTO_VSIX="/workspace/.code-server-cache/cto-sidebar.vsix"
+              if [ ! -s "$CTO_VSIX" ] || [ "$(stat -c %s "$CTO_VSIX" 2>/dev/null || wc -c < "$CTO_VSIX")" -lt 1024 ]; then
+                rm -f "$CTO_VSIX"
+                if [ -n "${GITHUB_TOKEN:-}" ]; then
+                  CTO_ASSET_URL=$(curl -sf \
+                    -H "authorization: Bearer $GITHUB_TOKEN" \
+                    -H "accept: application/vnd.github+json" \
+                    "https://api.github.com/repos/5dlabs/cto/releases/tags/cto-sidebar-latest" 2>/dev/null \
+                    | grep -oE '"url": *"https://api\.github\.com/repos/5dlabs/cto/releases/assets/[0-9]+"' \
+                    | head -1 | sed 's/.*"\(https:[^"]*\)"/\1/')
+                  if [ -n "$CTO_ASSET_URL" ]; then
+                    curl -sfL \
+                      -H "authorization: Bearer $GITHUB_TOKEN" \
+                      -H "accept: application/octet-stream" \
+                      "$CTO_ASSET_URL" -o "$CTO_VSIX" 2>/dev/null || rm -f "$CTO_VSIX"
+                  fi
+                fi
+              fi
+              if [ -s "$CTO_VSIX" ] && [ "$(stat -c %s "$CTO_VSIX" 2>/dev/null || wc -c < "$CTO_VSIX")" -ge 1024 ]; then
+                code-server --extensions-dir "$EXTDIR" --install-extension "$CTO_VSIX" 2>/dev/null || true
+              else
+                echo "[code-server] WARN: cto-sidebar.vsix unavailable; extension not installed"
+              fi
+              # Remove GitHub Copilot extensions — the cto-sidebar above is our
+              # agent surface. `code-server --github-auth` auto-installs them on
+              # first start, so we uninstall here after that has happened.
+              code-server --extensions-dir "$EXTDIR" --uninstall-extension GitHub.copilot 2>/dev/null || true
+              code-server --extensions-dir "$EXTDIR" --uninstall-extension GitHub.copilot-chat 2>/dev/null || true
+              echo "[code-server] Installing GitLab workflow extension..."
+              GITLAB_VSIX="/workspace/.code-server-cache/gitlab-workflow.vsix"
+              curl -sL --compressed \
+                "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/GitLab/vsextensions/gitlab-workflow/latest/vspackage" \
+                -o "${GITLAB_VSIX}.gz" && (gunzip -f "${GITLAB_VSIX}.gz" 2>/dev/null || mv "${GITLAB_VSIX}.gz" "$GITLAB_VSIX")
+              code-server --extensions-dir "$EXTDIR" --install-extension "$GITLAB_VSIX" 2>/dev/null || true
+              # Patch product.json to use MS Marketplace (Copilot not on Open VSX)
+              /usr/lib/code-server/lib/node -e "
+                var fs=require('fs'),p='/usr/lib/code-server/lib/vscode/product.json';
+                var d=JSON.parse(fs.readFileSync(p,'utf8'));
+                d.extensionsGallery={
+                  serviceUrl:'https://marketplace.visualstudio.com/_apis/public/gallery',
+                  cacheUrl:'https://vscode.blob.core.windows.net/gallery/index',
+                  itemUrl:'https://marketplace.visualstudio.com/items',
+                  controlUrl:'',recommendationsUrl:''
+                };
+                fs.writeFileSync(p,JSON.stringify(d,null,2));
+              " 2>/dev/null || true
+              # Remove the bundled GitHub Copilot extension from code-server's
+              # builtin dir. code-server 4.117+ ships Copilot as a builtin that
+              # is immune to `--uninstall-extension`, and code-server has NO
+              # `--disable-extension` CLI flag (that's VS Code Desktop only —
+              # passing it here makes code-server exit with "Unknown option").
+              # Deleting the directory is the only reliable way to keep the
+              # cto-sidebar as our primary agent surface.
+              rm -rf /usr/lib/code-server/lib/vscode/extensions/copilot 2>/dev/null || true
+              exec code-server \
+                --disable-telemetry \
+                --user-data-dir /workspace/.code-server \
+                --extensions-dir "$EXTDIR" \
+                {{ .Values.codeServer.defaultFolder | default "/workspace" }}
+          env:
+            - name: PASSWORD
+              value: {{ .Values.codeServer.password | quote }}
+            {{- if .Values.codeServer.githubToken }}
+            {{- if .Values.codeServer.githubToken.secretName }}
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.codeServer.githubToken.secretName }}
+                  key: {{ .Values.codeServer.githubToken.key | default "token" }}
+            {{- end }}
+            {{- end }}
+          ports:
+            - name: code-server
+              containerPort: {{ .Values.codeServer.port | default 8080 }}
+              protocol: TCP
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: code-server
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: code-server
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+        {{- if .Values.codeServer.quickTunnel.enabled }}
+        - name: cloudflared
+          image: cloudflare/cloudflared:latest
+          command:
+            - cloudflared
+            - tunnel
+            - --url
+            - http://localhost:{{ .Values.codeServer.port | default 8080 }}
+            - --no-autoupdate
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+        {{- end }}
+        {{- end }}
+        {{- if .Values.projectApi.enabled }}
+        # ---------------------------------------------------------------
+        # project-api sidecar — HTTP surface for /workspace/repos and the
+        # "active project" pointer. Reads/writes the same PVC the agent
+        # container mounts at /workspace, so changes are immediately
+        # visible to the agent (and vice versa) without IPC.
+        # ---------------------------------------------------------------
+        - name: project-api
+          image: "{{ .Values.projectApi.image.repository }}:{{ .Values.projectApi.image.tag }}"
+          imagePullPolicy: {{ .Values.projectApi.image.pullPolicy }}
+          env:
+            - name: PORT
+              value: {{ .Values.projectApi.port | quote }}
+            - name: REPOS_ROOT
+              value: {{ .Values.projectApi.reposRoot | quote }}
+            - name: STATE_DIR
+              value: {{ .Values.projectApi.stateDir | quote }}
+            - name: GITHUB_ORG
+              value: {{ .Values.projectApi.githubOrg | quote }}
+            - name: ALLOWED_ORIGINS
+              value: {{ .Values.projectApi.allowedOrigins | quote }}
+            - name: GIT_COMMIT_NAME
+              value: {{ .Values.projectApi.git.commitName | quote }}
+            - name: GIT_COMMIT_EMAIL
+              value: {{ .Values.projectApi.git.commitEmail | quote }}
+            # Reuse the same GitHub PAT that powers agent-side clones/pushes
+            # so `/projects` can hit private repos under the configured org.
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: github-pat
+                  optional: true
+          ports:
+            - name: project-api
+              containerPort: {{ .Values.projectApi.port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: project-api
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: project-api
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.projectApi.resources | nindent 12 }}
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+        {{- end }}
+        {{- if .Values.narrator.enabled }}
+        {{- if .Values.narrator.musetalk.enabled }}
+        - name: narrator-musetalk
+          image: "{{ .Values.narrator.image.repository }}:{{ .Values.narrator.image.tag }}"
+          imagePullPolicy: {{ .Values.narrator.image.pullPolicy }}
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+          command:
+            - python
+            - -m
+            - app.main
+          env:
+            - name: BACKEND
+              value: musetalk
+            - name: PORT
+              value: "{{ .Values.narrator.musetalk.port }}"
+            - name: OPENCLAW_RAW_STREAM_PATH
+              value: {{ .Values.narrator.rawStreamPath | quote }}
+            - name: NARRATOR_INTERRUPT_PATH
+              value: {{ .Values.narrator.interruptPath | quote }}
+            - name: PERSONA_ID
+              value: {{ .Values.narrator.persona.id | quote }}
+            - name: PERSONA_VOICE_SAMPLE
+              value: {{ .Values.narrator.persona.voiceSamplePath | quote }}
+            - name: LIPSYNC_WORKER_URL
+              value: {{ .Values.narrator.musetalk.workerUrl | quote }}
+            - name: LIPSYNC_NATS_URL
+              value: {{ .Values.narrator.lipsyncNatsUrl | quote }}
+            - name: LIPSYNC_SUBJECT
+              value: {{ .Values.narrator.musetalk.lipsyncSubject | quote }}
+            - name: LIPSYNC_RESULT_SUBJECT
+              value: {{ .Values.narrator.musetalk.lipsyncResultSubject | quote }}
+            {{- if .Values.nats.enabled }}
+            - name: NATS_URL
+              value: {{ .Values.nats.url | quote }}
+            {{- end }}
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: openai-api-key
+                  optional: true
+            - name: LLM_MODEL
+              value: "gpt-4o-mini"
+          ports:
+            - name: narr-muse
+              containerPort: {{ .Values.narrator.musetalk.port }}
+              protocol: TCP
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: narrator-voice-samples
+              mountPath: /models/voice-samples
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.narrator.probes.readiness.path | quote }}
+              port: narr-muse
+            initialDelaySeconds: {{ .Values.narrator.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.narrator.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.narrator.probes.liveness.path | quote }}
+              port: narr-muse
+            initialDelaySeconds: {{ .Values.narrator.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.narrator.probes.liveness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.narrator.resources | nindent 12 }}
+        {{- end }}
+        {{- if .Values.narrator.hunyuan.enabled }}
+        - name: narrator-hunyuan
+          image: "{{ .Values.narrator.image.repository }}:{{ .Values.narrator.image.tag }}"
+          imagePullPolicy: {{ .Values.narrator.image.pullPolicy }}
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+          command:
+            - python
+            - -m
+            - app.main
+          env:
+            - name: BACKEND
+              value: hunyuan
+            - name: PORT
+              value: "{{ .Values.narrator.hunyuan.port }}"
+            - name: OPENCLAW_RAW_STREAM_PATH
+              value: {{ .Values.narrator.rawStreamPath | quote }}
+            - name: NARRATOR_INTERRUPT_PATH
+              value: {{ .Values.narrator.interruptPath | quote }}
+            - name: PERSONA_ID
+              value: {{ .Values.narrator.persona.id | quote }}
+            - name: PERSONA_VOICE_SAMPLE
+              value: {{ .Values.narrator.persona.voiceSamplePath | quote }}
+            - name: LIPSYNC_WORKER_URL
+              value: {{ .Values.narrator.hunyuan.workerUrl | quote }}
+            - name: LIPSYNC_NATS_URL
+              value: {{ .Values.narrator.lipsyncNatsUrl | quote }}
+            - name: LIPSYNC_SUBJECT
+              value: {{ .Values.narrator.hunyuan.lipsyncSubject | quote }}
+            - name: LIPSYNC_RESULT_SUBJECT
+              value: {{ .Values.narrator.hunyuan.lipsyncResultSubject | quote }}
+            {{- if .Values.nats.enabled }}
+            - name: NATS_URL
+              value: {{ .Values.nats.url | quote }}
+            {{- end }}
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: openai-api-key
+                  optional: true
+            - name: LLM_MODEL
+              value: "gpt-4o-mini"
+          ports:
+            - name: narr-huny
+              containerPort: {{ .Values.narrator.hunyuan.port }}
+              protocol: TCP
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: narrator-voice-samples
+              mountPath: /models/voice-samples
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.narrator.probes.readiness.path | quote }}
+              port: narr-huny
+            initialDelaySeconds: {{ .Values.narrator.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.narrator.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.narrator.probes.liveness.path | quote }}
+              port: narr-huny
+            initialDelaySeconds: {{ .Values.narrator.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.narrator.probes.liveness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.narrator.resources | nindent 12 }}
+        {{- end }}
+        {{- end }}
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: {{ include "openclaw-agent.fullname" . }}-workspace
+        - name: config-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-config
+        - name: hermes-harness
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-hermes-harness
+        {{- if .Values.workspace.files }}
+        - name: workspace-files-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-workspace-files
+        {{- end }}
+        {{- if .Values.claudeCode.enabled }}
+        - name: claude-settings-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-claude-settings
+        - name: claude-skills-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-claude-skills
+        {{- if .Values.claudeCode.mcp.servers }}
+        - name: claude-mcp-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-claude-mcp
+        {{- end }}
+        {{- end }}
+        {{- if .Values.toolServer.url }}
+        - name: cli-backend-configs-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-cli-backend-configs
+        {{- end }}
+        {{- if .Values.toolsConfig }}
+        - name: tools-config-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-tools-config
+        {{- end }}
+        {{- if .Values.tools.acp.enabled }}
+        - name: acpx-node-modules
+          emptyDir: {}
+        {{- end }}
+        {{- if .Values.kaniko.enabled }}
+        - name: kaniko-docker-config
+          secret:
+            secretName: ghcr-secret
+            items:
+              - key: .dockerconfigjson
+                path: config.json
+        {{- end }}
+        {{- if .Values.telemetry.enabled }}
+        - name: promtail-config
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-promtail
+        {{- end }}
+        {{- if .Values.narrator.enabled }}
+        - name: narrator-voice-samples
+          configMap:
+            name: narrator-voice-samples
+            optional: true
+        {{- end }}
