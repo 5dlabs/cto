@@ -568,7 +568,28 @@ claudeCode:
 # backends (Claude Code, Codex, Droid).
 toolsConfig:
   remoteTools:
+    - "ai_elements_*"
+    - "argocd_*"
+    - "better_auth_*"
+    - "context7_*"
+    - "exa_*"
     - "firecrawl_*"
+    - "grafana_*"
+    - "graphql_*"
+    - "github_*"
+    - "kubernetes_*"
+    - "linear_*"
+    - "loki_*"
+    - "modelcontextprotocol_*"
+    - "octocode_*"
+    - "openmemory_*"
+    - "pg_aiguide_*"
+    - "playwright_*"
+    - "repomix_*"
+    - "shadcn_*"
+    - "solana_*"
+    - "tavily_*"
+    - "terraform_*"
   localServers:
     memory:
       command: "npx"
@@ -585,6 +606,18 @@ toolsConfig:
         - "read_graph"
         - "search_nodes"
         - "open_nodes"
+    huggingface:
+      command: "sh"
+      args:
+        - "-lc"
+        - 'if [ -z "${HF_TOKEN:-}" ]; then echo "HF_TOKEN is required for Hugging Face MCP headless auth" >&2; exit 1; fi; exec npx -y mcp-remote@latest https://huggingface.co/mcp --header "Authorization: Bearer ${HF_TOKEN}"'
+      tools: []
+    scenario:
+      command: "sh"
+      args:
+        - "-lc"
+        - 'if [ -z "${SCENARIO_API_KEY:-}" ] || [ -z "${SCENARIO_API_SECRET:-}" ]; then echo "SCENARIO_API_KEY and SCENARIO_API_SECRET are required for Scenario MCP headless auth" >&2; exit 1; fi; AUTH=$(printf "%s:%s" "$SCENARIO_API_KEY" "$SCENARIO_API_SECRET" | base64 | tr -d "\n"); exec npx -y mcp-remote@latest https://mcp.scenario.com/mcp --header "Authorization: Basic $AUTH"'
+      tools: []
 
 toolServer:
   url: ""

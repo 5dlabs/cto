@@ -49,6 +49,12 @@ MCP servers spawned locally alongside CLI sessions. Each entry defines:
 2. **New local MCP server:** Add an entry to `localServers` with the npx command and tool whitelist
 3. **Claude Code MCP server:** Add to `claudeCode.mcp.servers` in values.yaml (renders into `.claude.json`)
 
+## Headless OAuth/API-backed tools
+
+- Hugging Face uses `HF_TOKEN`/`HUGGING_FACE_HUB_TOKEN` from the shared API-key secret (`huggingface-token`) and connects to `https://huggingface.co/mcp` through `mcp-remote`.
+- Scenario uses project API credentials from the shared API-key secret (`scenario-api-key` and `scenario-api-secret`) and connects to `https://mcp.scenario.com/mcp` with a Basic auth header generated at runtime.
+- These local MCP bridges are spawned only when a CLI session requests their tools, so missing optional credentials do not block pod startup.
+
 ## Available Tool Groups
 
 The OpenClaw gateway organizes tools into groups:

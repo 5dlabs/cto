@@ -109,9 +109,12 @@ data:
 
   copilot-config.json: |
     {
-      "model": "claude-opus-4.7",
-      "trustDirectories": ["/workspace"],
+      "model": "gpt-5.5",
+      "trustedFolders": ["/workspace"],
       "allowAllTools": true,
+      "autoUpdate": false,
+      "experimental": true,
+      "logLevel": "info",
       "mcpServers": {
         "tool-server": {
           "command": "/workspace/.local/bin/tools",

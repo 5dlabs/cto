@@ -125,6 +125,15 @@ data:
               namespace: {{ .Values.namespace | default .Release.Namespace | quote }}
               service_name: acp-cli
               __path__: /workspace/.cursor/logs/*.log
+          - targets:
+              - localhost
+            labels:
+              job: acp-cli
+              source: acp-copilot
+              agent_id: {{ .Values.agent.id | quote }}
+              namespace: {{ .Values.namespace | default .Release.Namespace | quote }}
+              service_name: acp-cli
+              __path__: /workspace/.copilot/logs/*.log
         pipeline_stages:
           - regex:
               expression: '(?P<cli_name>acp-[a-z]+)'
@@ -134,4 +143,3 @@ data:
               source:
               session_type:
 {{- end }}
-

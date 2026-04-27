@@ -979,6 +979,32 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: github-pat
                   optional: true
+            # Hugging Face Hub/MCP headless auth.
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: huggingface-token
+                  optional: true
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: huggingface-token
+                  optional: true
+            # Scenario API/MCP headless auth uses Basic auth key + secret.
+            - name: SCENARIO_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: scenario-api-key
+                  optional: true
+            - name: SCENARIO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: scenario-api-secret
+                  optional: true
             # 1Password CLI (headless via service account token)
             - name: OP_SERVICE_ACCOUNT_TOKEN
               valueFrom:

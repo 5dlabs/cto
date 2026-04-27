@@ -761,7 +761,7 @@ tools:
       gemini:
         command: "gemini --experimental-acp --yolo"
       copilot:
-        command: "copilot --acp --yolo --no-ask-user --model gpt-5.5"
+        command: "copilot --acp --yolo --no-ask-user --model gpt-5.5 --experimental --autopilot --max-autopilot-continues 12 --effort high --enable-reasoning-summaries --enable-all-github-mcp-tools --no-auto-update --log-dir /workspace/.copilot/logs --log-level info"
       kimi:
         command: "kimi acp"
       cursor:
@@ -942,19 +942,41 @@ narrator:
 # =============================================================================
 toolsConfig:
   remoteTools:
+    - "ai_elements_*"
     - "argocd_*"
+    - "better_auth_*"
     - "context7_*"
     - "exa_*"
     - "firecrawl_*"
+    - "grafana_*"
+    - "graphql_*"
     - "github_*"
     - "kubernetes_*"
     - "linear_*"
     - "loki_*"
+    - "modelcontextprotocol_*"
     - "octocode_*"
     - "openmemory_*"
+    - "pg_aiguide_*"
     - "playwright_*"
+    - "repomix_*"
     - "shadcn_*"
+    - "solana_*"
     - "tavily_*"
+    - "terraform_*"
+  localServers:
+    huggingface:
+      command: "sh"
+      args:
+        - "-lc"
+        - 'if [ -z "${HF_TOKEN:-}" ]; then echo "HF_TOKEN is required for Hugging Face MCP headless auth" >&2; exit 1; fi; exec npx -y mcp-remote@latest https://huggingface.co/mcp --header "Authorization: Bearer ${HF_TOKEN}"'
+      tools: []
+    scenario:
+      command: "sh"
+      args:
+        - "-lc"
+        - 'if [ -z "${SCENARIO_API_KEY:-}" ] || [ -z "${SCENARIO_API_SECRET:-}" ]; then echo "SCENARIO_API_KEY and SCENARIO_API_SECRET are required for Scenario MCP headless auth" >&2; exit 1; fi; AUTH=$(printf "%s:%s" "$SCENARIO_API_KEY" "$SCENARIO_API_SECRET" | base64 | tr -d "\n"); exec npx -y mcp-remote@latest https://mcp.scenario.com/mcp --header "Authorization: Basic $AUTH"'
+      tools: []
 
 # =============================================================================
 # CLI Backends
