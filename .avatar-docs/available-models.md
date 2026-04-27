@@ -2,8 +2,8 @@
 
 This catalog tracks models and service offerings that could participate in the
 Morgan avatar provisioning pipeline. It is intentionally broader than the
-current open-source path so we can swap in paid providers when credits or budget
-are available.
+current hosted path so we can swap in self-hosted/open-source providers after
+Scenario proves or falsifies the workflow.
 
 Sources used:
 
@@ -13,16 +13,38 @@ Sources used:
   lip-sync, and video models.
 - Existing local catalogs in `.avatar-docs/index/scenario-models.json` and
   `.avatar-docs/index/huggingface-models.json`.
+- Scenario help docs for 3D generation, multiview generation, Tripo P1/3.1,
+  Hunyuan/Tencent topology tools, and content-management/project concepts.
 
 Scenario's public catalog includes many generic style LoRAs and art-direction
 models. Those are excluded unless they map directly to this avatar pipeline.
+
+## Current stance
+
+Scenario is the primary hosted path now. Use Scenario asset IDs, tags,
+collections, model jobs, and downloads for the first Morgan validation loop.
+OVH/self-hosted workers remain important, but they are fallback or
+cost-optimization work after hosted validation. Scenario metadata is useful for
+triage, but it is not a runtime-readiness verdict; every GLB still needs our
+validator, Blender render proof, and browser runtime evidence.
+
+Known Scenario context:
+
+| Field | Value |
+| --- | --- |
+| Team | `team_tGJbdjDcUVVaC94KP5tut3D9` |
+| Project | `proj_SoJEwku2cCYaHGepX3HiPc4A` |
+| Existing Morgan-like GLB asset | `asset_jZB1gEWR79NiNL38fXKhBz81` |
+| Existing asset metadata | `model/gltf-binary`, ~13.96 MB, 581,652 vertices, 1,163,370 faces, Scenario-reported `hasSkeleton=false`, `hasAnimations=false` |
 
 ## Scenario recommendation signals
 
 | Pipeline stage | Scenario recommendation signal | Practical meaning for us |
 | --- | --- | --- |
 | Image/reference prep | `model_google-gemini-3-1-flash` | Scenario recommends Gemini 3.1 Flash for image editing/reference workflows with many reference images. Use for source cleanup, reference-sheet generation, texture/skin/fur prompt refinement, and QA images. |
-| Image-to-3D | `model_hunyuan-3d-pro-3-1-i23d` | Scenario's default quality recommendation for image-to-3D is Hunyuan 3D 3.1 Pro, with Tripo P1 noted for game-ready low-poly. This is the top paid benchmark after the open-source AniGen pass. |
+| Image-to-3D | `model_hunyuan-3d-pro-3-1-i23d`, `model_hunyuan-3d-pro-3-1-multiview` | Scenario's default quality recommendation for image-to-3D is Hunyuan 3D 3.1 Pro. Use single-image first, then multiview once front/side/back refs are consistent. |
+| Game-ready 3D | `model_tripo-p1-image-to-3d`, `model_tripo-p1-multiview-to-3d`, `model_tripo-v3-1-image-to-3d`, `model_tripo-v3-1-multiview-to-3d` | Tripo P1/3.1 expose engine-oriented controls: PBR, texture quality, geometry-vs-source alignment, face limits, auto sizing, seeds, and multiview inputs. |
+| Rig / retopo / utilities | `model_tripo-rigging-v1`, `model_tripo-rigging-v2-5`, `model_tripo-retopology`, `model_tencent-smarttopology`, `model_tencent-uv-unwrapping`, `model_tencent-texture-edit` | Run only after a candidate has acceptable identity/shape. These repair topology, rigging, UVs, and textures; they do not solve ARKit/Oculus facial controls by themselves. |
 | Text-to-3D | Meshy Text-to-3D, Rodin Gen-1/2 | Scenario recommends image-first, but if text-to-3D is required, Meshy and Rodin are the main paid candidates. Rodin has T/A-pose and PBR options that matter for rigging. |
 | Video fallback | `model_kling-v3-i2v-pro` | Scenario's quality default for image-to-video is Kling V3 I2V Pro; it supports elements, end frames, generated audio, and 3-15s clips. Use only for hero/fallback videos, not the runtime GLB path. |
 | Full workflow plan | Gemini-led reference workflow | Scenario's plan call mapped our request to a character-sheet/reference workflow and suggested a talking-head fallback. That reinforces our DAG: source/reference quality first, then 3D, then rig/face/runtime. |
@@ -31,13 +53,14 @@ models. Those are excluded unless they map directly to this avatar pipeline.
 
 | Model name | Provider | Open source | Should we use it? | Service offerings if not open source |
 | --- | --- | --- | --- | --- |
-| AniGen | VAST-AI Research | Yes, with license caveats | **Yes, first open-source head/bust benchmark.** It is the current primary path because it emits skinned GLB-like assets and we already have a local preview to diagnose. | N/A. Self-host on DigitalOcean GPU Droplet, RunPod, Modal, OVH, or Hugging Face GPU Space. |
-| Hunyuan 3D 3.1 Pro | Tencent / Hunyuan | No | **Yes, paid benchmark after AniGen or if AniGen fails geometry/material quality.** Scenario recommends it as the default image-to-3D quality model. | Scenario, Tencent/Hunyuan ecosystem if directly accessible, possible partner APIs. |
-| Hunyuan3D 2 / 2.1 | Tencent / Hunyuan | Yes | **Yes, open-source fallback/benchmark.** Useful if we want self-hosted Hunyuan-style generation without paying Scenario. | N/A. Self-host; Hugging Face models/spaces; DigitalOcean/RunPod/Modal GPU. |
-| Tripo 3.1 | Tripo AI | No | **Yes, paid fallback for game-ready 3D mesh output.** Scenario notes PBR textures and multi-view inputs; useful if AniGen identity or material quality is weak. | Scenario, Tripo API/platform. |
+| AniGen | VAST-AI Research | Yes, with license caveats | **Deferred.** Keep it ready as the first self-hosted/open-source benchmark if Scenario fails, but do not block hosted validation on building the worker. | N/A. Self-host on OVH, DigitalOcean GPU Droplet, RunPod, Modal, or Hugging Face GPU Space. |
+| Hunyuan 3D 3.1 Pro | Tencent / Hunyuan | No | **Yes, first Scenario 3D quality benchmark.** Use `model_hunyuan-3d-pro-3-1-i23d` and `model_hunyuan-3d-pro-3-1-multiview`; test PBR and face-count controls, then validate outside Scenario. | Scenario, Tencent/Hunyuan ecosystem if directly accessible, possible partner APIs. |
+| Hunyuan3D 2 / 2.1 | Tencent / Hunyuan | Yes | **Fallback/benchmark.** Useful if we want self-hosted Hunyuan-style generation without paying Scenario, or if 3.1 output is poor. | Scenario legacy models, Hugging Face/self-host. |
+| Tripo 3.1 | Tripo AI | No | **Yes, first Scenario game-ready benchmark.** Use HD/smart-low-poly/face-limit/multiview controls to target realtime topology. | Scenario, Tripo API/platform. |
 | Tripo 3.0 | Tripo AI | No | **Maybe.** Good cheaper/free-tier Scenario baseline, but 3.1 is preferred where available. | Scenario, Tripo API/platform. |
-| Tripo P1 | Tripo AI | No | **Maybe, for low-poly/game-ready route.** Scenario recommendation mentioned it as the game-ready low-poly option. | Scenario and/or Tripo platform. |
+| Tripo P1 | Tripo AI | No | **Yes, game-ready route.** P1 is positioned for clean topology and engine integration; use single-image and multiview variants when refs are ready. | Scenario and/or Tripo platform. |
 | Tripo Rigging 1.0 | Tripo AI | No | **Yes if mesh is good but rigging/skinning is weak.** Directly maps to the biped auto-rigging stage. | Scenario, Tripo platform. |
+| Tripo Rigging 2.5 | Tripo AI | No | **Maybe for Morgan if creature/non-biped behavior helps.** Schema supports biped, quadruped, hexapod, octopod, avian, serpentine, aquatic, and others, but docs say it is strongest for non-biped rigs. | Scenario, Tripo platform. |
 | Tripo Retopology | Tripo AI | No | **Yes if generated meshes are too dense or unsuitable for realtime.** This is a targeted repair stage, not a first pass. | Scenario, Tripo platform. |
 | Meshy Text-to-3D | Meshy | No | **Maybe, text-to-3D fallback only.** Scenario recommends image-first for quality; Meshy is useful for quick concept volume or non-Morgan props. | Scenario, Meshy API/platform. |
 | Rodin Gen-1 / Hyper3D | Deemos / Rodin | No | **Maybe.** Use when paid text/image-to-3D alternatives are needed; T/A-pose and PBR options are relevant. | Scenario, Rodin/Hyper3D platform, Blender Hyper3D integration if credentials are available. |
@@ -102,11 +125,11 @@ models. Those are excluded unless they map directly to this avatar pipeline.
 
 | Stage | First choice | Second choice | Notes |
 | --- | --- | --- | --- |
-| Source cleanup/background | Gemini 3.1 Flash + RMBG/BiRefNet | SAM2 | Replace placeholder alpha masks before expensive GPU runs. |
-| Primary head/asset generation | AniGen | Hunyuan 3D 3.1 Pro | AniGen is open-source/current path; Hunyuan 3D 3.1 Pro is Scenario's recommended paid image-to-3D quality model. |
-| Mesh fallback | Hunyuan3D 2/2.1, TRELLIS.2 | Tripo 3.1 / Rodin | Prefer open-source if we are optimizing credits; use paid if quality is clearly better. |
-| Retopo/optimization | Tripo Retopology | Blender/InstantMesh-style cleanup | Only after a visually good mesh exists. |
-| Rigging/skinning | Tripo Rigging 1.0 | UniRig / Blender | Use paid rigging if it prevents a long manual Blender pass. |
+| Source cleanup/background | Scenario Gemini 3.1 Flash + Scenario edit/background tools | RMBG/BiRefNet / SAM2 | Use Scenario-hosted source refs first; OSS segmentation remains fallback. |
+| Primary head/asset generation | Scenario Hunyuan 3D 3.1 Pro | Scenario Tripo P1 / Tripo 3.1 | Hosted first; compare high-fidelity and game-ready outputs in parallel. |
+| Mesh fallback | Scenario Rodin / Trellis / Meshy | Hunyuan3D 2/2.1 self-host | Use Scenario alternates before provisioning custom GPU images. |
+| Retopo/optimization | Scenario Hunyuan Polygen 1.5 / Tripo Retopology | Blender/InstantMesh-style cleanup | Only after a visually good mesh exists. |
+| Rigging/skinning | Scenario Tripo Rigging 1.0 / 2.5 | UniRig / Blender | Use hosted rigging if it prevents a long manual Blender pass. |
 | Face controls | ARKit/Oculus/VRM transfer | Faceit/Blender | We still need a reliable morph/viseme authoring path; this remains a major unknown. |
 | Texture/material cleanup | Gemini 3.1 Flash / Imagen | Blender bake + Real-ESRGAN | Use paid image models only after shape/identity are good. |
 | Video fallback | Kling V3 I2V Pro | Veo 3.1 / LTX / LivePortrait / Hallo | For hero videos or fallback, not the browser GLB runtime. |
@@ -121,19 +144,22 @@ models. Those are excluded unless they map directly to this avatar pipeline.
 | DigitalOcean | Ephemeral GPU Droplets for self-hosting AniGen, Hunyuan3D, TRELLIS, UniRig, RMBG/BiRefNet, LivePortrait, etc. |
 | Hugging Face | Hosted Spaces/models for AniGen, Hunyuan3D, TRELLIS, UniRig, SkinTokens, LivePortrait, LatentSync, MuseTalk, Wav2Lip, RMBG/BiRefNet |
 | Fireworks | No direct 3D avatar hit yet; likely useful for LLM/prompting/image-adjacent hosted models if supported |
-| Scenario | Paid orchestration/wrappers for Hunyuan 3D 3.1 Pro, Tripo, Rodin, Kling, Veo, LTX, Sync/Veed/HeyGen/Pixverse, Gemini workflows |
+| Scenario | Primary hosted pipeline: asset management, Hunyuan 3D 3.1 Pro, Tripo P1/3.1, Tripo Rigging, Tripo Retopology, Tencent topology/UV/texture utilities, Rodin/Meshy/Trellis fallbacks, video/lip-sync fallback |
 | Tripo | Tripo 3D generation, rigging, retopology |
 | RunPod / Modal | True short-lived/serverless-style GPU execution for open-source worker images if DigitalOcean is too VM-like |
 
 ## Notes
 
-- The next execution blocker is still publishing a runnable `avatar-anigen-worker`
-  image or choosing a hosted equivalent.
+- The next execution blocker is Scenario credential injection plus uploading the
+  canonical Morgan refs as Scenario assets.
 - DigitalOcean is currently best treated as an ephemeral GPU VM runner, not true
   serverless GPU. RunPod Serverless or Modal remain better matches for
   automatic scale-to-zero semantics.
-- Use Scenario paid models as **repair/benchmark nodes** in the DAG, not as a
-  replacement for the whole open-source plan unless quality or time savings make
-  it obvious.
+- Use Scenario as the **default execution and asset-management surface** until a
+  validator result proves we need self-hosted generation or a custom repair
+  worker.
 - Before running any Scenario model, call `scenario-get_model_schema` for the
   selected model ID and log its exact parameter contract in the run folder.
+- For every Scenario output, record the Scenario `asset_id`, `job_id`, model ID,
+  parameters, source asset IDs, and validator result. Scenario `hasSkeleton` and
+  `hasAnimations` fields are advisory only.
