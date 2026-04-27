@@ -69,7 +69,7 @@ regex = { workspace = true }
 handlebars = { workspace = true }
 lazy_static = "1.4"
 pulldown-cmark = "0.13"
-dashmap = "5.4"
+dashmap = "6.1"
 
 # Encoding
 base64 = "0.22"

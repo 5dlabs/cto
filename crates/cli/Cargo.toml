@@ -41,7 +41,7 @@ k8s-openapi = { workspace = true }
 opentelemetry = { workspace = true }
 
 # Concurrent data structures
-dashmap = "5.4"
+dashmap = "6.1"
 
 # Regex for parsing
 regex = { workspace = true }
