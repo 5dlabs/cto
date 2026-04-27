@@ -245,6 +245,51 @@ workspace:
       - If you are uncertain, say what you know, what is missing, and the fastest
         next check.
 
+      ## Avatar Standing Orders
+
+      These are persistent operating orders for the Morgan avatar objective.
+      Treat them as always-on authority, not as a passive design document.
+
+      - Objective: deliver a browser-controllable Morgan GLB/VRM-style runtime
+        asset driven by LiveKit/LLM state. MP4/talking-portrait output is
+        auxiliary and must not block the runtime asset path.
+      - Continue without asking for routine permission. Choose a reasonable
+        default, try one fallback, decompose blocked work into sub-agents, and
+        keep unrelated unblocked lanes moving in parallel.
+      - On boot, heartbeat, context compaction, or provider switch, re-read
+        `HANDOFF.md`, `MEMORY.md`, `docs/2026-04/avatar/model-dag-plan.md`,
+        `docs/2026-04/specs/avatar-runtime-validator-contract.md`, active
+        todos/Task Flow state, and the latest Scenario/pipeline ledger before
+        taking new write actions.
+      - Use Scenario hosted models, assets, collections, and jobs first for
+        source cleanup, 3D generation, rigging/retopo/UV/texture utilities, and
+        previews. Defer OVH/self-hosted worker images until a Scenario result
+        fails a concrete validator gate or cost requires migration.
+      - Persist the source of truth outside the LLM context: `HANDOFF.md`,
+        `memory/YYYY-MM-DD.md`, Scenario asset IDs/tags/collections, pipeline
+        manifests, asset and budget ledgers, validation reports, PR links, and
+        human escalation records.
+      - Do not promote a candidate from Scenario metadata alone. Promotion
+        requires machine-checkable evidence: GLB/VRM bundle present, provenance
+        recorded, skeleton/morph/viseme inventories generated, browser/WebGL
+        load verified without console errors, and validator gates green.
+      - Use bounded retries: at most three transient retries, one changed
+        hypothesis before re-running an expensive generation, then provider or
+        CLI rotation. Before switching CLI/provider, write a checkpoint with the
+        current objective, assets, attempts, next action, and blocker.
+      - Rotate CLIs/providers to preserve quota: Claude/Dexter for hard
+        reasoning, Copilot/GitHub for PR work, Cursor when enabled for UI/code
+        shadowing, Kimi/OpenCode/Gemini/Droid for cheaper focused worker lanes.
+        Only one write leader may own a branch or manifest section at a time.
+      - Guard cost and loops. Default caps are $10 per single generation run and
+        $50 per avatar objective unless the human overrides them. Pause before
+        exceeding 80% of cap. Escalate if 50 steps pass without a verifiable
+        milestone or the same next action repeats three times.
+      - Escalate only for serious blockers: irreversible/prohibited action,
+        auth or 2FA failure after documented retries, all approved providers
+        exhausted, budget cap reached, repeated crash/OOM, semantic merge
+        conflict, or an objective whose done condition cannot be verified.
+
       ## Voice Demo Constraints
 
       - Keep default responses under five sentences unless the user asks for depth.
@@ -374,7 +419,19 @@ workspace:
     HEARTBEAT.md: |
       # HEARTBEAT.md -- Morgan
 
-      If there is active user work, continue that work first.
+      If there is active user work or an active avatar objective, continue that
+      work first. Do not ask what to do next when the next action is inferable
+      from `HANDOFF.md`, Task Flow, todos, Scenario jobs, or the avatar DAG docs.
+
+      For an active avatar objective:
+
+      - Read `HANDOFF.md` and the latest memory/ledger state.
+      - Check active Scenario jobs, sub-agent tasks, PRs, and validator outputs.
+      - Advance the next unblocked DAG step or re-queue a stale worker.
+      - Post only milestone, retry-level, blocker, PR, asset, or completion
+        updates. Do not post routine chatter.
+      - If blocked, record attempts and escalate only under the serious-blocker
+        rules in `AGENTS.md`.
 
       If idle, keep checks lightweight:
 
