@@ -190,6 +190,42 @@ GEMINICFG
   echo "[hermes] ✅ Gemini settings installed (API key auth)"
 fi
 
+# Claude Code: relies on PVC-persisted OAuth at ~/.claude/ (symlinked from /workspace/.claude).
+# ANTHROPIC_API_KEY env (if set) takes precedence; nothing to write at boot.
+if [ "{{cli_type}}" = "claude" ]; then
+  mkdir -p "$HOME/.claude"
+  echo "[hermes] ✅ Claude CLI workspace prepared (auth via PVC OAuth or ANTHROPIC_API_KEY)"
+fi
+
+# Copilot: OAuth at ~/.copilot/ (PVC-persisted). Model selected at invocation time
+# via --model (e.g. --model gpt-5.5). ACPX wrapper is patched to pass --allow-all.
+if [ "{{cli_type}}" = "copilot" ]; then
+  mkdir -p "$HOME/.copilot"
+  echo "[hermes] ✅ Copilot CLI workspace prepared (auth via PVC OAuth)"
+fi
+
+# OpenCode: auth lives at ~/.local/share/opencode/auth.json (PVC-persisted).
+# Honors ANTHROPIC_API_KEY / OPENAI_API_KEY when present.
+if [ "{{cli_type}}" = "opencode" ]; then
+  mkdir -p "$HOME/.local/share/opencode"
+  echo "[hermes] ✅ OpenCode CLI workspace prepared (auth via PVC or env keys)"
+fi
+
+# Cursor Agent: CURSOR_API_KEY env drives auth; ~/.cursor for any local state.
+if [ "{{cli_type}}" = "cursor" ]; then
+  mkdir -p "$HOME/.cursor"
+  echo "[hermes] CURSOR_API_KEY: ${CURSOR_API_KEY:+set (${#CURSOR_API_KEY} chars)}${CURSOR_API_KEY:-NOT SET}"
+  echo "[hermes] ✅ Cursor Agent workspace prepared"
+fi
+
+# Factory: FACTORY_API_KEY env drives auth; settings.json initialized in image.
+if [ "{{cli_type}}" = "factory" ]; then
+  mkdir -p "$HOME/.factory"
+  [ -f "$HOME/.factory/settings.json" ] || echo '{}' > "$HOME/.factory/settings.json"
+  echo "[hermes] FACTORY_API_KEY: ${FACTORY_API_KEY:+set (${#FACTORY_API_KEY} chars)}${FACTORY_API_KEY:-NOT SET}"
+  echo "[hermes] ✅ Factory CLI workspace prepared"
+fi
+
 for f in /etc/profile.d/*.sh; do
   [ -f "$f" ] && source "$f"
 done
