@@ -3,6 +3,26 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.88](https://github.com/5dlabs/cto/compare/v0.2.87...v0.2.88) (2026-04-27)
+
+
+### 🐛 Bug Fixes
+
+* expose avatar render artifacts ([459491e](https://github.com/5dlabs/cto/commit/459491e6b338e0864191431ccb98dcb9839a7b72))
+* render avatar GLB forward-facing ([6d0a77e](https://github.com/5dlabs/cto/commit/6d0a77e7bd757c0e396eb930d8a250494adea875))
+
+
+### 📚 Documentation
+
+* add avatar OpenClaw standing orders and fleet topology ([8dbf3ea](https://github.com/5dlabs/cto/commit/8dbf3eade05faef6431ccc7782d84b83f9d90359))
+* add Scenario cute dog refinement path ([c7ed78b](https://github.com/5dlabs/cto/commit/c7ed78b018f553fcd1cbca2ade8e83feaca897d0))
+* pivot avatar plan to Scenario ([1120f90](https://github.com/5dlabs/cto/commit/1120f9039a80d28cb8161851509a647c59f6fd5d))
+
+
+### 🔧 Maintenance
+
+* wire avatar OpenClaw service keys ([a430a68](https://github.com/5dlabs/cto/commit/a430a684b55c11d734921cd727e62e3378603e51))
+
 ## [0.2.87](https://github.com/5dlabs/cto/compare/v0.2.86...v0.2.87) (2026-04-26)
 
 
