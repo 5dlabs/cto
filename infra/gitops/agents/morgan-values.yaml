@@ -265,6 +265,12 @@ workspace:
         source cleanup, 3D generation, rigging/retopo/UV/texture utilities, and
         previews. Defer OVH/self-hosted worker images until a Scenario result
         fails a concrete validator gate or cost requires migration.
+      - Treat Scenario and Hugging Face as required avatar service dependencies.
+        On boot, verify `SCENARIO_API_KEY`, `SCENARIO_SECRET_API_KEY`, and
+        `HF_TOKEN`/`HUGGING_FACE_HUB_TOKEN` are available before generation work.
+        If Scenario credentials fail, retry via OpenBao/1Password once; if
+        Hugging Face credentials fail, keep Scenario lanes moving and escalate
+        only when an HF-gated fallback is actually needed.
       - Persist the source of truth outside the LLM context: `HANDOFF.md`,
         `memory/YYYY-MM-DD.md`, Scenario asset IDs/tags/collections, pipeline
         manifests, asset and budget ledgers, validation reports, PR links, and
@@ -685,10 +691,62 @@ claudeCode:
   disableTelemetry: true
   mcp:
     servers:
+      openmemory:
+        type: "sse"
+        url: "http://openmemory.openmemory.svc.cluster.local:8080/mcp/sse"
+      firecrawl:
+        command: "npx"
+        args: ["-y", "firecrawl-mcp"]
+        env:
+          FIRECRAWL_API_KEY: "${FIRECRAWL_API_KEY}"
       tool-server:
         command: "/workspace/.local/bin/tools"
         args: []
         cwd: "/workspace"
+
+extraEnv:
+  - name: SCENARIO_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: cto-secrets
+        key: SCENARIO_API_KEY
+        optional: true
+  - name: SCENARIO_SECRET_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: cto-secrets
+        key: SCENARIO_SECRET_API_KEY
+        optional: true
+  - name: SCENARIO_API_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: cto-secrets
+        key: SCENARIO_SECRET_API_KEY
+        optional: true
+  - name: SCENARIO_TEAM_ID
+    value: "team_tGJbdjDcUVVaC94KP5tut3D9"
+  - name: SCENARIO_PROJECT_ID
+    value: "proj_SoJEwku2cCYaHGepX3HiPc4A"
+  - name: MORGAN_SCENARIO_ASSET_ID
+    value: "asset_jZB1gEWR79NiNL38fXKhBz81"
+  - name: HF_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: cto-secrets
+        key: HF_TOKEN
+        optional: true
+  - name: HUGGING_FACE_HUB_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: cto-secrets
+        key: HUGGING_FACE_HUB_TOKEN
+        optional: true
+  - name: HUGGINGFACE_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: cto-secrets
+        key: HUGGINGFACE_API_KEY
+        optional: true
 
 # =============================================================================
 # Codex Harness (shared infra baseline with Coder)
