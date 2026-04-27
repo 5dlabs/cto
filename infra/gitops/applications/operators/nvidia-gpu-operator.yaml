@@ -79,8 +79,10 @@ spec:
         # DCGM exporter - GPU metrics for Prometheus/Grafana
         dcgmExporter:
           enabled: true
+          # This cluster does not install the Prometheus Operator CRDs. Datadog
+          # scrapes DCGM via the pod annotation above, so keep ServiceMonitor off.
           serviceMonitor:
-            enabled: true
+            enabled: false
             interval: 15s
 
         # Container toolkit - configure container runtime for GPU access
