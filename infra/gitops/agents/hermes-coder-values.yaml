@@ -13,9 +13,19 @@
 
 namespace: cto
 
+# Persistent, stable pod identity — debug bot is exec'd into repeatedly.
+deploymentMode: statefulset
+
 agent:
   id: hermes-coder
   name: "Hermes Coder"
+
+# Use the public agents image (same as openclaw-coder); the default
+# registry.5dlabs.ai/5dlabs/openclaw image requires auth.
+image:
+  repository: ghcr.io/5dlabs/agents
+  tag: "latest"
+  pullPolicy: Always
 
 # Disable cross-pod agent messaging — this is a standalone debug bot.
 nats:
@@ -24,4 +34,14 @@ nats:
 # Disable Discord/web messaging — debug bot doesn't need a chat surface.
 messaging:
   discord:
+    enabled: false
+
+# Agent container runs `sleep infinity` (no gateway). Disable HTTP health
+# probes that would otherwise crashloop the pod.
+probes:
+  startup:
+    enabled: false
+  liveness:
+    enabled: false
+  readiness:
     enabled: false

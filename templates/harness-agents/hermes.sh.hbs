@@ -107,14 +107,17 @@ fi
 
 # Codex: configure provider via config.toml
 # CODEX_HOME is pinned to /root/.codex in the container env.
-# Unset OPENAI_API_KEY to prevent codex from trying the broken svcacct key from cto-secrets.
+# Unset OPENAI_API_KEY to prevent codex from trying the broken svcacct key from cto-secrets,
+# UNLESS the active provider is nous (which expects OPENAI_API_KEY=$NOUS_API_KEY).
 if [ "{{cli_type}}" = "codex" ]; then
   PROVIDER="${RESOLVED_PROVIDER:-fireworks}"
   mkdir -p /root/.codex
-  unset OPENAI_API_KEY
+
+  CODEX_WIRE_API="responses"
 
   case "$PROVIDER" in
     fireworks)
+      unset OPENAI_API_KEY
       CODEX_PROVIDER_NAME="Fireworks"
       CODEX_PROVIDER_URL="https://api.fireworks.ai/inference/v1"
       CODEX_ENV_KEY="FIREWORKS_API_KEY"
@@ -124,7 +127,18 @@ if [ "{{cli_type}}" = "codex" ]; then
       CODEX_PROVIDER_URL="https://api.openai.com/v1"
       CODEX_ENV_KEY="OPENAI_API_KEY"
       ;;
+    nous)
+      # Nous Research chat-completions endpoint. /v1/responses is unsupported (404),
+      # so we pin wire_api="chat". codex-acp 0.6.1 honors this; 0.12.0+ does NOT.
+      # OPENAI_API_KEY must equal NOUS_API_KEY for codex to authenticate.
+      export OPENAI_API_KEY="${NOUS_API_KEY:-}"
+      CODEX_PROVIDER_NAME="Nous"
+      CODEX_PROVIDER_URL="${NOUS_BASE_URL:-https://inference-api.nousresearch.com/v1}"
+      CODEX_ENV_KEY="OPENAI_API_KEY"
+      CODEX_WIRE_API="chat"
+      ;;
     *)
+      unset OPENAI_API_KEY
       CODEX_PROVIDER_NAME="Fireworks"
       CODEX_PROVIDER_URL="https://api.fireworks.ai/inference/v1"
       CODEX_ENV_KEY="FIREWORKS_API_KEY"
@@ -141,8 +155,24 @@ sandbox_mode = "danger-full-access"
 name = "${CODEX_PROVIDER_NAME}"
 base_url = "${CODEX_PROVIDER_URL}"
 env_key = "${CODEX_ENV_KEY}"
+wire_api = "${CODEX_WIRE_API}"
 CODEXCFG
-  echo "[hermes] ✅ Codex config installed (${PROVIDER} provider)"
+  echo "[hermes] ✅ Codex config installed (${PROVIDER} provider, wire_api=${CODEX_WIRE_API})"
+
+  # Pin @zed-industries/codex-acp@0.6.1 — 0.12.0+ ships a native binary that
+  # rejects wire_api="chat" and breaks Nous. Install once into PVC at
+  # /workspace/.npm-local so the persistent bot keeps it across pod restarts.
+  CODEX_ACP_VERSION="0.6.1"
+  CODEX_ACP_BIN="/workspace/.npm-local/bin/codex-acp"
+  if [ ! -x "$CODEX_ACP_BIN" ] || ! "$CODEX_ACP_BIN" --version 2>/dev/null | grep -q "$CODEX_ACP_VERSION"; then
+    echo "[hermes] Installing @zed-industries/codex-acp@${CODEX_ACP_VERSION} into /workspace/.npm-local..."
+    npm install --prefix /workspace/.npm-local --silent --no-audit --no-fund \
+      "@zed-industries/codex-acp@${CODEX_ACP_VERSION}" 2>&1 | tail -3 || \
+      echo "[hermes] ⚠️ codex-acp install failed (non-fatal; lobster may still resolve via npx)"
+  else
+    echo "[hermes] codex-acp ${CODEX_ACP_VERSION} already present at $CODEX_ACP_BIN"
+  fi
+  export PATH="/workspace/.npm-local/bin:$PATH"
 fi
 
 # Gemini: configure settings.json for headless API-key auth + yolo approval

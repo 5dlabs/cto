@@ -537,12 +537,15 @@ spec:
                 echo "=== Init complete for {{ .Values.agent.id }} — all clean ==="
               fi
           env:
+            {{- if $discordConfig.enabled }}
             # Discord token
             - name: DISCORD_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.discordTokensSecret }}
                   key: {{ $discordConfig.tokenSecretKey | default .Values.agent.id }}
+                  optional: true
+            {{- end }}
             # Provider API keys used when init renders openclaw.json via envsubst.
             {{- range $name, $provider := .Values.models.providers }}
             {{- if and (or (not (hasKey $provider "enabled")) $provider.enabled) $provider.apiKeySecretKey }}
@@ -588,6 +591,16 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: DO_INFERENCE_KEY
                   optional: true
+            # Nous Research inference (Hermes harness)
+            - name: NOUS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.hermesSecret }}
+                  key: NOUS_API_KEY
+            - name: NOUS_BASE_URL
+              value: {{ .Values.hermes.nousBaseUrl | default "https://inference-api.nousresearch.com/v1" | quote }}
+            - name: NOUS_MODEL
+              value: {{ .Values.hermes.nousModel | default "nousresearch/hermes-4-70b" | quote }}
             {{- if .Values.cloudProviders.bedrock.enabled }}
             # AWS Bedrock credentials (used by OpenClaw gateway + Claude Code CLI)
             - name: AWS_ACCESS_KEY_ID
@@ -810,12 +823,14 @@ spec:
             - name: OPENCLAW_DEFAULT_RECIPIENT
               value: {{ .Values.agent.defaultRecipient | quote }}
             {{- end }}
+            {{- if $discordConfig.enabled }}
             - name: DISCORD_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.discordTokensSecret }}
                   key: {{ $discordConfig.tokenSecretKey | default .Values.agent.id }}
                   optional: true
+            {{- end }}
             # Provider API keys (available at runtime for dynamic use)
             - name: ANTHROPIC_API_KEY
               valueFrom:
@@ -869,6 +884,16 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: DO_INFERENCE_KEY
                   optional: true
+            # Nous Research inference (Hermes harness)
+            - name: NOUS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.hermesSecret }}
+                  key: NOUS_API_KEY
+            - name: NOUS_BASE_URL
+              value: {{ .Values.hermes.nousBaseUrl | default "https://inference-api.nousresearch.com/v1" | quote }}
+            - name: NOUS_MODEL
+              value: {{ .Values.hermes.nousModel | default "nousresearch/hermes-4-70b" | quote }}
             # Web tools API keys (Brave search + Firecrawl scraping)
             - name: BRAVE_API_KEY
               valueFrom:
