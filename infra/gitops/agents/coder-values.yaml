@@ -71,7 +71,7 @@ telemetry:
 agent:
   id: "coder"
   name: "Coder"
-  model: "openai-codex/gpt-5.5"
+  model: "github-copilot/gpt-5.5"
   # Fallback Discord channel for autonomous final-response delivery.
   defaultRecipient: "channel:1494057364301545542"
   heartbeat:
@@ -171,9 +171,10 @@ agentDefaults:
       briefly.
 
 modelDefaults:
-  primary: "openai-codex/gpt-5.5"
+  primary: "github-copilot/gpt-5.5"
   fallbacks:
-    - "openai-codex/gpt-5.4"
+    - "github-copilot/gpt-5.4"
+    - "github-copilot/gpt-4.1"
     - "fireworks/accounts/fireworks/models/qwen3p6-plus"
     - "fireworks/accounts/fireworks/models/minimax-m2p7"
     - "fireworks/accounts/fireworks/models/glm-5p1"
