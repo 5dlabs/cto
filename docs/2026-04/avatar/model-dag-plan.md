@@ -20,7 +20,8 @@ specific failed gate or improve an accepted candidate.
 | Execution goal | Scenario-hosted jobs and Scenario asset IDs first; no long-running GPU apps for validation. |
 | Cost stance | Use Scenario credits to remove provisioning delay; optimize to open-source/self-hosted after quality is proven. |
 | Model stance | Keep open-source and paid candidates cataloged, but run hosted Scenario candidates first. |
-| Current blocker | Need the Scenario secret in the Avatar/OpenClaw runtime plus a source-reference upload/run manifest. |
+| Cute animal stance | Solve cuteness in the 2D source/multiview references before image-to-3D. 3D conversion models mostly infer from pixels and will not reliably make a creepy source cute. |
+| Current blocker | Need a source-reference upload/run manifest and first Scenario dog/Morgan candidate runs. |
 
 ## DAG
 
@@ -52,6 +53,65 @@ Morgan source image
 | Face controls | ARKit/Oculus/VRM transfer, Faceit/Blender | Major unknown; required for runtime lip sync. | Oculus visemes or ARKit/VRM expression coverage, mouth/eye deformation proof. |
 | Texture/material cleanup | Scenario Tencent Texture Edit, Gemini/Imagen, Blender bake | Run only when shape is good but finish is weak. | No white/background contamination, stable color/materials in Blender and browser. |
 | Video fallback / hero clips | Scenario lip-sync/I2V models, Kling V3 I2V Pro, Veo 3.1, LTX, LivePortrait/Hallo | Useful for demos or fallback, but not the main GLB runtime. | MP4 quality benchmark only. |
+
+## Cute dog / animal 2D-to-3D guidance
+
+The talking-dog tests showed that the weak point is not lip sync; it is the
+image-to-3D conversion drifting toward an uncanny humanoid or insufficiently
+cute animal. Treat this as source conditioning plus conservative conversion:
+
+1. Make the source image cute first with Scenario image editing, preferably
+   `model_google-gemini-3-1-flash`. Prompt for a charming pet mascot or soft
+   plush dog figurine while preserving dog muzzle, fur pattern, ears, and
+   animal anatomy. Explicitly ban human lips, human teeth, human skin,
+   humanoid face structure, and biped proportions.
+2. If the UI can produce consistent front/side/back references, create clean
+   multiviews before 3D. Single-image conversion invents the unseen shape and
+   is more likely to humanize or distort the dog.
+3. Run `model_hunyuan-3d-pro-3-1-i23d` first for quality conversion. Use
+   `generateType: Normal`, `enablePbr: true`, and `faceCount` around
+   `300000-500000` for the first serious candidate. Hunyuan 3D 3.1 Pro is
+   mostly image-driven, so do not expect a text prompt at this stage to fix
+   cuteness.
+4. If Hunyuan preserves charm but the mesh is too dense or hard to rig, try
+   Tripo 3.0 / P1 with detailed geometry/texture, PBR, `quad: true`, and a
+   `faceLimit` around `50000-100000`.
+5. If organic shape or surface quality is messy, try Trellis 2 with
+   `resolution: 1536`, `textureSize: 4096`, `remesh: true`, `remeshBand: 2-4`,
+   and `decimationTarget: 100000`.
+
+Do not use terms like `talking portrait`, `avatar face`, `lip sync`, or
+`human-like expression` in 3D conversion prompts. Those belong only in the
+later video fallback lane, never in the GLB/VRM runtime conversion lane.
+
+### Post-conversion likeness refinement
+
+If a generated dog mesh is structurally good but loses cuteness, markings, or
+personality, do not discard it immediately. Run an image-conditioned 3D refiner
+before retopology:
+
+| Refinement pass | Scenario model | Inputs | Suggested settings | Use when |
+| --- | --- | --- | --- | --- |
+| Geometry/surface likeness | `model_ultrashape-1-0` | original cute image + coarse GLB | `numInferenceSteps: 50`, `octreeResolution: 1024`, fixed `seed` for comparisons | The silhouette, muzzle, eyes, or soft dog personality drifted during 2D-to-3D. |
+| Reference retexture | `model_trellis-2-retexture` | original cute image + refined GLB | `resolution: 1024`, `textureSize: 4096`, `texSlatGuidanceStrength: 1`, fixed `seed` | Shape is acceptable but fur, eyes, colors, or markings no longer match the source. |
+| Texture-only edit | `model_tencent-texture-edit` | FBX under 100k faces + image or prompt | use the reference image, not a prompt, when preserving identity | Only after decimation/export to FBX; useful for texture cleanup, not shape. |
+| Retopo after likeness | `model_tripo-retopology` | refined GLB | `quad: true`, `bake: true`, `faceLimit: 10000-20000` | The refiner preserves charm but the mesh is too dense for runtime. |
+| Shape-preserving reduction | `model_tencent-smarttopology` / Hunyuan Polygen 1.5 | refined GLB or OBJ | `polygonType: quadrilateral`, `faceLevel: medium` or `high` | Need lower-poly topology while keeping the accepted shape. |
+
+Recommended cute-dog chain:
+
+```text
+original cute image
+  -> Hunyuan 3D 3.1 Pro or Tripo image-to-3D
+  -> Ultrashape 1.0 with the same original image
+  -> Trellis 2 Retexture with the same original image, if markings/eyes/fur drift
+  -> Tripo Retopology or Hunyuan Polygen only after likeness is accepted
+  -> Blender/browser validation gallery
+```
+
+Retopology and rigging must come after likeness refinement. If topology cleanup
+runs too early, it can bake in an uncanny shape and make later image-conditioned
+refinement less effective.
 
 ## Parallel test matrix
 
