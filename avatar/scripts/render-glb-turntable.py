@@ -2,7 +2,9 @@
 
 The direct-mesh mode is intentionally small and dependency-light. It bypasses
 Blender's glTF importer for first-pass visual checks when generated GLBs trigger
-pathological importer memory use.
+pathological importer memory use. It still applies the glTF Y-up to Blender Z-up
+axis conversion and preserves vertex colors so the default front still is useful
+for human review.
 """
 
 from __future__ import annotations
@@ -36,10 +38,26 @@ TYPE_COUNTS = {
     "MAT4": 16,
 }
 
+FALSE_VALUES = {"0", "false", "no", "off"}
+
 
 def clear_scene() -> None:
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete()
+
+
+def env_flag(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in FALSE_VALUES
+
+
+def clamp_color(value: float) -> float:
+    value = float(value)
+    if value > 1.0:
+        value /= 255.0
+    return max(0.0, min(1.0, value))
 
 
 def set_engine() -> None:
@@ -93,6 +111,8 @@ def setup_world() -> None:
     scene.render.resolution_x = int(os.environ.get("BLENDER_RENDER_WIDTH", "1280"))
     scene.render.resolution_y = int(os.environ.get("BLENDER_RENDER_HEIGHT", "720"))
     scene.render.fps = 24
+    if scene.render.engine == "BLENDER_WORKBENCH":
+        scene.display.shading.color_type = "VERTEX"
     scene.view_settings.view_transform = "Filmic"
     scene.view_settings.look = "Medium High Contrast"
     scene.world = scene.world or bpy.data.worlds.new("World")
@@ -153,18 +173,44 @@ def import_glb_mesh_direct(path: Path) -> None:
     primitive = json_doc["meshes"][0]["primitives"][0]
     positions = read_accessor(json_doc, binary_chunk, primitive["attributes"]["POSITION"])
     indices = [item[0] for item in read_accessor(json_doc, binary_chunk, primitive["indices"])]
+    colors_index = primitive["attributes"].get("COLOR_0")
+    colors = read_accessor(json_doc, binary_chunk, colors_index) if colors_index is not None else None
     if len(indices) % 3 != 0:
         raise RuntimeError("Only triangle-list GLB primitives are supported for direct import")
     faces = [tuple(indices[index : index + 3]) for index in range(0, len(indices), 3)]
+    if env_flag("BLENDER_DIRECT_MESH_Y_UP_TO_Z_UP", default=True):
+        vertices = [(float(x), -float(z), float(y)) for x, y, z in positions]
+    else:
+        vertices = [(float(x), float(y), float(z)) for x, y, z in positions]
 
     mesh = bpy.data.meshes.new(path.stem)
-    mesh.from_pydata([(float(x), float(y), float(z)) for x, y, z in positions], [], faces)
+    mesh.from_pydata(vertices, [], faces)
     mesh.update()
     obj = bpy.data.objects.new(path.stem, mesh)
     bpy.context.collection.objects.link(obj)
 
-    material = bpy.data.materials.new("Direct_GLB_Check_Material")
-    material.diffuse_color = (0.72, 0.72, 0.72, 1.0)
+    if colors:
+        color_attribute = mesh.color_attributes.new(name="Color", type="BYTE_COLOR", domain="CORNER")
+        for polygon in mesh.polygons:
+            for loop_index in polygon.loop_indices:
+                vertex_index = mesh.loops[loop_index].vertex_index
+                r, g, b = colors[vertex_index][:3]
+                color_attribute.data[loop_index].color = (clamp_color(r), clamp_color(g), clamp_color(b), 1.0)
+        mesh.color_attributes.active_color = color_attribute
+        mesh.color_attributes.render_color_index = mesh.color_attributes.find(color_attribute.name)
+
+        material = bpy.data.materials.new("Direct_GLB_Vertex_Color_Material")
+        material.use_nodes = True
+        nodes = material.node_tree.nodes
+        bsdf = nodes.get("Principled BSDF")
+        if bsdf is not None:
+            color_node = nodes.new(type="ShaderNodeVertexColor")
+            color_node.layer_name = "Color"
+            material.node_tree.links.new(color_node.outputs["Color"], bsdf.inputs["Base Color"])
+            bsdf.inputs["Roughness"].default_value = 0.85
+    else:
+        material = bpy.data.materials.new("Direct_GLB_Check_Material")
+        material.diffuse_color = (0.72, 0.72, 0.72, 1.0)
     mesh.materials.append(material)
 
 
@@ -235,6 +281,22 @@ def render_turntable(camera: bpy.types.Object, center: Vector, distance: float, 
     bpy.ops.render.render(animation=True)
 
 
+def still_locations(
+    import_mode: str, center: Vector, distance: float, z_offset: float
+) -> tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]:
+    if import_mode == "direct-mesh" and env_flag("BLENDER_DIRECT_MESH_Y_UP_TO_Z_UP", default=True):
+        return (
+            (center.x, center.y + distance, center.z + z_offset),
+            (center.x + distance, center.y, center.z + z_offset),
+            (center.x + distance * 0.7, center.y + distance * 0.7, center.z + z_offset),
+        )
+    return (
+        (center.x, center.y - distance, center.z + z_offset),
+        (center.x + distance, center.y, center.z + z_offset),
+        (center.x + distance * 0.7, center.y - distance * 0.7, center.z + z_offset),
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", default=os.environ.get("BLENDER_GLB_INPUT"))
@@ -266,15 +328,14 @@ def main() -> None:
     add_lighting(center, max_dim)
     camera, distance, z_offset = add_camera(center, max_dim)
 
-    render_still(camera, center, (center.x, center.y - distance, center.z + z_offset), output_dir / "front.png")
-    render_still(camera, center, (center.x + distance, center.y, center.z + z_offset), output_dir / "side.png")
-    render_still(
-        camera,
-        center,
-        (center.x + distance * 0.7, center.y - distance * 0.7, center.z + z_offset),
-        output_dir / "three_quarter.png",
-    )
-    render_turntable(camera, center, distance, z_offset, output_dir / "turntable.mp4")
+    front_location, side_location, three_quarter_location = still_locations(import_mode, center, distance, z_offset)
+    render_still(camera, center, front_location, output_dir / "front.png")
+    render_still(camera, center, side_location, output_dir / "side.png")
+    render_still(camera, center, three_quarter_location, output_dir / "three_quarter.png")
+    outputs = ["front.png", "side.png", "three_quarter.png"]
+    if not env_flag("BLENDER_SKIP_TURNTABLE", default=False):
+        render_turntable(camera, center, distance, z_offset, output_dir / "turntable.mp4")
+        outputs.append("turntable.mp4")
 
     summary = output_dir / "summary.txt"
     summary.write_text(
@@ -286,7 +347,7 @@ def main() -> None:
                 f"max_dim={max_dim:.4f}",
                 f"mesh_count={sum(1 for obj in bpy.context.scene.objects if obj.type == 'MESH')}",
                 f"material_count={len(bpy.data.materials)}",
-                "outputs=front.png,side.png,three_quarter.png,turntable.mp4",
+                "outputs=" + ",".join(outputs),
             ]
         )
         + "\n"
