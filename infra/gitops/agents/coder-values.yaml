@@ -4,7 +4,7 @@
 # =============================================================================
 # General-purpose coding agent for the CTO platform.
 # Primary focus: e2e testing of intake, work, play, and lobster workflows.
-# Primary CLI: Copilot/cloud delegation with Codex GPT-5.5 as the gateway model.
+# Primary CLI: Copilot/cloud delegation with Copilot GPT-5.5 as the gateway model.
 # Secondary: OpenCode (Kimi K2 Turbo via Fireworks).
 # =============================================================================
 namespace: cto
@@ -71,7 +71,7 @@ telemetry:
 agent:
   id: "coder"
   name: "Coder"
-  model: "github-copilot/gpt-5.5"
+  model: "copilot-cli/gpt-5.5"
   # Fallback Discord channel for autonomous final-response delivery.
   defaultRecipient: "channel:1494057364301545542"
   heartbeat:
@@ -171,10 +171,8 @@ agentDefaults:
       briefly.
 
 modelDefaults:
-  primary: "github-copilot/gpt-5.5"
+  primary: "copilot-cli/gpt-5.5"
   fallbacks:
-    - "github-copilot/gpt-5.4"
-    - "github-copilot/gpt-4.1"
     - "fireworks/accounts/fireworks/models/qwen3p6-plus"
     - "fireworks/accounts/fireworks/models/minimax-m2p7"
     - "fireworks/accounts/fireworks/models/glm-5p1"
@@ -986,6 +984,25 @@ toolsConfig:
 # CLI Backends
 # =============================================================================
 cliBackends:
+  copilot-cli:
+    command: "/usr/local/share/npm-global/bin/copilot"
+    args:
+      - "--allow-all"
+      - "--no-ask-user"
+      - "--no-auto-update"
+      - "--output-format"
+      - "text"
+      - "--log-dir"
+      - "/workspace/.copilot/logs"
+      - "--log-level"
+      - "info"
+      - "-p"
+      - "{prompt}"
+    output: "text"
+    input: "arg"
+    modelArg: "--model"
+    sessionMode: "none"
+    serialize: true
   claude-cli:
     command: "/usr/local/share/npm-global/bin/claude"
   codex-cli:

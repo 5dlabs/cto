@@ -42,7 +42,7 @@ resources:
 agent:
   id: "avatar-openclaw"
   name: "Avatar OpenClaw"
-  model: "github-copilot/gpt-5.5"
+  model: "copilot-cli/gpt-5.5"
   defaultRecipient: "channel:1494057364301545542"
   heartbeat:
     every: "2m"
@@ -127,7 +127,7 @@ workspace:
       - **Name:** Avatar OpenClaw
       - **Role:** GPU-backed OpenClaw agent for avatar/media runtime work
       - **Primary CLI:** GitHub Copilot CLI / Copilot cloud delegation
-      - **Gateway Model:** GPT-5.5 via GitHub Copilot
+      - **Gateway Model:** GPT-5.5 via GitHub Copilot CLI
       - **GPU placement:** OVH GPU node selected by `openclaw.5dlabs.ai/gpu-node`
 
     HEARTBEAT.md: |
