@@ -22,7 +22,7 @@ path = "src/bin/dex-backfill.rs"
 [dependencies]
 # Yellowstone gRPC
 yellowstone-grpc-client = "12.1"
-yellowstone-grpc-proto = "12.1"
+yellowstone-grpc-proto = "12.2"
 tonic = "0.14"
 tonic-prost = "0.14"
 prost = "0.14"
@@ -33,7 +33,7 @@ futures = { workspace = true }
 tokio-stream = { version = "0.1", features = ["net"] }
 
 # QuestDB
-questdb-rs = "=6.0.0"
+questdb-rs = "=6.1.0"
 tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }
 
 # Config & CLI
