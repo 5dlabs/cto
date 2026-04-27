@@ -4,12 +4,12 @@ version = 4
 
 [[package]]
 name = "acp-runtime"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "agent-client-protocol",
  "anyhow",
  "async-trait",
- "config 0.2.74",
+ "config 0.2.88",
  "futures",
  "serde",
  "serde_json",
@@ -813,7 +813,7 @@ checksum = "3a822ea5bc7590f9d40f1ba12c0dc3c2760f3482c6984db1573ad11031420831"
 
 [[package]]
 name = "cli"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -824,7 +824,7 @@ dependencies = [
  "k8s-openapi",
  "opentelemetry 0.31.0",
  "regex",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "serde_json",
  "serial_test",
@@ -883,7 +883,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "serde",
  "serde_json",
@@ -966,7 +966,7 @@ dependencies = [
 
 [[package]]
 name = "controller"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "acp-runtime",
  "anyhow",
@@ -974,7 +974,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "chrono",
- "config 0.2.74",
+ "config 0.2.88",
  "dashmap 5.5.3",
  "flate2",
  "futures",
@@ -991,7 +991,7 @@ dependencies = [
  "pulldown-cmark",
  "regex",
  "reqwest 0.12.28",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "scm",
  "serde",
  "serde_json",
@@ -1576,7 +1576,7 @@ dependencies = [
 
 [[package]]
 name = "dex-indexer"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "bs58",
@@ -2056,7 +2056,7 @@ dependencies = [
 
 [[package]]
 name = "experience"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2638,7 +2638,7 @@ dependencies = [
 
 [[package]]
 name = "gpu"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2848,7 +2848,7 @@ dependencies = [
 
 [[package]]
 name = "healer"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "acp-runtime",
  "agent-client-protocol",
@@ -2858,7 +2858,7 @@ dependencies = [
  "chrono",
  "clap",
  "colored",
- "config 0.2.74",
+ "config 0.2.88",
  "handlebars",
  "notify",
  "regex",
@@ -3394,7 +3394,7 @@ dependencies = [
 
 [[package]]
 name = "intake"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3404,7 +3404,7 @@ dependencies = [
  "cli",
  "colored",
  "comfy-table",
- "config 0.2.74",
+ "config 0.2.88",
  "dialoguer",
  "futures",
  "handlebars",
@@ -3908,7 +3908,7 @@ dependencies = [
 
 [[package]]
 name = "linear-sink"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4054,7 +4054,7 @@ dependencies = [
 
 [[package]]
 name = "metal"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4253,7 +4253,7 @@ dependencies = [
 
 [[package]]
 name = "notify"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5174,7 +5174,7 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
 name = "play-launcher"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "clap",
@@ -5199,7 +5199,7 @@ dependencies = [
 
 [[package]]
 name = "pm"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "acp-runtime",
  "anyhow",
@@ -5208,7 +5208,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "clap",
- "config 0.2.74",
+ "config 0.2.88",
  "hex",
  "hmac",
  "k8s-openapi",
@@ -6113,7 +6113,7 @@ dependencies = [
 
 [[package]]
 name = "research"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anthropic",
  "anyhow",
@@ -6472,7 +6472,7 @@ dependencies = [
 
 [[package]]
 name = "scm"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7832,7 +7832,7 @@ dependencies = [
  "k8s-openapi",
  "kube",
  "reqwest 0.12.28",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -8306,7 +8306,7 @@ dependencies = [
 
 [[package]]
 name = "tools"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "axum",
@@ -8769,7 +8769,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "utils"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "clap",
