@@ -338,6 +338,33 @@ workspace:
       - For TypeScript: `bun test` and relevant linters.
       - Use ACP sessions when delegating to other coding CLIs.
 
+      ## ACP CLI Alias Map
+
+      When the user mentions a CLI by its colloquial name in a delegation,
+      status, MCP, or "ask X" request, resolve it to the ACP agent below.
+      Do not answer with generic product documentation when the user says
+      "ACP", "ACP server", "MCP tools for X", or asks what a CLI can do; query
+      or run the matching ACP agent instead.
+
+      - Copilot, co-pilot, GitHub Copilot, gh copilot, ChatGPT 5.5,
+        GPT-5.5 -> `agentId: "copilot"` (`copilot --acp --model gpt-5.5`)
+      - Claude, Claude Code, Anthropic, Opus -> `agentId: "claude"`
+        (`claude-agent-acp`)
+      - OpenCode, open code, open-code -> `agentId: "opencode"`
+        (`opencode acp`)
+      - Gemini, Google Gemini -> `agentId: "gemini"`
+        (`gemini --experimental-acp --yolo`)
+      - Kimi, Moonshot -> `agentId: "kimi"` (`kimi acp`)
+      - Cursor, Cursor Agent -> `agentId: "cursor"`
+        (`cursor-agent acp --yolo --trust`)
+      - Droid, Factory Droid -> `agentId: "droid"`
+        (`droid exec --output-format acp`)
+      - Pi, Pi AI, pi.ai -> `agentId: "pi"` (`pi-acp`)
+
+      For coding work, default to `copilot`. For "what MCP servers/tools does
+      X have?" ask or inspect that ACP agent's runtime; do not substitute this
+      gateway's own MCP tools.
+
       ## Memory (OpenMemory / mem0)
 
       You have hierarchical memory in the same shape a CRD agent would — agent,
@@ -482,8 +509,8 @@ workspace:
       - **Role:** General-purpose coding agent for CTO platform
       - **Primary CLI:** GitHub Copilot CLI / Copilot cloud delegation
       - **Secondary CLI:** OpenCode (Kimi K2 Turbo via Fireworks)
-      - **Gateway Model:** GPT-5.5 via OpenAI Codex OAuth
-      - **Fallbacks:** GPT-5.4 via Codex OAuth, Qwen 3.6 Plus, MiniMax M2.7, GLM 5.1
+      - **Gateway Model:** GPT-5.5 via GitHub Copilot CLI
+      - **Fallbacks:** Qwen 3.6 Plus, MiniMax M2.7, GLM 5.1
       - **Memory:** mem0 (Qdrant-backed, collection: cto_memory, shared with all agents)
 
     TOOLS.md: |
@@ -514,6 +541,25 @@ workspace:
       - Gemini: `gemini --version`
       - Kimi: `kimi --version`
       - Cursor: `cursor-agent --help`
+
+      ## ACP CLI Alias Map
+
+      Treat colloquial CLI names as ACP agent IDs:
+
+      | User says | ACP agentId | Command |
+      | --- | --- | --- |
+      | Copilot, co-pilot, GitHub Copilot, gh copilot, ChatGPT 5.5, GPT-5.5 | `copilot` | `copilot --acp --model gpt-5.5` |
+      | Claude, Claude Code, Anthropic, Opus | `claude` | `claude-agent-acp` |
+      | OpenCode, open code, open-code | `opencode` | `opencode acp` |
+      | Gemini, Google Gemini | `gemini` | `gemini --experimental-acp --yolo` |
+      | Kimi, Moonshot | `kimi` | `kimi acp` |
+      | Cursor, Cursor Agent | `cursor` | `cursor-agent acp --yolo --trust` |
+      | Droid, Factory Droid | `droid` | `droid exec --output-format acp` |
+      | Pi, Pi AI, pi.ai | `pi` | `pi-acp` |
+
+      If the user asks about an ACP server's MCP servers/tools, inspect or ask
+      that ACP agent. Do not answer from generic product docs or from this
+      gateway's own tool list.
 
       ## ACP Sessions
 
