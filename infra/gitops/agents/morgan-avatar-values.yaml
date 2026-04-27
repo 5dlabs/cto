@@ -200,6 +200,22 @@ extraEnv:
       secretKeyRef:
         name: lemonslice-api-key
         key: LEMONSLICE_API_KEY
+  - name: SCENARIO_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: cto-secrets
+        key: SCENARIO_API_KEY
+  - name: SCENARIO_SECRET_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: cto-secrets
+        key: SCENARIO_SECRET_API_KEY
+  - name: SCENARIO_TEAM_ID
+    value: "team_tGJbdjDcUVVaC94KP5tut3D9"
+  - name: SCENARIO_PROJECT_ID
+    value: "proj_SoJEwku2cCYaHGepX3HiPc4A"
+  - name: MORGAN_SCENARIO_ASSET_ID
+    value: "asset_jZB1gEWR79NiNL38fXKhBz81"
 
 codeServer:
   enabled: false
