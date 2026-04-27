@@ -1,0 +1,8 @@
+{{- if .Values.createNamespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace | default "bots" }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+{{- end }}

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}-hermes-harness
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+data:
+  # Raw Handlebars-templated Hermes harness script. Mounted at /etc/hermes/.
+  # Render manually inside the pod (e.g. with `npx handlebars` or by hand)
+  # then execute. The pod itself runs `sleep infinity` so a human can
+  # `kubectl exec` and iterate on the harness.
+  container.sh.hbs: |
+{{ .Files.Get "files/hermes-container.sh.hbs" | indent 4 }}

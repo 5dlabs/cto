@@ -1,0 +1,23 @@
+{{- if .Values.toolsConfig }}
+# =============================================================================
+# Tools Config (tools-config.json)
+# =============================================================================
+# Mounted into the pod at /workspace/tools-config.json
+# Provides additional MCP tool configuration for CLI backends:
+#   - Remote tools forwarded from the CTO tool server
+#   - Local MCP servers spawned alongside CLI sessions
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}-tools-config
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tools-config
+data:
+  tools-config.json: |
+    {
+      "remoteTools": {{ .Values.toolsConfig.remoteTools | toJson }},
+      "localServers": {{ .Values.toolsConfig.localServers | toJson }}
+    }
+{{- end }}

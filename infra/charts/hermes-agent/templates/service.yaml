@@ -1,0 +1,46 @@
+# =============================================================================
+# Gateway Service
+# =============================================================================
+# Exposes the OpenClaw gateway as a ClusterIP service.
+# Even when the control UI is disabled, the local CTO runtime still needs
+# an addressable service for chat-completions, ACP bridge access, and ingress.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.gateway.port }}
+      targetPort: gateway
+      protocol: TCP
+      name: gateway
+    {{- if .Values.ssh.enabled }}
+    - port: {{ .Values.ssh.port | default 2222 }}
+      targetPort: ssh
+      protocol: TCP
+      name: ssh
+    {{- end }}
+    {{- if .Values.codeServer.enabled }}
+    - port: {{ .Values.codeServer.port | default 8080 }}
+      targetPort: code-server
+      protocol: TCP
+      name: code-server
+    {{- end }}
+    {{- if .Values.devServer.enabled }}
+    - port: {{ .Values.devServer.port | default 3000 }}
+      targetPort: {{ .Values.devServer.port | default 3000 }}
+      protocol: TCP
+      name: {{ .Values.devServer.name | default "dev-server" }}
+    {{- end }}
+    {{- if .Values.projectApi.enabled }}
+    - port: {{ .Values.projectApi.servicePort | default .Values.projectApi.port }}
+      targetPort: project-api
+      protocol: TCP
+      name: project-api
+    {{- end }}
+  selector:
+    {{- include "openclaw-agent.selectorLabels" . | nindent 4 }}

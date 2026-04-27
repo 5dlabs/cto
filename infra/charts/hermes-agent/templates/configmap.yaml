@@ -1,0 +1,585 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}-config
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+data:
+  openclaw.json: |
+    {{- $messaging := index .Values "messaging" | default dict }}
+    {{- $discordConfig := index $messaging "discord" | default .Values.discord }}
+    {{- $plugins := index .Values "plugins" | default dict }}
+    {{- $memoryCore := index $plugins "memoryCore" | default dict }}
+    {{- $mem0Plugin := index .Values "mem0Plugin" | default dict }}
+    {{- $codexPlugin := index .Values "codexPlugin" | default dict }}
+    {{- $webTools := index .Values.tools "web" | default dict }}
+    {{- $webSearch := index $webTools "search" | default dict }}
+    {{- $webFetch := index $webTools "fetch" | default dict }}
+    {
+      "agents": {
+        "defaults": {
+          "compaction": {
+            "memoryFlush": {
+              "enabled": {{ .Values.agentDefaults.compaction.memoryFlush.enabled }},
+              "prompt": {{ .Values.agentDefaults.compaction.memoryFlush.prompt | default "Write any lasting notes, decisions, preferences, or task context to memory/YYYY-MM-DD.md. Include: ongoing tasks, user preferences learned, key decisions made, and important context that should persist. Reply with NO_REPLY if nothing to store." | quote }},
+              "softThresholdTokens": {{ .Values.agentDefaults.compaction.memoryFlush.softThresholdTokens }}
+            },
+            "mode": {{ .Values.agentDefaults.compaction.mode | quote }},
+            "reserveTokensFloor": {{ .Values.agentDefaults.compaction.reserveTokensFloor }},
+            "notifyUser": {{ .Values.agentDefaults.compaction.notifyUser | default true }},
+            "identifierPolicy": {{ .Values.agentDefaults.compaction.identifierPolicy | default "strict" | quote }}
+          },
+          "contextPruning": {
+            "mode": {{ .Values.agentDefaults.contextPruning.mode | quote }},
+            "ttl": {{ .Values.agentDefaults.contextPruning.ttl | quote }}
+          },
+          "elevatedDefault": {{ .Values.agentDefaults.elevatedDefault | quote }},
+          "heartbeat": {
+            "every": {{ .Values.agentDefaults.heartbeat.every | quote }},
+            "target": {{ .Values.agentDefaults.heartbeat.target | quote }},
+            "ackMaxChars": {{ .Values.agentDefaults.heartbeat.ackMaxChars }},
+            "prompt": {{ .Values.agentDefaults.heartbeat.prompt | quote }}
+          },
+          "maxConcurrent": {{ .Values.agentDefaults.maxConcurrent }},
+          "thinkingDefault": {{ .Values.agentDefaults.thinkingDefault | quote }},
+          {{- if .Values.memorySearch.enabled }}
+          "memorySearch": {
+            "cache": {
+              "enabled": {{ .Values.memorySearch.cache.enabled }},
+              "maxEntries": {{ .Values.memorySearch.cache.maxEntries }}
+            },
+            "experimental": {
+              "sessionMemory": {{ .Values.memorySearch.sessionMemory }}
+            },
+            "model": {{ .Values.memorySearch.model | quote }},
+            "provider": {{ .Values.memorySearch.provider | quote }},
+            "query": {
+              "hybrid": {
+                "candidateMultiplier": {{ .Values.memorySearch.hybrid.candidateMultiplier }},
+                "enabled": {{ .Values.memorySearch.hybrid.enabled }},
+                "textWeight": {{ .Values.memorySearch.hybrid.textWeight }},
+                "vectorWeight": {{ .Values.memorySearch.hybrid.vectorWeight }}
+              },
+              "maxResults": {{ .Values.memorySearch.maxResults | default 6 }}
+            },
+            "sources": {{ .Values.memorySearch.sources | toJson }},
+            "sync": {
+              "sessions": {
+                "deltaBytes": {{ .Values.memorySearch.sync.deltaBytes }},
+                "deltaMessages": {{ .Values.memorySearch.sync.deltaMessages }}
+              },
+              "watch": {{ .Values.memorySearch.sync.watch }}
+            }
+            {{- /* gc block removed — not supported by current OpenClaw build */ -}}
+          },
+          {{- end }}
+          "model": {
+            "fallbacks": {{ .Values.modelDefaults.fallbacks | toJson }},
+            "primary": {{ .Values.modelDefaults.primary | quote }}
+          }
+          {{- if .Values.cliBackends }},
+          "cliBackends": {{ .Values.cliBackends | toJson }}
+          {{- end }}
+          {{- if and (hasKey $codexPlugin "enabled") $codexPlugin.enabled }},
+          "embeddedHarness": {
+            "runtime": "auto",
+            "fallback": "pi"
+          }
+          {{- end }}
+        },
+        "list": [
+          {
+            "agentDir": "/workspace/.openclaw/agents/{{ .Values.agent.id }}/agent",
+            "heartbeat": {
+              {{- if kindIs "string" .Values.agent.heartbeat }}
+              "every": {{ .Values.agent.heartbeat | quote }}
+              {{- else if .Values.agent.heartbeat }}
+              "every": {{ .Values.agent.heartbeat.every | default "15m" | quote }},
+              "target": {{ .Values.agent.heartbeat.target | default "last" | quote }},
+              "ackMaxChars": {{ .Values.agent.heartbeat.ackMaxChars | default 500 }}
+              {{- if .Values.agent.heartbeat.prompt }},
+              "prompt": {{ .Values.agent.heartbeat.prompt | quote }}
+              {{- end }}
+              {{- if .Values.agent.heartbeat.model }},
+              "model": {{ .Values.agent.heartbeat.model | quote }}
+              {{- end }}
+              {{- if .Values.agent.heartbeat.to }},
+              "to": {{ .Values.agent.heartbeat.to | quote }}
+              {{- end }}
+              {{- if .Values.agent.heartbeat.session }},
+              "session": {{ .Values.agent.heartbeat.session | quote }}
+              {{- end }}
+              {{- if .Values.agent.heartbeat.accountId }},
+              "accountId": {{ .Values.agent.heartbeat.accountId | quote }}
+              {{- end }}
+              {{- if .Values.agent.heartbeat.includeReasoning }},
+              "includeReasoning": {{ .Values.agent.heartbeat.includeReasoning }}
+              {{- end }}
+              {{- if .Values.agent.heartbeat.activeHours }},
+              "activeHours": {
+                "start": {{ .Values.agent.heartbeat.activeHours.start | default "" | quote }},
+                "end": {{ .Values.agent.heartbeat.activeHours.end | default "" | quote }},
+                "timezone": {{ .Values.agent.heartbeat.activeHours.timezone | default "" | quote }}
+              }
+              {{- end }}
+              {{- end }}
+            },
+            "id": {{ .Values.agent.id | quote }},
+            "model": {{ .Values.agent.model | quote }},
+            "name": {{ .Values.agent.name | quote }},
+            "sandbox": {
+              "mode": {{ .Values.agent.sandbox | quote }}
+            },
+            "tools": {
+              "allow": {{ .Values.agent.tools.allow | toJson }}
+            },
+            "workspace": "/workspace"
+          }
+        ]
+      },
+      "browser": {
+        "headless": true
+      },
+      "channels": {
+        "discord": {
+          {{- if $discordConfig.enabled }}
+          "accounts": {
+            "default": {
+              "token": "${DISCORD_TOKEN}"
+              ,
+              "allowBots": {{ if hasKey $discordConfig "allowBots" }}{{ $discordConfig.allowBots | toJson }}{{ else }}true{{ end }},
+              {{- if $discordConfig.dmPolicy }}
+              "dmPolicy": {{ $discordConfig.dmPolicy | quote }},
+              {{- else if $discordConfig.dm }}
+              "dmPolicy": {{ $discordConfig.dm.policy | default "allowlist" | quote }},
+              {{- end }}
+              {{- if $discordConfig.allowFrom }}
+              "allowFrom": {{ $discordConfig.allowFrom | toJson }},
+              {{- else if and $discordConfig.dm $discordConfig.dm.allowFrom }}
+              "allowFrom": {{ $discordConfig.dm.allowFrom | toJson }},
+              {{- end }}
+              "groupPolicy": {{ $discordConfig.groupPolicy | default "allowlist" | quote }},
+              "guilds": {{ $discordConfig.guilds | default dict | toJson }}
+              {{- if $discordConfig.replyToMode }},
+              "replyToMode": {{ $discordConfig.replyToMode | quote }}
+              {{- end }}
+              {{- if $discordConfig.threadBindings }},
+              "threadBindings": {
+                "enabled": {{ $discordConfig.threadBindings.enabled | default false }},
+                "spawnSubagentSessions": {{ $discordConfig.threadBindings.spawnSubagentSessions | default true }},
+                "spawnAcpSessions": {{ $discordConfig.threadBindings.spawnAcpSessions | default false }}
+                {{- if $discordConfig.threadBindings.idleHours }},
+                "idleHours": {{ $discordConfig.threadBindings.idleHours }}
+                {{- end }}
+                {{- if $discordConfig.threadBindings.maxAgeHours }},
+                "maxAgeHours": {{ $discordConfig.threadBindings.maxAgeHours }}
+                {{- end }}
+              }
+              {{- end }}
+            }
+          },
+          "enabled": true
+          {{- else }}
+          "enabled": false
+          {{- end }}
+        }
+      },
+      "gateway": {
+        "auth": {
+          "token": {{ .Values.gateway.auth.token | quote }}
+        },
+        "bind": {{ .Values.gateway.bind | quote }},
+        {{- if .Values.gateway.http }}
+        "http": {
+          "endpoints": {
+            "chatCompletions": {
+              "enabled": {{ .Values.gateway.http.endpoints.chatCompletions.enabled }}
+            },
+            "responses": {
+              "enabled": {{ .Values.gateway.http.endpoints.responses.enabled }},
+              "maxBodyBytes": {{ .Values.gateway.http.endpoints.responses.maxBodyBytes | default 20971520 }}
+            }
+          }
+        },
+        {{- end }}
+        "mode": {{ .Values.gateway.mode | quote }},
+        "port": {{ .Values.gateway.port }},
+        "controlUi": {
+          "enabled": {{ if and .Values.gateway.controlUi (hasKey .Values.gateway.controlUi "enabled") }}{{ .Values.gateway.controlUi.enabled }}{{ else }}true{{ end }},
+          "basePath": {{ if .Values.gateway.controlUi }}{{ .Values.gateway.controlUi.basePath | default "/openclaw" | quote }}{{ else }}"/openclaw"{{ end }},
+          "dangerouslyAllowHostHeaderOriginFallback": true
+        }
+      },
+      "memory": {
+        "citations": {{ .Values.memory.citations | default "auto" | quote }}
+      },
+      "commands": {
+        "native": "auto",
+        "nativeSkills": "auto"
+      },
+      "messages": {
+        "ackReactionScope": "group-mentions"
+      },
+      "plugins": {
+        "entries": {
+          "discord": {
+            "enabled": true
+          },
+          "memory-core": {
+            "enabled": {{ if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }}false{{ else if hasKey $memoryCore "enabled" }}{{ $memoryCore.enabled }}{{ else }}true{{ end }}
+          }
+          {{- if .Values.tools.acp.enabled }},
+          "acpx": {
+            "enabled": true,
+            "config": {
+              "permissionMode": {{ .Values.tools.acp.permissionMode | default "approve-all" | quote }},
+              "nonInteractivePermissions": {{ .Values.tools.acp.nonInteractivePermissions | default "deny" | quote }}
+            }
+          }
+          {{- end }}
+          {{- if .Values.nats.enabled }},
+          "nats-messenger": {
+            "enabled": true,
+            "config": {
+              "enabled": true,
+              "url": {{ .Values.nats.url | quote }},
+              "agentName": {{ .Values.agent.id | quote }},
+              "subjects": [
+                "agent.{{ .Values.agent.id }}.inbox",
+                "agent.all.broadcast"
+                {{- range .Values.nats.extraSubjects }},
+                {{ . | quote }}
+                {{- end }}
+              ],
+              "reconnectWaitMs": {{ .Values.nats.reconnectWaitMs }},
+              "maxReconnectAttempts": {{ .Values.nats.maxReconnectAttempts }},
+              "agentRole": {{ .Values.nats.agentRole | default "general" | quote }},
+              "maxPingPongTurns": {{ .Values.nats.maxPingPongTurns | default 10 }},
+              "pingPongWindowMs": {{ .Values.nats.pingPongWindowMs | default 300000 }},
+              "roster": {{ .Values.nats.roster | default list | toJson }}
+            }
+          }
+          {{- end }}
+          {{- $tokenjuice := index .Values "tokenjuice" | default dict }}
+          {{- if and (hasKey $tokenjuice "enabled") $tokenjuice.enabled }},
+          "tokenjuice": {
+            "enabled": true
+          }
+          {{- end }}
+          {{- if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }},
+          "openclaw-mem0": {
+            "enabled": true,
+            "config": {
+              "mode": {{ $mem0Plugin.mode | default "open-source" | quote }},
+              "userId": {{ $mem0Plugin.userId | default "jonathon" | quote }},
+              "autoRecall": {{ $mem0Plugin.autoRecall | default true }},
+              "autoCapture": {{ $mem0Plugin.autoCapture | default true }},
+              "topK": {{ $mem0Plugin.topK | default 5 }},
+              "searchThreshold": {{ $mem0Plugin.searchThreshold | default 0.6 }},
+              "oss": {
+                "vectorStore": {
+                  "provider": {{ ($mem0Plugin.oss).vectorStore.provider | default "qdrant" | quote }},
+                  "config": {
+                    "host": {{ ($mem0Plugin.oss).vectorStore.config.host | default "qdrant.cto.svc.cluster.local" | quote }},
+                    "port": {{ ($mem0Plugin.oss).vectorStore.config.port | default 6333 }},
+                    "collectionName": {{ ($mem0Plugin.oss).collectionName | default "cto_memory" | quote }}
+                  }
+                },
+                "embedder": {
+                  "provider": {{ ($mem0Plugin.oss).embedder.provider | default "openai" | quote }},
+                  "config": {
+                    "model": {{ ($mem0Plugin.oss).embedder.config.model | default "qwen3-embedding-8b" | quote }}
+                    {{- if ne (($mem0Plugin.oss).embedder.provider | default "openai") "google" }}
+                    {{- if ($mem0Plugin.oss).embedder.config.apiKey }},
+                    "apiKey": {{ ($mem0Plugin.oss).embedder.config.apiKey | quote }}
+                    {{- else }},
+                    "apiKey": "${ {{- ($mem0Plugin.oss).embedder.config.apiKeyEnvVar | default "FIREWORKS_API_KEY" -}} }"
+                    {{- end }}
+                    {{- if ($mem0Plugin.oss).embedder.config.baseUrl }},
+                    "baseURL": {{ ($mem0Plugin.oss).embedder.config.baseUrl | quote }}
+                    {{- end }}
+                    {{- end }}
+                    {{- if ($mem0Plugin.oss).embedder.config.embeddingDims }},
+                    "embeddingDims": {{ ($mem0Plugin.oss).embedder.config.embeddingDims }}
+                    {{- end }}
+                  }
+                },
+                "llm": {
+                  "provider": {{ ($mem0Plugin.oss).llm.provider | default "openai" | quote }},
+                  "config": {
+                    "model": {{ ($mem0Plugin.oss).llm.config.model | default "accounts/fireworks/models/kimi-k2p6" | quote }}
+                    {{- if ($mem0Plugin.oss).llm.config.apiKey }},
+                    "apiKey": {{ ($mem0Plugin.oss).llm.config.apiKey | quote }}
+                    {{- else }},
+                    "apiKey": "${ {{- ($mem0Plugin.oss).llm.config.apiKeyEnvVar | default "FIREWORKS_API_KEY" -}} }"
+                    {{- end }}
+                    {{- if ($mem0Plugin.oss).llm.config.baseUrl }},
+                    "baseURL": {{ ($mem0Plugin.oss).llm.config.baseUrl | quote }}
+                    {{- end }}
+                  }
+                }
+              }
+            }
+          }
+          {{- end }}
+          {{- if and (hasKey $codexPlugin "enabled") $codexPlugin.enabled }},
+          "codex": {
+            "enabled": true,
+            "config": {
+              "appServer": {
+                "approvalPolicy": {{ $codexPlugin.approvalPolicy | default "never" | quote }},
+                "sandbox": {{ $codexPlugin.sandbox | default "workspace-write" | quote }}
+              }
+              {{- if hasKey $codexPlugin "discovery" }},
+              "discovery": {
+                "enabled": {{ $codexPlugin.discovery.enabled | default true }}
+              }
+              {{- end }}
+            }
+          }
+          {{- end }}
+        },
+        "allow": [
+          {{- $pluginEntries := list }}
+          {{- if and (or (not (hasKey $memoryCore "enabled")) $memoryCore.enabled) (not (and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled)) }}
+          {{- $pluginEntries = append $pluginEntries "\"memory-core\"" }}
+          {{- end }}
+          {{- if .Values.tools.acp.enabled }}
+          {{- $pluginEntries = append $pluginEntries "\"acpx\"" }}
+          {{- end }}
+          {{- if .Values.nats.enabled }}
+          {{- $pluginEntries = append $pluginEntries "\"nats-messenger\"" }}
+          {{- end }}
+          {{- if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }}
+          {{- $pluginEntries = append $pluginEntries "\"openclaw-mem0\"" }}
+          {{- end }}
+          {{- if and (hasKey $codexPlugin "enabled") $codexPlugin.enabled }}
+          {{- $pluginEntries = append $pluginEntries "\"codex\"" }}
+          {{- end }}
+          {{- join ", " $pluginEntries }}
+        ]
+        {{- if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }},
+        "slots": {
+          "memory": "openclaw-mem0"
+        }
+        {{- end }}
+        {{- $loadPaths := list }}
+        {{- if .Values.nats.enabled }}
+        {{- $loadPaths = append $loadPaths "/workspace/.openclaw/extensions/nats-messenger" }}
+        {{- end }}
+        {{- if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }}
+        {{- $loadPaths = append $loadPaths "/workspace/.openclaw/extensions/openclaw-mem0/node_modules/@mem0/openclaw-mem0" }}
+        {{- end }}
+        {{- if $loadPaths }},
+        "load": {
+          "paths": {{ $loadPaths | toJson }}
+        }
+        {{- end }}
+      },
+      "models": {
+        {{- $catalogEnabled := .Values.models.catalog.enabled | default false }}
+        {{- $catalogPath := .Values.models.catalog.generatedPath | default "" }}
+        {{- $catalogData := dict }}
+        {{- if and $catalogEnabled $catalogPath (gt (len (.Files.Glob $catalogPath)) 0) }}
+        {{- $catalogData = (.Files.Get $catalogPath | fromJson) }}
+        {{- end }}
+        {{- $catalogProviders := get $catalogData "providers" | default dict }}
+        {{- $catalogGeneratedAt := get $catalogData "generatedAt" | default (.Values.models.catalog.syncedAt | default "") }}
+        {{- if $catalogEnabled }}
+        "catalog": {
+          "enabled": {{ $catalogEnabled }},
+          "source": {{ ternary "mmmodels" "values" $catalogEnabled | quote }},
+          "generatedAt": {{ $catalogGeneratedAt | quote }}
+        },
+        {{- end }}
+        "providers": {
+          {{- $first := true }}
+          {{- $enabledProviders := dict }}
+          {{- $allowedProviders := .Values.models.catalog.allowProviders | default list }}
+          {{- $denyModels := .Values.models.catalog.denyModels | default list }}
+          {{- range $name, $provider := .Values.models.providers }}
+          {{- $providerAllowed := or (eq (len $allowedProviders) 0) (has $name $allowedProviders) }}
+          {{- if and $providerAllowed (or (not (hasKey $provider "enabled")) $provider.enabled) }}
+          {{- $_ := set $enabledProviders $name $provider }}
+          {{- end }}
+          {{- end }}
+          {{- range $name, $provider := $enabledProviders }}
+          {{- $providerCatalog := get $catalogProviders $name | default dict }}
+          {{- $providerModels := $provider.models | default list }}
+          {{- if and $catalogEnabled (hasKey $providerCatalog "models") }}
+          {{- $providerModels = (get $providerCatalog "models") }}
+          {{- end }}
+          {{- $filteredModels := list }}
+          {{- range $model := ($providerModels | default list) }}
+          {{- $modelId := get $model "id" | default "" }}
+          {{- if not (has $modelId $denyModels) }}
+          {{- $filteredModels = append $filteredModels $model }}
+          {{- end }}
+          {{- end }}
+          {{- if not $first }},{{ end }}
+          {{ $name | quote }}: {
+            "api": {{ $provider.api | quote }},
+            "apiKey": "${PROVIDER_{{ $name | upper | replace "-" "_" }}_KEY}",
+            "baseUrl": {{ $provider.baseUrl | quote }},
+            "models": {{ $filteredModels | toJson }}
+            {{- if $provider.auth }},
+            "auth": {{ $provider.auth | quote }}
+            {{- end }}
+            {{- if hasKey $provider "authHeader" }},
+            "authHeader": {{ $provider.authHeader }}
+            {{- end }}
+            {{- if $provider.headers }},
+            "headers": {{ $provider.headers | toJson }}
+            {{- end }}
+          }
+          {{- $first = false }}
+          {{- end }}
+          {{- if .Values.cloudProviders.bedrock.enabled }},
+          "amazon-bedrock": {
+            "api": {{ .Values.cloudProviders.bedrock.openclaw.api | quote }},
+            "auth": {{ .Values.cloudProviders.bedrock.openclaw.auth | quote }},
+            "baseUrl": "https://bedrock-runtime.{{ .Values.cloudProviders.bedrock.region }}.amazonaws.com",
+            "models": {{ .Values.cloudProviders.bedrock.openclaw.models | toJson }}
+          }
+          {{- end }}
+        }
+      },
+      "session": {
+        "agentToAgent": {
+          "maxPingPongTurns": {{ .Values.session.agentToAgent.maxPingPongTurns }}
+        },
+        {{- if .Values.session.threadBindings }}
+        "threadBindings": {
+          "enabled": {{ .Values.session.threadBindings.enabled | default false }},
+          "idleHours": {{ .Values.session.threadBindings.idleHours | default 24 }}
+          {{- if .Values.session.threadBindings.maxAgeHours }},
+          "maxAgeHours": {{ .Values.session.threadBindings.maxAgeHours }}
+          {{- end }}
+        },
+        {{- end }}
+        "dmScope": {{ .Values.session.dmScope | quote }},
+        "reset": {
+          "atHour": {{ .Values.session.reset.atHour }},
+          "idleMinutes": {{ .Values.session.reset.idleMinutes }},
+          "mode": {{ .Values.session.reset.mode | quote }}
+        },
+        "resetByType": {
+          "dm": {
+            "idleMinutes": {{ .Values.session.resetByType.dm.idleMinutes }},
+            "mode": {{ .Values.session.resetByType.dm.mode | quote }}
+          },
+          "group": {
+            "idleMinutes": {{ .Values.session.resetByType.group.idleMinutes }},
+            "mode": {{ .Values.session.resetByType.group.mode | quote }}
+          },
+          "thread": {
+            "atHour": {{ .Values.session.resetByType.thread.atHour }},
+            "mode": {{ .Values.session.resetByType.thread.mode | quote }}
+          }
+        }
+      },
+      "tools": {
+        "agentToAgent": {
+          "enabled": {{ .Values.tools.agentToAgent.enabled }}
+        },
+        "allow": {{ .Values.agent.tools.allow | toJson }}
+        {{- if .Values.tools.deny }},
+        "deny": {{ .Values.tools.deny | toJson }}
+        {{- end }}
+        {{- if .Values.tools.alsoAllow }},
+        "alsoAllow": {{ .Values.tools.alsoAllow | toJson }}
+        {{- end }}
+        {{- if .Values.tools.byProvider }},
+        "byProvider": {{ .Values.tools.byProvider | toJson }}
+        {{- end }},
+        "elevated": {
+          "enabled": {{ .Values.tools.elevated.enabled }}
+          {{- if .Values.tools.elevated.allowFrom }},
+          "allowFrom": {{ .Values.tools.elevated.allowFrom | toJson }}
+          {{- end }}
+        },
+        "exec": {
+          "pathPrepend": {{ .Values.tools.exec.pathPrepend | toJson }},
+          "backgroundMs": {{ .Values.tools.exec.backgroundMs }},
+          "notifyOnExit": {{ .Values.tools.exec.notifyOnExit }}
+          {{- if .Values.tools.exec.host }},
+          "host": {{ .Values.tools.exec.host | quote }}
+          {{- end }}
+          {{- if .Values.tools.exec.security }},
+          "security": {{ .Values.tools.exec.security | quote }}
+          {{- end }}
+          {{- if and .Values.tools.exec.ask (ne .Values.tools.exec.ask "off") }},
+          "ask": {{ .Values.tools.exec.ask | quote }}
+          {{- end }}
+          {{- if .Values.tools.exec.node }},
+          "node": {{ .Values.tools.exec.node | quote }}
+          {{- end }}
+          {{- if .Values.tools.exec.safeBins }},
+          "safeBins": {{ .Values.tools.exec.safeBins | toJson }}
+          {{- end }}
+          {{- if .Values.tools.exec.safeBinTrustedDirs }},
+          "safeBinTrustedDirs": {{ .Values.tools.exec.safeBinTrustedDirs | toJson }}
+          {{- end }}
+          {{- if and .Values.tools.exec.timeoutSec (ne .Values.tools.exec.timeoutSec 0) }},
+          "timeoutSec": {{ .Values.tools.exec.timeoutSec }}
+          {{- end }}
+          {{- if .Values.tools.exec.cleanupMs }},
+          "cleanupMs": {{ .Values.tools.exec.cleanupMs }}
+          {{- end }}
+          {{- if .Values.tools.exec.applyPatch.enabled }},
+          "applyPatch": {
+            "enabled": true
+            {{- if .Values.tools.exec.applyPatch.allowModels }},
+            "allowModels": {{ .Values.tools.exec.applyPatch.allowModels | toJson }}
+            {{- end }}
+          }
+          {{- end }}
+        },
+        {{- if or .Values.tools.message.crossContext .Values.tools.message.broadcast.enabled }}
+        "message": {
+          {{- if .Values.tools.message.crossContext }}
+          "crossContext": {{ .Values.tools.message.crossContext | toJson }}
+          {{- end }}
+          {{- if .Values.tools.message.broadcast.enabled }}
+          {{- if .Values.tools.message.crossContext }},{{ end }}
+          "broadcast": {
+            "enabled": true
+          }
+          {{- end }}
+        },
+        {{- end }}
+        "profile": {{ .Values.tools.profile | quote }},
+        {{- if .Values.tools.sessions }}
+        "sessions": {
+          "visibility": {{ .Values.tools.sessions.visibility | default "own" | quote }}
+        },
+        {{- end }}
+        "web": {
+          "search": { "enabled": {{ if hasKey $webSearch "enabled" }}{{ $webSearch.enabled }}{{ else }}true{{ end }} },
+          "fetch": { "enabled": {{ if hasKey $webFetch "enabled" }}{{ $webFetch.enabled }}{{ else }}true{{ end }} }
+        }
+      },
+      {{- if .Values.logging }}
+      "logging": {
+        "level": {{ .Values.logging.level | quote }},
+        "file": {{ .Values.logging.file | quote }},
+        "consoleLevel": {{ .Values.logging.consoleLevel | quote }}
+        {{- if .Values.logging.consoleStyle }},
+        "consoleStyle": {{ .Values.logging.consoleStyle | quote }}
+        {{- end }}
+      },
+      {{- end }}
+      {{- if .Values.diagnostics }}
+      "diagnostics": {
+        "enabled": {{ .Values.diagnostics.enabled | default true }}
+        {{- if .Values.diagnostics.flags }},
+        "flags": {{ .Values.diagnostics.flags | toJson }}
+        {{- end }}
+      },
+      {{- end }}
+      "wizard": {
+        "lastRunCommand": "doctor",
+        "lastRunMode": "local"
+      }
+    }

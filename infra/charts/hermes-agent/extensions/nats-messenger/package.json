@@ -1,0 +1,9 @@
+{
+  "name": "nats-messenger",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NATS inter-agent messaging plugin for OpenClaw",
+  "dependencies": {
+    "nats": "^2.28.0"
+  }
+}
