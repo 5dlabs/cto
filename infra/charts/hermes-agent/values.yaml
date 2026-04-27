@@ -590,6 +590,15 @@ toolServer:
   url: ""
 
 # =============================================================================
+# Hermes harness inference defaults (Nous Research)
+# =============================================================================
+hermes:
+  # -- Base URL for the Nous inference API
+  nousBaseUrl: "https://inference-api.nousresearch.com/v1"
+  # -- Default model used by the Hermes harness
+  nousModel: "nousresearch/hermes-4-70b"
+
+# =============================================================================
 # Secrets Configuration
 # =============================================================================
 secrets:
@@ -597,6 +606,8 @@ secrets:
   discordTokensSecret: "openclaw-discord-tokens"
   # -- Name of the Secret containing shared API keys (Anthropic, OpenAI, etc.)
   apiKeysSecret: "openclaw-api-keys"
+  # -- Name of the Secret containing Hermes-specific keys (NOUS_API_KEY). Not ESO-managed.
+  hermesSecret: "hermes-coder-secrets"
 
 # =============================================================================
 # Probes
