@@ -129,9 +129,46 @@ if [ -f "$COMPONENT_LIB" ]; then
   fi
 fi
 
-# --- Stitch Variants ---
+# --- Stitch Mockups (repo-local PNGs) ---
+# Prefer rendering mockups from .tasks/design/mockups/ so reviewers can see them
+# directly on GitHub without authenticating to Stitch or Linear.
+MOCKUPS_DIR="$ROOT/.tasks/design/mockups"
+MOCKUPS_MANIFEST="$MOCKUPS_DIR/manifest.json"
+HAS_LOCAL_MOCKUPS=false
+if [ -d "$MOCKUPS_DIR" ]; then
+  if compgen -G "$MOCKUPS_DIR/*.png" > /dev/null; then
+    HAS_LOCAL_MOCKUPS=true
+  fi
+fi
+
+if [ "$HAS_LOCAL_MOCKUPS" = true ]; then
+  printf '## Stitch Mockups\n\n'
+  printf '> Screenshots captured from Stitch HTML mockups. Click "View in Stitch"\n'
+  printf '> to open the live, interactive version (auth required).\n\n'
+  if [ -f "$MOCKUPS_MANIFEST" ]; then
+    jq -r '
+      sort_by(.index) | .[] |
+      select((.png // "") != "") |
+      "### Mockup \(.index): \(.target) (\(.device))\n\n" +
+      "![\(.target) — \(.device)](./mockups/\(.png))\n\n" +
+      "**Screen:** `\(.screenId)`\n\n" +
+      (if (.rationale // "") != "" then "> \(.rationale)\n\n" else "" end) +
+      (if (.htmlUrl // "") != "" then "🔗 [View in Stitch](\(.htmlUrl))\n\n" else "" end)
+    ' "$MOCKUPS_MANIFEST" 2>/dev/null
+  else
+    # No manifest — embed every PNG with a generic label.
+    for png in "$MOCKUPS_DIR"/*.png; do
+      [ -f "$png" ] || continue
+      filename=$(basename "$png")
+      label="${filename%.png}"
+      printf '### %s\n\n![%s](./mockups/%s)\n\n' "$label" "$label" "$filename"
+    done
+  fi
+fi
+
+# --- Stitch Variants (legacy / remote) ---
 STITCH_VARIANTS="$ROOT/.tasks/design/stitch/design-variants.json"
-if [ -f "$STITCH_VARIANTS" ]; then
+if [ -f "$STITCH_VARIANTS" ] && [ "$HAS_LOCAL_MOCKUPS" = false ]; then
   VARIANT_COUNT=$(jq 'length' "$STITCH_VARIANTS" 2>/dev/null || echo 0)
   if [ "$VARIANT_COUNT" -gt 0 ]; then
     printf '## Stitch Design Variants\n\n'
@@ -173,6 +210,9 @@ if [ -f "$ROOT/.tasks/design/stitch/candidates.json" ]; then
 fi
 if [ -f "$ROOT/.tasks/design/stitch/design-variants.json" ]; then
   printf '| `.tasks/design/stitch/design-variants.json` | Stitch visual variants |\n'
+fi
+if [ -d "$ROOT/.tasks/design/mockups" ]; then
+  printf '| `.tasks/design/mockups/` | Repo-local PNG screenshots of Stitch mockups |\n'
 fi
 printf '| `.tasks/design/snapshot-links.md` | Screenshot URLs |\n'
 printf '| `.tasks/docs/design-brief.md` | Full enhanced PRD |\n'
