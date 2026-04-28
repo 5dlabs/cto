@@ -3,7 +3,7 @@
 ## Why
 
 PR #4792 exposed `avatar.5dlabs.ai` via a `TunnelBinding` pointing at
-`next dev` (port 3000 on the `openclaw-coder` Service). The tunnel bypasses
+`next dev` through the dedicated `avatar-demo` Service. The tunnel bypasses
 code-server's built-in auth, so without an additional layer the Next.js
 **development** server is reachable by anyone on the internet.
 
@@ -32,7 +32,7 @@ A **Cloudflare Access Self-Hosted Application** bound to
 - 24h session duration (re-auth after a working day).
 
 Cloudflare Access terminates at Cloudflare's edge, so the authenticated
-request still reaches `cloudflared → openclaw-coder:3000` exactly as
+request still reaches `cloudflared → avatar-demo:3000` exactly as
 before — no in-cluster changes are required.
 
 ## Why this is a runbook and not GitOps
