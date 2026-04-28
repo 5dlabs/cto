@@ -24,6 +24,7 @@ from morgan_avatar_agent.avatar_provider import AvatarProvider, build_avatar_pro
 from morgan_avatar_agent.config import AgentConfig
 from morgan_avatar_agent.latency import LatencyRecorder
 from morgan_avatar_agent.providers import build_llm, build_stt, build_tts, build_turn_detection
+from morgan_avatar_agent.startup import room_is_disconnected, run_startup_step
 
 load_dotenv()
 
@@ -143,21 +144,40 @@ async def entrypoint(ctx: JobContext) -> None:
         config,
         allow_audio_only_fallback=allow_audio_only_fallback,
     )
-    await avatar_provider.start(session, room=ctx.room)
+    if room_is_disconnected(ctx.room):
+        logger.info("startup.avatar.skip reason=room_disconnected")
+        return
+    if not await run_startup_step(
+        "avatar",
+        lambda: avatar_provider.start(session, room=ctx.room),
+        logger,
+    ):
+        return
 
     audio_input = room_io.AudioInputOptions(
         noise_cancellation=noise_cancellation.BVC() if config.use_noise_cancellation else None,
     )
 
-    await session.start(
-        room=ctx.room,
-        agent=MorganAgent(config),
-        room_options=room_io.RoomOptions(audio_input=audio_input),
-    )
+    if room_is_disconnected(ctx.room):
+        logger.info("startup.session.skip reason=room_disconnected")
+        return
+    if not await run_startup_step(
+        "session",
+        lambda: session.start(
+            room=ctx.room,
+            agent=MorganAgent(config),
+            room_options=room_io.RoomOptions(audio_input=audio_input),
+        ),
+        logger,
+    ):
+        return
 
     # Give the browser a moment to subscribe to the remote tracks before the greeting starts.
     await asyncio.sleep(1.0)
-    await session.say(config.greeting)
+    if room_is_disconnected(ctx.room):
+        logger.info("startup.greeting.skip reason=room_disconnected")
+        return
+    await run_startup_step("greeting", lambda: session.say(config.greeting), logger)
 
 
 if __name__ == "__main__":

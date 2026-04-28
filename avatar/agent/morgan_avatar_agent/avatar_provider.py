@@ -7,6 +7,7 @@ from livekit.agents._exceptions import APIStatusError
 
 from .config import AgentConfig
 from .echomimic_avatar import build_echomimic_avatar_session
+from .startup import is_expected_startup_disconnect
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,10 @@ class LemonSliceAvatarProvider:
             await self._avatar.start(session, room=room)
         except Exception as exc:
             root = exc.__cause__ or exc
+            if isinstance(root, RuntimeError) and is_expected_startup_disconnect(root):
+                if root is exc:
+                    raise
+                raise root from exc
             if isinstance(root, APIStatusError):
                 logger.error(
                     "LemonSlice session start failed: status=%s body=%r message=%s",
