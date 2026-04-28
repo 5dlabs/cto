@@ -279,6 +279,9 @@ spec:
               echo "[tools] tools MCP proxy ready"
 
               mkdir -p /workspace/.codex /workspace/.gemini /workspace/.factory /workspace/.cursor /workspace/.copilot
+              # Defensive: scrub any stale codex config from prior chart revs before re-seeding
+              # (configmap content has changed shape historically; PVC files persist across pod restarts)
+              rm -f /workspace/.codex/config.toml
               cp /cli-backend-configs-template/codex-config.toml /workspace/.codex/config.toml
               {{- if and (hasKey .Values "codexPlugin") .Values.codexPlugin.enabled .Values.codexPlugin.authSecretKey }}
               # Inject Codex OAuth auth.json from secret (headless auth)
