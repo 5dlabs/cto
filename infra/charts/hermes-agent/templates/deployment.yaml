@@ -745,6 +745,15 @@ spec:
               mkdir -p /workspace/.harness
               cp -f /etc/hermes/container.sh.hbs /workspace/.harness/container.sh.hbs
               echo "[hermes] Harness staged at /workspace/.harness/container.sh.hbs"
+              # If the rendered container.sh is older than the template (or absent),
+              # remove it so the operator re-renders on next manual run. This ensures
+              # template fixes (e.g. CODEX_HOME) flow through without requiring a
+              # fresh PVC.
+              if [ ! -f /workspace/.harness/container.sh ] \
+                 || [ /workspace/.harness/container.sh.hbs -nt /workspace/.harness/container.sh ]; then
+                echo "[hermes] Rendered container.sh is stale or missing — removing so it gets re-rendered"
+                rm -f /workspace/.harness/container.sh
+              fi
               echo "[hermes] Render with: npx -y handlebars /workspace/.harness/container.sh.hbs --output /workspace/.harness/container.sh"
               echo "[hermes] Pod is sleeping; exec in with: kubectl exec -it <pod> -- /bin/bash"
               exec sleep infinity
