@@ -36,6 +36,12 @@ spec:
       protocol: TCP
       name: {{ .Values.devServer.name | default "dev-server" }}
     {{- end }}
+    {{- if .Values.artifactServer.enabled }}
+    - port: {{ .Values.artifactServer.port | default 18080 }}
+      targetPort: {{ .Values.artifactServer.name | default "artifacts" }}
+      protocol: TCP
+      name: {{ .Values.artifactServer.name | default "artifacts" }}
+    {{- end }}
     {{- if .Values.projectApi.enabled }}
     - port: {{ .Values.projectApi.servicePort | default .Values.projectApi.port }}
       targetPort: project-api

@@ -356,6 +356,25 @@ devServer:
   name: dev-server
 
 # =============================================================================
+# Optional static artifacts sidecar (disabled by default)
+# =============================================================================
+# Serves files from the shared workspace PVC. This is useful for GPU render
+# galleries or smoke-test outputs that should survive independently of the
+# interactive agent process.
+artifactServer:
+  enabled: false
+  port: 18080
+  name: artifacts
+  directory: /workspace/avatar-render
+  resources:
+    requests:
+      cpu: "25m"
+      memory: "64Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+
+# =============================================================================
 # Optional project-api sidecar (disabled by default)
 # =============================================================================
 # Bun HTTP service that surfaces the shared /workspace/repos PVC to the

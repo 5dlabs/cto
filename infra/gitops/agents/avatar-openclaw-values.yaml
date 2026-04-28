@@ -215,5 +215,11 @@ codeServer:
 devServer:
   enabled: false
 
+artifactServer:
+  enabled: true
+  port: 18080
+  name: artifacts
+  directory: /workspace/avatar-render
+
 nats:
   agentRole: "avatar-openclaw"

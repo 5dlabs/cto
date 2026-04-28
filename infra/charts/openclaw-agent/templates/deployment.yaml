@@ -1152,6 +1152,37 @@ spec:
             - name: acpx-node-modules
               mountPath: /usr/local/share/npm-global/lib/node_modules/openclaw/extensions/acpx/node_modules
             {{- end }}
+        {{- if .Values.artifactServer.enabled }}
+        - name: {{ .Values.artifactServer.name | default "artifacts" }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              mkdir -p {{ .Values.artifactServer.directory | quote }}
+              exec python3 -m http.server {{ .Values.artifactServer.port | default 18080 }} \
+                --bind 0.0.0.0 \
+                --directory {{ .Values.artifactServer.directory | quote }}
+          ports:
+            - name: {{ .Values.artifactServer.name | default "artifacts" }}
+              containerPort: {{ .Values.artifactServer.port | default 18080 }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.artifactServer.name | default "artifacts" }}
+            initialDelaySeconds: 2
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.artifactServer.resources | nindent 12 }}
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+        {{- end }}
         {{- if .Values.kaniko.enabled }}
         - name: kaniko
           image: {{ .Values.kaniko.image }}
