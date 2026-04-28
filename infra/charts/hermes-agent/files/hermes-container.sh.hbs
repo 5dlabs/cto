@@ -106,12 +106,14 @@ KIMICFG
 fi
 
 # Codex: configure provider via config.toml
-# CODEX_HOME is pinned to /root/.codex in the container env.
+# Honor CODEX_HOME if set; otherwise default to $HOME/.codex. Older container images
+# pinned this to /root/.codex, but the agent now runs as non-root (uid 1001 / $HOME=/workspace).
 # Unset OPENAI_API_KEY to prevent codex from trying the broken svcacct key from cto-secrets,
 # UNLESS the active provider is nous (which expects OPENAI_API_KEY=$NOUS_API_KEY).
 if [ "{{cli_type}}" = "codex" ]; then
   PROVIDER="${RESOLVED_PROVIDER:-fireworks}"
-  mkdir -p /root/.codex
+  export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+  mkdir -p "$CODEX_HOME"
 
   CODEX_WIRE_API="responses"
 
@@ -145,7 +147,7 @@ if [ "{{cli_type}}" = "codex" ]; then
       ;;
   esac
 
-  cat > /root/.codex/config.toml <<CODEXCFG
+  cat > "$CODEX_HOME/config.toml" <<CODEXCFG
 model = "{{model}}"
 model_provider = "${PROVIDER}"
 approval_policy = "never"
