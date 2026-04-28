@@ -544,6 +544,12 @@ claudeCode:
   # -- Disable telemetry in Claude Code CLI
   disableTelemetry: true
 
+  # -- OAuth token secret keys (Pro/Max/Teams headless auth) inside `secrets.apiKeysSecret`.
+  # When set, the deployment renders CLAUDE_CODE_OAUTH_TOKEN[_SUB2] env vars,
+  # which the Claude Code CLI prefers over ANTHROPIC_API_KEY.
+  oauthTokenSecretKey: "anthropic-sub1-oauth"
+  oauthTokenSecretKeySub2: "anthropic-sub2-oauth"
+
   # -- MCP servers available to Claude Code CLI sessions
   # These are the tools that the Claude Code coding agent can use when
   # invoked by an OpenClaw agent. Separate from OpenClaw's own tools.
@@ -559,6 +565,17 @@ claudeCode:
         args: ["-y", "firecrawl-mcp"]
         env:
           FIRECRAWL_API_KEY: "${FIRECRAWL_API_KEY}"
+
+# =============================================================================
+# Codex CLI plugin (OAuth auth.json passthrough)
+# =============================================================================
+# When enabled, the deployment renders CODEX_AUTH_SUB1[_SUB2] env vars from
+# `secrets.apiKeysSecret`. The harness stages these into ~/.codex/auth.json so
+# Codex CLI runs under ChatGPT Pro/Plus OAuth instead of an OpenAI API key.
+codexPlugin:
+  enabled: true
+  authSecretKey: "codex-auth-sub1"
+  authSecretKeySub2: "codex-auth-sub2"
 
 # =============================================================================
 # Tools Config (MCP tools for CLI backends)
@@ -605,7 +622,10 @@ secrets:
   # -- Name of the Secret containing Discord bot tokens (one key per agent)
   discordTokensSecret: "openclaw-discord-tokens"
   # -- Name of the Secret containing shared API keys (Anthropic, OpenAI, etc.)
-  apiKeysSecret: "openclaw-api-keys"
+  # cto-coder-api-keys carries the OAuth tokens (anthropic-sub1-oauth,
+  # codex-auth-sub1, copilot-github-token, NOUS_API_KEY, …) that the working
+  # cto-metal / openclaw-coder pods rely on. openclaw-api-keys is API-key only.
+  apiKeysSecret: "cto-coder-api-keys"
   # -- Name of the Secret containing Hermes-specific keys (NOUS_API_KEY). Not ESO-managed.
   hermesSecret: "hermes-coder-secrets"
 
