@@ -10,6 +10,15 @@ args:
     default: ""
   # When set (path relative to WORKSPACE), PRD is copied into .intake/run-prd.txt so shell never
   # expands $(command) / backticks inside the document. Required for real PRDs (e.g. sigma-1).
+  #
+  # Resolution order (see materialize-prd, ~L107-L141):
+  #   1. $WORKSPACE/$prd_path
+  #   2. ${target_repo_local_path}/$prd_path  (fallback for multi-repo runs;
+  #      e.g. PRD lives in the target product repo, not in CTO)
+  #
+  # Canonical convention for target repos: store the PRD at `.plan/prd/prd.md`
+  # (sigma-style). Supplemental specs / mockups under `.plan/spec/` are NOT
+  # ingested today — see docs/2026-04/intake-sigma-one-path-audit.md §3.
   prd_path:
     default: ""
   design_prompt:
@@ -1288,33 +1297,68 @@ steps:
         intake-util linear-activity --session-id "$DESIGN_LINEAR_SID" --type thought --body "$INTRO_BODY" >/dev/null 2>/dev/null || true
       fi
 
-      # Post Stitch mockups to the DESIGN session (screenshot + upload to Linear)
-      if [ "$STITCH_COUNT" -gt 0 ] && [ -n "$DESIGN_LINEAR_SID" ]; then
+      # Screenshot Stitch mockups, copy into the repo-tracked .tasks/design/mockups/
+      # directory so reviewers can see them in the deliverable without logging in
+      # to Stitch or Linear, and (when a DESIGN session exists) post them to Linear.
+      if [ "$STITCH_COUNT" -gt 0 ]; then
         SCREENSHOT_DIR="$WS/.intake/design/stitch/screenshots"
-        mkdir -p "$SCREENSHOT_DIR"
+        REPO_MOCKUPS_DIR="$WS/.tasks/design/mockups"
+        mkdir -p "$SCREENSHOT_DIR" "$REPO_MOCKUPS_DIR"
+        REPO_MOCKUPS_MANIFEST="$REPO_MOCKUPS_DIR/manifest.json"
+        : > "$REPO_MOCKUPS_MANIFEST.tmp"
+        printf '[' > "$REPO_MOCKUPS_MANIFEST.tmp"
+        FIRST_ENTRY=1
         for i in $(seq 0 $((STITCH_COUNT - 1))); do
           HTML_URL="$(jq -r ".[$i].htmlUrl // empty" "$STITCH_FILE")"
           DEVICE="$(jq -r ".[$i].deviceType // \"unknown\"" "$STITCH_FILE")"
           TARGET="$(jq -r ".[$i].target // \"unknown\"" "$STITCH_FILE")"
           RATIONALE="$(jq -r ".[$i].rationale // \"\"" "$STITCH_FILE")"
           SCREEN_ID="$(jq -r ".[$i].screenId // \"unknown\"" "$STITCH_FILE")"
-          HTML_LOCAL="$SCREENSHOT_DIR/mockup-$((i+1))-${DEVICE}.html"
+          BASENAME="mockup-$((i+1))-${DEVICE}"
+          HTML_LOCAL="$SCREENSHOT_DIR/${BASENAME}.html"
+          PNG_LOCAL="$SCREENSHOT_DIR/${BASENAME}.png"
           if [ -n "$HTML_URL" ]; then
             curl -sL "$HTML_URL" -o "$HTML_LOCAL" 2>/dev/null || true
           fi
-          # Screenshot and upload to Linear
+          # Screenshot (and upload to Linear if a session is present). The
+          # upload script generates the PNG via Playwright even if the Linear
+          # upload fails, so we always try to copy the PNG into the repo dir.
           IMG_MARKDOWN=""
+          REPO_PNG=""
           if [ -f "$HTML_LOCAL" ]; then
             UPLOAD_JSON="$("$WS/intake/scripts/upload-mockup-to-linear.sh" "$HTML_LOCAL" "$DEVICE" 2>/dev/null)" || true
             ASSET_URL="$(printf '%s' "$UPLOAD_JSON" | jq -r '.assetUrl // empty' 2>/dev/null)"
             if [ -n "$ASSET_URL" ]; then
               IMG_MARKDOWN="$(printf '\n\n![%s mockup — %s](%s)\n' "$TARGET" "$DEVICE" "$ASSET_URL")"
             fi
+            if [ -f "$PNG_LOCAL" ]; then
+              cp "$PNG_LOCAL" "$REPO_MOCKUPS_DIR/${BASENAME}.png" 2>/dev/null || true
+              REPO_PNG="${BASENAME}.png"
+            fi
           fi
-          MOCK_BODY="$(printf '## 🎨 Designer\n\n> *Crafting the visual identity — form follows function.*\n\n**Mockup %d:** %s (%s)\n**Screen:** `%s`%s\n\n%s' \
-            "$((i + 1))" "$TARGET" "$DEVICE" "$SCREEN_ID" "$IMG_MARKDOWN" "$RATIONALE")"
-          intake-util linear-activity --session-id "$DESIGN_LINEAR_SID" --type thought --body "$MOCK_BODY" >/dev/null 2>/dev/null || true
+          if [ "$FIRST_ENTRY" -eq 0 ]; then
+            printf ',' >> "$REPO_MOCKUPS_MANIFEST.tmp"
+          fi
+          FIRST_ENTRY=0
+          jq -nc \
+            --arg index "$((i + 1))" \
+            --arg device "$DEVICE" \
+            --arg target "$TARGET" \
+            --arg screen_id "$SCREEN_ID" \
+            --arg rationale "$RATIONALE" \
+            --arg html_url "$HTML_URL" \
+            --arg asset_url "${ASSET_URL:-}" \
+            --arg png "$REPO_PNG" \
+            '{index: ($index|tonumber), device: $device, target: $target, screenId: $screen_id, rationale: $rationale, htmlUrl: $html_url, assetUrl: $asset_url, png: $png}' \
+            >> "$REPO_MOCKUPS_MANIFEST.tmp" || true
+          if [ -n "$DESIGN_LINEAR_SID" ]; then
+            MOCK_BODY="$(printf '## 🎨 Designer\n\n> *Crafting the visual identity — form follows function.*\n\n**Mockup %d:** %s (%s)\n**Screen:** `%s`%s\n\n%s' \
+              "$((i + 1))" "$TARGET" "$DEVICE" "$SCREEN_ID" "$IMG_MARKDOWN" "$RATIONALE")"
+            intake-util linear-activity --session-id "$DESIGN_LINEAR_SID" --type thought --body "$MOCK_BODY" >/dev/null 2>/dev/null || true
+          fi
         done
+        printf ']' >> "$REPO_MOCKUPS_MANIFEST.tmp"
+        mv "$REPO_MOCKUPS_MANIFEST.tmp" "$REPO_MOCKUPS_MANIFEST" 2>/dev/null || rm -f "$REPO_MOCKUPS_MANIFEST.tmp"
       fi
 
       RUN_TS=$(date +%s)
