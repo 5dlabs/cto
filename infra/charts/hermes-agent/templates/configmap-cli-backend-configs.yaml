@@ -9,9 +9,22 @@ metadata:
     app.kubernetes.io/component: cli-configs
 data:
   codex-config.toml: |
-    model = "gpt-5.3-codex"
+    # Hermes-agent default: Nous Research inference. The agent container exposes
+    # NOUS_API_KEY (see deployment.yaml) — codex-acp reads it via env_key below.
+    # Do NOT set model_provider = "openai" or env_key = "OPENAI_API_KEY" here:
+    # codex-cli rewrites /workspace/.codex/auth.json to apikey-mode when it sees
+    # OPENAI_API_KEY in env, clobbering any OAuth token.
+    model = "nousresearch/hermes-4-70b"
+    model_provider = "nous"
     approval_policy = "never"
     sandbox_mode = "danger-full-access"
+
+    [model_providers.nous]
+    name = "Nous"
+    base_url = "https://inference-api.nousresearch.com/v1"
+    env_key = "NOUS_API_KEY"
+    # Nous rejects OpenAI's `responses` wire protocol — must use chat completions.
+    wire_api = "chat"
 
     [mcp_servers.tool-server]
     command = "/workspace/.local/bin/tools"
