@@ -127,8 +127,9 @@ tunnelRef:
   name: cto-main
 ---
 # avatar.5dlabs.ai routes directly to the Next.js dev server running inside
-# the coder workspace (port 3000 on the openclaw-coder Service, exposed via
-# the chart's optional devServer block). This bypasses coder's /proxy/<port>
+# the coder workspace. Use a dedicated single-port Service so the
+# cloudflare-operator cannot accidentally select the agent gateway port from
+# the multi-port openclaw-coder Service. This bypasses coder's /proxy/<port>
 # path, which was returning ECONNREFUSED externally.
 #
 # SECURITY: `next dev` MUST NOT be reachable unauthenticated on the public
@@ -139,6 +140,22 @@ tunnelRef:
 # cloudflare-operator only manages Tunnels/TunnelBindings); until that gap
 # is closed, the Access app must be (re)created manually if the account is
 # ever rebuilt.
+apiVersion: v1
+kind: Service
+metadata:
+  name: avatar-demo
+  namespace: cto
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: cto-coder
+    app.kubernetes.io/name: openclaw-coder
+  ports:
+    - name: http
+      port: 3000
+      protocol: TCP
+      targetPort: 3000
+---
 apiVersion: networking.cfargotunnel.com/v1alpha1
 kind: TunnelBinding
 metadata:
@@ -149,10 +166,10 @@ metadata:
     5dlabs.ai/cloudflare-access-runbook: docs/runbooks/cloudflare-access-avatar-demo.md
 subjects:
   - kind: Service
-    name: openclaw-coder
+    name: avatar-demo
     spec:
       fqdn: avatar.5dlabs.ai
-      target: http://openclaw-coder.cto.svc:3000
+      target: http://avatar-demo.cto.svc:3000
 tunnelRef:
   kind: ClusterTunnel
   name: cto-main
