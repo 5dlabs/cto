@@ -101,6 +101,8 @@ steps:
       echo "preflight: cleaning ALL stale intake artifacts..." >&2
       rm -rf "$root/.intake/tmp" "$root/.intake/step-outputs" "$root/.intake/checkpoints" "$root/.intake/design"
       rm -rf "$root/.tasks/docs" "$root/.tasks/tasks" "$root/.tasks/design" "$root/.tasks/audio" "$root/.tasks/workflows"
+      # Clean .plan/ (sigma-1-style emission consumed by sync-to-target-repo)
+      rm -rf "$root/.plan"
       mkdir -p "$root/.intake/tmp" "$root/.intake/step-outputs" "$root/.intake/checkpoints" "$root/.tasks/audio"
       "${root}/intake/scripts/pipeline-preflight.sh"
 
@@ -135,6 +137,15 @@ steps:
         fi
         printf '%s' "${prd_content}" > "$OUT"
       fi
+      # Sigma-1 style .plan/ emission — surfaced into target repo by sync-to-target-repo.
+      # PRD is committed in two formats so downstream agents can consume markdown
+      # (.md) or plain text (.txt) without conversion. Both files share content
+      # for now; deliberation may replace prd.md later via Enhanced PRD.
+      mkdir -p "$WS/.plan/prd"
+      cp "$OUT" "$WS/.plan/prd/prd.txt"
+      cp "$OUT" "$WS/.plan/prd/prd.md"
+      # Lifecycle marker consumed by downstream agents (matches sigma-1 convention).
+      printf 'new\n' > "$WS/.plan/status.txt"
       printf '%s\n' "$OUT"
 
   - id: reset-audio-artifacts
@@ -1795,6 +1806,17 @@ steps:
       git pull --ff-only origin main 2>/dev/null || true
       rm -rf "$TARGET/.tasks"
       rsync -a "$root/.tasks/" "$TARGET/.tasks/"
+      # Sigma-1 style .plan/ layout (additive — coexists with .tasks/ for now).
+      # Customer/target repos consume .plan/ as the canonical PRD + spec home.
+      if [ -d "$root/.plan" ]; then
+        rm -rf "$TARGET/.plan"
+        rsync -a "$root/.plan/" "$TARGET/.plan/"
+        # Mirror the deliberation-enhanced PRD as architecture spec when present.
+        if [ -s "$root/.tasks/docs/design-brief.md" ]; then
+          mkdir -p "$TARGET/.plan/spec"
+          cp "$root/.tasks/docs/design-brief.md" "$TARGET/.plan/spec/architecture.md"
+        fi
+      fi
       # Validate no cross-project contamination in audio transcripts
       for tf in "$TARGET/.tasks/audio/"*.transcript.json; do
         [ -f "$tf" ] || continue
@@ -1821,7 +1843,7 @@ steps:
       }
       git config user.email "morgan@5dlabs.io"
       git config user.name "Morgan (Intake Agent)"
-      git add .tasks/
+      git add .tasks/ .plan/ 2>/dev/null || git add .tasks/
       if git diff --staged --quiet 2>/dev/null; then
         echo "sync-to-target-repo: no changes to commit in target repo" >&2
         jq -nc --arg branch "$BRANCH_NAME" '{"synced":false,"reason":"no changes","branch":$branch}'
