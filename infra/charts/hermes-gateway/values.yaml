@@ -48,7 +48,7 @@ secrets:
 # DISCORD_ALLOWED_USERS is REQUIRED — without it the bot accepts no users
 # and looks broken on first start. Override per-environment.
 discord:
-  allowedUsers: "REPLACE_ME_DISCORD_USER_ID"
+  allowedUsers: "444519104808878090"
   homeChannel: ""
   allowedRoles: ""
 
