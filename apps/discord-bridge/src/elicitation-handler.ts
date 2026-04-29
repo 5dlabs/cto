@@ -72,7 +72,9 @@ function describeInteraction(interaction: Interaction): string {
     interaction.isButton() || interaction.isStringSelectMenu()
       ? interaction.customId
       : "n/a";
-  return `${kind} customId=${customId} deferred=${interaction.deferred} replied=${interaction.replied}`;
+  const deferred = "deferred" in interaction ? interaction.deferred : false;
+  const replied = "replied" in interaction ? interaction.replied : false;
+  return `${kind} customId=${customId} deferred=${deferred} replied=${replied}`;
 }
 
 // =============================================================================

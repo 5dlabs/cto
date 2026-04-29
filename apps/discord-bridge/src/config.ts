@@ -13,6 +13,16 @@ export interface BridgeConfig {
   linearBridgeUrl: string;
   /** Optional fixed channel ID for deliberation traffic (bypasses room allocator) */
   deliberationChannelId?: string;
+  /** Optional JSON file for persisted runtime route mappings */
+  presenceRouteStorePath?: string;
+  /** Optional NATS URL for presence event fanout */
+  natsUrl?: string;
+  /** Shared bearer token required for /presence/* endpoints */
+  presenceSharedToken?: string;
+}
+
+function defaultWorkspaceRoot(): string {
+  return process.env.WORKSPACE?.trim() || process.cwd();
 }
 
 export function loadConfig(): BridgeConfig {
@@ -29,5 +39,9 @@ export function loadConfig(): BridgeConfig {
     httpPort: parseInt(process.env.HTTP_PORT ?? "3200", 10),
     linearBridgeUrl: process.env.LINEAR_BRIDGE_URL ?? "http://linear-bridge.bots.svc:3100",
     deliberationChannelId: process.env.DISCORD_DELIBERATION_CHANNEL_ID?.trim() || undefined,
+    presenceRouteStorePath:
+      process.env.PRESENCE_ROUTE_STORE_PATH?.trim() || `${defaultWorkspaceRoot()}/.intake/presence-routes.json`,
+    natsUrl: process.env.NATS_URL?.trim() || undefined,
+    presenceSharedToken: process.env.PRESENCE_SHARED_TOKEN?.trim() || undefined,
   };
 }

@@ -15,6 +15,7 @@ import { createServer, type Server, type IncomingMessage, type ServerResponse } 
 import type { Bridge } from './bridge.js';
 import type { DiscordHandle } from './discord-client.js';
 import type { DiscordElicitationHandler } from './elicitation-handler.js';
+import type { PresenceRouter } from './presence-router.js';
 import type { AgentMessage } from './types.js';
 import type { ElicitationRequest, ElicitationCancel, DesignReviewRequest } from './elicitation-types.js';
 
@@ -30,6 +31,8 @@ export function createHttpServer(
   logger: { info: Function; warn: Function; error: Function },
   defaultChannelId?: string,
   discord?: DiscordHandle,
+  presence?: PresenceRouter,
+  presenceSharedToken?: string,
 ): HttpServer {
   let server: Server | undefined;
 
@@ -46,6 +49,22 @@ export function createHttpServer(
     res.end(JSON.stringify(data));
   }
 
+  function authorizePresence(req: IncomingMessage, res: ServerResponse): boolean {
+    if (!presenceSharedToken) {
+      json(res, 503, { error: 'Presence auth token not configured' });
+      return false;
+    }
+    const bearer = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+    const headerToken = Array.isArray(req.headers['x-presence-token'])
+      ? req.headers['x-presence-token'][0]
+      : req.headers['x-presence-token'];
+    if (bearer !== presenceSharedToken && headerToken !== presenceSharedToken) {
+      json(res, 401, { error: 'Unauthorized' });
+      return false;
+    }
+    return true;
+  }
+
   async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const method = req.method?.toUpperCase();
     const rawUrl = req.url ?? "/";
@@ -55,7 +74,33 @@ export function createHttpServer(
 
     // Health check
     if (method === 'GET' && url === '/health') {
-      json(res, 200, { status: 'ok', service: 'discord-bridge' });
+      json(res, 200, { status: 'ok', service: 'discord-bridge', presence: Boolean(presence) });
+      return;
+    }
+
+    if (method === 'GET' && url === '/presence/routes') {
+      if (!authorizePresence(req, res)) return;
+      if (!presence) {
+        json(res, 503, { error: 'Presence router not initialized' });
+        return;
+      }
+      json(res, 200, { routes: presence.listRoutes() });
+      return;
+    }
+
+    if (method === 'DELETE' && url.startsWith('/presence/routes/')) {
+      if (!authorizePresence(req, res)) return;
+      if (!presence) {
+        json(res, 503, { error: 'Presence router not initialized' });
+        return;
+      }
+      const routeId = decodeURIComponent(url.slice('/presence/routes/'.length));
+      if (!routeId) {
+        json(res, 400, { error: 'Missing route id' });
+        return;
+      }
+      const deleted = await presence.deleteRoute(routeId);
+      json(res, deleted ? 200 : 404, { deleted });
       return;
     }
 
@@ -156,6 +201,53 @@ export function createHttpServer(
     }
 
     switch (url) {
+      case '/presence/routes': {
+        if (!authorizePresence(req, res)) return;
+        if (!presence) {
+          json(res, 503, { error: 'Presence router not initialized' });
+          return;
+        }
+        try {
+          const route = await presence.registerRoute(payload);
+          json(res, 200, { route });
+        } catch (err) {
+          json(res, 400, { error: String(err instanceof Error ? err.message : err) });
+        }
+        return;
+      }
+
+      case '/presence/inbound': {
+        if (!authorizePresence(req, res)) return;
+        if (!presence) {
+          json(res, 503, { error: 'Presence router not initialized' });
+          return;
+        }
+        try {
+          const result = await presence.routeInbound(payload);
+          json(res, 202, result);
+        } catch (err) {
+          const message = String(err instanceof Error ? err.message : err);
+          const status = message.startsWith('No presence route') ? 404 : 400;
+          json(res, status, { error: message });
+        }
+        return;
+      }
+
+      case '/presence/outbound': {
+        if (!authorizePresence(req, res)) return;
+        if (!presence) {
+          json(res, 503, { error: 'Presence router not initialized' });
+          return;
+        }
+        try {
+          const result = await presence.handleOutbound(payload);
+          json(res, 200, result);
+        } catch (err) {
+          json(res, 400, { error: String(err instanceof Error ? err.message : err) });
+        }
+        return;
+      }
+
       case '/notify': {
         const msg = payload as AgentMessage;
         if (!msg.from || !msg.message) {

@@ -47,6 +47,14 @@ export interface DiscordHandle {
     embed: EmbedBuilder,
     components?: ActionRowBuilder<MessageActionRowComponentBuilder>[],
   ): Promise<void>;
+  /** Send a plain message to a text channel or thread and return its Discord message id. */
+  postMessage(channelId: string, content: string): Promise<string>;
+  /** Edit a plain message in a text channel or thread. */
+  editPlainMessage(channelId: string, messageId: string, content: string): Promise<void>;
+  /** Add a reaction to a message in a text channel or thread. */
+  addReaction(channelId: string, messageId: string, emoji: string): Promise<void>;
+  /** Send a Discord typing indicator to a text channel or thread. */
+  sendTyping(channelId: string): Promise<void>;
   /** Register a handler for interaction events (buttons, select menus) */
   onInteraction(handler: (interaction: Interaction) => void): void;
   /** Disconnect from Discord */
@@ -238,6 +246,74 @@ export async function createDiscordClient(
       } catch (err) {
         logger.warn(`Failed to update message ${messageId} in ${channelId}: ${err}`);
       }
+    },
+
+    async postMessage(channelId, content): Promise<string> {
+      const channel = await client.channels.fetch(channelId);
+      if (!channel) {
+        throw new Error(`Channel ${channelId} not found`);
+      }
+      if (channel.type === ChannelType.GuildText) {
+        const sent = await (channel as TextChannel).send({ content });
+        return sent.id;
+      }
+      if (channel.isThread()) {
+        const sent = await channel.send({ content });
+        return sent.id;
+      }
+      throw new Error(`Channel ${channelId} is not a guild text channel or thread`);
+    },
+
+    async editPlainMessage(channelId, messageId, content): Promise<void> {
+      const channel = await client.channels.fetch(channelId);
+      if (!channel) {
+        throw new Error(`Channel ${channelId} not found`);
+      }
+      if (channel.type === ChannelType.GuildText) {
+        const message = await (channel as TextChannel).messages.fetch(messageId);
+        await message.edit({ content });
+        return;
+      }
+      if (channel.isThread()) {
+        const message = await channel.messages.fetch(messageId);
+        await message.edit({ content });
+        return;
+      }
+      throw new Error(`Channel ${channelId} is not a guild text channel or thread`);
+    },
+
+    async addReaction(channelId, messageId, emoji): Promise<void> {
+      const channel = await client.channels.fetch(channelId);
+      if (!channel) {
+        throw new Error(`Channel ${channelId} not found`);
+      }
+      if (channel.type === ChannelType.GuildText) {
+        const message = await (channel as TextChannel).messages.fetch(messageId);
+        await message.react(emoji);
+        return;
+      }
+      if (channel.isThread()) {
+        const message = await channel.messages.fetch(messageId);
+        await message.react(emoji);
+        return;
+      }
+      throw new Error(`Channel ${channelId} is not a guild text channel or thread`);
+    },
+
+    async sendTyping(channelId): Promise<void> {
+      const channel = await client.channels.fetch(channelId);
+      if (!channel) {
+        throw new Error(`Channel ${channelId} not found`);
+      }
+      if (channel.type === ChannelType.GuildText) {
+        await (channel as TextChannel).sendTyping();
+        return;
+      }
+      if (channel.isThread()) {
+        await channel.sendTyping();
+        return;
+      }
+      throw new Error(`Channel ${channelId} is not a guild text channel or thread`);
     },
 
     onInteraction(handler): void {

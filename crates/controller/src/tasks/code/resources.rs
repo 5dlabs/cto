@@ -7,7 +7,7 @@ use crate::crds::{CLIConfig, CodeRun};
 use crate::tasks::cleanup::{
     LABEL_CLEANUP_KIND, LABEL_CLEANUP_RUN, LABEL_CLEANUP_SCOPE, SCOPE_RUN,
 };
-use crate::tasks::config::{ControllerConfig, ResolvedSecretBinding};
+use crate::tasks::config::{ControllerConfig, PresenceConfig, ResolvedSecretBinding};
 use crate::tasks::types::{github_app_secret_name, Context, Error, Result};
 use k8s_openapi::api::{
     batch::v1::Job,
@@ -362,6 +362,135 @@ impl EffectiveProviderConfig {
 
         vars
     }
+}
+
+fn build_hermes_presence_adapter_spec(
+    code_run: &CodeRun,
+    presence: &PresenceConfig,
+    workspace_subdir: &str,
+) -> Option<serde_json::Value> {
+    if !matches!(code_run.spec.effective_harness(), HarnessAgent::Hermes) || !presence.enabled {
+        return None;
+    }
+
+    let adapter_image = presence
+        .hermes_adapter_image
+        .clone()
+        .unwrap_or_else(|| "ghcr.io/5dlabs/hermes-presence-adapter:latest".to_string());
+    let adapter_pull_policy =
+        if adapter_image.ends_with(":latest") || adapter_image.ends_with(":dev") {
+            "Always"
+        } else {
+            "IfNotPresent"
+        };
+    Some(json!({
+        "name": "hermes-presence-adapter",
+        "image": adapter_image,
+        "imagePullPolicy": adapter_pull_policy,
+        "env": build_hermes_presence_adapter_env(code_run, presence, workspace_subdir),
+        "ports": [
+            { "containerPort": 3305, "name": "presence" }
+        ],
+        "volumeMounts": [
+            { "name": "workspace", "mountPath": "/workspace" }
+        ],
+        "resources": {
+            "requests": { "cpu": "10m", "memory": "32Mi" },
+            "limits": { "cpu": "100m", "memory": "128Mi" }
+        }
+    }))
+}
+
+fn hermes_presence_agent_id(code_run: &CodeRun) -> String {
+    code_run
+        .spec
+        .implementation_agent
+        .clone()
+        .or_else(|| {
+            code_run
+                .spec
+                .github_app
+                .as_deref()
+                .and_then(|app| {
+                    app.strip_prefix("5DLabs-")
+                        .or_else(|| app.strip_prefix("5dlabs-"))
+                })
+                .map(str::to_lowercase)
+        })
+        .unwrap_or_else(|| code_run.spec.service.to_lowercase())
+}
+
+fn build_hermes_presence_adapter_env(
+    code_run: &CodeRun,
+    presence: &PresenceConfig,
+    workspace_subdir: &str,
+) -> Vec<serde_json::Value> {
+    let mut adapter_env = vec![
+        json!({ "name": "HTTP_PORT", "value": "3305" }),
+        json!({
+            "name": "PRESENCE_ROUTER_URL",
+            "value": presence.router_url.clone()
+        }),
+        json!({ "name": "PRESENCE_ROUTE_ID", "value": code_run.name_any() }),
+        json!({ "name": "AGENT_ID", "value": hermes_presence_agent_id(code_run) }),
+        json!({ "name": "CODERUN_ID", "value": code_run.name_any() }),
+        json!({
+            "name": "PROJECT_ID",
+            "value": code_run.spec.project_id.clone().unwrap_or_default()
+        }),
+        json!({
+            "name": "TASK_ID",
+            "value": code_run.spec.task_id.map_or(String::new(), |id| id.to_string())
+        }),
+        json!({ "name": "HERMES_INPUT_URL", "value": "http://127.0.0.1:8080/input" }),
+        json!({
+            "name": "HERMES_INBOX_PATH",
+            "value": format!("/workspace/{workspace_subdir}/presence-inbox.jsonl")
+        }),
+        json!({
+            "name": "POD_IP",
+            "valueFrom": {
+                "fieldRef": {
+                    "fieldPath": "status.podIP"
+                }
+            }
+        }),
+    ];
+
+    if let (Some(secret_name), Some(secret_key)) = (
+        presence.shared_token_secret_name.as_deref(),
+        presence.shared_token_secret_key.as_deref(),
+    ) {
+        adapter_env.push(json!({
+            "name": "PRESENCE_SHARED_TOKEN",
+            "valueFrom": {
+                "secretKeyRef": {
+                    "name": secret_name,
+                    "key": secret_key,
+                    "optional": false
+                }
+            }
+        }));
+    }
+
+    for (env_name, spec_key) in [
+        ("DISCORD_ACCOUNT_ID", "DISCORD_ACCOUNT_ID"),
+        ("DISCORD_GUILD_ID", "DISCORD_GUILD_ID"),
+        ("PRESENCE_DISCORD_CHANNEL_ID", "PRESENCE_DISCORD_CHANNEL_ID"),
+        ("DISCORD_CHANNEL_ID", "DISCORD_CHANNEL_ID"),
+        ("DISCORD_THREAD_ID", "DISCORD_THREAD_ID"),
+    ] {
+        if let Some(value) = code_run
+            .spec
+            .env
+            .get(spec_key)
+            .filter(|value| !value.is_empty())
+        {
+            adapter_env.push(json!({ "name": env_name, "value": value }));
+        }
+    }
+
+    adapter_env
 }
 
 pub struct CodeResourceManager<'a> {
@@ -2024,6 +2153,18 @@ impl<'a> CodeResourceManager<'a> {
                 containers.push(sidecar_spec);
                 info!("Added Linear sidecar for session {} (status sync + log streaming + 2-way comms + whip cracking)", session_id);
             }
+        }
+
+        // Add Hermes presence adapter sidecar when enabled. The adapter owns no Discord token;
+        // it registers this pod with the central presence router and accepts routed events.
+        if let Some(adapter_spec) =
+            build_hermes_presence_adapter_spec(code_run, &self.config.presence, &workspace_subdir)
+        {
+            containers.push(adapter_spec);
+            info!(
+                "Added Hermes presence adapter sidecar for {}",
+                code_run.name_any()
+            );
         }
 
         // Add promtail sidecar for shipping CLI logs to Loki
@@ -3714,6 +3855,116 @@ mod tests {
         assert_eq!(linear.session_id, Some("test-session-123".to_string()));
         assert_eq!(linear.issue_id, Some("TEST-456".to_string()));
         assert_eq!(linear.team_id, Some("team-789".to_string()));
+    }
+
+    #[test]
+    fn hermes_presence_adapter_not_added_when_disabled() {
+        let mut code_run = create_test_code_run_with_linear("5DLabs-Rex", CLIType::Claude, false);
+        code_run.spec.harness_agent = Some(HarnessAgent::Hermes);
+
+        assert!(build_hermes_presence_adapter_spec(
+            &code_run,
+            &PresenceConfig {
+                enabled: false,
+                ..Default::default()
+            },
+            "runs/sidecar-test-run-uid",
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn hermes_presence_adapter_not_added_for_openclaw() {
+        let mut code_run = create_test_code_run_with_linear("5DLabs-Rex", CLIType::Claude, false);
+        code_run.spec.harness_agent = Some(HarnessAgent::OpenClaw);
+
+        assert!(build_hermes_presence_adapter_spec(
+            &code_run,
+            &PresenceConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            "runs/sidecar-test-run-uid",
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn hermes_presence_adapter_spec_contains_route_context_and_required_token() {
+        let mut code_run = create_test_code_run_with_linear("5DLabs-Rex", CLIType::Claude, false);
+        code_run.spec.harness_agent = Some(HarnessAgent::Hermes);
+        code_run.spec.project_id = Some("project-1".to_string());
+        code_run.spec.task_id = Some(42);
+        code_run
+            .spec
+            .env
+            .insert("DISCORD_ACCOUNT_ID".to_string(), "discord-bot".to_string());
+        code_run
+            .spec
+            .env
+            .insert("DISCORD_CHANNEL_ID".to_string(), "channel-1".to_string());
+        code_run
+            .spec
+            .env
+            .insert("DISCORD_THREAD_ID".to_string(), "thread-1".to_string());
+
+        let spec = build_hermes_presence_adapter_spec(
+            &code_run,
+            &PresenceConfig {
+                enabled: true,
+                hermes_adapter_image: Some(
+                    "ghcr.io/5dlabs/hermes-presence-adapter:test".to_string(),
+                ),
+                router_url: "http://router.bots.svc:3200".to_string(),
+                shared_token_secret_name: Some("presence-secret".to_string()),
+                shared_token_secret_key: Some("TOKEN".to_string()),
+            },
+            "runs/sidecar-test-run-uid",
+        )
+        .expect("Hermes presence sidecar should be rendered");
+
+        assert_eq!(spec["name"], "hermes-presence-adapter");
+        assert_eq!(spec["image"], "ghcr.io/5dlabs/hermes-presence-adapter:test");
+        assert_eq!(spec["imagePullPolicy"], "IfNotPresent");
+        assert_eq!(
+            spec["ports"][0],
+            json!({ "containerPort": 3305, "name": "presence" })
+        );
+
+        let env = spec["env"].as_array().expect("env should be an array");
+        let env_value = |name: &str| -> Option<&serde_json::Value> {
+            env.iter()
+                .find(|item| item["name"] == name)
+                .and_then(|item| item.get("value").or_else(|| item.get("valueFrom")))
+        };
+
+        assert_eq!(
+            env_value("PRESENCE_ROUTER_URL"),
+            Some(&json!("http://router.bots.svc:3200"))
+        );
+        assert_eq!(env_value("AGENT_ID"), Some(&json!("rex")));
+        assert_eq!(env_value("CODERUN_ID"), Some(&json!("sidecar-test-run")));
+        assert_eq!(env_value("PROJECT_ID"), Some(&json!("project-1")));
+        assert_eq!(env_value("TASK_ID"), Some(&json!("42")));
+        assert_eq!(
+            env_value("HERMES_INBOX_PATH"),
+            Some(&json!(
+                "/workspace/runs/sidecar-test-run-uid/presence-inbox.jsonl"
+            ))
+        );
+        assert_eq!(env_value("DISCORD_ACCOUNT_ID"), Some(&json!("discord-bot")));
+        assert_eq!(env_value("DISCORD_CHANNEL_ID"), Some(&json!("channel-1")));
+        assert_eq!(env_value("DISCORD_THREAD_ID"), Some(&json!("thread-1")));
+        assert_eq!(
+            env_value("PRESENCE_SHARED_TOKEN"),
+            Some(&json!({
+                "secretKeyRef": {
+                    "name": "presence-secret",
+                    "key": "TOKEN",
+                    "optional": false
+                }
+            }))
+        );
     }
 
     /// Verify sidecar is added for ALL agent types (implementation agents)

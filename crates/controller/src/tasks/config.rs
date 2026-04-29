@@ -45,6 +45,10 @@ pub struct ControllerConfig {
     #[serde(default)]
     pub linear: LinearConfig,
 
+    /// Runtime-neutral presence routing configuration
+    #[serde(default)]
+    pub presence: PresenceConfig,
+
     /// Tools sidecar configuration (per-pod tools-server on localhost)
     #[serde(default)]
     pub tools_sidecar: ToolsSidecarConfig,
@@ -77,6 +81,46 @@ impl Default for ToolsSidecarConfig {
             enabled: false,
             image: None,
             port: default_tools_sidecar_port(),
+        }
+    }
+}
+
+/// Presence routing configuration for Hermes/OpenClaw worker adapters.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PresenceConfig {
+    /// Enable presence sidecars for supported worker runtimes.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Hermes presence adapter image.
+    #[serde(rename = "hermesAdapterImage")]
+    pub hermes_adapter_image: Option<String>,
+
+    /// Central Discord/Presence router URL.
+    #[serde(rename = "routerUrl", default = "default_presence_router_url")]
+    pub router_url: String,
+
+    /// Kubernetes Secret containing the shared presence bearer token.
+    #[serde(rename = "sharedTokenSecretName")]
+    pub shared_token_secret_name: Option<String>,
+
+    /// Key in `sharedTokenSecretName` for the shared presence bearer token.
+    #[serde(rename = "sharedTokenSecretKey")]
+    pub shared_token_secret_key: Option<String>,
+}
+
+fn default_presence_router_url() -> String {
+    "http://discord-bridge-http.bots.svc:3200".to_string()
+}
+
+impl Default for PresenceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            hermes_adapter_image: Some("ghcr.io/5dlabs/hermes-presence-adapter:latest".to_string()),
+            router_url: default_presence_router_url(),
+            shared_token_secret_name: Some("openclaw-discord-tokens".to_string()),
+            shared_token_secret_key: Some("PRESENCE_SHARED_TOKEN".to_string()),
         }
     }
 }
@@ -752,6 +796,7 @@ impl Default for ControllerConfig {
                 delete_configmap: true,
             },
             linear: LinearConfig::default(),
+            presence: PresenceConfig::default(),
             tools_sidecar: ToolsSidecarConfig::default(),
         }
     }

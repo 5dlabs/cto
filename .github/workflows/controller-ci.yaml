@@ -174,11 +174,8 @@ jobs:
   build-and-push:
     needs: [changes, lint-rust, test-rust]
     if: |
-      github.ref == 'refs/heads/main' &&
-      (
-        github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'push' && needs.changes.outputs.controller == 'true')
-      )
+      github.event_name == 'workflow_dispatch' ||
+      (github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.changes.outputs.controller == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -203,3 +200,4 @@ jobs:
           version: ${{ steps.version.outputs.version }}
           short-sha: ${{ steps.version.outputs.short-sha }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          tag-latest: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
