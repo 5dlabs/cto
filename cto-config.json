@@ -12,37 +12,37 @@
         "tiers": {
           "primary": {
             "provider": "github-copilot",
-            "model": "claude-opus-4.7"
+            "model": "gpt-5.5"
           },
           "fast": {
             "provider": "github-copilot",
-            "model": "claude-opus-4.7"
+            "model": "gpt-5.5"
           },
           "frontier": {
             "provider": "github-copilot",
-            "model": "claude-opus-4.7"
+            "model": "gpt-5.5"
           }
         },
         "committee": [
           {
             "provider": "github-copilot",
-            "model": "claude-opus-4.7"
+            "model": "gpt-5.5"
           },
           {
             "provider": "github-copilot",
-            "model": "claude-opus-4.7"
+            "model": "gpt-5.5"
           },
           {
             "provider": "github-copilot",
-            "model": "claude-opus-4.7"
+            "model": "gpt-5.5"
           },
           {
             "provider": "github-copilot",
-            "model": "claude-opus-4.7"
+            "model": "gpt-5.5"
           },
           {
             "provider": "github-copilot",
-            "model": "claude-opus-4.7"
+            "model": "gpt-5.5"
           }
         ],
         "cliModels": {
