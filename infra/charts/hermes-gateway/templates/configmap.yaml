@@ -7,3 +7,9 @@ metadata:
 data:
   config.yaml: |
     {{- tpl .Values.configYaml . | nindent 4 }}
+  SOUL.md: |
+    {{- tpl .Values.instructionFiles.soulMd . | nindent 4 }}
+  AGENTS.md: |
+    {{- tpl .Values.instructionFiles.agentsMd . | nindent 4 }}
+  TOOLS.md: |
+    {{- tpl .Values.instructionFiles.toolsMd . | nindent 4 }}

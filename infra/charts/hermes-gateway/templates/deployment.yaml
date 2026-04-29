@@ -37,6 +37,9 @@ spec:
               set -eu
               mkdir -p {{ .Values.persistence.mountPath | quote }} {{ .Values.workspace.mountPath | quote }} {{ .Values.persistence.mountPath }}/home/bin {{ .Values.persistence.mountPath }}/home/.kube
               cp /config-template/config.yaml {{ .Values.persistence.mountPath }}/config.yaml
+              cp /config-template/SOUL.md {{ .Values.persistence.mountPath }}/SOUL.md
+              cp /config-template/AGENTS.md {{ .Values.workspace.mountPath }}/AGENTS.md
+              cp /config-template/TOOLS.md {{ .Values.workspace.mountPath }}/TOOLS.md
               cat > {{ .Values.persistence.mountPath }}/home/bin/git-credential-github-token <<'EOF'
               #!/bin/sh
               [ "${1:-get}" = "get" ] || exit 0
@@ -87,7 +90,9 @@ spec:
               sed -i 's/^              //' {{ .Values.persistence.mountPath }}/home/.kube/config
               chown -R 10000:10000 {{ .Values.workspace.mountPath | quote }} {{ .Values.persistence.mountPath }}/home
               chown 10000:10000 {{ .Values.persistence.mountPath }}/config.yaml
+              chown 10000:10000 {{ .Values.persistence.mountPath }}/SOUL.md {{ .Values.workspace.mountPath }}/AGENTS.md {{ .Values.workspace.mountPath }}/TOOLS.md
               chmod 600 {{ .Values.persistence.mountPath }}/config.yaml
+              chmod 644 {{ .Values.persistence.mountPath }}/SOUL.md {{ .Values.workspace.mountPath }}/AGENTS.md {{ .Values.workspace.mountPath }}/TOOLS.md
               chmod 700 {{ .Values.persistence.mountPath }}/home/bin
               chmod 700 {{ .Values.persistence.mountPath }}/home/bin/git-credential-github-token
               chmod 600 {{ .Values.persistence.mountPath }}/home/.gitconfig
