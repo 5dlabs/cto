@@ -253,3 +253,99 @@ the narration script ordering, the ffmpeg arg shape, and the concat list.
 ---
 
 _Last update: 2026-04. Pipeline rewrite from FlashHead Pro → ffmpeg slideshow._
+
+---
+
+## 10. Hermes pickup — running intake against sigma-1
+
+This section is the live hand-off to **Hermes** (`openclaw-hermes-coder-0`,
+ns `cto`) to drive the first end-to-end intake test against **sigma-1**.
+Local OpenClaw was unreliable, so all intake runs go through Hermes which
+has Lobster and OpenClaw pre-installed.
+
+### 10.1 Wake the Hermes pod
+
+The Hermes coder pod sleeps after harness completion. Wake it before kicking
+off a run:
+
+```bash
+kubectl -n cto get pod openclaw-hermes-coder-0
+# if not Running, scale the StatefulSet or delete the pod to trigger a restart
+kubectl -n cto delete pod openclaw-hermes-coder-0   # safe — sts will recreate
+kubectl -n cto wait --for=condition=Ready pod/openclaw-hermes-coder-0 --timeout=120s
+```
+
+### 10.2 Verify the obsolete `openclaw invoke` syntax
+
+`intake/workflows/pipeline.lobster.yaml` lines **1073** and **1187** still use
+the legacy `openclaw invoke --tool llm-task` form. Before launching sigma-1,
+confirm the current OpenClaw binary on Hermes either still accepts that form
+or has been migrated. **Do not guess** — pull the binary's `--help` and the
+LLM tool docs from inside the pod:
+
+```bash
+kubectl -n cto exec openclaw-hermes-coder-0 -- openclaw --version
+kubectl -n cto exec openclaw-hermes-coder-0 -- openclaw invoke --help
+kubectl -n cto exec openclaw-hermes-coder-0 -- openclaw llm --help 2>/dev/null || true
+```
+
+If the syntax has changed, patch the pipeline before the run rather than
+during it.
+
+### 10.3 Discord bridge bot identity (status)
+
+The Discord bridge (`discord-bridge` ns `bots`) currently runs on the
+**original BRIDGE token** (OpenBao `secret/openclaw-discord` v9). An attempt
+to swap to the Coder bot token (v8) failed because the Coder bot is not
+invited to guild `1409006087331512342`; the swap was rolled back and the
+bridge is healthy. **No action required** for the sigma-1 test — bridge
+identity is cosmetic for the run.
+
+If the user later wants the Coder bot fronting intake messages, invite it
+to the guild via Developer Portal OAuth2 (`bot` scope + send/manage/read
+perms), then re-patch v8 and force-sync the ExternalSecret:
+
+```bash
+ROOT_TOKEN=$(kubectl -n vault get secret openbao-unseal-key -o jsonpath='{.data.root-token}' | base64 -d)
+# patch DISCORD_TOKEN_BRIDGE → coder token
+kubectl -n vault exec openclaw-openbao-0 -c openbao -- sh -c "BAO_TOKEN=$ROOT_TOKEN bao kv patch secret/openclaw-discord DISCORD_TOKEN_BRIDGE=<coder-token>"
+kubectl -n bots annotate ExternalSecret discord-bridge-token force-sync=$(date +%s) --overwrite
+kubectl -n bots rollout restart deploy/discord-bridge
+```
+
+### 10.4 Sigma-1 launch checklist
+
+1. Confirm `INTAKE_DELIBERATION_VIDEO=1` is set in the Hermes intake env
+   (`intake/local.env.op` mirror or container env). This is the gate for the
+   new ffmpeg-slideshow step.
+2. Confirm voice IDs for all five committee members are present in
+   `intake/voices.json` (or the equivalent committed registry). Locked
+   selections live in commit `dbc7c03d`.
+3. Confirm the v3 portrait assets (Optimus, Pessimus, Praxis, Rook, Veritas)
+   are committed under `assets/avatars/` and resolvable by name.
+4. Run the intake against sigma-1 from inside the Hermes pod:
+
+   ```bash
+   kubectl -n cto exec -it openclaw-hermes-coder-0 -- bash -lc \
+     'cd /workspace && lobster run intake/workflows/pipeline.lobster.yaml \
+        --input repo=https://github.com/5dlabs/sigma-1 \
+        --input intake_path=.plan/'
+   ```
+5. Watch the **Discord intake channel** + the **Lobster terminal** + the
+   **Linear session/project** in parallel (the monitoring-mesh rule from
+   `AGENTS.md` § "go-green monitoring mesh").
+
+### 10.5 Carryover open questions for Hermes
+
+- **"Google issue"** — the previous orchestrator left this unresolved.
+  Likely candidates: Vertex AI key path, Gemini Flash auth in the design
+  step, or Google Cloud creds in the cluster. Hermes should **clarify with
+  the user** before treating any Google call as green.
+- **Pipeline obsolete `openclaw invoke`** — see § 10.2; verify or patch
+  before the first sigma-1 run.
+- **`INTAKE_DELIBERATION_VIDEO=1` end-to-end** — this hand-off describes the
+  intended ffmpeg slideshow path; it has not yet been exercised against a
+  real PRD. Sigma-1 is the first integration test.
+
+_Hermes pickup section added 2026-04 after local-OpenClaw blockers._
+
