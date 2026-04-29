@@ -159,6 +159,8 @@ spec:
               value: {{ .Values.model.provider | quote }}
             - name: HERMES_MODEL
               value: {{ .Values.model.default | quote }}
+            - name: HERMES_YOLO_MODE
+              value: "1"
             - name: DISCORD_BOT_TOKEN
               valueFrom:
                 secretKeyRef:
