@@ -116,6 +116,29 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
       };
     }
 
+    case 'generate_deliberation_video': {
+      const { generateDeliberationVideo } = await import('./operations/generate-deliberation-video');
+      const payload = request.payload as {
+        transcript: Array<{ character: string; text: string }>;
+        outputPath: string;
+      };
+      if (!payload?.transcript || !Array.isArray(payload.transcript) || payload.transcript.length === 0) {
+        return errorResponse('Missing or empty transcript array in payload', 'validation_error');
+      }
+      if (!payload?.outputPath || typeof payload.outputPath !== 'string') {
+        return errorResponse('Missing outputPath in payload', 'validation_error');
+      }
+
+      const result = await generateDeliberationVideo(payload as never);
+      return {
+        success: true,
+        data: result,
+        usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+        model: 'elevenlabs+scenario+ffmpeg',
+        provider: 'intake-agent',
+      };
+    }
+
     case 'design_variants': {
       const { generateDesignVariants } = await import('./operations/design-intake');
       const payload = request.payload as {
@@ -192,6 +215,7 @@ Operations:
   prd_research           Research PRD context via Exa/Perplexity/Tavily/Firecrawl
   design_intake          Normalize design inputs + provider generation (Stitch/Framer)
   design_variants        Generate design variants from existing provider candidates
+  generate_deliberation_video  Render deliberation transcript into MP4 (ElevenLabs+Scenario)
 
 Options:
   -h, --help             Show this help message
