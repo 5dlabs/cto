@@ -1,0 +1,11 @@
+apiVersion: v2
+name: hermes-gateway
+description: |
+  Minimal chart that runs the upstream NousResearch Hermes Discord gateway
+  (docker.io/nousresearch/hermes-agent) using its built-in `hermes gateway run`
+  CLI. This is a separate, focused chart — distinct from the heavier
+  `hermes-agent` debug harness in this repo, which is for `kubectl exec`
+  development workflows.
+type: application
+version: 0.1.0
+appVersion: "v2026.4.23"
