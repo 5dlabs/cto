@@ -570,10 +570,16 @@ mem0:
   enabled: false
 
 tokenjuice:
-  enabled: true
+  enabled: false
 
 mem0Plugin:
-  enabled: true
+  # DISABLED: mem0 was hanging gateway init in `futex_wait_queue_me` because the
+  # embedder is configured for Google Gemini (`gemini-embedding-001`) but no
+  # working Google credentials are wired into the agent pod, so mem0's init
+  # network call never returns and the gateway never reaches `/healthz` on
+  # :18789, causing startup-probe restart loops. Re-enable once Google creds
+  # (Vertex API key or service account) are mounted and verified.
+  enabled: false
   mode: open-source
   userId: "jonathon"
   autoRecall: true
