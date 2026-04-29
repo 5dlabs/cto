@@ -164,6 +164,95 @@ the rigor and fact-check voice on the 5D Labs deliberation committee.
 
 ---
 
+## Optimus — the optimist / shipper
+
+**Persona.** The "we can ship this" voice. Warm, builder-energy, focused on
+upside and momentum. Carries the "APPROVED / SHIP IT" clipboard energy.
+Pairs with Pessimus to balance the deliberation.
+
+**Species rationale.** **Sea otter.** Otters are tool-users, collaborative,
+visibly busy-handed builders — perfect read for an optimistic shipper. Warm
+brown fur reads friendly on camera, distinct from the cooler-toned committee
+animals (gray wolf, badger, meerkat).
+
+**Full Scenario prompt.**
+```
+Anthropomorphic animal-human hybrid character portrait, semi-realistic
+Beatrix-Potter-meets-Pixar style, exact same cyberpunk Neo-Kyoto world as
+the 5D Labs Morgan red-fox character: head and shoulders of a sea otter with
+warm chestnut-brown fur, lighter cream face and chest, round dark eyes,
+small rounded ears, prominent whiskers, **facing the camera straight-on with
+direct forward gaze**, expression upbeat, confident, builder-energy — the
+optimist and shipper. Wearing a fitted dark navy 5dlabs techwear field
+jacket with structured collar and a clearly legible glowing-edge embroidered
+"5D" patch on the left shoulder. Both hands visible at chest level wearing
+matte black tactical gloves with subtle cyan circuit-pattern detailing,
+holding a holographic clipboard glowing cyan with readable "APPROVED" and
+"SHIP IT" panels and HUD elements. Background: rain-slicked Neo-Kyoto night
+street, heavily blurred neon Japanese signage in cyan / magenta / hot pink,
+distant out-of-focus flying vehicles, hazy atmospheric glow. Cyan + magenta
+neon rim light catching the fur edges from upper right, soft cinematic key
+light from the front. Photorealistic illustration, intricate fur detail.
+Centered composition, portrait orientation, head-and-shoulders crop, face
+forward for lipsync. Character is "Optimus", the optimist and shipper voice
+on the 5D Labs deliberation committee.
+```
+
+**Suggested aspect ratio.** `1:1` (1024x1024).
+**Suggested seed.** Random on first render; recorded below.
+
+**Render record.**
+- Model: `model_google-gemini-3-1-flash`
+- Seed used: not recorded
+- Asset ID: asset_yWdcG5CmdF1JQQaUJw79Qv3u
+
+---
+
+## Pessimus — the pessimist / risk-aware
+
+**Persona.** The "what could go wrong" voice. Skeptical, risk-aware,
+warning-bird energy. Carries the "RISK ASSESSMENT / BLOCKERS" clipboard
+energy. Pairs with Optimus to balance the deliberation.
+
+**Species rationale.** **Raven.** Ravens are folkloric warning-birds —
+clever, watchful, associated with "harbinger" energy. Black plumage gives
+strong silhouette contrast against the warm-toned Optimus otter and reads
+distinctly serious on camera.
+
+**Full Scenario prompt.**
+```
+Anthropomorphic animal-human hybrid character portrait, semi-realistic
+Beatrix-Potter-meets-Pixar style, exact same cyberpunk Neo-Kyoto world as
+the 5D Labs Morgan red-fox character: head and shoulders of a raven with
+glossy iridescent black plumage with subtle blue-purple sheen, sharp dark
+beak, intelligent piercing dark eyes, **facing the camera straight-on with
+direct forward gaze**, expression skeptical, watchful, risk-aware — the
+pessimist and warning voice. Wearing a fitted dark navy 5dlabs techwear
+field jacket with structured collar and a clearly legible glowing-edge
+embroidered "5D" patch on the left shoulder. Both hands (raven feather-hands
+with clawed digits) visible at chest level wearing matte black tactical
+gloves with subtle magenta circuit-pattern detailing, holding a holographic
+clipboard glowing magenta with readable "RISK ASSESSMENT" and "BLOCKERS"
+panels and warning-icon HUD elements. Background: rain-slicked Neo-Kyoto
+night street, heavily blurred neon Japanese signage in cyan / magenta / hot
+pink, distant out-of-focus flying vehicles, hazy atmospheric glow. Cyan +
+magenta neon rim light catching the feather edges from upper left, soft
+cinematic key light from the front. Photorealistic illustration, intricate
+feather detail. Centered composition, portrait orientation, head-and-
+shoulders crop, face forward for lipsync. Character is "Pessimus", the
+pessimist and risk-aware voice on the 5D Labs deliberation committee.
+```
+
+**Suggested aspect ratio.** `1:1` (1024x1024).
+**Suggested seed.** Random on first render; recorded below.
+
+**Render record.**
+- Model: `model_google-gemini-3-1-flash`
+- Seed used: not recorded
+- Asset ID: asset_PPyo97uajgCAMwSYreNXkSvd
+
+---
+
 ## Re-render checklist
 
 If a portrait comes back missing the **black gloves** or the **5D patch**,

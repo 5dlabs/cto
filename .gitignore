@@ -242,3 +242,4 @@ output/morgan-crop-*.jpg
 scripts/__pycache__/
 .copilot/
 .github/lsp.json
+.intake/portraits/
