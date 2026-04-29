@@ -1392,6 +1392,77 @@ steps:
       echo "design-deliberation-pipeline: sub-workflow stdout=$(printf '%s' "$DELIB_DESIGN_OUT" | head -c 500)" >&2
       printf '%s' "$DELIB_DESIGN_OUT"
 
+  - id: generate-deliberation-video
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+      CTO_DESIGN_DELIB_STDOUT: $design-deliberation.stdout
+    command: |
+      WS="${WORKSPACE:-.}"
+      # Gated: only run when INTAKE_DELIBERATION_VIDEO=1
+      if [ "${INTAKE_DELIBERATION_VIDEO:-0}" != "1" ]; then
+        echo "generate-deliberation-video: skipped (INTAKE_DELIBERATION_VIDEO!=1)" >&2
+        jq -nc '{skipped: true, reason: "INTAKE_DELIBERATION_VIDEO!=1"}'
+        exit 0
+      fi
+
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "generate-deliberation-video" "${audio_debug}" "project ${project_name}"
+
+      TRANSCRIPT_PATH="$WS/.tasks/audio/design-deliberation.transcript.json"
+      OUTPUT_PATH="$WS/.tasks/design/deliberation.mp4"
+      if [ ! -f "$TRANSCRIPT_PATH" ]; then
+        echo "generate-deliberation-video: transcript missing at $TRANSCRIPT_PATH — skipping" >&2
+        jq -nc --arg path "$TRANSCRIPT_PATH" '{skipped: true, reason: "missing transcript", transcript: $path}'
+        exit 0
+      fi
+
+      mkdir -p "$(dirname "$OUTPUT_PATH")"
+
+      # Resolve intake-agent binary (same pattern as materialize-design-inputs)
+      INTAKE_AGENT_BIN="${INTAKE_AGENT_BIN:-}"
+      if [ -z "$INTAKE_AGENT_BIN" ]; then
+        if command -v intake-agent >/dev/null 2>&1; then
+          INTAKE_AGENT_BIN="intake-agent"
+        elif [ -x "$WS/apps/intake-agent/dist/intake-agent" ]; then
+          INTAKE_AGENT_BIN="$WS/apps/intake-agent/dist/intake-agent"
+        elif [ -x "$WS/apps/intake-agent/intake-agent" ]; then
+          INTAKE_AGENT_BIN="$WS/apps/intake-agent/intake-agent"
+        fi
+      fi
+      if [ -z "$INTAKE_AGENT_BIN" ]; then
+        echo "generate-deliberation-video: intake-agent binary not found. Set INTAKE_AGENT_BIN or build apps/intake-agent." >&2
+        jq -nc '{skipped: false, failed: true, reason: "intake-agent not found"}'
+        exit 0
+      fi
+
+      RESULT_FILE="$WS/.intake/deliberation-video.json"
+      mkdir -p "$WS/.intake"
+      jq -n \
+        --arg transcript "$TRANSCRIPT_PATH" \
+        --arg output "$OUTPUT_PATH" \
+        '{
+          operation: "generate_deliberation_video",
+          payload: {
+            transcript: $transcript,
+            outputPath: $output
+          }
+        }' | "$INTAKE_AGENT_BIN" > "$RESULT_FILE" 2>"$WS/.intake/deliberation-video.log" || {
+          echo "generate-deliberation-video: intake-agent failed — see $WS/.intake/deliberation-video.log" >&2
+          cat "$WS/.intake/deliberation-video.log" >&2
+          jq -nc --arg path "$OUTPUT_PATH" '{skipped: false, failed: true, outputPath: $path}'
+          exit 0
+        }
+
+      if jq -e '.success == true' "$RESULT_FILE" >/dev/null 2>&1; then
+        FINAL_PATH="$(jq -r '.data.outputPath // .data.path // empty' "$RESULT_FILE")"
+        [ -z "$FINAL_PATH" ] && FINAL_PATH="$OUTPUT_PATH"
+        jq -nc --arg path "$FINAL_PATH" --arg transcript "$TRANSCRIPT_PATH" \
+          '{skipped: false, failed: false, outputPath: $path, transcript: $transcript}'
+      else
+        echo "generate-deliberation-video: intake-agent reported failure" >&2
+        cat "$RESULT_FILE" >&2
+        jq -nc --arg path "$OUTPUT_PATH" '{skipped: false, failed: true, outputPath: $path}'
+      fi
+
   - id: deliberation
     env:
       INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
