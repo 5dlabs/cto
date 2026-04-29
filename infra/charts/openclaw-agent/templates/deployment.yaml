@@ -153,7 +153,9 @@ spec:
               # ---------------------------------------------------------------
               envsubst < /config-template/openclaw.json > /workspace/.openclaw/openclaw.json
               echo "[config] openclaw.json rendered"
-              openclaw doctor --non-interactive >/dev/null 2>&1 || true
+              # Doctor can hang indefinitely on plugin probes (e.g. mem0 -> Google
+              # embedder futex). Cap it so a stuck doctor never blocks init.
+              timeout 30s openclaw doctor --non-interactive >/dev/null 2>&1 || true
               # doctor can normalize config from the image defaults. Restore the
               # GitOps-rendered config so provider routing stays declarative.
               envsubst < /config-template/openclaw.json > /workspace/.openclaw/openclaw.json
