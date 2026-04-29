@@ -1,0 +1,79 @@
+# Default values for hermes-gateway.
+# This chart deploys upstream nousresearch/hermes-agent in Discord gateway mode.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: docker.io/nousresearch/hermes-agent
+  tag: v2026.4.23
+  pullPolicy: IfNotPresent
+
+# Upstream entrypoint bootstraps .env/config.yaml/SOUL.md from /opt/hermes/examples
+# on first start, then exec's the `hermes` CLI.
+command: ["/opt/hermes/docker/entrypoint.sh"]
+args: ["hermes", "gateway", "run"]
+
+# HERMES_HOME — upstream image expects state at /opt/data
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClassName: ""
+  mountPath: /opt/data
+
+# Upstream container runs as UID 10000 (user `hermes`) via gosu.
+podSecurityContext:
+  fsGroup: 10000
+
+securityContext: {}
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+# Secrets must already exist in the destination namespace.
+# Defaults match what's currently provisioned in `cto`.
+secrets:
+  # NOUS_API_KEY, NOUS_BASE_URL, NOUS_MODEL
+  hermesSecretName: hermes-coder-secrets
+  # Discord bot token, key `coder` -> DISCORD_BOT_TOKEN
+  discordSecretName: openclaw-discord-tokens
+  discordSecretKey: coder
+
+# Discord runtime config.
+# DISCORD_ALLOWED_USERS is REQUIRED — without it the bot accepts no users
+# and looks broken on first start. Override per-environment.
+discord:
+  allowedUsers: "REPLACE_ME_DISCORD_USER_ID"
+  homeChannel: ""
+  allowedRoles: ""
+
+# Optional NOUS overrides; only set if you want to override what's in the secret.
+nous:
+  baseUrl: ""
+  model: ""
+
+# Liveness/readiness — gateway does not currently expose an HTTP probe;
+# fall back to process check.
+probes:
+  liveness:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 30
+  readiness:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 15
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

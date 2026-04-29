@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hermes-gateway.fullname" . }}
+  labels:
+    {{- include "hermes-gateway.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "hermes-gateway.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hermes-gateway.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "hermes-gateway.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: hermes
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command:
+            {{- toYaml .Values.command | nindent 12 }}
+          args:
+            {{- toYaml .Values.args | nindent 12 }}
+          env:
+            - name: HERMES_HOME
+              value: {{ .Values.persistence.mountPath | quote }}
+            - name: DISCORD_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.discordSecretName | quote }}
+                  key: {{ .Values.secrets.discordSecretKey | quote }}
+            {{- if .Values.discord.allowedUsers }}
+            - name: DISCORD_ALLOWED_USERS
+              value: {{ .Values.discord.allowedUsers | quote }}
+            {{- end }}
+            {{- if .Values.discord.allowedRoles }}
+            - name: DISCORD_ALLOWED_ROLES
+              value: {{ .Values.discord.allowedRoles | quote }}
+            {{- end }}
+            {{- if .Values.discord.homeChannel }}
+            - name: DISCORD_HOME_CHANNEL
+              value: {{ .Values.discord.homeChannel | quote }}
+            {{- end }}
+            {{- if .Values.nous.baseUrl }}
+            - name: NOUS_BASE_URL
+              value: {{ .Values.nous.baseUrl | quote }}
+            {{- end }}
+            {{- if .Values.nous.model }}
+            - name: NOUS_MODEL
+              value: {{ .Values.nous.model | quote }}
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secrets.hermesSecretName | quote }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.persistence.mountPath | quote }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.probes.liveness.enabled }}
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pgrep -f 'hermes' >/dev/null"]
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+          {{- end }}
+          {{- if .Values.probes.readiness.enabled }}
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pgrep -f 'hermes' >/dev/null"]
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+          {{- end }}
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "hermes-gateway.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
