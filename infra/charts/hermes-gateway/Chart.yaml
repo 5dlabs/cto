@@ -1,11 +1,10 @@
 apiVersion: v2
 name: hermes-gateway
 description: |
-  Minimal chart that runs the upstream NousResearch Hermes Discord gateway
+  Minimal chart that runs the upstream NousResearch Hermes Discord process
   (docker.io/nousresearch/hermes-agent) using its built-in `hermes gateway run`
-  CLI. This is a separate, focused chart — distinct from the heavier
-  `hermes-agent` debug harness in this repo, which is for `kubectl exec`
-  development workflows.
+  CLI. This is the single production Hermes install for the Coder Discord bot;
+  it is distinct from the heavier `hermes-agent` debug harness in this repo.
 type: application
 version: 0.1.0
 appVersion: "v2026.4.23"

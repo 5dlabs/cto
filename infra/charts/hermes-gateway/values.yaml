@@ -1,5 +1,6 @@
 # Default values for hermes-gateway.
-# This chart deploys upstream nousresearch/hermes-agent in Discord gateway mode.
+# This chart deploys upstream nousresearch/hermes-agent as the single
+# production Discord process for Coder.
 
 nameOverride: ""
 fullnameOverride: ""
@@ -14,7 +15,7 @@ image:
 command: ["/opt/hermes/docker/entrypoint.sh"]
 args: ["hermes", "gateway", "run"]
 
-# HERMES_HOME — upstream image expects state at /opt/data
+# HERMES_HOME - upstream image expects state at /opt/data.
 persistence:
   enabled: true
   size: 5Gi
@@ -38,17 +39,33 @@ resources:
 # Secrets must already exist in the destination namespace.
 # Defaults match what's currently provisioned in `cto`.
 secrets:
-  # NOUS_API_KEY, NOUS_BASE_URL, NOUS_MODEL
+  # Optional provider/tool credentials still loaded by envFrom.
   hermesSecretName: hermes-coder-secrets
-  # Discord bot token, key `coder` -> DISCORD_BOT_TOKEN
+  # Discord bot token, key `coder` -> DISCORD_BOT_TOKEN.
   discordSecretName: openclaw-discord-tokens
   discordSecretKey: coder
+  # GitHub Copilot OAuth/fine-grained token -> COPILOT_GITHUB_TOKEN.
+  copilotSecretName: cto-coder-api-keys
+  copilotSecretKey: copilot-github-token
+
+# Primary inference provider. Hermes' direct `copilot` provider reads
+# COPILOT_GITHUB_TOKEN before GH_TOKEN/GITHUB_TOKEN.
+# The current Coder Copilot token catalog exposes `gpt-4o`; newer GPT-5.x
+# aliases are rejected by the live GitHub Copilot API for this token.
+model:
+  provider: copilot
+  default: gpt-4o
+
+configYaml: |
+  model:
+    provider: {{ .Values.model.provider | quote }}
+    default: {{ .Values.model.default | quote }}
 
 # Discord runtime config.
-# DISCORD_ALLOWED_USERS is REQUIRED — without it the bot accepts no users
+# DISCORD_ALLOWED_USERS is REQUIRED - without it the bot accepts no users
 # and looks broken on first start. Override per-environment.
 discord:
-  allowedUsers: "REPLACE_ME_DISCORD_USER_ID"
+  allowedUsers: "444519104808878090"
   homeChannel: ""
   allowedRoles: ""
 
@@ -57,7 +74,7 @@ nous:
   baseUrl: ""
   model: ""
 
-# Liveness/readiness — gateway does not currently expose an HTTP probe;
+# Liveness/readiness - gateway does not currently expose an HTTP probe;
 # fall back to process check.
 probes:
   liveness:

@@ -1,20 +1,19 @@
 ---
 # =============================================================================
-# Hermes Gateway — ArgoCD Application
+# Hermes Gateway - Argo CD Application
 # =============================================================================
-# Deploys the upstream nousresearch/hermes-agent image as a Discord gateway
-# (`hermes gateway run`) in the cto namespace. This is the production Hermes
-# Discord bot — distinct from the `cto-hermes-coder` debug harness
-# (which runs `sleep infinity` for kubectl-exec experimentation).
+# Deploys the upstream nousresearch/hermes-agent image as the single production
+# Hermes Discord process for Coder (`hermes gateway run`) in the cto namespace.
+# This replaces the older OpenClaw Coder/Hermes harness path, which is not a
+# production Hermes gateway.
 #
 # Required pre-existing secrets in the cto namespace:
-#   - hermes-coder-secrets       (NOUS_API_KEY, optional NOUS_BASE_URL/MODEL)
+#   - hermes-coder-secrets       (optional provider/tool credentials)
 #   - openclaw-discord-tokens    (key `coder` -> DISCORD_BOT_TOKEN)
+#   - cto-coder-api-keys         (key `copilot-github-token` -> COPILOT_GITHUB_TOKEN)
 #
-# Before merging: replace `discord.allowedUsers` placeholder in
-# infra/charts/hermes-gateway/values.yaml with the real Discord user ID,
-# and confirm Message Content + Server Members intents are ON in the
-# Discord Developer Portal for this bot.
+# Confirm Message Content + Server Members intents are ON in the Discord
+# Developer Portal for the Coder bot.
 # =============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: Application
