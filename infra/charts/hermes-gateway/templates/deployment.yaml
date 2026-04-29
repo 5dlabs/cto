@@ -15,12 +15,35 @@ spec:
     metadata:
       labels:
         {{- include "hermes-gateway.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ tpl .Values.configYaml . | sha256sum }}
     spec:
       serviceAccountName: {{ include "hermes-gateway.serviceAccountName" . }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      initContainers:
+        - name: write-hermes-config
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              mkdir -p {{ .Values.persistence.mountPath | quote }}
+              cp /config-template/config.yaml {{ .Values.persistence.mountPath }}/config.yaml
+              chown 10000:10000 {{ .Values.persistence.mountPath }}/config.yaml
+              chmod 600 {{ .Values.persistence.mountPath }}/config.yaml
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.persistence.mountPath | quote }}
+            - name: config-template
+              mountPath: /config-template
       containers:
         - name: hermes
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -36,11 +59,20 @@ spec:
           env:
             - name: HERMES_HOME
               value: {{ .Values.persistence.mountPath | quote }}
+            - name: HERMES_INFERENCE_PROVIDER
+              value: {{ .Values.model.provider | quote }}
+            - name: HERMES_MODEL
+              value: {{ .Values.model.default | quote }}
             - name: DISCORD_BOT_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.discordSecretName | quote }}
                   key: {{ .Values.secrets.discordSecretKey | quote }}
+            - name: COPILOT_GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.copilotSecretName | quote }}
+                  key: {{ .Values.secrets.copilotSecretKey | quote }}
             {{- if .Values.discord.allowedUsers }}
             - name: DISCORD_ALLOWED_USERS
               value: {{ .Values.discord.allowedUsers | quote }}
@@ -91,6 +123,9 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        - name: config-template
+          configMap:
+            name: {{ include "hermes-gateway.fullname" . }}-config
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
