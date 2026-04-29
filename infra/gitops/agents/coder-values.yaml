@@ -28,7 +28,7 @@ diagnostics:
     - "acp.*"
     - "gateway.session"
 
-replicaCount: 1
+replicaCount: 0
 deploymentMode: statefulset
 
 global:
