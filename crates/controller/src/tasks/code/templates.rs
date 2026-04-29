@@ -4288,6 +4288,7 @@ Be constructive and explain the "why" behind your suggestions.
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
         Self::register_template_helpers(&mut handlebars);
+        Self::register_agent_partials(&mut handlebars)?;
 
         let template = Self::load_template(CODE_CODING_GUIDELINES_TEMPLATE)?;
 
