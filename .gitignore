@@ -208,20 +208,14 @@ skills/trader/**/.secrets/
 # Intake coordinator feedback-loop status (local)
 intake/.feedback-loop-state.json
 # Pipeline timing epoch (written at pipeline start)
-.intake/.pipeline-start-epoch
 # Initial task parse output (pre-deliberation)
-.intake/initial-tasks.json
 # 1Password inject file (see intake/local.env.op.example)
 intake/local.env.op
 # Local bridge stdout/stderr (run-local-bridges.sh)
 intake/.bridge-logs/
 # Context files written at pipeline runtime (consumed via jq --rawfile)
-.intake/contexts/
 # lobster-voice audio cache (ElevenLabs TTS)
-.intake/.voice-cache/
-.intake/.voice-locks/
 # Observability JSONL logs (collected by local Grafana/Loki stack)
-.intake/logs/
 
 # lobster-voice compiled binary (build artifact)
 apps/lobster-voice/lobster-voice
@@ -242,3 +236,7 @@ output/morgan-crop-*.jpg
 scripts/__pycache__/
 .copilot/
 .github/lsp.json
+
+# Intake pipeline run artifacts (local only)
+.intake/
+.tasks/
